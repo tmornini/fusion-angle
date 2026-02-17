@@ -1,0 +1,43 @@
+#!/bin/bash
+set -euo pipefail
+
+if [ -n "$(git status --porcelain)" ]; then
+  echo "Error: working directory is not clean. Commit or stash changes before building." >&2
+  exit 1
+fi
+
+echo "Building Fusion AI..."
+
+BUILD_DIR=$(mktemp -d)
+trap 'rm -rf "$BUILD_DIR"' EXIT
+
+# Compose HTML pages into build dir (dashboard + standalone)
+npx tsx site/compose.ts "$BUILD_DIR"
+
+# Bundle TypeScript into build dir
+mkdir -p "$BUILD_DIR/site"
+npx esbuild site/script.ts \
+  --bundle \
+  --minify \
+  --target=es2020 \
+  --format=iife \
+  --outfile="$BUILD_DIR/site/app.js"
+
+echo "Bundle created: site/app.js ($(wc -c < "$BUILD_DIR/site/app.js" | xargs) bytes)"
+
+# Copy static assets into build dir
+cp site/style.css "$BUILD_DIR/site/"
+cp -r site/fonts "$BUILD_DIR/site/"
+cp index.html "$BUILD_DIR/"
+cp site/favicon.ico "$BUILD_DIR/"
+
+# Create distribution ZIP on Desktop
+SHA=$(git rev-parse --short=7 HEAD)
+ZIPNAME="fusion-ai-${SHA}.zip"
+
+ZIPDEST="$HOME/Desktop/$ZIPNAME"
+
+(cd "$BUILD_DIR" && zip -r "$ZIPDEST" .)
+
+echo "Distribution: $ZIPDEST ($(wc -c < "$ZIPDEST" | xargs) bytes)"
+echo "Done."
