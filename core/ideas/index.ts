@@ -56,17 +56,8 @@ function renderIdeaCard(idea: Idea, view: string): string {
             </div>
           </div>
 
-          <div class="flex items-end justify-between gap-4">
-            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;flex:1">
-              <div class="flex items-center gap-2">
-                <div style="width:2rem;height:2rem;border-radius:var(--radius-lg);background:hsl(var(--primary)/0.1);display:flex;align-items:center;justify-content:center">
-                  ${iconTrendingUp(16, 'text-primary')}
-                </div>
-                <div>
-                  <p class="text-xs text-muted">Impact</p>
-                  <p class="text-sm font-medium">${idea.estimatedImpact}</p>
-                </div>
-              </div>
+          <div style="display:grid;grid-template-columns:3fr 2fr;gap:1rem;align-items:end">
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem">
               <div class="flex items-center gap-2">
                 <div style="width:2rem;height:2rem;border-radius:var(--radius-lg);background:hsl(var(--primary)/0.1);display:flex;align-items:center;justify-content:center">
                   ${iconClock(16, 'text-primary')}
@@ -85,9 +76,18 @@ function renderIdeaCard(idea: Idea, view: string): string {
                   <p class="text-sm font-medium">$${(idea.estimatedCost / 1000).toFixed(0)}k</p>
                 </div>
               </div>
+              <div class="flex items-center gap-2">
+                <div style="width:2rem;height:2rem;border-radius:var(--radius-lg);background:hsl(var(--primary)/0.1);display:flex;align-items:center;justify-content:center">
+                  ${iconTrendingUp(16, 'text-primary')}
+                </div>
+                <div>
+                  <p class="text-xs text-muted">Impact</p>
+                  <p class="text-sm font-medium">${idea.estimatedImpact}</p>
+                </div>
+              </div>
             </div>
 
-            <div class="flex items-center gap-2 idea-actions">
+            <div class="flex items-center gap-2 idea-actions" style="justify-content:flex-end">
               <button class="btn btn-outline btn-sm gap-2" data-idea-view="${idea.id}">
                 ${iconEye(16)} <span class="hidden-mobile">View</span>
               </button>

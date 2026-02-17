@@ -19,6 +19,7 @@ mkdir -p "$BUILD_DIR/site"
 npx esbuild site/script.ts \
   --bundle \
   --minify \
+  --keep-names \
   --target=es2020 \
   --format=iife \
   --outfile="$BUILD_DIR/site/app.js"

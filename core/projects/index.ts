@@ -45,20 +45,20 @@ function renderProjectCard(p: Project, view: string): string {
           <div class="flex items-end justify-between gap-4">
             <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;flex:1" class="project-metrics-grid">
               <div class="flex items-center gap-2">
-                <div style="width:2rem;height:2rem;border-radius:0.5rem;background:hsl(var(--primary)/0.1);display:flex;align-items:center;justify-content:center">${iconTarget(16, 'text-primary')}</div>
-                <div><p class="text-xs text-muted">Score</p><p class="text-sm font-medium">${p.priorityScore}</p></div>
-              </div>
-              <div class="flex items-center gap-2">
-                <div style="width:2rem;height:2rem;border-radius:0.5rem;background:hsl(var(--primary)/0.1);display:flex;align-items:center;justify-content:center">${iconTrendingUp(16, 'text-primary')}</div>
-                <div><p class="text-xs text-muted">Impact</p><p class="text-sm font-medium">${p.actualImpact || p.estimatedImpact}</p></div>
-              </div>
-              <div class="flex items-center gap-2">
                 <div style="width:2rem;height:2rem;border-radius:0.5rem;background:hsl(var(--primary)/0.1);display:flex;align-items:center;justify-content:center">${iconClock(16, 'text-primary')}</div>
                 <div><p class="text-xs text-muted">Time</p><p class="text-sm font-medium">${p.actualTime}h <span class="text-xs text-muted">/ ${p.estimatedTime}h</span></p></div>
               </div>
               <div class="flex items-center gap-2">
                 <div style="width:2rem;height:2rem;border-radius:0.5rem;background:hsl(var(--primary)/0.1);display:flex;align-items:center;justify-content:center">${iconDollarSign(16, 'text-primary')}</div>
                 <div><p class="text-xs text-muted">Cost</p><p class="text-sm font-medium">$${(p.actualCost / 1000).toFixed(0)}k</p></div>
+              </div>
+              <div class="flex items-center gap-2">
+                <div style="width:2rem;height:2rem;border-radius:0.5rem;background:hsl(var(--primary)/0.1);display:flex;align-items:center;justify-content:center">${iconTrendingUp(16, 'text-primary')}</div>
+                <div><p class="text-xs text-muted">Impact</p><p class="text-sm font-medium">${p.actualImpact || p.estimatedImpact}</p></div>
+              </div>
+              <div class="flex items-center gap-2">
+                <div style="width:2rem;height:2rem;border-radius:0.5rem;background:hsl(var(--primary)/0.1);display:flex;align-items:center;justify-content:center">${iconTarget(16, 'text-primary')}</div>
+                <div><p class="text-xs text-muted">Score</p><p class="text-sm font-medium">${p.priorityScore}</p></div>
               </div>
             </div>
             <button class="btn btn-outline btn-sm gap-2" data-view-project="${p.id}">${iconEye(16)} <span class="hidden-mobile">View Details</span></button>

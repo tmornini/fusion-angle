@@ -61,14 +61,14 @@ export interface QuickAction {
 export async function getDashboardGauges(): Promise<GaugeCardData[]> {
   return [
     {
-      title: 'Cost Overview', icon: 'dollarSign', iconClass: 'text-primary', theme: 'blue',
-      outer: { value: 42300, max: 50000, label: 'Budget Spent', display: '$42.3K' },
-      inner: { value: 25000, max: 50000, label: 'ROI Generated', display: '$25K' },
-    },
-    {
       title: 'Time Tracking', icon: 'clock', iconClass: 'text-success', theme: 'green',
       outer: { value: 25, max: 30, label: 'Total Duration', display: '25d' },
       inner: { value: 12, max: 30, label: 'Days Elapsed', display: '12d' },
+    },
+    {
+      title: 'Cost Overview', icon: 'dollarSign', iconClass: 'text-primary', theme: 'blue',
+      outer: { value: 42300, max: 50000, label: 'Budget Spent', display: '$42.3K' },
+      inner: { value: 25000, max: 50000, label: 'ROI Generated', display: '$25K' },
     },
     {
       title: 'Project Impact', icon: 'zap', iconClass: 'text-warning', theme: 'amber',

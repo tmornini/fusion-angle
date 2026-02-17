@@ -61,16 +61,16 @@ function renderPage(idea: ConvertIdea, ideaId: string): string {
               </div>
               <div style="border-top:1px solid hsl(var(--border));padding-top:1rem;display:flex;flex-direction:column;gap:0.75rem">
                 <div class="flex items-center justify-between">
-                  <span class="flex items-center gap-2 text-muted">${iconTrendingUp(16)} <span class="text-sm">Priority Score</span></span>
-                  <span class="font-bold" style="color:hsl(142 71% 45%)">${idea.score}/100</span>
-                </div>
-                <div class="flex items-center justify-between">
                   <span class="flex items-center gap-2 text-muted">${iconClock(16)} <span class="text-sm">Est. Time</span></span>
                   <span class="font-medium">${idea.estimatedTime}</span>
                 </div>
                 <div class="flex items-center justify-between">
                   <span class="flex items-center gap-2 text-muted">${iconDollarSign(16)} <span class="text-sm">Est. Cost</span></span>
                   <span class="font-medium">${idea.estimatedCost}</span>
+                </div>
+                <div class="flex items-center justify-between">
+                  <span class="flex items-center gap-2 text-muted">${iconTrendingUp(16)} <span class="text-sm">Priority Score</span></span>
+                  <span class="font-bold" style="color:hsl(142 71% 45%)">${idea.score}/100</span>
                 </div>
               </div>
             </div>
