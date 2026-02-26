@@ -1,0 +1,51 @@
+/* ==========================================
+   2. DARK MODE TOKENS
+   ========================================== */
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --background: var(--gray-900);
+  --background-subtle: var(--gray-800);
+  --foreground: var(--gray-100);
+
+  --card: var(--gray-800);
+  --card-foreground: var(--gray-100);
+  --popover: var(--gray-800);
+  --popover-foreground: var(--gray-100);
+
+  --primary: 217 45% 60%;
+  --primary-foreground: var(--gray-900);
+  --primary-hover: 217 45% 55%;
+  --primary-active: 217 45% 50%;
+
+  --secondary: var(--gray-700);
+  --secondary-foreground: var(--gray-200);
+  --secondary-hover: var(--gray-600);
+
+  --muted: var(--gray-700);
+  --muted-foreground: var(--gray-400);
+
+  --border: var(--gray-700);
+  --border-strong: var(--gray-600);
+  --input: var(--gray-700);
+
+  --success-soft: 152 40% 15%;
+  --warning-soft: 38 40% 15%;
+  --error-soft: 0 40% 15%;
+  --info-soft: 217 40% 15%;
+
+  --chart-5: 217 71% 63%;
+  --chart-6: 280 65% 70%;
+
+  --shadow-card: 0 1px 3px 0 hsl(0 0% 0% / 0.2), 0 1px 2px -1px hsl(0 0% 0% / 0.2);
+  --shadow-card-hover: 0 8px 16px -4px hsl(0 0% 0% / 0.3), 0 4px 6px -2px hsl(0 0% 0% / 0.2);
+
+  --gradient-subtle: linear-gradient(180deg, hsl(var(--gray-900)) 0%, hsl(var(--gray-800)) 100%);
+}
+
+[data-theme="dark"] .dialog-backdrop,
+[data-theme="dark"] .sheet-backdrop,
+[data-theme="dark"] .command-palette-backdrop {
+  background-color: hsl(var(--backdrop) / 0.7);
+}
+

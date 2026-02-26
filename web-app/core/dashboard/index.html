@@ -1,0 +1,62 @@
+<div>
+  <!-- Welcome Hero -->
+  <div class="card" style="position:relative;overflow:hidden;padding:2rem;margin-bottom:2rem;border:2px solid hsl(var(--primary)/0.1)">
+    <div style="position:absolute;inset:0;background:linear-gradient(135deg,hsl(var(--primary)/0.04),transparent,hsl(48 97% 55%/0.06))"></div>
+    <div style="position:relative;z-index:1">
+      <div class="flex items-start gap-4">
+        <div class="hidden-mobile" id="hero-icon" style="width:3.5rem;height:3.5rem;border-radius:1rem;background:linear-gradient(135deg,hsl(var(--primary)),hsl(var(--primary)/0.8));display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px hsl(var(--primary)/0.3)">
+        </div>
+        <div style="flex:1">
+          <p class="text-sm font-medium text-primary" style="margin-bottom:0.25rem" id="hero-greeting"></p>
+          <h1 class="text-2xl font-display font-bold" style="margin-bottom:0.5rem">Welcome back, <span id="hero-user-name"></span></h1>
+          <p class="text-sm text-muted">Here's an overview of your work in progress at <span class="font-medium" style="color:hsl(var(--foreground))" id="hero-company"></span></p>
+        </div>
+        <div class="hidden-mobile flex items-center gap-6" id="hero-stats">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Gauge Grid -->
+  <div class="gauge-grid mb-8" id="gauge-container">
+  </div>
+
+  <!-- Analytics Charts -->
+  <div class="charts-grid" style="margin-bottom:2rem">
+    <div class="card" style="padding:1.5rem">
+      <div class="flex items-center gap-2 mb-4">
+        <div style="width:2rem;height:2rem;border-radius:var(--radius);background:hsl(var(--primary)/0.1);display:flex;align-items:center;justify-content:center" id="chart-pipeline-icon"></div>
+        <h3 class="text-sm font-display font-semibold">Idea Pipeline</h3>
+      </div>
+      <div id="chart-pipeline" class="flex flex-col items-center"></div>
+    </div>
+    <div class="card" style="padding:1.5rem">
+      <div class="flex items-center gap-2 mb-4">
+        <div style="width:2rem;height:2rem;border-radius:var(--radius);background:hsl(var(--success)/0.1);display:flex;align-items:center;justify-content:center" id="chart-health-icon"></div>
+        <h3 class="text-sm font-display font-semibold">Project Health</h3>
+      </div>
+      <div id="chart-health"></div>
+    </div>
+    <div class="card" style="padding:1.5rem">
+      <div class="flex items-center gap-2 mb-4">
+        <div style="width:2rem;height:2rem;border-radius:var(--radius);background:hsl(var(--warning)/0.1);display:flex;align-items:center;justify-content:center" id="chart-scores-icon"></div>
+        <h3 class="text-sm font-display font-semibold">Idea Scores</h3>
+      </div>
+      <div id="chart-scores"></div>
+    </div>
+    <div class="card" style="padding:1.5rem">
+      <div class="flex items-center gap-2 mb-4">
+        <div style="width:2rem;height:2rem;border-radius:var(--radius);background:hsl(var(--primary)/0.1);display:flex;align-items:center;justify-content:center" id="chart-availability-icon"></div>
+        <h3 class="text-sm font-display font-semibold">Team Availability</h3>
+      </div>
+      <div id="chart-availability"></div>
+    </div>
+  </div>
+
+  <!-- Quick Actions -->
+  <div class="card" style="padding:2rem;border:2px dashed hsl(var(--border)/0.6)">
+    <h2 class="text-lg font-display font-semibold mb-6">Quick Actions</h2>
+    <div class="actions-grid" id="quick-actions">
+    </div>
+  </div>
+</div>

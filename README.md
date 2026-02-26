@@ -4,7 +4,7 @@ Enterprise innovation management platform for capturing ideas, defining business
 
 ## Overview
 
-Vanilla TypeScript with zero runtime browser dependencies. Every page is a standalone HTML file — open any `index.html` directly in a browser or serve via any HTTP server.
+Vanilla TypeScript with zero runtime dependencies. Uses localStorage for in-browser data persistence. Every page is a standalone HTML file that works via both HTTP server and `file:///` protocol.
 
 ### Modules
 
@@ -15,23 +15,21 @@ Vanilla TypeScript with zero runtime browser dependencies. Every page is a stand
 - **Projects** — track approved ideas through execution
 - **Teams** — team roster and assignments
 - **Account** — organization settings, users, billing, and activity
+- **DB Admin** — database management (wipe, reload, upload/download snapshots)
 
 ## Getting Started
 
 ```sh
 git clone <repo-url>
 cd fusion-ai
-npm install
 ```
 
 Preview locally:
 
 ```sh
 python3 -m http.server 8080
-# then open http://localhost:8080/landing/index.html
+# then open http://localhost:8080/web-app/entry/landing/index.html
 ```
-
-Or open any page's `index.html` directly in a browser (`file://`).
 
 ## Build
 
@@ -40,16 +38,34 @@ Or open any page's `index.html` directly in a browser (`file://`).
 ```
 
 Requires a clean git working directory. The build:
-1. Composes dashboard pages by merging `site/layout.html` with each page's `index.html`
+1. Composes dashboard pages by merging `web-app/site/layout.html` with each page's `index.html`
 2. Bundles TypeScript via esbuild into a single JS file
-3. Produces a distribution ZIP named `fusion-ai-<sha>.zip`
+3. Bundles and minifies CSS via esbuild into style.css, copies fonts/ and favicon.ico
+4. Produces a distribution ZIP named `fusion-ai-<sha>.zip`
 
 ## Tech Stack
 
 - TypeScript (vanilla, no framework)
+- localStorage with JSON serialization (zero runtime dependencies)
+- REST-style API layer (`api/`) with `DbAdapter` interface
 - Build-time HTML composition (shared layout + per-page content)
 - CSS custom properties with light/dark theme support
 - Standard `<a href>` navigation between standalone HTML pages
 - SVG charts (bar, line, donut, area)
-- 80+ inline SVG icons
+- Command palette (Cmd+K) with keyboard navigation
+- ~100 inline SVG icons
 - Self-hosted IBM Plex Sans, Inter, and IBM Plex Mono fonts
+
+## Architecture
+
+```
+api/          # Database abstraction, localStorage implementation, REST routing, seed data
+web-app/      # Frontend pages, styles, scripts, layout templates
+  site/       # Shared CSS, TypeScript, HTML layout, fonts
+  core/       # Ideas, projects, and related workflows
+  tools/      # Edge, Crunch, Flow analytics
+  admin/      # Account, team, settings, snapshots
+  entry/      # Landing, auth, onboarding
+  reference/  # Design system component gallery
+  system/     # 404 page
+```

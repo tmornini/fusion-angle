@@ -115,12 +115,12 @@ All grays are derived from blue tones for brand cohesion. **Never use pure black
 
 ```html
 <!-- Standard card -->
-<div class="fusion-card p-6">
+<div class="card p-6">
   Content
 </div>
 
 <!-- Flat card (no hover effect) -->
-<div class="fusion-card-flat p-4">
+<div class="card-flat p-4">
   Content
 </div>
 ```
@@ -141,6 +141,35 @@ All grays are derived from blue tones for brand cohesion. **Never use pure black
   <span class="metric-widget-value">$45,000</span>
   <span class="metric-widget-trend-up">+12%</span>
 </div>
+```
+
+### Command Palette
+
+Cmd+K (or Ctrl+K) overlay for quick navigation and search. Implemented in `web-app/site/command-palette.ts`.
+
+- Full keyboard navigation (arrow keys, Enter to select, Escape to close)
+- Searches across pages, ideas, and projects
+- Renders categorized results with icons
+- Focus trap while open
+
+### Charts
+
+SVG chart rendering functions in `web-app/site/charts.ts`. All charts use design system colors and respond to dark mode.
+
+| Type | Function | Usage |
+|------|----------|-------|
+| Bar | `renderBarChart()` | Comparisons, category breakdowns |
+| Line | `renderLineChart()` | Trends over time |
+| Donut | `renderDonutChart()` | Proportions, status distribution |
+| Area | `renderAreaChart()` | Volume trends |
+
+### Dark Mode
+
+CSS custom properties on `:root` define light theme values. The `[data-theme="dark"]` selector overrides them for dark mode. Toggle is persisted to `localStorage` and respects `prefers-color-scheme` for initial detection.
+
+```css
+:root { --bg-primary: hsl(0 0% 100%); }
+[data-theme="dark"] { --bg-primary: hsl(217 45% 10%); }
 ```
 
 ## 6. Interaction States
@@ -179,7 +208,6 @@ All grays are derived from blue tones for brand cohesion. **Never use pure black
 | `fast` | 150ms | Hover, focus |
 | `normal` | 200ms | Transitions |
 | `slow` | 300ms | Modals, drawers |
-| `slower` | 500ms | Page transitions |
 
 ### Easing
 - **Default**: `cubic-bezier(0.4, 0, 0.2, 1)` - Most transitions
@@ -194,7 +222,7 @@ All grays are derived from blue tones for brand cohesion. **Never use pure black
 ## 9. Iconography
 
 ### Style Guide
-- **Library**: Inline SVG functions in `site/script.ts` (line-based, each returns an SVG string)
+- **Library**: Inline SVG functions in `web-app/site/script.ts` (line-based, each returns an SVG string)
 - **Default size**: 16px (inline), 20px (buttons), 24px (standalone)
 - **Stroke width**: 2px
 - **Color**: Inherit from parent or use `text-muted-foreground`
@@ -215,6 +243,12 @@ All grays are derived from blue tones for brand cohesion. **Never use pure black
 - Professional but approachable
 - No jargon for business users
 - Action-oriented
+
+### Data Formatting
+- **Missing/zero values**: Display `—` (em-dash) instead of `0h`, `$0k`, or blank. Use the guard pattern: `value ? formatted : '—'`
+- **Singular/plural**: Use ternary grammar — `${count} ${count === 1 ? 'item' : 'items'}` — never parenthetical `item(s)` form
+- **Breadcrumb links**: Always use `class="hover-link"` for breadcrumb navigation links (not `text-primary`)
+- **Section headers (h3)**: Always include `font-display` class on section header h3 tags to use the display typeface (IBM Plex Sans)
 
 ### Error Messages
 **Do:**
@@ -238,7 +272,6 @@ All grays are derived from blue tones for brand cohesion. **Never use pure black
 | `md` | 768px | Tablets |
 | `lg` | 1024px | Small laptops |
 | `xl` | 1280px | Desktops |
-| `2xl` | 1400px | Large screens |
 
 ### Layout Rules
 - **Mobile**: Single column, full-width cards
