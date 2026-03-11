@@ -8,10 +8,9 @@ import type { DbAdapter, EntityStore, SingletonStore } from './db';
 import type {
   UserEntity, IdeaEntity, IdeaScoreEntity, ProjectEntity, ProjectTeamEntity,
   MilestoneEntity, ProjectTaskEntity, DiscussionEntity, ProjectVersionEntity,
-  EdgeEntity, EdgeOutcomeEntity, EdgeMetricEntity, ActivityEntity, NotificationEntity,
+  EdgeEntity, EdgeOutcomeEntity, EdgeMetricEntity, ActivityEntity,
   ClarificationEntity, CrunchColumnEntity, ProcessEntity, ProcessStepEntity,
-  CompanySettingsEntity, NotificationCategoryEntity, NotificationPreferenceEntity,
-  AccountEntity,
+  CompanySettingsEntity, AccountEntity,
 } from './types';
 
 const KEY_PREFIX = 'fusion-ai:';
@@ -38,12 +37,18 @@ function readTable<T>(tableName: string, includeDeleted = false): T[] {
 }
 
 function writeTable<T>(tableName: string, rows: T[]): void {
-  localStorage.setItem(KEY_PREFIX + tableName, JSON.stringify(rows));
+  try {
+    localStorage.setItem(KEY_PREFIX + tableName, JSON.stringify(rows));
+  } catch (e) {
+    if (e instanceof DOMException && e.name === 'QuotaExceededError') {
+      throw new Error(`Storage quota exceeded writing "${tableName}". Clear old data or export a snapshot first.`);
+    }
+    throw e;
+  }
 }
 
 function serializeValue(value: unknown): unknown {
   if (value === null || value === undefined) return null;
-  if (typeof value === 'object') return JSON.stringify(value);
   if (typeof value === 'boolean') return value ? 1 : 0;
   return value;
 }
@@ -54,6 +59,10 @@ function serializeRecord(record: Record<string, unknown>): Record<string, unknow
     result[key] = serializeValue(value);
   }
   return result;
+}
+
+function generateCompositeId(prefix: string, ...parts: string[]): string {
+  return `${prefix}-${parts.join('-')}`;
 }
 
 // ── Generic store factories ──────────────
@@ -121,13 +130,12 @@ function createSingletonStore<T extends { id: string }>(tableName: string): Sing
 
 // ── Table list for bulk operations ─────────
 
-const TABLE_NAMES = [
+export const TABLE_NAMES = [
   'users', 'ideas', 'idea_scores', 'projects', 'project_team',
   'milestones', 'project_tasks', 'discussions', 'project_versions',
-  'edges', 'edge_outcomes', 'edge_metrics', 'activities', 'notifications',
+  'edges', 'edge_outcomes', 'edge_metrics', 'activities',
   'clarifications', 'crunch_columns', 'processes', 'process_steps',
-  'company_settings', 'notification_categories', 'notification_preferences',
-  'account',
+  'company_settings', 'account',
 ];
 
 // ── Adapter factory ──────────────────────
@@ -141,12 +149,44 @@ export async function createLocalStorageAdapter(): Promise<DbAdapter> {
     localStorage.removeItem(oldAccountKey);
   }
 
-  // Migrate notification_prefs → notification_preferences (one-time rename)
-  const oldPrefsKey = KEY_PREFIX + 'notification_prefs';
-  const newPrefsKey = KEY_PREFIX + 'notification_preferences';
-  if (localStorage.getItem(oldPrefsKey) !== null && localStorage.getItem(newPrefsKey) === null) {
-    localStorage.setItem(newPrefsKey, localStorage.getItem(oldPrefsKey)!);
-    localStorage.removeItem(oldPrefsKey);
+  // Migrate ideas: estimated_time → estimated_duration (hours→seconds), effort_time_estimate → effort_duration_estimate
+  const ideasKey = KEY_PREFIX + 'ideas';
+  const ideasRaw = localStorage.getItem(ideasKey);
+  if (ideasRaw !== null) {
+    try {
+      const ideas = JSON.parse(ideasRaw);
+      if (Array.isArray(ideas) && ideas.some((r: Record<string, unknown>) => 'estimated_time' in r)) {
+        for (const idea of ideas) {
+          if ('estimated_time' in idea) {
+            idea.estimated_duration = (idea.estimated_time as number) * 3600;
+            delete idea.estimated_time;
+          }
+          if ('effort_time_estimate' in idea) {
+            idea.effort_duration_estimate = idea.effort_time_estimate;
+            delete idea.effort_time_estimate;
+          }
+        }
+        localStorage.setItem(ideasKey, JSON.stringify(ideas));
+      }
+    } catch { /* corrupt data handled by readTable */ }
+  }
+
+  // Migrate idea_scores: estimated_time → estimated_duration
+  const scoresKey = KEY_PREFIX + 'idea_scores';
+  const scoresRaw = localStorage.getItem(scoresKey);
+  if (scoresRaw !== null) {
+    try {
+      const scores = JSON.parse(scoresRaw);
+      if (Array.isArray(scores) && scores.some((r: Record<string, unknown>) => 'estimated_time' in r)) {
+        for (const score of scores) {
+          if ('estimated_time' in score) {
+            score.estimated_duration = score.estimated_time;
+            delete score.estimated_time;
+          }
+        }
+        localStorage.setItem(scoresKey, JSON.stringify(scores));
+      }
+    } catch { /* corrupt data handled by readTable */ }
   }
 
   const edgeStore = createEntityStore<EdgeEntity>('edges');
@@ -171,7 +211,7 @@ export async function createLocalStorageAdapter(): Promise<DbAdapter> {
       // No-op — writes are immediate
     },
 
-    async wipeAllData(): Promise<void> {
+    async deleteSchema(): Promise<void> {
       for (const table of TABLE_NAMES) {
         localStorage.removeItem(KEY_PREFIX + table);
       }
@@ -208,18 +248,22 @@ export async function createLocalStorageAdapter(): Promise<DbAdapter> {
         throw new Error('Invalid snapshot: expected an object with table keys.');
       }
       const record = snapshot as Record<string, unknown>;
+      // Pre-serialize all table data before any destructive operation
+      const serialized = new Map<string, string>();
       for (const table of TABLE_NAMES) {
         const rows = record[table];
         if (rows !== undefined && !Array.isArray(rows)) {
           throw new Error(`Invalid snapshot: table "${table}" is not an array.`);
         }
+        serialized.set(table, JSON.stringify(Array.isArray(rows) ? rows : []));
       }
+
+      // Now perform the swap — all serialization is done, so failures here are minimized
       for (const table of TABLE_NAMES) {
         localStorage.removeItem(KEY_PREFIX + table);
       }
-      for (const table of TABLE_NAMES) {
-        const rows = record[table];
-        writeTable(table, Array.isArray(rows) ? rows : []);
+      for (const [table, json] of serialized) {
+        localStorage.setItem(KEY_PREFIX + table, json);
       }
     },
 
@@ -235,7 +279,7 @@ export async function createLocalStorageAdapter(): Promise<DbAdapter> {
         const rows = readTable<IdeaScoreEntity>('idea_scores');
         const serialized = serializeRecord(fields);
         const index = rows.findIndex(entity => entity.idea_id === ideaId);
-        const id = index >= 0 ? rows[index]!.id : (fields.id as string ?? `score-${ideaId}`);
+        const id = index >= 0 ? rows[index]!.id : (fields.id as string ?? generateCompositeId('score', ideaId));
 
         if (index >= 0) {
           rows[index] = { ...rows[index]!, ...serialized, id, idea_id: ideaId } as IdeaScoreEntity;
@@ -258,7 +302,7 @@ export async function createLocalStorageAdapter(): Promise<DbAdapter> {
         const rows = readTable<ProjectTeamEntity>('project_team');
         const serialized = serializeRecord(fields);
         const index = rows.findIndex(entity => entity.project_id === projectId && entity.user_id === userId);
-        const id = index >= 0 ? rows[index]!.id : (fields.id as string ?? `pt-${projectId}-${userId}`);
+        const id = index >= 0 ? rows[index]!.id : (fields.id as string ?? generateCompositeId('pt', projectId, userId));
 
         if (index >= 0) {
           rows[index] = { ...rows[index]!, ...serialized, id, project_id: projectId, user_id: userId } as ProjectTeamEntity;
@@ -315,7 +359,6 @@ export async function createLocalStorageAdapter(): Promise<DbAdapter> {
 
     edgeMetrics: createEntityStore<EdgeMetricEntity>('edge_metrics'),
     activities: createEntityStore<ActivityEntity>('activities'),
-    notifications: createEntityStore<NotificationEntity>('notifications'),
 
     clarifications: Object.assign(clarificationStore, {
       async getByProjectId(projectId: string): Promise<ClarificationEntity[]> {
@@ -335,17 +378,6 @@ export async function createLocalStorageAdapter(): Promise<DbAdapter> {
     }),
 
     companySettings: createSingletonStore<CompanySettingsEntity>('company_settings'),
-    notificationCategories: createEntityStore<NotificationCategoryEntity>('notification_categories'),
-
-    notificationPreferences: Object.assign(
-      createEntityStore<NotificationPreferenceEntity>('notification_preferences'),
-      {
-        async getByCategoryId(categoryId: string): Promise<NotificationPreferenceEntity[]> {
-          return readTable<NotificationPreferenceEntity>('notification_preferences')
-            .filter(entity => entity.category_id === categoryId);
-        },
-      },
-    ),
 
     account: createSingletonStore<AccountEntity>('account'),
   };

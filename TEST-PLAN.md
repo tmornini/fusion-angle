@@ -12,21 +12,21 @@
 | D. Core: Ideas Workflow | 34 |
 | E. Core: Projects | 10 |
 | F. Tools | 14 |
-| G. Admin Pages | 22 |
+| G. Admin Pages | 19 |
 | H. Reference & System | 2 |
-| I. Cross-Cutting Concerns | 18 |
+| I. Cross-Cutting Concerns | 16 |
 | J. Protocol B: `file://` Retest | 14 |
 | K. Teardown | 3 |
-| **Total** | **146** |
+| **Total** | **141** |
 
 ---
 
 ## A. Build & Setup
 
 - [ ] **A1** Run `./build` from a clean working directory. PASS: exits 0, prints no errors, creates `~/Desktop/fusion-ai-<sha>.zip`.
-- [ ] **A2** Unzip the archive into a temp directory (e.g. `/tmp/fusion-test`). PASS: directory contains `site/app.js`, `site/style.css`, `site/fonts/`, `index.html`, and 27 page directories each with `index.html`.
+- [ ] **A2** Unzip the archive into a temp directory (e.g. `/tmp/fusion-test`). PASS: directory contains `assets/app.js`, `assets/styles.css`, `assets/` (*.woff2 fonts), `index.html`, and 26 page directories each with `index.html`.
 - [ ] **A3** Start an HTTP server from the unzipped directory (e.g. `python3 -m http.server 8080`). PASS: server starts without errors.
-- [ ] **A4** Open `http://localhost:8080/` in the test browser. PASS: redirects to `entry/landing/index.html`.
+- [ ] **A4** Open `http://localhost:8080/` in the test browser. PASS: redirects to `snapshots/index.html` when no data exists, or `landing/index.html` when data has been loaded.
 - [ ] **A5** Open DevTools Console and confirm no JavaScript errors on initial load. PASS: console is clean (warnings from browser extensions are acceptable).
 
 ---
@@ -67,7 +67,7 @@
 
 - [ ] **C1** Navigate to `dashboard/`. PASS: page loads with sidebar, header, and main content area.
 - [ ] **C2** Sidebar shows navigation links for all sections (Dashboard, Ideas, Projects, Edge List, Crunch, Flow, Team, Activity Feed, Settings group). PASS: all links present and styled.
-- [ ] **C3** Header shows user avatar area, notification bell, and theme toggle. PASS: elements visible and styled.
+- [ ] **C3** Header shows user avatar area and theme toggle. PASS: elements visible and styled.
 - [ ] **C4** Dashboard displays gauge/metric cards with numerical values. PASS: at least 3 metric cards render with non-zero values.
 - [ ] **C5** Dashboard displays at least one chart (bar, line, donut, or area). PASS: SVG chart renders with visible data.
 - [ ] **C6** Quick-action cards or links are present. PASS: clicking one navigates to the expected page.
@@ -94,7 +94,7 @@
 - [ ] **D9** Step 2 shows "Proposed Solution" textarea (required). "Continue" is disabled until text is entered. PASS: button enables after typing.
 - [ ] **D10** Click "Continue". PASS: advances to Step 3 ("The Impact"), button label changes to "Submit Idea".
 - [ ] **D11** Step 3 shows "Expected Outcome" (required) and "Success Metrics" (optional). "Submit Idea" disabled until Expected Outcome is filled. PASS: button enables after typing in Expected Outcome.
-- [ ] **D12** Click "Submit Idea". PASS: navigates to `idea-convert/index.html?ideaId=new`.
+- [ ] **D12** Click "Submit Idea". PASS: navigates to `ideas/index.html`.
 - [ ] **D13** On Step 2, click "Back". PASS: returns to Step 1 with previously entered data preserved.
 - [ ] **D14** On Step 1, click "Cancel" (or "Back"). PASS: navigates to `ideas/` list.
 - [ ] **D15** "Generate with AI" button is present in the header. PASS: button is visible (no action expected — UI placeholder).
@@ -139,7 +139,7 @@
 
 - [ ] **E3** Page loads with project summary card (description, dates, progress bar), baseline vs. current metrics, and Edge KPI card. PASS: all cards render with data. Baseline/current metrics show "—" (em-dash) when values are zero or missing.
 - [ ] **E4** Four quick-action cards visible (Engineering, Team, Flow, Crunch). PASS: clicking "Engineering" navigates to `engineering-requirements/?projectId=1`.
-- [ ] **E5** **Tasks tab** (default): shows 5 task cards with priority badges, skill tags, and hours. Assigned/unassigned count is dynamically computed from task data (seed data: 1 assigned, 4 unassigned). PASS: "Save Assignments" button visible.
+- [ ] **E5** **Tasks tab** (default): shows 5 task cards with priority badges, skill tags, and days. Assigned/unassigned count is dynamically computed from task data (seed data: 1 assigned, 4 unassigned). PASS: "Save Assignments" button visible.
 - [ ] **E6** **Discussion tab**: shows 3 seeded comments with author avatars/names. Comment composer textarea + "Post Comment" button (disabled when empty, enabled when text entered). PASS: all elements render.
 - [ ] **E7** **History tab**: shows 3 version entries (v1.0, v1.1, v1.2) with latest highlighted. PASS: version list renders in order.
 - [ ] **E8** **Linked Data tab**: shows empty state "No linked data yet" with "Link Data Source" button. PASS: empty state renders cleanly.
@@ -217,19 +217,13 @@ This test is covered by E4 (navigation) — verify the page loads:
 - [ ] **G13** Navigate to `activity-feed/`. PASS: shows 10 seeded activity entries with type icons and timestamps.
 - [ ] **G14** Activity types include idea_scored, task_completed, idea_created, comment_added, user_joined, status_changed, idea_converted, project_created. PASS: multiple distinct types visible with appropriate icons.
 
-### Notification Settings (`notification-settings/`)
-
-- [ ] **G15** Navigate to `notification-settings/`. PASS: shows 4 categories (Ideas, Projects, Teams, Account) with toggle controls.
-- [ ] **G16** 16 individual notification preferences are displayed with current on/off states. PASS: toggles render and are interactive.
-- [ ] **G17** Toggle a preference and save. PASS: change persists (no error toast).
-
 ### Snapshots (`snapshots/`) — Run These Last
 
 - [ ] **G18** Navigate to `snapshots/`. PASS: shows 4 operation cards: Create Pristine Environment, Wipe and Load Mock Data, Upload Snapshot, Download Snapshot.
 - [ ] **G19** Click "Download Snapshot". PASS: browser downloads `fusion-ai-snapshot-YYYY-MM-DD.json`. File contains valid JSON with entity data.
-- [ ] **G20** Click "Create Pristine Environment", confirm the dialog. PASS: success toast "Pristine environment created." Info banner appears: "Your database is empty." Navigate to `ideas/` — page loads (no redirect, schema exists). All 22 `fusion-ai:*` keys exist in localStorage as empty arrays.
-- [ ] **G21** Click "Wipe and Load Mock Data". PASS: redirects to root `index.html` (landing page). Navigate to `ideas/` — 11 ideas are back.
-- [ ] **G22** Return to `snapshots/`, wipe data, then use "Upload Snapshot" file input and select the previously downloaded JSON file. PASS: redirects to root `index.html`. Data matches the snapshot.
+- [ ] **G20** Click "Create Pristine Environment", confirm the dialog. PASS: redirects to `dashboard/index.html`. Dashboard renders with zeroed-out metrics (empty database). All 19 `fusion-ai:*` keys exist in localStorage as empty arrays.
+- [ ] **G21** Click "Wipe and Load Mock Data". PASS: redirects to `dashboard/index.html`. Navigate to `ideas/` — 11 ideas are back.
+- [ ] **G22** Return to `snapshots/`, wipe data, then use "Upload Snapshot" file input and select the previously downloaded JSON file. PASS: redirects to `dashboard/index.html`. Data matches the snapshot.
 
 ---
 
@@ -268,11 +262,6 @@ This test is covered by E4 (navigation) — verify the page loads:
 - [ ] **I13** Type a search term (e.g. "ideas"). PASS: filtered results appear. Select a result — navigates to the corresponding page.
 - [ ] **I14** Press `Escape`. PASS: command palette closes.
 
-### Notifications
-
-- [ ] **I15** Click the notification bell icon. PASS: dropdown opens showing 4 seeded notifications (2 unread, 2 read). Unread count badge shows "2".
-- [ ] **I16** Click outside the dropdown. PASS: dropdown closes.
-
 ### Toasts
 
 - [ ] **I17** Trigger a toast (e.g. save profile, or use DB Admin reload). PASS: toast appears at bottom or corner of screen, auto-dismisses after ~3 seconds with fade-out.
@@ -290,13 +279,13 @@ This test is covered by E4 (navigation) — verify the page loads:
 ### Static Pages (No DB Required)
 
 - [ ] **J1** Open `file:///.../index.html` (root). PASS: redirects or links to landing page.
-- [ ] **J2** Open `file:///.../entry/landing/index.html`. PASS: landing page renders with full layout and styling.
-- [ ] **J3** Open `file:///.../entry/auth/index.html`. PASS: auth form renders, validation works (test empty submit → error messages appear).
-- [ ] **J4** Open `file:///.../entry/onboarding/index.html`. PASS: page renders with content.
-- [ ] **J5** Open `file:///.../system/not-found/index.html`. PASS: 404 page renders.
-- [ ] **J6** Open `file:///.../reference/design-system/index.html`. PASS: component gallery renders.
+- [ ] **J2** Open `file:///.../landing/index.html`. PASS: landing page renders with full layout and styling.
+- [ ] **J3** Open `file:///.../auth/index.html`. PASS: auth form renders, validation works (test empty submit → error messages appear).
+- [ ] **J4** Open `file:///.../onboarding/index.html`. PASS: page renders with content.
+- [ ] **J5** Open `file:///.../not-found/index.html`. PASS: 404 page renders.
+- [ ] **J6** Open `file:///.../design-system/index.html`. PASS: component gallery renders.
 - [ ] **J7** Verify CSS loads: pages are styled (not unstyled HTML). PASS: fonts, colors, and layout apply correctly.
-- [ ] **J8** Verify `site/app.js` loads: interactive elements work (e.g. theme toggle, auth form validation). PASS: JavaScript executes.
+- [ ] **J8** Verify `assets/app.js` loads: interactive elements work (e.g. theme toggle, auth form validation). PASS: JavaScript executes.
 
 ### Database-Dependent Pages
 
@@ -329,7 +318,7 @@ This test is covered by E4 (navigation) — verify the page loads:
 | Browser & Version | |
 | OS | |
 | Build SHA | |
-| Tests Passed | /146 |
-| Tests Failed | /146 |
-| Tests Skipped | /146 |
+| Tests Passed | /141 |
+| Tests Failed | /141 |
+| Tests Skipped | /141 |
 | Notes | |

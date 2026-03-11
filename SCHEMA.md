@@ -1,6 +1,8 @@
 # Database Schema
 
-22 tables stored in localStorage as JSON arrays. Each table is keyed as `fusion-ai:tableName`. All rows have a text `id` primary key. Column types: TEXT (string), INTEGER (number), REAL (float). JSON columns store stringified arrays or objects.
+19 tables stored in localStorage as JSON arrays. Each table is keyed as `fusion-ai:tableName`. All rows have a text `id` primary key. Column types: TEXT (string), INTEGER (number), REAL (float). JSON columns store stringified arrays or objects.
+
+**Duration convention:** All numeric duration fields are persisted in seconds. UI displays days via `durationInDays(seconds)` from `format.ts`.
 
 ## Core
 
@@ -33,7 +35,7 @@
 | title | TEXT | '' |
 | score | INTEGER | 0 |
 | estimated_impact | INTEGER | 0 |
-| estimated_time | INTEGER | 0 |
+| estimated_duration | INTEGER (seconds) | 0 |
 | estimated_cost | INTEGER | 0 |
 | priority | INTEGER | 0 |
 | status | TEXT | 'draft' |
@@ -52,7 +54,7 @@
 | risks | TEXT (JSON array) | '[]' |
 | assumptions | TEXT (JSON array) | '[]' |
 | alignments | TEXT (JSON array) | '[]' |
-| effort_time_estimate | TEXT | '' |
+| effort_duration_estimate | TEXT | '' |
 | effort_team_size | TEXT | '' |
 | cost_estimate | TEXT | '' |
 | cost_breakdown | TEXT | '' |
@@ -70,7 +72,7 @@
 | feasibility_breakdown | TEXT (JSON array) | '[]' |
 | efficiency_score | INTEGER | 0 |
 | efficiency_breakdown | TEXT (JSON array) | '[]' |
-| estimated_time | TEXT | '' |
+| estimated_duration | TEXT | '' |
 | estimated_cost | TEXT | '' |
 | recommendation | TEXT | '' |
 
@@ -86,8 +88,8 @@
 | start_date | TEXT | '' |
 | target_end_date | TEXT | '' |
 | lead_id | TEXT (FK → users) | '' |
-| estimated_time | INTEGER | 0 |
-| actual_time | INTEGER | 0 |
+| estimated_duration | INTEGER (seconds) | 0 |
+| actual_duration | INTEGER (seconds) | 0 |
 | estimated_cost | INTEGER | 0 |
 | actual_cost | INTEGER | 0 |
 | estimated_impact | INTEGER | 0 |
@@ -130,7 +132,7 @@
 | priority | TEXT | '' |
 | description | TEXT | '' |
 | skills | TEXT (JSON array) | '[]' |
-| hours | INTEGER | 0 |
+| duration | INTEGER (seconds) | 0 |
 | assigned_to_id | TEXT | '' |
 
 ### discussions
@@ -242,16 +244,6 @@
 | status | TEXT | null |
 | comment | TEXT | null |
 
-### notifications
-
-| Column | Type | Default |
-|--------|------|---------|
-| id | TEXT | — |
-| title | TEXT | '' |
-| message | TEXT | '' |
-| time | TEXT | '' |
-| is_unread | INTEGER | 1 |
-
 ### clarifications
 
 | Column | Type | Default |
@@ -285,25 +277,6 @@ Singleton table (single row, `id = '1'`).
 | is_two_factor_enabled | INTEGER | 0 |
 | is_ip_whitelist_enabled | INTEGER | 0 |
 | data_retention | TEXT | '' |
-
-### notification_categories
-
-| Column | Type | Default |
-|--------|------|---------|
-| id | TEXT | — |
-| label | TEXT | '' |
-| icon | TEXT | '' |
-
-### notification_preferences
-
-| Column | Type | Default |
-|--------|------|---------|
-| id | TEXT | — |
-| category_id | TEXT (FK → notification_categories) | — |
-| label | TEXT | '' |
-| description | TEXT | '' |
-| is_email_enabled | INTEGER | 1 |
-| is_push_enabled | INTEGER | 0 |
 
 ### account
 

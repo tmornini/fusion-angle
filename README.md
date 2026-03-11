@@ -28,7 +28,7 @@ Preview locally:
 
 ```sh
 python3 -m http.server 8080
-# then open http://localhost:8080/web-app/entry/landing/index.html
+# then open http://localhost:8080/web-app/landing/index.html
 ```
 
 ## Build
@@ -38,9 +38,9 @@ python3 -m http.server 8080
 ```
 
 Requires a clean git working directory. The build:
-1. Composes dashboard pages by merging `web-app/site/layout.html` with each page's `index.html`
+1. Composes sidebar-layout pages by merging `web-app/app/layout.html` with each page's `index.html`
 2. Bundles TypeScript via esbuild into a single JS file
-3. Bundles and minifies CSS via esbuild into style.css, copies fonts/ and favicon.ico
+3. Bundles and minifies CSS via esbuild into styles.css, copies *.woff2 and favicon.ico
 4. Produces a distribution ZIP named `fusion-ai-<sha>.zip`
 
 ## Tech Stack
@@ -61,11 +61,19 @@ Requires a clean git working directory. The build:
 ```
 api/          # Database abstraction, localStorage implementation, REST routing, seed data
 web-app/      # Frontend pages, styles, scripts, layout templates
-  site/       # Shared CSS, TypeScript, HTML layout, fonts
-  core/       # Ideas, projects, and related workflows
-  tools/      # Edge, Crunch, Flow analytics
-  admin/      # Account, team, settings, snapshots
-  entry/      # Landing, auth, onboarding
-  reference/  # Design system component gallery
-  system/     # 404 page
+  app/        # Shared CSS, TypeScript, HTML layout, adapters
+  dashboard/  # 26 page directories at top level (dashboard, ideas, projects, team,
+  ideas/      #   edge, crunch, flow, account, profile, snapshots, landing, auth,
+  ...         #   onboarding, design-system, not-found, etc.)
 ```
+
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [api/](api/README.md) | REST-style API layer and database abstraction |
+| [web-app/](web-app/README.md) | Frontend pages, styles, scripts, and layout |
+| [SCHEMA.md](SCHEMA.md) | Database schema (22 tables) |
+| [DESIGN-SYSTEM.md](DESIGN-SYSTEM.md) | Design system specification |
+| [TEST-PLAN.md](TEST-PLAN.md) | Human-executable test plan |
+| [CLAUDE.md](CLAUDE.md) | Claude Code project guidance |

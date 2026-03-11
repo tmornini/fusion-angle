@@ -145,7 +145,7 @@ All grays are derived from blue tones for brand cohesion. **Never use pure black
 
 ### Command Palette
 
-Cmd+K (or Ctrl+K) overlay for quick navigation and search. Implemented in `web-app/site/command-palette.ts`.
+Cmd+K (or Ctrl+K) overlay for quick navigation and search. Implemented in `web-app/app/command-palette.ts`.
 
 - Full keyboard navigation (arrow keys, Enter to select, Escape to close)
 - Searches across pages, ideas, and projects
@@ -154,7 +154,7 @@ Cmd+K (or Ctrl+K) overlay for quick navigation and search. Implemented in `web-a
 
 ### Charts
 
-SVG chart rendering functions in `web-app/site/charts.ts`. All charts use design system colors and respond to dark mode.
+SVG chart rendering functions in `web-app/app/charts.ts`. All charts use design system colors and respond to dark mode.
 
 | Type | Function | Usage |
 |------|----------|-------|
@@ -222,7 +222,7 @@ CSS custom properties on `:root` define light theme values. The `[data-theme="da
 ## 9. Iconography
 
 ### Style Guide
-- **Library**: Inline SVG functions in `web-app/site/script.ts` (line-based, each returns an SVG string)
+- **Library**: Inline SVG functions in `web-app/app/icons.ts` (line-based, each returns a `SafeHtml` value)
 - **Default size**: 16px (inline), 20px (buttons), 24px (standalone)
 - **Stroke width**: 2px
 - **Color**: Inherit from parent or use `text-muted-foreground`

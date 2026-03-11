@@ -5,10 +5,9 @@
 import type {
   UserEntity, IdeaEntity, IdeaScoreEntity, ProjectEntity, ProjectTeamEntity,
   MilestoneEntity, ProjectTaskEntity, DiscussionEntity, ProjectVersionEntity,
-  EdgeEntity, EdgeOutcomeEntity, EdgeMetricEntity, ActivityEntity, NotificationEntity,
+  EdgeEntity, EdgeOutcomeEntity, EdgeMetricEntity, ActivityEntity,
   ClarificationEntity, CrunchColumnEntity, ProcessEntity, ProcessStepEntity,
-  CompanySettingsEntity, NotificationCategoryEntity, NotificationPreferenceEntity,
-  AccountEntity,
+  CompanySettingsEntity, AccountEntity,
 } from './types';
 
 export interface EntityStore<T> {
@@ -27,7 +26,7 @@ export interface DbAdapter {
   initialize(): Promise<void>;
   close(): Promise<void>;
   flush(): Promise<void>;
-  wipeAllData(): Promise<void>;
+  deleteSchema(): Promise<void>;
   hasSchema(): Promise<boolean>;
   createSchema(): Promise<void>;
   exportSnapshot(): Promise<string>;
@@ -64,7 +63,6 @@ export interface DbAdapter {
   };
   edgeMetrics: EntityStore<EdgeMetricEntity>;
   activities: EntityStore<ActivityEntity>;
-  notifications: EntityStore<NotificationEntity>;
   clarifications: EntityStore<ClarificationEntity> & {
     getByProjectId(projectId: string): Promise<ClarificationEntity[]>;
   };
@@ -74,9 +72,5 @@ export interface DbAdapter {
     getByProcessId(processId: string): Promise<ProcessStepEntity[]>;
   };
   companySettings: SingletonStore<CompanySettingsEntity>;
-  notificationCategories: EntityStore<NotificationCategoryEntity>;
-  notificationPreferences: EntityStore<NotificationPreferenceEntity> & {
-    getByCategoryId(categoryId: string): Promise<NotificationPreferenceEntity[]>;
-  };
   account: SingletonStore<AccountEntity>;
 }

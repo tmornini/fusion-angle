@@ -12,11 +12,33 @@ export type Id = string;
 /** Confidence level used across Edge, ideas, and projects. */
 export type ConfidenceLevel = 'high' | 'medium' | 'low';
 
+/** Computed priority from score (distinct from confidence). */
+export type PriorityLevel = 'high' | 'medium' | 'low';
+
 /** Edge definition completion status. */
 export type EdgeStatus = 'complete' | 'draft' | 'missing';
 
 /** Idea lifecycle status. */
 export type IdeaStatus = 'draft' | 'scored' | 'pending_review' | 'approved' | 'rejected';
+
+/** Score thresholds for priority classification. */
+export const SCORE_THRESHOLD_HIGH = 80;
+export const SCORE_THRESHOLD_MEDIUM = 60;
+
+/** Score badge thresholds for UI display (ideas list). */
+export const SCORE_BADGE_HIGH = 85;
+export const SCORE_BADGE_MEDIUM = 70;
+
+/** Team availability thresholds for UI display (team page). */
+export const AVAILABILITY_HIGH = 70;
+export const AVAILABILITY_LOW = 40;
+
+/** Compute priority level from a numeric score. */
+export function computePriority(score: number): PriorityLevel {
+  if (score >= SCORE_THRESHOLD_HIGH) return 'high';
+  if (score >= SCORE_THRESHOLD_MEDIUM) return 'medium';
+  return 'low';
+}
 
 /** Stored boolean in localStorage (0 or 1 integer). */
 export type StoredBoolean = 0 | 1;
@@ -97,7 +119,7 @@ export interface IdeaEntity {
   title: string;
   score: number;
   estimated_impact: number;
-  estimated_time: number;
+  estimated_duration: number;
   estimated_cost: number;
   priority: number;
   status: IdeaStatus;
@@ -116,7 +138,7 @@ export interface IdeaEntity {
   risks: string; // JSON array
   assumptions: string; // JSON array
   alignments: string; // JSON array
-  effort_time_estimate: string;
+  effort_duration_estimate: string;
   effort_team_size: string;
   cost_estimate: string;
   cost_breakdown: string;
@@ -132,7 +154,7 @@ export interface IdeaScoreEntity {
   feasibility_breakdown: string; // JSON array
   efficiency_score: number;
   efficiency_breakdown: string; // JSON array
-  estimated_time: string;
+  estimated_duration: string;
   estimated_cost: string;
   recommendation: string;
 }
@@ -146,8 +168,8 @@ export interface ProjectEntity {
   start_date: string;
   target_end_date: string;
   lead_id: Id;
-  estimated_time: number;
-  actual_time: number;
+  estimated_duration: number; // seconds
+  actual_duration: number; // seconds
   estimated_cost: number;
   actual_cost: number;
   estimated_impact: number;
@@ -184,7 +206,7 @@ export interface ProjectTaskEntity {
   priority: string;
   description: string;
   skills: string; // JSON array
-  hours: number;
+  duration: number; // seconds
   assigned_to_id: Id;
 }
 
@@ -209,7 +231,7 @@ export interface EdgeEntity {
   id: Id;
   idea_id: Id;
   status: EdgeStatus;
-  confidence: ConfidenceLevel | '';
+  confidence: ConfidenceLevel | null;
   owner_id: Id;
   impact_short_term: string;
   impact_mid_term: string;
@@ -242,14 +264,6 @@ export interface ActivityEntity {
   score: number | null;
   status: string | null;
   comment: string | null;
-}
-
-export interface NotificationEntity {
-  id: Id;
-  title: string;
-  message: string;
-  time: string;
-  is_unread: StoredBoolean;
 }
 
 export interface ClarificationEntity {
@@ -307,21 +321,6 @@ export interface CompanySettingsEntity {
   is_two_factor_enabled: StoredBoolean;
   is_ip_whitelist_enabled: StoredBoolean;
   data_retention: string;
-}
-
-export interface NotificationCategoryEntity {
-  id: Id;
-  label: string;
-  icon: string;
-}
-
-export interface NotificationPreferenceEntity {
-  id: Id;
-  category_id: Id;
-  label: string;
-  description: string;
-  is_email_enabled: StoredBoolean;
-  is_push_enabled: StoredBoolean;
 }
 
 export interface AccountEntity {
