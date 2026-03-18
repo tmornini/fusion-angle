@@ -201,7 +201,7 @@ function bindWizardEvents() {
         proposed_solution: formData.proposedSolution,
         expected_outcome: formData.expectedOutcome,
         description: formData.targetUsers,
-        status: 'scored',
+        status: 'active',
         submitted_by_id: '1',
         score: 0, estimated_impact: 0, estimated_duration: 0, estimated_cost: 0,
         priority: 0, edge_status: 'missing', category: '', readiness: '',

@@ -236,7 +236,7 @@ export async function init(params?: Record<string, string>): Promise<void> {
       await putProject(projectId, {
         title: projectDetails['project-name'],
         description: projectDetails['success-criteria'] || '',
-        status: 'approved',
+        status: 'submitted',
         progress: 0,
         start_date: projectDetails['start-date'],
         target_end_date: projectDetails['target-end-date'],
@@ -256,7 +256,7 @@ export async function init(params?: Record<string, string>): Promise<void> {
       });
 
       const existingIdea = await getIdea(ideaId);
-      await putIdea(ideaId, { ...existingIdea, status: 'approved' });
+      await putIdea(ideaId, { ...existingIdea, status: 'promoted' });
 
       if (projectDetails['first-milestone']?.trim()) {
         const milestoneId = crypto.randomUUID();

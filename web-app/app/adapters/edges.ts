@@ -1,5 +1,6 @@
-import { GET } from '../../../api/api';
+import { GET, PUT } from '../../../api/api';
 import type { IdeaEntity, EdgeEntity, EdgeOutcomeEntity, EdgeMetricEntity, EdgeStatus, ConfidenceLevel, Id } from '../../../api/types';
+import type { EdgeData } from './helpers';
 import { User } from '../../../api/types';
 import { buildUserMap, userName } from './helpers';
 
@@ -69,4 +70,35 @@ export async function getEdgeList(cachedUserMap?: Map<Id, User>): Promise<EdgeLi
       updatedAt: edge.updated_at,
     };
   });
+}
+
+// ── Write Operations ───────────────────────
+
+export async function putEdgeData(ideaId: string, data: EdgeData): Promise<void> {
+  const edge = await GET(`ideas/${ideaId}/edge`) as EdgeEntity | null;
+  if (!edge) return;
+
+  await PUT(`edges/${edge.id}`, {
+    confidence: data.confidence,
+    impact_short_term: data.impact.shortTerm,
+    impact_mid_term: data.impact.midTerm,
+    impact_long_term: data.impact.longTerm,
+    status: 'complete',
+  } as Record<string, unknown>);
+
+  for (const outcome of data.outcomes) {
+    await PUT(`edges/${edge.id}/outcomes/${outcome.id}`, {
+      description: outcome.description,
+      edge_id: edge.id,
+    } as Record<string, unknown>);
+    for (const metric of outcome.metrics) {
+      await PUT(`edges/${edge.id}/outcomes/${outcome.id}/metrics/${metric.id}`, {
+        name: metric.name,
+        target: metric.target,
+        unit: metric.unit,
+        current: metric.current,
+        outcome_id: outcome.id,
+      } as Record<string, unknown>);
+    }
+  }
 }

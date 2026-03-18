@@ -1,16 +1,20 @@
-import { $, $$, $textarea } from '../app/dom';
-import { html, setHtml, SafeHtml } from '../app/safe-html';
+import { $, $$, $textarea, $input, $select } from '../app/dom';
+import { html, setHtml, SafeHtml, trusted } from '../app/safe-html';
 import { showToast } from '../app/toast';
 import { buildSkeleton, buildErrorState } from '../app/loading-states';
 import {
   iconTrendingUp, iconTrendingDown, iconClock, iconDollarSign, iconUsers,
   iconCalendar, iconTarget, iconCheckCircle2, iconAlertCircle, iconMessageSquare,
-  iconFileText, iconHistory, iconMoreVertical, iconPlus, iconArrowUpRight,
+  iconFileText, iconHistory, iconArrowLeft, iconPlus, iconArrowUpRight,
   iconArrowDownRight, iconMinus, iconListTodo, iconGitBranch, iconDatabase,
-  iconCode, iconShield, iconBarChart, iconGauge,
+  iconCode, iconShield, iconBarChart, iconGauge, iconEdit, iconSave, iconX,
 } from '../app/icons';
 import { navigateTo, initials, initTabs } from '../app/core';
-import { getProjectById, type ProjectDetail } from '../app/adapters';
+import { getProjectById, putProject, type ProjectDetail } from '../app/adapters';
+import { projectStatusConfig, UNKNOWN_STATUS } from '../app/config';
+import type { ProjectStatus } from '../../api/types';
+
+let isEditing = false;
 
 function buildVariance(baseline: number, current: number, isLowerBetter: boolean, unit: string, prefix = ''): SafeHtml {
   const diff = current - baseline;
@@ -55,15 +59,27 @@ function buildProjectSummary(project: ProjectDetail): SafeHtml {
   return html`
     <div class="card p-6">
       <h2 class="text-lg font-display font-semibold mb-4">Project Summary</h2>
-      <p class="text-sm text-muted mb-6">${project.description}</p>
+      ${isEditing
+        ? html`<textarea class="textarea mb-6" id="project-edit-description" rows="3" style="resize:none">${project.description}</textarea>`
+        : html`<p class="text-sm text-muted mb-6">${project.description}</p>`}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
         <div class="flex items-center gap-3" style="padding:0.75rem;border-radius:0.5rem;background:hsl(var(--muted)/0.5)">
           ${iconCalendar(20, 'text-primary')}
-          <div><p class="text-xs text-muted">Start Date</p><p class="text-sm font-medium">${project.startDate}</p></div>
+          <div>
+            <p class="text-xs text-muted">Start Date</p>
+            ${isEditing
+              ? html`<input type="date" id="project-edit-start-date" value="${project.startDate}" class="input" style="margin-top:0.25rem" />`
+              : html`<p class="text-sm font-medium">${project.startDate}</p>`}
+          </div>
         </div>
         <div class="flex items-center gap-3" style="padding:0.75rem;border-radius:0.5rem;background:hsl(var(--muted)/0.5)">
           ${iconTarget(20, 'text-primary')}
-          <div><p class="text-xs text-muted">Target End</p><p class="text-sm font-medium">${project.targetEndDate}</p></div>
+          <div>
+            <p class="text-xs text-muted">Target End</p>
+            ${isEditing
+              ? html`<input type="date" id="project-edit-end-date" value="${project.targetEndDate}" class="input" style="margin-top:0.25rem" />`
+              : html`<p class="text-sm font-medium">${project.targetEndDate}</p>`}
+          </div>
         </div>
       </div>
       <div style="margin-top:1.5rem">
@@ -85,15 +101,23 @@ function buildBaselineComparison(project: ProjectDetail): SafeHtml {
       </div>
       <div class="score-grid">
         ${[
-          { label: 'Time', icon: iconClock, baseline: project.metrics.time.baseline, current: project.metrics.time.current, unit: 'd', prefix: '', isLowerBetter: true },
-          { label: 'Cost', icon: iconDollarSign, baseline: project.metrics.cost.baseline / 1000, current: project.metrics.cost.current / 1000, unit: 'k', prefix: '$', isLowerBetter: true },
-          { label: 'Impact', icon: iconTrendingUp, baseline: project.metrics.impact.baseline, current: project.metrics.impact.current, unit: ' pts', prefix: '', isLowerBetter: false },
+          { label: 'Time', inputId: 'time', icon: iconClock, baseline: project.metrics.time.baseline, current: project.metrics.time.current, unit: 'd', prefix: '', isLowerBetter: true },
+          { label: 'Cost', inputId: 'cost', icon: iconDollarSign, baseline: project.metrics.cost.baseline / 1000, current: project.metrics.cost.current / 1000, unit: 'k', prefix: '$', isLowerBetter: true },
+          { label: 'Impact', inputId: 'impact', icon: iconTrendingUp, baseline: project.metrics.impact.baseline, current: project.metrics.impact.current, unit: ' pts', prefix: '', isLowerBetter: false },
         ].map(metric => html`
           <div style="padding:1rem;border-radius:0.75rem;background:hsl(var(--muted)/0.3);border:1px solid hsl(var(--border))">
             <div class="flex items-center gap-2 mb-3">${metric.icon(20, 'text-primary')} <span class="font-medium">${metric.label}</span></div>
             <div style="display:flex;flex-direction:column;gap:0.5rem">
-              <div class="flex items-center justify-between"><span class="text-xs text-muted">Baseline</span><span class="text-sm font-medium">${metric.baseline ? `${metric.prefix}${metric.baseline}${metric.unit}` : '—'}</span></div>
-              <div class="flex items-center justify-between"><span class="text-xs text-muted">Current</span><span class="text-sm font-medium">${metric.current ? `${metric.prefix}${metric.current}${metric.unit}` : '—'}</span></div>
+              <div class="flex items-center justify-between">
+                <span class="text-xs text-muted">Baseline</span>
+                ${isEditing
+                  ? html`<input type="number" id="project-edit-${metric.inputId}-baseline" value="${String(metric.baseline)}" class="input" style="width:5rem;text-align:right" min="0" step="any" />`
+                  : html`<span class="text-sm font-medium">${metric.baseline ? `${metric.prefix}${metric.baseline}${metric.unit}` : '—'}</span>`}
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-xs text-muted">Current</span>
+                <span class="text-sm font-medium">${metric.current ? `${metric.prefix}${metric.current}${metric.unit}` : '—'}</span>
+              </div>
               <div style="padding-top:0.5rem;border-top:1px solid hsl(var(--border))" class="flex items-center justify-between">
                 <span class="text-xs font-medium text-muted">Variance</span>
                 ${buildVariance(metric.baseline, metric.current, metric.isLowerBetter, metric.unit, metric.prefix)}
@@ -313,6 +337,10 @@ function buildProjectSidebar(project: ProjectDetail): SafeHtml {
 }
 
 function buildProjectDetail(project: ProjectDetail, projectId: string): SafeHtml {
+  const statusOptions = Object.entries(projectStatusConfig).map(
+    ([key, cfg]) => html`<option value="${key}" ${trusted(key === project.status ? 'selected' : '')}>${cfg.label}</option>`
+  );
+
   return html`
     <div style="max-width:64rem;margin:0 auto">
       <div class="flex items-center gap-2 text-sm text-muted mb-4">
@@ -322,14 +350,26 @@ function buildProjectDetail(project: ProjectDetail, projectId: string): SafeHtml
       </div>
 
       <div class="flex items-start justify-between gap-4 mb-6">
-        <div>
-          <div class="flex flex-wrap items-center gap-3 mb-2">
-            <h1 class="text-xl font-display font-bold">${project.title}</h1>
-            <span class="badge badge-success text-xs">${iconCheckCircle2(14)} Approved</span>
+        <div class="flex items-center gap-4">
+          <button class="btn btn-ghost btn-icon" id="project-back-btn">${iconArrowLeft(20)}</button>
+          <div>
+            <div class="flex flex-wrap items-center gap-3 mb-2">
+              ${isEditing
+                ? html`<input class="input" id="project-edit-title" value="${project.title}" style="font-size:1.125rem;font-weight:700" />`
+                : html`<h1 class="text-xl font-display font-bold">${project.title}</h1>`}
+              ${isEditing
+                ? html`<select class="input" id="project-edit-status" style="width:auto">${statusOptions}</select>`
+                : html`<span class="badge ${(projectStatusConfig[project.status as keyof typeof projectStatusConfig] ?? UNKNOWN_STATUS).className} text-xs">${iconCheckCircle2(14)} ${(projectStatusConfig[project.status as keyof typeof projectStatusConfig] ?? UNKNOWN_STATUS).label}</span>`}
+            </div>
+            <p class="text-sm text-muted">Led by ${project.projectLead} • ${project.progress}% complete</p>
           </div>
-          <p class="text-sm text-muted">Led by ${project.projectLead} • ${project.progress}% complete</p>
         </div>
-        <button class="btn btn-outline btn-icon">${iconMoreVertical(20)}</button>
+        ${isEditing
+          ? html`<div class="flex gap-2">
+              <button class="btn btn-outline gap-2" id="project-cancel-btn">${iconX(16)} Cancel</button>
+              <button class="btn btn-primary gap-2" id="project-save-btn">${iconSave(16)} Save</button>
+            </div>`
+          : html`<button class="btn btn-outline gap-2" id="project-edit-btn">${iconEdit(16)} Edit</button>`}
       </div>
 
       <div class="actions-grid mb-8" style="gap:0.75rem">
@@ -371,23 +411,47 @@ function buildProjectDetail(project: ProjectDetail, projectId: string): SafeHtml
     </div>`;
 }
 
-export async function init(params?: Record<string, string>): Promise<void> {
-  const projectId = params?.projectId || '1';
+function bindProjectEvents(project: ProjectDetail, projectId: string): void {
+  // Back
+  $('#project-back-btn')?.addEventListener('click', () => navigateTo('projects'));
 
-  const container = $('#project-detail-content');
-  if (!container) return;
-  setHtml(container, buildSkeleton('detail'));
+  // Edit / Save / Cancel
+  $('#project-edit-btn')?.addEventListener('click', () => {
+    isEditing = true;
+    mutateProjectPage(project, projectId);
+  });
 
-  let project: ProjectDetail;
-  try {
-    project = await getProjectById(projectId);
-  } catch {
-    setHtml(container, buildErrorState('Failed to load project details. The project may not exist.'));
-    container.querySelector('[data-retry-btn]')?.addEventListener('click', () => init(params));
-    return;
-  }
+  $('#project-cancel-btn')?.addEventListener('click', () => {
+    isEditing = false;
+    mutateProjectPage(project, projectId);
+  });
 
-  setHtml(container, buildProjectDetail(project, projectId));
+  $('#project-save-btn')?.addEventListener('click', async () => {
+    const title = $input('#project-edit-title')?.value ?? project.title;
+    const description = $textarea('#project-edit-description')?.value ?? project.description;
+    const status = ($select('#project-edit-status')?.value ?? project.status) as ProjectStatus;
+    const startDate = $input('#project-edit-start-date')?.value ?? project.startDate;
+    const targetEndDate = $input('#project-edit-end-date')?.value ?? project.targetEndDate;
+    const timeBaseline = Number($input('#project-edit-time-baseline')?.value ?? project.metrics.time.baseline);
+    const costBaseline = Number($input('#project-edit-cost-baseline')?.value ?? project.metrics.cost.baseline / 1000);
+    const impactBaseline = Number($input('#project-edit-impact-baseline')?.value ?? project.metrics.impact.baseline);
+    try {
+      await putProject(projectId, {
+        title, description, status,
+        start_date: startDate,
+        target_end_date: targetEndDate,
+        estimated_duration: timeBaseline * 86400,
+        estimated_cost: costBaseline * 1000,
+        estimated_impact: impactBaseline,
+      });
+      showToast('Project saved', 'success');
+      const updated = await getProjectById(projectId);
+      isEditing = false;
+      mutateProjectPage(updated, projectId);
+    } catch {
+      showToast('Failed to save project', 'error');
+    }
+  });
 
   // Engineering nav
   $$('[data-navigate-to-engineering]').forEach(el => {
@@ -406,4 +470,31 @@ export async function init(params?: Record<string, string>): Promise<void> {
     if (comment) comment.value = '';
     if (postBtn instanceof HTMLButtonElement) postBtn.disabled = true;
   });
+}
+
+function mutateProjectPage(project: ProjectDetail, projectId: string): void {
+  const container = $('#project-detail-content');
+  if (!container) return;
+  setHtml(container, buildProjectDetail(project, projectId));
+  bindProjectEvents(project, projectId);
+}
+
+export async function init(params?: Record<string, string>): Promise<void> {
+  const projectId = params?.projectId || '1';
+  isEditing = false;
+
+  const container = $('#project-detail-content');
+  if (!container) return;
+  setHtml(container, buildSkeleton('detail'));
+
+  let project: ProjectDetail;
+  try {
+    project = await getProjectById(projectId);
+  } catch {
+    setHtml(container, buildErrorState('Failed to load project details. The project may not exist.'));
+    container.querySelector('[data-retry-btn]')?.addEventListener('click', () => init(params));
+    return;
+  }
+
+  mutateProjectPage(project, projectId);
 }

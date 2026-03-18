@@ -18,9 +18,9 @@ function styleForScoreBadge(score: number): string {
 }
 
 function buildIdeaCard(idea: Idea, view: string): SafeHtml {
-  const isReviewable = idea.status === 'pending_review' && idea.edgeStatus === 'complete';
+  const isReviewable = idea.status === 'in-review' && idea.edgeStatus === 'complete';
   const isConvertible = idea.status === 'approved';
-  const needsEdgeDefinition = idea.edgeStatus !== 'complete' && idea.status !== 'draft';
+  const needsEdgeDefinition = idea.edgeStatus !== 'complete' && idea.status === 'active';
 
   return html`
     <div class="card card-hover p-5" style="cursor:pointer" data-idea-card="${idea.id}">
@@ -136,7 +136,7 @@ export async function init(): Promise<void> {
   }
 
   // Review queue button
-  const pendingReviewCount = ideas.filter(idea => idea.status === 'pending_review').length;
+  const pendingReviewCount = ideas.filter(idea => idea.status === 'in-review').length;
   const reviewBtnEl = $('#review-queue-btn');
   if (reviewBtnEl && pendingReviewCount > 0) {
     setHtml(reviewBtnEl, html`

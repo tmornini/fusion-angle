@@ -98,7 +98,7 @@ async function loadSearchIndex(): Promise<void> {
     const ideaItems: SearchItem[] = ideas.map(idea => ({
       id: `idea-${idea.id}`,
       title: idea.title,
-      meta: `Score: ${idea.score} · ${idea.status.replace(/_/g, ' ')}`,
+      meta: `Score: ${idea.score} · ${idea.status.replace(/-/g, ' ')}`,
       category: 'ideas',
       icon: iconLightbulb(16),
       href: `../idea-convert/index.html?ideaId=${idea.id}`,
@@ -108,7 +108,7 @@ async function loadSearchIndex(): Promise<void> {
     const projectItems: SearchItem[] = projects.map(project => ({
       id: `project-${project.id}`,
       title: project.title,
-      meta: `Progress: ${project.progress}% · ${project.status.replace(/_/g, ' ')}`,
+      meta: `Progress: ${project.progress}% · ${project.status.replace(/-/g, ' ')}`,
       category: 'projects',
       icon: iconFolderKanban(16),
       href: `../project-detail/index.html?projectId=${project.id}`,

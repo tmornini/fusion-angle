@@ -7,7 +7,7 @@ import {
   iconTrash, iconCheck, iconAlertCircle, iconClock, iconUser, iconSave,
 } from '../app/icons';
 import { navigateTo } from '../app/core';
-import { getIdeaForEdge, getEdgeDataByIdeaId, type EdgeIdea, type EdgeData } from '../app/adapters';
+import { getIdeaForEdge, getEdgeDataByIdeaId, putEdgeData, type EdgeIdea, type EdgeData } from '../app/adapters';
 import type { ConfidenceLevel } from '../../api/types';
 
 const outcomeTemplates = ['Reduce operational cost', 'Increase customer retention', 'Improve delivery speed'];
@@ -285,7 +285,7 @@ function bindEdgeEvents(ideaId: string) {
     saveBtn.disabled = true;
     saveBtn.textContent = 'Saving...';
     try {
-      // Simulated save — replace with real API call when available
+      await putEdgeData(ideaId, edgeData);
       showToast('Edge data saved successfully', 'success');
       navigateTo('approval-detail', { id: ideaId });
     } catch {

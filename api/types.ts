@@ -19,7 +19,10 @@ export type PriorityLevel = 'high' | 'medium' | 'low';
 export type EdgeStatus = 'complete' | 'draft' | 'missing';
 
 /** Idea lifecycle status. */
-export type IdeaStatus = 'draft' | 'scored' | 'pending_review' | 'approved' | 'rejected';
+export type IdeaStatus = 'active' | 'in-review' | 'approved' | 'promoted' | 'archived' | 'deleted';
+
+/** Project lifecycle status. */
+export type ProjectStatus = 'submitted' | 'under-review' | 'sent-back' | 'approved' | 'declined' | 'completed' | 'deleted';
 
 /** Score thresholds for priority classification. */
 export const SCORE_THRESHOLD_HIGH = 80;
@@ -163,7 +166,7 @@ export interface ProjectEntity {
   id: Id;
   title: string;
   description: string;
-  status: string;
+  status: ProjectStatus;
   progress: number;
   start_date: string;
   target_end_date: string;

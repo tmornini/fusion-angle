@@ -23,6 +23,7 @@ export async function getIdeas(prefetchedIdeas?: IdeaEntity[], cachedUserMap?: M
     cachedUserMap ? Promise.resolve(cachedUserMap) : buildUserMap(),
   ]);
   return ideas
+    .filter(idea => idea.status !== 'deleted')
     .map(idea => ({
       id: idea.id,
       title: idea.title,
@@ -60,7 +61,7 @@ export async function getReviewQueue(cachedUserMap?: Map<Id, User>): Promise<Rev
   ]);
 
   return ideas
-    .filter(idea => idea.readiness !== '')
+    .filter(idea => idea.status === 'in-review')
     .map(idea => {
       return {
         id: idea.id,

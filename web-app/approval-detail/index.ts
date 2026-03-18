@@ -1,4 +1,4 @@
-import { $ } from '../app/dom';
+import { $, $input, $textarea } from '../app/dom';
 import { html, setHtml, SafeHtml } from '../app/safe-html';
 import { showToast } from '../app/toast';
 import { buildSkeleton, buildErrorState } from '../app/loading-states';
@@ -6,10 +6,12 @@ import {
   iconArrowLeft, iconAlertTriangle, iconTrendingUp, iconClock,
   iconUser, iconCalendar, iconTarget, iconLightbulb, iconCheckCircle,
   iconXCircle, iconMessageSquare, iconFileText, iconDollarSign,
-  iconUsers, iconShield, iconGauge,
+  iconUsers, iconShield, iconGauge, iconEdit, iconSave, iconX,
 } from '../app/icons';
 import { navigateTo, openDialog, closeDialog } from '../app/core';
-import { getIdeaForApproval, getEdgeForApproval, buildUserMap, type ApprovalIdea, type ApprovalEdge, type Metric } from '../app/adapters';
+import { getIdeaForApproval, getEdgeForApproval, getIdea, putIdea, buildUserMap, type ApprovalIdea, type ApprovalEdge, type Metric } from '../app/adapters';
+
+let isEditingIdea = false;
 
 const severityConfig: Record<string, string> = {
   high: 'badge-error',
@@ -27,10 +29,20 @@ function buildApprovalPage(idea: ApprovalIdea, edge: ApprovalEdge): SafeHtml {
               <button class="btn btn-ghost btn-icon" id="approval-back-btn">${iconArrowLeft(20)}</button>
               <div style="min-width:0">
                 <p class="text-xs text-muted">Reviewing Idea</p>
-                <h1 class="text-lg font-bold truncate">${idea.title}</h1>
+                ${isEditingIdea
+                  ? html`<input class="input" id="approval-edit-title" value="${idea.title}" style="font-size:1.125rem;font-weight:700" />`
+                  : html`<h1 class="text-lg font-bold truncate">${idea.title}</h1>`}
               </div>
             </div>
-            <span class="badge badge-error text-xs" style="flex-shrink:0">${idea.priority}</span>
+            <div class="flex items-center gap-2" style="flex-shrink:0">
+              ${isEditingIdea
+                ? html`
+                  <button class="btn btn-outline gap-2" id="approval-cancel-edit-btn">${iconX(16)} Cancel</button>
+                  <button class="btn btn-primary gap-2" id="approval-save-edit-btn">${iconSave(16)} Save</button>`
+                : html`
+                  <button class="btn btn-outline gap-2" id="approval-edit-btn">${iconEdit(16)} Edit</button>
+                  <span class="badge badge-error text-xs">${idea.priority}</span>`}
+            </div>
           </div>
         </div>
       </header>
@@ -63,7 +75,9 @@ function buildApprovalPage(idea: ApprovalIdea, edge: ApprovalEdge): SafeHtml {
 
         <div class="card p-6 mb-6">
           <h3 class="font-semibold mb-3 flex items-center gap-2">${iconLightbulb(20, 'text-primary')} Idea Overview</h3>
-          <p class="text-sm leading-relaxed">${idea.description}</p>
+          ${isEditingIdea
+            ? html`<textarea class="textarea" id="approval-edit-description" rows="4" style="resize:none">${idea.description}</textarea>`
+            : html`<p class="text-sm leading-relaxed">${idea.description}</p>`}
         </div>
 
         <div class="detail-grid mb-6" style="grid-template-columns:1fr 1fr">
@@ -197,31 +211,11 @@ function buildApprovalPage(idea: ApprovalIdea, edge: ApprovalEdge): SafeHtml {
     </div>`;
 }
 
-export async function init(params?: Record<string, string>): Promise<void> {
-  const id = params?.['id'] || '1';
-
-  const root = $('#page-root');
-  if (!root) return;
-  setHtml(root, buildSkeleton('detail'));
-
-  let idea: ApprovalIdea;
-  let edge: ApprovalEdge;
-  try {
-    const userMap = await buildUserMap();
-    [idea, edge] = await Promise.all([
-      getIdeaForApproval(id, userMap),
-      getEdgeForApproval(id, userMap),
-    ]);
-  } catch {
-    setHtml(root, buildErrorState('Failed to load approval details.'));
-    root.querySelector('[data-retry-btn]')?.addEventListener('click', () => init());
-    return;
-  }
-
-  setHtml(root, buildApprovalPage(idea, edge));
-
+function bindApprovalEvents(idea: ApprovalIdea, edge: ApprovalEdge, id: string): void {
   // Approve
-  $('#approval-approve-btn')?.addEventListener('click', () => {
+  $('#approval-approve-btn')?.addEventListener('click', async () => {
+    const existingIdea = await getIdea(id);
+    await putIdea(id, { ...existingIdea, status: 'approved' });
     showToast('Idea approved successfully', 'success');
     navigateTo('idea-review-queue');
   });
@@ -229,13 +223,45 @@ export async function init(params?: Record<string, string>): Promise<void> {
   // Back
   $('#approval-back-btn')?.addEventListener('click', () => navigateTo('idea-review-queue'));
 
+  // Edit / Save / Cancel
+  $('#approval-edit-btn')?.addEventListener('click', () => {
+    isEditingIdea = true;
+    mutateApprovalPage(idea, edge, id);
+  });
+
+  $('#approval-cancel-edit-btn')?.addEventListener('click', () => {
+    isEditingIdea = false;
+    mutateApprovalPage(idea, edge, id);
+  });
+
+  $('#approval-save-edit-btn')?.addEventListener('click', async () => {
+    const title = $input('#approval-edit-title')?.value ?? idea.title;
+    const description = $textarea('#approval-edit-description')?.value ?? idea.description;
+    try {
+      const existingIdea = await getIdea(id);
+      await putIdea(id, { ...existingIdea, title, description });
+      showToast('Idea saved', 'success');
+      const userMap = await buildUserMap();
+      const [updatedIdea, updatedEdge] = await Promise.all([
+        getIdeaForApproval(id, userMap),
+        getEdgeForApproval(id, userMap),
+      ]);
+      isEditingIdea = false;
+      mutateApprovalPage(updatedIdea, updatedEdge, id);
+    } catch {
+      showToast('Failed to save idea', 'error');
+    }
+  });
+
   // Reject dialog
   const openReject = () => openDialog('approval-reject');
   const closeReject = () => closeDialog('approval-reject');
   $('#approval-reject-btn')?.addEventListener('click', openReject);
   $('#approval-reject-cancel')?.addEventListener('click', closeReject);
   $('#approval-reject-backdrop')?.addEventListener('click', closeReject);
-  $('#approval-reject-confirm')?.addEventListener('click', () => {
+  $('#approval-reject-confirm')?.addEventListener('click', async () => {
+    const existingIdea = await getIdea(id);
+    await putIdea(id, { ...existingIdea, status: 'archived' });
     showToast('Idea sent back for revision', 'info');
     closeReject();
     navigateTo('idea-review-queue');
@@ -256,4 +282,36 @@ export async function init(params?: Record<string, string>): Promise<void> {
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') { closeReject(); closeClarify(); }
   });
+}
+
+function mutateApprovalPage(idea: ApprovalIdea, edge: ApprovalEdge, id: string): void {
+  const root = $('#page-root');
+  if (!root) return;
+  setHtml(root, buildApprovalPage(idea, edge));
+  bindApprovalEvents(idea, edge, id);
+}
+
+export async function init(params?: Record<string, string>): Promise<void> {
+  const id = params?.['id'] || '1';
+  isEditingIdea = false;
+
+  const root = $('#page-root');
+  if (!root) return;
+  setHtml(root, buildSkeleton('detail'));
+
+  let idea: ApprovalIdea;
+  let edge: ApprovalEdge;
+  try {
+    const userMap = await buildUserMap();
+    [idea, edge] = await Promise.all([
+      getIdeaForApproval(id, userMap),
+      getEdgeForApproval(id, userMap),
+    ]);
+  } catch {
+    setHtml(root, buildErrorState('Failed to load approval details.'));
+    root.querySelector('[data-retry-btn]')?.addEventListener('click', () => init());
+    return;
+  }
+
+  mutateApprovalPage(idea, edge, id);
 }

@@ -2,7 +2,7 @@ import { GET, PUT } from '../../../api/api';
 import type {
   ProjectEntity, ProjectTeamEntity, MilestoneEntity, ProjectTaskEntity,
   DiscussionEntity, ProjectVersionEntity,
-  IdeaEntity, ClarificationEntity, ConfidenceLevel, Id,
+  IdeaEntity, ClarificationEntity, ConfidenceLevel, ProjectStatus, Id,
 } from '../../../api/types';
 import { User } from '../../../api/types';
 import { durationInDays } from '../format';
@@ -11,7 +11,7 @@ import { buildUserMap, userName, parseJson, getEdgeDataWithConfidence, type Metr
 export interface Project {
   id: string;
   title: string;
-  status: 'approved' | 'under_review' | 'sent_back';
+  status: ProjectStatus;
   priorityScore: number;
   estimatedDuration: number;
   actualDuration: number;
@@ -25,10 +25,12 @@ export interface Project {
 
 export async function getProjects(prefetchedProjects?: ProjectEntity[]): Promise<Project[]> {
   const rows = prefetchedProjects ?? await GET('projects') as ProjectEntity[];
-  return rows.map(row => ({
+  return rows
+    .filter(row => row.status !== 'deleted')
+    .map(row => ({
     id: row.id,
     title: row.title,
-    status: row.status as Project['status'],
+    status: row.status,
     priorityScore: row.priority_score,
     estimatedDuration: durationInDays(row.estimated_duration),
     actualDuration: durationInDays(row.actual_duration),

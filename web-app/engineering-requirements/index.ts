@@ -71,12 +71,12 @@ export async function init(params?: Record<string, string>): Promise<void> {
         <span>Engineering Requirements</span>
       </div>
 
-      <div class="flex items-start justify-between mb-8">
+      <div class="flex items-center gap-4 mb-8">
+        <button class="btn btn-ghost btn-icon" id="requirements-back">${iconArrowLeft(20)}</button>
         <div>
           <h1 class="text-2xl font-display font-bold mb-2">Engineering Requirements</h1>
           <p class="text-muted">Business context and clarifications for ${project.title}</p>
         </div>
-        <button class="btn btn-outline gap-2" id="requirements-back">${iconArrowLeft(16)} Back to Project</button>
       </div>
 
       <div class="stats-grid mb-8">

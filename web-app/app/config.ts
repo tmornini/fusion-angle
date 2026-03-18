@@ -3,7 +3,7 @@
 // Status display configs used across pages.
 // ============================================
 
-import type { EdgeStatus, IdeaStatus, ConfidenceLevel } from '../../api/types';
+import type { EdgeStatus, IdeaStatus, ProjectStatus, ConfidenceLevel } from '../../api/types';
 
 export const edgeStatusConfig: Record<EdgeStatus | 'incomplete', { label: string; className: string }> = {
   missing:    { label: 'Edge Missing',  className: 'badge-error' },
@@ -13,18 +13,22 @@ export const edgeStatusConfig: Record<EdgeStatus | 'incomplete', { label: string
 };
 
 export const ideaStatusConfig: Record<IdeaStatus, { label: string; className: string }> = {
-  draft:          { label: 'Draft',          className: 'badge-default' },
-  scored:         { label: 'Scored',         className: 'badge-primary' },
-  pending_review: { label: 'Pending Review', className: 'badge-warning' },
-  approved:       { label: 'Approved',       className: 'badge-success' },
-  rejected:       { label: 'Sent Back',      className: 'badge-error' },
+  'active':    { label: 'Active',    className: 'badge-success' },
+  'in-review': { label: 'In Review', className: 'badge-warning' },
+  'approved':  { label: 'Approved',  className: 'badge-primary' },
+  'promoted':  { label: 'Promoted',  className: 'badge-primary' },
+  'archived':  { label: 'Archived',  className: 'badge-default' },
+  'deleted':   { label: 'Deleted',   className: 'badge-default' },
 };
 
-export const projectStatusConfig: Record<string, { label: string; className: string }> = {
-  approved:     { label: 'Approved',     className: 'badge-success' },
-  completed:    { label: 'Completed',    className: 'badge-primary' },
-  under_review: { label: 'Under Review', className: 'badge-warning' },
-  sent_back:    { label: 'Sent Back',    className: 'badge-error' },
+export const projectStatusConfig: Record<ProjectStatus, { label: string; className: string }> = {
+  'submitted':    { label: 'Submitted',    className: 'badge-default' },
+  'under-review': { label: 'Under Review', className: 'badge-warning' },
+  'sent-back':    { label: 'Sent Back',    className: 'badge-warning' },
+  'approved':     { label: 'Approved',     className: 'badge-success' },
+  'declined':     { label: 'Declined',     className: 'badge-error' },
+  'completed':    { label: 'Completed',    className: 'badge-primary' },
+  'deleted':      { label: 'Deleted',      className: 'badge-default' },
 };
 
 export const confidenceLevelConfig: Record<ConfidenceLevel, { label: string; className: string }> = {

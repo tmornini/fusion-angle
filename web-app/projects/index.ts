@@ -11,9 +11,13 @@ import { getProjects, type Project } from '../app/adapters';
 import { projectStatusConfig, UNKNOWN_STATUS } from '../app/config';
 
 const projectStatusIcons: Record<string, (size?: number, cssClass?: string) => SafeHtml> = {
-  approved: iconCheckCircle2,
-  under_review: iconAlertCircle,
-  sent_back: iconXCircle,
+  'submitted': iconClock,
+  'under-review': iconAlertCircle,
+  'sent-back': iconXCircle,
+  'approved': iconCheckCircle2,
+  'declined': iconXCircle,
+  'completed': iconCheckCircle2,
+  'deleted': iconXCircle,
 };
 
 function buildProgressRing(percent: number): SafeHtml {
@@ -92,18 +96,18 @@ export async function init(): Promise<void> {
     ['#performance-view-icon', iconBarChart(16)],
   ]);
 
-  // Status badges
-  const counts = {
-    approved: projects.filter(project => project.status === 'approved').length,
-    under_review: projects.filter(project => project.status === 'under_review').length,
-    sent_back: projects.filter(project => project.status === 'sent_back').length,
-  };
+  // Status badges — dynamic, only show states with count > 0
+  const statusGroups = Object.groupBy(projects, p => p.status);
   const badgesEl = $('#status-badges');
   if (badgesEl) {
-    setHtml(badgesEl, html`
-      <span class="badge badge-success text-xs">${iconCheckCircle2(14)} ${counts.approved}</span>
-      <span class="badge badge-warning text-xs">${iconAlertCircle(14)} ${counts.under_review}</span>
-      <span class="badge badge-error text-xs">${iconXCircle(14)} ${counts.sent_back}</span>`);
+    const badgeFragments = Object.entries(statusGroups)
+      .filter(([, items]) => items && items.length > 0)
+      .map(([status, items]) => {
+        const cfg = projectStatusConfig[status as keyof typeof projectStatusConfig] ?? UNKNOWN_STATUS;
+        const icon = projectStatusIcons[status] ?? iconAlertCircle;
+        return html`<span class="badge ${cfg.className} text-xs">${icon(14)} ${items!.length}</span>`;
+      });
+    setHtml(badgesEl, html`${badgeFragments}`);
   }
 
   function bindCards(): void {

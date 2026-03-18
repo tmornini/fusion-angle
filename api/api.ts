@@ -117,6 +117,10 @@ const routes: Route[] = [
   route('processes/:processId/steps', {
     get: (db, p) => db.processSteps.getByProcessId(param(p, 0)),
   }),
+  route('processes/:processId/steps/:stepId', {
+    get: (db, p) => db.processSteps.getById(param(p, 1)),
+    put: (db, p, payload) => db.processSteps.put(param(p, 1), { ...payload, process_id: param(p, 0) }),
+  }),
   route('activities/:id', {
     put: (db, p, payload) => db.activities.put(param(p, 0), payload),
   }),
