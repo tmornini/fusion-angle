@@ -571,7 +571,9 @@ export async function createLocalStorageAdapter(
                         === ideaId,
                 );
                 const fid =
-                    fields.id as string;
+                    typeof fields.id === 'string'
+                        ? fields.id
+                        : undefined;
                 const existing =
                     rows[index];
                 const id =
@@ -655,7 +657,9 @@ export async function createLocalStorageAdapter(
                             === userId,
                 );
                 const fid =
-                    fields.id as string;
+                    typeof fields.id === 'string'
+                        ? fields.id
+                        : undefined;
                 const existing =
                     rows[index];
                 const id =

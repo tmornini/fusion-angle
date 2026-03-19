@@ -6,7 +6,9 @@ import {
     setTheme,
     isValidTheme,
 } from './state';
-import { $, $$, } from './dom';
+import {
+    $, $$, FOCUSABLE_SELECTOR,
+} from './dom';
 import { setHtml } from './safe-html';
 import {
     iconSun,
@@ -18,6 +20,21 @@ import {
     navigateTo,
 } from './navigation';
 import { log } from './logger';
+
+const THEME_TOGGLE_IDS = [
+    'theme-toggle',
+    'mobile-theme-toggle',
+] as const;
+
+const SIDEBAR_USER_NAME_IDS = [
+    'sidebar-user-name',
+    'mobile-sidebar-user-name',
+] as const;
+
+const SIDEBAR_USER_COMPANY_IDS = [
+    'sidebar-user-company',
+    'mobile-sidebar-user-company',
+] as const;
 
 function mutateThemeToggleIcon(): void {
     const themeIcon =
@@ -32,10 +49,7 @@ function mutateThemeToggleIcon(): void {
             : state.theme === 'light'
                 ? 'Switch to dark theme'
                 : 'Toggle theme';
-    [
-        'theme-toggle',
-        'mobile-theme-toggle',
-    ].forEach(id => {
+    THEME_TOGGLE_IDS.forEach(id => {
         const button = $(`#${id}`);
         if (button) {
             setHtml(button, themeIcon);
@@ -53,18 +67,14 @@ async function mutateSidebarUser(
         await import('./adapters');
     const user =
         await getCurrentUser();
-    for (const id of [
-        'sidebar-user-name',
-        'mobile-sidebar-user-name',
-    ]) {
+    for (const id of SIDEBAR_USER_NAME_IDS) {
         const el = $(`#${id}`);
         if (el)
             el.textContent = user.name;
     }
-    for (const id of [
-        'sidebar-user-company',
-        'mobile-sidebar-user-company',
-    ]) {
+    for (const id of
+        SIDEBAR_USER_COMPANY_IDS
+    ) {
         const el = $(`#${id}`);
         if (el)
             el.textContent = user.company;
@@ -141,57 +151,41 @@ function initSidebar(): void {
         });
     }
 
+    function setSidebarCollapsed(
+        collapsed: boolean,
+    ): void {
+        const action = collapsed
+            ? 'add' : 'remove';
+        sidebar?.classList[action](
+            'sidebar-collapsed',
+        );
+        mainContent?.classList[action](
+            'sidebar-collapsed',
+        );
+        setState({
+            isSidebarCollapsed: collapsed,
+        });
+        try {
+            localStorage.setItem(
+                STORAGE_KEY_SIDEBAR,
+                String(collapsed),
+            );
+        } catch {
+            log.debug(
+                'Failed to save'
+                + ' sidebar state',
+                'layout',
+            );
+        }
+    }
+
     $('#sidebar-collapse')?.addEventListener(
         'click',
-        () => {
-            sidebar?.classList.add(
-                'sidebar-collapsed',
-            );
-            mainContent?.classList.add(
-                'sidebar-collapsed',
-            );
-            setState({
-                isSidebarCollapsed: true,
-            });
-            try {
-                localStorage.setItem(
-                    STORAGE_KEY_SIDEBAR,
-                    'true',
-                );
-            } catch {
-                log.debug(
-                    'Failed to save'
-                    + ' sidebar state',
-                    'layout',
-                );
-            }
-        },
+        () => setSidebarCollapsed(true),
     );
     $('#sidebar-expand')?.addEventListener(
         'click',
-        () => {
-            sidebar?.classList.remove(
-                'sidebar-collapsed',
-            );
-            mainContent?.classList.remove(
-                'sidebar-collapsed',
-            );
-            setState({
-                isSidebarCollapsed: false,
-            });
-            try {
-                localStorage.setItem(
-                    STORAGE_KEY_SIDEBAR,
-                    'false',
-                );
-            } catch {
-                log.debug(
-                    'Failed to save'
-                    + ' sidebar state',
-                    'layout',
-                );
-            }
-        },
+        () => setSidebarCollapsed(false),
     );
 
     $$('[data-section]').forEach(btn => {
@@ -285,7 +279,9 @@ function initDropdown(
 }
 
 function initThemeAndDropdowns(): void {
-    for (const prefix of ['', 'mobile-']) {
+    for (const prefix of
+        ['', 'mobile-'] as const
+    ) {
         initDropdown(
             `${prefix}theme-toggle`,
             `${prefix}theme-dropdown`,
@@ -341,15 +337,10 @@ function initMobileDrawer(): void {
             'hidden',
         );
         // Focus first focusable element
-        const focusableSelector =
-            'a[href], button, input,'
-            + ' select, textarea,'
-            + ' [tabindex]'
-            + ':not([tabindex="-1"])';
         const firstFocusable =
             sheet
                 ?.querySelector<HTMLElement>(
-                    focusableSelector,
+                    FOCUSABLE_SELECTOR,
                 );
         firstFocusable?.focus();
     }
@@ -393,16 +384,11 @@ function initMobileDrawer(): void {
         'keydown',
         (e) => {
             if (e.key !== 'Tab') return;
-            const focusableSelector =
-                'a[href], button, input,'
-                + ' select, textarea,'
-                + ' [tabindex]'
-                + ':not([tabindex="-1"])';
             const focusable =
                 sheet
                     .querySelectorAll<
                         HTMLElement
-                    >(focusableSelector);
+                    >(FOCUSABLE_SELECTOR);
             if (focusable.length === 0)
                 return;
             const first = focusable[0]!;
@@ -502,20 +488,26 @@ stat.label}</span></div>`,
 )}`,
             );
         }
-    } catch {
-        // Header info boxes stay
-        // empty/hidden via :empty
+    } catch (err) {
+        log.debug(
+            'Header info load failed',
+            'layout',
+            err,
+        );
     }
 }
 
-function initSidebarLayout(): void {
+async function initSidebarLayout(
+): Promise<void> {
     initActiveNavItem();
     initSidebar();
     initThemeAndDropdowns();
     initMobileDrawer();
     mutateThemeToggleIcon();
-    mutateSidebarUser();
-    mutateHeaderInfo();
+    await Promise.all([
+        mutateSidebarUser(),
+        mutateHeaderInfo(),
+    ]);
 }
 
 export { initSidebarLayout };

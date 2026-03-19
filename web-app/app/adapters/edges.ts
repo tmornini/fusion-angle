@@ -56,6 +56,8 @@ export interface EdgeListItem {
   outcomesCount: number;
   metricsCount: number;
   confidence: ConfidenceLevel;
+  confidenceLabel: string;
+  confidenceClassName: string;
   owner: string;
   updatedAt: string;
 }
@@ -113,6 +115,10 @@ export async function getEdgeList(
       outcomesCount: outcomes.length,
       metricsCount,
       confidence: edge.confidence,
+      confidenceLabel:
+        edge.confidenceLabel(),
+      confidenceClassName:
+        edge.confidenceClassName(),
       owner: userName(
         userMap,
         edge.ownerId,
@@ -142,29 +148,32 @@ export async function putEdgeData(
     status: 'complete' as const,
   });
 
-  for (const outcome of data.outcomes) {
-    await PUT(
-      `edges/${edge.id}`
-        + `/outcomes/${outcome.id}`,
-      {
-        description: outcome.description,
-        edge_id: edge.id,
-      },
-    );
-    for (
-      const metric of outcome.metrics
-    ) {
-      const metricUrl =
+  await Promise.all(
+    data.outcomes.map(async outcome => {
+      await PUT(
         `edges/${edge.id}`
-        + `/outcomes/${outcome.id}`
-        + `/metrics/${metric.id}`;
-      await PUT(metricUrl, {
-        name: metric.name,
-        target: metric.target,
-        unit: metric.unit,
-        current: metric.current,
-        outcome_id: outcome.id,
-      });
-    }
-  }
+          + `/outcomes/${outcome.id}`,
+        {
+          description: outcome.description,
+          edge_id: edge.id,
+        },
+      );
+      await Promise.all(
+        outcome.metrics.map(metric =>
+          PUT(
+            `edges/${edge.id}`
+            + `/outcomes/${outcome.id}`
+            + `/metrics/${metric.id}`,
+            {
+              name: metric.name,
+              target: metric.target,
+              unit: metric.unit,
+              current: metric.current,
+              outcome_id: outcome.id,
+            },
+          ),
+        ),
+      );
+    }),
+  );
 }

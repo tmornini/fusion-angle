@@ -101,23 +101,19 @@ export interface Flow {
 export async function getFlow(
     flowId: string,
 ): Promise<Flow> {
-    const flow =
-        await GET<FlowEntity | undefined>(
+    const [flow, steps] = await Promise.all([
+        GET<FlowEntity | undefined>(
             `processes/${flowId}`,
-        );
-    if (!flow) {
-        return {
-            name: '',
-            description: '',
-            department: '',
-            steps: [],
-        };
-    }
-
-    const steps =
-        await GET<FlowStepEntity[]>(
+        ),
+        GET<FlowStepEntity[]>(
             `processes/${flowId}/steps`,
+        ),
+    ]);
+    if (!flow) {
+        throw new Error(
+            `Flow not found: ${flowId}`,
         );
+    }
 
     return {
         name: flow.name,

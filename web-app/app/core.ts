@@ -121,11 +121,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // For pages with sidebar layout, init layout behavior
   if (document.querySelector('.sidebar-layout')) {
-    initSidebarLayout();
+    await initSidebarLayout();
   }
 
   // Init command palette (works on all pages)
-  import('./command-palette').then(m => m.initCommandPalette());
+  import('./command-palette')
+    .then(m => m.initCommandPalette())
+    .catch(err => log.error(
+      'Failed to load command palette',
+      'core',
+      err,
+    ));
 
   // Load and init the page module
   const loader = pageModules[pageName];

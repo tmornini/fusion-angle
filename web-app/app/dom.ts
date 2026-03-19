@@ -52,6 +52,11 @@ export function populateIcons(entries: Array<[string, SafeHtml]>): void {
   }
 }
 
+export const FOCUSABLE_SELECTOR =
+    'a[href], button, input,'
+    + ' select, textarea,'
+    + ' [tabindex]:not([tabindex="-1"])';
+
 export function initToggleGroup(
   selector: string,
   attrName: string,

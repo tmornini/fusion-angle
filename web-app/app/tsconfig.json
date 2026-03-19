@@ -13,6 +13,7 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedIndexedAccess": true,
     "noImplicitReturns": true,
+    "exactOptionalPropertyTypes": true,
     "lib": ["ES2024", "DOM", "DOM.Iterable"]
   },
   "include": ["./**/*.ts", "../**/*.ts", "../../api/**/*.ts"],

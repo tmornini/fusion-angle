@@ -1486,6 +1486,47 @@ const _allIcons = [
 
 type IconFn =
     (size?: number, cssClass?: string) => SafeHtml;
+
+export type IconName =
+    | 'sparkles' | 'home' | 'lightbulb'
+    | 'folderKanban' | 'users' | 'user'
+    | 'target' | 'database' | 'gitBranch'
+    | 'palette' | 'logOut' | 'menu'
+    | 'search' | 'bell' | 'sun'
+    | 'moon' | 'monitor' | 'x'
+    | 'chevronDown' | 'chevronRight'
+    | 'chevronLeft' | 'panelLeftClose'
+    | 'panelLeft' | 'plus' | 'arrowLeft'
+    | 'arrowRight' | 'check' | 'loader'
+    | 'settings' | 'externalLink'
+    | 'filter' | 'moreHorizontal'
+    | 'moreVertical' | 'star' | 'heart'
+    | 'trendingUp' | 'trendingDown'
+    | 'alertCircle' | 'alertTriangle'
+    | 'checkCircle' | 'info' | 'mail'
+    | 'phone' | 'calendar' | 'clock'
+    | 'upload' | 'download' | 'trash'
+    | 'edit' | 'eye' | 'copy' | 'save'
+    | 'send' | 'share' | 'globe'
+    | 'rocket' | 'zap' | 'award'
+    | 'brain' | 'wand' | 'activity'
+    | 'barChart' | 'fileText' | 'shield'
+    | 'building' | 'crown' | 'briefcase'
+    | 'clipboardCheck' | 'dollarSign'
+    | 'smartphone' | 'code' | 'hash'
+    | 'gripVertical' | 'gauge'
+    | 'lineChart' | 'arrowUpRight'
+    | 'arrowDownRight' | 'camera'
+    | 'creditCard' | 'circle'
+    | 'messageSquare' | 'userPlus'
+    | 'userCheck' | 'userX' | 'xCircle'
+    | 'checkCircle2' | 'helpCircle'
+    | 'minus' | 'folderOpen'
+    | 'fileSpreadsheet' | 'listTodo'
+    | 'toggleLeft' | 'type' | 'table'
+    | 'slider' | 'dot' | 'layoutGrid'
+    | 'chevronUp' | 'history';
+
 const icons: Record<string, IconFn> = {};
 
 for (const fn of _allIcons) {

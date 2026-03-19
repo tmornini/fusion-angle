@@ -449,10 +449,22 @@ const routes: Route[] = [
         },
     }),
     route('snapshots/import', {
-        put: (db, _, payload) =>
-            db.importSnapshot(
-                payload.json as string,
-            ),
+        put: (db, _, payload) => {
+            if (
+                typeof payload.json
+                    !== 'string'
+            ) {
+                throw new ApiError(
+                    'Missing or invalid'
+                    + ' "json" field:'
+                    + ' expected a string.',
+                    400,
+                );
+            }
+            return db.importSnapshot(
+                payload.json,
+            );
+        },
     }),
 ];
 

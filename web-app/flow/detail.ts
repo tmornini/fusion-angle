@@ -825,33 +825,33 @@ function bindFlowDetailEvents(): void {
                         flowDescription,
                     department: flowDepartment,
                 });
-                for (
-                    const step of flowSteps
-                ) {
-                    await putFlowStep(
-                        currentFlowId,
-                        step.id,
-                        {
-                            title: step.title,
-                            description:
-                                step
-                                .description,
-                            owner: step.owner,
-                            role: step.role,
-                            tools:
-                                JSON.stringify(
-                                    step.tools,
-                                ),
-                            duration:
-                                step.duration,
-                            sort_order:
-                                step.sortOrder,
-                            type: step.type,
-                        } as Record<
-                            string, unknown
-                        >,
-                    );
-                }
+                await Promise.all(
+                    flowSteps.map(step =>
+                        putFlowStep(
+                            currentFlowId,
+                            step.id,
+                            {
+                                title: step.title,
+                                description:
+                                    step
+                                    .description,
+                                owner: step.owner,
+                                role: step.role,
+                                tools:
+                                    JSON.stringify(
+                                        step.tools,
+                                    ),
+                                duration:
+                                    step.duration,
+                                sort_order:
+                                    step.sortOrder,
+                                type: step.type,
+                            } as Record<
+                                string, unknown
+                            >,
+                        ),
+                    ),
+                );
                 showToast(
                     'Flow saved', 'success',
                 );

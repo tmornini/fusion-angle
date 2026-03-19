@@ -1,4 +1,4 @@
-import { $ } from './dom';
+import { $, FOCUSABLE_SELECTOR } from './dom';
 
 const focusStack: HTMLElement[] = [];
 
@@ -12,9 +12,7 @@ function openDialog(dialogId: string): void {
   dialog?.setAttribute('aria-hidden', 'false');
   const focusable = dialog
     ?.querySelector<HTMLElement>(
-      'button, [href], input, select,'
-      + ' textarea,'
-      + ' [tabindex]:not([tabindex="-1"])',
+      FOCUSABLE_SELECTOR,
     );
   focusable?.focus();
 }

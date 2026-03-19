@@ -32,10 +32,7 @@ import {
     getEdgeList,
     type EdgeListItem,
 } from '../app/adapters';
-import {
-    confidenceLevelConfig,
-    UNKNOWN_CONFIDENCE,
-} from '../app/config';
+
 
 const edgeStatusDisplayConfig: Record<
     string,
@@ -72,10 +69,6 @@ function buildEdgeCard(
             className: 'badge-default',
             icon: iconAlertCircle,
         };
-    const confidenceDisplay =
-        confidenceLevelConfig[
-            edge.confidence
-        ] ?? UNKNOWN_CONFIDENCE;
     return html`
     <div class="card card-hover p-4"
         style="cursor:pointer"
@@ -91,10 +84,10 @@ function buildEdgeCard(
             <span
                 class="flex items-center
                   gap-1 text-xs
-                  ${confidenceDisplay
-                    .className}">${
+                  ${edge
+                    .confidenceClassName}">${
                 iconShield(14)
-              } ${confidenceDisplay.label
+              } ${edge.confidenceLabel
               } Confidence</span>
           </div>
           <h3 class="font-semibold mb-1">${edge.ideaTitle}</h3>

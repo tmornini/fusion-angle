@@ -68,3 +68,24 @@ We format code:
   - indent with 4 spaces 
   - no trailing whitespace, other than newline
   - newline required after last line in file
+
+We commit code:
+
+- frequently, --amend --no-edit is a thing, you can't commit too frequently
+- before building, which requires a clean working directory
+- in tiny, semantically continguous and exclusive chunks
+  - code must build, function properly and pass tests at each commit
+    - you can commit broken code, but you can never push a broken commit
+  - with a single line message about 50 characters in length
+    - is a high level description
+    - completes the sentence that begins "When applied, this commit will: "
+      - e.g. "refactor login functionality"
+    - if you think your commit demands a message with a subject line and body
+      - your commit is too large, use git commit -p like pro
+  - that never moves or renames file(s) and changes it's(their) content simultaneously
+- rarely mentions file names, paths, pathnames or function names
+  - codebase reorganizations moves and renames may
+  - pure function and/or file renaming may
+  - moves and renames always denoted as
+    - beofore -> after
+  - paths and pathnames always relative to repo root

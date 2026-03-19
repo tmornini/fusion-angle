@@ -1,6 +1,5 @@
 import {
     $,
-    $$,
     populateIcons,
     initToggleGroup,
 } from '../app/dom';
@@ -33,9 +32,9 @@ import {
     type Project,
 } from '../app/adapters';
 import {
-    projectStatusConfig,
-    UNKNOWN_STATUS,
-} from '../app/config';
+    PROJECT_STATUS_CONFIG,
+    UNKNOWN_CONFIG,
+} from '../../api/types';
 
 const projectStatusIcons: Record<
     string,
@@ -96,9 +95,6 @@ function buildProjectCard(
     project: Project,
     view: string,
 ): SafeHtml {
-    const statusCfg =
-        projectStatusConfig[project.status]
-        ?? UNKNOWN_STATUS;
     const statusIcon =
         projectStatusIcons[project.status]
         ?? iconAlertCircle;
@@ -141,11 +137,11 @@ function buildProjectCard(
                 }">${project.title}</h3>
                 <span class="${
                     'badge '
-                    + statusCfg.className
+                    + project.statusClassName()
                     + ' text-xs'
                 }">${
                     statusIcon(14)
-                } ${statusCfg.label}</span>
+                } ${project.statusLabel()}</span>
               </div>
               ${view === 'priority'
                   ? html`<span class="${
@@ -351,9 +347,9 @@ export async function init(): Promise<void> {
             )
             .map(([status, items]) => {
                 const cfg =
-                    projectStatusConfig[
-                        status as keyof typeof projectStatusConfig
-                    ] ?? UNKNOWN_STATUS;
+                    PROJECT_STATUS_CONFIG[
+                        status as keyof typeof PROJECT_STATUS_CONFIG
+                    ] ?? UNKNOWN_CONFIG;
                 const icon =
                     projectStatusIcons[
                         status
@@ -369,47 +365,6 @@ export async function init(): Promise<void> {
         setHtml(
             badgesEl,
             html`${badgeFragments}`,
-        );
-    }
-
-    function bindCards(): void {
-        $$('[data-project-card]').forEach(
-            projectCard => {
-                projectCard.style.cursor =
-                    'pointer';
-                projectCard.addEventListener(
-                    'click',
-                    () =>
-                        navigateTo(
-                            'project-detail',
-                            {
-                                projectId:
-                                    projectCard.getAttribute(
-                                        'data-project-card',
-                                    ) ?? '',
-                            },
-                        ),
-                );
-            },
-        );
-        $$('[data-view-project]').forEach(
-            viewButton => {
-                viewButton.addEventListener(
-                    'click',
-                    (e) => {
-                        e.stopPropagation();
-                        navigateTo(
-                            'project-detail',
-                            {
-                                projectId:
-                                    viewButton.getAttribute(
-                                        'data-view-project',
-                                    ) ?? '',
-                            },
-                        );
-                    },
-                );
-            },
         );
     }
 
@@ -448,8 +403,49 @@ export async function init(): Promise<void> {
                     ? 'by priority'
                     : 'by score');
         }
-        bindCards();
     }
+
+    listContainer.addEventListener(
+        'click',
+        (e) => {
+            if (
+                !(e.target instanceof Element)
+            ) return;
+            const viewBtn =
+                e.target
+                    .closest<HTMLElement>(
+                        '[data-view-project]',
+                    );
+            if (viewBtn) {
+                e.stopPropagation();
+                navigateTo(
+                    'project-detail',
+                    {
+                        projectId:
+                            viewBtn.getAttribute(
+                                'data-view-project',
+                            ) ?? '',
+                    },
+                );
+                return;
+            }
+            const card =
+                e.target
+                    .closest<HTMLElement>(
+                        '[data-project-card]',
+                    );
+            if (card)
+                navigateTo(
+                    'project-detail',
+                    {
+                        projectId:
+                            card.getAttribute(
+                                'data-project-card',
+                            ) ?? '',
+                    },
+                );
+        },
+    );
 
     initToggleGroup(
         '.view-toggle-btn',

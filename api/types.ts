@@ -116,6 +116,34 @@ export function isProjectStatus(
     );
 }
 
+const IDEA_STATUSES:
+    readonly IdeaStatus[]
+    = [
+        'active', 'in-review',
+        'approved', 'promoted',
+        'archived', 'deleted',
+    ];
+
+export function isIdeaStatus(
+    v: string,
+): v is IdeaStatus {
+    return includes(
+        IDEA_STATUSES, v,
+    );
+}
+
+const EDGE_STATUSES:
+    readonly EdgeStatus[]
+    = ['complete', 'draft', 'missing'];
+
+export function isEdgeStatus(
+    v: string,
+): v is EdgeStatus {
+    return includes(
+        EDGE_STATUSES, v,
+    );
+}
+
 export const SECONDS_PER_DAY = 86400;
 
 export function durationInDays(
@@ -649,17 +677,23 @@ export function createFlowStep(
     };
 }
 
-interface StatusDisplay {
+export interface StatusDisplay {
     label: string;
     className: string;
 }
 
-const UNKNOWN_CONFIG: StatusDisplay = {
+export const UNKNOWN_CONFIG: StatusDisplay = {
     label: 'Unknown',
     className: 'badge-default',
 };
 
-const IDEA_STATUS_CONFIG: Record<
+export const UNKNOWN_CONFIDENCE_CONFIG:
+    StatusDisplay = {
+        label: 'Unknown',
+        className: 'text-muted',
+    };
+
+export const IDEA_STATUS_CONFIG: Record<
     IdeaStatus,
     StatusDisplay
 > = {
@@ -689,7 +723,7 @@ const IDEA_STATUS_CONFIG: Record<
     },
 };
 
-const EDGE_STATUS_CONFIG: Record<
+export const EDGE_STATUS_CONFIG: Record<
     EdgeStatus | 'incomplete',
     StatusDisplay
 > = {
@@ -711,7 +745,7 @@ const EDGE_STATUS_CONFIG: Record<
     },
 };
 
-const PROJECT_STATUS_CONFIG: Record<
+export const PROJECT_STATUS_CONFIG: Record<
     ProjectStatus,
     StatusDisplay
 > = {
@@ -745,7 +779,7 @@ const PROJECT_STATUS_CONFIG: Record<
     },
 };
 
-const CONFIDENCE_CONFIG: Record<
+export const CONFIDENCE_CONFIG: Record<
     ConfidenceLevel,
     StatusDisplay
 > = {

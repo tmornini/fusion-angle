@@ -1,3 +1,5 @@
+import type { IconName } from './icons';
+
 export interface PageEntry {
     title: string;
     layout: 'sidebar' | 'standalone';
@@ -7,7 +9,7 @@ export interface PageEntry {
     sourceFile?: string;
     // icon function name from icons.ts
     // (used by command palette)
-    icon?: string;
+    icon?: IconName;
     // extra search terms for Cmd+K
     keywords?: string;
     // false to hide from command palette

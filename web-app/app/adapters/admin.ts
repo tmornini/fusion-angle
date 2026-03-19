@@ -168,18 +168,10 @@ export async function getProfile(
             'current-user',
         );
     if (!user)
-        return {
-            firstName: 'Alex',
-            lastName: 'Thompson',
-            email:
-                'alex.thompson@company.com',
-            phone: '+1 (555) 123-4567',
-            role: 'Product Manager',
-            department: 'Product',
-            bio: 'Passionate about building'
-                + ' products that solve'
-                + ' real problems.',
-        };
+        throw new Error(
+            'No current user found'
+            + ' — cannot load profile',
+        );
     return {
         firstName: user.first_name,
         lastName: user.last_name,

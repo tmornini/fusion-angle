@@ -30,8 +30,8 @@ import {
   type ProjectDetail,
 } from '../app/adapters';
 import {
-  projectStatusConfig, UNKNOWN_STATUS,
-} from '../app/config';
+  PROJECT_STATUS_CONFIG, UNKNOWN_CONFIG,
+} from '../../api/types';
 import {
   isProjectStatus,
   type ProjectStatus,
@@ -939,12 +939,12 @@ function buildProjectDetail(
     projectId: string,
 ): SafeHtml {
   const statusCfg =
-      projectStatusConfig[
+      PROJECT_STATUS_CONFIG[
         project.status as
-            keyof typeof projectStatusConfig
-      ] ?? UNKNOWN_STATUS;
+            keyof typeof PROJECT_STATUS_CONFIG
+      ] ?? UNKNOWN_CONFIG;
   const statusOptions =
-      Object.entries(projectStatusConfig).map(
+      Object.entries(PROJECT_STATUS_CONFIG).map(
         ([key, cfg]) => html`<option
             value="${key}"
             ${trusted(

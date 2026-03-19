@@ -29,10 +29,6 @@ import {
     getReviewQueue,
     type Idea,
 } from '../app/adapters';
-import {
-    edgeStatusConfig,
-    UNKNOWN_EDGE_STATUS,
-} from '../app/config';
 
 const priorityConfig: Record<
     string,
@@ -93,11 +89,6 @@ function buildReviewCard(
             label: 'Unknown',
             className: 'badge-default',
         };
-    const edgeDisplay =
-        edgeStatusConfig[
-            idea.edgeStatus as
-                keyof typeof edgeStatusConfig
-        ] ?? UNKNOWN_EDGE_STATUS;
     return html`
     <div class="card card-hover p-4"
         style="cursor:pointer"
@@ -117,9 +108,9 @@ function buildReviewCard(
             } ${readinessDisplay.label
             }</span>
             <span class="badge
-              ${edgeDisplay.className}
+              ${idea.edgeStatusClassName()}
               text-xs">${iconTarget(12)
-            } ${edgeDisplay.label}</span>
+            } ${idea.edgeStatusLabel()}</span>
           </div>
           <h3 class="font-semibold mb-1">${idea.title}</h3>
           <div class="flex items-center gap-4 text-sm text-muted">

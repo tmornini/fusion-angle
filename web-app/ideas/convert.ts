@@ -833,7 +833,7 @@ export async function init(
                             title: pd[
                                 'project'
                                 + '-name'
-                            ],
+                            ] ?? '',
                             description:
                                 pd[
                                     'success'
@@ -846,13 +846,13 @@ export async function init(
                                 pd[
                                     'start'
                                     + '-date'
-                                ],
+                                ] ?? '',
                             target_end_date:
                                 pd[
                                     'target'
                                     + '-end'
                                     + '-date'
-                                ],
+                                ] ?? '',
                             lead_id:
                                 leadMap[
                                     pd[
