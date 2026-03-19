@@ -1,20 +1,9 @@
-// ============================================
-// FUSION AI — State Management
-// App state, pub-sub, theme, mobile detection
-// ============================================
-
-// ------------------------------------
-// localStorage Key Constants
-// ------------------------------------
-
 import { log } from './logger';
 
 const STORAGE_KEY_THEME = 'fusion-theme';
-const STORAGE_KEY_SIDEBAR = 'fusion-sidebar-collapsed';
-
-// ------------------------------------
-// State Management
-// ------------------------------------
+const STORAGE_KEY_SIDEBAR =
+    'fusion-sidebar-collapsed';
+const MOBILE_BREAKPOINT_PX = 768;
 
 interface AppState {
   theme: 'light' | 'dark' | 'system';
@@ -32,8 +21,14 @@ function isValidTheme(value: string | null): value is AppState['theme'] {
 }
 
 const _state: AppState = {
-  theme: (() => { const raw = localStorage.getItem(STORAGE_KEY_THEME); return isValidTheme(raw) ? raw : 'system'; })(),
-  isMobile: window.matchMedia('(max-width: 768px)').matches,
+  theme: (() => {
+    const raw = localStorage
+      .getItem(STORAGE_KEY_THEME);
+    return isValidTheme(raw) ? raw : 'system';
+  })(),
+  isMobile: window.matchMedia(
+    `(max-width: ${MOBILE_BREAKPOINT_PX}px)`,
+  ).matches,
   isSidebarCollapsed: false,
   isSidebarOpen: false,
   isSearchOpen: false,
@@ -54,13 +49,13 @@ function subscribe(fn: StateListener): () => void {
   return () => { listeners.delete(fn); };
 }
 
-// ------------------------------------
-// Theme
-// ------------------------------------
-
 function computeTheme(): 'light' | 'dark' {
   if (state.theme === 'system') {
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    const query =
+      '(prefers-color-scheme: dark)';
+    return window.matchMedia(query).matches
+      ? 'dark'
+      : 'light';
   }
   return state.theme;
 }
@@ -68,31 +63,39 @@ function computeTheme(): 'light' | 'dark' {
 function applyTheme(): void {
   const resolved = computeTheme();
   document.documentElement.setAttribute('data-theme', resolved);
-  // Also set class for any CSS that uses .dark selector
   document.documentElement.classList.toggle('dark', resolved === 'dark');
 }
 
 function setTheme(theme: AppState['theme']): void {
-  try { localStorage.setItem(STORAGE_KEY_THEME, theme); } catch { log.debug('Failed to save theme preference', 'state'); }
+  try {
+    localStorage.setItem(
+      STORAGE_KEY_THEME,
+      theme,
+    );
+  } catch {
+    log.debug(
+      'Failed to save theme preference',
+      'state',
+    );
+  }
   setState({ theme });
   applyTheme();
 }
 
-// Listen for system theme changes
-window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+const darkQuery = '(prefers-color-scheme: dark)';
+window.matchMedia(darkQuery)
+  .addEventListener('change', () => {
   if (state.theme === 'system') applyTheme();
 });
 
-// ------------------------------------
-// Mobile Detection
-// ------------------------------------
-
-window.matchMedia('(max-width: 768px)').addEventListener('change', (e) => {
+const mobileQuery =
+  `(max-width: ${MOBILE_BREAKPOINT_PX}px)`;
+window.matchMedia(mobileQuery)
+  .addEventListener('change', (e) => {
   setState({ isMobile: e.matches });
   if (!e.matches) setState({ isSidebarOpen: false, isSearchOpen: false });
 });
 
-// Sync theme across tabs via StorageEvent
 window.addEventListener('storage', (e) => {
   if (e.key === STORAGE_KEY_THEME && isValidTheme(e.newValue)) {
     setState({ theme: e.newValue });
@@ -101,4 +104,14 @@ window.addEventListener('storage', (e) => {
 });
 
 export type { AppState };
-export { STORAGE_KEY_THEME, STORAGE_KEY_SIDEBAR, state, setState, subscribe, computeTheme, applyTheme, setTheme, isValidTheme };
+export {
+    STORAGE_KEY_THEME,
+    STORAGE_KEY_SIDEBAR,
+    state,
+    setState,
+    subscribe,
+    computeTheme,
+    applyTheme,
+    setTheme,
+    isValidTheme,
+};

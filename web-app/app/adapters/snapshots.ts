@@ -18,10 +18,10 @@ export async function importSnapshot(json: string): Promise<void> {
 }
 
 export async function exportSnapshot(): Promise<string> {
-  return GET('snapshots/schema') as Promise<string>;
+  return GET<string>('snapshots/schema');
 }
 
 export async function hasData(): Promise<boolean> {
-  const users = await GET('users') as UserEntity[];
+  const users = await GET<UserEntity[]>('users');
   return users.length > 0;
 }

@@ -198,9 +198,21 @@
   50% { opacity: 0.15; }
 }
 
-.animate-fade-in { animation: fade-in var(--duration-normal) var(--ease-out) forwards; }
-.animate-fade-in-up { animation: fade-in-up var(--duration-slow) var(--ease-out) forwards; }
-.animate-fade-in-down { animation: fade-in-down var(--duration-slow) var(--ease-out) forwards; }
-.animate-scale-in { animation: scale-in var(--duration-normal) var(--ease-out) forwards; }
+.animate-fade-in {
+    animation: fade-in var(--duration-normal)
+        var(--ease-out) forwards;
+}
+.animate-fade-in-up {
+    animation: fade-in-up var(--duration-slow)
+        var(--ease-out) forwards;
+}
+.animate-fade-in-down {
+    animation: fade-in-down var(--duration-slow)
+        var(--ease-out) forwards;
+}
+.animate-scale-in {
+    animation: scale-in var(--duration-normal)
+        var(--ease-out) forwards;
+}
 .animate-spin-slow { animation: spin-slow 3s linear infinite; }
 

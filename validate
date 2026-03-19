@@ -1,0 +1,17 @@
+#!/bin/bash
+set -euo pipefail
+
+# Check line lengths (78 char max)
+LONG_LINES=$(find api web-app -type f \
+  \( -name '*.ts' -o -name '*.html' -o -name '*.css' \) \
+  ! -path 'web-app/app/compose.ts' \
+  -exec awk \
+    'length > 78 {
+      printf "%s:%d: %d chars\n", FILENAME, NR, length
+    }' {} +)
+
+if [ -n "$LONG_LINES" ]; then
+  echo "Error: lines exceed 78 characters:" >&2
+  echo "$LONG_LINES" >&2
+  exit 1
+fi

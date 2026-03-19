@@ -6,6 +6,8 @@ if [ -n "$(git status --porcelain)" ]; then
   exit 1
 fi
 
+./validate
+
 echo "Building Fusion AI..."
 
 BUILD_DIR=$(mktemp -d)

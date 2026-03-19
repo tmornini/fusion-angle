@@ -80,23 +80,52 @@
 }
 
 /* Badge variants */
-.badge-primary { background: hsl(var(--primary) / 0.1); color: hsl(var(--primary)); border-color: hsl(var(--primary) / 0.3); }
-.badge-success { background: hsl(var(--success-soft)); color: hsl(var(--success)); border-color: hsl(var(--success) / 0.3); }
-.badge-warning { background: hsl(var(--warning-soft)); color: hsl(var(--warning)); border-color: hsl(var(--warning) / 0.3); }
-.badge-error { background: hsl(var(--error-soft)); color: hsl(var(--error)); border-color: hsl(var(--error) / 0.3); }
-.badge-default { background: hsl(var(--muted)); color: hsl(var(--muted-foreground)); border-color: hsl(var(--border)); }
+.badge-primary {
+    background: hsl(var(--primary) / 0.1);
+    color: hsl(var(--primary));
+    border-color: hsl(var(--primary) / 0.3);
+}
+.badge-success {
+    background: hsl(var(--success-soft));
+    color: hsl(var(--success));
+    border-color: hsl(var(--success) / 0.3);
+}
+.badge-warning {
+    background: hsl(var(--warning-soft));
+    color: hsl(var(--warning));
+    border-color: hsl(var(--warning) / 0.3);
+}
+.badge-error {
+    background: hsl(var(--error-soft));
+    color: hsl(var(--error));
+    border-color: hsl(var(--error) / 0.3);
+}
+.badge-default {
+    background: hsl(var(--muted));
+    color: hsl(var(--muted-foreground));
+    border-color: hsl(var(--border));
+}
 
 /* Button variants */
 .btn-hero {
-  background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary) / 0.8));
+  background: linear-gradient(135deg,
+      hsl(var(--primary)),
+      hsl(var(--primary) / 0.8));
   color: hsl(var(--primary-foreground));
   font-weight: 600;
   box-shadow: 0 2px 8px hsl(var(--primary) / 0.3);
 }
-.btn-hero:hover { opacity: 0.9; box-shadow: 0 4px 12px hsl(var(--primary) / 0.4); }
+.btn-hero:hover {
+    opacity: 0.9;
+    box-shadow: 0 4px 12px
+        hsl(var(--primary) / 0.4);
+}
 .btn-hero:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
 
-.btn-error { background: hsl(var(--error)); color: hsl(var(--error-foreground)); }
+.btn-error {
+    background: hsl(var(--error));
+    color: hsl(var(--error-foreground));
+}
 .btn-error:hover { opacity: 0.9; }
 
 /* Idea actions - show on hover on desktop */

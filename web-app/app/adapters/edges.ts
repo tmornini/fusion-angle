@@ -1,8 +1,18 @@
 import { GET, PUT } from '../../../api/api';
-import type { IdeaEntity, EdgeEntity, EdgeOutcomeEntity, EdgeMetricEntity, EdgeStatus, ConfidenceLevel, Id } from '../../../api/types';
+import type {
+    IdeaEntity,
+    EdgeEntity,
+    EdgeOutcomeEntity,
+    EdgeMetricEntity,
+    EdgeStatus,
+    ConfidenceLevel,
+} from '../../../api/types';
+import { Idea, Edge } from '../../../api/types';
 import type { EdgeData } from './helpers';
-import { User } from '../../../api/types';
-import { buildUserMap, userName } from './helpers';
+import {
+    buildUserMap,
+    userName,
+} from './helpers';
 
 export interface EdgeIdea {
   title: string;
@@ -12,21 +22,31 @@ export interface EdgeIdea {
   score: number;
 }
 
-export async function getIdeaForEdge(ideaId: string, cachedUserMap?: Map<Id, User>): Promise<EdgeIdea> {
-  const [idea, userMap] = await Promise.all([
-    GET(`ideas/${ideaId}`) as Promise<IdeaEntity>,
-    cachedUserMap ? Promise.resolve(cachedUserMap) : buildUserMap(),
-  ]);
+export async function getIdeaForEdge(
+  ideaId: string,
+): Promise<EdgeIdea> {
+  const [entity, userMap] =
+    await Promise.all([
+      GET<IdeaEntity>(`ideas/${ideaId}`),
+      buildUserMap(),
+    ]);
+  const idea = new Idea(
+    entity,
+    userName(
+      userMap,
+      entity.submitted_by_id,
+    ),
+  );
   return {
     title: idea.title,
-    problem: idea.problem_statement || '',
-    solution: idea.proposed_solution || '',
-    submittedBy: userName(userMap, idea.submitted_by_id),
+    problem: idea.problemStatement,
+    solution: idea.proposedSolution,
+    submittedBy: idea.submittedBy,
     score: idea.score,
   };
 }
 
-// ── Edge List ───────────────────────────────
+// ── Edge List ───────────────────
 
 export interface EdgeListItem {
   id: string;
@@ -35,70 +55,116 @@ export interface EdgeListItem {
   status: EdgeStatus;
   outcomesCount: number;
   metricsCount: number;
-  confidence: ConfidenceLevel | null;
+  confidence: ConfidenceLevel;
   owner: string;
   updatedAt: string;
 }
 
-export async function getEdgeList(cachedUserMap?: Map<Id, User>): Promise<EdgeListItem[]> {
-  const [edgeRows, ideaRows, userMap, allOutcomes, allMetrics] = await Promise.all([
-    GET('edges') as Promise<EdgeEntity[]>,
-    GET('ideas') as Promise<IdeaEntity[]>,
-    cachedUserMap ? Promise.resolve(cachedUserMap) : buildUserMap(),
-    GET('edge-outcomes') as Promise<EdgeOutcomeEntity[]>,
-    GET('edge-metrics') as Promise<EdgeMetricEntity[]>,
+export async function getEdgeList(
+): Promise<EdgeListItem[]> {
+  const [
+    edgeRows, ideaRows, userMap,
+    allOutcomes, allMetrics,
+  ] = await Promise.all([
+    GET<EdgeEntity[]>('edges'),
+    GET<IdeaEntity[]>('ideas'),
+    buildUserMap(),
+    GET<EdgeOutcomeEntity[]>(
+      'edge-outcomes',
+    ),
+    GET<EdgeMetricEntity[]>(
+      'edge-metrics',
+    ),
   ]);
-  const ideaMap = new Map(ideaRows.map(idea => [idea.id, idea]));
+  const ideaMap = new Map(
+    ideaRows.map(
+      idea => [idea.id, idea],
+    ),
+  );
 
-  const outcomesByEdgeId = Map.groupBy(allOutcomes, outcome => outcome.edge_id);
+  const outcomesByEdgeId = Map.groupBy(
+    allOutcomes,
+    outcome => outcome.edge_id,
+  );
 
-  return edgeRows.map(edge => {
-    const outcomes = outcomesByEdgeId.get(edge.id) || [];
-    const outcomeIds = new Set(outcomes.map(outcome => outcome.id));
-    const metricsCount = allMetrics.filter(metric => outcomeIds.has(metric.outcome_id)).length;
+  return edgeRows.map(entity => {
+    const edge = new Edge(entity);
+    const outcomes =
+      outcomesByEdgeId.get(edge.id)
+        || [];
+    const outcomeIds = new Set(
+      outcomes.map(
+        outcome => outcome.id,
+      ),
+    );
+    const metricsCount = allMetrics
+      .filter(
+        m => outcomeIds.has(m.outcome_id),
+      )
+      .length;
 
-    const idea = ideaMap.get(edge.idea_id);
+    const idea =
+      ideaMap.get(edge.ideaId);
     return {
       id: edge.id,
-      ideaId: edge.idea_id,
-      ideaTitle: idea?.title || '',
-      status: edge.status || 'missing',
+      ideaId: edge.ideaId,
+      ideaTitle: idea?.title ?? '',
+      status: edge.status,
       outcomesCount: outcomes.length,
       metricsCount,
-      confidence: edge.confidence || null,
-      owner: userName(userMap, edge.owner_id),
-      updatedAt: edge.updated_at,
+      confidence: edge.confidence,
+      owner: userName(
+        userMap,
+        edge.ownerId,
+      ),
+      updatedAt: edge.updatedAt,
     };
   });
 }
 
-// ── Write Operations ───────────────────────
+// ── Write Operations ─────────────────
 
-export async function putEdgeData(ideaId: string, data: EdgeData): Promise<void> {
-  const edge = await GET(`ideas/${ideaId}/edge`) as EdgeEntity | null;
+export async function putEdgeData(
+  ideaId: string,
+  data: EdgeData,
+): Promise<void> {
+  const edge = await GET<EdgeEntity | null>(`ideas/${ideaId}/edge`);
   if (!edge) return;
 
   await PUT(`edges/${edge.id}`, {
     confidence: data.confidence,
-    impact_short_term: data.impact.shortTerm,
-    impact_mid_term: data.impact.midTerm,
-    impact_long_term: data.impact.longTerm,
-    status: 'complete',
-  } as Record<string, unknown>);
+    impact_short_term:
+      data.impact.shortTerm,
+    impact_mid_term:
+      data.impact.midTerm,
+    impact_long_term:
+      data.impact.longTerm,
+    status: 'complete' as const,
+  });
 
   for (const outcome of data.outcomes) {
-    await PUT(`edges/${edge.id}/outcomes/${outcome.id}`, {
-      description: outcome.description,
-      edge_id: edge.id,
-    } as Record<string, unknown>);
-    for (const metric of outcome.metrics) {
-      await PUT(`edges/${edge.id}/outcomes/${outcome.id}/metrics/${metric.id}`, {
+    await PUT(
+      `edges/${edge.id}`
+        + `/outcomes/${outcome.id}`,
+      {
+        description: outcome.description,
+        edge_id: edge.id,
+      },
+    );
+    for (
+      const metric of outcome.metrics
+    ) {
+      const metricUrl =
+        `edges/${edge.id}`
+        + `/outcomes/${outcome.id}`
+        + `/metrics/${metric.id}`;
+      await PUT(metricUrl, {
         name: metric.name,
         target: metric.target,
         unit: metric.unit,
         current: metric.current,
         outcome_id: outcome.id,
-      } as Record<string, unknown>);
+      });
     }
   }
 }

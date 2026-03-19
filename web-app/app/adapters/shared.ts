@@ -19,8 +19,8 @@ export function getTimeOfDay(): string {
 
 export async function getCurrentUser(): Promise<CurrentUser> {
   const [row, settings] = await Promise.all([
-    GET('current-user') as Promise<UserEntity>,
-    GET('company-settings') as Promise<CompanySettingsEntity>,
+    GET<UserEntity>('current-user'),
+    GET<CompanySettingsEntity>('company-settings'),
   ]);
   return {
     id: row.id,

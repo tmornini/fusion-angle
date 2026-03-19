@@ -1,0 +1,53 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git worktree:*)",
+      "mcp__plugin_playwright_playwright__browser_select_option",
+      "mcp__plugin_playwright_playwright__browser_file_upload",
+      "WebFetch(domain:localhost)",
+      "Bash(done)",
+      "Bash(npx playwright --version)",
+      "Bash(# npx can download and run it - let me check if the cache has it find ~/.npm/_npx -name \"\"playwright\"\" -type d)",
+      "Bash(rm:*)",
+      "Bash(cd:*)",
+      "Bash(grep:*)",
+      "Bash(find:*)",
+      "Bash(xargs -I {} basename {})",
+      "Bash(cat:*)",
+      "Bash(printf \"=== UserEntity fields from types.ts ===\\\\n\")",
+      "Bash(printf \"=== IdeaEntity fields from types.ts ===\\\\n\")",
+      "Bash(printf \"=== AccountEntity fields from types.ts ===\\\\n\")",
+      "Skill(commit-commands:commit)",
+      "Bash(cd /tmp/claude/remove-idea-scoring && rm package-lock.json && ./build 2>&1)",
+      "Bash(git rebase:*)",
+      "Bash(git reset:*)",
+      "Bash(git merge:*)",
+      "Bash(git:*)",
+      "Bash(npx serve:*)",
+      "Bash(do sed:*)",
+      "Bash(do git:*)",
+      "Bash(do:*)",
+      "Bash(__NEW_LINE_6bc50585475ff029__ echo:*)",
+      "Bash(__NEW_LINE_0c89c8284349f9c6__ echo:*)",
+      "WebFetch(domain:registry.npmjs.org)",
+      "WebFetch(domain:github.com)",
+      "Skill(update-config)"
+    ]
+  },
+  "sandbox": {
+    "enabled": true,
+    "autoAllowBashIfSandboxed": true,
+    "allowUnsandboxedCommands": false,
+    "filesystem": {
+      "allowWrite": [
+        "/Users/tmornini/.npm-cache",
+        "/Users/tmornini/Desktop"
+      ]
+    },
+    "network": {
+      "allowUnixSockets": [
+        "/tmp/claude/tsx-501"
+      ]
+    }
+  }
+}

@@ -4,7 +4,7 @@
 
 Database administration tools for development and testing.
 
-- **Type**: standalone
+- **Type**: composed
 - **Route**: `/snapshots/index.html`
 
 ## Features

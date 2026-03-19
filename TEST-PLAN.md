@@ -110,7 +110,7 @@
 - [ ] **D23** At least one idea with `pending_review` status appears in the queue. PASS: idea 7 ("AI-Powered Customer Support Chatbot") or similar is listed.
 - [ ] **D24** Click a review item. PASS: navigates to `approval-detail/?id=<ideaId>`.
 
-### Approval Detail (`approval-detail/`)
+### Approval Detail (`ideas/approval-detail.html`)
 
 - [ ] **D25** Navigate to `approval-detail/?id=7`. PASS: page loads with full idea details for idea 7.
 - [ ] **D26** Page shows the idea title, problem statement, proposed solution, and expected outcome. PASS: all text fields populated.
@@ -185,9 +185,9 @@ This test is covered by E4 (navigation) — verify the page loads:
 
 ## G. Admin Pages
 
-### Team (`team/`)
+### Team (`teams/`)
 
-- [ ] **G1** Navigate to `team/`. PASS: shows roster of seeded users with names, roles, departments, and status indicators.
+- [ ] **G1** Navigate to `teams/`. PASS: shows roster of seeded users with names, roles, departments, and status indicators.
 - [ ] **G2** User status badges render with distinct styling (available, busy, limited, active, deactivated). PASS: at least 3 different statuses visible.
 
 ### Account (`account/`)
@@ -200,9 +200,9 @@ This test is covered by E4 (navigation) — verify the page loads:
 - [ ] **G5** Navigate to `profile/`. PASS: shows profile form for the current user (Demo User / demo@example.com).
 - [ ] **G6** Edit a field (e.g. bio or phone) and save. PASS: success toast appears, or save action completes without error.
 
-### Company Settings (`company-settings/`)
+### Company Settings (`settings/`)
 
-- [ ] **G7** Navigate to `company-settings/`. PASS: shows company info (Acme Corporation, acmecorp.com, Technology, 51-200).
+- [ ] **G7** Navigate to `settings/`. PASS: shows company info (Acme Corporation, acmecorp.com, Technology, 51-200).
 - [ ] **G8** Security settings visible: SSO (off), 2FA (on), IP Whitelist (off). PASS: toggle/indicator states match seed data.
 - [ ] **G9** Edit a setting (e.g. timezone or language) and save. PASS: success toast or save completes without error.
 
@@ -212,9 +212,9 @@ This test is covered by E4 (navigation) — verify the page loads:
 - [ ] **G11** Deactivated user (James Miller) is visually distinguished. PASS: different styling or badge for deactivated status.
 - [ ] **G12** "Add User" or invite action is available. PASS: button/link is visible and clickable.
 
-### Activity Feed (`activity-feed/`)
+### Activity Feed (`teams/activity-feed.html`)
 
-- [ ] **G13** Navigate to `activity-feed/`. PASS: shows 10 seeded activity entries with type icons and timestamps.
+- [ ] **G13** Navigate to `teams/activity-feed.html`. PASS: shows 10 seeded activity entries with type icons and timestamps.
 - [ ] **G14** Activity types include idea_scored, task_completed, idea_created, comment_added, user_joined, status_changed, idea_converted, project_created. PASS: multiple distinct types visible with appropriate icons.
 
 ### Snapshots (`snapshots/`) — Run These Last

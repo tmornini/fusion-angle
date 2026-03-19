@@ -1,25 +1,21 @@
-// ============================================
-// FUSION AI — Database Abstraction Interface
-// ============================================
-
 import type {
   UserEntity, IdeaEntity, IdeaScoreEntity, ProjectEntity, ProjectTeamEntity,
   MilestoneEntity, ProjectTaskEntity, DiscussionEntity, ProjectVersionEntity,
   EdgeEntity, EdgeOutcomeEntity, EdgeMetricEntity, ActivityEntity,
-  ClarificationEntity, CrunchColumnEntity, ProcessEntity, ProcessStepEntity,
+  ClarificationEntity, CrunchColumnEntity, FlowEntity, FlowStepEntity,
   CompanySettingsEntity, AccountEntity,
 } from './types';
 
 export interface EntityStore<T> {
   getAll(): Promise<T[]>;
   getById(id: string): Promise<T | null>;
-  put(id: string, fields: Record<string, unknown>): Promise<T>;
+  put(id: string, fields: Partial<T>): Promise<T>;
   delete(id: string): Promise<void>;
 }
 
 export interface SingletonStore<T> {
   get(): Promise<T>;
-  put(fields: Record<string, unknown>): Promise<T>;
+  put(fields: Partial<T>): Promise<T>;
 }
 
 export interface DbAdapter {
@@ -35,13 +31,24 @@ export interface DbAdapter {
   users: EntityStore<UserEntity>;
   ideas: EntityStore<IdeaEntity>;
   ideaScores: {
-    getByIdeaId(ideaId: string): Promise<IdeaScoreEntity | null>;
-    put(ideaId: string, fields: Record<string, unknown>): Promise<IdeaScoreEntity>;
+    getByIdeaId(
+      ideaId: string,
+    ): Promise<IdeaScoreEntity | null>;
+    put(
+      ideaId: string,
+      fields: Partial<IdeaScoreEntity>,
+    ): Promise<IdeaScoreEntity>;
   };
   projects: EntityStore<ProjectEntity>;
   projectTeam: {
-    getByProjectId(projectId: string): Promise<ProjectTeamEntity[]>;
-    put(projectId: string, userId: string, fields: Record<string, unknown>): Promise<ProjectTeamEntity>;
+    getByProjectId(
+      projectId: string,
+    ): Promise<ProjectTeamEntity[]>;
+    put(
+      projectId: string,
+      userId: string,
+      fields: Partial<ProjectTeamEntity>,
+    ): Promise<ProjectTeamEntity>;
   };
   milestones: EntityStore<MilestoneEntity> & {
     getByProjectId(projectId: string): Promise<MilestoneEntity[]>;
@@ -67,9 +74,9 @@ export interface DbAdapter {
     getByProjectId(projectId: string): Promise<ClarificationEntity[]>;
   };
   crunchColumns: EntityStore<CrunchColumnEntity>;
-  processes: EntityStore<ProcessEntity>;
-  processSteps: EntityStore<ProcessStepEntity> & {
-    getByProcessId(processId: string): Promise<ProcessStepEntity[]>;
+  flows: EntityStore<FlowEntity>;
+  flowSteps: EntityStore<FlowStepEntity> & {
+    getByFlowId(processId: string): Promise<FlowStepEntity[]>;
   };
   companySettings: SingletonStore<CompanySettingsEntity>;
   account: SingletonStore<AccountEntity>;

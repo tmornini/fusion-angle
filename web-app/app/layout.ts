@@ -1,226 +1,521 @@
 import type { AppState } from './state';
-import { STORAGE_KEY_SIDEBAR, state, setState, setTheme, isValidTheme } from './state';
+import {
+    STORAGE_KEY_SIDEBAR,
+    state,
+    setState,
+    setTheme,
+    isValidTheme,
+} from './state';
 import { $, $$, } from './dom';
 import { setHtml } from './safe-html';
-import { iconSun, iconMoon, iconMonitor } from './icons';
-import { getPageName, navigateTo } from './navigation';
+import {
+    iconSun,
+    iconMoon,
+    iconMonitor,
+} from './icons';
+import {
+    getPageName,
+    navigateTo,
+} from './navigation';
 import { log } from './logger';
 
 function mutateThemeToggleIcon(): void {
-  const themeIcon = state.theme === 'dark'
-    ? iconMoon(20)
-    : state.theme === 'light'
-    ? iconSun(20)
-    : iconMonitor(20);
-  const themeLabel = state.theme === 'dark'
-    ? 'Switch to light theme'
-    : state.theme === 'light'
-    ? 'Switch to dark theme'
-    : 'Toggle theme';
-  ['theme-toggle', 'mobile-theme-toggle'].forEach(id => {
-    const button = document.getElementById(id);
-    if (button) {
-      setHtml(button, themeIcon);
-      button.setAttribute('aria-label', themeLabel);
+    const themeIcon =
+        state.theme === 'dark'
+            ? iconMoon(20)
+            : state.theme === 'light'
+                ? iconSun(20)
+                : iconMonitor(20);
+    const themeLabel =
+        state.theme === 'dark'
+            ? 'Switch to light theme'
+            : state.theme === 'light'
+                ? 'Switch to dark theme'
+                : 'Toggle theme';
+    [
+        'theme-toggle',
+        'mobile-theme-toggle',
+    ].forEach(id => {
+        const button = $(`#${id}`);
+        if (button) {
+            setHtml(button, themeIcon);
+            button.setAttribute(
+                'aria-label',
+                themeLabel,
+            );
+        }
+    });
+}
+
+async function mutateSidebarUser(
+): Promise<void> {
+    const { getCurrentUser } =
+        await import('./adapters');
+    const user =
+        await getCurrentUser();
+    for (const id of [
+        'sidebar-user-name',
+        'mobile-sidebar-user-name',
+    ]) {
+        const el = $(`#${id}`);
+        if (el)
+            el.textContent = user.name;
     }
-  });
+    for (const id of [
+        'sidebar-user-company',
+        'mobile-sidebar-user-company',
+    ]) {
+        const el = $(`#${id}`);
+        if (el)
+            el.textContent = user.company;
+    }
 }
 
-async function mutateSidebarUser(): Promise<void> {
-  const { getCurrentUser } = await import('./adapters');
-  const user = await getCurrentUser();
-  for (const id of ['sidebar-user-name', 'mobile-sidebar-user-name']) {
-    const el = document.getElementById(id);
-    if (el) el.textContent = user.name;
-  }
-  for (const id of ['sidebar-user-company', 'mobile-sidebar-user-company']) {
-    const el = document.getElementById(id);
-    if (el) el.textContent = user.company;
-  }
-}
-
-const NAV_GROUP_CHILDREN: Record<string, string[]> = {
-  account: ['profile', 'company-settings', 'manage-users', 'activity-feed', 'snapshots'],
-  ideas: ['idea-create', 'idea-convert', 'idea-review-queue', 'approval-detail'],
-  projects: ['project-detail', 'engineering-requirements'],
-  'edge-list': ['edge'],
-};
+const NAV_GROUP_CHILDREN:
+    Record<string, string[]> = {
+        account: [
+            'profile',
+            'settings',
+            'manage-users',
+        ],
+        ideas: [
+            'idea-create',
+            'idea-convert',
+            'idea-review-queue',
+            'approval-detail',
+        ],
+        projects: [
+            'project-detail',
+            'engineering-requirements',
+        ],
+        teams: ['activity-feed'],
+        'edge-list': ['edge'],
+    };
 
 function initActiveNavItem(): void {
-  const pageName = getPageName();
-  $$('[data-page-link]').forEach(navLink => {
-    const linkPage = navLink.getAttribute('data-page-link') || '';
-    const isActive = linkPage === pageName
-      || (NAV_GROUP_CHILDREN[linkPage]?.includes(pageName) ?? false);
-    if (isActive) navLink.setAttribute('aria-current', 'page');
-    else navLink.removeAttribute('aria-current');
-  });
+    const pageName = getPageName();
+    $$('[data-page-link]').forEach(
+        navLink => {
+            const linkPage =
+                navLink.getAttribute(
+                    'data-page-link',
+                ) || '';
+            const isActive =
+                linkPage === pageName
+                || (NAV_GROUP_CHILDREN[
+                    linkPage
+                ]?.includes(pageName)
+                    ?? false);
+            if (isActive)
+                navLink.setAttribute(
+                    'aria-current',
+                    'page',
+                );
+            else
+                navLink.removeAttribute(
+                    'aria-current',
+                );
+        },
+    );
 }
 
 function initSidebar(): void {
-  const sidebar = document.getElementById('desktop-sidebar');
-  const mainContent = $('.main-content');
+    const sidebar =
+        $('#desktop-sidebar');
+    const mainContent =
+        $('.main-content');
 
-  if (localStorage.getItem(STORAGE_KEY_SIDEBAR) === 'true') {
-    sidebar?.classList.add('sidebar-collapsed');
-    mainContent?.classList.add('sidebar-collapsed');
-    setState({ isSidebarCollapsed: true });
-  }
+    if (
+        localStorage.getItem(
+            STORAGE_KEY_SIDEBAR,
+        ) === 'true'
+    ) {
+        sidebar?.classList.add(
+            'sidebar-collapsed',
+        );
+        mainContent?.classList.add(
+            'sidebar-collapsed',
+        );
+        setState({
+            isSidebarCollapsed: true,
+        });
+    }
 
-  document.getElementById('sidebar-collapse')?.addEventListener('click', () => {
-    sidebar?.classList.add('sidebar-collapsed');
-    mainContent?.classList.add('sidebar-collapsed');
-    setState({ isSidebarCollapsed: true });
-    try { localStorage.setItem(STORAGE_KEY_SIDEBAR, 'true'); } catch { log.debug('Failed to save sidebar state', 'layout'); }
-  });
-  document.getElementById('sidebar-expand')?.addEventListener('click', () => {
-    sidebar?.classList.remove('sidebar-collapsed');
-    mainContent?.classList.remove('sidebar-collapsed');
-    setState({ isSidebarCollapsed: false });
-    try { localStorage.setItem(STORAGE_KEY_SIDEBAR, 'false'); } catch { log.debug('Failed to save sidebar state', 'layout'); }
-  });
+    $('#sidebar-collapse')?.addEventListener(
+        'click',
+        () => {
+            sidebar?.classList.add(
+                'sidebar-collapsed',
+            );
+            mainContent?.classList.add(
+                'sidebar-collapsed',
+            );
+            setState({
+                isSidebarCollapsed: true,
+            });
+            try {
+                localStorage.setItem(
+                    STORAGE_KEY_SIDEBAR,
+                    'true',
+                );
+            } catch {
+                log.debug(
+                    'Failed to save'
+                    + ' sidebar state',
+                    'layout',
+                );
+            }
+        },
+    );
+    $('#sidebar-expand')?.addEventListener(
+        'click',
+        () => {
+            sidebar?.classList.remove(
+                'sidebar-collapsed',
+            );
+            mainContent?.classList.remove(
+                'sidebar-collapsed',
+            );
+            setState({
+                isSidebarCollapsed: false,
+            });
+            try {
+                localStorage.setItem(
+                    STORAGE_KEY_SIDEBAR,
+                    'false',
+                );
+            } catch {
+                log.debug(
+                    'Failed to save'
+                    + ' sidebar state',
+                    'layout',
+                );
+            }
+        },
+    );
 
-  $$('[data-section]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const label = btn.getAttribute('data-section');
-      const items = $(`[data-section-items="${label}"]`);
-      if (items) {
-        const isCollapsed = items.style.display === 'none';
-        items.style.display = isCollapsed ? '' : 'none';
-        btn.setAttribute('aria-expanded', String(isCollapsed));
-        const chevron = btn.querySelector('svg');
-        if (chevron) chevron.style.transform = isCollapsed ? '' : 'rotate(-90deg)';
-      }
+    $$('[data-section]').forEach(btn => {
+        btn.addEventListener(
+            'click',
+            () => {
+                const label =
+                    btn.getAttribute(
+                        'data-section',
+                    );
+                const items = $(
+                    `[data-section-items=`
+                    + `"${label}"]`,
+                );
+                if (items) {
+                    const isCollapsed =
+                        items.style.display
+                            === 'none';
+                    items.style.display =
+                        isCollapsed
+                            ? '' : 'none';
+                    btn.setAttribute(
+                        'aria-expanded',
+                        String(isCollapsed),
+                    );
+                    const chevron =
+                        btn.querySelector(
+                            'svg',
+                        );
+                    if (chevron)
+                        chevron
+                            .style
+                            .transform =
+                                isCollapsed
+                                    ? ''
+                                    : 'rotate('
+                                    + '-90deg)';
+                }
+            },
+        );
     });
-  });
 }
 
-function initDropdown(toggleId: string, contentId: string): void {
-  const toggle = document.getElementById(toggleId);
-  const content = document.getElementById(contentId);
-  if (!toggle || !content) return;
+function initDropdown(
+    toggleId: string,
+    contentId: string,
+): void {
+    const toggle = $(`#${toggleId}`);
+    const content = $(`#${contentId}`);
+    if (!toggle || !content) return;
 
-  toggle.addEventListener('click', (e) => {
-    e.stopPropagation();
-    $$('.dropdown-content').forEach(dropdown => {
-      if (dropdown.id !== contentId) dropdown.classList.add('hidden');
-    });
-    content.classList.toggle('hidden');
-  });
+    toggle.addEventListener(
+        'click',
+        (e) => {
+            e.stopPropagation();
+            $$('.dropdown-content').forEach(
+                dropdown => {
+                    if (
+                        dropdown.id
+                            !== contentId
+                    )
+                        dropdown.classList.add(
+                            'hidden',
+                        );
+                },
+            );
+            content.classList.toggle(
+                'hidden',
+            );
+        },
+    );
 
-  document.addEventListener('click', (e) => {
-    if (e.target instanceof Node && !content.contains(e.target) && !toggle.contains(e.target)) {
-      content.classList.add('hidden');
-    }
-  });
+    document.addEventListener(
+        'click',
+        (e) => {
+            if (
+                e.target instanceof Node
+                && !content.contains(
+                    e.target,
+                )
+                && !toggle.contains(
+                    e.target,
+                )
+            ) {
+                content.classList.add(
+                    'hidden',
+                );
+            }
+        },
+    );
 }
 
 function initThemeAndDropdowns(): void {
-  for (const prefix of ['', 'mobile-']) {
-    initDropdown(`${prefix}theme-toggle`, `${prefix}theme-dropdown`);
-  }
+    for (const prefix of ['', 'mobile-']) {
+        initDropdown(
+            `${prefix}theme-toggle`,
+            `${prefix}theme-dropdown`,
+        );
+    }
 
-  $$('[data-theme-set]').forEach(themeButton => {
-    themeButton.addEventListener('click', () => {
-      const theme = themeButton.getAttribute('data-theme-set');
-      if (isValidTheme(theme)) {
-        setTheme(theme);
-        mutateThemeToggleIcon();
-        $$('.dropdown-content').forEach(dropdown => dropdown.classList.add('hidden'));
-      }
-    });
-  });
+    $$('[data-theme-set]').forEach(
+        themeButton => {
+            themeButton.addEventListener(
+                'click',
+                () => {
+                    const theme =
+                        themeButton
+                            .getAttribute(
+                                'data-theme-set',
+                            );
+                    if (isValidTheme(theme)) {
+                        setTheme(theme);
+                        mutateThemeToggleIcon();
+                        $$(
+                            '.dropdown-content',
+                        ).forEach(
+                            dropdown =>
+                                dropdown
+                                    .classList
+                                    .add(
+                                        'hidden',
+                                    ),
+                        );
+                    }
+                },
+            );
+        },
+    );
 }
 
 function initMobileDrawer(): void {
-  const sheet = document.getElementById('mobile-sheet');
-  const backdrop = document.getElementById('mobile-sheet-backdrop');
-  let drawerPreviousFocus: HTMLElement | null = null;
+    const sheet =
+        $('#mobile-sheet');
+    const backdrop =
+        $('#mobile-sheet-backdrop');
+    let drawerPreviousFocus:
+        HTMLElement | null = null;
 
-  function openDrawer(): void {
-    drawerPreviousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    sheet?.classList.remove('hidden');
-    backdrop?.classList.remove('hidden');
-    // Focus first focusable element in the drawer
-    const firstFocusable = sheet?.querySelector<HTMLElement>('a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])');
-    firstFocusable?.focus();
-  }
-
-  function closeDrawer(): void {
-    sheet?.classList.add('hidden');
-    backdrop?.classList.add('hidden');
-    drawerPreviousFocus?.focus();
-    drawerPreviousFocus = null;
-  }
-
-  document.getElementById('mobile-sidebar-open')?.addEventListener('click', openDrawer);
-  backdrop?.addEventListener('click', closeDrawer);
-
-  // Escape key closes drawer
-  document.addEventListener('keydown', (e) => {
-    if (e.key !== 'Escape') return;
-    if (sheet && !sheet.classList.contains('hidden')) {
-      closeDrawer();
+    function openDrawer(): void {
+        drawerPreviousFocus =
+            document.activeElement
+                instanceof HTMLElement
+                ? document.activeElement
+                : null;
+        sheet?.classList.remove('hidden');
+        backdrop?.classList.remove(
+            'hidden',
+        );
+        // Focus first focusable element
+        const focusableSelector =
+            'a[href], button, input,'
+            + ' select, textarea,'
+            + ' [tabindex]'
+            + ':not([tabindex="-1"])';
+        const firstFocusable =
+            sheet
+                ?.querySelector<HTMLElement>(
+                    focusableSelector,
+                );
+        firstFocusable?.focus();
     }
-  });
 
-  // Focus trap within drawer
-  sheet?.addEventListener('keydown', (e) => {
-    if (e.key !== 'Tab') return;
-    const focusable = sheet.querySelectorAll<HTMLElement>('a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])');
-    if (focusable.length === 0) return;
-    const first = focusable[0]!;
-    const last = focusable[focusable.length - 1]!;
-    if (e.shiftKey && document.activeElement === first) {
-      e.preventDefault();
-      last.focus();
-    } else if (!e.shiftKey && document.activeElement === last) {
-      e.preventDefault();
-      first.focus();
+    function closeDrawer(): void {
+        sheet?.classList.add('hidden');
+        backdrop?.classList.add('hidden');
+        drawerPreviousFocus?.focus();
+        drawerPreviousFocus = null;
     }
-  });
 
-  document.getElementById('mobile-search-toggle')?.addEventListener('click', () => {
-    document.getElementById('mobile-search-bar')?.classList.remove('hidden');
-  });
-  document.getElementById('mobile-search-close')?.addEventListener('click', () => {
-    document.getElementById('mobile-search-bar')?.classList.add('hidden');
-  });
+    $(
+        '#mobile-sidebar-open',
+    )?.addEventListener(
+        'click',
+        openDrawer,
+    );
+    backdrop?.addEventListener(
+        'click',
+        closeDrawer,
+    );
+
+    // Escape key closes drawer
+    document.addEventListener(
+        'keydown',
+        (e) => {
+            if (e.key !== 'Escape') return;
+            if (
+                sheet
+                && !sheet.classList.contains(
+                    'hidden',
+                )
+            ) {
+                closeDrawer();
+            }
+        },
+    );
+
+    // Focus trap within drawer
+    sheet?.addEventListener(
+        'keydown',
+        (e) => {
+            if (e.key !== 'Tab') return;
+            const focusableSelector =
+                'a[href], button, input,'
+                + ' select, textarea,'
+                + ' [tabindex]'
+                + ':not([tabindex="-1"])';
+            const focusable =
+                sheet
+                    .querySelectorAll<
+                        HTMLElement
+                    >(focusableSelector);
+            if (focusable.length === 0)
+                return;
+            const first = focusable[0]!;
+            const last = focusable[
+                focusable.length - 1
+            ]!;
+            if (
+                e.shiftKey
+                && document.activeElement
+                    === first
+            ) {
+                e.preventDefault();
+                last.focus();
+            } else if (
+                !e.shiftKey
+                && document.activeElement
+                    === last
+            ) {
+                e.preventDefault();
+                first.focus();
+            }
+        },
+    );
+
+    $(
+        '#mobile-search-toggle',
+    )?.addEventListener(
+        'click',
+        () => {
+            $(
+                '#mobile-search-bar',
+            )?.classList.remove('hidden');
+        },
+    );
+    $(
+        '#mobile-search-close',
+    )?.addEventListener(
+        'click',
+        () => {
+            $(
+                '#mobile-search-bar',
+            )?.classList.add('hidden');
+        },
+    );
 }
 
-async function mutateHeaderInfo(): Promise<void> {
-  try {
-    const { getCurrentUser, getDashboardStats, getTimeOfDay } = await import('./adapters');
-    const { html, setHtml } = await import('./safe-html');
+async function mutateHeaderInfo(
+): Promise<void> {
+    try {
+        const {
+            getCurrentUser,
+            getDashboardStats,
+            getTimeOfDay,
+        } = await import('./adapters');
+        const { html, setHtml } =
+            await import('./safe-html');
 
-    const [user, stats] = await Promise.all([
-      getCurrentUser(),
-      getDashboardStats(),
-    ]);
+        const [user, stats] =
+            await Promise.all([
+                getCurrentUser(),
+                getDashboardStats(),
+            ]);
 
-    const greetingEl = document.getElementById('header-greeting');
-    if (greetingEl) {
-      setHtml(greetingEl, html`<span style="font-weight:400">Good ${getTimeOfDay()},</span> ${user.name}`);
-      greetingEl.addEventListener('click', () => navigateTo('profile'));
+        const greetingEl =
+            $('#header-greeting');
+        if (greetingEl) {
+            setHtml(
+                greetingEl,
+                html`<span
+style="font-weight:400">Good ${
+getTimeOfDay()},</span> ${user.name}`,
+            );
+            greetingEl.addEventListener(
+                'click',
+                () =>
+                    navigateTo('profile'),
+            );
+        }
+
+        const statsEl =
+            $('#header-stats');
+        if (statsEl) {
+            setHtml(
+                statsEl,
+                html`<span
+class="header-stat-label">${
+user.company}</span>${
+stats.map(
+    (stat, i) =>
+        html`<div
+class="header-stat-divider"></div>
+<div class="header-stat-item">
+<span class="header-stat-value">${
+stat.value}</span>
+<span class="header-stat-label">${
+stat.label}</span></div>`,
+)}`,
+            );
+        }
+    } catch {
+        // Header info boxes stay
+        // empty/hidden via :empty
     }
-
-    const statsEl = document.getElementById('header-stats');
-    if (statsEl) {
-      setHtml(statsEl, html`<span class="header-stat-label">${user.company}</span>${stats.map((stat, i) => html`<div class="header-stat-divider"></div><div class="header-stat-item"><span class="header-stat-value">${stat.value}</span><span class="header-stat-label">${stat.label}</span></div>`)}`);
-    }
-  } catch {
-    // Header info boxes stay empty/hidden via :empty
-  }
 }
 
 function initSidebarLayout(): void {
-  initActiveNavItem();
-  initSidebar();
-  initThemeAndDropdowns();
-  initMobileDrawer();
-  mutateThemeToggleIcon();
-  mutateSidebarUser();
-  mutateHeaderInfo();
+    initActiveNavItem();
+    initSidebar();
+    initThemeAndDropdowns();
+    initMobileDrawer();
+    mutateThemeToggleIcon();
+    mutateSidebarUser();
+    mutateHeaderInfo();
 }
 
 export { initSidebarLayout };

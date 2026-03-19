@@ -66,13 +66,13 @@
   background-color: hsl(var(--destructive));
   color: hsl(var(--destructive-foreground));
 }
-.btn-destructive:hover { background-color: hsl(0 72% 45%); }
+.btn-destructive:hover { background-color: hsl(var(--destructive-hover)); }
 
 .btn-success {
   background-color: hsl(var(--success));
   color: hsl(var(--success-foreground));
 }
-.btn-success:hover { background-color: hsl(152 60% 35%); }
+.btn-success:hover { background-color: hsl(var(--success-hover)); }
 
 .btn-destructive:focus-visible,
 .btn-success:focus-visible {
@@ -107,7 +107,9 @@
 }
 
 .input::placeholder { color: hsl(var(--muted-foreground)); }
-.input:hover:not(:disabled):not(:focus) { border-color: hsl(var(--border-strong)); }
+.input:hover:not(:disabled):not(:focus) {
+    border-color: hsl(var(--border-strong));
+}
 .input:focus {
   outline: none;
   border-color: hsl(var(--ring));
@@ -531,7 +533,11 @@
 .toast-info { border-left: 3px solid hsl(var(--info)); }
 
 .toast-title { font-size: var(--text-sm); font-weight: 500; }
-.toast-message { font-size: var(--text-sm); color: hsl(var(--muted-foreground)); flex: 1; }
+.toast-message {
+    font-size: var(--text-sm);
+    color: hsl(var(--muted-foreground));
+    flex: 1;
+}
 
 .toast-close {
   background: none;

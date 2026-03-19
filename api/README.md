@@ -38,7 +38,7 @@ The localStorage implementation (`db-localstorage.ts`) persists each table as a 
 |---------|---------|-------------|
 | `/{collection}` | `GET("users")` | List all entities |
 | `/{collection}/{id}` | `GET("ideas/abc")` | Single entity by ID |
-| `/{parent}/{id}/{child}` | `GET("ideas/abc/scores")` | Nested resources |
+| `/{parent}/{id}/{child}` | `GET("ideas/abc/score")` | Nested resources |
 | `/{collection}` | `PUT("users", body)` | Create or update entity |
 
 ## Database Tables (19)

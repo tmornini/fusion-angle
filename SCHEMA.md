@@ -58,6 +58,7 @@
 | effort_team_size | TEXT | '' |
 | cost_estimate | TEXT | '' |
 | cost_breakdown | TEXT | '' |
+| success_metrics | TEXT | '' |
 
 ### idea_scores
 
@@ -165,7 +166,7 @@
 | id | TEXT | — |
 | idea_id | TEXT (FK → ideas) | — |
 | status | TEXT | '' |
-| confidence | TEXT | '' |
+| confidence | TEXT | null |
 | owner_id | TEXT | '' |
 | impact_short_term | TEXT | '' |
 | impact_mid_term | TEXT | '' |

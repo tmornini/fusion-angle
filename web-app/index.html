@@ -1,13 +1,21 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <title>Fusion AI</title>
-  </head>
-  <body>
-    <script>
-      var hasSchema = Object.keys(localStorage).some(function(k) { return k.indexOf('fusion-ai:') === 0; });
-      window.location.href = hasSchema ? 'landing/index.html' : 'snapshots/index.html';
-    </script>
-  </body>
+    <head>
+        <meta charset="UTF-8" />
+        <title>Fusion AI</title>
+    </head>
+    <body>
+        <script>
+            var hasSchema =
+                Object.keys(localStorage)
+                .some(function(k) {
+                    return k.indexOf(
+                        'fusion-ai:'
+                    ) === 0;
+                });
+            window.location.href = hasSchema
+                ? 'landing/index.html'
+                : 'snapshots/index.html';
+        </script>
+    </body>
 </html>

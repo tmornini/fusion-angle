@@ -10,7 +10,12 @@ function openDialog(dialogId: string): void {
   const dialog = $(`#${dialogId}-dialog`);
   dialog?.classList.remove('hidden');
   dialog?.setAttribute('aria-hidden', 'false');
-  const focusable = dialog?.querySelector<HTMLElement>('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+  const focusable = dialog
+    ?.querySelector<HTMLElement>(
+      'button, [href], input, select,'
+      + ' textarea,'
+      + ' [tabindex]:not([tabindex="-1"])',
+    );
   focusable?.focus();
 }
 
@@ -22,9 +27,21 @@ function closeDialog(dialogId: string): void {
   focusStack.pop()?.focus();
 }
 
-function initTabs(tabSelector: string, panelSelector: string, activeClass = 'active'): void {
-  const tabs = Array.from(document.querySelectorAll<HTMLElement>(tabSelector));
-  const panels = Array.from(document.querySelectorAll<HTMLElement>(panelSelector));
+function initTabs(
+  tabSelector: string,
+  panelSelector: string,
+  activeClass = 'active',
+): void {
+  const tabs = Array.from(
+    document.querySelectorAll<HTMLElement>(
+      tabSelector,
+    ),
+  );
+  const panels = Array.from(
+    document.querySelectorAll<HTMLElement>(
+      panelSelector,
+    ),
+  );
 
   // Set up ARIA roles and attributes
   tabs.forEach(tab => {
@@ -71,8 +88,13 @@ function initTabs(tabSelector: string, panelSelector: string, activeClass = 'act
     tab.addEventListener('keydown', (e) => {
       const currentIndex = tabs.indexOf(tab);
       let targetIndex = -1;
-      if (e.key === 'ArrowRight') targetIndex = (currentIndex + 1) % tabs.length;
-      else if (e.key === 'ArrowLeft') targetIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+      if (e.key === 'ArrowRight')
+        targetIndex =
+          (currentIndex + 1) % tabs.length;
+      else if (e.key === 'ArrowLeft')
+        targetIndex =
+          (currentIndex - 1 + tabs.length)
+          % tabs.length;
       else if (e.key === 'Home') targetIndex = 0;
       else if (e.key === 'End') targetIndex = tabs.length - 1;
       if (targetIndex >= 0) {
@@ -83,4 +105,53 @@ function initTabs(tabSelector: string, panelSelector: string, activeClass = 'act
   });
 }
 
-export { openDialog, closeDialog, initTabs };
+interface InitDialogOptions {
+    openBtnId?: string;
+    cancelBtnId?: string;
+    onSubmit?: () => void;
+}
+
+function initDialog(
+    dialogId: string,
+    options?: InitDialogOptions,
+): void {
+    const openId = options?.openBtnId
+        ?? `${dialogId}-btn`;
+    const cancelId = options?.cancelBtnId
+        ?? `${dialogId}-cancel`;
+
+    $(`#${openId}`)?.addEventListener(
+        'click',
+        () => openDialog(dialogId),
+    );
+    $(`#${cancelId}`)?.addEventListener(
+        'click',
+        () => closeDialog(dialogId),
+    );
+    $(`#${dialogId}-backdrop`)
+        ?.addEventListener(
+            'click',
+            (e) => {
+                if (
+                    e.target
+                    === e.currentTarget
+                ) {
+                    closeDialog(dialogId);
+                }
+            },
+        );
+    if (options?.onSubmit) {
+        $(`#${dialogId}-submit`)
+            ?.addEventListener(
+                'click',
+                options.onSubmit,
+            );
+    }
+}
+
+export {
+    openDialog,
+    closeDialog,
+    initDialog,
+    initTabs,
+};
