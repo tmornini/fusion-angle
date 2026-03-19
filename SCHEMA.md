@@ -4,6 +4,8 @@
 
 **Duration convention:** All numeric duration fields are persisted in seconds. UI displays days via `durationInDays(seconds)` from `format.ts`.
 
+**Timestamp convention:** TEXT columns storing timestamps use RFC-3339 Zulu format (e.g., `2024-01-15T09:30:00.000000Z`). See CONDUCT-OF-CODE.md.
+
 ## Core
 
 ### users

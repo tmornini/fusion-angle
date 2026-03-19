@@ -2,7 +2,7 @@
 
 All code in this project, and the process of creating it, must adhere to these strictures.
 
-In order of importance, from most to least importance:
+In order of importance, from most to least:
 
 - reliable - the bedrock upon which everything we do rests
 - secure - security breaches are to be avoided
@@ -15,7 +15,7 @@ In order of importance, from most to least importance:
 - atomic - avoid at all costs, thank your God for giving it to you when you can't
 - snappy - low latency is godliness, essential for UI and high frequency serial ops
 - general - never before exploratory duplication, snappiness development progress rules
-- efficient - true if above are adhered to, disasterous when focused on prematurely
+- efficient - true if above are adhered to, disastrous when focused on prematurely
 - perfect - asymptotically achievable, generally many years of considerations and iteration
 
 We detest:
@@ -82,10 +82,10 @@ We commit code:
       - e.g. "refactor login functionality"
     - if you think your commit demands a message with a subject line and body
       - your commit is too large, use git commit -p like pro
-  - that never moves or renames file(s) and changes it's(their) content simultaneously
+  - that never moves or renames file(s) and changes its (their) content simultaneously
 - rarely mentions file names, paths, pathnames or function names
   - codebase reorganizations moves and renames may
   - pure function and/or file renaming may
   - moves and renames always denoted as
-    - beofore -> after
+    - before -> after
   - paths and pathnames always relative to repo root

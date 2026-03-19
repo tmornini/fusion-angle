@@ -294,6 +294,3 @@ CSS custom properties on `:root` define light theme values. The `[data-theme="da
 - ❌ Skip focus states on interactive elements
 - ❌ Mix typography scales inconsistently
 
----
-
-*Version 1.0.0 | Fusion AI Design System*

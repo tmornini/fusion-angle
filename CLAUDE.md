@@ -81,7 +81,7 @@ import { navigateTo, openDialog, closeDialog } from '../app/core';
 - Adapter function names use **domain nouns** (`getIdea`, `putProject`), never internal type names like `Entity` — the return type already communicates the shape
 - `deleteSchema`, `createSchema`, `loadMockData`, `importSnapshot`, `exportSnapshot`, `hasData` — snapshot lifecycle operations in `adapters/snapshots.ts`
 - Boolean variables: `is*`, `has*`, `needs*` (use the prefix that reads naturally in English)
-- Config objects: `Record<StatusType, { label, className }>` in `config.ts`
+- Config objects: `Record<StatusType, { label, className }>` in `api/types.ts`
 
 ### Adapter Conventions
 
@@ -152,7 +152,6 @@ web-app/
     command-palette.ts        # Cmd+K search overlay with keyboard navigation
     dom.ts                    # querySelector wrappers ($, $$)
     toast.ts                  # showToast() auto-dismiss notifications
-    config.ts                 # edgeStatusConfig mapping
     logger.ts                 # Lightweight logger respecting fusion-ai:log-level in localStorage
     safe-html.ts              # SafeHtml class, html tagged template, trusted(), setHtml()
     loading-states.ts         # Loading skeletons, error states, empty states, withLoadingState()
