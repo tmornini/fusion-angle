@@ -64,6 +64,11 @@ export interface EdgeListItem {
     ideaId: string;
     ideaTitle: string;
     status: EdgeStatus;
+    statusLabel: string;
+    statusClassName: string;
+    isComplete: boolean;
+    isDraft: boolean;
+    isMissing: boolean;
     outcomesCount: number;
     metricsCount: number;
     confidence: ConfidenceLevel;
@@ -198,6 +203,13 @@ export async function getEdgeList(
             ideaTitle:
                 idea?.title ?? '',
             status: edge.status,
+            statusLabel:
+                edge.statusLabel(),
+            statusClassName:
+                edge.statusClassName(),
+            isComplete: edge.isComplete(),
+            isDraft: edge.isDraft(),
+            isMissing: edge.isMissing(),
             outcomesCount:
                 outcomes.length,
             metricsCount,

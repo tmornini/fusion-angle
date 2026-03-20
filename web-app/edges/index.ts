@@ -9,7 +9,6 @@ import {
     html,
     setHtml,
     type SafeHtml,
-    trusted,
 } from '../app/safe-html';
 import {
     buildSkeleton,
@@ -33,42 +32,19 @@ import {
     type EdgeListItem,
 } from '../app/adapters';
 
-
-const edgeStatusDisplayConfig: Record<
-    string,
-    {
-        label: string;
-        className: string;
-        icon: (size?: number) => SafeHtml;
-    }
-> = {
-    complete: {
-        label: 'Complete',
-        className: 'badge-success',
-        icon: iconCheckCircle2,
-    },
-    draft: {
-        label: 'Draft',
-        className: 'badge-warning',
-        icon: iconClock,
-    },
-    missing: {
-        label: 'Missing',
-        className: 'badge-error',
-        icon: iconAlertCircle,
-    },
-};
+function statusIcon(
+    edge: EdgeListItem,
+): SafeHtml {
+    if (edge.isComplete)
+        return iconCheckCircle2(12);
+    if (edge.isDraft)
+        return iconClock(12);
+    return iconAlertCircle(12);
+}
 
 function buildEdgeCard(
     edge: EdgeListItem,
 ): SafeHtml {
-    const statusDisplay =
-        edgeStatusDisplayConfig[edge.status]
-        ?? {
-            label: 'Unknown',
-            className: 'badge-default',
-            icon: iconAlertCircle,
-        };
     return html`
     <div class="card card-hover p-4"
         style="cursor:pointer"
@@ -77,10 +53,10 @@ function buildEdgeCard(
         <div style="flex:1;min-width:0">
           <div class="flex flex-wrap items-center gap-2 mb-2">
             <span class="badge
-              ${statusDisplay.className}
+              ${edge.statusClassName}
               text-xs">${
-              statusDisplay.icon(12)
-            } ${statusDisplay.label}</span>
+              statusIcon(edge)
+            } ${edge.statusLabel}</span>
             <span
                 class="flex items-center
                   gap-1 text-xs
@@ -99,7 +75,7 @@ function buildEdgeCard(
                     iconUser(14)
                   } ${edge.owner}</span>`
                 : html``}
-            ${edge.status !== 'missing'
+            ${!edge.isMissing
                 ? html`<span
                     class="flex items-center
                       gap-1">${
@@ -174,16 +150,13 @@ export async function init(): Promise<void> {
     const stats = {
         total: edges.length,
         complete: edges.filter(
-            edge =>
-                edge.status === 'complete',
+            edge => edge.isComplete,
         ).length,
         draft: edges.filter(
-            edge =>
-                edge.status === 'draft',
+            edge => edge.isDraft,
         ).length,
         missing: edges.filter(
-            edge =>
-                edge.status === 'missing',
+            edge => edge.isMissing,
         ).length,
     };
     const statsEl = $('#edge-stats');

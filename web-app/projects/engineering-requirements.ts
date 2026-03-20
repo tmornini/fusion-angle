@@ -33,7 +33,9 @@ function buildClarification(
     clarification: Clarification,
 ): SafeHtml {
     const isPending =
-            clarification.status === 'pending';
+            clarificationIsPending(
+                clarification,
+            );
     const borderColor = isPending
             ? 'hsl(var(--warning)/0.3)'
             : 'hsl(var(--border))';
