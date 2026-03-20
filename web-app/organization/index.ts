@@ -403,7 +403,7 @@ export async function init(): Promise<void> {
         >
           <button
             class="admin-link-card"
-            data-nav-to="manage-users"
+            data-nav-to="users"
           >
             <span
               style="color:hsl(var(
@@ -411,7 +411,7 @@ export async function init(): Promise<void> {
             >${iconUsers(20)}</span>
             <div style="flex:1;min-width:0">
               <p class="font-medium text-sm">
-                Manage Users
+                Users
               </p>
               <p
                 class="text-xs text-muted

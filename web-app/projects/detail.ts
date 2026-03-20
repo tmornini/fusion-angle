@@ -1071,7 +1071,7 @@ function buildProjectDetail(
                         </div>
                     </div>
                 </a>
-                <a href="../teams/index.html"
+                <a href="../organization/teams.html"
                         class="card card-hover"
                         style="padding:1rem;
                                 text-decoration:none;

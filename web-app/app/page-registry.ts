@@ -73,20 +73,20 @@ export const PAGE_REGISTRY: Record<
         icon: 'clipboardCheck',
         keywords: 'review approve reject',
     },
-    edge: {
-        title: 'Edge Definition',
+    edges: {
+        title: 'Edges',
         layout: 'sidebar',
-        icon: 'target',
-        searchable: false,
-    },
-    'edge-list': {
-        title: 'Edge List',
-        layout: 'sidebar',
-        sourceDir: 'edge',
-        sourceFile: 'list',
         icon: 'target',
         keywords:
             'edge outcomes metrics',
+    },
+    'edge-detail': {
+        title: 'Edge Detail',
+        layout: 'sidebar',
+        sourceDir: 'edges',
+        sourceFile: 'detail',
+        icon: 'target',
+        searchable: false,
     },
     crunch: {
         title: 'Crunch',
@@ -113,16 +113,18 @@ export const PAGE_REGISTRY: Record<
     teams: {
         title: 'Teams',
         layout: 'sidebar',
+        sourceDir: 'organization',
+        sourceFile: 'teams',
         icon: 'users',
         keywords: 'team members roster',
     },
     account: {
-        title: 'Administration',
+        title: 'Organization',
         layout: 'sidebar',
-        sourceDir: 'administration',
+        sourceDir: 'organization',
         icon: 'settings',
         keywords:
-            'account administration'
+            'account organization'
             + ' billing plan',
     },
     profile: {
@@ -140,18 +142,18 @@ export const PAGE_REGISTRY: Record<
             'company organization'
             + ' settings',
     },
-    'manage-users': {
-        title: 'Manage Users',
+    users: {
+        title: 'Users',
         layout: 'sidebar',
-        sourceDir: 'administration',
-        sourceFile: 'manage-users',
+        sourceDir: 'organization',
+        sourceFile: 'users',
         icon: 'users',
-        keywords: 'users invite admin',
+        keywords: 'users invite manage admin',
     },
     'activity-feed': {
         title: 'Activity Feed',
         layout: 'sidebar',
-        sourceDir: 'teams',
+        sourceDir: 'organization',
         sourceFile: 'activity-feed',
         icon: 'activity',
         keywords: 'activity feed log',
@@ -207,6 +209,8 @@ export const PAGE_REGISTRY: Record<
     onboarding: {
         title: 'Onboarding',
         layout: 'standalone',
+        sourceDir: 'organization',
+        sourceFile: 'onboarding',
         searchable: false,
     },
     'not-found': {

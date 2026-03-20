@@ -324,7 +324,7 @@ criteria</p>`);
                         '[data-edge-card]',
                     );
             if (card)
-                navigateTo('edge', {
+                navigateTo('edge-detail', {
                     ideaId: attr(
                         card,
                         'data-edge-card',

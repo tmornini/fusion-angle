@@ -449,7 +449,7 @@ export async function init(): Promise<void> {
                         'data-idea-edge',
                     )
                 )
-                    navigateTo('edge', {
+                    navigateTo('edge-detail', {
                         ideaId: attr(
                             actionButton,
                             'data-idea-edge',

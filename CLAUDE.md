@@ -25,8 +25,8 @@ Target: **ES2024** · Strict mode with `noUncheckedIndexedAccess`. Config at `we
 - **HTML Composition**: A build step (`web-app/app/compose.ts`) assembles `web-app/app/components-layout.html` (layout skeleton) with `component-*.html` files and each page's `index.html` to produce standalone composed `index.html` files in a temp build directory. 7 standalone pages have hand-written `index.html` that are copied directly to the build output.
 - **Navigation**: Standard `<a href>` links between pages. Parameterized pages use query strings (`?ideaId=1`). `navigateTo(page, params?)` helper constructs relative URLs for programmatic navigation.
 - **Layout**: Sidebar-layout pages share a layout template with sidebar, header, search, and theme toggle. Mobile layout uses CSS media queries (not JS) to swap between desktop sidebar and mobile drawer.
-- **Page Detection**: `page-registry.ts` defines `PAGE_REGISTRY` mapping page names to `'sidebar'` or `'standalone'` layout type. `<html data-page="dashboard">` attribute is read by JS on `DOMContentLoaded` to dispatch to the correct page module's `init()`. Pages with `sourceDir` in `PAGE_REGISTRY` have source files at a different path than their page name. The build script reads from `sourceDir`, outputs to the page name. This allows source nesting without changing page names or URLs.
-- **Source = Output Alignment**: Build output paths mirror source paths. A page at `web-app/edge/list.html` produces output at `edge/list.html`. The `sourceFile` property in `PAGE_REGISTRY` enables named files (e.g., `list.html`) alongside the default `index.html` convention. When `sourceFile` is set, compose.ts reads from and writes to `{sourceDir}/{sourceFile}.html`, and `navigateTo()` derives the correct URL automatically. This keeps the developer's mental model simple: the file you edit is the file the browser loads.
+- **Page Detection**: `page-registry.ts` defines `PAGE_REGISTRY` mapping page names to `'sidebar'` or `'standalone'` layout type. `<html data-page="dashboard">` attribute is read by JS on `DOMContentLoaded` to dispatch to the correct page module's `init()`. Pages with `sourceDir` in `PAGE_REGISTRY` have source files at a different path than their page name.
+- **Source = Output Alignment**: Build output paths always use `sourceDir` when present — both `compose.ts` and `navigateTo()` resolve output directory as `sourceDir || pageName`. This means a page at `web-app/edges/detail.html` produces output at `edges/detail.html`, and `navigateTo('account')` generates `../organization/index.html` because account's `sourceDir` is `'organization'`. The `sourceFile` property enables named files (e.g., `detail.html`) alongside the default `index.html` convention. This keeps the developer's mental model simple: the file you edit is the file the browser loads.
 - **Auth**: Mock auth returning `demo@example.com`.
 - **Data**: REST-style API layer (`api/`) backed by localStorage. The `web-app/app/adapters/` directory contains ~45 adapter functions (split into domain modules with barrel re-export) that call `GET()`/`PUT()`/`POST()` and convert normalized DB rows into the denormalized shapes pages expect.
 - **Database**: localStorage with JSON serialization, persisted across page navigations. Each table is stored as a `fusion-ai:tableName` key containing a JSON array of row objects. When no schema exists (no `fusion-ai:*` keys in localStorage), non-entry pages redirect to snapshots so users can initialize the environment. A snapshots page provides create pristine environment, wipe and load mock data, upload snapshot, and download snapshot operations.
@@ -47,7 +47,7 @@ The `DbAdapter` interface is designed for easy migration to Postgres or other ba
 
 ### Page Module Pattern
 
-Page folders contain `index.ts` and `index.html` by default. When `sourceFile` is set in `PAGE_REGISTRY`, the page uses `{sourceFile}.ts` and `{sourceFile}.html` instead (e.g., `edge/list.ts` + `edge/list.html`). Each page module exports:
+Page folders contain `index.ts` and `index.html` by default. When `sourceFile` is set in `PAGE_REGISTRY`, the page uses `{sourceFile}.ts` and `{sourceFile}.html` instead (e.g., `edges/detail.ts` + `edges/detail.html`). Each page module exports:
 - `init(): Promise<void>` — fetches data, populates DOM placeholders, binds event listeners
 
 Sidebar-layout pages have `index.html` containing page content that gets composed with the layout template. Standalone pages have a complete hand-written `index.html` with a `<div id="page-root">` that `init()` renders into.
@@ -185,19 +185,16 @@ web-app/
   dashboard/                # Dashboard with gauge cards
   ideas/                    # Ideas list + detail, create, convert, review-queue, approval-detail (named files)
   projects/                 # Projects list + detail, engineering-requirements (named files)
-  edge/                     # Edge definition (per-idea) + Edge list (list.ts/list.html)
+  edges/                    # Edge list + detail (detail.ts/detail.html)
   crunch/                   # Data labeling tool
   flow/                     # Process documentation list + detail (detail.ts/detail.html)
-  teams/                    # Team roster + activity feed (activity-feed.ts/activity-feed.html)
-  account/                  # Account overview
+  organization/             # Account overview, users, teams, activity-feed, onboarding (named files)
   profile/                  # Profile settings
   settings/                 # Company settings
-  manage-users/             # User administration
   snapshots/                # Snapshots (wipe, reload, upload/download snapshots)
   design-system/            # Component gallery
   landing/                  # Landing page (standalone)
   auth/                     # Login/signup (standalone)
-  onboarding/               # Welcome screen (standalone)
   not-found/                # 404 page (standalone)
 
 SCHEMA.md                     # Database schema (19 tables, columns, types, defaults)
@@ -205,7 +202,7 @@ DESIGN-SYSTEM.md              # Design system specification
 TEST-PLAN.md                  # Human-executable test plan (146 cases)
 ```
 
-Most pages use `index.ts` + `index.html`. Pages with `sourceFile` in `PAGE_REGISTRY` use named files (e.g., `list.ts` + `list.html`). Build output goes to a temp directory — no build artifacts in the repo.
+Most pages use `index.ts` + `index.html`. Pages with `sourceFile` in `PAGE_REGISTRY` use named files (e.g., `detail.ts` + `detail.html`). Build output goes to a temp directory — no build artifacts in the repo.
 
 ## Build
 
@@ -227,7 +224,7 @@ No build artifacts are created in the repo — everything is assembled in `/tmp/
 - **Non-critical writes swallowed**: localStorage writes for theme and sidebar state are wrapped in try/catch with empty catch — quota errors don't break the app.
 - **Snapshots wipe-first**: All snapshot operations (pristine, mock data, import) call `DELETE('snapshots/schema')` before writing — there is no merge, only replace.
 - **Score thresholds**: `SCORE_THRESHOLD_HIGH = 80` and `SCORE_THRESHOLD_MEDIUM = 60` in `api/types.ts` determine `PriorityLevel` computation.
-- **`file:///` protocol**: Navigation detects file protocol and skips link prefetching. Page URLs use `../pageName/index.html` relative paths, or `../dir/file.html` for pages with `sourceFile`.
+- **`file:///` protocol**: Navigation detects file protocol and skips link prefetching. Page URLs use `../${sourceDir || pageName}/index.html` relative paths, or `../dir/file.html` for pages with `sourceFile`.
 
 ## Worktrees
 

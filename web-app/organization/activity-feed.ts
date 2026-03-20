@@ -180,7 +180,7 @@ export async function init(
       margin:0 auto">
       <nav class="flex items-center
         gap-2 text-sm text-muted mb-6">
-        <a href="../teams/index.html"
+        <a href="teams.html"
           class="hover-link">Team</a>
         ${iconChevronRight(14)}
         <span>Activity Feed</span>

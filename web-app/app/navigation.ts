@@ -23,7 +23,7 @@ function buildPageUrl(
     if (entry?.sourceFile) {
         url = `../${entry.sourceDir || page}/${entry.sourceFile}.html`;
     } else {
-        url = `../${page}/index.html`;
+        url = `../${entry?.sourceDir || page}/index.html`;
     }
     if (params && Object.keys(params).length > 0) {
         url += '?' + new URLSearchParams(params).toString();

@@ -94,7 +94,7 @@ function compose(): void {
             .replace('{{PAGE_TITLE}}', title)
             .replace('<!-- PAGE_CONTENT -->', pageContent);
 
-        const outDir = join(OUT, sourceFile ? (sourceDir || name) : name);
+        const outDir = join(OUT, sourceDir || name);
         if (!existsSync(outDir)) mkdirSync(outDir, { recursive: true });
 
         const outPath = join(outDir, `${file}.html`);
@@ -109,7 +109,7 @@ function compose(): void {
         const file = sourceFile || 'index';
         const srcPath = join(ROOT, sourceDir || name, `${file}.html`);
 
-        const outDir = join(OUT, sourceFile ? (sourceDir || name) : name);
+        const outDir = join(OUT, sourceDir || name);
         if (!existsSync(outDir)) mkdirSync(outDir, { recursive: true });
 
         copyFileSync(srcPath, join(outDir, `${file}.html`));

@@ -96,7 +96,7 @@ const NAV_GROUP_CHILDREN:
         account: [
             'profile',
             'settings',
-            'manage-users',
+            'users',
         ],
         ideas: [
             'idea-create',
@@ -109,7 +109,7 @@ const NAV_GROUP_CHILDREN:
             'engineering-requirements',
         ],
         teams: ['activity-feed'],
-        'edge-list': ['edge'],
+        edges: ['edge-detail'],
     };
 
 function initActiveNavItem(): void {
