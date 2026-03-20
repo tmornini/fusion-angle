@@ -54,6 +54,30 @@ export function computePriority(
 
 export type StoredBoolean = 0 | 1;
 
+export type JsonArrayField = string & {
+    readonly __brand: 'JsonArrayField';
+};
+
+export type JsonObjectField = string & {
+    readonly __brand: 'JsonObjectField';
+};
+
+export function jsonArrayField(
+    value: unknown[],
+): JsonArrayField {
+    return JSON.stringify(
+        value,
+    ) as JsonArrayField;
+}
+
+export function jsonObjectField(
+    value: Record<string, unknown>,
+): JsonObjectField {
+    return JSON.stringify(
+        value,
+    ) as JsonObjectField;
+}
+
 export function toBool(
     value: unknown,
 ): boolean {
@@ -181,8 +205,8 @@ export interface UserEntity {
     performance_score: number;
     projects_completed: number;
     current_projects: number;
-    strengths: string; // JSON array
-    team_dimensions: string; // JSON object
+    strengths: JsonArrayField;
+    team_dimensions: JsonObjectField;
     phone: string;
     bio: string;
     last_active: string;
@@ -293,9 +317,9 @@ export interface IdeaEntity {
     effort_label: string;
     description: string;
     submitted_at: string;
-    risks: string; // JSON array
-    assumptions: string; // JSON array
-    alignments: string; // JSON array
+    risks: JsonArrayField;
+    assumptions: JsonArrayField;
+    alignments: JsonArrayField;
     effort_duration_estimate: string;
     effort_team_size: string;
     cost_estimate: string;
@@ -307,11 +331,11 @@ export interface IdeaScoreEntity {
     id: Id;
     overall: number;
     impact_score: number;
-    impact_breakdown: string; // JSON array
+    impact_breakdown: JsonArrayField;
     feasibility_score: number;
-    feasibility_breakdown: string; // JSON array
+    feasibility_breakdown: JsonArrayField;
     efficiency_score: number;
-    efficiency_breakdown: string; // JSON array
+    efficiency_breakdown: JsonArrayField;
     estimated_duration: string;
     estimated_cost: string;
     recommendation: string;
@@ -340,7 +364,7 @@ export interface ProjectEntity {
     actual_impact: number;
     priority: number;
     priority_score: number;
-    business_context: string; // JSON object
+    business_context: JsonObjectField;
     timeline_label: string;
     budget_label: string;
 }
@@ -385,7 +409,7 @@ export interface ProjectTaskEntity {
     name: string;
     priority: string;
     description: string;
-    skills: string; // JSON array
+    skills: JsonArrayField;
     duration: number; // seconds
 }
 
@@ -493,7 +517,7 @@ export interface CrunchColumnEntity {
     friendly_name: string;
     data_type: string;
     description: string;
-    sample_values: string; // JSON array
+    sample_values: JsonArrayField;
     is_acronym: StoredBoolean;
     acronym_expansion: string;
 }
@@ -511,7 +535,7 @@ export interface FlowStepEntity {
     description: string;
     owner: string;
     role: string;
-    tools: string; // JSON array
+    tools: JsonArrayField;
     duration: string;
     sort_order: number;
     type: FlowStepType;
@@ -675,9 +699,9 @@ export function createIdea(
         description:
             fields.description ?? '',
         submitted_at: nowUtc(),
-        risks: '[]',
-        assumptions: '[]',
-        alignments: '[]',
+        risks: jsonArrayField([]),
+        assumptions: jsonArrayField([]),
+        alignments: jsonArrayField([]),
         effort_duration_estimate: '',
         effort_team_size: '',
         cost_estimate: '',
@@ -720,7 +744,7 @@ export function createProject(
         actual_impact: 0,
         priority: 0,
         priority_score: 0,
-        business_context: '{}',
+        business_context: jsonObjectField({}),
         timeline_label: '',
         budget_label: '',
     };
@@ -799,7 +823,7 @@ export interface FlowStepCreationFields {
     description?: string;
     owner?: string;
     role?: string;
-    tools?: string;
+    tools?: JsonArrayField;
     duration?: string;
 }
 
@@ -813,7 +837,8 @@ export function createFlowStep(
             fields.description ?? '',
         owner: fields.owner ?? '',
         role: fields.role ?? '',
-        tools: fields.tools ?? '[]',
+        tools: fields.tools
+            ?? jsonArrayField([]),
         duration: fields.duration ?? '',
         sort_order: fields.sort_order,
         type: fields.type ?? 'action',

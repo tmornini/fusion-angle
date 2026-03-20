@@ -27,6 +27,10 @@ import type {
     ProjectTaskProjectEntity,
     ProjectVersionProjectEntity,
 } from './types';
+import {
+    jsonArrayField,
+    jsonObjectField,
+} from './types';
 
 export async function populateMockData(
     adapter: DbAdapter,
@@ -340,9 +344,9 @@ export async function populateMockData(
         adapter.users.put(user.id, {
             ...user,
             strengths:
-                JSON.stringify(user.strengths),
+                jsonArrayField(user.strengths),
             team_dimensions:
-                JSON.stringify(
+                jsonObjectField(
                     user.team_dimensions,
                 ),
         }),
@@ -385,9 +389,9 @@ export async function populateMockData(
             effort_label: '',
             description: '',
             submitted_at: '',
-            risks: '[]',
-            assumptions: '[]',
-            alignments: '[]',
+            risks: jsonArrayField([]),
+            assumptions: jsonArrayField([]),
+            alignments: jsonArrayField([]),
             effort_duration_estimate: '',
             effort_team_size: '',
             cost_estimate: '',
@@ -437,9 +441,9 @@ export async function populateMockData(
             effort_label: '',
             description: '',
             submitted_at: '',
-            risks: '[]',
-            assumptions: '[]',
-            alignments: '[]',
+            risks: jsonArrayField([]),
+            assumptions: jsonArrayField([]),
+            alignments: jsonArrayField([]),
             effort_duration_estimate: '',
             effort_team_size: '',
             cost_estimate: '',
@@ -486,9 +490,9 @@ export async function populateMockData(
             effort_label: '',
             description: '',
             submitted_at: '',
-            risks: '[]',
-            assumptions: '[]',
-            alignments: '[]',
+            risks: jsonArrayField([]),
+            assumptions: jsonArrayField([]),
+            alignments: jsonArrayField([]),
             effort_duration_estimate: '',
             effort_team_size: '',
             cost_estimate: '',
@@ -537,9 +541,9 @@ export async function populateMockData(
             effort_label: '',
             description: '',
             submitted_at: '',
-            risks: '[]',
-            assumptions: '[]',
-            alignments: '[]',
+            risks: jsonArrayField([]),
+            assumptions: jsonArrayField([]),
+            alignments: jsonArrayField([]),
             effort_duration_estimate: '',
             effort_team_size: '',
             cost_estimate: '',
@@ -589,9 +593,9 @@ export async function populateMockData(
             effort_label: '',
             description: '',
             submitted_at: '',
-            risks: '[]',
-            assumptions: '[]',
-            alignments: '[]',
+            risks: jsonArrayField([]),
+            assumptions: jsonArrayField([]),
+            alignments: jsonArrayField([]),
             effort_duration_estimate: '',
             effort_team_size: '',
             cost_estimate: '',
@@ -639,9 +643,9 @@ export async function populateMockData(
             effort_label: '',
             description: '',
             submitted_at: '',
-            risks: '[]',
-            assumptions: '[]',
-            alignments: '[]',
+            risks: jsonArrayField([]),
+            assumptions: jsonArrayField([]),
+            alignments: jsonArrayField([]),
             effort_duration_estimate: '',
             effort_team_size: '',
             cost_estimate: '',
@@ -685,7 +689,7 @@ export async function populateMockData(
                 + ' responses.',
             submitted_at:
                 '2024-01-15T10:00:00.000000Z',
-            risks: JSON.stringify([
+            risks: jsonArrayField([
                 {
                     title:
                         'AI response accuracy',
@@ -720,7 +724,7 @@ export async function populateMockData(
                         + ' human agents',
                 },
             ]),
-            assumptions: JSON.stringify([
+            assumptions: jsonArrayField([
                 'Current helpdesk API'
                     + ' supports required'
                     + ' integrations',
@@ -731,7 +735,7 @@ export async function populateMockData(
                     + ' usage for customer'
                     + ' interactions',
             ]),
-            alignments: JSON.stringify([
+            alignments: jsonArrayField([
                 'Q1 OKR: Improve customer'
                     + ' satisfaction score'
                     + ' by 15%',
@@ -773,9 +777,9 @@ export async function populateMockData(
             effort_label: 'Low',
             description: '',
             submitted_at: '',
-            risks: '[]',
-            assumptions: '[]',
-            alignments: '[]',
+            risks: jsonArrayField([]),
+            assumptions: jsonArrayField([]),
+            alignments: jsonArrayField([]),
             effort_duration_estimate: '',
             effort_team_size: '',
             cost_estimate: '',
@@ -803,9 +807,9 @@ export async function populateMockData(
             effort_label: 'High',
             description: '',
             submitted_at: '',
-            risks: '[]',
-            assumptions: '[]',
-            alignments: '[]',
+            risks: jsonArrayField([]),
+            assumptions: jsonArrayField([]),
+            alignments: jsonArrayField([]),
             effort_duration_estimate: '',
             effort_team_size: '',
             cost_estimate: '',
@@ -833,9 +837,9 @@ export async function populateMockData(
             effort_label: 'Medium',
             description: '',
             submitted_at: '',
-            risks: '[]',
-            assumptions: '[]',
-            alignments: '[]',
+            risks: jsonArrayField([]),
+            assumptions: jsonArrayField([]),
+            alignments: jsonArrayField([]),
             effort_duration_estimate: '',
             effort_team_size: '',
             cost_estimate: '',
@@ -863,9 +867,9 @@ export async function populateMockData(
             effort_label: 'Medium',
             description: '',
             submitted_at: '',
-            risks: '[]',
-            assumptions: '[]',
-            alignments: '[]',
+            risks: jsonArrayField([]),
+            assumptions: jsonArrayField([]),
+            alignments: jsonArrayField([]),
             effort_duration_estimate: '',
             effort_team_size: '',
             cost_estimate: '',
@@ -977,7 +981,7 @@ export async function populateMockData(
             actual_impact: 78,
             priority: 1,
             priority_score: 92,
-            business_context: JSON.stringify({
+            business_context: jsonObjectField({
                 problem:
                     'Current manual'
                     + ' segmentation takes 2'
@@ -1038,7 +1042,7 @@ export async function populateMockData(
             actual_impact: 82,
             priority: 2,
             priority_score: 87,
-            business_context: '{}',
+            business_context: jsonObjectField({}),
             timeline_label: '',
             budget_label: '',
         },
@@ -1059,7 +1063,7 @@ export async function populateMockData(
             actual_impact: 0,
             priority: 3,
             priority_score: 84,
-            business_context: '{}',
+            business_context: jsonObjectField({}),
             timeline_label: '',
             budget_label: '',
         },
@@ -1080,7 +1084,7 @@ export async function populateMockData(
             actual_impact: 70,
             priority: 4,
             priority_score: 81,
-            business_context: '{}',
+            business_context: jsonObjectField({}),
             timeline_label: '',
             budget_label: '',
         },
@@ -1101,7 +1105,7 @@ export async function populateMockData(
             actual_impact: 0,
             priority: 5,
             priority_score: 78,
-            business_context: '{}',
+            business_context: jsonObjectField({}),
             timeline_label: '',
             budget_label: '',
         },
@@ -1122,7 +1126,7 @@ export async function populateMockData(
             actual_impact: 0,
             priority: 6,
             priority_score: 74,
-            business_context: '{}',
+            business_context: jsonObjectField({}),
             timeline_label: '',
             budget_label: '',
         },
@@ -1347,7 +1351,7 @@ export async function populateMockData(
             friendly_name: '',
             data_type: 'text',
             description: '',
-            sample_values: JSON.stringify(
+            sample_values: jsonArrayField(
                 ['C001', 'C002', 'C003'],
             ),
             is_acronym: 1,
@@ -1359,7 +1363,7 @@ export async function populateMockData(
             friendly_name: '',
             data_type: 'date',
             description: '',
-            sample_values: JSON.stringify([
+            sample_values: jsonArrayField([
                 '2024-01-15'
                     + 'T00:00:00.000000Z',
                 '2024-01-16'
@@ -1376,7 +1380,7 @@ export async function populateMockData(
             friendly_name: '',
             data_type: 'number',
             description: '',
-            sample_values: JSON.stringify(
+            sample_values: jsonArrayField(
                 ['150.00', '299.99', '75.50'],
             ),
             is_acronym: 1,
@@ -1388,7 +1392,7 @@ export async function populateMockData(
             friendly_name: '',
             data_type: 'text',
             description: '',
-            sample_values: JSON.stringify([
+            sample_values: jsonArrayField([
                 'Electronics',
                 'Apparel',
                 'Home',
@@ -1402,7 +1406,7 @@ export async function populateMockData(
             friendly_name: '',
             data_type: 'text',
             description: '',
-            sample_values: JSON.stringify(
+            sample_values: jsonArrayField(
                 ['R101', 'R102', 'R103'],
             ),
             is_acronym: 1,
@@ -1414,7 +1418,7 @@ export async function populateMockData(
             friendly_name: '',
             data_type: 'text',
             description: '',
-            sample_values: JSON.stringify(
+            sample_values: jsonArrayField(
                 ['COMP', 'PEND', 'CANC'],
             ),
             is_acronym: 0,
@@ -1434,7 +1438,7 @@ export async function populateMockData(
                 + ' success inbox',
             owner: 'Sales Team',
             role: 'Account Executive',
-            tools: JSON.stringify(
+            tools: jsonArrayField(
                 ['Email', 'Document'],
             ),
             duration: 'Immediate',
@@ -1451,7 +1455,7 @@ export async function populateMockData(
                 + ' folder',
             owner: 'Customer Success',
             role: 'CS Manager',
-            tools: JSON.stringify(
+            tools: jsonArrayField(
                 ['Database', 'Files'],
             ),
             duration: '15 minutes',
@@ -1469,7 +1473,7 @@ export async function populateMockData(
             owner: 'Customer Success',
             role:
                 'Implementation Specialist',
-            tools: JSON.stringify(
+            tools: jsonArrayField(
                 ['Email', 'Phone'],
             ),
             duration: '1 day',
@@ -1487,7 +1491,7 @@ export async function populateMockData(
             owner: 'Customer Success',
             role:
                 'Implementation Specialist',
-            tools: JSON.stringify(
+            tools: jsonArrayField(
                 ['Chat', 'Document'],
             ),
             duration: '1 hour',
@@ -1504,7 +1508,7 @@ export async function populateMockData(
                 + ' customer use',
             owner: 'Engineering',
             role: 'Solutions Engineer',
-            tools: JSON.stringify(
+            tools: jsonArrayField(
                 ['Database', 'Website'],
             ),
             duration: '2 days',
@@ -1521,7 +1525,7 @@ export async function populateMockData(
                 + ' marketing campaign',
             owner: 'Marketing',
             role: 'Marketing Ops',
-            tools: JSON.stringify(
+            tools: jsonArrayField(
                 ['Email', 'Database'],
             ),
             duration: 'Immediate',
@@ -1538,7 +1542,7 @@ export async function populateMockData(
                 + ' criteria',
             owner: 'Marketing',
             role: 'Marketing Ops',
-            tools: JSON.stringify(
+            tools: jsonArrayField(
                 ['Database'],
             ),
             duration: '5 minutes',
@@ -1557,7 +1561,7 @@ export async function populateMockData(
                 + ' budget',
             owner: 'Sales',
             role: 'Sales Development Rep',
-            tools: JSON.stringify(
+            tools: jsonArrayField(
                 ['Email', 'Phone'],
             ),
             duration: '1-2 days',
@@ -1574,7 +1578,7 @@ export async function populateMockData(
                 + ' and decision process',
             owner: 'Sales',
             role: 'Account Executive',
-            tools: JSON.stringify(
+            tools: jsonArrayField(
                 ['Phone', 'Chat', 'Document'],
             ),
             duration: '45 minutes',
@@ -1592,7 +1596,7 @@ export async function populateMockData(
                 + ' pricing',
             owner: 'Sales',
             role: 'Account Executive',
-            tools: JSON.stringify(
+            tools: jsonArrayField(
                 ['Document', 'Email'],
             ),
             duration: '3-5 days',
@@ -1609,7 +1613,7 @@ export async function populateMockData(
                 + ' severity',
             owner: 'QA',
             role: 'QA Engineer',
-            tools: JSON.stringify(
+            tools: jsonArrayField(
                 ['Database', 'Document'],
             ),
             duration: '15 minutes',
@@ -1626,7 +1630,7 @@ export async function populateMockData(
                 + ' team',
             owner: 'Engineering',
             role: 'Engineering Lead',
-            tools: JSON.stringify(
+            tools: jsonArrayField(
                 ['Database'],
             ),
             duration: '30 minutes',
@@ -1643,7 +1647,7 @@ export async function populateMockData(
                 + ' identifies root cause',
             owner: 'Engineering',
             role: 'Software Engineer',
-            tools: JSON.stringify(
+            tools: jsonArrayField(
                 ['Database', 'Website'],
             ),
             duration: '1-4 hours',
@@ -1659,7 +1663,7 @@ export async function populateMockData(
                 + ' for review',
             owner: 'Engineering',
             role: 'Software Engineer',
-            tools: JSON.stringify(
+            tools: jsonArrayField(
                 ['Database', 'Document'],
             ),
             duration: '2-8 hours',
@@ -1675,7 +1679,7 @@ export async function populateMockData(
                 + ' staging environment',
             owner: 'Engineering',
             role: 'Senior Engineer',
-            tools: JSON.stringify(
+            tools: jsonArrayField(
                 ['Database', 'Website'],
             ),
             duration: '1 day',
@@ -1691,7 +1695,7 @@ export async function populateMockData(
                 + ' and notify reporter',
             owner: 'Engineering',
             role: 'DevOps Engineer',
-            tools: JSON.stringify(
+            tools: jsonArrayField(
                 ['Database', 'Email'],
             ),
             duration: '1 hour',
@@ -1709,7 +1713,7 @@ export async function populateMockData(
                 + ' previous quarter',
             owner: 'Operations',
             role: 'Chief of Staff',
-            tools: JSON.stringify(
+            tools: jsonArrayField(
                 ['Database', 'Document'],
             ),
             duration: '3 days',
@@ -1728,7 +1732,7 @@ export async function populateMockData(
                 + ' key initiatives',
             owner: 'Leadership',
             role: 'VP of Operations',
-            tools: JSON.stringify(
+            tools: jsonArrayField(
                 ['Chat', 'Document'],
             ),
             duration: '4 hours',
@@ -1744,7 +1748,7 @@ export async function populateMockData(
                 + ' with company strategy',
             owner: 'All Departments',
             role: 'Department Leads',
-            tools: JSON.stringify(
+            tools: jsonArrayField(
                 ['Document'],
             ),
             duration: '1 week',
@@ -1763,7 +1767,7 @@ export async function populateMockData(
                 + ' commitments',
             owner: 'Operations',
             role: 'Chief of Staff',
-            tools: JSON.stringify(
+            tools: jsonArrayField(
                 ['Chat', 'Document'],
             ),
             duration: '2 days',
@@ -1922,7 +1926,7 @@ export async function populateMockData(
             overall: 82,
             impact_score: 88,
             impact_breakdown:
-                JSON.stringify([
+                jsonArrayField([
                     {
                         label:
                             'Business Value',
@@ -1958,7 +1962,7 @@ export async function populateMockData(
                 ]),
             feasibility_score: 75,
             feasibility_breakdown:
-                JSON.stringify([
+                jsonArrayField([
                     {
                         label:
                             'Technical'
@@ -1993,7 +1997,7 @@ export async function populateMockData(
                 ]),
             efficiency_score: 85,
             efficiency_breakdown:
-                JSON.stringify([
+                jsonArrayField([
                     {
                         label:
                             'Time to Value',
@@ -2262,7 +2266,7 @@ export async function populateMockData(
                 'Configure ETL pipeline'
                 + ' for customer data'
                 + ' ingestion',
-            skills: JSON.stringify([
+            skills: jsonArrayField([
                 'Python',
                 'Apache Airflow',
                 'SQL',
@@ -2277,7 +2281,7 @@ export async function populateMockData(
                 'Develop and train'
                 + ' clustering model using'
                 + ' customer behavior data',
-            skills: JSON.stringify([
+            skills: jsonArrayField([
                 'Machine Learning',
                 'Python',
                 'scikit-learn',
@@ -2292,7 +2296,7 @@ export async function populateMockData(
                 'Create visual interface'
                 + ' for segment exploration'
                 + ' and management',
-            skills: JSON.stringify([
+            skills: jsonArrayField([
                 'React',
                 'D3.js',
                 'CSS',
@@ -2307,7 +2311,7 @@ export async function populateMockData(
                 'RESTful API for segment'
                 + ' data access and'
                 + ' management',
-            skills: JSON.stringify([
+            skills: jsonArrayField([
                 'Node.js',
                 'REST API',
                 'PostgreSQL',
@@ -2322,7 +2326,7 @@ export async function populateMockData(
                 'Technical documentation'
                 + ' and user guides for the'
                 + ' segmentation system',
-            skills: JSON.stringify([
+            skills: jsonArrayField([
                 'Technical Writing',
                 'Markdown',
             ]),

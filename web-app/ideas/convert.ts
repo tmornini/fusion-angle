@@ -15,7 +15,9 @@ import {
     iconFolderKanban,
 } from '../app/icons';
 import { navigateTo } from '../app/core';
-import { User } from '../../api/types';
+import {
+    User, jsonObjectField,
+} from '../../api/types';
 import {
     getIdeaForConversion,
     getManagedUsers,
@@ -859,7 +861,9 @@ export async function init(
                             priority_score:
                                 0,
                             business_context:
-                                '{}',
+                                jsonObjectField(
+                                    {},
+                                ),
                             timeline_label:
                                 '',
                             budget_label:
