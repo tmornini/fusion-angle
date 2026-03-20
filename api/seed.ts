@@ -6,8 +6,12 @@ import type {
     EdgeEntity,
     ActivityEntity,
     CrunchColumnEntity,
+    CrunchColumnAcronymEntity,
+    CrunchColumnAcronymLinkEntity,
     FlowStepEntity,
     ClarificationEntity,
+    ClarificationAnswerEntity,
+    ClarificationAnswerClarificationEntity,
     IdeaSubmissionEntity,
     IdeaProjectLinkEntity,
     EdgeIdeaEntity,
@@ -1353,8 +1357,6 @@ export async function populateMockData(
             sample_values: jsonArrayField(
                 ['C001', 'C002', 'C003'],
             ),
-            is_acronym: 1,
-            acronym_expansion: '',
         },
         {
             id: '2',
@@ -1370,8 +1372,6 @@ export async function populateMockData(
                 '2024-01-17'
                     + 'T00:00:00.000000Z',
             ]),
-            is_acronym: 1,
-            acronym_expansion: '',
         },
         {
             id: '3',
@@ -1382,8 +1382,6 @@ export async function populateMockData(
             sample_values: jsonArrayField(
                 ['150.00', '299.99', '75.50'],
             ),
-            is_acronym: 1,
-            acronym_expansion: '',
         },
         {
             id: '4',
@@ -1396,8 +1394,6 @@ export async function populateMockData(
                 'Apparel',
                 'Home',
             ]),
-            is_acronym: 1,
-            acronym_expansion: '',
         },
         {
             id: '5',
@@ -1408,8 +1404,6 @@ export async function populateMockData(
             sample_values: jsonArrayField(
                 ['R101', 'R102', 'R103'],
             ),
-            is_acronym: 1,
-            acronym_expansion: '',
         },
         {
             id: '6',
@@ -1420,8 +1414,64 @@ export async function populateMockData(
             sample_values: jsonArrayField(
                 ['COMP', 'PEND', 'CANC'],
             ),
-            is_acronym: 0,
-            acronym_expansion: '',
+        },
+    ];
+
+    const crunchColumnAcronyms:
+        CrunchColumnAcronymEntity[] = [
+        { id: 'cca-1', expansion: '' },
+        { id: 'cca-2', expansion: '' },
+        { id: 'cca-3', expansion: '' },
+        { id: 'cca-4', expansion: '' },
+        { id: 'cca-5', expansion: '' },
+    ];
+
+    const crunchColumnAcronymLinks:
+        CrunchColumnAcronymLinkEntity[] = [
+        {
+            id: 'ccal-1',
+            crunch_column_acronym_id:
+                'cca-1',
+            crunch_column_id: '1',
+            created_at:
+                '2024-01-15'
+                + 'T09:00:00.000000Z',
+        },
+        {
+            id: 'ccal-2',
+            crunch_column_acronym_id:
+                'cca-2',
+            crunch_column_id: '2',
+            created_at:
+                '2024-01-15'
+                + 'T09:00:00.000000Z',
+        },
+        {
+            id: 'ccal-3',
+            crunch_column_acronym_id:
+                'cca-3',
+            crunch_column_id: '3',
+            created_at:
+                '2024-01-15'
+                + 'T09:00:00.000000Z',
+        },
+        {
+            id: 'ccal-4',
+            crunch_column_acronym_id:
+                'cca-4',
+            crunch_column_id: '4',
+            created_at:
+                '2024-01-15'
+                + 'T09:00:00.000000Z',
+        },
+        {
+            id: 'ccal-5',
+            crunch_column_acronym_id:
+                'cca-5',
+            crunch_column_id: '5',
+            created_at:
+                '2024-01-15'
+                + 'T09:00:00.000000Z',
         },
     ];
 
@@ -2064,6 +2114,15 @@ export async function populateMockData(
                 column,
             ),
         ),
+        ...crunchColumnAcronyms.map(a =>
+            adapter.crunchColumnAcronyms.put(
+                a.id, a,
+            ),
+        ),
+        ...crunchColumnAcronymLinks.map(l =>
+            adapter.crunchColumnAcronymLinks
+                .put(l.id, l),
+        ),
         ...processSteps.map(step =>
             adapter.flowSteps.put(
                 step.id,
@@ -2416,18 +2475,6 @@ export async function populateMockData(
                 '2024-02-20'
                 + 'T10:00:00.000000Z',
             status: 'answered',
-            answer:
-                'We have event tracking'
-                + ' via Segment, transaction'
-                + ' data in our data'
-                + ' warehouse (Snowflake),'
-                + ' and email engagement'
-                + ' metrics from Mailchimp.'
-                + ' All can be accessed'
-                + ' via APIs.',
-            answered_at:
-                '2024-02-21'
-                + 'T14:00:00.000000Z',
         },
         {
             id: 'c2',
@@ -2442,18 +2489,6 @@ export async function populateMockData(
                 '2024-02-22'
                 + 'T09:30:00.000000Z',
             status: 'answered',
-            answer:
-                'Marketing has 5 legacy'
-                + ' segments they use today'
-                + ' (High Value, Growth,'
-                + ' At-Risk, New, Dormant).'
-                + " We'd like to preserve"
-                + ' compatibility but'
-                + ' welcome additional'
-                + ' discovered segments.',
-            answered_at:
-                '2024-02-22'
-                + 'T16:00:00.000000Z',
         },
         {
             id: 'c3',
@@ -2469,10 +2504,59 @@ export async function populateMockData(
                 '2024-02-25'
                 + 'T11:00:00.000000Z',
             status: 'pending',
-            answer: '',
-            answered_at: '',
         },
     ];
+
+    const clarificationAnswers:
+        ClarificationAnswerEntity[] = [
+        {
+            id: 'ca-c1',
+            answer:
+                'We have event tracking'
+                + ' via Segment, transaction'
+                + ' data in our data'
+                + ' warehouse (Snowflake),'
+                + ' and email engagement'
+                + ' metrics from Mailchimp.'
+                + ' All can be accessed'
+                + ' via APIs.',
+        },
+        {
+            id: 'ca-c2',
+            answer:
+                'Marketing has 5 legacy'
+                + ' segments they use today'
+                + ' (High Value, Growth,'
+                + ' At-Risk, New, Dormant).'
+                + " We'd like to preserve"
+                + ' compatibility but'
+                + ' welcome additional'
+                + ' discovered segments.',
+        },
+    ];
+
+    const clarificationAnswerClarifications:
+        ClarificationAnswerClarificationEntity[]
+        = [
+            {
+                id: 'cac-c1',
+                clarification_answer_id:
+                    'ca-c1',
+                clarification_id: 'c1',
+                created_at:
+                    '2024-02-21'
+                    + 'T14:00:00.000000Z',
+            },
+            {
+                id: 'cac-c2',
+                clarification_answer_id:
+                    'ca-c2',
+                clarification_id: 'c2',
+                created_at:
+                    '2024-02-22'
+                    + 'T16:00:00.000000Z',
+            },
+        ];
 
     await Promise.all([
         ...teamMemberships.map(tm =>
@@ -3534,6 +3618,17 @@ export async function populateMockData(
                 r.id, r,
             ),
         ),
+        ...clarificationAnswers.map(r =>
+            adapter.clarificationAnswers.put(
+                r.id, r,
+            ),
+        ),
+        ...clarificationAnswerClarifications
+            .map(r =>
+                adapter
+                    .clarificationAnswerClarifications
+                    .put(r.id, r),
+            ),
         ...clarificationAnswerers.map(r =>
             adapter.clarificationAnswerers.put(
                 r.id, r,

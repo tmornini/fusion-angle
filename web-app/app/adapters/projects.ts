@@ -15,6 +15,8 @@ import type {
     VersionAuthorshipEntity,
     ClarificationAskerEntity,
     ClarificationAnswererEntity,
+    ClarificationAnswerEntity,
+    ClarificationAnswerClarificationEntity,
 } from '../../../api/types';
 import {
     Project,
@@ -434,6 +436,7 @@ getClarificationsByProjectId(
     const [
         clarificationRows, userMap,
         askers, answerers,
+        answers, answerLinks,
     ] = await Promise.all([
         GET<ClarificationEntity[]>(
             `projects/${projectId}`
@@ -445,6 +448,15 @@ getClarificationsByProjectId(
         ),
         GET<ClarificationAnswererEntity[]>(
             'clarification-answerers',
+        ),
+        GET<ClarificationAnswerEntity[]>(
+            'clarification-answers',
+        ),
+        GET<
+            ClarificationAnswerClarificationEntity[]
+        >(
+            'clarification-answer'
+            + '-clarifications',
         ),
     ]);
     const askerMap = new Map(
@@ -463,9 +475,30 @@ getClarificationsByProjectId(
             ],
         ),
     );
+    const answerMap = new Map(
+        answers.map(
+            a => [a.id, a.answer],
+        ),
+    );
+    const answerLinkMap = new Map(
+        answerLinks.map(
+            l => [
+                l.clarification_id,
+                l,
+            ],
+        ),
+    );
     return clarificationRows.map(c => {
         const answererId =
             answererMap.get(c.id);
+        const answerLink =
+            answerLinkMap.get(c.id);
+        const answerText = answerLink
+            ? answerMap.get(
+                answerLink
+                    .clarification_answer_id,
+            )
+            : undefined;
         return {
             id: c.id,
             question: c.question,
@@ -476,8 +509,8 @@ getClarificationsByProjectId(
             ),
             askedAt: c.asked_at,
             status: c.status,
-            ...(c.answer
-                ? { answer: c.answer }
+            ...(answerText
+                ? { answer: answerText }
                 : {}),
             ...(answererId
                 ? {
@@ -487,10 +520,10 @@ getClarificationsByProjectId(
                     ),
                 }
                 : {}),
-            ...(c.answered_at
+            ...(answerLink
                 ? {
                     answeredAt:
-                        c.answered_at,
+                        answerLink.created_at,
                 }
                 : {}),
         };

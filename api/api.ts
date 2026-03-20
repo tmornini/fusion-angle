@@ -118,6 +118,16 @@ const routes: Route[] = [
         get: (db) =>
             db.crunchColumns.getAll(),
     }),
+    route('crunch-column-acronyms', {
+        get: (db) =>
+            db.crunchColumnAcronyms
+                .getAll(),
+    }),
+    route('crunch-column-acronym-links', {
+        get: (db) =>
+            db.crunchColumnAcronymLinks
+                .getAll(),
+    }),
     route('processes', {
         get: (db) => db.flows.getAll(),
     }),
@@ -180,6 +190,20 @@ const routes: Route[] = [
         get: (db) =>
             db.activityActors.getAll(),
     }),
+    route('clarification-answers', {
+        get: (db) =>
+            db.clarificationAnswers
+                .getAll(),
+    }),
+    route(
+        'clarification-answer-clarifications',
+        {
+            get: (db) =>
+                db
+                    .clarificationAnswerClarifications
+                    .getAll(),
+        },
+    ),
     route('clarification-askers', {
         get: (db) =>
             db.clarificationAskers
@@ -363,6 +387,24 @@ const routes: Route[] = [
                 payload,
             ),
     }),
+    route('crunch-column-acronyms/:id', {
+        put: (db, p, payload) =>
+            db.crunchColumnAcronyms.put(
+                param(p, 0),
+                payload,
+            ),
+    }),
+    route(
+        'crunch-column-acronym-links/:id',
+        {
+            put: (db, p, payload) =>
+                db.crunchColumnAcronymLinks
+                    .put(
+                        param(p, 0),
+                        payload,
+                    ),
+        },
+    ),
     route('idea-submissions/:id', {
         put: (db, p, payload) =>
             db.ideaSubmissions.put(
@@ -440,6 +482,26 @@ const routes: Route[] = [
                 payload,
             ),
     }),
+    route('clarification-answers/:id', {
+        put: (db, p, payload) =>
+            db.clarificationAnswers.put(
+                param(p, 0),
+                payload,
+            ),
+    }),
+    route(
+        'clarification-answer'
+        + '-clarifications/:id',
+        {
+            put: (db, p, payload) =>
+                db
+                    .clarificationAnswerClarifications
+                    .put(
+                        param(p, 0),
+                        payload,
+                    ),
+        },
+    ),
     route('clarification-askers/:id', {
         put: (db, p, payload) =>
             db.clarificationAskers.put(

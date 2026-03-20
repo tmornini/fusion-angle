@@ -507,8 +507,18 @@ export interface ClarificationEntity {
     question: string;
     asked_at: string;
     status: ClarificationStatus;
+}
+
+export interface ClarificationAnswerEntity {
+    id: Id;
     answer: string;
-    answered_at: string;
+}
+
+export interface ClarificationAnswerClarificationEntity {
+    id: Id;
+    clarification_answer_id: Id;
+    clarification_id: Id;
+    created_at: string;
 }
 
 export interface CrunchColumnEntity {
@@ -518,8 +528,18 @@ export interface CrunchColumnEntity {
     data_type: string;
     description: string;
     sample_values: JsonArrayField;
-    is_acronym: StoredBoolean;
-    acronym_expansion: string;
+}
+
+export interface CrunchColumnAcronymEntity {
+    id: Id;
+    expansion: string;
+}
+
+export interface CrunchColumnAcronymLinkEntity {
+    id: Id;
+    crunch_column_acronym_id: Id;
+    crunch_column_id: Id;
+    created_at: string;
 }
 
 export interface FlowEntity {
