@@ -15,10 +15,14 @@ import {
     getCrunchColumns, type CrunchColumn,
 } from '../app/adapters';
 
-let step: 'upload' | 'label' | 'review' = 'upload';
-let columns: CrunchColumn[] = [];
-let expandedColumnId: string | null = null;
-let businessContext = '';
+const state = {
+    step: 'upload' as
+        'upload' | 'label' | 'review',
+    columns: [] as CrunchColumn[],
+    expandedColumnId: null as string | null,
+    businessContext: '',
+    mockColumns: [] as CrunchColumn[],
+};
 
 function buildDataTypeIcon(type: string): SafeHtml {
     switch (type) {
@@ -34,8 +38,8 @@ function buildDataTypeIcon(type: string): SafeHtml {
 }
 
 function completionPercent(): number {
-    if (!columns.length) return 0;
-    const labeledCount = columns.filter(
+    if (!state.columns.length) return 0;
+    const labeledCount = state.columns.filter(
         column =>
             column.friendlyName
             && column.description
@@ -43,7 +47,8 @@ function completionPercent(): number {
                 || column.acronymExpansion),
     ).length;
     return Math.round(
-        (labeledCount / columns.length) * 100,
+        (labeledCount / state.columns.length)
+            * 100,
     );
 }
 
@@ -66,10 +71,12 @@ function buildStepIndicator(): SafeHtml {
         },
     ];
     return html`${steps.map((s, i) => {
-        const isActive = s.key === step;
+        const isActive =
+            s.key === state.step;
         const isComplete =
-            (step === 'label' && i === 0)
-            || (step === 'review' && i <= 1);
+            (state.step === 'label' && i === 0)
+            || (state.step === 'review'
+                && i <= 1);
         const activeStyle =
             'background:hsl(var(--primary));'
             + 'color:hsl(var('
@@ -199,12 +206,12 @@ function buildUploadStep(): SafeHtml {
 
 function buildLabelStep(): SafeHtml {
     const percent = completionPercent();
-    const labeled = columns.filter(
+    const labeled = state.columns.filter(
         column =>
             column.friendlyName
             && column.description,
     ).length;
-    const colWord = columns.length === 1
+    const colWord = state.columns.length === 1
         ? 'column'
         : 'columns';
     return html`
@@ -240,7 +247,7 @@ function buildLabelStep(): SafeHtml {
               </p>
               <p class="text-xs text-muted">
                 ${'2.3 MB \u2022 1,247 rows \u2022 '
-                  + columns.length
+                  + state.columns.length
                   + ' columns'}
               </p>
             </div>
@@ -253,7 +260,7 @@ function buildLabelStep(): SafeHtml {
                 ${percent}% complete
               </p>
               <p class="text-xs text-muted">
-                ${labeled} of ${columns.length}
+                ${labeled} of ${state.columns.length}
                 ${colWord} labeled
               </p>
             </div>
@@ -297,7 +304,7 @@ function buildLabelStep(): SafeHtml {
           placeholder="${'Example: This is our'
             + ' quarterly sales report...'}"
           style="min-height:5rem;resize:none"
-        >${businessContext}</textarea>
+        >${state.businessContext}</textarea>
       </div>
 
       <div
@@ -308,9 +315,10 @@ function buildLabelStep(): SafeHtml {
         <h3 class="font-medium">
           Help us understand each column
         </h3>
-        ${columns.map(column => {
+        ${state.columns.map(column => {
             const isExpanded =
-                expandedColumnId === column.id;
+                state.expandedColumnId
+                    === column.id;
             const isColumnLabeled =
                 column.friendlyName
                 && column.description
@@ -642,7 +650,7 @@ function syncFormFields(): void {
             el.getAttribute('data-column-id');
         const field =
             el.getAttribute('data-field-name');
-        const column = columns.find(
+        const column = state.columns.find(
             candidate => candidate.id === columnId,
         );
         if (column && field) {
@@ -667,7 +675,8 @@ function syncFormFields(): void {
     const contextField =
         $textarea('#crunch-context');
     if (contextField) {
-        businessContext = contextField.value;
+        state.businessContext =
+            contextField.value;
     }
 }
 
@@ -706,15 +715,13 @@ function buildCrunchPage(): SafeHtml {
         ${buildStepIndicator()}
       </div>
 
-      ${step === 'upload'
+      ${state.step === 'upload'
           ? buildUploadStep()
-          : step === 'label'
+          : state.step === 'label'
               ? buildLabelStep()
               : buildReviewStep()}
     </div>`;
 }
-
-let mockColumns: CrunchColumn[] = [];
 
 function mutateCrunchPage(): void {
     const root = $('#crunch-content');
@@ -724,22 +731,22 @@ function mutateCrunchPage(): void {
 }
 
 function bindCrunchEvents(): void {
-    if (step === 'upload') {
+    if (state.step === 'upload') {
         const dropzone = $('#crunch-dropzone');
         dropzone?.addEventListener(
             'click',
             () => {
-                columns =
-                    mockColumns.map(c => ({
-                        ...c,
-                    }));
-                step = 'label';
+                state.columns =
+                    state.mockColumns.map(
+                        c => ({ ...c }),
+                    );
+                state.step = 'label';
                 mutateCrunchPage();
             },
         );
     }
 
-    if (step === 'label') {
+    if (state.step === 'label') {
         $$('[data-column-toggle]').forEach(
             el => {
                 el.addEventListener(
@@ -751,8 +758,8 @@ function bindCrunchEvents(): void {
                                 'data-column'
                                 + '-toggle',
                             );
-                        expandedColumnId =
-                            expandedColumnId
+                        state.expandedColumnId =
+                            state.expandedColumnId
                                 === id
                                 ? null
                                 : id;
@@ -787,22 +794,22 @@ function bindCrunchEvents(): void {
 
         $('#crunch-back-upload')
             ?.addEventListener('click', () => {
-                step = 'upload';
-                columns = [];
+                state.step = 'upload';
+                state.columns = [];
                 mutateCrunchPage();
             });
         $('#crunch-to-review')
             ?.addEventListener('click', () => {
                 syncFormFields();
-                step = 'review';
+                state.step = 'review';
                 mutateCrunchPage();
             });
     }
 
-    if (step === 'review') {
+    if (state.step === 'review') {
         $('#crunch-edit-labels')
             ?.addEventListener('click', () => {
-                step = 'label';
+                state.step = 'label';
                 mutateCrunchPage();
             });
         $('#crunch-to-dashboard')
@@ -816,11 +823,12 @@ export async function init(): Promise<void> {
     const container = $('#crunch-content');
     if (!container) return;
     try {
-        mockColumns = await getCrunchColumns();
-        step = 'upload';
-        columns = [];
-        expandedColumnId = null;
-        businessContext = '';
+        state.mockColumns =
+            await getCrunchColumns();
+        state.step = 'upload';
+        state.columns = [];
+        state.expandedColumnId = null;
+        state.businessContext = '';
         mutateCrunchPage();
     } catch {
         setHtml(

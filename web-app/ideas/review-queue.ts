@@ -48,44 +48,26 @@ const priorityConfig: Record<
     },
 };
 
-const readinessConfig: Record<
+const readinessIcon: Record<
     string,
-    {
-        label: string;
-        icon: (size?: number) => SafeHtml;
-        className: string;
-    }
+    (size?: number) => SafeHtml
 > = {
-    ready: {
-        label: 'Ready for Review',
-        icon: iconCheckCircle2,
-        className: 'text-success',
-    },
-    'needs-info': {
-        label: 'Needs Info',
-        icon: iconMessageSquare,
-        className: 'text-warning',
-    },
-    incomplete: {
-        label: 'Incomplete',
-        icon: iconAlertCircle,
-        className: 'text-error',
-    },
+    ready: iconCheckCircle2,
+    'needs-info': iconMessageSquare,
+    incomplete: iconAlertCircle,
 };
 
 function buildReviewCard(
     idea: Idea,
 ): SafeHtml {
-    const readinessDisplay =
-        readinessConfig[idea.readiness]
-        ?? {
-            label: 'Unknown',
-            icon: iconAlertCircle,
-            className: 'text-muted',
-        };
+    const rIcon = (
+        readinessIcon[idea.readiness]
+        ?? iconAlertCircle
+    );
     const priorityDisplay =
-        priorityConfig[idea.priorityLevel()]
-        ?? {
+        priorityConfig[
+            idea.priorityLevel()
+        ] ?? {
             label: 'Unknown',
             className: 'badge-default',
         };
@@ -93,19 +75,21 @@ function buildReviewCard(
     <div class="card card-hover p-4"
         style="cursor:pointer"
         data-review-card="${idea.id}">
-      <div class="flex items-start justify-between gap-4">
+      <div class="flex items-start
+          justify-between gap-4">
         <div style="flex:1;min-width:0">
           <div class="flex flex-wrap
             items-center gap-2 mb-2">
             <span class="badge
               ${priorityDisplay.className}
-              text-xs">${priorityDisplay.label
+              text-xs">${
+              priorityDisplay.label
             }</span>
             <span class="flex items-center
               gap-1 text-sm
-              ${readinessDisplay.className}">${
-              readinessDisplay.icon(16)
-            } ${readinessDisplay.label
+              ${idea.readinessClassName()
+              }">${rIcon(16)
+            } ${idea.readinessLabel()
             }</span>
             <span class="badge
               ${idea.edgeStatusClassName()}
@@ -150,7 +134,9 @@ function buildReviewCard(
     </div>`;
 }
 
-let allIdeas: Idea[] = [];
+const state = {
+    allIdeas: [] as Idea[],
+};
 
 export async function init(): Promise<void> {
     const root = $(
@@ -175,25 +161,24 @@ export async function init(): Promise<void> {
         },
     );
     if (!result) return;
-    allIdeas = result;
+    state.allIdeas = result;
 
     const stats = {
-        total: allIdeas.length,
-        ready: allIdeas.filter(
-            idea =>
-                idea.readiness === 'ready',
+        total: state.allIdeas.length,
+        ready: state.allIdeas.filter(
+            idea => idea.isReady(),
         ).length,
-        highPriority: allIdeas.filter(
+        highPriority: state.allIdeas.filter(
             idea =>
                 idea.priorityLevel()
                     === 'high',
         ).length,
         avgWait: Math.round(
-            allIdeas.reduce(
+            state.allIdeas.reduce(
                 (sum, idea) =>
                     sum + idea.waitingDays,
                 0,
-            ) / allIdeas.length,
+            ) / state.allIdeas.length,
         ),
     };
 
@@ -295,7 +280,7 @@ export async function init(): Promise<void> {
 
     <div id="review-queue-list"
       style="display:flex;flex-direction:column;gap:0.75rem">
-      ${allIdeas.map(buildReviewCard)}
+      ${state.allIdeas.map(buildReviewCard)}
     </div>
     <div id="review-queue-empty"
       class="text-center"
@@ -321,7 +306,7 @@ export async function init(): Promise<void> {
                 '#review-queue-readiness-filter',
             )?.value ?? 'all';
 
-        const filtered = allIdeas.filter(
+        const filtered = state.allIdeas.filter(
             idea => {
                 const matchesSearch =
                     idea.title

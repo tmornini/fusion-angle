@@ -21,6 +21,7 @@ import {
     iconDatabase,
     iconInfo,
 } from '../app/icons';
+import { nowUtc } from '../../api/types';
 
 const BANNER_ID = 'empty-banner';
 
@@ -353,8 +354,7 @@ export async function init(): Promise<void> {
                         'a',
                     );
                 downloadLink.href = url;
-                const date = new Date()
-                    .toISOString()
+                const date = nowUtc()
                     .split('T')[0];
                 downloadLink.download =
                     'fusion-ai-snapshot-'

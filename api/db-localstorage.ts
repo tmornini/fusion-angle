@@ -7,15 +7,23 @@ import type {
     UserEntity,
     IdeaEntity,
     IdeaScoreEntity,
+    IdeaScoreIdeaEntity,
     ProjectEntity,
-    ProjectTeamEntity,
+    TeamMembershipEntity,
+    TeamMembershipProjectEntity,
+    TeamMembershipUserEntity,
     MilestoneEntity,
+    MilestoneProjectEntity,
     ProjectTaskEntity,
+    ProjectTaskProjectEntity,
     DiscussionEntity,
     ProjectVersionEntity,
+    ProjectVersionProjectEntity,
     EdgeEntity,
     EdgeOutcomeEntity,
+    EdgeOutcomeEdgeEntity,
     EdgeMetricEntity,
+    EdgeMetricOutcomeEntity,
     ActivityEntity,
     ClarificationEntity,
     CrunchColumnEntity,
@@ -23,6 +31,19 @@ import type {
     FlowStepEntity,
     CompanySettingsEntity,
     AccountEntity,
+    IdeaSubmissionEntity,
+    IdeaProjectLinkEntity,
+    EdgeIdeaEntity,
+    EdgeOwnershipEntity,
+    TaskAssignmentEntity,
+    DiscussionAuthorshipEntity,
+    DiscussionProjectEntity,
+    VersionAuthorshipEntity,
+    ActivityActorEntity,
+    ClarificationAskerEntity,
+    ClarificationAnswererEntity,
+    ClarificationProjectEntity,
+    ProcessStepProcessEntity,
 } from './types';
 import { nowUtc } from './types';
 
@@ -297,15 +318,20 @@ export const TABLE_NAMES = [
     'users',
     'ideas',
     'idea_scores',
+    'idea_score_ideas',
     'projects',
-    'project_team',
+    'team_memberships',
+    'team_membership_projects',
+    'team_membership_users',
     'milestones',
     'project_tasks',
     'discussions',
     'project_versions',
     'edges',
     'edge_outcomes',
+    'edge_outcome_edges',
     'edge_metrics',
+    'edge_metric_outcomes',
     'activities',
     'clarifications',
     'crunch_columns',
@@ -313,6 +339,22 @@ export const TABLE_NAMES = [
     'process_steps',
     'company_settings',
     'account',
+    'idea_submissions',
+    'idea_project_links',
+    'edge_ideas',
+    'edge_ownerships',
+    'task_assignments',
+    'discussion_authorships',
+    'discussion_projects',
+    'version_authorships',
+    'activity_actors',
+    'clarification_askers',
+    'clarification_answerers',
+    'clarification_projects',
+    'project_task_projects',
+    'process_step_processes',
+    'milestone_projects',
+    'project_version_projects',
 ];
 
 export async function createLocalStorageAdapter(
@@ -352,37 +394,6 @@ export async function createLocalStorageAdapter(
             to: 'estimated_duration',
         },
     ]);
-
-    const edgeStore =
-        createEntityStore<EdgeEntity>('edges');
-    const milestoneStore =
-        createEntityStore<MilestoneEntity>(
-            'milestones',
-        );
-    const projectTaskStore =
-        createEntityStore<ProjectTaskEntity>(
-            'project_tasks',
-        );
-    const discussionStore =
-        createEntityStore<DiscussionEntity>(
-            'discussions',
-        );
-    const projectVersionStore =
-        createEntityStore<ProjectVersionEntity>(
-            'project_versions',
-        );
-    const edgeOutcomeStore =
-        createEntityStore<EdgeOutcomeEntity>(
-            'edge_outcomes',
-        );
-    const clarificationStore =
-        createEntityStore<ClarificationEntity>(
-            'clarifications',
-        );
-    const flowStepStore =
-        createEntityStore<FlowStepEntity>(
-            'process_steps',
-        );
 
     const adapter: DbAdapter = {
         async initialize(): Promise<void> {
@@ -537,336 +548,108 @@ export async function createLocalStorageAdapter(
                 'ideas',
             ),
 
-        ideaScores: {
-            async getByIdeaId(
-                ideaId: string,
-            ): Promise<IdeaScoreEntity | null> {
-                const rows =
-                    readTable<IdeaScoreEntity>(
-                        'idea_scores',
-                    );
-                return (
-                    rows.find(
-                        entity =>
-                            entity.idea_id
-                            === ideaId,
-                    ) ?? null
-                );
-            },
-            async put(
-                ideaId: string,
-                fields: Partial<
-                    IdeaScoreEntity
-                >,
-            ): Promise<IdeaScoreEntity> {
-                const rows =
-                    readTable<IdeaScoreEntity>(
-                        'idea_scores',
-                    );
-                const serialized =
-                    serializeRecord(fields);
-                const index = rows.findIndex(
-                    entity =>
-                        entity.idea_id
-                        === ideaId,
-                );
-                const fid =
-                    typeof fields.id === 'string'
-                        ? fields.id
-                        : undefined;
-                const existing =
-                    rows[index];
-                const id =
-                    existing
-                        ? existing.id
-                        : (fid
-                            ?? generateCompositeId(
-                                'score',
-                                ideaId,
-                            ));
-
-                if (index >= 0) {
-                    rows[index] = {
-                        ...rows[index]!,
-                        ...serialized,
-                        id,
-                        idea_id: ideaId,
-                    } as IdeaScoreEntity;
-                } else {
-                    rows.push({
-                        id,
-                        ...serialized,
-                        idea_id: ideaId,
-                    } as IdeaScoreEntity);
-                }
-
-                writeTable(
-                    'idea_scores',
-                    rows,
-                );
-                const pos = index >= 0
-                    ? index
-                    : rows.length - 1;
-                const written = rows[pos];
-                if (!written) {
-                    throw new Error(
-                        'Internal error: entity'
-                        + ' not found after'
-                        + ' write',
-                    );
-                }
-                return written;
-            },
-        },
+        ideaScores:
+            createEntityStore<
+                IdeaScoreEntity
+            >('idea_scores'),
+        ideaScoreIdeas:
+            createEntityStore<
+                IdeaScoreIdeaEntity
+            >('idea_score_ideas'),
 
         projects:
             createEntityStore<ProjectEntity>(
                 'projects',
             ),
 
-        projectTeam: {
-            async getByProjectId(
-                projectId: string,
-            ): Promise<ProjectTeamEntity[]> {
-                return readTable<
-                    ProjectTeamEntity
-                >('project_team').filter(
-                    entity =>
-                        entity.project_id
-                        === projectId,
-                );
-            },
-            async put(
-                projectId: string,
-                userId: string,
-                fields: Partial<
-                    ProjectTeamEntity
-                >,
-            ): Promise<ProjectTeamEntity> {
-                const rows =
-                    readTable<
-                        ProjectTeamEntity
-                    >('project_team');
-                const serialized =
-                    serializeRecord(fields);
-                const index = rows.findIndex(
-                    entity =>
-                        entity.project_id
-                            === projectId
-                        && entity.user_id
-                            === userId,
-                );
-                const fid =
-                    typeof fields.id === 'string'
-                        ? fields.id
-                        : undefined;
-                const existing =
-                    rows[index];
-                const id =
-                    existing
-                        ? existing.id
-                        : (fid
-                            ?? generateCompositeId(
-                                'pt',
-                                projectId,
-                                userId,
-                            ));
+        teamMemberships:
+            createEntityStore<
+                TeamMembershipEntity
+            >('team_memberships'),
+        teamMembershipProjects:
+            createEntityStore<
+                TeamMembershipProjectEntity
+            >('team_membership_projects'),
+        teamMembershipUsers:
+            createEntityStore<
+                TeamMembershipUserEntity
+            >('team_membership_users'),
 
-                if (index >= 0) {
-                    rows[index] = {
-                        ...rows[index]!,
-                        ...serialized,
-                        id,
-                        project_id: projectId,
-                        user_id: userId,
-                    } as ProjectTeamEntity;
-                } else {
-                    rows.push({
-                        id,
-                        ...serialized,
-                        project_id: projectId,
-                        user_id: userId,
-                    } as ProjectTeamEntity);
-                }
+        milestones:
+            createEntityStore<MilestoneEntity>(
+                'milestones',
+            ),
+        milestoneProjects:
+            createEntityStore<
+                MilestoneProjectEntity
+            >('milestone_projects'),
 
-                writeTable(
-                    'project_team',
-                    rows,
-                );
-                const pos = index >= 0
-                    ? index
-                    : rows.length - 1;
-                const written = rows[pos];
-                if (!written) {
-                    throw new Error(
-                        'Internal error: entity'
-                        + ' not found after'
-                        + ' write',
-                    );
-                }
-                return written;
-            },
-        },
+        projectTasks:
+            createEntityStore<
+                ProjectTaskEntity
+            >('project_tasks'),
+        projectTaskProjects:
+            createEntityStore<
+                ProjectTaskProjectEntity
+            >('project_task_projects'),
 
-        milestones: Object.assign(
-            milestoneStore,
-            {
-                async getByProjectId(
-                    projectId: string,
-                ): Promise<MilestoneEntity[]> {
-                    return readTable<
-                        MilestoneEntity
-                    >('milestones')
-                        .filter(
-                            entity =>
-                                entity
-                                    .project_id
-                                === projectId,
-                        )
-                        .sort(
-                            (a, b) =>
-                                a.sort_order
-                                - b.sort_order,
-                        );
-                },
-            },
-        ),
+        discussions:
+            createEntityStore<
+                DiscussionEntity
+            >('discussions'),
+        discussionProjects:
+            createEntityStore<
+                DiscussionProjectEntity
+            >('discussion_projects'),
 
-        projectTasks: Object.assign(
-            projectTaskStore,
-            {
-                async getByProjectId(
-                    projectId: string,
-                ): Promise<
-                    ProjectTaskEntity[]
-                > {
-                    return readTable<
-                        ProjectTaskEntity
-                    >('project_tasks').filter(
-                        entity =>
-                            entity.project_id
-                            === projectId,
-                    );
-                },
-            },
-        ),
+        projectVersions:
+            createEntityStore<
+                ProjectVersionEntity
+            >('project_versions'),
+        projectVersionProjects:
+            createEntityStore<
+                ProjectVersionProjectEntity
+            >('project_version_projects'),
 
-        discussions: Object.assign(
-            discussionStore,
-            {
-                async getByProjectId(
-                    projectId: string,
-                ): Promise<
-                    DiscussionEntity[]
-                > {
-                    return readTable<
-                        DiscussionEntity
-                    >('discussions')
-                        .filter(
-                            entity =>
-                                entity
-                                    .project_id
-                                === projectId,
-                        )
-                        .sort((a, b) =>
-                            b.date.localeCompare(
-                                a.date,
-                            ),
-                        );
-                },
-            },
-        ),
+        edges:
+            createEntityStore<EdgeEntity>(
+                'edges',
+            ),
+        edgeIdeas:
+            createEntityStore<
+                EdgeIdeaEntity
+            >('edge_ideas'),
 
-        projectVersions: Object.assign(
-            projectVersionStore,
-            {
-                async getByProjectId(
-                    projectId: string,
-                ): Promise<
-                    ProjectVersionEntity[]
-                > {
-                    return readTable<
-                        ProjectVersionEntity
-                    >('project_versions')
-                        .filter(
-                            entity =>
-                                entity
-                                    .project_id
-                                === projectId,
-                        )
-                        .sort((a, b) =>
-                            b.date.localeCompare(
-                                a.date,
-                            ),
-                        );
-                },
-            },
-        ),
-
-        edges: Object.assign(edgeStore, {
-            async getByIdeaId(
-                ideaId: string,
-            ): Promise<EdgeEntity | null> {
-                return (
-                    readTable<EdgeEntity>(
-                        'edges',
-                    ).find(
-                        entity =>
-                            entity.idea_id
-                            === ideaId,
-                    ) ?? null
-                );
-            },
-        }),
-
-        edgeOutcomes: Object.assign(
-            edgeOutcomeStore,
-            {
-                async getByEdgeId(
-                    edgeId: string,
-                ): Promise<
-                    EdgeOutcomeEntity[]
-                > {
-                    return readTable<
-                        EdgeOutcomeEntity
-                    >('edge_outcomes').filter(
-                        entity =>
-                            entity.edge_id
-                            === edgeId,
-                    );
-                },
-            },
-        ),
+        edgeOutcomes:
+            createEntityStore<
+                EdgeOutcomeEntity
+            >('edge_outcomes'),
+        edgeOutcomeEdges:
+            createEntityStore<
+                EdgeOutcomeEdgeEntity
+            >('edge_outcome_edges'),
 
         edgeMetrics:
             createEntityStore<EdgeMetricEntity>(
                 'edge_metrics',
             ),
+        edgeMetricOutcomes:
+            createEntityStore<
+                EdgeMetricOutcomeEntity
+            >('edge_metric_outcomes'),
         activities:
             createEntityStore<ActivityEntity>(
                 'activities',
             ),
 
-        clarifications: Object.assign(
-            clarificationStore,
-            {
-                async getByProjectId(
-                    projectId: string,
-                ): Promise<
-                    ClarificationEntity[]
-                > {
-                    return readTable<
-                        ClarificationEntity
-                    >(
-                        'clarifications',
-                    ).filter(
-                        entity =>
-                            entity.project_id
-                            === projectId,
-                    );
-                },
-            },
-        ),
+        clarifications:
+            createEntityStore<
+                ClarificationEntity
+            >('clarifications'),
+        clarificationProjects:
+            createEntityStore<
+                ClarificationProjectEntity
+            >('clarification_projects'),
 
         crunchColumns:
             createEntityStore<
@@ -877,29 +660,14 @@ export async function createLocalStorageAdapter(
                 'processes',
             ),
 
-        flowSteps: Object.assign(
-            flowStepStore,
-            {
-                async getByFlowId(
-                    processId: string,
-                ): Promise<FlowStepEntity[]> {
-                    return readTable<
-                        FlowStepEntity
-                    >('process_steps')
-                        .filter(
-                            entity =>
-                                entity
-                                    .process_id
-                                === processId,
-                        )
-                        .sort(
-                            (a, b) =>
-                                a.sort_order
-                                - b.sort_order,
-                        );
-                },
-            },
-        ),
+        flowSteps:
+            createEntityStore<FlowStepEntity>(
+                'process_steps',
+            ),
+        processStepProcesses:
+            createEntityStore<
+                ProcessStepProcessEntity
+            >('process_step_processes'),
 
         companySettings:
             createSingletonStore<
@@ -910,6 +678,43 @@ export async function createLocalStorageAdapter(
             createSingletonStore<AccountEntity>(
                 'account',
             ),
+
+        ideaSubmissions:
+            createEntityStore<
+                IdeaSubmissionEntity
+            >('idea_submissions'),
+        ideaProjectLinks:
+            createEntityStore<
+                IdeaProjectLinkEntity
+            >('idea_project_links'),
+        edgeOwnerships:
+            createEntityStore<
+                EdgeOwnershipEntity
+            >('edge_ownerships'),
+        taskAssignments:
+            createEntityStore<
+                TaskAssignmentEntity
+            >('task_assignments'),
+        discussionAuthorships:
+            createEntityStore<
+                DiscussionAuthorshipEntity
+            >('discussion_authorships'),
+        versionAuthorships:
+            createEntityStore<
+                VersionAuthorshipEntity
+            >('version_authorships'),
+        activityActors:
+            createEntityStore<
+                ActivityActorEntity
+            >('activity_actors'),
+        clarificationAskers:
+            createEntityStore<
+                ClarificationAskerEntity
+            >('clarification_askers'),
+        clarificationAnswerers:
+            createEntityStore<
+                ClarificationAnswererEntity
+            >('clarification_answerers'),
     };
 
     return adapter;

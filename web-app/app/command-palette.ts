@@ -1,6 +1,5 @@
 import {
     $,
-    $input,
 } from './dom';
 import {
     html,
@@ -96,137 +95,6 @@ interface CommandPaletteState {
         HTMLElement | null;
 }
 
-const state: CommandPaletteState = {
-    isOpen: false,
-    activeIndex: 0,
-    allItems: [],
-    filteredItems: [],
-    isDataLoaded: false,
-    debounceTimeoutId: null,
-    backdrop: null,
-    dialog: null,
-    input: null,
-    list: null,
-    liveRegion: null,
-    previousFocusElement: null,
-};
-
-async function loadSearchIndex(
-): Promise<void> {
-    if (state.isDataLoaded) return;
-    state.isDataLoaded = true;
-
-    // Start with pages immediately
-    state.allItems = pages.map(
-        (page, i) => ({
-            id: `page-${i}`,
-            title: page.title,
-            meta: 'Page',
-            category: 'pages' as const,
-            icon: page.icon,
-            href: page.href,
-            keywords: page.keywords,
-        }),
-    );
-
-    // Load dynamic data
-    try {
-        const [ideas, projects, members] =
-            await Promise.all([
-                getIdeas(),
-                getProjects(),
-                getTeamMembers(),
-            ]);
-
-        const ideaItems: SearchItem[] =
-            ideas.map(idea => ({
-                id: `idea-${idea.id}`,
-                title: idea.title,
-                meta:
-                    `Score: ${idea.score}`
-                    + ` · ${idea.status.replace(/-/g, ' ')}`,
-                category: 'ideas',
-                icon: iconLightbulb(16),
-                href: buildPageUrl(
-                    'idea-convert',
-                    { ideaId: idea.id },
-                ),
-                keywords:
-                    `${idea.submittedBy}`
-                    + ` ${idea.status}`,
-            }));
-
-        const projectItems: SearchItem[] =
-            projects.map(project => ({
-                id:
-                    `project-${project.id}`,
-                title: project.title,
-                meta:
-                    `Progress:`
-                    + ` ${project.progress}%`
-                    + ` · ${project.status.replace(/-/g, ' ')}`,
-                category: 'projects',
-                icon: iconFolderKanban(16),
-                href: buildPageUrl(
-                    'project-detail',
-                    {
-                        projectId:
-                            project.id,
-                    },
-                ),
-                keywords:
-                    `${project.status}`,
-            }));
-
-        const peopleItems: SearchItem[] =
-            members.map(member => ({
-                id: `person-${member.id}`,
-                title: member.name,
-                meta:
-                    `${member.role}`
-                    + ` · ${member.department}`,
-                category: 'people',
-                icon: iconUser(16),
-                href: buildPageUrl('teams'),
-                keywords:
-                    `${member.role}`
-                    + ` ${member.department}`
-                    + ` ${member.email}`,
-            }));
-
-        state.allItems = [
-            ...ideaItems,
-            ...projectItems,
-            ...peopleItems,
-            ...state.allItems,
-        ];
-    } catch {
-        // Pages are still available
-        // even if data loading fails
-    }
-}
-
-function search(
-    query: string,
-): SearchItem[] {
-    if (!query.trim())
-        return state.allItems.slice(0, 12);
-    const normalizedQuery =
-        query.toLowerCase();
-    return state.allItems.filter(
-        item =>
-            item.title
-                .toLowerCase()
-                .includes(normalizedQuery)
-            || item.meta
-                .toLowerCase()
-                .includes(normalizedQuery)
-            || item.keywords
-                .toLowerCase()
-                .includes(normalizedQuery),
-    );
-}
-
 function buildHighlightedMatch(
     text: string,
     query: string,
@@ -263,57 +131,237 @@ const categoryLabels:
         pages: 'Pages',
     };
 
-function mutateResults(
-    query: string,
+export function initCommandPalette(
 ): void {
-    if (!state.list) return;
+    const state: CommandPaletteState = {
+        isOpen: false,
+        activeIndex: 0,
+        allItems: [],
+        filteredItems: [],
+        isDataLoaded: false,
+        debounceTimeoutId: null,
+        backdrop: null,
+        dialog: null,
+        input: null,
+        list: null,
+        liveRegion: null,
+        previousFocusElement: null,
+    };
 
-    state.filteredItems = search(query);
-    state.activeIndex = 0;
+    async function loadSearchIndex(
+    ): Promise<void> {
+        if (state.isDataLoaded) return;
+        state.isDataLoaded = true;
 
-    if (state.filteredItems.length === 0) {
-        setHtml(
-            state.list,
-            html`<div
-class="command-palette-empty"
->No results found for "${query}"</div>`,
+        state.allItems = pages.map(
+            (page, i) => ({
+                id: `page-${i}`,
+                title: page.title,
+                meta: 'Page',
+                category:
+                    'pages' as const,
+                icon: page.icon,
+                href: page.href,
+                keywords: page.keywords,
+            }),
         );
-        if (state.liveRegion)
-            state.liveRegion.textContent =
-                'No results found';
-        return;
+
+        try {
+            const [
+                ideas,
+                projects,
+                members,
+            ] = await Promise.all([
+                getIdeas(),
+                getProjects(),
+                getTeamMembers(),
+            ]);
+
+            const ideaItems:
+                SearchItem[] =
+                ideas.map(idea => ({
+                    id: `idea-${idea.id}`,
+                    title: idea.title,
+                    meta:
+                        `Score: `
+                        + `${idea.score}`
+                        + ` · ${idea.status.replace(/-/g, ' ')}`,
+                    category: 'ideas',
+                    icon:
+                        iconLightbulb(16),
+                    href: buildPageUrl(
+                        'idea-convert',
+                        {
+                            ideaId:
+                                idea.id,
+                        },
+                    ),
+                    keywords:
+                        `${idea.submittedBy}`
+                        + ` ${idea.status}`,
+                }));
+
+            const projectItems:
+                SearchItem[] =
+                projects.map(
+                    project => ({
+                        id: `project-`
+                            + `${project.id}`,
+                        title:
+                            project.title,
+                        meta:
+                            `Progress:`
+                            + ` ${project.progress}%`
+                            + ` · ${project.status.replace(/-/g, ' ')}`,
+                        category:
+                            'projects',
+                        icon:
+                            iconFolderKanban(
+                                16,
+                            ),
+                        href:
+                            buildPageUrl(
+                                'project-detail',
+                                {
+                                    projectId:
+                                        project.id,
+                                },
+                            ),
+                        keywords:
+                            `${project.status}`,
+                    }),
+                );
+
+            const peopleItems:
+                SearchItem[] =
+                members.map(
+                    member => ({
+                        id: `person-`
+                            + `${member.id}`,
+                        title:
+                            member.name,
+                        meta:
+                            `${member.role}`
+                            + ` · ${member.department}`,
+                        category:
+                            'people',
+                        icon:
+                            iconUser(16),
+                        href:
+                            buildPageUrl(
+                                'teams',
+                            ),
+                        keywords:
+                            `${member.role}`
+                            + ` ${member.department}`
+                            + ` ${member.email}`,
+                    }),
+                );
+
+            state.allItems = [
+                ...ideaItems,
+                ...projectItems,
+                ...peopleItems,
+                ...state.allItems,
+            ];
+        } catch {
+            // Pages are still available
+            // even if data loading fails
+        }
     }
 
-    // Group by category
-    const grouped: Partial<
-        Record<
-            SearchItem['category'],
-            SearchItem[]
-        >
-    > = {};
-    state.filteredItems.forEach(item => {
-        const group =
-            grouped[item.category] ?? [];
-        grouped[item.category] = group;
-        group.push(item);
-    });
-
-    const markup: SafeHtml[] = [];
-    let posIndex = 0;
-    for (
-        const category of categoryOrder
-    ) {
-        const items = grouped[category];
-        if (!items?.length) continue;
-
-        markup.push(
-            html`<div
-class="command-palette-group-label">${
-categoryLabels[category]}</div>`,
+    function search(
+        query: string,
+    ): SearchItem[] {
+        if (!query.trim())
+            return state.allItems
+                .slice(0, 12);
+        const normalizedQuery =
+            query.toLowerCase();
+        return state.allItems.filter(
+            item =>
+                item.title
+                    .toLowerCase()
+                    .includes(
+                        normalizedQuery,
+                    )
+                || item.meta
+                    .toLowerCase()
+                    .includes(
+                        normalizedQuery,
+                    )
+                || item.keywords
+                    .toLowerCase()
+                    .includes(
+                        normalizedQuery,
+                    ),
         );
-        for (const item of items) {
+    }
+
+    function mutateResults(
+        query: string,
+    ): void {
+        if (!state.list) return;
+
+        state.filteredItems =
+            search(query);
+        state.activeIndex = 0;
+
+        if (
+            state.filteredItems.length
+            === 0
+        ) {
+            setHtml(
+                state.list,
+                html`<div
+class="command-palette-empty"
+>No results found for "${query}"</div>`,
+            );
+            if (state.liveRegion)
+                state.liveRegion
+                    .textContent =
+                    'No results found';
+            return;
+        }
+
+        const grouped: Partial<
+            Record<
+                SearchItem['category'],
+                SearchItem[]
+            >
+        > = {};
+        state.filteredItems.forEach(
+            item => {
+                const group =
+                    grouped[
+                        item.category
+                    ] ?? [];
+                grouped[item.category] =
+                    group;
+                group.push(item);
+            },
+        );
+
+        const markup: SafeHtml[] = [];
+        let posIndex = 0;
+        for (
+            const category
+            of categoryOrder
+        ) {
+            const items =
+                grouped[category];
+            if (!items?.length) continue;
+
             markup.push(
                 html`<div
+class="command-palette-group-label">${
+categoryLabels[category]}</div>`,
+            );
+            for (
+                const item of items
+            ) {
+                markup.push(
+                    html`<div
 class="command-palette-item"
 role="option"
 id="command-palette-item-${item.id}"
@@ -323,7 +371,9 @@ aria-posinset="${posIndex + 1}"
 aria-setsize="${
 state.filteredItems.length}"
 ${posIndex === 0
-    ? trusted('aria-selected="true"')
+    ? trusted(
+        'aria-selected="true"',
+    )
     : trusted('')}>
 <div class="command-palette-item-icon">${
   item.icon}</div>
@@ -339,131 +389,143 @@ ${posIndex === 0
     item.meta}</div>
 </div>
 </div>`,
-            );
-            posIndex++;
+                );
+                posIndex++;
+            }
+        }
+
+        setHtml(
+            state.list,
+            html`${markup}`,
+        );
+        if (state.liveRegion)
+            state.liveRegion
+                .textContent =
+                `${state.filteredItems.length}`
+                + ` result${state.filteredItems.length !== 1 ? 's' : ''}`
+                + ` found`;
+    }
+
+    function mutateActiveItem(): void {
+        if (!state.list) return;
+        state.list
+            .querySelectorAll(
+                '.command-palette-item',
+            )
+            .forEach((el, i) => {
+                el.setAttribute(
+                    'aria-selected',
+                    i === state.activeIndex
+                        ? 'true'
+                        : 'false',
+                );
+            });
+        const activeItem =
+            state.filteredItems[
+                state.activeIndex
+            ];
+        if (activeItem) {
+            const activeEl =
+                state.list.querySelector(
+                    `[data-item-id=`
+                    + `"${activeItem.id}"]`,
+                );
+            if (activeEl)
+                activeEl.scrollIntoView(
+                    { block: 'nearest' },
+                );
+            if (state.input)
+                state.input.setAttribute(
+                    'aria-activedescendant',
+                    'command-palette-item-'
+                        + activeItem.id,
+                );
         }
     }
 
-    setHtml(
-        state.list,
-        html`${markup}`,
-    );
-    if (state.liveRegion)
-        state.liveRegion.textContent =
-            `${state.filteredItems.length}`
-            + ` result${state.filteredItems.length !== 1 ? 's' : ''}`
-            + ` found`;
-}
-
-function mutateActiveItem(): void {
-    if (!state.list) return;
-    state.list
-        .querySelectorAll(
-            '.command-palette-item',
-        )
-        .forEach((el, i) => {
-            el.setAttribute(
-                'aria-selected',
-                i === state.activeIndex
-                    ? 'true'
-                    : 'false',
-            );
-        });
-    const activeItem =
-        state.filteredItems[
-            state.activeIndex
-        ];
-    if (activeItem) {
-        const activeEl =
-            state.list.querySelector(
-                `[data-item-id=`
-                + `"${activeItem.id}"]`,
-            );
-        if (activeEl)
-            activeEl.scrollIntoView(
-                { block: 'nearest' },
-            );
-        if (state.input)
-            state.input.setAttribute(
-                'aria-activedescendant',
-                'command-palette-item-'
-                    + activeItem.id,
-            );
-    }
-}
-
-function navigateToItem(
-    index: number,
-): void {
-    const item =
-        state.filteredItems[index];
-    if (!item) return;
-    close();
-    window.location.href = item.href;
-}
-
-function open(): void {
-    if (state.isOpen) return;
-    state.isOpen = true;
-    state.previousFocusElement =
-        document.activeElement
-            instanceof HTMLElement
-            ? document.activeElement
-            : null;
-
-    if (!state.backdrop)
-        initCommandPaletteDOM();
-    state.backdrop
-        ?.classList.remove('hidden');
-    state.dialog
-        ?.classList.remove('hidden');
-    if (state.input) {
-        state.input.value = '';
-        state.input.focus();
+    function navigateToItem(
+        index: number,
+    ): void {
+        const item =
+            state.filteredItems[index];
+        if (!item) return;
+        close();
+        window.location.href = item.href;
     }
 
-    loadSearchIndex().then(
-        () => mutateResults(''),
-    );
-}
+    function open(): void {
+        if (state.isOpen) return;
+        state.isOpen = true;
+        state.previousFocusElement =
+            document.activeElement
+                instanceof HTMLElement
+                ? document.activeElement
+                : null;
 
-function close(): void {
-    if (!state.isOpen) return;
-    state.isOpen = false;
-    state.backdrop
-        ?.classList.add('hidden');
-    state.dialog
-        ?.classList.add('hidden');
-    if (state.previousFocusElement)
-        state.previousFocusElement.focus();
-}
+        if (!state.backdrop)
+            initCommandPaletteDOM();
+        state.backdrop
+            ?.classList.remove('hidden');
+        state.dialog
+            ?.classList.remove('hidden');
+        if (state.input) {
+            state.input.value = '';
+            state.input.focus();
+        }
 
-function initCommandPaletteDOM(): void {
-    state.backdrop =
-        document.createElement('div');
-    state.backdrop.className =
-        'command-palette-backdrop hidden';
-    state.backdrop
-        .addEventListener('click', close);
+        loadSearchIndex().then(
+            () => mutateResults(''),
+        );
+    }
 
-    state.dialog =
-        document.createElement('div');
-    state.dialog.className =
-        'command-palette-dialog hidden';
-    state.dialog.setAttribute(
-        'role',
-        'dialog',
-    );
-    state.dialog.setAttribute(
-        'aria-modal',
-        'true',
-    );
-    state.dialog.setAttribute(
-        'aria-label',
-        'Search',
-    );
+    function close(): void {
+        if (!state.isOpen) return;
+        state.isOpen = false;
+        state.backdrop
+            ?.classList.add('hidden');
+        state.dialog
+            ?.classList.add('hidden');
+        if (state.previousFocusElement)
+            state
+                .previousFocusElement
+                .focus();
+    }
 
-    setHtml(state.dialog, html`
+    function initCommandPaletteDOM(
+    ): void {
+        state.backdrop =
+            document.createElement(
+                'div',
+            );
+        state.backdrop.className =
+            'command-palette-backdrop'
+            + ' hidden';
+        state.backdrop.addEventListener(
+            'click',
+            close,
+        );
+
+        state.dialog =
+            document.createElement(
+                'div',
+            );
+        state.dialog.className =
+            'command-palette-dialog'
+            + ' hidden';
+        state.dialog.setAttribute(
+            'role',
+            'dialog',
+        );
+        state.dialog.setAttribute(
+            'aria-modal',
+            'true',
+        );
+        state.dialog.setAttribute(
+            'aria-label',
+            'Search',
+        );
+
+        setHtml(state.dialog, html`
     <div
       class="command-palette-input-wrapper">
       ${iconSearch(20)}
@@ -512,180 +574,216 @@ function initCommandPaletteDOM(): void {
       role="status" aria-live="polite"
       aria-atomic="true"></div>`);
 
-    state.input =
-        state.dialog
-            .querySelector<HTMLInputElement>(
-                '.command-palette-input',
+        state.input =
+            state.dialog
+                .querySelector<
+                    HTMLInputElement
+                >(
+                    '.command-palette-input',
+                );
+        state.list =
+            state.dialog.querySelector(
+                '#command-palette-listbox',
             );
-    state.list =
+        state.liveRegion =
+            state.dialog.querySelector(
+                '.command-palette-live',
+            );
+
+        state.input
+            ?.addEventListener(
+                'input',
+                () => {
+                    if (
+                        state
+                            .debounceTimeoutId
+                    )
+                        clearTimeout(
+                            state
+                                .debounceTimeoutId,
+                        );
+                    state
+                        .debounceTimeoutId =
+                        setTimeout(
+                            () => {
+                                mutateResults(
+                                    state
+                                        .input
+                                        ?.value
+                                        ?? '',
+                                );
+                            },
+                            DEBOUNCE_MS,
+                        );
+                },
+            );
+
         state.dialog.querySelector(
-            '#command-palette-listbox',
-        );
-    state.liveRegion =
-        state.dialog.querySelector(
-            '.command-palette-live',
+            '#command-palette-close',
+        )?.addEventListener(
+            'click',
+            close,
         );
 
-    // Input handler with debounce
-    state.input
-        ?.addEventListener(
-            'input',
-            () => {
+        state.dialog.addEventListener(
+            'keydown',
+            (e: KeyboardEvent) => {
                 if (
-                    state.debounceTimeoutId
-                )
-                    clearTimeout(
+                    e.key === 'Escape'
+                ) {
+                    e.preventDefault();
+                    close();
+                    return;
+                }
+                if (
+                    e.key === 'ArrowDown'
+                ) {
+                    e.preventDefault();
+                    if (
                         state
-                            .debounceTimeoutId,
+                            .filteredItems
+                            .length > 0
+                    ) {
+                        state
+                            .activeIndex =
+                            (state
+                                .activeIndex
+                                + 1)
+                            % state
+                                .filteredItems
+                                .length;
+                        mutateActiveItem();
+                    }
+                    return;
+                }
+                if (
+                    e.key === 'ArrowUp'
+                ) {
+                    e.preventDefault();
+                    if (
+                        state
+                            .filteredItems
+                            .length > 0
+                    ) {
+                        state
+                            .activeIndex =
+                            (state
+                                .activeIndex
+                                - 1
+                                + state
+                                    .filteredItems
+                                    .length)
+                            % state
+                                .filteredItems
+                                .length;
+                        mutateActiveItem();
+                    }
+                    return;
+                }
+                if (
+                    e.key === 'Enter'
+                ) {
+                    e.preventDefault();
+                    navigateToItem(
+                        state
+                            .activeIndex,
                     );
-                state.debounceTimeoutId =
-                    setTimeout(() => {
-                        mutateResults(
-                            state.input?.value
-                                ?? '',
-                        );
-                    }, DEBOUNCE_MS);
+                    return;
+                }
             },
         );
 
-    // Close button
-    state.dialog.querySelector(
-        '#command-palette-close',
-    )?.addEventListener('click', close);
-
-    // Keyboard nav
-    state.dialog.addEventListener(
-        'keydown',
-        (e: KeyboardEvent) => {
-            if (e.key === 'Escape') {
-                e.preventDefault();
-                close();
-                return;
-            }
-            if (e.key === 'ArrowDown') {
-                e.preventDefault();
+        state.list?.addEventListener(
+            'mousemove',
+            (e: Event) => {
                 if (
-                    state.filteredItems
-                        .length > 0
-                ) {
-                    state.activeIndex =
-                        (state.activeIndex
-                            + 1)
-                        % state.filteredItems
-                            .length;
-                    mutateActiveItem();
-                }
-                return;
-            }
-            if (e.key === 'ArrowUp') {
-                e.preventDefault();
-                if (
-                    state.filteredItems
-                        .length > 0
-                ) {
-                    state.activeIndex =
-                        (state.activeIndex
-                            - 1
-                            + state
-                                .filteredItems
-                                .length)
-                        % state.filteredItems
-                            .length;
-                    mutateActiveItem();
-                }
-                return;
-            }
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                navigateToItem(
-                    state.activeIndex,
-                );
-                return;
-            }
-        },
-    );
-
-    // Mouse hover sets active
-    state.list?.addEventListener(
-        'mousemove',
-        (e: Event) => {
-            if (
-                !(e.target
-                    instanceof Element)
-            ) return;
-            const target =
-                e.target
-                    .closest<HTMLElement>(
-                        '.command-palette-item',
-                    );
-            if (target) {
-                const hoveredId =
-                    target.getAttribute(
-                        'data-item-id',
-                    );
-                const hoveredIndex =
-                    state.filteredItems
-                        .findIndex(
-                            item =>
-                                item.id
-                                === hoveredId,
+                    !(e.target
+                        instanceof
+                        Element)
+                ) return;
+                const target =
+                    e.target
+                        .closest<
+                            HTMLElement
+                        >(
+                            '.command-palette-item',
                         );
-                if (
-                    hoveredIndex >= 0
-                    && hoveredIndex
-                        !== state.activeIndex
-                ) {
-                    state.activeIndex =
-                        hoveredIndex;
-                    mutateActiveItem();
+                if (target) {
+                    const hoveredId =
+                        target
+                            .getAttribute(
+                                'data-item-id',
+                            );
+                    const hoveredIndex =
+                        state
+                            .filteredItems
+                            .findIndex(
+                                item =>
+                                    item.id
+                                    === hoveredId,
+                            );
+                    if (
+                        hoveredIndex >= 0
+                        && hoveredIndex
+                            !== state
+                                .activeIndex
+                    ) {
+                        state
+                            .activeIndex =
+                            hoveredIndex;
+                        mutateActiveItem();
+                    }
                 }
-            }
-        },
-    );
+            },
+        );
 
-    // Click to navigate
-    state.list?.addEventListener(
-        'click',
-        (e: Event) => {
-            if (
-                !(e.target
-                    instanceof Element)
-            ) return;
-            const target =
-                e.target
-                    .closest<HTMLElement>(
-                        '.command-palette-item',
-                    );
-            if (target) {
-                const clickedId =
-                    target.getAttribute(
-                        'data-item-id',
-                    );
-                const clickedIndex =
-                    state.filteredItems
-                        .findIndex(
-                            item =>
-                                item.id
-                                === clickedId,
+        state.list?.addEventListener(
+            'click',
+            (e: Event) => {
+                if (
+                    !(e.target
+                        instanceof
+                        Element)
+                ) return;
+                const target =
+                    e.target
+                        .closest<
+                            HTMLElement
+                        >(
+                            '.command-palette-item',
                         );
-                if (clickedIndex >= 0)
-                    navigateToItem(
-                        clickedIndex,
-                    );
-            }
-        },
-    );
+                if (target) {
+                    const clickedId =
+                        target
+                            .getAttribute(
+                                'data-item-id',
+                            );
+                    const clickedIndex =
+                        state
+                            .filteredItems
+                            .findIndex(
+                                item =>
+                                    item.id
+                                    === clickedId,
+                            );
+                    if (
+                        clickedIndex >= 0
+                    )
+                        navigateToItem(
+                            clickedIndex,
+                        );
+                }
+            },
+        );
 
-    document.body.appendChild(
-        state.backdrop,
-    );
-    document.body.appendChild(
-        state.dialog,
-    );
-}
+        document.body.appendChild(
+            state.backdrop,
+        );
+        document.body.appendChild(
+            state.dialog,
+        );
+    }
 
-export function initCommandPalette(
-): void {
     // Global keyboard shortcut
     document.addEventListener(
         'keydown',
@@ -702,7 +800,7 @@ export function initCommandPalette(
         },
     );
 
-    // Intercept desktop search input focus
+    // Intercept desktop search input
     const searchInput = $(
         '#search-input',
     );
@@ -720,7 +818,6 @@ export function initCommandPalette(
         '#mobile-search-toggle',
     );
     if (mobileSearchToggle) {
-        // Replace click handler
         const newToggle =
             mobileSearchToggle
                 .cloneNode(true) as

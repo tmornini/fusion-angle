@@ -23,7 +23,12 @@ import {
     getFlow, putFlow, putFlowStep,
     type FlowStep, type Flow,
 } from '../app/adapters';
-import { isFlowStepType } from '../../api/types';
+import {
+    isFlowStepType,
+    FLOW_STEP_TYPE_CONFIG,
+    FLOW_STEP_TYPE_DEFAULT,
+    type FlowStepType,
+} from '../../api/types';
 
 const toolIconConfig: Record<
     string,
@@ -38,100 +43,103 @@ const toolIconConfig: Record<
     Document: iconFileText,
 };
 
-let flowSteps: FlowStep[] = [];
-let flowName = '';
-let flowDescription = '';
-let flowDepartment = '';
-let currentFlowId = '1';
-let expandedStepId: string | null = null;
+const state = {
+    flowSteps: [] as FlowStep[],
+    flowName: '',
+    flowDescription: '',
+    flowDepartment: '',
+    currentFlowId: '1',
+    expandedStepId: null as string | null,
+};
 
-function styleForStepType(
-    type: string,
+function buildStepFieldSelector(
+    stepId: string,
+    fieldName: string,
 ): string {
-    switch (type) {
-        case 'start':
-            return 'background:hsl(var('
-                + '--success) / 0.1);border:'
-                + '2px solid hsl(var(--success)'
-                + ' / 0.3);color:hsl(var('
-                + '--success))';
-        case 'end':
-            return 'background:hsl(var('
-                + '--error)/0.1);border:2px'
-                + ' solid hsl(var(--error)'
-                + '/0.3);color:hsl(var('
-                + '--error))';
-        case 'decision':
-            return 'background:hsl(var('
-                + '--warning)/0.1);border:2px'
-                + ' solid hsl(var(--warning)'
-                + '/0.3);color:hsl(var('
-                + '--warning))';
-        default:
-            return 'background:hsl(var('
-                + '--primary)/0.1);border:2px'
-                + ' solid hsl(var(--primary)'
-                + '/0.3);color:hsl(var('
-                + '--primary))';
-    }
+    return '[data-step-id="' + stepId + '"]'
+        + '[data-field-name="'
+        + fieldName + '"]';
 }
 
 function syncFormFields(): void {
     const nameInput = $input('#flow-name');
-    const descriptionInput =
+    const descInput =
         $textarea('#flow-description');
     const dept = $select('#flow-department');
     if (nameInput) {
-        flowName = nameInput.value;
+        state.flowName = nameInput.value;
     }
-    if (descriptionInput) {
-        flowDescription = descriptionInput.value;
+    if (descInput) {
+        state.flowDescription =
+            descInput.value;
     }
-    if (dept) flowDepartment = dept.value;
+    if (dept) {
+        state.flowDepartment = dept.value;
+    }
 
-    flowSteps.forEach(step => {
-        const title = $input(
-            '[data-step-id="' + step.id + '"]'
-            + '[data-field-name="title"]',
-        );
-        const descriptionField = $textarea(
-            '[data-step-id="' + step.id + '"]'
-            + '[data-field-name="description"]',
-        );
-        const owner = $input(
-            '[data-step-id="' + step.id + '"]'
-            + '[data-field-name="owner"]',
-        );
-        const role = $input(
-            '[data-step-id="' + step.id + '"]'
-            + '[data-field-name="role"]',
-        );
-        const durationInput = $input(
-            '[data-step-id="' + step.id + '"]'
-            + '[data-field-name="duration"]',
-        );
-        const type = $select(
-            '[data-step-id="' + step.id + '"]'
-            + '[data-field-name="type"]',
-        );
-        if (title) {
-            step.title = title.value;
-        }
-        if (descriptionField) {
-            step.description =
-                descriptionField.value;
-        }
-        if (owner) {
-            step.owner = owner.value;
-        }
-        if (role) step.role = role.value;
-        if (durationInput) {
-            step.duration = durationInput.value;
-        }
-        if (type && isFlowStepType(type.value)) {
-            step.type = type.value;
-        }
-    });
+    state.flowSteps =
+        state.flowSteps.map(step => {
+            const title = $input(
+                buildStepFieldSelector(
+                    step.id, 'title',
+                ),
+            );
+            const desc = $textarea(
+                buildStepFieldSelector(
+                    step.id, 'description',
+                ),
+            );
+            const owner = $input(
+                buildStepFieldSelector(
+                    step.id, 'owner',
+                ),
+            );
+            const role = $input(
+                buildStepFieldSelector(
+                    step.id, 'role',
+                ),
+            );
+            const dur = $input(
+                buildStepFieldSelector(
+                    step.id, 'duration',
+                ),
+            );
+            const type = $select(
+                buildStepFieldSelector(
+                    step.id, 'type',
+                ),
+            );
+            return {
+                ...step,
+                ...(title
+                    ? { title: title.value }
+                    : {}),
+                ...(desc
+                    ? {
+                        description:
+                            desc.value,
+                    }
+                    : {}),
+                ...(owner
+                    ? { owner: owner.value }
+                    : {}),
+                ...(role
+                    ? { role: role.value }
+                    : {}),
+                ...(dur
+                    ? {
+                        duration:
+                            dur.value,
+                    }
+                    : {}),
+                ...(type
+                    && isFlowStepType(
+                        type.value,
+                    )
+                    ? { type: type.value }
+                    : {}),
+            };
+        });
 }
 
 function buildEditMode(): SafeHtml {
@@ -150,17 +158,17 @@ function buildEditMode(): SafeHtml {
                  font-semibold"
         >Process Steps</h2>
         <span class="text-sm text-muted">
-          ${flowSteps.length} steps
+          ${state.flowSteps.length} steps
         </span>
       </div>
-      ${flowSteps.map((step, i) => {
+      ${state.flowSteps.map((step, i) => {
           const isExpanded =
-              expandedStepId === step.id;
+              state.expandedStepId === step.id;
           const isLast =
-              i === flowSteps.length - 1;
+              i === state.flowSteps.length - 1;
           return html`
           <div style="position:relative">
-            ${i < flowSteps.length - 1 ? html`
+            ${i < state.flowSteps.length - 1 ? html`
               <div
                 style="position:absolute;
                        left:1.5rem;top:100%;
@@ -199,9 +207,12 @@ function buildEditMode(): SafeHtml {
                            justify-content:
                            center;flex-shrink:0;
                            ${trusted(
-                               styleForStepType(
-                                   step.type,
-                               ),
+                               (
+                                   FLOW_STEP_TYPE_CONFIG[
+                                       step.type
+                                   ]
+                                   ?? FLOW_STEP_TYPE_DEFAULT
+                               ).style,
                            )}"
                   >
                     <span
@@ -588,11 +599,11 @@ function buildFlowDetailPage(): SafeHtml {
             <h1
               class="text-2xl font-display
                      font-bold mb-1"
-            >${flowName}</h1>
+            >${state.flowName}</h1>
             <p
               class="text-sm text-muted"
               style="max-width:32rem"
-            >${flowDescription}</p>
+            >${state.flowDescription}</p>
           </div>
         </div>
         <button
@@ -614,7 +625,7 @@ function buildFlowDetailPage(): SafeHtml {
             <input
               class="input"
               id="flow-name"
-              value="${flowName}"
+              value="${state.flowName}"
               placeholder="${
                   'e.g., Customer Onboarding'}"
               style="font-size:1.125rem;
@@ -634,7 +645,7 @@ function buildFlowDetailPage(): SafeHtml {
                 <option
                   ${trusted(
                       department
-                          === flowDepartment
+                          === state.flowDepartment
                           ? 'selected'
                           : ''
                   )}
@@ -653,7 +664,7 @@ function buildFlowDetailPage(): SafeHtml {
               placeholder="${
                   'Briefly describe what this'
                   + ' process accomplishes...'}"
-            >${flowDescription}</textarea>
+            >${state.flowDescription}</textarea>
           </div>
         </div>
       </div>
@@ -682,8 +693,8 @@ function bindFlowDetailEvents(): void {
                 el.getAttribute(
                     'data-step-header',
                 );
-            expandedStepId =
-                expandedStepId === id
+            state.expandedStepId =
+                state.expandedStepId === id
                     ? null
                     : id;
             mutateFlowDetailPage();
@@ -706,7 +717,7 @@ function bindFlowDetailEvents(): void {
                             'data-direction',
                         );
                     const stepIndex =
-                        flowSteps.findIndex(
+                        state.flowSteps.findIndex(
                             step =>
                                 step.id === id,
                         );
@@ -718,17 +729,19 @@ function bindFlowDetailEvents(): void {
                     if (
                         targetIndex < 0
                         || targetIndex
-                            >= flowSteps.length
+                            >= state.flowSteps.length
                     ) {
                         return;
                     }
-                    [
-                        flowSteps[stepIndex],
-                        flowSteps[targetIndex],
-                    ] = [
-                        flowSteps[targetIndex]!,
-                        flowSteps[stepIndex]!,
-                    ];
+                    const swapped =
+                        [...state.flowSteps];
+                    const temp =
+                        swapped[stepIndex]!;
+                    swapped[stepIndex] =
+                        swapped[targetIndex]!;
+                    swapped[targetIndex] =
+                        temp;
+                    state.flowSteps = swapped;
                     mutateFlowDetailPage();
                 },
             );
@@ -739,7 +752,7 @@ function bindFlowDetailEvents(): void {
         el.addEventListener('click', (e) => {
             e.stopPropagation();
             syncFormFields();
-            flowSteps = flowSteps.filter(
+            state.flowSteps = state.flowSteps.filter(
                 step =>
                     step.id
                     !== el.getAttribute(
@@ -764,24 +777,28 @@ function bindFlowDetailEvents(): void {
                         el.getAttribute(
                             'data-tool-name',
                         ) ?? '';
-                    const step =
-                        flowSteps.find(
-                            candidate =>
-                                candidate.id
-                                === stepId,
+                    state.flowSteps =
+                        state.flowSteps.map(
+                            s => s.id !== stepId
+                                ? s
+                                : {
+                                    ...s,
+                                    tools:
+                                        s.tools
+                                            .includes(
+                                                tool,
+                                            )
+                                        ? s.tools
+                                            .filter(
+                                                t =>
+                                                    t !== tool,
+                                            )
+                                        : [
+                                            ...s.tools,
+                                            tool,
+                                        ],
+                                },
                         );
-                    if (!step) return;
-                    step.tools =
-                        step.tools.includes(tool)
-                        ? step.tools.filter(
-                            toolName =>
-                                toolName
-                                !== tool,
-                        )
-                        : [
-                            ...step.tools,
-                            tool,
-                        ];
                     mutateFlowDetailPage();
                 },
             );
@@ -792,7 +809,7 @@ function bindFlowDetailEvents(): void {
         'click',
         () => {
             syncFormFields();
-            flowSteps.push({
+            const newStep: FlowStep = {
                 id: crypto.randomUUID(),
                 title: '',
                 description: '',
@@ -801,15 +818,16 @@ function bindFlowDetailEvents(): void {
                 tools: [],
                 duration: '',
                 sortOrder:
-                    flowSteps.length + 1,
+                    state.flowSteps.length
+                    + 1,
                 type: 'action',
-            });
-            const lastStep = flowSteps[
-                flowSteps.length - 1
+            };
+            state.flowSteps = [
+                ...state.flowSteps,
+                newStep,
             ];
-            if (lastStep)
-                expandedStepId =
-                    lastStep.id;
+            state.expandedStepId =
+                newStep.id;
             mutateFlowDetailPage();
         },
     );
@@ -819,16 +837,16 @@ function bindFlowDetailEvents(): void {
         async () => {
             syncFormFields();
             try {
-                await putFlow(currentFlowId, {
-                    name: flowName,
+                await putFlow(state.currentFlowId, {
+                    name: state.flowName,
                     description:
-                        flowDescription,
-                    department: flowDepartment,
+                        state.flowDescription,
+                    department: state.flowDepartment,
                 });
                 await Promise.all(
-                    flowSteps.map(step =>
+                    state.flowSteps.map(step =>
                         putFlowStep(
-                            currentFlowId,
+                            state.currentFlowId,
                             step.id,
                             {
                                 title: step.title,
@@ -874,14 +892,14 @@ export async function init(
     const flowId =
         params?.flowId ?? params?.processId;
     if (!flowId) { navigateTo('flow'); return; }
-    currentFlowId = flowId;
+    state.currentFlowId = flowId;
 
     const flowData = await withLoadingState(
         root,
         buildSkeleton(
             'card-list', { count: 4 },
         ),
-        () => getFlow(currentFlowId),
+        () => getFlow(state.currentFlowId),
         init,
     );
     if (!flowData) return;
@@ -901,10 +919,10 @@ export async function init(
         return;
     }
 
-    flowName = flowData.name;
-    flowDescription = flowData.description;
-    flowDepartment = flowData.department;
-    flowSteps = flowData.steps;
-    expandedStepId = null;
+    state.flowName = flowData.name;
+    state.flowDescription = flowData.description;
+    state.flowDepartment = flowData.department;
+    state.flowSteps = flowData.steps;
+    state.expandedStepId = null;
     mutateFlowDetailPage();
 }

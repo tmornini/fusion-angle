@@ -15,39 +15,39 @@ function dismissToast(
 }
 
 export function showToast(
-  message: string,
-  variant:
-    | 'success'
-    | 'error'
-    | 'warning'
-    | 'info' = 'info',
+    message: string,
+    variant:
+        | 'success'
+        | 'error'
+        | 'warning'
+        | 'info' = 'info',
 ): void {
-  const container = document.getElementById('toast-container');
-  if (!container) return;
+    const container = document.getElementById('toast-container');
+    if (!container) return;
 
-  while (container.children.length >= MAX_TOASTS) {
-    container.firstElementChild?.remove();
-  }
+    while (container.children.length >= MAX_TOASTS) {
+        container.firstElementChild?.remove();
+    }
 
-  const toast = document.createElement('div');
-  toast.className = `toast toast-${variant}`;
-  toast.setAttribute('role', 'status');
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${variant}`;
+    toast.setAttribute('role', 'status');
 
-  const msgSpan = document.createElement('span');
-  msgSpan.className = 'toast-message';
-  msgSpan.textContent = message;
-  toast.appendChild(msgSpan);
+    const msgSpan = document.createElement('span');
+    msgSpan.className = 'toast-message';
+    msgSpan.textContent = message;
+    toast.appendChild(msgSpan);
 
-  const closeBtn = document.createElement('button');
-  closeBtn.className = 'toast-close';
-  closeBtn.setAttribute('aria-label', 'Dismiss');
-  closeBtn.textContent = '\u00D7';
-  closeBtn.addEventListener('click', () => dismissToast(toast));
-  toast.appendChild(closeBtn);
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'toast-close';
+    closeBtn.setAttribute('aria-label', 'Dismiss');
+    closeBtn.textContent = '\u00D7';
+    closeBtn.addEventListener('click', () => dismissToast(toast));
+    toast.appendChild(closeBtn);
 
-  container.appendChild(toast);
-  setTimeout(
-      () => dismissToast(toast),
-      TOAST_DURATION_MS,
-  );
+    container.appendChild(toast);
+    setTimeout(
+            () => dismissToast(toast),
+            TOAST_DURATION_MS,
+    );
 }

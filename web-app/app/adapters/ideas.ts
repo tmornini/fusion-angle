@@ -3,8 +3,11 @@ import type {
     IdeaEntity,
     IdeaScoreEntity,
     ConfidenceLevel,
+    IdeaSubmissionEntity,
 } from '../../../api/types';
-import { Idea } from '../../../api/types';
+import {
+    Idea, nowUtc,
+} from '../../../api/types';
 import {
     buildUserMap,
     userName,
@@ -19,17 +22,27 @@ export { Idea } from '../../../api/types';
 
 export async function getIdeas(
 ): Promise<Idea[]> {
-    const [ideas, userMap] = await Promise.all([
-        GET<IdeaEntity[]>('ideas'),
-        buildUserMap(),
-    ]);
+    const [ideas, userMap, submissions] =
+        await Promise.all([
+            GET<IdeaEntity[]>('ideas'),
+            buildUserMap(),
+            GET<IdeaSubmissionEntity[]>(
+                'idea-submissions',
+            ),
+        ]);
+    const submitterMap = new Map(
+        submissions.map(
+            s => [s.idea_id, s.user_id],
+        ),
+    );
     return ideas
         .filter(isNotDeleted)
         .map(idea => new Idea(
             idea,
             userName(
                 userMap,
-                idea.submitted_by_id,
+                submitterMap.get(idea.id)
+                    ?? '',
             ),
         ));
 }
@@ -39,15 +52,24 @@ export async function getIdeas(
 export async function getIdeaDetail(
     ideaId: string,
 ): Promise<Idea> {
-    const [idea, userMap] = await Promise.all([
-        GET<IdeaEntity>(`ideas/${ideaId}`),
-        buildUserMap(),
-    ]);
+    const [idea, userMap, submissions] =
+        await Promise.all([
+            GET<IdeaEntity>(
+                `ideas/${ideaId}`,
+            ),
+            buildUserMap(),
+            GET<IdeaSubmissionEntity[]>(
+                'idea-submissions',
+            ),
+        ]);
+    const submission = submissions.find(
+        s => s.idea_id === ideaId,
+    );
     return new Idea(
         idea,
         userName(
             userMap,
-            idea.submitted_by_id,
+            submission?.user_id ?? '',
         ),
     );
 }
@@ -56,10 +78,19 @@ export async function getIdeaDetail(
 
 export async function getReviewQueue(
 ): Promise<Idea[]> {
-    const [ideas, userMap] = await Promise.all([
-        GET<IdeaEntity[]>('ideas'),
-        buildUserMap(),
-    ]);
+    const [ideas, userMap, submissions] =
+        await Promise.all([
+            GET<IdeaEntity[]>('ideas'),
+            buildUserMap(),
+            GET<IdeaSubmissionEntity[]>(
+                'idea-submissions',
+            ),
+        ]);
+    const submitterMap = new Map(
+        submissions.map(
+            s => [s.idea_id, s.user_id],
+        ),
+    );
 
     return ideas
         .filter(isInReview)
@@ -67,7 +98,8 @@ export async function getReviewQueue(
             idea,
             userName(
                 userMap,
-                idea.submitted_by_id,
+                submitterMap.get(idea.id)
+                    ?? '',
             ),
         ));
 }
@@ -169,18 +201,24 @@ export interface ApprovalEdge {
 export async function getIdeaForApproval(
     ideaId: string,
 ): Promise<ApprovalIdea> {
-    const [entity, userMap] =
+    const [entity, userMap, submissions] =
         await Promise.all([
             GET<IdeaEntity>(
                 `ideas/${ideaId}`,
             ),
             buildUserMap(),
+            GET<IdeaSubmissionEntity[]>(
+                'idea-submissions',
+            ),
         ]);
+    const submission = submissions.find(
+        s => s.idea_id === ideaId,
+    );
     const idea = new Idea(
         entity,
         userName(
             userMap,
-            entity.submitted_by_id,
+            submission?.user_id ?? '',
         ),
     );
 
@@ -240,4 +278,19 @@ export async function putIdea(
     entity: Partial<IdeaEntity>,
 ): Promise<void> {
     await PUT(`ideas/${id}`, entity);
+}
+
+export async function putIdeaSubmission(
+    ideaId: string,
+    userId: string,
+): Promise<void> {
+    await PUT(
+        `idea-submissions/`
+            + crypto.randomUUID(),
+        {
+            idea_id: ideaId,
+            user_id: userId,
+            created_at: nowUtc(),
+        },
+    );
 }

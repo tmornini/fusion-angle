@@ -79,8 +79,10 @@ const dimensionIconConfig: Record<
     amiable: iconHeart,
 };
 
-let members: TeamMember[] = [];
-let selectedMemberId: string | null = null;
+const state = {
+    members: [] as TeamMember[],
+    selectedMemberId: null as string | null,
+};
 
 function buildMemberDetail(
     member: TeamMember,
@@ -262,7 +264,7 @@ function buildMemberCard(
     member: TeamMember,
 ): SafeHtml {
     const cardStyle =
-        selectedMemberId === member.id
+        state.selectedMemberId === member.id
             ? 'box-shadow:0 0 0 2px'
               + ' hsl(var(--primary))'
             : '';
@@ -368,7 +370,7 @@ function mutateList(): void {
     const search = (
         $input('#team-search')?.value ?? ''
     ).toLowerCase();
-    const filtered = members.filter(
+    const filtered = state.members.filter(
         member =>
             member.name
                 .toLowerCase()
@@ -391,11 +393,11 @@ function mutateList(): void {
     }
 
     const panel = $('#team-detail-panel');
-    const member = selectedMemberId
-        ? members.find(
+    const member = state.selectedMemberId
+        ? state.members.find(
             candidate =>
                 candidate.id
-                === selectedMemberId,
+                === state.selectedMemberId,
         )
         : null;
     if (panel) {
@@ -426,7 +428,7 @@ function mutateList(): void {
 function bindCards(): void {
     $$('[data-member-card]').forEach(card => {
         card.addEventListener('click', () => {
-            selectedMemberId =
+            state.selectedMemberId =
                 card.getAttribute(
                     'data-member-card',
                 );
@@ -459,7 +461,7 @@ export async function init(): Promise<void> {
         },
     );
     if (!result) return;
-    members = result;
+    state.members = result;
 
     populateIcons([
         [
@@ -479,11 +481,12 @@ export async function init(): Promise<void> {
     // Summary
     const summaryEl = $('#team-summary');
     if (summaryEl) {
-        const word = members.length === 1
-            ? 'member'
-            : 'members';
+        const word =
+            state.members.length === 1
+                ? 'member'
+                : 'members';
         summaryEl.textContent =
-            members.length + ' ' + word
+            state.members.length + ' ' + word
             + ' \u2022 Manage roles, strengths,'
             + ' and availability';
     }

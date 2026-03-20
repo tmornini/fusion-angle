@@ -166,12 +166,14 @@ export function formatCompactCurrency(
 
 /**
  * Returns current UTC time as RFC-3339 Zulu
- * with microsecond resolution.
+ * with 6-digit fractional seconds.
  */
 export function nowUtc(): string {
     const iso = new Date().toISOString();
     // toISOString gives 3 decimal places;
-    // pad to 6 for microsecond resolution
+    // pad to 6 for RFC-3339 format compliance
+    // (true microsecond precision is
+    // unavailable in the JS runtime)
     return iso.replace(
         /\.(\d{3})Z$/,
         '.$1000Z',
@@ -179,301 +181,460 @@ export function nowUtc(): string {
 }
 
 export interface UserEntity {
-  id: Id;
-  first_name: string;
-  last_name: string;
-  email: string;
-  role: string;
-  department: string;
-  status: string;
-  availability: number;
-  performance_score: number;
-  projects_completed: number;
-  current_projects: number;
-  strengths: string; // JSON array
-  team_dimensions: string; // JSON object
-  phone: string;
-  bio: string;
-  last_active: string;
+    id: Id;
+    first_name: string;
+    last_name: string;
+    email: string;
+    role: string;
+    department: string;
+    status: string;
+    availability: number;
+    performance_score: number;
+    projects_completed: number;
+    current_projects: number;
+    strengths: string; // JSON array
+    team_dimensions: string; // JSON object
+    phone: string;
+    bio: string;
+    last_active: string;
 }
 
 export class User {
-  readonly id: string;
-  readonly firstName: string;
-  readonly lastName: string;
-  readonly email: string;
-  readonly role: string;
-  readonly department: string;
-  readonly status: string;
-  readonly availability: number;
-  readonly performanceScore: number;
-  readonly projectsCompleted: number;
-  readonly currentProjects: number;
-  readonly strengths: string;
-  readonly teamDimensions: string;
-  readonly phone: string;
-  readonly bio: string;
-  readonly lastActive: string;
+    readonly id: string;
+    readonly firstName: string;
+    readonly lastName: string;
+    readonly email: string;
+    readonly role: string;
+    readonly department: string;
+    readonly status: string;
+    readonly availability: number;
+    readonly performanceScore: number;
+    readonly projectsCompleted: number;
+    readonly currentProjects: number;
+    readonly strengths: string;
+    readonly teamDimensions: string;
+    readonly phone: string;
+    readonly bio: string;
+    readonly lastActive: string;
 
-  constructor(entity: UserEntity) {
-    this.id = entity.id;
-    this.firstName = entity.first_name;
-    this.lastName = entity.last_name;
-    this.email = entity.email;
-    this.role = entity.role;
-    this.department = entity.department;
-    this.status = entity.status;
-    this.availability = entity.availability;
-    this.performanceScore = entity.performance_score;
-    this.projectsCompleted = entity.projects_completed;
-    this.currentProjects = entity.current_projects;
-    this.strengths = entity.strengths;
-    this.teamDimensions = entity.team_dimensions;
-    this.phone = entity.phone;
-    this.bio = entity.bio;
-    this.lastActive = entity.last_active;
-  }
+    constructor(entity: UserEntity) {
+        this.id = entity.id;
+        this.firstName = entity.first_name;
+        this.lastName = entity.last_name;
+        this.email = entity.email;
+        this.role = entity.role;
+        this.department = entity.department;
+        this.status = entity.status;
+        this.availability = entity.availability;
+        this.performanceScore = entity.performance_score;
+        this.projectsCompleted = entity.projects_completed;
+        this.currentProjects = entity.current_projects;
+        this.strengths = entity.strengths;
+        this.teamDimensions = entity.team_dimensions;
+        this.phone = entity.phone;
+        this.bio = entity.bio;
+        this.lastActive = entity.last_active;
+    }
 
-  fullName(): string {
-    return `${this.firstName} ${this.lastName}`.trim();
-  }
+    fullName(): string {
+        return (
+            `${this.firstName}`
+            + ` ${this.lastName}`
+        ).trim();
+    }
+
+    isActive(): boolean {
+        return this.status === 'active';
+    }
+
+    isPending(): boolean {
+        return this.status === 'pending';
+    }
+
+    isDeactivated(): boolean {
+        return this.status === 'deactivated';
+    }
+
+    statusLabel(): string {
+        if (this.status === 'active')
+            return 'Active';
+        if (this.status === 'pending')
+            return 'Pending';
+        if (this.status === 'deactivated')
+            return 'Deactivated';
+        return 'Unknown';
+    }
+
+    statusClassName(): string {
+        if (this.status === 'active')
+            return 'badge-success';
+        if (this.status === 'pending')
+            return 'badge-warning';
+        if (this.status === 'deactivated')
+            return 'badge-default';
+        return 'badge-default';
+    }
 }
 
 export interface IdeaEntity {
-  id: Id;
-  title: string;
-  score: number;
-  estimated_impact: number;
-  estimated_duration: number;
-  estimated_cost: number;
-  priority: number;
-  status: IdeaStatus;
-  submitted_by_id: Id;
-  edge_status: EdgeStatus | 'incomplete';
-  problem_statement: string;
-  proposed_solution: string;
-  expected_outcome: string;
-  category: string;
-  readiness: string;
-  waiting_days: number;
-  impact_label: string;
-  effort_label: string;
-  description: string;
-  submitted_at: string;
-  risks: string; // JSON array
-  assumptions: string; // JSON array
-  alignments: string; // JSON array
-  effort_duration_estimate: string;
-  effort_team_size: string;
-  cost_estimate: string;
-  cost_breakdown: string;
-  success_metrics: string;
+    id: Id;
+    title: string;
+    score: number;
+    estimated_impact: number;
+    estimated_duration: number;
+    estimated_cost: number;
+    priority: number;
+    status: IdeaStatus;
+    edge_status: EdgeStatus | 'incomplete';
+    problem_statement: string;
+    proposed_solution: string;
+    expected_outcome: string;
+    category: string;
+    readiness: string;
+    waiting_days: number;
+    impact_label: string;
+    effort_label: string;
+    description: string;
+    submitted_at: string;
+    risks: string; // JSON array
+    assumptions: string; // JSON array
+    alignments: string; // JSON array
+    effort_duration_estimate: string;
+    effort_team_size: string;
+    cost_estimate: string;
+    cost_breakdown: string;
+    success_metrics: string;
 }
 
 export interface IdeaScoreEntity {
-  id: Id;
-  idea_id: Id;
-  overall: number;
-  impact_score: number;
-  impact_breakdown: string; // JSON array
-  feasibility_score: number;
-  feasibility_breakdown: string; // JSON array
-  efficiency_score: number;
-  efficiency_breakdown: string; // JSON array
-  estimated_duration: string;
-  estimated_cost: string;
-  recommendation: string;
+    id: Id;
+    overall: number;
+    impact_score: number;
+    impact_breakdown: string; // JSON array
+    feasibility_score: number;
+    feasibility_breakdown: string; // JSON array
+    efficiency_score: number;
+    efficiency_breakdown: string; // JSON array
+    estimated_duration: string;
+    estimated_cost: string;
+    recommendation: string;
+}
+
+export interface IdeaScoreIdeaEntity {
+    id: Id;
+    idea_score_id: Id;
+    idea_id: Id;
+    created_at: string;
 }
 
 export interface ProjectEntity {
-  id: Id;
-  title: string;
-  description: string;
-  status: ProjectStatus;
-  progress: number;
-  start_date: string;
-  target_end_date: string;
-  lead_id: Id;
-  estimated_duration: number; // seconds
-  actual_duration: number; // seconds
-  estimated_cost: number;
-  actual_cost: number;
-  estimated_impact: number;
-  actual_impact: number;
-  priority: number;
-  priority_score: number;
-  linked_idea_id: Id;
-  business_context: string; // JSON object
-  timeline_label: string;
-  budget_label: string;
+    id: Id;
+    title: string;
+    description: string;
+    status: ProjectStatus;
+    progress: number;
+    start_date: string;
+    target_end_date: string;
+    estimated_duration: number; // seconds
+    actual_duration: number; // seconds
+    estimated_cost: number;
+    actual_cost: number;
+    estimated_impact: number;
+    actual_impact: number;
+    priority: number;
+    priority_score: number;
+    business_context: string; // JSON object
+    timeline_label: string;
+    budget_label: string;
 }
 
-export interface ProjectTeamEntity {
-  id: Id;
-  project_id: Id;
-  user_id: Id;
-  role: string;
-  type: string;
+export interface TeamMembershipEntity {
+    id: Id;
+    role: string;
+    type: string;
+}
+
+export interface TeamMembershipProjectEntity {
+    id: Id;
+    team_membership_id: Id;
+    project_id: Id;
+    created_at: string;
+}
+
+export interface TeamMembershipUserEntity {
+    id: Id;
+    team_membership_id: Id;
+    user_id: Id;
+    created_at: string;
 }
 
 export interface MilestoneEntity {
-  id: Id;
-  project_id: Id;
-  title: string;
-  status: string;
-  date: string;
-  sort_order: number;
+    id: Id;
+    title: string;
+    status: string;
+    date: string;
+    sort_order: number;
+}
+
+export interface MilestoneProjectEntity {
+    id: Id;
+    milestone_id: Id;
+    project_id: Id;
+    created_at: string;
 }
 
 export interface ProjectTaskEntity {
-  id: Id;
-  project_id: Id;
-  name: string;
-  priority: string;
-  description: string;
-  skills: string; // JSON array
-  duration: number; // seconds
-  assigned_to_id: Id;
+    id: Id;
+    name: string;
+    priority: string;
+    description: string;
+    skills: string; // JSON array
+    duration: number; // seconds
+}
+
+export interface ProjectTaskProjectEntity {
+    id: Id;
+    project_task_id: Id;
+    project_id: Id;
+    created_at: string;
 }
 
 export interface DiscussionEntity {
-  id: Id;
-  project_id: Id;
-  author_id: Id;
-  date: string;
-  message: string;
+    id: Id;
+    date: string;
+    message: string;
+}
+
+export interface DiscussionProjectEntity {
+    id: Id;
+    discussion_id: Id;
+    project_id: Id;
+    created_at: string;
 }
 
 export interface ProjectVersionEntity {
-  id: Id;
-  project_id: Id;
-  version: string;
-  date: string;
-  changes: string;
-  author_id: Id;
+    id: Id;
+    version: string;
+    date: string;
+    changes: string;
+}
+
+export interface ProjectVersionProjectEntity {
+    id: Id;
+    project_version_id: Id;
+    project_id: Id;
+    created_at: string;
 }
 
 export interface EdgeEntity {
-  id: Id;
-  idea_id: Id;
-  status: EdgeStatus;
-  confidence: ConfidenceLevel;
-  owner_id: Id;
-  impact_short_term: string;
-  impact_mid_term: string;
-  impact_long_term: string;
-  updated_at: string;
+    id: Id;
+    status: EdgeStatus;
+    confidence: ConfidenceLevel;
+    impact_short_term: string;
+    impact_mid_term: string;
+    impact_long_term: string;
+    updated_at: string;
+}
+
+export interface EdgeIdeaEntity {
+    id: Id;
+    edge_id: Id;
+    idea_id: Id;
+    created_at: string;
 }
 
 export interface EdgeOutcomeEntity {
-  id: Id;
-  edge_id: Id;
-  description: string;
+    id: Id;
+    description: string;
+}
+
+export interface EdgeOutcomeEdgeEntity {
+    id: Id;
+    edge_outcome_id: Id;
+    edge_id: Id;
+    created_at: string;
 }
 
 export interface EdgeMetricEntity {
-  id: Id;
-  outcome_id: Id;
-  name: string;
-  target: string;
-  unit: string;
-  current: string;
+    id: Id;
+    name: string;
+    target: string;
+    unit: string;
+    current: string;
+}
+
+export interface EdgeMetricOutcomeEntity {
+    id: Id;
+    edge_metric_id: Id;
+    outcome_id: Id;
+    created_at: string;
 }
 
 export interface ActivityEntity {
-  id: Id;
-  type: string;
-  actor_id: Id;
-  action: string;
-  target: string;
-  timestamp: string;
-  score: number;
-  status: string;
-  comment: string;
+    id: Id;
+    type: string;
+    action: string;
+    target: string;
+    timestamp: string;
+    score: number;
+    status: string;
+    comment: string;
 }
 
 export interface ClarificationEntity {
-  id: Id;
-  project_id: Id;
-  question: string;
-  asked_by_id: Id;
-  asked_at: string;
-  status: ClarificationStatus;
-  answer: string;
-  answered_by_id: Id;
-  answered_at: string;
+    id: Id;
+    question: string;
+    asked_at: string;
+    status: ClarificationStatus;
+    answer: string;
+    answered_at: string;
 }
 
 export interface CrunchColumnEntity {
-  id: Id;
-  original_name: string;
-  friendly_name: string;
-  data_type: string;
-  description: string;
-  sample_values: string; // JSON array
-  is_acronym: StoredBoolean;
-  acronym_expansion: string;
+    id: Id;
+    original_name: string;
+    friendly_name: string;
+    data_type: string;
+    description: string;
+    sample_values: string; // JSON array
+    is_acronym: StoredBoolean;
+    acronym_expansion: string;
 }
 
 export interface FlowEntity {
-  id: Id;
-  name: string;
-  description: string;
-  department: string;
+    id: Id;
+    name: string;
+    description: string;
+    department: string;
 }
 
 export interface FlowStepEntity {
-  id: Id;
-  process_id: Id;
-  title: string;
-  description: string;
-  owner: string;
-  role: string;
-  tools: string; // JSON array
-  duration: string;
-  sort_order: number;
-  type: FlowStepType;
+    id: Id;
+    title: string;
+    description: string;
+    owner: string;
+    role: string;
+    tools: string; // JSON array
+    duration: string;
+    sort_order: number;
+    type: FlowStepType;
 }
 
 export interface CompanySettingsEntity {
-  id: Id;
-  name: string;
-  domain: string;
-  industry: string;
-  size: string;
-  timezone: string;
-  language: string;
-  is_sso_enforced: StoredBoolean;
-  is_two_factor_enabled: StoredBoolean;
-  is_ip_whitelist_enabled: StoredBoolean;
-  data_retention: string;
+    id: Id;
+    name: string;
+    domain: string;
+    industry: string;
+    size: string;
+    timezone: string;
+    language: string;
+    is_sso_enforced: StoredBoolean;
+    is_two_factor_enabled: StoredBoolean;
+    is_ip_whitelist_enabled: StoredBoolean;
+    data_retention: string;
 }
 
 export interface AccountEntity {
-  id: Id;
-  plan: string;
-  plan_status: string;
-  next_billing: string;
-  seats: number;
-  used_seats: number;
-  projects_limit: number;
-  projects_current: number;
-  ideas_limit: number;
-  ideas_current: number;
-  storage_limit: number;
-  storage_current: number;
-  ai_credits_limit: number;
-  ai_credits_current: number;
-  health_score: number;
-  health_status: string;
-  last_activity: string;
-  active_users: number;
+    id: Id;
+    plan: string;
+    plan_status: string;
+    next_billing: string;
+    seats: number;
+    used_seats: number;
+    projects_limit: number;
+    projects_current: number;
+    ideas_limit: number;
+    ideas_current: number;
+    storage_limit: number;
+    storage_current: number;
+    ai_credits_limit: number;
+    ai_credits_current: number;
+    health_score: number;
+    health_status: string;
+    last_activity: string;
+    active_users: number;
+}
+
+export interface IdeaSubmissionEntity {
+    id: Id;
+    idea_id: Id;
+    user_id: Id;
+    created_at: string;
+}
+
+export interface IdeaProjectLinkEntity {
+    id: Id;
+    idea_id: Id;
+    project_id: Id;
+    created_at: string;
+}
+
+export interface EdgeOwnershipEntity {
+    id: Id;
+    edge_id: Id;
+    user_id: Id;
+    created_at: string;
+}
+
+export interface TaskAssignmentEntity {
+    id: Id;
+    task_id: Id;
+    user_id: Id;
+    created_at: string;
+}
+
+export interface DiscussionAuthorshipEntity {
+    id: Id;
+    discussion_id: Id;
+    user_id: Id;
+    created_at: string;
+}
+
+export interface VersionAuthorshipEntity {
+    id: Id;
+    version_id: Id;
+    user_id: Id;
+    created_at: string;
+}
+
+export interface ActivityActorEntity {
+    id: Id;
+    activity_id: Id;
+    user_id: Id;
+    created_at: string;
+}
+
+export interface ClarificationAskerEntity {
+    id: Id;
+    clarification_id: Id;
+    user_id: Id;
+    created_at: string;
+}
+
+export interface ClarificationAnswererEntity {
+    id: Id;
+    clarification_id: Id;
+    user_id: Id;
+    created_at: string;
+}
+
+export interface ClarificationProjectEntity {
+    id: Id;
+    clarification_id: Id;
+    project_id: Id;
+    created_at: string;
+}
+
+export interface ProcessStepProcessEntity {
+    id: Id;
+    process_step_id: Id;
+    process_id: Id;
+    created_at: string;
 }
 
 export interface IdeaCreationFields {
     id: Id;
     title: string;
-    submitted_by_id: Id;
     score?: number;
     estimated_impact?: number;
     estimated_duration?: number;
@@ -502,8 +663,6 @@ export function createIdea(
             fields.estimated_cost ?? 0,
         priority: fields.priority ?? 0,
         status: fields.status ?? 'active',
-        submitted_by_id:
-            fields.submitted_by_id,
         edge_status: 'missing',
         problem_statement:
             fields.problem_statement ?? '',
@@ -533,8 +692,6 @@ export function createIdea(
 export interface ProjectCreationFields {
     id: Id;
     title: string;
-    lead_id: Id;
-    linked_idea_id?: Id;
     description?: string;
     status?: ProjectStatus;
     estimated_duration?: number;
@@ -555,7 +712,6 @@ export function createProject(
         progress: 0,
         start_date: nowUtc(),
         target_end_date: '',
-        lead_id: fields.lead_id,
         estimated_duration:
             fields.estimated_duration ?? 0,
         actual_duration: 0,
@@ -567,8 +723,6 @@ export function createProject(
         actual_impact: 0,
         priority: 0,
         priority_score: 0,
-        linked_idea_id:
-            fields.linked_idea_id ?? '',
         business_context: '{}',
         timeline_label: '',
         budget_label: '',
@@ -577,8 +731,6 @@ export function createProject(
 
 export interface EdgeCreationFields {
     id: Id;
-    idea_id: Id;
-    owner_id: Id;
     status?: EdgeStatus;
     confidence?: ConfidenceLevel;
 }
@@ -588,11 +740,9 @@ export function createEdge(
 ): EdgeEntity {
     return {
         id: fields.id,
-        idea_id: fields.idea_id,
         status: fields.status ?? 'draft',
         confidence:
             fields.confidence ?? 'medium',
-        owner_id: fields.owner_id,
         impact_short_term: '',
         impact_mid_term: '',
         impact_long_term: '',
@@ -603,7 +753,6 @@ export function createEdge(
 export interface ActivityCreationFields {
     id: Id;
     type: string;
-    actor_id: Id;
     action: string;
     target: string;
     score?: number;
@@ -617,7 +766,6 @@ export function createActivity(
     return {
         id: fields.id,
         type: fields.type,
-        actor_id: fields.actor_id,
         action: fields.action,
         target: fields.target,
         timestamp: nowUtc(),
@@ -648,7 +796,6 @@ export function createFlow(
 
 export interface FlowStepCreationFields {
     id: Id;
-    process_id: Id;
     title: string;
     sort_order: number;
     type?: FlowStepType;
@@ -664,7 +811,6 @@ export function createFlowStep(
 ): FlowStepEntity {
     return {
         id: fields.id,
-        process_id: fields.process_id,
         title: fields.title,
         description:
             fields.description ?? '',
@@ -680,6 +826,11 @@ export function createFlowStep(
 export interface StatusDisplay {
     label: string;
     className: string;
+}
+
+export interface InlineStyleDisplay {
+    label: string;
+    style: string;
 }
 
 export const UNKNOWN_CONFIG: StatusDisplay = {
@@ -797,6 +948,140 @@ export const CONFIDENCE_CONFIG: Record<
     },
 };
 
+export const FLOW_STEP_TYPE_CONFIG: Record<
+    FlowStepType,
+    InlineStyleDisplay
+> = {
+    start: {
+        label: 'Start',
+        style: 'background:hsl(var('
+            + '--success) / 0.1);border:'
+            + '2px solid hsl(var(--success)'
+            + ' / 0.3);color:hsl(var('
+            + '--success))',
+    },
+    end: {
+        label: 'End',
+        style: 'background:hsl(var('
+            + '--error)/0.1);border:2px'
+            + ' solid hsl(var(--error)'
+            + '/0.3);color:hsl(var('
+            + '--error))',
+    },
+    decision: {
+        label: 'Decision',
+        style: 'background:hsl(var('
+            + '--warning)/0.1);border:2px'
+            + ' solid hsl(var(--warning)'
+            + '/0.3);color:hsl(var('
+            + '--warning))',
+    },
+    action: {
+        label: 'Action',
+        style: 'background:hsl(var('
+            + '--primary)/0.1);border:2px'
+            + ' solid hsl(var(--primary)'
+            + '/0.3);color:hsl(var('
+            + '--primary))',
+    },
+};
+
+export const FLOW_STEP_TYPE_DEFAULT:
+    InlineStyleDisplay
+    = FLOW_STEP_TYPE_CONFIG.action;
+
+export interface MilestoneDisplay {
+    label: string;
+    textStyle: string;
+    iconBackground: string;
+}
+
+export const MILESTONE_STATUS_CONFIG:
+    Record<string, MilestoneDisplay>
+= {
+    completed: {
+        label: 'Completed',
+        textStyle:
+            'color:hsl(var(--success))',
+        iconBackground:
+            'hsl(var(--success))',
+    },
+    in_progress: {
+        label: 'In Progress',
+        textStyle:
+            'color:hsl(var(--warning))',
+        iconBackground:
+            'hsl(var(--warning))',
+    },
+};
+
+export const MILESTONE_STATUS_DEFAULT:
+    MilestoneDisplay = {
+        label: 'Pending',
+        textStyle: 'color:hsl(var('
+            + '--muted-foreground))',
+        iconBackground:
+            'hsl(var(--muted))',
+    };
+
+export const TASK_PRIORITY_CONFIG:
+    Record<string, InlineStyleDisplay>
+= {
+    High: {
+        label: 'High',
+        style: 'background:hsl(var('
+            + '--error-soft));'
+            + 'color:hsl(var('
+            + '--error-text));'
+            + 'border:1px solid '
+            + 'hsl(var(--error-border))',
+    },
+    Medium: {
+        label: 'Medium',
+        style: 'background:hsl(var('
+            + '--warning-soft));'
+            + 'color:hsl(var('
+            + '--warning-text));'
+            + 'border:1px solid '
+            + 'hsl(var(--warning-border))',
+    },
+};
+
+export const TASK_PRIORITY_DEFAULT:
+    InlineStyleDisplay = {
+        label: 'Low',
+        style: 'background:hsl(var('
+            + '--muted)/0.5);'
+            + 'color:hsl(var('
+            + '--muted-foreground));'
+            + 'border:1px solid '
+            + 'hsl(var(--border))',
+    };
+
+export const READINESS_CONFIG: Record<
+    string,
+    StatusDisplay
+> = {
+    ready: {
+        label: 'Ready for Review',
+        className: 'text-success',
+    },
+    'needs-info': {
+        label: 'Needs Info',
+        className: 'text-warning',
+    },
+    incomplete: {
+        label: 'Incomplete',
+        className: 'text-error',
+    },
+};
+
+export const UNKNOWN_READINESS_CONFIG:
+    StatusDisplay = {
+        label: 'Unknown',
+        className: 'text-muted',
+    };
+
 export class Idea {
     readonly id: string;
     readonly title: string;
@@ -807,7 +1092,6 @@ export class Idea {
     readonly priority: number;
     readonly status: IdeaStatus;
     readonly edgeStatus: EdgeStatus | 'incomplete';
-    readonly submittedById: Id;
     readonly problemStatement: string;
     readonly proposedSolution: string;
     readonly expectedOutcome: string;
@@ -845,8 +1129,6 @@ export class Idea {
         this.status = entity.status;
         this.edgeStatus =
             entity.edge_status || 'incomplete';
-        this.submittedById =
-            entity.submitted_by_id;
         this.problemStatement =
             entity.problem_statement;
         this.proposedSolution =
@@ -895,6 +1177,10 @@ export class Idea {
     needsEdgeDefinition(): boolean {
         return this.edgeStatus !== 'complete'
             && this.status === 'active';
+    }
+
+    isReady(): boolean {
+        return this.readiness === 'ready';
     }
 
     durationInDays(): number {
@@ -963,6 +1249,20 @@ export class Idea {
                 ?? UNKNOWN_CONFIG
         ).className;
     }
+
+    readinessLabel(): string {
+        return (
+            READINESS_CONFIG[this.readiness]
+                ?? UNKNOWN_READINESS_CONFIG
+        ).label;
+    }
+
+    readinessClassName(): string {
+        return (
+            READINESS_CONFIG[this.readiness]
+                ?? UNKNOWN_READINESS_CONFIG
+        ).className;
+    }
 }
 
 export class Project {
@@ -973,7 +1273,6 @@ export class Project {
     readonly progress: number;
     readonly startDate: string;
     readonly targetEndDate: string;
-    readonly leadId: Id;
     readonly estimatedDuration: number;
     readonly actualDuration: number;
     readonly estimatedCost: number;
@@ -982,7 +1281,6 @@ export class Project {
     readonly actualImpact: number;
     readonly priority: number;
     readonly priorityScore: number;
-    readonly linkedIdeaId: Id;
     readonly businessContext: string;
     readonly timelineLabel: string;
     readonly budgetLabel: string;
@@ -996,7 +1294,6 @@ export class Project {
         this.startDate = entity.start_date;
         this.targetEndDate =
             entity.target_end_date;
-        this.leadId = entity.lead_id;
         this.estimatedDuration =
             entity.estimated_duration;
         this.actualDuration =
@@ -1011,8 +1308,6 @@ export class Project {
         this.priority = entity.priority;
         this.priorityScore =
             entity.priority_score;
-        this.linkedIdeaId =
-            entity.linked_idea_id;
         this.businessContext =
             entity.business_context;
         this.timelineLabel =
@@ -1058,13 +1353,6 @@ export class Project {
         );
     }
 
-    leadName(
-        userMap: Map<Id, User>,
-    ): string {
-        return userMap.get(this.leadId)
-            ?.fullName() ?? 'Unknown';
-    }
-
     statusLabel(): string {
         return (
             PROJECT_STATUS_CONFIG[this.status]
@@ -1082,10 +1370,8 @@ export class Project {
 
 export class Edge {
     readonly id: string;
-    readonly ideaId: Id;
     readonly status: EdgeStatus;
     readonly confidence: ConfidenceLevel;
-    readonly ownerId: Id;
     readonly impactShortTerm: string;
     readonly impactMidTerm: string;
     readonly impactLongTerm: string;
@@ -1093,10 +1379,8 @@ export class Edge {
 
     constructor(entity: EdgeEntity) {
         this.id = entity.id;
-        this.ideaId = entity.idea_id;
         this.status = entity.status;
         this.confidence = entity.confidence;
-        this.ownerId = entity.owner_id;
         this.impactShortTerm =
             entity.impact_short_term;
         this.impactMidTerm =
@@ -1150,7 +1434,6 @@ export class Edge {
 export class Activity {
     readonly id: string;
     readonly type: string;
-    readonly actorId: Id;
     readonly action: string;
     readonly target: string;
     readonly timestamp: string;
@@ -1165,7 +1448,6 @@ export class Activity {
     ) {
         this.id = entity.id;
         this.type = entity.type;
-        this.actorId = entity.actor_id;
         this.action = entity.action;
         this.target = entity.target;
         this.timestamp = entity.timestamp;
@@ -1175,17 +1457,8 @@ export class Activity {
         this.actor = actor;
     }
 
-    actorName(
-        userMap: Map<Id, User>,
-    ): string {
-        return userMap.get(this.actorId)
-            ?.fullName() ?? 'Unknown';
-    }
-
-    formattedDescription(
-        userMap: Map<Id, User>,
-    ): string {
-        return `${this.actorName(userMap)}`
+    formattedDescription(): string {
+        return `${this.actor}`
             + ` ${this.action}`
             + ` ${this.target}`;
     }

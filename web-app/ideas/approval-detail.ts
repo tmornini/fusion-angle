@@ -30,7 +30,9 @@ import {
     type Metric,
 } from '../app/adapters';
 
-let isEditingIdea = false;
+const state = {
+    isEditingIdea: false,
+};
 
 const severityConfig:
     Record<string, string> = {
@@ -77,7 +79,7 @@ function buildApprovalPage(
                   text-muted">
                   Reviewing Idea
                 </p>
-                ${isEditingIdea
+                ${state.isEditingIdea
                     ? html`<input
                         class="input"
                         id="approval-edit-title"
@@ -97,7 +99,7 @@ function buildApprovalPage(
               class="flex items-center
                 gap-2"
               style="flex-shrink:0">
-              ${isEditingIdea
+              ${state.isEditingIdea
                 ? html`
                   <button
                     class="btn btn-outline
@@ -249,7 +251,7 @@ function buildApprovalPage(
             )}
             Idea Overview
           </h3>
-          ${isEditingIdea
+          ${state.isEditingIdea
             ? html`<textarea
                 class="textarea"
                 id=${'approval-edit'
@@ -809,7 +811,7 @@ function bindApprovalEvents(
         ?.addEventListener(
             'click',
             () => {
-                isEditingIdea = true;
+                state.isEditingIdea = true;
                 mutateApprovalPage(
                     idea,
                     edge,
@@ -822,7 +824,7 @@ function bindApprovalEvents(
         ?.addEventListener(
             'click',
             () => {
-                isEditingIdea = false;
+                state.isEditingIdea = false;
                 mutateApprovalPage(
                     idea,
                     edge,
@@ -867,7 +869,7 @@ function bindApprovalEvents(
                         getIdeaForApproval(id),
                         getEdgeForApproval(id),
                     ]);
-                    isEditingIdea = false;
+                    state.isEditingIdea = false;
                     mutateApprovalPage(
                         updatedIdea,
                         updatedEdge,
@@ -967,7 +969,7 @@ export async function init(
 ): Promise<void> {
     const id = params?.['id'];
     if (!id) { navigateTo('idea-review-queue'); return; }
-    isEditingIdea = false;
+    state.isEditingIdea = false;
 
     const root = $('#page-root');
     if (!root) return;

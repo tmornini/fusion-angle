@@ -26,7 +26,7 @@ function buildSkeletonCard(): SafeHtml {
     <div class="${SHIMMER_CLASS}
       skeleton-text"
       style="width:80%"></div>
-  </div>`;
+    </div>`;
 }
 
 function buildSkeletonListItem(
@@ -47,7 +47,7 @@ margin-bottom:0.375rem"></div>
     </div>
     <div class="${SHIMMER_CLASS}
       skeleton-badge"></div>
-  </div>`;
+    </div>`;
 }
 
 function buildSkeletonStatsRow(
@@ -64,7 +64,7 @@ function buildSkeletonStatsRow(
         + ` style="width:40%"></div>`
         + `</div>`,
     ))}
-  </div>`;
+    </div>`;
 }
 
 export function buildSkeleton(
@@ -185,7 +185,7 @@ export function buildErrorState(
     <button class="btn btn-outline"
       data-retry-btn>${retryLabel
     }</button>
-  </div>`;
+    </div>`;
 }
 
 export function buildEmptyState(
@@ -209,7 +209,7 @@ export function buildEmptyState(
             class="btn btn-primary">${
             action.label}</a>`
         : html``}
-  </div>`;
+    </div>`;
 }
 
 export function errorMessage(

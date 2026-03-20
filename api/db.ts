@@ -1,83 +1,138 @@
 import type {
-  UserEntity, IdeaEntity, IdeaScoreEntity, ProjectEntity, ProjectTeamEntity,
-  MilestoneEntity, ProjectTaskEntity, DiscussionEntity, ProjectVersionEntity,
-  EdgeEntity, EdgeOutcomeEntity, EdgeMetricEntity, ActivityEntity,
-  ClarificationEntity, CrunchColumnEntity, FlowEntity, FlowStepEntity,
-  CompanySettingsEntity, AccountEntity,
+    UserEntity,
+    IdeaEntity,
+    IdeaScoreEntity,
+    IdeaScoreIdeaEntity,
+    ProjectEntity,
+    TeamMembershipEntity,
+    TeamMembershipProjectEntity,
+    TeamMembershipUserEntity,
+    MilestoneEntity,
+    MilestoneProjectEntity,
+    ProjectTaskEntity,
+    ProjectTaskProjectEntity,
+    DiscussionEntity,
+    ProjectVersionEntity,
+    ProjectVersionProjectEntity,
+    EdgeEntity,
+    EdgeOutcomeEntity,
+    EdgeOutcomeEdgeEntity,
+    EdgeMetricEntity,
+    EdgeMetricOutcomeEntity,
+    ActivityEntity,
+    ClarificationEntity,
+    CrunchColumnEntity,
+    FlowEntity,
+    FlowStepEntity,
+    CompanySettingsEntity,
+    AccountEntity,
+    IdeaSubmissionEntity,
+    IdeaProjectLinkEntity,
+    EdgeIdeaEntity,
+    EdgeOwnershipEntity,
+    TaskAssignmentEntity,
+    DiscussionAuthorshipEntity,
+    DiscussionProjectEntity,
+    VersionAuthorshipEntity,
+    ActivityActorEntity,
+    ClarificationAskerEntity,
+    ClarificationAnswererEntity,
+    ClarificationProjectEntity,
+    ProcessStepProcessEntity,
 } from './types';
 
 export interface EntityStore<T> {
-  getAll(): Promise<T[]>;
-  getById(id: string): Promise<T | null>;
-  put(id: string, fields: Partial<T>): Promise<T>;
-  delete(id: string): Promise<void>;
+    getAll(): Promise<T[]>;
+    getById(id: string): Promise<T | null>;
+    put(id: string, fields: Partial<T>): Promise<T>;
+    delete(id: string): Promise<void>;
 }
 
 export interface SingletonStore<T> {
-  get(): Promise<T>;
-  put(fields: Partial<T>): Promise<T>;
+    get(): Promise<T>;
+    put(fields: Partial<T>): Promise<T>;
 }
 
 export interface DbAdapter {
-  initialize(): Promise<void>;
-  close(): Promise<void>;
-  flush(): Promise<void>;
-  deleteSchema(): Promise<void>;
-  hasSchema(): Promise<boolean>;
-  createSchema(): Promise<void>;
-  exportSnapshot(): Promise<string>;
-  importSnapshot(json: string): Promise<void>;
+    initialize(): Promise<void>;
+    close(): Promise<void>;
+    flush(): Promise<void>;
+    deleteSchema(): Promise<void>;
+    hasSchema(): Promise<boolean>;
+    createSchema(): Promise<void>;
+    exportSnapshot(): Promise<string>;
+    importSnapshot(json: string): Promise<void>;
 
-  users: EntityStore<UserEntity>;
-  ideas: EntityStore<IdeaEntity>;
-  ideaScores: {
-    getByIdeaId(
-      ideaId: string,
-    ): Promise<IdeaScoreEntity | null>;
-    put(
-      ideaId: string,
-      fields: Partial<IdeaScoreEntity>,
-    ): Promise<IdeaScoreEntity>;
-  };
-  projects: EntityStore<ProjectEntity>;
-  projectTeam: {
-    getByProjectId(
-      projectId: string,
-    ): Promise<ProjectTeamEntity[]>;
-    put(
-      projectId: string,
-      userId: string,
-      fields: Partial<ProjectTeamEntity>,
-    ): Promise<ProjectTeamEntity>;
-  };
-  milestones: EntityStore<MilestoneEntity> & {
-    getByProjectId(projectId: string): Promise<MilestoneEntity[]>;
-  };
-  projectTasks: EntityStore<ProjectTaskEntity> & {
-    getByProjectId(projectId: string): Promise<ProjectTaskEntity[]>;
-  };
-  discussions: EntityStore<DiscussionEntity> & {
-    getByProjectId(projectId: string): Promise<DiscussionEntity[]>;
-  };
-  projectVersions: EntityStore<ProjectVersionEntity> & {
-    getByProjectId(projectId: string): Promise<ProjectVersionEntity[]>;
-  };
-  edges: EntityStore<EdgeEntity> & {
-    getByIdeaId(ideaId: string): Promise<EdgeEntity | null>;
-  };
-  edgeOutcomes: EntityStore<EdgeOutcomeEntity> & {
-    getByEdgeId(edgeId: string): Promise<EdgeOutcomeEntity[]>;
-  };
-  edgeMetrics: EntityStore<EdgeMetricEntity>;
-  activities: EntityStore<ActivityEntity>;
-  clarifications: EntityStore<ClarificationEntity> & {
-    getByProjectId(projectId: string): Promise<ClarificationEntity[]>;
-  };
-  crunchColumns: EntityStore<CrunchColumnEntity>;
-  flows: EntityStore<FlowEntity>;
-  flowSteps: EntityStore<FlowStepEntity> & {
-    getByFlowId(processId: string): Promise<FlowStepEntity[]>;
-  };
-  companySettings: SingletonStore<CompanySettingsEntity>;
-  account: SingletonStore<AccountEntity>;
+    users: EntityStore<UserEntity>;
+    ideas: EntityStore<IdeaEntity>;
+    ideaScores:
+        EntityStore<IdeaScoreEntity>;
+    ideaScoreIdeas:
+        EntityStore<IdeaScoreIdeaEntity>;
+    projects: EntityStore<ProjectEntity>;
+    teamMemberships:
+        EntityStore<TeamMembershipEntity>;
+    teamMembershipProjects:
+        EntityStore<
+            TeamMembershipProjectEntity
+        >;
+    teamMembershipUsers:
+        EntityStore<
+            TeamMembershipUserEntity
+        >;
+    milestones:
+        EntityStore<MilestoneEntity>;
+    milestoneProjects:
+        EntityStore<MilestoneProjectEntity>;
+    projectTasks:
+        EntityStore<ProjectTaskEntity>;
+    projectTaskProjects:
+        EntityStore<
+            ProjectTaskProjectEntity
+        >;
+    discussions:
+        EntityStore<DiscussionEntity>;
+    discussionProjects:
+        EntityStore<
+            DiscussionProjectEntity
+        >;
+    projectVersions:
+        EntityStore<ProjectVersionEntity>;
+    projectVersionProjects:
+        EntityStore<
+            ProjectVersionProjectEntity
+        >;
+    edges: EntityStore<EdgeEntity>;
+    edgeIdeas:
+        EntityStore<EdgeIdeaEntity>;
+    edgeOutcomes:
+        EntityStore<EdgeOutcomeEntity>;
+    edgeOutcomeEdges:
+        EntityStore<
+            EdgeOutcomeEdgeEntity
+        >;
+    edgeMetrics:
+        EntityStore<EdgeMetricEntity>;
+    edgeMetricOutcomes:
+        EntityStore<
+            EdgeMetricOutcomeEntity
+        >;
+    activities: EntityStore<ActivityEntity>;
+    clarifications: EntityStore<ClarificationEntity>;
+    clarificationProjects: EntityStore<ClarificationProjectEntity>;
+    crunchColumns: EntityStore<CrunchColumnEntity>;
+    flows: EntityStore<FlowEntity>;
+    flowSteps: EntityStore<FlowStepEntity>;
+    processStepProcesses: EntityStore<ProcessStepProcessEntity>;
+    companySettings: SingletonStore<CompanySettingsEntity>;
+    account: SingletonStore<AccountEntity>;
+    ideaSubmissions: EntityStore<IdeaSubmissionEntity>;
+    ideaProjectLinks: EntityStore<IdeaProjectLinkEntity>;
+    edgeOwnerships: EntityStore<EdgeOwnershipEntity>;
+    taskAssignments: EntityStore<TaskAssignmentEntity>;
+    discussionAuthorships: EntityStore<DiscussionAuthorshipEntity>;
+    versionAuthorships: EntityStore<VersionAuthorshipEntity>;
+    activityActors: EntityStore<ActivityActorEntity>;
+    clarificationAskers: EntityStore<ClarificationAskerEntity>;
+    clarificationAnswerers: EntityStore<ClarificationAnswererEntity>;
 }

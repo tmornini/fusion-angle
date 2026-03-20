@@ -11,7 +11,11 @@ import {
     iconTrendingUp, iconWand, iconCheck,
 } from '../app/icons';
 import { navigateTo } from '../app/core';
-import { putIdea } from '../app/adapters';
+import {
+    putIdea,
+    putIdeaSubmission,
+} from '../app/adapters';
+import { nowUtc } from '../../api/types';
 
 const steps = [
     {
@@ -40,8 +44,7 @@ const steps = [
     },
 ];
 
-let currentStep = 1;
-const formData = {
+const emptyFormData = {
     title: '',
     problemStatement: '',
     proposedSolution: '',
@@ -50,20 +53,26 @@ const formData = {
     successMetrics: '',
 };
 
+const state = {
+    currentStep: 1,
+    formData: { ...emptyFormData },
+};
+
 function isStepComplete(): boolean {
-    switch (currentStep) {
+    switch (state.currentStep) {
         case 1:
             return !!(
-                formData.title.trim()
-                && formData
+                state.formData.title
+                    .trim()
+                && state.formData
                     .problemStatement
                     .trim()
             );
         case 2:
-            return !!formData
+            return !!state.formData
                 .proposedSolution.trim();
         case 3:
-            return !!formData
+            return !!state.formData
                 .expectedOutcome.trim();
         default:
             return false;
@@ -74,9 +83,9 @@ function buildProgressSteps(): SafeHtml {
     return html`${steps.map(
         (step, index) => {
             const isCurrent =
-                currentStep === step.id;
+                state.currentStep === step.id;
             const isCompleted =
-                currentStep > step.id;
+                state.currentStep > step.id;
             const bgStyle = isCompleted
                 ? 'background:'
                     + 'hsl(var(--success));'
@@ -141,7 +150,7 @@ function buildProgressSteps(): SafeHtml {
               font-medium"
             style=${'white-space:nowrap;'
                 + 'color:'
-                + (currentStep >= step.id
+                + (state.currentStep >= step.id
                     ? 'hsl(var('
                         + '--foreground))'
                     : 'hsl(var('
@@ -157,7 +166,7 @@ function buildProgressSteps(): SafeHtml {
 }
 
 function buildStepContent(): SafeHtml {
-    if (currentStep === 1) {
+    if (state.currentStep === 1) {
         return html`
       <div style=${'display:flex;'
           + 'flex-direction:column;'
@@ -173,7 +182,7 @@ function buildStepContent(): SafeHtml {
             placeholder=${'e.g.,'
                 + ' AI-Powered Customer'
                 + ' Segmentation'}
-            value="${formData.title}"
+            value="${state.formData.title}"
             style=${'font-size:1.125rem;'
                 + 'padding:0.75rem 1rem'}
           />
@@ -201,7 +210,7 @@ function buildStepContent(): SafeHtml {
                 + ' solving it?'}
             rows="5"
             style="resize:none">${
-              formData.problemStatement
+              state.formData.problemStatement
           }</textarea>
           <p class="text-xs text-muted
             mt-1">
@@ -228,12 +237,12 @@ function buildStepContent(): SafeHtml {
                 + ' customers, operations'
                 + ' managers'}
             value="${
-                formData.targetUsers
+                state.formData.targetUsers
             }" />
         </div>
       </div>`;
     }
-    if (currentStep === 2) {
+    if (state.currentStep === 2) {
         return html`
       <div style=${'display:flex;'
           + 'flex-direction:column;'
@@ -254,7 +263,7 @@ function buildStepContent(): SafeHtml {
                 + ' you use?'}
             rows="7"
             style="resize:none">${
-              formData.proposedSolution
+              state.formData.proposedSolution
           }</textarea>
           <p class="text-xs text-muted
             mt-1">
@@ -315,7 +324,7 @@ function buildStepContent(): SafeHtml {
               + ' improved...'}
           rows="5"
           style="resize:none">${
-            formData.expectedOutcome
+            state.formData.expectedOutcome
         }</textarea>
         <p class="text-xs text-muted
           mt-1">
@@ -344,7 +353,7 @@ function buildStepContent(): SafeHtml {
               + ' of 10 points'}
           rows="4"
           style="resize:none">${
-            formData.successMetrics
+            state.formData.successMetrics
         }</textarea>
       </div>
       <div class="p-4 rounded-xl"
@@ -379,7 +388,7 @@ function buildStepContent(): SafeHtml {
 
 function buildWizardPage(): SafeHtml {
     const step =
-        steps[currentStep - 1]!;
+        steps[state.currentStep - 1]!;
     return html`
     <div style=${'min-height:100vh;'
         + 'background:'
@@ -482,13 +491,13 @@ function buildWizardPage(): SafeHtml {
               id=${'idea-create'
                   + '-step-back'}>
               ${iconArrowLeft(16)}
-              ${currentStep === 1
+              ${state.currentStep === 1
                   ? 'Cancel'
                   : 'Back'}
             </button>
             <span class="text-sm
               text-muted">
-              Step ${currentStep}
+              Step ${state.currentStep}
               of ${steps.length}
             </span>
             <button
@@ -499,7 +508,7 @@ function buildWizardPage(): SafeHtml {
               ${isStepComplete()
                   ? ''
                   : 'disabled'}>
-              ${currentStep === 3
+              ${state.currentStep === 3
                   ? html`Submit Idea
                       ${iconCheck(16)}`
                   : html`Continue
@@ -525,47 +534,57 @@ function mutateWizard() {
 }
 
 function syncFormFields() {
-    if (currentStep === 1) {
-        formData.title =
-            $input(
-                '#idea-create'
-                + '-field-title',
-            )?.value ?? '';
-        formData.problemStatement =
-            $textarea(
-                '#idea-create'
-                + '-field-problem',
-            )?.value ?? '';
-        formData.targetUsers =
-            $input(
-                '#idea-create'
-                + '-field-target',
-            )?.value ?? '';
-    } else if (currentStep === 2) {
-        formData.proposedSolution =
-            $textarea(
-                '#idea-create'
-                + '-field-solution',
-            )?.value ?? '';
-    } else if (currentStep === 3) {
-        formData.expectedOutcome =
-            $textarea(
-                '#idea-create'
-                + '-field-outcome',
-            )?.value ?? '';
-        formData.successMetrics =
-            $textarea(
-                '#idea-create'
-                + '-field-metrics',
-            )?.value ?? '';
+    if (state.currentStep === 1) {
+        state.formData = {
+            ...state.formData,
+            title:
+                $input(
+                    '#idea-create'
+                    + '-field-title',
+                )?.value ?? '',
+            problemStatement:
+                $textarea(
+                    '#idea-create'
+                    + '-field-problem',
+                )?.value ?? '',
+            targetUsers:
+                $input(
+                    '#idea-create'
+                    + '-field-target',
+                )?.value ?? '',
+        };
+    } else if (state.currentStep === 2) {
+        state.formData = {
+            ...state.formData,
+            proposedSolution:
+                $textarea(
+                    '#idea-create'
+                    + '-field-solution',
+                )?.value ?? '',
+        };
+    } else if (state.currentStep === 3) {
+        state.formData = {
+            ...state.formData,
+            expectedOutcome:
+                $textarea(
+                    '#idea-create'
+                    + '-field-outcome',
+                )?.value ?? '',
+            successMetrics:
+                $textarea(
+                    '#idea-create'
+                    + '-field-metrics',
+                )?.value ?? '',
+        };
     }
 }
 
 function bindWizardEvents() {
     const goBack = () => {
-        if (currentStep > 1) {
+        if (state.currentStep > 1) {
             syncFormFields();
-            currentStep--;
+            state.currentStep =
+                state.currentStep - 1;
             mutateWizard();
         } else {
             navigateTo('ideas');
@@ -591,33 +610,31 @@ function bindWizardEvents() {
                 if (!isStepComplete()) {
                     return;
                 }
-                if (currentStep < 3) {
-                    currentStep++;
+                if (state.currentStep < 3) {
+                    state.currentStep =
+                        state.currentStep + 1;
                     mutateWizard();
                 } else {
                     const ideaId =
                         crypto.randomUUID();
+                    const fd = state.formData;
                     await putIdea(ideaId, {
-                        title:
-                            formData.title,
+                        title: fd.title,
                         problem_statement:
-                            formData
-                                .problemStatement,
+                            fd
+                            .problemStatement,
                         proposed_solution:
-                            formData
-                                .proposedSolution,
+                            fd
+                            .proposedSolution,
                         expected_outcome:
-                            formData
-                                .expectedOutcome,
+                            fd
+                            .expectedOutcome,
                         success_metrics:
-                            formData
-                                .successMetrics,
+                            fd
+                            .successMetrics,
                         description:
-                            formData
-                                .targetUsers,
+                            fd.targetUsers,
                         status: 'active',
-                        submitted_by_id:
-                            '1',
                         score: 0,
                         estimated_impact:
                             0,
@@ -633,9 +650,12 @@ function bindWizardEvents() {
                         impact_label: '',
                         effort_label: '',
                         submitted_at:
-                            new Date()
-                                .toISOString(),
+                            nowUtc(),
                     });
+                    await putIdeaSubmission(
+                        ideaId,
+                        '1',
+                    );
                     navigateTo('ideas');
                 }
             },
@@ -674,13 +694,7 @@ function bindWizardEvents() {
 
 export async function init():
     Promise<void> {
-    currentStep = 1;
-    (
-        Object.keys(formData) as Array<
-            keyof typeof formData
-        >
-    ).forEach(
-        key => formData[key] = '',
-    );
+    state.currentStep = 1;
+    state.formData = { ...emptyFormData };
     mutateWizard();
 }

@@ -3,6 +3,7 @@ import type {
     CrunchColumnEntity,
     FlowEntity,
     FlowStepEntity,
+    ProcessStepProcessEntity,
 } from '../../../api/types';
 import { toBool } from '../../../api/types';
 import { parseJson } from './helpers';
@@ -54,16 +55,16 @@ export interface FlowListItem {
 
 export async function getFlows(
 ): Promise<FlowListItem[]> {
-    const [flows, allSteps] =
+    const [flows, links] =
         await Promise.all([
             GET<FlowEntity[]>('processes'),
-            GET<FlowStepEntity[]>(
-                'process-steps',
+            GET<ProcessStepProcessEntity[]>(
+                'process-step-processes',
             ),
         ]);
-    const stepsByFlowId = Map.groupBy(
-        allSteps,
-        step => step.process_id,
+    const linksByProcessId = Map.groupBy(
+        links,
+        link => link.process_id,
     );
     return flows.map(flow => ({
         id: flow.id,
@@ -71,7 +72,7 @@ export async function getFlows(
         description: flow.description,
         department: flow.department,
         stepsCount:
-            stepsByFlowId.get(flow.id)
+            linksByProcessId.get(flow.id)
                 ?.length ?? 0,
     }));
 }

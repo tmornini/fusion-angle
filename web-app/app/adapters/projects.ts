@@ -1,7 +1,6 @@
 import { GET, PUT } from '../../../api/api';
 import type {
     ProjectEntity,
-    ProjectTeamEntity,
     MilestoneEntity,
     ProjectTaskEntity,
     DiscussionEntity,
@@ -10,10 +9,17 @@ import type {
     ClarificationEntity,
     ConfidenceLevel,
     ProjectStatus,
+    IdeaProjectLinkEntity,
+    TaskAssignmentEntity,
+    DiscussionAuthorshipEntity,
+    VersionAuthorshipEntity,
+    ClarificationAskerEntity,
+    ClarificationAnswererEntity,
 } from '../../../api/types';
 import {
     Project,
     durationInDays,
+    nowUtc,
 } from '../../../api/types';
 import {
     buildUserMap,
@@ -25,6 +31,13 @@ import {
 } from './helpers';
 
 export { Project } from '../../../api/types';
+
+interface TeamMemberRow {
+    id: string;
+    user_id: string;
+    role: string;
+    type: string;
+}
 
 export async function getProjects(
 ): Promise<Project[]> {
@@ -115,34 +128,80 @@ export async function getProjectById(
 ): Promise<ProjectDetail> {
     const [
         project, teamRows, milestoneRows,
-        taskRows, discussionRows, versionRows,
-        userMap,
+        taskRows, discussionRows,
+        versionRows, userMap,
+        ideaProjectLinks,
+        taskAssignments,
+        discussionAuthors,
+        versionAuthors,
     ] = await Promise.all([
         GET<ProjectEntity>(
             `projects/${projectId}`,
         ),
-        GET<ProjectTeamEntity[]>(
+        GET<TeamMemberRow[]>(
             `projects/${projectId}/team`,
         ),
         GET<MilestoneEntity[]>(
-            `projects/${projectId}/milestones`,
+            `projects/${projectId}`
+                + `/milestones`,
         ),
         GET<ProjectTaskEntity[]>(
             `projects/${projectId}/tasks`,
         ),
         GET<DiscussionEntity[]>(
-            `projects/${projectId}/discussions`,
+            `projects/${projectId}`
+                + `/discussions`,
         ),
         GET<ProjectVersionEntity[]>(
-            `projects/${projectId}/versions`,
+            `projects/${projectId}`
+                + `/versions`,
         ),
         buildUserMap(),
+        GET<IdeaProjectLinkEntity[]>(
+            'idea-project-links',
+        ),
+        GET<TaskAssignmentEntity[]>(
+            'task-assignments',
+        ),
+        GET<DiscussionAuthorshipEntity[]>(
+            'discussion-authorships',
+        ),
+        GET<VersionAuthorshipEntity[]>(
+            'version-authorships',
+        ),
     ]);
+
+    const leadRow = teamRows.find(
+        m => m.role === 'lead',
+    );
+    const link = ideaProjectLinks.find(
+        l => l.project_id === projectId,
+    );
+    const taskAssignmentMap = new Map(
+        taskAssignments.map(
+            a => [a.task_id, a.user_id],
+        ),
+    );
+    const discussionAuthorMap = new Map(
+        discussionAuthors.map(
+            a => [
+                a.discussion_id,
+                a.user_id,
+            ],
+        ),
+    );
+    const versionAuthorMap = new Map(
+        versionAuthors.map(
+            a => [
+                a.version_id,
+                a.user_id,
+            ],
+        ),
+    );
 
     const edgeData =
         await getEdgeDataWithConfidence(
-            project.linked_idea_id
-                || projectId,
+            link?.idea_id || projectId,
         );
 
     return {
@@ -156,15 +215,17 @@ export async function getProjectById(
             project.target_end_date,
         projectLead: userName(
             userMap,
-            project.lead_id,
+            leadRow?.user_id ?? '',
         ),
         metrics: {
             time: {
                 baseline: durationInDays(
-                    project.estimated_duration,
+                    project
+                        .estimated_duration,
                 ),
                 current: durationInDays(
-                    project.actual_duration,
+                    project
+                        .actual_duration,
                 ),
             },
             cost: {
@@ -175,7 +236,8 @@ export async function getProjectById(
             },
             impact: {
                 baseline:
-                    project.estimated_impact,
+                    project
+                        .estimated_impact,
                 current:
                     project.actual_impact,
             },
@@ -189,12 +251,13 @@ export async function getProjectById(
             ),
             role: member.role,
         })),
-        milestones: milestoneRows.map(m => ({
-            id: m.id,
-            title: m.title,
-            status: m.status,
-            date: m.date,
-        })),
+        milestones:
+            milestoneRows.map(m => ({
+                id: m.id,
+                title: m.title,
+                status: m.status,
+                date: m.date,
+            })),
         versions: versionRows.map(v => ({
             id: v.id,
             version: v.version,
@@ -202,22 +265,28 @@ export async function getProjectById(
             changes: v.changes,
             author: userName(
                 userMap,
-                v.author_id,
+                versionAuthorMap.get(
+                    v.id,
+                ) ?? '',
             ),
         })),
-        discussions: discussionRows.map(d => ({
-            id: d.id,
-            date: d.date,
-            message: d.message,
-            author: userName(
-                userMap,
-                d.author_id,
-            ),
-        })),
+        discussions:
+            discussionRows.map(d => ({
+                id: d.id,
+                date: d.date,
+                message: d.message,
+                author: userName(
+                    userMap,
+                    discussionAuthorMap.get(
+                        d.id,
+                    ) ?? '',
+                ),
+            })),
         tasks: taskRows.map(task => ({
             name: task.name,
             priority: task.priority,
-            description: task.description,
+            description:
+                task.description,
             skills: parseJson<string[]>(
                 task.skills,
                 [],
@@ -227,7 +296,9 @@ export async function getProjectById(
             ),
             assigned: userName(
                 userMap,
-                task.assigned_to_id,
+                taskAssignmentMap.get(
+                    task.id,
+                ) ?? '',
             ),
         })),
     };
@@ -271,19 +342,25 @@ export interface EngineeringProject {
     budget: string;
 }
 
-export async function getProjectForEngineering(
+export async function
+getProjectForEngineering(
     projectId: string,
 ): Promise<EngineeringProject> {
-    const [project, teamRows, userMap] =
-        await Promise.all([
-            GET<ProjectEntity>(
-                `projects/${projectId}`,
-            ),
-            GET<ProjectTeamEntity[]>(
-                `projects/${projectId}/team`,
-            ),
-            buildUserMap(),
-        ]);
+    const [
+        project, teamRows, userMap,
+        ideaProjectLinks,
+    ] = await Promise.all([
+        GET<ProjectEntity>(
+            `projects/${projectId}`,
+        ),
+        GET<TeamMemberRow[]>(
+            `projects/${projectId}/team`,
+        ),
+        buildUserMap(),
+        GET<IdeaProjectLinkEntity[]>(
+            'idea-project-links',
+        ),
+    ]);
 
     const businessContext = parseJson<{
         problem?: string;
@@ -292,27 +369,32 @@ export async function getProjectForEngineering(
         constraints?: string[];
     }>(project.business_context, {});
 
-    const linkedIdea =
-        project.linked_idea_id
-            ? await GET<IdeaEntity | null>(
-                `ideas/`
-                    + project.linked_idea_id,
-            )
-            : null;
+    const link = ideaProjectLinks.find(
+        l => l.project_id === projectId,
+    );
+    const linkedIdea = link
+        ? await GET<IdeaEntity | null>(
+            `ideas/${link.idea_id}`,
+        )
+        : null;
 
     return {
         id: project.id,
         title: project.title,
-        description: project.description,
+        description:
+            project.description,
         businessContext: {
             problem:
-                businessContext.problem || '',
+                businessContext.problem
+                    || '',
             expectedOutcome:
                 businessContext
-                    .expectedOutcome || '',
+                    .expectedOutcome
+                    || '',
             successMetrics:
                 businessContext
-                    .successMetrics || [],
+                    .successMetrics
+                    || [],
             constraints:
                 businessContext
                     .constraints || [],
@@ -332,8 +414,13 @@ export async function getProjectForEngineering(
                 title: linkedIdea.title,
                 score: linkedIdea.score,
             }
-            : { id: '', title: '', score: 0 },
-        timeline: project.timeline_label,
+            : {
+                id: '',
+                title: '',
+                score: 0,
+            },
+        timeline:
+            project.timeline_label,
         budget: project.budget_label,
     };
 }
@@ -342,38 +429,70 @@ export async function
 getClarificationsByProjectId(
     projectId: string,
 ): Promise<Clarification[]> {
-    const [clarificationRows, userMap] =
-        await Promise.all([
-            GET<ClarificationEntity[]>(
-                `projects/${projectId}`
-                    + `/clarifications`,
-            ),
-            buildUserMap(),
-        ]);
-    return clarificationRows.map(c => ({
-        id: c.id,
-        question: c.question,
-        askedBy: userName(
-            userMap,
-            c.asked_by_id,
+    const [
+        clarificationRows, userMap,
+        askers, answerers,
+    ] = await Promise.all([
+        GET<ClarificationEntity[]>(
+            `projects/${projectId}`
+                + `/clarifications`,
         ),
-        askedAt: c.asked_at,
-        status: c.status,
-        ...(c.answer
-            ? { answer: c.answer }
-            : {}),
-        ...(c.answered_by_id
-            ? {
-                answeredBy: userName(
-                    userMap,
-                    c.answered_by_id,
-                ),
-            }
-            : {}),
-        ...(c.answered_at
-            ? { answeredAt: c.answered_at }
-            : {}),
-    }));
+        buildUserMap(),
+        GET<ClarificationAskerEntity[]>(
+            'clarification-askers',
+        ),
+        GET<ClarificationAnswererEntity[]>(
+            'clarification-answerers',
+        ),
+    ]);
+    const askerMap = new Map(
+        askers.map(
+            a => [
+                a.clarification_id,
+                a.user_id,
+            ],
+        ),
+    );
+    const answererMap = new Map(
+        answerers.map(
+            a => [
+                a.clarification_id,
+                a.user_id,
+            ],
+        ),
+    );
+    return clarificationRows.map(c => {
+        const answererId =
+            answererMap.get(c.id);
+        return {
+            id: c.id,
+            question: c.question,
+            askedBy: userName(
+                userMap,
+                askerMap.get(c.id)
+                    ?? '',
+            ),
+            askedAt: c.asked_at,
+            status: c.status,
+            ...(c.answer
+                ? { answer: c.answer }
+                : {}),
+            ...(answererId
+                ? {
+                    answeredBy: userName(
+                        userMap,
+                        answererId,
+                    ),
+                }
+                : {}),
+            ...(c.answered_at
+                ? {
+                    answeredAt:
+                        c.answered_at,
+                }
+                : {}),
+        };
+    });
 }
 
 // ── Write Operations ─────────────────
@@ -394,5 +513,35 @@ export async function putMilestone(
         `projects/${projectId}`
             + `/milestones/${milestoneId}`,
         entity,
+    );
+}
+
+export async function
+putProjectTeamMember(
+    projectId: string,
+    userId: string,
+    role: string,
+    type: string,
+): Promise<void> {
+    await PUT(
+        `projects/${projectId}`
+            + `/team/${userId}`,
+        { role, type },
+    );
+}
+
+export async function
+putIdeaProjectLink(
+    ideaId: string,
+    projectId: string,
+): Promise<void> {
+    await PUT(
+        `idea-project-links/`
+            + crypto.randomUUID(),
+        {
+            idea_id: ideaId,
+            project_id: projectId,
+            created_at: nowUtc(),
+        },
     );
 }

@@ -1,6 +1,9 @@
 # Conduct of Code
 
-All code in this project, and the process of creating it, must adhere to these strictures.
+All code in this project, and the process of
+creating it, must adhere to these strictures.
+These rules are inviolate, not aspirational.
+Violations are defects.
 
 In order of importance, from most to least:
 

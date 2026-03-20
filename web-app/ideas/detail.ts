@@ -34,7 +34,9 @@ import {
     type Idea,
 } from '../app/adapters';
 
-let isEditing = false;
+const state = {
+    isEditing: false,
+};
 
 function buildProblemSolutionCard(
     idea: Idea,
@@ -52,7 +54,7 @@ function buildProblemSolutionCard(
           <p class="text-xs text-muted mb-1">
             Problem Statement
           </p>
-          ${isEditing
+          ${state.isEditing
             ? html`<textarea class="textarea"
                 id="idea-edit-problem"
                 rows="3"
@@ -67,7 +69,7 @@ function buildProblemSolutionCard(
           <p class="text-xs text-muted mb-1">
             Target Users
           </p>
-          ${isEditing
+          ${state.isEditing
             ? html`<textarea class="textarea"
                 id="idea-edit-target-users"
                 rows="2"
@@ -81,7 +83,7 @@ function buildProblemSolutionCard(
           <p class="text-xs text-muted mb-1">
             Proposed Solution
           </p>
-          ${isEditing
+          ${state.isEditing
             ? html`<textarea class="textarea"
                 id="idea-edit-solution"
                 rows="3"
@@ -96,7 +98,7 @@ function buildProblemSolutionCard(
           <p class="text-xs text-muted mb-1">
             Expected Outcome
           </p>
-          ${isEditing
+          ${state.isEditing
             ? html`<textarea class="textarea"
                 id="idea-edit-outcome"
                 rows="3"
@@ -111,7 +113,7 @@ function buildProblemSolutionCard(
           <p class="text-xs text-muted mb-1">
             Success Metrics
           </p>
-          ${isEditing
+          ${state.isEditing
             ? html`<textarea class="textarea"
                 id="idea-edit-metrics"
                 rows="3"
@@ -142,7 +144,7 @@ function buildDetailsCard(
           <p class="text-xs text-muted mb-1">
             Category
           </p>
-          ${isEditing
+          ${state.isEditing
             ? html`<input class="input"
                 id="idea-edit-category"
                 value="${idea.category}" />`
@@ -222,7 +224,7 @@ function buildEstimatesCard(
                 ${metric.label}
               </span>
             </div>
-            ${isEditing
+            ${state.isEditing
               ? html`<input type="number"
                   id="idea-edit-${metric.inputId}"
                   value="${String(
@@ -274,7 +276,7 @@ function buildIdeaDetail(
           <div>
             <div class="flex flex-wrap
                 items-center gap-3 mb-2">
-              ${isEditing
+              ${state.isEditing
                 ? html`<input class="input"
                     id="idea-edit-title"
                     value="${idea.title}"
@@ -347,7 +349,7 @@ function buildIdeaDetail(
               ${iconArrowRight(16)}
               Convert
             </button>` : html``}
-          ${isEditing
+          ${state.isEditing
             ? html`<div class="flex gap-2">
                 <button
                     class="btn btn-outline gap-2"
@@ -392,7 +394,7 @@ function bindIdeaEvents(
         ?.addEventListener(
             'click',
             () => {
-                isEditing = true;
+                state.isEditing = true;
                 mutateIdeaPage(
                     idea, ideaId,
                 );
@@ -403,7 +405,7 @@ function bindIdeaEvents(
         ?.addEventListener(
             'click',
             () => {
-                isEditing = false;
+                state.isEditing = false;
                 mutateIdeaPage(
                     idea, ideaId,
                 );
@@ -497,7 +499,7 @@ function bindIdeaEvents(
                         await getIdeaDetail(
                             ideaId,
                         );
-                    isEditing = false;
+                    state.isEditing = false;
                     mutateIdeaPage(
                         updated,
                         ideaId,
@@ -559,7 +561,7 @@ export async function init(
 ): Promise<void> {
     const ideaId = params?.ideaId;
     if (!ideaId) { navigateTo('ideas'); return; }
-    isEditing = false;
+    state.isEditing = false;
 
     const container = $(
         '#idea-detail-content',

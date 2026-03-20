@@ -4,12 +4,16 @@ import type {
     AccountEntity,
     CompanySettingsEntity,
     ActivityEntity,
+    ActivityActorEntity,
 } from '../../../api/types';
 import {
     toBool,
     Activity,
 } from '../../../api/types';
-import { buildUserMap, userName } from './helpers';
+import {
+    buildUserMap,
+    userName,
+} from './helpers';
 
 const RECENT_ACTIVITY_COUNT = 3;
 
@@ -58,34 +62,52 @@ export interface Account {
 export async function getAccount(
 ): Promise<Account> {
     const [
-        account,
-        settings,
-        activities,
-        userMap,
+        account, settings,
+        activities, userMap,
+        activityActors,
     ] = await Promise.all([
         GET<AccountEntity>('account'),
         GET<CompanySettingsEntity>(
             'company-settings',
         ),
-        GET<ActivityEntity[]>('activities'),
+        GET<ActivityEntity[]>(
+            'activities',
+        ),
         buildUserMap(),
+        GET<ActivityActorEntity[]>(
+            'activity-actors',
+        ),
     ]);
+
+    const actorMap = new Map(
+        activityActors.map(
+            a => [
+                a.activity_id,
+                a.user_id,
+            ],
+        ),
+    );
 
     return {
         company: {
             name: settings.name,
             plan: account.plan,
-            planStatus: account.plan_status,
-            nextBilling: account.next_billing,
+            planStatus:
+                account.plan_status,
+            nextBilling:
+                account.next_billing,
             seats: account.seats,
-            usedSeats: account.used_seats,
+            usedSeats:
+                account.used_seats,
         },
         usage: {
             projects: {
                 current:
-                    account.projects_current,
+                    account
+                        .projects_current,
                 limit:
-                    account.projects_limit,
+                    account
+                        .projects_limit,
             },
             ideas: {
                 current:
@@ -95,7 +117,8 @@ export async function getAccount(
             },
             storage: {
                 current:
-                    account.storage_current,
+                    account
+                        .storage_current,
                 limit:
                     account.storage_limit,
             },
@@ -104,33 +127,46 @@ export async function getAccount(
                     account
                         .ai_credits_current,
                 limit:
-                    account.ai_credits_limit,
+                    account
+                        .ai_credits_limit,
             },
         },
         health: {
-            score: account.health_score,
-            status: account.health_status,
+            score:
+                account.health_score,
+            status:
+                account.health_status,
             lastActivity:
                 account.last_activity,
             activeUsers:
                 account.active_users,
         },
         recentActivity: activities
-            .slice(0, RECENT_ACTIVITY_COUNT)
+            .slice(
+                0,
+                RECENT_ACTIVITY_COUNT,
+            )
             .map(a => {
                 const actor = userName(
                     userMap,
-                    a.actor_id,
+                    actorMap.get(a.id)
+                        ?? '',
                 );
                 const activity =
-                    new Activity(a, actor);
+                    new Activity(
+                        a,
+                        actor,
+                    );
                 return {
                     type: activity.type,
                     description:
                         `${activity.actor}`
-                        + ` ${activity.action}`
-                        + ` ${activity.target}`,
-                    time: activity.timestamp,
+                        + ` ${activity
+                            .action}`
+                        + ` ${activity
+                            .target}`,
+                    time:
+                        activity.timestamp,
                 };
             }),
     };
@@ -231,17 +267,34 @@ export { Activity } from '../../../api/types';
 
 export async function getActivityFeed(
 ): Promise<Activity[]> {
-    const [activities, userMap] =
-        await Promise.all([
-            GET<ActivityEntity[]>(
-                'activities',
-            ),
-            buildUserMap(),
-        ]);
+    const [
+        activities, userMap,
+        activityActors,
+    ] = await Promise.all([
+        GET<ActivityEntity[]>(
+            'activities',
+        ),
+        buildUserMap(),
+        GET<ActivityActorEntity[]>(
+            'activity-actors',
+        ),
+    ]);
+    const actorMap = new Map(
+        activityActors.map(
+            a => [
+                a.activity_id,
+                a.user_id,
+            ],
+        ),
+    );
     return activities.map(a =>
         new Activity(
             a,
-            userName(userMap, a.actor_id),
+            userName(
+                userMap,
+                actorMap.get(a.id)
+                    ?? '',
+            ),
         ),
     );
 }

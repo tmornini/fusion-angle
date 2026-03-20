@@ -29,24 +29,28 @@ const outcomeTemplates = [
     'Improve delivery speed',
 ];
 
-let edgeData: EdgeData = {
-    outcomes: [],
-    impact: {
-        shortTerm: '',
-        midTerm: '',
-        longTerm: '',
-    },
-    confidence: 'medium',
-    owner: 'Sarah Chen',
+const state = {
+    edgeData: {
+        outcomes: [],
+        impact: {
+            shortTerm: '',
+            midTerm: '',
+            longTerm: '',
+        },
+        confidence: 'medium',
+        owner: 'Sarah Chen',
+    } as EdgeData,
+    currentIdea: null as EdgeIdea | null,
 };
-let currentIdea: EdgeIdea | null = null;
 
 function computeCompletionStatus() {
+    const { edgeData } = state;
     const hasOutcomes =
         edgeData.outcomes.length > 0;
     const allOutcomesHaveMetrics =
         hasOutcomes && edgeData.outcomes.every(
-            outcome => outcome.metrics.length > 0,
+            outcome =>
+                outcome.metrics.length > 0,
         );
     const hasImpact = !!(
         edgeData.impact.shortTerm
@@ -93,7 +97,8 @@ function buildCompletionIcon(
 }
 
 function buildEdgePage(ideaId: string): SafeHtml {
-    const idea = currentIdea!;
+    const { edgeData } = state;
+    const idea = state.currentIdea!;
     const completion = computeCompletionStatus();
     const statusLabel = completion.isComplete
         ? 'Complete'
@@ -564,25 +569,9 @@ function buildEdgePage(ideaId: string): SafeHtml {
     </div>`;
 }
 
-function syncFormFields() {
-    edgeData.impact.shortTerm =
-        $textarea('#edge-impact-short-term')
-            ?.value ?? '';
-    edgeData.impact.midTerm =
-        $textarea('#edge-impact-mid-term')
-            ?.value ?? '';
-    edgeData.impact.longTerm =
-        $textarea('#edge-impact-long-term')
-            ?.value ?? '';
-    const confidenceValue =
-        $select('#edge-confidence-select')
-            ?.value ?? '';
-    edgeData.confidence =
-        isConfidenceLevel(confidenceValue)
-            ? confidenceValue
-            : edgeData.confidence;
-    edgeData.owner =
-        $input('#edge-owner-input')?.value ?? '';
+function buildDescriptionUpdates():
+    Map<string, string> {
+    const updates = new Map<string, string>();
     document.querySelectorAll<HTMLInputElement>(
         '[data-outcome-description]',
     ).forEach(descriptionInput => {
@@ -590,59 +579,103 @@ function syncFormFields() {
             descriptionInput.getAttribute(
                 'data-outcome-description',
             ) ?? '';
-        const outcome = edgeData.outcomes.find(
-            candidate =>
-                candidate.id === outcomeId,
+        updates.set(
+            outcomeId,
+            descriptionInput.value,
         );
-        if (outcome) {
-            outcome.description =
-                descriptionInput.value;
-        }
     });
+    return updates;
+}
+
+function buildMetricUpdates():
+    Map<string, Record<string, string>> {
+    const updates =
+        new Map<
+            string,
+            Record<string, string>
+        >();
     document.querySelectorAll<HTMLInputElement>(
         '[data-metric-field]',
     ).forEach(metricInput => {
-        const outcomeId =
-            metricInput.getAttribute(
-                'data-outcome-id',
-            );
         const metricId =
             metricInput.getAttribute(
                 'data-metric-id',
-            );
+            ) ?? '';
         const field =
             metricInput.getAttribute(
                 'data-metric-field',
-            );
-        const outcome = edgeData.outcomes.find(
-            candidate =>
-                candidate.id === outcomeId,
-        );
-        const metric = outcome?.metrics.find(
-            candidate =>
-                candidate.id === metricId,
-        );
-        if (metric && field) {
-            switch (field) {
-                case 'name':
-                    metric.name =
-                        metricInput.value;
-                    break;
-                case 'target':
-                    metric.target =
-                        metricInput.value;
-                    break;
-                case 'unit':
-                    metric.unit =
-                        metricInput.value;
-                    break;
-                case 'current':
-                    metric.current =
-                        metricInput.value;
-                    break;
-            }
-        }
+            ) ?? '';
+        const existing =
+            updates.get(metricId) ?? {};
+        updates.set(metricId, {
+            ...existing,
+            [field]: metricInput.value,
+        });
     });
+    return updates;
+}
+
+function syncFormFields() {
+    const confidenceValue =
+        $select('#edge-confidence-select')
+            ?.value ?? '';
+    const descUpdates =
+        buildDescriptionUpdates();
+    const metricUpdates =
+        buildMetricUpdates();
+    state.edgeData = {
+        ...state.edgeData,
+        impact: {
+            shortTerm:
+                $textarea(
+                    '#edge-impact-short-term',
+                )?.value ?? '',
+            midTerm:
+                $textarea(
+                    '#edge-impact-mid-term',
+                )?.value ?? '',
+            longTerm:
+                $textarea(
+                    '#edge-impact-long-term',
+                )?.value ?? '',
+        },
+        confidence:
+            isConfidenceLevel(confidenceValue)
+                ? confidenceValue
+                : state.edgeData.confidence,
+        owner:
+            $input('#edge-owner-input')
+                ?.value ?? '',
+        outcomes:
+            state.edgeData.outcomes.map(
+                outcome => ({
+                    ...outcome,
+                    description:
+                        descUpdates.get(
+                            outcome.id,
+                        )
+                        ?? outcome.description,
+                    metrics:
+                        outcome.metrics.map(
+                            metric => {
+                                const mu =
+                                    metricUpdates
+                                        .get(
+                                            metric
+                                                .id,
+                                        );
+                                if (!mu) {
+                                    return metric;
+                                }
+                                return {
+                                    ...metric,
+                                    ...mu,
+                                };
+                            },
+                        ),
+                }),
+            ),
+    };
 }
 
 function mutateEdgePage(ideaId: string) {
@@ -666,11 +699,17 @@ function bindEdgeEvents(ideaId: string) {
         'click',
         () => {
             syncFormFields();
-            edgeData.outcomes.push({
-                id: crypto.randomUUID(),
-                description: '',
-                metrics: [],
-            });
+            state.edgeData = {
+                ...state.edgeData,
+                outcomes: [
+                    ...state.edgeData.outcomes,
+                    {
+                        id: crypto.randomUUID(),
+                        description: '',
+                        metrics: [],
+                    },
+                ],
+            };
             mutateEdgePage(ideaId);
         },
     );
@@ -681,16 +720,24 @@ function bindEdgeEvents(ideaId: string) {
                 'click',
                 () => {
                     syncFormFields();
-                    edgeData.outcomes.push({
-                        id: crypto.randomUUID(),
-                        description:
-                            templateButton
-                                .getAttribute(
-                                    'data-add'
-                                    + '-template',
-                                ) || '',
-                        metrics: [],
-                    });
+                    state.edgeData = {
+                        ...state.edgeData,
+                        outcomes: [
+                            ...state.edgeData
+                                .outcomes,
+                            {
+                                id: crypto
+                                    .randomUUID(),
+                                description:
+                                    templateButton
+                                        .getAttribute(
+                                            'data-add'
+                                            + '-template',
+                                        ) || '',
+                                metrics: [],
+                            },
+                        ],
+                    };
                     mutateEdgePage(ideaId);
                 },
             );
@@ -704,15 +751,22 @@ function bindEdgeEvents(ideaId: string) {
                 () => {
                     syncFormFields();
                     const removeId =
-                        removeButton.getAttribute(
-                            'data-remove-outcome',
-                        );
-                    edgeData.outcomes =
-                        edgeData.outcomes.filter(
-                            outcome =>
-                                outcome.id
-                                !== removeId,
-                        );
+                        removeButton
+                            .getAttribute(
+                                'data-remove'
+                                + '-outcome',
+                            );
+                    state.edgeData = {
+                        ...state.edgeData,
+                        outcomes:
+                            state.edgeData
+                                .outcomes
+                                .filter(
+                                    outcome =>
+                                        outcome.id
+                                        !== removeId,
+                                ),
+                    };
                     mutateEdgePage(ideaId);
                 },
             );
@@ -729,22 +783,29 @@ function bindEdgeEvents(ideaId: string) {
                         addButton.getAttribute(
                             'data-add-metric',
                         ) ?? '';
-                    const outcome =
-                        edgeData.outcomes.find(
-                            candidate =>
-                                candidate.id
-                                === outcomeId,
-                        );
-                    if (outcome) {
-                        outcome.metrics.push({
-                            id: crypto
-                                .randomUUID(),
-                            name: '',
-                            target: '',
-                            unit: '',
-                            current: '',
-                        });
-                    }
+                    state.edgeData = {
+                        ...state.edgeData,
+                        outcomes:
+                            state.edgeData
+                                .outcomes.map(
+                                    o => o.id
+                                        !== outcomeId
+                                        ? o
+                                        : {
+                                            ...o,
+                                            metrics: [
+                                                ...o.metrics,
+                                                {
+                                                    id: crypto.randomUUID(),
+                                                    name: '',
+                                                    target: '',
+                                                    unit: '',
+                                                    current: '',
+                                                },
+                                            ],
+                                        },
+                                ),
+                    };
                     mutateEdgePage(ideaId);
                 },
             );
@@ -758,28 +819,32 @@ function bindEdgeEvents(ideaId: string) {
                 () => {
                     syncFormFields();
                     const outcomeId =
-                        removeButton.getAttribute(
-                            'data-outcome-id',
-                        );
+                        removeButton
+                            .getAttribute(
+                                'data-outcome-id',
+                            );
                     const metricId =
-                        removeButton.getAttribute(
-                            'data-metric-id',
-                        );
-                    const outcome =
-                        edgeData.outcomes.find(
-                            candidate =>
-                                candidate.id
-                                === outcomeId,
-                        );
-                    if (outcome) {
-                        outcome.metrics =
-                            outcome.metrics
-                                .filter(
-                                    metric =>
-                                        metric.id
-                                        !== metricId,
-                                );
-                    }
+                        removeButton
+                            .getAttribute(
+                                'data-metric-id',
+                            );
+                    state.edgeData = {
+                        ...state.edgeData,
+                        outcomes:
+                            state.edgeData
+                                .outcomes.map(
+                                    o => o.id
+                                        !== outcomeId
+                                        ? o
+                                        : {
+                                            ...o,
+                                            metrics:
+                                                o.metrics.filter(
+                                                    m => m.id !== metricId,
+                                                ),
+                                        },
+                                ),
+                    };
                     mutateEdgePage(ideaId);
                 },
             );
@@ -810,7 +875,7 @@ function bindEdgeEvents(ideaId: string) {
             try {
                 await putEdgeData(
                     ideaId,
-                    edgeData,
+                    state.edgeData,
                 );
                 showToast(
                     'Edge data saved'
@@ -850,19 +915,19 @@ export async function init(
         () => init(params),
     );
     if (!idea) return;
-    currentIdea = idea;
+    state.currentIdea = idea;
 
     const saved =
         await getEdgeDataByIdeaId(ideaId);
     if (saved && saved.outcomes.length > 0) {
-        edgeData = {
+        state.edgeData = {
             outcomes: saved.outcomes,
             impact: saved.impact,
             confidence: saved.confidence,
             owner: saved.owner,
         };
     } else {
-        edgeData = {
+        state.edgeData = {
             outcomes: [],
             impact: {
                 shortTerm: '',
