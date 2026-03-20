@@ -14,6 +14,7 @@ import { initSidebarLayout } from './layout';
 // — page modules import from '../app/core'
 export { navigateTo } from './navigation';
 export {
+    getTimeOfDay,
     initials,
     styleForScore,
     durationInDays,

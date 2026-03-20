@@ -1,4 +1,4 @@
-import { log } from './logger';
+import { showToast } from './toast';
 
 const STORAGE_KEY_THEME = 'fusion-theme';
 const STORAGE_KEY_SIDEBAR =
@@ -105,10 +105,10 @@ class AppStateManager {
                 theme,
             );
         } catch {
-            log.warn(
+            showToast(
                 'Failed to save theme'
-                + ' preference',
-                'state',
+                + ' preference.',
+                'error',
             );
         }
         this.setState({ theme });

@@ -14,6 +14,13 @@ function initials(name: string): string {
         .join('');
 }
 
+function getTimeOfDay(): string {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'morning';
+    if (hour < 18) return 'afternoon';
+    return 'evening';
+}
+
 function styleForScore(score: number): string {
     if (score >= SCORE_THRESHOLD_HIGH)
         return 'color:hsl(var(--success))';
@@ -23,6 +30,7 @@ function styleForScore(score: number): string {
 }
 
 export {
+    getTimeOfDay,
     initials,
     styleForScore,
     durationInDays,
