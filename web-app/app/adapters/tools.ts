@@ -8,8 +8,6 @@ import type {
 import { toBool } from '../../../api/types';
 import { parseJson } from './helpers';
 
-// ── Crunch ────────────────────
-
 export interface CrunchColumn {
     id: string;
     originalName: string;
@@ -42,8 +40,6 @@ export async function getCrunchColumns(
             row.acronym_expansion,
     }));
 }
-
-// ── Flow ─────────────────────
 
 export interface FlowListItem {
     id: string;
@@ -136,8 +132,6 @@ export async function getFlow(
         })),
     };
 }
-
-// ── Write Operations ─────────────────
 
 export async function putFlow(
     id: string,

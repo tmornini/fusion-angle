@@ -540,7 +540,6 @@ export async function init(): Promise<void> {
       ${buildFooter()}
     </div>`);
 
-    // Mobile menu toggle
     const toggle =
         $('#mobile-menu-toggle');
     const menu = $('#mobile-menu');
@@ -566,7 +565,6 @@ export async function init(): Promise<void> {
         );
     }
 
-    // Navigation to auth
     document
         .querySelectorAll<HTMLElement>(
             '[data-goto-auth]',

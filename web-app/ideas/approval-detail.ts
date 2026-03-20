@@ -784,7 +784,6 @@ export async function init(
         edge: ApprovalEdge,
         id: string,
     ): void {
-        // Approve
         $('#approval-approve-btn')
             ?.addEventListener(
                 'click',
@@ -806,7 +805,6 @@ export async function init(
                 },
             );
 
-        // Back
         $('#approval-back-btn')
             ?.addEventListener(
                 'click',
@@ -815,7 +813,6 @@ export async function init(
                 ),
             );
 
-        // Edit / Save / Cancel
         $('#approval-edit-btn')
             ?.addEventListener(
                 'click',
@@ -906,7 +903,6 @@ export async function init(
                 },
             );
 
-        // Reject dialog
         initDialog('approval-reject', {
             openBtnId:
                 'approval-reject-btn',
@@ -935,7 +931,6 @@ export async function init(
                 },
             );
 
-        // Clarify dialog
         initDialog('approval-clarify', {
             openBtnId:
                 'approval-clarify-btn',
@@ -955,7 +950,6 @@ export async function init(
                 },
             );
 
-        // Escape to close
         document.addEventListener(
             'keydown',
             (e) => {

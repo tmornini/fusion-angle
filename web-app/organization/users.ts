@@ -383,7 +383,6 @@ export async function init(): Promise<void> {
             </div>
         </div>`);
 
-    // Invite modal
     initDialog('invite', {
             openBtnId: 'invite-btn',
             onSubmit: () => {

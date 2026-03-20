@@ -789,7 +789,6 @@ ${posIndex === 0
         );
     }
 
-    // Global keyboard shortcut
     document.addEventListener(
         'keydown',
         (e: KeyboardEvent) => {
@@ -805,7 +804,6 @@ ${posIndex === 0
         },
     );
 
-    // Intercept desktop search input
     const searchInput = $(
         '#search-input',
     );
@@ -818,7 +816,6 @@ ${posIndex === 0
         },
     );
 
-    // Intercept mobile search toggle
     const mobileSearchToggle = $(
         '#mobile-search-toggle',
     );

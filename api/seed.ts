@@ -31,7 +31,6 @@ import type {
 export async function populateMockData(
     adapter: DbAdapter,
 ): Promise<void> {
-    // -- Users ----------------------------
     const users = [
         {
             id: '1',
@@ -337,7 +336,6 @@ export async function populateMockData(
         },
     ];
 
-    // Batch 1: Users (no foreign keys)
     await Promise.all(users.map(user =>
         adapter.users.put(user.id, {
             ...user,
@@ -654,7 +652,6 @@ export async function populateMockData(
                 + ' productivity scores up'
                 + ' 40% in first quarter',
         },
-        // Review queue ideas
         {
             id: '7',
             title: 'AI-Powered Customer'
@@ -877,8 +874,6 @@ export async function populateMockData(
         },
     ];
 
-    // Batch 2: Ideas, processes, company
-    // settings, account (reference users)
     await Promise.all([
         ...ideas.map(idea =>
             adapter.ideas.put(idea.id, idea),
@@ -956,7 +951,6 @@ export async function populateMockData(
         }),
     ]);
 
-    // -- Projects -------------------------
     const projects: ProjectEntity[] = [
         {
             id: '1',
@@ -1517,7 +1511,6 @@ export async function populateMockData(
             sort_order: 5,
             type: 'action',
         },
-        // Sales Pipeline Qualification
         {
             id: 'ps6',
             title: 'Receive inbound lead',
@@ -1606,7 +1599,6 @@ export async function populateMockData(
             sort_order: 5,
             type: 'action',
         },
-        // Bug Triage & Resolution
         {
             id: 'ps11',
             title: 'Bug reported',
@@ -1706,7 +1698,6 @@ export async function populateMockData(
             sort_order: 6,
             type: 'end',
         },
-        // Quarterly Planning
         {
             id: 'ps17',
             title:
@@ -1925,9 +1916,6 @@ export async function populateMockData(
         },
     ];
 
-    // Batch 3: Idea scores, projects,
-    // edges, activities, crunch columns,
-    // process steps
     await Promise.all([
         adapter.ideaScores.put('score-1', {
             id: 'score-1',
@@ -2099,10 +2087,6 @@ export async function populateMockData(
         },
     ];
 
-    // Batch 4: Project team, milestones,
-    // project tasks, discussions, project
-    // versions, clarifications, edge
-    // outcomes
     const teamMemberships: {
         id: string;
         project_id: string;
@@ -2603,8 +2587,6 @@ export async function populateMockData(
         }),
     ]);
 
-    // Batch 5: Edge metrics
-    // (reference edge outcomes)
     await Promise.all([
         adapter.edgeMetrics.put('em1', {
             name: 'Churn Rate Reduction',
@@ -2715,9 +2697,6 @@ export async function populateMockData(
             current: '',
         }),
     ]);
-
-    // Batch 6: Relationship entities
-    // (extracted from noun FK fields)
 
     const ideaSubmissions:
         IdeaSubmissionEntity[] = [

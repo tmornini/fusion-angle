@@ -38,8 +38,6 @@ export function parseJson<T>(value: string | T, fallback: T): T {
     return value;
 }
 
-// ── Shared Types ──────────────────
-
 export interface Metric {
     id: string;
     name: string;
@@ -47,8 +45,6 @@ export interface Metric {
     unit: string;
     current: string;
 }
-
-// ── Shared Edge Data Fetching ────────────
 
 export interface EdgeData {
     outcomes: { id: string; description: string; metrics: Metric[] }[];
@@ -151,8 +147,6 @@ export async function getEdgeDataByIdeaId(
         ),
     };
 }
-
-// ── Edge Data with Confidence ────────────
 
 export function buildDefaultEdgeData(
 ): EdgeData {

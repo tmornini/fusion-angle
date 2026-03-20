@@ -11,7 +11,6 @@ import { PAGE_REGISTRY } from './page-registry';
 const ROOT = join(dirname(new URL(import.meta.url).pathname), '..');
 const OUT = process.argv[2] || ROOT;
 
-// Derive sidebar and standalone page lists from the single registry
 const sidebarPages = Object.entries(PAGE_REGISTRY)
     .filter(([, entry]) => entry.layout === 'sidebar')
     .map(([name, entry]) => ({
@@ -29,7 +28,6 @@ const standalonePages = Object.entries(PAGE_REGISTRY)
             sourceFile: entry.sourceFile,
     }));
 
-// Component files injected into layout
 const COMPONENTS = [
     {
             placeholder: '<!-- COMPONENT_SIDEBAR -->',
@@ -52,7 +50,6 @@ const COMPONENTS = [
 function compose(): void {
     const appDir = join(ROOT, 'app');
 
-    // Phase 1: Validate all inputs exist
     const missing: string[] = [];
     const allPages = [
             ...sidebarPages,
@@ -72,7 +69,6 @@ function compose(): void {
         process.exit(1);
     }
 
-    // Phase 2: Read layout and inject components
     let layout = readFileSync(
         join(appDir, 'components-layout.html'),
         'utf-8',
@@ -82,7 +78,6 @@ function compose(): void {
         layout = layout.replace(placeholder, content);
     }
 
-    // Phase 3: Write all outputs
     let composed = 0;
     for (const { name, title, sourceDir, sourceFile } of sidebarPages) {
         const file = sourceFile || 'index';

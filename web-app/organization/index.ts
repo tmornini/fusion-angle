@@ -446,7 +446,6 @@ export async function init(): Promise<void> {
       </div>
     </div>`);
 
-    // Bind navigation
     $$('[data-nav-to]').forEach(navButton => {
         navButton.addEventListener(
             'click',

@@ -306,7 +306,6 @@ export async function init(): Promise<void> {
         ],
     ]);
 
-    // Flow indicator
     const flowEl = $('#flow-indicator');
     if (flowEl) {
         setHtml(flowEl, html`
@@ -330,7 +329,6 @@ export async function init(): Promise<void> {
       )}`);
     }
 
-    // Review queue button
     const pendingReviewCount = ideas
         .filter(idea => idea.isInReview())
         .length;
@@ -360,7 +358,6 @@ export async function init(): Promise<void> {
             );
     }
 
-    // Create button
     $('#create-idea-btn')
         ?.addEventListener(
             'click',

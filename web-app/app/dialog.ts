@@ -41,7 +41,6 @@ function initTabs(
         ),
     );
 
-    // Set up ARIA roles and attributes
     tabs.forEach(tab => {
         const tabId = tab.dataset.tab ?? '';
         const panel = document.getElementById(`tab-${tabId}`);
@@ -61,7 +60,6 @@ function initTabs(
         }
     });
 
-    // Set tablist role on parent
     const tablistParent = tabs[0]?.parentElement;
     if (tablistParent) tablistParent.setAttribute('role', 'tablist');
 

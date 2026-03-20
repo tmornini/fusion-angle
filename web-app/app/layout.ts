@@ -347,7 +347,6 @@ function initMobileDrawer(): void {
         backdrop?.classList.remove(
             'hidden',
         );
-        // Focus first focusable element
         const firstFocusable =
             sheet
                 ?.querySelector<HTMLElement>(
@@ -374,7 +373,6 @@ function initMobileDrawer(): void {
         closeDrawer,
     );
 
-    // Escape key closes drawer
     document.addEventListener(
         'keydown',
         (e) => {
@@ -390,7 +388,6 @@ function initMobileDrawer(): void {
         },
     );
 
-    // Focus trap within drawer
     sheet?.addEventListener(
         'keydown',
         (e) => {

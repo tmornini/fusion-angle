@@ -171,8 +171,6 @@ export async function init(): Promise<void> {
             iconSearch(16),
         ],
     ]);
-
-    // Stats
     const stats = {
         total: edges.length,
         complete: edges.filter(
@@ -257,7 +255,6 @@ export async function init(): Promise<void> {
       </div>`);
     }
 
-    // Empty state
     const emptyEl = $('#edge-empty');
     if (emptyEl)
         setHtml(emptyEl, html`${

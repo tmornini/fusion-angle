@@ -1,10 +1,9 @@
 #!/bin/bash
 set -euo pipefail
 
-# Type check (no emit — works on dirty tree)
 npx tsc --noEmit -p web-app/app/tsconfig.json
 
-# Check line lengths (78 char max)
+
 LONG_LINES=$(find api web-app -type f \
   \( -name '*.ts' -o -name '*.html' -o -name '*.css' \) \
   ! -path 'web-app/app/compose.ts' \

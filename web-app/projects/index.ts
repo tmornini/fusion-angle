@@ -329,8 +329,6 @@ export async function init(): Promise<void> {
         ],
     ]);
 
-    // Status badges — dynamic,
-    // only show states with count > 0
     const statusGroups = Object.groupBy(
         projects,
         p => p.status,

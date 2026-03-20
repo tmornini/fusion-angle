@@ -4,16 +4,9 @@ export interface PageEntry {
     title: string;
     layout: 'sidebar' | 'standalone';
     sourceDir?: string;
-    // basename without extension;
-    // defaults to 'index'
     sourceFile?: string;
-    // icon function name from icons.ts
-    // (used by command palette)
     icon?: IconName;
-    // extra search terms for Cmd+K
     keywords?: string;
-    // false to hide from command palette
-    // (default: true)
     searchable?: boolean;
 }
 

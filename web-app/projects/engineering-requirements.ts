@@ -543,7 +543,6 @@ export async function init(
             </div>
         </div>`);
 
-    // Event bindings
     const questionField = $textarea(
             '#requirements-question',
     );

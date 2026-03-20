@@ -116,8 +116,6 @@ function buildGauge(
         gaugeIconConfig[card.icon]
         || iconDollarSign;
 
-    // Inner arc gradient: green normally,
-    // green-to-red on overrun
     const isOverrun =
         card.hasOverrunWarning
         && card.inner.value > card.inner.max;
@@ -127,8 +125,6 @@ function buildGauge(
         ? 'red'
         : 'hsl(var(--success))';
 
-    // Flash animation on extreme
-    // overrun (>1.5x)
     let innerArcFlashStyle = '';
     if (
         card.hasOverrunWarning

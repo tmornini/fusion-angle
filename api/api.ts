@@ -39,8 +39,6 @@ export function getDbAdapter(): DbAdapter {
     return apiModule.get();
 }
 
-// ── Route Registry ─────────────────
-
 type GetHandler = (
     adapter: DbAdapter,
     params: string[],
@@ -101,7 +99,6 @@ function param(
 }
 
 const routes: Route[] = [
-    // ── Collections ────────────────
     route('users', {
         get: (db) => db.users.getAll(),
     }),
@@ -237,7 +234,6 @@ const routes: Route[] = [
                 .getAll(),
     }),
 
-    // ── Singletons ─────────────────
     route('company-settings', {
         get: (db) =>
             db.companySettings.get(),
@@ -254,7 +250,6 @@ const routes: Route[] = [
             db.users.getById('current'),
     }),
 
-    // ── Items by ID ─────────────────
     route('users/:id', {
         get: (db, p) =>
             db.users.getById(param(p, 0)),
@@ -534,7 +529,6 @@ const routes: Route[] = [
                     ),
         },
     ),
-    // ── Nested: idea children ─────────────
     route('ideas/:ideaId/edge', {
         get: async (db, p) => {
             const ideaId = param(p, 0);
@@ -601,7 +595,6 @@ const routes: Route[] = [
         },
     }),
 
-    // ── Nested: project children (GET) ────
     route('projects/:projectId/team', {
         get: async (db, p) => {
             const pid = param(p, 0);
@@ -826,7 +819,6 @@ const routes: Route[] = [
         },
     ),
 
-    // ── Nested: project children (PUT) ────
     route(
         'projects/:projectId/team/:userId',
         {
@@ -1055,7 +1047,6 @@ const routes: Route[] = [
         },
     ),
 
-    // ── Nested: edge children ─────────────
     route('edges/:edgeId/outcomes', {
         get: async (db, p) => {
             const edgeId = param(p, 0);
@@ -1176,7 +1167,6 @@ const routes: Route[] = [
         },
     ),
 
-    // ── Snapshots ──────────────────
     route('snapshots/schema', {
         get: async (db) =>
             (await db.hasSchema())
@@ -1211,8 +1201,6 @@ const routes: Route[] = [
         },
     }),
 ];
-
-// ── Route Matching ─────────────────
 
 function matchRoute(
     pathSegments: string[],
@@ -1262,8 +1250,6 @@ function matchRoute(
 }
 
 const BASE_URL = 'http://localhost';
-
-// ── Request / Response Dispatch ─────────────
 
 export async function handleRequest(
     request: Request,
@@ -1413,8 +1399,6 @@ export async function handleRequest(
         );
     }
 }
-
-// ── GET / PUT / DELETE / POST ─────────
 
 async function unwrapResponse<T>(
     response: Response,

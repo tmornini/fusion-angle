@@ -10,8 +10,6 @@ import {
 } from './navigation';
 import { initSidebarLayout } from './layout';
 
-// Re-export for backward compatibility
-// — page modules import from '../app/core'
 export { navigateTo } from './navigation';
 export {
     getTimeOfDay,
@@ -65,7 +63,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     applyTheme();
     initPrefetch();
 
-    // Initialize database before any page modules
     try {
         const { createLocalStorageAdapter } =
             await import('../../api/db-localstorage');
@@ -75,8 +72,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         await adapter.initialize();
         initApi(adapter);
 
-        // If no schema exists, redirect to snapshots
-        // so user can choose what to load
         const snapshot = await GET<string | null>('snapshots/schema');
         if (snapshot === null) {
             const page = getPageName();
@@ -120,12 +115,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const pageName = getPageName();
 
-    // For pages with sidebar layout, init layout behavior
     if (document.querySelector('.sidebar-layout')) {
         await initSidebarLayout();
     }
 
-    // Init command palette (works on all pages)
     import('./command-palette')
         .then(m => m.initCommandPalette())
         .catch(err => log.error(
@@ -134,7 +127,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             err,
         ));
 
-    // Load and init the page module
     const loader = pageModules[pageName];
     if (!loader) {
         navigateTo('not-found');

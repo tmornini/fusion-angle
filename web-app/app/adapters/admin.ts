@@ -17,8 +17,6 @@ import {
 
 const RECENT_ACTIVITY_COUNT = 3;
 
-// ── Account ────────────────────
-
 export interface Account {
     company: {
         name: string;
@@ -172,8 +170,6 @@ export async function getAccount(
     };
 }
 
-// ── Profile ────────────────────
-
 export interface Profile {
     firstName: string;
     lastName: string;
@@ -219,8 +215,6 @@ export async function getProfile(
     };
 }
 
-// ── Company Settings ─────────────────
-
 export interface CompanySettings {
     name: string;
     domain: string;
@@ -260,8 +254,6 @@ export async function getCompanySettings(
         dataRetention: row.data_retention,
     };
 }
-
-// ── Activity Feed ──────────────────
 
 export { Activity } from '../../../api/types';
 

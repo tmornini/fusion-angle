@@ -47,8 +47,6 @@ export async function getIdeas(
         ));
 }
 
-// ── Idea Detail ──────────────────
-
 export async function getIdeaDetail(
     ideaId: string,
 ): Promise<Idea> {
@@ -73,8 +71,6 @@ export async function getIdeaDetail(
         ),
     );
 }
-
-// ── Idea Review Queue ────────────────
 
 export async function getReviewQueue(
 ): Promise<Idea[]> {
@@ -103,8 +99,6 @@ export async function getReviewQueue(
             ),
         ));
 }
-
-// ── Idea Convert ──────────────────
 
 export interface ConversionIdea {
     id: string;
@@ -149,8 +143,6 @@ export async function getIdeaForConversion(
             scoreRow?.estimated_cost ?? '',
     };
 }
-
-// ── Approval Detail ─────────────────
 
 export interface ApprovalIdea {
     id: string;
@@ -264,8 +256,6 @@ export async function getEdgeForApproval(
 ): Promise<ApprovalEdge> {
     return getEdgeDataWithConfidence(ideaId);
 }
-
-// ── Write Operations ─────────────────
 
 export async function getIdea(
     id: string,

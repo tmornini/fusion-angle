@@ -514,7 +514,6 @@ function bindIdeaEvents(
             },
         );
 
-    // Contextual action buttons
     $('#idea-edge-btn')
         ?.addEventListener(
             'click',

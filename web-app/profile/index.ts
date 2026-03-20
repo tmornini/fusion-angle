@@ -118,7 +118,6 @@ export async function init(): Promise<void> {
         ],
     ]);
 
-    // Fill form values
     const avatarInitials = $(
         '#profile-avatar-initials',
     );
@@ -162,8 +161,6 @@ export async function init(): Promise<void> {
     if (bio) {
         bio.value = profile.bio;
     }
-
-    // Strengths
     const strengthsContainer = $(
         '#profile-strengths',
     );
@@ -221,7 +218,6 @@ export async function init(): Promise<void> {
             });
     }
 
-    // Save button
     $(
         '#profile-save-btn',
     )?.addEventListener('click', () => {

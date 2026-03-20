@@ -54,9 +54,6 @@ export function computePriority(
 
 export type StoredBoolean = 0 | 1;
 
-/** Convert 0/1/boolean to boolean.
- *  Handles localStorage int vs JSON bool.
- */
 export function toBool(
     value: unknown,
 ): boolean {
@@ -164,16 +161,8 @@ export function formatCompactCurrency(
     return `$${value}`;
 }
 
-/**
- * Returns current UTC time as RFC-3339 Zulu
- * with 6-digit fractional seconds.
- */
 export function nowUtc(): string {
     const iso = new Date().toISOString();
-    // toISOString gives 3 decimal places;
-    // pad to 6 for RFC-3339 format compliance
-    // (true microsecond precision is
-    // unavailable in the JS runtime)
     return iso.replace(
         /\.(\d{3})Z$/,
         '.$1000Z',
@@ -1471,8 +1460,6 @@ export class Activity {
             + ` ${this.target}`;
     }
 }
-
-// ── Entity Predicates ────────────────
 
 export function ideaIsNotDeleted(
     e: IdeaEntity,

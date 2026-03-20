@@ -359,7 +359,6 @@ export const TABLE_NAMES = [
 
 export async function createLocalStorageAdapter(
 ): Promise<DbAdapter> {
-    // Migrate account_config → account
     const oldAccountKey =
         KEY_PREFIX + 'account_config';
     const newAccountKey =
@@ -397,17 +396,12 @@ export async function createLocalStorageAdapter(
 
     const adapter: DbAdapter = {
         async initialize(): Promise<void> {
-            // No schema needed — tables
-            // auto-create on first write
         },
 
         async close(): Promise<void> {
-            // No cleanup needed — writes
-            // are immediate
         },
 
         async flush(): Promise<void> {
-            // No-op — writes are immediate
         },
 
         async deleteSchema(): Promise<void> {
@@ -487,8 +481,6 @@ export async function createLocalStorageAdapter(
                 string,
                 unknown
             >;
-            // Pre-serialize all table data
-            // before any destructive operation
             const serialized = new Map<
                 string,
                 string
@@ -518,9 +510,6 @@ export async function createLocalStorageAdapter(
                 );
             }
 
-            // Now perform the swap — all
-            // serialization is done, so
-            // failures here are minimized
             for (
                 const table of TABLE_NAMES
             ) {

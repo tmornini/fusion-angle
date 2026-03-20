@@ -478,7 +478,6 @@ export async function init(): Promise<void> {
         ],
     ]);
 
-    // Summary
     const summaryEl = $('#team-summary');
     if (summaryEl) {
         const word =
@@ -491,7 +490,6 @@ export async function init(): Promise<void> {
             + ' and availability';
     }
 
-    // Detail placeholder
     const placeholderEl =
         $('#team-detail-placeholder');
     if (placeholderEl) {
@@ -506,12 +504,10 @@ export async function init(): Promise<void> {
           </p>`);
     }
 
-    // Search
     $('#team-search')?.addEventListener(
         'input', mutateList,
     );
 
-    // Add member dialog
     initDialog('add-member', {
         openBtnId: 'team-add-btn',
     });

@@ -1168,14 +1168,12 @@ function bindProjectEvents(
     project: ProjectDetail,
     projectId: string,
 ): void {
-    // Back
     $('#project-back-btn')
         ?.addEventListener(
                 'click',
                 () => navigateTo('projects'),
         );
 
-    // Edit / Save / Cancel
     $('#project-edit-btn')
         ?.addEventListener('click', () => {
             state.isEditing = true;
@@ -1266,7 +1264,6 @@ function bindProjectEvents(
         }
     });
 
-    // Engineering nav
     $$('[data-navigate-to-engineering]')
         .forEach(el => {
             el.addEventListener('click', (e) => {
@@ -1278,10 +1275,8 @@ function bindProjectEvents(
             });
         });
 
-    // Tabs
     initTabs('.tab[data-tab]', '.tab-panel');
 
-    // Comment box
     const comment = $textarea(
             '#project-discussion-comment',
     );

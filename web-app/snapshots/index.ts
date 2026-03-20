@@ -254,11 +254,8 @@ export async function init(): Promise<void> {
     </div>
   `);
 
-    // Show empty-state banner
-    // if DB has no data
     await updateEmptyBanner(root);
 
-    // Create Pristine Environment
     const wipeBtn =
         document.querySelector<
             HTMLButtonElement
@@ -284,7 +281,6 @@ export async function init(): Promise<void> {
         );
     }
 
-    // Wipe and load mock data
     const reloadBtn =
         document.querySelector<
             HTMLButtonElement
@@ -304,7 +300,6 @@ export async function init(): Promise<void> {
         );
     }
 
-    // Upload snapshot
     const importInput =
         document.querySelector<
             HTMLInputElement
@@ -333,7 +328,6 @@ export async function init(): Promise<void> {
         },
     );
 
-    // Download snapshot
     $('#download-btn')?.addEventListener(
         'click',
         async () => {

@@ -348,7 +348,6 @@ export async function init(): Promise<void> {
         $('#auth-subtitle');
     const submitBtn = $('#submit-btn');
 
-    // Desktop branding visibility
     const branding = $('#auth-branding');
     if (
         branding

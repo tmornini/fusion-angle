@@ -62,8 +62,6 @@ export async function getTeamMembers(
         });
 }
 
-// ── Manage Users ──────────────────
-
 export type UserRole =
     | 'admin'
     | 'manager'

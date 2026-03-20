@@ -120,8 +120,6 @@ export async function init(): Promise<void> {
             iconSearch(16),
         ],
     ]);
-
-    // Stats
     const totalSteps = flows.reduce(
         (sum, flow) =>
             sum + flow.stepsCount,
@@ -209,7 +207,6 @@ export async function init(): Promise<void> {
       </div>`);
     }
 
-    // Populate department filter
     const filterEl = $select(
         '#flow-department-filter',
     );
@@ -228,7 +225,6 @@ export async function init(): Promise<void> {
         }
     }
 
-    // Empty state
     const emptyEl = $('#flow-empty');
     if (emptyEl) {
         setHtml(

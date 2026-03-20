@@ -288,7 +288,6 @@ export async function init(): Promise<void> {
       </div>
     </div>`);
 
-    // Switch toggles
     document
         .querySelectorAll<HTMLElement>(
             '.switch[role="switch"]',
@@ -310,7 +309,6 @@ export async function init(): Promise<void> {
             );
         });
 
-    // Save
     $(
         '#company-settings-save-btn',
     )?.addEventListener('click', () => {

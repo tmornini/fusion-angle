@@ -59,8 +59,6 @@ export async function getIdeaForEdge(
     };
 }
 
-// ── Edge List ───────────────────
-
 export interface EdgeListItem {
     id: string;
     ideaId: string;
@@ -218,8 +216,6 @@ export async function getEdgeList(
         };
     });
 }
-
-// ── Write Operations ─────────────────
 
 export async function putEdgeData(
     ideaId: string,

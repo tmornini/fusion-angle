@@ -13,10 +13,9 @@ echo "Building Fusion AI..."
 BUILD_DIR=$(mktemp -d)
 trap 'rm -rf "$BUILD_DIR"' EXIT
 
-# Compose HTML pages into build dir (dashboard + standalone)
 npx tsx web-app/app/compose.ts "$BUILD_DIR"
 
-# Bundle TypeScript into build dir
+
 mkdir -p "$BUILD_DIR/assets"
 npx esbuild web-app/app/core.ts \
   --bundle \
@@ -29,7 +28,6 @@ npx esbuild web-app/app/core.ts \
 [ -s "$BUILD_DIR/assets/app.js" ] || { echo "ERROR: app.js is empty or missing" >&2; exit 1; }
 echo "Bundle created: assets/app.js ($(wc -c < "$BUILD_DIR/assets/app.js" | xargs) bytes)"
 
-# Bundle and minify CSS — concatenate in cascade order, minify via esbuild
 cat web-app/app/styles/fonts.css \
     web-app/app/styles/tokens.css \
     web-app/app/styles/dark-mode.css \
@@ -48,7 +46,6 @@ cp web-app/assets/*.woff2 "$BUILD_DIR/assets/"
 cp web-app/index.html "$BUILD_DIR/"
 cp web-app/assets/favicon.ico "$BUILD_DIR/assets/"
 
-# Create distribution ZIP on Desktop
 SHA=$(git rev-parse --short=7 HEAD)
 ZIPNAME="fusion-ai-${SHA}.zip"
 

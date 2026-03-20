@@ -1378,10 +1378,6 @@ function iconHistory(size = 16, cssClass = '') {
     );
 }
 
-// Auto-generated icons map for lookup by
-// kebab-case name.
-// Converts "iconFolderKanban" ->
-// "folder-kanban" etc.
 const _allIcons = [
     iconSparkles,
     iconHome,
