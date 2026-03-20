@@ -53,93 +53,121 @@ const emptyFormData = {
     successMetrics: '',
 };
 
-const state = {
-    currentStep: 1,
-    formData: { ...emptyFormData },
-};
-
-function isStepComplete(): boolean {
-    switch (state.currentStep) {
-        case 1:
-            return !!(
-                state.formData.title
-                    .trim()
-                && state.formData
-                    .problemStatement
-                    .trim()
-            );
-        case 2:
-            return !!state.formData
-                .proposedSolution.trim();
-        case 3:
-            return !!state.formData
-                .expectedOutcome.trim();
-        default:
-            return false;
-    }
+interface State {
+    currentStep: number;
+    formData: typeof emptyFormData;
 }
 
-function buildProgressSteps(): SafeHtml {
-    return html`${steps.map(
-        (step, index) => {
-            const isCurrent =
-                state.currentStep === step.id;
-            const isCompleted =
-                state.currentStep > step.id;
-            const bgStyle = isCompleted
-                ? 'background:'
-                    + 'hsl(var(--success));'
-                    + 'color:hsl(var('
-                    + '--success'
-                    + '-foreground))'
-                : isCurrent
-                    ? 'background:'
-                        + 'hsl(var('
-                        + '--primary));'
-                        + 'color:hsl(var('
-                        + '--primary'
-                        + '-foreground))'
-                    : 'background:'
-                        + 'hsl(var('
-                        + '--muted));'
-                        + 'color:hsl(var('
-                        + '--muted'
-                        + '-foreground))';
+export async function init():
+    Promise<void> {
+    const state: State = {
+        currentStep: 1,
+        formData: { ...emptyFormData },
+    };
 
-            const isLast =
-                index >= steps.length - 1;
-            const connector = !isLast
-                ? html`<div
-                    class="hidden-mobile"
-                    style=${'flex:1;'
-                        + 'height:0.25rem;'
-                        + 'margin:0 1rem;'
-                        + 'border-radius:'
-                        + '9999px;'
-                        + (isCompleted
+    function isStepComplete(): boolean {
+        switch (state.currentStep) {
+            case 1:
+                return !!(
+                    state.formData.title
+                        .trim()
+                    && state.formData
+                        .problemStatement
+                        .trim()
+                );
+            case 2:
+                return !!state.formData
+                    .proposedSolution
+                    .trim();
+            case 3:
+                return !!state.formData
+                    .expectedOutcome
+                    .trim();
+            default:
+                return false;
+        }
+    }
+
+    function buildProgressSteps():
+        SafeHtml {
+        return html`${steps.map(
+            (step, index) => {
+                const isCurrent =
+                    state.currentStep
+                    === step.id;
+                const isCompleted =
+                    state.currentStep
+                    > step.id;
+                const bgStyle =
+                    isCompleted
+                        ? 'background:'
+                            + 'hsl(var('
+                            + '--success));'
+                            + 'color:hsl(var('
+                            + '--success'
+                            + '-foreground))'
+                        : isCurrent
                             ? 'background:'
                                 + 'hsl(var('
-                                + '--success))'
+                                + '--primary'
+                                + '));'
+                                + 'color:'
+                                + 'hsl(var('
+                                + '--primary'
+                                + '-foreground'
+                                + '))'
                             : 'background:'
                                 + 'hsl(var('
-                                + '--muted))'
-                        )}>
-                  </div>`
-                : html``;
+                                + '--muted));'
+                                + 'color:'
+                                + 'hsl(var('
+                                + '--muted'
+                                + '-foreground'
+                                + '))';
 
-            return html`
+                const isLast =
+                    index
+                    >= steps.length - 1;
+                const connector = !isLast
+                    ? html`<div
+                        class="hidden-mobile"
+                        style=${'flex:1;'
+                            + 'height:'
+                            + '0.25rem;'
+                            + 'margin:'
+                            + '0 1rem;'
+                            + 'border-radius:'
+                            + '9999px;'
+                            + (isCompleted
+                                ? 'background'
+                                    + ':hsl(var('
+                                    + '--success'
+                                    + '))'
+                                : 'background'
+                                    + ':hsl(var('
+                                    + '--muted'
+                                    + '))'
+                            )}>
+                      </div>`
+                    : html``;
+
+                return html`
       <div
         class="flex items-center"
         style=${'flex-shrink:0'
-            + (isLast ? '' : ';flex:1')}>
+            + (isLast
+                ? ''
+                : ';flex:1')}>
         <div class="flex flex-col
           items-center">
           <div style=${'width:3rem;'
               + 'height:3rem;'
-              + 'border-radius:0.75rem;'
+              + 'border-radius:'
+              + '0.75rem;'
               + 'display:flex;'
               + 'align-items:center;'
-              + 'justify-content:center;'
+              + 'justify-content:'
+              + 'center;'
               + bgStyle}>
             ${isCompleted
                 ? iconCheck(20)
@@ -148,26 +176,31 @@ function buildProgressSteps(): SafeHtml {
           <span
             class="mt-2 text-sm
               font-medium"
-            style=${'white-space:nowrap;'
+            style=${'white-space:'
+                + 'nowrap;'
                 + 'color:'
-                + (state.currentStep >= step.id
+                + (state.currentStep
+                    >= step.id
                     ? 'hsl(var('
-                        + '--foreground))'
+                        + '--foreground'
+                        + '))'
                     : 'hsl(var('
                         + '--muted'
-                        + '-foreground))')}>
+                        + '-foreground'
+                        + '))')}>
             ${step.title}
           </span>
         </div>
         ${connector}
       </div>`;
-        },
-    )}`;
-}
+            },
+        )}`;
+    }
 
-function buildStepContent(): SafeHtml {
-    if (state.currentStep === 1) {
-        return html`
+    function buildStepContent():
+        SafeHtml {
+        if (state.currentStep === 1) {
+            return html`
       <div style=${'display:flex;'
           + 'flex-direction:column;'
           + 'gap:1.5rem'}>
@@ -182,7 +215,9 @@ function buildStepContent(): SafeHtml {
             placeholder=${'e.g.,'
                 + ' AI-Powered Customer'
                 + ' Segmentation'}
-            value="${state.formData.title}"
+            value="${
+                state.formData.title
+            }"
             style=${'font-size:1.125rem;'
                 + 'padding:0.75rem 1rem'}
           />
@@ -210,7 +245,8 @@ function buildStepContent(): SafeHtml {
                 + ' solving it?'}
             rows="5"
             style="resize:none">${
-              state.formData.problemStatement
+              state.formData
+                  .problemStatement
           }</textarea>
           <p class="text-xs text-muted
             mt-1">
@@ -237,13 +273,14 @@ function buildStepContent(): SafeHtml {
                 + ' customers, operations'
                 + ' managers'}
             value="${
-                state.formData.targetUsers
+                state.formData
+                    .targetUsers
             }" />
         </div>
       </div>`;
-    }
-    if (state.currentStep === 2) {
-        return html`
+        }
+        if (state.currentStep === 2) {
+            return html`
       <div style=${'display:flex;'
           + 'flex-direction:column;'
           + 'gap:1.5rem'}>
@@ -263,7 +300,8 @@ function buildStepContent(): SafeHtml {
                 + ' you use?'}
             rows="7"
             style="resize:none">${
-              state.formData.proposedSolution
+              state.formData
+                  .proposedSolution
           }</textarea>
           <p class="text-xs text-muted
             mt-1">
@@ -302,8 +340,8 @@ function buildStepContent(): SafeHtml {
           </div>
         </div>
       </div>`;
-    }
-    return html`
+        }
+        return html`
     <div style=${'display:flex;'
         + 'flex-direction:column;'
         + 'gap:1.5rem'}>
@@ -324,7 +362,8 @@ function buildStepContent(): SafeHtml {
               + ' improved...'}
           rows="5"
           style="resize:none">${
-            state.formData.expectedOutcome
+            state.formData
+                .expectedOutcome
         }</textarea>
         <p class="text-xs text-muted
           mt-1">
@@ -353,7 +392,8 @@ function buildStepContent(): SafeHtml {
               + ' of 10 points'}
           rows="4"
           style="resize:none">${
-            state.formData.successMetrics
+            state.formData
+                .successMetrics
         }</textarea>
       </div>
       <div class="p-4 rounded-xl"
@@ -374,7 +414,8 @@ function buildStepContent(): SafeHtml {
               font-medium mb-1">
               Next: Convert to Project
             </p>
-            <p class="text-sm text-muted">
+            <p class="text-sm
+              text-muted">
               After submitting, you can
               convert this idea into a
               project with timeline,
@@ -384,12 +425,15 @@ function buildStepContent(): SafeHtml {
         </div>
       </div>
     </div>`;
-}
+    }
 
-function buildWizardPage(): SafeHtml {
-    const step =
-        steps[state.currentStep - 1]!;
-    return html`
+    function buildWizardPage():
+        SafeHtml {
+        const step =
+            steps[
+                state.currentStep - 1
+            ]!;
+        return html`
     <div style=${'min-height:100vh;'
         + 'background:'
         + 'hsl(var(--background))'}>
@@ -424,15 +468,19 @@ function buildWizardPage(): SafeHtml {
                     rounded-lg flex
                     items-center
                     justify-center"
-                  style=${'width:2.25rem;'
-                      + 'height:2.25rem;'
+                  style=${'width:'
+                      + '2.25rem;'
+                      + 'height:'
+                      + '2.25rem;'
                       + 'color:hsl(var('
                       + '--primary'
-                      + '-foreground))'}>
+                      + '-foreground'
+                      + '))'}>
                   ${iconSparkles(20)}
                 </div>
                 <span class="text-xl
-                  font-display font-bold">
+                  font-display
+                  font-bold">
                   New Idea
                 </span>
               </div>
@@ -461,7 +509,8 @@ function buildWizardPage(): SafeHtml {
           class="flex items-center
             justify-between mb-8"
           style=${'overflow-x:auto;'
-              + 'padding-bottom:0.5rem'}>
+              + 'padding-bottom:'
+              + '0.5rem'}>
           ${buildProgressSteps()}
         </div>
         <div class="card p-6"
@@ -484,7 +533,8 @@ function buildWizardPage(): SafeHtml {
               mt-8 pt-6"
             style=${'border-top:'
                 + '1px solid'
-                + ' hsl(var(--border))'}>
+                + ' hsl(var('
+                + '--border))'}>
             <button
               class="btn btn-ghost
                 gap-2"
@@ -497,7 +547,8 @@ function buildWizardPage(): SafeHtml {
             </button>
             <span class="text-sm
               text-muted">
-              Step ${state.currentStep}
+              Step
+              ${state.currentStep}
               of ${steps.length}
             </span>
             <button
@@ -520,181 +571,220 @@ function buildWizardPage(): SafeHtml {
         </div>
       </div>
     </div>`;
-}
-
-function mutateWizard() {
-    const root = $('#page-root');
-    if (root) {
-        setHtml(
-            root,
-            buildWizardPage(),
-        );
-        bindWizardEvents();
     }
-}
 
-function syncFormFields() {
-    if (state.currentStep === 1) {
-        state.formData = {
-            ...state.formData,
-            title:
-                $input(
-                    '#idea-create'
-                    + '-field-title',
-                )?.value ?? '',
-            problemStatement:
-                $textarea(
-                    '#idea-create'
-                    + '-field-problem',
-                )?.value ?? '',
-            targetUsers:
-                $input(
-                    '#idea-create'
-                    + '-field-target',
-                )?.value ?? '',
-        };
-    } else if (state.currentStep === 2) {
-        state.formData = {
-            ...state.formData,
-            proposedSolution:
-                $textarea(
-                    '#idea-create'
-                    + '-field-solution',
-                )?.value ?? '',
-        };
-    } else if (state.currentStep === 3) {
-        state.formData = {
-            ...state.formData,
-            expectedOutcome:
-                $textarea(
-                    '#idea-create'
-                    + '-field-outcome',
-                )?.value ?? '',
-            successMetrics:
-                $textarea(
-                    '#idea-create'
-                    + '-field-metrics',
-                )?.value ?? '',
-        };
-    }
-}
-
-function bindWizardEvents() {
-    const goBack = () => {
-        if (state.currentStep > 1) {
-            syncFormFields();
-            state.currentStep =
-                state.currentStep - 1;
-            mutateWizard();
-        } else {
-            navigateTo('ideas');
+    function mutateWizard() {
+        const root = $('#page-root');
+        if (root) {
+            setHtml(
+                root,
+                buildWizardPage(),
+            );
+            bindWizardEvents();
         }
-    };
+    }
 
-    $('#idea-create-back-btn')
-        ?.addEventListener(
-            'click',
-            goBack,
-        );
-    $('#idea-create-step-back')
-        ?.addEventListener(
-            'click',
-            goBack,
-        );
-
-    $('#idea-create-step-next')
-        ?.addEventListener(
-            'click',
-            async () => {
-                syncFormFields();
-                if (!isStepComplete()) {
-                    return;
-                }
-                if (state.currentStep < 3) {
-                    state.currentStep =
-                        state.currentStep + 1;
-                    mutateWizard();
-                } else {
-                    const ideaId =
-                        crypto.randomUUID();
-                    const fd = state.formData;
-                    await putIdea(ideaId, {
-                        title: fd.title,
-                        problem_statement:
-                            fd
-                            .problemStatement,
-                        proposed_solution:
-                            fd
-                            .proposedSolution,
-                        expected_outcome:
-                            fd
-                            .expectedOutcome,
-                        success_metrics:
-                            fd
-                            .successMetrics,
-                        description:
-                            fd.targetUsers,
-                        status: 'active',
-                        score: 0,
-                        estimated_impact:
-                            0,
-                        estimated_duration:
-                            0,
-                        estimated_cost: 0,
-                        priority: 0,
-                        edge_status:
-                            'missing',
-                        category: '',
-                        readiness: '',
-                        waiting_days: 0,
-                        impact_label: '',
-                        effort_label: '',
-                        submitted_at:
-                            nowUtc(),
-                    });
-                    await putIdeaSubmission(
-                        ideaId,
-                        '1',
-                    );
-                    navigateTo('ideas');
-                }
-            },
-        );
-
-    const selector =
-        '#idea-create-step-content'
-        + ' input,'
-        + ' #idea-create-step-content'
-        + ' textarea';
-    document
-        .querySelectorAll<
-            HTMLInputElement
-            | HTMLTextAreaElement
-        >(selector)
-        .forEach(field => {
-            field.addEventListener(
-                'input',
-                () => {
-                    syncFormFields();
-                    const nextBtn = $(
+    function syncFormFields() {
+        if (state.currentStep === 1) {
+            state.formData = {
+                ...state.formData,
+                title:
+                    $input(
                         '#idea-create'
-                        + '-step-next',
-                    );
+                        + '-field-title',
+                    )?.value ?? '',
+                problemStatement:
+                    $textarea(
+                        '#idea-create'
+                        + '-field'
+                        + '-problem',
+                    )?.value ?? '',
+                targetUsers:
+                    $input(
+                        '#idea-create'
+                        + '-field'
+                        + '-target',
+                    )?.value ?? '',
+            };
+        } else if (
+            state.currentStep === 2
+        ) {
+            state.formData = {
+                ...state.formData,
+                proposedSolution:
+                    $textarea(
+                        '#idea-create'
+                        + '-field'
+                        + '-solution',
+                    )?.value ?? '',
+            };
+        } else if (
+            state.currentStep === 3
+        ) {
+            state.formData = {
+                ...state.formData,
+                expectedOutcome:
+                    $textarea(
+                        '#idea-create'
+                        + '-field'
+                        + '-outcome',
+                    )?.value ?? '',
+                successMetrics:
+                    $textarea(
+                        '#idea-create'
+                        + '-field'
+                        + '-metrics',
+                    )?.value ?? '',
+            };
+        }
+    }
+
+    function bindWizardEvents() {
+        const goBack = () => {
+            if (state.currentStep > 1) {
+                syncFormFields();
+                state.currentStep =
+                    state.currentStep
+                    - 1;
+                mutateWizard();
+            } else {
+                navigateTo('ideas');
+            }
+        };
+
+        $('#idea-create-back-btn')
+            ?.addEventListener(
+                'click',
+                goBack,
+            );
+        $('#idea-create-step-back')
+            ?.addEventListener(
+                'click',
+                goBack,
+            );
+
+        $('#idea-create-step-next')
+            ?.addEventListener(
+                'click',
+                async () => {
+                    syncFormFields();
                     if (
-                        nextBtn instanceof
-                            HTMLButtonElement
+                        !isStepComplete()
                     ) {
-                        nextBtn.disabled =
-                            !isStepComplete();
+                        return;
+                    }
+                    if (
+                        state.currentStep
+                        < 3
+                    ) {
+                        state.currentStep =
+                            state
+                            .currentStep
+                            + 1;
+                        mutateWizard();
+                    } else {
+                        const ideaId =
+                            crypto
+                            .randomUUID();
+                        const fd =
+                            state
+                            .formData;
+                        await putIdea(
+                            ideaId,
+                            {
+                                title:
+                                    fd
+                                    .title,
+                                problem_statement:
+                                    fd
+                                    .problemStatement,
+                                proposed_solution:
+                                    fd
+                                    .proposedSolution,
+                                expected_outcome:
+                                    fd
+                                    .expectedOutcome,
+                                success_metrics:
+                                    fd
+                                    .successMetrics,
+                                description:
+                                    fd
+                                    .targetUsers,
+                                status:
+                                    'active',
+                                score: 0,
+                                estimated_impact:
+                                    0,
+                                estimated_duration:
+                                    0,
+                                estimated_cost:
+                                    0,
+                                priority:
+                                    0,
+                                edge_status:
+                                    'missing',
+                                category:
+                                    '',
+                                readiness:
+                                    '',
+                                waiting_days:
+                                    0,
+                                impact_label:
+                                    '',
+                                effort_label:
+                                    '',
+                                submitted_at:
+                                    nowUtc(),
+                            },
+                        );
+                        await putIdeaSubmission(
+                            ideaId,
+                            '1',
+                        );
+                        navigateTo(
+                            'ideas',
+                        );
                     }
                 },
             );
-        });
-}
 
-export async function init():
-    Promise<void> {
-    state.currentStep = 1;
-    state.formData = { ...emptyFormData };
+        const selector =
+            '#idea-create'
+            + '-step-content'
+            + ' input,'
+            + ' #idea-create'
+            + '-step-content'
+            + ' textarea';
+        document
+            .querySelectorAll<
+                HTMLInputElement
+                | HTMLTextAreaElement
+            >(selector)
+            .forEach(field => {
+                field.addEventListener(
+                    'input',
+                    () => {
+                        syncFormFields();
+                        const nextBtn =
+                            $(
+                                '#idea'
+                                + '-create'
+                                + '-step'
+                                + '-next',
+                            );
+                        if (
+                            nextBtn
+                            instanceof
+                            HTMLButtonElement
+                        ) {
+                            nextBtn
+                            .disabled =
+                                !isStepComplete();
+                        }
+                    },
+                );
+            });
+    }
+
     mutateWizard();
 }

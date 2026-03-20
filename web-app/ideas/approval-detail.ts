@@ -30,10 +30,6 @@ import {
     type Metric,
 } from '../app/adapters';
 
-const state = {
-    isEditingIdea: false,
-};
-
 const severityConfig:
     Record<string, string> = {
         high: 'badge-error',
@@ -41,11 +37,24 @@ const severityConfig:
         low: 'badge-default',
     };
 
-function buildApprovalPage(
-    idea: ApprovalIdea,
-    edge: ApprovalEdge,
-): SafeHtml {
-    return html`
+export async function init(
+    params?: Record<string, string>,
+): Promise<void> {
+    const id = params?.['id'];
+    if (!id) {
+        navigateTo('idea-review-queue');
+        return;
+    }
+
+    const state = {
+        isEditingIdea: false,
+    };
+
+    function buildApprovalPage(
+        idea: ApprovalIdea,
+        edge: ApprovalEdge,
+    ): SafeHtml {
+        return html`
     <div style=${'min-height:100vh;'
         + 'background:'
         + 'hsl(var(--background))'}>
@@ -768,208 +777,217 @@ function buildApprovalPage(
         </div>
       </div>
     </div>`;
-}
+    }
 
-function bindApprovalEvents(
-    idea: ApprovalIdea,
-    edge: ApprovalEdge,
-    id: string,
-): void {
-    // Approve
-    $('#approval-approve-btn')
-        ?.addEventListener(
-            'click',
-            async () => {
-                const existingIdea =
-                    await getIdea(id);
-                await putIdea(id, {
-                    ...existingIdea,
-                    status: 'approved',
-                });
-                showToast(
-                    'Idea approved'
-                    + ' successfully',
-                    'success',
-                );
-                navigateTo(
-                    'idea-review-queue',
-                );
-            },
-        );
-
-    // Back
-    $('#approval-back-btn')
-        ?.addEventListener(
-            'click',
-            () => navigateTo(
-                'idea-review-queue',
-            ),
-        );
-
-    // Edit / Save / Cancel
-    $('#approval-edit-btn')
-        ?.addEventListener(
-            'click',
-            () => {
-                state.isEditingIdea = true;
-                mutateApprovalPage(
-                    idea,
-                    edge,
-                    id,
-                );
-            },
-        );
-
-    $('#approval-cancel-edit-btn')
-        ?.addEventListener(
-            'click',
-            () => {
-                state.isEditingIdea = false;
-                mutateApprovalPage(
-                    idea,
-                    edge,
-                    id,
-                );
-            },
-        );
-
-    $('#approval-save-edit-btn')
-        ?.addEventListener(
-            'click',
-            async () => {
-                const titleEl = $input(
-                    '#approval-edit-title',
-                );
-                const descEl = $textarea(
-                    '#approval-edit'
-                    + '-description',
-                );
-                const title =
-                    titleEl?.value
-                    ?? idea.title;
-                const description =
-                    descEl?.value
-                    ?? idea.description;
-                try {
+    function bindApprovalEvents(
+        idea: ApprovalIdea,
+        edge: ApprovalEdge,
+        id: string,
+    ): void {
+        // Approve
+        $('#approval-approve-btn')
+            ?.addEventListener(
+                'click',
+                async () => {
                     const existingIdea =
                         await getIdea(id);
                     await putIdea(id, {
                         ...existingIdea,
-                        title,
-                        description,
+                        status: 'approved',
                     });
                     showToast(
-                        'Idea saved',
+                        'Idea approved'
+                        + ' successfully',
                         'success',
                     );
-                    const [
-                        updatedIdea,
-                        updatedEdge,
-                    ] = await Promise.all([
-                        getIdeaForApproval(id),
-                        getEdgeForApproval(id),
-                    ]);
-                    state.isEditingIdea = false;
+                    navigateTo(
+                        'idea-review-queue',
+                    );
+                },
+            );
+
+        // Back
+        $('#approval-back-btn')
+            ?.addEventListener(
+                'click',
+                () => navigateTo(
+                    'idea-review-queue',
+                ),
+            );
+
+        // Edit / Save / Cancel
+        $('#approval-edit-btn')
+            ?.addEventListener(
+                'click',
+                () => {
+                    state.isEditingIdea
+                        = true;
                     mutateApprovalPage(
-                        updatedIdea,
-                        updatedEdge,
+                        idea,
+                        edge,
                         id,
                     );
-                } catch {
+                },
+            );
+
+        $('#approval-cancel-edit-btn')
+            ?.addEventListener(
+                'click',
+                () => {
+                    state.isEditingIdea
+                        = false;
+                    mutateApprovalPage(
+                        idea,
+                        edge,
+                        id,
+                    );
+                },
+            );
+
+        $('#approval-save-edit-btn')
+            ?.addEventListener(
+                'click',
+                async () => {
+                    const titleEl = $input(
+                        '#approval-edit'
+                        + '-title',
+                    );
+                    const descEl =
+                        $textarea(
+                            '#approval-edit'
+                            + '-description',
+                        );
+                    const title =
+                        titleEl?.value
+                        ?? idea.title;
+                    const description =
+                        descEl?.value
+                        ?? idea.description;
+                    try {
+                        const existing =
+                            await getIdea(
+                                id,
+                            );
+                        await putIdea(id, {
+                            ...existing,
+                            title,
+                            description,
+                        });
+                        showToast(
+                            'Idea saved',
+                            'success',
+                        );
+                        const [
+                            updatedIdea,
+                            updatedEdge,
+                        ] = await Promise
+                            .all([
+                            getIdeaForApproval(
+                                id,
+                            ),
+                            getEdgeForApproval(
+                                id,
+                            ),
+                        ]);
+                        state.isEditingIdea
+                            = false;
+                        mutateApprovalPage(
+                            updatedIdea,
+                            updatedEdge,
+                            id,
+                        );
+                    } catch {
+                        showToast(
+                            'Failed to'
+                            + ' save idea',
+                            'error',
+                        );
+                    }
+                },
+            );
+
+        // Reject dialog
+        initDialog('approval-reject', {
+            openBtnId:
+                'approval-reject-btn',
+        });
+        $('#approval-reject-confirm')
+            ?.addEventListener(
+                'click',
+                async () => {
+                    const existingIdea =
+                        await getIdea(id);
+                    await putIdea(id, {
+                        ...existingIdea,
+                        status: 'archived',
+                    });
                     showToast(
-                        'Failed to save'
-                        + ' idea',
-                        'error',
+                        'Idea sent back'
+                        + ' for revision',
+                        'info',
+                    );
+                    closeDialog(
+                        'approval-reject',
+                    );
+                    navigateTo(
+                        'idea-review-queue',
+                    );
+                },
+            );
+
+        // Clarify dialog
+        initDialog('approval-clarify', {
+            openBtnId:
+                'approval-clarify-btn',
+        });
+        $('#approval-clarify-confirm')
+            ?.addEventListener(
+                'click',
+                () => {
+                    showToast(
+                        'Clarification'
+                        + ' requested',
+                        'info',
+                    );
+                    closeDialog(
+                        'approval-clarify',
+                    );
+                },
+            );
+
+        // Escape to close
+        document.addEventListener(
+            'keydown',
+            (e) => {
+                if (e.key === 'Escape') {
+                    closeDialog(
+                        'approval-reject',
+                    );
+                    closeDialog(
+                        'approval-clarify',
                     );
                 }
             },
         );
+    }
 
-    // Reject dialog
-    initDialog('approval-reject', {
-        openBtnId:
-            'approval-reject-btn',
-    });
-    $('#approval-reject-confirm')
-        ?.addEventListener(
-            'click',
-            async () => {
-                const existingIdea =
-                    await getIdea(id);
-                await putIdea(id, {
-                    ...existingIdea,
-                    status: 'archived',
-                });
-                showToast(
-                    'Idea sent back'
-                    + ' for revision',
-                    'info',
-                );
-                closeDialog(
-                    'approval-reject',
-                );
-                navigateTo(
-                    'idea-review-queue',
-                );
-            },
+    function mutateApprovalPage(
+        idea: ApprovalIdea,
+        edge: ApprovalEdge,
+        id: string,
+    ): void {
+        const root = $('#page-root');
+        if (!root) return;
+        setHtml(
+            root,
+            buildApprovalPage(idea, edge),
         );
-
-    // Clarify dialog
-    initDialog('approval-clarify', {
-        openBtnId:
-            'approval-clarify-btn',
-    });
-    $('#approval-clarify-confirm')
-        ?.addEventListener(
-            'click',
-            () => {
-                showToast(
-                    'Clarification'
-                    + ' requested',
-                    'info',
-                );
-                closeDialog(
-                    'approval-clarify',
-                );
-            },
+        bindApprovalEvents(
+            idea,
+            edge,
+            id,
         );
-
-    // Escape to close
-    document.addEventListener(
-        'keydown',
-        (e) => {
-            if (e.key === 'Escape') {
-                closeDialog(
-                    'approval-reject',
-                );
-                closeDialog(
-                    'approval-clarify',
-                );
-            }
-        },
-    );
-}
-
-function mutateApprovalPage(
-    idea: ApprovalIdea,
-    edge: ApprovalEdge,
-    id: string,
-): void {
-    const root = $('#page-root');
-    if (!root) return;
-    setHtml(
-        root,
-        buildApprovalPage(idea, edge),
-    );
-    bindApprovalEvents(idea, edge, id);
-}
-
-export async function init(
-    params?: Record<string, string>,
-): Promise<void> {
-    const id = params?.['id'];
-    if (!id) { navigateTo('idea-review-queue'); return; }
-    state.isEditingIdea = false;
+    }
 
     const root = $('#page-root');
     if (!root) return;

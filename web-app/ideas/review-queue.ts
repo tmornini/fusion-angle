@@ -134,10 +134,6 @@ function buildReviewCard(
     </div>`;
 }
 
-const state = {
-    allIdeas: [] as Idea[],
-};
-
 export async function init(): Promise<void> {
     const root = $(
         '#review-queue-content',
@@ -161,24 +157,24 @@ export async function init(): Promise<void> {
         },
     );
     if (!result) return;
-    state.allIdeas = result;
+    const allIdeas = result;
 
     const stats = {
-        total: state.allIdeas.length,
-        ready: state.allIdeas.filter(
+        total: allIdeas.length,
+        ready: allIdeas.filter(
             idea => idea.isReady(),
         ).length,
-        highPriority: state.allIdeas.filter(
+        highPriority: allIdeas.filter(
             idea =>
                 idea.priorityLevel()
                     === 'high',
         ).length,
         avgWait: Math.round(
-            state.allIdeas.reduce(
+            allIdeas.reduce(
                 (sum, idea) =>
                     sum + idea.waitingDays,
                 0,
-            ) / state.allIdeas.length,
+            ) / allIdeas.length,
         ),
     };
 
@@ -280,7 +276,7 @@ export async function init(): Promise<void> {
 
     <div id="review-queue-list"
       style="display:flex;flex-direction:column;gap:0.75rem">
-      ${state.allIdeas.map(buildReviewCard)}
+      ${allIdeas.map(buildReviewCard)}
     </div>
     <div id="review-queue-empty"
       class="text-center"
@@ -306,7 +302,7 @@ export async function init(): Promise<void> {
                 '#review-queue-readiness-filter',
             )?.value ?? 'all';
 
-        const filtered = state.allIdeas.filter(
+        const filtered = allIdeas.filter(
             idea => {
                 const matchesSearch =
                     idea.title

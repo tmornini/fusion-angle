@@ -29,33 +29,35 @@ import {
     allStrengths,
 } from '../app/adapters';
 
-const selectedStrengths = new Set([
-    'Strategic Planning',
-    'Data Analysis',
-    'Stakeholder Management',
-]);
+export async function init(): Promise<void> {
+    const selectedStrengths = new Set([
+        'Strategic Planning',
+        'Data Analysis',
+        'Stakeholder Management',
+    ]);
 
-function buildStrengthChip(
-    name: string,
-): SafeHtml {
-    const isActive =
-        selectedStrengths.has(name);
-    return html`<button class="${
-        'strength-chip btn '
-        + (isActive
-            ? 'btn-primary'
-            : 'btn-secondary')
-        + ' btn-sm'
-    }" data-strength="${name}">
+    function buildStrengthChip(
+        name: string,
+    ): SafeHtml {
+        const isActive =
+            selectedStrengths.has(name);
+        return html`<button class="${
+            'strength-chip btn '
+            + (isActive
+                ? 'btn-primary'
+                : 'btn-secondary')
+            + ' btn-sm'
+        }" data-strength="${name}">
     ${
         isActive
-            ? html`${iconCheckCircle2(12)} `
+            ? html`${
+                iconCheckCircle2(12)
+            } `
             : html``
     }${name}
   </button>`;
-}
+    }
 
-export async function init(): Promise<void> {
     const container = $('.page-content');
     if (!container) return;
     let profile: Awaited<
