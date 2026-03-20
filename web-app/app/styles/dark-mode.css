@@ -29,7 +29,11 @@
   --border-strong: var(--gray-600);
   --input: var(--gray-700);
 
+  --destructive: 0 65% 55%;
   --destructive-hover: 0 72% 55%;
+
+  --accent-soft: 48 40% 15%;
+  --accent-text: 48 80% 65%;
 
   --success: 152 55% 50%;
   --success-hover: 152 55% 45%;

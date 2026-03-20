@@ -63,21 +63,31 @@ function mutateThemeToggleIcon(): void {
 
 async function mutateSidebarUser(
 ): Promise<void> {
-    const { getCurrentUser } =
-        await import('./adapters');
-    const user =
-        await getCurrentUser();
-    for (const id of SIDEBAR_USER_NAME_IDS) {
-        const el = $(`#${id}`);
-        if (el)
-            el.textContent = user.name;
-    }
-    for (const id of
-        SIDEBAR_USER_COMPANY_IDS
-    ) {
-        const el = $(`#${id}`);
-        if (el)
-            el.textContent = user.company;
+    try {
+        const { getCurrentUser } =
+            await import('./adapters');
+        const user =
+            await getCurrentUser();
+        for (const id of
+            SIDEBAR_USER_NAME_IDS
+        ) {
+            const el = $(`#${id}`);
+            if (el)
+                el.textContent = user.name;
+        }
+        for (const id of
+            SIDEBAR_USER_COMPANY_IDS
+        ) {
+            const el = $(`#${id}`);
+            if (el)
+                el.textContent = user.company;
+        }
+    } catch (err) {
+        log.debug(
+            'Sidebar user info load failed',
+            'layout',
+            err,
+        );
     }
 }
 

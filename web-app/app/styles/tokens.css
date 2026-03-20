@@ -68,6 +68,8 @@
   /* Semantic: Accent (Yellow) */
   --accent: var(--yellow-400);
   --accent-foreground: var(--blue-900);
+  --accent-soft: 48 80% 95%;
+  --accent-text: 48 85% 30%;
 
   /* Semantic: Destructive */
   --destructive: 0 72% 51%;

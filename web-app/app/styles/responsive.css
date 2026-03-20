@@ -87,17 +87,17 @@
 }
 .badge-success {
     background: hsl(var(--success-soft));
-    color: hsl(var(--success));
+    color: hsl(var(--success-text));
     border-color: hsl(var(--success) / 0.3);
 }
 .badge-warning {
     background: hsl(var(--warning-soft));
-    color: hsl(var(--warning));
+    color: hsl(var(--warning-text));
     border-color: hsl(var(--warning) / 0.3);
 }
 .badge-error {
     background: hsl(var(--error-soft));
-    color: hsl(var(--error));
+    color: hsl(var(--error-text));
     border-color: hsl(var(--error) / 0.3);
 }
 .badge-default {

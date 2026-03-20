@@ -183,12 +183,12 @@ function buildProjectCard(
                       project.estimatedDuration
                       ? html`${
                           project
-                              .actualDuration
+                              .actualDurationDays()
                       }d <span class="${
                           'text-xs text-muted'
                       }">/ ${
                           project
-                              .estimatedDuration
+                              .estimatedDurationDays()
                       }d</span>`
                       : html`&mdash;`
                   }</p>

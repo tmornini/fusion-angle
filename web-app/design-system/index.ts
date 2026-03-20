@@ -133,7 +133,7 @@ export async function init(): Promise<void> {
         + ';text-align:center';
 
     const destColor =
-        'color:hsl(var(--destructive))';
+        'color:hsl(var(--error-text))';
 
     const errColor =
         'color:hsl(var(--error-text))';
@@ -142,7 +142,7 @@ export async function init(): Promise<void> {
         'color:hsl(var(--warning-text))';
 
     const succColor =
-        'color:hsl(var(--success))';
+        'color:hsl(var(--success-text))';
 
     const softPrimaryBtn = 'background:'
         + 'hsl(var(--primary)/0.1)'
@@ -169,7 +169,7 @@ export async function init(): Promise<void> {
         + ';font-weight:500'
         + ';background:hsl(var(--accent-soft))'
         + ';color:'
-        + 'hsl(var(--accent-foreground))'
+        + 'hsl(var(--accent-text))'
         + ';border:1px solid '
         + 'hsl(var(--accent)/0.3)';
 
