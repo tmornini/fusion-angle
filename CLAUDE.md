@@ -7,8 +7,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Build & Dev Commands
 
 ```bash
+./validate             # Type-check + lint (works on dirty tree)
 ./build                # Compile, bundle, minify, and create distribution ZIP
 ```
+
+**Always commit before building.** `./build` requires a clean working directory (see CONDUCT-OF-CODE.md line 78). Use `./validate` to catch type errors and lint issues before committing, then commit, then build.
 
 No test framework is configured.
 
