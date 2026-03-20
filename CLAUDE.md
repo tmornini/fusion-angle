@@ -221,7 +221,7 @@ No build artifacts are created in the repo — everything is assembled in `/tmp/
 - **ES2024 target**: No transpilation. Native `Object.groupBy()`, `Map.groupBy()` are available. Assumes modern browser.
 - **`withLoadingState()` returns null**: Returns `null` on error AND when data is empty with an `emptyState` config — callers must check for null before using the result.
 - **Cross-tab theme sync**: `state.ts` listens to `StorageEvent` and syncs theme changes across browser tabs automatically.
-- **Non-critical writes swallowed**: localStorage writes for theme and sidebar state are wrapped in try/catch with empty catch — quota errors don't break the app.
+- **Non-critical writes logged at warn**: localStorage writes for theme and sidebar state are wrapped in try/catch that log at `warn` level — quota errors don't break the app but are observable via the logger.
 - **Snapshots wipe-first**: All snapshot operations (pristine, mock data, import) call `DELETE('snapshots/schema')` before writing — there is no merge, only replace.
 - **Score thresholds**: `SCORE_THRESHOLD_HIGH = 80` and `SCORE_THRESHOLD_MEDIUM = 60` in `api/types.ts` determine `PriorityLevel` computation.
 - **`file:///` protocol**: Navigation detects file protocol and skips link prefetching. Page URLs use `../${sourceDir || pageName}/index.html` relative paths, or `../dir/file.html` for pages with `sourceFile`.

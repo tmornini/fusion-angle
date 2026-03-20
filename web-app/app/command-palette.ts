@@ -2,6 +2,9 @@ import {
     $,
 } from './dom';
 import {
+    log,
+} from './logger';
+import {
     html,
     setHtml,
     SafeHtml,
@@ -265,8 +268,10 @@ export function initCommandPalette(
                 ...state.allItems,
             ];
         } catch {
-            // Pages are still available
-            // even if data loading fails
+            log.warn(
+                'Failed to load search data',
+                'command-palette',
+            );
         }
     }
 

@@ -105,7 +105,7 @@ class AppStateManager {
                 theme,
             );
         } catch {
-            log.debug(
+            log.warn(
                 'Failed to save theme'
                 + ' preference',
                 'state',

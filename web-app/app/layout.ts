@@ -181,7 +181,7 @@ function initSidebar(): void {
                 String(collapsed),
             );
         } catch {
-            log.debug(
+            log.warn(
                 'Failed to save'
                 + ' sidebar state',
                 'layout',
