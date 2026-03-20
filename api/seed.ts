@@ -352,7 +352,6 @@ export async function populateMockData(
         }),
     ));
 
-    // -- Ideas ----------------------------
     const ideas: IdeaEntity[] = [
         {
             id: '1',
