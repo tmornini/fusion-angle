@@ -28,14 +28,14 @@ export async function getTeamMembers(
     const rows =
         await GET<UserEntity[]>('users');
     return rows
-        .filter(entity =>
-            entity.id !== 'current'
-            && entity.department !== ''
-            && entity.performance_score > 0,
+        .map(entity => new User(entity))
+        .filter(user =>
+            user.id !== 'current'
+            && user.hasDepartment()
+            && user.hasPerformanceScore(),
         )
         .slice(0, TOP_MEMBERS_COUNT)
-        .map(entity => {
-            const user = new User(entity);
+        .map(user => {
             return {
                 id: user.id,
                 name: user.fullName(),

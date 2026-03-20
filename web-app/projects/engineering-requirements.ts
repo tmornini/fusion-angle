@@ -17,6 +17,9 @@ import {
 } from '../app/icons';
 import { navigateTo } from '../app/core';
 import {
+    clarificationIsPending,
+} from '../../api/types';
+import {
     getProjectForEngineering,
     getClarificationsByProjectId,
     type EngineeringProject,
@@ -142,16 +145,11 @@ export async function init(
 
     const pendingCount =
             clarifications.filter(
-                    clarification =>
-                        clarification.status
-                                === 'pending',
+                    clarificationIsPending,
             ).length;
     const answeredCount =
-            clarifications.filter(
-                    clarification =>
-                        clarification.status
-                                === 'answered',
-            ).length;
+            clarifications.length
+            - pendingCount;
 
     setHtml(root, html`
         <div style="max-width:56rem;

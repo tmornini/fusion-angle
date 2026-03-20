@@ -7,13 +7,13 @@ import type {
 } from '../../../api/types';
 import {
     Idea, nowUtc,
+    ideaIsNotDeleted,
+    ideaIsInReview,
 } from '../../../api/types';
 import {
     buildUserMap,
     userName,
     parseJson,
-    isNotDeleted,
-    isInReview,
     getEdgeDataWithConfidence,
     type Metric,
 } from './helpers';
@@ -36,7 +36,7 @@ export async function getIdeas(
         ),
     );
     return ideas
-        .filter(isNotDeleted)
+        .filter(ideaIsNotDeleted)
         .map(idea => new Idea(
             idea,
             userName(
@@ -93,7 +93,7 @@ export async function getReviewQueue(
     );
 
     return ideas
-        .filter(isInReview)
+        .filter(ideaIsInReview)
         .map(idea => new Idea(
             idea,
             userName(

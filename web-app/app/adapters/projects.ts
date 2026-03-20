@@ -18,6 +18,7 @@ import type {
 } from '../../../api/types';
 import {
     Project,
+    projectIsNotDeleted,
     durationInDays,
     nowUtc,
 } from '../../../api/types';
@@ -25,7 +26,6 @@ import {
     buildUserMap,
     userName,
     parseJson,
-    isNotDeleted,
     getEdgeDataWithConfidence,
     type Metric,
 } from './helpers';
@@ -39,6 +39,12 @@ interface TeamMemberRow {
     type: string;
 }
 
+function isTeamLead(
+    m: { role: string },
+): boolean {
+    return m.role === 'lead';
+}
+
 export async function getProjects(
 ): Promise<Project[]> {
     const rows =
@@ -46,7 +52,7 @@ export async function getProjects(
             'projects',
         );
     return rows
-        .filter(isNotDeleted)
+        .filter(projectIsNotDeleted)
         .map(row => new Project(row));
 }
 
@@ -172,7 +178,7 @@ export async function getProjectById(
     ]);
 
     const leadRow = teamRows.find(
-        m => m.role === 'lead',
+        isTeamLead,
     );
     const link = ideaProjectLinks.find(
         l => l.project_id === projectId,

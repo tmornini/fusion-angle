@@ -5,10 +5,14 @@ import type {
     FlowEntity,
 } from '../../../api/types';
 import {
+    ideaIsNotDeleted,
+    projectIsApproved,
+    projectIsNotDeleted,
+} from '../../../api/types';
+import {
     durationInDays,
     formatCompactCurrency,
 } from '../format';
-import { isNotDeleted } from './helpers';
 
 export interface GaugeCard {
     title: string;
@@ -37,7 +41,7 @@ export async function getDashboardGauges(
             'projects',
         );
     const projects = allProjects.filter(
-        p => p.status === 'approved',
+        projectIsApproved,
     );
 
     const sumEstimatedDuration =
@@ -180,13 +184,15 @@ export async function getDashboardStats(
         {
             label: 'Ideas',
             value: ideas
-                .filter(isNotDeleted).length,
+                .filter(ideaIsNotDeleted)
+                .length,
             trend: '',
         },
         {
             label: 'Projects',
             value: projects
-                .filter(isNotDeleted).length,
+                .filter(projectIsNotDeleted)
+                .length,
             trend: '',
         },
         {

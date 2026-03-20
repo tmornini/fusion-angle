@@ -38,20 +38,6 @@ export function parseJson<T>(value: string | T, fallback: T): T {
     return value;
 }
 
-// ── Status Predicates ────────────
-
-export function isNotDeleted(
-    entity: { status: string },
-): boolean {
-    return entity.status !== 'deleted';
-}
-
-export function isInReview(
-    entity: { status: string },
-): boolean {
-    return entity.status === 'in-review';
-}
-
 // ── Shared Types ──────────────────
 
 export interface Metric {

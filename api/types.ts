@@ -274,6 +274,14 @@ export class User {
             return 'badge-default';
         return 'badge-default';
     }
+
+    hasDepartment(): boolean {
+        return this.department !== '';
+    }
+
+    hasPerformanceScore(): boolean {
+        return this.performanceScore > 0;
+    }
 }
 
 export interface IdeaEntity {
@@ -1462,4 +1470,36 @@ export class Activity {
             + ` ${this.action}`
             + ` ${this.target}`;
     }
+}
+
+// ── Entity Predicates ────────────────
+
+export function ideaIsNotDeleted(
+    e: IdeaEntity,
+): boolean {
+    return e.status !== 'deleted';
+}
+
+export function ideaIsInReview(
+    e: IdeaEntity,
+): boolean {
+    return e.status === 'in-review';
+}
+
+export function projectIsNotDeleted(
+    e: ProjectEntity,
+): boolean {
+    return e.status !== 'deleted';
+}
+
+export function projectIsApproved(
+    e: ProjectEntity,
+): boolean {
+    return e.status === 'approved';
+}
+
+export function clarificationIsPending(
+    e: { status: ClarificationStatus },
+): boolean {
+    return e.status === 'pending';
 }
