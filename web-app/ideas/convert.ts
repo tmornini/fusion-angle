@@ -15,8 +15,10 @@ import {
     iconFolderKanban,
 } from '../app/icons';
 import { navigateTo } from '../app/core';
+import { User } from '../../api/types';
 import {
     getIdeaForConversion,
+    getManagedUsers,
     getIdea,
     putIdea,
     putProject,
@@ -25,6 +27,16 @@ import {
     putIdeaProjectLink,
     type ConversionIdea,
 } from '../app/adapters';
+
+const PRIORITY_RANKS: Record<
+    string,
+    number
+> = {
+    critical: 1,
+    high: 2,
+    medium: 3,
+    low: 4,
+};
 
 const requiredFields = [
     'project-name',
@@ -64,9 +76,25 @@ function fieldCheckIcon(
         : html``;
 }
 
+function buildLeadOptions(
+    users: User[],
+    selectedId: string,
+): SafeHtml[] {
+    return users
+        .filter(u => u.isActive())
+        .map(u => html`<option
+            value="${u.id}" ${
+                u.id === selectedId
+                    ? 'selected'
+                    : ''
+            }>${u.fullName()} -
+            ${u.role}</option>`);
+}
+
 function buildConversionPage(
     idea: ConversionIdea,
     ideaId: string,
+    users: User[],
 ): SafeHtml {
     const completedCount =
         completedFieldCount();
@@ -326,42 +354,10 @@ function buildConversionPage(
                       Who will own this
                       project?
                     </option>
-                    <option
-                      value="sarah" ${
-                        leadVal === 'sarah'
-                            ? 'selected'
-                            : ''
-                    }>
-                      Sarah Chen -
-                      Product Manager
-                    </option>
-                    <option
-                      value="mike" ${
-                        leadVal === 'mike'
-                            ? 'selected'
-                            : ''
-                    }>
-                      Mike Thompson -
-                      Engineering Lead
-                    </option>
-                    <option
-                      value="jessica" ${
-                        leadVal === 'jessica'
-                            ? 'selected'
-                            : ''
-                    }>
-                      Jessica Park -
-                      Data Science Lead
-                    </option>
-                    <option
-                      value="david" ${
-                        leadVal === 'david'
-                            ? 'selected'
-                            : ''
-                    }>
-                      David Martinez -
-                      Marketing Director
-                    </option>
+                    ${buildLeadOptions(
+                        users,
+                        leadVal ?? '',
+                    )}
                   </select>
                 </div>
                 <div style=${'display:grid;'
@@ -678,11 +674,12 @@ export async function init(
     setHtml(root, buildSkeleton('detail'));
 
     let idea: ConversionIdea;
+    let users: User[];
     try {
-        idea =
-            await getIdeaForConversion(
-                ideaId,
-            );
+        [idea, users] = await Promise.all([
+            getIdeaForConversion(ideaId),
+            getManagedUsers(),
+        ]);
     } catch {
         setHtml(
             root,
@@ -713,7 +710,9 @@ export async function init(
 
     setHtml(
         root,
-        buildConversionPage(idea, ideaId),
+        buildConversionPage(
+            idea, ideaId, users,
+        ),
     );
 
     const syncFormFields = () => {
@@ -807,37 +806,14 @@ export async function init(
                     btn.disabled = true;
                 }
 
-                const leadMap: Record<
-                    string,
-                    string
-                > = {
-                    sarah: '1',
-                    mike: '2',
-                    jessica: '3',
-                    david: '4',
-                };
-                const priorityMap: Record<
-                    string,
-                    number
-                > = {
-                    critical: 1,
-                    high: 2,
-                    medium: 3,
-                    low: 4,
-                };
-
                 const projectId =
                     crypto.randomUUID();
                 try {
                     const pd =
                         state.projectDetails;
                     const leadUserId =
-                        leadMap[
-                            pd[
-                                'project'
-                                + '-lead'
-                            ] ?? ''
-                        ] ?? '1';
+                        pd['project-lead']
+                            ?? '';
                     await putProject(
                         projectId,
                         {
@@ -875,7 +851,7 @@ export async function init(
                                 0,
                             actual_impact: 0,
                             priority:
-                                priorityMap[
+                                PRIORITY_RANKS[
                                     pd[
                                         'priority'
                                     ] ?? ''

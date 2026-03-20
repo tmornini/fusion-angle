@@ -3,10 +3,10 @@ import { html, setHtml } from '../app/safe-html';
 import { iconSparkles } from '../app/icons';
 
 export async function init(): Promise<void> {
-  const root = $('#page-root');
-  if (!root) return;
+    const root = $('#page-root');
+    if (!root) return;
 
-  setHtml(root, html`
+    setHtml(root, html`
     <div class="flex min-h-screen
       items-center justify-center"
       style="background:
