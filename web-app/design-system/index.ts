@@ -76,7 +76,7 @@ function buildShadowBox(
 }
 
 export async function init(): Promise<void> {
-    const root = $('#design-system-content');
+    const root = $('#design-system-content', document);
     if (!root) return;
 
     const borderHr = 'border:none'
@@ -654,28 +654,28 @@ export async function init(): Promise<void> {
                     <button class="${''
                         }btn btn-primary${''
                         } gap-2">${''
-                        }${iconPlus(16)
+                        }${iconPlus(16, '')
                         } Create</button>
                     <button class="${''
                         }btn btn-outline${''
                         } gap-2">${''
-                        }${iconSearch(16)} ${''
+                        }${iconSearch(16, '')} ${''
                         }Search</button>
                     <button class="${''
                         }btn btn-outline${''
                         } gap-2">${''
                         }Continue ${''
-                        }${iconArrowRight(16)
+                        }${iconArrowRight(16, '')
                         }</button>
                     <button class="${''
                         }btn btn-destructive${''
                         } gap-2">${''
-                        }${iconTrash(16)} ${''
+                        }${iconTrash(16, '')} ${''
                         }Delete</button>
                     <button class="${''
                         }btn btn-primary${''
                         } btn-icon">${''
-                        }${iconPlus(20)}</button>
+                        }${iconPlus(20, '')}</button>
                 </div>
             </div>
         </section>
@@ -727,21 +727,21 @@ export async function init(): Promise<void> {
                     <span class="${''
                         }badge${''
                         } badge-success">${''
-                        }${iconCheck(12)} ${''
+                        }${iconCheck(12, '')} ${''
                         }Approved</span>
                     <span class="${''
                         }badge${''
                         } badge-warning">${''
-                        }${iconAlertTriangle(12)
+                        }${iconAlertTriangle(12, '')
                         } ${''
                         }Pending</span>
                     <span class="${''
                         }badge badge-error">${''
-                        }${iconX(12)} ${''
+                        }${iconX(12, '')} ${''
                         }Rejected</span>
                     <span class="${''
                         }status-badge-info">${''
-                        }${iconInfo(12)
+                        }${iconInfo(12, '')
                         } Info</span>
                 </div>
                 <h3 class="${''
@@ -1018,7 +1018,7 @@ export async function init(): Promise<void> {
                             }color:hsl(${''
                             }var(--primary))">${''
                             }${iconSparkles(
-                                size,
+                                size, '',
                             )}</div>
                         <code class="${''
                             }text-xs${''
@@ -1082,7 +1082,7 @@ export async function init(): Promise<void> {
                             }color:hsl(${''
                             }var(${''
                             }--foreground))">${''
-                            }${entry.fn(20)
+                            }${entry.fn(20, '')
                             }</div>
                         <span class="${''
                             }text-2xs${''
@@ -1222,7 +1222,7 @@ export async function init(): Promise<void> {
                                     destColor
                                 }">${''
                                 }${
-                                iconAlertCircle(12)
+                                iconAlertCircle(12, '')
                                 } ${''
                                 }Please enter ${''
                                 }a valid ${''
@@ -1249,7 +1249,7 @@ export async function init(): Promise<void> {
                                 style="${
                                     succColor
                                 }">${''
-                                }${iconCheck(12)
+                                }${iconCheck(12, '')
                                 } ${''
                                 }Looks good!</p>
                         </div>
@@ -1467,7 +1467,7 @@ export async function init(): Promise<void> {
                         } text-success${''
                         } flex items-center ${''
                         }gap-2 mb-4">${''
-                        }${iconCheck(20)
+                        }${iconCheck(20, '')
                         } Do</h3>
                     <div class="text-sm"
                         style="${doColStyle}">
@@ -1518,7 +1518,7 @@ export async function init(): Promise<void> {
                         } text-error ${''
                         }flex items-center ${''
                         }gap-2 mb-4">${''
-                        }${iconX(20)
+                        }${iconX(20, '')
                         } Don't</h3>
                     <div class="text-sm"
                         style="${doColStyle}">

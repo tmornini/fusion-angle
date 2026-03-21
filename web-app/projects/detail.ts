@@ -30,11 +30,11 @@ import {
     type ProjectDetail,
 } from '../app/adapters';
 import {
-    PROJECT_STATUS_CONFIG, UNKNOWN_CONFIG,
+    PROJECT_STATUS_CONFIG,
     MILESTONE_STATUS_CONFIG,
-    MILESTONE_STATUS_DEFAULT,
+    MILESTONE_STATUS_PENDING,
     TASK_PRIORITY_CONFIG,
-    TASK_PRIORITY_DEFAULT,
+    TASK_PRIORITY_LOW,
     isProjectStatus,
     type ProjectStatus,
 } from '../../api/types';
@@ -54,13 +54,13 @@ function buildVariance(
     if (diff === 0)
         return html`<span
             class="text-muted"
-            >${iconMinus(16)} 0</span>`;
+            >${iconMinus(16, '')} 0</span>`;
     const good = isLowerBetter
         ? diff < 0
         : diff > 0;
     const icon = diff < 0
-        ? iconArrowDownRight(16)
-        : iconArrowUpRight(16);
+        ? iconArrowDownRight(16, '')
+        : iconArrowUpRight(16, '');
     const color = good
         ? 'color:hsl(var(--success))'
         : 'color:hsl(var(--error))';
@@ -80,8 +80,8 @@ const MILESTONE_ICON_MAP: Record<
     string,
     {
         iconFn: (
-            s?: number,
-            c?: string,
+            s: number,
+            c: string,
         ) => SafeHtml;
         iconClass: string;
     }
@@ -112,7 +112,7 @@ function buildMilestoneIcon(
         + 'justify-content:center';
     const cfg =
         MILESTONE_STATUS_CONFIG[status]
-        ?? MILESTONE_STATUS_DEFAULT;
+        ?? MILESTONE_STATUS_PENDING;
     const icon =
         MILESTONE_ICON_MAP[status]
         ?? MILESTONE_ICON_DEFAULT;
@@ -560,6 +560,14 @@ function buildBaselineComparison(
 function buildEdgeKPIs(
     project: ProjectDetail,
 ): SafeHtml {
+    if (!project.edge) {
+        return html`
+        <div class="card p-6">
+            <p class="text-muted text-sm">
+                No edge data available.
+            </p>
+        </div>`;
+    }
     return html`
         <div class="card p-6">
             <div class="${
@@ -609,7 +617,7 @@ function buildEdgeKPIs(
                         + 'badge-success '
                         + 'text-xs'
                     }">
-                    ${iconShield(12)
+                    ${iconShield(12, '')
                     } High Confidence
                 </span>
             </div>
@@ -1077,7 +1085,7 @@ function buildProjectTabs(
                         data-tab="${
                             tab.id
                         }">
-                        ${tab.icon(16)
+                        ${tab.icon(16, '')
                         } ${tab.label}
                     </button>
                 `)}
@@ -1097,7 +1105,7 @@ function buildProjectTabs(
                             TASK_PRIORITY_CONFIG[
                                 task.priority
                             ]
-                            ?? TASK_PRIORITY_DEFAULT
+                            ?? TASK_PRIORITY_LOW
                         ).style;
                         return html`
                         <div class="card"
@@ -1163,7 +1171,7 @@ function buildProjectTabs(
                                                 }">
                                                 ${
                                                     iconUsers(
-                                                        10,
+                                                        10, '',
                                                     )
                                                 }
                                                 AI
@@ -1228,7 +1236,7 @@ function buildProjectTabs(
                                             }">
                                             ${
                                                 iconClock(
-                                                    12,
+                                                    12, '',
                                                 )
                                             }
                                             ${
@@ -1631,7 +1639,7 @@ function buildProjectTabs(
                             'btn btn-outline'
                             + ' btn-sm gap-2'
                         }">
-                        ${iconPlus(16)
+                        ${iconPlus(16, '')
                         } Link Data Source
                     </button>
                 </div>
@@ -1664,7 +1672,7 @@ function buildProjectSidebar(
                             'btn btn-ghost '
                             + 'btn-sm gap-1'
                         }">
-                        ${iconPlus(14)} Add
+                        ${iconPlus(14, '')} Add
                     </button>
                 </div>
                 <div style="${
@@ -1841,7 +1849,7 @@ function buildProjectSidebar(
                                             milestone
                                                 .status
                                         ]
-                                        ?? MILESTONE_STATUS_DEFAULT
+                                        ?? MILESTONE_STATUS_PENDING
                                     ).textStyle
                                     }">
                                     ${milestone
@@ -1873,7 +1881,7 @@ function buildProjectDetail(
             PROJECT_STATUS_CONFIG[
                 project.status as
                         keyof typeof PROJECT_STATUS_CONFIG
-            ] ?? UNKNOWN_CONFIG;
+            ]!;
     const statusOptions =
             Object.entries(
                 PROJECT_STATUS_CONFIG,
@@ -1932,7 +1940,7 @@ function buildProjectDetail(
                         id="${
                             'project-back-btn'
                         }">
-                        ${iconArrowLeft(20)}
+                        ${iconArrowLeft(20, '')}
                     </button>
                     <div>
                         <div class="${
@@ -2003,7 +2011,7 @@ function buildProjectDetail(
                                     }">
                                     ${
                                         iconCheckCircle2(
-                                            14,
+                                            14, '',
                                         )
                                     }
                                     ${
@@ -2043,7 +2051,7 @@ function buildProjectDetail(
                                 'project-'
                                 + 'cancel-btn'
                             }">
-                            ${iconX(16)
+                            ${iconX(16, '')
                             } Cancel
                         </button>
                         <button
@@ -2056,7 +2064,7 @@ function buildProjectDetail(
                                 'project-'
                                 + 'save-btn'
                             }">
-                            ${iconSave(16)
+                            ${iconSave(16, '')
                             } Save
                         </button>
                     </div>`
@@ -2070,7 +2078,7 @@ function buildProjectDetail(
                             'project-'
                             + 'edit-btn'
                         }">
-                        ${iconEdit(16)
+                        ${iconEdit(16, '')
                         } Edit
                     </button>`}
             </div>
@@ -2329,13 +2337,13 @@ function bindProjectEvents(
     project: ProjectDetail,
     projectId: string,
 ): void {
-    $('#project-back-btn')
+    $('#project-back-btn', document)
         ?.addEventListener(
                 'click',
                 () => navigateTo('projects'),
         );
 
-    $('#project-edit-btn')
+    $('#project-edit-btn', document)
         ?.addEventListener('click', () => {
             state.isEditing = true;
             mutateProjectPage(
@@ -2343,7 +2351,7 @@ function bindProjectEvents(
             );
         });
 
-    $('#project-cancel-btn')
+    $('#project-cancel-btn', document)
         ?.addEventListener('click', () => {
             state.isEditing = false;
             mutateProjectPage(
@@ -2351,47 +2359,47 @@ function bindProjectEvents(
             );
         });
 
-    $('#project-save-btn')
+    $('#project-save-btn', document)
         ?.addEventListener(
                 'click',
                 async () => {
         const title =
-                $input('#project-edit-title')
+                $input('#project-edit-title', document)
                     ?.value ?? project.title;
         const description =
                 $textarea(
-                        '#project-edit-description',
+                        '#project-edit-description', document,
                 )?.value ?? project.description;
         const statusValue =
-                $select('#project-edit-status')?.value;
+                $select('#project-edit-status', document)?.value;
         const status: ProjectStatus =
                 statusValue && isProjectStatus(statusValue)
                         ? statusValue
                         : project.status;
         const startDate =
                 $input(
-                        '#project-edit-start-date',
+                        '#project-edit-start-date', document,
                 )?.value ?? project.startDate;
         const targetEndDate =
                 $input(
-                        '#project-edit-end-date',
+                        '#project-edit-end-date', document,
                 )?.value ?? project.targetEndDate;
         const timeBaseline = Number(
                 $input(
-                        '#project-edit-time-baseline',
+                        '#project-edit-time-baseline', document,
                 )?.value
                 ?? project.metrics.time.baseline,
         );
         const costBaseline = Number(
                 $input(
-                        '#project-edit-cost-baseline',
+                        '#project-edit-cost-baseline', document,
                 )?.value
                 ?? project.metrics.cost.baseline
                         / 1000,
         );
         const impactBaseline = Number(
                 $input(
-                        '#project-edit-impact-baseline',
+                        '#project-edit-impact-baseline', document,
                 )?.value
                 ?? project.metrics.impact.baseline,
         );
@@ -2425,7 +2433,7 @@ function bindProjectEvents(
         }
     });
 
-    $$('[data-navigate-to-engineering]')
+    $$('[data-navigate-to-engineering]', document)
         .forEach(el => {
             el.addEventListener('click', (e) => {
                 e.preventDefault();
@@ -2436,13 +2444,13 @@ function bindProjectEvents(
             });
         });
 
-    initTabs('.tab[data-tab]', '.tab-panel');
+    initTabs('.tab[data-tab]', '.tab-panel', 'active');
 
     const comment = $textarea(
-            '#project-discussion-comment',
+            '#project-discussion-comment', document,
     );
     const postBtn = $(
-            '#project-discussion-post-btn',
+            '#project-discussion-post-btn', document,
     );
     comment?.addEventListener(
             'input',
@@ -2472,7 +2480,7 @@ function mutateProjectPage(
     projectId: string,
 ): void {
     const container = $(
-            '#project-detail-content',
+            '#project-detail-content', document,
     );
     if (!container) return;
     setHtml(
@@ -2494,12 +2502,12 @@ export async function init(
     state.isEditing = false;
 
     const container = $(
-            '#project-detail-content',
+            '#project-detail-content', document,
     );
     if (!container) return;
     setHtml(
             container,
-            buildSkeleton('detail'),
+            buildSkeleton('detail', 4),
     );
 
     let project: ProjectDetail;
@@ -2513,6 +2521,7 @@ export async function init(
                         'Failed to load project'
                         + ' details. The project'
                         + ' may not exist.',
+                        'Try Again',
                 ),
         );
         container

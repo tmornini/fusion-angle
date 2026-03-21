@@ -55,7 +55,7 @@ const KEY_PREFIX = 'fusion-ai:';
 
 function readTable<T>(
     tableName: string,
-    includeDeleted = false,
+    includeDeleted: boolean,
 ): T[] {
     const raw = localStorage.getItem(
         KEY_PREFIX + tableName,
@@ -114,9 +114,17 @@ function writeTable<T>(
     }
 }
 
-function serializeValue(value: unknown): unknown {
+function serializeValue(
+    value: unknown,
+    key: string,
+    tableName: string,
+): unknown {
     if (value === null || value === undefined) {
-        return null;
+        throw new Error(
+            `NOT NULL violation: "${key}"`
+            + ` in "${tableName}" is`
+            + ` ${String(value)}.`,
+        );
     }
     if (typeof value === 'boolean') {
         return value ? 1 : 0;
@@ -126,6 +134,7 @@ function serializeValue(value: unknown): unknown {
 
 function serializeRecord<T>(
     record: Partial<T>,
+    tableName: string,
 ): Record<string, unknown> {
     const result: Record<string, unknown> = {};
     for (
@@ -137,8 +146,9 @@ function serializeRecord<T>(
             >,
         )
     ) {
-        result[key] =
-            serializeValue(value);
+        result[key] = serializeValue(
+            value, key, tableName,
+        );
     }
     return result;
 }
@@ -150,57 +160,19 @@ function generateCompositeId(
     return `${prefix}-${parts.join('-')}`;
 }
 
-function migrateRenamedFields(
-    tableName: string,
-    renames: {
-        from: string;
-        to: string;
-        transform?: (v: unknown) => unknown;
-    }[],
-): void {
-    const key = KEY_PREFIX + tableName;
-    const raw = localStorage.getItem(key);
-    if (raw === null) return;
-    try {
-        const rows = JSON.parse(raw);
-        if (!Array.isArray(rows)) return;
-        const needsMigration = rows.some(
-            (r: Record<string, unknown>) =>
-                renames.some(re => re.from in r),
-        );
-        if (!needsMigration) return;
-        for (const row of rows) {
-            for (const { from, to, transform }
-                of renames) {
-                if (from in row) {
-                    row[to] = transform
-                        ? transform(row[from])
-                        : row[from];
-                    delete row[from];
-                }
-            }
-        }
-        localStorage.setItem(
-            key,
-            JSON.stringify(rows),
-        );
-    } catch {
-        /* corrupt JSON — readTable will
-           throw when the page loads */
-    }
-}
-
 function createEntityStore<
     T extends { id: string },
 >(tableName: string): EntityStore<T> {
     return {
         async getAll(): Promise<T[]> {
-            return readTable<T>(tableName);
+            return readTable<T>(tableName, false);
         },
         async getById(
             id: string,
         ): Promise<T | null> {
-            const rows = readTable<T>(tableName);
+            const rows = readTable<T>(
+                tableName, false,
+            );
             return (
                 rows.find(
                     entity => entity.id === id,
@@ -211,12 +183,15 @@ function createEntityStore<
             id: string,
             fields: Partial<T>,
         ): Promise<T> {
-            const rows = readTable<T>(tableName);
+            const rows = readTable<T>(
+                tableName, false,
+            );
             const index = rows.findIndex(
                 entity => entity.id === id,
             );
-            const serialized =
-                serializeRecord(fields);
+            const serialized = serializeRecord(
+                fields, tableName,
+            );
 
             if (index >= 0) {
                 rows[index] = {
@@ -268,23 +243,28 @@ function createSingletonStore<
 >(tableName: string): SingletonStore<T> {
     return {
         async get(): Promise<T> {
-            const rows = readTable<T>(tableName);
+            const rows = readTable<T>(
+                tableName, false,
+            );
             const row = rows.find(
                 entity => entity.id === '1',
             );
             if (row) return row;
-            const defaultEntity = {
-                id: '1',
-            } as T;
-            writeTable(tableName, [defaultEntity]);
-            return defaultEntity;
+            throw new Error(
+                'Singleton "' + tableName
+                + '" not found. Load data'
+                + ' via snapshots.',
+            );
         },
         async put(
             fields: Partial<T>,
         ): Promise<T> {
-            const rows = readTable<T>(tableName);
-            const serialized =
-                serializeRecord(fields);
+            const rows = readTable<T>(
+                tableName, false,
+            );
+            const serialized = serializeRecord(
+                fields, tableName,
+            );
             const index = rows.findIndex(
                 entity => entity.id === '1',
             );
@@ -365,194 +345,9 @@ export const TABLE_NAMES = [
     'project_version_projects',
 ];
 
-function migrateClarificationAnswers(
-): void {
-    const key =
-        KEY_PREFIX + 'clarifications';
-    const raw = localStorage.getItem(key);
-    if (raw === null) return;
-    try {
-        const rows = JSON.parse(raw);
-        if (!Array.isArray(rows)) return;
-        const needsMigration = rows.some(
-            (r: Record<string, unknown>) =>
-                'answer' in r,
-        );
-        if (!needsMigration) return;
-        const answers: Record<
-            string,
-            unknown
-        >[] = [];
-        const links: Record<
-            string,
-            unknown
-        >[] = [];
-        for (const row of rows) {
-            if (
-                typeof row.answer === 'string'
-                && row.answer !== ''
-            ) {
-                const answerId =
-                    `ca-${row.id}`;
-                answers.push({
-                    id: answerId,
-                    answer: row.answer,
-                });
-                links.push({
-                    id: `cac-${row.id}`,
-                    clarification_answer_id:
-                        answerId,
-                    clarification_id:
-                        row.id,
-                    created_at:
-                        typeof row.answered_at
-                            === 'string'
-                            && row.answered_at
-                                !== ''
-                            ? row.answered_at
-                            : nowUtc(),
-                });
-            }
-            delete row.answer;
-            delete row.answered_at;
-        }
-        localStorage.setItem(
-            key,
-            JSON.stringify(rows),
-        );
-        if (answers.length > 0) {
-            localStorage.setItem(
-                KEY_PREFIX
-                    + 'clarification_answers',
-                JSON.stringify(answers),
-            );
-            localStorage.setItem(
-                KEY_PREFIX
-                    + 'clarification_answer'
-                    + '_clarifications',
-                JSON.stringify(links),
-            );
-        }
-    } catch {
-        /* corrupt JSON — readTable will
-           throw when the page loads */
-    }
-}
-
-function migrateCrunchColumnAcronyms(
-): void {
-    const key =
-        KEY_PREFIX + 'crunch_columns';
-    const raw = localStorage.getItem(key);
-    if (raw === null) return;
-    try {
-        const rows = JSON.parse(raw);
-        if (!Array.isArray(rows)) return;
-        const needsMigration = rows.some(
-            (r: Record<string, unknown>) =>
-                'is_acronym' in r,
-        );
-        if (!needsMigration) return;
-        const acronyms: Record<
-            string,
-            unknown
-        >[] = [];
-        const links: Record<
-            string,
-            unknown
-        >[] = [];
-        for (const row of rows) {
-            if (
-                row.is_acronym === 1
-                || row.is_acronym === true
-            ) {
-                const acronymId =
-                    `cca-${row.id}`;
-                acronyms.push({
-                    id: acronymId,
-                    expansion:
-                        typeof row
-                            .acronym_expansion
-                            === 'string'
-                            ? row
-                                .acronym_expansion
-                            : '',
-                });
-                links.push({
-                    id: `ccal-${row.id}`,
-                    crunch_column_acronym_id:
-                        acronymId,
-                    crunch_column_id:
-                        row.id,
-                    created_at: nowUtc(),
-                });
-            }
-            delete row.is_acronym;
-            delete row.acronym_expansion;
-        }
-        localStorage.setItem(
-            key,
-            JSON.stringify(rows),
-        );
-        if (acronyms.length > 0) {
-            localStorage.setItem(
-                KEY_PREFIX
-                    + 'crunch_column_acronyms',
-                JSON.stringify(acronyms),
-            );
-            localStorage.setItem(
-                KEY_PREFIX
-                    + 'crunch_column'
-                    + '_acronym_links',
-                JSON.stringify(links),
-            );
-        }
-    } catch {
-        /* corrupt JSON — readTable will
-           throw when the page loads */
-    }
-}
 
 export async function createLocalStorageAdapter(
 ): Promise<DbAdapter> {
-    const oldAccountKey =
-        KEY_PREFIX + 'account_config';
-    const newAccountKey =
-        KEY_PREFIX + 'account';
-    if (
-        localStorage.getItem(oldAccountKey)
-            !== null
-        && localStorage.getItem(newAccountKey)
-            === null
-    ) {
-        localStorage.setItem(
-            newAccountKey,
-            localStorage.getItem(oldAccountKey)!,
-        );
-        localStorage.removeItem(oldAccountKey);
-    }
-
-    migrateRenamedFields('ideas', [
-        {
-            from: 'estimated_time',
-            to: 'estimated_duration',
-            transform: v => (v as number) * 3600,
-        },
-        {
-            from: 'effort_time_estimate',
-            to: 'effort_duration_estimate',
-        },
-    ]);
-    migrateRenamedFields('idea_scores', [
-        {
-            from: 'estimated_time',
-            to: 'estimated_duration',
-        },
-    ]);
-
-    migrateClarificationAnswers();
-    migrateCrunchColumnAcronyms();
-
     const adapter: DbAdapter = {
         async initialize(): Promise<void> {
         },

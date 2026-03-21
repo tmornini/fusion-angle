@@ -58,7 +58,7 @@ async function updateEmptyBanner(
                     + 'hsl(var(--primary));'
                     + 'flex-shrink:0'
                 }">${
-                    iconInfo(20)
+                    iconInfo(20, '')
                 }</span>
                 <p class="text-sm"
                     style="margin:0">${
@@ -119,7 +119,7 @@ function withWipeAndReload(
         pendingButton = button;
         pendingLabel = label;
         const msg =
-            $('#confirm-wipe-message');
+            $('#confirm-wipe-message', document);
         if (msg) {
             msg.textContent =
                 confirmMessage;
@@ -168,7 +168,7 @@ function buildOutlineBtn(
 }
 
 export async function init(): Promise<void> {
-    const root = $('#snapshots-content');
+    const root = $('#snapshots-content', document);
     if (!root) return;
 
     setHtml(root, html`
@@ -180,7 +180,7 @@ export async function init(): Promise<void> {
         }">
             <div style="${
                 iconBoxStyle('success')
-            }">${iconDownload(20)}</div>
+            }">${iconDownload(20, '')}</div>
             <div>
                 <h3 class="${
                     'text-sm font-semibold'
@@ -207,7 +207,7 @@ export async function init(): Promise<void> {
         }">
             <div style="${
                 iconBoxStyle('success')
-            }">${iconUpload(20)}</div>
+            }">${iconUpload(20, '')}</div>
             <div>
                 <h3 class="${
                     'text-sm font-semibold'
@@ -245,7 +245,7 @@ export async function init(): Promise<void> {
         }">
             <div style="${
                 iconBoxStyle('warning')
-            }">${iconDatabase(20)}</div>
+            }">${iconDatabase(20, '')}</div>
             <div>
                 <h3 class="${
                     'text-sm font-semibold'
@@ -274,7 +274,7 @@ export async function init(): Promise<void> {
         }">
             <div style="${
                 iconBoxStyle('error')
-            }">${iconTrash(20)}</div>
+            }">${iconTrash(20, '')}</div>
             <div>
                 <h3 class="${
                     'text-sm font-semibold'
@@ -372,7 +372,7 @@ export async function init(): Promise<void> {
         },
     );
 
-    $('#download-btn')?.addEventListener(
+    $('#download-btn', document)?.addEventListener(
         'click',
         async () => {
             try {
@@ -415,14 +415,14 @@ export async function init(): Promise<void> {
         },
     );
 
-    $('#confirm-wipe-cancel')
+    $('#confirm-wipe-cancel', document)
         ?.addEventListener('click', () => {
             pendingAction = null;
             pendingButton = null;
             pendingLabel = '';
             closeDialog('confirm-wipe');
         });
-    $('#confirm-wipe-backdrop')
+    $('#confirm-wipe-backdrop', document)
         ?.addEventListener('click', (e) => {
             if (e.target === e.currentTarget) {
                 pendingAction = null;
@@ -431,7 +431,7 @@ export async function init(): Promise<void> {
                 closeDialog('confirm-wipe');
             }
         });
-    $('#confirm-wipe-submit')
+    $('#confirm-wipe-submit', document)
         ?.addEventListener(
             'click',
             () => void executePendingAction(),

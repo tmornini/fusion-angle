@@ -90,13 +90,13 @@ function buildUploadStep(): SafeHtml {
                 <span class="${
                     'flex items-center gap-1'
                 }">
-                    ${iconFileSpreadsheet(14)}
+                    ${iconFileSpreadsheet(14, '')}
                     Spreadsheets
                 </span>
                 <span class="${
                     'flex items-center gap-1'
                 }">
-                    ${iconFileText(14)} CSV Files
+                    ${iconFileText(14, '')} CSV Files
                 </span>
             </div>
         </div>
@@ -207,7 +207,7 @@ function buildReviewStep(): SafeHtml {
 }
 
 export async function init(): Promise<void> {
-    const container = $('#crunch-content');
+    const container = $('#crunch-content', document);
     if (!container) return;
 
     const state: CrunchState = {
@@ -300,8 +300,8 @@ export async function init(): Promise<void> {
                     )}"
                 >
                     ${isComplete
-                        ? iconCheck(16)
-                        : s.icon(16)}
+                        ? iconCheck(16, '')
+                        : s.icon(16, '')}
                     <span
                         class="${
                             'text-sm'
@@ -971,7 +971,7 @@ export async function init(): Promise<void> {
                     )}
                 >
                     Continue to Review
-                    ${iconChevronRight(16)}
+                    ${iconChevronRight(16, '')}
                 </button>
             </div>
         </div>`;
@@ -1025,7 +1025,7 @@ export async function init(): Promise<void> {
             }
         });
         const contextField =
-            $textarea('#crunch-context');
+            $textarea('#crunch-context', document);
         if (contextField) {
             state.businessContext =
                 contextField.value;
@@ -1042,7 +1042,7 @@ export async function init(): Promise<void> {
                 <div
                     class="badge badge-primary
                            text-sm mb-3"
-                >${iconTable(14)
+                >${iconTable(14, '')
                     } Data Translation
                     Tool</div>
                 <h1
@@ -1091,7 +1091,7 @@ export async function init(): Promise<void> {
     }
 
     function mutateCrunchPage(): void {
-        const root = $('#crunch-content');
+        const root = $('#crunch-content', document);
         if (!root) return;
         setHtml(root, buildCrunchPage());
         bindCrunchEvents();
@@ -1100,7 +1100,7 @@ export async function init(): Promise<void> {
     function bindCrunchEvents(): void {
         if (state.step === 'upload') {
             const dropzone =
-                $('#crunch-dropzone');
+                $('#crunch-dropzone', document);
             dropzone?.addEventListener(
                 'click',
                 () => {
@@ -1119,7 +1119,7 @@ export async function init(): Promise<void> {
 
         if (state.step === 'label') {
             $$(
-                '[data-column-toggle]',
+                '[data-column-toggle]', document,
             ).forEach(el => {
                 el.addEventListener(
                     'click',
@@ -1144,7 +1144,7 @@ export async function init(): Promise<void> {
 
             $$(
                 '[data-column-id]'
-                + '[data-field-name]',
+                + '[data-field-name]', document,
             ).forEach(el => {
                 el.addEventListener(
                     'input',
@@ -1153,7 +1153,7 @@ export async function init(): Promise<void> {
                         const reviewBtn =
                             $(
                                 '#crunch-to'
-                                + '-review',
+                                + '-review', document,
                             );
                         if (
                             reviewBtn
@@ -1169,7 +1169,7 @@ export async function init(): Promise<void> {
                 );
             });
 
-            $('#crunch-back-upload')
+            $('#crunch-back-upload', document)
                 ?.addEventListener(
                     'click',
                     () => {
@@ -1179,7 +1179,7 @@ export async function init(): Promise<void> {
                         mutateCrunchPage();
                     },
                 );
-            $('#crunch-to-review')
+            $('#crunch-to-review', document)
                 ?.addEventListener(
                     'click',
                     () => {
@@ -1192,7 +1192,7 @@ export async function init(): Promise<void> {
         }
 
         if (state.step === 'review') {
-            $('#crunch-edit-labels')
+            $('#crunch-edit-labels', document)
                 ?.addEventListener(
                     'click',
                     () => {
@@ -1201,7 +1201,7 @@ export async function init(): Promise<void> {
                         mutateCrunchPage();
                     },
                 );
-            $('#crunch-to-dashboard')
+            $('#crunch-to-dashboard', document)
                 ?.addEventListener(
                     'click',
                     () => navigateTo(
@@ -1221,6 +1221,7 @@ export async function init(): Promise<void> {
             buildErrorState(
                 'Failed to load'
                 + ' Crunch data.',
+                'Try Again',
             ),
         );
         container

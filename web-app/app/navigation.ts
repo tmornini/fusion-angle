@@ -1,7 +1,16 @@
 import { PAGE_REGISTRY } from './page-registry';
 
 function getPageName(): string {
-    return document.documentElement.getAttribute('data-page') || '';
+    const name = document
+        .documentElement
+        .getAttribute('data-page');
+    if (!name) {
+        throw new Error(
+            'Missing data-page attribute'
+            + ' on <html>',
+        );
+    }
+    return name;
 }
 
 function getParams(): Record<string, string> {
@@ -19,12 +28,13 @@ function buildPageUrl(
     params?: Record<string, string>,
 ): string {
     const entry = PAGE_REGISTRY[page];
-    let url: string;
-    if (entry?.sourceFile) {
-        url = `../${entry.sourceDir || page}/${entry.sourceFile}.html`;
-    } else {
-        url = `../${entry?.sourceDir || page}/index.html`;
+    if (!entry) {
+        throw new Error(
+            `Unknown page: "${page}"`,
+        );
     }
+    let url = `../${entry.sourceDir}`
+        + `/${entry.sourceFile}.html`;
     if (params && Object.keys(params).length > 0) {
         url += '?' + new URLSearchParams(params).toString();
     }

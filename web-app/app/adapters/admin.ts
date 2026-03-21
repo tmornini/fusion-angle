@@ -152,8 +152,7 @@ export async function getAccount(
             .map(a => {
                 const actor = userName(
                     userMap,
-                    actorMap.get(a.id)
-                        ?? '',
+                    actorMap.get(a.id)!,
                 );
                 const activity =
                     new Activity(
@@ -289,8 +288,7 @@ export async function getActivityFeed(
             a,
             userName(
                 userMap,
-                actorMap.get(a.id)
-                    ?? '',
+                actorMap.get(a.id)!,
             ),
         ),
     );

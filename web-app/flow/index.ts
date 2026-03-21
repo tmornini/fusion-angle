@@ -76,7 +76,7 @@ function buildFlowCard(
                         + ' items-center'
                         + ' gap-1'
                     }">${
-                        iconListTodo(14)
+                        iconListTodo(14, '')
                     } ${
                         flow.stepsCount
                     } ${
@@ -100,18 +100,16 @@ function buildFlowCard(
 }
 
 export async function init(): Promise<void> {
-    const listEl = $('#flow-list');
+    const listEl = $('#flow-list', document);
     if (!listEl) return;
 
     const result = await withLoadingState(
         listEl,
-        buildSkeleton('card-list', {
-            count: 4,
-        }),
+        buildSkeleton('card-list', 4),
         getFlows,
         init,
         {
-            icon: iconGitBranch(24),
+            icon: iconGitBranch(24, ''),
             title:
                 'No Processes Documented',
             description:
@@ -133,15 +131,15 @@ export async function init(): Promise<void> {
         [
             '#page-badge',
             html`${
-                iconGitBranch(14)
+                iconGitBranch(14, '')
             } Process Documentation`,
         ],
         [
             '#search-field-icon',
-            iconSearch(16),
+            iconSearch(16, ''),
         ],
     ]);
-    $('#page-badge')?.classList
+    $('#page-badge', document)?.classList
         .remove('hidden');
     const totalSteps = flows.reduce(
         (sum, flow) =>
@@ -151,7 +149,7 @@ export async function init(): Promise<void> {
     const departments = new Set(
         flows.map(flow => flow.department),
     );
-    const statsEl = $('#flow-stats');
+    const statsEl = $('#flow-stats', document);
     if (statsEl) {
         const statBoxStyle = (bg: string) =>
             'p-2 rounded-lg';
@@ -242,7 +240,7 @@ export async function init(): Promise<void> {
     }
 
     const filterEl = $select(
-        '#flow-department-filter',
+        '#flow-department-filter', document,
     );
     if (filterEl) {
         for (
@@ -259,7 +257,7 @@ export async function init(): Promise<void> {
         }
     }
 
-    const emptyEl = $('#flow-empty');
+    const emptyEl = $('#flow-empty', document);
     if (emptyEl) {
         setHtml(
             emptyEl,
@@ -281,12 +279,12 @@ export async function init(): Promise<void> {
 
     function mutateFilteredList() {
         const search = (
-            $input('#flow-search')?.value
+            $input('#flow-search', document)?.value
             ?? ''
         ).toLowerCase();
         const department =
             $select(
-                '#flow-department-filter',
+                '#flow-department-filter', document,
             )?.value ?? 'all';
         const filtered = flows.filter(
             flow => {
@@ -307,8 +305,8 @@ export async function init(): Promise<void> {
                 );
             },
         );
-        const list = $('#flow-list');
-        const empty = $('#flow-empty');
+        const list = $('#flow-list', document);
+        const empty = $('#flow-empty', document);
         if (list) {
             setHtml(
                 list,
@@ -356,13 +354,13 @@ export async function init(): Promise<void> {
     );
 
     $(
-        '#flow-search',
+        '#flow-search', document,
     )?.addEventListener(
         'input',
         mutateFilteredList,
     );
     $(
-        '#flow-department-filter',
+        '#flow-department-filter', document,
     )?.addEventListener(
         'change',
         mutateFilteredList,

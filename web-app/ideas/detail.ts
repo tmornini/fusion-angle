@@ -26,7 +26,7 @@ import {
 } from '../app/icons';
 import {
     navigateTo, formatDate,
-    SECONDS_PER_DAY,
+    SECONDS_PER_DAY, displayText,
 } from '../app/core';
 import {
     getIdeaDetail,
@@ -66,9 +66,10 @@ function buildProblemSolutionCard(
                             .problemStatement
                         }</textarea>`
                     : html`<p class="text-sm">
-                        ${idea
-                            .problemStatement
-                            || '\u2014'}
+                        ${displayText(
+                            idea
+                                .problemStatement,
+                        )}
                         </p>`}
             </div>
             <div>
@@ -90,8 +91,9 @@ function buildProblemSolutionCard(
                             .description
                         }</textarea>`
                     : html`<p class="text-sm">
-                        ${idea.description
-                            || '\u2014'}
+                        ${displayText(
+                            idea.description,
+                        )}
                         </p>`}
             </div>
             <div>
@@ -113,9 +115,10 @@ function buildProblemSolutionCard(
                             .proposedSolution
                         }</textarea>`
                     : html`<p class="text-sm">
-                        ${idea
-                            .proposedSolution
-                            || '\u2014'}
+                        ${displayText(
+                            idea
+                                .proposedSolution,
+                        )}
                         </p>`}
             </div>
             <div>
@@ -137,9 +140,10 @@ function buildProblemSolutionCard(
                             .expectedOutcome
                         }</textarea>`
                     : html`<p class="text-sm">
-                        ${idea
-                            .expectedOutcome
-                            || '\u2014'}
+                        ${displayText(
+                            idea
+                                .expectedOutcome,
+                        )}
                         </p>`}
             </div>
             <div>
@@ -161,9 +165,10 @@ function buildProblemSolutionCard(
                             .successMetrics
                         }</textarea>`
                     : html`<p class="text-sm">
-                        ${idea
-                            .successMetrics
-                            || '\u2014'}
+                        ${displayText(
+                            idea
+                                .successMetrics,
+                        )}
                         </p>`}
             </div>
         </div>
@@ -200,8 +205,9 @@ function buildDetailsCard(
                         class="${
                             'text-sm font-medium'
                         }">
-                        ${idea.category
-                            || '\u2014'}
+                        ${displayText(
+                            idea.category,
+                        )}
                     </p>`}
             </div>
             <div>
@@ -213,7 +219,9 @@ function buildDetailsCard(
                 <p class="${
                     'text-sm font-medium'
                 }">
-                    ${idea.submittedBy}
+                    ${displayText(
+                        idea.submittedBy,
+                    )}
                 </p>
             </div>
             <div>
@@ -229,7 +237,7 @@ function buildDetailsCard(
                         ? formatDate(
                             idea.submittedAt,
                         )
-                        : '\u2014'}
+                        : displayText('')}
                 </p>
             </div>
         </div>
@@ -347,7 +355,7 @@ function buildIdeaDetail(
                         'btn btn-ghost btn-icon'
                     }"
                     id="idea-back-btn">
-                    ${iconArrowLeft(20)}
+                    ${iconArrowLeft(20, '')}
                 </button>
                 <div>
                     <div class="flex flex-wrap
@@ -386,7 +394,7 @@ function buildIdeaDetail(
                             ${idea
                                 .edgeStatusClassName()}
                             text-xs">
-                            ${iconTarget(12)}
+                            ${iconTarget(12, '')}
                             ${idea
                                 .edgeStatusLabel()}
                         </span>
@@ -400,7 +408,7 @@ function buildIdeaDetail(
                             + 'font-size:'
                             + '0.875rem;'
                         }${idea.scoreStyle()}">
-                            ${iconStar(14)}
+                            ${iconStar(14, '')}
                             ${idea.score}
                         </div>
                     </div>
@@ -408,7 +416,9 @@ function buildIdeaDetail(
                         'text-sm text-muted'
                     }">
                         Submitted by
-                        ${idea.submittedBy}
+                        ${displayText(
+                            idea.submittedBy,
+                        )}
                     </p>
                 </div>
             </div>
@@ -430,7 +440,7 @@ function buildIdeaDetail(
                         + 'var(--primary))'
                     }"
                     id="idea-edge-btn">
-                    ${iconTarget(16)}
+                    ${iconTarget(16, '')}
                     Define Edge
                 </button>` : html``}
                 ${idea.isReviewable()
@@ -447,7 +457,7 @@ function buildIdeaDetail(
                         + 'var(--warning))'
                     }"
                     id="idea-review-btn">
-                    ${iconClipboardCheck(16)}
+                    ${iconClipboardCheck(16, '')}
                     Review
                 </button>` : html``}
                 ${idea.isConvertible()
@@ -458,7 +468,7 @@ function buildIdeaDetail(
                         + ' btn-sm gap-2'
                     }"
                     id="idea-convert-btn">
-                    ${iconArrowRight(16)}
+                    ${iconArrowRight(16, '')}
                     Convert
                 </button>` : html``}
                 ${state.isEditing
@@ -472,7 +482,7 @@ function buildIdeaDetail(
                             id="${
                                 'idea-cancel-btn'
                             }">
-                            ${iconX(16)} Cancel
+                            ${iconX(16, '')} Cancel
                         </button>
                         <button
                             class="${
@@ -482,7 +492,7 @@ function buildIdeaDetail(
                             id="${
                                 'idea-save-btn'
                             }">
-                            ${iconSave(16)} Save
+                            ${iconSave(16, '')} Save
                         </button>
                     </div>`
                     : html`<button
@@ -491,7 +501,7 @@ function buildIdeaDetail(
                             + ' gap-2'
                         }"
                         id="idea-edit-btn">
-                        ${iconEdit(16)} Edit
+                        ${iconEdit(16, '')} Edit
                     </button>`}
             </div>
         </div>
@@ -510,13 +520,13 @@ function bindIdeaEvents(
     idea: Idea,
     ideaId: string,
 ): void {
-    $('#idea-back-btn')
+    $('#idea-back-btn', document)
         ?.addEventListener(
             'click',
             () => navigateTo('ideas'),
         );
 
-    $('#idea-edit-btn')
+    $('#idea-edit-btn', document)
         ?.addEventListener(
             'click',
             () => {
@@ -527,7 +537,7 @@ function bindIdeaEvents(
             },
         );
 
-    $('#idea-cancel-btn')
+    $('#idea-cancel-btn', document)
         ?.addEventListener(
             'click',
             () => {
@@ -538,60 +548,60 @@ function bindIdeaEvents(
             },
         );
 
-    $('#idea-save-btn')
+    $('#idea-save-btn', document)
         ?.addEventListener(
             'click',
             async () => {
                 const title =
                     $input(
-                        '#idea-edit-title',
+                        '#idea-edit-title', document,
                     )?.value
                     ?? idea.title;
                 const description =
                     $textarea(
-                        '#idea-edit-target-users',
+                        '#idea-edit-target-users', document,
                     )?.value
                     ?? idea.description;
                 const category =
                     $input(
-                        '#idea-edit-category',
+                        '#idea-edit-category', document,
                     )?.value
                     ?? idea.category;
                 const problemStatement =
                     $textarea(
-                        '#idea-edit-problem',
+                        '#idea-edit-problem', document,
                     )?.value
                     ?? idea.problemStatement;
                 const proposedSolution =
                     $textarea(
-                        '#idea-edit-solution',
+                        '#idea-edit-solution', document,
                     )?.value
                     ?? idea.proposedSolution;
                 const expectedOutcome =
                     $textarea(
-                        '#idea-edit-outcome',
+                        '#idea-edit-outcome', document,
                     )?.value
                     ?? idea.expectedOutcome;
                 const successMetrics =
                     $textarea(
-                        '#idea-edit-metrics',
+                        '#idea-edit-metrics', document,
                     )?.value
                     ?? idea.successMetrics;
                 const impact = Number(
                     $input(
-                        '#idea-edit-impact',
+                        '#idea-edit-impact', document,
                     )?.value
                     ?? idea.estimatedImpact,
                 );
                 const duration = Number(
                     $input(
-                        '#idea-edit-duration',
+                        '#idea-edit-duration', document,
                     )?.value
                     ?? idea.durationInDays(),
                 );
                 const cost = Number(
                     $input(
-                        '#idea-edit-cost',
+                        '#idea-edit-cost', document,
                     )?.value
                     ?? idea.estimatedCost,
                 );
@@ -640,7 +650,7 @@ function bindIdeaEvents(
             },
         );
 
-    $('#idea-edge-btn')
+    $('#idea-edge-btn', document)
         ?.addEventListener(
             'click',
             () => navigateTo(
@@ -648,7 +658,7 @@ function bindIdeaEvents(
                 { ideaId },
             ),
         );
-    $('#idea-review-btn')
+    $('#idea-review-btn', document)
         ?.addEventListener(
             'click',
             () => navigateTo(
@@ -656,7 +666,7 @@ function bindIdeaEvents(
                 { id: ideaId },
             ),
         );
-    $('#idea-convert-btn')
+    $('#idea-convert-btn', document)
         ?.addEventListener(
             'click',
             () => navigateTo(
@@ -671,7 +681,7 @@ function mutateIdeaPage(
     ideaId: string,
 ): void {
     const container = $(
-        '#idea-detail-content',
+        '#idea-detail-content', document,
     );
     if (!container) return;
     setHtml(
@@ -689,13 +699,13 @@ export async function init(
     state.isEditing = false;
 
     const container = $(
-        '#idea-detail-content',
+        '#idea-detail-content', document,
     );
     if (!container) return;
 
     const idea = await withLoadingState(
         container,
-        buildSkeleton('detail'),
+        buildSkeleton('detail', 4),
         () => getIdeaDetail(ideaId),
         () => init(params),
     );

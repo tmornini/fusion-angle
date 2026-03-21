@@ -40,10 +40,10 @@ const SIDEBAR_USER_COMPANY_IDS = [
 function mutateThemeToggleIcon(): void {
     const themeIcon =
         state.theme === 'dark'
-            ? iconMoon(20)
+            ? iconMoon(20, '')
             : state.theme === 'light'
-                ? iconSun(20)
-                : iconMonitor(20);
+                ? iconSun(20, '')
+                : iconMonitor(20, '');
     const themeLabel =
         state.theme === 'dark'
             ? 'Switch to light theme'
@@ -51,7 +51,7 @@ function mutateThemeToggleIcon(): void {
                 ? 'Switch to dark theme'
                 : 'Toggle theme';
     THEME_TOGGLE_IDS.forEach(id => {
-        const button = $(`#${id}`);
+        const button = $(`#${id}`, document);
         if (button) {
             setHtml(button, themeIcon);
             button.setAttribute(
@@ -72,14 +72,14 @@ async function mutateSidebarUser(
         for (const id of
             SIDEBAR_USER_NAME_IDS
         ) {
-            const el = $(`#${id}`);
+            const el = $(`#${id}`, document);
             if (el)
                 el.textContent = user.name;
         }
         for (const id of
             SIDEBAR_USER_COMPANY_IDS
         ) {
-            const el = $(`#${id}`);
+            const el = $(`#${id}`, document);
             if (el)
                 el.textContent = user.company;
         }
@@ -115,7 +115,7 @@ const NAV_GROUP_CHILDREN:
 
 function initActiveNavItem(): void {
     const pageName = getPageName();
-    $$('[data-page-link]').forEach(
+    $$('[data-page-link]', document).forEach(
         navLink => {
             const linkPage =
                 navLink.getAttribute(
@@ -142,9 +142,9 @@ function initActiveNavItem(): void {
 
 function initSidebar(): void {
     const sidebar =
-        $('#desktop-sidebar');
+        $('#desktop-sidebar', document);
     const mainContent =
-        $('.main-content');
+        $('.main-content', document);
 
     if (
         localStorage.getItem(
@@ -190,16 +190,16 @@ function initSidebar(): void {
         }
     }
 
-    $('#sidebar-collapse')?.addEventListener(
+    $('#sidebar-collapse', document)?.addEventListener(
         'click',
         () => setSidebarCollapsed(true),
     );
-    $('#sidebar-expand')?.addEventListener(
+    $('#sidebar-expand', document)?.addEventListener(
         'click',
         () => setSidebarCollapsed(false),
     );
 
-    $$('[data-section]').forEach(btn => {
+    $$('[data-section]', document).forEach(btn => {
         btn.addEventListener(
             'click',
             () => {
@@ -209,7 +209,7 @@ function initSidebar(): void {
                     );
                 const items = $(
                     `[data-section-items=`
-                    + `"${label}"]`,
+                    + `"${label}"]`, document,
                 );
                 if (items) {
                     const isCollapsed =
@@ -244,15 +244,15 @@ function initDropdown(
     toggleId: string,
     contentId: string,
 ): void {
-    const toggle = $(`#${toggleId}`);
-    const content = $(`#${contentId}`);
+    const toggle = $(`#${toggleId}`, document);
+    const content = $(`#${contentId}`, document);
     if (!toggle || !content) return;
 
     toggle.addEventListener(
         'click',
         (e) => {
             e.stopPropagation();
-            $$('.dropdown-content').forEach(
+            $$('.dropdown-content', document).forEach(
                 dropdown => {
                     if (
                         dropdown.id
@@ -299,7 +299,7 @@ function initThemeAndDropdowns(): void {
         );
     }
 
-    $$('[data-theme-set]').forEach(
+    $$('[data-theme-set]', document).forEach(
         themeButton => {
             themeButton.addEventListener(
                 'click',
@@ -313,7 +313,7 @@ function initThemeAndDropdowns(): void {
                         setTheme(theme);
                         mutateThemeToggleIcon();
                         $$(
-                            '.dropdown-content',
+                            '.dropdown-content', document,
                         ).forEach(
                             dropdown =>
                                 dropdown
@@ -331,9 +331,9 @@ function initThemeAndDropdowns(): void {
 
 function initMobileDrawer(): void {
     const sheet =
-        $('#mobile-sheet');
+        $('#mobile-sheet', document);
     const backdrop =
-        $('#mobile-sheet-backdrop');
+        $('#mobile-sheet-backdrop', document);
     let drawerPreviousFocus:
         HTMLElement | null = null;
 
@@ -363,7 +363,7 @@ function initMobileDrawer(): void {
     }
 
     $(
-        '#mobile-sidebar-open',
+        '#mobile-sidebar-open', document,
     )?.addEventListener(
         'click',
         openDrawer,
@@ -422,22 +422,22 @@ function initMobileDrawer(): void {
     );
 
     $(
-        '#mobile-search-toggle',
+        '#mobile-search-toggle', document,
     )?.addEventListener(
         'click',
         () => {
             $(
-                '#mobile-search-bar',
+                '#mobile-search-bar', document,
             )?.classList.remove('hidden');
         },
     );
     $(
-        '#mobile-search-close',
+        '#mobile-search-close', document,
     )?.addEventListener(
         'click',
         () => {
             $(
-                '#mobile-search-bar',
+                '#mobile-search-bar', document,
             )?.classList.add('hidden');
         },
     );
@@ -462,7 +462,7 @@ async function mutateHeaderInfo(
             ]);
 
         const greetingEl =
-            $('#header-greeting');
+            $('#header-greeting', document);
         if (greetingEl) {
             setHtml(
                 greetingEl,
@@ -478,7 +478,7 @@ getTimeOfDay()},</span> ${user.name}`,
         }
 
         const statsEl =
-            $('#header-stats');
+            $('#header-stats', document);
         if (statsEl) {
             setHtml(
                 statsEl,

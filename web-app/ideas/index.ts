@@ -30,7 +30,9 @@ import {
     iconLightbulb,
     iconTarget,
 } from '../app/icons';
-import { navigateTo } from '../app/core';
+import {
+    navigateTo, displayText,
+} from '../app/core';
 import {
     getIdeas,
     type Idea,
@@ -51,7 +53,7 @@ function buildIdeaCard(
                     /0.5);
                     margin-top:0.25rem;
                     cursor:grab">
-                ${iconGripVertical(20)}
+                ${iconGripVertical(20, '')}
             </div>
             <div style="flex:1;min-width:0">
                 <div class="flex items-start
@@ -86,7 +88,7 @@ function buildIdeaCard(
                                     .edgeStatusClassName()
                                 + ' text-xs'
                             }">
-                                ${iconTarget(12)}
+                                ${iconTarget(12, '')}
                                 ${idea
                                     .edgeStatusLabel()}
                             </span>
@@ -109,7 +111,9 @@ function buildIdeaCard(
                                 : html``}
                             <span>
                                 by ${
-                                    idea.submittedBy
+                                    displayText(
+                                        idea.submittedBy,
+                                    )
                                 }
                             </span>
                         </div>
@@ -122,7 +126,7 @@ function buildIdeaCard(
                         + 'font-weight:600;'
                         + 'font-size:0.875rem;'
                     }${idea.scoreStyle()}">
-                        ${iconStar(14)
+                        ${iconStar(14, '')
                         } ${idea.score}
                     </div>
                 </div>
@@ -281,9 +285,13 @@ function buildIdeaCard(
                                         + ' font-'
                                         + 'medium'
                                     }">
-                                    ${idea
-                                        .estimatedImpact
-                                        || '\u2014'}
+                                    ${displayText(
+                                        String(
+                                            idea
+                                                .estimatedImpact
+                                            || '',
+                                        ),
+                                    )}
                                 </p>
                             </div>
                         </div>
@@ -304,7 +312,7 @@ function buildIdeaCard(
                             }"
                             data-idea-view="${
                                 idea.id}">
-                            ${iconEye(16)}
+                            ${iconEye(16, '')}
                             <span class="${
                                 'hidden-mobile'
                             }">
@@ -329,7 +337,7 @@ function buildIdeaCard(
                             }"
                             data-idea-edge="${
                                 idea.id}">
-                            ${iconTarget(16)}
+                            ${iconTarget(16, '')}
                             <span
                                 class="${
                                     'hidden-'
@@ -356,7 +364,7 @@ function buildIdeaCard(
                             data-idea-review="${
                                 idea.id}">
                             ${iconClipboardCheck(
-                                16,
+                                16, '',
                             )}
                             <span
                                 class="${
@@ -375,7 +383,7 @@ function buildIdeaCard(
                             }"
                             data-idea-convert="${
                                 idea.id}">
-                            ${iconArrowRight(16)}
+                            ${iconArrowRight(16, '')}
                             <span
                                 class="${
                                     'hidden-'
@@ -392,34 +400,32 @@ function buildIdeaCard(
 }
 
 export async function init(): Promise<void> {
-    const listContainer = $('#ideas-list');
+    const listContainer = $('#ideas-list', document);
     if (!listContainer) return;
 
     const result = await withLoadingState(
         listContainer,
-        buildSkeleton(
-            'card-list', { count: 4 },
-        ),
+        buildSkeleton('card-list', 4),
         getIdeas,
         init,
         {
-            icon: iconLightbulb(24),
+            icon: iconLightbulb(24, ''),
             title: 'No Ideas Yet',
             description:
                 'Start innovating by'
                 + ' creating'
                 + ' your first idea.',
             action: {
-                label: html`${iconPlus(16)}
+                label: html`${iconPlus(16, '')}
                     Create Your First Idea
-                    ${iconWand(16)}`,
+                    ${iconWand(16, '')}`,
                 href:
                     '../idea-create'
                     + '/index.html',
             },
             onEmpty: () => {
                 $(
-                    '#create-idea-btn',
+                    '#create-idea-btn', document,
                 )?.remove();
             },
         },
@@ -430,22 +436,22 @@ export async function init(): Promise<void> {
     let currentView = 'priority';
 
     populateIcons([
-        ['#create-btn-icon', iconPlus(16)],
+        ['#create-btn-icon', iconPlus(16, '')],
         [
             '#create-btn-accent',
-            iconWand(16),
+            iconWand(16, ''),
         ],
         [
             '#priority-view-icon',
-            iconLayoutGrid(16),
+            iconLayoutGrid(16, ''),
         ],
         [
             '#performance-view-icon',
-            iconBarChart(16),
+            iconBarChart(16, ''),
         ],
     ]);
 
-    const flowEl = $('#flow-indicator');
+    const flowEl = $('#flow-indicator', document);
     if (flowEl) {
         setHtml(flowEl, html`
         ${iconLightbulb(16, 'text-primary')}
@@ -474,7 +480,7 @@ export async function init(): Promise<void> {
         .filter(idea => idea.isInReview())
         .length;
     const reviewBtnEl = $(
-        '#review-queue-btn',
+        '#review-queue-btn', document,
     );
     if (reviewBtnEl
         && pendingReviewCount > 0) {
@@ -485,12 +491,12 @@ export async function init(): Promise<void> {
                 var(--warning)/0.3);
                 color:hsl(var(--warning))"
             id="review-queue-nav">
-            ${iconClipboardCheck(16)}
+            ${iconClipboardCheck(16, '')}
             <span class="hidden-mobile">
                 Review Queue
             </span> (${pendingReviewCount})
         </button>`);
-        $('#review-queue-nav')
+        $('#review-queue-nav', document)
             ?.addEventListener(
                 'click',
                 () => navigateTo(
@@ -499,7 +505,7 @@ export async function init(): Promise<void> {
             );
     }
 
-    $('#create-idea-btn')
+    $('#create-idea-btn', document)
         ?.addEventListener(
             'click',
             () => navigateTo(
@@ -520,7 +526,7 @@ export async function init(): Promise<void> {
                         b.score - a.score,
                 );
 
-        const list = $('#ideas-list');
+        const list = $('#ideas-list', document);
         if (list)
             setHtml(list, html`${sorted.map(
                 idea => buildIdeaCard(
@@ -529,7 +535,7 @@ export async function init(): Promise<void> {
                 ),
             )}`);
 
-        const count = $('#ideas-count');
+        const count = $('#ideas-count', document);
         if (count)
             count.textContent =
                 `${sorted.length} `
@@ -550,7 +556,7 @@ export async function init(): Promise<void> {
         },
     );
 
-    $('#ideas-list')?.addEventListener(
+    $('#ideas-list', document)?.addEventListener(
         'click',
         (e) => {
             if (

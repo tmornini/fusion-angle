@@ -19,6 +19,7 @@ import {
 } from '../app/icons';
 import {
     navigateTo, initDialog, closeDialog,
+    displayText,
 } from '../app/core';
 import {
     getIdeaForApproval,
@@ -52,7 +53,7 @@ export async function init(
 
     function buildApprovalPage(
         idea: ApprovalIdea,
-        edge: ApprovalEdge,
+        edge: ApprovalEdge | null,
     ): SafeHtml {
         return html`
     <div style=${'min-height:100vh;'
@@ -86,7 +87,7 @@ export async function init(
                                 'approval-back'
                                 + '-btn'
                             }">
-                            ${iconArrowLeft(20)}
+                            ${iconArrowLeft(20, '')}
                         </button>
                         <div style="${
                             'min-width:0'
@@ -137,7 +138,7 @@ export async function init(
                             id=${'approval'
                                 + '-cancel'
                                 + '-edit-btn'}>
-                            ${iconX(16)} Cancel
+                            ${iconX(16, '')} Cancel
                         </button>
                         <button
                             class="${
@@ -147,7 +148,7 @@ export async function init(
                             id=${'approval'
                                 + '-save'
                                 + '-edit-btn'}>
-                            ${iconSave(16)} Save
+                            ${iconSave(16, '')} Save
                         </button>`
                             : html`
                         <button
@@ -159,7 +160,7 @@ export async function init(
                                 'approval'
                                 + '-edit-btn'
                             }">
-                            ${iconEdit(16)} Edit
+                            ${iconEdit(16, '')} Edit
                         </button>
                         <span
                             class="badge
@@ -182,37 +183,39 @@ export async function init(
                 <span
                     class="flex items-center
                         gap-1">
-                    ${iconUser(16)}
+                    ${iconUser(16, '')}
                     <span
                         class="font-medium"
                         style=${'color:'
                             + 'hsl(var('
                             + '--foreground))'}>
-                        ${idea.submittedBy}
+                        ${displayText(
+                            idea.submittedBy,
+                        )}
                     </span>
                 </span>
                 <span
                     class="flex items-center
                         gap-1">
-                    ${iconCalendar(16)}
+                    ${iconCalendar(16, '')}
                     ${idea.submittedAt}
                 </span>
                 <span
                     class="flex items-center
                         gap-1">
-                    ${iconTarget(16)}
+                    ${iconTarget(16, '')}
                     ${idea.category}
                 </span>
                 <span
                     class="flex items-center
                         gap-1 hidden-mobile">
-                    ${iconFileText(16)}
+                    ${iconFileText(16, '')}
                     3 attachments
                 </span>
                 <span
                     class="flex items-center
                         gap-1 hidden-mobile">
-                    ${iconMessageSquare(16)}
+                    ${iconMessageSquare(16, '')}
                     7 comments
                 </span>
             </div>
@@ -349,7 +352,7 @@ export async function init(
                         + ' flex items-center'
                         + ' gap-2'
                     }">
-                        ${iconTrendingUp(20)}
+                        ${iconTrendingUp(20, '')}
                         Expected Impact
                     </h3>
                     <p class="text-sm">${
@@ -362,7 +365,7 @@ export async function init(
                         + ' flex items-center'
                         + ' gap-2'
                     }">
-                        ${iconClock(20)}
+                        ${iconClock(20, '')}
                         Effort Required
                     </h3>
                     <div style=${
@@ -433,6 +436,7 @@ export async function init(
                 }</p>
             </div>
 
+            ${edge ? html`
             <div class="card p-6 mb-6"
                 style=${'background:'
                     + 'linear-gradient('
@@ -463,7 +467,7 @@ export async function init(
                         + ' badge-success'
                         + ' text-xs'
                     }">
-                        ${iconShield(12)}
+                        ${iconShield(12, '')}
                         High Confidence
                     </span>
                 </div>
@@ -592,7 +596,7 @@ export async function init(
                                     + 'hsl(var('
                                     + '--success'
                                     + '))'}>
-                                ${iconClock(14)}
+                                ${iconClock(14, '')}
                                 ${'Short-term'
                                     + ' (0-3mo)'}
                             </span>
@@ -622,7 +626,7 @@ export async function init(
                                     + 'hsl(var('
                                     + '--warning'
                                     + '))'}>
-                                ${iconClock(14)}
+                                ${iconClock(14, '')}
                                 ${'Mid-term'
                                     + ' (3-12mo)'}
                             </span>
@@ -650,7 +654,7 @@ export async function init(
                                     + ' text-'
                                     + 'primary'
                                 }">
-                                ${iconClock(14)}
+                                ${iconClock(14, '')}
                                 ${'Long-term'
                                     + ' (12+mo)'}
                             </span>
@@ -677,6 +681,7 @@ export async function init(
                     }</span>
                 </div>
             </div>
+            ` : html``}
 
             ${idea.risks.length
                 ? html`
@@ -685,7 +690,7 @@ export async function init(
                     'font-semibold mb-4'
                     + ' flex items-center gap-2'
                 }">
-                    ${iconAlertTriangle(20)}
+                    ${iconAlertTriangle(20, '')}
                     Identified Risks
                 </h3>
                 <div style=${'display:flex;'
@@ -810,7 +815,7 @@ export async function init(
                             'approval-clarify'
                             + '-btn'
                         }">
-                        ${iconMessageSquare(16)}
+                        ${iconMessageSquare(16, '')}
                         <span class="${
                             'hidden-mobile'
                         }">
@@ -835,7 +840,7 @@ export async function init(
                                 'approval-reject'
                                 + '-btn'
                             }">
-                            ${iconXCircle(16)}
+                            ${iconXCircle(16, '')}
                             <span
                                 class="${
                                     'hidden-'
@@ -858,7 +863,7 @@ export async function init(
                             }"
                             id=${'approval'
                                 + '-approve-btn'}>
-                            ${iconCheckCircle(16)}
+                            ${iconCheckCircle(16, '')}
                             Approve
                         </button>
                     </div>
@@ -999,10 +1004,10 @@ export async function init(
 
     function bindApprovalEvents(
         idea: ApprovalIdea,
-        edge: ApprovalEdge,
+        edge: ApprovalEdge | null,
         id: string,
     ): void {
-        $('#approval-approve-btn')
+        $('#approval-approve-btn', document)
             ?.addEventListener(
                 'click',
                 async () => {
@@ -1023,7 +1028,7 @@ export async function init(
                 },
             );
 
-        $('#approval-back-btn')
+        $('#approval-back-btn', document)
             ?.addEventListener(
                 'click',
                 () => navigateTo(
@@ -1031,7 +1036,7 @@ export async function init(
                 ),
             );
 
-        $('#approval-edit-btn')
+        $('#approval-edit-btn', document)
             ?.addEventListener(
                 'click',
                 () => {
@@ -1045,7 +1050,7 @@ export async function init(
                 },
             );
 
-        $('#approval-cancel-edit-btn')
+        $('#approval-cancel-edit-btn', document)
             ?.addEventListener(
                 'click',
                 () => {
@@ -1059,18 +1064,18 @@ export async function init(
                 },
             );
 
-        $('#approval-save-edit-btn')
+        $('#approval-save-edit-btn', document)
             ?.addEventListener(
                 'click',
                 async () => {
                     const titleEl = $input(
                         '#approval-edit'
-                        + '-title',
+                        + '-title', document,
                     );
                     const descEl =
                         $textarea(
                             '#approval-edit'
-                            + '-description',
+                            + '-description', document,
                         );
                     const title =
                         titleEl?.value
@@ -1125,7 +1130,7 @@ export async function init(
             openBtnId:
                 'approval-reject-btn',
         });
-        $('#approval-reject-confirm')
+        $('#approval-reject-confirm', document)
             ?.addEventListener(
                 'click',
                 async () => {
@@ -1153,7 +1158,7 @@ export async function init(
             openBtnId:
                 'approval-clarify-btn',
         });
-        $('#approval-clarify-confirm')
+        $('#approval-clarify-confirm', document)
             ?.addEventListener(
                 'click',
                 () => {
@@ -1185,10 +1190,10 @@ export async function init(
 
     function mutateApprovalPage(
         idea: ApprovalIdea,
-        edge: ApprovalEdge,
+        edge: ApprovalEdge | null,
         id: string,
     ): void {
-        const root = $('#page-root');
+        const root = $('#page-root', document);
         if (!root) return;
         setHtml(
             root,
@@ -1201,13 +1206,13 @@ export async function init(
         );
     }
 
-    const root = $('#page-root');
+    const root = $('#page-root', document);
     if (!root) return;
 
     const result =
         await withLoadingState(
             root,
-            buildSkeleton('detail'),
+            buildSkeleton('detail', 4),
             () => Promise.all([
                 getIdeaForApproval(id),
                 getEdgeForApproval(id),

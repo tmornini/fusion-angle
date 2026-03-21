@@ -13,7 +13,9 @@ import {
     iconShield, iconPlus, iconTrash, iconCheck,
     iconAlertCircle, iconClock, iconUser, iconSave,
 } from '../app/icons';
-import { navigateTo } from '../app/core';
+import {
+    navigateTo, displayText,
+} from '../app/core';
 import {
     getIdeaForEdge, getEdgeDataByIdeaId,
     putEdgeData, type EdgeIdea, type EdgeData,
@@ -91,13 +93,13 @@ function buildCompletionIcon(
             style="${
                 'color:'
                 + 'hsl(var(--success))'
-            }">${iconCheck(14)}</span>`
+            }">${iconCheck(14, '')}</span>`
         : html`<span
             style="${
                 'color:hsl(var('
                 + '--muted-foreground))'
             }">${
-                iconAlertCircle(14)
+                iconAlertCircle(14, '')
             }</span>`;
 }
 
@@ -215,7 +217,7 @@ function buildEdgePage(
                         data-remove-outcome="${
                             outcome.id
                         }">${
-                            iconTrash(16)
+                            iconTrash(16, '')
                     }</button>
                 </div>
                 <div style="${
@@ -239,7 +241,7 @@ function buildEdgePage(
                             data-add-metric="${
                                 outcome.id
                             }">${
-                                iconPlus(12)
+                                iconPlus(12, '')
                             } Add Metric
                         </button>
                     </div>
@@ -399,7 +401,7 @@ function buildEdgePage(
                                             .id
                                     }">${
                                         iconTrash(
-                                            14,
+                                            14, '',
                                         )
                                 }</button>
                             </div>
@@ -422,14 +424,14 @@ function buildEdgePage(
                 }"
                     id="edge-back-btn"
                     >${
-                        iconArrowLeft(20)
+                        iconArrowLeft(20, '')
                 }</button>
                 <div>
                     <div class="${
                         'badge badge-primary '
                         + 'text-sm mb-2'
                     }">${
-                        iconTarget(14)
+                        iconTarget(14, '')
                     } Business Case
                         Definition</div>
                     <div class="${
@@ -464,7 +466,7 @@ function buildEdgePage(
                         ? ''
                         : 'disabled',
                 )}>
-                ${iconSave(16)
+                ${iconSave(16, '')
                 } Save &amp; Continue
             </button>
         </div>
@@ -596,7 +598,9 @@ function buildEdgePage(
                         }">Submitted by</p>
                         <p class="text-sm"
                             >${
-                                idea.submittedBy
+                                displayText(
+                                    idea.submittedBy,
+                                )
                         }</p>
                     </div>
                 </div>
@@ -634,7 +638,7 @@ function buildEdgePage(
                                 'edge-add'
                                 + '-outcome'
                             }">${
-                                iconPlus(16)
+                                iconPlus(16, '')
                             } Add
                             Outcome</button>
                     </div>
@@ -667,7 +671,7 @@ function buildEdgePage(
                                 + 'items-center'
                                 + ' gap-1'
                             }">${
-                                iconClock(14)
+                                iconClock(14, '')
                             } Short-term
                                 (0-3
                                 months)</label>
@@ -702,7 +706,7 @@ function buildEdgePage(
                                 + 'items-center'
                                 + ' gap-1'
                             }">${
-                                iconClock(14)
+                                iconClock(14, '')
                             } Mid-term
                                 (3-12
                                 months)</label>
@@ -737,7 +741,7 @@ function buildEdgePage(
                                 + 'items-center'
                                 + ' gap-1'
                             }">${
-                                iconClock(14)
+                                iconClock(14, '')
                             } Long-term
                                 (12+
                                 months)</label>
@@ -857,7 +861,7 @@ function buildEdgePage(
                                 + 'items-center'
                                 + ' gap-1'
                             }">${
-                                iconUser(14)
+                                iconUser(14, '')
                             } Edge
                                 Owner</label>
                             <input
@@ -1023,7 +1027,7 @@ function buildMetricUpdates():
 
 function syncFormFields() {
     const confidenceValue =
-        $select('#edge-confidence-select')
+        $select('#edge-confidence-select', document)
             ?.value ?? '';
     const descUpdates =
         buildDescriptionUpdates();
@@ -1034,15 +1038,15 @@ function syncFormFields() {
         impact: {
             shortTerm:
                 $textarea(
-                    '#edge-impact-short-term',
+                    '#edge-impact-short-term', document,
                 )?.value ?? '',
             midTerm:
                 $textarea(
-                    '#edge-impact-mid-term',
+                    '#edge-impact-mid-term', document,
                 )?.value ?? '',
             longTerm:
                 $textarea(
-                    '#edge-impact-long-term',
+                    '#edge-impact-long-term', document,
                 )?.value ?? '',
         },
         confidence:
@@ -1050,7 +1054,7 @@ function syncFormFields() {
                 ? confidenceValue
                 : state.edgeData.confidence,
         owner:
-            $input('#edge-owner-input')
+            $input('#edge-owner-input', document)
                 ?.value ?? '',
         outcomes:
             state.edgeData.outcomes.map(
@@ -1085,7 +1089,7 @@ function syncFormFields() {
 }
 
 function mutateEdgePage(ideaId: string) {
-    const container = $('#edge-content');
+    const container = $('#edge-content', document);
     if (container) {
         setHtml(
             container,
@@ -1096,12 +1100,12 @@ function mutateEdgePage(ideaId: string) {
 }
 
 function bindEdgeEvents(ideaId: string) {
-    $('#edge-back-btn')?.addEventListener(
+    $('#edge-back-btn', document)?.addEventListener(
         'click',
         () => navigateTo('ideas'),
     );
 
-    $('#edge-add-outcome')?.addEventListener(
+    $('#edge-add-outcome', document)?.addEventListener(
         'click',
         () => {
             syncFormFields();
@@ -1120,7 +1124,7 @@ function bindEdgeEvents(ideaId: string) {
         },
     );
 
-    $$('[data-add-template]').forEach(
+    $$('[data-add-template]', document).forEach(
         templateButton => {
             templateButton.addEventListener(
                 'click',
@@ -1150,7 +1154,7 @@ function bindEdgeEvents(ideaId: string) {
         },
     );
 
-    $$('[data-remove-outcome]').forEach(
+    $$('[data-remove-outcome]', document).forEach(
         removeButton => {
             removeButton.addEventListener(
                 'click',
@@ -1179,7 +1183,7 @@ function bindEdgeEvents(ideaId: string) {
         },
     );
 
-    $$('[data-add-metric]').forEach(
+    $$('[data-add-metric]', document).forEach(
         addButton => {
             addButton.addEventListener(
                 'click',
@@ -1218,7 +1222,7 @@ function bindEdgeEvents(ideaId: string) {
         },
     );
 
-    $$('[data-action="remove-metric"]').forEach(
+    $$('[data-action="remove-metric"]', document).forEach(
         removeButton => {
             removeButton.addEventListener(
                 'click',
@@ -1311,12 +1315,12 @@ export async function init(
 ): Promise<void> {
     const ideaId = params?.ideaId;
     if (!ideaId) { navigateTo('ideas'); return; }
-    const container = $('#edge-content');
+    const container = $('#edge-content', document);
     if (!container) return;
 
     const idea = await withLoadingState(
         container,
-        buildSkeleton('detail'),
+        buildSkeleton('detail', 4),
         () => getIdeaForEdge(ideaId),
         () => init(params),
     );

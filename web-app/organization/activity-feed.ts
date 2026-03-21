@@ -22,7 +22,9 @@ import {
     buildSkeleton,
     withLoadingState,
 } from '../app/loading-states';
-import { formatDate } from '../app/core';
+import {
+    formatDate, displayText,
+} from '../app/core';
 import {
     getActivityFeed,
     type Activity,
@@ -34,7 +36,7 @@ function buildActivityIcon(
     const iconMap: Record<
         string,
         {
-            icon: (size?: number) => SafeHtml;
+            icon: (size: number, cssClass: string) => SafeHtml;
             bg: string;
         }
     > = {
@@ -106,7 +108,7 @@ function buildActivityIcon(
 height:2.5rem;border-radius:var(--radius-lg);
 display:flex;align-items:center;
 justify-content:center;flex-shrink:0;
-${entry.bg}">${entry.icon(20)}</div>`;
+${entry.bg}">${entry.icon(20, '')}</div>`;
 }
 
 function buildActivity(
@@ -115,7 +117,7 @@ function buildActivity(
     const meta = activity.score
         ? html`<div
                 class="badge badge-default text-xs mt-1">${
-                iconStar(12)
+                iconStar(12, '')
             } Score: ${activity.score}</div>`
         : activity.status
             ? html`<div
@@ -134,7 +136,9 @@ function buildActivity(
         <div style="flex:1;min-width:0">
             <p class="text-sm">
                 <span class="font-medium">${
-                    activity.actor}</span>
+                    displayText(
+                        activity.actor,
+                    )}</span>
                 <span class="text-muted"> ${
                     activity.action} </span>
                 <span class="font-medium">${
@@ -150,21 +154,18 @@ function buildActivity(
 export async function init(
 ): Promise<void> {
     const container = $(
-        '#activity-feed-content',
+        '#activity-feed-content', document,
     );
     if (!container) return;
 
     const activities =
         await withLoadingState(
             container,
-            buildSkeleton(
-                'card-list',
-                { count: 6 },
-            ),
+            buildSkeleton('card-list', 6),
             getActivityFeed,
             () => init(),
             {
-                icon: iconActivity(24),
+                icon: iconActivity(24, ''),
                 title: 'No Activity Yet',
                 description:
                     'Activity from your'
@@ -184,7 +185,7 @@ export async function init(
             <div class="search-wrapper"
                 style="flex:1">
                 <span class="search-icon">${
-                    iconSearch(16)}</span>
+                    iconSearch(16, '')}</span>
                 <input class="input search-input"
                     placeholder="Search activity..."
                     id="activity-search"

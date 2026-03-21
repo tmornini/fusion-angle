@@ -51,14 +51,14 @@ export async function init(): Promise<void> {
     ${
         isActive
             ? html`${
-                iconCheckCircle2(12)
+                iconCheckCircle2(12, '')
             } `
             : html``
     }${name}
     </button>`;
     }
 
-    const container = $('.page-content');
+    const container = $('.page-content', document);
     if (!container) return;
     let profile: Awaited<
         ReturnType<typeof getProfile>
@@ -70,6 +70,7 @@ export async function init(): Promise<void> {
             container,
             buildErrorState(
                 'Failed to load profile.',
+                'Try Again',
             ),
         );
         container
@@ -86,28 +87,28 @@ export async function init(): Promise<void> {
     populateIcons([
         [
             '#profile-breadcrumb-separator',
-            iconChevronRight(14),
+            iconChevronRight(14, ''),
         ],
         [
             '#profile-save-btn-icon',
-            iconSave(16),
+            iconSave(16, ''),
         ],
         [
             '#profile-avatar-btn',
-            iconCamera(14),
+            iconCamera(14, ''),
         ],
         [
             '#profile-email-label',
-            html`${iconMail(16)} Email`,
+            html`${iconMail(16, '')} Email`,
         ],
         [
             '#profile-phone-label',
-            html`${iconPhone(16)} Phone`,
+            html`${iconPhone(16, '')} Phone`,
         ],
         [
             '#profile-role-label',
             html`${
-                iconBriefcase(16)
+                iconBriefcase(16, '')
             } Role`,
         ],
         [
@@ -119,7 +120,7 @@ export async function init(): Promise<void> {
     ]);
 
     const avatarInitials = $(
-        '#profile-avatar-initials',
+        '#profile-avatar-initials', document,
     );
     if (avatarInitials) {
         avatarInitials.textContent =
@@ -127,42 +128,42 @@ export async function init(): Promise<void> {
             + (profile.lastName[0] ?? '');
     }
     const firstName = $input(
-        '#profile-first-name',
+        '#profile-first-name', document,
     );
     if (firstName) {
         firstName.value = profile.firstName;
     }
     const lastName = $input(
-        '#profile-last-name',
+        '#profile-last-name', document,
     );
     if (lastName) {
         lastName.value = profile.lastName;
     }
-    const email = $input('#profile-email');
+    const email = $input('#profile-email', document);
     if (email) {
         email.value = profile.email;
     }
-    const phone = $input('#profile-phone');
+    const phone = $input('#profile-phone', document);
     if (phone) {
         phone.value = profile.phone;
     }
-    const role = $input('#profile-role');
+    const role = $input('#profile-role', document);
     if (role) {
         role.value = profile.role;
     }
     const department = $select(
-        '#profile-department',
+        '#profile-department', document,
     );
     if (department) {
         department.value =
             profile.department;
     }
-    const bio = $textarea('#profile-bio');
+    const bio = $textarea('#profile-bio', document);
     if (bio) {
         bio.value = profile.bio;
     }
     const strengthsContainer = $(
-        '#profile-strengths',
+        '#profile-strengths', document,
     );
     if (strengthsContainer) {
         setHtml(
@@ -208,7 +209,7 @@ export async function init(): Promise<void> {
                                 chip,
                                 html`${
                                     iconCheckCircle2(
-                                        12,
+                                        12, '',
                                     )
                                 } ${name}`,
                             );
@@ -219,10 +220,10 @@ export async function init(): Promise<void> {
     }
 
     $(
-        '#profile-save-btn',
+        '#profile-save-btn', document,
     )?.addEventListener('click', () => {
         const btn = $(
-            '#profile-save-btn',
+            '#profile-save-btn', document,
         )!;
         btn.textContent = 'Saving...';
         btn.setAttribute('disabled', '');
@@ -230,7 +231,7 @@ export async function init(): Promise<void> {
             setHtml(
                 btn,
                 html`${
-                    iconCheckCircle2(16)
+                    iconCheckCircle2(16, '')
                 } Saved!`,
             );
             btn.removeAttribute('disabled');
@@ -242,7 +243,7 @@ export async function init(): Promise<void> {
                 setHtml(
                     btn,
                     html`${
-                        iconSave(16)
+                        iconSave(16, '')
                     } Save Changes`,
                 );
             }, 2000);

@@ -189,7 +189,7 @@ function buildNavbar(): SafeHtml {
                     aria-label="${
                         'Toggle menu'
                     }">
-                    ${iconMenu(24)}
+                    ${iconMenu(24, '')}
                 </button>
             </div>
             <div class="${
@@ -241,7 +241,7 @@ function buildHero(): SafeHtml {
         <div class="container">
             <div class="hero-content">
                 <div class="hero-badge">
-                    ${iconSparkles(16)}
+                    ${iconSparkles(16, '')}
                     <span>${
                         'Human-Intelligence'
                         + ' First'
@@ -280,7 +280,7 @@ function buildHero(): SafeHtml {
                         'btn btn-accent btn-xl'
                     }" data-goto-auth>
                         Start Free Trial ${
-                            iconArrowRight(20)
+                            iconArrowRight(20, '')
                         }
                     </button>
                     <button class="${
@@ -345,7 +345,7 @@ function buildFeatures(): SafeHtml {
                     <div class="${
                         'feature-icon'
                     }">${
-                        feature.icon(24)
+                        feature.icon(24, '')
                     }</div>
                     <h3>${
                         feature.title
@@ -411,7 +411,7 @@ function buildHowItWorks(): SafeHtml {
                                     'step-point'
                                     + '-icon'
                                 }">${
-                                    iconCheck(12)
+                                    iconCheck(12, '')
                                 }</div>
                                 <span>${
                                     point
@@ -457,7 +457,7 @@ function buildCTA(): SafeHtml {
                         'btn btn-accent btn-xl'
                     }" data-goto-auth>
                         Start Free Trial ${
-                            iconArrowRight(20)
+                            iconArrowRight(20, '')
                         }
                     </button>
                     <button class="${
@@ -565,7 +565,7 @@ function buildFooter(): SafeHtml {
 }
 
 export async function init(): Promise<void> {
-    const root = $('#page-root');
+    const root = $('#page-root', document);
     if (!root) return;
 
     setHtml(root, html`
@@ -583,8 +583,8 @@ export async function init(): Promise<void> {
     </div>`);
 
     const toggle =
-        $('#mobile-menu-toggle');
-    const menu = $('#mobile-menu');
+        $('#mobile-menu-toggle', document);
+    const menu = $('#mobile-menu', document);
     if (toggle && menu) {
         toggle.addEventListener(
             'click',
@@ -600,8 +600,8 @@ export async function init(): Promise<void> {
                 setHtml(
                     toggle,
                     isHidden
-                        ? iconX(24)
-                        : iconMenu(24),
+                        ? iconX(24, '')
+                        : iconMenu(24, ''),
                 );
             },
         );

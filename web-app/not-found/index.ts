@@ -3,7 +3,7 @@ import { html, setHtml } from '../app/safe-html';
 import { iconSparkles } from '../app/icons';
 
 export async function init(): Promise<void> {
-    const root = $('#page-root');
+    const root = $('#page-root', document);
     if (!root) return;
 
     setHtml(root, html`

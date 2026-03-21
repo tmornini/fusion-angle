@@ -281,7 +281,7 @@ export class User {
             return 'Pending';
         if (this.status === 'deactivated')
             return 'Deactivated';
-        return 'Unknown';
+        return this.status;
     }
 
     statusClassName(): string {
@@ -312,17 +312,14 @@ export interface IdeaEntity {
     estimated_cost: number;
     priority: number;
     status: IdeaStatus;
-    edge_status: EdgeStatus;
     problem_statement: string;
     proposed_solution: string;
     expected_outcome: string;
     category: string;
     readiness: string;
-    waiting_days: number;
     impact_label: string;
     effort_label: string;
     description: string;
-    submitted_at: string;
     risks: JsonArrayField;
     assumptions: JsonArrayField;
     alignments: JsonArrayField;
@@ -679,198 +676,6 @@ export interface ProcessStepProcessEntity {
     created_at: string;
 }
 
-export interface IdeaCreationFields {
-    id: Id;
-    title: string;
-    score?: number;
-    estimated_impact?: number;
-    estimated_duration?: number;
-    estimated_cost?: number;
-    priority?: number;
-    status?: IdeaStatus;
-    category?: string;
-    description?: string;
-    problem_statement?: string;
-    proposed_solution?: string;
-    expected_outcome?: string;
-}
-
-export function createIdea(
-    fields: IdeaCreationFields,
-): IdeaEntity {
-    return {
-        id: fields.id,
-        title: fields.title,
-        score: fields.score ?? 0,
-        estimated_impact:
-            fields.estimated_impact ?? 0,
-        estimated_duration:
-            fields.estimated_duration ?? 0,
-        estimated_cost:
-            fields.estimated_cost ?? 0,
-        priority: fields.priority ?? 0,
-        status: fields.status ?? 'active',
-        edge_status: 'missing',
-        problem_statement:
-            fields.problem_statement ?? '',
-        proposed_solution:
-            fields.proposed_solution ?? '',
-        expected_outcome:
-            fields.expected_outcome ?? '',
-        category: fields.category ?? '',
-        readiness: 'incomplete',
-        waiting_days: 0,
-        impact_label: '',
-        effort_label: '',
-        description:
-            fields.description ?? '',
-        submitted_at: nowUtc(),
-        risks: jsonArrayField([]),
-        assumptions: jsonArrayField([]),
-        alignments: jsonArrayField([]),
-        effort_duration_estimate: '',
-        effort_team_size: '',
-        cost_estimate: '',
-        cost_breakdown: '',
-        success_metrics: '',
-    };
-}
-
-export interface ProjectCreationFields {
-    id: Id;
-    title: string;
-    description?: string;
-    status?: ProjectStatus;
-    estimated_duration?: number;
-    estimated_cost?: number;
-    estimated_impact?: number;
-}
-
-export function createProject(
-    fields: ProjectCreationFields,
-): ProjectEntity {
-    return {
-        id: fields.id,
-        title: fields.title,
-        description:
-            fields.description ?? '',
-        status:
-            fields.status ?? 'submitted',
-        progress: 0,
-        start_date: nowUtc(),
-        target_end_date: '',
-        estimated_duration:
-            fields.estimated_duration ?? 0,
-        actual_duration: 0,
-        estimated_cost:
-            fields.estimated_cost ?? 0,
-        actual_cost: 0,
-        estimated_impact:
-            fields.estimated_impact ?? 0,
-        actual_impact: 0,
-        priority: 0,
-        priority_score: 0,
-        business_context: jsonObjectField({}),
-        timeline_label: '',
-        budget_label: '',
-    };
-}
-
-export interface EdgeCreationFields {
-    id: Id;
-    status?: EdgeStatus;
-    confidence?: ConfidenceLevel;
-}
-
-export function createEdge(
-    fields: EdgeCreationFields,
-): EdgeEntity {
-    return {
-        id: fields.id,
-        status: fields.status ?? 'draft',
-        confidence:
-            fields.confidence ?? 'medium',
-        impact_short_term: '',
-        impact_mid_term: '',
-        impact_long_term: '',
-        updated_at: nowUtc(),
-    };
-}
-
-export interface ActivityCreationFields {
-    id: Id;
-    type: string;
-    action: string;
-    target: string;
-    score?: number;
-    status?: string;
-    comment?: string;
-}
-
-export function createActivity(
-    fields: ActivityCreationFields,
-): ActivityEntity {
-    return {
-        id: fields.id,
-        type: fields.type,
-        action: fields.action,
-        target: fields.target,
-        timestamp: nowUtc(),
-        score: fields.score ?? 0,
-        status: fields.status ?? '',
-        comment: fields.comment ?? '',
-    };
-}
-
-export interface FlowCreationFields {
-    id: Id;
-    name: string;
-    department: string;
-    description?: string;
-}
-
-export function createFlow(
-    fields: FlowCreationFields,
-): FlowEntity {
-    return {
-        id: fields.id,
-        name: fields.name,
-        description:
-            fields.description ?? '',
-        department: fields.department,
-    };
-}
-
-export interface FlowStepCreationFields {
-    id: Id;
-    title: string;
-    sort_order: number;
-    type?: FlowStepType;
-    description?: string;
-    owner?: string;
-    role?: string;
-    tools?: JsonArrayField;
-    duration?: string;
-}
-
-export function createFlowStep(
-    fields: FlowStepCreationFields,
-): FlowStepEntity {
-    return {
-        id: fields.id,
-        title: fields.title,
-        description:
-            fields.description ?? '',
-        owner: fields.owner ?? '',
-        role: fields.role ?? '',
-        tools: fields.tools
-            ?? jsonArrayField([]),
-        duration: fields.duration ?? '',
-        sort_order: fields.sort_order,
-        type: fields.type ?? 'action',
-    };
-}
-
 export interface StatusDisplay {
     label: string;
     className: string;
@@ -880,17 +685,6 @@ export interface InlineStyleDisplay {
     label: string;
     style: string;
 }
-
-export const UNKNOWN_CONFIG: StatusDisplay = {
-    label: 'Unknown',
-    className: 'badge-default',
-};
-
-export const UNKNOWN_CONFIDENCE_CONFIG:
-    StatusDisplay = {
-        label: 'Unknown',
-        className: 'text-muted',
-    };
 
 export const IDEA_STATUS_CONFIG: Record<
     IdeaStatus,
@@ -1030,10 +824,6 @@ export const FLOW_STEP_TYPE_CONFIG: Record<
     },
 };
 
-export const FLOW_STEP_TYPE_DEFAULT:
-    InlineStyleDisplay
-    = FLOW_STEP_TYPE_CONFIG.action;
-
 export interface MilestoneDisplay {
     label: string;
     textStyle: string;
@@ -1059,7 +849,7 @@ export const MILESTONE_STATUS_CONFIG:
     },
 };
 
-export const MILESTONE_STATUS_DEFAULT:
+export const MILESTONE_STATUS_PENDING:
     MilestoneDisplay = {
         label: 'Pending',
         textStyle: 'color:hsl(var('
@@ -1091,7 +881,7 @@ export const TASK_PRIORITY_CONFIG:
     },
 };
 
-export const TASK_PRIORITY_DEFAULT:
+export const TASK_PRIORITY_LOW:
     InlineStyleDisplay = {
         label: 'Low',
         style: 'background:hsl(var('
@@ -1119,12 +909,6 @@ export const READINESS_CONFIG: Record<
         className: 'text-error',
     },
 };
-
-export const UNKNOWN_READINESS_CONFIG:
-    StatusDisplay = {
-        label: 'Unknown',
-        className: 'text-muted',
-    };
 
 export class Idea {
     readonly id: string;
@@ -1158,7 +942,9 @@ export class Idea {
 
     constructor(
         entity: IdeaEntity,
-        submittedBy: string = 'Unknown',
+        submittedBy: string,
+        edgeStatus: EdgeStatus,
+        submittedAt: string,
     ) {
         this.id = entity.id;
         this.title = entity.title;
@@ -1171,8 +957,7 @@ export class Idea {
             entity.estimated_cost;
         this.priority = entity.priority;
         this.status = entity.status;
-        this.edgeStatus =
-            entity.edge_status || 'missing';
+        this.edgeStatus = edgeStatus;
         this.problemStatement =
             entity.problem_statement;
         this.proposedSolution =
@@ -1181,11 +966,20 @@ export class Idea {
             entity.expected_outcome;
         this.category = entity.category;
         this.readiness = entity.readiness;
-        this.waitingDays = entity.waiting_days;
         this.impactLabel = entity.impact_label;
         this.effortLabel = entity.effort_label;
         this.description = entity.description;
-        this.submittedAt = entity.submitted_at;
+        this.submittedAt = submittedAt;
+        this.waitingDays = this.submittedAt
+            ? Math.max(0, Math.ceil(
+                (Date.now()
+                    - new Date(
+                        this.submittedAt,
+                    ).getTime())
+                / SECONDS_PER_DAY
+                / 1000,
+            ))
+            : 0;
         this.risks = entity.risks;
         this.assumptions = entity.assumptions;
         this.alignments = entity.alignments;
@@ -1269,43 +1063,37 @@ export class Idea {
     statusLabel(): string {
         return (
             IDEA_STATUS_CONFIG[this.status]
-                ?? UNKNOWN_CONFIG
-        ).label;
+        )!.label;
     }
 
     statusClassName(): string {
         return (
             IDEA_STATUS_CONFIG[this.status]
-                ?? UNKNOWN_CONFIG
-        ).className;
+        )!.className;
     }
 
     edgeStatusLabel(): string {
         return (
             EDGE_STATUS_CONFIG[this.edgeStatus]
-                ?? UNKNOWN_CONFIG
-        ).label;
+        )!.label;
     }
 
     edgeStatusClassName(): string {
         return (
             EDGE_STATUS_CONFIG[this.edgeStatus]
-                ?? UNKNOWN_CONFIG
-        ).className;
+        )!.className;
     }
 
     readinessLabel(): string {
         return (
             READINESS_CONFIG[this.readiness]
-                ?? UNKNOWN_READINESS_CONFIG
-        ).label;
+        )!.label;
     }
 
     readinessClassName(): string {
         return (
             READINESS_CONFIG[this.readiness]
-                ?? UNKNOWN_READINESS_CONFIG
-        ).className;
+        )!.className;
     }
 }
 
@@ -1400,15 +1188,13 @@ export class Project {
     statusLabel(): string {
         return (
             PROJECT_STATUS_CONFIG[this.status]
-                ?? UNKNOWN_CONFIG
-        ).label;
+        )!.label;
     }
 
     statusClassName(): string {
         return (
             PROJECT_STATUS_CONFIG[this.status]
-                ?? UNKNOWN_CONFIG
-        ).className;
+        )!.className;
     }
 }
 
@@ -1449,29 +1235,25 @@ export class Edge {
     statusLabel(): string {
         return (
             EDGE_STATUS_CONFIG[this.status]
-                ?? UNKNOWN_CONFIG
-        ).label;
+        )!.label;
     }
 
     statusClassName(): string {
         return (
             EDGE_STATUS_CONFIG[this.status]
-                ?? UNKNOWN_CONFIG
-        ).className;
+        )!.className;
     }
 
     confidenceLabel(): string {
         return (
             CONFIDENCE_CONFIG[this.confidence]
-                ?? UNKNOWN_CONFIG
-        ).label;
+        )!.label;
     }
 
     confidenceClassName(): string {
         return (
             CONFIDENCE_CONFIG[this.confidence]
-                ?? UNKNOWN_CONFIG
-        ).className;
+        )!.className;
     }
 }
 
@@ -1488,7 +1270,7 @@ export class Activity {
 
     constructor(
         entity: ActivityEntity,
-        actor: string = 'Unknown',
+        actor: string,
     ) {
         this.id = entity.id;
         this.type = entity.type;

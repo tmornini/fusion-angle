@@ -2,8 +2,8 @@ import { SafeHtml } from './safe-html';
 
 function icon(
     paths: string,
-    size = 16,
-    cssClass = '',
+    size: number,
+    cssClass: string,
     ariaLabel?: string,
 ): SafeHtml {
     const a11y = ariaLabel
@@ -21,7 +21,7 @@ function icon(
     );
 }
 
-function iconSparkles(size = 16, cssClass = '') {
+function iconSparkles(size: number, cssClass: string) {
     return icon(
         '<path d="M9.937 15.5A2 2 0 0 0 8.5'
         + ' 14.063l-6.135-1.582a.5.5 0 0 1'
@@ -39,7 +39,7 @@ function iconSparkles(size = 16, cssClass = '') {
     );
 }
 
-function iconHome(size = 16, cssClass = '') {
+function iconHome(size: number, cssClass: string) {
     return icon(
         '<path d="M15 21v-8a1 1 0 0 0-1-1h-4a1'
         + ' 1 0 0 0-1 1v8"/>'
@@ -52,7 +52,7 @@ function iconHome(size = 16, cssClass = '') {
     );
 }
 
-function iconLightbulb(size = 16, cssClass = '') {
+function iconLightbulb(size: number, cssClass: string) {
     return icon(
         '<path d="M15 14c.2-1 .7-1.7 1.5-2.5'
         + ' 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6'
@@ -66,8 +66,8 @@ function iconLightbulb(size = 16, cssClass = '') {
 }
 
 function iconFolderKanban(
-    size = 16,
-    cssClass = '',
+    size: number,
+    cssClass: string,
 ) {
     return icon(
         '<path d="M4 20h16a2 2 0 0 0 2-2V8a2'
@@ -83,7 +83,7 @@ function iconFolderKanban(
     );
 }
 
-function iconUsers(size = 16, cssClass = '') {
+function iconUsers(size: number, cssClass: string) {
     return icon(
         '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4'
         + ' 4 0 0 0-4 4v2"/>'
@@ -97,7 +97,7 @@ function iconUsers(size = 16, cssClass = '') {
     );
 }
 
-function iconUser(size = 16, cssClass = '') {
+function iconUser(size: number, cssClass: string) {
     return icon(
         '<path d="M19 21v-2a4 4 0 0 0-4-4H9a4'
         + ' 4 0 0 0-4 4v2"/>'
@@ -107,7 +107,7 @@ function iconUser(size = 16, cssClass = '') {
     );
 }
 
-function iconTarget(size = 16, cssClass = '') {
+function iconTarget(size: number, cssClass: string) {
     return icon(
         '<circle cx="12" cy="12" r="10"/>'
         + '<circle cx="12" cy="12" r="6"/>'
@@ -118,8 +118,8 @@ function iconTarget(size = 16, cssClass = '') {
 }
 
 function iconDatabase(
-    size = 16,
-    cssClass = '',
+    size: number,
+    cssClass: string,
 ) {
     return icon(
         '<ellipse cx="12" cy="5" rx="9"'
@@ -133,8 +133,8 @@ function iconDatabase(
 }
 
 function iconGitBranch(
-    size = 16,
-    cssClass = '',
+    size: number,
+    cssClass: string,
 ) {
     return icon(
         '<line x1="6" x2="6" y1="3" y2="15"/>'
@@ -146,7 +146,7 @@ function iconGitBranch(
     );
 }
 
-function iconPalette(size = 16, cssClass = '') {
+function iconPalette(size: number, cssClass: string) {
     return icon(
         '<circle cx="13.5" cy="6.5" r=".5"'
         + ' fill="currentColor"/>'
@@ -169,7 +169,7 @@ function iconPalette(size = 16, cssClass = '') {
     );
 }
 
-function iconLogOut(size = 16, cssClass = '') {
+function iconLogOut(size: number, cssClass: string) {
     return icon(
         '<path d="M9 21H5a2 2 0 0 1-2-2V5a2'
         + ' 2 0 0 1 2-2h4"/>'
@@ -182,7 +182,7 @@ function iconLogOut(size = 16, cssClass = '') {
     );
 }
 
-function iconMenu(size = 16, cssClass = '') {
+function iconMenu(size: number, cssClass: string) {
     return icon(
         '<line x1="4" x2="20" y1="12"'
         + ' y2="12"/>'
@@ -195,7 +195,7 @@ function iconMenu(size = 16, cssClass = '') {
     );
 }
 
-function iconSearch(size = 16, cssClass = '') {
+function iconSearch(size: number, cssClass: string) {
     return icon(
         '<circle cx="11" cy="11" r="8"/>'
         + '<path d="m21 21-4.3-4.3"/>',
@@ -204,7 +204,7 @@ function iconSearch(size = 16, cssClass = '') {
     );
 }
 
-function iconBell(size = 16, cssClass = '') {
+function iconBell(size: number, cssClass: string) {
     return icon(
         '<path d="M6 8a6 6 0 0 1 12 0c0 7 3'
         + ' 9 3 9H3s3-2 3-9"/>'
@@ -215,7 +215,7 @@ function iconBell(size = 16, cssClass = '') {
     );
 }
 
-function iconSun(size = 16, cssClass = '') {
+function iconSun(size: number, cssClass: string) {
     return icon(
         '<circle cx="12" cy="12" r="4"/>'
         + '<path d="M12 2v2"/>'
@@ -234,7 +234,7 @@ function iconSun(size = 16, cssClass = '') {
     );
 }
 
-function iconMoon(size = 16, cssClass = '') {
+function iconMoon(size: number, cssClass: string) {
     return icon(
         '<path d="M12 3a6 6 0 0 0 9 9 9 9 0'
         + ' 1 1-9-9Z"/>',
@@ -243,7 +243,7 @@ function iconMoon(size = 16, cssClass = '') {
     );
 }
 
-function iconMonitor(size = 16, cssClass = '') {
+function iconMonitor(size: number, cssClass: string) {
     return icon(
         '<rect width="20" height="14" x="2"'
         + ' y="3" rx="2"/>'
@@ -256,7 +256,7 @@ function iconMonitor(size = 16, cssClass = '') {
     );
 }
 
-function iconX(size = 16, cssClass = '') {
+function iconX(size: number, cssClass: string) {
     return icon(
         '<path d="M18 6 6 18"/>'
         + '<path d="m6 6 12 12"/>',
@@ -266,8 +266,8 @@ function iconX(size = 16, cssClass = '') {
 }
 
 function iconChevronDown(
-    size = 16,
-    cssClass = '',
+    size: number,
+    cssClass: string,
 ) {
     return icon(
         '<path d="m6 9 6 6 6-6"/>',
@@ -277,8 +277,8 @@ function iconChevronDown(
 }
 
 function iconChevronRight(
-    size = 16,
-    cssClass = '',
+    size: number,
+    cssClass: string,
 ) {
     return icon(
         '<path d="m9 18 6-6-6-6"/>',
@@ -288,8 +288,8 @@ function iconChevronRight(
 }
 
 function iconChevronLeft(
-    size = 16,
-    cssClass = '',
+    size: number,
+    cssClass: string,
 ) {
     return icon(
         '<path d="m15 18-6-6 6-6"/>',
@@ -299,8 +299,8 @@ function iconChevronLeft(
 }
 
 function iconPanelLeftClose(
-    size = 16,
-    cssClass = '',
+    size: number,
+    cssClass: string,
 ) {
     return icon(
         '<rect width="18" height="18" x="3"'
@@ -313,8 +313,8 @@ function iconPanelLeftClose(
 }
 
 function iconPanelLeft(
-    size = 16,
-    cssClass = '',
+    size: number,
+    cssClass: string,
 ) {
     return icon(
         '<rect width="18" height="18" x="3"'
@@ -325,7 +325,7 @@ function iconPanelLeft(
     );
 }
 
-function iconPlus(size = 16, cssClass = '') {
+function iconPlus(size: number, cssClass: string) {
     return icon(
         '<path d="M5 12h14"/>'
         + '<path d="M12 5v14"/>',
@@ -335,8 +335,8 @@ function iconPlus(size = 16, cssClass = '') {
 }
 
 function iconArrowLeft(
-    size = 16,
-    cssClass = '',
+    size: number,
+    cssClass: string,
 ) {
     return icon(
         '<path d="m12 19-7-7 7-7"/>'
@@ -347,8 +347,8 @@ function iconArrowLeft(
 }
 
 function iconArrowRight(
-    size = 16,
-    cssClass = '',
+    size: number,
+    cssClass: string,
 ) {
     return icon(
         '<path d="M5 12h14"/>'
@@ -358,7 +358,7 @@ function iconArrowRight(
     );
 }
 
-function iconCheck(size = 16, cssClass = '') {
+function iconCheck(size: number, cssClass: string) {
     return icon(
         '<path d="M20 6 9 17l-5-5"/>',
         size,
@@ -366,7 +366,7 @@ function iconCheck(size = 16, cssClass = '') {
     );
 }
 
-function iconLoader(size = 16, cssClass = '') {
+function iconLoader(size: number, cssClass: string) {
     return icon(
         '<path d="M12 2v4"/>'
         + '<path d="m16.2 7.8 2.9-2.9"/>'
@@ -382,8 +382,8 @@ function iconLoader(size = 16, cssClass = '') {
 }
 
 function iconSettings(
-    size = 16,
-    cssClass = '',
+    size: number,
+    cssClass: string,
 ) {
     return icon(
         '<path d="M12.22 2h-.44a2 2 0 0 0-2'
@@ -412,8 +412,8 @@ function iconSettings(
 }
 
 function iconExternalLink(
-    size = 16,
-    cssClass = '',
+    size: number,
+    cssClass: string,
 ) {
     return icon(
         '<path d="M15 3h6v6"/>'
@@ -426,7 +426,7 @@ function iconExternalLink(
     );
 }
 
-function iconFilter(size = 16, cssClass = '') {
+function iconFilter(size: number, cssClass: string) {
     return icon(
         '<polygon points="22 3 2 3 10 12.46'
         + ' 10 19 14 21 14 12.46 22 3"/>',
@@ -436,8 +436,8 @@ function iconFilter(size = 16, cssClass = '') {
 }
 
 function iconMoreHorizontal(
-    size = 16,
-    cssClass = '',
+    size: number,
+    cssClass: string,
 ) {
     return icon(
         '<circle cx="12" cy="12" r="1"/>'
@@ -449,8 +449,8 @@ function iconMoreHorizontal(
 }
 
 function iconMoreVertical(
-    size = 16,
-    cssClass = '',
+    size: number,
+    cssClass: string,
 ) {
     return icon(
         '<circle cx="12" cy="12" r="1"/>'
@@ -461,7 +461,7 @@ function iconMoreVertical(
     );
 }
 
-function iconStar(size = 16, cssClass = '') {
+function iconStar(size: number, cssClass: string) {
     return icon(
         '<polygon points="12 2 15.09 8.26 22'
         + ' 9.27 17 14.14 18.18 21.02 12'
@@ -472,7 +472,7 @@ function iconStar(size = 16, cssClass = '') {
     );
 }
 
-function iconHeart(size = 16, cssClass = '') {
+function iconHeart(size: number, cssClass: string) {
     return icon(
         '<path d="M19 14c1.49-1.46 3-3.21'
         + ' 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76'
@@ -485,8 +485,8 @@ function iconHeart(size = 16, cssClass = '') {
 }
 
 function iconTrendingUp(
-    size = 16,
-    cssClass = '',
+    size: number,
+    cssClass: string,
 ) {
     return icon(
         '<polyline points="22 7 13.5 15.5'
@@ -499,8 +499,8 @@ function iconTrendingUp(
 }
 
 function iconTrendingDown(
-    size = 16,
-    cssClass = '',
+    size: number,
+    cssClass: string,
 ) {
     return icon(
         '<polyline points="22 17 13.5 8.5'
@@ -513,8 +513,8 @@ function iconTrendingDown(
 }
 
 function iconAlertCircle(
-    size = 16,
-    cssClass = '',
+    size: number,
+    cssClass: string,
 ) {
     return icon(
         '<circle cx="12" cy="12" r="10"/>'
@@ -528,8 +528,8 @@ function iconAlertCircle(
 }
 
 function iconAlertTriangle(
-    size = 16,
-    cssClass = '',
+    size: number,
+    cssClass: string,
 ) {
     return icon(
         '<path d="m21.73 18-8-14a2 2 0 0'
@@ -543,8 +543,8 @@ function iconAlertTriangle(
 }
 
 function iconCheckCircle(
-    size = 16,
-    cssClass = '',
+    size: number,
+    cssClass: string,
 ) {
     return icon(
         '<path d="M22 11.08V12a10 10 0 1'
@@ -555,7 +555,7 @@ function iconCheckCircle(
     );
 }
 
-function iconInfo(size = 16, cssClass = '') {
+function iconInfo(size: number, cssClass: string) {
     return icon(
         '<circle cx="12" cy="12" r="10"/>'
         + '<path d="M12 16v-4"/>'
@@ -565,7 +565,7 @@ function iconInfo(size = 16, cssClass = '') {
     );
 }
 
-function iconMail(size = 16, cssClass = '') {
+function iconMail(size: number, cssClass: string) {
     return icon(
         '<rect width="20" height="16" x="2"'
         + ' y="4" rx="2"/>'
@@ -576,7 +576,7 @@ function iconMail(size = 16, cssClass = '') {
     );
 }
 
-function iconPhone(size = 16, cssClass = '') {
+function iconPhone(size: number, cssClass: string) {
     return icon(
         '<path d="M22 16.92v3a2 2 0 0'
         + ' 1-2.18 2 19.79 19.79 0 0'
@@ -594,8 +594,8 @@ function iconPhone(size = 16, cssClass = '') {
 }
 
 function iconCalendar(
-    size = 16,
-    cssClass = '',
+    size: number,
+    cssClass: string,
 ) {
     return icon(
         '<path d="M8 2v4"/>'
@@ -608,7 +608,7 @@ function iconCalendar(
     );
 }
 
-function iconClock(size = 16, cssClass = '') {
+function iconClock(size: number, cssClass: string) {
     return icon(
         '<circle cx="12" cy="12" r="10"/>'
         + '<polyline points="12 6 12 12'
@@ -618,7 +618,7 @@ function iconClock(size = 16, cssClass = '') {
     );
 }
 
-function iconUpload(size = 16, cssClass = '') {
+function iconUpload(size: number, cssClass: string) {
     return icon(
         '<path d="M21 15v4a2 2 0 0 1-2 2H5a2'
         + ' 2 0 0 1-2-2v-4"/>'
@@ -631,8 +631,8 @@ function iconUpload(size = 16, cssClass = '') {
 }
 
 function iconDownload(
-    size = 16,
-    cssClass = '',
+    size: number,
+    cssClass: string,
 ) {
     return icon(
         '<path d="M21 15v4a2 2 0 0 1-2 2H5a2'
@@ -646,7 +646,7 @@ function iconDownload(
     );
 }
 
-function iconTrash(size = 16, cssClass = '') {
+function iconTrash(size: number, cssClass: string) {
     return icon(
         '<path d="M3 6h18"/>'
         + '<path d="M19 6v14c0 1-1 2-2'
@@ -662,7 +662,7 @@ function iconTrash(size = 16, cssClass = '') {
     );
 }
 
-function iconEdit(size = 16, cssClass = '') {
+function iconEdit(size: number, cssClass: string) {
     return icon(
         '<path d="M17 3a2.85 2.83 0 1 1 4'
         + ' 4L7.5 20.5 2 22l1.5-5.5Z"/>'
@@ -672,7 +672,7 @@ function iconEdit(size = 16, cssClass = '') {
     );
 }
 
-function iconEye(size = 16, cssClass = '') {
+function iconEye(size: number, cssClass: string) {
     return icon(
         '<path d="M2 12s3-7 10-7 10 7 10'
         + ' 7-3 7-10 7-10-7-10-7Z"/>'
@@ -682,7 +682,7 @@ function iconEye(size = 16, cssClass = '') {
     );
 }
 
-function iconCopy(size = 16, cssClass = '') {
+function iconCopy(size: number, cssClass: string) {
     return icon(
         '<rect width="14" height="14" x="8"'
         + ' y="8" rx="2" ry="2"/>'
@@ -693,7 +693,7 @@ function iconCopy(size = 16, cssClass = '') {
     );
 }
 
-function iconSave(size = 16, cssClass = '') {
+function iconSave(size: number, cssClass: string) {
     return icon(
         '<path d="M15.2 3a2 2 0 0 1 1.4.6l3.8'
         + ' 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0'
@@ -707,7 +707,7 @@ function iconSave(size = 16, cssClass = '') {
     );
 }
 
-function iconSend(size = 16, cssClass = '') {
+function iconSend(size: number, cssClass: string) {
     return icon(
         '<path d="m22 2-7 20-4-9-9-4Z"/>'
         + '<path d="M22 2 11 13"/>',
@@ -716,7 +716,7 @@ function iconSend(size = 16, cssClass = '') {
     );
 }
 
-function iconShare(size = 16, cssClass = '') {
+function iconShare(size: number, cssClass: string) {
     return icon(
         '<circle cx="18" cy="5" r="3"/>'
         + '<circle cx="6" cy="12" r="3"/>'
@@ -730,7 +730,7 @@ function iconShare(size = 16, cssClass = '') {
     );
 }
 
-function iconGlobe(size = 16, cssClass = '') {
+function iconGlobe(size: number, cssClass: string) {
     return icon(
         '<circle cx="12" cy="12" r="10"/>'
         + '<path d="M12 2a14.5 14.5 0 0 0 0'
@@ -741,7 +741,7 @@ function iconGlobe(size = 16, cssClass = '') {
     );
 }
 
-function iconRocket(size = 16, cssClass = '') {
+function iconRocket(size: number, cssClass: string) {
     return icon(
         '<path d="M4.5 16.5c-1.5 1.26-2 5-2'
         + ' 5s3.74-.5 5-2c.71-.84.7-2.13'
@@ -760,7 +760,7 @@ function iconRocket(size = 16, cssClass = '') {
     );
 }
 
-function iconZap(size = 16, cssClass = '') {
+function iconZap(size: number, cssClass: string) {
     return icon(
         '<path d="M4 14a1 1 0 0 1-.78-1.63l9.9'
         + '-10.2a.5.5 0 0 1 .86.46l-1.92'
@@ -773,7 +773,7 @@ function iconZap(size = 16, cssClass = '') {
     );
 }
 
-function iconAward(size = 16, cssClass = '') {
+function iconAward(size: number, cssClass: string) {
     return icon(
         '<path d="m15.477 12.89 1.515'
         + ' 8.526a.5.5 0 0 1-.81.47l-3.58'
@@ -786,7 +786,7 @@ function iconAward(size = 16, cssClass = '') {
     );
 }
 
-function iconBrain(size = 16, cssClass = '') {
+function iconBrain(size: number, cssClass: string) {
     return icon(
         '<path d="M12 5a3 3 0 1 0-5.997.125'
         + ' 4 4 0 0 0-2.526 5.77 4 4 0 0 0'
@@ -813,7 +813,7 @@ function iconBrain(size = 16, cssClass = '') {
     );
 }
 
-function iconWand(size = 16, cssClass = '') {
+function iconWand(size: number, cssClass: string) {
     return icon(
         '<path d="m21.64 3.64-1.28-1.28a1.21'
         + ' 1.21 0 0 0-1.72 0L2.36 18.64a1.21'
@@ -833,8 +833,8 @@ function iconWand(size = 16, cssClass = '') {
 }
 
 function iconActivity(
-    size = 16,
-    cssClass = '',
+    size: number,
+    cssClass: string,
 ) {
     return icon(
         '<path d="M22 12h-2.48a2 2 0 0'
@@ -848,8 +848,8 @@ function iconActivity(
 }
 
 function iconBarChart(
-    size = 16,
-    cssClass = '',
+    size: number,
+    cssClass: string,
 ) {
     return icon(
         '<path d="M3 3v18h18"/>'
@@ -862,8 +862,8 @@ function iconBarChart(
 }
 
 function iconFileText(
-    size = 16,
-    cssClass = '',
+    size: number,
+    cssClass: string,
 ) {
     return icon(
         '<path d="M15 2H6a2 2 0 0 0-2 2v16a2'
@@ -879,7 +879,7 @@ function iconFileText(
     );
 }
 
-function iconShield(size = 16, cssClass = '') {
+function iconShield(size: number, cssClass: string) {
     return icon(
         '<path d="M20 13c0 5-3.5 7.5-7.66'
         + ' 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4'
@@ -893,8 +893,8 @@ function iconShield(size = 16, cssClass = '') {
 }
 
 function iconBuilding(
-    size = 16,
-    cssClass = '',
+    size: number,
+    cssClass: string,
 ) {
     return icon(
         '<path d="M6 22V4a2 2 0 0 1 2-2h8a2'
@@ -912,7 +912,7 @@ function iconBuilding(
     );
 }
 
-function iconCrown(size = 16, cssClass = '') {
+function iconCrown(size: number, cssClass: string) {
     return icon(
         '<path d="M11.562 3.266a.5.5 0 0 1'
         + ' .876 0L15.39 8.87a1 1 0 0 0 1.516'
@@ -929,8 +929,8 @@ function iconCrown(size = 16, cssClass = '') {
 }
 
 function iconBriefcase(
-    size = 16,
-    cssClass = '',
+    size: number,
+    cssClass: string,
 ) {
     return icon(
         '<path d="M16 20V4a2 2 0 0 0-2-2h-4a'
@@ -943,8 +943,8 @@ function iconBriefcase(
 }
 
 function iconClipboardCheck(
-    size = 16,
-    cssClass = '',
+    size: number,
+    cssClass: string,
 ) {
     return icon(
         '<rect width="8" height="4" x="8"'
@@ -959,8 +959,8 @@ function iconClipboardCheck(
 }
 
 function iconDollarSign(
-    size = 16,
-    cssClass = '',
+    size: number,
+    cssClass: string,
 ) {
     return icon(
         '<line x1="12" x2="12" y1="2"'
@@ -973,8 +973,8 @@ function iconDollarSign(
 }
 
 function iconSmartphone(
-    size = 16,
-    cssClass = '',
+    size: number,
+    cssClass: string,
 ) {
     return icon(
         '<rect width="14" height="20" x="5"'
@@ -985,7 +985,7 @@ function iconSmartphone(
     );
 }
 
-function iconCode(size = 16, cssClass = '') {
+function iconCode(size: number, cssClass: string) {
     return icon(
         '<polyline points="16 18 22 12'
         + ' 16 6"/>'
@@ -995,7 +995,7 @@ function iconCode(size = 16, cssClass = '') {
     );
 }
 
-function iconHash(size = 16, cssClass = '') {
+function iconHash(size: number, cssClass: string) {
     return icon(
         '<line x1="4" x2="20" y1="9"'
         + ' y2="9"/>'
@@ -1011,8 +1011,8 @@ function iconHash(size = 16, cssClass = '') {
 }
 
 function iconGripVertical(
-    size = 16,
-    cssClass = '',
+    size: number,
+    cssClass: string,
 ) {
     return icon(
         '<circle cx="9" cy="12" r="1"/>'
@@ -1026,7 +1026,7 @@ function iconGripVertical(
     );
 }
 
-function iconGauge(size = 16, cssClass = '') {
+function iconGauge(size: number, cssClass: string) {
     return icon(
         '<path d="m12 14 4-4"/>'
         + '<path d="M3.34 19a10 10 0 1 1'
@@ -1037,8 +1037,8 @@ function iconGauge(size = 16, cssClass = '') {
 }
 
 function iconLineChart(
-    size = 16,
-    cssClass = '',
+    size: number,
+    cssClass: string,
 ) {
     return icon(
         '<path d="M3 3v18h18"/>'
@@ -1049,8 +1049,8 @@ function iconLineChart(
 }
 
 function iconArrowUpRight(
-    size = 16,
-    cssClass = '',
+    size: number,
+    cssClass: string,
 ) {
     return icon(
         '<path d="M7 7h10v10"/>'
@@ -1061,8 +1061,8 @@ function iconArrowUpRight(
 }
 
 function iconArrowDownRight(
-    size = 16,
-    cssClass = '',
+    size: number,
+    cssClass: string,
 ) {
     return icon(
         '<path d="m7 7 10 10"/>'
@@ -1072,7 +1072,7 @@ function iconArrowDownRight(
     );
 }
 
-function iconCamera(size = 16, cssClass = '') {
+function iconCamera(size: number, cssClass: string) {
     return icon(
         '<path d="M14.5 4h-5L7 7H4a2 2 0 0'
         + ' 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0'
@@ -1085,8 +1085,8 @@ function iconCamera(size = 16, cssClass = '') {
 }
 
 function iconCreditCard(
-    size = 16,
-    cssClass = '',
+    size: number,
+    cssClass: string,
 ) {
     return icon(
         '<rect width="20" height="14" x="2"'
@@ -1098,7 +1098,7 @@ function iconCreditCard(
     );
 }
 
-function iconCircle(size = 16, cssClass = '') {
+function iconCircle(size: number, cssClass: string) {
     return icon(
         '<circle cx="12" cy="12" r="10"/>',
         size,
@@ -1107,8 +1107,8 @@ function iconCircle(size = 16, cssClass = '') {
 }
 
 function iconMessageSquare(
-    size = 16,
-    cssClass = '',
+    size: number,
+    cssClass: string,
 ) {
     return icon(
         '<path d="M21 15a2 2 0 0 1-2 2H7l-4'
@@ -1120,8 +1120,8 @@ function iconMessageSquare(
 }
 
 function iconUserPlus(
-    size = 16,
-    cssClass = '',
+    size: number,
+    cssClass: string,
 ) {
     return icon(
         '<path d="M16 21v-2a4 4 0 0 0-4-4H6a'
@@ -1137,8 +1137,8 @@ function iconUserPlus(
 }
 
 function iconUserCheck(
-    size = 16,
-    cssClass = '',
+    size: number,
+    cssClass: string,
 ) {
     return icon(
         '<path d="M16 21v-2a4 4 0 0 0-4-4H6a'
@@ -1151,7 +1151,7 @@ function iconUserCheck(
     );
 }
 
-function iconUserX(size = 16, cssClass = '') {
+function iconUserX(size: number, cssClass: string) {
     return icon(
         '<path d="M16 21v-2a4 4 0 0 0-4-4H6a'
         + '4 4 0 0 0-4 4v2"/>'
@@ -1166,8 +1166,8 @@ function iconUserX(size = 16, cssClass = '') {
 }
 
 function iconXCircle(
-    size = 16,
-    cssClass = '',
+    size: number,
+    cssClass: string,
 ) {
     return icon(
         '<circle cx="12" cy="12" r="10"/>'
@@ -1179,8 +1179,8 @@ function iconXCircle(
 }
 
 function iconCheckCircle2(
-    size = 16,
-    cssClass = '',
+    size: number,
+    cssClass: string,
 ) {
     return icon(
         '<circle cx="12" cy="12" r="10"/>'
@@ -1191,8 +1191,8 @@ function iconCheckCircle2(
 }
 
 function iconHelpCircle(
-    size = 16,
-    cssClass = '',
+    size: number,
+    cssClass: string,
 ) {
     return icon(
         '<circle cx="12" cy="12" r="10"/>'
@@ -1204,7 +1204,7 @@ function iconHelpCircle(
     );
 }
 
-function iconMinus(size = 16, cssClass = '') {
+function iconMinus(size: number, cssClass: string) {
     return icon(
         '<path d="M5 12h14"/>',
         size,
@@ -1213,8 +1213,8 @@ function iconMinus(size = 16, cssClass = '') {
 }
 
 function iconFolderOpen(
-    size = 16,
-    cssClass = '',
+    size: number,
+    cssClass: string,
 ) {
     return icon(
         '<path d="m6 14 1.5-2.9A2 2 0 0 1'
@@ -1230,8 +1230,8 @@ function iconFolderOpen(
 }
 
 function iconFileSpreadsheet(
-    size = 16,
-    cssClass = '',
+    size: number,
+    cssClass: string,
 ) {
     return icon(
         '<path d="M15 2H6a2 2 0 0 0-2 2v16a2'
@@ -1249,8 +1249,8 @@ function iconFileSpreadsheet(
 }
 
 function iconListTodo(
-    size = 16,
-    cssClass = '',
+    size: number,
+    cssClass: string,
 ) {
     return icon(
         '<rect x="3" y="5" width="6"'
@@ -1268,8 +1268,8 @@ function iconListTodo(
 }
 
 function iconToggleLeft(
-    size = 16,
-    cssClass = '',
+    size: number,
+    cssClass: string,
 ) {
     return icon(
         '<rect width="20" height="12" x="2"'
@@ -1280,7 +1280,7 @@ function iconToggleLeft(
     );
 }
 
-function iconType(size = 16, cssClass = '') {
+function iconType(size: number, cssClass: string) {
     return icon(
         '<polyline points="4 7 4 4 20 4'
         + ' 20 7"/>'
@@ -1293,7 +1293,7 @@ function iconType(size = 16, cssClass = '') {
     );
 }
 
-function iconTable(size = 16, cssClass = '') {
+function iconTable(size: number, cssClass: string) {
     return icon(
         '<path d="M12 3v18"/>'
         + '<rect width="18" height="18" x="3"'
@@ -1305,7 +1305,7 @@ function iconTable(size = 16, cssClass = '') {
     );
 }
 
-function iconSlider(size = 16, cssClass = '') {
+function iconSlider(size: number, cssClass: string) {
     return icon(
         '<line x1="4" x2="4" y1="21"'
         + ' y2="14"/>'
@@ -1330,7 +1330,7 @@ function iconSlider(size = 16, cssClass = '') {
     );
 }
 
-function iconDot(size = 16, cssClass = '') {
+function iconDot(size: number, cssClass: string) {
     return icon(
         '<circle cx="12.1" cy="12.1" r="1"/>',
         size,
@@ -1339,8 +1339,8 @@ function iconDot(size = 16, cssClass = '') {
 }
 
 function iconLayoutGrid(
-    size = 16,
-    cssClass = '',
+    size: number,
+    cssClass: string,
 ) {
     return icon(
         '<rect width="7" height="7" x="3"'
@@ -1357,8 +1357,8 @@ function iconLayoutGrid(
 }
 
 function iconChevronUp(
-    size = 16,
-    cssClass = '',
+    size: number,
+    cssClass: string,
 ) {
     return icon(
         '<path d="m18 15-6-6-6 6"/>',
@@ -1367,7 +1367,7 @@ function iconChevronUp(
     );
 }
 
-function iconHistory(size = 16, cssClass = '') {
+function iconHistory(size: number, cssClass: string) {
     return icon(
         '<path d="M3 12a9 9 0 1 0 9-9 9.75'
         + ' 9.75 0 0 0-6.74 2.74L3 8"/>'
@@ -1481,7 +1481,7 @@ const _allIcons = [
 ];
 
 type IconFn =
-    (size?: number, cssClass?: string) => SafeHtml;
+    (size: number, cssClass: string) => SafeHtml;
 
 export type IconName =
     | 'sparkles' | 'home' | 'lightbulb'

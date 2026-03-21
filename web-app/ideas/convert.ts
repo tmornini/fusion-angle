@@ -73,7 +73,7 @@ function fieldCheckIcon(
         ? html`<span
             style=${'color:'
                 + 'hsl(var(--success))'}>
-            ${iconCheckCircle2(16)}
+            ${iconCheckCircle2(16, '')}
             </span>`
         : html``;
 }
@@ -137,7 +137,7 @@ function buildConversionPage(
                             id=${'convert'
                                 + '-back-to'
                                 + '-ideas'}>
-                            ${iconArrowLeft(20)}
+                            ${iconArrowLeft(20, '')}
                         </button>
                         <div class="flex
                             items-center gap-3">
@@ -159,7 +159,7 @@ function buildConversionPage(
                                     + '--primary'
                                     + '-foreground'
                                     + '))'}>
-                                ${iconRocket(20)}
+                                ${iconRocket(20, '')}
                             </div>
                             <span class="${
                                 'text-xl'
@@ -233,7 +233,7 @@ function buildConversionPage(
                             + ' text-muted mb-4'
                         }">
                             ${iconFolderKanban(
-                                16,
+                                16, '',
                             )}
                             Idea Summary
                         </div>
@@ -329,7 +329,7 @@ function buildConversionPage(
                                     + ' text-muted'
                                 }">
                                     ${iconClock(
-                                        16,
+                                        16, '',
                                     )}
                                     <span class="${
                                         'text-sm'
@@ -357,7 +357,7 @@ function buildConversionPage(
                                     + ' text-muted'
                                 }">
                                     ${iconDollarSign(
-                                        16,
+                                        16, '',
                                     )}
                                     <span class="${
                                         'text-sm'
@@ -385,7 +385,7 @@ function buildConversionPage(
                                     + ' text-muted'
                                 }">
                                     ${iconTrendingUp(
-                                        16,
+                                        16, '',
                                     )}
                                     <span class="${
                                         'text-sm'
@@ -903,7 +903,7 @@ function buildConversionPage(
                                         + 'ground'
                                         + '))')
                             }>
-                                ${iconRocket(24)}
+                                ${iconRocket(24, '')}
                             </div>
                             <div style="flex:1">
                                 <h3
@@ -967,7 +967,7 @@ function buildConversionPage(
                                             + '-ideas-2'
                                         }>
                                         ${iconArrowLeft(
-                                            16,
+                                            16, '',
                                         )}
                                         ${'Back to'
                                             + ' Ideas'}
@@ -991,7 +991,7 @@ function buildConversionPage(
                                         ${'Create'
                                             + ' Project'}
                                         ${iconArrowRight(
-                                            16,
+                                            16, '',
                                         )}
                                     </button>
                                 </div>
@@ -1010,9 +1010,9 @@ export async function init(
     const ideaId = params?.['ideaId'];
     if (!ideaId) { navigateTo('ideas'); return; }
 
-    const root = $('#page-root');
+    const root = $('#page-root', document);
     if (!root) return;
-    setHtml(root, buildSkeleton('detail'));
+    setHtml(root, buildSkeleton('detail', 4));
 
     let idea: ConversionIdea;
     let users: User[];
@@ -1027,6 +1027,7 @@ export async function init(
             buildErrorState(
                 'Failed to load idea'
                 + ' for conversion.',
+                'Try Again',
             ),
         );
         root.querySelector(
@@ -1064,7 +1065,7 @@ export async function init(
             ])
             .forEach(field => {
                 const el = $(
-                    `#convert-${field}`,
+                    `#convert-${field}`, document,
                 );
                 if (
                     el instanceof
@@ -1093,7 +1094,7 @@ export async function init(
                     syncFormFields();
                     const btn = $(
                         '#convert'
-                        + '-submit-btn',
+                        + '-submit-btn', document,
                     );
                     if (
                         btn instanceof
@@ -1110,7 +1111,7 @@ export async function init(
                     syncFormFields();
                     const btn = $(
                         '#convert'
-                        + '-submit-btn',
+                        + '-submit-btn', document,
                     );
                     if (
                         btn instanceof
@@ -1123,7 +1124,7 @@ export async function init(
             );
         });
 
-    $('#convert-submit-btn')
+    $('#convert-submit-btn', document)
         ?.addEventListener(
             'click',
             async () => {
@@ -1132,12 +1133,12 @@ export async function init(
                     return;
                 }
                 const btn = $(
-                    '#convert-submit-btn',
+                    '#convert-submit-btn', document,
                 );
                 if (!btn) return;
                 setHtml(
                     btn,
-                    html`${iconLoader(16)}
+                    html`${iconLoader(16, '')}
                         Creating Project...`,
                 );
                 if (
@@ -1282,7 +1283,7 @@ export async function init(
                         html`${'Create'
                             + ' Project'}
                             ${iconArrowRight(
-                                16,
+                                16, '',
                             )}`,
                     );
                     if (
@@ -1295,12 +1296,12 @@ export async function init(
             },
         );
 
-    $('#convert-back-to-ideas')
+    $('#convert-back-to-ideas', document)
         ?.addEventListener(
             'click',
             () => navigateTo('ideas'),
         );
-    $('#convert-back-to-ideas-2')
+    $('#convert-back-to-ideas-2', document)
         ?.addEventListener(
             'click',
             () => navigateTo('ideas'),

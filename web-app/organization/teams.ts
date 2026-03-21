@@ -71,7 +71,7 @@ function buildStatusDot(
 
 const dimensionIconConfig: Record<
     string,
-    (size?: number, cssClass?: string) => SafeHtml
+    (size: number, cssClass: string) => SafeHtml
 > = {
     driver: iconTarget,
     analytical: iconBrain,
@@ -329,7 +329,7 @@ function buildMemberCard(
                            --muted)/0.5);
                            font-size:0.625rem"
                 >
-                    ${iconStar(10)} ${strength}
+                    ${iconStar(10, '')} ${strength}
                 </span>
                     `)}
                 </div>
@@ -348,7 +348,7 @@ function buildMemberCard(
                     <span
                         class="flex items-center gap-1"
                     >
-                        ${iconBriefcase(14)}
+                        ${iconBriefcase(14, '')}
                         ${member.currentProjects} active
                     </span>
                     <span
@@ -368,7 +368,7 @@ function buildMemberCard(
 
 function mutateList(): void {
     const search = (
-        $input('#team-search')?.value ?? ''
+        $input('#team-search', document)?.value ?? ''
     ).toLowerCase();
     const filtered = state.members.filter(
         member =>
@@ -382,7 +382,7 @@ function mutateList(): void {
                 .toLowerCase()
                 .includes(search),
     );
-    const list = $('#team-list');
+    const list = $('#team-list', document);
     if (list) {
         setHtml(
             list,
@@ -392,7 +392,7 @@ function mutateList(): void {
         );
     }
 
-    const panel = $('#team-detail-panel');
+    const panel = $('#team-detail-panel', document);
     const member = state.selectedMemberId
         ? state.members.find(
             candidate =>
@@ -426,7 +426,7 @@ function mutateList(): void {
 }
 
 function bindCards(): void {
-    $$('[data-member-card]').forEach(card => {
+    $$('[data-member-card]', document).forEach(card => {
         card.addEventListener('click', () => {
             state.selectedMemberId =
                 card.getAttribute(
@@ -438,22 +438,20 @@ function bindCards(): void {
 }
 
 function bindDetailTabs(): void {
-    initTabs('[data-tab]', '.tab-panel');
+    initTabs('[data-tab]', '.tab-panel', 'active');
 }
 
 export async function init(): Promise<void> {
-    const teamListEl = $('#team-list');
+    const teamListEl = $('#team-list', document);
     if (!teamListEl) return;
 
     const result = await withLoadingState(
         teamListEl,
-        buildSkeleton(
-            'card-list', { count: 4 },
-        ),
+        buildSkeleton('card-list', 4),
         getTeamMembers,
         init,
         {
-            icon: iconUsers(24),
+            icon: iconUsers(24, ''),
             title: 'No Team Members',
             description:
                 'Invite team members to start'
@@ -466,19 +464,19 @@ export async function init(): Promise<void> {
     populateIcons([
         [
             '#activity-feed-btn-icon',
-            iconActivity(16),
+            iconActivity(16, ''),
         ],
         [
             '#add-member-btn-icon',
-            iconPlus(16),
+            iconPlus(16, ''),
         ],
         [
             '#search-field-icon',
-            iconSearch(16),
+            iconSearch(16, ''),
         ],
     ]);
 
-    const summaryEl = $('#team-summary');
+    const summaryEl = $('#team-summary', document);
     if (summaryEl) {
         const word =
             state.members.length === 1
@@ -491,7 +489,7 @@ export async function init(): Promise<void> {
     }
 
     const placeholderEl =
-        $('#team-detail-placeholder');
+        $('#team-detail-placeholder', document);
     if (placeholderEl) {
         setHtml(placeholderEl, html`
             ${iconUsers(48, 'text-muted')}
@@ -504,18 +502,18 @@ export async function init(): Promise<void> {
             </p>`);
     }
 
-    $('#team-search')?.addEventListener(
+    $('#team-search', document)?.addEventListener(
         'input', mutateList,
     );
 
     initDialog('add-member', {
         openBtnId: 'team-add-btn',
     });
-    $('#add-member-send')?.addEventListener(
+    $('#add-member-send', document)?.addEventListener(
         'click',
         () => {
             const email =
-                $input('#add-member-email')
+                $input('#add-member-email', document)
                     ?.value;
             showToast(
                 email

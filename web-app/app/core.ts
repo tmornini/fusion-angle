@@ -12,6 +12,7 @@ import { initSidebarLayout } from './layout';
 
 export { navigateTo } from './navigation';
 export {
+    displayText,
     formatDate,
     getTimeOfDay,
     initials,
@@ -147,6 +148,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (container) {
             setHtml(container, buildErrorState(
                 errorMessage(err, 'This page failed to load.'),
+                'Try Again',
             ));
             container
                 .querySelector('[data-retry-btn]')

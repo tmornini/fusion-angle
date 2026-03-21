@@ -66,8 +66,8 @@ const gaugeThemeConfig: Record<
 const gaugeIconConfig: Record<
     string,
     (
-        size?: number,
-        cssClass?: string,
+        size: number,
+        cssClass: string,
     ) => SafeHtml
 > = {
     dollarSign: iconDollarSign,
@@ -98,16 +98,22 @@ function buildGauge(
     const elementId = card.title
         .replace(/\s+/g, '-')
         .toLowerCase();
-    const outerPct = Math.min(
-        (card.outer.value / card.outer.max)
-            * 100,
-        100,
-    );
-    const innerPct = Math.min(
-        (card.inner.value / card.inner.max)
-            * 100,
-        100,
-    );
+    const outerPct = card.outer.max > 0
+        ? Math.min(
+            (card.outer.value
+                / card.outer.max)
+                * 100,
+            100,
+        )
+        : 0;
+    const innerPct = card.inner.max > 0
+        ? Math.min(
+            (card.inner.value
+                / card.inner.max)
+                * 100,
+            100,
+        )
+        : 0;
     const outerArc =
         Math.PI * GAUGE_ARC_OUTER_RADIUS;
     const innerArc =
@@ -389,15 +395,13 @@ function buildGauge(
 
 export async function init(): Promise<void> {
     const container =
-        $('#gauge-container');
+        $('#gauge-container', document);
     if (!container) return;
 
     const gauges =
         await withLoadingState(
             container,
-            buildSkeleton('card-grid', {
-                count: 3,
-            }),
+            buildSkeleton('card-grid', 3),
             () => getDashboardGauges(),
             () => init(),
         );

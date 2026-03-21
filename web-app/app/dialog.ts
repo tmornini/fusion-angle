@@ -6,8 +6,8 @@ function openDialog(dialogId: string): void {
     if (document.activeElement instanceof HTMLElement) {
         focusStack.push(document.activeElement);
     }
-    $(`#${dialogId}-backdrop`)?.classList.remove('hidden');
-    const dialog = $(`#${dialogId}-dialog`);
+    $(`#${dialogId}-backdrop`, document)?.classList.remove('hidden');
+    const dialog = $(`#${dialogId}-dialog`, document);
     dialog?.classList.remove('hidden');
     dialog?.setAttribute('aria-hidden', 'false');
     const focusable = dialog
@@ -18,8 +18,8 @@ function openDialog(dialogId: string): void {
 }
 
 function closeDialog(dialogId: string): void {
-    $(`#${dialogId}-backdrop`)?.classList.add('hidden');
-    const dialog = $(`#${dialogId}-dialog`);
+    $(`#${dialogId}-backdrop`, document)?.classList.add('hidden');
+    const dialog = $(`#${dialogId}-dialog`, document);
     dialog?.classList.add('hidden');
     dialog?.setAttribute('aria-hidden', 'true');
     focusStack.pop()?.focus();
@@ -28,7 +28,7 @@ function closeDialog(dialogId: string): void {
 function initTabs(
     tabSelector: string,
     panelSelector: string,
-    activeClass = 'active',
+    activeClass: string,
 ): void {
     const tabs = Array.from(
         document.querySelectorAll<HTMLElement>(
@@ -116,15 +116,15 @@ function initDialog(
     const cancelId = options?.cancelBtnId
         ?? `${dialogId}-cancel`;
 
-    $(`#${openId}`)?.addEventListener(
+    $(`#${openId}`, document)?.addEventListener(
         'click',
         () => openDialog(dialogId),
     );
-    $(`#${cancelId}`)?.addEventListener(
+    $(`#${cancelId}`, document)?.addEventListener(
         'click',
         () => closeDialog(dialogId),
     );
-    $(`#${dialogId}-backdrop`)
+    $(`#${dialogId}-backdrop`, document)
         ?.addEventListener(
             'click',
             (e) => {
@@ -137,7 +137,7 @@ function initDialog(
             },
         );
     if (options?.onSubmit) {
-        $(`#${dialogId}-submit`)
+        $(`#${dialogId}-submit`, document)
             ?.addEventListener(
                 'click',
                 options.onSubmit,

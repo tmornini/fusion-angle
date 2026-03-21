@@ -4,7 +4,7 @@ Enterprise innovation management platform for capturing ideas, defining business
 
 ## Overview
 
-Vanilla TypeScript with zero runtime dependencies. Uses localStorage for in-browser data persistence. Every page is a standalone HTML file that works via both HTTP server and `file:///` protocol.
+Vanilla TypeScript with zero runtime dependencies. Uses localStorage for in-browser data persistence. Every page is a standalone HTML file served via HTTP.
 
 ### Modules
 

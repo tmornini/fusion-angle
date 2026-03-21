@@ -2,6 +2,8 @@ import { GET } from '../../../api/api';
 import type {
     Id,
     ConfidenceLevel,
+    EdgeStatus,
+    EdgeIdeaEntity,
 } from '../../../api/types';
 import type {
     UserEntity,
@@ -19,8 +21,29 @@ export async function buildUserMap(): Promise<Map<Id, User>> {
     return new Map(users.map(entity => [entity.id, new User(entity)]));
 }
 
-export function userName(userMap: Map<Id, User>, userId: string): string {
-    return userMap.get(userId)?.fullName() ?? 'Unknown';
+export function userName(
+    userMap: Map<Id, User>,
+    userId: string | undefined,
+): string {
+    if (!userId) return '';
+    return userMap.get(userId)?.fullName()
+        ?? '';
+}
+
+export function computeEdgeStatus(
+    ideaId: string,
+    edgeIdeas: EdgeIdeaEntity[],
+    edges: EdgeEntity[],
+): EdgeStatus {
+    const link = edgeIdeas.find(
+        ei => ei.idea_id === ideaId,
+    );
+    if (!link) return 'missing';
+    const edge = edges.find(
+        e => e.id === link.edge_id,
+    );
+    if (!edge) return 'missing';
+    return edge.status;
 }
 
 export function parseJson<T>(value: string | T, fallback: T): T {
@@ -143,26 +166,13 @@ export async function getEdgeDataByIdeaId(
         confidence: edge.confidence,
         owner: userName(
             userMap,
-            ownership?.user_id ?? '',
+            ownership?.user_id,
         ),
-    };
-}
-
-export function buildDefaultEdgeData(
-): EdgeData {
-    return {
-        outcomes: [],
-        impact: { shortTerm: '', midTerm: '', longTerm: '' },
-        confidence: 'medium',
-        owner: '',
     };
 }
 
 export async function getEdgeDataWithConfidence(
     ideaId: string,
-): Promise<EdgeData> {
-    const edgeData =
-        await getEdgeDataByIdeaId(ideaId);
-    if (!edgeData) return buildDefaultEdgeData();
-    return edgeData;
+): Promise<EdgeData | null> {
+    return getEdgeDataByIdeaId(ideaId);
 }

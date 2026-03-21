@@ -31,6 +31,12 @@ We detest:
 - obscurity
 - cleverness
 - magical values
+- default values — in all forms
+  - schema column defaults
+  - function parameter defaults
+  - fallback objects and factories
+  - silent coercion (`?? ''`, `|| fallback`)
+  - default values mask absence of real data
 - premature optimization
 - polling for state changes
 
@@ -43,6 +49,13 @@ We adore:
 - relationship entities storing relationships between nouns
   - should only store noun IDs and when the relationship was formed
 - being informed or notified of state changes
+- validate at entity creation boundaries
+  - every noun entity attribute is NOT NULL
+  - enforced on instantiation, not downstream
+  - trust data after validation — no internal
+    defensive coding against your own data model
+  - defend only against external reality: user input,
+    storage corruption, DOM API, async failure
 
 We handle and persist timestamps uniformly:
 

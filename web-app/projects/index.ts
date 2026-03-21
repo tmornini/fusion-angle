@@ -26,21 +26,22 @@ import {
     iconGripVertical,
     iconFolderKanban,
 } from '../app/icons';
-import { navigateTo } from '../app/core';
+import {
+    navigateTo, displayText,
+} from '../app/core';
 import {
     getProjects,
     type Project,
 } from '../app/adapters';
 import {
     PROJECT_STATUS_CONFIG,
-    UNKNOWN_CONFIG,
 } from '../../api/types';
 
 const projectStatusIcons: Record<
     string,
     (
-        size?: number,
-        cssClass?: string,
+        size: number,
+        cssClass: string,
     ) => SafeHtml
 > = {
     'submitted': iconClock,
@@ -127,7 +128,7 @@ function buildProjectCard(
             }" style="${
                 'margin-top:0.25rem;'
                 + 'cursor:grab'
-            }">${iconGripVertical(20)}</div>
+            }">${iconGripVertical(20, '')}</div>
             <div style="flex:1;min-width:0">
                 <div class="${
                     'flex items-start '
@@ -161,7 +162,7 @@ function buildProjectCard(
                                     .statusClassName()
                                 + ' text-xs'
                             }">${
-                                statusIcon(14)
+                                statusIcon(14, '')
                             } ${project
                                 .statusLabel()
                             }</span>
@@ -278,11 +279,15 @@ function buildProjectCard(
                                     'text-sm'
                                     + ' font-medium'
                                 }">${
-                                    project
-                                        .actualImpact
-                                    || project
-                                        .estimatedImpact
-                                    || '\u2014'
+                                    displayText(
+                                        String(
+                                            project
+                                                .actualImpact
+                                            || project
+                                                .estimatedImpact
+                                            || '',
+                                        ),
+                                    )
                                 }</p>
                             </div>
                         </div>
@@ -318,7 +323,7 @@ function buildProjectCard(
                         + 'btn-sm gap-2'
                     }" data-view-project="${
                         project.id
-                    }">${iconEye(16)
+                    }">${iconEye(16, '')
                     } <span class="${
                         'hidden-mobile'
                     }">View Details</span
@@ -331,18 +336,16 @@ function buildProjectCard(
 
 export async function init(): Promise<void> {
     const listContainer =
-        $('#projects-list');
+        $('#projects-list', document);
     if (!listContainer) return;
 
     const result = await withLoadingState(
         listContainer,
-        buildSkeleton('card-list', {
-            count: 4,
-        }),
+        buildSkeleton('card-list', 4),
         getProjects,
         init,
         {
-            icon: iconFolderKanban(24),
+            icon: iconFolderKanban(24, ''),
             title: 'No Projects Yet',
             description:
                 'Convert approved ideas'
@@ -365,11 +368,11 @@ export async function init(): Promise<void> {
     populateIcons([
         [
             '#priority-view-icon',
-            iconLayoutGrid(16),
+            iconLayoutGrid(16, ''),
         ],
         [
             '#performance-view-icon',
-            iconBarChart(16),
+            iconBarChart(16, ''),
         ],
     ]);
 
@@ -377,7 +380,7 @@ export async function init(): Promise<void> {
         projects,
         p => p.status,
     );
-    const badgesEl = $('#status-badges');
+    const badgesEl = $('#status-badges', document);
     if (badgesEl) {
         const badgeFragments = Object.entries(
             statusGroups,
@@ -391,7 +394,7 @@ export async function init(): Promise<void> {
                 const cfg =
                     PROJECT_STATUS_CONFIG[
                         status as keyof typeof PROJECT_STATUS_CONFIG
-                    ] ?? UNKNOWN_CONFIG;
+                    ]!;
                 const icon =
                     projectStatusIcons[
                         status
@@ -401,7 +404,7 @@ export async function init(): Promise<void> {
                     + cfg.className
                     + ' text-xs'
                 }">${
-                    icon(14)
+                    icon(14, '')
                 } ${items?.length ?? 0}</span>`;
             });
         setHtml(
@@ -412,7 +415,7 @@ export async function init(): Promise<void> {
 
     function mutateList(): void {
         const container =
-            $('#projects-list');
+            $('#projects-list', document);
         const sorted = [...projects].sort(
             (a, b) =>
                 currentView === 'priority'
@@ -432,7 +435,7 @@ export async function init(): Promise<void> {
                 )}`,
             );
         }
-        const info = $('#projects-info');
+        const info = $('#projects-info', document);
         if (info) {
             info.textContent =
                 projects.length

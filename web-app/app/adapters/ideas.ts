@@ -4,6 +4,8 @@ import type {
     IdeaScoreEntity,
     ConfidenceLevel,
     IdeaSubmissionEntity,
+    EdgeIdeaEntity,
+    EdgeEntity,
 } from '../../../api/types';
 import {
     Idea, nowUtc,
@@ -13,6 +15,7 @@ import {
 import {
     buildUserMap,
     userName,
+    computeEdgeStatus,
     parseJson,
     getEdgeDataWithConfidence,
     type Metric,
@@ -22,17 +25,31 @@ export { Idea } from '../../../api/types';
 
 export async function getIdeas(
 ): Promise<Idea[]> {
-    const [ideas, userMap, submissions] =
-        await Promise.all([
-            GET<IdeaEntity[]>('ideas'),
-            buildUserMap(),
-            GET<IdeaSubmissionEntity[]>(
-                'idea-submissions',
-            ),
-        ]);
+    const [
+        ideas, userMap, submissions,
+        edgeIdeas, edges,
+    ] = await Promise.all([
+        GET<IdeaEntity[]>('ideas'),
+        buildUserMap(),
+        GET<IdeaSubmissionEntity[]>(
+            'idea-submissions',
+        ),
+        GET<EdgeIdeaEntity[]>(
+            'edge-ideas',
+        ),
+        GET<EdgeEntity[]>('edges'),
+    ]);
     const submitterMap = new Map(
         submissions.map(
             s => [s.idea_id, s.user_id],
+        ),
+    );
+    const submittedAtMap = new Map(
+        submissions.map(
+            s => [
+                s.idea_id,
+                s.created_at,
+            ],
         ),
     );
     return ideas
@@ -41,25 +58,36 @@ export async function getIdeas(
             idea,
             userName(
                 userMap,
-                submitterMap.get(idea.id)
-                    ?? '',
+                submitterMap.get(idea.id)!,
             ),
+            computeEdgeStatus(
+                idea.id,
+                edgeIdeas,
+                edges,
+            ),
+            submittedAtMap.get(idea.id)!,
         ));
 }
 
 export async function getIdeaDetail(
     ideaId: string,
 ): Promise<Idea> {
-    const [idea, userMap, submissions] =
-        await Promise.all([
-            GET<IdeaEntity>(
-                `ideas/${ideaId}`,
-            ),
-            buildUserMap(),
-            GET<IdeaSubmissionEntity[]>(
-                'idea-submissions',
-            ),
-        ]);
+    const [
+        idea, userMap, submissions,
+        edgeIdeas, edges,
+    ] = await Promise.all([
+        GET<IdeaEntity>(
+            `ideas/${ideaId}`,
+        ),
+        buildUserMap(),
+        GET<IdeaSubmissionEntity[]>(
+            'idea-submissions',
+        ),
+        GET<EdgeIdeaEntity[]>(
+            'edge-ideas',
+        ),
+        GET<EdgeEntity[]>('edges'),
+    ]);
     const submission = submissions.find(
         s => s.idea_id === ideaId,
     );
@@ -67,24 +95,44 @@ export async function getIdeaDetail(
         idea,
         userName(
             userMap,
-            submission?.user_id ?? '',
+            submission!.user_id,
         ),
+        computeEdgeStatus(
+            ideaId,
+            edgeIdeas,
+            edges,
+        ),
+        submission!.created_at,
     );
 }
 
 export async function getReviewQueue(
 ): Promise<Idea[]> {
-    const [ideas, userMap, submissions] =
-        await Promise.all([
-            GET<IdeaEntity[]>('ideas'),
-            buildUserMap(),
-            GET<IdeaSubmissionEntity[]>(
-                'idea-submissions',
-            ),
-        ]);
+    const [
+        ideas, userMap, submissions,
+        edgeIdeas, edges,
+    ] = await Promise.all([
+        GET<IdeaEntity[]>('ideas'),
+        buildUserMap(),
+        GET<IdeaSubmissionEntity[]>(
+            'idea-submissions',
+        ),
+        GET<EdgeIdeaEntity[]>(
+            'edge-ideas',
+        ),
+        GET<EdgeEntity[]>('edges'),
+    ]);
     const submitterMap = new Map(
         submissions.map(
             s => [s.idea_id, s.user_id],
+        ),
+    );
+    const submittedAtMap = new Map(
+        submissions.map(
+            s => [
+                s.idea_id,
+                s.created_at,
+            ],
         ),
     );
 
@@ -94,9 +142,14 @@ export async function getReviewQueue(
             idea,
             userName(
                 userMap,
-                submitterMap.get(idea.id)
-                    ?? '',
+                submitterMap.get(idea.id)!,
             ),
+            computeEdgeStatus(
+                idea.id,
+                edgeIdeas,
+                edges,
+            ),
+            submittedAtMap.get(idea.id)!,
         ));
 }
 
@@ -123,19 +176,17 @@ export async function getIdeaForConversion(
                 `ideas/${ideaId}/score`,
             ),
         ]);
-    const idea = new Idea(entity);
     return {
-        id: idea.id,
-        title: idea.title,
+        id: entity.id,
+        title: entity.title,
         problemStatement:
-            idea.problemStatement,
+            entity.problem_statement,
         proposedSolution:
-            idea.proposedSolution,
+            entity.proposed_solution,
         expectedOutcome:
-            idea.expectedOutcome,
-        score: idea.resolvedScore(
-            scoreRow?.overall,
-        ),
+            entity.expected_outcome,
+        score: scoreRow?.overall
+            ?? entity.score,
         estimatedDuration:
             scoreRow?.estimated_duration
                 ?? '',
@@ -210,8 +261,10 @@ export async function getIdeaForApproval(
         entity,
         userName(
             userMap,
-            submission?.user_id ?? '',
+            submission!.user_id,
         ),
+        'missing',
+        submission!.created_at,
     );
 
     return {
@@ -253,7 +306,7 @@ export async function getIdeaForApproval(
 
 export async function getEdgeForApproval(
     ideaId: string,
-): Promise<ApprovalEdge> {
+): Promise<ApprovalEdge | null> {
     return getEdgeDataWithConfidence(ideaId);
 }
 

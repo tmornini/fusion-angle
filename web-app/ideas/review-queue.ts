@@ -24,6 +24,7 @@ import {
 import {
     navigateTo,
     styleForScore,
+    displayText,
 } from '../app/core';
 import {
     getReviewQueue,
@@ -50,7 +51,7 @@ const priorityConfig: Record<
 
 const readinessIcon: Record<
     string,
-    (size?: number) => SafeHtml
+    (size: number, cssClass: string) => SafeHtml
 > = {
     ready: iconCheckCircle2,
     'needs-info': iconMessageSquare,
@@ -67,10 +68,7 @@ function buildReviewCard(
     const priorityDisplay =
         priorityConfig[
             idea.priorityLevel()
-        ] ?? {
-            label: 'Unknown',
-            className: 'badge-default',
-        };
+        ]!;
     return html`
     <div class="card card-hover p-4"
         style="cursor:pointer"
@@ -91,7 +89,7 @@ function buildReviewCard(
                         + ' gap-1 text-sm '
                         + idea
                             .readinessClassName()
-                    }">${rIcon(16)
+                    }">${rIcon(16, '')
                     } ${idea
                         .readinessLabel()
                     }</span>
@@ -99,7 +97,7 @@ function buildReviewCard(
                         ${idea
                             .edgeStatusClassName()}
                         text-xs">${
-                        iconTarget(12)
+                        iconTarget(12, '')
                     } ${idea
                         .edgeStatusLabel()
                     }</span>
@@ -113,7 +111,9 @@ function buildReviewCard(
                     + ' text-muted'
                 }">
                     <span>by ${
-                        idea.submittedBy
+                        displayText(
+                            idea.submittedBy,
+                        )
                     }</span>
                     <span>${
                         '\u2022'
@@ -188,21 +188,19 @@ function buildReviewCard(
 
 export async function init(): Promise<void> {
     const root = $(
-        '#review-queue-content',
+        '#review-queue-content', document,
     );
     if (!root) return;
 
     const result = await withLoadingState(
         root,
-        html`${buildSkeleton('stats-row')}${
-            buildSkeleton('card-list', {
-                count: 4,
-            })
+        html`${buildSkeleton('stats-row', 4)}${
+            buildSkeleton('card-list', 4)
         }`,
         getReviewQueue,
         init,
         {
-            icon: iconClipboardCheck(24),
+            icon: iconClipboardCheck(24, ''),
             title: 'Review Queue Empty',
             description:
                 'All ideas have been reviewed.'
@@ -353,7 +351,7 @@ export async function init(): Promise<void> {
         <div class="search-wrapper"
             style="flex:1">
             <span class="search-icon">${
-                iconSearch(16)
+                iconSearch(16, '')
             }</span>
             <input class="input search-input"
                 placeholder="${
@@ -441,16 +439,16 @@ export async function init(): Promise<void> {
     function mutateFilteredList() {
         const search = (
             $input(
-                '#review-queue-search',
+                '#review-queue-search', document,
             )?.value ?? ''
         ).toLowerCase();
         const priority =
             $select(
-                '#review-queue-priority-filter',
+                '#review-queue-priority-filter', document,
             )?.value ?? 'all';
         const readiness =
             $select(
-                '#review-queue-readiness-filter',
+                '#review-queue-readiness-filter', document,
             )?.value ?? 'all';
 
         const filtered = allIdeas.filter(
@@ -477,10 +475,10 @@ export async function init(): Promise<void> {
         );
 
         const list = $(
-            '#review-queue-list',
+            '#review-queue-list', document,
         );
         const empty = $(
-            '#review-queue-empty',
+            '#review-queue-empty', document,
         );
         if (list)
             setHtml(
@@ -498,7 +496,7 @@ export async function init(): Promise<void> {
                     ? 'none' : '';
     }
 
-    $('#review-queue-list')
+    $('#review-queue-list', document)
         ?.addEventListener(
             'click',
             (e) => {
@@ -524,19 +522,19 @@ export async function init(): Promise<void> {
             },
         );
 
-    $('#review-queue-search')
+    $('#review-queue-search', document)
         ?.addEventListener(
             'input',
             mutateFilteredList,
         );
     $(
-        '#review-queue-priority-filter',
+        '#review-queue-priority-filter', document,
     )?.addEventListener(
         'change',
         mutateFilteredList,
     );
     $(
-        '#review-queue-readiness-filter',
+        '#review-queue-readiness-filter', document,
     )?.addEventListener(
         'change',
         mutateFilteredList,

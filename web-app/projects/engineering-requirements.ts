@@ -163,10 +163,10 @@ export async function init(
     if (!projectId) { navigateTo('projects'); return; }
 
     const root = $(
-            '#engineering-requirements-content',
+            '#engineering-requirements-content', document,
     );
     if (!root) return;
-    setHtml(root, buildSkeleton('detail'));
+    setHtml(root, buildSkeleton('detail', 4));
 
     let project: EngineeringProject;
     let clarifications: Clarification[];
@@ -186,6 +186,7 @@ export async function init(
                 buildErrorState(
                         'Failed to load engineering'
                         + ' requirements.',
+                        'Try Again',
                 ),
         );
         root
@@ -249,7 +250,7 @@ export async function init(
                     id="${
                         'requirements-back'
                     }">
-                    ${iconArrowLeft(20)}
+                    ${iconArrowLeft(20, '')}
                 </button>
                 <div>
                     <h1 class="${
@@ -718,6 +719,7 @@ export async function init(
                 </div>
             </div>
 
+            ${project.linkedIdea ? html`
             <div class="${
                 'card p-6 mb-8'
             }">
@@ -816,6 +818,7 @@ export async function init(
                     </div>
                 </a>
             </div>
+            ` : html``}
 
             <div style="${
                 'margin-bottom:2rem'
@@ -874,7 +877,7 @@ export async function init(
                                 + '-send'
                             }"
                             disabled>
-                            ${iconSend(16)
+                            ${iconSend(16, '')
                             } Send Question
                         </button>
                     </div>
@@ -948,7 +951,7 @@ export async function init(
                             'requirements-'
                             + 'complete'
                         }">
-                        ${iconCheckCircle2(16)}
+                        ${iconCheckCircle2(16, '')}
                         Mark Requirements
                         Complete
                     </button>
@@ -957,10 +960,10 @@ export async function init(
         </div>`);
 
     const questionField = $textarea(
-            '#requirements-question',
+            '#requirements-question', document,
     );
     const sendButton = $(
-            '#requirements-send',
+            '#requirements-send', document,
     );
     questionField?.addEventListener(
             'input',
@@ -990,7 +993,7 @@ export async function init(
             },
     );
 
-    $('#requirements-complete')
+    $('#requirements-complete', document)
         ?.addEventListener('click', () => {
             showToast(
                     'Requirements marked as complete',
@@ -1001,7 +1004,7 @@ export async function init(
             );
         });
 
-    $('#requirements-back')
+    $('#requirements-back', document)
         ?.addEventListener(
                 'click',
                 () => navigateTo(
@@ -1009,7 +1012,7 @@ export async function init(
                         { projectId },
                 ),
         );
-    $('#requirements-back-footer')
+    $('#requirements-back-footer', document)
         ?.addEventListener(
                 'click',
                 () => navigateTo(

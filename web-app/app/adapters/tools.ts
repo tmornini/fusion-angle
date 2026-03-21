@@ -67,8 +67,7 @@ export async function getCrunchColumns(
             isAcronym:
                 acronymId !== undefined,
             acronymExpansion: acronymId
-                ? (acronymMap.get(acronymId)
-                    ?? '')
+                ? acronymMap.get(acronymId)!
                 : '',
         };
     });

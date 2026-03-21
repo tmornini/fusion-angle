@@ -3,8 +3,8 @@ import type { IconName } from './icons';
 export interface PageEntry {
     title: string;
     layout: 'sidebar' | 'standalone';
-    sourceDir?: string;
-    sourceFile?: string;
+    sourceDir: string;
+    sourceFile: string;
     icon?: IconName;
     keywords?: string;
     searchable?: boolean;
@@ -17,12 +17,16 @@ export const PAGE_REGISTRY: Record<
     dashboard: {
         title: 'Dashboard',
         layout: 'sidebar',
+        sourceDir: 'dashboard',
+        sourceFile: 'index',
         icon: 'home',
         keywords: 'home overview',
     },
     ideas: {
         title: 'Ideas',
         layout: 'sidebar',
+        sourceDir: 'ideas',
+        sourceFile: 'index',
         icon: 'lightbulb',
         keywords: 'ideas list innovation',
     },
@@ -37,6 +41,8 @@ export const PAGE_REGISTRY: Record<
     projects: {
         title: 'Projects',
         layout: 'sidebar',
+        sourceDir: 'projects',
+        sourceFile: 'index',
         icon: 'folderKanban',
         keywords:
             'projects list kanban',
@@ -69,6 +75,8 @@ export const PAGE_REGISTRY: Record<
     edges: {
         title: 'Edges',
         layout: 'sidebar',
+        sourceDir: 'edges',
+        sourceFile: 'index',
         icon: 'target',
         keywords:
             'edge outcomes metrics',
@@ -84,6 +92,8 @@ export const PAGE_REGISTRY: Record<
     crunch: {
         title: 'Crunch',
         layout: 'sidebar',
+        sourceDir: 'crunch',
+        sourceFile: 'index',
         icon: 'database',
         keywords:
             'data labeling columns',
@@ -91,6 +101,8 @@ export const PAGE_REGISTRY: Record<
     flow: {
         title: 'Flow',
         layout: 'sidebar',
+        sourceDir: 'flow',
+        sourceFile: 'index',
         icon: 'gitBranch',
         keywords:
             'process workflow steps',
@@ -115,6 +127,7 @@ export const PAGE_REGISTRY: Record<
         title: 'Organization',
         layout: 'sidebar',
         sourceDir: 'organization',
+        sourceFile: 'index',
         icon: 'settings',
         keywords:
             'account organization'
@@ -123,6 +136,8 @@ export const PAGE_REGISTRY: Record<
     profile: {
         title: 'Profile',
         layout: 'sidebar',
+        sourceDir: 'profile',
+        sourceFile: 'index',
         icon: 'user',
         keywords:
             'profile settings personal',
@@ -130,6 +145,8 @@ export const PAGE_REGISTRY: Record<
     settings: {
         title: 'Company Settings',
         layout: 'sidebar',
+        sourceDir: 'settings',
+        sourceFile: 'index',
         icon: 'settings',
         keywords:
             'company organization'
@@ -154,6 +171,8 @@ export const PAGE_REGISTRY: Record<
     snapshots: {
         title: 'Snapshots',
         layout: 'sidebar',
+        sourceDir: 'snapshots',
+        sourceFile: 'index',
         icon: 'database',
         keywords:
             'data export import wipe',
@@ -161,6 +180,8 @@ export const PAGE_REGISTRY: Record<
     'design-system': {
         title: 'Design System',
         layout: 'sidebar',
+        sourceDir: 'design-system',
+        sourceFile: 'index',
         icon: 'palette',
         keywords:
             'components ui reference',
@@ -192,11 +213,15 @@ export const PAGE_REGISTRY: Record<
     auth: {
         title: 'Authentication',
         layout: 'standalone',
+        sourceDir: 'auth',
+        sourceFile: 'index',
         searchable: false,
     },
     landing: {
         title: 'Landing',
         layout: 'standalone',
+        sourceDir: 'landing',
+        sourceFile: 'index',
         searchable: false,
     },
     onboarding: {
@@ -209,6 +234,8 @@ export const PAGE_REGISTRY: Record<
     'not-found': {
         title: '404 Not Found',
         layout: 'standalone',
+        sourceDir: 'not-found',
+        sourceFile: 'index',
         searchable: false,
     },
 };

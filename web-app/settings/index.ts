@@ -80,7 +80,7 @@ function buildToggleRow(
 
 export async function init(): Promise<void> {
     const container =
-        $('#settings-content');
+        $('#settings-content', document);
     if (!container) return;
     let settings: Awaited<
         ReturnType<typeof getCompanySettings>
@@ -94,6 +94,7 @@ export async function init(): Promise<void> {
             buildErrorState(
                 'Failed to load'
                 + ' company settings.',
+                'Try Again',
             ),
         );
         container
@@ -121,7 +122,7 @@ export async function init(): Promise<void> {
             }" class="text-primary">${
                 'Administration'
             }</a>
-            ${iconChevronRight(14)}
+            ${iconChevronRight(14, '')}
             <span>Company Settings</span>
         </nav>
 
@@ -144,7 +145,7 @@ export async function init(): Promise<void> {
             }" id="${
                 'company-settings-save-btn'
             }">${
-                iconSave(16)
+                iconSave(16, '')
             } Save Changes</button>
         </div>
 
@@ -156,7 +157,7 @@ export async function init(): Promise<void> {
                 + 'mb-4 flex items-center'
                 + ' gap-2'
             }">${
-                iconBuilding(20)
+                iconBuilding(20, '')
             } General Information</h3>
             <div class="${
                 'grid grid-cols-2'
@@ -181,7 +182,7 @@ export async function init(): Promise<void> {
                         + 'flex items-center'
                         + ' gap-2'
                     }">${
-                        iconGlobe(16)
+                        iconGlobe(16, '')
                     } Domain</label>
                     <input class="input"
                         id="${
@@ -274,7 +275,7 @@ export async function init(): Promise<void> {
                 + 'mb-4 flex items-center'
                 + ' gap-2'
             }">${
-                iconShield(20)
+                iconShield(20, '')
             } Security</h3>
             ${buildToggleRow(
                 'company-settings-sso',
@@ -338,7 +339,7 @@ export async function init(): Promise<void> {
         });
 
     $(
-        '#company-settings-save-btn',
+        '#company-settings-save-btn', document,
     )?.addEventListener('click', () => {
         showToast(
             'Company settings saved'

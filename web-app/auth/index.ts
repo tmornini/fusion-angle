@@ -42,7 +42,7 @@ function validatePassword(
 }
 
 export async function init(): Promise<void> {
-    const root = $('#page-root');
+    const root = $('#page-root', document);
     if (!root) return;
 
     setHtml(root, html`
@@ -76,7 +76,7 @@ export async function init(): Promise<void> {
                             + 'justify-content:'
                             + 'center'
                         }">
-                            ${iconSparkles(24)}
+                            ${iconSparkles(24, '')}
                         </div>
                         <span class="${
                             'text-3xl '
@@ -204,7 +204,7 @@ export async function init(): Promise<void> {
                         'width:2.5rem;'
                         + 'height:2.5rem'
                     }">
-                        ${iconSparkles(20)}
+                        ${iconSparkles(20, '')}
                     </div>
                     <span class="${
                         'text-2xl font-display '
@@ -347,7 +347,7 @@ export async function init(): Promise<void> {
                                 + 'base)'
                             }" id="submit-btn">
                             Sign in ${
-                                iconArrowRight(20)
+                                iconArrowRight(20, '')
                             }
                         </button>
                     </form>
@@ -402,24 +402,24 @@ export async function init(): Promise<void> {
 
     let isLogin = true;
 
-    const form = $('#auth-form');
-    const emailInput = $input('#email');
+    const form = $('#auth-form', document);
+    const emailInput = $input('#email', document);
     const passwordInput =
-        $input('#password');
-    const emailError = $('#email-error');
+        $input('#password', document);
+    const emailError = $('#email-error', document);
     const passwordError =
-        $('#password-error');
+        $('#password-error', document);
     const companyField =
-        $('#company-field');
-    const toggleMode = $('#toggle-mode');
+        $('#company-field', document);
+    const toggleMode = $('#toggle-mode', document);
     const togglePrompt =
-        $('#toggle-prompt');
-    const authTitle = $('#auth-title');
+        $('#toggle-prompt', document);
+    const authTitle = $('#auth-title', document);
     const authSubtitle =
-        $('#auth-subtitle');
-    const submitBtn = $('#submit-btn');
+        $('#auth-subtitle', document);
+    const submitBtn = $('#submit-btn', document);
 
-    const branding = $('#auth-branding');
+    const branding = $('#auth-branding', document);
     if (
         branding
         && window.innerWidth >= 1024
@@ -427,7 +427,7 @@ export async function init(): Promise<void> {
         branding.classList.remove('hidden');
         branding.style.display = '';
     }
-    const mobileLogo = $('#mobile-logo');
+    const mobileLogo = $('#mobile-logo', document);
     if (
         mobileLogo
         && window.innerWidth >= 1024
@@ -476,7 +476,7 @@ export async function init(): Promise<void> {
                 isLogin
                     ? 'Sign in'
                     : 'Create account'
-            } ${iconArrowRight(20)}`,
+            } ${iconArrowRight(20, '')}`,
         );
         emailInput.setAttribute(
             'autocomplete',

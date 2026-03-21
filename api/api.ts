@@ -702,8 +702,7 @@ const routes: Route[] = [
                     id: m.id,
                     user_id:
                         userByMembership
-                            .get(m.id)
-                        ?? '',
+                            .get(m.id)!,
                     role: m.role,
                     type: m.type,
                 }));

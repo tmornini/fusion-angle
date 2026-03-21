@@ -94,7 +94,7 @@ export interface ProjectDetail {
         };
         confidence: ConfidenceLevel;
         owner: string;
-    };
+    } | null;
     team: {
         id: string;
         name: string;
@@ -221,7 +221,7 @@ export async function getProjectById(
             project.target_end_date,
         projectLead: userName(
             userMap,
-            leadRow?.user_id ?? '',
+            leadRow?.user_id,
         ),
         metrics: {
             time: {
@@ -273,7 +273,7 @@ export async function getProjectById(
                 userMap,
                 versionAuthorMap.get(
                     v.id,
-                ) ?? '',
+                )!,
             ),
         })),
         discussions:
@@ -285,7 +285,7 @@ export async function getProjectById(
                     userMap,
                     discussionAuthorMap.get(
                         d.id,
-                    ) ?? '',
+                    )!,
                 ),
             })),
         tasks: taskRows.map(task => ({
@@ -304,7 +304,7 @@ export async function getProjectById(
                 userMap,
                 taskAssignmentMap.get(
                     task.id,
-                ) ?? '',
+                ),
             ),
         })),
     };
@@ -341,7 +341,7 @@ export interface EngineeringProject {
         id: string;
         title: string;
         score: number;
-    };
+    } | null;
     timeline: string;
     budget: string;
 }
@@ -390,18 +390,18 @@ getProjectForEngineering(
         businessContext: {
             problem:
                 businessContext.problem
-                    || '',
+                    ?? '',
             expectedOutcome:
                 businessContext
                     .expectedOutcome
-                    || '',
+                    ?? '',
             successMetrics:
                 businessContext
                     .successMetrics
-                    || [],
+                    ?? [],
             constraints:
                 businessContext
-                    .constraints || [],
+                    .constraints ?? [],
         },
         team: teamRows.map(member => ({
             id: member.user_id,
@@ -418,11 +418,7 @@ getProjectForEngineering(
                 title: linkedIdea.title,
                 score: linkedIdea.score,
             }
-            : {
-                id: '',
-                title: '',
-                score: 0,
-            },
+            : null,
         timeline:
             project.timeline_label,
         budget: project.budget_label,
@@ -504,8 +500,7 @@ getClarificationsByProjectId(
             question: c.question,
             askedBy: userName(
                 userMap,
-                askerMap.get(c.id)
-                    ?? '',
+                askerMap.get(c.id),
             ),
             askedAt: c.asked_at,
             status: c.status,

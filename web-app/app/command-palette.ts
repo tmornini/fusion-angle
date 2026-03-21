@@ -67,11 +67,11 @@ function buildPageList(
         result.push({
             title: entry.title,
             icon: iconFn
-                ? iconFn(16)
-                : iconSearch(16),
+                ? iconFn(16, '')
+                : iconSearch(16, ''),
             href: buildPageUrl(name),
             keywords:
-                entry.keywords || '',
+                entry.keywords ?? '',
         });
     }
     return result;
@@ -191,7 +191,7 @@ export function initCommandPalette(
                         + ` · ${idea.status.replace(/-/g, ' ')}`,
                     category: 'ideas',
                     icon:
-                        iconLightbulb(16),
+                        iconLightbulb(16, ''),
                     href: buildPageUrl(
                         'idea-convert',
                         {
@@ -220,7 +220,7 @@ export function initCommandPalette(
                             'projects',
                         icon:
                             iconFolderKanban(
-                                16,
+                                16, '',
                             ),
                         href:
                             buildPageUrl(
@@ -249,7 +249,7 @@ export function initCommandPalette(
                         category:
                             'people',
                         icon:
-                            iconUser(16),
+                            iconUser(16, ''),
                         href:
                             buildPageUrl(
                                 'teams',
@@ -542,7 +542,7 @@ ${posIndex === 0
     <div class="${
         'command-palette-input-wrapper'
     }">
-        ${iconSearch(20)}
+        ${iconSearch(20, '')}
         <input
             class="command-palette-input"
             placeholder="${
@@ -563,7 +563,7 @@ ${posIndex === 0
             }"
             aria-label="Close"
             id="command-palette-close">${
-            iconX(16)}</button>
+            iconX(16, '')}</button>
     </div>
     <div class="command-palette-list"
         id="command-palette-listbox"
@@ -837,7 +837,7 @@ ${posIndex === 0
     );
 
     const searchInput = $(
-        '#search-input',
+        '#search-input', document,
     );
     searchInput?.addEventListener(
         'focus',
@@ -849,7 +849,7 @@ ${posIndex === 0
     );
 
     const mobileSearchToggle = $(
-        '#mobile-search-toggle',
+        '#mobile-search-toggle', document,
     );
     if (mobileSearchToggle) {
         const newToggle =

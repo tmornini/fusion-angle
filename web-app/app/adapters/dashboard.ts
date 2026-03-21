@@ -92,7 +92,7 @@ export async function getDashboardGauges(
     const maxImpact = Math.max(
         sumEstimatedImpact,
         sumActualImpact,
-    ) || 1;
+    );
 
     return [
         {
@@ -169,9 +169,7 @@ export async function getDashboardGauges(
 
 export async function getDashboardStats(
 ): Promise<
-    { label: string;
-      value: number;
-      trend: string }[]
+    { label: string; value: number }[]
 > {
     const [ideas, projects, processes] =
         await Promise.all([
@@ -186,19 +184,16 @@ export async function getDashboardStats(
             value: ideas
                 .filter(ideaIsNotDeleted)
                 .length,
-            trend: '',
         },
         {
             label: 'Projects',
             value: projects
                 .filter(projectIsNotDeleted)
                 .length,
-            trend: '',
         },
         {
             label: 'Flow',
             value: processes.length,
-            trend: '',
         },
     ];
 }

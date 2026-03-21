@@ -37,7 +37,12 @@ function styleForScore(score: number): string {
     return 'color:hsl(var(--error))';
 }
 
+function displayText(value: string): string {
+    return value || '\u2014';
+}
+
 export {
+    displayText,
     formatDate,
     getTimeOfDay,
     initials,

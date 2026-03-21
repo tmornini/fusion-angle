@@ -4,12 +4,9 @@
 
 ### Protocol Coverage
 
-All test sections (B through I) must be executed under **both** protocols:
+All test sections (B through I) are executed via HTTP:
 
 1. **HTTP** — serve the unzipped build via a local HTTP server (e.g. `python3 -m http.server 8080`)
-2. **`file://`** — open the unzipped build directory directly in the browser (e.g. `file:///tmp/fusion-test/index.html`)
-
-Section J covers `file://`-specific edge cases (asset loading, navigation quirks). The rest of the suite applies identically to both protocols.
 
 ## Summary
 
@@ -24,9 +21,8 @@ Section J covers `file://`-specific edge cases (asset loading, navigation quirks
 | G. Admin Pages | 28 |
 | H. Reference & System | 2 |
 | I. Cross-Cutting Concerns | 18 |
-| J. `file://` Edge Cases | 7 |
-| K. Teardown | 3 |
-| **Total** | **172** |
+| J. Teardown | 3 |
+| **Total** | **165** |
 
 ---
 
@@ -339,25 +335,11 @@ Section J covers `file://`-specific edge cases (asset loading, navigation quirks
 
 ---
 
-## J. `file://` Edge Cases
+## J. Teardown
 
-> These cases verify `file://`-specific behavior that differs from HTTP. All other test sections (B–I) also apply under `file://` — see **Protocol Coverage** above.
-
-- [ ] **J1** Open `file:///.../index.html` (root). PASS: redirects to landing page (or snapshots when no data exists).
-- [ ] **J2** Verify CSS loads under `file://`: pages are styled (not unstyled HTML). PASS: fonts, colors, and layout apply correctly.
-- [ ] **J3** Verify `assets/app.js` loads under `file://`: interactive elements work (e.g. theme toggle, auth form validation). PASS: JavaScript executes.
-- [ ] **J4** Link prefetching is disabled under `file://` (no `<link rel="prefetch">` elements created). PASS: no prefetch-related errors in console.
-- [ ] **J5** Navigate between 3+ database-dependent pages (dashboard, ideas, projects) under `file://`. PASS: data persists across page navigations via localStorage.
-- [ ] **J6** Click sidebar navigation links between pages under `file://`. PASS: relative paths resolve correctly.
-- [ ] **J7** Test `Cmd+K` command palette under `file://`. PASS: palette opens and closes. Navigation from palette results may not resolve correctly under `file://`.
-
----
-
-## K. Teardown
-
-- [ ] **K1** Stop the HTTP server started in A3. PASS: process terminates.
-- [ ] **K2** Remove the temp test directory (`rm -rf /tmp/fusion-test` or equivalent). PASS: directory removed.
-- [ ] **K3** Verify the ZIP file remains on `~/Desktop` for archival. PASS: `fusion-ai-<sha>.zip` exists.
+- [ ] **J1** Stop the HTTP server started in A3. PASS: process terminates.
+- [ ] **J2** Remove the temp test directory (`rm -rf /tmp/fusion-test` or equivalent). PASS: directory removed.
+- [ ] **J3** Verify the ZIP file remains on `~/Desktop` for archival. PASS: `fusion-ai-<sha>.zip` exists.
 
 ---
 

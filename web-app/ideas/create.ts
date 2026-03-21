@@ -15,7 +15,6 @@ import {
     putIdea,
     putIdeaSubmission,
 } from '../app/adapters';
-import { nowUtc } from '../../api/types';
 
 const steps = [
     {
@@ -168,8 +167,8 @@ export async function init():
                 + 'center;'
                 + bgStyle}>
                 ${isCompleted
-                    ? iconCheck(20)
-                    : step.icon(20)}
+                    ? iconCheck(20, '')
+                    : step.icon(20, '')}
             </div>
             <span
                 class="mt-2 text-sm
@@ -473,7 +472,7 @@ export async function init():
                                 btn-icon"
                             id=${'idea-create'
                                 + '-back-btn'}>
-                            ${iconArrowLeft(20)}
+                            ${iconArrowLeft(20, '')}
                         </button>
                         <div class="flex
                             items-center gap-3">
@@ -496,7 +495,7 @@ export async function init():
                                     + '-foreground'
                                     + '))'}>
                                 ${iconSparkles(
-                                    20,
+                                    20, '',
                                 )}
                             </div>
                             <span class="${
@@ -514,7 +513,7 @@ export async function init():
                             + ' btn-sm gap-2'
                             + ' text-primary'
                         }">
-                        ${iconWand(16)}
+                        ${iconWand(16, '')}
                         <span
                             class="${
                                 'hidden-mobile'
@@ -574,7 +573,7 @@ export async function init():
                         }"
                         id=${'idea-create'
                             + '-step-back'}>
-                        ${iconArrowLeft(16)}
+                        ${iconArrowLeft(16, '')}
                         ${state.currentStep
                             === 1
                             ? 'Cancel'
@@ -600,10 +599,10 @@ export async function init():
                             === 3
                             ? html`${'Submit'
                                 + ' Idea'}
-                                ${iconCheck(16)}`
+                                ${iconCheck(16, '')}`
                             : html`Continue
                                 ${iconArrowRight(
-                                    16,
+                                    16, '',
                                 )}`}
                     </button>
                 </div>
@@ -613,7 +612,7 @@ export async function init():
     }
 
     function mutateWizard() {
-        const root = $('#page-root');
+        const root = $('#page-root', document);
         if (root) {
             setHtml(
                 root,
@@ -630,19 +629,19 @@ export async function init():
                 title:
                     $input(
                         '#idea-create'
-                        + '-field-title',
+                        + '-field-title', document,
                     )?.value ?? '',
                 problemStatement:
                     $textarea(
                         '#idea-create'
                         + '-field'
-                        + '-problem',
+                        + '-problem', document,
                     )?.value ?? '',
                 targetUsers:
                     $input(
                         '#idea-create'
                         + '-field'
-                        + '-target',
+                        + '-target', document,
                     )?.value ?? '',
             };
         } else if (
@@ -654,7 +653,7 @@ export async function init():
                     $textarea(
                         '#idea-create'
                         + '-field'
-                        + '-solution',
+                        + '-solution', document,
                     )?.value ?? '',
             };
         } else if (
@@ -666,13 +665,13 @@ export async function init():
                     $textarea(
                         '#idea-create'
                         + '-field'
-                        + '-outcome',
+                        + '-outcome', document,
                     )?.value ?? '',
                 successMetrics:
                     $textarea(
                         '#idea-create'
                         + '-field'
-                        + '-metrics',
+                        + '-metrics', document,
                     )?.value ?? '',
             };
         }
@@ -691,18 +690,18 @@ export async function init():
             }
         };
 
-        $('#idea-create-back-btn')
+        $('#idea-create-back-btn', document)
             ?.addEventListener(
                 'click',
                 goBack,
             );
-        $('#idea-create-step-back')
+        $('#idea-create-step-back', document)
             ?.addEventListener(
                 'click',
                 goBack,
             );
 
-        $('#idea-create-step-next')
+        $('#idea-create-step-next', document)
             ?.addEventListener(
                 'click',
                 async () => {
@@ -760,20 +759,14 @@ export async function init():
                                     0,
                                 priority:
                                     0,
-                                edge_status:
-                                    'missing',
                                 category:
                                     '',
                                 readiness:
                                     '',
-                                waiting_days:
-                                    0,
                                 impact_label:
                                     '',
                                 effort_label:
                                     '',
-                                submitted_at:
-                                    nowUtc(),
                             },
                         );
                         await putIdeaSubmission(
@@ -809,7 +802,7 @@ export async function init():
                                 '#idea'
                                 + '-create'
                                 + '-step'
-                                + '-next',
+                                + '-next', document,
                             );
                         if (
                             nextBtn

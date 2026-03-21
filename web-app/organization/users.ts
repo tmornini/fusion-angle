@@ -23,7 +23,7 @@ import {
 
 const roleLabels: Record<string, {
     label: string;
-    icon: (size?: number) => SafeHtml;
+    icon: (size: number, cssClass: string) => SafeHtml;
 }> = {
     admin: {
         label: 'Admin', icon: iconCrown,
@@ -47,20 +47,20 @@ function buildStatusBadge(
                 class="${
                     'status-badge-success'
                 }">
-            ${iconCheckCircle2(14)} Active
+            ${iconCheckCircle2(14, '')} Active
         </span>`;
     if (user.isPending())
         return html`<span
                 class="${
                     'status-badge-warning'
                 }">
-            ${iconClock(14)} Pending
+            ${iconClock(14, '')} Pending
         </span>`;
     return html`<span
             class="${
                 'status-badge-error'
             }">
-        ${iconUserX(14)} Deactivated
+        ${iconUserX(14, '')} Deactivated
     </span>`;
 }
 
@@ -79,7 +79,7 @@ function buildRoleBadge(
             class="${
                 'badge badge-secondary'
             }">
-        ${roleConfig.icon(12)}
+        ${roleConfig.icon(12, '')}
         ${roleConfig.label}
     </span>`;
 }
@@ -186,7 +186,7 @@ function buildUserRow(
                         + 'btn-icon btn-sm'
                     }">
                     ${iconMoreHorizontal(
-                        16,
+                        16, '',
                     )}
                 </button>
             </div>
@@ -195,19 +195,17 @@ function buildUserRow(
 
 export async function init(): Promise<void> {
     const container = $(
-            '#manage-users-content',
+            '#manage-users-content', document,
     );
     if (!container) return;
 
     const users = await withLoadingState(
             container,
-            buildSkeleton(
-                    'table', { count: 5 },
-            ),
+            buildSkeleton('table', 5),
             getManagedUsers,
             init,
             {
-                icon: iconUsers(24),
+                icon: iconUsers(24, ''),
                 title: 'No Users Yet',
                 description:
                         'Invite users to your'
@@ -240,7 +238,7 @@ export async function init(): Promise<void> {
                     }">
                     Administration
                 </a>
-                ${iconChevronRight(14)}
+                ${iconChevronRight(14, '')}
                 <span>Manage Users</span>
             </nav>
 
@@ -269,7 +267,7 @@ export async function init(): Promise<void> {
                         + 'gap-2'
                     }"
                     id="invite-btn">
-                    ${iconUserPlus(16)
+                    ${iconUserPlus(16, '')
                     } Invite User
                 </button>
             </div>
@@ -289,7 +287,7 @@ export async function init(): Promise<void> {
                     <span class="${
                         'search-icon'
                     }">
-                        ${iconSearch(16)}
+                        ${iconSearch(16, '')}
                     </span>
                     <input class="${
                         'input search-input'
@@ -452,7 +450,7 @@ export async function init(): Promise<void> {
                             + 'items-center '
                             + 'gap-2'
                         }">
-                        ${iconUserPlus(20)}
+                        ${iconUserPlus(20, '')}
                         Invite New User
                     </h3>
                     <p class="${
@@ -593,7 +591,7 @@ export async function init(): Promise<void> {
                         id="${
                             'invite-submit'
                         }">
-                        ${iconSend(16)
+                        ${iconSend(16, '')
                         } Send Invite
                     </button>
                 </div>
@@ -604,7 +602,7 @@ export async function init(): Promise<void> {
             openBtnId: 'invite-btn',
             onSubmit: () => {
                     const email =
-                            $input('#invite-email')
+                            $input('#invite-email', document)
                                     ?.value;
                     if (!email) {
                             showToast(
