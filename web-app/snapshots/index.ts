@@ -13,7 +13,11 @@ import {
     SafeHtml,
 } from '../app/safe-html';
 import { showToast } from '../app/toast';
-import { navigateTo } from '../app/core';
+import {
+    navigateTo,
+    openDialog,
+    closeDialog,
+} from '../app/core';
 import {
     iconTrash,
     iconDownload,
@@ -71,18 +75,23 @@ async function updateEmptyBanner(
     }
 }
 
-async function withWipeAndReload(
-    button: HTMLButtonElement,
-    label: string,
-    action: () => Promise<void>,
-    confirmMessage?: string,
+let pendingAction:
+    (() => Promise<void>) | null = null;
+let pendingButton:
+    HTMLButtonElement | null = null;
+let pendingLabel = '';
+
+async function executePendingAction(
 ): Promise<void> {
-    if (
-        confirmMessage
-        && !confirm(confirmMessage)
-    ) {
-        return;
-    }
+    const button = pendingButton;
+    const action = pendingAction;
+    const label = pendingLabel;
+    pendingAction = null;
+    pendingButton = null;
+    pendingLabel = '';
+    if (!button || !action) return;
+
+    closeDialog('confirm-wipe');
     const originalText = button.textContent;
     button.disabled = true;
     button.textContent = 'Working...';
@@ -99,6 +108,31 @@ async function withWipeAndReload(
         );
         button.disabled = false;
         button.textContent = originalText;
+    }
+}
+
+function withWipeAndReload(
+    button: HTMLButtonElement,
+    label: string,
+    action: () => Promise<void>,
+    confirmMessage?: string,
+): void {
+    if (confirmMessage) {
+        pendingAction = action;
+        pendingButton = button;
+        pendingLabel = label;
+        const msg =
+            $('#confirm-wipe-message');
+        if (msg) {
+            msg.textContent =
+                confirmMessage;
+        }
+        openDialog('confirm-wipe');
+    } else {
+        pendingAction = action;
+        pendingButton = button;
+        pendingLabel = label;
+        void executePendingAction();
     }
 }
 
@@ -383,4 +417,26 @@ export async function init(): Promise<void> {
             }
         },
     );
+
+    $('#confirm-wipe-cancel')
+        ?.addEventListener('click', () => {
+            pendingAction = null;
+            pendingButton = null;
+            pendingLabel = '';
+            closeDialog('confirm-wipe');
+        });
+    $('#confirm-wipe-backdrop')
+        ?.addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) {
+                pendingAction = null;
+                pendingButton = null;
+                pendingLabel = '';
+                closeDialog('confirm-wipe');
+            }
+        });
+    $('#confirm-wipe-submit')
+        ?.addEventListener(
+            'click',
+            () => void executePendingAction(),
+        );
 }

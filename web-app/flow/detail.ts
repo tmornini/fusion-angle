@@ -1015,6 +1015,19 @@ export async function init(
             style="max-width:64rem;
                    margin:0 auto"
         >
+            <div class="${
+                'flex items-center gap-2'
+                + ' text-sm text-muted mb-4'
+            }">
+                <a href="${
+                    '../flow/index.html'
+                }" class="hover-link"
+                >Flow</a>
+                <span>/</span>
+                <span>${
+                    state.flowName
+                }</span>
+            </div>
             <div
                 class="${
                     'flex items-start'

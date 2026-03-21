@@ -98,6 +98,7 @@ const NAV_GROUP_CHILDREN:
             'profile',
             'settings',
             'users',
+            'activity-feed',
         ],
         ideas: [
             'idea-create',
@@ -109,7 +110,6 @@ const NAV_GROUP_CHILDREN:
             'project-detail',
             'engineering-requirements',
         ],
-        teams: ['activity-feed'],
         edges: ['edge-detail'],
     };
 

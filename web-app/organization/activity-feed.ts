@@ -179,34 +179,6 @@ export async function init(
     setHtml(container, html`
     <div style="max-width:48rem;
         margin:0 auto">
-        <nav class="flex items-center
-            gap-2 text-sm text-muted mb-6">
-            <a href="teams.html"
-                class="hover-link">Team</a>
-            ${iconChevronRight(14)}
-            <span>Activity Feed</span>
-        </nav>
-
-        <div class="mb-8">
-            <div class="flex items-center
-                gap-3 mb-2">
-                <div class="gradient-hero
-                    rounded-lg flex items-center
-                    justify-content:center"
-                    style="width:2.5rem;
-height:2.5rem;
-color:hsl(var(--primary-foreground))">${
-                    iconActivity(20)}</div>
-                <h1 class="text-3xl
-                    font-display font-bold"
-                    >Activity Feed</h1>
-            </div>
-            <p class="text-muted"
-                >Stay updated on recent actions
-                across your ideas and
-                projects</p>
-        </div>
-
         <div class="flex items-center
             gap-4 mb-6">
             <div class="search-wrapper"

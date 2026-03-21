@@ -198,6 +198,8 @@ export async function init(): Promise<void> {
             iconSearch(16),
         ],
     ]);
+    $('#page-badge')?.classList
+        .remove('hidden');
     const stats = {
         total: edges.length,
         complete: edges.filter(
