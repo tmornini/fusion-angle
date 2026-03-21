@@ -45,6 +45,7 @@
       ]
     },
     "network": {
+      "allowLocalBinding": true,
       "allowUnixSockets": [
         "/tmp/claude/tsx-501"
       ]

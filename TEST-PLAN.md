@@ -9,15 +9,15 @@
 | A. Build & Setup | 5 |
 | B. Entry Pages | 16 |
 | C. Core: Dashboard | 8 |
-| D. Core: Ideas Workflow | 34 |
-| E. Core: Projects | 10 |
-| F. Tools | 14 |
-| G. Admin Pages | 19 |
+| D. Core: Ideas Workflow | 44 |
+| E. Core: Projects | 16 |
+| F. Tools | 26 |
+| G. Admin Pages | 28 |
 | H. Reference & System | 2 |
-| I. Cross-Cutting Concerns | 16 |
+| I. Cross-Cutting Concerns | 18 |
 | J. Protocol B: `file://` Retest | 14 |
 | K. Teardown | 3 |
-| **Total** | **141** |
+| **Total** | **180** |
 
 ---
 
@@ -26,7 +26,7 @@
 - [ ] **A1** Run `./build` from a clean working directory. PASS: exits 0, prints no errors, creates `~/Desktop/fusion-ai-<sha>.zip`.
 - [ ] **A2** Unzip the archive into a temp directory (e.g. `/tmp/fusion-test`). PASS: directory contains `assets/app.js`, `assets/styles.css`, `assets/` (*.woff2 fonts), `index.html`, and 26 page directories each with `index.html`.
 - [ ] **A3** Start an HTTP server from the unzipped directory (e.g. `python3 -m http.server 8080`). PASS: server starts without errors.
-- [ ] **A4** Open `http://localhost:8080/` in the test browser. PASS: redirects to `snapshots/index.html` when no data exists, or `landing/index.html` when data has been loaded.
+- [ ] **A4** Open `http://localhost:8080/` in the test browser. PASS: redirects to `snapshots/index.html` when no data exists, or `dashboard/index.html` when data has been loaded.
 - [ ] **A5** Open DevTools Console and confirm no JavaScript errors on initial load. PASS: console is clean (warnings from browser extensions are acceptable).
 
 ---
@@ -52,8 +52,8 @@
 
 ### Onboarding Page (`onboarding/`)
 
-- [ ] **B12** Page renders with welcome content. PASS: page layout is intact, no console errors.
-- [ ] **B13** Click the primary action to proceed. PASS: navigates to `dashboard/index.html`.
+- [ ] **B12** Page renders centered welcome section with sparkle icon, "Welcome to Fusion AI" heading, and descriptive text. PASS: layout is complete, no console errors.
+- [ ] **B13** Click "Go to Dashboard" button. PASS: navigates to `dashboard/index.html`.
 
 ### Auth Validation Edge Cases
 
@@ -66,9 +66,9 @@
 ## C. Core: Dashboard
 
 - [ ] **C1** Navigate to `dashboard/`. PASS: page loads with sidebar, header, and main content area.
-- [ ] **C2** Sidebar shows navigation links for all sections (Dashboard, Ideas, Projects, Edge List, Crunch, Flow, Team, Activity Feed, Settings group). PASS: all links present and styled.
-- [ ] **C3** Header shows user avatar area and theme toggle. PASS: elements visible and styled.
-- [ ] **C4** Dashboard displays gauge/metric cards with numerical values. PASS: at least 3 metric cards render with non-zero values.
+- [ ] **C2** Sidebar shows navigation links grouped under Journey (Dashboard, Ideas, Projects, Teams), Tools (Edge, Crunch, Flow), and Settings (Organization, Snapshots, Design System). PASS: all links present and styled.
+- [ ] **C3** Header shows search bar, greeting ("Good evening, Tony Stark"), company stats ("Stark Industries · 11 Ideas · 6 Projects · 4 Flow"), and theme toggle. PASS: elements visible and styled.
+- [ ] **C4** Dashboard displays 3 gauge/metric cards (Time, Cost, Impact) with baseline and current values. PASS: cards render with non-zero values and concentric arc gauges.
 - [ ] **C5** Dashboard displays at least one chart (bar, line, donut, or area). PASS: SVG chart renders with visible data.
 - [ ] **C6** Quick-action cards or links are present. PASS: clicking one navigates to the expected page.
 - [ ] **C7** Scroll the page. PASS: sidebar stays fixed, main content scrolls independently.
@@ -81,7 +81,7 @@
 ### Ideas List (`ideas/`)
 
 - [ ] **D1** Navigate to `ideas/`. PASS: table/list shows 11 seeded ideas with title, score, priority, status, and Time/Cost/Impact stats. Ideas without estimates show "—" (em-dash) instead of zero values.
-- [ ] **D2** Each idea row shows a status badge (pending_review, approved, scored, draft, or rejected). PASS: badges render with distinct colors.
+- [ ] **D2** Each idea row shows a status badge (In Review, Promoted, Active, Archived, or Rejected) and an edge status badge (Edge Complete, Edge Draft, or Edge Missing). PASS: badges render with distinct colors.
 - [ ] **D3** Click an idea row/title. PASS: navigates to the idea's detail or scoring page with the correct `ideaId` parameter.
 - [ ] **D4** "New Idea" or "Create Idea" button is visible. PASS: clicking it navigates to `idea-create/index.html`.
 
@@ -99,15 +99,35 @@
 - [ ] **D14** On Step 1, click "Cancel" (or "Back"). PASS: navigates to `ideas/` list.
 - [ ] **D15** "Generate with AI" button is present in the header. PASS: button is visible (no action expected — UI placeholder).
 
+### Idea Detail (`ideas/detail.html?ideaId=1`)
+
+- [ ] **D16** Navigate to `ideas/detail.html?ideaId=1`. PASS: page loads with idea title, status badge, score (with score-based styling), "Submitted by" name, and submission date.
+- [ ] **D17** Page displays Problem & Solution card (Problem Statement, Target Users, Proposed Solution, Expected Outcome, Success Metrics) and Estimates card (Impact, Duration in days, Cost). PASS: all fields populated from seed data.
+- [ ] **D18** Click "Edit" button. PASS: text fields become editable inputs/textareas, Save and Cancel buttons appear, Edit button hides.
+- [ ] **D19** Modify a field (e.g. title), click "Save". PASS: toast "Idea saved" appears, page returns to view mode with updated data.
+
+### Idea Detail — Edit & Actions
+
+- [ ] **D19b** Click "Edit", then "Cancel". PASS: returns to view mode with original data unchanged.
+- [ ] **D19c** For an idea with edge_status "missing": "Define Edge" action button is visible. PASS: clicking it navigates to edge detail page with correct `ideaId`.
+- [ ] **D19d** For an idea in "in_review" status: "Review" action button is visible. PASS: clicking it navigates to `approval-detail/` page.
+- [ ] **D19e** For a convertible idea: "Convert" action button is visible. PASS: clicking it navigates to `idea-convert/` page.
+- [ ] **D19f** Navigate to `ideas/detail.html?ideaId=999` (non-existent). PASS: page handles gracefully — shows error state, no unhandled JS exception.
+
 ### Idea Convert (`idea-convert/`)
 
-- [ ] **D20** Navigate to `idea-convert/`. PASS: page loads with conversion form/workflow.
-- [ ] **D21** Conversion action completes (fill required fields if any, click convert). PASS: navigates to project detail or projects list.
+- [ ] **D20** Navigate to `idea-convert/?ideaId=<id>` for a convertible idea. PASS: page loads with conversion form showing 6 required fields: Project Name, Project Lead (dropdown of active users), Start Date, Target End Date, Budget (select), Priority (select). Sticky sidebar shows idea summary (problem, solution, outcome).
+- [ ] **D21** Fill all required fields (progress bar reaches 100%), click "Create Project". PASS: navigates to project detail page for the newly created project.
 
 ### Idea Review Queue (`idea-review-queue/`)
 
-- [ ] **D22** Navigate to `idea-review-queue/`. PASS: page shows a list of ideas pending review.
+- [ ] **D22** Navigate to `idea-review-queue/`. PASS: page shows stats cards (Pending Review, Ready to Decide, High Priority, Avg. Wait Time) and a list of ideas pending review.
+- [ ] **D22b** Each review card shows priority badge (High Priority/Medium), readiness status (Ready for Review/Needs Info/Unknown), edge status badge, title, submitter, category, days waiting, score, impact, and effort. PASS: all fields render with data.
 - [ ] **D23** At least one idea with `pending_review` status appears in the queue. PASS: idea 7 ("AI-Powered Customer Support Chatbot") or similar is listed.
+- [ ] **D23b** Type a search term in the search input. PASS: review cards filter by title or submitter name in real-time.
+- [ ] **D23c** Select "High" from the priority filter dropdown. PASS: list shows only high-priority items. Reset to "All Priority" → full list returns.
+- [ ] **D23d** Select "Ready for Review" from the readiness filter dropdown. PASS: list shows only ready items. Reset to "All Status" → full list returns.
+- [ ] **D23e** Apply search + filter that matches no items. PASS: empty state shows "No ideas match your filters" message.
 - [ ] **D24** Click a review item. PASS: navigates to `approval-detail/?id=<ideaId>`.
 
 ### Approval Detail (`ideas/approval-detail.html`)
@@ -141,15 +161,22 @@
 - [ ] **E4** Four quick-action cards visible (Engineering, Team, Flow, Crunch). PASS: clicking "Engineering" navigates to `engineering-requirements/?projectId=1`.
 - [ ] **E5** **Tasks tab** (default): shows 5 task cards with priority badges, skill tags, and days. Assigned/unassigned count is dynamically computed from task data (seed data: 1 assigned, 4 unassigned). PASS: "Save Assignments" button visible.
 - [ ] **E6** **Discussion tab**: shows 3 seeded comments with author avatars/names. Comment composer textarea + "Post Comment" button (disabled when empty, enabled when text entered). PASS: all elements render.
+- [ ] **E6b** Type a comment in the composer textarea, click "Post Comment". PASS: toast "Comment posted" appears, comment appears in the list.
 - [ ] **E7** **History tab**: shows 3 version entries (v1.0, v1.1, v1.2) with latest highlighted. PASS: version list renders in order.
 - [ ] **E8** **Linked Data tab**: shows empty state "No linked data yet" with "Link Data Source" button. PASS: empty state renders cleanly.
 - [ ] **E9** Right sidebar shows Team card (4 members with roles) and Milestones card (5 milestones: 2 completed, 1 in progress, 2 pending). PASS: both cards render with correct data.
 
-### Engineering Requirements (`engineering-requirements/`)
+### Project Detail — Edit Mode
 
-This test is covered by E4 (navigation) — verify the page loads:
+- [ ] **E9b** Click "Edit" button on project detail. PASS: fields become editable inputs/textareas, Save and Cancel buttons appear.
+- [ ] **E9c** Modify a field, click "Save". PASS: project saves successfully, returns to view mode with updated data.
+- [ ] **E9d** Click "Edit", then "Cancel". PASS: returns to view mode with original data unchanged.
 
-- [ ] **E10** (covered by E4 navigation) Page loads with engineering requirements content for the project. PASS: page renders without errors.
+### Engineering Requirements (`engineering-requirements/?projectId=1`)
+
+- [ ] **E10** Navigate to `engineering-requirements/?projectId=1`. PASS: page renders with engineering specifications content.
+- [ ] **E10b** Clarification questions section displays question cards with asker name, timestamp, question text, and status (pending/answered). PASS: at least one clarification visible with correct styling.
+- [ ] **E10c** Pending clarifications show warning-colored status badge. Answered clarifications show answer text. PASS: visual distinction between pending and answered states.
 
 ---
 
@@ -163,9 +190,13 @@ This test is covered by E4 (navigation) — verify the page loads:
 - [ ] **F4** Delete an outcome. PASS: outcome is removed, progress bar updates.
 - [ ] **F5** Expected Impact section shows 3 textareas (Short-term, Mid-term, Long-term). Confidence select and Edge Owner fields are visible. PASS: all fields render with seeded data.
 
-### Edge List (`edge-list/`)
+### Edge List (`edges/`)
 
-- [ ] **F6** Navigate to `edge-list/`. PASS: shows a list of edges (up to 6 seeded) with status indicators (complete, draft, missing). Outcome/metric counts use correct singular/plural grammar (e.g. "1 outcome", "2 outcomes").
+- [ ] **F6** Navigate to `edges/`. PASS: shows stats cards (Total Ideas, Complete, In Draft, Missing) and edge cards with status badges (Edge Complete, Edge Draft, Edge Missing), confidence level (High/Medium/Low Confidence), owner, outcome/metric counts, and idea titles.
+- [ ] **F6b** Type in the search input. PASS: filters edge cards by idea title or owner name in real-time.
+- [ ] **F6c** Select a status from the filter dropdown (e.g. "Complete"). PASS: list shows only edges with that status. Reset to "All Status" → full list returns.
+- [ ] **F6d** Apply search + filter that matches no items. PASS: empty state shows "No Edge definitions found" with "Try adjusting your search or filter criteria".
+- [ ] **F6e** Click an edge card. PASS: navigates to `edges/detail.html?ideaId=<id>`.
 
 ### Crunch (`crunch/`)
 
@@ -174,12 +205,23 @@ This test is covered by E4 (navigation) — verify the page loads:
 - [ ] **F9** Expand a column card (e.g. CUST_ID). PASS: reveals Friendly Name input, Data Type select, Acronym Expansion input (for acronym columns), and Description textarea. Fill all fields — completion icon changes to green check.
 - [ ] **F10** Fill all 6 columns to 100% completion, click "Continue to Review". PASS: advances to Step 3 — shows "Data Translation Complete" with "Edit Labels" and "Continue to Dashboard" buttons.
 
-### Flow (`flow/`)
+### Flow List (`flow/`)
 
-- [ ] **F11** Navigate to `flow/`. PASS: Edit mode shows "Customer Onboarding" process with 5 step cards connected by vertical lines.
-- [ ] **F12** Expand a step card. PASS: reveals Title, Description, Owner, Role, Duration, Step Type, and Tools Used fields. Toggle a tool button on/off — button highlights/unhighlights.
-- [ ] **F13** Click "Add Step". PASS: new step card appears at the bottom, auto-expanded, type defaults to Action.
-- [ ] **F14** Click "Preview" button. PASS: switches to preview mode — shows process name heading, vertical timeline with numbered step circles, and step details (title, owner, duration, tool badges).
+- [ ] **F11** Navigate to `flow/`. PASS: page shows stats cards (Total Flows, Total Steps, Departments) and flow cards with name, description, department badge, and step count.
+- [ ] **F12** Type in the search input. PASS: filters flow cards by name or description in real-time.
+- [ ] **F12b** Select a department from the filter dropdown. PASS: list shows only flows in that department. Reset to "All Departments" → full list returns.
+- [ ] **F12c** Apply search + filter that matches no items. PASS: empty state shows "No processes found" with "Try adjusting your search or filter criteria".
+- [ ] **F13** Click a flow card. PASS: navigates to `flow/detail.html?flowId=<id>`.
+
+### Flow Detail (`flow/detail.html?flowId=1`)
+
+- [ ] **F14** Navigate to `flow/detail.html?flowId=1`. PASS: shows flow name, description, department, and step cards in a vertical timeline.
+- [ ] **F15** Click a step card header to expand it. PASS: reveals Title, Description, Owner, Role, Duration, and Step Type fields.
+- [ ] **F16** Click "Add Step". PASS: new step card appears at the bottom, auto-expanded.
+- [ ] **F17** Click move-up/move-down buttons on a step. PASS: step reorders in the list.
+- [ ] **F18** Click remove button on a step. PASS: step is removed from the list.
+- [ ] **F19** Edit flow name and step fields, click "Save". PASS: toast "Flow saved" appears.
+- [ ] **F19b** Navigate to `flow/detail.html?flowId=999` (non-existent). PASS: page handles gracefully — shows error state, no unhandled JS exception.
 
 ---
 
@@ -187,8 +229,11 @@ This test is covered by E4 (navigation) — verify the page loads:
 
 ### Team (`teams/`)
 
-- [ ] **G1** Navigate to `teams/`. PASS: shows roster of seeded users with names, roles, departments, and status indicators.
-- [ ] **G2** User status badges render with distinct styling (available, busy, limited, active, deactivated). PASS: at least 3 different statuses visible.
+- [ ] **G1** Navigate to `teams/`. PASS: shows roster of seeded team members with initials avatars, names, roles, departments, availability percentage badges, strength chips, performance stats (percentage, active count, completed count), and status dots (green=available, yellow=busy, red=limited). Search input and "Activity Feed" / "Add Member" buttons visible.
+- [ ] **G1b** Click a team member card. PASS: right-side detail panel populates with member name, role, email, and large avatar with initials.
+- [ ] **G1c** Detail panel shows two tabs (Dimensions, Performance). Click between tabs. PASS: tab content switches — Dimensions shows Driver/Analytical/Expressive/Amiable scores with progress bars.
+- [ ] **G1d** Click a different team member card. PASS: detail panel updates to show the newly selected member's information.
+- [ ] **G2** Member status dots render with distinct colors (green for available, yellow for busy, red for limited). PASS: at least 2 different statuses visible.
 
 ### Account (`account/`)
 
@@ -197,8 +242,9 @@ This test is covered by E4 (navigation) — verify the page loads:
 
 ### Profile (`profile/`)
 
-- [ ] **G5** Navigate to `profile/`. PASS: shows profile form for the current user (Demo User / demo@example.com).
-- [ ] **G6** Edit a field (e.g. bio or phone) and save. PASS: success toast appears, or save action completes without error.
+- [ ] **G5** Navigate to `profile/`. PASS: shows profile form with avatar (initials), First Name, Last Name, Email, Phone, Role, Department (dropdown), and Bio fields for the current user (Tony Stark / demo@example.com).
+- [ ] **G5b** Strength chips are displayed with pre-selected strengths shown in primary style with checkmark icons. Click an unselected chip. PASS: chip toggles to primary/selected style. Click a selected chip. PASS: chip toggles to secondary/unselected style.
+- [ ] **G6** Edit a field (e.g. phone), toggle strengths, and click "Save Changes". PASS: toast "Profile saved successfully" appears.
 
 ### Company Settings (`settings/`)
 
@@ -208,14 +254,22 @@ This test is covered by E4 (navigation) — verify the page loads:
 
 ### Manage Users (`manage-users/`)
 
-- [ ] **G10** Navigate to `manage-users/`. PASS: shows user list with admin controls (role assignments, status changes).
-- [ ] **G11** Deactivated user (James Miller) is visually distinguished. PASS: different styling or badge for deactivated status.
-- [ ] **G12** "Add User" or invite action is available. PASS: button/link is visible and clickable.
+- [ ] **G10** Navigate to `manage-users/`. PASS: shows user table with avatar, name, email, role badge (job title), department, status badge (Active/Pending/Deactivated), and last active time. Header shows active/pending user counts. Search input and two filter dropdowns (All Roles, All Status) visible.
+- [ ] **G10b** Type in the search input. PASS: filters user list by name or email in real-time. Role and status dropdowns also filter the list.
+- [ ] **G11** Deactivated user (James Miller) is visually distinguished with "Deactivated" badge (X icon), strikethrough or opacity styling. PASS: clearly different from active users.
+- [ ] **G11b** Pending users show "Pending" badge with clock icon and "Invite sent" text. PASS: visually distinct from active users.
+- [ ] **G12** "Invite User" button is visible. PASS: clicking it opens the invite dialog with email input and role selector.
 
 ### Activity Feed (`teams/activity-feed.html`)
 
-- [ ] **G13** Navigate to `teams/activity-feed.html`. PASS: shows 10 seeded activity entries with type icons and timestamps.
-- [ ] **G14** Activity types include idea_scored, task_completed, idea_created, comment_added, user_joined, status_changed, idea_converted, project_created. PASS: multiple distinct types visible with appropriate icons.
+- [ ] **G13** Navigate to `activity-feed/`. PASS: shows seeded activity entries with type icons and timestamps. Search input ("Search activity...") and type filter dropdown ("All Activity") visible.
+- [ ] **G14** Activity types include scored, completed task, submitted new idea, commented on, joined the team, changed status, converted idea to project. PASS: multiple distinct types visible with appropriate icons (star, checkmark, lightbulb, chat bubble, user-plus, edit, arrow-right).
+- [ ] **G14b** Each activity entry shows actor name, action verb, target name, and meta info (score badge, status badge, or quoted comment text). PASS: entries have full context.
+
+### Engineering Requirements
+
+- [ ] **G15** Navigate to `engineering-requirements/?projectId=1`. PASS: page renders with engineering specifications content for project 1.
+- [ ] **G16** Clarification questions section shows question cards with message icon, asker name, timestamp, question text, and status (pending with warning styling or answered with answer text). PASS: at least one clarification visible.
 
 ### Snapshots (`snapshots/`) — Run These Last
 
@@ -261,6 +315,11 @@ This test is covered by E4 (navigation) — verify the page loads:
 - [ ] **I12** Press `Cmd+K` (Mac) or `Ctrl+K` (Windows/Linux). PASS: command palette overlay appears with search input focused.
 - [ ] **I13** Type a search term (e.g. "ideas"). PASS: filtered results appear. Select a result — navigates to the corresponding page.
 - [ ] **I14** Press `Escape`. PASS: command palette closes.
+
+### Loading States
+
+- [ ] **I15** Navigate to a data-dependent page with mock data loaded. PASS: loading skeleton (card-grid, card-list, or detail pattern) appears briefly before content renders.
+- [ ] **I16** If an error occurs loading a page (e.g. corrupted localStorage), error state with "Try Again" retry button is shown. PASS: clicking retry re-attempts data loading.
 
 ### Toasts
 
@@ -318,7 +377,7 @@ This test is covered by E4 (navigation) — verify the page loads:
 | Browser & Version | |
 | OS | |
 | Build SHA | |
-| Tests Passed | /141 |
-| Tests Failed | /141 |
-| Tests Skipped | /141 |
+| Tests Passed | /180 |
+| Tests Failed | /180 |
+| Tests Skipped | /180 |
 | Notes | |
