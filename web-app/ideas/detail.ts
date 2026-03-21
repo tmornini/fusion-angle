@@ -25,7 +25,7 @@ import {
     iconClipboardCheck,
 } from '../app/icons';
 import {
-    navigateTo,
+    navigateTo, formatDate,
     SECONDS_PER_DAY,
 } from '../app/core';
 import {
@@ -226,7 +226,10 @@ function buildDetailsCard(
                     'text-sm font-medium'
                 }">
                     ${idea.submittedAt
-                        || '\u2014'}
+                        ? formatDate(
+                            idea.submittedAt,
+                        )
+                        : '\u2014'}
                 </p>
             </div>
         </div>

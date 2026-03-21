@@ -427,7 +427,7 @@ export async function init(
                                                 + '-mobile'
                                             }"
                                         >${
-                                            '&bull;'
+                                            '•'
                                         }</span>
                                         ${
                                             iconClock(

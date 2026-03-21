@@ -21,6 +21,14 @@ function getTimeOfDay(): string {
     return 'evening';
 }
 
+function formatDate(iso: string): string {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return '—';
+    return d.toLocaleDateString('en-US', {
+        month: 'short', day: 'numeric', year: 'numeric',
+    });
+}
+
 function styleForScore(score: number): string {
     if (score >= SCORE_THRESHOLD_HIGH)
         return 'color:hsl(var(--success))';
@@ -30,6 +38,7 @@ function styleForScore(score: number): string {
 }
 
 export {
+    formatDate,
     getTimeOfDay,
     initials,
     styleForScore,

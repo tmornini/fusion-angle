@@ -104,7 +104,7 @@ function buildIdeaCard(
                                     idea.priority
                                     }
                                 </span><span>${
-                                    '&bull;'
+                                    '•'
                                 }</span>`
                                 : html``}
                             <span>

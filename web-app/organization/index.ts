@@ -12,7 +12,9 @@ import {
     iconLightbulb, iconCalendar,
     iconTrendingUp, iconExternalLink,
 } from '../app/icons';
-import { navigateTo } from '../app/core';
+import {
+    navigateTo, formatDate,
+} from '../app/core';
 import {
     getAccount, type Account,
 } from '../app/adapters';
@@ -90,11 +92,9 @@ export async function init(): Promise<void> {
         return;
     }
 
-    const billingDate = new Date(
+    const billingDate = formatDate(
         account.company.nextBilling,
-    ).toLocaleDateString('en-US', {
-        month: 'short', day: 'numeric',
-    });
+    );
 
     setHtml(container, html`
     <div style="max-width:64rem;margin:0 auto">

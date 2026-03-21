@@ -22,6 +22,7 @@ import {
     buildSkeleton,
     withLoadingState,
 } from '../app/loading-states';
+import { formatDate } from '../app/core';
 import {
     getActivityFeed,
     type Activity,
@@ -141,7 +142,7 @@ function buildActivity(
             </p>
             ${meta}
             <p class="text-xs text-muted mt-1">${
-                activity.timestamp}</p>
+                formatDate(activity.timestamp)}</p>
         </div>
     </div>`;
 }

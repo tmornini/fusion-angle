@@ -315,7 +315,7 @@ function buildMemberCard(
                 </div>
                 <p class="text-xs text-muted mb-2">
                     ${member.role}
-                    &bull; ${member.department}
+                    • ${member.department}
                 </p>
                 <div
                     class="flex flex-wrap gap-1.5 mb-2"

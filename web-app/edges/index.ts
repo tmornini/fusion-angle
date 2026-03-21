@@ -26,7 +26,9 @@ import {
     iconBarChart,
     iconUser,
 } from '../app/icons';
-import { navigateTo } from '../app/core';
+import {
+    navigateTo, formatDate,
+} from '../app/core';
 import {
     getEdgeList,
     type EdgeListItem,
@@ -138,7 +140,9 @@ function buildEdgeCard(
                         ? html`<span
                             class="text-xs"
                             >Updated ${
-                            edge.updatedAt
+                            formatDate(
+                                edge.updatedAt,
+                            )
                         }</span>`
                         : html``}
                 </div>

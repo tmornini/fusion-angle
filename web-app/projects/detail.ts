@@ -23,7 +23,7 @@ import {
 } from '../app/icons';
 import {
     navigateTo, initials, initTabs,
-    SECONDS_PER_DAY,
+    formatDate, SECONDS_PER_DAY,
 } from '../app/core';
 import {
     getProjectById, putProject,
@@ -220,8 +220,10 @@ function buildProjectSummary(
                                     + 'font-'
                                     + 'medium'
                                 }">${
-                                    project
-                                        .startDate
+                                    formatDate(
+                                        project
+                                            .startDate,
+                                    )
                                 }</p>`}
                     </div>
                 </div>
@@ -270,8 +272,10 @@ function buildProjectSummary(
                                     + 'font-'
                                     + 'medium'
                                 }">${
-                                    project
-                                        .targetEndDate
+                                    formatDate(
+                                        project
+                                            .targetEndDate,
+                                    )
                                 }</p>`}
                     </div>
                 </div>
@@ -1460,8 +1464,10 @@ function buildProjectTabs(
                                                 + '-muted'
                                             }">
                                             ${
-                                                discussion
-                                                    .date
+                                                formatDate(
+                                                    discussion
+                                                        .date,
+                                                )
                                             }
                                         </span>
                                     </div>
@@ -1591,9 +1597,11 @@ function buildProjectTabs(
                                         version
                                             .author
                                     }
-                                    &bull; ${
-                                        version
-                                            .date
+                                    • ${
+                                        formatDate(
+                                            version
+                                                .date,
+                                        )
                                     }
                                 </p>
                             </div>
@@ -1844,8 +1852,10 @@ function buildProjectSidebar(
                                     + 'text-'
                                     + 'muted'
                                 }">
-                                    ${milestone
-                                        .date}
+                                    ${formatDate(
+                                        milestone
+                                            .date,
+                                    )}
                                 </p>
                             </div>
                         </div>
@@ -2010,7 +2020,7 @@ function buildProjectDetail(
                                 project
                                     .projectLead
                             }
-                            &bull; ${
+                            • ${
                                 project
                                     .progress
                             }%

@@ -584,7 +584,7 @@ export async function init(
                             <span class="${
                                 'text-warning'
                             }">
-                                &bull;
+                                •
                             </span>
                             <span>${
                                 constraint
