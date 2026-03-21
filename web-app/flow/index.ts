@@ -33,53 +33,69 @@ function buildFlowCard(
 ): SafeHtml {
     return html`
     <div class="card card-hover p-4"
-      style="cursor:pointer"
-      data-flow-card="${flow.id}">
-      <div class="${
-          'flex items-start '
-          + 'justify-between gap-4'
-      }">
-        <div style="flex:1;min-width:0">
-          <div class="${
-              'flex flex-wrap '
-              + 'items-center gap-2 mb-2'
-          }">
-            <span class="${
-                'badge badge-outline '
-                + 'text-xs'
-            }">${flow.department}</span>
-          </div>
-          <h3 class="${
-              'font-semibold mb-1'
-          }">${flow.name}</h3>
-          <p class="${
-              'text-sm text-muted mb-2'
-          }">${flow.description}</p>
-          <div class="${
-              'flex flex-wrap '
-              + 'items-center gap-3 '
-              + 'text-sm text-muted'
-          }">
-            <span class="${
-                'flex items-center gap-1'
-            }">${
-                iconListTodo(14)
-            } ${flow.stepsCount} ${
-                flow.stepsCount === 1
-                    ? 'step'
-                    : 'steps'
-            }</span>
-          </div>
-        </div>
+        style="cursor:pointer"
+        data-flow-card="${flow.id}">
         <div class="${
-            'flex items-center'
-        }">${
-            iconChevronRight(
-                20,
-                'text-muted',
-            )
-        }</div>
-      </div>
+            'flex items-start '
+            + 'justify-between gap-4'
+        }">
+            <div style="${
+                'flex:1;min-width:0'
+            }">
+                <div class="${
+                    'flex flex-wrap '
+                    + 'items-center'
+                    + ' gap-2 mb-2'
+                }">
+                    <span class="${
+                        'badge'
+                        + ' badge-outline'
+                        + ' text-xs'
+                    }">${
+                        flow.department
+                    }</span>
+                </div>
+                <h3 class="${
+                    'font-semibold mb-1'
+                }">${flow.name}</h3>
+                <p class="${
+                    'text-sm'
+                    + ' text-muted mb-2'
+                }">${
+                    flow.description
+                }</p>
+                <div class="${
+                    'flex flex-wrap '
+                    + 'items-center'
+                    + ' gap-3 '
+                    + 'text-sm'
+                    + ' text-muted'
+                }">
+                    <span class="${
+                        'flex'
+                        + ' items-center'
+                        + ' gap-1'
+                    }">${
+                        iconListTodo(14)
+                    } ${
+                        flow.stepsCount
+                    } ${
+                        flow.stepsCount
+                            === 1
+                            ? 'step'
+                            : 'steps'
+                    }</span>
+                </div>
+            </div>
+            <div class="${
+                'flex items-center'
+            }">${
+                iconChevronRight(
+                    20,
+                    'text-muted',
+                )
+            }</div>
+        </div>
     </div>`;
 }
 
@@ -134,76 +150,87 @@ export async function init(): Promise<void> {
             'p-2 rounded-lg';
         setHtml(statsEl, html`
       <div class="card p-4">
-        <div class="${
-            'flex items-center gap-3'
-        }">
-          <div class="p-2 rounded-lg"
-            style="${
-                'background:'
-                + 'hsl(var(--primary)/0.1)'
-            }">${
-              iconGitBranch(
-                  20,
-                  'text-primary',
-              )
-          }</div>
-          <div>
-            <p class="${
-                'text-2xl font-bold'
-            }">${flows.length}</p>
-            <p class="${
-                'text-sm text-muted'
-            }">Total Flows</p>
+          <div class="${
+              'flex items-center gap-3'
+          }">
+              <div
+                  class="p-2 rounded-lg"
+                  style="${
+                      'background:'
+                      + 'hsl(var('
+                      + '--primary)/0.1)'
+                  }"
+              >${
+                  iconGitBranch(
+                      20,
+                      'text-primary',
+                  )
+              }</div>
+              <div>
+                  <p class="${
+                      'text-2xl font-bold'
+                  }">${flows.length}</p>
+                  <p class="${
+                      'text-sm text-muted'
+                  }">Total Flows</p>
+              </div>
           </div>
-        </div>
       </div>
       <div class="card p-4">
-        <div class="${
-            'flex items-center gap-3'
-        }">
-          <div class="p-2 rounded-lg"
-            style="${
-                'background:'
-                + 'hsl(var(--success-soft))'
-            }">${
-              iconFileText(
-                  20,
-                  'text-success',
-              )
-          }</div>
-          <div>
-            <p class="${
-                'text-2xl font-bold'
-            }">${totalSteps}</p>
-            <p class="${
-                'text-sm text-muted'
-            }">Total Steps</p>
+          <div class="${
+              'flex items-center gap-3'
+          }">
+              <div
+                  class="p-2 rounded-lg"
+                  style="${
+                      'background:'
+                      + 'hsl(var('
+                      + '--success-soft))'
+                  }"
+              >${
+                  iconFileText(
+                      20,
+                      'text-success',
+                  )
+              }</div>
+              <div>
+                  <p class="${
+                      'text-2xl font-bold'
+                  }">${totalSteps}</p>
+                  <p class="${
+                      'text-sm text-muted'
+                  }">Total Steps</p>
+              </div>
           </div>
-        </div>
       </div>
       <div class="card p-4">
-        <div class="${
-            'flex items-center gap-3'
-        }">
-          <div class="p-2 rounded-lg"
-            style="${
-                'background:'
-                + 'hsl(var(--warning-soft))'
-            }">${
-              iconUsers(
-                  20,
-                  'text-warning',
-              )
-          }</div>
-          <div>
-            <p class="${
-                'text-2xl font-bold'
-            }">${departments.size}</p>
-            <p class="${
-                'text-sm text-muted'
-            }">Departments</p>
+          <div class="${
+              'flex items-center gap-3'
+          }">
+              <div
+                  class="p-2 rounded-lg"
+                  style="${
+                      'background:'
+                      + 'hsl(var('
+                      + '--warning-soft))'
+                  }"
+              >${
+                  iconUsers(
+                      20,
+                      'text-warning',
+                  )
+              }</div>
+              <div>
+                  <p class="${
+                      'text-2xl font-bold'
+                  }">${
+                      departments.size
+                  }</p>
+                  <p class="${
+                      'text-sm text-muted'
+                  }">Departments</p>
+              </div>
           </div>
-        </div>
       </div>`);
     }
 

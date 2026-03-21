@@ -161,168 +161,229 @@ function buildGauge(
         + 'padding:1.5rem;'
         + 'transition:all 0.3s'
     }">
-      <div class="flex items-center gap-3 mb-5">
-        <div style="${
-            'width:2.5rem;height:2.5rem;'
-            + 'border-radius:0.5rem;'
-            + themeStyle.iconBg + ';'
-            + 'display:flex;'
-            + 'align-items:center;'
-            + 'justify-content:center'
+        <div class="${
+            'flex items-center gap-3 mb-5'
         }">
-          ${iconFn(20, card.iconCssClass)}
-        </div>
-        <h3 class="text-sm font-semibold">${
-            card.title
-        }</h3>
-      </div>
-      <div style="${
-          'display:flex;'
-          + 'justify-content:center;'
-          + 'margin-bottom:1.25rem'
-      }">
-        <svg width="180" height="95"
-          viewBox="0 0 180 95"
-          style="overflow:visible">
-          <defs>
-            <linearGradient
-              id="outer-${elementId}"
-              x1="0%" y1="0%"
-              x2="100%" y2="0%">
-              <stop offset="0%"
-                stop-color="${
-                    'hsl(var(--primary))'
-                }"
-                stop-opacity="0.4"/>
-              <stop offset="100%"
-                stop-color="${
-                    'hsl(var(--primary))'
-                }"
-                stop-opacity="1"/>
-            </linearGradient>
-            <linearGradient
-              id="inner-${elementId}"
-              x1="0%" y1="0%"
-              x2="100%" y2="0%">
-              <stop offset="0%"
-                stop-color="${
-                    innerGradientStop0
-                }"
-                stop-opacity="0.4"/>
-              <stop offset="100%"
-                stop-color="${
-                    innerGradientStop1
-                }"
-                stop-opacity="1"/>
-            </linearGradient>
-          </defs>
-          <path
-            d="M 25 85 A 65 65 0 0 1 155 85"
-            fill="none"
-            stroke="hsl(var(--muted))"
-            stroke-width="14"
-            stroke-linecap="round"
-            opacity="0.3"/>
-          <path
-            d="M 25 85 A 65 65 0 0 1 155 85"
-            fill="none"
-            stroke="${
-                'url(#outer-' + elementId + ')'
-            }"
-            stroke-width="14"
-            stroke-linecap="round"
-            stroke-dasharray="${outerArc}"
-            stroke-dashoffset="${
-                outerDashoffset
-            }"/>
-          <path
-            d="M 45 85 A 45 45 0 0 1 135 85"
-            fill="none"
-            stroke="hsl(var(--muted))"
-            stroke-width="14"
-            stroke-linecap="round"
-            opacity="0.3"/>
-          <path
-            d="M 45 85 A 45 45 0 0 1 135 85"
-            fill="none"
-            stroke="${
-                'url(#inner-' + elementId + ')'
-            }"
-            stroke-width="14"
-            stroke-linecap="round"
-            stroke-dasharray="${innerArc}"
-            stroke-dashoffset="${
-                innerDashoffset
-            }"
-            style="${innerArcFlashStyle}"/>
-        </svg>
-      </div>
-      <div style="${
-          'display:grid;'
-          + 'grid-template-columns:1fr 1fr;'
-          + 'gap:1rem'
-      }">
-        <div style="${
-            'text-align:center;'
-            + 'padding:0.75rem;'
-            + 'border-radius:0.5rem;'
-            + 'background:'
-            + 'hsl(var(--card)/0.8);'
-            + 'border:1px solid '
-            + 'hsl(var(--border)/0.5)'
-        }">
-          <div class="${
-              'flex items-center '
-              + 'justify-center gap-2'
-          }" style="margin-bottom:0.25rem">
             <div style="${
-                'width:0.625rem;'
-                + 'height:0.625rem;'
-                + 'border-radius:9999px;'
-                + 'background:'
-                + 'hsl(var(--primary))'
-            }"></div>
-            <span class="${
-                'text-xs text-muted'
-            }" style="font-weight:500">${
-                card.outer.label
-            }</span>
-          </div>
-          <p class="text-2xl font-bold">${
-              card.outer.display
-          }</p>
+                'width:2.5rem;'
+                + 'height:2.5rem;'
+                + 'border-radius:0.5rem;'
+                + themeStyle.iconBg + ';'
+                + 'display:flex;'
+                + 'align-items:center;'
+                + 'justify-content:center'
+            }">
+                ${iconFn(
+                    20,
+                    card.iconCssClass,
+                )}
+            </div>
+            <h3 class="${
+                'text-sm font-semibold'
+            }">${
+                card.title
+            }</h3>
         </div>
         <div style="${
-            'text-align:center;'
-            + 'padding:0.75rem;'
-            + 'border-radius:0.5rem;'
-            + 'background:'
-            + 'hsl(var(--card)/0.8);'
-            + 'border:1px solid '
-            + 'hsl(var(--border)/0.5)'
+            'display:flex;'
+            + 'justify-content:center;'
+            + 'margin-bottom:1.25rem'
         }">
-          <div class="${
-              'flex items-center '
-              + 'justify-center gap-2'
-          }" style="margin-bottom:0.25rem">
-            <div style="${
-                'width:0.625rem;'
-                + 'height:0.625rem;'
-                + 'border-radius:9999px;'
-                + 'background:'
-                + 'hsl(var(--success))'
-            }"></div>
-            <span class="${
-                'text-xs text-muted'
-            }" style="font-weight:500">${
-                card.inner.label
-            }</span>
-          </div>
-          <p class="text-2xl font-bold">${
-              card.inner.display
-          }</p>
+            <svg width="180" height="95"
+                viewBox="0 0 180 95"
+                style="overflow:visible">
+                <defs>
+                    <linearGradient
+                        id="${
+                            'outer-' + elementId
+                        }"
+                        x1="0%" y1="0%"
+                        x2="100%" y2="0%">
+                        <stop offset="0%"
+                            stop-color="${
+                                'hsl(var('
+                                + '--primary))'
+                            }"
+                            stop-opacity="${
+                                '0.4'
+                            }"/>
+                        <stop offset="100%"
+                            stop-color="${
+                                'hsl(var('
+                                + '--primary))'
+                            }"
+                            stop-opacity="${
+                                '1'
+                            }"/>
+                    </linearGradient>
+                    <linearGradient
+                        id="${
+                            'inner-' + elementId
+                        }"
+                        x1="0%" y1="0%"
+                        x2="100%" y2="0%">
+                        <stop offset="0%"
+                            stop-color="${
+                                innerGradientStop0
+                            }"
+                            stop-opacity="${
+                                '0.4'
+                            }"/>
+                        <stop offset="100%"
+                            stop-color="${
+                                innerGradientStop1
+                            }"
+                            stop-opacity="${
+                                '1'
+                            }"/>
+                    </linearGradient>
+                </defs>
+                <path
+                    d="${
+                        'M 25 85 A 65 65'
+                        + ' 0 0 1 155 85'
+                    }"
+                    fill="none"
+                    stroke="${
+                        'hsl(var(--muted))'
+                    }"
+                    stroke-width="14"
+                    stroke-linecap="round"
+                    opacity="0.3"/>
+                <path
+                    d="${
+                        'M 25 85 A 65 65'
+                        + ' 0 0 1 155 85'
+                    }"
+                    fill="none"
+                    stroke="${
+                        'url(#outer-'
+                        + elementId + ')'
+                    }"
+                    stroke-width="14"
+                    stroke-linecap="round"
+                    stroke-dasharray="${
+                        outerArc
+                    }"
+                    stroke-dashoffset="${
+                        outerDashoffset
+                    }"/>
+                <path
+                    d="${
+                        'M 45 85 A 45 45'
+                        + ' 0 0 1 135 85'
+                    }"
+                    fill="none"
+                    stroke="${
+                        'hsl(var(--muted))'
+                    }"
+                    stroke-width="14"
+                    stroke-linecap="round"
+                    opacity="0.3"/>
+                <path
+                    d="${
+                        'M 45 85 A 45 45'
+                        + ' 0 0 1 135 85'
+                    }"
+                    fill="none"
+                    stroke="${
+                        'url(#inner-'
+                        + elementId + ')'
+                    }"
+                    stroke-width="14"
+                    stroke-linecap="round"
+                    stroke-dasharray="${
+                        innerArc
+                    }"
+                    stroke-dashoffset="${
+                        innerDashoffset
+                    }"
+                    style="${
+                        innerArcFlashStyle
+                    }"/>
+            </svg>
         </div>
-      </div>
+        <div style="${
+            'display:grid;'
+            + 'grid-template-columns:'
+            + '1fr 1fr;'
+            + 'gap:1rem'
+        }">
+            <div style="${
+                'text-align:center;'
+                + 'padding:0.75rem;'
+                + 'border-radius:0.5rem;'
+                + 'background:'
+                + 'hsl(var(--card)/0.8);'
+                + 'border:1px solid '
+                + 'hsl(var(--border)/0.5)'
+            }">
+                <div class="${
+                    'flex items-center '
+                    + 'justify-center gap-2'
+                }" style="${
+                    'margin-bottom:0.25rem'
+                }">
+                    <div style="${
+                        'width:0.625rem;'
+                        + 'height:0.625rem;'
+                        + 'border-radius:'
+                        + '9999px;'
+                        + 'background:'
+                        + 'hsl(var(--primary))'
+                    }"></div>
+                    <span class="${
+                        'text-xs text-muted'
+                    }" style="${
+                        'font-weight:500'
+                    }">${
+                        card.outer.label
+                    }</span>
+                </div>
+                <p class="${
+                    'text-2xl font-bold'
+                }">${
+                    card.outer.display
+                }</p>
+            </div>
+            <div style="${
+                'text-align:center;'
+                + 'padding:0.75rem;'
+                + 'border-radius:0.5rem;'
+                + 'background:'
+                + 'hsl(var(--card)/0.8);'
+                + 'border:1px solid '
+                + 'hsl(var(--border)/0.5)'
+            }">
+                <div class="${
+                    'flex items-center '
+                    + 'justify-center gap-2'
+                }" style="${
+                    'margin-bottom:0.25rem'
+                }">
+                    <div style="${
+                        'width:0.625rem;'
+                        + 'height:0.625rem;'
+                        + 'border-radius:'
+                        + '9999px;'
+                        + 'background:'
+                        + 'hsl(var(--success))'
+                    }"></div>
+                    <span class="${
+                        'text-xs text-muted'
+                    }" style="${
+                        'font-weight:500'
+                    }">${
+                        card.inner.label
+                    }</span>
+                </div>
+                <p class="${
+                    'text-2xl font-bold'
+                }">${
+                    card.inner.display
+                }</p>
+            </div>
+        </div>
     </div>`;
 }
 

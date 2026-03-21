@@ -55,7 +55,7 @@ export async function init(): Promise<void> {
             } `
             : html``
     }${name}
-  </button>`;
+    </button>`;
     }
 
     const container = $('.page-content');

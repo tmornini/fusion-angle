@@ -49,284 +49,355 @@ export async function init(): Promise<void> {
     <div class="${
         'min-h-screen flex bg-background'
     }">
-      <div class="auth-branding hidden"
-        id="auth-branding">
-        <div style="${
-            'position:relative;z-index:10;'
-            + 'display:flex;'
-            + 'flex-direction:column;'
-            + 'justify-content:center;'
-            + 'padding:3rem 5rem;'
-            + 'height:100%'
-        }">
-          <div class="mb-8">
-            <div class="${
-                'flex items-center '
-                + 'gap-3 mb-6'
+        <div class="auth-branding hidden"
+            id="auth-branding">
+            <div style="${
+                'position:relative;z-index:10;'
+                + 'display:flex;'
+                + 'flex-direction:column;'
+                + 'justify-content:center;'
+                + 'padding:3rem 5rem;'
+                + 'height:100%'
             }">
-              <div style="${
-                  'width:3rem;height:3rem;'
-                  + 'border-radius:'
-                  + 'var(--radius-xl);'
-                  + 'background:'
-                  + 'hsl(var(--accent));'
-                  + 'display:flex;'
-                  + 'align-items:center;'
-                  + 'justify-content:center'
-              }">
-                ${iconSparkles(24)}
-              </div>
-              <span class="${
-                  'text-3xl font-display '
-                  + 'font-bold'
-              }" style="${
-                  'color:hsl(var('
-                  + '--primary-foreground))'
-              }">Fusion AI</span>
-            </div>
-          </div>
-          <h1 class="${
-              'font-display font-bold'
-          }" style="${
-              'font-size:2.5rem;'
-              + 'color:hsl(var('
-              + '--primary-foreground));'
-              + 'line-height:1.2;'
-              + 'margin-bottom:1.5rem'
-          }">
-            ${
-                'Transform your business'
-                + ' with intelligent'
-                + ' automation'
-            }
-          </h1>
-          <p style="${
-              'font-size:var(--text-lg);'
-              + 'color:hsl(var('
-              + '--primary-foreground)'
-              + ' / 0.8);'
-              + 'max-width:28rem'
-          }">
-            ${
-                'Join thousands of'
-                + ' companies using'
-                + ' Fusion AI to'
-                + ' streamline operations,'
-                + ' boost productivity,'
-                + ' and unlock new'
-                + ' possibilities.'
-            }
-          </p>
-          <div class="flex gap-8 mt-12">
-            <div>
-              <div class="${
-                  'text-3xl font-display '
-                  + 'font-bold'
-              }" style="${
-                  'color:'
-                  + 'hsl(var(--accent))'
-              }">10K+</div>
-              <div class="text-sm" style="${
-                  'color:hsl(var('
-                  + '--primary-foreground)'
-                  + ' / 0.7)'
-              }">Active Users</div>
-            </div>
-            <div>
-              <div class="${
-                  'text-3xl font-display '
-                  + 'font-bold'
-              }" style="${
-                  'color:'
-                  + 'hsl(var(--accent))'
-              }">98%</div>
-              <div class="text-sm" style="${
-                  'color:hsl(var('
-                  + '--primary-foreground)'
-                  + ' / 0.7)'
-              }">Satisfaction</div>
-            </div>
-            <div>
-              <div class="${
-                  'text-3xl font-display '
-                  + 'font-bold'
-              }" style="${
-                  'color:'
-                  + 'hsl(var(--accent))'
-              }">50+</div>
-              <div class="text-sm" style="${
-                  'color:hsl(var('
-                  + '--primary-foreground)'
-                  + ' / 0.7)'
-              }">Integrations</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="auth-form-wrapper"
-        id="auth-form-wrapper">
-        <div style="${
-            'width:100%;'
-            + 'max-width:28rem'
-        }">
-          <div class="${
-              'flex items-center gap-3 '
-              + 'mb-8 justify-center'
-          }" id="mobile-logo">
-            <div class="${
-                'gradient-hero rounded-xl '
-                + 'flex items-center '
-                + 'justify-center'
-            }" style="${
-                'width:2.5rem;'
-                + 'height:2.5rem'
-            }">
-              ${iconSparkles(20)}
-            </div>
-            <span class="${
-                'text-2xl font-display '
-                + 'font-bold text-foreground'
-            }">Fusion AI</span>
-          </div>
-
-          <div class="card p-8">
-            <div class="text-center mb-8">
-              <h2 class="${
-                  'text-2xl font-display '
-                  + 'font-bold '
-                  + 'text-foreground mb-2'
-              }" id="auth-title">${
-                  'Welcome back'
-              }</h2>
-              <p class="text-muted"
-                id="auth-subtitle">${
-                    'Sign in to your'
-                    + ' account to continue'
-              }</p>
-            </div>
-
-            <form id="auth-form"
-              class="flex flex-col gap-5"
-              novalidate>
-              <div>
-                <label class="${
-                    'label mb-2 block'
-                }" for="email">${
-                    'Email'
-                }</label>
-                <input class="input"
-                  id="email"
-                  name="username"
-                  type="email"
-                  placeholder="${
-                      'you@company.com'
-                  }"
-                  autocomplete="${
-                      'username'
-                  }" />
-                <p class="${
-                    'text-sm text-error '
-                    + 'mt-1 hidden'
-                }" id="email-error"></p>
-              </div>
-
-              <div>
-                <label class="${
-                    'label mb-2 block'
-                }" for="password">${
-                    'Password'
-                }</label>
-                <input class="input"
-                  id="password"
-                  name="password"
-                  type="password"
-                  placeholder="${
-                      '\u2022\u2022\u2022'
-                      + '\u2022\u2022\u2022'
-                      + '\u2022\u2022'
-                  }"
-                  autocomplete="${
-                      'current-password'
-                  }" />
-                <p class="${
-                    'text-sm text-error '
-                    + 'mt-1 hidden'
-                }" id="${
-                    'password-error'
-                }"></p>
-              </div>
-
-              <div id="company-field"
-                class="${
-                    'hidden animate-fade-in'
+                <div class="mb-8">
+                    <div class="${
+                        'flex items-center '
+                        + 'gap-3 mb-6'
+                    }">
+                        <div style="${
+                            'width:3rem;'
+                            + 'height:3rem;'
+                            + 'border-radius:'
+                            + 'var(--radius-xl);'
+                            + 'background:'
+                            + 'hsl(var(--accent));'
+                            + 'display:flex;'
+                            + 'align-items:center;'
+                            + 'justify-content:'
+                            + 'center'
+                        }">
+                            ${iconSparkles(24)}
+                        </div>
+                        <span class="${
+                            'text-3xl '
+                            + 'font-display '
+                            + 'font-bold'
+                        }" style="${
+                            'color:hsl(var('
+                            + '--primary-'
+                            + 'foreground))'
+                        }">Fusion AI</span>
+                    </div>
+                </div>
+                <h1 class="${
+                    'font-display font-bold'
+                }" style="${
+                    'font-size:2.5rem;'
+                    + 'color:hsl(var('
+                    + '--primary-foreground));'
+                    + 'line-height:1.2;'
+                    + 'margin-bottom:1.5rem'
                 }">
-                <label class="${
-                    'label mb-2 block'
-                }" for="companyName">
-                  Company name
-                  <span class="text-muted">${
-                      '(optional)'
-                  }</span>
-                </label>
-                <input class="input"
-                  id="companyName"
-                  name="companyName"
-                  type="text"
-                  placeholder="Acme Inc."
-                  autocomplete="${
-                      'organization'
-                  }" />
-              </div>
-
-              <button type="submit"
-                class="btn btn-primary w-full"
-                style="${
-                    'height:3rem;'
-                    + 'font-size:'
-                    + 'var(--text-base)'
-                }" id="submit-btn">
-                Sign in ${
-                    iconArrowRight(20)
-                }
-              </button>
-            </form>
-
-            <div class="mt-6 text-center">
-              <p class="text-muted">
-                <span id="${
-                    'toggle-prompt'
-                }">${
-                    "Don't have"
-                    + ' an account?'
-                }</span>
-                <button type="button"
-                  class="${
-                      'text-primary '
-                      + 'font-medium ml-2'
-                  }"
-                  id="toggle-mode"
-                  style="${
-                      'background:none;'
-                      + 'border:none;'
-                      + 'cursor:pointer'
-                  }">Sign up</button>
-              </p>
+                    ${
+                        'Transform your business'
+                        + ' with intelligent'
+                        + ' automation'
+                    }
+                </h1>
+                <p style="${
+                    'font-size:var(--text-lg);'
+                    + 'color:hsl(var('
+                    + '--primary-foreground)'
+                    + ' / 0.8);'
+                    + 'max-width:28rem'
+                }">
+                    ${
+                        'Join thousands of'
+                        + ' companies using'
+                        + ' Fusion AI to'
+                        + ' streamline operations,'
+                        + ' boost productivity,'
+                        + ' and unlock new'
+                        + ' possibilities.'
+                    }
+                </p>
+                <div class="${
+                    'flex gap-8 mt-12'
+                }">
+                    <div>
+                        <div class="${
+                            'text-3xl '
+                            + 'font-display '
+                            + 'font-bold'
+                        }" style="${
+                            'color:'
+                            + 'hsl(var('
+                            + '--accent))'
+                        }">10K+</div>
+                        <div class="${
+                            'text-sm'
+                        }" style="${
+                            'color:hsl(var('
+                            + '--primary-'
+                            + 'foreground)'
+                            + ' / 0.7)'
+                        }">Active Users</div>
+                    </div>
+                    <div>
+                        <div class="${
+                            'text-3xl '
+                            + 'font-display '
+                            + 'font-bold'
+                        }" style="${
+                            'color:'
+                            + 'hsl(var('
+                            + '--accent))'
+                        }">98%</div>
+                        <div class="${
+                            'text-sm'
+                        }" style="${
+                            'color:hsl(var('
+                            + '--primary-'
+                            + 'foreground)'
+                            + ' / 0.7)'
+                        }">Satisfaction</div>
+                    </div>
+                    <div>
+                        <div class="${
+                            'text-3xl '
+                            + 'font-display '
+                            + 'font-bold'
+                        }" style="${
+                            'color:'
+                            + 'hsl(var('
+                            + '--accent))'
+                        }">50+</div>
+                        <div class="${
+                            'text-sm'
+                        }" style="${
+                            'color:hsl(var('
+                            + '--primary-'
+                            + 'foreground)'
+                            + ' / 0.7)'
+                        }">Integrations</div>
+                    </div>
+                </div>
             </div>
-          </div>
-
-          <p class="${
-              'mt-6 text-center '
-              + 'text-sm text-muted'
-          }">
-            ${
-                'By continuing, you agree'
-                + ' to our Terms of Service'
-                + ' and Privacy Policy.'
-            }
-          </p>
         </div>
-      </div>
+
+        <div class="auth-form-wrapper"
+            id="auth-form-wrapper">
+            <div style="${
+                'width:100%;'
+                + 'max-width:28rem'
+            }">
+                <div class="${
+                    'flex items-center gap-3 '
+                    + 'mb-8 justify-center'
+                }" id="mobile-logo">
+                    <div class="${
+                        'gradient-hero '
+                        + 'rounded-xl '
+                        + 'flex items-center '
+                        + 'justify-center'
+                    }" style="${
+                        'width:2.5rem;'
+                        + 'height:2.5rem'
+                    }">
+                        ${iconSparkles(20)}
+                    </div>
+                    <span class="${
+                        'text-2xl font-display '
+                        + 'font-bold '
+                        + 'text-foreground'
+                    }">Fusion AI</span>
+                </div>
+
+                <div class="card p-8">
+                    <div class="${
+                        'text-center mb-8'
+                    }">
+                        <h2 class="${
+                            'text-2xl '
+                            + 'font-display '
+                            + 'font-bold '
+                            + 'text-foreground '
+                            + 'mb-2'
+                        }" id="auth-title">${
+                            'Welcome back'
+                        }</h2>
+                        <p class="text-muted"
+                            id="${
+                                'auth-subtitle'
+                            }">${
+                                'Sign in to your'
+                                + ' account to'
+                                + ' continue'
+                        }</p>
+                    </div>
+
+                    <form id="auth-form"
+                        class="${
+                            'flex flex-col '
+                            + 'gap-5'
+                        }"
+                        novalidate>
+                        <div>
+                            <label class="${
+                                'label mb-2 '
+                                + 'block'
+                            }" for="email">${
+                                'Email'
+                            }</label>
+                            <input class="input"
+                                id="email"
+                                name="username"
+                                type="email"
+                                placeholder="${
+                                    'you@company'
+                                    + '.com'
+                                }"
+                                autocomplete="${
+                                    'username'
+                                }" />
+                            <p class="${
+                                'text-sm '
+                                + 'text-error '
+                                + 'mt-1 hidden'
+                            }" id="${
+                                'email-error'
+                            }"></p>
+                        </div>
+
+                        <div>
+                            <label class="${
+                                'label mb-2 '
+                                + 'block'
+                            }" for="password">${
+                                'Password'
+                            }</label>
+                            <input class="input"
+                                id="password"
+                                name="password"
+                                type="password"
+                                placeholder="${
+                                    '\u2022\u2022'
+                                    + '\u2022\u2022'
+                                    + '\u2022\u2022'
+                                    + '\u2022\u2022'
+                                }"
+                                autocomplete="${
+                                    'current-'
+                                    + 'password'
+                                }" />
+                            <p class="${
+                                'text-sm '
+                                + 'text-error '
+                                + 'mt-1 hidden'
+                            }" id="${
+                                'password-error'
+                            }"></p>
+                        </div>
+
+                        <div id="${
+                            'company-field'
+                        }"
+                            class="${
+                                'hidden '
+                                + 'animate-fade-in'
+                            }">
+                            <label class="${
+                                'label mb-2 '
+                                + 'block'
+                            }" for="${
+                                'companyName'
+                            }">
+                                Company name
+                                <span class="${
+                                    'text-muted'
+                                }">${
+                                    '(optional)'
+                                }</span>
+                            </label>
+                            <input class="input"
+                                id="${
+                                    'companyName'
+                                }"
+                                name="${
+                                    'companyName'
+                                }"
+                                type="text"
+                                placeholder="${
+                                    'Acme Inc.'
+                                }"
+                                autocomplete="${
+                                    'organization'
+                                }" />
+                        </div>
+
+                        <button type="submit"
+                            class="${
+                                'btn btn-primary'
+                                + ' w-full'
+                            }"
+                            style="${
+                                'height:3rem;'
+                                + 'font-size:'
+                                + 'var(--text-'
+                                + 'base)'
+                            }" id="submit-btn">
+                            Sign in ${
+                                iconArrowRight(20)
+                            }
+                        </button>
+                    </form>
+
+                    <div class="${
+                        'mt-6 text-center'
+                    }">
+                        <p class="text-muted">
+                            <span id="${
+                                'toggle-prompt'
+                            }">${
+                                "Don't have"
+                                + ' an account?'
+                            }</span>
+                            <button type="button"
+                                class="${
+                                    'text-primary'
+                                    + ' font-'
+                                    + 'medium ml-2'
+                                }"
+                                id="${
+                                    'toggle-mode'
+                                }"
+                                style="${
+                                    'background:'
+                                    + 'none;'
+                                    + 'border:'
+                                    + 'none;'
+                                    + 'cursor:'
+                                    + 'pointer'
+                                }">${
+                                    'Sign up'
+                            }</button>
+                        </p>
+                    </div>
+                </div>
+
+                <p class="${
+                    'mt-6 text-center '
+                    + 'text-sm text-muted'
+                }">
+                    ${
+                        'By continuing, you'
+                        + ' agree to our Terms'
+                        + ' of Service and'
+                        + ' Privacy Policy.'
+                    }
+                </p>
+            </div>
+        </div>
     </div>`);
 
     let isLogin = true;

@@ -18,14 +18,14 @@ const SHIMMER_CLASS = 'skeleton-shimmer';
 function buildSkeletonCard(): SafeHtml {
     return html`<div class="skeleton-card">
     <div class="${SHIMMER_CLASS}
-      skeleton-badge mb-3"></div>
+        skeleton-badge mb-3"></div>
     <div class="${SHIMMER_CLASS}
-      skeleton-heading"></div>
+        skeleton-heading"></div>
     <div class="${SHIMMER_CLASS}
-      skeleton-text"></div>
+        skeleton-text"></div>
     <div class="${SHIMMER_CLASS}
-      skeleton-text"
-      style="width:80%"></div>
+        skeleton-text"
+        style="width:80%"></div>
     </div>`;
 }
 
@@ -33,20 +33,20 @@ function buildSkeletonListItem(
 ): SafeHtml {
     return html`<div
     class="skeleton-card flex
-      items-center gap-4">
+        items-center gap-4">
     <div class="${SHIMMER_CLASS}
-      skeleton-avatar"></div>
+        skeleton-avatar"></div>
     <div class="flex-1">
-      <div class="${SHIMMER_CLASS}
-        skeleton-text"
-        style="width:60%;
+        <div class="${SHIMMER_CLASS}
+            skeleton-text"
+            style="width:60%;
 margin-bottom:0.375rem"></div>
-      <div class="${SHIMMER_CLASS}
-        skeleton-text-sm"
-        style="width:40%"></div>
+        <div class="${SHIMMER_CLASS}
+            skeleton-text-sm"
+            style="width:40%"></div>
     </div>
     <div class="${SHIMMER_CLASS}
-      skeleton-badge"></div>
+        skeleton-badge"></div>
     </div>`;
 }
 
@@ -78,59 +78,59 @@ export function buildSkeleton(
 style="display:grid;
 grid-template-columns:repeat(auto-fill,minmax(16rem,1fr));
 gap:1.5rem">
-        ${Array(count).fill(
-            buildSkeletonCard(),
-        )}
-      </div>`;
+                ${Array(count).fill(
+                    buildSkeletonCard(),
+                )}
+            </div>`;
         case 'card-list':
             return html`<div
         class="flex flex-col gap-3">
         ${Array(count).fill(
             buildSkeletonListItem(),
         )}
-      </div>`;
+        </div>`;
         case 'detail':
             return html`<div>
         <div class="${SHIMMER_CLASS}
-          skeleton-heading mb-6"
-          style="width:40%"></div>
+            skeleton-heading mb-6"
+            style="width:40%"></div>
         <div class="skeleton-card mb-6">
-          <div class="${SHIMMER_CLASS}
-            skeleton-text"
-            style="width:90%"></div>
-          <div class="${SHIMMER_CLASS}
-            skeleton-text"
-            style="width:75%"></div>
-          <div class="${SHIMMER_CLASS}
-            skeleton-text mb-4"
-            style="width:60%"></div>
-          <div
-            class="grid grid-cols-3 gap-4">
-            ${Array(3).fill(trusted(
-                '<div>'
-                + `<div class="`
-                + `${SHIMMER_CLASS}`
-                + ` skeleton-text-sm">`
-                + `</div>`
-                + `<div class="`
-                + `${SHIMMER_CLASS}`
-                + ` skeleton-heading"`
-                + ` style="width:60%">`
-                + `</div>`
-                + `</div>`,
-            ))}
-          </div>
+            <div class="${SHIMMER_CLASS}
+                skeleton-text"
+                style="width:90%"></div>
+            <div class="${SHIMMER_CLASS}
+                skeleton-text"
+                style="width:75%"></div>
+            <div class="${SHIMMER_CLASS}
+                skeleton-text mb-4"
+                style="width:60%"></div>
+            <div
+                class="grid grid-cols-3 gap-4">
+                ${Array(3).fill(trusted(
+                    '<div>'
+                    + `<div class="`
+                    + `${SHIMMER_CLASS}`
+                    + ` skeleton-text-sm">`
+                    + `</div>`
+                    + `<div class="`
+                    + `${SHIMMER_CLASS}`
+                    + ` skeleton-heading"`
+                    + ` style="width:60%">`
+                    + `</div>`
+                    + `</div>`,
+                ))}
+            </div>
         </div>
-      </div>`;
+        </div>`;
         case 'table':
             return html`<div
         class="skeleton-card p-0
-          overflow-hidden">
+            overflow-hidden">
         <div style="padding:1rem;
 border-bottom:1px solid hsl(var(--border))">
-          <div class="${SHIMMER_CLASS}
-            skeleton-text"
-            style="width:30%"></div>
+            <div class="${SHIMMER_CLASS}
+                skeleton-text"
+                style="width:30%"></div>
         </div>
         ${Array(count).fill(trusted(
             '<div'
@@ -161,7 +161,7 @@ border-bottom:1px solid hsl(var(--border))">
             + ` ml-auto"></div>`
             + `</div>`,
         ))}
-      </div>`;
+        </div>`;
         case 'stats-row':
             return buildSkeletonStatsRow();
         default:
@@ -176,14 +176,14 @@ export function buildErrorState(
     return html`<div
     class="state-container">
     <div class="state-icon
-      state-icon-error">${
-      iconAlertTriangle(24)}</div>
+        state-icon-error">${
+        iconAlertTriangle(24)}</div>
     <p class="state-title"
-      >Something went wrong</p>
+        >Something went wrong</p>
     <p class="state-description">${
-      message}</p>
+        message}</p>
     <button class="btn btn-outline"
-      data-retry-btn>${retryLabel
+        data-retry-btn>${retryLabel
     }</button>
     </div>`;
 }
@@ -200,10 +200,10 @@ export function buildEmptyState(
     return html`<div
     class="state-container">
     <div class="state-icon
-      state-icon-empty">${iconHtml}</div>
+        state-icon-empty">${iconHtml}</div>
     <p class="state-title">${title}</p>
     <p class="state-description">${
-      description}</p>
+        description}</p>
     ${action
         ? html`<a href="${action.href}"
             class="btn btn-primary">${

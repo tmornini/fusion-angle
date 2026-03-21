@@ -113,36 +113,36 @@ function buildActivity(
 ): SafeHtml {
     const meta = activity.score
         ? html`<div
-            class="badge badge-default text-xs mt-1">${
-            iconStar(12)
-          } Score: ${activity.score}</div>`
+                class="badge badge-default text-xs mt-1">${
+                iconStar(12)
+            } Score: ${activity.score}</div>`
         : activity.status
             ? html`<div
-                class="badge badge-default text-xs mt-1">${
-                activity.status}</div>`
+                    class="badge badge-default text-xs mt-1">${
+                    activity.status}</div>`
             : activity.comment
                 ? html`<p
-                    class="text-sm text-muted mt-1"
-                    style="font-style:italic"
-                    >"${activity.comment}"</p>`
+                        class="text-sm text-muted mt-1"
+                        style="font-style:italic"
+                        >"${activity.comment}"</p>`
                 : html``;
     return html`
     <div class="flex items-start gap-4
-      p-4 rounded-lg activity-row">
-      ${buildActivityIcon(activity.type)}
-      <div style="flex:1;min-width:0">
-        <p class="text-sm">
-          <span class="font-medium">${
-            activity.actor}</span>
-          <span class="text-muted"> ${
-            activity.action} </span>
-          <span class="font-medium">${
-            activity.target}</span>
-        </p>
-        ${meta}
-        <p class="text-xs text-muted mt-1">${
-          activity.timestamp}</p>
-      </div>
+        p-4 rounded-lg activity-row">
+        ${buildActivityIcon(activity.type)}
+        <div style="flex:1;min-width:0">
+            <p class="text-sm">
+                <span class="font-medium">${
+                    activity.actor}</span>
+                <span class="text-muted"> ${
+                    activity.action} </span>
+                <span class="font-medium">${
+                    activity.target}</span>
+            </p>
+            ${meta}
+            <p class="text-xs text-muted mt-1">${
+                activity.timestamp}</p>
+        </div>
     </div>`;
 }
 
@@ -177,71 +177,71 @@ export async function init(
 
     setHtml(container, html`
     <div style="max-width:48rem;
-      margin:0 auto">
-      <nav class="flex items-center
-        gap-2 text-sm text-muted mb-6">
-        <a href="teams.html"
-          class="hover-link">Team</a>
-        ${iconChevronRight(14)}
-        <span>Activity Feed</span>
-      </nav>
+        margin:0 auto">
+        <nav class="flex items-center
+            gap-2 text-sm text-muted mb-6">
+            <a href="teams.html"
+                class="hover-link">Team</a>
+            ${iconChevronRight(14)}
+            <span>Activity Feed</span>
+        </nav>
 
-      <div class="mb-8">
-        <div class="flex items-center
-          gap-3 mb-2">
-          <div class="gradient-hero
-            rounded-lg flex items-center
-            justify-content:center"
-            style="width:2.5rem;
+        <div class="mb-8">
+            <div class="flex items-center
+                gap-3 mb-2">
+                <div class="gradient-hero
+                    rounded-lg flex items-center
+                    justify-content:center"
+                    style="width:2.5rem;
 height:2.5rem;
 color:hsl(var(--primary-foreground))">${
-            iconActivity(20)}</div>
-          <h1 class="text-3xl
-            font-display font-bold"
-            >Activity Feed</h1>
+                    iconActivity(20)}</div>
+                <h1 class="text-3xl
+                    font-display font-bold"
+                    >Activity Feed</h1>
+            </div>
+            <p class="text-muted"
+                >Stay updated on recent actions
+                across your ideas and
+                projects</p>
         </div>
-        <p class="text-muted"
-          >Stay updated on recent actions
-          across your ideas and
-          projects</p>
-      </div>
 
-      <div class="flex items-center
-        gap-4 mb-6">
-        <div class="search-wrapper"
-          style="flex:1">
-          <span class="search-icon">${
-            iconSearch(16)}</span>
-          <input class="input search-input"
-            placeholder="Search activity..."
-            id="activity-search"
-            aria-label="Search activity"
-          />
+        <div class="flex items-center
+            gap-4 mb-6">
+            <div class="search-wrapper"
+                style="flex:1">
+                <span class="search-icon">${
+                    iconSearch(16)}</span>
+                <input class="input search-input"
+                    placeholder="Search activity..."
+                    id="activity-search"
+                    aria-label="Search activity"
+                />
+            </div>
+            <select class="input"
+                style="width:10rem"
+                id="activity-filter"
+                aria-label="Filter by activity type">
+                <option value="all"
+                    >All Activity</option>
+                <option value="idea"
+                    >Ideas</option>
+                <option value="project"
+                    >Projects</option>
+                <option value="task"
+                    >Tasks</option>
+                <option value="team"
+                    >Teams</option>
+            </select>
         </div>
-        <select class="input"
-          style="width:10rem"
-          id="activity-filter"
-          aria-label="Filter by activity type">
-          <option value="all"
-            >All Activity</option>
-          <option value="idea"
-            >Ideas</option>
-          <option value="project"
-            >Projects</option>
-          <option value="task"
-            >Tasks</option>
-          <option value="team"
-            >Teams</option>
-        </select>
-      </div>
 
-      <div id="activity-list">
-        ${activities.map(buildActivity)}
-      </div>
+        <div id="activity-list">
+            ${activities.map(buildActivity)}
+        </div>
 
-      <div class="text-center mt-8">
-        <button class="btn btn-outline"
-          >Load More Activity</button>
-      </div>
+        <div class="text-center mt-8">
+            <button class="btn btn-outline"
+                >Load More Activity</button>
+        </div>
     </div>`);
 }

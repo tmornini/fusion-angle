@@ -57,7 +57,7 @@ async function updateEmptyBanner(
                     iconInfo(20)
                 }</span>
                 <p class="text-sm"
-                  style="margin:0">${
+                    style="margin:0">${
                     'Your database is empty.'
                     + ' Load mock data or'
                     + ' upload a snapshot'
@@ -127,13 +127,13 @@ function buildOutlineBtn(
     cssVar: string,
 ): SafeHtml {
     return html`<button
-      class="btn btn-outline" id="${id}"
-      style="${
-          'border-color:hsl(var(--'
-          + cssVar + '));'
-          + 'color:hsl(var(--'
-          + cssVar + '))'
-      }">${label}</button>`;
+        class="btn btn-outline" id="${id}"
+        style="${
+            'border-color:hsl(var(--'
+            + cssVar + '));'
+            + 'color:hsl(var(--'
+            + cssVar + '))'
+        }">${label}</button>`;
 }
 
 export async function init(): Promise<void> {
@@ -142,117 +142,130 @@ export async function init(): Promise<void> {
 
     setHtml(root, html`
     <div class="card" style="${cardStyle}">
-      <div style="${
-          'display:flex;'
-          + 'align-items:center;'
-          + 'gap:0.75rem'
-      }">
         <div style="${
-            iconBoxStyle('success')
-        }">${iconDownload(20)}</div>
-        <div>
-          <h3 class="${
-              'text-sm font-semibold'
-          }">Download Snapshot</h3>
-          <p class="text-xs text-muted">${
-              'Download snapshot'
-          }</p>
-        </div>
-      </div>
-      ${buildOutlineBtn(
-          'download-btn',
-          'Download Snapshot',
-          'success',
-      )}
-    </div>
-
-    <div class="card" style="${cardStyle}">
-      <div style="${
-          'display:flex;'
-          + 'align-items:center;'
-          + 'gap:0.75rem'
-      }">
-        <div style="${
-            iconBoxStyle('success')
-        }">${iconUpload(20)}</div>
-        <div>
-          <h3 class="${
-              'text-sm font-semibold'
-          }">Upload Snapshot</h3>
-          <p class="text-xs text-muted">${
-              'Load data from snapshot file'
-          }</p>
-        </div>
-      </div>
-      <label class="btn btn-outline"
-        style="${
-            'cursor:pointer;'
-            + 'text-align:center;'
-            + 'border-color:'
-            + 'hsl(var(--success));'
-            + 'color:'
-            + 'hsl(var(--success))'
+            'display:flex;'
+            + 'align-items:center;'
+            + 'gap:0.75rem'
         }">
-        Upload Snapshot
-        <input type="file"
-          accept=".json"
-          id="upload-input"
-          style="display:none" />
-      </label>
+            <div style="${
+                iconBoxStyle('success')
+            }">${iconDownload(20)}</div>
+            <div>
+                <h3 class="${
+                    'text-sm font-semibold'
+                }">Download Snapshot</h3>
+                <p class="${
+                    'text-xs text-muted'
+                }">${
+                    'Download snapshot'
+                }</p>
+            </div>
+        </div>
+        ${buildOutlineBtn(
+            'download-btn',
+            'Download Snapshot',
+            'success',
+        )}
     </div>
 
     <div class="card" style="${cardStyle}">
-      <div style="${
-          'display:flex;'
-          + 'align-items:center;'
-          + 'gap:0.75rem'
-      }">
         <div style="${
-            iconBoxStyle('warning')
-        }">${iconDatabase(20)}</div>
-        <div>
-          <h3 class="${
-              'text-sm font-semibold'
-          }">Wipe and Load Mock Data</h3>
-          <p class="text-xs text-muted">${
-              'Wipe and load mock data'
-          }</p>
+            'display:flex;'
+            + 'align-items:center;'
+            + 'gap:0.75rem'
+        }">
+            <div style="${
+                iconBoxStyle('success')
+            }">${iconUpload(20)}</div>
+            <div>
+                <h3 class="${
+                    'text-sm font-semibold'
+                }">Upload Snapshot</h3>
+                <p class="${
+                    'text-xs text-muted'
+                }">${
+                    'Load data from'
+                    + ' snapshot file'
+                }</p>
+            </div>
         </div>
-      </div>
-      ${buildOutlineBtn(
-          'reload-btn',
-          'Wipe and Load Mock Data',
-          'warning',
-      )}
+        <label class="btn btn-outline"
+            style="${
+                'cursor:pointer;'
+                + 'text-align:center;'
+                + 'border-color:'
+                + 'hsl(var(--success));'
+                + 'color:'
+                + 'hsl(var(--success))'
+            }">
+            Upload Snapshot
+            <input type="file"
+                accept=".json"
+                id="upload-input"
+                style="display:none" />
+        </label>
     </div>
 
     <div class="card" style="${cardStyle}">
-      <div style="${
-          'display:flex;'
-          + 'align-items:center;'
-          + 'gap:0.75rem'
-      }">
         <div style="${
-            iconBoxStyle('error')
-        }">${iconTrash(20)}</div>
-        <div>
-          <h3 class="${
-              'text-sm font-semibold'
-          }">${
-              'Create Pristine Environment'
-          }</h3>
-          <p class="text-xs text-muted">${
-              'Create a pristine environment'
-          }</p>
+            'display:flex;'
+            + 'align-items:center;'
+            + 'gap:0.75rem'
+        }">
+            <div style="${
+                iconBoxStyle('warning')
+            }">${iconDatabase(20)}</div>
+            <div>
+                <h3 class="${
+                    'text-sm font-semibold'
+                }">${
+                    'Wipe and Load Mock Data'
+                }</h3>
+                <p class="${
+                    'text-xs text-muted'
+                }">${
+                    'Wipe and load mock data'
+                }</p>
+            </div>
         </div>
-      </div>
-      ${buildOutlineBtn(
-          'wipe-btn',
-          'Create Pristine Environment',
-          'error',
-      )}
+        ${buildOutlineBtn(
+            'reload-btn',
+            'Wipe and Load Mock Data',
+            'warning',
+        )}
     </div>
-  `);
+
+    <div class="card" style="${cardStyle}">
+        <div style="${
+            'display:flex;'
+            + 'align-items:center;'
+            + 'gap:0.75rem'
+        }">
+            <div style="${
+                iconBoxStyle('error')
+            }">${iconTrash(20)}</div>
+            <div>
+                <h3 class="${
+                    'text-sm font-semibold'
+                }">${
+                    'Create Pristine'
+                    + ' Environment'
+                }</h3>
+                <p class="${
+                    'text-xs text-muted'
+                }">${
+                    'Create a pristine'
+                    + ' environment'
+                }</p>
+            </div>
+        </div>
+        ${buildOutlineBtn(
+            'wipe-btn',
+            'Create Pristine Environment',
+            'error',
+        )}
+    </div>
+    `);
 
     await updateEmptyBanner(root);
 

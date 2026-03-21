@@ -49,63 +49,108 @@ function buildEdgeCard(
     <div class="card card-hover p-4"
         style="cursor:pointer"
         data-edge-card="${edge.ideaId}">
-      <div class="flex items-start justify-between gap-4">
-        <div style="flex:1;min-width:0">
-          <div class="flex flex-wrap items-center gap-2 mb-2">
-            <span class="badge
-              ${edge.statusClassName}
-              text-xs">${
-              statusIcon(edge)
-            } ${edge.statusLabel}</span>
-            <span
-                class="flex items-center
-                  gap-1 text-xs
-                  ${edge
-                    .confidenceClassName}">${
-                iconShield(14)
-              } ${edge.confidenceLabel
-              } Confidence</span>
-          </div>
-          <h3 class="font-semibold mb-1">${edge.ideaTitle}</h3>
-          <div class="flex flex-wrap items-center gap-3 text-sm text-muted">
-            ${edge.owner
-                ? html`<span
-                    class="flex items-center
-                      gap-1">${
-                    iconUser(14)
-                  } ${edge.owner}</span>`
-                : html``}
-            ${!edge.isMissing
-                ? html`<span
-                    class="flex items-center
-                      gap-1">${
-                    iconTrendingUp(14)
-                  } ${edge.outcomesCount} ${
-                    edge.outcomesCount === 1
-                        ? 'outcome'
-                        : 'outcomes'
-                  }</span><span
-                    class="flex items-center
-                      gap-1">${
-                    iconBarChart(14)
-                  } ${edge.metricsCount} ${
-                    edge.metricsCount === 1
-                        ? 'metric'
-                        : 'metrics'
-                  }</span>`
-                : html``}
-            ${edge.updatedAt
-                ? html`<span
-                    class="text-xs"
-                    >Updated ${
-                    edge.updatedAt}</span>`
-                : html``}
-          </div>
+        <div class="${
+            'flex items-start '
+            + 'justify-between gap-4'
+        }">
+            <div style="${
+                'flex:1;min-width:0'
+            }">
+                <div class="${
+                    'flex flex-wrap '
+                    + 'items-center '
+                    + 'gap-2 mb-2'
+                }">
+                    <span class="${
+                        'badge '
+                        + edge.statusClassName
+                        + ' text-xs'
+                    }">${
+                        statusIcon(edge)
+                    } ${
+                        edge.statusLabel
+                    }</span>
+                    <span
+                        class="${
+                            'flex items-center'
+                            + ' gap-1 text-xs '
+                            + edge
+                                .confidenceClassName
+                        }">${
+                            iconShield(14)
+                        } ${
+                            edge
+                                .confidenceLabel
+                        } Confidence</span>
+                </div>
+                <h3 class="${
+                    'font-semibold mb-1'
+                }">${edge.ideaTitle}</h3>
+                <div class="${
+                    'flex flex-wrap '
+                    + 'items-center gap-3 '
+                    + 'text-sm text-muted'
+                }">
+                    ${edge.owner
+                        ? html`<span
+                            class="${
+                                'flex '
+                                + 'items-center'
+                                + ' gap-1'
+                            }">${
+                            iconUser(14)
+                        } ${
+                            edge.owner
+                        }</span>`
+                        : html``}
+                    ${!edge.isMissing
+                        ? html`<span
+                            class="${
+                                'flex '
+                                + 'items-center'
+                                + ' gap-1'
+                            }">${
+                            iconTrendingUp(14)
+                        } ${
+                            edge.outcomesCount
+                        } ${
+                            edge.outcomesCount
+                                === 1
+                                ? 'outcome'
+                                : 'outcomes'
+                        }</span><span
+                            class="${
+                                'flex '
+                                + 'items-center'
+                                + ' gap-1'
+                            }">${
+                            iconBarChart(14)
+                        } ${
+                            edge.metricsCount
+                        } ${
+                            edge.metricsCount
+                                === 1
+                                ? 'metric'
+                                : 'metrics'
+                        }</span>`
+                        : html``}
+                    ${edge.updatedAt
+                        ? html`<span
+                            class="text-xs"
+                            >Updated ${
+                            edge.updatedAt
+                        }</span>`
+                        : html``}
+                </div>
+            </div>
+            <div class="${
+                'flex items-center'
+            }">${
+                iconChevronRight(
+                    20, 'text-muted',
+                )
+            }</div>
         </div>
-        <div class="flex items-center">${
-          iconChevronRight(20, 'text-muted')
-        }</div>
-      </div>
     </div>`;
 }
 
@@ -140,7 +185,9 @@ export async function init(): Promise<void> {
     populateIcons([
         [
             '#page-badge',
-            html`${iconTarget(14)} Business Case Definition`,
+            html`${
+                iconTarget(14)
+            } Business Case Definition`,
         ],
         [
             '#search-field-icon',
@@ -162,70 +209,135 @@ export async function init(): Promise<void> {
     const statsEl = $('#edge-stats');
     if (statsEl) {
         setHtml(statsEl, html`
-      <div class="card p-4">
-        <div class="flex items-center
-          gap-3">
-          <div class="p-2 rounded-lg"
-            style="background:hsl(var(--primary)/0.1)">${
-            iconTarget(20, 'text-primary')
-          }</div>
-          <div>
-            <p class="text-2xl font-bold"
-              >${stats.total}</p>
-            <p class="text-sm text-muted"
-              >Total Ideas</p>
-          </div>
-        </div>
-      </div>
-      <div class="card p-4">
-        <div class="flex items-center
-          gap-3">
-          <div class="p-2 rounded-lg"
-            style="background:hsl(var(--success-soft))">${
-            iconCheckCircle2(
-                20,
-                'text-success',
-            )}</div>
-          <div>
-            <p class="text-2xl font-bold"
-              >${stats.complete}</p>
-            <p class="text-sm text-muted"
-              >Complete</p>
-          </div>
-        </div>
-      </div>
-      <div class="card p-4">
-        <div class="flex items-center
-          gap-3">
-          <div class="p-2 rounded-lg"
-            style="background:hsl(var(--warning-soft))">${
-            iconClock(20, 'text-warning')
-          }</div>
-          <div>
-            <p class="text-2xl font-bold"
-              >${stats.draft}</p>
-            <p class="text-sm text-muted"
-              >In Draft</p>
-          </div>
-        </div>
-      </div>
-      <div class="card p-4">
-        <div class="flex items-center
-          gap-3">
-          <div class="p-2 rounded-lg"
-            style="background:hsl(var(--error-soft))">${
-            iconAlertCircle(
-                20,
-                'text-error',
-            )}</div>
-          <div>
-            <p class="text-2xl font-bold"
-              >${stats.missing}</p>
-            <p class="text-sm text-muted"
-              >Missing</p>
-          </div>
-        </div>
-      </div>`);
+            <div class="card p-4">
+                <div class="${
+                    'flex items-center '
+                    + 'gap-3'
+                }">
+                    <div class="${
+                        'p-2 rounded-lg'
+                    }"
+                        style="${
+                            'background:'
+                            + 'hsl(var('
+                            + '--primary)'
+                            + '/0.1)'
+                        }">${
+                        iconTarget(
+                            20,
+                            'text-primary',
+                        )
+                    }</div>
+                    <div>
+                        <p class="${
+                            'text-2xl '
+                            + 'font-bold'
+                        }">${
+                            stats.total
+                        }</p>
+                        <p class="${
+                            'text-sm '
+                            + 'text-muted'
+                        }">Total Ideas</p>
+                    </div>
+                </div>
+            </div>
+            <div class="card p-4">
+                <div class="${
+                    'flex items-center '
+                    + 'gap-3'
+                }">
+                    <div class="${
+                        'p-2 rounded-lg'
+                    }"
+                        style="${
+                            'background:'
+                            + 'hsl(var('
+                            + '--success-soft))'
+                        }">${
+                        iconCheckCircle2(
+                            20,
+                            'text-success',
+                        )
+                    }</div>
+                    <div>
+                        <p class="${
+                            'text-2xl '
+                            + 'font-bold'
+                        }">${
+                            stats.complete
+                        }</p>
+                        <p class="${
+                            'text-sm '
+                            + 'text-muted'
+                        }">Complete</p>
+                    </div>
+                </div>
+            </div>
+            <div class="card p-4">
+                <div class="${
+                    'flex items-center '
+                    + 'gap-3'
+                }">
+                    <div class="${
+                        'p-2 rounded-lg'
+                    }"
+                        style="${
+                            'background:'
+                            + 'hsl(var('
+                            + '--warning-soft))'
+                        }">${
+                        iconClock(
+                            20,
+                            'text-warning',
+                        )
+                    }</div>
+                    <div>
+                        <p class="${
+                            'text-2xl '
+                            + 'font-bold'
+                        }">${
+                            stats.draft
+                        }</p>
+                        <p class="${
+                            'text-sm '
+                            + 'text-muted'
+                        }">In Draft</p>
+                    </div>
+                </div>
+            </div>
+            <div class="card p-4">
+                <div class="${
+                    'flex items-center '
+                    + 'gap-3'
+                }">
+                    <div class="${
+                        'p-2 rounded-lg'
+                    }"
+                        style="${
+                            'background:'
+                            + 'hsl(var('
+                            + '--error-soft))'
+                        }">${
+                        iconAlertCircle(
+                            20,
+                            'text-error',
+                        )
+                    }</div>
+                    <div>
+                        <p class="${
+                            'text-2xl '
+                            + 'font-bold'
+                        }">${
+                            stats.missing
+                        }</p>
+                        <p class="${
+                            'text-sm '
+                            + 'text-muted'
+                        }">Missing</p>
+                    </div>
+                </div>
+            </div>`);
     }
 
     const emptyEl = $('#edge-empty');
@@ -233,8 +345,9 @@ export async function init(): Promise<void> {
         setHtml(emptyEl, html`${
             iconTarget(48, 'text-muted')
         }<h3
-class="text-lg font-semibold mt-4 mb-2"
->No Edge definitions found</h3>
+class="${
+    'text-lg font-semibold mt-4 mb-2'
+}">No Edge definitions found</h3>
 <p class="text-muted"
 >Try adjusting your search or filter
 criteria</p>`);

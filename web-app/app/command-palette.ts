@@ -380,19 +380,27 @@ ${posIndex === 0
         'aria-selected="true"',
     )
     : trusted('')}>
-<div class="command-palette-item-icon">${
-  item.icon}</div>
-<div class="command-palette-item-content">
-  <div
-    class="command-palette-item-title">${
-    buildHighlightedMatch(
-        item.title,
-        query,
-    )}</div>
-  <div
-    class="command-palette-item-meta">${
-    item.meta}</div>
-</div>
+    <div class="${
+        'command-palette-item-icon'
+    }">${item.icon}</div>
+    <div class="${
+        'command-palette-item-content'
+    }">
+        <div
+            class="${
+                'command-palette'
+                + '-item-title'
+            }">${
+            buildHighlightedMatch(
+                item.title,
+                query,
+            )}</div>
+        <div
+            class="${
+                'command-palette'
+                + '-item-meta'
+            }">${item.meta}</div>
+    </div>
 </div>`,
                 );
                 posIndex++;
@@ -531,53 +539,77 @@ ${posIndex === 0
         );
 
         setHtml(state.dialog, html`
-    <div
-      class="command-palette-input-wrapper">
-      ${iconSearch(20)}
-      <input
-        class="command-palette-input"
-        placeholder="Search ideas, projects, people, pages..."
-        type="text"
-        role="combobox"
-        aria-expanded="true"
-        aria-controls="command-palette-listbox"
-        aria-autocomplete="list" />
-      <button
-        class="btn btn-ghost btn-icon btn-xs"
-        aria-label="Close"
-        id="command-palette-close">${
-        iconX(16)}</button>
+    <div class="${
+        'command-palette-input-wrapper'
+    }">
+        ${iconSearch(20)}
+        <input
+            class="command-palette-input"
+            placeholder="${
+                'Search ideas, projects,'
+                + ' people, pages...'
+            }"
+            type="text"
+            role="combobox"
+            aria-expanded="true"
+            aria-controls="${
+                'command-palette-listbox'
+            }"
+            aria-autocomplete="list" />
+        <button
+            class="${
+                'btn btn-ghost'
+                + ' btn-icon btn-xs'
+            }"
+            aria-label="Close"
+            id="command-palette-close">${
+            iconX(16)}</button>
     </div>
     <div class="command-palette-list"
-      id="command-palette-listbox"
-      role="listbox"
-      aria-label="Search results"></div>
-    <div class="command-palette-footer">
-      <div class="flex items-center gap-3">
-        ${trusted(
-            '<span'
-            + ' class="flex items-center'
-            + ' gap-1"><kbd>\u2191</kbd>'
-            + '<kbd>\u2193</kbd>'
-            + ' Navigate</span>',
-        )}
-        ${trusted(
-            '<span'
-            + ' class="flex items-center'
-            + ' gap-1"><kbd>\u21B5</kbd>'
-            + ' Open</span>',
-        )}
-        ${trusted(
-            '<span'
-            + ' class="flex items-center'
-            + ' gap-1"><kbd>Esc</kbd>'
-            + ' Close</span>',
-        )}
-      </div>
+        id="command-palette-listbox"
+        role="listbox"
+        aria-label="${
+            'Search results'
+        }"></div>
+    <div class="${
+        'command-palette-footer'
+    }">
+        <div class="${
+            'flex items-center gap-3'
+        }">
+            ${trusted(
+                '<span'
+                + ' class="flex'
+                + ' items-center'
+                + ' gap-1">'
+                + '<kbd>\u2191</kbd>'
+                + '<kbd>\u2193</kbd>'
+                + ' Navigate</span>',
+            )}
+            ${trusted(
+                '<span'
+                + ' class="flex'
+                + ' items-center'
+                + ' gap-1">'
+                + '<kbd>\u21B5</kbd>'
+                + ' Open</span>',
+            )}
+            ${trusted(
+                '<span'
+                + ' class="flex'
+                + ' items-center'
+                + ' gap-1">'
+                + '<kbd>Esc</kbd>'
+                + ' Close</span>',
+            )}
+        </div>
     </div>
-    <div class="command-palette-live"
-      role="status" aria-live="polite"
-      aria-atomic="true"></div>`);
+    <div class="${
+        'command-palette-live'
+    }"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"></div>`);
 
         state.input =
             state.dialog

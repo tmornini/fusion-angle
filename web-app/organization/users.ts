@@ -44,16 +44,22 @@ function buildStatusBadge(
 ): SafeHtml {
     if (user.isActive())
         return html`<span
-                class="status-badge-success">
+                class="${
+                    'status-badge-success'
+                }">
             ${iconCheckCircle2(14)} Active
         </span>`;
     if (user.isPending())
         return html`<span
-                class="status-badge-warning">
+                class="${
+                    'status-badge-warning'
+                }">
             ${iconClock(14)} Pending
         </span>`;
     return html`<span
-            class="status-badge-error">
+            class="${
+                'status-badge-error'
+            }">
         ${iconUserX(14)} Deactivated
     </span>`;
 }
@@ -64,11 +70,15 @@ function buildRoleBadge(
     const roleConfig = roleLabels[role];
     if (!roleConfig)
         return html`<span
-                class="badge badge-secondary">
+                class="${
+                    'badge badge-secondary'
+                }">
             ${role}
         </span>`;
     return html`<span
-            class="badge badge-secondary">
+            class="${
+                'badge badge-secondary'
+            }">
         ${roleConfig.icon(12)}
         ${roleConfig.label}
     </span>`;
@@ -78,60 +88,106 @@ function buildUserRow(
     user: User,
 ): SafeHtml {
     return html`
-        <div class="flex items-center gap-4 p-4
-                ${user.isDeactivated()
-                    ? 'opacity-50' : ''}"
-                style="border-bottom:1px solid
-                        hsl(var(--border))">
-            <div style="flex:2;display:flex;
-                    align-items:center;
-                    gap:0.75rem;min-width:0">
-                <div style="width:2.5rem;
-                        height:2.5rem;
-                        border-radius:9999px;
-                        background:linear-gradient(
-                                135deg,
-                                hsl(var(--primary)/0.2),
-                                hsl(var(--primary)/0.05));
-                        display:flex;
-                        align-items:center;
-                        justify-content:center;
-                        flex-shrink:0">
+        <div class="${
+            'flex items-center '
+            + 'gap-4 p-4 '
+            + (user.isDeactivated()
+                ? 'opacity-50' : '')
+        }"
+            style="${
+                'border-bottom:'
+                + '1px solid '
+                + 'hsl(var(--border))'
+            }">
+            <div style="${
+                'flex:2;display:flex;'
+                + 'align-items:center;'
+                + 'gap:0.75rem;'
+                + 'min-width:0'
+            }">
+                <div style="${
+                    'width:2.5rem;'
+                    + 'height:2.5rem;'
+                    + 'border-radius:'
+                    + '9999px;'
+                    + 'background:'
+                    + 'linear-gradient('
+                    + '135deg,'
+                    + 'hsl(var(--primary)'
+                    + '/0.2),'
+                    + 'hsl(var(--primary)'
+                    + '/0.05));'
+                    + 'display:flex;'
+                    + 'align-items:center;'
+                    + 'justify-content:'
+                    + 'center;'
+                    + 'flex-shrink:0'
+                }">
                     <span
-                            class="text-sm font-bold text-primary">
-                        ${initials(user.fullName())}
+                        class="${
+                            'text-sm '
+                            + 'font-bold '
+                            + 'text-primary'
+                        }">
+                        ${initials(
+                            user.fullName(),
+                        )}
                     </span>
                 </div>
-                <div style="min-width:0">
-                    <p class="font-medium truncate">
+                <div style="${
+                    'min-width:0'
+                }">
+                    <p class="${
+                        'font-medium '
+                        + 'truncate'
+                    }">
                         ${user.fullName()}
                     </p>
                     <p
-                            class="text-xs text-muted truncate">
+                        class="${
+                            'text-xs '
+                            + 'text-muted '
+                            + 'truncate'
+                        }">
                         ${user.email}
                     </p>
                 </div>
             </div>
             <div style="flex:1">
-                ${buildRoleBadge(user.role)}
+                ${buildRoleBadge(
+                    user.role,
+                )}
             </div>
             <div style="flex:1"
-                    class="text-sm text-muted">
+                class="${
+                    'text-sm text-muted'
+                }">
                 ${user.department}
             </div>
             <div style="flex:1">
                 ${buildStatusBadge(user)}
-                <p class="text-xs text-muted mt-1">
+                <p class="${
+                    'text-xs text-muted'
+                    + ' mt-1'
+                }">
                     ${user.isPending()
                         ? 'Invite sent'
                         : 'Last active '
-                                + user.lastActive}
+                            + user
+                                .lastActive}
                 </p>
             </div>
-            <div style="flex:0 0 auto">
+            <div style="${
+                'flex:0 0 auto'
+            }">
                 <button
-                        class="btn btn-ghost btn-icon btn-sm">
-                    ${iconMoreHorizontal(16)}
+                    class="${
+                        'btn btn-ghost '
+                        + 'btn-icon btn-sm'
+                    }">
+                    ${iconMoreHorizontal(
+                        16,
+                    )}
                 </button>
             </div>
         </div>`;
@@ -169,215 +225,376 @@ export async function init(): Promise<void> {
     ).length;
 
     setHtml(container, html`
-        <div style="max-width:72rem;
-                margin:0 auto">
-            <nav class="flex items-center gap-2
-                    text-sm text-muted mb-6">
+        <div style="${
+            'max-width:72rem;'
+            + 'margin:0 auto'
+        }">
+            <nav class="${
+                'flex items-center '
+                + 'gap-2 text-sm '
+                + 'text-muted mb-6'
+            }">
                 <a href="index.html"
-                        class="text-primary">
+                    class="${
+                        'text-primary'
+                    }">
                     Administration
                 </a>
                 ${iconChevronRight(14)}
                 <span>Manage Users</span>
             </nav>
 
-            <div class="flex items-center
-                    justify-between mb-6">
+            <div class="${
+                'flex items-center '
+                + 'justify-between mb-6'
+            }">
                 <div>
-                    <h1 class="text-3xl font-display
-                            font-bold mb-2">
+                    <h1 class="${
+                        'text-3xl '
+                        + 'font-display '
+                        + 'font-bold mb-2'
+                    }">
                         Manage Users
                     </h1>
                     <p class="text-muted">
-                        ${activeCount} active users,
+                        ${activeCount
+                        } active users,
                         ${pendingCount}
                         pending invitations
                     </p>
                 </div>
                 <button
-                        class="btn btn-primary gap-2"
-                        id="invite-btn">
-                    ${iconUserPlus(16)} Invite User
+                    class="${
+                        'btn btn-primary '
+                        + 'gap-2'
+                    }"
+                    id="invite-btn">
+                    ${iconUserPlus(16)
+                    } Invite User
                 </button>
             </div>
 
             <div
-                    class="flex items-center gap-4 mb-6">
-                <div class="search-wrapper"
-                        style="flex:1;max-width:20rem">
-                    <span class="search-icon">
+                class="${
+                    'flex items-center '
+                    + 'gap-4 mb-6'
+                }">
+                <div class="${
+                    'search-wrapper'
+                }"
+                    style="${
+                        'flex:1;'
+                        + 'max-width:20rem'
+                    }">
+                    <span class="${
+                        'search-icon'
+                    }">
                         ${iconSearch(16)}
                     </span>
-                    <input class="input search-input"
-                            placeholder="Search by name or email..."
-                            id="user-search"
-                            aria-label="Search by name or email" />
+                    <input class="${
+                        'input search-input'
+                    }"
+                        placeholder="${
+                            'Search by name'
+                            + ' or email...'
+                        }"
+                        id="user-search"
+                        aria-label="${
+                            'Search by name'
+                            + ' or email'
+                        }" />
                 </div>
                 <select class="input"
-                        style="width:10rem"
-                        id="role-filter"
-                        aria-label="Filter by role">
+                    style="${
+                        'width:10rem'
+                    }"
+                    id="role-filter"
+                    aria-label="${
+                        'Filter by role'
+                    }">
                     <option value="all">
                         All Roles
                     </option>
                     <option value="admin">
                         Admin
                     </option>
-                    <option value="manager">
+                    <option value="${
+                        'manager'
+                    }">
                         Manager
                     </option>
-                    <option value="member">
+                    <option value="${
+                        'member'
+                    }">
                         Member
                     </option>
-                    <option value="viewer">
+                    <option value="${
+                        'viewer'
+                    }">
                         Viewer
                     </option>
                 </select>
                 <select class="input"
-                        style="width:10rem"
-                        id="status-filter"
-                        aria-label="Filter by status">
+                    style="${
+                        'width:10rem'
+                    }"
+                    id="status-filter"
+                    aria-label="${
+                        'Filter by status'
+                    }">
                     <option value="all">
                         All Status
                     </option>
-                    <option value="active">
+                    <option value="${
+                        'active'
+                    }">
                         Active
                     </option>
-                    <option value="pending">
+                    <option value="${
+                        'pending'
+                    }">
                         Pending
                     </option>
-                    <option value="deactivated">
+                    <option value="${
+                        'deactivated'
+                    }">
                         Deactivated
                     </option>
                 </select>
             </div>
 
             <div class="card"
-                    style="overflow:hidden">
-                <div class="flex items-center
-                        gap-4 p-4"
-                        style="background:hsl(
-                                var(--muted)/0.3);
-                                border-bottom:1px solid
-                                        hsl(var(--border))">
+                style="${
+                    'overflow:hidden'
+                }">
+                <div class="${
+                    'flex items-center '
+                    + 'gap-4 p-4'
+                }"
+                    style="${
+                        'background:'
+                        + 'hsl(var(--muted)'
+                        + '/0.3);'
+                        + 'border-bottom:'
+                        + '1px solid '
+                        + 'hsl(var(--border))'
+                    }">
                     <div style="flex:2"
-                            class="text-xs font-medium
-                                    text-muted">
+                        class="${
+                            'text-xs '
+                            + 'font-medium '
+                            + 'text-muted'
+                        }">
                         User
                     </div>
                     <div style="flex:1"
-                            class="text-xs font-medium
-                                    text-muted">
+                        class="${
+                            'text-xs '
+                            + 'font-medium '
+                            + 'text-muted'
+                        }">
                         Role
                     </div>
                     <div style="flex:1"
-                            class="text-xs font-medium
-                                    text-muted">
+                        class="${
+                            'text-xs '
+                            + 'font-medium '
+                            + 'text-muted'
+                        }">
                         Department
                     </div>
                     <div style="flex:1"
-                            class="text-xs font-medium
-                                    text-muted">
+                        class="${
+                            'text-xs '
+                            + 'font-medium '
+                            + 'text-muted'
+                        }">
                         Status
                     </div>
                     <div
-                            style="flex:0 0 auto;
-                                    width:2.5rem">
+                        style="${
+                            'flex:0 0 auto;'
+                            + 'width:2.5rem'
+                        }">
                     </div>
                 </div>
                 <div id="user-list">
-                    ${users.map(buildUserRow)}
+                    ${users.map(
+                        buildUserRow,
+                    )}
                 </div>
             </div>
 
-            <div id="invite-backdrop"
-                    class="dialog-backdrop hidden">
+            <div id="${
+                'invite-backdrop'
+            }"
+                class="${
+                    'dialog-backdrop '
+                    + 'hidden'
+                }">
             </div>
-            <div id="invite-dialog"
-                    class="dialog hidden"
-                    role="dialog"
-                    aria-modal="true"
-                    style="max-width:28rem">
-                <div class="dialog-header">
+            <div id="${
+                'invite-dialog'
+            }"
+                class="dialog hidden"
+                role="dialog"
+                aria-modal="true"
+                style="${
+                    'max-width:28rem'
+                }">
+                <div class="${
+                    'dialog-header'
+                }">
                     <h3
-                            class="dialog-title flex items-center gap-2">
+                        class="${
+                            'dialog-title '
+                            + 'flex '
+                            + 'items-center '
+                            + 'gap-2'
+                        }">
                         ${iconUserPlus(20)}
                         Invite New User
                     </h3>
-                    <p class="dialog-description">
-                        Send an invitation to join
-                        your organization.
+                    <p class="${
+                        'dialog-description'
+                    }">
+                        Send an invitation
+                        to join your
+                        organization.
                     </p>
                 </div>
                 <div
-                        class="flex flex-col gap-4 py-4">
+                    class="${
+                        'flex flex-col '
+                        + 'gap-4 py-4'
+                    }">
                     <div>
                         <label
-                                class="label mb-2 block">
+                            class="${
+                                'label mb-2 '
+                                + 'block'
+                            }">
                             Email Address
                         </label>
-                        <input class="input"
-                                type="email"
-                                placeholder="colleague@company.com"
-                                id="invite-email" />
+                        <input
+                            class="input"
+                            type="email"
+                            placeholder="${
+                                'colleague@'
+                                + 'company.com'
+                            }"
+                            id="${
+                                'invite-email'
+                            }" />
                     </div>
                     <div>
                         <label
-                                class="label mb-2 block">
+                            class="${
+                                'label mb-2 '
+                                + 'block'
+                            }">
                             Role
                         </label>
-                        <select class="input"
-                                id="invite-role">
-                            <option value="member">
+                        <select
+                            class="input"
+                            id="${
+                                'invite-role'
+                            }">
+                            <option
+                                value="${
+                                    'member'
+                                }">
                                 Member
                             </option>
-                            <option value="admin">
+                            <option
+                                value="${
+                                    'admin'
+                                }">
                                 Admin
                             </option>
-                            <option value="manager">
+                            <option
+                                value="${
+                                    'manager'
+                                }">
                                 Manager
                             </option>
-                            <option value="viewer">
+                            <option
+                                value="${
+                                    'viewer'
+                                }">
                                 Viewer
                             </option>
                         </select>
                     </div>
                     <div>
                         <label
-                                class="label mb-2 block">
+                            class="${
+                                'label mb-2 '
+                                + 'block'
+                            }">
                             Department
                         </label>
-                        <select class="input"
-                                id="invite-department">
+                        <select
+                            class="input"
+                            id="${
+                                'invite-'
+                                + 'department'
+                            }">
                             <option
-                                    value="Engineering">
+                                value="${
+                                    'Engineering'
+                                }">
                                 Engineering
                             </option>
-                            <option value="Product">
+                            <option
+                                value="${
+                                    'Product'
+                                }">
                                 Product
                             </option>
-                            <option value="Design">
+                            <option
+                                value="${
+                                    'Design'
+                                }">
                                 Design
                             </option>
-                            <option value="Sales">
+                            <option
+                                value="${
+                                    'Sales'
+                                }">
                                 Sales
                             </option>
                             <option
-                                    value="Operations">
+                                value="${
+                                    'Operations'
+                                }">
                                 Operations
                             </option>
                         </select>
                     </div>
                 </div>
-                <div class="dialog-footer">
-                    <button class="btn btn-outline"
-                            id="invite-cancel">
+                <div class="${
+                    'dialog-footer'
+                }">
+                    <button class="${
+                        'btn btn-outline'
+                    }"
+                        id="${
+                            'invite-cancel'
+                        }">
                         Cancel
                     </button>
                     <button
-                            class="btn btn-primary gap-2"
-                            id="invite-submit">
-                        ${iconSend(16)} Send Invite
+                        class="${
+                            'btn '
+                            + 'btn-primary '
+                            + 'gap-2'
+                        }"
+                        id="${
+                            'invite-submit'
+                        }">
+                        ${iconSend(16)
+                        } Send Invite
                     </button>
                 </div>
             </div>
