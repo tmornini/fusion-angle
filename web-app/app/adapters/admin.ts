@@ -77,6 +77,11 @@ export async function getAccount(
         ),
     ]);
 
+    if (!account.plan)
+        throw new Error(
+            'Account not configured',
+        );
+
     const actorMap = new Map(
         activityActors.map(
             a => [
@@ -199,7 +204,7 @@ export async function getProfile(
         await GET<UserEntity | null>(
             'current-user',
         );
-    if (!user)
+    if (!user || !user.email)
         throw new Error(
             'No current user found'
             + ' — cannot load profile',
