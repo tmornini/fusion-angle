@@ -569,7 +569,7 @@ export async function populateMockData(
             estimated_cost: 38000,
             priority: 5,
             status: 'active',
-            edge_status: 'incomplete',
+            edge_status: 'missing',
             problem_statement:
                 'Excess inventory ties up'
                 + ' $2M in capital while'
@@ -620,7 +620,7 @@ export async function populateMockData(
             estimated_cost: 35000,
             priority: 6,
             status: 'archived',
-            edge_status: 'incomplete',
+            edge_status: 'missing',
             problem_statement:
                 'New hire onboarding takes'
                 + ' 6 weeks on average, with'

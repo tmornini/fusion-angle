@@ -41,7 +41,7 @@
 | estimated_cost | INTEGER | 0 |
 | priority | INTEGER | 0 |
 | status | TEXT | 'draft' |
-| edge_status | TEXT | 'incomplete' |
+| edge_status | TEXT | 'missing' |
 | problem_statement | TEXT | '' |
 | proposed_solution | TEXT | '' |
 | expected_outcome | TEXT | '' |

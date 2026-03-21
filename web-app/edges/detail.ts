@@ -52,11 +52,10 @@ function computeCompletionStatus() {
             outcome =>
                 outcome.metrics.length > 0,
         );
-    const hasImpact = !!(
-        edgeData.impact.shortTerm
-        || edgeData.impact.midTerm
-        || edgeData.impact.longTerm
-    );
+    const hasImpact =
+        edgeData.impact.shortTerm !== ''
+        || edgeData.impact.midTerm !== ''
+        || edgeData.impact.longTerm !== '';
     const hasOwner =
         edgeData.owner.trim() !== '';
     const hasConfidence =

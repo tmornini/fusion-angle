@@ -68,21 +68,19 @@ export async function init():
     function isStepComplete(): boolean {
         switch (state.currentStep) {
             case 1:
-                return !!(
-                    state.formData.title
-                        .trim()
+                return state.formData
+                    .title.trim() !== ''
                     && state.formData
                         .problemStatement
-                        .trim()
-                );
+                        .trim() !== '';
             case 2:
-                return !!state.formData
+                return state.formData
                     .proposedSolution
-                    .trim();
+                    .trim() !== '';
             case 3:
-                return !!state.formData
+                return state.formData
                     .expectedOutcome
-                    .trim();
+                    .trim() !== '';
             default:
                 return false;
         }
