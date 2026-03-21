@@ -63,9 +63,6 @@ async function updateEmptyBanner(
                 <p class="text-sm"
                     style="margin:0">${
                     'Your database is empty.'
-                    + ' Load mock data or'
-                    + ' upload a snapshot'
-                    + ' to get started.'
                 }</p>`,
             );
             root.prepend(banner);

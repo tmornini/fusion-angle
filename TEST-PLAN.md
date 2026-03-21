@@ -2,22 +2,31 @@
 
 > **Encoding:** `- [ ]` = pending, `- [x]` = PASS, `- [FAIL]` = failure (add note)
 
+### Protocol Coverage
+
+All test sections (B through I) must be executed under **both** protocols:
+
+1. **HTTP** — serve the unzipped build via a local HTTP server (e.g. `python3 -m http.server 8080`)
+2. **`file://`** — open the unzipped build directory directly in the browser (e.g. `file:///tmp/fusion-test/index.html`)
+
+Section J covers `file://`-specific edge cases (asset loading, navigation quirks). The rest of the suite applies identically to both protocols.
+
 ## Summary
 
 | Section | Tests |
 |---|--:|
 | A. Build & Setup | 5 |
 | B. Entry Pages | 16 |
-| C. Core: Dashboard | 8 |
+| C. Core: Dashboard | 7 |
 | D. Core: Ideas Workflow | 44 |
 | E. Core: Projects | 16 |
 | F. Tools | 26 |
 | G. Admin Pages | 28 |
 | H. Reference & System | 2 |
 | I. Cross-Cutting Concerns | 18 |
-| J. Protocol B: `file://` Retest | 14 |
+| J. `file://` Edge Cases | 7 |
 | K. Teardown | 3 |
-| **Total** | **180** |
+| **Total** | **172** |
 
 ---
 
@@ -26,7 +35,7 @@
 - [ ] **A1** Run `./build` from a clean working directory. PASS: exits 0, prints no errors, creates `~/Desktop/fusion-ai-<sha>.zip`.
 - [ ] **A2** Unzip the archive into a temp directory (e.g. `/tmp/fusion-test`). PASS: directory contains `assets/app.js`, `assets/styles.css`, `assets/` (*.woff2 fonts), `index.html`, and 26 page directories each with `index.html`.
 - [ ] **A3** Start an HTTP server from the unzipped directory (e.g. `python3 -m http.server 8080`). PASS: server starts without errors.
-- [ ] **A4** Open `http://localhost:8080/` in the test browser. PASS: redirects to `snapshots/index.html` when no data exists, or `dashboard/index.html` when data has been loaded.
+- [ ] **A4** Open `http://localhost:8080/` in the test browser. PASS: redirects to `snapshots/index.html` when no data exists, or `landing/index.html` (which auto-redirects to `dashboard/index.html` after ~2 seconds) when data has been loaded.
 - [ ] **A5** Open DevTools Console and confirm no JavaScript errors on initial load. PASS: console is clean (warnings from browser extensions are acceptable).
 
 ---
@@ -35,9 +44,9 @@
 
 ### Landing Page (`landing/`)
 
-- [ ] **B1** Page renders with marketing hero content, feature sections, and call-to-action buttons. PASS: layout is complete, no broken images or unstyled text.
-- [ ] **B2** Click "Get Started" (or primary CTA). PASS: navigates to `auth/index.html`.
-- [ ] **B3** Click "Sign In" link. PASS: navigates to `auth/index.html`.
+- [ ] **B1** Page renders with marketing hero content, feature sections, and call-to-action buttons, then auto-redirects to `dashboard/index.html` after ~2 seconds. PASS: layout renders briefly, redirect occurs.
+- [ ] **B2** "Get Started" (or primary CTA) is present and navigates to `auth/index.html` if clicked before the auto-redirect. PASS: button exists with correct target.
+- [ ] **B3** "Sign In" link is present and navigates to `auth/index.html` if clicked before the auto-redirect. PASS: link exists with correct target.
 
 ### Auth Page (`auth/`)
 
@@ -69,8 +78,7 @@
 - [ ] **C2** Sidebar shows navigation links grouped under Journey (Dashboard, Ideas, Projects, Teams), Tools (Edge, Crunch, Flow), and Settings (Organization, Snapshots, Design System). PASS: all links present and styled.
 - [ ] **C3** Header shows search bar, greeting ("Good evening, Tony Stark"), company stats ("Stark Industries · 11 Ideas · 6 Projects · 4 Flow"), and theme toggle. PASS: elements visible and styled.
 - [ ] **C4** Dashboard displays 3 gauge/metric cards (Time, Cost, Impact) with baseline and current values. PASS: cards render with non-zero values and concentric arc gauges.
-- [ ] **C5** Dashboard displays at least one chart (bar, line, donut, or area). PASS: SVG chart renders with visible data.
-- [ ] **C6** Quick-action cards or links are present. PASS: clicking one navigates to the expected page.
+- [ ] **C6** Sidebar navigation links all function correctly. PASS: clicking a sidebar link navigates to the expected page.
 - [ ] **C7** Scroll the page. PASS: sidebar stays fixed, main content scrolls independently.
 - [ ] **C8** Check that seed data populates all dashboard widgets. PASS: no "No data" empty states on initial load (seed data provides content for all widgets).
 
@@ -123,7 +131,7 @@
 
 - [ ] **D22** Navigate to `idea-review-queue/`. PASS: page shows stats cards (Pending Review, Ready to Decide, High Priority, Avg. Wait Time) and a list of ideas pending review.
 - [ ] **D22b** Each review card shows priority badge (High Priority/Medium), readiness status (Ready for Review/Needs Info/Unknown), edge status badge, title, submitter, category, days waiting, score, impact, and effort. PASS: all fields render with data.
-- [ ] **D23** At least one idea with `pending_review` status appears in the queue. PASS: idea 7 ("AI-Powered Customer Support Chatbot") or similar is listed.
+- [ ] **D23** At least one idea with `in-review` status appears in the queue. PASS: idea 7 ("AI-Powered Customer Support Chatbot") or similar is listed.
 - [ ] **D23b** Type a search term in the search input. PASS: review cards filter by title or submitter name in real-time.
 - [ ] **D23c** Select "High" from the priority filter dropdown. PASS: list shows only high-priority items. Reset to "All Priority" → full list returns.
 - [ ] **D23d** Select "Ready for Review" from the readiness filter dropdown. PASS: list shows only ready items. Reset to "All Status" → full list returns.
@@ -248,7 +256,7 @@
 
 ### Company Settings (`settings/`)
 
-- [ ] **G7** Navigate to `settings/`. PASS: shows company info (Acme Corporation, acmecorp.com, Technology, 51-200).
+- [ ] **G7** Navigate to `settings/`. PASS: shows company info (Stark Industries, acmecorp.com, Technology, 51-200).
 - [ ] **G8** Security settings visible: SSO (off), 2FA (on), IP Whitelist (off). PASS: toggle/indicator states match seed data.
 - [ ] **G9** Edit a setting (e.g. timezone or language) and save. PASS: success toast or save completes without error.
 
@@ -331,32 +339,17 @@
 
 ---
 
-## J. Protocol B: `file://` Retest
+## J. `file://` Edge Cases
 
-> Open the unzipped build directory directly in the browser via `file://` protocol (e.g. `file:///tmp/fusion-test/index.html`). The app uses localStorage for persistence, which works on `file://` across all major browsers.
+> These cases verify `file://`-specific behavior that differs from HTTP. All other test sections (B–I) also apply under `file://` — see **Protocol Coverage** above.
 
-### Static Pages (No DB Required)
-
-- [ ] **J1** Open `file:///.../index.html` (root). PASS: redirects or links to landing page.
-- [ ] **J2** Open `file:///.../landing/index.html`. PASS: landing page renders with full layout and styling.
-- [ ] **J3** Open `file:///.../auth/index.html`. PASS: auth form renders, validation works (test empty submit → error messages appear).
-- [ ] **J4** Open `file:///.../onboarding/index.html`. PASS: page renders with content.
-- [ ] **J5** Open `file:///.../not-found/index.html`. PASS: 404 page renders.
-- [ ] **J6** Open `file:///.../design-system/index.html`. PASS: component gallery renders.
-- [ ] **J7** Verify CSS loads: pages are styled (not unstyled HTML). PASS: fonts, colors, and layout apply correctly.
-- [ ] **J8** Verify `assets/app.js` loads: interactive elements work (e.g. theme toggle, auth form validation). PASS: JavaScript executes.
-
-### Database-Dependent Pages
-
-- [ ] **J9** Open `file:///.../dashboard/index.html`. PASS: dashboard renders (redirects to snapshots if no data loaded yet).
-- [ ] **J10** Navigate to `snapshots/index.html`, click "Reload Mock Data". PASS: mock data loads. Navigate to `ideas/index.html`. PASS: ideas list renders with seed data.
-- [ ] **J11** Navigate to `snapshots/index.html` and click "Download Snapshot". PASS: download triggers.
-- [ ] **J12** Navigate between 3+ database-dependent pages (dashboard, ideas, projects). PASS: data persists across page navigations via localStorage.
-
-### Navigation Under `file://`
-
-- [ ] **J13** Click sidebar navigation links between pages. PASS: links work (note: relative paths resolve correctly under `file://`).
-- [ ] **J14** Test `Cmd+K` command palette. PASS: palette opens and closes. Navigation from palette results may or may not work depending on URL resolution under `file://`.
+- [ ] **J1** Open `file:///.../index.html` (root). PASS: redirects to landing page (or snapshots when no data exists).
+- [ ] **J2** Verify CSS loads under `file://`: pages are styled (not unstyled HTML). PASS: fonts, colors, and layout apply correctly.
+- [ ] **J3** Verify `assets/app.js` loads under `file://`: interactive elements work (e.g. theme toggle, auth form validation). PASS: JavaScript executes.
+- [ ] **J4** Link prefetching is disabled under `file://` (no `<link rel="prefetch">` elements created). PASS: no prefetch-related errors in console.
+- [ ] **J5** Navigate between 3+ database-dependent pages (dashboard, ideas, projects) under `file://`. PASS: data persists across page navigations via localStorage.
+- [ ] **J6** Click sidebar navigation links between pages under `file://`. PASS: relative paths resolve correctly.
+- [ ] **J7** Test `Cmd+K` command palette under `file://`. PASS: palette opens and closes. Navigation from palette results may not resolve correctly under `file://`.
 
 ---
 

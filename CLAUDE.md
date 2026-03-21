@@ -202,7 +202,7 @@ web-app/
 
 SCHEMA.md                     # Database schema (19 tables, columns, types, defaults)
 DESIGN-SYSTEM.md              # Design system specification
-TEST-PLAN.md                  # Human-executable test plan (146 cases)
+TEST-PLAN.md                  # Human-executable test plan (180 cases)
 ```
 
 Most pages use `index.ts` + `index.html`. Pages with `sourceFile` in `PAGE_REGISTRY` use named files (e.g., `detail.ts` + `detail.html`). Build output goes to a temp directory — no build artifacts in the repo.
