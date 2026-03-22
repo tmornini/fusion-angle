@@ -18,10 +18,10 @@ import {
 } from '../app/core';
 import {
     getIdeaForEdge, getEdgeDataByIdeaId,
-    putEdgeData, type EdgeIdea, type EdgeData,
+    putEdgeData, type EdgeData,
 } from '../app/adapters';
 import {
-    isConfidenceLevel,
+    Idea, isConfidenceLevel,
     type ConfidenceLevel,
 } from '../../api/types';
 
@@ -42,7 +42,7 @@ const state = {
         confidence: 'medium',
         owner: 'Sarah Chen',
     } as EdgeData,
-    currentIdea: null as EdgeIdea | null,
+    currentIdea: null as Idea | null,
 };
 
 function computeCompletionStatus() {
@@ -579,14 +579,14 @@ function buildEdgePage(
                     }">Problem</p>
                     <p class="${
                         'text-sm mb-3'
-                    }">${idea.problem}</p>
+                    }">${idea.problemStatement}</p>
                     <p class="${
                         'text-xs '
                         + 'text-muted mb-1'
                     }">Solution</p>
                     <p class="${
                         'text-sm mb-3'
-                    }">${idea.solution}</p>
+                    }">${idea.proposedSolution}</p>
                     <div style="${
                         'padding-top:0.75rem;'
                         + 'border-top:'

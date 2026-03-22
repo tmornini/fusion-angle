@@ -27,7 +27,7 @@ import {
 } from '../app/core';
 import {
     getProjectById, putProject,
-    type ProjectDetail,
+    ProjectView,
 } from '../app/adapters';
 import {
     PROJECT_STATUS_CONFIG,
@@ -136,7 +136,7 @@ function isKpiOnTrack(
 }
 
 function buildProjectSummary(
-    project: ProjectDetail,
+    project: ProjectView,
 ): SafeHtml {
     return html`
         <div class="card p-6">
@@ -315,7 +315,7 @@ function buildProjectSummary(
 }
 
 function buildBaselineComparison(
-    project: ProjectDetail,
+    project: ProjectView,
 ): SafeHtml {
     return html`
         <div class="card p-6">
@@ -342,11 +342,11 @@ function buildBaselineComparison(
                         inputId: 'time',
                         icon: iconClock,
                         baseline:
-                            project.metrics
-                                .time.baseline,
+                            project
+                                .timeBaselineDays(),
                         current:
-                            project.metrics
-                                .time.current,
+                            project
+                                .timeCurrentDays(),
                         unit: 'd',
                         prefix: '',
                         isLowerBetter: true,
@@ -356,13 +356,11 @@ function buildBaselineComparison(
                         inputId: 'cost',
                         icon: iconDollarSign,
                         baseline:
-                            project.metrics
-                                .cost.baseline
-                            / 1000,
+                            project
+                                .costBaselineK(),
                         current:
-                            project.metrics
-                                .cost.current
-                            / 1000,
+                            project
+                                .costCurrentK(),
                         unit: 'k',
                         prefix: '$',
                         isLowerBetter: true,
@@ -372,13 +370,11 @@ function buildBaselineComparison(
                         inputId: 'impact',
                         icon: iconTrendingUp,
                         baseline:
-                            project.metrics
-                                .impact
-                                .baseline,
+                            project
+                                .impactBaseline(),
                         current:
-                            project.metrics
-                                .impact
-                                .current,
+                            project
+                                .impactCurrent(),
                         unit: ' pts',
                         prefix: '',
                         isLowerBetter: false,
@@ -557,7 +553,7 @@ function buildBaselineComparison(
 }
 
 function buildEdgeKPIs(
-    project: ProjectDetail,
+    project: ProjectView,
 ): SafeHtml {
     if (!project.edge) {
         return html`
@@ -1048,7 +1044,7 @@ function buildEdgeKPIs(
 }
 
 function buildProjectTabs(
-    project: ProjectDetail,
+    project: ProjectView,
 ): SafeHtml {
     return html`
         <div class="card p-6">
@@ -1276,14 +1272,12 @@ function buildProjectTabs(
                     <span class="${
                         'text-sm text-muted'
                     }">
-                        ${project.tasks.filter(
-                            task =>
-                                task.assigned,
-                        ).length} assigned,
-                        ${project.tasks.filter(
-                            task =>
-                                !task.assigned,
-                        ).length} unassigned
+                        ${project
+                            .assignedTaskCount()
+                        } assigned,
+                        ${project
+                            .unassignedTaskCount()
+                        } unassigned
                     </span>
                     <button
                         class="${
@@ -1647,7 +1641,7 @@ function buildProjectTabs(
 }
 
 function buildProjectSidebar(
-    project: ProjectDetail,
+    project: ProjectView,
 ): SafeHtml {
     return html`
         <div style="${
@@ -1872,15 +1866,10 @@ function buildProjectSidebar(
         </div>`;
 }
 
-function buildProjectDetail(
-    project: ProjectDetail,
+function buildProjectView(
+    project: ProjectView,
     projectId: string,
 ): SafeHtml {
-    const statusCfg =
-            PROJECT_STATUS_CONFIG[
-                project.status as
-                        keyof typeof PROJECT_STATUS_CONFIG
-            ]!;
     const statusOptions =
             Object.entries(
                 PROJECT_STATUS_CONFIG,
@@ -2004,8 +1993,8 @@ function buildProjectDetail(
                                 : html`<span
                                     class="${
                                         'badge '
-                                        + statusCfg
-                                            .className
+                                        + project
+                                            .statusClassName()
                                         + ' text-xs'
                                     }">
                                     ${
@@ -2014,8 +2003,8 @@ function buildProjectDetail(
                                         )
                                     }
                                     ${
-                                        statusCfg
-                                            .label
+                                        project
+                                            .statusLabel()
                                     }
                                 </span>`}
                         </div>
@@ -2333,7 +2322,7 @@ function buildProjectDetail(
 }
 
 function bindProjectEvents(
-    project: ProjectDetail,
+    project: ProjectView,
     projectId: string,
 ): void {
     $('#project-back-btn', document)
@@ -2482,7 +2471,7 @@ function bindProjectEvents(
 }
 
 function mutateProjectPage(
-    project: ProjectDetail,
+    project: ProjectView,
     projectId: string,
 ): void {
     const container = $(
@@ -2491,7 +2480,7 @@ function mutateProjectPage(
     if (!container) return;
     setHtml(
             container,
-            buildProjectDetail(
+            buildProjectView(
                     project, projectId,
             ),
     );
@@ -2516,7 +2505,7 @@ export async function init(
             buildSkeleton('detail', 4),
     );
 
-    let project: ProjectDetail;
+    let project: ProjectView;
     try {
         project =
                 await getProjectById(projectId);

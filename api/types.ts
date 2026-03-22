@@ -297,6 +297,19 @@ export class User {
     hasPerformanceScore(): boolean {
         return this.performanceScore > 0;
     }
+
+    parsedStrengths(): string[] {
+        return JSON.parse(
+            this.strengths,
+        ) as string[];
+    }
+
+    parsedTeamDimensions():
+        Record<string, number> {
+        return JSON.parse(
+            this.teamDimensions,
+        ) as Record<string, number>;
+    }
 }
 
 export interface IdeaEntity {
@@ -1094,6 +1107,28 @@ export class Idea {
             READINESS_CONFIG[this.readiness]
         )!.className;
     }
+
+    parsedRisks(): { title: string;
+        severity: string;
+        mitigation: string }[] {
+        return JSON.parse(
+            this.risks,
+        ) as { title: string;
+            severity: string;
+            mitigation: string }[];
+    }
+
+    parsedAssumptions(): string[] {
+        return JSON.parse(
+            this.assumptions,
+        ) as string[];
+    }
+
+    parsedAlignments(): string[] {
+        return JSON.parse(
+            this.alignments,
+        ) as string[];
+    }
 }
 
 export class Project {
@@ -1256,6 +1291,30 @@ export class Edge {
     }
 }
 
+export class EdgeListEntry extends Edge {
+    readonly ideaId: string;
+    readonly ideaTitle: string;
+    readonly outcomesCount: number;
+    readonly metricsCount: number;
+    readonly owner: string | null;
+
+    constructor(
+        entity: EdgeEntity,
+        ideaId: string,
+        ideaTitle: string,
+        outcomesCount: number,
+        metricsCount: number,
+        owner: string | null,
+    ) {
+        super(entity);
+        this.ideaId = ideaId;
+        this.ideaTitle = ideaTitle;
+        this.outcomesCount = outcomesCount;
+        this.metricsCount = metricsCount;
+        this.owner = owner;
+    }
+}
+
 export class Activity {
     readonly id: string;
     readonly type: string;
@@ -1286,6 +1345,132 @@ export class Activity {
         return `${this.actor ?? ''}`
             + ` ${this.action}`
             + ` ${this.target}`;
+    }
+}
+
+export interface RecentActivityItem {
+    type: string;
+    description: string;
+    time: string;
+}
+
+export class Account {
+    readonly companyName: string;
+    readonly plan: string;
+    readonly planStatus: string;
+    readonly nextBilling: string;
+    readonly seats: number;
+    readonly usedSeats: number;
+    readonly projectsCurrent: number;
+    readonly projectsLimit: number;
+    readonly ideasCurrent: number;
+    readonly ideasLimit: number;
+    readonly storageCurrent: number;
+    readonly storageLimit: number;
+    readonly aiCreditsCurrent: number;
+    readonly aiCreditsLimit: number;
+    readonly healthScore: number;
+    readonly healthStatus: string;
+    readonly lastActivity: string;
+    readonly activeUsers: number;
+    readonly recentActivity:
+        RecentActivityItem[];
+
+    constructor(
+        entity: AccountEntity,
+        companyName: string,
+        recentActivity:
+            RecentActivityItem[],
+    ) {
+        this.companyName = companyName;
+        this.plan = entity.plan;
+        this.planStatus =
+            entity.plan_status;
+        this.nextBilling =
+            entity.next_billing;
+        this.seats = entity.seats;
+        this.usedSeats =
+            entity.used_seats;
+        this.projectsCurrent =
+            entity.projects_current;
+        this.projectsLimit =
+            entity.projects_limit;
+        this.ideasCurrent =
+            entity.ideas_current;
+        this.ideasLimit =
+            entity.ideas_limit;
+        this.storageCurrent =
+            entity.storage_current;
+        this.storageLimit =
+            entity.storage_limit;
+        this.aiCreditsCurrent =
+            entity.ai_credits_current;
+        this.aiCreditsLimit =
+            entity.ai_credits_limit;
+        this.healthScore =
+            entity.health_score;
+        this.healthStatus =
+            entity.health_status;
+        this.lastActivity =
+            entity.last_activity;
+        this.activeUsers =
+            entity.active_users;
+        this.recentActivity =
+            recentActivity;
+    }
+
+    seatUsagePercent(): number {
+        return this.seats > 0
+            ? Math.min(
+                (this.usedSeats
+                    / this.seats) * 100,
+                100,
+            )
+            : 0;
+    }
+
+    projectUsagePercent(): number {
+        return this.projectsLimit > 0
+            ? Math.min(
+                (this.projectsCurrent
+                    / this.projectsLimit)
+                    * 100,
+                100,
+            )
+            : 0;
+    }
+
+    ideaUsagePercent(): number {
+        return this.ideasLimit > 0
+            ? Math.min(
+                (this.ideasCurrent
+                    / this.ideasLimit)
+                    * 100,
+                100,
+            )
+            : 0;
+    }
+
+    aiCreditUsagePercent(): number {
+        return this.aiCreditsLimit > 0
+            ? Math.min(
+                (this.aiCreditsCurrent
+                    / this.aiCreditsLimit)
+                    * 100,
+                100,
+            )
+            : 0;
+    }
+
+    storageUsagePercent(): number {
+        return this.storageLimit > 0
+            ? Math.min(
+                (this.storageCurrent
+                    / this.storageLimit)
+                    * 100,
+                100,
+            )
+            : 0;
     }
 }
 

@@ -27,7 +27,7 @@ import {
     putMilestone,
     putProjectTeamMember,
     putIdeaProjectLink,
-    type ConversionIdea,
+    type ConversionData,
 } from '../app/adapters';
 
 const PRIORITY_RANKS: Record<
@@ -94,10 +94,15 @@ function buildLeadOptions(
 }
 
 function buildConversionPage(
-    idea: ConversionIdea,
+    data: ConversionData,
     ideaId: string,
     users: User[],
 ): SafeHtml {
+    const {
+        idea,
+        estimatedDuration,
+        estimatedCost,
+    } = data;
     const completedCount =
         completedFieldCount();
     const percent =
@@ -342,8 +347,7 @@ function buildConversionPage(
                                         'font-'
                                         + 'medium'
                                     }">${
-                                    idea
-                                    .estimatedDuration
+                                    estimatedDuration
                                 }</span>
                             </div>
                             <div class="flex
@@ -370,8 +374,7 @@ function buildConversionPage(
                                         'font-'
                                         + 'medium'
                                     }">${
-                                    idea
-                                    .estimatedCost
+                                    estimatedCost
                                 }</span>
                             </div>
                             <div class="flex
@@ -673,8 +676,7 @@ function buildConversionPage(
                                     + ' mt-1'
                                 }">
                                     AI estimate:
-                                    ${idea
-                                        .estimatedCost}
+                                    ${estimatedCost}
                                 </p>
                             </div>
                             <div>
@@ -1014,13 +1016,14 @@ export async function init(
     if (!root) return;
     setHtml(root, buildSkeleton('detail', 4));
 
-    let idea: ConversionIdea;
+    let conversionData: ConversionData;
     let users: User[];
     try {
-        [idea, users] = await Promise.all([
-            getIdeaForConversion(ideaId),
-            getManagedUsers(),
-        ]);
+        [conversionData, users] =
+            await Promise.all([
+                getIdeaForConversion(ideaId),
+                getManagedUsers(),
+            ]);
     } catch {
         setHtml(
             root,
@@ -1040,7 +1043,8 @@ export async function init(
     }
 
     state.projectDetails = {
-        'project-name': idea.title,
+        'project-name':
+            conversionData.idea.title,
         'project-lead': '',
         'start-date': '',
         'target-end-date': '',
@@ -1053,7 +1057,9 @@ export async function init(
     setHtml(
         root,
         buildConversionPage(
-            idea, ideaId, users,
+            conversionData,
+            ideaId,
+            users,
         ),
     );
 

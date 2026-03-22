@@ -26,8 +26,8 @@ import {
     getEdgeForApproval,
     getIdea,
     putIdea,
-    type ApprovalIdea,
-    type ApprovalEdge,
+    Idea,
+    type EdgeData,
     type Metric,
 } from '../app/adapters';
 
@@ -52,8 +52,8 @@ export async function init(
     };
 
     function buildApprovalPage(
-        idea: ApprovalIdea,
-        edge: ApprovalEdge | null,
+        idea: Idea,
+        edge: EdgeData | null,
     ): SafeHtml {
         return html`
     <div style=${'min-height:100vh;'
@@ -166,7 +166,7 @@ export async function init(
                             class="badge
                                 badge-error
                                 text-xs">
-                            ${idea.priority}
+                            ${idea.priorityLevel()}
                         </span>`}
                     </div>
                 </div>
@@ -275,7 +275,7 @@ export async function init(
                                 + ' font-semibold'
                             }">
                                 ${idea
-                                    .impact.level}
+                                    .impactLabel}
                             </p>
                         </div>
                         <div>
@@ -291,7 +291,7 @@ export async function init(
                                 + ' font-semibold'
                             }">
                                 ${idea
-                                    .effort.level}
+                                    .effortLabel}
                             </p>
                         </div>
                         <div>
@@ -306,8 +306,8 @@ export async function init(
                                 'text-xl'
                                 + ' font-semibold'
                             }">
-                                ${idea.effort
-                                    .durationEstimate}
+                                ${idea
+                                    .effortDurationEstimate}
                             </p>
                         </div>
                     </div>
@@ -356,7 +356,7 @@ export async function init(
                         Expected Impact
                     </h3>
                     <p class="text-sm">${
-                        idea.impact.description
+                        idea.description
                     }</p>
                 </div>
                 <div class="card p-6">
@@ -387,8 +387,8 @@ export async function init(
                                 'text-sm'
                                 + ' font-medium'
                             }">${
-                                idea.effort
-                                    .durationEstimate
+                                idea
+                                    .effortDurationEstimate
                             }</span>
                         </div>
                         <div
@@ -404,8 +404,8 @@ export async function init(
                                 'text-sm'
                                 + ' font-medium'
                             }">${
-                                idea.effort
-                                    .teamSize
+                                idea
+                                    .effortTeamSize
                             }</span>
                         </div>
                     </div>
@@ -427,12 +427,12 @@ export async function init(
                     'text-2xl font-bold'
                     + ' mb-1'
                 }">${
-                    idea.cost.estimate
+                    idea.costEstimate
                 }</p>
                 <p class="${
                     'text-sm text-muted'
                 }">${
-                    idea.cost.breakdown
+                    idea.costBreakdown
                 }</p>
             </div>
 
@@ -473,7 +473,7 @@ export async function init(
                 </div>
                 ${edge.outcomes.map((
                     outcome:
-                        ApprovalEdge[
+                        EdgeData[
                             'outcomes'
                         ][number],
                     outcomeIndex: number,
@@ -527,10 +527,7 @@ export async function init(
                         }">
                         ${outcome.metrics.map((
                             metric:
-                                Omit<
-                                    Metric,
-                                    'current'
-                                >,
+                                Metric,
                         ) => html`
                         <span
                             class="${
@@ -683,7 +680,7 @@ export async function init(
             </div>
             ` : html``}
 
-            ${idea.risks.length
+            ${idea.parsedRisks().length
                 ? html`
             <div class="card p-6 mb-6">
                 <h3 class="${
@@ -696,11 +693,11 @@ export async function init(
                 <div style=${'display:flex;'
                     + 'flex-direction:column;'
                     + 'gap:0.75rem'}>
-                    ${idea.risks.map((
+                    ${idea.parsedRisks().map((
                         risk:
-                            ApprovalIdea[
-                                'risks'
-                            ][number],
+                            { title: string;
+                                severity: string;
+                                mitigation: string },
                     ) => html`
                     <div
                         class="p-4 rounded-lg"
@@ -745,7 +742,7 @@ export async function init(
             </div>`
                 : html``}
 
-            ${idea.assumptions.length
+            ${idea.parsedAssumptions().length
                 ? html`
             <div class="card p-6 mb-6">
                 <h3 class="font-semibold mb-3">
@@ -754,7 +751,7 @@ export async function init(
                 <ul style=${'display:flex;'
                     + 'flex-direction:column;'
                     + 'gap:0.5rem'}>
-                    ${idea.assumptions.map((
+                    ${idea.parsedAssumptions().map((
                         assumption: string,
                     ) => html`
                     <li class="${
@@ -772,7 +769,7 @@ export async function init(
             </div>`
                 : html``}
 
-            ${idea.alignments.length
+            ${idea.parsedAlignments().length
                 ? html`
             <div class="card p-6 mb-6">
                 <h3 class="${
@@ -787,7 +784,7 @@ export async function init(
                 </h3>
                 <div class="flex flex-wrap
                     gap-2">
-                    ${idea.alignments.map((
+                    ${idea.parsedAlignments().map((
                         alignment: string,
                     ) => html`
                     <span class="${
@@ -1003,8 +1000,8 @@ export async function init(
     }
 
     function bindApprovalEvents(
-        idea: ApprovalIdea,
-        edge: ApprovalEdge | null,
+        idea: Idea,
+        edge: EdgeData | null,
         id: string,
     ): void {
         $('#approval-approve-btn', document)
@@ -1186,8 +1183,8 @@ export async function init(
     }
 
     function mutateApprovalPage(
-        idea: ApprovalIdea,
-        edge: ApprovalEdge | null,
+        idea: Idea,
+        edge: EdgeData | null,
         id: string,
     ): void {
         const root = $('#page-root', document);

@@ -29,23 +29,23 @@ import {
 import {
     navigateTo, formatDate,
 } from '../app/core';
+import { getEdgeList } from '../app/adapters';
 import {
-    getEdgeList,
-    type EdgeListItem,
-} from '../app/adapters';
+    type EdgeListEntry,
+} from '../../api/types';
 
 function statusIcon(
-    edge: EdgeListItem,
+    edge: EdgeListEntry,
 ): SafeHtml {
-    if (edge.isComplete)
+    if (edge.isComplete())
         return iconCheckCircle2(12, '');
-    if (edge.isDraft)
+    if (edge.isDraft())
         return iconClock(12, '');
     return iconAlertCircle(12, '');
 }
 
 function buildEdgeCard(
-    edge: EdgeListItem,
+    edge: EdgeListEntry,
 ): SafeHtml {
     return html`
     <div class="card card-hover p-4"
@@ -65,24 +65,24 @@ function buildEdgeCard(
                 }">
                     <span class="${
                         'badge '
-                        + edge.statusClassName
+                        + edge.statusClassName()
                         + ' text-xs'
                     }">${
                         statusIcon(edge)
                     } ${
-                        edge.statusLabel
+                        edge.statusLabel()
                     }</span>
                     <span
                         class="${
                             'flex items-center'
                             + ' gap-1 text-xs '
                             + edge
-                                .confidenceClassName
+                                .confidenceClassName()
                         }">${
                             iconShield(14, '')
                         } ${
                             edge
-                                .confidenceLabel
+                                .confidenceLabel()
                         } Confidence</span>
                 </div>
                 <h3 class="${
@@ -200,13 +200,13 @@ export async function init(): Promise<void> {
     const stats = {
         total: edges.length,
         complete: edges.filter(
-            edge => edge.isComplete,
+            edge => edge.isComplete(),
         ).length,
         draft: edges.filter(
-            edge => edge.isDraft,
+            edge => edge.isDraft(),
         ).length,
         missing: edges.filter(
-            edge => edge.isMissing,
+            edge => edge.isMissing(),
         ).length,
     };
     const statsEl = $('#edge-stats', document);

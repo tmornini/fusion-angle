@@ -16,7 +16,8 @@ import {
     navigateTo, formatDate,
 } from '../app/core';
 import {
-    getAccount, type Account,
+    getAccount,
+    type Account,
 } from '../app/adapters';
 
 function styleForUsageLevel(
@@ -94,7 +95,7 @@ export async function init(): Promise<void> {
     }
 
     const billingDate = formatDate(
-        account.company.nextBilling,
+        account.nextBilling,
     );
 
     setHtml(container, html`
@@ -231,7 +232,7 @@ export async function init(): Promise<void> {
                         <h2
                             class="text-xl font-display
                                    font-semibold"
-                        >${account.company.name}</h2>
+                        >${account.companyName}</h2>
                         <div
                             class="flex items-center
                                    gap-2 mt-1"
@@ -241,7 +242,7 @@ export async function init(): Promise<void> {
                                        text-xs"
                             >
                                 ${iconCrown(12, '')}
-                                ${account.company.plan} Plan
+                                ${account.plan} Plan
                             </span>
                             <span
                                 class="status-badge-success"
@@ -262,12 +263,12 @@ export async function init(): Promise<void> {
                     >
                         ${iconActivity(16, '')}
                         <span class="text-sm font-medium">
-                            ${account.health.status}
+                            ${account.healthStatus}
                         </span>
                     </div>
                     <p class="text-xs mt-1">
                         ${'Health Score: '
-                            + account.health.score + '%'}
+                            + account.healthScore + '%'}
                     </p>
                 </div>
             </div>
@@ -291,10 +292,10 @@ export async function init(): Promise<void> {
                         </span>
                     </div>
                     <p class="text-2xl font-bold">
-                        ${account.company.usedSeats}<span
+                        ${account.usedSeats}<span
                             class="text-sm font-normal
                                    text-muted"
-                        >/${account.company.seats}</span>
+                        >/${account.seats}</span>
                     </p>
                 </div>
                 <div
@@ -312,7 +313,7 @@ export async function init(): Promise<void> {
                         </span>
                     </div>
                     <p class="text-2xl font-bold">
-                        ${account.usage.projects.current}
+                        ${account.projectsCurrent}
                     </p>
                 </div>
                 <div
@@ -330,7 +331,7 @@ export async function init(): Promise<void> {
                         </span>
                     </div>
                     <p class="text-2xl font-bold">
-                        ${account.usage.ideas.current}
+                        ${account.ideasCurrent}
                     </p>
                 </div>
                 <div
@@ -366,28 +367,28 @@ export async function init(): Promise<void> {
             <div class="flex flex-col gap-4">
                 ${buildUsageBar(
                         'User Seats',
-                        account.company.usedSeats,
-                        account.company.seats,
+                        account.usedSeats,
+                        account.seats,
                 )}
                 ${buildUsageBar(
                         'Projects',
-                        account.usage.projects.current,
-                        account.usage.projects.limit,
+                        account.projectsCurrent,
+                        account.projectsLimit,
                 )}
                 ${buildUsageBar(
                         'Ideas',
-                        account.usage.ideas.current,
-                        account.usage.ideas.limit,
+                        account.ideasCurrent,
+                        account.ideasLimit,
                 )}
                 ${buildUsageBar(
                         'AI Credits',
-                        account.usage.aiCredits.current,
-                        account.usage.aiCredits.limit,
+                        account.aiCreditsCurrent,
+                        account.aiCreditsLimit,
                 )}
                 ${buildUsageBar(
                         'Storage (GB)',
-                        account.usage.storage.current,
-                        account.usage.storage.limit,
+                        account.storageCurrent,
+                        account.storageLimit,
                 )}
             </div>
         </div>

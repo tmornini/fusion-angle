@@ -9,7 +9,9 @@ import type {
 import {
     toBool,
     Activity,
+    Account,
 } from '../../../api/types';
+export type { Account };
 import {
     buildUserMap,
     userName,
@@ -17,50 +19,10 @@ import {
 
 const RECENT_ACTIVITY_COUNT = 3;
 
-export interface Account {
-    company: {
-        name: string;
-        plan: string;
-        planStatus: string;
-        nextBilling: string;
-        seats: number;
-        usedSeats: number;
-    };
-    usage: {
-        projects: {
-            current: number;
-            limit: number;
-        };
-        ideas: {
-            current: number;
-            limit: number;
-        };
-        storage: {
-            current: number;
-            limit: number;
-        };
-        aiCredits: {
-            current: number;
-            limit: number;
-        };
-    };
-    health: {
-        score: number;
-        status: string;
-        lastActivity: string;
-        activeUsers: number;
-    };
-    recentActivity: {
-        type: string;
-        description: string;
-        time: string;
-    }[];
-}
-
 export async function getAccount(
 ): Promise<Account> {
     const [
-        account, settings,
+        entity, settings,
         activities, userMap,
         activityActors,
     ] = await Promise.all([
@@ -77,7 +39,7 @@ export async function getAccount(
         ),
     ]);
 
-    if (!account.plan)
+    if (!entity.plan)
         throw new Error(
             'Account not configured',
         );
@@ -91,84 +53,29 @@ export async function getAccount(
         ),
     );
 
-    return {
-        company: {
-            name: settings.name,
-            plan: account.plan,
-            planStatus:
-                account.plan_status,
-            nextBilling:
-                account.next_billing,
-            seats: account.seats,
-            usedSeats:
-                account.used_seats,
-        },
-        usage: {
-            projects: {
-                current:
-                    account
-                        .projects_current,
-                limit:
-                    account
-                        .projects_limit,
-            },
-            ideas: {
-                current:
-                    account.ideas_current,
-                limit:
-                    account.ideas_limit,
-            },
-            storage: {
-                current:
-                    account
-                        .storage_current,
-                limit:
-                    account.storage_limit,
-            },
-            aiCredits: {
-                current:
-                    account
-                        .ai_credits_current,
-                limit:
-                    account
-                        .ai_credits_limit,
-            },
-        },
-        health: {
-            score:
-                account.health_score,
-            status:
-                account.health_status,
-            lastActivity:
-                account.last_activity,
-            activeUsers:
-                account.active_users,
-        },
-        recentActivity: activities
-            .slice(
-                0,
-                RECENT_ACTIVITY_COUNT,
-            )
-            .map(a => {
-                const actor = userName(
-                    userMap,
-                    actorMap.get(a.id)!,
-                );
-                const activity =
-                    new Activity(
-                        a,
-                        actor,
-                    );
-                return {
-                    type: activity.type,
-                    description:
-                        activity
-                            .formattedDescription(),
-                    time:
-                        activity.timestamp,
-                };
-            }),
-    };
+    const recent = activities
+        .slice(0, RECENT_ACTIVITY_COUNT)
+        .map(a => {
+            const actor = userName(
+                userMap,
+                actorMap.get(a.id)!,
+            );
+            const activity =
+                new Activity(a, actor);
+            return {
+                type: activity.type,
+                description:
+                    activity
+                    .formattedDescription(),
+                time: activity.timestamp,
+            };
+        });
+
+    return new Account(
+        entity,
+        settings.name,
+        recent,
+    );
 }
 
 export interface Profile {

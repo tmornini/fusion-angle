@@ -67,21 +67,22 @@ async function mutateSidebarUser(
     try {
         const { getCurrentUser } =
             await import('./adapters');
-        const user =
+        const { user, company } =
             await getCurrentUser();
         for (const id of
             SIDEBAR_USER_NAME_IDS
         ) {
             const el = $(`#${id}`, document);
             if (el)
-                el.textContent = user.name;
+                el.textContent =
+                    user.fullName();
         }
         for (const id of
             SIDEBAR_USER_COMPANY_IDS
         ) {
             const el = $(`#${id}`, document);
             if (el)
-                el.textContent = user.company;
+                el.textContent = company;
         }
     } catch (err) {
         log.debug(
@@ -455,7 +456,7 @@ async function mutateHeaderInfo(
         const { html, setHtml } =
             await import('./safe-html');
 
-        const [user, stats] =
+        const [auth, stats] =
             await Promise.all([
                 getCurrentUser(),
                 getDashboardStats(),
@@ -468,7 +469,8 @@ async function mutateHeaderInfo(
                 greetingEl,
                 html`<span
 style="font-weight:400">Good ${
-getTimeOfDay()},</span> ${user.name}`,
+getTimeOfDay()},</span> ${
+auth.user.fullName()}`,
             );
             greetingEl.addEventListener(
                 'click',
@@ -484,7 +486,7 @@ getTimeOfDay()},</span> ${user.name}`,
                 statsEl,
                 html`<span
 class="header-stat-label">${
-user.company}</span>${
+auth.company}</span>${
 stats.map(
     (stat, i) =>
         html`<div

@@ -242,7 +242,7 @@ export function initCommandPalette(
                         id: `person-`
                             + `${member.id}`,
                         title:
-                            member.name,
+                            member.fullName(),
                         meta:
                             `${member.role}`
                             + ` · ${member.department}`,

@@ -21,7 +21,7 @@ import {
     closeDialog,
 } from '../app/core';
 import {
-    getTeamMembers, type TeamMember,
+    getTeamMembers, type User,
 } from '../app/adapters';
 import {
     AVAILABILITY_HIGH, AVAILABILITY_LOW,
@@ -79,12 +79,12 @@ const dimensionIconConfig: Record<
 };
 
 const state = {
-    members: [] as TeamMember[],
+    members: [] as User[],
     selectedMemberId: null as string | null,
 };
 
 function buildMemberDetail(
-    member: TeamMember,
+    member: User,
 ): SafeHtml {
     return html`
     <div style="padding:1.5rem">
@@ -106,12 +106,12 @@ function buildMemberDetail(
                 <span
                     class="text-2xl font-bold
                            text-primary"
-                >${initials(member.name)}</span>
+                >${initials(member.fullName())}</span>
             </div>
             <h3
                 class="text-lg font-display
                        font-semibold"
-            >${member.name}</h3>
+            >${member.fullName()}</h3>
             <p class="text-sm text-muted">
                 ${member.role}
             </p>
@@ -149,7 +149,7 @@ function buildMemberDetail(
                 Team Dimensions Assessment Results
             </p>
             ${Object.entries(
-                    member.teamDimensions,
+                    member.parsedTeamDimensions(),
             ).map(([key, value]) => html`
             <div style="margin-bottom:1rem">
                 <div
@@ -260,7 +260,7 @@ function buildMemberDetail(
 }
 
 function buildMemberCard(
-    member: TeamMember,
+    member: User,
 ): SafeHtml {
     const cardStyle =
         state.selectedMemberId === member.id
@@ -292,7 +292,7 @@ function buildMemberCard(
                     <span
                         class="text-lg font-bold
                                text-primary"
-                    >${initials(member.name)}</span>
+                    >${initials(member.fullName())}</span>
                 </div>
                 ${buildStatusDot(member.availability)}
             </div>
@@ -302,7 +302,7 @@ function buildMemberCard(
                            items-center gap-2 mb-1"
                 >
                     <h3 class="font-semibold text-sm">
-                        ${member.name}
+                        ${member.fullName()}
                     </h3>
                     <span
                         class="pill"
@@ -319,7 +319,7 @@ function buildMemberCard(
                 <div
                     class="flex flex-wrap gap-1.5 mb-2"
                 >
-                    ${member.strengths
+                    ${member.parsedStrengths()
                             .slice(0, 3)
                             .map(strength => html`
                 <span
@@ -371,7 +371,7 @@ function mutateList(): void {
             .value.toLowerCase();
     const filtered = state.members.filter(
         member =>
-            member.name
+            member.fullName()
                 .toLowerCase()
                 .includes(search)
             || member.role

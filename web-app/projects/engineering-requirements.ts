@@ -22,12 +22,12 @@ import {
 import {
     getProjectForEngineering,
     getClarificationsByProjectId,
-    type EngineeringProject,
+    EngineeringView,
     type Clarification,
 } from '../app/adapters';
 
 type TeamMember =
-    EngineeringProject['team'][number];
+    EngineeringView['team'][number];
 
 function buildClarification(
     clarification: Clarification,
@@ -168,7 +168,7 @@ export async function init(
     if (!root) return;
     setHtml(root, buildSkeleton('detail', 4));
 
-    let project: EngineeringProject;
+    let project: EngineeringView;
     let clarifications: Clarification[];
     try {
         [project, clarifications] =
@@ -302,7 +302,7 @@ export async function init(
                                 + 'font-bold'
                             }">
                                 ${project
-                                    .timeline}
+                                    .timeline()}
                             </p>
                             <p class="${
                                 'text-xs '
@@ -342,7 +342,7 @@ export async function init(
                                 + 'font-bold'
                             }">
                                 ${project
-                                    .budget}
+                                    .budget()}
                             </p>
                             <p class="${
                                 'text-xs '
@@ -476,8 +476,7 @@ export async function init(
                             'text-muted'
                         }">
                             ${project
-                                .businessContext
-                                .problem}
+                                .problemStatement()}
                         </p>
                     </div>
                     <div>
@@ -495,8 +494,7 @@ export async function init(
                             'text-muted'
                         }">
                             ${project
-                                .businessContext
-                                .expectedOutcome}
+                                .expectedOutcome()}
                         </p>
                     </div>
                 </div>
@@ -523,8 +521,7 @@ export async function init(
                     + 'gap:0.5rem'
                 }">
                     ${project
-                        .businessContext
-                        .successMetrics
+                        .successMetrics()
                         .map(
                             (metric: string) =>
                                 html`
@@ -571,8 +568,7 @@ export async function init(
                     + 'gap:0.5rem'
                 }">
                     ${project
-                        .businessContext
-                        .constraints.map(
+                        .constraints().map(
                             (constraint:
                                 string) =>
                                 html`

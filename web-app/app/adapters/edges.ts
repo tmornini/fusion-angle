@@ -7,29 +7,19 @@ import type {
     EdgeOutcomeEdgeEntity,
     EdgeMetricEntity,
     EdgeMetricOutcomeEntity,
-    EdgeStatus,
-    ConfidenceLevel,
     IdeaSubmissionEntity,
     EdgeOwnershipEntity,
 } from '../../../api/types';
-import { Idea, Edge } from '../../../api/types';
+import { Idea, EdgeListEntry } from '../../../api/types';
 import type { EdgeData } from './helpers';
 import {
     buildUserMap,
     userName,
 } from './helpers';
 
-export interface EdgeIdea {
-    title: string;
-    problem: string;
-    solution: string;
-    submittedBy: string | null;
-    score: number;
-}
-
 export async function getIdeaForEdge(
     ideaId: string,
-): Promise<EdgeIdea> {
+): Promise<Idea> {
     const [entity, userMap, submissions] =
         await Promise.all([
             GET<IdeaEntity>(
@@ -43,7 +33,7 @@ export async function getIdeaForEdge(
     const submission = submissions.find(
         s => s.idea_id === ideaId,
     );
-    const idea = new Idea(
+    return new Idea(
         entity,
         userName(
             userMap,
@@ -52,36 +42,10 @@ export async function getIdeaForEdge(
         'missing',
         submission!.created_at,
     );
-    return {
-        title: idea.title,
-        problem: idea.problemStatement,
-        solution: idea.proposedSolution,
-        submittedBy: idea.submittedBy,
-        score: idea.score,
-    };
-}
-
-export interface EdgeListItem {
-    id: string;
-    ideaId: string;
-    ideaTitle: string;
-    status: EdgeStatus;
-    statusLabel: string;
-    statusClassName: string;
-    isComplete: boolean;
-    isDraft: boolean;
-    isMissing: boolean;
-    outcomesCount: number;
-    metricsCount: number;
-    confidence: ConfidenceLevel;
-    confidenceLabel: string;
-    confidenceClassName: string;
-    owner: string | null;
-    updatedAt: string;
 }
 
 export async function getEdgeList(
-): Promise<EdgeListItem[]> {
+): Promise<EdgeListEntry[]> {
     const [
         edgeRows, ideaRows, userMap,
         allOutcomes, outcomeEdgeLinks,
@@ -179,12 +143,14 @@ export async function getEdgeList(
     }
 
     return edgeRows.map(entity => {
-        const edge = new Edge(entity);
         const outcomes =
-            outcomesByEdgeId.get(edge.id)
-                || [];
+            outcomesByEdgeId.get(
+                entity.id,
+            ) || [];
         let metricsCount = 0;
-        for (const outcome of outcomes) {
+        for (
+            const outcome of outcomes
+        ) {
             const ids =
                 metricIdsByOutcome.get(
                     outcome.id,
@@ -195,37 +161,20 @@ export async function getEdgeList(
         }
 
         const ideaId =
-            edgeIdeaMap.get(edge.id)!;
+            edgeIdeaMap.get(entity.id)!;
         const idea =
             ideaMap.get(ideaId);
-        return {
-            id: edge.id,
+        return new EdgeListEntry(
+            entity,
             ideaId,
-            ideaTitle:
-                idea!.title,
-            status: edge.status,
-            statusLabel:
-                edge.statusLabel(),
-            statusClassName:
-                edge.statusClassName(),
-            isComplete: edge.isComplete(),
-            isDraft: edge.isDraft(),
-            isMissing: edge.isMissing(),
-            outcomesCount:
-                outcomes.length,
+            idea!.title,
+            outcomes.length,
             metricsCount,
-            confidence: edge.confidence,
-            confidenceLabel:
-                edge.confidenceLabel(),
-            confidenceClassName:
-                edge
-                    .confidenceClassName(),
-            owner: userName(
+            userName(
                 userMap,
-                ownerMap.get(edge.id),
+                ownerMap.get(entity.id),
             ),
-            updatedAt: edge.updatedAt,
-        };
+        );
     });
 }
 

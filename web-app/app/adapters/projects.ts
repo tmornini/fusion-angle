@@ -7,7 +7,6 @@ import type {
     ProjectVersionEntity,
     IdeaEntity,
     ClarificationEntity,
-    ConfidenceLevel,
     ProjectStatus,
     IdeaProjectLinkEntity,
     TaskAssignmentEntity,
@@ -29,10 +28,15 @@ import {
     userName,
     parseJson,
     getEdgeDataWithConfidence,
+    type EdgeData,
     type Metric,
 } from './helpers';
 
-export { Project } from '../../../api/types';
+export {
+    Project,
+    type ProjectStatus,
+} from '../../../api/types';
+export type { EdgeData, Metric };
 
 interface TeamMemberRow {
     id: string;
@@ -58,82 +62,167 @@ export async function getProjects(
         .map(row => new Project(row));
 }
 
-export interface ProjectDetail {
-    id: string;
-    title: string;
-    description: string;
-    status: ProjectStatus;
-    progress: number;
-    startDate: string;
-    targetEndDate: string;
-    projectLead: string | null;
-    metrics: {
-        time: {
-            baseline: number;
-            current: number;
-        };
-        cost: {
-            baseline: number;
-            current: number;
-        };
-        impact: {
-            baseline: number;
-            current: number;
-        };
-    };
-    edge: {
-        outcomes: {
-            id: string;
-            description: string;
-            metrics: Metric[];
-        }[];
-        impact: {
-            shortTerm: string;
-            midTerm: string;
-            longTerm: string;
-        };
-        confidence: ConfidenceLevel;
-        owner: string | null;
-    } | null;
-    team: {
-        id: string;
-        name: string | null;
-        role: string;
-    }[];
-    milestones: {
-        id: string;
-        title: string;
-        status: string;
-        date: string;
-    }[];
-    versions: {
-        id: string;
-        version: string;
-        date: string;
-        changes: string;
-        author: string | null;
-    }[];
-    discussions: {
-        id: string;
-        author: string | null;
-        date: string;
-        message: string;
-    }[];
-    tasks: {
-        name: string;
-        priority: string;
-        description: string;
-        skills: string[];
-        duration: number;
-        assigned: string | null;
-    }[];
+export interface DetailTeamMember {
+    readonly id: string;
+    readonly name: string | null;
+    readonly role: string;
+}
+
+export interface DetailMilestone {
+    readonly id: string;
+    readonly title: string;
+    readonly status: string;
+    readonly date: string;
+}
+
+export interface DetailVersion {
+    readonly id: string;
+    readonly version: string;
+    readonly date: string;
+    readonly changes: string;
+    readonly author: string | null;
+}
+
+export interface DetailDiscussion {
+    readonly id: string;
+    readonly author: string | null;
+    readonly date: string;
+    readonly message: string;
+}
+
+export interface DetailTask {
+    readonly name: string;
+    readonly priority: string;
+    readonly description: string;
+    readonly skills: readonly string[];
+    readonly duration: number;
+    readonly assigned: string | null;
+}
+
+const COST_DIVISOR = 1000;
+
+export class ProjectView {
+    private readonly project: Project;
+    readonly projectLead: string | null;
+    readonly edge: EdgeData | null;
+    readonly team:
+        readonly DetailTeamMember[];
+    readonly milestones:
+        readonly DetailMilestone[];
+    readonly versions:
+        readonly DetailVersion[];
+    readonly discussions:
+        readonly DetailDiscussion[];
+    readonly tasks:
+        readonly DetailTask[];
+
+    constructor(
+        project: Project,
+        projectLead: string | null,
+        edge: EdgeData | null,
+        team: readonly DetailTeamMember[],
+        milestones:
+            readonly DetailMilestone[],
+        versions:
+            readonly DetailVersion[],
+        discussions:
+            readonly DetailDiscussion[],
+        tasks: readonly DetailTask[],
+    ) {
+        this.project = project;
+        this.projectLead = projectLead;
+        this.edge = edge;
+        this.team = team;
+        this.milestones = milestones;
+        this.versions = versions;
+        this.discussions = discussions;
+        this.tasks = tasks;
+    }
+
+    get id(): string {
+        return this.project.id;
+    }
+
+    get title(): string {
+        return this.project.title;
+    }
+
+    get description(): string {
+        return this.project.description;
+    }
+
+    get status(): ProjectStatus {
+        return this.project.status;
+    }
+
+    get progress(): number {
+        return this.project.progress;
+    }
+
+    get startDate(): string {
+        return this.project.startDate;
+    }
+
+    get targetEndDate(): string {
+        return this.project.targetEndDate;
+    }
+
+    statusLabel(): string {
+        return this.project.statusLabel();
+    }
+
+    statusClassName(): string {
+        return this.project
+            .statusClassName();
+    }
+
+    timeBaselineDays(): number {
+        return this.project
+            .estimatedDurationDays();
+    }
+
+    timeCurrentDays(): number {
+        return this.project
+            .actualDurationDays();
+    }
+
+    costBaselineK(): number {
+        return this.project.estimatedCost
+            / COST_DIVISOR;
+    }
+
+    costCurrentK(): number {
+        return this.project.actualCost
+            / COST_DIVISOR;
+    }
+
+    impactBaseline(): number {
+        return this.project
+            .estimatedImpact;
+    }
+
+    impactCurrent(): number {
+        return this.project.actualImpact;
+    }
+
+    assignedTaskCount(): number {
+        return this.tasks.filter(
+            t => t.assigned,
+        ).length;
+    }
+
+    unassignedTaskCount(): number {
+        return this.tasks.filter(
+            t => !t.assigned,
+        ).length;
+    }
 }
 
 export async function getProjectById(
     projectId: string,
-): Promise<ProjectDetail> {
+): Promise<ProjectView> {
     const [
-        project, teamRows, milestoneRows,
+        entity, teamRows, milestoneRows,
         taskRows, discussionRows,
         versionRows, userMap,
         ideaProjectLinks,
@@ -177,6 +266,7 @@ export async function getProjectById(
         ),
     ]);
 
+    const project = new Project(entity);
     const leadRow = teamRows.find(
         isTeamLead,
     );
@@ -210,46 +300,13 @@ export async function getProjectById(
             link?.idea_id || projectId,
         );
 
-    return {
-        id: project.id,
-        title: project.title,
-        description: project.description,
-        status: project.status,
-        progress: project.progress,
-        startDate: project.start_date,
-        targetEndDate:
-            project.target_end_date,
-        projectLead: userName(
-            userMap,
-            leadRow?.user_id,
+    return new ProjectView(
+        project,
+        userName(
+            userMap, leadRow?.user_id,
         ),
-        metrics: {
-            time: {
-                baseline: durationInDays(
-                    project
-                        .estimated_duration,
-                ),
-                current: durationInDays(
-                    project
-                        .actual_duration,
-                ),
-            },
-            cost: {
-                baseline:
-                    project.estimated_cost,
-                current:
-                    project.actual_cost,
-            },
-            impact: {
-                baseline:
-                    project
-                        .estimated_impact,
-                current:
-                    project.actual_impact,
-            },
-        },
-        edge: edgeData,
-        team: teamRows.map(member => ({
+        edgeData,
+        teamRows.map(member => ({
             id: member.user_id,
             name: userName(
                 userMap,
@@ -257,14 +314,13 @@ export async function getProjectById(
             ),
             role: member.role,
         })),
-        milestones:
-            milestoneRows.map(m => ({
-                id: m.id,
-                title: m.title,
-                status: m.status,
-                date: m.date,
-            })),
-        versions: versionRows.map(v => ({
+        milestoneRows.map(m => ({
+            id: m.id,
+            title: m.title,
+            status: m.status,
+            date: m.date,
+        })),
+        versionRows.map(v => ({
             id: v.id,
             version: v.version,
             date: v.date,
@@ -276,19 +332,18 @@ export async function getProjectById(
                 )!,
             ),
         })),
-        discussions:
-            discussionRows.map(d => ({
-                id: d.id,
-                date: d.date,
-                message: d.message,
-                author: userName(
-                    userMap,
-                    discussionAuthorMap.get(
-                        d.id,
-                    )!,
-                ),
-            })),
-        tasks: taskRows.map(task => ({
+        discussionRows.map(d => ({
+            id: d.id,
+            date: d.date,
+            message: d.message,
+            author: userName(
+                userMap,
+                discussionAuthorMap.get(
+                    d.id,
+                )!,
+            ),
+        })),
+        taskRows.map(task => ({
             name: task.name,
             priority: task.priority,
             description:
@@ -307,7 +362,7 @@ export async function getProjectById(
                 ),
             ),
         })),
-    };
+    );
 }
 
 export interface Clarification {
@@ -321,37 +376,95 @@ export interface Clarification {
     answeredAt?: string;
 }
 
-export interface EngineeringProject {
-    id: string;
-    title: string;
-    description: string;
-    businessContext: {
-        problem: string;
-        expectedOutcome: string;
-        successMetrics: string[];
-        constraints: string[];
-    };
-    team: {
-        id: string;
-        name: string | null;
-        role: string;
-        type: string;
-    }[];
-    linkedIdea: {
-        id: string;
-        title: string;
-        score: number;
-    } | null;
-    timeline: string;
-    budget: string;
+export interface EngTeamMember {
+    readonly id: string;
+    readonly name: string | null;
+    readonly role: string;
+    readonly type: string;
+}
+
+export interface LinkedIdea {
+    readonly id: string;
+    readonly title: string;
+    readonly score: number;
+}
+
+interface BusinessContext {
+    readonly problem: string;
+    readonly expectedOutcome: string;
+    readonly successMetrics:
+        readonly string[];
+    readonly constraints:
+        readonly string[];
+}
+
+export class EngineeringView {
+    private readonly project: Project;
+    private readonly context:
+        BusinessContext;
+    readonly team:
+        readonly EngTeamMember[];
+    readonly linkedIdea:
+        LinkedIdea | null;
+
+    constructor(
+        project: Project,
+        context: BusinessContext,
+        team: readonly EngTeamMember[],
+        linkedIdea: LinkedIdea | null,
+    ) {
+        this.project = project;
+        this.context = context;
+        this.team = team;
+        this.linkedIdea = linkedIdea;
+    }
+
+    get id(): string {
+        return this.project.id;
+    }
+
+    get title(): string {
+        return this.project.title;
+    }
+
+    get description(): string {
+        return this.project.description;
+    }
+
+    timeline(): string {
+        return this.project
+            .timelineLabel;
+    }
+
+    budget(): string {
+        return this.project.budgetLabel;
+    }
+
+    problemStatement(): string {
+        return this.context.problem;
+    }
+
+    expectedOutcome(): string {
+        return this.context
+            .expectedOutcome;
+    }
+
+    successMetrics(): readonly string[] {
+        return this.context
+            .successMetrics;
+    }
+
+    constraints(): readonly string[] {
+        return this.context.constraints;
+    }
 }
 
 export async function
 getProjectForEngineering(
     projectId: string,
-): Promise<EngineeringProject> {
+): Promise<EngineeringView> {
     const [
-        project, teamRows, userMap,
+        entity, teamRows, userMap,
         ideaProjectLinks,
     ] = await Promise.all([
         GET<ProjectEntity>(
@@ -366,12 +479,13 @@ getProjectForEngineering(
         ),
     ]);
 
-    const businessContext = parseJson<{
+    const project = new Project(entity);
+    const context = parseJson<{
         problem: string;
         expectedOutcome: string;
         successMetrics: string[];
         constraints: string[];
-    }>(project.business_context, {
+    }>(entity.business_context, {
         problem: '',
         expectedOutcome: '',
         successMetrics: [],
@@ -381,31 +495,16 @@ getProjectForEngineering(
     const link = ideaProjectLinks.find(
         l => l.project_id === projectId,
     );
-    const linkedIdea = link
+    const ideaEntity = link
         ? await GET<IdeaEntity | null>(
             `ideas/${link.idea_id}`,
         )
         : null;
 
-    return {
-        id: project.id,
-        title: project.title,
-        description:
-            project.description,
-        businessContext: {
-            problem:
-                businessContext.problem,
-            expectedOutcome:
-                businessContext
-                    .expectedOutcome,
-            successMetrics:
-                businessContext
-                    .successMetrics,
-            constraints:
-                businessContext
-                    .constraints,
-        },
-        team: teamRows.map(member => ({
+    return new EngineeringView(
+        project,
+        context,
+        teamRows.map(member => ({
             id: member.user_id,
             name: userName(
                 userMap,
@@ -414,17 +513,14 @@ getProjectForEngineering(
             role: member.role,
             type: member.type,
         })),
-        linkedIdea: linkedIdea
+        ideaEntity
             ? {
-                id: linkedIdea.id,
-                title: linkedIdea.title,
-                score: linkedIdea.score,
+                id: ideaEntity.id,
+                title: ideaEntity.title,
+                score: ideaEntity.score,
             }
             : null,
-        timeline:
-            project.timeline_label,
-        budget: project.budget_label,
-    };
+    );
 }
 
 export async function
