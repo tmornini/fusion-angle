@@ -61,6 +61,14 @@ const pageModules: Record<
     'not-found': () => import('../not-found/index'),
 };
 
+window.addEventListener('unhandledrejection', event => {
+    const name = (event.reason as DOMException)?.name;
+    if (name === 'InvalidStateError'
+        || name === 'AbortError') {
+        event.preventDefault();
+    }
+});
+
 document.addEventListener('DOMContentLoaded', async () => {
     applyTheme();
     initPrefetch();

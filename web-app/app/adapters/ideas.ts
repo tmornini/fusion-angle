@@ -91,18 +91,21 @@ export async function getIdeaDetail(
     const submission = submissions.find(
         s => s.idea_id === ideaId,
     );
+    if (!idea || !submission) {
+        throw new Error('Idea not found');
+    }
     return new Idea(
         idea,
         userName(
             userMap,
-            submission!.user_id,
+            submission.user_id,
         ),
         computeEdgeStatus(
             ideaId,
             edgeIdeas,
             edges,
         ),
-        submission!.created_at,
+        submission.created_at,
     );
 }
 

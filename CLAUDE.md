@@ -13,6 +13,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Always commit before building.** `./build` requires a clean working directory (see CONDUCT-OF-CODE.md line 78). Use `./validate` to catch type errors and lint issues before committing, then commit, then build.
 
+`./validate` runs `tsc --noEmit` (type checking) then enforces 78-character maximum line length on all `.ts`, `.html`, and `.css` files (excluding `compose.ts`).
+
 No test framework is configured.
 
 ## TypeScript
@@ -153,7 +155,7 @@ web-app/
     state.ts                  # AppState, theme, mobile detection, pub-sub
     charts.ts                 # SVG chart rendering (bar, line, donut, area)
     command-palette.ts        # Cmd+K search overlay with keyboard navigation
-    dom.ts                    # querySelector wrappers ($, $$)
+    dom.ts                    # querySelector wrappers ($, $$, $input, $select, $textarea), attr(), populateIcons(), initToggleGroup()
     toast.ts                  # showToast() auto-dismiss notifications
     logger.ts                 # Lightweight logger respecting fusion-ai:log-level in localStorage
     safe-html.ts              # SafeHtml class, html tagged template, trusted(), setHtml()
@@ -200,9 +202,9 @@ web-app/
   auth/                     # Login/signup (standalone)
   not-found/                # 404 page (standalone)
 
-SCHEMA.md                     # Database schema (19 tables, columns, types, defaults)
+SCHEMA.md                     # Database schema (40+ tables, columns, types, defaults)
 DESIGN-SYSTEM.md              # Design system specification
-TEST-PLAN.md                  # Human-executable test plan (180 cases)
+TEST-PLAN.md                  # Human-executable test plan (176 cases)
 ```
 
 Most pages use `index.ts` + `index.html`. Pages with `sourceFile` in `PAGE_REGISTRY` use named files (e.g., `detail.ts` + `detail.html`). Build output goes to a temp directory — no build artifacts in the repo.
@@ -226,7 +228,7 @@ No build artifacts are created in the repo — everything is assembled in `/tmp/
 - **Cross-tab theme sync**: `state.ts` listens to `StorageEvent` and syncs theme changes across browser tabs automatically.
 - **Non-critical writes logged at warn**: localStorage writes for theme and sidebar state are wrapped in try/catch that log at `warn` level — quota errors don't break the app but are observable via the logger.
 - **Snapshots wipe-first**: All snapshot operations (pristine, mock data, import) call `DELETE('snapshots/schema')` before writing — there is no merge, only replace.
-- **Score thresholds**: `SCORE_THRESHOLD_HIGH = 80` and `SCORE_THRESHOLD_MEDIUM = 60` in `api/types.ts` determine `PriorityLevel` computation.
+- **Score thresholds**: `SCORE_THRESHOLD_HIGH = 80` and `SCORE_THRESHOLD_MEDIUM = 60` in `api/types.ts` determine `PriorityLevel` computation. Separate badge thresholds: `SCORE_BADGE_HIGH = 85`, `SCORE_BADGE_MEDIUM = 70`. Availability thresholds: `AVAILABILITY_HIGH = 70`, `AVAILABILITY_LOW = 40`.
 - **`file:///` protocol**: Navigation detects file protocol and skips link prefetching. Page URLs use relative paths. Code supports `file:///` locally but testing is HTTP-only.
 
 ## Worktrees

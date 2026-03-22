@@ -49,13 +49,14 @@ function styleForAvailability(
 }
 
 function buildStatusDot(
-    status: string,
+    availability: number,
 ): SafeHtml {
-    const colors: Record<string, string> = {
-        available: 'hsl(var(--success))',
-        busy: 'hsl(var(--warning))',
-        limited: 'hsl(var(--error))',
-    };
+    const color =
+        availability >= AVAILABILITY_HIGH
+            ? 'hsl(var(--success))'
+            : availability >= AVAILABILITY_LOW
+                ? 'hsl(var(--warning))'
+                : 'hsl(var(--error))';
     return html`
     <div
         style="position:absolute;bottom:-2px;
@@ -63,9 +64,7 @@ function buildStatusDot(
                height:1rem;
                border-radius:9999px;
                border:2px solid hsl(var(
-               --background));background:${
-                   colors[status]
-                   || 'hsl(var(--muted))'}"
+               --background));background:${color}"
     ></div>`;
 }
 
@@ -295,7 +294,7 @@ function buildMemberCard(
                                text-primary"
                     >${initials(member.name)}</span>
                 </div>
-                ${buildStatusDot(member.status)}
+                ${buildStatusDot(member.availability)}
             </div>
             <div style="flex:1;min-width:0">
                 <div

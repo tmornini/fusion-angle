@@ -4,9 +4,10 @@
 
 ### Protocol Coverage
 
-All test sections (B through I) are executed via HTTP:
+All test sections (B through I) are executed under both protocols:
 
 1. **HTTP** — serve the unzipped build via a local HTTP server (e.g. `python3 -m http.server 8080`)
+2. **file://** — stop the HTTP server, then open `index.html` directly from the unzipped build directory
 
 ## Summary
 
@@ -15,21 +16,21 @@ All test sections (B through I) are executed via HTTP:
 | A. Build & Setup | 5 |
 | B. Entry Pages | 16 |
 | C. Core: Dashboard | 7 |
-| D. Core: Ideas Workflow | 44 |
-| E. Core: Projects | 16 |
-| F. Tools | 26 |
-| G. Admin Pages | 28 |
+| D. Core: Ideas Workflow | 46 |
+| E. Core: Projects | 17 |
+| F. Tools | 29 |
+| G. Admin Pages | 31 |
 | H. Reference & System | 2 |
-| I. Cross-Cutting Concerns | 18 |
+| I. Cross-Cutting Concerns | 20 |
 | J. Teardown | 3 |
-| **Total** | **165** |
+| **Total** | **176** |
 
 ---
 
 ## A. Build & Setup
 
 - [ ] **A1** Run `./build` from a clean working directory. PASS: exits 0, prints no errors, creates `~/Desktop/fusion-ai-<sha>.zip`.
-- [ ] **A2** Unzip the archive into a temp directory (e.g. `/tmp/fusion-test`). PASS: directory contains `assets/app.js`, `assets/styles.css`, `assets/` (*.woff2 fonts), `index.html`, and 26 page directories each with `index.html`.
+- [ ] **A2** Unzip the archive into a temp directory (e.g. `/tmp/fusion-test`). PASS: directory contains `assets/app.js`, `assets/styles.css`, `assets/` (*.woff2 fonts), `index.html`, and 14 page directories containing 27 HTML page files total.
 - [ ] **A3** Start an HTTP server from the unzipped directory (e.g. `python3 -m http.server 8080`). PASS: server starts without errors.
 - [ ] **A4** Open `http://localhost:8080/` in the test browser. PASS: redirects to `snapshots/index.html` when no data exists, or `landing/index.html` (which auto-redirects to `dashboard/index.html` after ~2 seconds) when data has been loaded.
 - [ ] **A5** Open DevTools Console and confirm no JavaScript errors on initial load. PASS: console is clean (warnings from browser extensions are acceptable).
@@ -72,7 +73,7 @@ All test sections (B through I) are executed via HTTP:
 
 - [ ] **C1** Navigate to `dashboard/`. PASS: page loads with sidebar, header, and main content area.
 - [ ] **C2** Sidebar shows navigation links grouped under Journey (Dashboard, Ideas, Projects, Teams), Tools (Edge, Crunch, Flow), and Settings (Organization, Snapshots, Design System). PASS: all links present and styled.
-- [ ] **C3** Header shows search bar, greeting ("Good evening, Tony Stark"), company stats ("Stark Industries · 11 Ideas · 6 Projects · 4 Flow"), and theme toggle. PASS: elements visible and styled.
+- [ ] **C3** Header shows search bar, greeting ("Good {morning/afternoon/evening}, Tony Stark" — varies by time of day), company stats ("Stark Industries · 11 Ideas · 6 Projects · 4 Flow"), and theme toggle. PASS: elements visible and styled.
 - [ ] **C4** Dashboard displays 3 gauge/metric cards (Time, Cost, Impact) with baseline and current values. PASS: cards render with non-zero values and concentric arc gauges.
 - [ ] **C6** Sidebar navigation links all function correctly. PASS: clicking a sidebar link navigates to the expected page.
 - [ ] **C7** Scroll the page. PASS: sidebar stays fixed, main content scrolls independently.
@@ -85,7 +86,9 @@ All test sections (B through I) are executed via HTTP:
 ### Ideas List (`ideas/`)
 
 - [ ] **D1** Navigate to `ideas/`. PASS: table/list shows 11 seeded ideas with title, score, priority, status, and Time/Cost/Impact stats. Ideas without estimates show "—" (em-dash) instead of zero values.
-- [ ] **D2** Each idea row shows a status badge (In Review, Promoted, Active, Archived, or Rejected) and an edge status badge (Edge Complete, Edge Draft, or Edge Missing). PASS: badges render with distinct colors.
+- [ ] **D1b** Click the "Performance" view toggle. PASS: cards reorder by score descending, toggle button highlights. Click "Priority" toggle. PASS: cards return to priority rank order.
+- [ ] **D1c** "Idea Flow" workflow banner is visible showing the 4 stages: Create → Edge → Review → Convert. PASS: banner renders with labeled steps.
+- [ ] **D2** Each idea row shows a status badge (In Review, Promoted, Active, Approved, or Archived) and an edge status badge (Edge Complete, Edge Draft, or Edge Missing). PASS: badges render with distinct colors.
 - [ ] **D3** Click an idea row/title. PASS: navigates to the idea's detail or scoring page with the correct `ideaId` parameter.
 - [ ] **D4** "New Idea" or "Create Idea" button is visible. PASS: clicking it navigates to `idea-create/index.html`.
 
@@ -157,6 +160,7 @@ All test sections (B through I) are executed via HTTP:
 ### Projects List (`projects/`)
 
 - [ ] **E1** Navigate to `projects/`. PASS: table/list shows 6 seeded projects with title, status, progress, and priority. Project cards show "—" (em-dash) for missing/zero metric values (time, cost, impact). Footer count uses correct singular/plural grammar (e.g. "1 project", "6 projects").
+- [ ] **E1b** Click the table/grid view toggle. PASS: layout switches between card grid and table row format. Toggle button highlights for the active view.
 - [ ] **E2** Click a project row. PASS: navigates to `project-detail/?projectId=<id>`.
 
 ### Project Detail (`project-detail/?projectId=1`)
@@ -191,8 +195,11 @@ All test sections (B through I) are executed via HTTP:
 - [ ] **F1** Navigate to `edge/?ideaId=1`. PASS: left panel shows idea 1's summary (title, score, problem statement); right panel shows the Edge form.
 - [ ] **F2** Business Outcomes section shows 2 seeded outcomes with metrics. Completion progress bar reflects current state. PASS: outcomes and metrics render with input fields.
 - [ ] **F3** Click "Add Outcome". PASS: a new empty outcome row appears with "Add Metric" button.
+- [ ] **F3b** Within an outcome, click "Add Metric". PASS: new metric row appears with Name, Target, Unit, and Current input fields.
 - [ ] **F4** Delete an outcome. PASS: outcome is removed, progress bar updates.
+- [ ] **F4b** Delete a metric within an outcome. PASS: metric row is removed.
 - [ ] **F5** Expected Impact section shows 3 textareas (Short-term, Mid-term, Long-term). Confidence select and Edge Owner fields are visible. PASS: all fields render with seeded data.
+- [ ] **F5b** Modify edge fields (e.g. outcome description, confidence level) and click "Save". PASS: toast "Edge saved" appears, data persists on page reload.
 
 ### Edge List (`edges/`)
 
@@ -237,6 +244,7 @@ All test sections (B through I) are executed via HTTP:
 - [ ] **G1b** Click a team member card. PASS: right-side detail panel populates with member name, role, email, and large avatar with initials.
 - [ ] **G1c** Detail panel shows two tabs (Dimensions, Performance). Click between tabs. PASS: tab content switches — Dimensions shows Driver/Analytical/Expressive/Amiable scores with progress bars.
 - [ ] **G1d** Click a different team member card. PASS: detail panel updates to show the newly selected member's information.
+- [ ] **G1e** Type a name in the search input. PASS: team member cards filter in real-time by name, role, or department.
 - [ ] **G2** Member status dots render with distinct colors (green for available, yellow for busy, red for limited). PASS: at least 2 different statuses visible.
 
 ### Account (`account/`)
@@ -269,6 +277,8 @@ All test sections (B through I) are executed via HTTP:
 - [ ] **G13** Navigate to `activity-feed/`. PASS: shows seeded activity entries with type icons and timestamps. Search input ("Search activity...") and type filter dropdown ("All Activity") visible.
 - [ ] **G14** Activity types include scored, completed task, submitted new idea, commented on, joined the team, changed status, converted idea to project. PASS: multiple distinct types visible with appropriate icons (star, checkmark, lightbulb, chat bubble, user-plus, edit, arrow-right).
 - [ ] **G14b** Each activity entry shows actor name, action verb, target name, and meta info (score badge, status badge, or quoted comment text). PASS: entries have full context.
+- [ ] **G14c** Type in the search input. PASS: activity entries filter by actor name or target name in real-time.
+- [ ] **G14d** Select a type from the filter dropdown (e.g. "Scored"). PASS: only activities of that type shown. Reset to "All Activity" → full list returns.
 
 ### Engineering Requirements
 
@@ -305,6 +315,7 @@ All test sections (B through I) are executed via HTTP:
 ### Sidebar
 
 - [ ] **I6** Click the sidebar collapse button. PASS: sidebar collapses to icon-only view, main content area expands.
+- [ ] **I6b** Click a sidebar section header (e.g. "Journey"). PASS: section items collapse/hide, chevron rotates. Click again. PASS: section items reappear, chevron returns to original orientation.
 - [ ] **I7** Navigate to another page. PASS: collapsed state persists (stored in `localStorage` key `fusion-sidebar-collapsed`).
 - [ ] **I8** Click the expand button. PASS: sidebar returns to full width with labels.
 
@@ -313,6 +324,7 @@ All test sections (B through I) are executed via HTTP:
 - [ ] **I9** Resize browser to ≤768px width (or use DevTools device emulation). PASS: desktop sidebar disappears, mobile header with hamburger menu appears.
 - [ ] **I10** Tap/click the hamburger menu. PASS: mobile sidebar sheet slides in from the left with navigation links.
 - [ ] **I11** Tap/click the backdrop or a nav link. PASS: mobile sidebar closes.
+- [ ] **I11b** Tap a navigation link in the mobile sidebar. PASS: navigates to the target page and mobile sidebar closes.
 
 ### Command Palette
 
@@ -352,7 +364,7 @@ All test sections (B through I) are executed via HTTP:
 | Browser & Version | |
 | OS | |
 | Build SHA | |
-| Tests Passed | /180 |
-| Tests Failed | /180 |
-| Tests Skipped | /180 |
+| Tests Passed | /176 |
+| Tests Failed | /176 |
+| Tests Skipped | /176 |
 | Notes | |
