@@ -188,7 +188,7 @@ export const PAGE_REGISTRY: Record<
     },
     'idea-create': {
         title: 'Create Idea',
-        layout: 'standalone',
+        layout: 'sidebar',
         sourceDir: 'ideas',
         sourceFile: 'create',
         icon: 'lightbulb',
@@ -196,7 +196,7 @@ export const PAGE_REGISTRY: Record<
     },
     'idea-convert': {
         title: 'Convert Idea',
-        layout: 'standalone',
+        layout: 'sidebar',
         sourceDir: 'ideas',
         sourceFile: 'convert',
         icon: 'lightbulb',
@@ -204,7 +204,7 @@ export const PAGE_REGISTRY: Record<
     },
     'approval-detail': {
         title: 'Approval Detail',
-        layout: 'standalone',
+        layout: 'sidebar',
         sourceDir: 'ideas',
         sourceFile: 'approval-detail',
         icon: 'clipboardCheck',

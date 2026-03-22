@@ -113,9 +113,7 @@ function buildConversionPage(
         state.projectDetails['project-lead'];
 
     return html`
-    <div style=${'min-height:100vh;'
-        + 'background:'
-        + 'hsl(var(--background))'}>
+    <div>
         <header style=${'border-bottom:'
             + '1px solid hsl(var(--border));'
             + 'background:'
@@ -1012,7 +1010,7 @@ export async function init(
     const ideaId = params?.['ideaId'];
     if (!ideaId) { navigateTo('ideas'); return; }
 
-    const root = $('#page-root', document);
+    const root = $('#wizard-root', document);
     if (!root) return;
     setHtml(root, buildSkeleton('detail', 4));
 

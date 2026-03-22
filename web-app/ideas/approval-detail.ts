@@ -56,9 +56,7 @@ export async function init(
         edge: EdgeData | null,
     ): SafeHtml {
         return html`
-    <div style=${'min-height:100vh;'
-        + 'background:'
-        + 'hsl(var(--background))'}>
+    <div>
         <header style=${'position:sticky;'
             + 'top:0;z-index:10;'
             + 'background:'
@@ -1187,7 +1185,7 @@ export async function init(
         edge: EdgeData | null,
         id: string,
     ): void {
-        const root = $('#page-root', document);
+        const root = $('#wizard-root', document);
         if (!root) return;
         setHtml(
             root,
@@ -1200,7 +1198,7 @@ export async function init(
         );
     }
 
-    const root = $('#page-root', document);
+    const root = $('#wizard-root', document);
     if (!root) return;
 
     const result =

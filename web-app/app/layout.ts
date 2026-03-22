@@ -44,12 +44,7 @@ function mutateThemeToggleIcon(): void {
             : state.theme === 'light'
                 ? iconSun(20, '')
                 : iconMonitor(20, '');
-    const themeLabel =
-        state.theme === 'dark'
-            ? 'Switch to light theme'
-            : state.theme === 'light'
-                ? 'Switch to dark theme'
-                : 'Toggle theme';
+    const themeLabel = 'Toggle theme';
     THEME_TOGGLE_IDS.forEach(id => {
         const button = $(`#${id}`, document);
         if (button) {

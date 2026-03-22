@@ -445,9 +445,7 @@ export async function init():
                 state.currentStep - 1
             ]!;
         return html`
-    <div style=${'min-height:100vh;'
-        + 'background:'
-        + 'hsl(var(--background))'}>
+    <div>
         <header style=${'border-bottom:'
             + '1px solid'
             + ' hsl(var(--border));'
@@ -612,7 +610,7 @@ export async function init():
     }
 
     function mutateWizard() {
-        const root = $('#page-root', document);
+        const root = $('#wizard-root', document);
         if (root) {
             setHtml(
                 root,
