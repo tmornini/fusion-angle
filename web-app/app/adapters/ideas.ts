@@ -163,8 +163,8 @@ export interface ConversionIdea {
     proposedSolution: string;
     expectedOutcome: string;
     score: number;
-    estimatedDuration: string;
-    estimatedCost: string;
+    estimatedDuration: string | null;
+    estimatedCost: string | null;
 }
 
 export async function getIdeaForConversion(
@@ -192,9 +192,10 @@ export async function getIdeaForConversion(
             ?? entity.score,
         estimatedDuration:
             scoreRow?.estimated_duration
-                ?? '',
+                ?? null,
         estimatedCost:
-            scoreRow?.estimated_cost ?? '',
+            scoreRow?.estimated_cost
+                ?? null,
     };
 }
 
@@ -202,7 +203,7 @@ export interface ApprovalIdea {
     id: string;
     title: string;
     description: string;
-    submittedBy: string;
+    submittedBy: string | null;
     submittedAt: string;
     priority: string;
     score: number;
@@ -241,7 +242,7 @@ export interface ApprovalEdge {
         longTerm: string;
     };
     confidence: ConfidenceLevel;
-    owner: string;
+    owner: string | null;
 }
 
 export async function getIdeaForApproval(

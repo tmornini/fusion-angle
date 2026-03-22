@@ -192,11 +192,7 @@ export function formatCompactCurrency(
 }
 
 export function nowUtc(): string {
-    const iso = new Date().toISOString();
-    return iso.replace(
-        /\.(\d{3})Z$/,
-        '.$1000Z',
-    );
+    return new Date().toISOString();
 }
 
 export interface UserEntity {
@@ -830,8 +826,13 @@ export interface MilestoneDisplay {
     iconBackground: string;
 }
 
+export type MilestoneStatus =
+    'completed'
+    | 'in_progress'
+    | 'pending';
+
 export const MILESTONE_STATUS_CONFIG:
-    Record<string, MilestoneDisplay>
+    Record<MilestoneStatus, MilestoneDisplay>
 = {
     completed: {
         label: 'Completed',
@@ -847,16 +848,14 @@ export const MILESTONE_STATUS_CONFIG:
         iconBackground:
             'hsl(var(--warning))',
     },
-};
-
-export const MILESTONE_STATUS_PENDING:
-    MilestoneDisplay = {
+    pending: {
         label: 'Pending',
         textStyle: 'color:hsl(var('
             + '--muted-foreground))',
         iconBackground:
             'hsl(var(--muted))',
-    };
+    },
+};
 
 export const TASK_PRIORITY_CONFIG:
     Record<string, InlineStyleDisplay>
@@ -938,11 +937,11 @@ export class Idea {
     readonly costEstimate: string;
     readonly costBreakdown: string;
     readonly successMetrics: string;
-    readonly submittedBy: string;
+    readonly submittedBy: string | null;
 
     constructor(
         entity: IdeaEntity,
-        submittedBy: string,
+        submittedBy: string | null,
         edgeStatus: EdgeStatus,
         submittedAt: string,
     ) {
@@ -1266,11 +1265,11 @@ export class Activity {
     readonly score: number;
     readonly status: string;
     readonly comment: string;
-    readonly actor: string;
+    readonly actor: string | null;
 
     constructor(
         entity: ActivityEntity,
-        actor: string,
+        actor: string | null,
     ) {
         this.id = entity.id;
         this.type = entity.type;
@@ -1284,7 +1283,7 @@ export class Activity {
     }
 
     formattedDescription(): string {
-        return `${this.actor}`
+        return `${this.actor ?? ''}`
             + ` ${this.action}`
             + ` ${this.target}`;
     }

@@ -162,11 +162,8 @@ export async function getAccount(
                 return {
                     type: activity.type,
                     description:
-                        `${activity.actor}`
-                        + ` ${activity
-                            .action}`
-                        + ` ${activity
-                            .target}`,
+                        activity
+                            .formattedDescription(),
                     time:
                         activity.timestamp,
                 };

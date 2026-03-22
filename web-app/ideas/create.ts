@@ -629,20 +629,23 @@ export async function init():
                 title:
                     $input(
                         '#idea-create'
-                        + '-field-title', document,
-                    )?.value ?? '',
+                        + '-field-title',
+                        document,
+                    )!.value,
                 problemStatement:
                     $textarea(
                         '#idea-create'
                         + '-field'
-                        + '-problem', document,
-                    )?.value ?? '',
+                        + '-problem',
+                        document,
+                    )!.value,
                 targetUsers:
                     $input(
                         '#idea-create'
                         + '-field'
-                        + '-target', document,
-                    )?.value ?? '',
+                        + '-target',
+                        document,
+                    )!.value,
             };
         } else if (
             state.currentStep === 2
@@ -653,8 +656,9 @@ export async function init():
                     $textarea(
                         '#idea-create'
                         + '-field'
-                        + '-solution', document,
-                    )?.value ?? '',
+                        + '-solution',
+                        document,
+                    )!.value,
             };
         } else if (
             state.currentStep === 3
@@ -665,14 +669,16 @@ export async function init():
                     $textarea(
                         '#idea-create'
                         + '-field'
-                        + '-outcome', document,
-                    )?.value ?? '',
+                        + '-outcome',
+                        document,
+                    )!.value,
                 successMetrics:
                     $textarea(
                         '#idea-create'
                         + '-field'
-                        + '-metrics', document,
-                    )?.value ?? '',
+                        + '-metrics',
+                        document,
+                    )!.value,
             };
         }
     }

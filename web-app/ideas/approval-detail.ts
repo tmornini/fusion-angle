@@ -1068,21 +1068,18 @@ export async function init(
             ?.addEventListener(
                 'click',
                 async () => {
-                    const titleEl = $input(
-                        '#approval-edit'
-                        + '-title', document,
-                    );
-                    const descEl =
+                    const title =
+                        $input(
+                            '#approval-edit'
+                            + '-title',
+                            document,
+                        )!.value;
+                    const description =
                         $textarea(
                             '#approval-edit'
-                            + '-description', document,
-                        );
-                    const title =
-                        titleEl?.value
-                        ?? idea.title;
-                    const description =
-                        descEl?.value
-                        ?? idea.description;
+                            + '-description',
+                            document,
+                        )!.value;
                     try {
                         const existing =
                             await getIdea(

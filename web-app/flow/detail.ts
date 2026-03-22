@@ -1,5 +1,5 @@
 import {
-    $, $$, $input, $textarea, $select,
+    $, $$, $input, $textarea, $select, attr,
 } from '../app/dom';
 import {
     html, setHtml, type SafeHtml, trusted,
@@ -18,7 +18,9 @@ import {
     iconGlobe, iconPhone, iconMessageSquare,
     iconFolderOpen, iconArrowLeft, iconSave,
 } from '../app/icons';
-import { navigateTo } from '../app/core';
+import {
+    navigateTo, displayText,
+} from '../app/core';
 import {
     getFlow, putFlow, putFlowStep,
     type FlowStep, type Flow,
@@ -355,12 +357,10 @@ export async function init(
                                                 + 'nowrap'
                                             )}"
                                         >
-                                            ${
+                                            ${displayText(
                                                 step
-                                                .title
-                                                || 'Untitled'
-                                                + ' Step'
-                                            }
+                                                .title,
+                                            )}
                                         </span>
                                         ${!step.title
                                             ? html`
@@ -1346,16 +1346,14 @@ export async function init(
                     'click',
                     () => {
                         syncFormFields();
-                        const stepId =
-                            el.getAttribute(
-                                'data-step'
-                                + '-id',
-                            ) ?? '';
-                        const tool =
-                            el.getAttribute(
-                                'data-tool'
-                                + '-name',
-                            ) ?? '';
+                        const stepId = attr(
+                            el,
+                            'data-step-id',
+                        );
+                        const tool = attr(
+                            el,
+                            'data-tool-name',
+                        );
                         state.flowSteps =
                             state.flowSteps
                             .map(

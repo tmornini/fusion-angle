@@ -286,11 +286,13 @@ function buildIdeaCard(
                                         + 'medium'
                                     }">
                                     ${displayText(
-                                        String(
+                                        idea
+                                        .estimatedImpact
+                                        ? String(
                                             idea
-                                                .estimatedImpact
-                                            || '',
-                                        ),
+                                            .estimatedImpact,
+                                        )
+                                        : null,
                                     )}
                                 </p>
                             </div>

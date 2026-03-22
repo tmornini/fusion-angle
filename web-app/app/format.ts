@@ -6,7 +6,10 @@ import {
     formatCompactCurrency,
 } from '../../api/types';
 
-function initials(name: string): string {
+function initials(
+    name: string | null,
+): string {
+    if (!name) return '';
     return name
         .split(' ')
         .filter(Boolean)
@@ -37,7 +40,9 @@ function styleForScore(score: number): string {
     return 'color:hsl(var(--error))';
 }
 
-function displayText(value: string): string {
+function displayText(
+    value: string | null,
+): string {
     return value || '\u2014';
 }
 

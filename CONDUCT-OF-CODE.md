@@ -12,6 +12,8 @@ In order of importance, from most to least:
 - uniform - call a thing a thing in all aspects of what we do
 - logical - we strive to be less wrong and less fallacious
 - clear - we emphasize dense, high information communication
+  - no equivocation — say what is true, not what sounds reasonable
+  - no reframing failures as scope constraints
 - immutable nouns - limit the need to ask "Why did THAT happen?"
 - idempotent - HTTP > SQL, PUT/DELETE/POST > CRUD, but Postgres is the shiz
 - simple - if I had more time I'd have written a shorter letter -- Blaise Pascal
@@ -37,6 +39,9 @@ We detest:
   - fallback objects and factories
   - silent coercion (`?? ''`, `|| fallback`)
   - default values mask absence of real data
+  - this does not apply to display formatting
+    that renders absence visually (e.g. em-dash)
+    — presentation transforms are not coercion
 - premature optimization
 - polling for state changes
 

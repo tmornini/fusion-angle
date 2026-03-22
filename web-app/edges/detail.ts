@@ -1,5 +1,5 @@
 import {
-    $, $$, $textarea, $select, $input,
+    $, $$, $textarea, $select, $input, attr,
 } from '../app/dom';
 import {
     html, setHtml, type SafeHtml, trusted,
@@ -59,7 +59,8 @@ function computeCompletionStatus() {
         || edgeData.impact.midTerm !== ''
         || edgeData.impact.longTerm !== '';
     const hasOwner =
-        edgeData.owner.trim() !== '';
+        edgeData.owner !== null
+        && edgeData.owner.trim() !== '';
     const hasConfidence =
         edgeData.confidence.length > 0;
     const completionPercent = [
@@ -985,10 +986,10 @@ function buildDescriptionUpdates():
     document.querySelectorAll<HTMLInputElement>(
         '[data-outcome-description]',
     ).forEach(descriptionInput => {
-        const outcomeId =
-            descriptionInput.getAttribute(
-                'data-outcome-description',
-            ) ?? '';
+        const outcomeId = attr(
+            descriptionInput,
+            'data-outcome-description',
+        );
         updates.set(
             outcomeId,
             descriptionInput.value,
@@ -1007,14 +1008,12 @@ function buildMetricUpdates():
     document.querySelectorAll<HTMLInputElement>(
         '[data-metric-field]',
     ).forEach(metricInput => {
-        const metricId =
-            metricInput.getAttribute(
-                'data-metric-id',
-            ) ?? '';
-        const field =
-            metricInput.getAttribute(
-                'data-metric-field',
-            ) ?? '';
+        const metricId = attr(
+            metricInput, 'data-metric-id',
+        );
+        const field = attr(
+            metricInput, 'data-metric-field',
+        );
         const existing =
             updates.get(metricId) ?? {};
         updates.set(metricId, {
@@ -1027,8 +1026,10 @@ function buildMetricUpdates():
 
 function syncFormFields() {
     const confidenceValue =
-        $select('#edge-confidence-select', document)
-            ?.value ?? '';
+        $select(
+            '#edge-confidence-select',
+            document,
+        )!.value;
     const descUpdates =
         buildDescriptionUpdates();
     const metricUpdates =
@@ -1038,24 +1039,28 @@ function syncFormFields() {
         impact: {
             shortTerm:
                 $textarea(
-                    '#edge-impact-short-term', document,
-                )?.value ?? '',
+                    '#edge-impact-short-term',
+                    document,
+                )!.value,
             midTerm:
                 $textarea(
-                    '#edge-impact-mid-term', document,
-                )?.value ?? '',
+                    '#edge-impact-mid-term',
+                    document,
+                )!.value,
             longTerm:
                 $textarea(
-                    '#edge-impact-long-term', document,
-                )?.value ?? '',
+                    '#edge-impact-long-term',
+                    document,
+                )!.value,
         },
         confidence:
             isConfidenceLevel(confidenceValue)
                 ? confidenceValue
                 : state.edgeData.confidence,
         owner:
-            $input('#edge-owner-input', document)
-                ?.value ?? '',
+            $input(
+                '#edge-owner-input', document,
+            )!.value,
         outcomes:
             state.edgeData.outcomes.map(
                 outcome => ({
@@ -1139,11 +1144,11 @@ function bindEdgeEvents(ideaId: string) {
                                 id: crypto
                                     .randomUUID(),
                                 description:
-                                    templateButton
-                                        .getAttribute(
-                                            'data-add'
-                                            + '-template',
-                                        ) || '',
+                                    attr(
+                                        templateButton,
+                                        'data-add'
+                                        + '-template',
+                                    ),
                                 metrics: [],
                             },
                         ],
@@ -1189,10 +1194,10 @@ function bindEdgeEvents(ideaId: string) {
                 'click',
                 () => {
                     syncFormFields();
-                    const outcomeId =
-                        addButton.getAttribute(
-                            'data-add-metric',
-                        ) ?? '';
+                    const outcomeId = attr(
+                        addButton,
+                        'data-add-metric',
+                    );
                     state.edgeData = {
                         ...state.edgeData,
                         outcomes:

@@ -11,41 +11,22 @@ export interface ChartDatum {
 }
 
 export interface ChartConfig {
-    width?: number;
-    height?: number;
-    colors?: string[];
-    showLabels?: boolean;
-    padding?: number;
-    id?: string;
-    accessibleLabel?: string;
+    width: number;
+    height: number;
+    colors: string[];
+    showLabels: boolean;
+    padding: number;
+    id: string;
+    accessibleLabel: string;
 }
-
-const CHART_DEFAULT_WIDTH = 300;
-const CHART_DEFAULT_HEIGHT = 200;
-const CHART_PADDING = 40;
-
-const defaultColors = [
-    'hsl(var(--primary))',
-    'hsl(var(--success))',
-    'hsl(var(--warning))',
-    'hsl(var(--error))',
-    'hsl(var(--chart-5))',
-    'hsl(var(--chart-6))',
-];
 
 function computeChartLayout(
     data: ChartDatum[],
-    config?: ChartConfig,
+    config: ChartConfig,
 ) {
-    const width =
-        config?.width ?? CHART_DEFAULT_WIDTH;
-    const height =
-        config?.height
-        ?? CHART_DEFAULT_HEIGHT;
-    const padding =
-        config?.padding ?? CHART_PADDING;
-    const colors =
-        config?.colors ?? defaultColors;
+    const {
+        width, height, padding, colors,
+    } = config;
     const maxValue = Math.max(
         ...data.map(datum => datum.value),
     );
@@ -98,7 +79,7 @@ function buildBaseline(
 
 export function buildBarChart(
     data: ChartDatum[],
-    config?: ChartConfig,
+    config: ChartConfig,
 ): SafeHtml {
     if (!data.length) return trusted('');
     const {
@@ -109,6 +90,9 @@ export function buildBarChart(
         maxValue,
         chartHeight,
     } = computeChartLayout(data, config);
+    const {
+        showLabels, accessibleLabel,
+    } = config;
     const barWidth = Math.min(
         40,
         (width - padding * 2)
@@ -142,7 +126,7 @@ export function buildBarChart(
             + ' rx="4"'
             + ` fill="${color}"`
             + ' opacity="0.85"/>';
-        if (config?.showLabels !== false) {
+        if (showLabels) {
             bars +=
                 '<text'
                 + ` x="${x + barWidth / 2}"`
@@ -157,8 +141,7 @@ export function buildBarChart(
     });
 
     const label = escapeForHtml(
-        config?.accessibleLabel
-        ?? 'Bar chart',
+        accessibleLabel,
     );
     return trusted(
         '<svg'
@@ -182,7 +165,7 @@ export function buildBarChart(
 
 export function buildLineChart(
     data: ChartDatum[],
-    config?: ChartConfig,
+    config: ChartConfig,
 ): SafeHtml {
     if (!data.length) return trusted('');
     const {
@@ -192,9 +175,10 @@ export function buildLineChart(
         maxValue,
         chartHeight,
     } = computeChartLayout(data, config);
-    const color =
-        config?.colors?.[0]
-        ?? 'hsl(var(--primary))';
+    const {
+        accessibleLabel, colors,
+    } = config;
+    const color = colors[0]!;
     const points = computeChartPoints(
         data,
         width,
@@ -222,8 +206,7 @@ export function buildLineChart(
     });
 
     const label = escapeForHtml(
-        config?.accessibleLabel
-        ?? 'Line chart',
+        accessibleLabel,
     );
     return trusted(
         '<svg'
@@ -253,11 +236,12 @@ export function buildLineChart(
 
 export function buildDonutChart(
     data: ChartDatum[],
-    config?: ChartConfig,
+    config: ChartConfig,
 ): SafeHtml {
-    const size = config?.width ?? 160;
-    const colors =
-        config?.colors ?? defaultColors;
+    const {
+        width: size, colors,
+        accessibleLabel,
+    } = config;
     if (!data.length) return trusted('');
 
     const cx = size / 2;
@@ -301,8 +285,7 @@ export function buildDonutChart(
     });
 
     const label = escapeForHtml(
-        config?.accessibleLabel
-        ?? 'Donut chart',
+        accessibleLabel,
     );
     return trusted(
         '<svg'
@@ -321,7 +304,7 @@ export function buildDonutChart(
 
 export function buildAreaChart(
     data: ChartDatum[],
-    config?: ChartConfig,
+    config: ChartConfig,
 ): SafeHtml {
     if (!data.length) return trusted('');
     const {
@@ -331,9 +314,10 @@ export function buildAreaChart(
         maxValue,
         chartHeight,
     } = computeChartLayout(data, config);
-    const color =
-        config?.colors?.[0]
-        ?? 'hsl(var(--primary))';
+    const {
+        colors, id, accessibleLabel,
+    } = config;
+    const color = colors[0]!;
     const points = computeChartPoints(
         data,
         width,
@@ -359,19 +343,11 @@ export function buildAreaChart(
         + ` ${height - padding}`
         + ` L ${firstPt.x}`
         + ` ${height - padding} Z`;
-    if (!config?.id) {
-        throw new Error(
-            'buildAreaChart requires'
-            + ' config.id for a deterministic'
-            + ' SVG gradient ID',
-        );
-    }
     const gradientId =
-        `area-grad-${config.id}`;
+        `area-grad-${id}`;
 
     const label = escapeForHtml(
-        config?.accessibleLabel
-        ?? 'Area chart',
+        accessibleLabel,
     );
     return trusted(
         '<svg'

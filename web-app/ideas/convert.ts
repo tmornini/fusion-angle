@@ -462,7 +462,7 @@ function buildConversionPage(
                                         .projectDetails[
                                             'project'
                                             + '-name'
-                                        ] || ''
+                                        ] ?? ''
                                     }"
                                     placeholder=${
                                         'Give your'
@@ -550,7 +550,7 @@ function buildConversionPage(
                                             .projectDetails[
                                                 'start'
                                                 + '-date'
-                                            ] || ''
+                                            ] ?? ''
                                         }" />
                                 </div>
                                 <div>
@@ -595,7 +595,7 @@ function buildConversionPage(
                                                 'target'
                                                 + '-end'
                                                 + '-date'
-                                            ] || ''
+                                            ] ?? ''
                                         }" />
                                 </div>
                             </div>
@@ -796,7 +796,7 @@ function buildConversionPage(
                                         .projectDetails[
                                             'first'
                                             + '-milestone'
-                                        ] || ''
+                                        ] ?? ''
                                     }" />
                                 <p class="${
                                     'text-xs'
@@ -845,7 +845,7 @@ function buildConversionPage(
                                     .projectDetails[
                                         'success'
                                         + '-criteria'
-                                    ] || ''
+                                    ] ?? ''
                                 }</textarea>
                             </div>
                         </div>
@@ -1167,7 +1167,7 @@ export async function init(
                                 pd[
                                     'success'
                                     + '-criteria'
-                                ] || '',
+                                ] ?? '',
                             status:
                                 'submitted',
                             progress: 0,
@@ -1208,7 +1208,7 @@ export async function init(
                                 '',
                             budget_label:
                                 pd['budget']
-                                || '',
+                                ?? '',
                         },
                     );
 
@@ -1255,7 +1255,7 @@ export async function init(
                                         'target'
                                         + '-end'
                                         + '-date'
-                                    ] || '',
+                                    ] ?? '',
                                 sort_order:
                                     1,
                             },

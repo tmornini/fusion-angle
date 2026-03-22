@@ -9,7 +9,9 @@ import {
     iconTable, iconHash, iconCalendar, iconType,
     iconToggleLeft,
 } from '../app/icons';
-import { navigateTo } from '../app/core';
+import {
+    navigateTo, displayText,
+} from '../app/core';
 import { buildErrorState } from '../app/loading-states';
 import {
     getCrunchColumns, type CrunchColumn,
@@ -682,13 +684,10 @@ export async function init(): Promise<void> {
                                             + 'rem'
                                         }"
                                     >
-                                        ${column
-                                            .friendlyName
-                                            || 'Click'
-                                            + ' to'
-                                            + ' label'
-                                            + ' this'
-                                            + ' column'}
+                                        ${displayText(
+                                            column
+                                            .friendlyName,
+                                        )}
                                     </p>
                                 </div>
                                 <div

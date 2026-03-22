@@ -23,7 +23,7 @@ export interface EdgeIdea {
     title: string;
     problem: string;
     solution: string;
-    submittedBy: string;
+    submittedBy: string | null;
     score: number;
 }
 
@@ -76,7 +76,7 @@ export interface EdgeListItem {
     confidence: ConfidenceLevel;
     confidenceLabel: string;
     confidenceClassName: string;
-    owner: string;
+    owner: string | null;
     updatedAt: string;
 }
 
@@ -222,8 +222,7 @@ export async function getEdgeList(
                     .confidenceClassName(),
             owner: userName(
                 userMap,
-                ownerMap.get(edge.id)
-                    ?? '',
+                ownerMap.get(edge.id),
             ),
             updatedAt: edge.updatedAt,
         };

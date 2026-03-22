@@ -1,4 +1,4 @@
-import { $, $$ } from '../app/dom';
+import { $, $$, attr } from '../app/dom';
 import {
     html, setHtml, SafeHtml, trusted,
 } from '../app/safe-html';
@@ -447,14 +447,17 @@ export async function init(): Promise<void> {
         </div>
     </div>`);
 
-    $$('[data-nav-to]', document).forEach(navButton => {
-        navButton.addEventListener(
-            'click',
-            () => navigateTo(
-                navButton.getAttribute(
-                    'data-nav-to',
-                ) ?? '',
-            ),
-        );
-    });
+    $$('[data-nav-to]', document).forEach(
+        navButton => {
+            navButton.addEventListener(
+                'click',
+                () => navigateTo(
+                    attr(
+                        navButton,
+                        'data-nav-to',
+                    ),
+                ),
+            );
+        },
+    );
 }

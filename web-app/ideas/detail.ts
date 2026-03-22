@@ -554,56 +554,56 @@ function bindIdeaEvents(
             async () => {
                 const title =
                     $input(
-                        '#idea-edit-title', document,
-                    )?.value
-                    ?? idea.title;
+                        '#idea-edit-title',
+                        document,
+                    )!.value;
                 const description =
                     $textarea(
-                        '#idea-edit-target-users', document,
-                    )?.value
-                    ?? idea.description;
+                        '#idea-edit-target-users',
+                        document,
+                    )!.value;
                 const category =
                     $input(
-                        '#idea-edit-category', document,
-                    )?.value
-                    ?? idea.category;
+                        '#idea-edit-category',
+                        document,
+                    )!.value;
                 const problemStatement =
                     $textarea(
-                        '#idea-edit-problem', document,
-                    )?.value
-                    ?? idea.problemStatement;
+                        '#idea-edit-problem',
+                        document,
+                    )!.value;
                 const proposedSolution =
                     $textarea(
-                        '#idea-edit-solution', document,
-                    )?.value
-                    ?? idea.proposedSolution;
+                        '#idea-edit-solution',
+                        document,
+                    )!.value;
                 const expectedOutcome =
                     $textarea(
-                        '#idea-edit-outcome', document,
-                    )?.value
-                    ?? idea.expectedOutcome;
+                        '#idea-edit-outcome',
+                        document,
+                    )!.value;
                 const successMetrics =
                     $textarea(
-                        '#idea-edit-metrics', document,
-                    )?.value
-                    ?? idea.successMetrics;
+                        '#idea-edit-metrics',
+                        document,
+                    )!.value;
                 const impact = Number(
                     $input(
-                        '#idea-edit-impact', document,
-                    )?.value
-                    ?? idea.estimatedImpact,
+                        '#idea-edit-impact',
+                        document,
+                    )!.value,
                 );
                 const duration = Number(
                     $input(
-                        '#idea-edit-duration', document,
-                    )?.value
-                    ?? idea.durationInDays(),
+                        '#idea-edit-duration',
+                        document,
+                    )!.value,
                 );
                 const cost = Number(
                     $input(
-                        '#idea-edit-cost', document,
-                    )?.value
-                    ?? idea.estimatedCost,
+                        '#idea-edit-cost',
+                        document,
+                    )!.value,
                 );
 
                 try {

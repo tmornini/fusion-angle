@@ -18,9 +18,14 @@ import {
     type GaugeCard,
 } from '../app/adapters';
 
+type GaugeThemeStyle = {
+    bg: string;
+    iconBg: string;
+    border: string;
+};
 const gaugeThemeConfig: Record<
-    string,
-    { bg: string; iconBg: string; border: string }
+    GaugeCard['theme'],
+    GaugeThemeStyle
 > = {
     blue: {
         bg:
@@ -75,17 +80,6 @@ const gaugeIconConfig: Record<
     zap: iconZap,
 };
 
-const GAUGE_THEME_FALLBACK = {
-    bg:
-        'background:'
-        + 'hsl(var(--muted)/0.04)',
-    iconBg:
-        'background:'
-        + 'hsl(var(--muted)/0.1)',
-    border:
-        'border-color:'
-        + 'hsl(var(--muted)/0.15)',
-};
 const GAUGE_ARC_OUTER_RADIUS = 65;
 const GAUGE_ARC_INNER_RADIUS = 45;
 
@@ -93,8 +87,7 @@ function buildGauge(
     card: GaugeCard,
 ): SafeHtml {
     const themeStyle =
-        gaugeThemeConfig[card.theme]
-        ?? GAUGE_THEME_FALLBACK;
+        gaugeThemeConfig[card.theme];
     const elementId = card.title
         .replace(/\s+/g, '-')
         .toLowerCase();
@@ -120,7 +113,7 @@ function buildGauge(
         Math.PI * GAUGE_ARC_INNER_RADIUS;
     const iconFn =
         gaugeIconConfig[card.icon]
-        || iconDollarSign;
+        ?? iconDollarSign;
 
     const isOverrun =
         card.hasOverrunWarning

@@ -7,7 +7,7 @@ import {
     isValidTheme,
 } from './state';
 import {
-    $, $$, FOCUSABLE_SELECTOR,
+    $, $$, attr, FOCUSABLE_SELECTOR,
 } from './dom';
 import { setHtml } from './safe-html';
 import {
@@ -117,10 +117,10 @@ function initActiveNavItem(): void {
     const pageName = getPageName();
     $$('[data-page-link]', document).forEach(
         navLink => {
-            const linkPage =
-                navLink.getAttribute(
-                    'data-page-link',
-                ) || '';
+            const linkPage = attr(
+                navLink,
+                'data-page-link',
+            );
             const isActive =
                 linkPage === pageName
                 || (NAV_GROUP_CHILDREN[

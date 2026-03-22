@@ -4,6 +4,7 @@ import {
     $select,
     $textarea,
     populateIcons,
+    attr,
 } from '../app/dom';
 import {
     html,
@@ -180,10 +181,10 @@ export async function init(): Promise<void> {
                 chip.addEventListener(
                     'click',
                     () => {
-                        const name =
-                            chip.getAttribute(
-                                'data-strength',
-                            ) ?? '';
+                        const name = attr(
+                            chip,
+                            'data-strength',
+                        );
                         if (
                             selectedStrengths
                                 .has(name)

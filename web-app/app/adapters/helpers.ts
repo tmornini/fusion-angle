@@ -4,8 +4,6 @@ import type {
     ConfidenceLevel,
     EdgeStatus,
     EdgeIdeaEntity,
-} from '../../../api/types';
-import type {
     UserEntity,
     EdgeEntity,
     EdgeOutcomeEntity,
@@ -24,10 +22,10 @@ export async function buildUserMap(): Promise<Map<Id, User>> {
 export function userName(
     userMap: Map<Id, User>,
     userId: string | undefined,
-): string {
-    if (!userId) return '';
+): string | null {
+    if (!userId) return null;
     return userMap.get(userId)?.fullName()
-        ?? '';
+        ?? null;
 }
 
 export function computeEdgeStatus(
@@ -46,16 +44,21 @@ export function computeEdgeStatus(
     return edge.status;
 }
 
-export function parseJson<T>(value: string | T, fallback: T): T {
+export function parseJson<T>(
+    value: string | T,
+    recoveryShape: T,
+): T {
     if (typeof value === 'string') {
-        try { return JSON.parse(value) as T; }
-        catch {
+        try {
+            return JSON.parse(value) as T;
+        } catch {
             log.warn(
-                `Failed to parse JSON value:`
-                + ` ${value.slice(0, 100)}`,
+                'Failed to parse JSON'
+                + ' value: '
+                + value.slice(0, 100),
                 'parseJson',
             );
-            return fallback;
+            return recoveryShape;
         }
     }
     return value;
@@ -73,7 +76,7 @@ export interface EdgeData {
     outcomes: { id: string; description: string; metrics: Metric[] }[];
     impact: { shortTerm: string; midTerm: string; longTerm: string };
     confidence: ConfidenceLevel;
-    owner: string;
+    owner: string | null;
 }
 
 export async function getEdgeDataByIdeaId(

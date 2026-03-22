@@ -162,7 +162,7 @@ function buildMemberDetail(
                                gap-2"
                     >
                         ${(dimensionIconConfig[key]
-                                || iconStar)(
+                                ?? iconStar)(
                                         16, 'text-primary',
                                 )}
                         <span
@@ -366,9 +366,9 @@ function buildMemberCard(
 }
 
 function mutateList(): void {
-    const search = (
-        $input('#team-search', document)?.value ?? ''
-    ).toLowerCase();
+    const search =
+        $input('#team-search', document)!
+            .value.toLowerCase();
     const filtered = state.members.filter(
         member =>
             member.name

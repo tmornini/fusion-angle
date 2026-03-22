@@ -99,9 +99,10 @@ export async function getFlows(
         name: flow.name,
         description: flow.description,
         department: flow.department,
-        stepsCount:
+        stepsCount: (
             linksByProcessId.get(flow.id)
-                ?.length ?? 0,
+                ?? []
+        ).length,
     }));
 }
 

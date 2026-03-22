@@ -278,14 +278,14 @@ export async function init(): Promise<void> {
     }
 
     function mutateFilteredList() {
-        const search = (
-            $input('#flow-search', document)?.value
-            ?? ''
-        ).toLowerCase();
+        const search =
+            $input('#flow-search', document)!
+                .value.toLowerCase();
         const department =
             $select(
-                '#flow-department-filter', document,
-            )?.value ?? 'all';
+                '#flow-department-filter',
+                document,
+            )!.value;
         const filtered = flows.filter(
             flow => {
                 const matchesSearch =

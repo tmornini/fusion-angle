@@ -213,9 +213,7 @@ export function buildEmptyState(
 
 export function errorMessage(
     error: unknown,
-    fallback =
-        'An unexpected error occurred.'
-        + ' Please try again.',
+    noMatchMessage: string,
 ): string {
     if (error instanceof Error)
         return error.message;
@@ -223,7 +221,7 @@ export function errorMessage(
         typeof error === 'string'
         && error.length > 0
     ) return error;
-    return fallback;
+    return noMatchMessage;
 }
 
 export interface EmptyStateConfig {
@@ -290,7 +288,12 @@ export async function withLoadingState<T>(
         setHtml(
             container,
             buildErrorState(
-                errorMessage(e),
+                errorMessage(
+                    e,
+                    'An unexpected error'
+                    + ' occurred.'
+                    + ' Please try again.',
+                ),
                 'Try Again',
             ),
         );

@@ -1,5 +1,6 @@
 import {
     $,
+    attr,
     populateIcons,
     initToggleGroup,
 } from '../app/dom';
@@ -280,13 +281,17 @@ function buildProjectCard(
                                     + ' font-medium'
                                 }">${
                                     displayText(
-                                        String(
+                                        (project
+                                            .actualImpact
+                                        || project
+                                            .estimatedImpact)
+                                        ? String(
                                             project
-                                                .actualImpact
+                                            .actualImpact
                                             || project
-                                                .estimatedImpact
-                                            || '',
-                                        ),
+                                            .estimatedImpact,
+                                        )
+                                        : null,
                                     )
                                 }</p>
                             </div>
@@ -466,10 +471,10 @@ export async function init(): Promise<void> {
                 navigateTo(
                     'project-detail',
                     {
-                        projectId:
-                            viewBtn.getAttribute(
-                                'data-view-project',
-                            ) ?? '',
+                        projectId: attr(
+                            viewBtn,
+                            'data-view-project',
+                        ),
                     },
                 );
                 return;
@@ -483,10 +488,10 @@ export async function init(): Promise<void> {
                 navigateTo(
                     'project-detail',
                     {
-                        projectId:
-                            card.getAttribute(
-                                'data-project-card',
-                            ) ?? '',
+                        projectId: attr(
+                            card,
+                            'data-project-card',
+                        ),
                     },
                 );
         },

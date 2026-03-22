@@ -72,21 +72,24 @@ async function updateEmptyBanner(
     }
 }
 
-let pendingAction:
-    (() => Promise<void>) | null = null;
-let pendingButton:
-    HTMLButtonElement | null = null;
-let pendingLabel = '';
+const pending = {
+    action: null as
+        (() => Promise<void>) | null,
+    button: null as
+        HTMLButtonElement | null,
+    label: null as string | null,
+};
 
 async function executePendingAction(
 ): Promise<void> {
-    const button = pendingButton;
-    const action = pendingAction;
-    const label = pendingLabel;
-    pendingAction = null;
-    pendingButton = null;
-    pendingLabel = '';
-    if (!button || !action) return;
+    const button = pending.button;
+    const action = pending.action;
+    const label = pending.label;
+    pending.action = null;
+    pending.button = null;
+    pending.label = null;
+    if (!button || !action || !label)
+        return;
 
     closeDialog('confirm-wipe');
     const originalText = button.textContent;
@@ -115,9 +118,9 @@ function withWipeAndReload(
     confirmMessage?: string,
 ): void {
     if (confirmMessage) {
-        pendingAction = action;
-        pendingButton = button;
-        pendingLabel = label;
+        pending.action = action;
+        pending.button = button;
+        pending.label = label;
         const msg =
             $('#confirm-wipe-message', document);
         if (msg) {
@@ -126,9 +129,9 @@ function withWipeAndReload(
         }
         openDialog('confirm-wipe');
     } else {
-        pendingAction = action;
-        pendingButton = button;
-        pendingLabel = label;
+        pending.action = action;
+        pending.button = button;
+        pending.label = label;
         void executePendingAction();
     }
 }
@@ -417,17 +420,17 @@ export async function init(): Promise<void> {
 
     $('#confirm-wipe-cancel', document)
         ?.addEventListener('click', () => {
-            pendingAction = null;
-            pendingButton = null;
-            pendingLabel = '';
+            pending.action = null;
+            pending.button = null;
+            pending.label = null;
             closeDialog('confirm-wipe');
         });
     $('#confirm-wipe-backdrop', document)
         ?.addEventListener('click', (e) => {
             if (e.target === e.currentTarget) {
-                pendingAction = null;
-                pendingButton = null;
-                pendingLabel = '';
+                pending.action = null;
+                pending.button = null;
+                pending.label = null;
                 closeDialog('confirm-wipe');
             }
         });

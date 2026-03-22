@@ -66,7 +66,7 @@ export interface ProjectDetail {
     progress: number;
     startDate: string;
     targetEndDate: string;
-    projectLead: string;
+    projectLead: string | null;
     metrics: {
         time: {
             baseline: number;
@@ -93,11 +93,11 @@ export interface ProjectDetail {
             longTerm: string;
         };
         confidence: ConfidenceLevel;
-        owner: string;
+        owner: string | null;
     } | null;
     team: {
         id: string;
-        name: string;
+        name: string | null;
         role: string;
     }[];
     milestones: {
@@ -111,11 +111,11 @@ export interface ProjectDetail {
         version: string;
         date: string;
         changes: string;
-        author: string;
+        author: string | null;
     }[];
     discussions: {
         id: string;
-        author: string;
+        author: string | null;
         date: string;
         message: string;
     }[];
@@ -125,7 +125,7 @@ export interface ProjectDetail {
         description: string;
         skills: string[];
         duration: number;
-        assigned: string;
+        assigned: string | null;
     }[];
 }
 
@@ -313,11 +313,11 @@ export async function getProjectById(
 export interface Clarification {
     id: string;
     question: string;
-    askedBy: string;
+    askedBy: string | null;
     askedAt: string;
     status: 'pending' | 'answered';
     answer?: string;
-    answeredBy?: string;
+    answeredBy?: string | null;
     answeredAt?: string;
 }
 
@@ -333,7 +333,7 @@ export interface EngineeringProject {
     };
     team: {
         id: string;
-        name: string;
+        name: string | null;
         role: string;
         type: string;
     }[];
@@ -367,11 +367,16 @@ getProjectForEngineering(
     ]);
 
     const businessContext = parseJson<{
-        problem?: string;
-        expectedOutcome?: string;
-        successMetrics?: string[];
-        constraints?: string[];
-    }>(project.business_context, {});
+        problem: string;
+        expectedOutcome: string;
+        successMetrics: string[];
+        constraints: string[];
+    }>(project.business_context, {
+        problem: '',
+        expectedOutcome: '',
+        successMetrics: [],
+        constraints: [],
+    });
 
     const link = ideaProjectLinks.find(
         l => l.project_id === projectId,
@@ -389,19 +394,16 @@ getProjectForEngineering(
             project.description,
         businessContext: {
             problem:
-                businessContext.problem
-                    ?? '',
+                businessContext.problem,
             expectedOutcome:
                 businessContext
-                    .expectedOutcome
-                    ?? '',
+                    .expectedOutcome,
             successMetrics:
                 businessContext
-                    .successMetrics
-                    ?? [],
+                    .successMetrics,
             constraints:
                 businessContext
-                    .constraints ?? [],
+                    .constraints,
         },
         team: teamRows.map(member => ({
             id: member.user_id,

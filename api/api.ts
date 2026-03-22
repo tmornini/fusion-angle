@@ -886,24 +886,36 @@ const routes: Route[] = [
             put: async (db, p, payload) => {
                 const pid = param(p, 0);
                 const uid = param(p, 1);
+                if (
+                    typeof payload.role
+                        !== 'string'
+                    || payload.role === ''
+                ) {
+                    throw new ApiError(
+                        'Missing or invalid'
+                        + ' "role" field.',
+                        400,
+                    );
+                }
+                if (
+                    typeof payload.type
+                        !== 'string'
+                    || payload.type === ''
+                ) {
+                    throw new ApiError(
+                        'Missing or invalid'
+                        + ' "type" field.',
+                        400,
+                    );
+                }
                 const tmId =
                     `tm-${pid}-${uid}`;
                 const membership =
                     await db.teamMemberships
                         .put(tmId, {
                             id: tmId,
-                            role:
-                                typeof payload
-                                    .role
-                                === 'string'
-                                    ? payload.role
-                                    : '',
-                            type:
-                                typeof payload
-                                    .type
-                                === 'string'
-                                    ? payload.type
-                                    : '',
+                            role: payload.role,
+                            type: payload.type,
                         });
                 const projLinkId =
                     `tmp-${tmId}`;
