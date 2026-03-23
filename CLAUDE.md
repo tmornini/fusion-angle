@@ -202,7 +202,7 @@ web-app/
   auth/                     # Login/signup (standalone)
   not-found/                # 404 page (standalone)
 
-SCHEMA.md                     # Database schema (40+ tables, columns, types, defaults)
+SCHEMA.md                     # Database schema (44 tables, columns, types, defaults)
 DESIGN-SYSTEM.md              # Design system specification
 TEST-PLAN.md                  # Human-executable test plan (176 cases)
 ```

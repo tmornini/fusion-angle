@@ -229,4 +229,74 @@ export async function init(
                 >Load More Activity</button>
         </div>
     </div>`);
+
+    const activityList = $(
+        '#activity-list', container,
+    );
+    const searchInput =
+        container.querySelector<
+            HTMLInputElement
+        >('#activity-search');
+    const typeFilter =
+        container.querySelector<
+            HTMLSelectElement
+        >('#activity-filter');
+
+    const typeMap: Record<string, string[]> = {
+        idea: [
+            'idea_created',
+            'idea_scored',
+            'idea_converted',
+        ],
+        project: ['project_created'],
+        task: ['task_completed'],
+        team: [
+            'user_joined',
+            'status_changed',
+            'comment_added',
+        ],
+    };
+
+    function filterActivities(): void {
+        if (!activityList) return;
+        const query = (
+            searchInput?.value ?? ''
+        ).toLowerCase();
+        const typeVal =
+            typeFilter?.value ?? 'all';
+        const filtered =
+            activities!.filter(a => {
+                if (query
+                    && !(a.actor ?? '')
+                        .toLowerCase()
+                        .includes(query)
+                    && !a.target
+                        .toLowerCase()
+                        .includes(query))
+                    return false;
+                if (typeVal !== 'all') {
+                    const types =
+                        typeMap[typeVal];
+                    if (types
+                        && !types.includes(
+                            a.type,
+                        ))
+                        return false;
+                }
+                return true;
+            });
+        setHtml(
+            activityList,
+            html`${filtered.map(
+                buildActivity,
+            )}`,
+        );
+    }
+
+    searchInput?.addEventListener(
+        'input', filterActivities,
+    );
+    typeFilter?.addEventListener(
+        'change', filterActivities,
+    );
 }

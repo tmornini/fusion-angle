@@ -17,7 +17,7 @@ import {
 } from '../app/icons';
 import {
     initials, initDialog, closeDialog,
-    navigateTo,
+    navigateTo, formatDate,
 } from '../app/core';
 import {
     getManagedUsers, putUser,
@@ -181,8 +181,10 @@ function buildUserRow(
                     ${user.isPending()
                         ? 'Invite sent'
                         : 'Last active '
-                            + user
-                                .lastActive}
+                            + formatDate(
+                                user
+                                    .lastActive,
+                            )}
                 </p>
             </div>
             <div style="${
@@ -784,6 +786,61 @@ export async function init(): Promise<void> {
                 </div>
             </div>
         </div>`);
+
+    const userList = $(
+        '#user-list', document,
+    );
+    const searchInput = $input(
+        '#user-search', document,
+    );
+    const roleFilter = $select(
+        '#role-filter', document,
+    );
+    const statusFilter = $select(
+        '#status-filter', document,
+    );
+
+    function filterUsers(): void {
+        if (!userList) return;
+        const query = (
+            searchInput?.value ?? ''
+        ).toLowerCase();
+        const role =
+            roleFilter?.value ?? 'all';
+        const status =
+            statusFilter?.value ?? 'all';
+        const filtered = users!.filter(u => {
+            if (query && !u.fullName()
+                .toLowerCase()
+                .includes(query)
+                && !u.email.toLowerCase()
+                    .includes(query))
+                return false;
+            if (role !== 'all'
+                && u.role !== role)
+                return false;
+            if (status !== 'all'
+                && u.status !== status)
+                return false;
+            return true;
+        });
+        setHtml(
+            userList,
+            html`${filtered.map(
+                buildUserRow,
+            )}`,
+        );
+    }
+
+    searchInput?.addEventListener(
+        'input', filterUsers,
+    );
+    roleFilter?.addEventListener(
+        'change', filterUsers,
+    );
+    statusFilter?.addEventListener(
+        'change', filterUsers,
+    );
 
     initDialog('invite', 'invite-btn',
         async () => {

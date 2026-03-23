@@ -12,6 +12,7 @@ import {
     toBool,
     Activity,
     Account,
+    User,
 } from '../../../api/types';
 export type { Account };
 import {
@@ -88,6 +89,7 @@ export interface Profile {
     role: string;
     department: string;
     bio: string;
+    strengths: string[];
 }
 
 export const allStrengths = [
@@ -114,6 +116,7 @@ export async function getProfile(
             'No current user found'
             + ' — cannot load profile',
         );
+    const userObj = new User(user);
     return {
         firstName: user.first_name,
         lastName: user.last_name,
@@ -122,6 +125,8 @@ export async function getProfile(
         role: user.role,
         department: user.department,
         bio: user.bio,
+        strengths:
+            userObj.parsedStrengths(),
     };
 }
 

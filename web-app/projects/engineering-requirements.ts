@@ -15,7 +15,9 @@ import {
     iconDollarSign, iconUser,
     iconChevronRight,
 } from '../app/icons';
-import { navigateTo } from '../app/core';
+import {
+    navigateTo, formatDate,
+} from '../app/core';
 import {
     clarificationIsPending,
 } from '../../api/types';
@@ -91,8 +93,10 @@ function buildClarification(
                             'text-xs '
                             + 'text-muted'
                         }">
-                            ${clarification
-                                .askedAt}
+                            ${formatDate(
+                                clarification
+                                    .askedAt,
+                            )}
                         </span>
                         <span class="${
                             'badge '
@@ -144,8 +148,11 @@ function buildClarification(
                             'text-xs '
                             + 'text-muted'
                         }">
-                            ${clarification
-                                .answeredAt}
+                            ${formatDate(
+                                clarification
+                                    .answeredAt
+                                    ?? '',
+                            )}
                         </span>
                     </div>
                     <p>${

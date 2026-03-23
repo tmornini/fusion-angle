@@ -34,11 +34,8 @@ import {
 } from '../../api/types';
 
 export async function init(): Promise<void> {
-    const selectedStrengths = new Set([
-        'Strategic Planning',
-        'Data Analysis',
-        'Stakeholder Management',
-    ]);
+    const selectedStrengths = new Set<string>(
+    );
 
     function buildStrengthChip(
         name: string,
@@ -86,6 +83,10 @@ export async function init(): Promise<void> {
                 () => init(),
             );
         return;
+    }
+
+    for (const s of profile.strengths) {
+        selectedStrengths.add(s);
     }
 
     populateIcons([

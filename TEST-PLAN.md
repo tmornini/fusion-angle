@@ -2,28 +2,34 @@
 
 > **Encoding:** `- [ ]` = pending, `- [x]` = PASS, `- [FAIL]` = failure (add note)
 
-### Protocol Coverage
+### Protocol
 
-All test sections (B through I) are executed under both protocols:
+All sections are executed over HTTP — serve the unzipped build via
+a local HTTP server (e.g. `python3 -m http.server 8080`).
 
-1. **HTTP** — serve the unzipped build via a local HTTP server (e.g. `python3 -m http.server 8080`)
-2. **file://** — stop the HTTP server, then open `index.html` directly from the unzipped build directory
+### Execution Order
+
+Sections A through AA establish a pristine environment and populate
+it with data through the UI. Sections B through J then verify every
+page renders correctly against that data. The plan is designed to
+run as a single continuous regression pass.
 
 ## Summary
 
 | Section | Tests |
 |---|--:|
 | A. Build & Setup | 5 |
+| AA. Data Entry Workflow | 46 |
 | B. Entry Pages | 16 |
 | C. Core: Dashboard | 7 |
-| D. Core: Ideas Workflow | 46 |
+| D. Core: Ideas Workflow | 52 |
 | E. Core: Projects | 17 |
 | F. Tools | 29 |
-| G. Admin Pages | 31 |
+| G. Admin Pages | 34 |
 | H. Reference & System | 2 |
-| I. Cross-Cutting Concerns | 20 |
+| I. Cross-Cutting Concerns | 21 |
 | J. Teardown | 3 |
-| **Total** | **176** |
+| **Total** | **232** |
 
 ---
 
@@ -34,6 +40,96 @@ All test sections (B through I) are executed under both protocols:
 - [ ] **A3** Start an HTTP server from the unzipped directory (e.g. `python3 -m http.server 8080`). PASS: server starts without errors.
 - [ ] **A4** Open `http://localhost:8080/` in the test browser. PASS: redirects to `snapshots/index.html` when no data exists, or `landing/index.html` (which auto-redirects to `dashboard/index.html` after ~2 seconds) when data has been loaded.
 - [ ] **A5** Open DevTools Console and confirm no JavaScript errors on initial load. PASS: console is clean (warnings from browser extensions are acceptable).
+
+---
+
+## AA. Data Entry Workflow
+
+This section populates a pristine environment with all data
+through the UI. Each step creates data that later steps depend
+on. Run these in order.
+
+### AA1. Create Pristine Environment
+
+- [ ] **AA1** Navigate to `snapshots/`. Click "Create Pristine Environment" and confirm the wipe dialog. PASS: redirects to dashboard. Dashboard shows empty/minimal state.
+- [ ] **AA2** Open DevTools, verify localStorage has `fusion-ai:*` keys (44 tables as empty arrays plus bootstrap data).
+- [ ] **AA3** Verify bootstrap data exists: user "Tony Stark" (id: `current`), company "Stark Industries" with "Business" plan.
+
+### AA2. Create Users
+
+- [ ] **AA4** Navigate to Organization > Users. Click "Invite User". PASS: invite dialog opens with fields for First Name, Last Name, Email, Role, Department, Status, Availability, Performance Score, Strengths, Team Dimensions, Phone, and Bio.
+- [ ] **AA5** Fill all fields for user "Sarah Chen" (Engineering Manager, Engineering dept, active status). Submit. PASS: toast confirms creation, user appears in the list.
+- [ ] **AA6** Repeat for all 10 users: Sarah Chen, Mike Thompson, Jessica Park, David Martinez, Emily Rodriguez (pending), Alex Kim, Marcus Johnson, David Kim, Lisa Wang, James Miller (deactivated). PASS: all 10 appear on Users page with correct name, email, role, and status badge.
+- [ ] **AA7** Navigate to Teams page. PASS: users display with correct availability color coding and performance stats.
+
+### AA3. Profile & Company Settings
+
+- [ ] **AA8** Navigate to Profile. Edit fields (phone, bio, strengths). Click "Save Changes". PASS: toast "Profile saved successfully" appears.
+- [ ] **AA9** Navigate away, return to Profile. PASS: edited fields persist with saved values.
+- [ ] **AA10** Navigate to Company Settings. Edit a field (e.g. timezone). Click save. PASS: success toast appears.
+- [ ] **AA11** Navigate away, return to Settings. PASS: edited field persists with saved value.
+
+### AA4. Create Ideas
+
+- [ ] **AA12** Navigate to Ideas. Click "Create Idea". Complete the 3-step wizard for "AI-Powered Customer Segmentation" (title, problem, solution, outcome, metrics). PASS: idea appears on ideas list.
+- [ ] **AA13** Navigate to the new idea's detail page. Click "Edit". Set remaining fields: category, estimated impact, duration (days), cost. Click "Save". PASS: toast confirms save, all fields persist.
+- [ ] **AA14** Repeat creation and field entry for all 11 ideas matching mock data titles. PASS: ideas list shows all 11 with correct titles.
+
+### AA5. Score Ideas
+
+- [ ] **AA15** Navigate to idea #1 detail. Locate the score editing section. PASS: score input is visible showing current score (0).
+- [ ] **AA16** Enter score 92 for idea #1. Click save. PASS: toast confirms, score displays with correct color-coded styling.
+- [ ] **AA17** Set scores for all 11 ideas (92, 87, 84, 81, 78, 74, 87, 72, 81, 45, 91). PASS: ideas list shows correct scores with priority badges and color coding.
+
+### AA6. Submit Ideas for Review
+
+- [ ] **AA18** Navigate to idea #1 detail (status: active). Click "Submit for Review". PASS: status changes to "In Review", button disappears.
+- [ ] **AA19** Submit ideas 1, 4, 7, 8, 9, 10, 11 for review (matching mock data statuses). PASS: each transitions from active to in-review.
+- [ ] **AA20** Navigate to Review Queue. PASS: the 7 submitted ideas appear with priority badges and readiness status.
+
+### AA7. Define Edges
+
+- [ ] **AA21** Navigate to idea #1 detail. Click "Define Edge". PASS: navigates to edge detail page with correct ideaId.
+- [ ] **AA22** Set confidence to "High". Enter impact text (short-term, mid-term, long-term). Set edge owner. PASS: fields accept input.
+- [ ] **AA23** Click "Add Outcome". Enter outcome name "Reduce customer churn rate". Click "Add Metric" within that outcome. Enter metric fields (Name, Target, Unit, Current). PASS: outcome and metric rows appear.
+- [ ] **AA24** Add second outcome with its metrics. Click "Save". PASS: toast "Edge saved" appears.
+- [ ] **AA25** Navigate away and back to edge detail. PASS: all edge data persists (confidence, impact, outcomes, metrics, owner).
+- [ ] **AA26** Repeat edge creation for all 9 ideas that have edges. PASS: each edge saves with outcomes and metrics.
+- [ ] **AA27** Navigate to Edges list. PASS: shows all 9 edges with correct status, confidence, owner, and outcome/metric counts.
+
+### AA8. Approve Ideas & Convert to Projects
+
+- [ ] **AA28** Navigate to Review Queue. Click idea #1. PASS: navigates to approval detail.
+- [ ] **AA29** Click "Approve". PASS: idea status changes to approved, confirmation shown.
+- [ ] **AA30** Approve idea #2 as well. Leave others in their current status. PASS: statuses match mock data (2 approved, rest in-review/active).
+- [ ] **AA31** Navigate to approved idea #1. Click "Convert to Project". PASS: conversion form loads with 6 required fields (Project Name, Lead, Start Date, End Date, Budget, Priority).
+- [ ] **AA32** Fill all fields. Select "Sarah Chen" as project lead. Enter first milestone "Data Pipeline Setup". Click "Create Project". PASS: navigates to project detail for the new project.
+- [ ] **AA33** On project detail, click "Edit". Set progress, priority_score, and other fields to match mock data. Save. PASS: project data persists.
+- [ ] **AA34** Repeat conversion for all 6 projects. PASS: Projects list shows all 6 with correct status, progress, and priority.
+
+### AA9. Create Flows
+
+- [ ] **AA35** Navigate to Flow list. PASS: page shows empty state or existing flows.
+- [ ] **AA36** Create a new flow (if create UI exists) or navigate to an existing flow detail. Use "Add Step" to add steps with title, description, owner, role, duration, and step type. Click "Save". PASS: toast confirms save.
+- [ ] **AA37** Repeat for all flows. Verify flow list shows correct names, departments, and step counts. PASS: flow data persists.
+
+### AA10. Verify Dashboard
+
+- [ ] **AA38** Navigate to Dashboard. PASS: gauge cards (Time, Cost, Impact) show aggregated values computed from the entered project data.
+- [ ] **AA39** Header stats reflect entered data counts (ideas, projects, flows). PASS: counts are non-zero and match.
+
+### AA11. Edit & Verify Cycle
+
+- [ ] **AA40** Edit idea #1: change title. Save, navigate to ideas list, return to detail. PASS: changed title persists.
+- [ ] **AA41** Edit project #1: change description. Save, navigate away, return. PASS: changed description persists.
+- [ ] **AA42** Edit edge #1: change confidence level. Save, navigate away, return. PASS: changed confidence persists.
+- [ ] **AA43** Edit flow #1: change a step's title. Save, navigate away, return. PASS: changed step title persists.
+- [ ] **AA44** Edit profile: change phone number. Save, navigate away, return. PASS: changed phone persists.
+- [ ] **AA45** Edit company settings: change timezone. Save, navigate away, return. PASS: changed timezone persists.
+
+### AA12. Snapshot Round-Trip
+
+- [ ] **AA46** Navigate to Snapshots. Click "Download Snapshot". PASS: JSON file downloads with all manually-entered data. Click "Create Pristine Environment", confirm. PASS: all data wiped. Click "Upload Snapshot", select the downloaded file. PASS: all data restored. Spot-check 3 pages to confirm data matches.
 
 ---
 
@@ -120,6 +216,18 @@ All test sections (B through I) are executed under both protocols:
 - [ ] **D19d** For an idea in "in_review" status: "Review" action button is visible. PASS: clicking it navigates to `approval-detail/` page.
 - [ ] **D19e** For a convertible idea: "Convert" action button is visible. PASS: clicking it navigates to `idea-convert/` page.
 - [ ] **D19f** Navigate to `ideas/detail.html?ideaId=999` (non-existent). PASS: page handles gracefully — shows error state, no unhandled JS exception.
+
+### Idea Detail — Score Editing
+
+- [ ] **D19g** Navigate to idea detail. Score editing section is visible with the current score value displayed. PASS: score input renders with current value.
+- [ ] **D19h** Enter a new score value (e.g. 85). Click save. PASS: toast confirms save, score updates with correct color-coded styling (green for high, yellow for medium, red for low).
+- [ ] **D19i** Navigate to ideas list. PASS: updated score is reflected on the idea's row with correct priority badge.
+- [ ] **D19j** Return to idea detail. PASS: score value persists at the saved value.
+
+### Idea Detail — Submit for Review
+
+- [ ] **D19k** Navigate to an idea with status "active". PASS: "Submit for Review" button is visible in the header area.
+- [ ] **D19l** Click "Submit for Review". PASS: status changes to "In Review", button disappears, status badge updates.
 
 ### Idea Convert (`idea-convert/`)
 
@@ -257,12 +365,14 @@ All test sections (B through I) are executed under both protocols:
 - [ ] **G5** Navigate to `profile/`. PASS: shows profile form with avatar (initials), First Name, Last Name, Email, Phone, Role, Department (dropdown), and Bio fields for the current user (Tony Stark / demo@example.com).
 - [ ] **G5b** Strength chips are displayed with pre-selected strengths shown in primary style with checkmark icons. Click an unselected chip. PASS: chip toggles to primary/selected style. Click a selected chip. PASS: chip toggles to secondary/unselected style.
 - [ ] **G6** Edit a field (e.g. phone), toggle strengths, and click "Save Changes". PASS: toast "Profile saved successfully" appears.
+- [ ] **G6b** Navigate away from Profile (e.g. to Dashboard), then return to Profile. PASS: the edited field retains the saved value — data was persisted to the database, not just displayed via toast.
 
 ### Company Settings (`settings/`)
 
 - [ ] **G7** Navigate to `settings/`. PASS: shows company info (Stark Industries, acmecorp.com, Technology, 51-200).
 - [ ] **G8** Security settings visible: SSO (off), 2FA (on), IP Whitelist (off). PASS: toggle/indicator states match seed data.
 - [ ] **G9** Edit a setting (e.g. timezone or language) and save. PASS: success toast or save completes without error.
+- [ ] **G9b** Navigate away from Settings, then return. PASS: the edited setting retains the saved value — data was persisted to the database.
 
 ### Manage Users (`manage-users/`)
 
@@ -270,7 +380,8 @@ All test sections (B through I) are executed under both protocols:
 - [ ] **G10b** Type in the search input. PASS: filters user list by name or email in real-time. Role and status dropdowns also filter the list.
 - [ ] **G11** Deactivated user (James Miller) is visually distinguished with "Deactivated" badge (X icon), strikethrough or opacity styling. PASS: clearly different from active users.
 - [ ] **G11b** Pending users show "Pending" badge with clock icon and "Invite sent" text. PASS: visually distinct from active users.
-- [ ] **G12** "Invite User" button is visible. PASS: clicking it opens the invite dialog with email input and role selector.
+- [ ] **G12** "Invite User" button is visible. PASS: clicking it opens the invite dialog with fields for First Name, Last Name, Email, Role, Department, Status, Availability, Performance Score, Strengths, Team Dimensions, Phone, and Bio.
+- [ ] **G12b** Fill all required fields and submit the invite dialog. PASS: toast confirms user creation, new user appears in the user list with correct name, email, role, and status badge.
 
 ### Activity Feed (`teams/activity-feed.html`)
 
@@ -289,7 +400,7 @@ All test sections (B through I) are executed under both protocols:
 
 - [ ] **G18** Navigate to `snapshots/`. PASS: shows 4 operation cards: Create Pristine Environment, Wipe and Load Mock Data, Upload Snapshot, Download Snapshot.
 - [ ] **G19** Click "Download Snapshot". PASS: browser downloads `fusion-ai-snapshot-YYYY-MM-DD.json`. File contains valid JSON with entity data.
-- [ ] **G20** Click "Create Pristine Environment", confirm the dialog. PASS: redirects to `dashboard/index.html`. Dashboard renders with zeroed-out metrics (empty database). All 19 `fusion-ai:*` keys exist in localStorage as empty arrays.
+- [ ] **G20** Click "Create Pristine Environment", confirm the dialog. PASS: redirects to `dashboard/index.html`. Dashboard renders with zeroed-out metrics (empty database). All 44 `fusion-ai:*` keys exist in localStorage as empty arrays.
 - [ ] **G21** Click "Wipe and Load Mock Data". PASS: redirects to `dashboard/index.html`. Navigate to `ideas/` — 11 ideas are back.
 - [ ] **G22** Return to `snapshots/`, wipe data, then use "Upload Snapshot" file input and select the previously downloaded JSON file. PASS: redirects to `dashboard/index.html`. Data matches the snapshot.
 
@@ -341,9 +452,13 @@ All test sections (B through I) are executed under both protocols:
 
 - [ ] **I17** Trigger a toast (e.g. save profile, or use DB Admin reload). PASS: toast appears at bottom or corner of screen, auto-dismisses after ~3 seconds with fade-out.
 
+### Snapshot Round-Trip
+
+- [ ] **I18** Download a snapshot, wipe data (Create Pristine), upload the snapshot. PASS: all data restored correctly — spot-check 3 pages to confirm content matches pre-wipe state.
+
 ### General
 
-- [ ] **I18** Check DevTools Console after navigating through 5+ different pages. PASS: no unhandled JavaScript errors (warnings and info messages from browser extensions are acceptable).
+- [ ] **I19** Check DevTools Console after navigating through 5+ different pages. PASS: no unhandled JavaScript errors (warnings and info messages from browser extensions are acceptable).
 
 ---
 
@@ -364,7 +479,7 @@ All test sections (B through I) are executed under both protocols:
 | Browser & Version | |
 | OS | |
 | Build SHA | |
-| Tests Passed | /176 |
-| Tests Failed | /176 |
-| Tests Skipped | /176 |
+| Tests Passed | /232 |
+| Tests Failed | /232 |
+| Tests Skipped | /232 |
 | Notes | |

@@ -35,6 +35,9 @@ import type {
     ProjectTaskEntity,
     ProjectTaskProjectEntity,
     ProjectVersionProjectEntity,
+    FlowEntity,
+    FlowStepEntity,
+    ProcessStepProcessEntity,
 } from './types';
 import {
     jsonArrayField,
@@ -1881,6 +1884,425 @@ export async function populateMockData(
         },
     ];
 
+    const flows: FlowEntity[] = [
+        {
+            id: '1',
+            name: 'Customer Onboarding',
+            description:
+                'End-to-end process for'
+                + ' onboarding new enterprise'
+                + ' customers from contract'
+                + ' signing to first value.',
+            department: 'Operations',
+        },
+        {
+            id: '2',
+            name:
+                'Product Development Sprint',
+            description:
+                'Two-week sprint cycle'
+                + ' for planning, building,'
+                + ' and shipping product'
+                + ' increments.',
+            department: 'Engineering',
+        },
+        {
+            id: '3',
+            name: 'Sales Pipeline Review',
+            description:
+                'Weekly review of active'
+                + ' deals, pipeline health,'
+                + ' and forecast accuracy.',
+            department: 'Sales',
+        },
+        {
+            id: '4',
+            name: 'Content Publishing',
+            description:
+                'Workflow for creating,'
+                + ' reviewing, and'
+                + ' publishing marketing'
+                + ' content across channels.',
+            department: 'Marketing',
+        },
+    ];
+
+    const flowSteps: FlowStepEntity[] = [
+        {
+            id: 'fs-1',
+            title: 'Send Welcome Package',
+            description:
+                'Send branded welcome kit'
+                + ' with login credentials'
+                + ' and onboarding schedule.',
+            owner: 'Sarah Chen',
+            role: 'Account Manager',
+            tools: jsonArrayField(
+                ['Email', 'CRM'],
+            ),
+            duration: '1 day',
+            sort_order: 0,
+            type: 'start',
+        },
+        {
+            id: 'fs-2',
+            title: 'Schedule Kickoff Call',
+            description:
+                'Coordinate kickoff with'
+                + ' customer stakeholders'
+                + ' and internal team.',
+            owner: 'Sarah Chen',
+            role: 'Account Manager',
+            tools: jsonArrayField(
+                ['Calendar', 'Zoom'],
+            ),
+            duration: '2 days',
+            sort_order: 1,
+            type: 'action',
+        },
+        {
+            id: 'fs-3',
+            title: 'Configure Environment',
+            description:
+                'Set up customer tenant,'
+                + ' integrations, and'
+                + ' initial data import.',
+            owner: 'Alex Kim',
+            role: 'Solutions Engineer',
+            tools: jsonArrayField(
+                ['Admin Console', 'API'],
+            ),
+            duration: '3 days',
+            sort_order: 2,
+            type: 'action',
+        },
+        {
+            id: 'fs-4',
+            title: 'Conduct Training',
+            description:
+                'Run hands-on training'
+                + ' sessions for customer'
+                + ' admin and end users.',
+            owner: 'Jessica Park',
+            role: 'Customer Success',
+            tools: jsonArrayField(
+                ['Zoom', 'LMS'],
+            ),
+            duration: '5 days',
+            sort_order: 3,
+            type: 'action',
+        },
+        {
+            id: 'fs-5',
+            title: 'Go-Live Approval',
+            description:
+                'Verify all acceptance'
+                + ' criteria met and'
+                + ' approve go-live.',
+            owner: 'Sarah Chen',
+            role: 'Account Manager',
+            tools: jsonArrayField(
+                ['Checklist'],
+            ),
+            duration: '1 day',
+            sort_order: 4,
+            type: 'end',
+        },
+        {
+            id: 'fs-6',
+            title: 'Sprint Planning',
+            description:
+                'Review backlog, estimate'
+                + ' stories, and commit'
+                + ' to sprint scope.',
+            owner: 'David Martinez',
+            role: 'Engineering Manager',
+            tools: jsonArrayField(
+                ['Jira', 'Confluence'],
+            ),
+            duration: '4 hours',
+            sort_order: 0,
+            type: 'start',
+        },
+        {
+            id: 'fs-7',
+            title: 'Development',
+            description:
+                'Implement features and'
+                + ' bug fixes per sprint'
+                + ' backlog.',
+            owner: 'Mike Thompson',
+            role: 'Senior Developer',
+            tools: jsonArrayField(
+                ['VS Code', 'GitHub'],
+            ),
+            duration: '7 days',
+            sort_order: 1,
+            type: 'action',
+        },
+        {
+            id: 'fs-8',
+            title: 'Code Review',
+            description:
+                'Peer review all pull'
+                + ' requests for quality'
+                + ' and standards.',
+            owner: 'Alex Kim',
+            role: 'Tech Lead',
+            tools: jsonArrayField(
+                ['GitHub', 'SonarQube'],
+            ),
+            duration: '2 days',
+            sort_order: 2,
+            type: 'action',
+        },
+        {
+            id: 'fs-9',
+            title: 'QA & Testing',
+            description:
+                'Execute test plans,'
+                + ' regression testing, and'
+                + ' bug triage.',
+            owner: 'Emily Rodriguez',
+            role: 'QA Engineer',
+            tools: jsonArrayField(
+                ['Playwright', 'Jira'],
+            ),
+            duration: '3 days',
+            sort_order: 3,
+            type: 'action',
+        },
+        {
+            id: 'fs-10',
+            title: 'Release Decision',
+            description:
+                'Review test results and'
+                + ' decide whether to ship'
+                + ' or hold.',
+            owner: 'David Martinez',
+            role: 'Engineering Manager',
+            tools: jsonArrayField(
+                ['Dashboard'],
+            ),
+            duration: '2 hours',
+            sort_order: 4,
+            type: 'decision',
+        },
+        {
+            id: 'fs-11',
+            title: 'Deploy to Production',
+            description:
+                'Execute deployment'
+                + ' pipeline and verify'
+                + ' production health.',
+            owner: 'Mike Thompson',
+            role: 'Senior Developer',
+            tools: jsonArrayField([
+                'CI/CD',
+                'Datadog',
+            ]),
+            duration: '4 hours',
+            sort_order: 5,
+            type: 'end',
+        },
+        {
+            id: 'fs-12',
+            title: 'Pipeline Review',
+            description:
+                'Review deal status,'
+                + ' stage progression, and'
+                + ' blockers for each'
+                + ' opportunity.',
+            owner: 'Marcus Johnson',
+            role: 'Sales Director',
+            tools: jsonArrayField(
+                ['Salesforce', 'Gong'],
+            ),
+            duration: '1 hour',
+            sort_order: 0,
+            type: 'start',
+        },
+        {
+            id: 'fs-13',
+            title: 'Forecast Update',
+            description:
+                'Update revenue forecast'
+                + ' based on pipeline'
+                + ' changes and win rates.',
+            owner: 'Marcus Johnson',
+            role: 'Sales Director',
+            tools: jsonArrayField(
+                ['Salesforce', 'Excel'],
+            ),
+            duration: '30 min',
+            sort_order: 1,
+            type: 'action',
+        },
+        {
+            id: 'fs-14',
+            title: 'Deal Escalation Check',
+            description:
+                'Identify at-risk deals'
+                + ' requiring executive'
+                + ' involvement.',
+            owner: 'Marcus Johnson',
+            role: 'Sales Director',
+            tools: jsonArrayField(
+                ['CRM'],
+            ),
+            duration: '30 min',
+            sort_order: 2,
+            type: 'decision',
+        },
+        {
+            id: 'fs-15',
+            title: 'Action Items & Follow-Up',
+            description:
+                'Assign next steps for'
+                + ' each deal and schedule'
+                + ' follow-ups.',
+            owner: 'Marcus Johnson',
+            role: 'Sales Director',
+            tools: jsonArrayField(
+                ['Slack', 'CRM'],
+            ),
+            duration: '30 min',
+            sort_order: 3,
+            type: 'end',
+        },
+        {
+            id: 'fs-16',
+            title: 'Content Brief',
+            description:
+                'Define topic, audience,'
+                + ' keywords, and goals'
+                + ' for the content piece.',
+            owner: 'Lisa Wang',
+            role: 'Content Strategist',
+            tools: jsonArrayField([
+                'Google Docs',
+                'SEMrush',
+            ]),
+            duration: '1 day',
+            sort_order: 0,
+            type: 'start',
+        },
+        {
+            id: 'fs-17',
+            title: 'Drafting',
+            description:
+                'Write first draft based'
+                + ' on brief and research.',
+            owner: 'Lisa Wang',
+            role: 'Content Writer',
+            tools: jsonArrayField(
+                ['Google Docs'],
+            ),
+            duration: '3 days',
+            sort_order: 1,
+            type: 'action',
+        },
+        {
+            id: 'fs-18',
+            title: 'Editorial Review',
+            description:
+                'Review for accuracy,'
+                + ' tone, and brand voice.'
+                + ' Approve or request'
+                + ' revisions.',
+            owner: 'David Kim',
+            role: 'Editor',
+            tools: jsonArrayField(
+                ['Google Docs'],
+            ),
+            duration: '2 days',
+            sort_order: 2,
+            type: 'decision',
+        },
+        {
+            id: 'fs-19',
+            title: 'Design & Formatting',
+            description:
+                'Add visuals, format for'
+                + ' target channel, and'
+                + ' prepare assets.',
+            owner: 'James Miller',
+            role: 'Designer',
+            tools: jsonArrayField(
+                ['Figma', 'Canva'],
+            ),
+            duration: '2 days',
+            sort_order: 3,
+            type: 'action',
+        },
+        {
+            id: 'fs-20',
+            title: 'Publish & Distribute',
+            description:
+                'Publish content and'
+                + ' schedule distribution'
+                + ' across channels.',
+            owner: 'Lisa Wang',
+            role: 'Content Strategist',
+            tools: jsonArrayField([
+                'CMS',
+                'Buffer',
+                'Mailchimp',
+            ]),
+            duration: '1 day',
+            sort_order: 4,
+            type: 'end',
+        },
+    ];
+
+    const processStepProcesses:
+        ProcessStepProcessEntity[] = [
+        ...['fs-1', 'fs-2', 'fs-3',
+            'fs-4', 'fs-5'].map(
+            stepId => ({
+                id: `psp-${stepId}`,
+                process_step_id: stepId,
+                process_id: '1',
+                created_at:
+                    '2024-02-01'
+                    + 'T09:00:00.000000Z',
+            } as ProcessStepProcessEntity),
+        ),
+        ...['fs-6', 'fs-7', 'fs-8',
+            'fs-9', 'fs-10', 'fs-11'].map(
+            stepId => ({
+                id: `psp-${stepId}`,
+                process_step_id: stepId,
+                process_id: '2',
+                created_at:
+                    '2024-02-01'
+                    + 'T09:00:00.000000Z',
+            } as ProcessStepProcessEntity),
+        ),
+        ...['fs-12', 'fs-13',
+            'fs-14', 'fs-15'].map(
+            stepId => ({
+                id: `psp-${stepId}`,
+                process_step_id: stepId,
+                process_id: '3',
+                created_at:
+                    '2024-02-01'
+                    + 'T09:00:00.000000Z',
+            } as ProcessStepProcessEntity),
+        ),
+        ...['fs-16', 'fs-17', 'fs-18',
+            'fs-19', 'fs-20'].map(
+            stepId => ({
+                id: `psp-${stepId}`,
+                process_step_id: stepId,
+                process_id: '4',
+                created_at:
+                    '2024-02-01'
+                    + 'T09:00:00.000000Z',
+            } as ProcessStepProcessEntity),
+        ),
+    ];
+
     await Promise.all([
         adapter.ideaScores.put('score-1', {
             id: 'score-1',
@@ -2034,6 +2456,16 @@ export async function populateMockData(
         ...crunchColumnAcronymLinks.map(l =>
             adapter.crunchColumnAcronymLinks
                 .put(l.id, l),
+        ),
+        ...flows.map(flow =>
+            adapter.flows.put(
+                flow.id, flow,
+            ),
+        ),
+        ...flowSteps.map(step =>
+            adapter.flowSteps.put(
+                step.id, step,
+            ),
         ),
     ]);
 
@@ -3567,6 +3999,11 @@ export async function populateMockData(
         ...projectVersionProjects.map(r =>
             adapter
                 .projectVersionProjects
+                .put(r.id, r),
+        ),
+        ...processStepProcesses.map(r =>
+            adapter
+                .processStepProcesses
                 .put(r.id, r),
         ),
     ]);
