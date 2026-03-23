@@ -1,4 +1,6 @@
-import { GET } from '../../../api/api';
+import {
+    GET, PUT,
+} from '../../../api/api';
 import type {
     UserEntity,
     AccountEntity,
@@ -123,6 +125,12 @@ export async function getProfile(
     };
 }
 
+export async function putProfile(
+    entity: Partial<UserEntity>,
+): Promise<void> {
+    await PUT('users/current', entity);
+}
+
 export interface CompanySettings {
     name: string;
     domain: string;
@@ -161,6 +169,12 @@ export async function getCompanySettings(
             ),
         dataRetention: row.data_retention,
     };
+}
+
+export async function putCompanySettings(
+    entity: Partial<CompanySettingsEntity>,
+): Promise<void> {
+    await PUT('company-settings', entity);
 }
 
 export { Activity } from '../../../api/types';

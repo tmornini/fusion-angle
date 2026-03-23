@@ -26,9 +26,12 @@ import {
     buildErrorState,
 } from '../app/loading-states';
 import {
-    getProfile,
+    getProfile, putProfile,
     allStrengths,
 } from '../app/adapters';
+import {
+    jsonArrayField,
+} from '../../api/types';
 
 export async function init(): Promise<void> {
     const selectedStrengths = new Set([
@@ -222,32 +225,71 @@ export async function init(): Promise<void> {
 
     $(
         '#profile-save-btn', document,
-    )?.addEventListener('click', () => {
-        const btn = $(
-            '#profile-save-btn', document,
-        )!;
-        btn.textContent = 'Saving...';
-        btn.setAttribute('disabled', '');
-        setTimeout(() => {
-            setHtml(
-                btn,
-                html`${
-                    iconCheckCircle2(16, '')
-                } Saved!`,
+    )?.addEventListener(
+        'click',
+        async () => {
+            const btn = $(
+                '#profile-save-btn',
+                document,
+            )!;
+            btn.textContent = 'Saving...';
+            btn.setAttribute(
+                'disabled', '',
             );
-            btn.removeAttribute('disabled');
-            showToast(
-                'Profile saved successfully',
-                'success',
-            );
-            setTimeout(() => {
+            try {
+                await putProfile({
+                    first_name:
+                        firstName?.value
+                        ?? '',
+                    last_name:
+                        lastName?.value
+                        ?? '',
+                    email:
+                        email?.value ?? '',
+                    phone:
+                        phone?.value ?? '',
+                    role:
+                        role?.value ?? '',
+                    department:
+                        department?.value
+                        ?? '',
+                    bio:
+                        bio?.value ?? '',
+                    strengths:
+                        jsonArrayField(
+                            [...selectedStrengths],
+                        ),
+                });
                 setHtml(
                     btn,
                     html`${
-                        iconSave(16, '')
-                    } Save Changes`,
+                        iconCheckCircle2(
+                            16, '',
+                        )
+                    } Saved!`,
                 );
-            }, 2000);
-        }, 800);
-    });
+                showToast(
+                    'Profile saved',
+                    'success',
+                );
+                setTimeout(() => {
+                    setHtml(
+                        btn,
+                        html`${
+                            iconSave(16, '')
+                        } Save Changes`,
+                    );
+                }, 2000);
+            } catch {
+                showToast(
+                    'Failed to save'
+                    + ' profile',
+                    'error',
+                );
+            }
+            btn.removeAttribute(
+                'disabled',
+            );
+        },
+    );
 }

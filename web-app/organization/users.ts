@@ -1,4 +1,6 @@
-import { $, $input } from '../app/dom';
+import {
+    $, $input, $select,
+} from '../app/dom';
 import {
     html, setHtml, SafeHtml, trusted,
 } from '../app/safe-html';
@@ -15,11 +17,17 @@ import {
 } from '../app/icons';
 import {
     initials, initDialog, closeDialog,
+    navigateTo,
 } from '../app/core';
 import {
-    getManagedUsers,
+    getManagedUsers, putUser,
     type User,
 } from '../app/adapters';
+import {
+    jsonArrayField,
+    jsonObjectField,
+    nowUtc,
+} from '../../api/types';
 
 const roleLabels: Record<string, {
     label: string;
@@ -438,7 +446,7 @@ export async function init(): Promise<void> {
                 role="dialog"
                 aria-modal="true"
                 style="${
-                    'max-width:28rem'
+                    'max-width:36rem'
                 }">
                 <div class="${
                     'dialog-header'
@@ -451,124 +459,303 @@ export async function init(): Promise<void> {
                             + 'gap-2'
                         }">
                         ${iconUserPlus(20, '')}
-                        Invite New User
+                        Add User
                     </h3>
-                    <p class="${
-                        'dialog-description'
-                    }">
-                        Send an invitation
-                        to join your
-                        organization.
-                    </p>
                 </div>
                 <div
                     class="${
                         'flex flex-col '
-                        + 'gap-4 py-4'
+                        + 'gap-3 py-4'
+                    }"
+                    style="${
+                        'max-height:60vh;'
+                        + 'overflow-y:auto'
                     }">
+                    <div class="${
+                        'flex gap-3'
+                    }">
+                        <div style="flex:1">
+                            <label
+                                class="${
+                                    'label '
+                                    + 'mb-1 '
+                                    + 'block'
+                                }">
+                                First Name
+                            </label>
+                            <input
+                                class="input"
+                                id="${
+                                    'invite-'
+                                    + 'first'
+                                }"
+                                placeholder="${
+                                    'First name'
+                                }" />
+                        </div>
+                        <div style="flex:1">
+                            <label
+                                class="${
+                                    'label '
+                                    + 'mb-1 '
+                                    + 'block'
+                                }">
+                                Last Name
+                            </label>
+                            <input
+                                class="input"
+                                id="${
+                                    'invite-'
+                                    + 'last'
+                                }"
+                                placeholder="${
+                                    'Last name'
+                                }" />
+                        </div>
+                    </div>
                     <div>
                         <label
                             class="${
-                                'label mb-2 '
+                                'label '
+                                + 'mb-1 '
                                 + 'block'
                             }">
-                            Email Address
+                            Email
                         </label>
                         <input
                             class="input"
                             type="email"
                             placeholder="${
-                                'colleague@'
-                                + 'company.com'
+                                'user@company'
+                                + '.com'
                             }"
                             id="${
                                 'invite-email'
                             }" />
                     </div>
-                    <div>
-                        <label
-                            class="${
-                                'label mb-2 '
-                                + 'block'
-                            }">
-                            Role
-                        </label>
-                        <select
-                            class="input"
-                            id="${
-                                'invite-role'
-                            }">
-                            <option
-                                value="${
-                                    'member'
+                    <div class="${
+                        'flex gap-3'
+                    }">
+                        <div style="flex:1">
+                            <label
+                                class="${
+                                    'label '
+                                    + 'mb-1 '
+                                    + 'block'
                                 }">
-                                Member
-                            </option>
-                            <option
-                                value="${
-                                    'admin'
+                                Role
+                            </label>
+                            <select
+                                class="input"
+                                id="${
+                                    'invite-'
+                                    + 'role'
                                 }">
-                                Admin
-                            </option>
-                            <option
-                                value="${
-                                    'manager'
+                                <option
+                                    value="${
+                                        'member'
+                                    }">
+                                    Member
+                                </option>
+                                <option
+                                    value="${
+                                        'admin'
+                                    }">
+                                    Admin
+                                </option>
+                                <option
+                                    value="${
+                                        'manager'
+                                    }">
+                                    Manager
+                                </option>
+                                <option
+                                    value="${
+                                        'viewer'
+                                    }">
+                                    Viewer
+                                </option>
+                            </select>
+                        </div>
+                        <div style="flex:1">
+                            <label
+                                class="${
+                                    'label '
+                                    + 'mb-1 '
+                                    + 'block'
                                 }">
-                                Manager
-                            </option>
-                            <option
-                                value="${
-                                    'viewer'
+                                Department
+                            </label>
+                            <select
+                                class="input"
+                                id="${
+                                    'invite-'
+                                    + 'department'
                                 }">
-                                Viewer
-                            </option>
-                        </select>
+                                <option
+                                    value="${
+                                        'Engineering'
+                                    }">
+                                    Engineering
+                                </option>
+                                <option
+                                    value="${
+                                        'Product'
+                                    }">
+                                    Product
+                                </option>
+                                <option
+                                    value="${
+                                        'Design'
+                                    }">
+                                    Design
+                                </option>
+                                <option
+                                    value="${
+                                        'Sales'
+                                    }">
+                                    Sales
+                                </option>
+                                <option
+                                    value="${
+                                        'Operations'
+                                    }">
+                                    Operations
+                                </option>
+                                <option
+                                    value="${
+                                        'Analytics'
+                                    }">
+                                    Analytics
+                                </option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="${
+                        'flex gap-3'
+                    }">
+                        <div style="flex:1">
+                            <label
+                                class="${
+                                    'label '
+                                    + 'mb-1 '
+                                    + 'block'
+                                }">
+                                Status
+                            </label>
+                            <select
+                                class="input"
+                                id="${
+                                    'invite-'
+                                    + 'status'
+                                }">
+                                <option
+                                    value="${
+                                        'active'
+                                    }">
+                                    Active
+                                </option>
+                                <option
+                                    value="${
+                                        'pending'
+                                    }">
+                                    Pending
+                                </option>
+                                <option
+                                    value="${
+                                        'deactivated'
+                                    }">
+                                    Deactivated
+                                </option>
+                            </select>
+                        </div>
+                        <div style="flex:1">
+                            <label
+                                class="${
+                                    'label '
+                                    + 'mb-1 '
+                                    + 'block'
+                                }">
+                                Phone
+                            </label>
+                            <input
+                                class="input"
+                                id="${
+                                    'invite-'
+                                    + 'phone'
+                                }"
+                                placeholder="${
+                                    '+1 (555)'
+                                    + ' 000-0000'
+                                }" />
+                        </div>
+                    </div>
+                    <div class="${
+                        'flex gap-3'
+                    }">
+                        <div style="flex:1">
+                            <label
+                                class="${
+                                    'label '
+                                    + 'mb-1 '
+                                    + 'block'
+                                }">
+                                Availability %
+                            </label>
+                            <input
+                                class="input"
+                                type="number"
+                                min="0"
+                                max="100"
+                                id="${
+                                    'invite-'
+                                    + 'avail'
+                                }"
+                                placeholder="${
+                                    '0-100'
+                                }" />
+                        </div>
+                        <div style="flex:1">
+                            <label
+                                class="${
+                                    'label '
+                                    + 'mb-1 '
+                                    + 'block'
+                                }">
+                                Performance
+                            </label>
+                            <input
+                                class="input"
+                                type="number"
+                                min="0"
+                                max="100"
+                                id="${
+                                    'invite-'
+                                    + 'perf'
+                                }"
+                                placeholder="${
+                                    '0-100'
+                                }" />
+                        </div>
                     </div>
                     <div>
                         <label
                             class="${
-                                'label mb-2 '
+                                'label '
+                                + 'mb-1 '
                                 + 'block'
                             }">
-                            Department
+                            Bio
                         </label>
-                        <select
-                            class="input"
+                        <textarea
+                            class="textarea"
+                            rows="2"
                             id="${
-                                'invite-'
-                                + 'department'
-                            }">
-                            <option
-                                value="${
-                                    'Engineering'
-                                }">
-                                Engineering
-                            </option>
-                            <option
-                                value="${
-                                    'Product'
-                                }">
-                                Product
-                            </option>
-                            <option
-                                value="${
-                                    'Design'
-                                }">
-                                Design
-                            </option>
-                            <option
-                                value="${
-                                    'Sales'
-                                }">
-                                Sales
-                            </option>
-                            <option
-                                value="${
-                                    'Operations'
-                                }">
-                                Operations
-                            </option>
-                        </select>
+                                'invite-bio'
+                            }"
+                            placeholder="${
+                                'Short bio...'
+                            }"></textarea>
                     </div>
                 </div>
                 <div class="${
@@ -592,38 +779,113 @@ export async function init(): Promise<void> {
                             'invite-submit'
                         }">
                         ${iconSend(16, '')
-                        } Send Invite
+                        } Add User
                     </button>
                 </div>
             </div>
         </div>`);
 
     initDialog('invite', 'invite-btn',
-            () => {
-                    const email =
-                            $input('#invite-email', document)
-                                    ?.value;
-                    if (!email) {
-                            showToast(
-                                    'Please enter an'
-                                    + ' email address',
-                                    'error',
-                            );
-                            return;
-                    }
-                    showToast(
-                            'Invitation sent to '
-                            + email,
-                            'success',
-                    );
-                    closeDialog('invite');
-            },
+        async () => {
+            const first = $input(
+                '#invite-first', document,
+            )?.value ?? '';
+            const last = $input(
+                '#invite-last', document,
+            )?.value ?? '';
+            const email = $input(
+                '#invite-email', document,
+            )?.value ?? '';
+            if (!first || !last || !email) {
+                showToast(
+                    'Name and email'
+                    + ' are required',
+                    'error',
+                );
+                return;
+            }
+            const role = $select(
+                '#invite-role', document,
+            )?.value ?? 'member';
+            const dept = $select(
+                '#invite-department',
+                document,
+            )?.value ?? '';
+            const status = $select(
+                '#invite-status',
+                document,
+            )?.value ?? 'active';
+            const phone = $input(
+                '#invite-phone', document,
+            )?.value ?? '';
+            const avail = Number(
+                $input(
+                    '#invite-avail',
+                    document,
+                )?.value ?? '0',
+            );
+            const perf = Number(
+                $input(
+                    '#invite-perf',
+                    document,
+                )?.value ?? '0',
+            );
+            const bio = (
+                document.querySelector<
+                    HTMLTextAreaElement
+                >('#invite-bio')
+                    ?.value ?? ''
+            );
+            const id = crypto.randomUUID();
+            try {
+                await putUser(id, {
+                    first_name: first,
+                    last_name: last,
+                    email,
+                    role,
+                    department: dept,
+                    status: status as
+                        'active'
+                        | 'pending'
+                        | 'deactivated',
+                    availability: avail,
+                    performance_score:
+                        perf,
+                    projects_completed: 0,
+                    current_projects: 0,
+                    strengths:
+                        jsonArrayField([]),
+                    team_dimensions:
+                        jsonObjectField({
+                            driver: 50,
+                            analytical: 50,
+                            expressive: 50,
+                            amiable: 50,
+                        }),
+                    phone,
+                    bio,
+                    last_active: nowUtc(),
+                });
+                showToast(
+                    'User created',
+                    'success',
+                );
+                closeDialog('invite');
+                navigateTo('users');
+            } catch {
+                showToast(
+                    'Failed to create'
+                    + ' user',
+                    'error',
+                );
+            }
+        },
     );
     document.addEventListener(
-            'keydown',
-            (e) => {
-                    if (e.key === 'Escape')
-                            closeDialog('invite');
-            },
+        'keydown',
+        (e) => {
+            if (e.key === 'Escape')
+                closeDialog('invite');
+        },
     );
 }

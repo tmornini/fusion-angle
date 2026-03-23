@@ -1,4 +1,6 @@
-import { GET } from '../../../api/api';
+import {
+    GET, PUT,
+} from '../../../api/api';
 import type {
     UserEntity,
 } from '../../../api/types';
@@ -37,4 +39,11 @@ export async function getManagedUsers(
         await GET<UserEntity[]>('users');
     return rows
         .map(entity => new User(entity));
+}
+
+export async function putUser(
+    id: string,
+    entity: Partial<UserEntity>,
+): Promise<void> {
+    await PUT(`users/${id}`, entity);
 }

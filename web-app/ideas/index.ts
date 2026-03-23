@@ -422,8 +422,7 @@ export async function init(): Promise<void> {
                     Create Your First Idea
                     ${iconWand(16, '')}`,
                 href:
-                    '../idea-create'
-                    + '/index.html',
+                    'create.html',
             },
             onEmpty: () => {
                 $(

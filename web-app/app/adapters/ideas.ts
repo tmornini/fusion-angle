@@ -260,3 +260,13 @@ export async function putIdeaSubmission(
         },
     );
 }
+
+export async function putIdeaScore(
+    ideaId: string,
+    entity: Partial<IdeaScoreEntity>,
+): Promise<void> {
+    await PUT(
+        `ideas/${ideaId}/score`,
+        entity,
+    );
+}

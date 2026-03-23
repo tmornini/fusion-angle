@@ -18,7 +18,9 @@ import {
 } from '../app/loading-states';
 import {
     getCompanySettings,
+    putCompanySettings,
 } from '../app/adapters';
+import { $input, $select } from '../app/dom';
 
 function buildSelectField(
     id: string,
@@ -339,12 +341,68 @@ export async function init(): Promise<void> {
         });
 
     $(
-        '#company-settings-save-btn', document,
-    )?.addEventListener('click', () => {
-        showToast(
-            'Company settings saved'
-            + ' successfully',
-            'success',
-        );
-    });
+        '#company-settings-save-btn',
+        document,
+    )?.addEventListener(
+        'click',
+        async () => {
+            const sel = (id: string) =>
+                $select(
+                    '#' + id, document,
+                )?.value ?? '';
+            const inp = (id: string) =>
+                $input(
+                    '#' + id, document,
+                )?.value ?? '';
+            const sw = (id: string) =>
+                $(
+                    '#switch-' + id,
+                    document,
+                )?.getAttribute(
+                    'aria-checked',
+                ) === 'true' ? 1 : 0;
+            const p =
+                'company-settings-';
+            try {
+                await putCompanySettings({
+                    name: inp(p + 'name'),
+                    domain: inp(
+                        p + 'domain',
+                    ),
+                    industry: sel(
+                        p + 'industry',
+                    ),
+                    size: sel(p + 'size'),
+                    timezone: sel(
+                        p + 'timezone',
+                    ),
+                    language: sel(
+                        p + 'language',
+                    ),
+                    is_sso_enforced:
+                        sw(p + 'sso'),
+                    is_two_factor_enabled:
+                        sw(p + '2fa'),
+                    is_ip_whitelist_enabled:
+                        sw(
+                            p
+                            + 'ip-whitelist',
+                        ),
+                    data_retention: sel(
+                        p + 'retention',
+                    ),
+                });
+                showToast(
+                    'Settings saved',
+                    'success',
+                );
+            } catch {
+                showToast(
+                    'Failed to save'
+                    + ' settings',
+                    'error',
+                );
+            }
+        },
+    );
 }

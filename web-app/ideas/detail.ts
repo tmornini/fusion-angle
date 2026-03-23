@@ -256,6 +256,14 @@ function buildEstimatesCard(
         <div class="score-grid">
             ${[
               {
+                  label: 'Score',
+                  inputId: 'score',
+                  icon: iconStar,
+                  value: idea.score,
+                  unit: '',
+                  prefix: '#',
+              },
+              {
                   label: 'Impact',
                   inputId: 'impact',
                   icon: iconTrendingUp,
@@ -443,6 +451,22 @@ function buildIdeaDetail(
                     ${iconTarget(16, '')}
                     Define Edge
                 </button>` : html``}
+                ${idea.status === 'active'
+                    ? html`
+                <button
+                    class="${
+                        'btn btn-primary'
+                        + ' btn-sm gap-2'
+                    }"
+                    id="${
+                        'idea-submit'
+                        + '-review-btn'
+                    }">
+                    ${iconClipboardCheck(
+                        16, '',
+                    )}
+                    Submit for Review
+                </button>` : html``}
                 ${idea.isReviewable()
                     ? html`
                 <button
@@ -587,6 +611,12 @@ function bindIdeaEvents(
                         '#idea-edit-metrics',
                         document,
                     )!.value;
+                const score = Number(
+                    $input(
+                        '#idea-edit-score',
+                        document,
+                    )!.value,
+                );
                 const impact = Number(
                     $input(
                         '#idea-edit-impact',
@@ -619,6 +649,7 @@ function bindIdeaEvents(
                             expectedOutcome,
                         success_metrics:
                             successMetrics,
+                        score,
                         estimated_impact:
                             impact,
                         estimated_duration:
@@ -674,6 +705,35 @@ function bindIdeaEvents(
                 { ideaId },
             ),
         );
+    $(
+        '#idea-submit-review-btn',
+        document,
+    )?.addEventListener(
+        'click',
+        async () => {
+            try {
+                await putIdea(ideaId, {
+                    status: 'in-review',
+                });
+                showToast(
+                    'Submitted for review',
+                    'success',
+                );
+                const updated =
+                    await getIdeaDetail(
+                        ideaId,
+                    );
+                mutateIdeaPage(
+                    updated, ideaId,
+                );
+            } catch {
+                showToast(
+                    'Failed to submit',
+                    'error',
+                );
+            }
+        },
+    );
 }
 
 function mutateIdeaPage(
