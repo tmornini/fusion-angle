@@ -605,6 +605,41 @@ const routes: Route[] = [
                 link.edge_id,
             );
         },
+        put: async (db, p, payload) => {
+            const ideaId = param(p, 0);
+            const links =
+                await db.edgeIdeas
+                    .getAll();
+            const existing = links.find(
+                l => l.idea_id === ideaId,
+            );
+            const edgeId = existing
+                ? existing.edge_id
+                : crypto.randomUUID();
+            const result =
+                await db.edges.put(
+                    edgeId,
+                    {
+                        ...payload,
+                        updated_at: nowUtc(),
+                    },
+                );
+            if (!existing) {
+                const linkId =
+                    `ei-${edgeId}`;
+                await db.edgeIdeas.put(
+                    linkId,
+                    {
+                        id: linkId,
+                        edge_id: edgeId,
+                        idea_id: ideaId,
+                        created_at:
+                            nowUtc(),
+                    },
+                );
+            }
+            return result;
+        },
     }),
     route('ideas/:ideaId/score', {
         get: async (db, p) => {
@@ -1253,6 +1288,14 @@ const routes: Route[] = [
             const { populateMockData } =
                 await import('./mock-data');
             await populateMockData(db);
+        },
+    }),
+    route('snapshots/bootstrap', {
+        post: async (db) => {
+            const {
+                populateBootstrapData,
+            } = await import('./mock-data');
+            await populateBootstrapData(db);
         },
     }),
     route('snapshots/import', {

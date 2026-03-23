@@ -457,9 +457,6 @@ export async function init(): Promise<void> {
                 + ' collaborating on projects.',
         },
     );
-    if (!result) return;
-    state.members = result;
-
     populateIcons([
         [
             '#activity-feed-btn-icon',
@@ -474,6 +471,30 @@ export async function init(): Promise<void> {
             iconSearch(16, ''),
         ],
     ]);
+
+    initDialog(
+        'add-member',
+        'team-add-btn',
+    );
+    $('#add-member-send', document)?.addEventListener(
+        'click',
+        () => {
+            const email =
+                $input('#add-member-email', document)
+                    ?.value;
+            showToast(
+                email
+                    ? 'Invitation sent to '
+                      + email
+                    : 'Member invited',
+                'success',
+            );
+            closeDialog('add-member');
+        },
+    );
+
+    if (!result) return;
+    state.members = result;
 
     const summaryEl = $('#team-summary', document);
     if (summaryEl) {
@@ -503,27 +524,6 @@ export async function init(): Promise<void> {
 
     $('#team-search', document)?.addEventListener(
         'input', mutateList,
-    );
-
-    initDialog(
-        'add-member',
-        'team-add-btn',
-    );
-    $('#add-member-send', document)?.addEventListener(
-        'click',
-        () => {
-            const email =
-                $input('#add-member-email', document)
-                    ?.value;
-            showToast(
-                email
-                    ? 'Invitation sent to '
-                      + email
-                    : 'Member invited',
-                'success',
-            );
-            closeDialog('add-member');
-        },
     );
 
     mutateList();

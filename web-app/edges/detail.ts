@@ -18,7 +18,8 @@ import {
 } from '../app/core';
 import {
     getIdeaForEdge, getEdgeDataByIdeaId,
-    putEdgeData, type EdgeData,
+    putEdge, putEdgeOutcome, putEdgeMetric,
+    type EdgeData,
 } from '../app/adapters';
 import {
     Idea, isConfidenceLevel,
@@ -40,7 +41,7 @@ const state = {
             longTerm: '',
         },
         confidence: 'medium',
-        owner: 'Sarah Chen',
+        owner: null,
     } as EdgeData,
     currentIdea: null as Idea | null,
 };
@@ -461,12 +462,7 @@ function buildEdgePage(
             <button class="${
                 'btn btn-hero gap-2'
             }"
-                id="edge-save-btn"
-                ${trusted(
-                    completion.isComplete
-                        ? ''
-                        : 'disabled',
-                )}>
+                id="edge-save-btn">
                 ${iconSave(16, '')
                 } Save &amp; Continue
             </button>
@@ -881,6 +877,7 @@ function buildEdgePage(
                                 value="${
                                     edgeData
                                         .owner
+                                        ?? ''
                                 }" />
                         </div>
                     </div>
@@ -1288,9 +1285,73 @@ function bindEdgeEvents(ideaId: string) {
             saveBtn.disabled = true;
             saveBtn.textContent = 'Saving...';
             try {
-                await putEdgeData(
+                const edge = await putEdge(
                     ideaId,
-                    state.edgeData,
+                    {
+                        confidence:
+                            state.edgeData
+                                .confidence,
+                        impact_short_term:
+                            state.edgeData
+                                .impact
+                                .shortTerm,
+                        impact_mid_term:
+                            state.edgeData
+                                .impact
+                                .midTerm,
+                        impact_long_term:
+                            state.edgeData
+                                .impact
+                                .longTerm,
+                        status:
+                            'complete',
+                    },
+                );
+                await Promise.all(
+                    state.edgeData
+                        .outcomes
+                        .map(
+                            async outcome => {
+                                await putEdgeOutcome(
+                                    edge.id,
+                                    outcome.id,
+                                    {
+                                        description:
+                                            outcome
+                                            .description,
+                                    },
+                                );
+                                await Promise
+                                    .all(
+                                    outcome
+                                        .metrics
+                                        .map(
+                                        metric =>
+                                        putEdgeMetric(
+                                            edge.id,
+                                            outcome
+                                                .id,
+                                            metric
+                                                .id,
+                                            {
+                                                name:
+                                                    metric
+                                                    .name,
+                                                target:
+                                                    metric
+                                                    .target,
+                                                unit:
+                                                    metric
+                                                    .unit,
+                                                current:
+                                                    metric
+                                                    .current,
+                                            },
+                                        ),
+                                    ),
+                                );
+                            },
+                        ),
                 );
                 showToast(
                     'Edge data saved'
@@ -1350,7 +1411,7 @@ export async function init(
                 longTerm: '',
             },
             confidence: 'medium',
-            owner: 'Sarah Chen',
+            owner: null,
         };
     }
     mutateEdgePage(ideaId);

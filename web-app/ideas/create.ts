@@ -15,6 +15,9 @@ import {
     putIdea,
     putIdeaSubmission,
 } from '../app/adapters';
+import {
+    jsonArrayField,
+} from '../../api/types';
 
 const steps = [
     {
@@ -750,11 +753,31 @@ export async function init():
                                     '',
                                 effort_label:
                                     '',
+                                risks:
+                                    jsonArrayField(
+                                        [],
+                                    ),
+                                assumptions:
+                                    jsonArrayField(
+                                        [],
+                                    ),
+                                alignments:
+                                    jsonArrayField(
+                                        [],
+                                    ),
+                                effort_duration_estimate:
+                                    '',
+                                effort_team_size:
+                                    '',
+                                cost_estimate:
+                                    '',
+                                cost_breakdown:
+                                    '',
                             },
                         );
                         await putIdeaSubmission(
                             ideaId,
-                            '1',
+                            'current',
                         );
                         navigateTo(
                             'ideas',

@@ -14,8 +14,7 @@ export async function getTeamMembers(
     return rows
         .map(entity => new User(entity))
         .filter(user =>
-            user.id !== 'current'
-            && user.hasDepartment()
+            user.hasDepartment()
             && user.hasPerformanceScore(),
         )
         .slice(0, TOP_MEMBERS_COUNT);
@@ -37,8 +36,5 @@ export async function getManagedUsers(
     const rows =
         await GET<UserEntity[]>('users');
     return rows
-        .filter(
-            entity => entity.id !== 'current',
-        )
         .map(entity => new User(entity));
 }

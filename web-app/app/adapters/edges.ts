@@ -178,53 +178,43 @@ export async function getEdgeList(
     });
 }
 
-export async function putEdgeData(
+export async function putEdge(
     ideaId: string,
-    data: EdgeData,
+    fields: Partial<EdgeEntity>,
+): Promise<EdgeEntity> {
+    return PUT<EdgeEntity>(
+        `ideas/${ideaId}/edge`,
+        fields,
+    );
+}
+
+export async function putEdgeOutcome(
+    edgeId: string,
+    outcomeId: string,
+    fields: { description: string },
 ): Promise<void> {
-    const edge = await GET<EdgeEntity | null>(`ideas/${ideaId}/edge`);
-    if (!edge) return;
+    await PUT(
+        `edges/${edgeId}`
+            + `/outcomes/${outcomeId}`,
+        fields,
+    );
+}
 
-    await PUT(`edges/${edge.id}`, {
-        confidence: data.confidence,
-        impact_short_term:
-            data.impact.shortTerm,
-        impact_mid_term:
-            data.impact.midTerm,
-        impact_long_term:
-            data.impact.longTerm,
-        status: 'complete' as const,
-    });
-
-    await Promise.all(
-        data.outcomes.map(async outcome => {
-            await PUT(
-                `edges/${edge.id}`
-                    + `/outcomes/${outcome.id}`,
-                {
-                    description:
-                        outcome.description,
-                },
-            );
-            await Promise.all(
-                outcome.metrics.map(metric =>
-                    PUT(
-                        `edges/${edge.id}`
-                        + `/outcomes/`
-                        + `${outcome.id}`
-                        + `/metrics/`
-                        + `${metric.id}`,
-                        {
-                            name: metric.name,
-                            target:
-                                metric.target,
-                            unit: metric.unit,
-                            current:
-                                metric.current,
-                        },
-                    ),
-                ),
-            );
-        }),
+export async function putEdgeMetric(
+    edgeId: string,
+    outcomeId: string,
+    metricId: string,
+    fields: {
+        name: string;
+        target: string;
+        unit: string;
+        current: string;
+    },
+): Promise<void> {
+    await PUT(
+        `edges/${edgeId}`
+            + `/outcomes/${outcomeId}`
+            + `/metrics/${metricId}`,
+        fields,
     );
 }

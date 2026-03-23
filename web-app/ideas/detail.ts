@@ -654,7 +654,7 @@ function bindIdeaEvents(
         ?.addEventListener(
             'click',
             () => navigateTo(
-                'edge',
+                'edge-detail',
                 { ideaId },
             ),
         );

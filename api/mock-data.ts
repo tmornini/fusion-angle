@@ -4116,3 +4116,75 @@ export async function populateMockData(
         ),
     ]);
 }
+
+export async function populateBootstrapData(
+    adapter: DbAdapter,
+): Promise<void> {
+    await Promise.all([
+        adapter.users.put('current', {
+            first_name: 'Tony',
+            last_name: 'Stark',
+            email: 'demo@example.com',
+            role: 'Admin',
+            department: 'Product',
+            status: 'active' as UserStatus,
+            availability: 100,
+            performance_score: 95,
+            projects_completed: 20,
+            current_projects: 5,
+            strengths: jsonArrayField([
+                'Strategic Planning',
+                'Data Analysis',
+                'Stakeholder Management',
+            ]),
+            team_dimensions: jsonObjectField({
+                driver: 80,
+                analytical: 80,
+                expressive: 80,
+                amiable: 80,
+            }),
+            phone: '+1 (555) 123-4567',
+            bio: 'Passionate about building'
+                + ' products that solve'
+                + ' real problems.',
+            last_active:
+                '2024-02-28'
+                + 'T18:00:00.000000Z',
+        }),
+        adapter.companySettings.put({
+            name: 'Stark Industries',
+            domain: 'acmecorp.com',
+            industry: 'Technology',
+            size: '51-200',
+            timezone: 'America/New_York',
+            language: 'English',
+            is_sso_enforced: 0,
+            is_two_factor_enabled: 1,
+            is_ip_whitelist_enabled: 0,
+            data_retention: '12 months',
+        }),
+        adapter.account.put({
+            plan: 'Business',
+            plan_status: 'active',
+            next_billing:
+                '2025-01-15'
+                + 'T00:00:00.000000Z',
+            seats: 25,
+            used_seats: 18,
+            projects_limit: 50,
+            projects_current: 12,
+            ideas_limit: 200,
+            ideas_current: 47,
+            storage_limit: 10,
+            storage_current: 2.4,
+            ai_credits_limit: 1000,
+            ai_credits_current: 850,
+            health_score: 92,
+            health_status: 'excellent',
+            last_activity:
+                '2024-02-28'
+                + 'T16:00:00.000000Z',
+            active_users: 14,
+        }),
+    ]);
+}

@@ -1,6 +1,7 @@
 import {
     deleteSchema,
     createSchema,
+    bootstrapData,
     loadMockData,
     importSnapshot,
     exportSnapshot,
@@ -317,6 +318,7 @@ export async function init(): Promise<void> {
                     + ' environment',
                     async () => {
                         await createSchema();
+                        await bootstrapData();
                     },
                     'Are you sure you want'
                     + ' to create a pristine'

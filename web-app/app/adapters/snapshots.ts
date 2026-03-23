@@ -13,6 +13,10 @@ export async function loadMockData(): Promise<void> {
     await POST('snapshots/mock-data', {});
 }
 
+export async function bootstrapData(): Promise<void> {
+    await POST('snapshots/bootstrap', {});
+}
+
 export async function importSnapshot(json: string): Promise<void> {
     await PUT('snapshots/import', { json });
 }
