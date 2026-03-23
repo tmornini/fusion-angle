@@ -1251,7 +1251,7 @@ const routes: Route[] = [
     route('snapshots/mock-data', {
         post: async (db) => {
             const { populateMockData } =
-                await import('./seed');
+                await import('./mock-data');
             await populateMockData(db);
         },
     }),
