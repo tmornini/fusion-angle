@@ -144,113 +144,97 @@ function buildConversionPage(
         state.projectDetails['project-lead'];
 
     return html`
-    <div>
-        <header style=${'border-bottom:'
-            + '1px solid hsl(var(--border));'
-            + 'background:'
-            + 'hsl(var(--card)/0.5);'
-            + 'backdrop-filter:blur(8px);'
-            + 'position:sticky;top:0;'
-            + 'z-index:50'}>
-            <div style=${'max-width:72rem;'
-                + 'margin:0 auto;'
-                + 'padding:0 1.5rem'}>
-                <div
-                    class="flex items-center
-                        justify-between"
-                    style="height:4rem">
-                    <div class="${
-                        'flex items-center'
-                        + ' gap-4'
-                    }">
-                        <button
-                            class="${
-                                'btn btn-ghost'
-                                + ' btn-icon'
-                            }"
-                            id=${'convert'
-                                + '-back-to'
-                                + '-ideas'}>
-                            ${iconArrowLeft(20, '')}
-                        </button>
-                        <div class="flex
-                            items-center gap-3">
-                            <div
-                                class="${
-                                    'gradient-hero'
-                                    + ' rounded-lg'
-                                    + ' flex'
-                                    + ' items-center'
-                                    + ' justify-'
-                                    + 'center'
-                                }"
-                                style=${'width:'
-                                    + '2.25rem;'
-                                    + 'height:'
-                                    + '2.25rem;'
-                                    + 'color:'
-                                    + 'hsl(var('
-                                    + '--primary'
-                                    + '-foreground'
-                                    + '))'}>
-                                ${iconRocket(20, '')}
-                            </div>
-                            <span class="${
-                                'text-xl'
-                                + ' font-display'
-                                + ' font-bold'
-                            }">
-                                ${'Convert to'
-                                    + ' Project'}
-                            </span>
-                        </div>
+        <div class="${
+            'flex items-center'
+            + ' justify-between'
+            + ' gap-4 mb-6'
+        }">
+            <div class="${
+                'flex items-center'
+                + ' gap-4'
+            }">
+                <button
+                    class="${
+                        'btn btn-ghost'
+                        + ' btn-icon'
+                    }"
+                    id=${'convert'
+                        + '-back-to'
+                        + '-ideas'}>
+                    ${iconArrowLeft(20, '')}
+                </button>
+                <div class="flex
+                    items-center gap-3">
+                    <div
+                        class="${
+                            'gradient-hero'
+                            + ' rounded-lg'
+                            + ' flex'
+                            + ' items-center'
+                            + ' justify-'
+                            + 'center'
+                        }"
+                        style=${'width:'
+                            + '2.25rem;'
+                            + 'height:'
+                            + '2.25rem;'
+                            + 'color:'
+                            + 'hsl(var('
+                            + '--primary'
+                            + '-foreground'
+                            + '))'}>
+                        ${iconRocket(20, '')}
                     </div>
-                    <div class="${
-                        'hidden-mobile'
-                        + ' flex items-center'
-                        + ' gap-2'
-                        + ' text-sm'
+                    <span class="${
+                        'text-xl'
+                        + ' font-display'
+                        + ' font-bold'
                     }">
-                        <span class="${
-                            'text-muted'
-                        }">${
-                            completedCount
-                        }/${
-                            requiredFields
-                                .length
-                        } required fields${
-                            ''
-                        }</span>
-                        <div style=${'width:'
-                            + '6rem;'
-                            + 'height:0.5rem;'
-                            + 'background:'
-                            + 'hsl(var(--muted)'
-                            + ');'
-                            + 'border-radius:'
-                            + '9999px;'
-                            + 'overflow:'
-                            + 'hidden'}>
-                            <div style=${
-                                'height:100%;'
-                                + 'background:'
-                                + 'hsl(var('
-                                + '--success));'
-                                + 'transition:'
-                                + 'width 0.3s;'
-                                + 'width:'
-                                + percent
-                                + '%'
-                            }></div>
-                        </div>
-                    </div>
+                        ${'Convert to'
+                            + ' Project'}
+                    </span>
                 </div>
             </div>
-        </header>
-
-        <div style=${'max-width:72rem;'
-            + 'margin:0 auto;'
-            + 'padding:2rem 1.5rem'}>
+            <div class="${
+                'hidden-mobile'
+                + ' flex items-center'
+                + ' gap-2'
+                + ' text-sm'
+            }">
+                <span class="${
+                    'text-muted'
+                }">${
+                    completedCount
+                }/${
+                    requiredFields
+                        .length
+                } required fields${
+                    ''
+                }</span>
+                <div style=${'width:'
+                    + '6rem;'
+                    + 'height:0.5rem;'
+                    + 'background:'
+                    + 'hsl(var(--muted)'
+                    + ');'
+                    + 'border-radius:'
+                    + '9999px;'
+                    + 'overflow:'
+                    + 'hidden'}>
+                    <div style=${
+                        'height:100%;'
+                        + 'background:'
+                        + 'hsl(var('
+                        + '--success));'
+                        + 'transition:'
+                        + 'width 0.3s;'
+                        + 'width:'
+                        + percent
+                        + '%'
+                    }></div>
+                </div>
+            </div>
+        </div>
             <div class="convert-grid"
                 style=${'grid-template-'
                     + 'columns:'
@@ -1013,9 +997,7 @@ function buildConversionPage(
                         </div>
                     </div>
                 </div>
-            </div>
-        </div>
-    </div>`;
+            </div>`;
 }
 
 export async function init(
@@ -1024,7 +1006,9 @@ export async function init(
     const ideaId = params?.['ideaId'];
     if (!ideaId) { navigateTo('ideas'); return; }
 
-    const root = $('#wizard-root', document);
+    const root = $(
+        '#convert-content', document,
+    );
     if (!root) return;
     setHtml(root, buildSkeleton('detail', 4));
 

@@ -175,6 +175,11 @@
 .sidebar-collapsed ~ .main-content,
 .main-content.sidebar-collapsed { margin-left: 4rem; }
 
+.sidebar-collapsed ~ .main-content .action-footer,
+.main-content.sidebar-collapsed .action-footer {
+  left: 4rem;
+}
+
 /* Header */
 .top-header {
   position: sticky;
@@ -272,6 +277,8 @@
 .page-content {
   flex: 1;
   padding: 2rem;
+  max-width: 72rem;
+  margin: 0 auto;
 }
 
 /* Mobile header */
@@ -329,6 +336,7 @@
   .main-content .page-content {
     padding: 1rem;
   }
+  .action-footer { left: 0; }
 }
 
 /* Sidebar sign-out link */

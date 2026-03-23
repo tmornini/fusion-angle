@@ -63,126 +63,107 @@ export async function init(
         edge: EdgeData | null,
     ): SafeHtml {
         return html`
-    <div>
-        <header style=${'position:sticky;'
-            + 'top:0;z-index:10;'
-            + 'background:'
-            + 'hsl(var(--background)/0.95);'
-            + 'backdrop-filter:blur(8px);'
-            + 'border-bottom:'
-            + '1px solid hsl(var(--border))'}>
-            <div style=${'max-width:60rem;'
-                + 'margin:0 auto;'
-                + 'padding:0 1.5rem'}>
-                <div
-                    class="flex items-center
-                        justify-between"
-                    style=${'height:4rem;'
-                        + 'gap:0.5rem'}>
-                    <div
-                        class="flex items-center
-                            gap-4"
-                        style="min-width:0">
-                        <button
-                            class="${
-                                'btn btn-ghost'
-                                + ' btn-icon'
-                            }"
-                            id="${
-                                'approval-back'
-                                + '-btn'
-                            }">
-                            ${iconArrowLeft(20, '')}
-                        </button>
-                        <div style="${
-                            'min-width:0'
+    <div class="${
+        'flex items-center'
+        + ' justify-between'
+        + ' gap-4 mb-6'
+    }">
+        <div
+            class="flex items-center gap-4"
+            style="min-width:0">
+            <button
+                class="${
+                    'btn btn-ghost'
+                    + ' btn-icon'
+                }"
+                id="${
+                    'approval-back'
+                    + '-btn'
+                }">
+                ${iconArrowLeft(20, '')}
+            </button>
+            <div style="min-width:0">
+                <p class="text-xs
+                    text-muted">
+                    Reviewing Idea
+                </p>
+                ${state.isEditingIdea
+                    ? html`<input
+                        class="input"
+                        id="${
+                            'approval'
+                            + '-edit'
+                            + '-title'
+                        }"
+                        value="${
+                            idea.title
+                        }"
+                        style=${
+                            'font-size:'
+                            + '1.125rem;'
+                            + 'font-'
+                            + 'weight:'
+                            + '700'
+                        } />`
+                    : html`<h1
+                        class="${
+                            'text-lg'
+                            + ' font-bold'
+                            + ' truncate'
                         }">
-                            <p class="text-xs
-                                text-muted">
-                                Reviewing Idea
-                            </p>
-                            ${state.isEditingIdea
-                                ? html`<input
-                                    class="input"
-                                    id="${
-                                        'approval'
-                                        + '-edit'
-                                        + '-title'
-                                    }"
-                                    value="${
-                                        idea.title
-                                    }"
-                                    style=${
-                                        'font-size:'
-                                        + '1.125rem;'
-                                        + 'font-'
-                                        + 'weight:'
-                                        + '700'
-                                    } />`
-                                : html`<h1
-                                    class="${
-                                        'text-lg'
-                                        + ' font-bold'
-                                        + ' truncate'
-                                    }">
-                                    ${idea.title}
-                                </h1>`}
-                        </div>
-                    </div>
-                    <div
-                        class="flex items-center
-                            gap-2"
-                        style="flex-shrink:0">
-                        ${state.isEditingIdea
-                            ? html`
-                        <button
-                            class="${
-                                'btn btn-outline'
-                                + ' gap-2'
-                            }"
-                            id=${'approval'
-                                + '-cancel'
-                                + '-edit-btn'}>
-                            ${iconX(16, '')} Cancel
-                        </button>
-                        <button
-                            class="${
-                                'btn btn-primary'
-                                + ' gap-2'
-                            }"
-                            id=${'approval'
-                                + '-save'
-                                + '-edit-btn'}>
-                            ${iconSave(16, '')} Save
-                        </button>`
-                            : html`
-                        <button
-                            class="${
-                                'btn btn-outline'
-                                + ' gap-2'
-                            }"
-                            id="${
-                                'approval'
-                                + '-edit-btn'
-                            }">
-                            ${iconEdit(16, '')} Edit
-                        </button>
-                        <span
-                            class="badge
-                                badge-error
-                                text-xs">
-                            ${idea.priorityLevel()}
-                        </span>`}
-                    </div>
-                </div>
+                        ${idea.title}
+                    </h1>`}
             </div>
-        </header>
+        </div>
+        <div
+            class="flex items-center
+                gap-2"
+            style="flex-shrink:0">
+            ${state.isEditingIdea
+                ? html`
+            <button
+                class="${
+                    'btn btn-outline'
+                    + ' gap-2'
+                }"
+                id=${'approval'
+                    + '-cancel'
+                    + '-edit-btn'}>
+                ${iconX(16, '')} Cancel
+            </button>
+            <button
+                class="${
+                    'btn btn-primary'
+                    + ' gap-2'
+                }"
+                id=${'approval'
+                    + '-save'
+                    + '-edit-btn'}>
+                ${iconSave(16, '')} Save
+            </button>`
+                : html`
+            <button
+                class="${
+                    'btn btn-outline'
+                    + ' gap-2'
+                }"
+                id="${
+                    'approval'
+                    + '-edit-btn'
+                }">
+                ${iconEdit(16, '')} Edit
+            </button>
+            <span
+                class="badge
+                    badge-error
+                    text-xs">
+                ${idea.priorityLevel()}
+            </span>`}
+        </div>
+    </div>
 
-        <main style=${'max-width:60rem;'
-            + 'margin:0 auto;'
-            + 'padding:1.5rem;'
-            + 'padding-bottom:10rem'}>
-            <div class="flex flex-wrap
+    <div style="padding-bottom:10rem">
+        <div class="flex flex-wrap
                 items-center gap-4
                 text-sm text-muted mb-6">
                 <span
@@ -806,7 +787,7 @@ export async function init(
                 </div>
             </div>`
                 : html``}
-        </main>
+    </div>
 
         <div class="action-footer">
             <div class="action-footer-inner">
@@ -1004,8 +985,7 @@ export async function init(
                     Send Request
                 </button>
             </div>
-        </div>
-    </div>`;
+        </div>`;
     }
 
     function bindApprovalEvents(
@@ -1196,7 +1176,10 @@ export async function init(
         edge: EdgeData | null,
         id: string,
     ): void {
-        const root = $('#wizard-root', document);
+        const root = $(
+            '#approval-content',
+            document,
+        );
         if (!root) return;
         setHtml(
             root,
@@ -1209,7 +1192,10 @@ export async function init(
         );
     }
 
-    const root = $('#wizard-root', document);
+    const root = $(
+        '#approval-content',
+        document,
+    );
     if (!root) return;
 
     const result =

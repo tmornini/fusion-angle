@@ -445,172 +445,151 @@ export async function init():
                 state.currentStep - 1
             ]!;
         return html`
-    <div>
-        <header style=${'border-bottom:'
-            + '1px solid'
-            + ' hsl(var(--border));'
-            + 'background:'
-            + 'hsl(var(--card)/0.5);'
-            + 'backdrop-filter:blur(8px);'
-            + 'position:sticky;top:0;'
-            + 'z-index:50'}>
-            <div style=${'max-width:48rem;'
-                + 'margin:0 auto;'
-                + 'padding:0 1.5rem'}>
-                <div
-                    class="flex items-center
-                        justify-between"
-                    style="height:4rem">
-                    <div class="${
-                        'flex items-center'
-                        + ' gap-4'
-                    }">
-                        <button
-                            class="btn btn-ghost
-                                btn-icon"
-                            id=${'idea-create'
-                                + '-back-btn'}>
-                            ${iconArrowLeft(20, '')}
-                        </button>
-                        <div class="flex
-                            items-center gap-3">
-                            <div
-                                class="${
-                                    'gradient-hero'
-                                    + ' rounded-lg'
-                                    + ' flex'
-                                    + ' items-center'
-                                    + ' justify-'
-                                    + 'center'
-                                }"
-                                style=${'width:'
-                                    + '2.25rem;'
-                                    + 'height:'
-                                    + '2.25rem;'
-                                    + 'color:'
-                                    + 'hsl(var('
-                                    + '--primary'
-                                    + '-foreground'
-                                    + '))'}>
-                                ${iconSparkles(
-                                    20, '',
-                                )}
-                            </div>
-                            <span class="${
-                                'text-xl'
-                                + ' font-display'
-                                + ' font-bold'
-                            }">
-                                New Idea
-                            </span>
-                        </div>
-                    </div>
-                    <button
-                        class="${
-                            'btn btn-ghost'
-                            + ' btn-sm gap-2'
-                            + ' text-primary'
-                        }">
-                        ${iconWand(16, '')}
-                        <span
-                            class="${
-                                'hidden-mobile'
-                            }">
-                            Generate with AI
-                        </span>
-                        <span
-                            class="${
-                                'visible-mobile'
-                            }">
-                            AI
-                        </span>
-                    </button>
-                </div>
-            </div>
-        </header>
-        <div style=${'max-width:48rem;'
-            + 'margin:0 auto;'
-            + 'padding:2rem 1.5rem'}>
-            <div
-                class="flex items-center
-                    justify-between mb-8"
-                style=${'overflow-x:auto;'
-                    + 'padding-bottom:'
-                    + '0.5rem'}>
-                ${buildProgressSteps()}
-            </div>
-            <div class="card p-6"
+    <div class="${
+        'flex items-center'
+        + ' justify-between'
+        + ' gap-4 mb-6'
+    }">
+        <div class="${
+            'flex items-center gap-4'
+        }">
+            <button
+                class="${
+                    'btn btn-ghost'
+                    + ' btn-icon'
+                }"
                 id=${'idea-create'
-                    + '-step-content'}>
-                <div class="mb-6">
-                    <h2 class="${
-                        'text-2xl'
-                        + ' font-display'
-                        + ' font-bold'
-                        + ' mb-2'
-                    }">${
-                        step.title
-                    }</h2>
-                    <p class="text-muted">${
-                        step.description
-                    }</p>
-                </div>
-                ${buildStepContent()}
+                    + '-back-btn'}>
+                ${iconArrowLeft(20, '')}
+            </button>
+            <div class="${
+                'flex items-center gap-3'
+            }">
                 <div
-                    class="flex items-center
-                        justify-between gap-3
-                        mt-8 pt-6"
-                    style=${'border-top:'
-                        + '1px solid'
-                        + ' hsl(var('
-                        + '--border))'}>
-                    <button
-                        class="${
-                            'btn btn-ghost'
-                            + ' gap-2'
-                        }"
-                        id=${'idea-create'
-                            + '-step-back'}>
-                        ${iconArrowLeft(16, '')}
-                        ${state.currentStep
-                            === 1
-                            ? 'Cancel'
-                            : 'Back'}
-                    </button>
-                    <span class="text-sm
-                        text-muted">
-                        Step
-                        ${state.currentStep}
-                        of ${steps.length}
-                    </span>
-                    <button
-                        class="${
-                            'btn btn-hero'
-                            + ' gap-2'
-                        }"
-                        id=${'idea-create'
-                            + '-step-next'}
-                        ${isStepComplete()
-                            ? ''
-                            : 'disabled'}>
-                        ${state.currentStep
-                            === 3
-                            ? html`${'Submit'
-                                + ' Idea'}
-                                ${iconCheck(16, '')}`
-                            : html`Continue
-                                ${iconArrowRight(
-                                    16, '',
-                                )}`}
-                    </button>
+                    class="${
+                        'gradient-hero'
+                        + ' rounded-lg'
+                        + ' flex'
+                        + ' items-center'
+                        + ' justify-center'
+                    }"
+                    style=${'width:'
+                        + '2.25rem;'
+                        + 'height:'
+                        + '2.25rem;'
+                        + 'color:'
+                        + 'hsl(var('
+                        + '--primary'
+                        + '-foreground'
+                        + '))'}>
+                    ${iconSparkles(
+                        20, '',
+                    )}
                 </div>
+                <span class="${
+                    'text-xl'
+                    + ' font-display'
+                    + ' font-bold'
+                }">
+                    New Idea
+                </span>
             </div>
+        </div>
+        <button
+            class="${
+                'btn btn-ghost'
+                + ' btn-sm gap-2'
+                + ' text-primary'
+            }">
+            ${iconWand(16, '')}
+            <span
+                class="hidden-mobile">
+                Generate with AI
+            </span>
+            <span
+                class="visible-mobile">
+                AI
+            </span>
+        </button>
+    </div>
+    <div
+        class="flex items-center
+            justify-between mb-8"
+        style=${'overflow-x:auto;'
+            + 'padding-bottom:'
+            + '0.5rem'}>
+        ${buildProgressSteps()}
+    </div>
+    <div class="card p-6"
+        id=${'idea-create'
+            + '-step-content'}>
+        <div class="mb-6">
+            <h2 class="${
+                'text-2xl'
+                + ' font-display'
+                + ' font-bold'
+                + ' mb-2'
+            }">${
+                step.title
+            }</h2>
+            <p class="text-muted">${
+                step.description
+            }</p>
+        </div>
+        ${buildStepContent()}
+        <div
+            class="flex items-center
+                justify-between gap-3
+                mt-8 pt-6"
+            style=${'border-top:'
+                + '1px solid'
+                + ' hsl(var('
+                + '--border))'}>
+            <button
+                class="${
+                    'btn btn-ghost'
+                    + ' gap-2'
+                }"
+                id=${'idea-create'
+                    + '-step-back'}>
+                ${iconArrowLeft(16, '')}
+                ${state.currentStep
+                    === 1
+                    ? 'Cancel'
+                    : 'Back'}
+            </button>
+            <span class="text-sm
+                text-muted">
+                Step
+                ${state.currentStep}
+                of ${steps.length}
+            </span>
+            <button
+                class="${
+                    'btn btn-hero'
+                    + ' gap-2'
+                }"
+                id=${'idea-create'
+                    + '-step-next'}
+                ${isStepComplete()
+                    ? ''
+                    : 'disabled'}>
+                ${state.currentStep
+                    === 3
+                    ? html`${'Submit'
+                        + ' Idea'}
+                        ${iconCheck(16, '')}`
+                    : html`Continue
+                        ${iconArrowRight(
+                            16, '',
+                        )}`}
+            </button>
         </div>
     </div>`;
     }
 
     function mutateWizard() {
-        const root = $('#wizard-root', document);
+        const root = $('#create-content', document);
         if (root) {
             setHtml(
                 root,
