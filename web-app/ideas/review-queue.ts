@@ -30,6 +30,9 @@ import {
     getReviewQueue,
     type Idea,
 } from '../app/adapters';
+import type {
+    ReadinessLevel,
+} from '../../api/types';
 
 const priorityConfig: Record<
     string,
@@ -50,7 +53,7 @@ const priorityConfig: Record<
 };
 
 const readinessIcon: Record<
-    string,
+    ReadinessLevel,
     (size: number, cssClass: string) => SafeHtml
 > = {
     ready: iconCheckCircle2,
@@ -61,10 +64,8 @@ const readinessIcon: Record<
 function buildReviewCard(
     idea: Idea,
 ): SafeHtml {
-    const rIcon = (
-        readinessIcon[idea.readiness]
-        ?? iconAlertCircle
-    );
+    const rIcon =
+        readinessIcon[idea.readiness]!;
     const priorityDisplay =
         priorityConfig[
             idea.priorityLevel()
@@ -456,12 +457,9 @@ export async function init(): Promise<void> {
         const filtered = allIdeas.filter(
             idea => {
                 const matchesSearch =
-                    idea.title
-                        .toLowerCase()
-                        .includes(search)
-                    || (idea.submittedBy ?? '')
-                        .toLowerCase()
-                        .includes(search);
+                    idea.matchesSearch(
+                        search,
+                    );
                 const matchesPriority =
                     priority === 'all'
                     || idea.priorityLevel()

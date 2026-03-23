@@ -1,5 +1,10 @@
 import type { DbAdapter } from './db';
 import type {
+    UserEntity,
+    UserStatus,
+    ReadinessLevel,
+    TaskPriority,
+    MilestoneStatus,
     IdeaEntity,
     IdeaScoreIdeaEntity,
     ProjectEntity,
@@ -27,7 +32,9 @@ import type {
     ClarificationAnswererEntity,
     ClarificationProjectEntity,
     ProcessStepProcessEntity,
+    MilestoneEntity,
     MilestoneProjectEntity,
+    ProjectTaskEntity,
     ProjectTaskProjectEntity,
     ProjectVersionProjectEntity,
 } from './types';
@@ -36,10 +43,20 @@ import {
     jsonObjectField,
 } from './types';
 
+type SeedUser = Omit<
+    UserEntity,
+    'strengths' | 'team_dimensions'
+> & {
+    strengths: string[];
+    team_dimensions: Record<
+        string, number
+    >;
+};
+
 export async function populateMockData(
     adapter: DbAdapter,
 ): Promise<void> {
-    const users = [
+    const users: SeedUser[] = [
         {
             id: '1',
             first_name: 'Sarah',
@@ -2650,7 +2667,7 @@ export async function populateMockData(
         },
     ];
 
-    const milestones = [
+    const milestones: MilestoneEntity[] = [
         {
             id: 'm1',
             title: 'Data Pipeline Setup',
@@ -2744,7 +2761,7 @@ export async function populateMockData(
         },
     ];
 
-    const tasks = [
+    const tasks: ProjectTaskEntity[] = [
         {
             id: 'task-1',
             name: 'Set up data pipeline',

@@ -8,6 +8,7 @@ import type {
     IdeaEntity,
     ClarificationEntity,
     ProjectStatus,
+    TaskPriority,
     IdeaProjectLinkEntity,
     TaskAssignmentEntity,
     DiscussionAuthorshipEntity,
@@ -92,7 +93,7 @@ export interface DetailDiscussion {
 
 export interface DetailTask {
     readonly name: string;
-    readonly priority: string;
+    readonly priority: TaskPriority;
     readonly description: string;
     readonly skills: readonly string[];
     readonly duration: number;

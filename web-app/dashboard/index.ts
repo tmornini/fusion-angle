@@ -16,6 +16,7 @@ import {
 import {
     getDashboardGauges,
     type GaugeCard,
+    type GaugeIcon,
 } from '../app/adapters';
 
 type GaugeThemeStyle = {
@@ -69,7 +70,7 @@ const gaugeThemeConfig: Record<
 };
 
 const gaugeIconConfig: Record<
-    string,
+    GaugeIcon,
     (
         size: number,
         cssClass: string,
@@ -112,8 +113,7 @@ function buildGauge(
     const innerArc =
         Math.PI * GAUGE_ARC_INNER_RADIUS;
     const iconFn =
-        gaugeIconConfig[card.icon]
-        ?? iconDollarSign;
+        gaugeIconConfig[card.icon]!;
 
     const isOverrun =
         card.hasOverrunWarning

@@ -505,9 +505,10 @@ export async function init(): Promise<void> {
         'input', mutateList,
     );
 
-    initDialog('add-member', {
-        openBtnId: 'team-add-btn',
-    });
+    initDialog(
+        'add-member',
+        'team-add-btn',
+    );
     $('#add-member-send', document)?.addEventListener(
         'click',
         () => {

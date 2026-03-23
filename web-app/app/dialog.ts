@@ -42,7 +42,8 @@ function initTabs(
     );
 
     tabs.forEach(tab => {
-        const tabId = tab.dataset.tab ?? '';
+        const tabId = tab.dataset.tab;
+        if (!tabId) return;
         const panel = document.getElementById(`tab-${tabId}`);
         const tabButtonId = `tab-btn-${tabId}`;
         const panelId = `tab-${tabId}`;
@@ -64,7 +65,8 @@ function initTabs(
     if (tablistParent) tablistParent.setAttribute('role', 'tablist');
 
     function activateTab(tab: HTMLElement): void {
-        const tabId = tab.dataset.tab ?? '';
+        const tabId = tab.dataset.tab;
+        if (!tabId) return;
         tabs.forEach(otherTab => {
             otherTab.classList.remove(activeClass);
             otherTab.setAttribute('aria-selected', 'false');
@@ -101,29 +103,24 @@ function initTabs(
     });
 }
 
-interface InitDialogOptions {
-    openBtnId?: string;
-    cancelBtnId?: string;
-    onSubmit?: () => void;
-}
-
 function initDialog(
     dialogId: string,
-    options?: InitDialogOptions,
+    openBtnId: string,
+    onSubmit?: () => void,
 ): void {
-    const openId = options?.openBtnId
-        ?? `${dialogId}-btn`;
-    const cancelId = options?.cancelBtnId
-        ?? `${dialogId}-cancel`;
+    const cancelId =
+        `${dialogId}-cancel`;
 
-    $(`#${openId}`, document)?.addEventListener(
-        'click',
-        () => openDialog(dialogId),
-    );
-    $(`#${cancelId}`, document)?.addEventListener(
-        'click',
-        () => closeDialog(dialogId),
-    );
+    $(`#${openBtnId}`, document)
+        ?.addEventListener(
+            'click',
+            () => openDialog(dialogId),
+        );
+    $(`#${cancelId}`, document)
+        ?.addEventListener(
+            'click',
+            () => closeDialog(dialogId),
+        );
     $(`#${dialogId}-backdrop`, document)
         ?.addEventListener(
             'click',
@@ -136,11 +133,11 @@ function initDialog(
                 }
             },
         );
-    if (options?.onSubmit) {
+    if (onSubmit) {
         $(`#${dialogId}-submit`, document)
             ?.addEventListener(
                 'click',
-                options.onSubmit,
+                onSubmit,
             );
     }
 }

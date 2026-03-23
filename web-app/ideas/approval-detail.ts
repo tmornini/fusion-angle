@@ -31,12 +31,19 @@ import {
     type Metric,
 } from '../app/adapters';
 
-const severityConfig:
-    Record<string, string> = {
-        high: 'badge-error',
-        medium: 'badge-warning',
-        low: 'badge-default',
-    };
+type Severity =
+    | 'high'
+    | 'medium'
+    | 'low';
+
+const severityConfig: Record<
+    Severity,
+    string
+> = {
+    high: 'badge-error',
+    medium: 'badge-warning',
+    low: 'badge-default',
+};
 
 export async function init(
     params?: Record<string, string>,
@@ -696,7 +703,12 @@ export async function init(
                             { title: string;
                                 severity: string;
                                 mitigation: string },
-                    ) => html`
+                    ) => {
+                    const s =
+                        risk.severity as Severity;
+                    const sev =
+                        severityConfig[s]!;
+                    return html`
                     <div
                         class="p-4 rounded-lg"
                         style=${'background:'
@@ -717,9 +729,7 @@ export async function init(
                             }</h4>
                             <span class="${
                                 'badge '
-                                + (severityConfig[
-                                    risk.severity
-                                ] ?? '')
+                                + sev
                                 + ' text-xs'
                             }">${
                                 risk.severity
@@ -735,7 +745,8 @@ export async function init(
                             </span>
                             ${risk.mitigation}
                         </p>
-                    </div>`)}
+                    </div>`;
+                    })}
                 </div>
             </div>`
                 : html``}
@@ -1118,10 +1129,10 @@ export async function init(
                 },
             );
 
-        initDialog('approval-reject', {
-            openBtnId:
-                'approval-reject-btn',
-        });
+        initDialog(
+            'approval-reject',
+            'approval-reject-btn',
+        );
         $('#approval-reject-confirm', document)
             ?.addEventListener(
                 'click',
@@ -1146,10 +1157,10 @@ export async function init(
                 },
             );
 
-        initDialog('approval-clarify', {
-            openBtnId:
-                'approval-clarify-btn',
-        });
+        initDialog(
+            'approval-clarify',
+            'approval-clarify-btn',
+        );
         $('#approval-clarify-confirm', document)
             ?.addEventListener(
                 'click',

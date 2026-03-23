@@ -766,7 +766,7 @@ export async function init():
                                 category:
                                     '',
                                 readiness:
-                                    '',
+                                    'incomplete',
                                 impact_label:
                                     '',
                                 effort_label:

@@ -34,7 +34,6 @@ import {
     MILESTONE_STATUS_CONFIG,
     type MilestoneStatus,
     TASK_PRIORITY_CONFIG,
-    TASK_PRIORITY_LOW,
     isProjectStatus,
     type ProjectStatus,
 } from '../../api/types';
@@ -1100,8 +1099,7 @@ function buildProjectTabs(
                             TASK_PRIORITY_CONFIG[
                                 task.priority
                             ]
-                            ?? TASK_PRIORITY_LOW
-                        ).style;
+                        )!.style;
                         return html`
                         <div class="card"
                             style="${

@@ -146,9 +146,9 @@ export async function getEdgeList(
         const outcomes =
             outcomesByEdgeId.get(
                 entity.id,
-            ) || [];
+            );
         let metricsCount = 0;
-        for (
+        if (outcomes) for (
             const outcome of outcomes
         ) {
             const ids =
@@ -168,7 +168,7 @@ export async function getEdgeList(
             entity,
             ideaId,
             idea!.title,
-            outcomes.length,
+            outcomes ? outcomes.length : 0,
             metricsCount,
             userName(
                 userMap,

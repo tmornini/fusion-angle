@@ -36,10 +36,11 @@ import {
 } from '../app/adapters';
 import {
     PROJECT_STATUS_CONFIG,
+    type ProjectStatus,
 } from '../../api/types';
 
 const projectStatusIcons: Record<
-    string,
+    ProjectStatus,
     (
         size: number,
         cssClass: string,
@@ -107,8 +108,7 @@ function buildProjectCard(
     view: string,
 ): SafeHtml {
     const statusIcon =
-        projectStatusIcons[project.status]
-        ?? iconAlertCircle;
+        projectStatusIcons[project.status]!;
     const metricBoxStyle =
         'width:2rem;height:2rem;'
         + 'border-radius:0.5rem;'
@@ -402,8 +402,8 @@ export async function init(): Promise<void> {
                     ]!;
                 const icon =
                     projectStatusIcons[
-                        status
-                    ] ?? iconAlertCircle;
+                        status as ProjectStatus
+                    ]!;
                 return html`<span class="${
                     'badge '
                     + cfg.className

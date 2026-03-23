@@ -30,8 +30,14 @@ import {
     type ConversionData,
 } from '../app/adapters';
 
+type PriorityRank =
+    | 'critical'
+    | 'high'
+    | 'medium'
+    | 'low';
+
 const PRIORITY_RANKS: Record<
-    string,
+    PriorityRank,
     number
 > = {
     critical: 1,
@@ -40,7 +46,17 @@ const PRIORITY_RANKS: Record<
     low: 4,
 };
 
-const requiredFields = [
+type ConversionField =
+    | 'project-name'
+    | 'project-lead'
+    | 'start-date'
+    | 'target-end-date'
+    | 'budget'
+    | 'priority'
+    | 'first-milestone'
+    | 'success-criteria';
+
+const requiredFields: ConversionField[] = [
     'project-name',
     'project-lead',
     'start-date',
@@ -49,15 +65,30 @@ const requiredFields = [
     'priority',
 ];
 
+const optionalFields: ConversionField[] = [
+    'first-milestone',
+    'success-criteria',
+];
+
 const state = {
-    projectDetails: {} as
-        Record<string, string>,
+    projectDetails: {
+        'project-name': '',
+        'project-lead': '',
+        'start-date': '',
+        'target-end-date': '',
+        'budget': '',
+        'priority': '',
+        'first-milestone': '',
+        'success-criteria': '',
+    } satisfies Record<
+        ConversionField, string
+    >,
 };
 
 function completedFieldCount(): number {
     return requiredFields.filter(
         (field) =>
-            state.projectDetails[field]?.trim(),
+            state.projectDetails[field].trim(),
     ).length;
 }
 
@@ -67,9 +98,9 @@ function isReadyToConvert(): boolean {
 }
 
 function fieldCheckIcon(
-    field: string,
+    field: ConversionField,
 ): SafeHtml {
-    return state.projectDetails[field]?.trim()
+    return state.projectDetails[field].trim()
         ? html`<span
             style=${'color:'
                 + 'hsl(var(--success))'}>
@@ -449,21 +480,19 @@ function buildConversionPage(
                                 }">
                                     Project Name
                                     ${fieldCheckIcon(
-                                        'project'
-                                        + '-name',
+                                        'project-name',
                                     )}
                                 </label>
                                 <input
                                     class="input"
-                                    id=${'convert'
-                                        + '-project'
-                                        + '-name'}
+                                    id=${
+                                    'convert-project-name'
+                                    }
                                     value="${
                                         state
                                         .projectDetails[
-                                            'project'
-                                            + '-name'
-                                        ] ?? ''
+                                        'project-name'
+                                        ]
                                     }"
                                     placeholder=${
                                         'Give your'
@@ -484,15 +513,14 @@ function buildConversionPage(
                                 }">
                                     Project Lead
                                     ${fieldCheckIcon(
-                                        'project'
-                                        + '-lead',
+                                        'project-lead',
                                     )}
                                 </label>
                                 <select
                                     class="input"
-                                    id=${'convert'
-                                        + '-project'
-                                        + '-lead'}>
+                                    id=${
+                                    'convert-project-lead'
+                                    }>
                                     <option
                                         value="">
                                         ${'Who will'
@@ -502,8 +530,7 @@ function buildConversionPage(
                                     </option>
                                     ${buildLeadOptions(
                                         users,
-                                        leadVal
-                                            ?? '',
+                                        leadVal,
                                     )}
                                 </select>
                             </div>
@@ -532,8 +559,7 @@ function buildConversionPage(
                                         )}
                                         Start Date
                                         ${fieldCheckIcon(
-                                            'start'
-                                            + '-date',
+                                            'start-date',
                                         )}
                                     </label>
                                     <input
@@ -542,16 +568,13 @@ function buildConversionPage(
                                         }"
                                         type="date"
                                         id=${
-                                            'convert'
-                                            + '-start'
-                                            + '-date'
+                                        'convert-start-date'
                                         }
                                         value="${
                                             state
                                             .projectDetails[
-                                                'start'
-                                                + '-date'
-                                            ] ?? ''
+                                            'start-date'
+                                            ]
                                         }" />
                                 </div>
                                 <div>
@@ -574,9 +597,7 @@ function buildConversionPage(
                                             + ' End'
                                             + ' Date'}
                                         ${fieldCheckIcon(
-                                            'target'
-                                            + '-end'
-                                            + '-date',
+                                            'target-end-date',
                                         )}
                                     </label>
                                     <input
@@ -585,18 +606,13 @@ function buildConversionPage(
                                         }"
                                         type="date"
                                         id=${
-                                            'convert'
-                                            + '-target'
-                                            + '-end'
-                                            + '-date'
+                                        'convert-target-end-date'
                                         }
                                         value="${
                                             state
                                             .projectDetails[
-                                                'target'
-                                                + '-end'
-                                                + '-date'
-                                            ] ?? ''
+                                            'target-end-date'
+                                            ]
                                         }" />
                                 </div>
                             </div>
@@ -794,9 +810,8 @@ function buildConversionPage(
                                     value="${
                                         state
                                         .projectDetails[
-                                            'first'
-                                            + '-milestone'
-                                        ] ?? ''
+                                        'first-milestone'
+                                        ]
                                     }" />
                                 <p class="${
                                     'text-xs'
@@ -843,9 +858,8 @@ function buildConversionPage(
                                     }">${
                                     state
                                     .projectDetails[
-                                        'success'
-                                        + '-criteria'
-                                    ] ?? ''
+                                    'success-criteria'
+                                    ]
                                 }</textarea>
                             </div>
                         </div>
@@ -1063,10 +1077,7 @@ export async function init(
 
     const syncFormFields = () => {
         requiredFields
-            .concat([
-                'first-milestone',
-                'success-criteria',
-            ])
+            .concat(optionalFields)
             .forEach(field => {
                 const el = $(
                     `#convert-${field}`, document,
@@ -1158,34 +1169,25 @@ export async function init(
                     const pd =
                         state.projectDetails;
                     const leadUserId =
-                        pd['project-lead']
-                            ?? '';
+                        pd['project-lead'];
                     await putProject(
                         projectId,
                         {
                             title: pd[
-                                'project'
-                                + '-name'
-                            ] ?? '',
-                            description:
-                                pd[
-                                    'success'
-                                    + '-criteria'
-                                ] ?? '',
+                                'project-name'
+                            ],
+                            description: pd[
+                                'success-criteria'
+                            ],
                             status:
                                 'submitted',
                             progress: 0,
-                            start_date:
-                                pd[
-                                    'start'
-                                    + '-date'
-                                ] ?? '',
-                            target_end_date:
-                                pd[
-                                    'target'
-                                    + '-end'
-                                    + '-date'
-                                ] ?? '',
+                            start_date: pd[
+                                'start-date'
+                            ],
+                            target_end_date: pd[
+                                'target-end-date'
+                            ],
                             estimated_duration:
                                 0,
                             actual_duration:
@@ -1200,8 +1202,9 @@ export async function init(
                                 PRIORITY_RANKS[
                                     pd[
                                         'priority'
-                                    ] ?? ''
-                                ] ?? 3,
+                                    ] as
+                                    PriorityRank
+                                ]!,
                             priority_score:
                                 0,
                             business_context:
@@ -1211,8 +1214,7 @@ export async function init(
                             timeline_label:
                                 '',
                             budget_label:
-                                pd['budget']
-                                ?? '',
+                                pd['budget'],
                         },
                     );
 
@@ -1254,12 +1256,9 @@ export async function init(
                                     mTitle,
                                 status:
                                     'pending',
-                                date:
-                                    pd[
-                                        'target'
-                                        + '-end'
-                                        + '-date'
-                                    ] ?? '',
+                                date: pd[
+                                    'target-end-date'
+                                ],
                                 sort_order:
                                     1,
                             },

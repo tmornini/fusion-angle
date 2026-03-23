@@ -61,6 +61,7 @@ function buildPageList(
     ) {
         if (entry.searchable === false)
             continue;
+        if (!entry.keywords) continue;
         const iconFn = entry.icon
             ? icons[entry.icon]
             : undefined;
@@ -70,8 +71,7 @@ function buildPageList(
                 ? iconFn(16, '')
                 : iconSearch(16, ''),
             href: buildPageUrl(name),
-            keywords:
-                entry.keywords ?? '',
+            keywords: entry.keywords,
         });
     }
     return result;
@@ -643,11 +643,12 @@ ${posIndex === 0
                         .debounceTimeoutId =
                         setTimeout(
                             () => {
+                                if (!state.input)
+                                    return;
                                 mutateResults(
                                     state
                                         .input
-                                        ?.value
-                                        ?? '',
+                                        .value,
                                 );
                             },
                             DEBOUNCE_MS,

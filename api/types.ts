@@ -12,6 +12,21 @@ export type FlowStepType =
     | 'start'
     | 'end';
 
+export type UserStatus =
+    | 'active'
+    | 'pending'
+    | 'deactivated';
+
+export type ReadinessLevel =
+    | 'ready'
+    | 'needs-info'
+    | 'incomplete';
+
+export type TaskPriority =
+    | 'High'
+    | 'Medium'
+    | 'Low';
+
 export type ClarificationStatus =
     | 'pending'
     | 'answered';
@@ -165,6 +180,41 @@ export function isEdgeStatus(
     );
 }
 
+const USER_STATUSES: readonly UserStatus[] =
+    ['active', 'pending', 'deactivated'];
+
+export function isUserStatus(
+    v: string,
+): v is UserStatus {
+    return includes(
+        USER_STATUSES, v,
+    );
+}
+
+const READINESS_LEVELS:
+    readonly ReadinessLevel[] =
+    ['ready', 'needs-info', 'incomplete'];
+
+export function isReadinessLevel(
+    v: string,
+): v is ReadinessLevel {
+    return includes(
+        READINESS_LEVELS, v,
+    );
+}
+
+const TASK_PRIORITIES:
+    readonly TaskPriority[] =
+    ['High', 'Medium', 'Low'];
+
+export function isTaskPriority(
+    v: string,
+): v is TaskPriority {
+    return includes(
+        TASK_PRIORITIES, v,
+    );
+}
+
 export const SECONDS_PER_DAY = 86400;
 
 export function durationInDays(
@@ -202,7 +252,7 @@ export interface UserEntity {
     email: string;
     role: string;
     department: string;
-    status: string;
+    status: UserStatus;
     availability: number;
     performance_score: number;
     projects_completed: number;
@@ -221,7 +271,7 @@ export class User {
     readonly email: string;
     readonly role: string;
     readonly department: string;
-    readonly status: string;
+    readonly status: UserStatus;
     readonly availability: number;
     readonly performanceScore: number;
     readonly projectsCompleted: number;
@@ -271,23 +321,15 @@ export class User {
     }
 
     statusLabel(): string {
-        if (this.status === 'active')
-            return 'Active';
-        if (this.status === 'pending')
-            return 'Pending';
-        if (this.status === 'deactivated')
-            return 'Deactivated';
-        return this.status;
+        return (
+            USER_STATUS_CONFIG[this.status]
+        )!.label;
     }
 
     statusClassName(): string {
-        if (this.status === 'active')
-            return 'badge-success';
-        if (this.status === 'pending')
-            return 'badge-warning';
-        if (this.status === 'deactivated')
-            return 'badge-default';
-        return 'badge-default';
+        return (
+            USER_STATUS_CONFIG[this.status]
+        )!.className;
     }
 
     hasDepartment(): boolean {
@@ -325,7 +367,7 @@ export interface IdeaEntity {
     proposed_solution: string;
     expected_outcome: string;
     category: string;
-    readiness: string;
+    readiness: ReadinessLevel;
     impact_label: string;
     effort_label: string;
     description: string;
@@ -404,7 +446,7 @@ export interface TeamMembershipUserEntity {
 export interface MilestoneEntity {
     id: Id;
     title: string;
-    status: string;
+    status: MilestoneStatus;
     date: string;
     sort_order: number;
 }
@@ -419,7 +461,7 @@ export interface MilestoneProjectEntity {
 export interface ProjectTaskEntity {
     id: Id;
     name: string;
-    priority: string;
+    priority: TaskPriority;
     description: string;
     skills: JsonArrayField;
     duration: number; // seconds
@@ -695,6 +737,24 @@ export interface InlineStyleDisplay {
     style: string;
 }
 
+export const USER_STATUS_CONFIG: Record<
+    UserStatus,
+    StatusDisplay
+> = {
+    active: {
+        label: 'Active',
+        className: 'badge-success',
+    },
+    pending: {
+        label: 'Pending',
+        className: 'badge-warning',
+    },
+    deactivated: {
+        label: 'Deactivated',
+        className: 'badge-default',
+    },
+};
+
 export const IDEA_STATUS_CONFIG: Record<
     IdeaStatus,
     StatusDisplay
@@ -870,9 +930,10 @@ export const MILESTONE_STATUS_CONFIG:
     },
 };
 
-export const TASK_PRIORITY_CONFIG:
-    Record<string, InlineStyleDisplay>
-= {
+export const TASK_PRIORITY_CONFIG: Record<
+    TaskPriority,
+    InlineStyleDisplay
+> = {
     High: {
         label: 'High',
         style: 'background:hsl(var('
@@ -891,10 +952,7 @@ export const TASK_PRIORITY_CONFIG:
             + 'border:1px solid '
             + 'hsl(var(--warning-border))',
     },
-};
-
-export const TASK_PRIORITY_LOW:
-    InlineStyleDisplay = {
+    Low: {
         label: 'Low',
         style: 'background:hsl(var('
             + '--muted)/0.5);'
@@ -902,10 +960,11 @@ export const TASK_PRIORITY_LOW:
             + '--muted-foreground));'
             + 'border:1px solid '
             + 'hsl(var(--border))',
-    };
+    },
+};
 
 export const READINESS_CONFIG: Record<
-    string,
+    ReadinessLevel,
     StatusDisplay
 > = {
     ready: {
@@ -936,7 +995,7 @@ export class Idea {
     readonly proposedSolution: string;
     readonly expectedOutcome: string;
     readonly category: string;
-    readonly readiness: string;
+    readonly readiness: ReadinessLevel;
     readonly waitingDays: number;
     readonly impactLabel: string;
     readonly effortLabel: string;
@@ -1040,12 +1099,6 @@ export class Idea {
         );
     }
 
-    resolvedScore(
-        scoreOverride?: number,
-    ): number {
-        return scoreOverride ?? this.score;
-    }
-
     priorityLevel(): PriorityLevel {
         return computePriority(this.score);
     }
@@ -1128,6 +1181,19 @@ export class Idea {
         return JSON.parse(
             this.alignments,
         ) as string[];
+    }
+
+    matchesSearch(term: string): boolean {
+        const t = term.toLowerCase();
+        return (
+            this.title
+                .toLowerCase()
+                .includes(t)
+            || (this.submittedBy !== null
+                && this.submittedBy
+                    .toLowerCase()
+                    .includes(t))
+        );
     }
 }
 
@@ -1313,6 +1379,19 @@ export class EdgeListEntry extends Edge {
         this.metricsCount = metricsCount;
         this.owner = owner;
     }
+
+    matchesSearch(term: string): boolean {
+        const t = term.toLowerCase();
+        return (
+            this.ideaTitle
+                .toLowerCase()
+                .includes(t)
+            || (this.owner !== null
+                && this.owner
+                    .toLowerCase()
+                    .includes(t))
+        );
+    }
 }
 
 export class Activity {
@@ -1342,8 +1421,12 @@ export class Activity {
     }
 
     formattedDescription(): string {
-        return `${this.actor ?? ''}`
-            + ` ${this.action}`
+        const prefix =
+            this.actor !== null
+                ? `${this.actor} `
+                : '';
+        return prefix
+            + `${this.action}`
             + ` ${this.target}`;
     }
 }

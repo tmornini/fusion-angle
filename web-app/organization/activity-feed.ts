@@ -30,15 +30,30 @@ import {
     type Activity,
 } from '../app/adapters';
 
+type ActivityType =
+    | 'idea_created'
+    | 'idea_scored'
+    | 'project_created'
+    | 'task_completed'
+    | 'comment_added'
+    | 'user_joined'
+    | 'status_changed'
+    | 'idea_converted';
+
+type IconEntry = {
+    icon: (
+        size: number,
+        cssClass: string,
+    ) => SafeHtml;
+    bg: string;
+};
+
 function buildActivityIcon(
-    type: string,
+    type: ActivityType,
 ): SafeHtml {
     const iconMap: Record<
-        string,
-        {
-            icon: (size: number, cssClass: string) => SafeHtml;
-            bg: string;
-        }
+        ActivityType,
+        IconEntry
     > = {
         idea_created: {
             icon: iconLightbulb,
@@ -97,13 +112,7 @@ function buildActivityIcon(
                 + 'hsl(var(--success-text))',
         },
     };
-    const entry = iconMap[type] ?? {
-        icon: iconActivity,
-        bg: 'background:'
-            + 'hsl(var(--muted));'
-            + 'color:'
-            + 'hsl(var(--muted-foreground))',
-    };
+    const entry = iconMap[type]!;
     return html`<div style="width:2.5rem;
 height:2.5rem;border-radius:var(--radius-lg);
 display:flex;align-items:center;
@@ -132,7 +141,9 @@ function buildActivity(
     return html`
     <div class="flex items-start gap-4
         p-4 rounded-lg activity-row">
-        ${buildActivityIcon(activity.type)}
+        ${buildActivityIcon(
+            activity.type as ActivityType,
+        )}
         <div style="flex:1;min-width:0">
             <p class="text-sm">
                 <span class="font-medium">${

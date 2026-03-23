@@ -367,12 +367,9 @@ criteria</p>`);
         const filtered = edges.filter(
             edge => {
                 const matchesSearch =
-                    edge.ideaTitle
-                        .toLowerCase()
-                        .includes(search)
-                    || (edge.owner ?? '')
-                        .toLowerCase()
-                        .includes(search);
+                    edge.matchesSearch(
+                        search,
+                    );
                 const matchesStatus =
                     status === 'all'
                     || edge.status === status;

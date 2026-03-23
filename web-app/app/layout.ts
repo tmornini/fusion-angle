@@ -117,12 +117,17 @@ function initActiveNavItem(): void {
                 navLink,
                 'data-page-link',
             );
+            const children =
+                NAV_GROUP_CHILDREN[
+                    linkPage
+                ];
             const isActive =
                 linkPage === pageName
-                || (NAV_GROUP_CHILDREN[
-                    linkPage
-                ]?.includes(pageName)
-                    ?? false);
+                || (children
+                    ? children.includes(
+                        pageName,
+                    )
+                    : false);
             if (isActive)
                 navLink.setAttribute(
                     'aria-current',

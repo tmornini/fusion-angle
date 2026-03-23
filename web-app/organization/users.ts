@@ -598,9 +598,8 @@ export async function init(): Promise<void> {
             </div>
         </div>`);
 
-    initDialog('invite', {
-            openBtnId: 'invite-btn',
-            onSubmit: () => {
+    initDialog('invite', 'invite-btn',
+            () => {
                     const email =
                             $input('#invite-email', document)
                                     ?.value;
@@ -619,7 +618,7 @@ export async function init(): Promise<void> {
                     );
                     closeDialog('invite');
             },
-    });
+    );
     document.addEventListener(
             'keydown',
             (e) => {

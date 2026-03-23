@@ -142,22 +142,26 @@ export async function getEdgeDataByIdeaId(
     );
 
     return {
-        outcomes: outcomes.map(outcome => ({
-            id: outcome.id,
-            description:
-                outcome.description,
-            metrics: (
+        outcomes: outcomes.map(outcome => {
+            const metrics =
                 metricsByOutcomeId.get(
                     outcome.id,
-                ) || []
-            ).map(metric => ({
-                id: metric.id,
-                name: metric.name,
-                target: metric.target,
-                unit: metric.unit,
-                current: metric.current,
-            })),
-        })),
+                );
+            return {
+                id: outcome.id,
+                description:
+                    outcome.description,
+                metrics: metrics
+                    ? metrics.map(metric => ({
+                        id: metric.id,
+                        name: metric.name,
+                        target: metric.target,
+                        unit: metric.unit,
+                        current: metric.current,
+                    }))
+                    : [],
+            };
+        }),
         impact: {
             shortTerm:
                 edge.impact_short_term,

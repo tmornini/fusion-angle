@@ -7,7 +7,7 @@ import {
 export interface ChartDatum {
     label: string;
     value: number;
-    color?: string;
+    color: string;
 }
 
 export interface ChartConfig {
@@ -114,9 +114,6 @@ export function buildBarChart(
             + (slotWidth - barWidth) / 2;
         const y =
             height - padding - barHeight;
-        const color =
-            datum.color
-            || colors[index % colors.length];
         bars +=
             '<rect'
             + ` x="${x}"`
@@ -124,7 +121,7 @@ export function buildBarChart(
             + ` width="${barWidth}"`
             + ` height="${barHeight}"`
             + ' rx="4"'
-            + ` fill="${color}"`
+            + ` fill="${datum.color}"`
             + ' opacity="0.85"/>';
         if (showLabels) {
             bars +=
@@ -262,16 +259,13 @@ export function buildDonutChart(
             datum.value / total;
         const dash =
             percentage * circumference;
-        const color =
-            datum.color
-            || colors[index % colors.length];
         arcs +=
             '<circle'
             + ` cx="${cx}"`
             + ` cy="${cy}"`
             + ` r="${radius}"`
             + ' fill="none"'
-            + ` stroke="${color}"`
+            + ` stroke="${datum.color}"`
             + ` stroke-width="${strokeWidth}"`
             + ' stroke-dasharray='
             + `"${dash}`

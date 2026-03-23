@@ -125,8 +125,8 @@ export async function init(): Promise<void> {
     );
     if (avatarInitials) {
         avatarInitials.textContent =
-            (profile.firstName[0] ?? '')
-            + (profile.lastName[0] ?? '');
+            profile.firstName.charAt(0)
+            + profile.lastName.charAt(0);
     }
     const firstName = $input(
         '#profile-first-name', document,

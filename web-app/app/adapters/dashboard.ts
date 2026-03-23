@@ -14,9 +14,14 @@ import {
     formatCompactCurrency,
 } from '../format';
 
+export type GaugeIcon =
+    | 'clock'
+    | 'dollarSign'
+    | 'zap';
+
 export interface GaugeCard {
     title: string;
-    icon: string;
+    icon: GaugeIcon;
     iconCssClass: string;
     theme: 'blue' | 'green' | 'amber';
     outer: {
