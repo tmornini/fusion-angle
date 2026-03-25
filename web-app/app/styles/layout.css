@@ -277,8 +277,6 @@
 .page-content {
   flex: 1;
   padding: 2rem;
-  max-width: 72rem;
-  margin: 0 auto;
 }
 
 /* Mobile header */
