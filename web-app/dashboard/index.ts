@@ -2,389 +2,18 @@ import { $ } from '../app/dom';
 import {
     html,
     setHtml,
-    SafeHtml,
 } from '../app/safe-html';
 import {
     buildSkeleton,
     withLoadingState,
 } from '../app/loading-states';
 import {
-    iconDollarSign,
-    iconClock,
-    iconZap,
-} from '../app/icons';
-import {
     getDashboardGauges,
-    type GaugeCard,
-    type GaugeIcon,
+    getDashboardStats,
 } from '../app/adapters';
-
-type GaugeThemeStyle = {
-    bg: string;
-    iconBg: string;
-    border: string;
-};
-const gaugeThemeConfig: Record<
-    GaugeCard['theme'],
-    GaugeThemeStyle
-> = {
-    blue: {
-        bg:
-            'background:'
-            + 'hsl(var(--primary)/0.04)',
-        iconBg:
-            'background:linear-gradient('
-            + '135deg,'
-            + 'hsl(var(--primary)/0.2),'
-            + 'hsl(var(--primary)/0.1))',
-        border:
-            'border-color:'
-            + 'hsl(var(--primary)/0.15)',
-    },
-    green: {
-        bg:
-            'background:'
-            + 'hsl(var(--success)/0.04)',
-        iconBg:
-            'background:linear-gradient('
-            + '135deg,'
-            + 'hsl(var(--success)/0.2),'
-            + 'hsl(var(--success)/0.1))',
-        border:
-            'border-color:'
-            + 'hsl(var(--success)/0.15)',
-    },
-    amber: {
-        bg:
-            'background:'
-            + 'hsl(var(--warning)/0.04)',
-        iconBg:
-            'background:linear-gradient('
-            + '135deg,'
-            + 'hsl(var(--warning)/0.2),'
-            + 'hsl(var(--warning)/0.1))',
-        border:
-            'border-color:'
-            + 'hsl(var(--warning)/0.15)',
-    },
-};
-
-const gaugeIconConfig: Record<
-    GaugeIcon,
-    (
-        size: number,
-        cssClass: string,
-    ) => SafeHtml
-> = {
-    dollarSign: iconDollarSign,
-    clock: iconClock,
-    zap: iconZap,
-};
-
-const GAUGE_ARC_OUTER_RADIUS = 65;
-const GAUGE_ARC_INNER_RADIUS = 45;
-
-function buildGauge(
-    card: GaugeCard,
-): SafeHtml {
-    const themeStyle =
-        gaugeThemeConfig[card.theme];
-    const elementId = card.title
-        .replace(/\s+/g, '-')
-        .toLowerCase();
-    const outerPct = card.outer.max > 0
-        ? Math.min(
-            (card.outer.value
-                / card.outer.max)
-                * 100,
-            100,
-        )
-        : 0;
-    const innerPct = card.inner.max > 0
-        ? Math.min(
-            (card.inner.value
-                / card.inner.max)
-                * 100,
-            100,
-        )
-        : 0;
-    const outerArc =
-        Math.PI * GAUGE_ARC_OUTER_RADIUS;
-    const innerArc =
-        Math.PI * GAUGE_ARC_INNER_RADIUS;
-    const iconFn =
-        gaugeIconConfig[card.icon]!;
-
-    const isOverrun =
-        card.hasOverrunWarning
-        && card.inner.value > card.inner.max;
-    const innerGradientStop0 =
-        'hsl(var(--success))';
-    const innerGradientStop1 = isOverrun
-        ? 'red'
-        : 'hsl(var(--success))';
-
-    let innerArcFlashStyle = '';
-    if (
-        card.hasOverrunWarning
-        && card.inner.max > 0
-    ) {
-        const ratio =
-            card.inner.value
-            / card.inner.max;
-        if (ratio > 1.5) {
-            const duration = Math.max(
-                0.333,
-                1 - (ratio - 1.5) * 0.667,
-            );
-            innerArcFlashStyle =
-                'animation:gauge-flash '
-                + duration.toFixed(3)
-                + 's infinite';
-        }
-    }
-
-    const outerDashoffset =
-        outerArc
-        - (outerPct / 100) * outerArc;
-    const innerDashoffset =
-        innerArc
-        - (innerPct / 100) * innerArc;
-
-    return html`
-    <div class="card" style="${
-        'border:2px solid transparent;'
-        + themeStyle.border + ';'
-        + themeStyle.bg + ';'
-        + 'border-radius:0.75rem;'
-        + 'padding:1.5rem;'
-        + 'transition:all 0.3s'
-    }">
-        <div class="${
-            'flex items-center gap-3 mb-5'
-        }">
-            <div style="${
-                'width:2.5rem;'
-                + 'height:2.5rem;'
-                + 'border-radius:0.5rem;'
-                + themeStyle.iconBg + ';'
-                + 'display:flex;'
-                + 'align-items:center;'
-                + 'justify-content:center'
-            }">
-                ${iconFn(
-                    20,
-                    card.iconCssClass,
-                )}
-            </div>
-            <h3 class="${
-                'text-sm font-semibold'
-            }">${
-                card.title
-            }</h3>
-        </div>
-        <div style="${
-            'display:flex;'
-            + 'justify-content:center;'
-            + 'margin-bottom:1.25rem'
-        }">
-            <svg width="180" height="95"
-                viewBox="0 0 180 95"
-                style="overflow:visible">
-                <defs>
-                    <linearGradient
-                        id="${
-                            'outer-' + elementId
-                        }"
-                        x1="0%" y1="0%"
-                        x2="100%" y2="0%">
-                        <stop offset="0%"
-                            stop-color="${
-                                'hsl(var('
-                                + '--primary))'
-                            }"
-                            stop-opacity="${
-                                '0.4'
-                            }"/>
-                        <stop offset="100%"
-                            stop-color="${
-                                'hsl(var('
-                                + '--primary))'
-                            }"
-                            stop-opacity="${
-                                '1'
-                            }"/>
-                    </linearGradient>
-                    <linearGradient
-                        id="${
-                            'inner-' + elementId
-                        }"
-                        x1="0%" y1="0%"
-                        x2="100%" y2="0%">
-                        <stop offset="0%"
-                            stop-color="${
-                                innerGradientStop0
-                            }"
-                            stop-opacity="${
-                                '0.4'
-                            }"/>
-                        <stop offset="100%"
-                            stop-color="${
-                                innerGradientStop1
-                            }"
-                            stop-opacity="${
-                                '1'
-                            }"/>
-                    </linearGradient>
-                </defs>
-                <path
-                    d="${
-                        'M 25 85 A 65 65'
-                        + ' 0 0 1 155 85'
-                    }"
-                    fill="none"
-                    stroke="${
-                        'hsl(var(--muted))'
-                    }"
-                    stroke-width="14"
-                    stroke-linecap="round"
-                    opacity="0.3"/>
-                <path
-                    d="${
-                        'M 25 85 A 65 65'
-                        + ' 0 0 1 155 85'
-                    }"
-                    fill="none"
-                    stroke="${
-                        'url(#outer-'
-                        + elementId + ')'
-                    }"
-                    stroke-width="14"
-                    stroke-linecap="round"
-                    stroke-dasharray="${
-                        outerArc
-                    }"
-                    stroke-dashoffset="${
-                        outerDashoffset
-                    }"/>
-                <path
-                    d="${
-                        'M 45 85 A 45 45'
-                        + ' 0 0 1 135 85'
-                    }"
-                    fill="none"
-                    stroke="${
-                        'hsl(var(--muted))'
-                    }"
-                    stroke-width="14"
-                    stroke-linecap="round"
-                    opacity="0.3"/>
-                <path
-                    d="${
-                        'M 45 85 A 45 45'
-                        + ' 0 0 1 135 85'
-                    }"
-                    fill="none"
-                    stroke="${
-                        'url(#inner-'
-                        + elementId + ')'
-                    }"
-                    stroke-width="14"
-                    stroke-linecap="round"
-                    stroke-dasharray="${
-                        innerArc
-                    }"
-                    stroke-dashoffset="${
-                        innerDashoffset
-                    }"
-                    style="${
-                        innerArcFlashStyle
-                    }"/>
-            </svg>
-        </div>
-        <div style="${
-            'display:grid;'
-            + 'grid-template-columns:'
-            + '1fr 1fr;'
-            + 'gap:1rem'
-        }">
-            <div style="${
-                'text-align:center;'
-                + 'padding:0.75rem;'
-                + 'border-radius:0.5rem;'
-                + 'background:'
-                + 'hsl(var(--card)/0.8);'
-                + 'border:1px solid '
-                + 'hsl(var(--border)/0.5)'
-            }">
-                <div class="${
-                    'flex items-center '
-                    + 'justify-center gap-2'
-                }" style="${
-                    'margin-bottom:0.25rem'
-                }">
-                    <div style="${
-                        'width:0.625rem;'
-                        + 'height:0.625rem;'
-                        + 'border-radius:'
-                        + '9999px;'
-                        + 'background:'
-                        + 'hsl(var(--primary))'
-                    }"></div>
-                    <span class="${
-                        'text-xs text-muted'
-                    }" style="${
-                        'font-weight:500'
-                    }">${
-                        card.outer.label
-                    }</span>
-                </div>
-                <p class="${
-                    'text-2xl font-bold'
-                }">${
-                    card.outer.display
-                }</p>
-            </div>
-            <div style="${
-                'text-align:center;'
-                + 'padding:0.75rem;'
-                + 'border-radius:0.5rem;'
-                + 'background:'
-                + 'hsl(var(--card)/0.8);'
-                + 'border:1px solid '
-                + 'hsl(var(--border)/0.5)'
-            }">
-                <div class="${
-                    'flex items-center '
-                    + 'justify-center gap-2'
-                }" style="${
-                    'margin-bottom:0.25rem'
-                }">
-                    <div style="${
-                        'width:0.625rem;'
-                        + 'height:0.625rem;'
-                        + 'border-radius:'
-                        + '9999px;'
-                        + 'background:'
-                        + 'hsl(var(--success))'
-                    }"></div>
-                    <span class="${
-                        'text-xs text-muted'
-                    }" style="${
-                        'font-weight:500'
-                    }">${
-                        card.inner.label
-                    }</span>
-                </div>
-                <p class="${
-                    'text-2xl font-bold'
-                }">${
-                    card.inner.display
-                }</p>
-            </div>
-        </div>
-    </div>`;
-}
+import {
+    GaugePresenter,
+} from '../app/presenters';
 
 export async function init(): Promise<void> {
     const container =
@@ -400,8 +29,31 @@ export async function init(): Promise<void> {
         );
     if (!gauges) return;
 
+    const presenters = gauges.map(
+        g => new GaugePresenter(g),
+    );
     setHtml(
         container,
-        html`${gauges.map(buildGauge)}`,
+        html`${presenters.map(
+            g => g.buildGauge(),
+        )}`,
     );
+
+    const stats =
+        await getDashboardStats();
+    const statsContainer =
+        $('#stats-container', document);
+    if (statsContainer)
+        setHtml(
+            statsContainer,
+            html`${stats.map(s => html`
+                <div class="card p-4">
+                    <p class="${
+                        'text-2xl font-bold'
+                    }">${s.value}</p>
+                    <p class="${
+                        'text-sm text-muted'
+                    }">${s.label}</p>
+                </div>`)}`,
+        );
 }

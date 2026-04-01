@@ -23,6 +23,7 @@ import {
     projectIsNotDeleted,
     durationInDays,
     nowUtc,
+    COST_DIVISOR,
 } from '../../../api/types';
 import {
     buildUserMap,
@@ -65,7 +66,7 @@ export async function getProjects(
 
 export interface DetailTeamMember {
     readonly id: string;
-    readonly name: string | null;
+    readonly name: string;
     readonly role: string;
 }
 
@@ -81,12 +82,12 @@ export interface DetailVersion {
     readonly version: string;
     readonly date: string;
     readonly changes: string;
-    readonly author: string | null;
+    readonly author: string;
 }
 
 export interface DetailDiscussion {
     readonly id: string;
-    readonly author: string | null;
+    readonly author: string;
     readonly date: string;
     readonly message: string;
 }
@@ -97,14 +98,12 @@ export interface DetailTask {
     readonly description: string;
     readonly skills: readonly string[];
     readonly duration: number;
-    readonly assigned: string | null;
+    readonly assigned: string;
 }
-
-const COST_DIVISOR = 1000;
 
 export class ProjectView {
     private readonly project: Project;
-    readonly projectLead: string | null;
+    readonly projectLead: string;
     readonly edge: EdgeData | null;
     readonly team:
         readonly DetailTeamMember[];
@@ -119,7 +118,7 @@ export class ProjectView {
 
     constructor(
         project: Project,
-        projectLead: string | null,
+        projectLead: string,
         edge: EdgeData | null,
         team: readonly DetailTeamMember[],
         milestones:
@@ -366,20 +365,72 @@ export async function getProjectById(
     );
 }
 
-export interface Clarification {
-    id: string;
-    question: string;
-    askedBy: string | null;
-    askedAt: string;
-    status: 'pending' | 'answered';
-    answer?: string;
-    answeredBy?: string | null;
-    answeredAt?: string;
+export class Clarification {
+    readonly id: string;
+    private readonly question: string;
+    private readonly askedBy: string;
+    private readonly askedAt: string;
+    readonly status:
+        'pending' | 'answered';
+    private readonly answer:
+        string | undefined;
+    private readonly answeredBy:
+        string | undefined;
+    private readonly answeredAt:
+        string | undefined;
+
+    constructor(data: {
+        id: string;
+        question: string;
+        askedBy: string;
+        askedAt: string;
+        status: 'pending' | 'answered';
+        answer?: string;
+        answeredBy?: string;
+        answeredAt?: string;
+    }) {
+        this.id = data.id;
+        this.question = data.question;
+        this.askedBy = data.askedBy;
+        this.askedAt = data.askedAt;
+        this.status = data.status;
+        this.answer = data.answer;
+        this.answeredBy = data.answeredBy;
+        this.answeredAt = data.answeredAt;
+    }
+
+    questionText(): string {
+        return this.question;
+    }
+
+    askerName(): string {
+        return this.askedBy;
+    }
+
+    askedAtDate(): string {
+        return this.askedAt;
+    }
+
+    hasAnswer(): boolean {
+        return this.answer !== undefined;
+    }
+
+    answerText(): string {
+        return this.answer!;
+    }
+
+    answeredByName(): string {
+        return this.answeredBy!;
+    }
+
+    answeredAtDate(): string {
+        return this.answeredAt!;
+    }
 }
 
 export interface EngTeamMember {
     readonly id: string;
-    readonly name: string | null;
+    readonly name: string;
     readonly role: string;
     readonly type: string;
 }
@@ -387,7 +438,6 @@ export interface EngTeamMember {
 export interface LinkedIdea {
     readonly id: string;
     readonly title: string;
-    readonly score: number;
 }
 
 interface BusinessContext {
@@ -403,9 +453,9 @@ export class EngineeringView {
     private readonly project: Project;
     private readonly context:
         BusinessContext;
-    readonly team:
+    private readonly team:
         readonly EngTeamMember[];
-    readonly linkedIdea:
+    private readonly idea:
         LinkedIdea | null;
 
     constructor(
@@ -417,7 +467,7 @@ export class EngineeringView {
         this.project = project;
         this.context = context;
         this.team = team;
-        this.linkedIdea = linkedIdea;
+        this.idea = linkedIdea;
     }
 
     get id(): string {
@@ -457,6 +507,26 @@ export class EngineeringView {
 
     constraints(): readonly string[] {
         return this.context.constraints;
+    }
+
+    teamMembers():
+        readonly EngTeamMember[] {
+        return this.team;
+    }
+
+    hasLinkedIdea(): boolean {
+        return this.idea !== null;
+    }
+
+    linkedIdeaHref(): string {
+        return '../idea-convert/'
+            + 'index.html'
+            + '?ideaId='
+            + this.idea!.id;
+    }
+
+    linkedIdeaTitle(): string {
+        return this.idea!.title;
     }
 }
 
@@ -518,7 +588,6 @@ getProjectForEngineering(
             ? {
                 id: ideaEntity.id,
                 title: ideaEntity.title,
-                score: ideaEntity.score,
             }
             : null,
     );
@@ -594,7 +663,7 @@ getClarificationsByProjectId(
                     .clarification_answer_id,
             )
             : undefined;
-        return {
+        return new Clarification({
             id: c.id,
             question: c.question,
             askedBy: userName(
@@ -620,7 +689,7 @@ getClarificationsByProjectId(
                         answerLink.created_at,
                 }
                 : {}),
-        };
+        });
     });
 }
 

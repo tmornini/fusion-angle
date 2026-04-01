@@ -1,11 +1,11 @@
 import {
     $,
-    $input,
-    $select,
-    $textarea,
     populateIcons,
     attr,
 } from '../app/dom';
+import {
+    ProfilePresenter,
+} from '../app/presenters';
 import {
     html,
     setHtml,
@@ -85,9 +85,11 @@ export async function init(): Promise<void> {
         return;
     }
 
-    for (const s of profile.strengths) {
-        selectedStrengths.add(s);
-    }
+    const presenter =
+        new ProfilePresenter(profile);
+    presenter.initStrengths(
+        selectedStrengths,
+    );
 
     populateIcons([
         [
@@ -124,49 +126,28 @@ export async function init(): Promise<void> {
         ],
     ]);
 
-    const avatarInitials = $(
-        '#profile-avatar-initials', document,
-    );
-    if (avatarInitials) {
-        avatarInitials.textContent =
-            profile.firstName.charAt(0)
-            + profile.lastName.charAt(0);
-    }
-    const firstName = $input(
+    presenter.populateForm();
+    const firstName = $(
         '#profile-first-name', document,
-    );
-    if (firstName) {
-        firstName.value = profile.firstName;
-    }
-    const lastName = $input(
+    )! as HTMLInputElement;
+    const lastName = $(
         '#profile-last-name', document,
-    );
-    if (lastName) {
-        lastName.value = profile.lastName;
-    }
-    const email = $input('#profile-email', document);
-    if (email) {
-        email.value = profile.email;
-    }
-    const phone = $input('#profile-phone', document);
-    if (phone) {
-        phone.value = profile.phone;
-    }
-    const role = $input('#profile-role', document);
-    if (role) {
-        role.value = profile.role;
-    }
-    const department = $select(
+    )! as HTMLInputElement;
+    const email = $(
+        '#profile-email', document,
+    )! as HTMLInputElement;
+    const phone = $(
+        '#profile-phone', document,
+    )! as HTMLInputElement;
+    const role = $(
+        '#profile-role', document,
+    )! as HTMLInputElement;
+    const department = $(
         '#profile-department', document,
-    );
-    if (department) {
-        department.value =
-            profile.department;
-    }
-    const bio = $textarea('#profile-bio', document);
-    if (bio) {
-        bio.value = profile.bio;
-    }
+    )! as HTMLSelectElement;
+    const bio = $(
+        '#profile-bio', document,
+    )! as HTMLTextAreaElement;
     const strengthsContainer = $(
         '#profile-strengths', document,
     );
@@ -240,22 +221,15 @@ export async function init(): Promise<void> {
             try {
                 await putProfile({
                     first_name:
-                        firstName?.value
-                        ?? '',
+                        firstName.value,
                     last_name:
-                        lastName?.value
-                        ?? '',
-                    email:
-                        email?.value ?? '',
-                    phone:
-                        phone?.value ?? '',
-                    role:
-                        role?.value ?? '',
+                        lastName.value,
+                    email: email.value,
+                    phone: phone.value,
+                    role: role.value,
                     department:
-                        department?.value
-                        ?? '',
-                    bio:
-                        bio?.value ?? '',
+                        department.value,
+                    bio: bio.value,
                     strengths:
                         jsonArrayField(
                             [...selectedStrengths],

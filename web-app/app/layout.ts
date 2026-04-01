@@ -1,9 +1,10 @@
 import type { AppState } from './state';
 import {
-    STORAGE_KEY_SIDEBAR,
     state,
     setState,
     setTheme,
+    setSidebarCollapsed
+        as persistSidebarCollapsed,
     isValidTheme,
 } from './state';
 import {
@@ -57,34 +58,55 @@ function mutateThemeToggleIcon(): void {
     });
 }
 
+async function fetchSidebarUser(
+): Promise<{
+    name: string;
+    company: string;
+}> {
+    const { getCurrentUser } =
+        await import('./adapters');
+    const { user, company } =
+        await getCurrentUser();
+    return {
+        name: user.fullName(),
+        company,
+    };
+}
+
 async function mutateSidebarUser(
 ): Promise<void> {
+    let data: {
+        name: string;
+        company: string;
+    };
     try {
-        const { getCurrentUser } =
-            await import('./adapters');
-        const { user, company } =
-            await getCurrentUser();
-        for (const id of
-            SIDEBAR_USER_NAME_IDS
-        ) {
-            const el = $(`#${id}`, document);
-            if (el)
-                el.textContent =
-                    user.fullName();
-        }
-        for (const id of
-            SIDEBAR_USER_COMPANY_IDS
-        ) {
-            const el = $(`#${id}`, document);
-            if (el)
-                el.textContent = company;
-        }
+        data =
+            await fetchSidebarUser();
     } catch (err) {
         log.debug(
-            'Sidebar user info load failed',
+            'Sidebar user info'
+            + ' load failed',
             'layout',
             err,
         );
+        return;
+    }
+    for (const id of
+        SIDEBAR_USER_NAME_IDS
+    ) {
+        const el =
+            $(`#${id}`, document);
+        if (el)
+            el.textContent = data.name;
+    }
+    for (const id of
+        SIDEBAR_USER_COMPANY_IDS
+    ) {
+        const el =
+            $(`#${id}`, document);
+        if (el)
+            el.textContent =
+                data.company;
     }
 }
 
@@ -147,20 +169,13 @@ function initSidebar(): void {
     const mainContent =
         $('.main-content', document);
 
-    if (
-        localStorage.getItem(
-            STORAGE_KEY_SIDEBAR,
-        ) === 'true'
-    ) {
+    if (state.isSidebarCollapsed) {
         sidebar?.classList.add(
             'sidebar-collapsed',
         );
         mainContent?.classList.add(
             'sidebar-collapsed',
         );
-        setState({
-            isSidebarCollapsed: true,
-        });
     }
 
     function setSidebarCollapsed(
@@ -174,21 +189,7 @@ function initSidebar(): void {
         mainContent?.classList[action](
             'sidebar-collapsed',
         );
-        setState({
-            isSidebarCollapsed: collapsed,
-        });
-        try {
-            localStorage.setItem(
-                STORAGE_KEY_SIDEBAR,
-                String(collapsed),
-            );
-        } catch {
-            showToast(
-                'Failed to save'
-                + ' sidebar state.',
-                'error',
-            );
-        }
+        persistSidebarCollapsed(collapsed);
     }
 
     $('#sidebar-collapse', document)?.addEventListener(
@@ -444,51 +445,78 @@ function initMobileDrawer(): void {
     );
 }
 
+interface HeaderData {
+    userName: string;
+    company: string;
+    greeting: string;
+    stats: ReadonlyArray<{
+        value: string | number;
+        label: string;
+    }>;
+}
+
+async function fetchHeaderData(
+): Promise<HeaderData> {
+    const {
+        getCurrentUser,
+        getDashboardStats,
+    } = await import('./adapters');
+    const { getTimeOfDay } =
+        await import('./format');
+    const [auth, stats] =
+        await Promise.all([
+            getCurrentUser(),
+            getDashboardStats(),
+        ]);
+    return {
+        userName: auth.user.fullName(),
+        company: auth.company,
+        greeting: getTimeOfDay(),
+        stats,
+    };
+}
+
 async function mutateHeaderInfo(
 ): Promise<void> {
+    let data: HeaderData;
     try {
-        const {
-            getCurrentUser,
-            getDashboardStats,
-        } = await import('./adapters');
-        const { getTimeOfDay } =
-            await import('./format');
-        const { html, setHtml } =
-            await import('./safe-html');
-
-        const [auth, stats] =
-            await Promise.all([
-                getCurrentUser(),
-                getDashboardStats(),
-            ]);
-
-        const greetingEl =
-            $('#header-greeting', document);
-        if (greetingEl) {
-            setHtml(
-                greetingEl,
-                html`<span
+        data = await fetchHeaderData();
+    } catch (err) {
+        log.debug(
+            'Header info load failed',
+            'layout',
+            err,
+        );
+        return;
+    }
+    const { html, setHtml } =
+        await import('./safe-html');
+    const greetingEl =
+        $('#header-greeting', document);
+    if (greetingEl) {
+        setHtml(
+            greetingEl,
+            html`<span
 style="font-weight:400">Good ${
-getTimeOfDay()},</span> ${
-auth.user.fullName()}`,
-            );
-            greetingEl.addEventListener(
-                'click',
-                () =>
-                    navigateTo('profile'),
-            );
-        }
-
-        const statsEl =
-            $('#header-stats', document);
-        if (statsEl) {
-            setHtml(
-                statsEl,
-                html`<span
+data.greeting},</span> ${
+data.userName}`,
+        );
+        greetingEl.addEventListener(
+            'click',
+            () =>
+                navigateTo('profile'),
+        );
+    }
+    const statsEl =
+        $('#header-stats', document);
+    if (statsEl) {
+        setHtml(
+            statsEl,
+            html`<span
 class="header-stat-label">${
-auth.company}</span>${
-stats.map(
-    (stat, i) =>
+data.company}</span>${
+data.stats.map(
+    (stat) =>
         html`<div
 class="header-stat-divider"></div>
 <div class="header-stat-item">
@@ -497,13 +525,6 @@ stat.value}</span>
 <span class="header-stat-label">${
 stat.label}</span></div>`,
 )}`,
-            );
-        }
-    } catch (err) {
-        log.debug(
-            'Header info load failed',
-            'layout',
-            err,
         );
     }
 }

@@ -6,11 +6,21 @@ export type PriorityLevel = 'high' | 'medium' | 'low';
 
 export type EdgeStatus = 'complete' | 'draft' | 'missing';
 
-export type FlowStepType =
-    | 'action'
-    | 'decision'
-    | 'start'
-    | 'end';
+export type WfFieldType =
+    | 'text'
+    | 'textarea'
+    | 'number'
+    | 'date'
+    | 'select'
+    | 'checkbox'
+    | 'file'
+    | 'email'
+    | 'url'
+    | 'phone'
+    | 'currency'
+    | 'multi_select'
+    | 'radio'
+    | 'image';
 
 export type UserStatus =
     | 'active'
@@ -36,6 +46,7 @@ export type IdeaStatus =
     | 'in-review'
     | 'approved'
     | 'promoted'
+    | 'sent-back'
     | 'archived'
     | 'deleted';
 
@@ -50,9 +61,6 @@ export type ProjectStatus =
 
 export const SCORE_THRESHOLD_HIGH = 80;
 export const SCORE_THRESHOLD_MEDIUM = 60;
-
-export const SCORE_BADGE_HIGH = 85;
-export const SCORE_BADGE_MEDIUM = 70;
 
 export const AVAILABILITY_HIGH = 70;
 export const AVAILABILITY_LOW = 40;
@@ -120,18 +128,22 @@ export function isConfidenceLevel(
     );
 }
 
-const FLOW_STEP_TYPES:
-    readonly FlowStepType[]
+const WF_FIELD_TYPES:
+    readonly WfFieldType[]
     = [
-        'action', 'decision',
-        'start', 'end',
+        'text', 'textarea', 'number',
+        'date', 'select', 'checkbox',
+        'file', 'email', 'url',
+        'phone', 'currency',
+        'multi_select', 'radio',
+        'image',
     ];
 
-export function isFlowStepType(
+export function isWfFieldType(
     v: string,
-): v is FlowStepType {
+): v is WfFieldType {
     return includes(
-        FLOW_STEP_TYPES, v,
+        WF_FIELD_TYPES, v,
     );
 }
 
@@ -157,7 +169,8 @@ const IDEA_STATUSES:
     = [
         'active', 'in-review',
         'approved', 'promoted',
-        'archived', 'deleted',
+        'sent-back', 'archived',
+        'deleted',
     ];
 
 export function isIdeaStatus(
@@ -215,7 +228,9 @@ export function isTaskPriority(
     );
 }
 
+export const MS_PER_SECOND = 1000;
 export const SECONDS_PER_DAY = 86400;
+export const COST_DIVISOR = 1000;
 
 export function durationInDays(
     seconds: number,
@@ -357,7 +372,6 @@ export class User {
 export interface IdeaEntity {
     id: Id;
     title: string;
-    score: number;
     estimated_impact: number;
     estimated_duration: number;
     estimated_cost: number;
@@ -379,27 +393,6 @@ export interface IdeaEntity {
     cost_estimate: string;
     cost_breakdown: string;
     success_metrics: string;
-}
-
-export interface IdeaScoreEntity {
-    id: Id;
-    overall: number;
-    impact_score: number;
-    impact_breakdown: JsonArrayField;
-    feasibility_score: number;
-    feasibility_breakdown: JsonArrayField;
-    efficiency_score: number;
-    efficiency_breakdown: JsonArrayField;
-    estimated_duration: string;
-    estimated_cost: string;
-    recommendation: string;
-}
-
-export interface IdeaScoreIdeaEntity {
-    id: Id;
-    idea_score_id: Id;
-    idea_id: Id;
-    created_at: string;
 }
 
 export interface ProjectEntity {
@@ -596,23 +589,40 @@ export interface CrunchColumnAcronymLinkEntity {
     created_at: string;
 }
 
-export interface FlowEntity {
+export interface WorkflowEntity {
     id: Id;
     name: string;
     description: string;
-    department: string;
+    created_at: string;
+    updated_at: string;
 }
 
-export interface FlowStepEntity {
+export interface WfNodeEntity {
     id: Id;
-    title: string;
+    name: string;
     description: string;
-    owner: string;
-    role: string;
-    tools: JsonArrayField;
-    duration: string;
+    position_x: number;
+    position_y: number;
+    is_start: StoredBoolean;
+    is_complete: StoredBoolean;
+    created_at: string;
+}
+
+export interface WfEdgeEntity {
+    id: Id;
+    name: string;
+    description: string;
+    created_at: string;
+}
+
+export interface WfFieldEntity {
+    id: Id;
+    name: string;
+    field_type: WfFieldType;
     sort_order: number;
-    type: FlowStepType;
+    is_required: StoredBoolean;
+    options: JsonArrayField;
+    created_at: string;
 }
 
 export interface CompanySettingsEntity {
@@ -720,10 +730,32 @@ export interface ClarificationProjectEntity {
     created_at: string;
 }
 
-export interface ProcessStepProcessEntity {
+export interface ProjectWorkflowEntity {
     id: Id;
-    process_step_id: Id;
-    process_id: Id;
+    project_id: Id;
+    workflow_id: Id;
+    created_at: string;
+}
+
+export interface WfWorkflowNodeEntity {
+    id: Id;
+    workflow_id: Id;
+    node_id: Id;
+    created_at: string;
+}
+
+export interface WfNodeEdgeEntity {
+    id: Id;
+    wf_edge_id: Id;
+    from_node_id: Id;
+    to_node_id: Id;
+    created_at: string;
+}
+
+export interface WfNodeFieldEntity {
+    id: Id;
+    node_id: Id;
+    field_id: Id;
     created_at: string;
 }
 
@@ -774,6 +806,10 @@ export const IDEA_STATUS_CONFIG: Record<
     'promoted': {
         label: 'Promoted',
         className: 'badge-primary',
+    },
+    'sent-back': {
+        label: 'Sent Back',
+        className: 'badge-error',
     },
     'archived': {
         label: 'Archived',
@@ -852,44 +888,6 @@ export const CONFIDENCE_CONFIG: Record<
     low: {
         label: 'Low',
         className: 'text-error',
-    },
-};
-
-export const FLOW_STEP_TYPE_CONFIG: Record<
-    FlowStepType,
-    InlineStyleDisplay
-> = {
-    start: {
-        label: 'Start',
-        style: 'background:hsl(var('
-            + '--success) / 0.1);border:'
-            + '2px solid hsl(var(--success)'
-            + ' / 0.3);color:hsl(var('
-            + '--success))',
-    },
-    end: {
-        label: 'End',
-        style: 'background:hsl(var('
-            + '--error)/0.1);border:2px'
-            + ' solid hsl(var(--error)'
-            + '/0.3);color:hsl(var('
-            + '--error))',
-    },
-    decision: {
-        label: 'Decision',
-        style: 'background:hsl(var('
-            + '--warning)/0.1);border:2px'
-            + ' solid hsl(var(--warning)'
-            + '/0.3);color:hsl(var('
-            + '--warning))',
-    },
-    action: {
-        label: 'Action',
-        style: 'background:hsl(var('
-            + '--primary)/0.1);border:2px'
-            + ' solid hsl(var(--primary)'
-            + '/0.3);color:hsl(var('
-            + '--primary))',
     },
 };
 
@@ -984,7 +982,6 @@ export const READINESS_CONFIG: Record<
 export class Idea {
     readonly id: string;
     readonly title: string;
-    readonly score: number;
     readonly estimatedImpact: number;
     readonly estimatedDuration: number;
     readonly estimatedCost: number;
@@ -1009,17 +1006,16 @@ export class Idea {
     readonly costEstimate: string;
     readonly costBreakdown: string;
     readonly successMetrics: string;
-    readonly submittedBy: string | null;
+    readonly submittedBy: string;
 
     constructor(
         entity: IdeaEntity,
-        submittedBy: string | null,
+        submittedBy: string,
         edgeStatus: EdgeStatus,
         submittedAt: string,
     ) {
         this.id = entity.id;
         this.title = entity.title;
-        this.score = entity.score;
         this.estimatedImpact =
             entity.estimated_impact;
         this.estimatedDuration =
@@ -1047,8 +1043,8 @@ export class Idea {
                     - new Date(
                         this.submittedAt,
                     ).getTime())
-                / SECONDS_PER_DAY
-                / 1000,
+                / MS_PER_SECOND
+                / SECONDS_PER_DAY,
             ))
             : 0;
         this.risks = entity.risks;
@@ -1084,8 +1080,8 @@ export class Idea {
     }
 
     needsEdgeDefinition(): boolean {
-        return this.edgeStatus !== 'complete'
-            && this.status !== 'archived';
+        return this.edgeStatus === 'missing'
+            || this.edgeStatus === 'draft';
     }
 
     isReady(): boolean {
@@ -1097,32 +1093,6 @@ export class Idea {
             this.estimatedDuration
                 / SECONDS_PER_DAY,
         );
-    }
-
-    priorityLevel(): PriorityLevel {
-        return computePriority(this.score);
-    }
-
-    scoreStyle(): string {
-        if (this.score >= SCORE_BADGE_HIGH)
-            return 'color:hsl(var(--success))'
-                + ';background:'
-                + 'hsl(var(--success-soft))';
-        if (this.score >= SCORE_BADGE_MEDIUM)
-            return 'color:hsl(var(--warning))'
-                + ';background:'
-                + 'hsl(var(--warning-soft))';
-        return 'color:hsl(var(--error))'
-            + ';background:'
-            + 'hsl(var(--error-soft))';
-    }
-
-    scoreColor(): string {
-        if (this.score >= SCORE_THRESHOLD_HIGH)
-            return 'color:hsl(var(--success))';
-        if (this.score >= SCORE_THRESHOLD_MEDIUM)
-            return 'color:hsl(var(--warning))';
-        return 'color:hsl(var(--error))';
     }
 
     statusLabel(): string {
@@ -1189,10 +1159,9 @@ export class Idea {
             this.title
                 .toLowerCase()
                 .includes(t)
-            || (this.submittedBy !== null
-                && this.submittedBy
-                    .toLowerCase()
-                    .includes(t))
+            || this.submittedBy
+                .toLowerCase()
+                .includes(t)
         );
     }
 }
@@ -1357,12 +1326,13 @@ export class Edge {
     }
 }
 
-export class EdgeListEntry extends Edge {
+export class EdgeListEntry {
+    readonly edge: Edge;
     readonly ideaId: string;
     readonly ideaTitle: string;
     readonly outcomesCount: number;
     readonly metricsCount: number;
-    readonly owner: string | null;
+    readonly owner: string;
 
     constructor(
         entity: EdgeEntity,
@@ -1370,9 +1340,9 @@ export class EdgeListEntry extends Edge {
         ideaTitle: string,
         outcomesCount: number,
         metricsCount: number,
-        owner: string | null,
+        owner: string,
     ) {
-        super(entity);
+        this.edge = new Edge(entity);
         this.ideaId = ideaId;
         this.ideaTitle = ideaTitle;
         this.outcomesCount = outcomesCount;
@@ -1380,16 +1350,17 @@ export class EdgeListEntry extends Edge {
         this.owner = owner;
     }
 
-    matchesSearch(term: string): boolean {
+    matchesSearch(
+        term: string,
+    ): boolean {
         const t = term.toLowerCase();
         return (
             this.ideaTitle
                 .toLowerCase()
                 .includes(t)
-            || (this.owner !== null
-                && this.owner
-                    .toLowerCase()
-                    .includes(t))
+            || this.owner
+                .toLowerCase()
+                .includes(t)
         );
     }
 }
@@ -1403,11 +1374,11 @@ export class Activity {
     readonly score: number;
     readonly status: string;
     readonly comment: string;
-    readonly actor: string | null;
+    readonly actor: string;
 
     constructor(
         entity: ActivityEntity,
-        actor: string | null,
+        actor: string,
     ) {
         this.id = entity.id;
         this.type = entity.type;
@@ -1557,10 +1528,11 @@ export class Account {
     }
 }
 
-export function ideaIsNotDeleted(
+export function ideaIsVisible(
     e: IdeaEntity,
 ): boolean {
-    return e.status !== 'deleted';
+    return e.status !== 'archived'
+        && e.status !== 'deleted';
 }
 
 export function ideaIsInReview(

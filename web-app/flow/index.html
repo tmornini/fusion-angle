@@ -1,62 +1,23 @@
 <div>
-    <div class="mb-6">
-        <div
-            class="badge badge-primary
-                text-sm mb-3 hidden"
-            id="page-badge"
-        ></div>
-        <h1
-            class="text-2xl font-display
-                font-bold mb-1"
-        >Flow</h1>
-        <p class="text-muted">
-            Document and manage your business
-            processes step by step
-        </p>
-    </div>
-
     <div
-        class="stats-grid mb-8"
-        id="flow-stats"
+        class="flex items-center
+            justify-between gap-4 mb-6"
     >
-    </div>
-
-    <div class="flex gap-4 mb-6">
-        <div class="search-wrapper flex-1">
-            <span
-                class="search-icon"
-                id="search-field-icon"
-            ></span>
-            <input
-                class="input search-input"
-                placeholder="Search
-                    processes..."
-                id="flow-search"
-                aria-label="Search processes"
-            />
+        <div>
+            <h1
+                class="text-2xl font-display
+                    font-bold mb-1"
+            >Workflows</h1>
+            <p class="text-muted">
+                Visual state machine workflows
+                for your projects
+            </p>
         </div>
-        <select
-            class="input"
-            style="width:12rem"
-            id="flow-department-filter"
-            aria-label="Filter by department"
-        >
-            <option value="all">
-                All Departments
-            </option>
-        </select>
     </div>
 
     <div
-        id="flow-list"
+        id="workflow-list"
         class="flex flex-col gap-3"
-    >
-    </div>
-
-    <div
-        id="flow-empty"
-        class="text-center"
-        style="display:none;padding:3rem 0"
     >
     </div>
 </div>

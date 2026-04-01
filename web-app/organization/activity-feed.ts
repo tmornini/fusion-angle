@@ -2,165 +2,21 @@ import { $ } from '../app/dom';
 import {
     html,
     setHtml,
-    SafeHtml,
-    trusted,
 } from '../app/safe-html';
 import {
     iconActivity,
-    iconLightbulb,
-    iconStar,
-    iconFolderKanban,
-    iconCheckCircle2,
-    iconMessageSquare,
-    iconUserPlus,
-    iconEdit,
-    iconArrowRight,
     iconSearch,
-    iconChevronRight,
 } from '../app/icons';
 import {
     buildSkeleton,
     withLoadingState,
 } from '../app/loading-states';
 import {
-    formatDate, displayText,
-} from '../app/core';
-import {
     getActivityFeed,
-    type Activity,
 } from '../app/adapters';
-
-type ActivityType =
-    | 'idea_created'
-    | 'idea_scored'
-    | 'project_created'
-    | 'task_completed'
-    | 'comment_added'
-    | 'user_joined'
-    | 'status_changed'
-    | 'idea_converted';
-
-type IconEntry = {
-    icon: (
-        size: number,
-        cssClass: string,
-    ) => SafeHtml;
-    bg: string;
-};
-
-function buildActivityIcon(
-    type: ActivityType,
-): SafeHtml {
-    const iconMap: Record<
-        ActivityType,
-        IconEntry
-    > = {
-        idea_created: {
-            icon: iconLightbulb,
-            bg: 'background:'
-                + 'hsl(var(--warning-soft));'
-                + 'color:'
-                + 'hsl(var(--warning-text))',
-        },
-        idea_scored: {
-            icon: iconStar,
-            bg: 'background:'
-                + 'hsl(var(--info-soft));'
-                + 'color:'
-                + 'hsl(var(--info-text))',
-        },
-        project_created: {
-            icon: iconFolderKanban,
-            bg: 'background:'
-                + 'hsl(var(--primary) / 0.1);'
-                + 'color:'
-                + 'hsl(var(--primary))',
-        },
-        task_completed: {
-            icon: iconCheckCircle2,
-            bg: 'background:'
-                + 'hsl(var(--success-soft));'
-                + 'color:'
-                + 'hsl(var(--success-text))',
-        },
-        comment_added: {
-            icon: iconMessageSquare,
-            bg: 'background:'
-                + 'hsl(var(--info-soft));'
-                + 'color:'
-                + 'hsl(var(--info-text))',
-        },
-        user_joined: {
-            icon: iconUserPlus,
-            bg: 'background:'
-                + 'hsl(var(--info-soft));'
-                + 'color:'
-                + 'hsl(var(--info-text))',
-        },
-        status_changed: {
-            icon: iconEdit,
-            bg: 'background:'
-                + 'hsl(var(--warning-soft));'
-                + 'color:'
-                + 'hsl(var(--warning-text))',
-        },
-        idea_converted: {
-            icon: iconArrowRight,
-            bg: 'background:'
-                + 'hsl(var(--success-soft));'
-                + 'color:'
-                + 'hsl(var(--success-text))',
-        },
-    };
-    const entry = iconMap[type]!;
-    return html`<div style="width:2.5rem;
-height:2.5rem;border-radius:var(--radius-lg);
-display:flex;align-items:center;
-justify-content:center;flex-shrink:0;
-${entry.bg}">${entry.icon(20, '')}</div>`;
-}
-
-function buildActivity(
-    activity: Activity,
-): SafeHtml {
-    const meta = activity.score
-        ? html`<div
-                class="badge badge-default text-xs mt-1">${
-                iconStar(12, '')
-            } Score: ${activity.score}</div>`
-        : activity.status
-            ? html`<div
-                    class="badge badge-default text-xs mt-1">${
-                    activity.status}</div>`
-            : activity.comment
-                ? html`<p
-                        class="text-sm text-muted mt-1"
-                        style="font-style:italic"
-                        >"${activity.comment}"</p>`
-                : html``;
-    return html`
-    <div class="flex items-start gap-4
-        p-4 rounded-lg activity-row">
-        ${buildActivityIcon(
-            activity.type as ActivityType,
-        )}
-        <div style="flex:1;min-width:0">
-            <p class="text-sm">
-                <span class="font-medium">${
-                    displayText(
-                        activity.actor,
-                    )}</span>
-                <span class="text-muted"> ${
-                    activity.action} </span>
-                <span class="font-medium">${
-                    activity.target}</span>
-            </p>
-            ${meta}
-            <p class="text-xs text-muted mt-1">${
-                formatDate(activity.timestamp)}</p>
-        </div>
-    </div>`;
-}
+import {
+    ActivityPresenter,
+} from '../app/presenters';
 
 export async function init(
 ): Promise<void> {
@@ -187,6 +43,9 @@ export async function init(
             },
         );
     if (!activities) return;
+    const items = activities.map(
+        a => new ActivityPresenter(a),
+    );
 
     setHtml(container, html`
     <div style="max-width:48rem;
@@ -221,7 +80,9 @@ export async function init(
         </div>
 
         <div id="activity-list">
-            ${activities.map(buildActivity)}
+            ${items.map(
+                a => a.buildActivity(),
+            )}
         </div>
 
         <div class="text-center mt-8">
@@ -236,16 +97,15 @@ export async function init(
     const searchInput =
         container.querySelector<
             HTMLInputElement
-        >('#activity-search');
+        >('#activity-search')!;
     const typeFilter =
         container.querySelector<
             HTMLSelectElement
-        >('#activity-filter');
+        >('#activity-filter')!;
 
     const typeMap: Record<string, string[]> = {
         idea: [
             'idea_created',
-            'idea_scored',
             'idea_converted',
         ],
         project: ['project_created'],
@@ -259,44 +119,30 @@ export async function init(
 
     function filterActivities(): void {
         if (!activityList) return;
-        const query = (
-            searchInput?.value ?? ''
-        ).toLowerCase();
-        const typeVal =
-            typeFilter?.value ?? 'all';
-        const filtered =
-            activities!.filter(a => {
-                if (query
-                    && !(a.actor ?? '')
-                        .toLowerCase()
-                        .includes(query)
-                    && !a.target
-                        .toLowerCase()
-                        .includes(query))
-                    return false;
-                if (typeVal !== 'all') {
-                    const types =
-                        typeMap[typeVal];
-                    if (types
-                        && !types.includes(
-                            a.type,
-                        ))
-                        return false;
-                }
-                return true;
-            });
+        const query =
+            searchInput.value
+                .toLowerCase();
+        const typeVal = typeFilter.value;
+        const types = typeVal !== 'all'
+            ? typeMap[typeVal]
+            : undefined;
+        const filtered = items.filter(
+            a => a.matchesFilter(
+                query, types,
+            ),
+        );
         setHtml(
             activityList,
             html`${filtered.map(
-                buildActivity,
+                a => a.buildActivity(),
             )}`,
         );
     }
 
-    searchInput?.addEventListener(
+    searchInput.addEventListener(
         'input', filterActivities,
     );
-    typeFilter?.addEventListener(
+    typeFilter.addEventListener(
         'change', filterActivities,
     );
 }

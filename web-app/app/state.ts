@@ -44,7 +44,10 @@ class AppStateManager {
                 + MOBILE_BREAKPOINT_PX
                 + 'px)',
             ).matches,
-            isSidebarCollapsed: false,
+            isSidebarCollapsed:
+                localStorage.getItem(
+                    STORAGE_KEY_SIDEBAR,
+                ) === 'true',
             isSidebarOpen: false,
             isSearchOpen: false,
             searchQuery: '',
@@ -113,6 +116,26 @@ class AppStateManager {
         }
         this.setState({ theme });
         this.applyTheme();
+    }
+
+    setSidebarCollapsed(
+        collapsed: boolean,
+    ): void {
+        try {
+            localStorage.setItem(
+                STORAGE_KEY_SIDEBAR,
+                String(collapsed),
+            );
+        } catch {
+            showToast(
+                'Failed to save'
+                + ' sidebar state.',
+                'error',
+            );
+        }
+        this.setState({
+            isSidebarCollapsed: collapsed,
+        });
     }
 
     private initListeners(): void {
@@ -202,15 +225,21 @@ function setTheme(
     mgr.setTheme(theme);
 }
 
+function setSidebarCollapsed(
+    collapsed: boolean,
+): void {
+    mgr.setSidebarCollapsed(collapsed);
+}
+
 export type { AppState };
 export {
     STORAGE_KEY_THEME,
-    STORAGE_KEY_SIDEBAR,
     state,
     setState,
     subscribe,
     computeTheme,
     applyTheme,
     setTheme,
+    setSidebarCollapsed,
     isValidTheme,
 };

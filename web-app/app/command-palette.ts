@@ -169,110 +169,122 @@ export function initCommandPalette(
             }),
         );
 
+        let ideas: Awaited<
+            ReturnType<typeof getIdeas>
+        >;
+        let projects: Awaited<
+            ReturnType<typeof getProjects>
+        >;
+        let members: Awaited<
+            ReturnType<
+                typeof getTeamMembers
+            >
+        >;
         try {
-            const [
-                ideas,
-                projects,
-                members,
-            ] = await Promise.all([
-                getIdeas(),
-                getProjects(),
-                getTeamMembers(),
-            ]);
-
-            const ideaItems:
-                SearchItem[] =
-                ideas.map(idea => ({
-                    id: `idea-${idea.id}`,
-                    title: idea.title,
-                    meta:
-                        `Score: `
-                        + `${idea.score}`
-                        + ` · ${idea.status.replace(/-/g, ' ')}`,
-                    category: 'ideas',
-                    icon:
-                        iconLightbulb(16, ''),
-                    href: buildPageUrl(
-                        'idea-convert',
-                        {
-                            ideaId:
-                                idea.id,
-                        },
-                    ),
-                    keywords:
-                        `${idea.submittedBy}`
-                        + ` ${idea.status}`,
-                }));
-
-            const projectItems:
-                SearchItem[] =
-                projects.map(
-                    project => ({
-                        id: `project-`
-                            + `${project.id}`,
-                        title:
-                            project.title,
-                        meta:
-                            `Progress:`
-                            + ` ${project.progress}%`
-                            + ` · ${project.status.replace(/-/g, ' ')}`,
-                        category:
-                            'projects',
-                        icon:
-                            iconFolderKanban(
-                                16, '',
-                            ),
-                        href:
-                            buildPageUrl(
-                                'project-detail',
-                                {
-                                    projectId:
-                                        project.id,
-                                },
-                            ),
-                        keywords:
-                            `${project.status}`,
-                    }),
-                );
-
-            const peopleItems:
-                SearchItem[] =
-                members.map(
-                    member => ({
-                        id: `person-`
-                            + `${member.id}`,
-                        title:
-                            member.fullName(),
-                        meta:
-                            `${member.role}`
-                            + ` · ${member.department}`,
-                        category:
-                            'people',
-                        icon:
-                            iconUser(16, ''),
-                        href:
-                            buildPageUrl(
-                                'teams',
-                            ),
-                        keywords:
-                            `${member.role}`
-                            + ` ${member.department}`
-                            + ` ${member.email}`,
-                    }),
-                );
-
-            state.allItems = [
-                ...ideaItems,
-                ...projectItems,
-                ...peopleItems,
-                ...state.allItems,
-            ];
+            [ideas, projects, members] =
+                await Promise.all([
+                    getIdeas(),
+                    getProjects(),
+                    getTeamMembers(),
+                ]);
         } catch {
             log.warn(
-                'Failed to load search data',
+                'Failed to load'
+                + ' search data',
                 'command-palette',
             );
+            return;
         }
+
+        const ideaItems:
+            SearchItem[] =
+            ideas.map(idea => ({
+                id: `idea-${idea.id}`,
+                title: idea.title,
+                meta:
+                    idea.status
+                        .replace(
+                            /-/g,
+                            ' ',
+                        ),
+                category: 'ideas',
+                icon:
+                    iconLightbulb(16, ''),
+                href: buildPageUrl(
+                    'idea-convert',
+                    {
+                        ideaId:
+                            idea.id,
+                    },
+                ),
+                keywords:
+                    `${idea.submittedBy}`
+                    + ` ${idea.status}`,
+            }));
+
+        const projectItems:
+            SearchItem[] =
+            projects.map(
+                project => ({
+                    id: `project-`
+                        + `${project.id}`,
+                    title:
+                        project.title,
+                    meta:
+                        `Progress:`
+                        + ` ${project.progress}%`
+                        + ` · ${project.status.replace(/-/g, ' ')}`,
+                    category:
+                        'projects',
+                    icon:
+                        iconFolderKanban(
+                            16, '',
+                        ),
+                    href:
+                        buildPageUrl(
+                            'project-detail',
+                            {
+                                projectId:
+                                    project.id,
+                            },
+                        ),
+                    keywords:
+                        `${project.status}`,
+                }),
+            );
+
+        const peopleItems:
+            SearchItem[] =
+            members.map(
+                member => ({
+                    id: `person-`
+                        + `${member.id}`,
+                    title:
+                        member.fullName(),
+                    meta:
+                        `${member.role}`
+                        + ` · ${member.department}`,
+                    category:
+                        'people',
+                    icon:
+                        iconUser(16, ''),
+                    href:
+                        buildPageUrl(
+                            'teams',
+                        ),
+                    keywords:
+                        `${member.role}`
+                        + ` ${member.department}`
+                        + ` ${member.email}`,
+                }),
+            );
+
+        state.allItems = [
+            ...ideaItems,
+            ...projectItems,
+            ...peopleItems,
+            ...state.allItems,
+        ];
     }
 
     function search(

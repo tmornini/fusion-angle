@@ -6,7 +6,6 @@ import type {
     TaskPriority,
     MilestoneStatus,
     IdeaEntity,
-    IdeaScoreIdeaEntity,
     ProjectEntity,
     EdgeEntity,
     ActivityEntity,
@@ -35,9 +34,14 @@ import type {
     ProjectTaskEntity,
     ProjectTaskProjectEntity,
     ProjectVersionProjectEntity,
-    FlowEntity,
-    FlowStepEntity,
-    ProcessStepProcessEntity,
+    WorkflowEntity,
+    WfNodeEntity,
+    WfEdgeEntity,
+    WfFieldEntity,
+    ProjectWorkflowEntity,
+    WfWorkflowNodeEntity,
+    WfNodeEdgeEntity,
+    WfNodeFieldEntity,
 } from './types';
 import {
     jsonArrayField,
@@ -419,7 +423,6 @@ export async function populateMockData(
             id: '1',
             title: 'AI-Powered Customer'
                 + ' Segmentation',
-            score: 92,
             estimated_impact: 85,
             estimated_duration: 432000,
             estimated_cost: 45000,
@@ -478,7 +481,6 @@ export async function populateMockData(
             id: '2',
             title: 'Automated Report'
                 + ' Generation',
-            score: 87,
             estimated_impact: 78,
             estimated_duration: 288000,
             estimated_cost: 32000,
@@ -540,7 +542,6 @@ export async function populateMockData(
             id: '3',
             title: 'Predictive Maintenance'
                 + ' System',
-            score: 84,
             estimated_impact: 90,
             estimated_duration: 720000,
             estimated_cost: 75000,
@@ -599,7 +600,6 @@ export async function populateMockData(
             id: '4',
             title: 'Real-time Analytics'
                 + ' Dashboard',
-            score: 81,
             estimated_impact: 72,
             estimated_duration: 216000,
             estimated_cost: 28000,
@@ -661,7 +661,6 @@ export async function populateMockData(
             id: '5',
             title: 'Smart Inventory'
                 + ' Optimization',
-            score: 78,
             estimated_impact: 68,
             estimated_duration: 360000,
             estimated_cost: 38000,
@@ -722,12 +721,11 @@ export async function populateMockData(
             id: '6',
             title: 'Employee Training'
                 + ' Assistant',
-            score: 74,
             estimated_impact: 65,
             estimated_duration: 324000,
             estimated_cost: 35000,
             priority: 6,
-            status: 'archived',
+            status: 'sent-back',
 
             problem_statement:
                 'New hire onboarding takes'
@@ -781,7 +779,6 @@ export async function populateMockData(
             id: '7',
             title: 'AI-Powered Customer'
                 + ' Support Chatbot',
-            score: 87,
             estimated_impact: 0,
             estimated_duration: 0,
             estimated_cost: 0,
@@ -898,7 +895,6 @@ export async function populateMockData(
             id: '8',
             title: 'Mobile App Push'
                 + ' Notification Revamp',
-            score: 72,
             estimated_impact: 0,
             estimated_duration: 0,
             estimated_cost: 0,
@@ -953,7 +949,6 @@ export async function populateMockData(
             id: '9',
             title: 'Sustainability Dashboard'
                 + ' for Operations',
-            score: 81,
             estimated_impact: 0,
             estimated_duration: 0,
             estimated_cost: 0,
@@ -1010,7 +1005,6 @@ export async function populateMockData(
             id: '10',
             title: 'Employee Wellness'
                 + ' Program Integration',
-            score: 45,
             estimated_impact: 0,
             estimated_duration: 0,
             estimated_cost: 0,
@@ -1068,7 +1062,6 @@ export async function populateMockData(
             id: '11',
             title: 'Real-time Inventory'
                 + ' Tracking System',
-            score: 91,
             estimated_impact: 0,
             estimated_duration: 0,
             estimated_cost: 0,
@@ -1600,20 +1593,6 @@ export async function populateMockData(
 
     const activities: ActivityEntity[] = [
         {
-            id: '1',
-            type: 'idea_scored',
-            action: 'scored',
-            target: 'AI-Powered Customer'
-                + ' Support Bot',
-            timestamp:
-                '2024-02-28T17:50:00.000000Z',
-            score: 87,
-            status: 'high',
-            comment:
-                'Strong potential for'
-                + ' cost reduction.',
-        },
-        {
             id: '2',
             type: 'task_completed',
             action: 'completed task',
@@ -1722,20 +1701,6 @@ export async function populateMockData(
             comment:
                 'All endpoints documented'
                 + ' with examples.',
-        },
-        {
-            id: '10',
-            type: 'idea_scored',
-            action: 'scored',
-            target: 'Data Pipeline'
-                + ' Modernization',
-            timestamp:
-                '2024-02-27T15:00:00.000000Z',
-            score: 92,
-            status: 'high',
-            comment:
-                'Top priority for Q2'
-                + ' roadmap.',
         },
     ];
 
@@ -1884,546 +1849,351 @@ export async function populateMockData(
         },
     ];
 
-    const flows: FlowEntity[] = [
+    const wfTimestamp =
+        '2024-02-01T09:00:00.000000Z';
+
+    const mockWorkflows:
+        WorkflowEntity[] = [
         {
-            id: '1',
+            id: 'wf-1',
             name: 'Customer Onboarding',
             description:
-                'End-to-end process for'
-                + ' onboarding new enterprise'
-                + ' customers from contract'
-                + ' signing to first value.',
-            department: 'Operations',
-        },
-        {
-            id: '2',
-            name:
-                'Product Development Sprint',
-            description:
-                'Two-week sprint cycle'
-                + ' for planning, building,'
-                + ' and shipping product'
-                + ' increments.',
-            department: 'Engineering',
-        },
-        {
-            id: '3',
-            name: 'Sales Pipeline Review',
-            description:
-                'Weekly review of active'
-                + ' deals, pipeline health,'
-                + ' and forecast accuracy.',
-            department: 'Sales',
-        },
-        {
-            id: '4',
-            name: 'Content Publishing',
-            description:
-                'Workflow for creating,'
-                + ' reviewing, and'
-                + ' publishing marketing'
-                + ' content across channels.',
-            department: 'Marketing',
+                'Standard customer'
+                + ' onboarding process',
+            created_at: wfTimestamp,
+            updated_at: wfTimestamp,
         },
     ];
 
-    const flowSteps: FlowStepEntity[] = [
+    const mockWfNodes:
+        WfNodeEntity[] = [
         {
-            id: 'fs-1',
-            title: 'Send Welcome Package',
-            description:
-                'Send branded welcome kit'
-                + ' with login credentials'
-                + ' and onboarding schedule.',
-            owner: 'Sarah Chen',
-            role: 'Account Manager',
-            tools: jsonArrayField(
-                ['Email', 'CRM'],
-            ),
-            duration: '1 day',
-            sort_order: 0,
-            type: 'start',
+            id: 'wn-1',
+            name: 'New',
+            description: '',
+            position_x: 40,
+            position_y: 30,
+            is_start: 1,
+            is_complete: 0,
+            created_at: wfTimestamp,
         },
         {
-            id: 'fs-2',
-            title: 'Schedule Kickoff Call',
-            description:
-                'Coordinate kickoff with'
-                + ' customer stakeholders'
-                + ' and internal team.',
-            owner: 'Sarah Chen',
-            role: 'Account Manager',
-            tools: jsonArrayField(
-                ['Calendar', 'Zoom'],
-            ),
-            duration: '2 days',
+            id: 'wn-2',
+            name: 'Data Capture',
+            description: '',
+            position_x: 260,
+            position_y: 140,
+            is_start: 0,
+            is_complete: 0,
+            created_at: wfTimestamp,
+        },
+        {
+            id: 'wn-3',
+            name: 'Review',
+            description: '',
+            position_x: 480,
+            position_y: 250,
+            is_start: 0,
+            is_complete: 0,
+            created_at: wfTimestamp,
+        },
+        {
+            id: 'wn-4',
+            name: 'Complete',
+            description: '',
+            position_x: 680,
+            position_y: 370,
+            is_start: 0,
+            is_complete: 1,
+            created_at: wfTimestamp,
+        },
+    ];
+
+    const mockWfEdges:
+        WfEdgeEntity[] = [
+        {
+            id: 'we-1',
+            name: 'begin',
+            description: '',
+            created_at: wfTimestamp,
+        },
+        {
+            id: 'we-2',
+            name: 'submit',
+            description: '',
+            created_at: wfTimestamp,
+        },
+        {
+            id: 'we-3',
+            name: 'needs revision',
+            description: '',
+            created_at: wfTimestamp,
+        },
+        {
+            id: 'we-4',
+            name: 'approve',
+            description: '',
+            created_at: wfTimestamp,
+        },
+    ];
+
+    const mockWfFields:
+        WfFieldEntity[] = [
+        {
+            id: 'wff-1',
+            name: 'Company Name',
+            field_type: 'text',
             sort_order: 1,
-            type: 'action',
+            is_required: 1,
+            options: jsonArrayField([]),
+            created_at: wfTimestamp,
         },
         {
-            id: 'fs-3',
-            title: 'Configure Environment',
-            description:
-                'Set up customer tenant,'
-                + ' integrations, and'
-                + ' initial data import.',
-            owner: 'Alex Kim',
-            role: 'Solutions Engineer',
-            tools: jsonArrayField(
-                ['Admin Console', 'API'],
-            ),
-            duration: '3 days',
+            id: 'wff-2',
+            name: 'Contact Email',
+            field_type: 'email',
             sort_order: 2,
-            type: 'action',
+            is_required: 1,
+            options: jsonArrayField([]),
+            created_at: wfTimestamp,
         },
         {
-            id: 'fs-4',
-            title: 'Conduct Training',
-            description:
-                'Run hands-on training'
-                + ' sessions for customer'
-                + ' admin and end users.',
-            owner: 'Jessica Park',
-            role: 'Customer Success',
-            tools: jsonArrayField(
-                ['Zoom', 'LMS'],
-            ),
-            duration: '5 days',
+            id: 'wff-3',
+            name: 'Contact Phone',
+            field_type: 'phone',
             sort_order: 3,
-            type: 'action',
+            is_required: 0,
+            options: jsonArrayField([]),
+            created_at: wfTimestamp,
         },
         {
-            id: 'fs-5',
-            title: 'Go-Live Approval',
-            description:
-                'Verify all acceptance'
-                + ' criteria met and'
-                + ' approve go-live.',
-            owner: 'Sarah Chen',
-            role: 'Account Manager',
-            tools: jsonArrayField(
-                ['Checklist'],
-            ),
-            duration: '1 day',
+            id: 'wff-4',
+            name: 'Industry',
+            field_type: 'select',
             sort_order: 4,
-            type: 'end',
-        },
-        {
-            id: 'fs-6',
-            title: 'Sprint Planning',
-            description:
-                'Review backlog, estimate'
-                + ' stories, and commit'
-                + ' to sprint scope.',
-            owner: 'David Martinez',
-            role: 'Engineering Manager',
-            tools: jsonArrayField(
-                ['Jira', 'Confluence'],
-            ),
-            duration: '4 hours',
-            sort_order: 0,
-            type: 'start',
-        },
-        {
-            id: 'fs-7',
-            title: 'Development',
-            description:
-                'Implement features and'
-                + ' bug fixes per sprint'
-                + ' backlog.',
-            owner: 'Mike Thompson',
-            role: 'Senior Developer',
-            tools: jsonArrayField(
-                ['VS Code', 'GitHub'],
-            ),
-            duration: '7 days',
-            sort_order: 1,
-            type: 'action',
-        },
-        {
-            id: 'fs-8',
-            title: 'Code Review',
-            description:
-                'Peer review all pull'
-                + ' requests for quality'
-                + ' and standards.',
-            owner: 'Alex Kim',
-            role: 'Tech Lead',
-            tools: jsonArrayField(
-                ['GitHub', 'SonarQube'],
-            ),
-            duration: '2 days',
-            sort_order: 2,
-            type: 'action',
-        },
-        {
-            id: 'fs-9',
-            title: 'QA & Testing',
-            description:
-                'Execute test plans,'
-                + ' regression testing, and'
-                + ' bug triage.',
-            owner: 'Emily Rodriguez',
-            role: 'QA Engineer',
-            tools: jsonArrayField(
-                ['Playwright', 'Jira'],
-            ),
-            duration: '3 days',
-            sort_order: 3,
-            type: 'action',
-        },
-        {
-            id: 'fs-10',
-            title: 'Release Decision',
-            description:
-                'Review test results and'
-                + ' decide whether to ship'
-                + ' or hold.',
-            owner: 'David Martinez',
-            role: 'Engineering Manager',
-            tools: jsonArrayField(
-                ['Dashboard'],
-            ),
-            duration: '2 hours',
-            sort_order: 4,
-            type: 'decision',
-        },
-        {
-            id: 'fs-11',
-            title: 'Deploy to Production',
-            description:
-                'Execute deployment'
-                + ' pipeline and verify'
-                + ' production health.',
-            owner: 'Mike Thompson',
-            role: 'Senior Developer',
-            tools: jsonArrayField([
-                'CI/CD',
-                'Datadog',
+            is_required: 0,
+            options: jsonArrayField([
+                'Technology',
+                'Finance',
+                'Healthcare',
+                'Retail',
+                'Manufacturing',
             ]),
-            duration: '4 hours',
+            created_at: wfTimestamp,
+        },
+        {
+            id: 'wff-5',
+            name: 'Annual Revenue',
+            field_type: 'currency',
             sort_order: 5,
-            type: 'end',
+            is_required: 0,
+            options: jsonArrayField([]),
+            created_at: wfTimestamp,
         },
         {
-            id: 'fs-12',
-            title: 'Pipeline Review',
-            description:
-                'Review deal status,'
-                + ' stage progression, and'
-                + ' blockers for each'
-                + ' opportunity.',
-            owner: 'Marcus Johnson',
-            role: 'Sales Director',
-            tools: jsonArrayField(
-                ['Salesforce', 'Gong'],
-            ),
-            duration: '1 hour',
-            sort_order: 0,
-            type: 'start',
+            id: 'wff-6',
+            name: 'Number of Employees',
+            field_type: 'number',
+            sort_order: 6,
+            is_required: 0,
+            options: jsonArrayField([]),
+            created_at: wfTimestamp,
         },
         {
-            id: 'fs-13',
-            title: 'Forecast Update',
-            description:
-                'Update revenue forecast'
-                + ' based on pipeline'
-                + ' changes and win rates.',
-            owner: 'Marcus Johnson',
-            role: 'Sales Director',
-            tools: jsonArrayField(
-                ['Salesforce', 'Excel'],
-            ),
-            duration: '30 min',
+            id: 'wff-7',
+            name: 'Company Logo',
+            field_type: 'image',
+            sort_order: 7,
+            is_required: 0,
+            options: jsonArrayField([]),
+            created_at: wfTimestamp,
+        },
+        {
+            id: 'wff-8',
+            name: 'Supporting Documents',
+            field_type: 'file',
+            sort_order: 8,
+            is_required: 0,
+            options: jsonArrayField([]),
+            created_at: wfTimestamp,
+        },
+        {
+            id: 'wff-9',
+            name: 'Reviewer Notes',
+            field_type: 'textarea',
             sort_order: 1,
-            type: 'action',
+            is_required: 1,
+            options: jsonArrayField([]),
+            created_at: wfTimestamp,
         },
         {
-            id: 'fs-14',
-            title: 'Deal Escalation Check',
-            description:
-                'Identify at-risk deals'
-                + ' requiring executive'
-                + ' involvement.',
-            owner: 'Marcus Johnson',
-            role: 'Sales Director',
-            tools: jsonArrayField(
-                ['CRM'],
-            ),
-            duration: '30 min',
+            id: 'wff-10',
+            name: 'Decision',
+            field_type: 'select',
             sort_order: 2,
-            type: 'decision',
-        },
-        {
-            id: 'fs-15',
-            title: 'Action Items & Follow-Up',
-            description:
-                'Assign next steps for'
-                + ' each deal and schedule'
-                + ' follow-ups.',
-            owner: 'Marcus Johnson',
-            role: 'Sales Director',
-            tools: jsonArrayField(
-                ['Slack', 'CRM'],
-            ),
-            duration: '30 min',
-            sort_order: 3,
-            type: 'end',
-        },
-        {
-            id: 'fs-16',
-            title: 'Content Brief',
-            description:
-                'Define topic, audience,'
-                + ' keywords, and goals'
-                + ' for the content piece.',
-            owner: 'Lisa Wang',
-            role: 'Content Strategist',
-            tools: jsonArrayField([
-                'Google Docs',
-                'SEMrush',
+            is_required: 1,
+            options: jsonArrayField([
+                'Approve',
+                'Needs Revision',
             ]),
-            duration: '1 day',
-            sort_order: 0,
-            type: 'start',
+            created_at: wfTimestamp,
         },
         {
-            id: 'fs-17',
-            title: 'Drafting',
-            description:
-                'Write first draft based'
-                + ' on brief and research.',
-            owner: 'Lisa Wang',
-            role: 'Content Writer',
-            tools: jsonArrayField(
-                ['Google Docs'],
-            ),
-            duration: '3 days',
-            sort_order: 1,
-            type: 'action',
-        },
-        {
-            id: 'fs-18',
-            title: 'Editorial Review',
-            description:
-                'Review for accuracy,'
-                + ' tone, and brand voice.'
-                + ' Approve or request'
-                + ' revisions.',
-            owner: 'David Kim',
-            role: 'Editor',
-            tools: jsonArrayField(
-                ['Google Docs'],
-            ),
-            duration: '2 days',
-            sort_order: 2,
-            type: 'decision',
-        },
-        {
-            id: 'fs-19',
-            title: 'Design & Formatting',
-            description:
-                'Add visuals, format for'
-                + ' target channel, and'
-                + ' prepare assets.',
-            owner: 'James Miller',
-            role: 'Designer',
-            tools: jsonArrayField(
-                ['Figma', 'Canva'],
-            ),
-            duration: '2 days',
+            id: 'wff-11',
+            name: 'Risk Assessment',
+            field_type: 'radio',
             sort_order: 3,
-            type: 'action',
-        },
-        {
-            id: 'fs-20',
-            title: 'Publish & Distribute',
-            description:
-                'Publish content and'
-                + ' schedule distribution'
-                + ' across channels.',
-            owner: 'Lisa Wang',
-            role: 'Content Strategist',
-            tools: jsonArrayField([
-                'CMS',
-                'Buffer',
-                'Mailchimp',
+            is_required: 0,
+            options: jsonArrayField([
+                'Low',
+                'Medium',
+                'High',
             ]),
-            duration: '1 day',
-            sort_order: 4,
-            type: 'end',
+            created_at: wfTimestamp,
         },
     ];
 
-    const processStepProcesses:
-        ProcessStepProcessEntity[] = [
-        ...['fs-1', 'fs-2', 'fs-3',
-            'fs-4', 'fs-5'].map(
-            stepId => ({
-                id: `psp-${stepId}`,
-                process_step_id: stepId,
-                process_id: '1',
-                created_at:
-                    '2024-02-01'
-                    + 'T09:00:00.000000Z',
-            } as ProcessStepProcessEntity),
-        ),
-        ...['fs-6', 'fs-7', 'fs-8',
-            'fs-9', 'fs-10', 'fs-11'].map(
-            stepId => ({
-                id: `psp-${stepId}`,
-                process_step_id: stepId,
-                process_id: '2',
-                created_at:
-                    '2024-02-01'
-                    + 'T09:00:00.000000Z',
-            } as ProcessStepProcessEntity),
-        ),
-        ...['fs-12', 'fs-13',
-            'fs-14', 'fs-15'].map(
-            stepId => ({
-                id: `psp-${stepId}`,
-                process_step_id: stepId,
-                process_id: '3',
-                created_at:
-                    '2024-02-01'
-                    + 'T09:00:00.000000Z',
-            } as ProcessStepProcessEntity),
-        ),
-        ...['fs-16', 'fs-17', 'fs-18',
-            'fs-19', 'fs-20'].map(
-            stepId => ({
-                id: `psp-${stepId}`,
-                process_step_id: stepId,
-                process_id: '4',
-                created_at:
-                    '2024-02-01'
-                    + 'T09:00:00.000000Z',
-            } as ProcessStepProcessEntity),
-        ),
+    const mockProjectWorkflows:
+        ProjectWorkflowEntity[] = [
+        {
+            id: 'pw-1',
+            project_id: '1',
+            workflow_id: 'wf-1',
+            created_at: wfTimestamp,
+        },
+    ];
+
+    const mockWfWorkflowNodes:
+        WfWorkflowNodeEntity[] = [
+        {
+            id: 'wwn-1',
+            workflow_id: 'wf-1',
+            node_id: 'wn-1',
+            created_at: wfTimestamp,
+        },
+        {
+            id: 'wwn-2',
+            workflow_id: 'wf-1',
+            node_id: 'wn-2',
+            created_at: wfTimestamp,
+        },
+        {
+            id: 'wwn-3',
+            workflow_id: 'wf-1',
+            node_id: 'wn-3',
+            created_at: wfTimestamp,
+        },
+        {
+            id: 'wwn-4',
+            workflow_id: 'wf-1',
+            node_id: 'wn-4',
+            created_at: wfTimestamp,
+        },
+    ];
+
+    const mockWfNodeEdges:
+        WfNodeEdgeEntity[] = [
+        {
+            id: 'wne-1',
+            wf_edge_id: 'we-1',
+            from_node_id: 'wn-1',
+            to_node_id: 'wn-2',
+            created_at: wfTimestamp,
+        },
+        {
+            id: 'wne-2',
+            wf_edge_id: 'we-2',
+            from_node_id: 'wn-2',
+            to_node_id: 'wn-3',
+            created_at: wfTimestamp,
+        },
+        {
+            id: 'wne-3',
+            wf_edge_id: 'we-3',
+            from_node_id: 'wn-3',
+            to_node_id: 'wn-2',
+            created_at: wfTimestamp,
+        },
+        {
+            id: 'wne-4',
+            wf_edge_id: 'we-4',
+            from_node_id: 'wn-3',
+            to_node_id: 'wn-4',
+            created_at: wfTimestamp,
+        },
+    ];
+
+    const mockWfNodeFields:
+        WfNodeFieldEntity[] = [
+        {
+            id: 'wnf-1',
+            node_id: 'wn-2',
+            field_id: 'wff-1',
+            created_at: wfTimestamp,
+        },
+        {
+            id: 'wnf-2',
+            node_id: 'wn-2',
+            field_id: 'wff-2',
+            created_at: wfTimestamp,
+        },
+        {
+            id: 'wnf-3',
+            node_id: 'wn-2',
+            field_id: 'wff-3',
+            created_at: wfTimestamp,
+        },
+        {
+            id: 'wnf-4',
+            node_id: 'wn-2',
+            field_id: 'wff-4',
+            created_at: wfTimestamp,
+        },
+        {
+            id: 'wnf-5',
+            node_id: 'wn-2',
+            field_id: 'wff-5',
+            created_at: wfTimestamp,
+        },
+        {
+            id: 'wnf-6',
+            node_id: 'wn-2',
+            field_id: 'wff-6',
+            created_at: wfTimestamp,
+        },
+        {
+            id: 'wnf-7',
+            node_id: 'wn-2',
+            field_id: 'wff-7',
+            created_at: wfTimestamp,
+        },
+        {
+            id: 'wnf-8',
+            node_id: 'wn-2',
+            field_id: 'wff-8',
+            created_at: wfTimestamp,
+        },
+        {
+            id: 'wnf-9',
+            node_id: 'wn-3',
+            field_id: 'wff-9',
+            created_at: wfTimestamp,
+        },
+        {
+            id: 'wnf-10',
+            node_id: 'wn-3',
+            field_id: 'wff-10',
+            created_at: wfTimestamp,
+        },
+        {
+            id: 'wnf-11',
+            node_id: 'wn-3',
+            field_id: 'wff-11',
+            created_at: wfTimestamp,
+        },
     ];
 
     await Promise.all([
-        adapter.ideaScores.put('score-1', {
-            id: 'score-1',
-            overall: 82,
-            impact_score: 88,
-            impact_breakdown:
-                jsonArrayField([
-                    {
-                        label:
-                            'Business Value',
-                        score: 9,
-                        maxScore: 10,
-                        reason:
-                            'Direct revenue'
-                            + ' impact through'
-                            + ' improved'
-                            + ' conversions',
-                    },
-                    {
-                        label:
-                            'Strategic'
-                            + ' Alignment',
-                        score: 8,
-                        maxScore: 10,
-                        reason:
-                            'Supports digital'
-                            + ' transformation'
-                            + ' goals',
-                    },
-                    {
-                        label:
-                            'User Benefit',
-                        score: 9,
-                        maxScore: 10,
-                        reason:
-                            'Saves significant'
-                            + ' time for'
-                            + ' marketing team',
-                    },
-                ]),
-            feasibility_score: 75,
-            feasibility_breakdown:
-                jsonArrayField([
-                    {
-                        label:
-                            'Technical'
-                            + ' Complexity',
-                        score: 7,
-                        maxScore: 10,
-                        reason:
-                            'Requires ML'
-                            + ' expertise and'
-                            + ' data pipeline',
-                    },
-                    {
-                        label:
-                            'Resource'
-                            + ' Availability',
-                        score: 8,
-                        maxScore: 10,
-                        reason:
-                            'Team has relevant'
-                            + ' skills',
-                    },
-                    {
-                        label:
-                            'Integration'
-                            + ' Effort',
-                        score: 8,
-                        maxScore: 10,
-                        reason:
-                            'Works with'
-                            + ' existing CRM',
-                    },
-                ]),
-            efficiency_score: 85,
-            efficiency_breakdown:
-                jsonArrayField([
-                    {
-                        label:
-                            'Time to Value',
-                        score: 9,
-                        maxScore: 10,
-                        reason:
-                            'MVP deliverable'
-                            + ' in 6-8 weeks',
-                    },
-                    {
-                        label:
-                            'Cost Efficiency',
-                        score: 8,
-                        maxScore: 10,
-                        reason:
-                            'Reasonable'
-                            + ' investment for'
-                            + ' expected'
-                            + ' returns',
-                    },
-                    {
-                        label:
-                            'Scalability',
-                        score: 9,
-                        maxScore: 10,
-                        reason:
-                            'Can expand to'
-                            + ' other use cases',
-                    },
-                ]),
-            estimated_duration: '6-8 weeks',
-            estimated_cost:
-                '$45,000 - $65,000',
-            recommendation:
-                'Strong candidate for'
-                + ' immediate'
-                + ' prioritization. High'
-                + ' impact with manageable'
-                + ' complexity. Recommend'
-                + ' starting with a focused'
-                + ' pilot on top customer'
-                + ' segment.',
-        }),
         ...projects.map(project =>
             adapter.projects.put(
                 project.id,
@@ -2457,30 +2227,27 @@ export async function populateMockData(
             adapter.crunchColumnAcronymLinks
                 .put(l.id, l),
         ),
-        ...flows.map(flow =>
-            adapter.flows.put(
-                flow.id, flow,
+        ...mockWorkflows.map(wf =>
+            adapter.workflows.put(
+                wf.id, wf,
             ),
         ),
-        ...flowSteps.map(step =>
-            adapter.flowSteps.put(
-                step.id, step,
+        ...mockWfNodes.map(n =>
+            adapter.wfNodes.put(
+                n.id, n,
+            ),
+        ),
+        ...mockWfEdges.map(e =>
+            adapter.wfEdges.put(
+                e.id, e,
+            ),
+        ),
+        ...mockWfFields.map(f =>
+            adapter.wfFields.put(
+                f.id, f,
             ),
         ),
     ]);
-
-    const ideaScoreIdeas:
-        IdeaScoreIdeaEntity[]
-    = [
-        {
-            id: 'isi-1',
-            idea_score_id: 'score-1',
-            idea_id: '1',
-            created_at:
-                '2024-01-15'
-                + 'T09:30:00.000000Z',
-        },
-    ];
 
     const teamMemberships: {
         id: string;
@@ -3900,11 +3667,6 @@ export async function populateMockData(
     ];
 
     await Promise.all([
-        ...ideaScoreIdeas.map(r =>
-            adapter.ideaScoreIdeas.put(
-                r.id, r,
-            ),
-        ),
         ...ideaSubmissions.map(r =>
             adapter.ideaSubmissions.put(
                 r.id, r,
@@ -4001,10 +3763,25 @@ export async function populateMockData(
                 .projectVersionProjects
                 .put(r.id, r),
         ),
-        ...processStepProcesses.map(r =>
-            adapter
-                .processStepProcesses
-                .put(r.id, r),
+        ...mockProjectWorkflows.map(r =>
+            adapter.projectWorkflows.put(
+                r.id, r,
+            ),
+        ),
+        ...mockWfWorkflowNodes.map(r =>
+            adapter.wfWorkflowNodes.put(
+                r.id, r,
+            ),
+        ),
+        ...mockWfNodeEdges.map(r =>
+            adapter.wfNodeEdges.put(
+                r.id, r,
+            ),
+        ),
+        ...mockWfNodeFields.map(r =>
+            adapter.wfNodeFields.put(
+                r.id, r,
+            ),
         ),
     ]);
 }

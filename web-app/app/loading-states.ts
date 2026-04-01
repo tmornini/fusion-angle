@@ -244,8 +244,9 @@ export async function withLoadingState<T>(
     timeoutMs?: number,
 ): Promise<T | null> {
     setHtml(container, skeletonHtml);
+    let data: T;
     try {
-        const data = timeoutMs
+        data = timeoutMs
             ? await Promise.race([
                 fetchFn(),
                 new Promise<never>(
@@ -266,40 +267,26 @@ export async function withLoadingState<T>(
                 ),
             ])
             : await fetchFn();
-        if (
-            emptyState
-            && Array.isArray(data)
-            && data.length === 0
-        ) {
-            setHtml(
-                container,
-                buildEmptyState(
-                    emptyState.icon,
-                    emptyState.title,
-                    emptyState.description,
-                    emptyState.action,
-                ),
-            );
-            emptyState.onEmpty?.();
-            return null;
-        }
-        return data;
     } catch (e) {
         setHtml(
             container,
             buildErrorState(
                 errorMessage(
                     e,
-                    'An unexpected error'
+                    'An unexpected'
+                    + ' error'
                     + ' occurred.'
-                    + ' Please try again.',
+                    + ' Please try'
+                    + ' again.',
                 ),
                 'Try Again',
             ),
         );
         const retryBtn =
             container
-                .querySelector<HTMLElement>(
+                .querySelector<
+                    HTMLElement
+                >(
                     '[data-retry-btn]',
                 );
         if (retryBtn && retryFn) {
@@ -311,4 +298,22 @@ export async function withLoadingState<T>(
         }
         return null;
     }
+    if (
+        emptyState
+        && Array.isArray(data)
+        && data.length === 0
+    ) {
+        setHtml(
+            container,
+            buildEmptyState(
+                emptyState.icon,
+                emptyState.title,
+                emptyState.description,
+                emptyState.action,
+            ),
+        );
+        emptyState.onEmpty?.();
+        return null;
+    }
+    return data;
 }

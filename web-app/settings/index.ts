@@ -1,18 +1,8 @@
 import { $ } from '../app/dom';
 import {
-    html,
     setHtml,
-    SafeHtml,
-    trusted,
 } from '../app/safe-html';
 import { showToast } from '../app/toast';
-import {
-    iconBuilding,
-    iconGlobe,
-    iconShield,
-    iconSave,
-    iconChevronRight,
-} from '../app/icons';
 import {
     buildErrorState,
 } from '../app/loading-states';
@@ -20,65 +10,12 @@ import {
     getCompanySettings,
     putCompanySettings,
 } from '../app/adapters';
-import { $input, $select } from '../app/dom';
-
-function buildSelectField(
-    id: string,
-    label: string,
-    value: string,
-    options: string[],
-): SafeHtml {
-    return html`<div>
-    <label class="label mb-2 block">${
-        label
-    }</label>
-    <select class="input" id="${id}">
-        ${options.map(
-            option => html`<option
-                value="${option}"
-                ${option === value
-                    ? trusted('selected')
-                    : html``}>${
-                    option
-            }</option>`,
-        )}
-    </select>
-    </div>`;
-}
-
-function buildToggleRow(
-    id: string,
-    label: string,
-    description: string,
-    checked: boolean,
-): SafeHtml {
-    return html`
-    <div class="${
-        'flex items-center '
-        + 'justify-between py-4'
-    }" style="${
-        'border-bottom:1px solid '
-        + 'hsl(var(--border))'
-    }">
-        <div style="${
-            'flex:1;min-width:0;'
-            + 'margin-right:2rem'
-        }">
-            <p class="font-medium">${
-                label}</p>
-            <p class="text-sm text-muted">${
-                description
-            }</p>
-        </div>
-        <button class="switch"
-            role="switch"
-            aria-checked="${checked}"
-            id="switch-${id}">
-            <span class="switch-thumb"
-            ></span>
-        </button>
-    </div>`;
-}
+import {
+    $input, $select,
+} from '../app/dom';
+import {
+    SettingsPresenter,
+} from '../app/presenters';
 
 export async function init(): Promise<void> {
     const container =
@@ -110,214 +47,12 @@ export async function init(): Promise<void> {
         return;
     }
 
-    setHtml(container, html`
-    <div style="${
-        'max-width:48rem;'
-        + 'margin:0 auto'
-    }">
-        <nav class="${
-            'flex items-center gap-2 '
-            + 'text-sm text-muted mb-6'
-        }">
-            <a href="${
-                '../administration/index.html'
-            }" class="text-primary">${
-                'Administration'
-            }</a>
-            ${iconChevronRight(14, '')}
-            <span>Company Settings</span>
-        </nav>
-
-        <div class="${
-            'flex items-center '
-            + 'justify-between mb-8'
-        }">
-            <div>
-                <h1 class="${
-                    'text-3xl font-display '
-                    + 'font-bold mb-2'
-                }">Company Settings</h1>
-                <p class="text-muted">${
-                    "Manage your organization's"
-                    + ' configuration'
-                }</p>
-            </div>
-            <button class="${
-                'btn btn-primary gap-2'
-            }" id="${
-                'company-settings-save-btn'
-            }">${
-                iconSave(16, '')
-            } Save Changes</button>
-        </div>
-
-        <div class="${
-            'card card-hover p-6 mb-6'
-        }">
-            <h3 class="${
-                'font-display font-semibold '
-                + 'mb-4 flex items-center'
-                + ' gap-2'
-            }">${
-                iconBuilding(20, '')
-            } General Information</h3>
-            <div class="${
-                'grid grid-cols-2'
-                + ' gap-4 mb-4'
-            }">
-                <div>
-                    <label class="${
-                        'label mb-2 block'
-                    }">Company Name</label>
-                    <input class="input"
-                        id="${
-                            'company-settings'
-                            + '-name'
-                        }"
-                        value="${
-                            settings.name
-                        }" />
-                </div>
-                <div>
-                    <label class="${
-                        'label mb-2 block '
-                        + 'flex items-center'
-                        + ' gap-2'
-                    }">${
-                        iconGlobe(16, '')
-                    } Domain</label>
-                    <input class="input"
-                        id="${
-                            'company-settings'
-                            + '-domain'
-                        }"
-                        value="${
-                            settings.domain
-                        }" />
-                </div>
-            </div>
-            <div class="${
-                'grid grid-cols-2 gap-4'
-            }">
-                ${buildSelectField(
-                    'company-settings'
-                    + '-industry',
-                    'Industry',
-                    settings.industry,
-                    [
-                        'Technology',
-                        'Healthcare',
-                        'Finance',
-                        'Manufacturing',
-                        'Education',
-                        'Other',
-                    ],
-                )}
-                ${buildSelectField(
-                    'company-settings-size',
-                    'Company Size',
-                    settings.size,
-                    [
-                        '1-10',
-                        '11-50',
-                        '51-200',
-                        '201-500',
-                        '500+',
-                    ],
-                )}
-            </div>
-        </div>
-
-        <div class="${
-            'card card-hover p-6 mb-6'
-        }">
-            <h3 class="${
-                'font-display '
-                + 'font-semibold mb-4'
-            }">Regional Settings</h3>
-            <div class="${
-                'grid grid-cols-2 gap-4'
-            }">
-                ${buildSelectField(
-                    'company-settings'
-                    + '-timezone',
-                    'Timezone',
-                    settings.timezone,
-                    [
-                        'America/New_York',
-                        'America/Chicago',
-                        'America/Denver',
-                        'America/Los_Angeles',
-                        'Europe/London',
-                        'Europe/Berlin',
-                        'Asia/Tokyo',
-                    ],
-                )}
-                ${buildSelectField(
-                    'company-settings'
-                    + '-language',
-                    'Language',
-                    settings.language,
-                    [
-                        'English',
-                        'Spanish',
-                        'French',
-                        'German',
-                        'Japanese',
-                    ],
-                )}
-            </div>
-        </div>
-
-        <div class="${
-            'card card-hover p-6 mb-6'
-        }">
-            <h3 class="${
-                'font-display font-semibold '
-                + 'mb-4 flex items-center'
-                + ' gap-2'
-            }">${
-                iconShield(20, '')
-            } Security</h3>
-            ${buildToggleRow(
-                'company-settings-sso',
-                'Enforce SSO',
-                'Require Single Sign-On'
-                + ' for all users',
-                settings.isSsoEnforced,
-            )}
-            ${buildToggleRow(
-                'company-settings-2fa',
-                'Two-Factor Authentication',
-                'Require 2FA for all users',
-                settings.isTwoFactorEnabled,
-            )}
-            ${buildToggleRow(
-                'company-settings'
-                + '-ip-whitelist',
-                'IP Whitelist',
-                'Restrict access to specific'
-                + ' IP addresses',
-                settings
-                    .isIpWhitelistEnabled,
-            )}
-            <div class="pt-4">
-                ${buildSelectField(
-                    'company-settings'
-                    + '-retention',
-                    'Data Retention Period',
-                    settings.dataRetention,
-                    [
-                        '6 months',
-                        '12 months',
-                        '24 months',
-                        '36 months',
-                        'Indefinite',
-                    ],
-                )}
-            </div>
-        </div>
-    </div>`);
+    const presenter =
+        new SettingsPresenter(settings);
+    setHtml(
+        container,
+        presenter.buildPage(),
+    );
 
     document
         .querySelectorAll<HTMLElement>(
@@ -349,11 +84,11 @@ export async function init(): Promise<void> {
             const sel = (id: string) =>
                 $select(
                     '#' + id, document,
-                )?.value ?? '';
+                )!.value;
             const inp = (id: string) =>
                 $input(
                     '#' + id, document,
-                )?.value ?? '';
+                )!.value;
             const sw = (id: string) =>
                 $(
                     '#switch-' + id,

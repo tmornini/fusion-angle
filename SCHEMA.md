@@ -1,10 +1,10 @@
 # Database Schema
 
-44 tables stored in localStorage as JSON arrays. Each table is keyed as `fusion-ai:tableName`. All rows have a text `id` primary key. Column types: TEXT (string), INTEGER (number), REAL (float). JSON columns store stringified arrays or objects. All columns are NOT NULL — entity validation on creation ensures every field is present.
+49 tables stored in localStorage as JSON arrays. Each table is keyed as `fusion-ai:tableName`. All rows have a text `id` primary key. Column types: TEXT (string), INTEGER (number), REAL (float). JSON columns store stringified arrays or objects. All columns are NOT NULL — entity validation on creation ensures every field is present.
 
 **Duration convention:** All numeric duration fields are persisted in seconds. UI displays days via `durationInDays(seconds)` from `format.ts`.
 
-**Timestamp convention:** TEXT columns storing timestamps use RFC-3339 Zulu format (e.g., `2024-01-15T09:30:00.000000Z`). Empty string `''` means the event has not yet occurred. All timestamps for events that have occurred must be RFC-3339 Zulu. See CONDUCT-OF-CODE.md.
+**Timestamp convention:** TEXT columns storing timestamps use RFC-3339 Zulu format (e.g., `2024-01-15T09:30:00.000000Z`). Temporal facts (completedAt, deletedAt, etc.) belong in event tables — the absence of a row is the absence of the event. See CHURCH-OF-CODE.md.
 
 ## Core
 
@@ -192,28 +192,49 @@
 | id | TEXT |
 | expansion | TEXT |
 
-### processes
+### workflows
 
-| Column | Type |
-|--------|------|
-| id | TEXT |
-| name | TEXT |
-| description | TEXT |
-| department | TEXT |
+| Column | Type | Notes |
+|--------|------|-------|
+| id | TEXT | PRIMARY KEY |
+| name | TEXT | |
+| description | TEXT | |
+| created_at | TEXT | RFC-3339 Zulu |
+| updated_at | TEXT | RFC-3339 Zulu |
 
-### process_steps
+### wf_nodes
 
-| Column | Type |
-|--------|------|
-| id | TEXT |
-| title | TEXT |
-| description | TEXT |
-| owner | TEXT |
-| role | TEXT |
-| tools | TEXT (JSON array) |
-| duration | TEXT |
-| sort_order | INTEGER |
-| type | TEXT |
+| Column | Type | Notes |
+|--------|------|-------|
+| id | TEXT | PRIMARY KEY |
+| name | TEXT | |
+| description | TEXT | |
+| position_x | INTEGER | Canvas X coordinate |
+| position_y | INTEGER | Canvas Y coordinate |
+| is_start | INTEGER | Boolean (0/1) |
+| is_complete | INTEGER | Boolean (0/1) |
+| created_at | TEXT | RFC-3339 Zulu |
+
+### wf_edges
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | TEXT | PRIMARY KEY |
+| name | TEXT | Transition/button label |
+| description | TEXT | |
+| created_at | TEXT | RFC-3339 Zulu |
+
+### wf_fields
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | TEXT | PRIMARY KEY |
+| name | TEXT | Field label |
+| field_type | TEXT | Enum (see WfFieldType) |
+| sort_order | INTEGER | Display order |
+| is_required | INTEGER | Boolean (0/1) |
+| options | TEXT | JSON array for select/radio/multi_select |
+| created_at | TEXT | RFC-3339 Zulu |
 
 ## Platform
 
@@ -455,14 +476,42 @@ Singleton table (single row, `id = '1'`).
 | crunch_column_id | TEXT (FK → crunch_columns) |
 | created_at | TEXT |
 
-### process_step_processes
+### project_workflows
 
-| Column | Type |
-|--------|------|
-| id | TEXT |
-| process_step_id | TEXT (FK → process_steps) |
-| process_id | TEXT (FK → processes) |
-| created_at | TEXT |
+| Column | Type | Notes |
+|--------|------|-------|
+| id | TEXT | PRIMARY KEY |
+| project_id | TEXT | References projects |
+| workflow_id | TEXT | References workflows |
+| created_at | TEXT | RFC-3339 Zulu |
+
+### wf_workflow_nodes
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | TEXT | PRIMARY KEY |
+| workflow_id | TEXT | References workflows |
+| node_id | TEXT | References wf_nodes |
+| created_at | TEXT | RFC-3339 Zulu |
+
+### wf_node_edges
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | TEXT | PRIMARY KEY |
+| wf_edge_id | TEXT | References wf_edges |
+| from_node_id | TEXT | References wf_nodes |
+| to_node_id | TEXT | References wf_nodes |
+| created_at | TEXT | RFC-3339 Zulu |
+
+### wf_node_fields
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | TEXT | PRIMARY KEY |
+| node_id | TEXT | References wf_nodes |
+| field_id | TEXT | References wf_fields |
+| created_at | TEXT | RFC-3339 Zulu |
 
 ### milestone_projects
 

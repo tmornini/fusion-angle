@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-**All work must follow [CONDUCT-OF-CODE.md](CONDUCT-OF-CODE.md)** — read it before making changes.
+**All work must follow [CHURCH-OF-CODE.md](CHURCH-OF-CODE.md)** — read it before making changes.
 
 ## Build & Dev Commands
 
@@ -11,7 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ./build                # Compile, bundle, minify, and create distribution ZIP
 ```
 
-**Always commit before building.** `./build` requires a clean working directory (see CONDUCT-OF-CODE.md line 78). Use `./validate` to catch type errors and lint issues before committing, then commit, then build.
+**Always commit before building.** `./build` requires a clean working directory. Use `./validate` to catch type errors and lint issues before committing, then commit, then build.
 
 `./validate` runs `tsc --noEmit` (type checking) then enforces 78-character maximum line length on all `.ts`, `.html`, and `.css` files (excluding `compose.ts`).
 
@@ -70,7 +70,7 @@ import { iconPlus, iconTrash } from '../app/icons';
 import { navigateTo, openDialog, closeDialog } from '../app/core';
 ```
 
-`core.ts` re-exports from `format.ts`, `navigation.ts`, and `dialog.ts` so page modules can import `navigateTo`, `initials`, `styleForScore`, `durationInDays`, `formatCompactCurrency`, `SECONDS_PER_DAY`, `openDialog`, `closeDialog`, `initTabs` from `'../app/core'`. The `adapters/` directory retains its barrel re-export (`adapters/index.ts`).
+`core.ts` re-exports from `format.ts`, `navigation.ts`, and `dialog.ts` so page modules can import `navigateTo`, `initials`, `durationInDays`, `formatCompactCurrency`, `SECONDS_PER_DAY`, `openDialog`, `closeDialog`, `initTabs` from `'../app/core'`. The `adapters/` directory retains its barrel re-export (`adapters/index.ts`).
 
 **Page modules never import from `api/api.ts`** — all data access (reads and writes) goes through the adapter layer (`adapters/`). Only adapter modules import from the API layer directly.
 
@@ -91,7 +91,7 @@ import { navigateTo, openDialog, closeDialog } from '../app/core';
 ### Adapter Conventions
 
 - **User-name fallback**: When a user ID can't resolve to a name, return `''` (empty string). UI renders `'\u2014'` (em dash) for display. Never use magical fallback strings like `'Unknown'`.
-- **Absent values**: Use `null` for semantically absent values in adapter return types (e.g., `confidence: ConfidenceLevel | null`). Persisted noun entities never use `null` — see CONDUCT-OF-CODE.md.
+- **Absent values**: Use `null` for semantically absent values in adapter return types (e.g., `confidence: ConfidenceLevel | null`). Persisted noun entities never use `null`.
 - **No adapter caching**: Each adapter function fetches its own data directly via `buildUserMap()`. No `cachedUserMap` or `prefetched*` parameters — simplicity over micro-optimization of localStorage reads.
 - **Shared types**: The `Metric` interface (`{ id, name, target, unit, current }`) is defined in `helpers.ts` and used across adapters. `PriorityLevel` (computed from score) is distinct from `ConfidenceLevel` (user-selected).
 
@@ -147,7 +147,7 @@ web-app/
     compose.ts                # Build-time script: layout + page → composed index.html
     core.ts                   # Page dispatch + re-exports from format.ts, navigation.ts, dialog.ts
     page-registry.ts          # PAGE_REGISTRY: maps page names → sidebar/standalone classification + sourceDir/sourceFile overrides
-    format.ts                 # initials(), styleForScore(), durationInDays(), formatCompactCurrency(), SECONDS_PER_DAY
+    format.ts                 # initials(), durationInDays(), formatCompactCurrency(), SECONDS_PER_DAY
     layout.ts                 # Sidebar layout initialization and sidebar behavior
     navigation.ts             # navigateTo(), getPageName(), URL construction, link prefetch
     dialog.ts                 # openDialog(), closeDialog(), initTabs() dialog/tab helpers
@@ -228,7 +228,7 @@ No build artifacts are created in the repo — everything is assembled in `/tmp/
 - **Cross-tab theme sync**: `state.ts` listens to `StorageEvent` and syncs theme changes across browser tabs automatically.
 - **Non-critical writes logged at warn**: localStorage writes for theme and sidebar state are wrapped in try/catch that log at `warn` level — quota errors don't break the app but are observable via the logger.
 - **Snapshots wipe-first**: All snapshot operations (pristine, mock data, import) call `DELETE('snapshots/schema')` before writing — there is no merge, only replace.
-- **Score thresholds**: `SCORE_THRESHOLD_HIGH = 80` and `SCORE_THRESHOLD_MEDIUM = 60` in `api/types.ts` determine `PriorityLevel` computation. Separate badge thresholds: `SCORE_BADGE_HIGH = 85`, `SCORE_BADGE_MEDIUM = 70`. Availability thresholds: `AVAILABILITY_HIGH = 70`, `AVAILABILITY_LOW = 40`.
+- **Score thresholds**: `SCORE_THRESHOLD_HIGH = 80` and `SCORE_THRESHOLD_MEDIUM = 60` in `api/types.ts` determine `PriorityLevel` computation for projects. Availability thresholds: `AVAILABILITY_HIGH = 70`, `AVAILABILITY_LOW = 40`.
 - **`file:///` protocol**: Navigation detects file protocol and skips link prefetching. Page URLs use relative paths. Code supports `file:///` locally but testing is HTTP-only.
 
 ## Worktrees

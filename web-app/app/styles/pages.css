@@ -37,46 +37,6 @@
 }
 
 /* ==========================================
-   27b. SCORE TABS (Idea Scoring)
-   ========================================== */
-
-.score-tab {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-weight: 500;
-  font-size: var(--text-sm);
-  padding: 0.625rem 1rem;
-  border-radius: var(--radius-lg);
-  white-space: nowrap;
-  border: none;
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: background-color var(--duration-fast) var(--ease-default),
-              color var(--duration-fast) var(--ease-default);
-  background: hsl(var(--muted));
-  color: hsl(var(--muted-foreground));
-}
-
-.score-tab.active {
-  background: hsl(var(--primary));
-  color: hsl(var(--primary-foreground));
-}
-
-.score-tab .score-tab-badge {
-  margin-left: 0.25rem;
-  padding: 0.125rem 0.5rem;
-  border-radius: var(--radius);
-  font-size: 0.75rem;
-  font-weight: 700;
-  background: hsl(var(--background));
-}
-
-.score-tab.active .score-tab-badge {
-  background: hsl(var(--primary-foreground) / 0.2);
-}
-
-/* ==========================================
    28. VIEW TOGGLE BUTTONS
    ========================================== */
 
@@ -882,5 +842,113 @@
 @keyframes fade-out {
   from { opacity: 1; }
   to { opacity: 0; }
+}
+
+/* ==========================================
+   39. WORKFLOW DESIGNER
+   ========================================== */
+
+.wf-designer {
+  display: flex;
+  flex-direction: column;
+}
+
+.wf-designer-header {
+  padding: 16px;
+}
+
+.wf-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  background-color: hsl(var(--card));
+  border-bottom:
+      1px solid hsl(var(--border));
+  flex-wrap: wrap;
+}
+
+.wf-toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wf-canvas-wrap {
+  min-height: 400px;
+  background-color: hsl(var(--background));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  cursor: grab;
+}
+
+.wf-canvas-wrap:active {
+  cursor: grabbing;
+}
+
+svg.wf-canvas {
+  width: 100%;
+  display: block;
+}
+
+.wf-props-panel {
+  padding: 16px;
+  background-color: hsl(var(--card));
+  border-bottom:
+      1px solid hsl(var(--border));
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.wf-field-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  background-color: hsl(var(--background));
+  border-radius: var(--radius-sm);
+  margin-bottom: 4px;
+  font-size: var(--text-sm);
+}
+
+.wf-field-editor {
+  margin-top: 8px;
+  padding: 12px;
+  background-color: hsl(var(--background));
+  border-radius: var(--radius-sm);
+  border: 1px solid hsl(var(--border));
+}
+
+svg.wf-canvas [data-node-id] {
+  transition:
+      opacity var(--duration-fast)
+      var(--ease-default);
+}
+
+svg.wf-canvas [data-node-id]:hover {
+  opacity: 0.85;
+}
+
+svg.wf-canvas [data-port] {
+  cursor: crosshair;
+  opacity: 0.7;
+  transition:
+      opacity var(--duration-fast)
+      var(--ease-default);
+}
+
+svg.wf-canvas [data-port]:hover {
+  opacity: 1;
+}
+
+svg.wf-canvas [data-edge-id] {
+  cursor: pointer;
+}
+
+@media (max-width: 767px) {
+  .wf-toolbar { gap: 8px; }
+  .wf-canvas-wrap { min-height: 250px; }
+  .wf-props-panel { max-height: none; }
 }
 

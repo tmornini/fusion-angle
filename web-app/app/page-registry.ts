@@ -99,16 +99,17 @@ export const PAGE_REGISTRY: Record<
             'data labeling columns',
     },
     flow: {
-        title: 'Flow',
+        title: 'Workflows',
         layout: 'sidebar',
         sourceDir: 'flow',
         sourceFile: 'index',
         icon: 'gitBranch',
         keywords:
-            'process workflow steps',
+            'workflow, process,'
+            + ' state machine, flow',
     },
     'flow-detail': {
-        title: 'Flow Detail',
+        title: 'Workflow Designer',
         layout: 'sidebar',
         sourceDir: 'flow',
         sourceFile: 'detail',

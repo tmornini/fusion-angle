@@ -128,9 +128,6 @@ const routes: Route[] = [
             db.crunchColumnAcronymLinks
                 .getAll(),
     }),
-    route('processes', {
-        get: (db) => db.flows.getAll(),
-    }),
     route('edge-outcomes', {
         get: (db) =>
             db.edgeOutcomes.getAll(),
@@ -147,10 +144,6 @@ const routes: Route[] = [
         get: (db) =>
             db.edgeMetricOutcomes
                 .getAll(),
-    }),
-    route('process-steps', {
-        get: (db) =>
-            db.flowSteps.getAll(),
     }),
     route('idea-submissions', {
         get: (db) =>
@@ -219,18 +212,9 @@ const routes: Route[] = [
             db.clarificationProjects
                 .getAll(),
     }),
-    route('idea-score-ideas', {
-        get: (db) =>
-            db.ideaScoreIdeas.getAll(),
-    }),
     route('project-task-projects', {
         get: (db) =>
             db.projectTaskProjects
-                .getAll(),
-    }),
-    route('process-step-processes', {
-        get: (db) =>
-            db.processStepProcesses
                 .getAll(),
     }),
     route('milestone-projects', {
@@ -256,6 +240,185 @@ const routes: Route[] = [
         get: (db) =>
             db.teamMembershipUsers
                 .getAll(),
+    }),
+
+    route('workflows', {
+        get: (db) =>
+            db.workflows.getAll(),
+        post: async (db, _params, body) => {
+            const id =
+                body.id as string;
+            return db.workflows.put(
+                id, body,
+            );
+        },
+    }),
+    route('workflows/:id', {
+        get: (db, params) =>
+            db.workflows.getById(
+                param(params, 0),
+            ),
+        put: (db, params, body) =>
+            db.workflows.put(
+                param(params, 0), body,
+            ),
+        delete: (db, params) =>
+            db.workflows.delete(
+                param(params, 0),
+            ),
+    }),
+    route('wf-nodes', {
+        get: (db) =>
+            db.wfNodes.getAll(),
+        post: async (
+            db, _params, body,
+        ) => {
+            const id =
+                body.id as string;
+            return db.wfNodes.put(
+                id, body,
+            );
+        },
+    }),
+    route('wf-nodes/:id', {
+        get: (db, params) =>
+            db.wfNodes.getById(
+                param(params, 0),
+            ),
+        put: (db, params, body) =>
+            db.wfNodes.put(
+                param(params, 0), body,
+            ),
+        delete: (db, params) =>
+            db.wfNodes.delete(
+                param(params, 0),
+            ),
+    }),
+    route('wf-edges', {
+        get: (db) =>
+            db.wfEdges.getAll(),
+        post: async (
+            db, _params, body,
+        ) => {
+            const id =
+                body.id as string;
+            return db.wfEdges.put(
+                id, body,
+            );
+        },
+    }),
+    route('wf-edges/:id', {
+        get: (db, params) =>
+            db.wfEdges.getById(
+                param(params, 0),
+            ),
+        put: (db, params, body) =>
+            db.wfEdges.put(
+                param(params, 0), body,
+            ),
+        delete: (db, params) =>
+            db.wfEdges.delete(
+                param(params, 0),
+            ),
+    }),
+    route('wf-fields', {
+        get: (db) =>
+            db.wfFields.getAll(),
+        post: async (
+            db, _params, body,
+        ) => {
+            const id =
+                body.id as string;
+            return db.wfFields.put(
+                id, body,
+            );
+        },
+    }),
+    route('wf-fields/:id', {
+        put: (db, params, body) =>
+            db.wfFields.put(
+                param(params, 0), body,
+            ),
+        delete: (db, params) =>
+            db.wfFields.delete(
+                param(params, 0),
+            ),
+    }),
+    route('project-workflows', {
+        get: (db) =>
+            db.projectWorkflows
+                .getAll(),
+        post: async (
+            db, _params, body,
+        ) => {
+            const id =
+                body.id as string;
+            return db.projectWorkflows
+                .put(id, body);
+        },
+    }),
+    route('project-workflows/:id', {
+        delete: (db, params) =>
+            db.projectWorkflows.delete(
+                param(params, 0),
+            ),
+    }),
+    route('wf-workflow-nodes', {
+        get: (db) =>
+            db.wfWorkflowNodes
+                .getAll(),
+        post: async (
+            db, _params, body,
+        ) => {
+            const id =
+                body.id as string;
+            return db.wfWorkflowNodes
+                .put(id, body);
+        },
+    }),
+    route('wf-workflow-nodes/:id', {
+        delete: (db, params) =>
+            db.wfWorkflowNodes.delete(
+                param(params, 0),
+            ),
+    }),
+    route('wf-node-edges', {
+        get: (db) =>
+            db.wfNodeEdges.getAll(),
+        post: async (
+            db, _params, body,
+        ) => {
+            const id =
+                body.id as string;
+            return db.wfNodeEdges.put(
+                id, body,
+            );
+        },
+    }),
+    route('wf-node-edges/:id', {
+        delete: (db, params) =>
+            db.wfNodeEdges.delete(
+                param(params, 0),
+            ),
+    }),
+    route('wf-node-fields', {
+        get: (db) =>
+            db.wfNodeFields.getAll(),
+        post: async (
+            db, _params, body,
+        ) => {
+            const id =
+                body.id as string;
+            return db.wfNodeFields.put(
+                id, body,
+            );
+        },
+    }),
+    route('wf-node-fields/:id', {
+        delete: (db, params) =>
+            db.wfNodeFields.delete(
+                param(params, 0),
+            ),
     }),
 
     route('company-settings', {
@@ -318,61 +481,6 @@ const routes: Route[] = [
         delete: (db, p) =>
             db.edges.delete(param(p, 0)),
     }),
-    route('processes/:id', {
-        get: (db, p) =>
-            db.flows.getById(param(p, 0)),
-        put: (db, p, payload) =>
-            db.flows.put(
-                param(p, 0),
-                payload,
-            ),
-        delete: (db, p) =>
-            db.flows.delete(param(p, 0)),
-    }),
-    route('processes/:processId/steps', {
-        get: async (db, p) => {
-            const pid = param(p, 0);
-            const [links, steps] =
-                await Promise.all([
-                    db.processStepProcesses
-                        .getAll(),
-                    db.flowSteps.getAll(),
-                ]);
-            const stepIds = new Set(
-                links
-                    .filter(
-                        l => l.process_id
-                            === pid,
-                    )
-                    .map(
-                        l => l.process_step_id,
-                    ),
-            );
-            return steps
-                .filter(
-                    s => stepIds.has(s.id),
-                )
-                .sort(
-                    (a, b) =>
-                        a.sort_order
-                        - b.sort_order,
-                );
-        },
-    }),
-    route(
-        'processes/:processId/steps/:stepId',
-        {
-            get: (db, p) =>
-                db.flowSteps.getById(
-                    param(p, 1),
-                ),
-            put: (db, p, payload) =>
-                db.flowSteps.put(
-                    param(p, 1),
-                    payload,
-                ),
-        },
-    ),
     route('activities/:id', {
         put: (db, p, payload) =>
             db.activities.put(
@@ -523,23 +631,9 @@ const routes: Route[] = [
                 payload,
             ),
     }),
-    route('idea-score-ideas/:id', {
-        put: (db, p, payload) =>
-            db.ideaScoreIdeas.put(
-                param(p, 0),
-                payload,
-            ),
-    }),
     route('project-task-projects/:id', {
         put: (db, p, payload) =>
             db.projectTaskProjects.put(
-                param(p, 0),
-                payload,
-            ),
-    }),
-    route('process-step-processes/:id', {
-        put: (db, p, payload) =>
-            db.processStepProcesses.put(
                 param(p, 0),
                 payload,
             ),
@@ -641,57 +735,6 @@ const routes: Route[] = [
             return result;
         },
     }),
-    route('ideas/:ideaId/score', {
-        get: async (db, p) => {
-            const ideaId = param(p, 0);
-            const links =
-                await db.ideaScoreIdeas
-                    .getAll();
-            const link = links.find(
-                l => l.idea_id === ideaId,
-            );
-            if (!link) return null;
-            return db.ideaScores.getById(
-                link.idea_score_id,
-            );
-        },
-        put: async (db, p, payload) => {
-            const ideaId = param(p, 0);
-            const links =
-                await db.ideaScoreIdeas
-                    .getAll();
-            const existing = links.find(
-                l => l.idea_id === ideaId,
-            );
-            const scoreId =
-                typeof payload.id === 'string'
-                    ? payload.id
-                    : (existing
-                        ?.idea_score_id
-                        ?? `score-${ideaId}`);
-            const score =
-                await db.ideaScores.put(
-                    scoreId, payload,
-                );
-            if (!existing) {
-                const linkId =
-                    `isi-${ideaId}`;
-                await db.ideaScoreIdeas.put(
-                    linkId,
-                    {
-                        id: linkId,
-                        idea_score_id:
-                            scoreId,
-                        idea_id: ideaId,
-                        created_at:
-                            nowUtc(),
-                    },
-                );
-            }
-            return score;
-        },
-    }),
-
     route('projects/:projectId/team', {
         get: async (db, p) => {
             const pid = param(p, 0);

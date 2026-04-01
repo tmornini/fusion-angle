@@ -31,23 +31,24 @@
       "Bash(__NEW_LINE_0c89c8284349f9c6__ echo:*)",
       "WebFetch(domain:registry.npmjs.org)",
       "WebFetch(domain:github.com)",
-      "Skill(update-config)"
+      "Skill(update-config)",
+      "WebFetch(domain:raw.githubusercontent.com)"
     ]
   },
   "sandbox": {
     "enabled": true,
     "autoAllowBashIfSandboxed": true,
     "allowUnsandboxedCommands": false,
+    "network": {
+      "allowUnixSockets": [
+        "/tmp/claude/tsx-501"
+      ],
+      "allowLocalBinding": true
+    },
     "filesystem": {
       "allowWrite": [
         "/Users/tmornini/.npm-cache",
         "/Users/tmornini/Desktop"
-      ]
-    },
-    "network": {
-      "allowLocalBinding": true,
-      "allowUnixSockets": [
-        "/tmp/claude/tsx-501"
       ]
     }
   }

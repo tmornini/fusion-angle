@@ -1,11 +1,8 @@
-import { GET, PUT } from '../../../api/api';
+import { GET } from '../../../api/api';
 import type {
     CrunchColumnEntity,
     CrunchColumnAcronymEntity,
     CrunchColumnAcronymLinkEntity,
-    FlowEntity,
-    FlowStepEntity,
-    ProcessStepProcessEntity,
 } from '../../../api/types';
 import { parseJson } from './helpers';
 
@@ -73,114 +70,3 @@ export async function getCrunchColumns(
     });
 }
 
-export interface FlowListItem {
-    id: string;
-    name: string;
-    description: string;
-    department: string;
-    stepsCount: number;
-}
-
-export async function getFlows(
-): Promise<FlowListItem[]> {
-    const [flows, links] =
-        await Promise.all([
-            GET<FlowEntity[]>('processes'),
-            GET<ProcessStepProcessEntity[]>(
-                'process-step-processes',
-            ),
-        ]);
-    const linksByProcessId = Map.groupBy(
-        links,
-        link => link.process_id,
-    );
-    return flows.map(flow => ({
-        id: flow.id,
-        name: flow.name,
-        description: flow.description,
-        department: flow.department,
-        stepsCount: (
-            linksByProcessId.get(flow.id)
-                ?? []
-        ).length,
-    }));
-}
-
-export interface FlowStep {
-    id: string;
-    title: string;
-    description: string;
-    owner: string;
-    role: string;
-    tools: string[];
-    duration: string;
-    sortOrder: number;
-    type: 'action'
-        | 'decision'
-        | 'start'
-        | 'end';
-}
-
-export interface Flow {
-    name: string;
-    description: string;
-    department: string;
-    steps: FlowStep[];
-}
-
-export async function getFlow(
-    flowId: string,
-): Promise<Flow> {
-    const [flow, steps] = await Promise.all([
-        GET<FlowEntity | undefined>(
-            `processes/${flowId}`,
-        ),
-        GET<FlowStepEntity[]>(
-            `processes/${flowId}/steps`,
-        ),
-    ]);
-    if (!flow) {
-        throw new Error(
-            `Flow not found: ${flowId}`,
-        );
-    }
-
-    return {
-        name: flow.name,
-        description: flow.description,
-        department: flow.department,
-        steps: steps.map(step => ({
-            id: step.id,
-            title: step.title,
-            description: step.description,
-            owner: step.owner,
-            role: step.role,
-            tools: parseJson<string[]>(
-                step.tools,
-                [],
-            ),
-            duration: step.duration,
-            sortOrder: step.sort_order,
-            type: step.type,
-        })),
-    };
-}
-
-export async function putFlow(
-    id: string,
-    entity: Partial<FlowEntity>,
-): Promise<void> {
-    await PUT(`processes/${id}`, entity);
-}
-
-export async function putFlowStep(
-    flowId: string,
-    stepId: string,
-    entity: Partial<FlowStepEntity>,
-): Promise<void> {
-    await PUT(
-        `processes/${flowId}`
-            + `/steps/${stepId}`,
-        entity,
-    );
-}

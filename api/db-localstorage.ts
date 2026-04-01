@@ -6,8 +6,6 @@ import type {
 import type {
     UserEntity,
     IdeaEntity,
-    IdeaScoreEntity,
-    IdeaScoreIdeaEntity,
     ProjectEntity,
     TeamMembershipEntity,
     TeamMembershipProjectEntity,
@@ -31,8 +29,10 @@ import type {
     CrunchColumnEntity,
     CrunchColumnAcronymEntity,
     CrunchColumnAcronymLinkEntity,
-    FlowEntity,
-    FlowStepEntity,
+    WorkflowEntity,
+    WfNodeEntity,
+    WfEdgeEntity,
+    WfFieldEntity,
     CompanySettingsEntity,
     AccountEntity,
     IdeaSubmissionEntity,
@@ -47,11 +47,25 @@ import type {
     ClarificationAskerEntity,
     ClarificationAnswererEntity,
     ClarificationProjectEntity,
-    ProcessStepProcessEntity,
+    ProjectWorkflowEntity,
+    WfWorkflowNodeEntity,
+    WfNodeEdgeEntity,
+    WfNodeFieldEntity,
 } from './types';
 import { nowUtc } from './types';
 
 const KEY_PREFIX = 'fusion-ai:';
+
+function isRowShaped(
+    row: unknown,
+): row is { id: string } {
+    return typeof row === 'object'
+        && row !== null
+        && 'id' in row
+        && typeof (
+            row as { id: unknown }
+        ).id === 'string';
+}
 
 function readTable<T>(
     tableName: string,
@@ -71,10 +85,19 @@ function readTable<T>(
                 + ' a valid snapshot.',
             );
         }
+        if (!parsed.every(isRowShaped)) {
+            throw new Error(
+                'Table "' + tableName
+                + '" has malformed row(s).'
+                + ' Clear data or import'
+                + ' a valid snapshot.',
+            );
+        }
         if (!includeDeleted) {
             return parsed.filter(
-                (row: Record<string, unknown>) =>
-                    !row.deleted_at,
+                (row: Record<
+                    string, unknown
+                >) => !row.deleted_at,
             ) as T[];
         }
         return parsed as T[];
@@ -193,6 +216,9 @@ function createEntityStore<
                 fields, tableName,
             );
 
+            // ASSERT: spread merges validated
+            // row with serialized fields; id
+            // ensures T constraint is met
             if (index >= 0) {
                 rows[index] = {
                     ...rows[index]!,
@@ -228,6 +254,9 @@ function createEntityStore<
                 e => e.id === id,
             );
             if (idx >= 0) {
+                // ASSERT: spread preserves
+                // complete T; deleted_at is
+                // an event-table convention
                 rows[idx] = {
                     ...rows[idx]!,
                     deleted_at: nowUtc(),
@@ -269,6 +298,9 @@ function createSingletonStore<
                 entity => entity.id === '1',
             );
 
+            // ASSERT: spread merges validated
+            // singleton with serialized fields;
+            // id: '1' ensures T constraint
             if (index >= 0) {
                 rows[index] = {
                     ...rows[index]!,
@@ -301,8 +333,6 @@ function createSingletonStore<
 export const TABLE_NAMES = [
     'users',
     'ideas',
-    'idea_scores',
-    'idea_score_ideas',
     'projects',
     'team_memberships',
     'team_membership_projects',
@@ -323,8 +353,14 @@ export const TABLE_NAMES = [
     'crunch_columns',
     'crunch_column_acronyms',
     'crunch_column_acronym_links',
-    'processes',
-    'process_steps',
+    'workflows',
+    'wf_nodes',
+    'wf_edges',
+    'wf_fields',
+    'project_workflows',
+    'wf_workflow_nodes',
+    'wf_node_edges',
+    'wf_node_fields',
     'company_settings',
     'account',
     'idea_submissions',
@@ -340,7 +376,6 @@ export const TABLE_NAMES = [
     'clarification_answerers',
     'clarification_projects',
     'project_task_projects',
-    'process_step_processes',
     'milestone_projects',
     'project_version_projects',
 ];
@@ -431,6 +466,8 @@ export async function createLocalStorageAdapter(
                     + ' keys.',
                 );
             }
+            // ASSERT: typeof/null/Array
+            // guards above prove this shape
             const record = snapshot as Record<
                 string,
                 unknown
@@ -490,15 +527,6 @@ export async function createLocalStorageAdapter(
             createEntityStore<IdeaEntity>(
                 'ideas',
             ),
-
-        ideaScores:
-            createEntityStore<
-                IdeaScoreEntity
-            >('idea_scores'),
-        ideaScoreIdeas:
-            createEntityStore<
-                IdeaScoreIdeaEntity
-            >('idea_score_ideas'),
 
         projects:
             createEntityStore<ProjectEntity>(
@@ -617,19 +645,38 @@ export async function createLocalStorageAdapter(
             createEntityStore<
                 CrunchColumnAcronymLinkEntity
             >('crunch_column_acronym_links'),
-        flows:
-            createEntityStore<FlowEntity>(
-                'processes',
-            ),
-
-        flowSteps:
-            createEntityStore<FlowStepEntity>(
-                'process_steps',
-            ),
-        processStepProcesses:
+        workflows:
             createEntityStore<
-                ProcessStepProcessEntity
-            >('process_step_processes'),
+                WorkflowEntity
+            >('workflows'),
+        wfNodes:
+            createEntityStore<
+                WfNodeEntity
+            >('wf_nodes'),
+        wfEdges:
+            createEntityStore<
+                WfEdgeEntity
+            >('wf_edges'),
+        wfFields:
+            createEntityStore<
+                WfFieldEntity
+            >('wf_fields'),
+        projectWorkflows:
+            createEntityStore<
+                ProjectWorkflowEntity
+            >('project_workflows'),
+        wfWorkflowNodes:
+            createEntityStore<
+                WfWorkflowNodeEntity
+            >('wf_workflow_nodes'),
+        wfNodeEdges:
+            createEntityStore<
+                WfNodeEdgeEntity
+            >('wf_node_edges'),
+        wfNodeFields:
+            createEntityStore<
+                WfNodeFieldEntity
+            >('wf_node_fields'),
 
         companySettings:
             createSingletonStore<

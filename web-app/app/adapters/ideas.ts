@@ -1,14 +1,13 @@
 import { GET, PUT } from '../../../api/api';
 import type {
     IdeaEntity,
-    IdeaScoreEntity,
     IdeaSubmissionEntity,
     EdgeIdeaEntity,
     EdgeEntity,
 } from '../../../api/types';
 import {
     Idea, nowUtc,
-    ideaIsNotDeleted,
+    ideaIsVisible,
     ideaIsInReview,
 } from '../../../api/types';
 import {
@@ -51,7 +50,7 @@ export async function getIdeas(
         ),
     );
     return ideas
-        .filter(ideaIsNotDeleted)
+        .filter(ideaIsVisible)
         .map(idea => new Idea(
             idea,
             userName(
@@ -164,14 +163,10 @@ export async function getIdeaForConversion(
     ideaId: string,
 ): Promise<ConversionData> {
     const [
-        entity, scoreRow,
-        userMap, submissions,
+        entity, userMap, submissions,
     ] = await Promise.all([
         GET<IdeaEntity>(
             `ideas/${ideaId}`,
-        ),
-        GET<IdeaScoreEntity | null>(
-            `ideas/${ideaId}/score`,
         ),
         buildUserMap(),
         GET<IdeaSubmissionEntity[]>(
@@ -191,12 +186,8 @@ export async function getIdeaForConversion(
             'missing',
             submission!.created_at,
         ),
-        estimatedDuration:
-            scoreRow?.estimated_duration
-                ?? null,
-        estimatedCost:
-            scoreRow?.estimated_cost
-                ?? null,
+        estimatedDuration: null,
+        estimatedCost: null,
     };
 }
 
@@ -261,12 +252,3 @@ export async function putIdeaSubmission(
     );
 }
 
-export async function putIdeaScore(
-    ideaId: string,
-    entity: Partial<IdeaScoreEntity>,
-): Promise<void> {
-    await PUT(
-        `ideas/${ideaId}/score`,
-        entity,
-    );
-}

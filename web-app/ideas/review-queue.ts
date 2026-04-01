@@ -1,191 +1,28 @@
-import { $, $input, $select, attr } from '../app/dom';
+import {
+    $, $input, $select, attr,
+} from '../app/dom';
 import {
     html,
     setHtml,
-    SafeHtml,
 } from '../app/safe-html';
 import {
     buildSkeleton,
     withLoadingState,
 } from '../app/loading-states';
 import {
-    iconArrowLeft,
     iconClock,
     iconTrendingUp,
-    iconAlertCircle,
     iconCheckCircle2,
-    iconMessageSquare,
     iconSearch,
-    iconChevronRight,
-    iconTarget,
-    iconShield,
     iconClipboardCheck,
 } from '../app/icons';
-import {
-    navigateTo,
-    styleForScore,
-    displayText,
-} from '../app/core';
+import { navigateTo } from '../app/core';
 import {
     getReviewQueue,
-    type Idea,
 } from '../app/adapters';
-import type {
-    ReadinessLevel,
-} from '../../api/types';
-
-const priorityConfig: Record<
-    string,
-    { label: string; className: string }
-> = {
-    high: {
-        label: 'High Priority',
-        className: 'badge-error',
-    },
-    medium: {
-        label: 'Medium',
-        className: 'badge-warning',
-    },
-    low: {
-        label: 'Low',
-        className: 'badge-default',
-    },
-};
-
-const readinessIcon: Record<
-    ReadinessLevel,
-    (size: number, cssClass: string) => SafeHtml
-> = {
-    ready: iconCheckCircle2,
-    'needs-info': iconMessageSquare,
-    incomplete: iconAlertCircle,
-};
-
-function buildReviewCard(
-    idea: Idea,
-): SafeHtml {
-    const rIcon =
-        readinessIcon[idea.readiness]!;
-    const priorityDisplay =
-        priorityConfig[
-            idea.priorityLevel()
-        ]!;
-    return html`
-    <div class="card card-hover p-4"
-        style="cursor:pointer"
-        data-review-card="${idea.id}">
-        <div class="flex items-start
-            justify-between gap-4">
-            <div style="flex:1;min-width:0">
-                <div class="flex flex-wrap
-                    items-center gap-2 mb-2">
-                    <span class="badge
-                        ${priorityDisplay
-                            .className}
-                        text-xs">${
-                        priorityDisplay.label
-                    }</span>
-                    <span class="${
-                        'flex items-center'
-                        + ' gap-1 text-sm '
-                        + idea
-                            .readinessClassName()
-                    }">${rIcon(16, '')
-                    } ${idea
-                        .readinessLabel()
-                    }</span>
-                    <span class="badge
-                        ${idea
-                            .edgeStatusClassName()}
-                        text-xs">${
-                        iconTarget(12, '')
-                    } ${idea
-                        .edgeStatusLabel()
-                    }</span>
-                </div>
-                <h3 class="${
-                    'font-semibold mb-1'
-                }">${idea.title}</h3>
-                <div class="${
-                    'flex items-center'
-                    + ' gap-4 text-sm'
-                    + ' text-muted'
-                }">
-                    <span>by ${
-                        displayText(
-                            idea.submittedBy,
-                        )
-                    }</span>
-                    <span>${
-                        '\u2022'
-                    }</span>
-                    <span>${
-                        idea.category
-                    }</span>
-                    <span>${
-                        '\u2022'
-                    }</span>
-                    <span style="${
-                        'color:hsl('
-                        + 'var(--warning))'
-                    }">${
-                        idea.waitingDays
-                    } days waiting</span>
-                </div>
-            </div>
-            <div class="${
-                'flex items-center gap-6'
-            }">
-                <div class="${
-                    'text-right hidden-mobile'
-                }">
-                    <div class="${
-                        'flex items-center'
-                        + ' gap-4 text-sm'
-                    }">
-                        <div>
-                            <p class="${
-                                'text-muted'
-                            }">Score</p>
-                            <p class="${
-                                'font-semibold'
-                            }"
-                                style="${
-                                    idea
-                                    .scoreColor()
-                                }">${
-                                idea.score
-                            }</p>
-                        </div>
-                        <div>
-                            <p class="${
-                                'text-muted'
-                            }">Impact</p>
-                            <p class="${
-                                'font-medium'
-                            }">${
-                                idea.impactLabel
-                            }</p>
-                        </div>
-                        <div>
-                            <p class="${
-                                'text-muted'
-                            }">Effort</p>
-                            <p class="${
-                                'font-medium'
-                            }">${
-                                idea.effortLabel
-                            }</p>
-                        </div>
-                    </div>
-                </div>
-                ${iconChevronRight(
-                    20, 'text-muted',
-                )}
-            </div>
-        </div>
-    </div>`;
-}
+import {
+    ReviewQueuePresenter,
+} from '../app/presenters';
 
 export async function init(): Promise<void> {
     const root = $(
@@ -210,26 +47,9 @@ export async function init(): Promise<void> {
         },
     );
     if (!result) return;
-    const allIdeas = result;
-
-    const stats = {
-        total: allIdeas.length,
-        ready: allIdeas.filter(
-            idea => idea.isReady(),
-        ).length,
-        highPriority: allIdeas.filter(
-            idea =>
-                idea.priorityLevel()
-                    === 'high',
-        ).length,
-        avgWait: Math.round(
-            allIdeas.reduce(
-                (sum, idea) =>
-                    sum + idea.waitingDays,
-                0,
-            ) / allIdeas.length,
-        ),
-    };
+    const presenter =
+        new ReviewQueuePresenter(result);
+    const stats = presenter.stats();
 
     setHtml(root, html`
     <div class="${
@@ -304,31 +124,6 @@ export async function init(): Promise<void> {
                 <div class="p-2 rounded-lg"
                     style="${
                         'background:hsl('
-                        + 'var(--error-soft))'
-                    }">${
-                    iconAlertCircle(
-                        20, 'text-error',
-                    )
-                }</div>
-                <div>
-                    <p class="${
-                        'text-2xl font-bold'
-                    }">${
-                        stats.highPriority
-                    }</p>
-                    <p class="${
-                        'text-sm text-muted'
-                    }">High Priority</p>
-                </div>
-            </div>
-        </div>
-        <div class="card p-4">
-            <div class="${
-                'flex items-center gap-3'
-            }">
-                <div class="p-2 rounded-lg"
-                    style="${
-                        'background:hsl('
                         + 'var(--warning-soft))'
                     }">${
                     iconTrendingUp(
@@ -370,28 +165,6 @@ export async function init(): Promise<void> {
             style="width:10rem"
             id="${
                 'review-queue-'
-                + 'priority-filter'
-            }"
-            aria-label="${
-                'Filter by priority'
-            }">
-            <option value="all">${
-                'All Priority'
-            }</option>
-            <option value="high">${
-                'High'
-            }</option>
-            <option value="medium">${
-                'Medium'
-            }</option>
-            <option value="low">${
-                'Low'
-            }</option>
-        </select>
-        <select class="input"
-            style="width:10rem"
-            id="${
-                'review-queue-'
                 + 'readiness-filter'
             }"
             aria-label="${
@@ -418,7 +191,6 @@ export async function init(): Promise<void> {
             + 'flex-direction:column;'
             + 'gap:0.75rem'
         }">
-        ${allIdeas.map(buildReviewCard)}
     </div>
     <div id="review-queue-empty"
         class="text-center"
@@ -437,62 +209,26 @@ export async function init(): Promise<void> {
         }</p>
     </div>`);
 
-    function mutateFilteredList() {
-        const search =
-            $input(
-                '#review-queue-search',
-                document,
-            )!.value.toLowerCase();
-        const priority =
-            $select(
-                '#review-queue-priority-filter',
-                document,
-            )!.value;
-        const readiness =
-            $select(
-                '#review-queue-readiness-filter',
-                document,
-            )!.value;
-
-        const filtered = allIdeas.filter(
-            idea => {
-                const matchesSearch =
-                    idea.matchesSearch(
-                        search,
-                    );
-                const matchesPriority =
-                    priority === 'all'
-                    || idea.priorityLevel()
-                        === priority;
-                const matchesReadiness =
-                    readiness === 'all'
-                    || idea.readiness
-                        === readiness;
-                return matchesSearch
-                    && matchesPriority
-                    && matchesReadiness;
-            },
-        );
-
+    function renderList(): void {
         const list = $(
             '#review-queue-list', document,
         );
         const empty = $(
             '#review-queue-empty', document,
         );
+        const hasResults =
+            presenter.hasFilteredResults();
         if (list)
             setHtml(
                 list,
-                html`${filtered.map(
-                    buildReviewCard,
-                )}`,
+                presenter.renderList(),
             );
         if (list)
             list.style.display =
-                filtered.length ? '' : 'none';
+                hasResults ? '' : 'none';
         if (empty)
             empty.style.display =
-                filtered.length
+                hasResults
                     ? 'none' : '';
     }
 
@@ -515,7 +251,8 @@ export async function init(): Promise<void> {
                         {
                             id: attr(
                                 card,
-                                'data-review-card',
+                                'data-review'
+                                + '-card',
                             ),
                         },
                     );
@@ -525,19 +262,32 @@ export async function init(): Promise<void> {
     $('#review-queue-search', document)
         ?.addEventListener(
             'input',
-            mutateFilteredList,
+            () => {
+                presenter.setSearch(
+                    $input(
+                        '#review-queue'
+                        + '-search',
+                        document,
+                    )!.value,
+                );
+                renderList();
+            },
         );
     $(
-        '#review-queue-priority-filter', document,
+        '#review-queue-readiness-filter',
+        document,
     )?.addEventListener(
         'change',
-        mutateFilteredList,
+        () => {
+            presenter.setReadinessFilter(
+                $select(
+                    '#review-queue'
+                    + '-readiness-filter',
+                    document,
+                )!.value,
+            );
+            renderList();
+        },
     );
-    $(
-        '#review-queue-readiness-filter', document,
-    )?.addEventListener(
-        'change',
-        mutateFilteredList,
-    );
-    mutateFilteredList();
+    renderList();
 }

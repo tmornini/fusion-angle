@@ -2,6 +2,7 @@ import { $ } from '../app/dom';
 import {
     html,
     setHtml,
+    trusted,
     type SafeHtml,
 } from '../app/safe-html';
 import {
@@ -72,6 +73,234 @@ function buildShadowBox(
         }hsl(var(--border))"></div>
     <code class="text-xs text-muted">${
         name}</code>
+    </div>`;
+}
+
+const WF_BLUE = '#4B6CA1';
+const WF_WARN = '#d97706';
+const WF_GREEN = '#16a34a';
+
+const NW = 140;
+const NH = 56;
+
+function buildWfDefs(): string {
+    return '<defs>'
+        + '<marker id="ds-arrow"'
+        + ' viewBox="0 0 10 10"'
+        + ' refX="10" refY="5"'
+        + ' markerWidth="8"'
+        + ' markerHeight="8"'
+        + ' orient="auto">'
+        + '<path d="M 0 0 L 10 5'
+        + ' L 0 10 z"'
+        + ` fill="${WF_BLUE}"/>`
+        + '</marker>'
+        + '<marker id="ds-arrow-warn"'
+        + ' viewBox="0 0 10 10"'
+        + ' refX="10" refY="5"'
+        + ' markerWidth="8"'
+        + ' markerHeight="8"'
+        + ' orient="auto">'
+        + '<path d="M 0 0 L 10 5'
+        + ' L 0 10 z"'
+        + ` fill="${WF_WARN}"/>`
+        + '</marker>'
+        + '<marker id="ds-arrow-ok"'
+        + ' viewBox="0 0 10 10"'
+        + ' refX="10" refY="5"'
+        + ' markerWidth="8"'
+        + ' markerHeight="8"'
+        + ' orient="auto">'
+        + '<path d="M 0 0 L 10 5'
+        + ' L 0 10 z"'
+        + ` fill="${WF_GREEN}"/>`
+        + '</marker>'
+        + '</defs>';
+}
+
+function buildWfNodeSvg(
+    label: string,
+    subtitle: string,
+    borderColor: string,
+    isComplete: boolean,
+): SafeHtml {
+    const halfW = NW / 2;
+    const sw = isComplete ? 3
+        : borderColor === WF_GREEN
+            ? 2.5 : 2;
+    let inner = '<rect'
+        + ` width="${NW}"`
+        + ` height="${NH}"`
+        + ' rx="10"'
+        + ' fill="var('
+        + '--color-card-bg, #232940)"'
+        + ` stroke="${borderColor}"`
+        + ` stroke-width="${sw}"/>`;
+    if (isComplete) {
+        inner += '<rect'
+            + ' x="4" y="4"'
+            + ` width="${NW - 8}"`
+            + ` height="${NH - 8}"`
+            + ' rx="7" fill="none"'
+            + ` stroke="${WF_GREEN}"`
+            + ' stroke-width="1.5"/>';
+    }
+    inner += '<text'
+        + ` x="${halfW}" y="22"`
+        + ' text-anchor="middle"'
+        + ' font-size="14"'
+        + ' font-weight="600"'
+        + ' fill="var('
+        + '--color-foreground,'
+        + ' #e0e4ef)">'
+        + label + '</text>';
+    inner += '<text'
+        + ` x="${halfW}" y="40"`
+        + ' text-anchor="middle"'
+        + ' font-size="11"'
+        + ' fill="var('
+        + '--color-muted-foreground,'
+        + ' #5a6480)">'
+        + subtitle + '</text>';
+    inner += '<circle'
+        + ' cx="0"'
+        + ` cy="${NH / 2}"`
+        + ' r="6"'
+        + ` fill="${borderColor}"/>`;
+    inner += '<circle'
+        + ` cx="${NW}"`
+        + ` cy="${NH / 2}"`
+        + ' r="6"'
+        + ` fill="${borderColor}"/>`;
+    const pad = 8;
+    const svgW = NW + pad * 2;
+    const svgH = NH + pad * 2;
+    return trusted(
+        '<svg'
+        + ` width="${svgW}"`
+        + ` height="${svgH}"`
+        + ` viewBox="${-pad} ${-pad}`
+        + ` ${svgW} ${svgH}">`
+        + inner
+        + '</svg>',
+    );
+}
+
+function buildWfEdgeSvg(
+    label: string,
+    color: string,
+    markerRef: string,
+    isDashed: boolean,
+): SafeHtml {
+    const w = 200;
+    const h = 40;
+    const y = h / 2;
+    const x1 = 10;
+    const x2 = w - 10;
+    const dash = isDashed
+        ? ' stroke-dasharray="6 3"' : '';
+    const mid = (x1 + x2) / 2;
+    const lw = label.length * 7 + 12;
+    const lh = 20;
+    return trusted(
+        `<svg width="${w}" height="${h}">`
+        + buildWfDefs()
+        + '<path'
+        + ` d="M ${x1} ${y}`
+        + ` L ${x2} ${y}"`
+        + ' fill="none"'
+        + ` stroke="${color}"`
+        + ' stroke-width="2"'
+        + dash
+        + ` marker-end="${markerRef}"/>`
+        + '<rect'
+        + ` x="${mid - lw / 2}"`
+        + ` y="${y - lh / 2}"`
+        + ` width="${lw}"`
+        + ` height="${lh}"`
+        + ' rx="4"'
+        + ' fill="var('
+        + '--color-card-bg, #232940)"'
+        + ` stroke="${color}"`
+        + ' stroke-width="1"'
+        + ' opacity="0.9"/>'
+        + '<text'
+        + ` x="${mid}"`
+        + ` y="${y + 4}"`
+        + ' text-anchor="middle"'
+        + ' font-size="11"'
+        + ' fill="var('
+        + '--color-foreground,'
+        + ' #e0e4ef)">'
+        + label + '</text>'
+        + '</svg>',
+    );
+}
+
+function buildWfPortSvg(
+    color: string,
+    label: string,
+): SafeHtml {
+    return trusted(
+        '<svg width="48" height="48">'
+        + `<circle cx="24" cy="24"`
+        + ` r="6" fill="${color}"/>`
+        + '<text x="24" y="42"'
+        + ' text-anchor="middle"'
+        + ' font-size="10"'
+        + ' fill="var('
+        + '--color-muted-foreground,'
+        + ' #5a6480)">'
+        + label + '</text>'
+        + '</svg>',
+    );
+}
+
+function buildWfPropPanel(): SafeHtml {
+    const panelStyle = 'padding:1rem'
+        + ';border-radius:'
+        + 'var(--radius-lg)'
+        + ';background:'
+        + 'hsl(var(--card))'
+        + ';border:1px solid '
+        + 'hsl(var(--border))'
+        + ';max-width:18rem';
+    const fieldStyle = 'display:flex'
+        + ';flex-direction:column'
+        + ';gap:0.25rem';
+    return html`
+    <div style="${panelStyle}">
+        <h4 class="${''
+            }font-semibold text-sm mb-3">${''
+            }Node Properties</h4>
+        <div style="${''
+            }display:flex${''
+            };flex-direction:column${''
+            };gap:0.75rem">
+            <div style="${fieldStyle}">
+                <label class="${''
+                    }text-xs text-muted">${''
+                    }Name</label>
+                <input class="input"
+                    value="Data Capture"
+                    readonly/>
+            </div>
+            <div style="${fieldStyle}">
+                <label class="${''
+                    }text-xs text-muted">${''
+                    }Type</label>
+                <span class="${''
+                    }badge badge-default">${''
+                    }Standard</span>
+            </div>
+            <div style="${fieldStyle}">
+                <label class="${''
+                    }text-xs text-muted">${''
+                    }Fields</label>
+                <span class="${''
+                    }text-sm">8 fields</span>
+            </div>
+        </div>
     </div>`;
 }
 
@@ -1559,6 +1788,132 @@ export async function init(): Promise<void> {
                     </div>
                 </div>
             </div>
+        </section>
+
+        <hr style="${borderHr}"/>
+
+        <section style="${sectionStyle}">
+            <div>
+                <h2 class="${''
+                    }text-2xl font-semibold ${''
+                    }font-display">${''
+                    }Workflow Components</h2>
+                <p class="text-muted mt-1">${''
+                    }Visual vocabulary for ${''
+                    }the workflow designer</p>
+            </div>
+
+            <h3 class="font-semibold">${''
+                }Node Variants</h3>
+            <div style="${grid3}"
+                class="stats-grid">
+                <div style="${colStyle}">
+                    <code class="${''
+                        }text-xs text-muted">${''
+                        }Start Node</code>
+                    ${buildWfNodeSvg(
+                        'New',
+                        'Start state',
+                        WF_GREEN,
+                        false,
+                    )}
+                </div>
+                <div style="${colStyle}">
+                    <code class="${''
+                        }text-xs text-muted">${''
+                        }Standard Node</code>
+                    ${buildWfNodeSvg(
+                        'Data Capture',
+                        '8 fields',
+                        WF_BLUE,
+                        false,
+                    )}
+                </div>
+                <div style="${colStyle}">
+                    <code class="${''
+                        }text-xs text-muted">${''
+                        }Complete Node</code>
+                    ${buildWfNodeSvg(
+                        'Complete',
+                        'End state',
+                        WF_GREEN,
+                        true,
+                    )}
+                </div>
+            </div>
+
+            <h3 class="font-semibold">${''
+                }Edge Variants</h3>
+            <div style="${grid3}"
+                class="stats-grid">
+                <div style="${colStyle}">
+                    <code class="${''
+                        }text-xs text-muted">${''
+                        }Forward Edge</code>
+                    ${buildWfEdgeSvg(
+                        'submit',
+                        WF_BLUE,
+                        'url(#ds-arrow)',
+                        false,
+                    )}
+                </div>
+                <div style="${colStyle}">
+                    <code class="${''
+                        }text-xs text-muted">${''
+                        }Cycle Edge</code>
+                    ${buildWfEdgeSvg(
+                        'needs revision',
+                        WF_WARN,
+                        'url(#ds-arrow-warn)',
+                        true,
+                    )}
+                </div>
+                <div style="${colStyle}">
+                    <code class="${''
+                        }text-xs text-muted">${''
+                        }Completion Edge</code>
+                    ${buildWfEdgeSvg(
+                        'approve',
+                        WF_GREEN,
+                        'url(#ds-arrow-ok)',
+                        false,
+                    )}
+                </div>
+            </div>
+
+            <h3 class="font-semibold">${''
+                }Port Styles</h3>
+            <div class="${''
+                }flex flex-wrap gap-6">
+                <div style="${colStyle}">
+                    <code class="${''
+                        }text-xs text-muted">${''
+                        }Standard</code>
+                    ${buildWfPortSvg(
+                        WF_BLUE, 'port',
+                    )}
+                </div>
+                <div style="${colStyle}">
+                    <code class="${''
+                        }text-xs text-muted">${''
+                        }Start / End</code>
+                    ${buildWfPortSvg(
+                        WF_GREEN, 'port',
+                    )}
+                </div>
+                <div style="${colStyle}">
+                    <code class="${''
+                        }text-xs text-muted">${''
+                        }Cycle</code>
+                    ${buildWfPortSvg(
+                        WF_WARN, 'port',
+                    )}
+                </div>
+            </div>
+
+            <h3 class="font-semibold">${''
+                }Properties Panel</h3>
+            ${buildWfPropPanel()}
         </section>
     </div>`);
 }

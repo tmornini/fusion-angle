@@ -1,14 +1,10 @@
 import {
-    SCORE_THRESHOLD_HIGH,
-    SCORE_THRESHOLD_MEDIUM,
     SECONDS_PER_DAY,
     durationInDays,
     formatCompactCurrency,
 } from '../../api/types';
 
-function initials(
-    name: string | null,
-): string {
+function initials(name: string): string {
     if (!name) return '';
     return name
         .split(' ')
@@ -32,16 +28,8 @@ function formatDate(iso: string): string {
     });
 }
 
-function styleForScore(score: number): string {
-    if (score >= SCORE_THRESHOLD_HIGH)
-        return 'color:hsl(var(--success))';
-    if (score >= SCORE_THRESHOLD_MEDIUM)
-        return 'color:hsl(var(--warning))';
-    return 'color:hsl(var(--error))';
-}
-
 function displayText(
-    value: string | null,
+    value: string,
 ): string {
     return value || '\u2014';
 }
@@ -51,7 +39,6 @@ export {
     formatDate,
     getTimeOfDay,
     initials,
-    styleForScore,
     durationInDays,
     formatCompactCurrency,
     SECONDS_PER_DAY,

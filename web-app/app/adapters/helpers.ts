@@ -22,10 +22,10 @@ export async function buildUserMap(): Promise<Map<Id, User>> {
 export function userName(
     userMap: Map<Id, User>,
     userId: string | undefined,
-): string | null {
-    if (!userId) return null;
+): string {
+    if (!userId) return '';
     return userMap.get(userId)?.fullName()
-        ?? null;
+        ?? '';
 }
 
 export function computeEdgeStatus(
@@ -76,7 +76,7 @@ export interface EdgeData {
     outcomes: { id: string; description: string; metrics: Metric[] }[];
     impact: { shortTerm: string; midTerm: string; longTerm: string };
     confidence: ConfidenceLevel;
-    owner: string | null;
+    owner: string;
 }
 
 export async function getEdgeDataByIdeaId(

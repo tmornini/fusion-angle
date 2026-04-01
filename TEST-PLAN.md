@@ -19,17 +19,17 @@ run as a single continuous regression pass.
 | Section | Tests |
 |---|--:|
 | A. Build & Setup | 5 |
-| AA. Data Entry Workflow | 46 |
+| AA. Data Entry Workflow | 54 |
 | B. Entry Pages | 16 |
 | C. Core: Dashboard | 7 |
 | D. Core: Ideas Workflow | 52 |
 | E. Core: Projects | 17 |
-| F. Tools | 29 |
+| F. Tools | 38 |
 | G. Admin Pages | 34 |
 | H. Reference & System | 2 |
 | I. Cross-Cutting Concerns | 21 |
 | J. Teardown | 3 |
-| **Total** | **232** |
+| **Total** | **249** |
 
 ---
 
@@ -52,7 +52,7 @@ on. Run these in order.
 ### AA1. Create Pristine Environment
 
 - [ ] **AA1** Navigate to `snapshots/`. Click "Create Pristine Environment" and confirm the wipe dialog. PASS: redirects to dashboard. Dashboard shows empty/minimal state.
-- [ ] **AA2** Open DevTools, verify localStorage has `fusion-ai:*` keys (44 tables as empty arrays plus bootstrap data).
+- [ ] **AA2** Open DevTools, verify localStorage has `fusion-ai:*` keys (49 tables as empty arrays plus bootstrap data).
 - [ ] **AA3** Verify bootstrap data exists: user "Tony Stark" (id: `current`), company "Stark Industries" with "Business" plan.
 
 ### AA2. Create Users
@@ -107,29 +107,99 @@ on. Run these in order.
 - [ ] **AA33** On project detail, click "Edit". Set progress, priority_score, and other fields to match mock data. Save. PASS: project data persists.
 - [ ] **AA34** Repeat conversion for all 6 projects. PASS: Projects list shows all 6 with correct status, progress, and priority.
 
-### AA9. Create Flows
+### AA9. Create Workflows
 
-- [ ] **AA35** Navigate to Flow list. PASS: page shows empty state or existing flows.
-- [ ] **AA36** Create a new flow (if create UI exists) or navigate to an existing flow detail. Use "Add Step" to add steps with title, description, owner, role, duration, and step type. Click "Save". PASS: toast confirms save.
-- [ ] **AA37** Repeat for all flows. Verify flow list shows correct names, departments, and step counts. PASS: flow data persists.
+- [ ] **AA35** Navigate to Projects. Click into
+  project #1 detail. PASS: a "Workflows" section
+  is visible showing "No workflows yet" empty
+  state and a "New Workflow" button.
+- [ ] **AA36** Click "New Workflow". PASS: navigates
+  to the workflow designer page. The SVG canvas
+  shows two nodes: "New" (start, top-left with
+  green border) and "Complete" (end, bottom-right
+  with double green border) connected by no edges.
+  Toolbar shows "+ Add State", "Re-layout", zoom
+  controls, and "Save".
+- [ ] **AA37** Click "+ Add State". PASS: a new node
+  named "New State" appears between the start and
+  complete nodes on the canvas. The node has a blue
+  border and connection ports.
+- [ ] **AA38** Click the new node to select it. PASS:
+  properties panel appears showing State Name
+  input, Description input, empty Fields list, and
+  outgoing transitions. The node gets a blue glow
+  effect on the canvas.
+- [ ] **AA39** Rename the state to "Data Capture"
+  using the properties panel name input. PASS: the
+  node label updates on the canvas immediately.
+- [ ] **AA40** Drag from the right port of "New" to
+  the left port of "Data Capture". PASS: a new edge
+  appears connecting the two nodes with a default
+  name. A dashed preview line shows during the
+  drag.
+- [ ] **AA41** Select the new edge by clicking its
+  label. PASS: edge properties panel shows
+  Transition Name, Description, From/To states.
+  Rename it to "begin".
+- [ ] **AA42** Repeat: add a "Review" state, connect
+  "Data Capture" to "Review" (name: "submit"),
+  connect "Review" to "Data Capture" (name: "needs
+  revision", should appear as dashed orange cycle
+  edge), connect "Review" to "Complete" (name:
+  "approve").
+- [ ] **AA43** In the "Data Capture" properties
+  panel, click "+ Add Field". Enter name "Company
+  Name", type "text", check "Required". PASS:
+  field appears in the fields list with a TEXT
+  badge and "required" indicator.
+- [ ] **AA44** Add more fields to "Data Capture":
+  Contact Email (email, required), Industry (select
+  with options "Technology, Finance, Healthcare"),
+  Company Logo (image). PASS: all fields appear
+  with correct type badges.
+- [ ] **AA45** Click "Save". PASS: toast confirms
+  save. Navigate away and back. PASS: all nodes,
+  edges, and fields persist.
 
 ### AA10. Verify Dashboard
 
-- [ ] **AA38** Navigate to Dashboard. PASS: gauge cards (Time, Cost, Impact) show aggregated values computed from the entered project data.
-- [ ] **AA39** Header stats reflect entered data counts (ideas, projects, flows). PASS: counts are non-zero and match.
+- [ ] **AA46** Navigate to Dashboard. PASS: gauge
+  cards (Time, Cost, Impact) show aggregated values
+  computed from the entered project data.
+- [ ] **AA47** Header stats reflect entered data
+  counts (ideas, projects, workflows). PASS:
+  counts are non-zero and match.
 
 ### AA11. Edit & Verify Cycle
 
-- [ ] **AA40** Edit idea #1: change title. Save, navigate to ideas list, return to detail. PASS: changed title persists.
-- [ ] **AA41** Edit project #1: change description. Save, navigate away, return. PASS: changed description persists.
-- [ ] **AA42** Edit edge #1: change confidence level. Save, navigate away, return. PASS: changed confidence persists.
-- [ ] **AA43** Edit flow #1: change a step's title. Save, navigate away, return. PASS: changed step title persists.
-- [ ] **AA44** Edit profile: change phone number. Save, navigate away, return. PASS: changed phone persists.
-- [ ] **AA45** Edit company settings: change timezone. Save, navigate away, return. PASS: changed timezone persists.
+- [ ] **AA48** Edit idea #1: change title. Save,
+  navigate to ideas list, return to detail. PASS:
+  changed title persists.
+- [ ] **AA49** Edit project #1: change description.
+  Save, navigate away, return. PASS: changed
+  description persists.
+- [ ] **AA50** Edit edge #1: change confidence level.
+  Save, navigate away, return. PASS: changed
+  confidence persists.
+- [ ] **AA51** Edit workflow: navigate to workflow
+  designer, rename a state, click Save. Navigate
+  away, return. PASS: changed state name persists.
+- [ ] **AA52** Edit profile: change phone number.
+  Save, navigate away, return. PASS: changed phone
+  persists.
+- [ ] **AA53** Edit company settings: change
+  timezone. Save, navigate away, return. PASS:
+  changed timezone persists.
 
 ### AA12. Snapshot Round-Trip
 
-- [ ] **AA46** Navigate to Snapshots. Click "Download Snapshot". PASS: JSON file downloads with all manually-entered data. Click "Create Pristine Environment", confirm. PASS: all data wiped. Click "Upload Snapshot", select the downloaded file. PASS: all data restored. Spot-check 3 pages to confirm data matches.
+- [ ] **AA54** Navigate to Snapshots. Click
+  "Download Snapshot". PASS: JSON file downloads
+  with all manually-entered data. Click "Create
+  Pristine Environment", confirm. PASS: all data
+  wiped. Click "Upload Snapshot", select the
+  downloaded file. PASS: all data restored.
+  Spot-check 3 pages to confirm data matches.
 
 ---
 
@@ -168,8 +238,8 @@ on. Run these in order.
 ## C. Core: Dashboard
 
 - [ ] **C1** Navigate to `dashboard/`. PASS: page loads with sidebar, header, and main content area.
-- [ ] **C2** Sidebar shows navigation links grouped under Journey (Dashboard, Ideas, Projects, Teams), Tools (Edge, Crunch, Flow), and Settings (Organization, Snapshots, Design System). PASS: all links present and styled.
-- [ ] **C3** Header shows search bar, greeting ("Good {morning/afternoon/evening}, Tony Stark" — varies by time of day), company stats ("Stark Industries · 11 Ideas · 6 Projects · 4 Flow"), and theme toggle. PASS: elements visible and styled.
+- [ ] **C2** Sidebar shows navigation links grouped under Journey (Dashboard, Ideas, Projects, Teams), Tools (Edge, Crunch, Workflows), and Settings (Organization, Snapshots, Design System). PASS: all links present and styled.
+- [ ] **C3** Header shows search bar, greeting ("Good {morning/afternoon/evening}, Tony Stark" — varies by time of day), company stats ("Stark Industries · 11 Ideas · 6 Projects · 1 Workflows"), and theme toggle. PASS: elements visible and styled.
 - [ ] **C4** Dashboard displays 3 gauge/metric cards (Time, Cost, Impact) with baseline and current values. PASS: cards render with non-zero values and concentric arc gauges.
 - [ ] **C6** Sidebar navigation links all function correctly. PASS: clicking a sidebar link navigates to the expected page.
 - [ ] **C7** Scroll the page. PASS: sidebar stays fixed, main content scrolls independently.
@@ -274,7 +344,7 @@ on. Run these in order.
 ### Project Detail (`project-detail/?projectId=1`)
 
 - [ ] **E3** Page loads with project summary card (description, dates, progress bar), baseline vs. current metrics, and Edge KPI card. PASS: all cards render with data. Baseline/current metrics show "—" (em-dash) when values are zero or missing.
-- [ ] **E4** Four quick-action cards visible (Engineering, Team, Flow, Crunch). PASS: clicking "Engineering" navigates to `engineering-requirements/?projectId=1`.
+- [ ] **E4** Four quick-action cards visible (Engineering, Team, Workflows, Crunch). PASS: clicking "Engineering" navigates to `engineering-requirements/?projectId=1`.
 - [ ] **E5** **Tasks tab** (default): shows 5 task cards with priority badges, skill tags, and days. Assigned/unassigned count is dynamically computed from task data (seed data: 1 assigned, 4 unassigned). PASS: "Save Assignments" button visible.
 - [ ] **E6** **Discussion tab**: shows 3 seeded comments with author avatars/names. Comment composer textarea + "Post Comment" button (disabled when empty, enabled when text entered). PASS: all elements render.
 - [ ] **E6b** Type a comment in the composer textarea, click "Post Comment". PASS: toast "Comment posted" appears, comment appears in the list.
@@ -324,23 +394,90 @@ on. Run these in order.
 - [ ] **F9** Expand a column card (e.g. CUST_ID). PASS: reveals Friendly Name input, Data Type select, Acronym Expansion input (for acronym columns), and Description textarea. Fill all fields — completion icon changes to green check.
 - [ ] **F10** Fill all 6 columns to 100% completion, click "Continue to Review". PASS: advances to Step 3 — shows "Data Translation Complete" with "Edit Labels" and "Continue to Dashboard" buttons.
 
-### Flow List (`flow/`)
+### Workflow List (`flow/`)
 
-- [ ] **F11** Navigate to `flow/`. PASS: page shows stats cards (Total Flows, Total Steps, Departments) and flow cards with name, description, department badge, and step count.
-- [ ] **F12** Type in the search input. PASS: filters flow cards by name or description in real-time.
-- [ ] **F12b** Select a department from the filter dropdown. PASS: list shows only flows in that department. Reset to "All Departments" → full list returns.
-- [ ] **F12c** Apply search + filter that matches no items. PASS: empty state shows "No processes found" with "Try adjusting your search or filter criteria".
-- [ ] **F13** Click a flow card. PASS: navigates to `flow/detail.html?flowId=<id>`.
+- [ ] **F11** Navigate to `flow/`. PASS: page shows
+  workflow cards with name, description, project
+  name badge, and state/transition counts.
+- [ ] **F12** Type in the search input (if present).
+  PASS: filters workflow cards by name or
+  description in real-time.
+- [ ] **F13** Click a workflow card. PASS: navigates
+  to `flow/detail.html?workflowId=<id>`.
 
-### Flow Detail (`flow/detail.html?flowId=1`)
+### Workflow Designer (`flow/detail.html?workflowId=...`)
 
-- [ ] **F14** Navigate to `flow/detail.html?flowId=1`. PASS: shows flow name, description, department, and step cards in a vertical timeline.
-- [ ] **F15** Click a step card header to expand it. PASS: reveals Title, Description, Owner, Role, Duration, and Step Type fields.
-- [ ] **F16** Click "Add Step". PASS: new step card appears at the bottom, auto-expanded.
-- [ ] **F17** Click move-up/move-down buttons on a step. PASS: step reorders in the list.
-- [ ] **F18** Click remove button on a step. PASS: step is removed from the list.
-- [ ] **F19** Edit flow name and step fields, click "Save". PASS: toast "Flow saved" appears.
-- [ ] **F19b** Navigate to `flow/detail.html?flowId=999` (non-existent). PASS: page handles gracefully — shows error state, no unhandled JS exception.
+- [ ] **F14** Navigate to a workflow designer page.
+  PASS: toolbar at top with Add State, Re-layout,
+  Zoom +/-, Fit, stats, and Save. SVG canvas below
+  with dot grid background showing the workflow
+  graph.
+- [ ] **F15** Nodes display correctly: start node
+  has green border with "Start state" subtitle,
+  standard nodes have blue border with field count,
+  complete node has double green border with "End
+  state" subtitle.
+- [ ] **F16** Edges display correctly: forward edges
+  are solid blue lines with arrow markers and named
+  labels. Cycle edges (pointing backward in the
+  graph) are dashed orange.
+- [ ] **F17** Connection ports (small circles) are
+  visible on node edges. Hover over a port. PASS:
+  cursor changes to crosshair.
+- [ ] **F18** Click a node. PASS: node gets blue
+  glow selection effect. Properties panel appears
+  showing state name, description, form fields
+  list, and outgoing transitions.
+- [ ] **F19** Click "+ Add State" in toolbar. PASS:
+  new node appears on the canvas between existing
+  nodes. Auto-layout places it along the diagonal
+  flow.
+- [ ] **F19b** Drag a non-pinned node to a new
+  position. PASS: node follows the pointer. It
+  cannot be dragged higher/lefter than the start
+  node or lower/righter than the complete node.
+- [ ] **F19c** Attempt to drag the start or complete
+  node. PASS: they remain pinned at their positions
+  and do not move.
+- [ ] **F19d** Click "Re-layout" in toolbar. PASS:
+  all non-pinned nodes reposition along the
+  top-left to bottom-right diagonal. Start stays
+  top-left, complete stays bottom-right.
+- [ ] **F20** Drag from one node's port to another
+  node's port. PASS: a dashed preview line appears
+  during drag. On release over a valid port, a new
+  edge is created with a default name.
+- [ ] **F21** Select a node, edit its name in the
+  properties panel. PASS: the node label updates on
+  the SVG canvas immediately.
+- [ ] **F22** Select a node, click "+ Add Field".
+  Enter field name, select type from dropdown,
+  toggle required. PASS: field appears in the
+  fields list with correct type badge and required
+  indicator.
+- [ ] **F23** Select an edge by clicking its label or
+  path. PASS: edge properties panel shows
+  transition name, description, from/to state
+  names. Edit the name. PASS: label updates on the
+  canvas.
+- [ ] **F24** Select a non-start/non-complete node,
+  click "Delete State". PASS: node and all its
+  connected edges are removed from the canvas.
+- [ ] **F25** Select an edge, click "Delete
+  Transition". PASS: edge is removed from the
+  canvas.
+- [ ] **F26** Click "Zoom +" and "Zoom -" in
+  toolbar. PASS: canvas zooms in and out smoothly.
+  Click "Fit". PASS: canvas adjusts to show all
+  nodes.
+- [ ] **F27** Click "Save". PASS: success toast
+  appears. Navigate away and return to the
+  designer. PASS: all nodes, edges, fields, and
+  positions persist.
+- [ ] **F28** Navigate to
+  `flow/detail.html?workflowId=nonexistent`. PASS:
+  page handles gracefully — redirects to flow list
+  or shows error state, no unhandled JS exception.
 
 ---
 
@@ -400,7 +537,7 @@ on. Run these in order.
 
 - [ ] **G18** Navigate to `snapshots/`. PASS: shows 4 operation cards: Create Pristine Environment, Wipe and Load Mock Data, Upload Snapshot, Download Snapshot.
 - [ ] **G19** Click "Download Snapshot". PASS: browser downloads `fusion-ai-snapshot-YYYY-MM-DD.json`. File contains valid JSON with entity data.
-- [ ] **G20** Click "Create Pristine Environment", confirm the dialog. PASS: redirects to `dashboard/index.html`. Dashboard renders with zeroed-out metrics (empty database). All 44 `fusion-ai:*` keys exist in localStorage as empty arrays.
+- [ ] **G20** Click "Create Pristine Environment", confirm the dialog. PASS: redirects to `dashboard/index.html`. Dashboard renders with zeroed-out metrics (empty database). All 49 `fusion-ai:*` keys exist in localStorage as empty arrays.
 - [ ] **G21** Click "Wipe and Load Mock Data". PASS: redirects to `dashboard/index.html`. Navigate to `ideas/` — 11 ideas are back.
 - [ ] **G22** Return to `snapshots/`, wipe data, then use "Upload Snapshot" file input and select the previously downloaded JSON file. PASS: redirects to `dashboard/index.html`. Data matches the snapshot.
 
@@ -479,7 +616,7 @@ on. Run these in order.
 | Browser & Version | |
 | OS | |
 | Build SHA | |
-| Tests Passed | /232 |
-| Tests Failed | /232 |
-| Tests Skipped | /232 |
+| Tests Passed | /249 |
+| Tests Failed | /249 |
+| Tests Skipped | /249 |
 | Notes | |

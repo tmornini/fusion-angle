@@ -30,114 +30,8 @@ import { nowUtc } from '../../api/types';
 
 const BANNER_ID = 'empty-banner';
 
-async function updateEmptyBanner(
-    root: HTMLElement,
-): Promise<void> {
-    const hasExistingData = await hasData();
-    const existing =
-        document.getElementById(BANNER_ID);
-    if (!hasExistingData) {
-        if (!existing) {
-            const banner =
-                document.createElement('div');
-            banner.id = BANNER_ID;
-            banner.className = 'card';
-            banner.style.cssText =
-                'padding:1rem 1.25rem;'
-                + 'display:flex;'
-                + 'align-items:center;'
-                + 'gap:0.75rem;'
-                + 'grid-column:1/-1;'
-                + 'background:'
-                + 'hsl(var(--primary)/0.06);'
-                + 'border:1px solid '
-                + 'hsl(var(--primary)/0.2)';
-            setHtml(
-                banner,
-                html`<span style="${
-                    'color:'
-                    + 'hsl(var(--primary));'
-                    + 'flex-shrink:0'
-                }">${
-                    iconInfo(20, '')
-                }</span>
-                <p class="text-sm"
-                    style="margin:0">${
-                    'Your database is empty.'
-                }</p>`,
-            );
-            root.prepend(banner);
-        }
-    } else {
-        existing?.remove();
-    }
-}
-
-const pending = {
-    action: null as
-        (() => Promise<void>) | null,
-    button: null as
-        HTMLButtonElement | null,
-    label: null as string | null,
-};
-
-async function executePendingAction(
-): Promise<void> {
-    const button = pending.button;
-    const action = pending.action;
-    const label = pending.label;
-    pending.action = null;
-    pending.button = null;
-    pending.label = null;
-    if (!button || !action || !label)
-        return;
-
-    closeDialog('confirm-wipe');
-    const originalText = button.textContent;
-    button.disabled = true;
-    button.textContent = 'Working...';
-    try {
-        await deleteSchema();
-        await action();
-        navigateTo('dashboard');
-    } catch {
-        showToast(
-            'Failed to '
-            + label.toLowerCase()
-            + '.',
-            'error',
-        );
-        button.disabled = false;
-        button.textContent = originalText;
-    }
-}
-
-function withWipeAndReload(
-    button: HTMLButtonElement,
-    label: string,
-    action: () => Promise<void>,
-    confirmMessage?: string,
-): void {
-    if (confirmMessage) {
-        pending.action = action;
-        pending.button = button;
-        pending.label = label;
-        const msg =
-            $('#confirm-wipe-message', document);
-        if (msg) {
-            msg.textContent =
-                confirmMessage;
-        }
-        openDialog('confirm-wipe');
-    } else {
-        pending.action = action;
-        pending.button = button;
-        pending.label = label;
-        void executePendingAction();
-    }
-}
-
-const iconBoxStyle = (cssVar: string) =>
+const iconBoxStyle =
+    (cssVar: string) =>
     'width:2.5rem;height:2.5rem;'
     + 'border-radius:0.5rem;'
     + 'background:hsl(var(--'
@@ -162,7 +56,8 @@ function buildOutlineBtn(
     cssVar: string,
 ): SafeHtml {
     return html`<button
-        class="btn btn-outline" id="${id}"
+        class="btn btn-outline"
+        id="${id}"
         style="${
             'border-color:hsl(var(--'
             + cssVar + '));'
@@ -171,12 +66,88 @@ function buildOutlineBtn(
         }">${label}</button>`;
 }
 
-export async function init(): Promise<void> {
-    const root = $('#snapshots-content', document);
+interface PendingAction {
+    action: (() => Promise<void>) | null;
+    button: HTMLButtonElement | null;
+    label: string | null;
+}
+
+export async function init(
+): Promise<void> {
+    const root = $(
+        '#snapshots-content', document,
+    );
     if (!root) return;
 
+    const pending: PendingAction = {
+        action: null,
+        button: null,
+        label: null,
+    };
+
+    function clearPending(): void {
+        pending.action = null;
+        pending.button = null;
+        pending.label = null;
+    }
+
+    async function executePending(
+    ): Promise<void> {
+        const { action, button, label }
+            = pending;
+        clearPending();
+        if (!button || !action || !label)
+            return;
+
+        closeDialog('confirm-wipe');
+        const originalText =
+            button.textContent;
+        button.disabled = true;
+        button.textContent = 'Working...';
+        try {
+            await deleteSchema();
+            await action();
+        } catch {
+            showToast(
+                'Failed to '
+                + label.toLowerCase()
+                + '.',
+                'error',
+            );
+            button.disabled = false;
+            button.textContent =
+                originalText;
+            return;
+        }
+        navigateTo('dashboard');
+    }
+
+    function confirmAction(
+        button: HTMLButtonElement,
+        label: string,
+        action: () => Promise<void>,
+        message?: string,
+    ): void {
+        pending.action = action;
+        pending.button = button;
+        pending.label = label;
+        if (message) {
+            const msg = $(
+                '#confirm-wipe-message',
+                document,
+            );
+            if (msg) {
+                msg.textContent = message;
+            }
+            openDialog('confirm-wipe');
+        } else {
+            void executePending();
+        }
+    }
+
     setHtml(root, html`
-    <div class="card" style="${cardStyle}">
+    <div class="card"
+        style="${cardStyle}">
         <div style="${
             'display:flex;'
             + 'align-items:center;'
@@ -184,10 +155,13 @@ export async function init(): Promise<void> {
         }">
             <div style="${
                 iconBoxStyle('success')
-            }">${iconDownload(20, '')}</div>
+            }">${
+                iconDownload(20, '')
+            }</div>
             <div>
                 <h3 class="${
-                    'text-sm font-semibold'
+                    'text-sm'
+                    + ' font-semibold'
                 }">Download Snapshot</h3>
                 <p class="${
                     'text-xs text-muted'
@@ -203,7 +177,8 @@ export async function init(): Promise<void> {
         )}
     </div>
 
-    <div class="card" style="${cardStyle}">
+    <div class="card"
+        style="${cardStyle}">
         <div style="${
             'display:flex;'
             + 'align-items:center;'
@@ -211,10 +186,13 @@ export async function init(): Promise<void> {
         }">
             <div style="${
                 iconBoxStyle('success')
-            }">${iconUpload(20, '')}</div>
+            }">${
+                iconUpload(20, '')
+            }</div>
             <div>
                 <h3 class="${
-                    'text-sm font-semibold'
+                    'text-sm'
+                    + ' font-semibold'
                 }">Upload Snapshot</h3>
                 <p class="${
                     'text-xs text-muted'
@@ -241,7 +219,8 @@ export async function init(): Promise<void> {
         </label>
     </div>
 
-    <div class="card" style="${cardStyle}">
+    <div class="card"
+        style="${cardStyle}">
         <div style="${
             'display:flex;'
             + 'align-items:center;'
@@ -249,17 +228,22 @@ export async function init(): Promise<void> {
         }">
             <div style="${
                 iconBoxStyle('warning')
-            }">${iconDatabase(20, '')}</div>
+            }">${
+                iconDatabase(20, '')
+            }</div>
             <div>
                 <h3 class="${
-                    'text-sm font-semibold'
+                    'text-sm'
+                    + ' font-semibold'
                 }">${
-                    'Wipe and Load Mock Data'
+                    'Wipe and Load'
+                    + ' Mock Data'
                 }</h3>
                 <p class="${
                     'text-xs text-muted'
                 }">${
-                    'Wipe and load mock data'
+                    'Wipe and load'
+                    + ' mock data'
                 }</p>
             </div>
         </div>
@@ -270,7 +254,8 @@ export async function init(): Promise<void> {
         )}
     </div>
 
-    <div class="card" style="${cardStyle}">
+    <div class="card"
+        style="${cardStyle}">
         <div style="${
             'display:flex;'
             + 'align-items:center;'
@@ -278,10 +263,13 @@ export async function init(): Promise<void> {
         }">
             <div style="${
                 iconBoxStyle('error')
-            }">${iconTrash(20, '')}</div>
+            }">${
+                iconTrash(20, '')
+            }</div>
             <div>
                 <h3 class="${
-                    'text-sm font-semibold'
+                    'text-sm'
+                    + ' font-semibold'
                 }">${
                     'Create Pristine'
                     + ' Environment'
@@ -312,7 +300,7 @@ export async function init(): Promise<void> {
         wipeBtn.addEventListener(
             'click',
             () =>
-                withWipeAndReload(
+                confirmAction(
                     wipeBtn,
                     'Create pristine'
                     + ' environment',
@@ -320,12 +308,14 @@ export async function init(): Promise<void> {
                         await createSchema();
                         await bootstrapData();
                     },
-                    'Are you sure you want'
-                    + ' to create a pristine'
+                    'Are you sure you'
+                    + ' want to create a'
+                    + ' pristine'
                     + ' environment? All'
-                    + ' existing data will'
-                    + ' be removed. This'
-                    + ' cannot be undone.',
+                    + ' existing data'
+                    + ' will be removed.'
+                    + ' This cannot be'
+                    + ' undone.',
                 ),
         );
     }
@@ -338,7 +328,7 @@ export async function init(): Promise<void> {
         reloadBtn.addEventListener(
             'click',
             () =>
-                withWipeAndReload(
+                confirmAction(
                     reloadBtn,
                     'Load mock data',
                     async () => {
@@ -363,8 +353,9 @@ export async function init(): Promise<void> {
                 const text =
                     await file.text();
                 await deleteSchema();
-                await importSnapshot(text);
-                navigateTo('dashboard');
+                await importSnapshot(
+                    text,
+                );
             } catch {
                 showToast(
                     'Failed to upload'
@@ -372,73 +363,141 @@ export async function init(): Promise<void> {
                     + ' file format.',
                     'error',
                 );
+                importInput.value = '';
+                return;
             }
             importInput.value = '';
+            navigateTo('dashboard');
         },
     );
 
-    $('#download-btn', document)?.addEventListener(
+    $(
+        '#download-btn', document,
+    )?.addEventListener(
         'click',
         async () => {
+            let json: string;
             try {
-                const json =
+                json =
                     await exportSnapshot();
-                const blob = new Blob(
-                    [json],
-                    {
-                        type:
-                            'application/json',
-                    },
-                );
-                const url =
-                    URL.createObjectURL(blob);
-                const downloadLink =
-                    document.createElement(
-                        'a',
-                    );
-                downloadLink.href = url;
-                const date = nowUtc()
-                    .split('T')[0];
-                downloadLink.download =
-                    'fusion-ai-snapshot-'
-                    + date
-                    + '.json';
-                downloadLink.click();
-                URL.revokeObjectURL(url);
-                showToast(
-                    'Snapshot downloaded'
-                    + ' successfully.',
-                    'success',
-                );
             } catch {
                 showToast(
                     'Failed to download'
                     + ' snapshot.',
                     'error',
                 );
+                return;
             }
+            const blob = new Blob(
+                [json],
+                {
+                    type:
+                        'application/json',
+                },
+            );
+            const url =
+                URL.createObjectURL(blob);
+            const downloadLink =
+                document.createElement(
+                    'a',
+                );
+            downloadLink.href = url;
+            const date = nowUtc()
+                .split('T')[0];
+            downloadLink.download =
+                'fusion-ai-snapshot-'
+                + date
+                + '.json';
+            downloadLink.click();
+            URL.revokeObjectURL(url);
+            showToast(
+                'Snapshot downloaded'
+                + ' successfully.',
+                'success',
+            );
         },
     );
 
-    $('#confirm-wipe-cancel', document)
-        ?.addEventListener('click', () => {
-            pending.action = null;
-            pending.button = null;
-            pending.label = null;
+    $(
+        '#confirm-wipe-cancel', document,
+    )?.addEventListener(
+        'click',
+        () => {
+            clearPending();
             closeDialog('confirm-wipe');
-        });
-    $('#confirm-wipe-backdrop', document)
-        ?.addEventListener('click', (e) => {
-            if (e.target === e.currentTarget) {
-                pending.action = null;
-                pending.button = null;
-                pending.label = null;
-                closeDialog('confirm-wipe');
+        },
+    );
+    $(
+        '#confirm-wipe-backdrop', document,
+    )?.addEventListener(
+        'click',
+        (e) => {
+            if (
+                e.target
+                === e.currentTarget
+            ) {
+                clearPending();
+                closeDialog(
+                    'confirm-wipe',
+                );
             }
-        });
-    $('#confirm-wipe-submit', document)
-        ?.addEventListener(
-            'click',
-            () => void executePendingAction(),
+        },
+    );
+    $(
+        '#confirm-wipe-submit', document,
+    )?.addEventListener(
+        'click',
+        () => void executePending(),
+    );
+}
+
+async function updateEmptyBanner(
+    root: HTMLElement,
+): Promise<void> {
+    const hasExistingData =
+        await hasData();
+    const existing =
+        document.getElementById(
+            BANNER_ID,
         );
+    if (!hasExistingData) {
+        if (!existing) {
+            const banner =
+                document.createElement(
+                    'div',
+                );
+            banner.id = BANNER_ID;
+            banner.className = 'card';
+            banner.style.cssText =
+                'padding:1rem 1.25rem;'
+                + 'display:flex;'
+                + 'align-items:center;'
+                + 'gap:0.75rem;'
+                + 'grid-column:1/-1;'
+                + 'background:'
+                + 'hsl(var(--primary)'
+                + '/0.06);'
+                + 'border:1px solid '
+                + 'hsl(var(--primary)'
+                + '/0.2)';
+            setHtml(
+                banner,
+                html`<span style="${
+                    'color:'
+                    + 'hsl(var(--primary));'
+                    + 'flex-shrink:0'
+                }">${
+                    iconInfo(20, '')
+                }</span>
+                <p class="text-sm"
+                    style="margin:0">${
+                    'Your database is'
+                    + ' empty.'
+                }</p>`,
+            );
+            root.prepend(banner);
+        }
+    } else {
+        existing?.remove();
+    }
 }
