@@ -8,9 +8,9 @@ import {
     ideaIsVisible,
     projectIsApproved,
     projectIsNotDeleted,
+    SECONDS_PER_DAY,
 } from '../../../api/types';
 import {
-    durationInDays,
     formatCompactCurrency,
 } from '../format';
 
@@ -49,18 +49,35 @@ export async function getDashboardGauges(
         projectIsApproved,
     );
 
-    const sumEstimatedDuration =
-        projects.reduce(
-            (sum, p) =>
-                sum + p.estimated_duration,
+    const msPerDay =
+        SECONDS_PER_DAY * 1000;
+    const now = Date.now();
+    let sumBaselineDays = 0;
+    let sumCurrentDays = 0;
+    for (const p of projects) {
+        const start = new Date(
+            p.start_date,
+        ).getTime();
+        if (isNaN(start)) continue;
+        const end = new Date(
+            p.target_end_date,
+        ).getTime();
+        if (!isNaN(end)) {
+            sumBaselineDays += Math.max(
+                0,
+                Math.ceil(
+                    (end - start)
+                    / msPerDay,
+                ),
+            );
+        }
+        sumCurrentDays += Math.max(
             0,
+            Math.ceil(
+                (now - start) / msPerDay,
+            ),
         );
-    const sumActualDuration =
-        projects.reduce(
-            (sum, p) =>
-                sum + p.actual_duration,
-            0,
-        );
+    }
     const sumEstimatedCost =
         projects.reduce(
             (sum, p) =>
@@ -86,10 +103,6 @@ export async function getDashboardGauges(
             0,
         );
 
-    const baselineDays =
-        durationInDays(sumEstimatedDuration);
-    const currentDays =
-        durationInDays(sumActualDuration);
     const estCost =
         Math.ceil(sumEstimatedCost);
     const actCost =
@@ -106,18 +119,18 @@ export async function getDashboardGauges(
             iconCssClass: 'text-success',
             theme: 'green',
             outer: {
-                value: baselineDays,
-                max: baselineDays,
+                value: sumBaselineDays,
+                max: sumBaselineDays,
                 label: 'Baseline',
                 display:
-                    `${baselineDays}d`,
+                    `${sumBaselineDays}d`,
             },
             inner: {
-                value: currentDays,
-                max: baselineDays,
+                value: sumCurrentDays,
+                max: sumBaselineDays,
                 label: 'Current',
                 display:
-                    `${currentDays}d`,
+                    `${sumCurrentDays}d`,
             },
             hasOverrunWarning: true,
         },

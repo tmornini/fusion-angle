@@ -8,6 +8,9 @@ export interface ViewBox {
 export interface InteractionState {
     selectedNodeId: string | null;
     selectedEdgeId: string | null;
+    isPanelOpen: boolean;
+    lastClickId: string | null;
+    lastClickTime: number;
     isDragging: boolean;
     dragNodeId: string | null;
     dragOffsetX: number;
@@ -40,6 +43,7 @@ export type InteractionCallback = () => void;
 const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 2.0;
 const ZOOM_STEP = 0.1;
+const DBLCLICK_MS = 400;
 
 export function createInteractionState(
     viewBoxW: number,
@@ -48,6 +52,9 @@ export function createInteractionState(
     return {
         selectedNodeId: null,
         selectedEdgeId: null,
+        isPanelOpen: false,
+        lastClickId: null,
+        lastClickTime: 0,
         isDragging: false,
         dragNodeId: null,
         dragOffsetX: 0,
@@ -139,8 +146,16 @@ function handlePointerDown(
         target, 'data-node-id',
     );
     if (nodeId) {
+        const now = Date.now();
+        const isDbl =
+            nodeId === state.lastClickId
+            && now - state.lastClickTime
+                < DBLCLICK_MS;
         state.selectedNodeId = nodeId;
         state.selectedEdgeId = null;
+        state.lastClickId = nodeId;
+        state.lastClickTime = now;
+        state.isPanelOpen = isDbl;
         const pos = getNodePosition(nodeId);
         if (!pos || !pos.isDraggable) {
             onUpdate();
@@ -164,14 +179,25 @@ function handlePointerDown(
         target, 'data-edge-id',
     );
     if (edgeId) {
+        const now = Date.now();
+        const isDbl =
+            edgeId === state.lastClickId
+            && now - state.lastClickTime
+                < DBLCLICK_MS;
         state.selectedEdgeId = edgeId;
         state.selectedNodeId = null;
+        state.lastClickId = edgeId;
+        state.lastClickTime = now;
+        state.isPanelOpen = isDbl;
         onUpdate();
         return;
     }
 
     state.selectedNodeId = null;
     state.selectedEdgeId = null;
+    state.isPanelOpen = false;
+    state.lastClickId = null;
+    state.lastClickTime = 0;
     state.isPanning = true;
     state.panStartX = e.clientX;
     state.panStartY = e.clientY;

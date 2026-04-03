@@ -24,11 +24,44 @@ import {
 
 const CANVAS_W = 1200;
 const CANVAS_H = 800;
+const SAVE_DELAY_MS = 800;
+
+let saveTimer: ReturnType<
+    typeof setTimeout
+> | null = null;
+let pendingSave: (() => void) | null =
+    null;
+
+function debounceSave(
+    fn: () => void,
+): void {
+    if (saveTimer !== null) {
+        clearTimeout(saveTimer);
+    }
+    pendingSave = fn;
+    saveTimer = setTimeout(() => {
+        fn();
+        saveTimer = null;
+        pendingSave = null;
+    }, SAVE_DELAY_MS);
+}
+
+function flushPendingSave(): void {
+    if (saveTimer !== null) {
+        clearTimeout(saveTimer);
+        saveTimer = null;
+    }
+    if (pendingSave !== null) {
+        pendingSave();
+        pendingSave = null;
+    }
+}
 
 function renderAndBind(
     container: HTMLElement,
     presenter: FlowDesignerPresenter,
 ): void {
+    flushPendingSave();
     presenter.render(container);
     bindBackButton();
     bindSvgInteractions(
@@ -197,6 +230,9 @@ function bindPanelActions(
     container: HTMLElement,
     presenter: FlowDesignerPresenter,
 ): void {
+    bindClosePanelAction(
+        container, presenter,
+    );
     bindNodePanelInputs(
         container, presenter,
     );
@@ -208,6 +244,26 @@ function bindPanelActions(
     );
     bindFieldActions(
         container, presenter,
+    );
+}
+
+function bindClosePanelAction(
+    container: HTMLElement,
+    presenter: FlowDesignerPresenter,
+): void {
+    const btn = container.querySelector(
+        '[data-action="close-panel"]',
+    );
+    if (!btn) return;
+    btn.addEventListener(
+        'click',
+        () => {
+            presenter.interactionState()
+                .isPanelOpen = false;
+            renderAndBind(
+                container, presenter,
+            );
+        },
     );
 }
 
@@ -227,18 +283,27 @@ function bindNodePanelInputs(
     ) return;
 
     nameInput.addEventListener(
-        'change',
-        () => presenter.updateNodeName(
-            nameInput.value,
-        ),
+        'input',
+        () => {
+            const val = nameInput.value;
+            debounceSave(
+                () => presenter
+                    .updateNodeName(val),
+            );
+        },
     );
 
     descInput.addEventListener(
-        'change',
-        () => presenter
-            .updateNodeDescription(
-                descInput.value,
-            ),
+        'input',
+        () => {
+            const val = descInput.value;
+            debounceSave(
+                () => presenter
+                    .updateNodeDescription(
+                        val,
+                    ),
+            );
+        },
     );
 }
 
@@ -258,18 +323,27 @@ function bindEdgePanelInputs(
     ) return;
 
     nameInput.addEventListener(
-        'change',
-        () => presenter.updateEdgeName(
-            nameInput.value,
-        ),
+        'input',
+        () => {
+            const val = nameInput.value;
+            debounceSave(
+                () => presenter
+                    .updateEdgeName(val),
+            );
+        },
     );
 
     descInput.addEventListener(
-        'change',
-        () => presenter
-            .updateEdgeDescription(
-                descInput.value,
-            ),
+        'input',
+        () => {
+            const val = descInput.value;
+            debounceSave(
+                () => presenter
+                    .updateEdgeDescription(
+                        val,
+                    ),
+            );
+        },
     );
 }
 
@@ -562,6 +636,21 @@ function bindKeyboardShortcuts(
     document.addEventListener(
         'keydown',
         (e: KeyboardEvent) => {
+            if (
+                e.key === 'Escape'
+                && presenter
+                    .interactionState()
+                    .isPanelOpen
+            ) {
+                e.preventDefault();
+                presenter
+                    .interactionState()
+                    .isPanelOpen = false;
+                renderAndBind(
+                    container, presenter,
+                );
+                return;
+            }
             const mod =
                 e.metaKey || e.ctrlKey;
             if (!mod) return;

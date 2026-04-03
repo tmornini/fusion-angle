@@ -7,6 +7,7 @@ import {
     iconArrowLeft,
     iconUndo,
     iconRedo,
+    iconX,
 } from '../icons';
 import {
     putNode,
@@ -127,6 +128,8 @@ export class FlowDesignerPresenter {
             .selectedNodeId = null;
         this.#state.interaction
             .selectedEdgeId = null;
+        this.#state.interaction
+            .isPanelOpen = false;
     }
 
     #migrateToCenter(): void {
@@ -1116,8 +1119,17 @@ Required</label>
                 ? 'Start' : 'End';
             return html`<div
 class="wf-props-panel">
-<h3 class="text-sm font-semibold mb-3"
+<div style="display:flex;
+align-items:center;
+justify-content:space-between"
+><h3 class="text-sm font-semibold"
     >${kind} State</h3>
+<button
+    class="btn btn-ghost btn-icon btn-xs"
+    data-action="close-panel"
+    aria-label="Close"
+    >${iconX(14, '')}</button>
+</div>
 <div class="mb-2">
 <label class="text-xs text-muted"
     >Name</label>
@@ -1139,8 +1151,17 @@ class="text-sm text-muted"
             .map(f => this.#buildFieldRow(f));
         return html`<div
 class="wf-props-panel">
-<h3 class="text-sm font-semibold mb-3"
+<div style="display:flex;
+align-items:center;
+justify-content:space-between"
+><h3 class="text-sm font-semibold"
     >State Properties</h3>
+<button
+    class="btn btn-ghost btn-icon btn-xs"
+    data-action="close-panel"
+    aria-label="Close"
+    >${iconX(14, '')}</button>
+</div>
 <div class="mb-2">
 <label class="text-xs text-muted"
     >Name</label>
@@ -1195,8 +1216,17 @@ data-action="delete-node"
             toNode?.name ?? '\u2014';
         return html`<div
 class="wf-props-panel">
-<h3 class="text-sm font-semibold mb-3"
+<div style="display:flex;
+align-items:center;
+justify-content:space-between"
+><h3 class="text-sm font-semibold"
     >Transition Properties</h3>
+<button
+    class="btn btn-ghost btn-icon btn-xs"
+    data-action="close-panel"
+    aria-label="Close"
+    >${iconX(14, '')}</button>
+</div>
 <div class="mb-2">
 <label class="text-xs text-muted"
     >Name</label>
@@ -1233,6 +1263,9 @@ data-action="delete-edge"
     #buildPropsPanel(): SafeHtml {
         const interaction =
             this.#state.interaction;
+        if (!interaction.isPanelOpen) {
+            return html``;
+        }
         const selNodeId =
             interaction.selectedNodeId;
         const selEdgeId =

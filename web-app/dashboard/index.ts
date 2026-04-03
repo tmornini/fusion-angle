@@ -9,7 +9,6 @@ import {
 } from '../app/loading-states';
 import {
     getDashboardGauges,
-    getDashboardStats,
 } from '../app/adapters';
 import {
     GaugePresenter,
@@ -38,22 +37,4 @@ export async function init(): Promise<void> {
             g => g.buildGauge(),
         )}`,
     );
-
-    const stats =
-        await getDashboardStats();
-    const statsContainer =
-        $('#stats-container', document);
-    if (statsContainer)
-        setHtml(
-            statsContainer,
-            html`${stats.map(s => html`
-                <div class="card p-4">
-                    <p class="${
-                        'text-2xl font-bold'
-                    }">${s.value}</p>
-                    <p class="${
-                        'text-sm text-muted'
-                    }">${s.label}</p>
-                </div>`)}`,
-        );
 }
