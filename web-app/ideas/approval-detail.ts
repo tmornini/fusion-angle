@@ -11,10 +11,8 @@ import {
 } from '../app/core';
 import {
     getIdeaForApproval,
-    getEdgeForApproval,
     getIdea,
     putIdea,
-    type EdgeData,
 } from '../app/adapters';
 import {
     IdeaApprovalPresenter,
@@ -45,8 +43,6 @@ export async function init(
 
     let presenter:
         IdeaApprovalPresenter;
-    let currentEdge:
-        EdgeData | null;
 
     function renderPage(): void {
         const root = $(
@@ -57,9 +53,7 @@ export async function init(
         setHtml(
             root,
             presenter
-                .buildApprovalPage(
-                    currentEdge,
-                ),
+                .buildApprovalPage(),
         );
         bindEvents();
     }
@@ -158,24 +152,14 @@ export async function init(
                     'Idea saved',
                     'success',
                 );
-                const [
-                    updatedIdea,
-                    updatedEdge,
-                ] = await Promise
-                    .all([
-                    getIdeaForApproval(
+                const updatedIdea =
+                    await getIdeaForApproval(
                         id,
-                    ),
-                    getEdgeForApproval(
-                        id,
-                    ),
-                ]);
+                    );
                 presenter =
                     new IdeaApprovalPresenter(
                         updatedIdea,
                     );
-                currentEdge =
-                    updatedEdge;
                 renderPage();
             },
         );
@@ -252,21 +236,16 @@ export async function init(
     );
     if (!root) return;
 
-    const result =
+    const idea =
         await withLoadingState(
             root,
             buildSkeleton('detail', 4),
-            () => Promise.all([
-                getIdeaForApproval(id),
-                getEdgeForApproval(id),
-            ]),
+            () => getIdeaForApproval(id),
             () => init(),
         );
-    if (!result) return;
-    const [idea, edge] = result;
+    if (!idea) return;
 
     presenter =
         new IdeaApprovalPresenter(idea);
-    currentEdge = edge;
     renderPage();
 }

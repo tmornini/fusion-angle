@@ -31,7 +31,7 @@ const features = [
     },
     {
         icon: iconUsers,
-        title: 'Collaborative Workflows',
+        title: 'Collaborative Flows',
         description:
             'Seamlessly integrate AI'
             + ' assistance into your'
@@ -96,7 +96,7 @@ const steps = [
     },
     {
         number: '02',
-        title: 'Configure Your Workflows',
+        title: 'Configure Your Flows',
         description:
             'Set up AI-assisted'
             + ' processes that match your'
@@ -104,9 +104,9 @@ const steps = [
             + ' checkpoints where they'
             + ' matter.',
         points: [
-            'Visual workflow builder',
+            'Visual flow builder',
             'Role-based permissions',
-            'Audit trails',
+            'Process automation',
         ],
     },
     {

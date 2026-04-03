@@ -1,6 +1,6 @@
 # Database Schema
 
-49 tables stored in localStorage as JSON arrays. Each table is keyed as `fusion-ai:tableName`. All rows have a text `id` primary key. Column types: TEXT (string), INTEGER (number), REAL (float). JSON columns store stringified arrays or objects. All columns are NOT NULL — entity validation on creation ensures every field is present.
+21 tables stored in localStorage as JSON arrays. Each table is keyed as `fusion-ai:tableName`. All rows have a text `id` primary key. Column types: TEXT (string), INTEGER (number), REAL (float). JSON columns store stringified arrays or objects. All columns are NOT NULL — entity validation on creation ensures every field is present.
 
 **Duration convention:** All numeric duration fields are persisted in seconds. UI displays days via `durationInDays(seconds)` from `format.ts`.
 
@@ -104,95 +104,9 @@
 | id | TEXT |
 | role | TEXT |
 | type | TEXT |
-
-### milestones
-
-| Column | Type |
-|--------|------|
-| id | TEXT |
-| title | TEXT |
-| status | TEXT |
-| date | TEXT |
-| sort_order | INTEGER |
-
-### project_tasks
-
-| Column | Type |
-|--------|------|
-| id | TEXT |
-| name | TEXT |
-| priority | TEXT |
-| description | TEXT |
-| skills | TEXT (JSON array) |
-| duration | INTEGER (seconds) |
-
-### discussions
-
-| Column | Type |
-|--------|------|
-| id | TEXT |
-| date | TEXT |
-| message | TEXT |
-
-### project_versions
-
-| Column | Type |
-|--------|------|
-| id | TEXT |
-| version | TEXT |
-| date | TEXT |
-| changes | TEXT |
-
 ## Tools
 
-### edges
-
-| Column | Type |
-|--------|------|
-| id | TEXT |
-| status | TEXT |
-| confidence | TEXT |
-| impact_short_term | TEXT |
-| impact_mid_term | TEXT |
-| impact_long_term | TEXT |
-| updated_at | TEXT |
-
-### edge_outcomes
-
-| Column | Type |
-|--------|------|
-| id | TEXT |
-| description | TEXT |
-
-### edge_metrics
-
-| Column | Type |
-|--------|------|
-| id | TEXT |
-| name | TEXT |
-| target | TEXT |
-| unit | TEXT |
-| current | TEXT |
-
-### crunch_columns
-
-| Column | Type |
-|--------|------|
-| id | TEXT |
-| original_name | TEXT |
-| friendly_name | TEXT |
-| data_type | TEXT |
-| description | TEXT |
-| sample_values | TEXT (JSON array) |
-
-### crunch_column_acronyms
-
-| Column | Type |
-|--------|------|
-| id | TEXT |
-| expansion | TEXT |
-
-### workflows
+### flows
 
 | Column | Type | Notes |
 |--------|------|-------|
@@ -250,23 +164,6 @@
 | score | INTEGER |
 | status | TEXT |
 | comment | TEXT |
-
-### clarifications
-
-| Column | Type |
-|--------|------|
-| id | TEXT |
-| question | TEXT |
-| asked_at | TEXT |
-| status | TEXT |
-
-### clarification_answers
-
-| Column | Type |
-|--------|------|
-| id | TEXT |
-| answer | TEXT |
-
 ## Admin
 
 ### company_settings
@@ -331,88 +228,6 @@ Singleton table (single row, `id = '1'`).
 | idea_id | TEXT (FK → ideas) |
 | user_id | TEXT (FK → users) |
 | created_at | TEXT |
-
-### idea_project_links
-
-| Column | Type |
-|--------|------|
-| id | TEXT |
-| idea_id | TEXT (FK → ideas) |
-| project_id | TEXT (FK → projects) |
-| created_at | TEXT |
-
-### edge_ownerships
-
-| Column | Type |
-|--------|------|
-| id | TEXT |
-| edge_id | TEXT (FK → edges) |
-| user_id | TEXT (FK → users) |
-| created_at | TEXT |
-
-### edge_ideas
-
-| Column | Type |
-|--------|------|
-| id | TEXT |
-| edge_id | TEXT (FK → edges) |
-| idea_id | TEXT (FK → ideas) |
-| created_at | TEXT |
-
-### edge_outcome_edges
-
-| Column | Type |
-|--------|------|
-| id | TEXT |
-| edge_outcome_id | TEXT (FK → edge_outcomes) |
-| edge_id | TEXT (FK → edges) |
-| created_at | TEXT |
-
-### edge_metric_outcomes
-
-| Column | Type |
-|--------|------|
-| id | TEXT |
-| edge_metric_id | TEXT (FK → edge_metrics) |
-| outcome_id | TEXT (FK → edge_outcomes) |
-| created_at | TEXT |
-
-### task_assignments
-
-| Column | Type |
-|--------|------|
-| id | TEXT |
-| task_id | TEXT (FK → project_tasks) |
-| user_id | TEXT (FK → users) |
-| created_at | TEXT |
-
-### discussion_authorships
-
-| Column | Type |
-|--------|------|
-| id | TEXT |
-| discussion_id | TEXT (FK → discussions) |
-| user_id | TEXT (FK → users) |
-| created_at | TEXT |
-
-### discussion_projects
-
-| Column | Type |
-|--------|------|
-| id | TEXT |
-| discussion_id | TEXT (FK → discussions) |
-| project_id | TEXT (FK → projects) |
-| created_at | TEXT |
-
-### version_authorships
-
-| Column | Type |
-|--------|------|
-| id | TEXT |
-| version_id | TEXT (FK → project_versions) |
-| user_id | TEXT (FK → users) |
-| created_at | TEXT |
-
 ### activity_actors
 
 | Column | Type |
@@ -421,76 +236,21 @@ Singleton table (single row, `id = '1'`).
 | activity_id | TEXT (FK → activities) |
 | user_id | TEXT (FK → users) |
 | created_at | TEXT |
-
-### clarification_projects
-
-| Column | Type |
-|--------|------|
-| id | TEXT |
-| clarification_id | TEXT (FK → clarifications) |
-| project_id | TEXT (FK → projects) |
-| created_at | TEXT |
-
-### clarification_answer_clarifications
-
-| Column | Type |
-|--------|------|
-| id | TEXT |
-| clarification_answer_id | TEXT (FK → clarification_answers) |
-| clarification_id | TEXT (FK → clarifications) |
-| created_at | TEXT |
-
-### clarification_askers
-
-| Column | Type |
-|--------|------|
-| id | TEXT |
-| clarification_id | TEXT (FK → clarifications) |
-| user_id | TEXT (FK → users) |
-| created_at | TEXT |
-
-### clarification_answerers
-
-| Column | Type |
-|--------|------|
-| id | TEXT |
-| clarification_id | TEXT (FK → clarifications) |
-| user_id | TEXT (FK → users) |
-| created_at | TEXT |
-
-### project_task_projects
-
-| Column | Type |
-|--------|------|
-| id | TEXT |
-| project_task_id | TEXT (FK → project_tasks) |
-| project_id | TEXT (FK → projects) |
-| created_at | TEXT |
-
-### crunch_column_acronym_links
-
-| Column | Type |
-|--------|------|
-| id | TEXT |
-| crunch_column_acronym_id | TEXT (FK → crunch_column_acronyms) |
-| crunch_column_id | TEXT (FK → crunch_columns) |
-| created_at | TEXT |
-
-### project_workflows
+### project_flows
 
 | Column | Type | Notes |
 |--------|------|-------|
 | id | TEXT | PRIMARY KEY |
 | project_id | TEXT | References projects |
-| workflow_id | TEXT | References workflows |
+| flow_id | TEXT | References flows |
 | created_at | TEXT | RFC-3339 Zulu |
 
-### wf_workflow_nodes
+### wf_flow_nodes
 
 | Column | Type | Notes |
 |--------|------|-------|
 | id | TEXT | PRIMARY KEY |
-| workflow_id | TEXT | References workflows |
+| flow_id | TEXT | References flows |
 | node_id | TEXT | References wf_nodes |
 | created_at | TEXT | RFC-3339 Zulu |
 
@@ -512,25 +272,6 @@ Singleton table (single row, `id = '1'`).
 | node_id | TEXT | References wf_nodes |
 | field_id | TEXT | References wf_fields |
 | created_at | TEXT | RFC-3339 Zulu |
-
-### milestone_projects
-
-| Column | Type |
-|--------|------|
-| id | TEXT |
-| milestone_id | TEXT (FK → milestones) |
-| project_id | TEXT (FK → projects) |
-| created_at | TEXT |
-
-### project_version_projects
-
-| Column | Type |
-|--------|------|
-| id | TEXT |
-| project_version_id | TEXT (FK → project_versions) |
-| project_id | TEXT (FK → projects) |
-| created_at | TEXT |
-
 ### team_membership_projects
 
 | Column | Type |

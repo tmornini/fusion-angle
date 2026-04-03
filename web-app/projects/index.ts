@@ -96,25 +96,6 @@ export async function init(): Promise<void> {
                 !(e.target
                     instanceof Element)
             ) return;
-            const viewBtn =
-                e.target
-                    .closest<HTMLElement>(
-                        '[data-view-project]',
-                    );
-            if (viewBtn) {
-                e.stopPropagation();
-                navigateTo(
-                    'project-detail',
-                    {
-                        projectId: attr(
-                            viewBtn,
-                            'data-view'
-                            + '-project',
-                        ),
-                    },
-                );
-                return;
-            }
             const card =
                 e.target
                     .closest<HTMLElement>(

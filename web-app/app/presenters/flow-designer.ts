@@ -4,79 +4,154 @@ import {
 import type { SafeHtml } from '../safe-html';
 import { showToast } from '../toast';
 import {
-    putWorkflow,
+    iconArrowLeft,
+    iconUndo,
+    iconRedo,
+} from '../icons';
+import {
     putNode,
     putWfEdge,
     postNodeAddition,
     postEdgeConnection,
     postFieldAddition,
-    deleteNode,
-    deleteEdge,
-    deleteField,
+    deleteNodeCapture,
+    deleteEdgeCapture,
+    deleteFieldCapture,
+    executeUndoSteps,
+    getFlowGraph,
 } from '../adapters';
 import type {
     GraphNode,
     GraphEdge,
     GraphField,
-    WorkflowGraph,
-} from '../adapters/workflows';
+    FlowGraph,
+} from '../adapters/flows';
+import { UndoManager } from '../flow-undo';
+import type { UndoStep } from '../flow-undo';
 import {
     buildGraphSvg,
-} from '../workflow-graph';
+} from '../flow-graph';
 import {
     computeLayout,
     NODE_WIDTH,
     NODE_HEIGHT,
+    HORIZONTAL_GAP,
+    VERTICAL_GAP,
     START_X,
     START_Y,
-} from '../workflow-layout';
+} from '../flow-layout';
 import {
     createInteractionState,
     zoomIn as zoomInState,
     zoomOut as zoomOutState,
     zoomToFit as zoomToFitState,
-} from '../workflow-interactions';
+} from '../flow-interactions';
 import type {
     InteractionState,
-} from '../workflow-interactions';
+} from '../flow-interactions';
 
 interface DesignerState {
-    workflowId: string;
-    workflowName: string;
-    workflowDescription: string;
+    flowId: string;
+    flowName: string;
+    flowDescription: string;
     nodes: GraphNode[];
     edges: GraphEdge[];
     interaction: InteractionState;
-    hasUnsavedChanges: boolean;
 }
 
 export class FlowDesignerPresenter {
     #state: DesignerState;
     #canvasW: number;
     #canvasH: number;
+    #undo: UndoManager;
 
     constructor(
-        graph: WorkflowGraph,
+        graph: FlowGraph,
         canvasW: number,
         canvasH: number,
     ) {
         this.#canvasW = canvasW;
         this.#canvasH = canvasH;
+        this.#undo = new UndoManager(
+            executeUndoSteps,
+        );
         const interaction =
             createInteractionState(
                 canvasW, canvasH,
             );
         this.#state = {
-            workflowId: graph.id,
-            workflowName: graph.name,
-            workflowDescription:
+            flowId: graph.id,
+            flowName: graph.name,
+            flowDescription:
                 graph.description,
             nodes: graph.nodes,
             edges: graph.edges,
             interaction,
-            hasUnsavedChanges: false,
         };
+        this.#migrateToCenter();
         this.#applyZoomToFit();
+    }
+
+    canUndo(): boolean {
+        return this.#undo.canUndo();
+    }
+
+    canRedo(): boolean {
+        return this.#undo.canRedo();
+    }
+
+    async performUndo(): Promise<boolean> {
+        const action =
+            await this.#undo.undo();
+        if (!action) return false;
+        await this.#refreshState();
+        return true;
+    }
+
+    async performRedo(): Promise<boolean> {
+        const action =
+            await this.#undo.redo();
+        if (!action) return false;
+        await this.#refreshState();
+        return true;
+    }
+
+    async #refreshState(): Promise<void> {
+        const graph = await getFlowGraph(
+            this.#state.flowId,
+        );
+        if (!graph) return;
+        this.#state.nodes = graph.nodes;
+        this.#state.edges = graph.edges;
+        this.#state.interaction
+            .selectedNodeId = null;
+        this.#state.interaction
+            .selectedEdgeId = null;
+    }
+
+    #migrateToCenter(): void {
+        const nodes = this.#state.nodes;
+        if (nodes.length === 0) return;
+        let sumX = 0;
+        let sumY = 0;
+        for (const n of nodes) {
+            sumX += n.positionX;
+            sumY += n.positionY;
+        }
+        const cx = sumX / nodes.length;
+        const cy = sumY / nodes.length;
+        if (
+            Math.abs(cx) <= 1
+            && Math.abs(cy) <= 1
+        ) return;
+        for (const n of nodes) {
+            n.positionX -= cx;
+            n.positionY -= cy;
+            void putNode(n.id, {
+                position_x: n.positionX,
+                position_y: n.positionY,
+            });
+        }
     }
 
     selectedNodeId(): string | null {
@@ -91,32 +166,31 @@ export class FlowDesignerPresenter {
             .selectedEdgeId;
     }
 
-    workflowId(): string {
-        return this.#state.workflowId;
+    flowId(): string {
+        return this.#state.flowId;
     }
 
     interactionState(): InteractionState {
         return this.#state.interaction;
     }
 
-    initDragPositions(): void {
-        const nodeId =
-            this.#state
-                .interaction
-                .selectedNodeId;
-        if (nodeId === null) return;
-        for (const node of this.#state.nodes) {
-            if (node.id !== nodeId) continue;
-            this.#state
-                .interaction
-                .dragCurrentX =
-                    node.positionX;
-            this.#state
-                .interaction
-                .dragCurrentY =
-                    node.positionY;
-            break;
-        }
+    getNodePosition(id: string): {
+        x: number;
+        y: number;
+        isDraggable: boolean;
+    } | null {
+        const node =
+            this.#state.nodes.find(
+                n => n.id === id,
+            );
+        if (!node) return null;
+        return {
+            x: node.positionX,
+            y: node.positionY,
+            isDraggable:
+                !node.isStart
+                && !node.isComplete,
+        };
     }
 
     render(
@@ -128,19 +202,22 @@ export class FlowDesignerPresenter {
             this.#buildPropsPanel();
         const canvas =
             this.#buildCanvas();
+        const dialog =
+            this.#buildAddStateDialog();
         const content = html`<div
 class="wf-designer">
 <div class="wf-designer-header">
 <h2 class="text-lg font-semibold"
-    >${this.#state.workflowName}</h2>
+    >${this.#state.flowName}</h2>
 <p class="text-sm text-muted"
-    >${this.#state.workflowDescription}</p>
+    >${this.#state.flowDescription}</p>
 </div>
 ${toolbar}
 ${panel}
 <div class="wf-canvas-wrap"
     >${canvas}</div>
-</div>`;
+</div>
+${dialog}`;
         setHtml(container, content);
     }
 
@@ -153,9 +230,31 @@ ${panel}
             n => n.id === nodeId,
         );
         if (!node) return;
+        const oldX = node.positionX;
+        const oldY = node.positionY;
         node.positionX = x;
         node.positionY = y;
-        this.#state.hasUnsavedChanges = true;
+        const resource =
+            `wf-nodes/${nodeId}`;
+        this.#undo.push({
+            type: 'move-node',
+            forward: [{
+                op: 'put',
+                resource,
+                body: {
+                    position_x: x,
+                    position_y: y,
+                },
+            }],
+            reverse: [{
+                op: 'put',
+                resource,
+                body: {
+                    position_x: oldX,
+                    position_y: oldY,
+                },
+            }],
+        });
         void putNode(nodeId, {
             position_x: x,
             position_y: y,
@@ -168,11 +267,14 @@ ${panel}
             * (NODE_WIDTH + 120);
         const y = START_Y + 100;
         const nodeId = crypto.randomUUID();
+        const flowNodeId =
+            crypto.randomUUID();
         try {
             await postNodeAddition({
                 nodeId,
-                workflowId:
-                    this.#state.workflowId,
+                flowNodeId,
+                flowId:
+                    this.#state.flowId,
                 name: 'New State',
                 positionX: x,
                 positionY: y,
@@ -194,7 +296,23 @@ ${panel}
             isComplete: false,
             fields: [],
         });
-        this.#state.hasUnsavedChanges = true;
+        this.#undo.push({
+            type: 'add-node',
+            forward: [],
+            reverse: [
+                {
+                    op: 'delete',
+                    resource:
+                        'wf-flow-nodes/'
+                        + flowNodeId,
+                },
+                {
+                    op: 'delete',
+                    resource:
+                        `wf-nodes/${nodeId}`,
+                },
+            ],
+        });
         return true;
     }
 
@@ -202,10 +320,37 @@ ${panel}
         fromId: string,
         toId: string,
     ): Promise<boolean> {
+        const from =
+            this.#state.nodes.find(
+                n => n.id === fromId,
+            );
+        const to =
+            this.#state.nodes.find(
+                n => n.id === toId,
+            );
+        if (from?.isComplete) {
+            showToast(
+                'Cannot create transition'
+                + ' from end state',
+                'error',
+            );
+            return false;
+        }
+        if (to?.isStart) {
+            showToast(
+                'Cannot create transition'
+                + ' to start state',
+                'error',
+            );
+            return false;
+        }
         const edgeId = crypto.randomUUID();
+        const nodeEdgeId =
+            crypto.randomUUID();
         try {
             await postEdgeConnection({
                 edgeId,
+                nodeEdgeId,
                 name: 'Transition',
                 fromNodeId: fromId,
                 toNodeId: toId,
@@ -224,7 +369,23 @@ ${panel}
             fromNodeId: fromId,
             toNodeId: toId,
         });
-        this.#state.hasUnsavedChanges = true;
+        this.#undo.push({
+            type: 'add-edge',
+            forward: [],
+            reverse: [
+                {
+                    op: 'delete',
+                    resource:
+                        'wf-node-edges/'
+                        + nodeEdgeId,
+                },
+                {
+                    op: 'delete',
+                    resource:
+                        `wf-edges/${edgeId}`,
+                },
+            ],
+        });
         return true;
     }
 
@@ -235,11 +396,38 @@ ${panel}
                 .interaction
                 .selectedNodeId;
         if (nodeId === null) return false;
-        try {
-            await deleteNode(
-                nodeId,
-                this.#state.workflowId,
+        const target =
+            this.#state.nodes.find(
+                n => n.id === nodeId,
             );
+        if (
+            target?.isStart
+            || target?.isComplete
+        ) return false;
+        try {
+            const capture =
+                await deleteNodeCapture(
+                    nodeId,
+                    this.#state.flowId,
+                );
+            this.#undo.push({
+                type: 'delete-node',
+                forward: capture.deleteSteps,
+                reverse:
+                    capture.restoreSteps,
+            });
+            this.#state.nodes =
+                this.#state.nodes.filter(
+                    n => n.id !== nodeId,
+                );
+            this.#state.edges =
+                this.#state.edges.filter(
+                    e =>
+                        e.fromNodeId
+                            !== nodeId
+                        && e.toNodeId
+                            !== nodeId,
+                );
         } catch {
             showToast(
                 'Failed to delete state',
@@ -247,19 +435,9 @@ ${panel}
             );
             return false;
         }
-        this.#state.nodes =
-            this.#state.nodes.filter(
-                n => n.id !== nodeId,
-            );
-        this.#state.edges =
-            this.#state.edges.filter(
-                e => e.fromNodeId !== nodeId
-                    && e.toNodeId !== nodeId,
-            );
         this.#state
             .interaction
             .selectedNodeId = null;
-        this.#state.hasUnsavedChanges = true;
         return true;
     }
 
@@ -271,7 +449,20 @@ ${panel}
                 .selectedEdgeId;
         if (edgeId === null) return false;
         try {
-            await deleteEdge(edgeId);
+            const capture =
+                await deleteEdgeCapture(
+                    edgeId,
+                );
+            this.#undo.push({
+                type: 'delete-edge',
+                forward: capture.deleteSteps,
+                reverse:
+                    capture.restoreSteps,
+            });
+            this.#state.edges =
+                this.#state.edges.filter(
+                    e => e.id !== edgeId,
+                );
         } catch {
             showToast(
                 'Failed to delete transition',
@@ -279,18 +470,23 @@ ${panel}
             );
             return false;
         }
-        this.#state.edges =
-            this.#state.edges.filter(
-                e => e.id !== edgeId,
-            );
         this.#state
             .interaction
             .selectedEdgeId = null;
-        this.#state.hasUnsavedChanges = true;
         return true;
     }
 
     relayout(): void {
+        const oldPositions: UndoStep[] =
+            this.#state.nodes.map(n => ({
+                op: 'put' as const,
+                resource:
+                    `wf-nodes/${n.id}`,
+                body: {
+                    position_x: n.positionX,
+                    position_y: n.positionY,
+                },
+            }));
         const layoutInputs =
             this.#state.nodes.map(
                 n => ({
@@ -310,6 +506,7 @@ ${panel}
             layoutInputs, layoutEdges,
             this.#canvasW, this.#canvasH,
         );
+        const newPositions: UndoStep[] = [];
         for (
             const node of this.#state.nodes
         ) {
@@ -318,25 +515,25 @@ ${panel}
             if (!pos) continue;
             node.positionX = pos.x;
             node.positionY = pos.y;
+            newPositions.push({
+                op: 'put',
+                resource:
+                    `wf-nodes/${node.id}`,
+                body: {
+                    position_x: pos.x,
+                    position_y: pos.y,
+                },
+            });
+            void putNode(node.id, {
+                position_x: pos.x,
+                position_y: pos.y,
+            });
         }
-        this.#state.hasUnsavedChanges = true;
-    }
-
-    async persist(): Promise<boolean> {
-        try {
-            await this.#persistWorkflow();
-        } catch {
-            showToast(
-                'Failed to save workflow',
-                'error',
-            );
-            return false;
-        }
-        this.#state.hasUnsavedChanges = false;
-        showToast(
-            'Workflow saved', 'success',
-        );
-        return true;
+        this.#undo.push({
+            type: 'relayout',
+            forward: newPositions,
+            reverse: oldPositions,
+        });
     }
 
     updateNodeName(
@@ -351,8 +548,22 @@ ${panel}
             n => n.id === nodeId,
         );
         if (!node) return;
+        const oldName = node.name;
         node.name = name;
-        this.#state.hasUnsavedChanges = true;
+        const resource =
+            `wf-nodes/${nodeId}`;
+        this.#undo.push({
+            type: 'update-node-name',
+            forward: [{
+                op: 'put', resource,
+                body: { name },
+            }],
+            reverse: [{
+                op: 'put', resource,
+                body: { name: oldName },
+            }],
+        });
+        void putNode(nodeId, { name });
     }
 
     updateNodeDescription(
@@ -367,8 +578,26 @@ ${panel}
             n => n.id === nodeId,
         );
         if (!node) return;
+        const oldDesc = node.description;
         node.description = desc;
-        this.#state.hasUnsavedChanges = true;
+        const resource =
+            `wf-nodes/${nodeId}`;
+        this.#undo.push({
+            type: 'update-node-desc',
+            forward: [{
+                op: 'put', resource,
+                body: { description: desc },
+            }],
+            reverse: [{
+                op: 'put', resource,
+                body: {
+                    description: oldDesc,
+                },
+            }],
+        });
+        void putNode(
+            nodeId, { description: desc },
+        );
     }
 
     updateEdgeName(
@@ -383,8 +612,22 @@ ${panel}
             e => e.id === edgeId,
         );
         if (!edge) return;
+        const oldName = edge.name;
         edge.name = name;
-        this.#state.hasUnsavedChanges = true;
+        const resource =
+            `wf-edges/${edgeId}`;
+        this.#undo.push({
+            type: 'update-edge-name',
+            forward: [{
+                op: 'put', resource,
+                body: { name },
+            }],
+            reverse: [{
+                op: 'put', resource,
+                body: { name: oldName },
+            }],
+        });
+        void putWfEdge(edgeId, { name });
     }
 
     updateEdgeDescription(
@@ -399,8 +642,26 @@ ${panel}
             e => e.id === edgeId,
         );
         if (!edge) return;
+        const oldDesc = edge.description;
         edge.description = desc;
-        this.#state.hasUnsavedChanges = true;
+        const resource =
+            `wf-edges/${edgeId}`;
+        this.#undo.push({
+            type: 'update-edge-desc',
+            forward: [{
+                op: 'put', resource,
+                body: { description: desc },
+            }],
+            reverse: [{
+                op: 'put', resource,
+                body: {
+                    description: oldDesc,
+                },
+            }],
+        });
+        void putWfEdge(
+            edgeId, { description: desc },
+        );
     }
 
     async addField(
@@ -420,9 +681,12 @@ ${panel}
         if (!node) return false;
         const sortOrder = node.fields.length;
         const fieldId = crypto.randomUUID();
+        const nodeFieldId =
+            crypto.randomUUID();
         try {
             await postFieldAddition({
                 fieldId,
+                nodeFieldId,
                 nodeId,
                 name,
                 fieldType,
@@ -445,7 +709,24 @@ ${panel}
             isRequired,
             options,
         });
-        this.#state.hasUnsavedChanges = true;
+        this.#undo.push({
+            type: 'add-field',
+            forward: [],
+            reverse: [
+                {
+                    op: 'delete',
+                    resource:
+                        'wf-node-fields/'
+                        + nodeFieldId,
+                },
+                {
+                    op: 'delete',
+                    resource:
+                        'wf-fields/'
+                        + fieldId,
+                },
+            ],
+        });
         return true;
     }
 
@@ -458,9 +739,26 @@ ${panel}
                 .selectedNodeId;
         if (nodeId === null) return false;
         try {
-            await deleteField(
-                fieldId, nodeId,
-            );
+            const capture =
+                await deleteFieldCapture(
+                    fieldId, nodeId,
+                );
+            this.#undo.push({
+                type: 'delete-field',
+                forward: capture.deleteSteps,
+                reverse:
+                    capture.restoreSteps,
+            });
+            const node =
+                this.#state.nodes.find(
+                    n => n.id === nodeId,
+                );
+            if (node) {
+                node.fields =
+                    node.fields.filter(
+                        f => f.id !== fieldId,
+                    );
+            }
         } catch {
             showToast(
                 'Failed to delete field',
@@ -468,17 +766,154 @@ ${panel}
             );
             return false;
         }
+        return true;
+    }
+
+    selectedNodeName(): string {
+        const nodeId =
+            this.#state
+                .interaction
+                .selectedNodeId;
+        if (nodeId === null) return '';
         const node = this.#state.nodes.find(
             n => n.id === nodeId,
         );
-        if (node) {
-            node.fields =
-                node.fields.filter(
-                    f => f.id !== fieldId,
-                );
+        return node?.name ?? '';
+    }
+
+    async addNodeWithEdge(
+        name: string,
+        transitionName: string,
+        direction: string,
+    ): Promise<boolean> {
+        const fromNodeId =
+            this.#state
+                .interaction
+                .selectedNodeId;
+        if (fromNodeId === null) return false;
+        const fromNode =
+            this.#state.nodes.find(
+                n => n.id === fromNodeId,
+            );
+        if (!fromNode) return false;
+
+        const pos =
+            this.#computeDirectionPos(
+                fromNode, direction,
+            );
+        const nodeId = crypto.randomUUID();
+        const flowNodeId =
+            crypto.randomUUID();
+        const edgeId = crypto.randomUUID();
+        const nodeEdgeId =
+            crypto.randomUUID();
+
+        try {
+            await postNodeAddition({
+                nodeId,
+                flowNodeId,
+                flowId:
+                    this.#state.flowId,
+                name,
+                positionX: pos.x,
+                positionY: pos.y,
+            });
+            await postEdgeConnection({
+                edgeId,
+                nodeEdgeId,
+                name: transitionName,
+                fromNodeId,
+                toNodeId: nodeId,
+            });
+        } catch {
+            showToast(
+                'Failed to add state',
+                'error',
+            );
+            return false;
         }
-        this.#state.hasUnsavedChanges = true;
+        this.#state.nodes.push({
+            id: nodeId,
+            name,
+            description: '',
+            positionX: pos.x,
+            positionY: pos.y,
+            isStart: false,
+            isComplete: false,
+            fields: [],
+        });
+        this.#state.edges.push({
+            id: edgeId,
+            name: transitionName,
+            description: '',
+            fromNodeId,
+            toNodeId: nodeId,
+        });
+        this.#undo.push({
+            type: 'add-node-and-edge',
+            forward: [],
+            reverse: [
+                {
+                    op: 'delete',
+                    resource:
+                        'wf-node-edges/'
+                        + nodeEdgeId,
+                },
+                {
+                    op: 'delete',
+                    resource:
+                        `wf-edges/${edgeId}`,
+                },
+                {
+                    op: 'delete',
+                    resource:
+                        'wf-flow-nodes/'
+                        + flowNodeId,
+                },
+                {
+                    op: 'delete',
+                    resource:
+                        `wf-nodes/${nodeId}`,
+                },
+            ],
+        });
         return true;
+    }
+
+    #computeDirectionPos(
+        fromNode: GraphNode,
+        direction: string,
+    ): { x: number; y: number } {
+        switch (direction) {
+            case 'left':
+                return {
+                    x: fromNode.positionX
+                        - NODE_WIDTH
+                        - HORIZONTAL_GAP,
+                    y: fromNode.positionY,
+                };
+            case 'above':
+                return {
+                    x: fromNode.positionX,
+                    y: fromNode.positionY
+                        - NODE_HEIGHT
+                        - VERTICAL_GAP,
+                };
+            case 'below':
+                return {
+                    x: fromNode.positionX,
+                    y: fromNode.positionY
+                        + NODE_HEIGHT
+                        + VERTICAL_GAP,
+                };
+            default:
+                return {
+                    x: fromNode.positionX
+                        + NODE_WIDTH
+                        + HORIZONTAL_GAP,
+                    y: fromNode.positionY,
+                };
+        }
     }
 
     zoomIn(): void {
@@ -523,15 +958,38 @@ ${panel}
             + String(edgeCount)
             + ' transition'
             + (edgeCount !== 1 ? 's' : '');
-        const saveDisabled =
-            this.#state.hasUnsavedChanges
-                ? '' : ' disabled';
         return html`<div
 class="wf-toolbar">
 <div class="wf-toolbar-group">
+<button
+    class="btn btn-ghost btn-icon"
+    id="flow-back-btn"
+    >${iconArrowLeft(20, '')}</button>
+</div>
+<div class="wf-toolbar-group">
+<button
+    class="btn btn-ghost btn-icon"
+    data-action="undo"${
+    trusted(
+        this.#undo.canUndo()
+            ? '' : ' disabled',
+    )}>${iconUndo(18, '')}</button>
+<button
+    class="btn btn-ghost btn-icon"
+    data-action="redo"${
+    trusted(
+        this.#undo.canRedo()
+            ? '' : ' disabled',
+    )}>${iconRedo(18, '')}</button>
+</div>
+<div class="wf-toolbar-group">
 <button class="btn btn-primary btn-sm"
-    data-action="add-state"
-    >+ Add State</button>
+    data-action="add-state"${
+    trusted(
+        this.#state.interaction
+            .selectedNodeId !== null
+            ? '' : ' disabled',
+    )}>+ Add State</button>
 </div>
 <div class="wf-toolbar-group">
 <button class="btn btn-ghost btn-sm"
@@ -549,13 +1007,6 @@ class="wf-toolbar">
 <div class="wf-toolbar-group">
 <span class="text-muted text-sm"
     >${stats}</span>
-</div>
-<div class="wf-toolbar-group ml-auto">
-<button
-    class="btn btn-success btn-sm"
-    data-action="save"${
-    trusted(saveDisabled)
-    }>Save</button>
 </div>
 </div>`;
     }
@@ -660,12 +1111,30 @@ Required</label>
     ): SafeHtml {
         const isSpecial =
             node.isStart || node.isComplete;
-        const deleteBtn = isSpecial
-            ? html``
-            : html`<button
-class="btn btn-destructive btn-sm mt-4"
-data-action="delete-node"
->Delete State</button>`;
+        if (isSpecial) {
+            const kind = node.isStart
+                ? 'Start' : 'End';
+            return html`<div
+class="wf-props-panel">
+<h3 class="text-sm font-semibold mb-3"
+    >${kind} State</h3>
+<div class="mb-2">
+<label class="text-xs text-muted"
+    >Name</label>
+<div class="text-sm">${node.name}</div>
+</div>
+<div class="mb-3">
+<label class="text-xs text-muted"
+    >Outgoing Transitions</label>
+${outgoing.length > 0
+    ? outgoing.map(e => html`<div
+class="text-sm text-muted"
+>\u2192 ${e.name}</div>`)
+    : html`<div class="text-sm text-muted"
+        >None</div>`}
+</div>
+</div>`;
+        }
         const fieldRows = node.fields
             .map(f => this.#buildFieldRow(f));
         return html`<div
@@ -708,7 +1177,10 @@ class="text-sm text-muted"
     : html`<div class="text-sm text-muted"
         >None</div>`}
 </div>
-${deleteBtn}
+<button
+class="btn btn-destructive btn-sm mt-4"
+data-action="delete-node"
+>Delete State</button>
 </div>`;
     }
 
@@ -904,36 +1376,106 @@ data-action="delete-edge"
         );
     }
 
-    async #persistWorkflow(): Promise<void> {
-        await putWorkflow(
-            this.#state.workflowId,
-            {
-                name:
-                    this.#state.workflowName,
-                description:
-                    this.#state
-                        .workflowDescription,
-            },
-        );
-        for (
-            const node of this.#state.nodes
-        ) {
-            await putNode(node.id, {
-                name: node.name,
-                description:
-                    node.description,
-                position_x: node.positionX,
-                position_y: node.positionY,
-            });
-        }
-        for (
-            const edge of this.#state.edges
-        ) {
-            await putWfEdge(edge.id, {
-                name: edge.name,
-                description:
-                    edge.description,
-            });
-        }
+    #buildAddStateDialog(): SafeHtml {
+        const selNodeId =
+            this.#state.interaction
+                .selectedNodeId;
+        const selNode = selNodeId
+            !== null
+            ? this.#state.nodes.find(
+                n => n.id === selNodeId,
+            )
+            : undefined;
+        const fromName =
+            selNode?.name ?? '';
+        const dirStyle =
+            'padding:0.5rem;'
+            + 'border-radius:6px;'
+            + 'cursor:pointer;'
+            + 'text-align:center';
+        return html`<div
+class="dialog-backdrop hidden"
+id="add-state-backdrop">
+<div class="dialog hidden"
+    id="add-state-dialog"
+    aria-hidden="true"
+    style="max-width:28rem">
+<div style="${
+    'padding:1.5rem;'
+    + 'border-bottom:1px solid'
+    + ' hsl(var(--border))'
+}">
+<h3 class="text-lg font-display font-semibold"
+    >Add State</h3>
+<p class="text-sm text-muted"
+    >Connected from <strong
+    >${fromName}</strong></p>
+</div>
+<div style="${
+    'padding:1.5rem;'
+    + 'display:flex;'
+    + 'flex-direction:column;'
+    + 'gap:1rem'
+}">
+<div>
+<label class="label mb-1"
+    for="add-state-name"
+    >State Name</label>
+<input class="input"
+    id="add-state-name"
+    placeholder="e.g., Approved" />
+</div>
+<div>
+<label class="label mb-1"
+    for="add-state-transition"
+    >Transition Name</label>
+<input class="input"
+    id="add-state-transition"
+    placeholder="e.g., approve" />
+</div>
+<div>
+<label class="label mb-1"
+    >Placement Direction</label>
+<div style="${
+    'display:grid;'
+    + 'grid-template-columns:1fr 1fr;'
+    + 'gap:0.5rem'
+}">
+<button class="btn btn-outline active"
+    data-direction="right"
+    style="${dirStyle}"
+    >\u2192 Right</button>
+<button class="btn btn-outline"
+    data-direction="left"
+    style="${dirStyle}"
+    >\u2190 Left</button>
+<button class="btn btn-outline"
+    data-direction="above"
+    style="${dirStyle}"
+    >\u2191 Above</button>
+<button class="btn btn-outline"
+    data-direction="below"
+    style="${dirStyle}"
+    >\u2193 Below</button>
+</div>
+</div>
+</div>
+<div style="${
+    'padding:1rem 1.5rem;'
+    + 'border-top:1px solid'
+    + ' hsl(var(--border));'
+    + 'display:flex;'
+    + 'justify-content:flex-end;'
+    + 'gap:0.75rem'
+}">
+<button class="btn btn-outline"
+    id="add-state-cancel"
+    >Cancel</button>
+<button class="btn btn-primary"
+    id="add-state-submit"
+    >Add State</button>
+</div>
+</div>
+</div>`;
     }
 }

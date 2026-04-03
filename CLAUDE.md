@@ -23,17 +23,41 @@ Target: **ES2024** · Strict mode with `noUncheckedIndexedAccess`. Config at `we
 
 ## Architecture
 
-**Vanilla TypeScript** with zero runtime dependencies. This is an enterprise innovation management platform with modules for ideas, projects, teams, and analytics (Edge, Crunch, Flow). Every page is a standalone HTML file served via HTTP. The code also supports `file:///` protocol locally, but testing is HTTP-only.
+**Vanilla TypeScript** with zero runtime dependencies.
+This is an enterprise innovation management platform
+with modules for ideas, projects, teams, flows,
+and analytics. Every page is a standalone HTML file
+served via HTTP. The code also supports `file:///`
+protocol locally, but testing is HTTP-only.
 
 ### Key Layers
 
-- **HTML Composition**: A build step (`web-app/app/compose.ts`) assembles `web-app/app/components-layout.html` (layout skeleton) with `component-*.html` files and each page's `index.html` to produce standalone composed `index.html` files in a temp build directory. 7 standalone pages have hand-written `index.html` that are copied directly to the build output.
+- **HTML Composition**: A build step
+  (`web-app/app/compose.ts`) assembles
+  `web-app/app/components-layout.html` (layout
+  skeleton) with `component-*.html` files and each
+  page's `index.html` to produce standalone composed
+  `index.html` files in a temp build directory.
+  4 standalone pages have hand-written `index.html`
+  that are copied directly to the build output.
 - **Navigation**: Standard `<a href>` links between pages. Parameterized pages use query strings (`?ideaId=1`). `navigateTo(page, params?)` helper constructs relative URLs for programmatic navigation.
 - **Layout**: Sidebar-layout pages share a layout template with sidebar, header, search, and theme toggle. Mobile layout uses CSS media queries (not JS) to swap between desktop sidebar and mobile drawer.
 - **Page Detection**: `page-registry.ts` defines `PAGE_REGISTRY` mapping page names to `'sidebar'` or `'standalone'` layout type. `<html data-page="dashboard">` attribute is read by JS on `DOMContentLoaded` to dispatch to the correct page module's `init()`. Pages with `sourceDir` in `PAGE_REGISTRY` have source files at a different path than their page name.
-- **Source = Output Alignment**: Build output paths always use `sourceDir` when present — both `compose.ts` and `navigateTo()` resolve output directory as `sourceDir || pageName`. This means a page at `web-app/edges/detail.html` produces output at `edges/detail.html`, and `navigateTo('account')` generates `../organization/index.html` because account's `sourceDir` is `'organization'`. The `sourceFile` property enables named files (e.g., `detail.html`) alongside the default `index.html` convention. This keeps the developer's mental model simple: the file you edit is the file the browser loads.
+- **Source = Output Alignment**: Build output paths
+  always use `sourceDir` when present -- both
+  `compose.ts` and `navigateTo()` resolve output
+  directory as `sourceDir || pageName`. This means a
+  page at `web-app/flow/detail.html` produces output
+  at `flow/detail.html`, and `navigateTo('account')`
+  generates `../organization/index.html` because
+  account's `sourceDir` is `'organization'`. The
+  `sourceFile` property enables named files (e.g.,
+  `detail.html`) alongside the default `index.html`
+  convention. This keeps the developer's mental model
+  simple: the file you edit is the file the browser
+  loads.
 - **Auth**: Mock auth returning `demo@example.com`.
-- **Data**: REST-style API layer (`api/`) backed by localStorage. The `web-app/app/adapters/` directory contains ~45 adapter functions (split into domain modules with barrel re-export) that call `GET()`/`PUT()`/`POST()` and convert normalized DB rows into the denormalized shapes pages expect.
+- **Data**: REST-style API layer (`api/`) backed by localStorage. The `web-app/app/adapters/` directory contains ~30 adapter functions (split into domain modules with barrel re-export) that call `GET()`/`PUT()`/`POST()` and convert normalized DB rows into the denormalized shapes pages expect.
 - **Database**: localStorage with JSON serialization, persisted across page navigations. Each table is stored as a `fusion-ai:tableName` key containing a JSON array of row objects. When no schema exists (no `fusion-ai:*` keys in localStorage), non-entry pages redirect to snapshots so users can initialize the environment. A snapshots page provides create pristine environment, wipe and load mock data, upload snapshot, and download snapshot operations.
 - **State**: Simple module-level variables + pub-sub pattern for theme (persisted to localStorage), mobile detection (matchMedia), auth, and sidebar state.
 - **Durations**: All numeric durations are persisted in seconds. UI displays days via `durationInDays(seconds)` from `format.ts`.
@@ -42,7 +66,11 @@ Target: **ES2024** · Strict mode with `noUncheckedIndexedAccess`. Config at `we
 
 The API layer is a set of TypeScript modules that provide a REST-style interface to the database:
 
-- **`api/types.ts`** — Row types (snake_case) matching schema, shared type aliases (`Id`, `ConfidenceLevel`, `PriorityLevel`, `EdgeStatus`, `IdeaStatus`), `User` class wrapping `UserEntity`, and `toBool` utility
+- **`api/types.ts`** — Row types (snake_case) matching
+  schema, shared type aliases (`Id`,
+  `ConfidenceLevel`, `PriorityLevel`, `IdeaStatus`),
+  `User` class wrapping `UserEntity`, and `toBool`
+  utility
 - **`api/db.ts`** — `DbAdapter` interface with `EntityStore<T>` and `SingletonStore<T>` patterns, plus `hasSchema()`/`createSchema()` lifecycle methods
 - **`api/db-localstorage.ts`** — localStorage implementation with JSON serialization
 - **`api/api.ts`** — `GET(resource)` / `PUT(resource, body)` / `DELETE(resource)` / `POST(resource, body)` URL routing
@@ -52,7 +80,12 @@ The `DbAdapter` interface is designed for easy migration to Postgres or other ba
 
 ### Page Module Pattern
 
-Page folders contain `index.ts` and `index.html` by default. When `sourceFile` is set in `PAGE_REGISTRY`, the page uses `{sourceFile}.ts` and `{sourceFile}.html` instead (e.g., `edges/detail.ts` + `edges/detail.html`). Each page module exports:
+Page folders contain `index.ts` and `index.html` by
+default. When `sourceFile` is set in `PAGE_REGISTRY`,
+the page uses `{sourceFile}.ts` and
+`{sourceFile}.html` instead (e.g.,
+`flow/detail.ts` + `flow/detail.html`). Each page
+module exports:
 - `init(): Promise<void>` — fetches data, populates DOM placeholders, binds event listeners
 
 Sidebar-layout pages have `index.html` containing page content that gets composed with the layout template. Standalone pages have a complete hand-written `index.html` with a `<div id="page-root">` that `init()` renders into.
@@ -132,7 +165,7 @@ package.json                  # Project config (zero runtime dependencies)
 build                         # Executable build script
 
 api/
-  types.ts                    # Row types (snake_case), shared type aliases (Id, ConfidenceLevel, PriorityLevel, EdgeStatus, IdeaStatus), User class, toBool
+  types.ts                    # Row types (snake_case), shared type aliases (Id, ConfidenceLevel, PriorityLevel, IdeaStatus), User class, toBool
   db.ts                       # DbAdapter interface (EntityStore, SingletonStore, hasSchema, createSchema)
   db-localstorage.ts          # localStorage implementation with JSON serialization
   api.ts                      # GET/PUT/DELETE/POST URL routing
@@ -160,16 +193,15 @@ web-app/
     logger.ts                 # Lightweight logger respecting fusion-ai:log-level in localStorage
     safe-html.ts              # SafeHtml class, html tagged template, trusted(), setHtml()
     loading-states.ts         # Loading skeletons, error states, empty states, withLoadingState()
-    adapters/                 # ~45 adapter functions (API → frontend shapes)
+    adapters/                 # ~30 adapter functions (API → frontend shapes)
       index.ts                # Barrel re-export
-      helpers.ts              # buildUserMap, parseJson, getEdgeDataByIdeaId, getEdgeDataWithConfidence (returns null when no edge), shared Metric type
+      helpers.ts              # buildUserMap, userName, parseJson
       shared.ts               # getCurrentUser
       dashboard.ts            # getDashboardGauges, getDashboardStats, etc.
-      ideas.ts                # getIdeas, getIdeaDetail, getReviewQueue, getIdeaForConversion, getIdeaForApproval, getEdgeForApproval, getIdea, putIdea
-      projects.ts             # getProjects, getProjectById, getProjectForEngineering, getClarificationsByProjectId
+      ideas.ts                # getIdeas, getIdeaDetail, getReviewQueue, getIdeaForConversion, getIdeaForApproval, getIdea, putIdea, putIdeaSubmission
+      projects.ts             # getProjects, getProjectById, putProject, putProjectTeamMember
       teams.ts                # getTeamMembers, getManagedUsers
-      edges.ts                # getIdeaForEdge, getEdgeList
-      tools.ts                # getCrunchColumns, getFlows, getFlow, putProcess, putProcessStep
+      flows.ts                # getFlows, getFlowsByProject, getFlowGraph, postFlowCreation, putFlow, etc.
       admin.ts                # getAccount, getProfile, getCompanySettings, getActivityFeed
     styles/                   # CSS modules (cascade-ordered) — build inputs
       fonts.css               # @font-face declarations
@@ -186,13 +218,11 @@ web-app/
     favicon.ico               # Application favicon
     *.woff2                   # 9 self-hosted font files (IBM Plex Sans, Inter, IBM Plex Mono)
 
-  # Pages — 27 pages across page directories (most use index.ts + index.html; some use sourceFile naming)
+  # Pages — 23 pages across page directories (most use index.ts + index.html; some use sourceFile naming)
   dashboard/                # Dashboard with gauge cards
   ideas/                    # Ideas list + detail, create, convert, review-queue, approval-detail (named files)
-  projects/                 # Projects list + detail, engineering-requirements (named files)
-  edges/                    # Edge list + detail (detail.ts/detail.html)
-  crunch/                   # Data labeling tool
-  flow/                     # Process documentation list + detail (detail.ts/detail.html)
+  projects/                 # Projects list + detail (named files)
+  flow/                     # Flow list + detail (detail.ts/detail.html)
   organization/             # Account overview, users, teams, activity-feed, onboarding (named files)
   profile/                  # Profile settings
   settings/                 # Company settings
@@ -202,18 +232,22 @@ web-app/
   auth/                     # Login/signup (standalone)
   not-found/                # 404 page (standalone)
 
-SCHEMA.md                     # Database schema (44 tables, columns, types, defaults)
+SCHEMA.md                     # Database schema (21 tables, columns, types, defaults)
 DESIGN-SYSTEM.md              # Design system specification
 TEST-PLAN.md                  # Human-executable test plan (176 cases)
 ```
 
-Most pages use `index.ts` + `index.html`. Pages with `sourceFile` in `PAGE_REGISTRY` use named files (e.g., `detail.ts` + `detail.html`). Build output goes to a temp directory — no build artifacts in the repo.
+Most pages use `index.ts` + `index.html`. Pages with
+`sourceFile` in `PAGE_REGISTRY` use named files (e.g.,
+`detail.ts` + `detail.html`). Build output goes to a
+temp directory -- no build artifacts in the repo.
 
 ## Build
 
 Build steps (requires clean git working directory):
 1. Composes HTML pages: runs `web-app/app/compose.ts` to assemble `components-layout.html` with `component-*.html` files and each sidebar-layout page's HTML file, producing 20 composed files in a temp build directory. Respects `sourceFile` for both input resolution and output placement. Exits with error if any page is missing.
-2. Copies 7 standalone pages' `index.html` to the build directory
+2. Copies 4 standalone pages' `index.html` to the
+   build directory
 3. Bundles TypeScript into a single IIFE (`assets/app.js`) via esbuild into the build directory
 4. Concatenates CSS modules in cascade order and minifies via esbuild into `assets/styles.css`, copies `*.woff2` and `favicon.ico` to the build directory
 5. Creates a distribution ZIP (`fusion-ai-<sha>.zip`) on `~/Desktop`

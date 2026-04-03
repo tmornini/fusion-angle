@@ -1797,10 +1797,10 @@ export async function init(): Promise<void> {
                 <h2 class="${''
                     }text-2xl font-semibold ${''
                     }font-display">${''
-                    }Workflow Components</h2>
+                    }Flow Components</h2>
                 <p class="text-muted mt-1">${''
                     }Visual vocabulary for ${''
-                    }the workflow designer</p>
+                    }the flow designer</p>
             </div>
 
             <h3 class="font-semibold">${''

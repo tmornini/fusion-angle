@@ -2,8 +2,6 @@ import { GET, PUT } from '../../../api/api';
 import type {
     IdeaEntity,
     IdeaSubmissionEntity,
-    EdgeIdeaEntity,
-    EdgeEntity,
 } from '../../../api/types';
 import {
     Idea, nowUtc,
@@ -13,9 +11,6 @@ import {
 import {
     buildUserMap,
     userName,
-    computeEdgeStatus,
-    getEdgeDataWithConfidence,
-    type EdgeData,
 } from './helpers';
 
 export { Idea } from '../../../api/types';
@@ -24,17 +19,12 @@ export async function getIdeas(
 ): Promise<Idea[]> {
     const [
         ideas, userMap, submissions,
-        edgeIdeas, edges,
     ] = await Promise.all([
         GET<IdeaEntity[]>('ideas'),
         buildUserMap(),
         GET<IdeaSubmissionEntity[]>(
             'idea-submissions',
         ),
-        GET<EdgeIdeaEntity[]>(
-            'edge-ideas',
-        ),
-        GET<EdgeEntity[]>('edges'),
     ]);
     const submitterMap = new Map(
         submissions.map(
@@ -57,11 +47,6 @@ export async function getIdeas(
                 userMap,
                 submitterMap.get(idea.id)!,
             ),
-            computeEdgeStatus(
-                idea.id,
-                edgeIdeas,
-                edges,
-            ),
             submittedAtMap.get(idea.id)!,
         ));
 }
@@ -71,7 +56,6 @@ export async function getIdeaDetail(
 ): Promise<Idea> {
     const [
         idea, userMap, submissions,
-        edgeIdeas, edges,
     ] = await Promise.all([
         GET<IdeaEntity>(
             `ideas/${ideaId}`,
@@ -80,10 +64,6 @@ export async function getIdeaDetail(
         GET<IdeaSubmissionEntity[]>(
             'idea-submissions',
         ),
-        GET<EdgeIdeaEntity[]>(
-            'edge-ideas',
-        ),
-        GET<EdgeEntity[]>('edges'),
     ]);
     const submission = submissions.find(
         s => s.idea_id === ideaId,
@@ -97,11 +77,6 @@ export async function getIdeaDetail(
             userMap,
             submission.user_id,
         ),
-        computeEdgeStatus(
-            ideaId,
-            edgeIdeas,
-            edges,
-        ),
         submission.created_at,
     );
 }
@@ -110,17 +85,12 @@ export async function getReviewQueue(
 ): Promise<Idea[]> {
     const [
         ideas, userMap, submissions,
-        edgeIdeas, edges,
     ] = await Promise.all([
         GET<IdeaEntity[]>('ideas'),
         buildUserMap(),
         GET<IdeaSubmissionEntity[]>(
             'idea-submissions',
         ),
-        GET<EdgeIdeaEntity[]>(
-            'edge-ideas',
-        ),
-        GET<EdgeEntity[]>('edges'),
     ]);
     const submitterMap = new Map(
         submissions.map(
@@ -143,11 +113,6 @@ export async function getReviewQueue(
             userName(
                 userMap,
                 submitterMap.get(idea.id)!,
-            ),
-            computeEdgeStatus(
-                idea.id,
-                edgeIdeas,
-                edges,
             ),
             submittedAtMap.get(idea.id)!,
         ));
@@ -183,7 +148,6 @@ export async function getIdeaForConversion(
                 userMap,
                 submission!.user_id,
             ),
-            'missing',
             submission!.created_at,
         ),
         estimatedDuration: null,
@@ -213,15 +177,8 @@ export async function getIdeaForApproval(
             userMap,
             submission!.user_id,
         ),
-        'missing',
         submission!.created_at,
     );
-}
-
-export async function getEdgeForApproval(
-    ideaId: string,
-): Promise<EdgeData | null> {
-    return getEdgeDataWithConfidence(ideaId);
 }
 
 export async function getIdea(
@@ -251,4 +208,3 @@ export async function putIdeaSubmission(
         },
     );
 }
-

@@ -19,17 +19,17 @@ run as a single continuous regression pass.
 | Section | Tests |
 |---|--:|
 | A. Build & Setup | 5 |
-| AA. Data Entry Workflow | 54 |
+| AA. Data Entry Workflow | 46 |
 | B. Entry Pages | 16 |
 | C. Core: Dashboard | 7 |
-| D. Core: Ideas Workflow | 52 |
+| D. Core: Ideas Workflow | 50 |
 | E. Core: Projects | 17 |
-| F. Tools | 38 |
+| F. Tools | 21 |
 | G. Admin Pages | 34 |
 | H. Reference & System | 2 |
-| I. Cross-Cutting Concerns | 21 |
+| I. Cross-Cutting Concerns | 20 |
 | J. Teardown | 3 |
-| **Total** | **249** |
+| **Total** | **221** |
 
 ---
 
@@ -87,17 +87,7 @@ on. Run these in order.
 - [ ] **AA19** Submit ideas 1, 4, 7, 8, 9, 10, 11 for review (matching mock data statuses). PASS: each transitions from active to in-review.
 - [ ] **AA20** Navigate to Review Queue. PASS: the 7 submitted ideas appear with priority badges and readiness status.
 
-### AA7. Define Edges
-
-- [ ] **AA21** Navigate to idea #1 detail. Click "Define Edge". PASS: navigates to edge detail page with correct ideaId.
-- [ ] **AA22** Set confidence to "High". Enter impact text (short-term, mid-term, long-term). Set edge owner. PASS: fields accept input.
-- [ ] **AA23** Click "Add Outcome". Enter outcome name "Reduce customer churn rate". Click "Add Metric" within that outcome. Enter metric fields (Name, Target, Unit, Current). PASS: outcome and metric rows appear.
-- [ ] **AA24** Add second outcome with its metrics. Click "Save". PASS: toast "Edge saved" appears.
-- [ ] **AA25** Navigate away and back to edge detail. PASS: all edge data persists (confidence, impact, outcomes, metrics, owner).
-- [ ] **AA26** Repeat edge creation for all 9 ideas that have edges. PASS: each edge saves with outcomes and metrics.
-- [ ] **AA27** Navigate to Edges list. PASS: shows all 9 edges with correct status, confidence, owner, and outcome/metric counts.
-
-### AA8. Approve Ideas & Convert to Projects
+### AA7. Approve Ideas & Convert to Projects
 
 - [ ] **AA28** Navigate to Review Queue. Click idea #1. PASS: navigates to approval detail.
 - [ ] **AA29** Click "Approve". PASS: idea status changes to approved, confirmation shown.
@@ -107,14 +97,14 @@ on. Run these in order.
 - [ ] **AA33** On project detail, click "Edit". Set progress, priority_score, and other fields to match mock data. Save. PASS: project data persists.
 - [ ] **AA34** Repeat conversion for all 6 projects. PASS: Projects list shows all 6 with correct status, progress, and priority.
 
-### AA9. Create Workflows
+### AA9. Create Flows
 
 - [ ] **AA35** Navigate to Projects. Click into
-  project #1 detail. PASS: a "Workflows" section
-  is visible showing "No workflows yet" empty
-  state and a "New Workflow" button.
-- [ ] **AA36** Click "New Workflow". PASS: navigates
-  to the workflow designer page. The SVG canvas
+  project #1 detail. PASS: a "Flows" section
+  is visible showing "No flows yet" empty
+  state and a "New Flow" button.
+- [ ] **AA36** Click "New Flow". PASS: navigates
+  to the flow designer page. The SVG canvas
   shows two nodes: "New" (start, top-left with
   green border) and "Complete" (end, bottom-right
   with double green border) connected by no edges.
@@ -167,7 +157,7 @@ on. Run these in order.
   cards (Time, Cost, Impact) show aggregated values
   computed from the entered project data.
 - [ ] **AA47** Header stats reflect entered data
-  counts (ideas, projects, workflows). PASS:
+  counts (ideas, projects, flows). PASS:
   counts are non-zero and match.
 
 ### AA11. Edit & Verify Cycle
@@ -178,10 +168,7 @@ on. Run these in order.
 - [ ] **AA49** Edit project #1: change description.
   Save, navigate away, return. PASS: changed
   description persists.
-- [ ] **AA50** Edit edge #1: change confidence level.
-  Save, navigate away, return. PASS: changed
-  confidence persists.
-- [ ] **AA51** Edit workflow: navigate to workflow
+- [ ] **AA50** Edit flow: navigate to flow
   designer, rename a state, click Save. Navigate
   away, return. PASS: changed state name persists.
 - [ ] **AA52** Edit profile: change phone number.
@@ -238,8 +225,16 @@ on. Run these in order.
 ## C. Core: Dashboard
 
 - [ ] **C1** Navigate to `dashboard/`. PASS: page loads with sidebar, header, and main content area.
-- [ ] **C2** Sidebar shows navigation links grouped under Journey (Dashboard, Ideas, Projects, Teams), Tools (Edge, Crunch, Workflows), and Settings (Organization, Snapshots, Design System). PASS: all links present and styled.
-- [ ] **C3** Header shows search bar, greeting ("Good {morning/afternoon/evening}, Tony Stark" — varies by time of day), company stats ("Stark Industries · 11 Ideas · 6 Projects · 1 Workflows"), and theme toggle. PASS: elements visible and styled.
+- [ ] **C2** Sidebar shows flat navigation
+  links: Dashboard, Ideas, Projects, Flows,
+  Organization, Teams, Snapshots, Design
+  System. PASS: all links present and styled.
+- [ ] **C3** Header shows search bar, greeting
+  ("Good {morning/afternoon/evening}, Tony
+  Stark" — varies by time of day), company
+  stats ("Stark Industries · 11 Ideas ·
+  6 Projects · 1 Flows"), and theme toggle.
+  PASS: elements visible and styled.
 - [ ] **C4** Dashboard displays 3 gauge/metric cards (Time, Cost, Impact) with baseline and current values. PASS: cards render with non-zero values and concentric arc gauges.
 - [ ] **C6** Sidebar navigation links all function correctly. PASS: clicking a sidebar link navigates to the expected page.
 - [ ] **C7** Scroll the page. PASS: sidebar stays fixed, main content scrolls independently.
@@ -253,8 +248,14 @@ on. Run these in order.
 
 - [ ] **D1** Navigate to `ideas/`. PASS: table/list shows 11 seeded ideas with title, score, priority, status, and Time/Cost/Impact stats. Ideas without estimates show "—" (em-dash) instead of zero values.
 - [ ] **D1b** Click the "Performance" view toggle. PASS: cards reorder by score descending, toggle button highlights. Click "Priority" toggle. PASS: cards return to priority rank order.
-- [ ] **D1c** "Idea Flow" workflow banner is visible showing the 4 stages: Create → Edge → Review → Convert. PASS: banner renders with labeled steps.
-- [ ] **D2** Each idea row shows a status badge (In Review, Promoted, Active, Approved, or Archived) and an edge status badge (Edge Complete, Edge Draft, or Edge Missing). PASS: badges render with distinct colors.
+- [ ] **D1c** "Idea Flow" workflow banner is
+  visible showing the 3 stages: Create → Review
+  → Convert. PASS: banner renders with labeled
+  steps.
+- [ ] **D2** Each idea row shows a status badge
+  (In Review, Promoted, Active, Approved, or
+  Archived). PASS: badges render with distinct
+  colors.
 - [ ] **D3** Click an idea row/title. PASS: navigates to the idea's detail or scoring page with the correct `ideaId` parameter.
 - [ ] **D4** "New Idea" or "Create Idea" button is visible. PASS: clicking it navigates to `idea-create/index.html`.
 
@@ -282,8 +283,10 @@ on. Run these in order.
 ### Idea Detail — Edit & Actions
 
 - [ ] **D19b** Click "Edit", then "Cancel". PASS: returns to view mode with original data unchanged.
-- [ ] **D19c** For an idea with edge_status "missing": "Define Edge" action button is visible. PASS: clicking it navigates to edge detail page with correct `ideaId`.
-- [ ] **D19d** For an idea in "in_review" status: "Review" action button is visible. PASS: clicking it navigates to `approval-detail/` page.
+- [ ] **D19c** For an idea in "in_review"
+  status: "Review" action button is visible.
+  PASS: clicking it navigates to
+  `approval-detail/` page.
 - [ ] **D19e** For a convertible idea: "Convert" action button is visible. PASS: clicking it navigates to `idea-convert/` page.
 - [ ] **D19f** Navigate to `ideas/detail.html?ideaId=999` (non-existent). PASS: page handles gracefully — shows error state, no unhandled JS exception.
 
@@ -307,7 +310,12 @@ on. Run these in order.
 ### Idea Review Queue (`idea-review-queue/`)
 
 - [ ] **D22** Navigate to `idea-review-queue/`. PASS: page shows stats cards (Pending Review, Ready to Decide, High Priority, Avg. Wait Time) and a list of ideas pending review.
-- [ ] **D22b** Each review card shows priority badge (High Priority/Medium), readiness status (Ready for Review/Needs Info/Unknown), edge status badge, title, submitter, category, days waiting, score, impact, and effort. PASS: all fields render with data.
+- [ ] **D22b** Each review card shows priority
+  badge (High Priority/Medium), readiness status
+  (Ready for Review/Needs Info/Unknown), title,
+  submitter, category, days waiting, score,
+  impact, and effort. PASS: all fields render
+  with data.
 - [ ] **D23** At least one idea with `in-review` status appears in the queue. PASS: idea 7 ("AI-Powered Customer Support Chatbot") or similar is listed.
 - [ ] **D23b** Type a search term in the search input. PASS: review cards filter by title or submitter name in real-time.
 - [ ] **D23c** Select "High" from the priority filter dropdown. PASS: list shows only high-priority items. Reset to "All Priority" → full list returns.
@@ -319,8 +327,9 @@ on. Run these in order.
 
 - [ ] **D25** Navigate to `approval-detail/?id=7`. PASS: page loads with full idea details for idea 7.
 - [ ] **D26** Page shows the idea title, problem statement, proposed solution, and expected outcome. PASS: all text fields populated.
-- [ ] **D27** Edge/business case information is displayed (outcomes, metrics from edge 6). PASS: at least 2 outcomes and 4 metrics visible.
-- [ ] **D28** "Approve" action is available. PASS: clicking it shows confirmation or success feedback.
+- [ ] **D27** "Approve" action is available.
+  PASS: clicking it shows confirmation or
+  success feedback.
 - [ ] **D29** "Reject" or "Send Back" action is available. PASS: clicking it shows confirmation or reason dialog.
 - [ ] **D30** Clarification questions are displayed if applicable. PASS: section renders (may show empty state if no clarifications for this idea).
 
@@ -343,8 +352,15 @@ on. Run these in order.
 
 ### Project Detail (`project-detail/?projectId=1`)
 
-- [ ] **E3** Page loads with project summary card (description, dates, progress bar), baseline vs. current metrics, and Edge KPI card. PASS: all cards render with data. Baseline/current metrics show "—" (em-dash) when values are zero or missing.
-- [ ] **E4** Four quick-action cards visible (Engineering, Team, Workflows, Crunch). PASS: clicking "Engineering" navigates to `engineering-requirements/?projectId=1`.
+- [ ] **E3** Page loads with project summary
+  card (description, dates, progress bar) and
+  baseline vs. current metrics. PASS: all cards
+  render with data. Baseline/current metrics
+  show em dash when values are zero or missing.
+- [ ] **E4** Three quick-action cards visible
+  (Engineering, Team, Flows). PASS: clicking
+  "Engineering" navigates to
+  `engineering-requirements/?projectId=1`.
 - [ ] **E5** **Tasks tab** (default): shows 5 task cards with priority badges, skill tags, and days. Assigned/unassigned count is dynamically computed from task data (seed data: 1 assigned, 4 unassigned). PASS: "Save Assignments" button visible.
 - [ ] **E6** **Discussion tab**: shows 3 seeded comments with author avatars/names. Comment composer textarea + "Post Comment" button (disabled when empty, enabled when text entered). PASS: all elements render.
 - [ ] **E6b** Type a comment in the composer textarea, click "Post Comment". PASS: toast "Comment posted" appears, comment appears in the list.
@@ -368,49 +384,23 @@ on. Run these in order.
 
 ## F. Tools
 
-### Edge Definition (`edge/?ideaId=1`)
-
-- [ ] **F1** Navigate to `edge/?ideaId=1`. PASS: left panel shows idea 1's summary (title, score, problem statement); right panel shows the Edge form.
-- [ ] **F2** Business Outcomes section shows 2 seeded outcomes with metrics. Completion progress bar reflects current state. PASS: outcomes and metrics render with input fields.
-- [ ] **F3** Click "Add Outcome". PASS: a new empty outcome row appears with "Add Metric" button.
-- [ ] **F3b** Within an outcome, click "Add Metric". PASS: new metric row appears with Name, Target, Unit, and Current input fields.
-- [ ] **F4** Delete an outcome. PASS: outcome is removed, progress bar updates.
-- [ ] **F4b** Delete a metric within an outcome. PASS: metric row is removed.
-- [ ] **F5** Expected Impact section shows 3 textareas (Short-term, Mid-term, Long-term). Confidence select and Edge Owner fields are visible. PASS: all fields render with seeded data.
-- [ ] **F5b** Modify edge fields (e.g. outcome description, confidence level) and click "Save". PASS: toast "Edge saved" appears, data persists on page reload.
-
-### Edge List (`edges/`)
-
-- [ ] **F6** Navigate to `edges/`. PASS: shows stats cards (Total Ideas, Complete, In Draft, Missing) and edge cards with status badges (Edge Complete, Edge Draft, Edge Missing), confidence level (High/Medium/Low Confidence), owner, outcome/metric counts, and idea titles.
-- [ ] **F6b** Type in the search input. PASS: filters edge cards by idea title or owner name in real-time.
-- [ ] **F6c** Select a status from the filter dropdown (e.g. "Complete"). PASS: list shows only edges with that status. Reset to "All Status" → full list returns.
-- [ ] **F6d** Apply search + filter that matches no items. PASS: empty state shows "No Edge definitions found" with "Try adjusting your search or filter criteria".
-- [ ] **F6e** Click an edge card. PASS: navigates to `edges/detail.html?ideaId=<id>`.
-
-### Crunch (`crunch/`)
-
-- [ ] **F7** Navigate to `crunch/`. PASS: Step 1 (Upload) shows drop zone with "Drop your file here or click to browse" and supported-format info.
-- [ ] **F8** Click the drop zone. PASS: advances to Step 2 (Label & Explain) — shows mock file info ("Q4_Sales_Report.xlsx", 1,247 rows, 6 columns) and per-column accordion cards.
-- [ ] **F9** Expand a column card (e.g. CUST_ID). PASS: reveals Friendly Name input, Data Type select, Acronym Expansion input (for acronym columns), and Description textarea. Fill all fields — completion icon changes to green check.
-- [ ] **F10** Fill all 6 columns to 100% completion, click "Continue to Review". PASS: advances to Step 3 — shows "Data Translation Complete" with "Edit Labels" and "Continue to Dashboard" buttons.
-
-### Workflow List (`flow/`)
+### Flow List (`flow/`)
 
 - [ ] **F11** Navigate to `flow/`. PASS: page shows
-  workflow cards with name, description, project
+  flow cards with name, description, project
   name badge, and state/transition counts.
 - [ ] **F12** Type in the search input (if present).
-  PASS: filters workflow cards by name or
+  PASS: filters flow cards by name or
   description in real-time.
-- [ ] **F13** Click a workflow card. PASS: navigates
-  to `flow/detail.html?workflowId=<id>`.
+- [ ] **F13** Click a flow card. PASS: navigates
+  to `flow/detail.html?flowId=<id>`.
 
-### Workflow Designer (`flow/detail.html?workflowId=...`)
+### Flow Designer (`flow/detail.html?flowId=...`)
 
-- [ ] **F14** Navigate to a workflow designer page.
+- [ ] **F14** Navigate to a flow designer page.
   PASS: toolbar at top with Add State, Re-layout,
   Zoom +/-, Fit, stats, and Save. SVG canvas below
-  with dot grid background showing the workflow
+  with dot grid background showing the flow
   graph.
 - [ ] **F15** Nodes display correctly: start node
   has green border with "Start state" subtitle,
@@ -475,7 +465,7 @@ on. Run these in order.
   designer. PASS: all nodes, edges, fields, and
   positions persist.
 - [ ] **F28** Navigate to
-  `flow/detail.html?workflowId=nonexistent`. PASS:
+  `flow/detail.html?flowId=nonexistent`. PASS:
   page handles gracefully — redirects to flow list
   or shows error state, no unhandled JS exception.
 
@@ -563,8 +553,10 @@ on. Run these in order.
 ### Sidebar
 
 - [ ] **I6** Click the sidebar collapse button. PASS: sidebar collapses to icon-only view, main content area expands.
-- [ ] **I6b** Click a sidebar section header (e.g. "Journey"). PASS: section items collapse/hide, chevron rotates. Click again. PASS: section items reappear, chevron returns to original orientation.
-- [ ] **I7** Navigate to another page. PASS: collapsed state persists (stored in `localStorage` key `fusion-sidebar-collapsed`).
+- [ ] **I7** Navigate to another page. PASS:
+  collapsed state persists (stored in
+  `localStorage` key
+  `fusion-sidebar-collapsed`).
 - [ ] **I8** Click the expand button. PASS: sidebar returns to full width with labels.
 
 ### Mobile Responsive
@@ -616,7 +608,7 @@ on. Run these in order.
 | Browser & Version | |
 | OS | |
 | Build SHA | |
-| Tests Passed | /249 |
-| Tests Failed | /249 |
-| Tests Skipped | /249 |
+| Tests Passed | /221 |
+| Tests Failed | /221 |
+| Tests Skipped | /221 |
 | Notes | |

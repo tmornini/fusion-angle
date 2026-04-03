@@ -17,10 +17,6 @@ export {
     ProjectListPresenter,
 } from './project';
 export {
-    EdgePresenter,
-    EdgeListPresenter,
-} from './edge';
-export {
     GaugePresenter,
 } from './gauge';
 export {
@@ -30,17 +26,11 @@ export {
     UserPresenter,
 } from './user';
 export {
-    WorkflowPresenter,
-} from './workflow';
+    FlowPresenter,
+} from './flow';
 export {
     ProjectDetailPresenter,
 } from './project-detail';
-export {
-    EdgeDetailPresenter,
-} from './edge-detail';
-export {
-    CrunchPresenter,
-} from './crunch';
 export {
     AccountPresenter,
 } from './account';
@@ -50,9 +40,6 @@ export {
 export {
     SettingsPresenter,
 } from './settings';
-export {
-    EngineeringPresenter,
-} from './engineering';
 export {
     FlowDesignerPresenter,
 } from './flow-designer';

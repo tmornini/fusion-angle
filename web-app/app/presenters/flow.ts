@@ -6,10 +6,10 @@ import {
     iconFolderKanban,
 } from '../icons';
 import type {
-    WorkflowSummary,
-} from '../adapters/workflows';
+    FlowSummary,
+} from '../adapters/flows';
 
-export class WorkflowPresenter {
+export class FlowPresenter {
     readonly #id: string;
     readonly #name: string;
     readonly #description: string;
@@ -17,7 +17,7 @@ export class WorkflowPresenter {
     readonly #edgeCount: number;
     readonly #projectName: string | null;
 
-    constructor(wf: WorkflowSummary) {
+    constructor(wf: FlowSummary) {
         this.#id = wf.id;
         this.#name = wf.name;
         this.#description = wf.description;
@@ -30,7 +30,7 @@ export class WorkflowPresenter {
         return html`
     <div class="card card-hover p-4"
         style="cursor:pointer"
-        data-workflow-card="${this.#id}">
+        data-flow-card="${this.#id}">
         <div class="${
             'flex items-start '
             + 'justify-between gap-4'

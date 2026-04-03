@@ -72,8 +72,6 @@ export async function init(
                     >Ideas</option>
                 <option value="project"
                     >Projects</option>
-                <option value="task"
-                    >Tasks</option>
                 <option value="team"
                     >Teams</option>
             </select>
@@ -109,11 +107,9 @@ export async function init(
             'idea_converted',
         ],
         project: ['project_created'],
-        task: ['task_completed'],
         team: [
             'user_joined',
             'status_changed',
-            'comment_added',
         ],
     };
 

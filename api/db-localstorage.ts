@@ -10,45 +10,17 @@ import type {
     TeamMembershipEntity,
     TeamMembershipProjectEntity,
     TeamMembershipUserEntity,
-    MilestoneEntity,
-    MilestoneProjectEntity,
-    ProjectTaskEntity,
-    ProjectTaskProjectEntity,
-    DiscussionEntity,
-    ProjectVersionEntity,
-    ProjectVersionProjectEntity,
-    EdgeEntity,
-    EdgeOutcomeEntity,
-    EdgeOutcomeEdgeEntity,
-    EdgeMetricEntity,
-    EdgeMetricOutcomeEntity,
     ActivityEntity,
-    ClarificationEntity,
-    ClarificationAnswerEntity,
-    ClarificationAnswerClarificationEntity,
-    CrunchColumnEntity,
-    CrunchColumnAcronymEntity,
-    CrunchColumnAcronymLinkEntity,
-    WorkflowEntity,
+    FlowEntity,
     WfNodeEntity,
     WfEdgeEntity,
     WfFieldEntity,
     CompanySettingsEntity,
     AccountEntity,
     IdeaSubmissionEntity,
-    IdeaProjectLinkEntity,
-    EdgeIdeaEntity,
-    EdgeOwnershipEntity,
-    TaskAssignmentEntity,
-    DiscussionAuthorshipEntity,
-    DiscussionProjectEntity,
-    VersionAuthorshipEntity,
     ActivityActorEntity,
-    ClarificationAskerEntity,
-    ClarificationAnswererEntity,
-    ClarificationProjectEntity,
-    ProjectWorkflowEntity,
-    WfWorkflowNodeEntity,
+    ProjectFlowEntity,
+    WfFlowNodeEntity,
     WfNodeEdgeEntity,
     WfNodeFieldEntity,
 } from './types';
@@ -337,47 +309,19 @@ export const TABLE_NAMES = [
     'team_memberships',
     'team_membership_projects',
     'team_membership_users',
-    'milestones',
-    'project_tasks',
-    'discussions',
-    'project_versions',
-    'edges',
-    'edge_outcomes',
-    'edge_outcome_edges',
-    'edge_metrics',
-    'edge_metric_outcomes',
     'activities',
-    'clarifications',
-    'clarification_answers',
-    'clarification_answer_clarifications',
-    'crunch_columns',
-    'crunch_column_acronyms',
-    'crunch_column_acronym_links',
-    'workflows',
+    'flows',
     'wf_nodes',
     'wf_edges',
     'wf_fields',
-    'project_workflows',
-    'wf_workflow_nodes',
+    'project_flows',
+    'wf_flow_nodes',
     'wf_node_edges',
     'wf_node_fields',
     'company_settings',
     'account',
     'idea_submissions',
-    'idea_project_links',
-    'edge_ideas',
-    'edge_ownerships',
-    'task_assignments',
-    'discussion_authorships',
-    'discussion_projects',
-    'version_authorships',
     'activity_actors',
-    'clarification_askers',
-    'clarification_answerers',
-    'clarification_projects',
-    'project_task_projects',
-    'milestone_projects',
-    'project_version_projects',
 ];
 
 
@@ -546,109 +490,15 @@ export async function createLocalStorageAdapter(
                 TeamMembershipUserEntity
             >('team_membership_users'),
 
-        milestones:
-            createEntityStore<MilestoneEntity>(
-                'milestones',
-            ),
-        milestoneProjects:
-            createEntityStore<
-                MilestoneProjectEntity
-            >('milestone_projects'),
-
-        projectTasks:
-            createEntityStore<
-                ProjectTaskEntity
-            >('project_tasks'),
-        projectTaskProjects:
-            createEntityStore<
-                ProjectTaskProjectEntity
-            >('project_task_projects'),
-
-        discussions:
-            createEntityStore<
-                DiscussionEntity
-            >('discussions'),
-        discussionProjects:
-            createEntityStore<
-                DiscussionProjectEntity
-            >('discussion_projects'),
-
-        projectVersions:
-            createEntityStore<
-                ProjectVersionEntity
-            >('project_versions'),
-        projectVersionProjects:
-            createEntityStore<
-                ProjectVersionProjectEntity
-            >('project_version_projects'),
-
-        edges:
-            createEntityStore<EdgeEntity>(
-                'edges',
-            ),
-        edgeIdeas:
-            createEntityStore<
-                EdgeIdeaEntity
-            >('edge_ideas'),
-
-        edgeOutcomes:
-            createEntityStore<
-                EdgeOutcomeEntity
-            >('edge_outcomes'),
-        edgeOutcomeEdges:
-            createEntityStore<
-                EdgeOutcomeEdgeEntity
-            >('edge_outcome_edges'),
-
-        edgeMetrics:
-            createEntityStore<EdgeMetricEntity>(
-                'edge_metrics',
-            ),
-        edgeMetricOutcomes:
-            createEntityStore<
-                EdgeMetricOutcomeEntity
-            >('edge_metric_outcomes'),
         activities:
             createEntityStore<ActivityEntity>(
                 'activities',
             ),
 
-        clarifications:
+        flows:
             createEntityStore<
-                ClarificationEntity
-            >('clarifications'),
-        clarificationAnswers:
-            createEntityStore<
-                ClarificationAnswerEntity
-            >('clarification_answers'),
-        clarificationAnswerClarifications:
-            createEntityStore<
-                ClarificationAnswerClarificationEntity
-            >(
-                'clarification_answer'
-                + '_clarifications',
-            ),
-        clarificationProjects:
-            createEntityStore<
-                ClarificationProjectEntity
-            >('clarification_projects'),
-
-        crunchColumns:
-            createEntityStore<
-                CrunchColumnEntity
-            >('crunch_columns'),
-        crunchColumnAcronyms:
-            createEntityStore<
-                CrunchColumnAcronymEntity
-            >('crunch_column_acronyms'),
-        crunchColumnAcronymLinks:
-            createEntityStore<
-                CrunchColumnAcronymLinkEntity
-            >('crunch_column_acronym_links'),
-        workflows:
-            createEntityStore<
-                WorkflowEntity
-            >('workflows'),
+                FlowEntity
+            >('flows'),
         wfNodes:
             createEntityStore<
                 WfNodeEntity
@@ -661,14 +511,14 @@ export async function createLocalStorageAdapter(
             createEntityStore<
                 WfFieldEntity
             >('wf_fields'),
-        projectWorkflows:
+        projectFlows:
             createEntityStore<
-                ProjectWorkflowEntity
-            >('project_workflows'),
-        wfWorkflowNodes:
+                ProjectFlowEntity
+            >('project_flows'),
+        wfFlowNodes:
             createEntityStore<
-                WfWorkflowNodeEntity
-            >('wf_workflow_nodes'),
+                WfFlowNodeEntity
+            >('wf_flow_nodes'),
         wfNodeEdges:
             createEntityStore<
                 WfNodeEdgeEntity
@@ -692,38 +542,10 @@ export async function createLocalStorageAdapter(
             createEntityStore<
                 IdeaSubmissionEntity
             >('idea_submissions'),
-        ideaProjectLinks:
-            createEntityStore<
-                IdeaProjectLinkEntity
-            >('idea_project_links'),
-        edgeOwnerships:
-            createEntityStore<
-                EdgeOwnershipEntity
-            >('edge_ownerships'),
-        taskAssignments:
-            createEntityStore<
-                TaskAssignmentEntity
-            >('task_assignments'),
-        discussionAuthorships:
-            createEntityStore<
-                DiscussionAuthorshipEntity
-            >('discussion_authorships'),
-        versionAuthorships:
-            createEntityStore<
-                VersionAuthorshipEntity
-            >('version_authorships'),
         activityActors:
             createEntityStore<
                 ActivityActorEntity
             >('activity_actors'),
-        clarificationAskers:
-            createEntityStore<
-                ClarificationAskerEntity
-            >('clarification_askers'),
-        clarificationAnswerers:
-            createEntityStore<
-                ClarificationAnswererEntity
-            >('clarification_answerers'),
     };
 
     return adapter;

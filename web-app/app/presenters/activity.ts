@@ -3,8 +3,6 @@ import { formatDate, displayText } from '../core';
 import {
     iconLightbulb,
     iconFolderKanban,
-    iconCheckCircle2,
-    iconMessageSquare,
     iconUserPlus,
     iconEdit,
     iconArrowRight,
@@ -14,8 +12,6 @@ import type { Activity } from '../../../api/types';
 type ActivityType =
     | 'idea_created'
     | 'project_created'
-    | 'task_completed'
-    | 'comment_added'
     | 'user_joined'
     | 'status_changed'
     | 'idea_converted';
@@ -45,20 +41,6 @@ const ICON_MAP: Record<
             + 'hsl(var(--primary) / 0.1);'
             + 'color:'
             + 'hsl(var(--primary))',
-    },
-    task_completed: {
-        icon: iconCheckCircle2,
-        bg: 'background:'
-            + 'hsl(var(--success-soft));'
-            + 'color:'
-            + 'hsl(var(--success-text))',
-    },
-    comment_added: {
-        icon: iconMessageSquare,
-        bg: 'background:'
-            + 'hsl(var(--info-soft));'
-            + 'color:'
-            + 'hsl(var(--info-text))',
     },
     user_joined: {
         icon: iconUserPlus,

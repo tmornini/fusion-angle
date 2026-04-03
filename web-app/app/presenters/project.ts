@@ -5,7 +5,6 @@ import {
     iconDollarSign,
     iconTrendingUp,
     iconTarget,
-    iconEye,
     iconGripVertical,
     iconCheckCircle2,
     iconAlertCircle,
@@ -61,7 +60,8 @@ export class ProjectPresenter {
         this.#priority = project.priority;
         this.#priorityScore =
             project.priorityScore;
-        this.#progress = project.progress;
+        this.#progress =
+            project.timelineProgress();
         this.#estimatedDuration =
             project.estimatedDuration;
         this.#actualDurationDays =
@@ -194,17 +194,6 @@ export class ProjectPresenter {
                     ${this.#buildMetrics(
                         metricBoxStyle,
                     )}
-                    <button class="${
-                        'btn btn-outline '
-                        + 'btn-sm gap-2'
-                    }" data-view-project="${
-                        this.#id
-                    }">${
-                        iconEye(16, '')
-                    } <span class="${
-                        'hidden-mobile'
-                    }">View Details</span
-                    ></button>
                 </div>
             </div>
         </div>
@@ -342,25 +331,6 @@ export class ProjectPresenter {
                             ? String(impact)
                             : '',
                     )
-                }</p>
-            </div>
-        </div>
-        <div class="${
-            'flex items-center gap-2'
-        }">
-            <div style="${boxStyle}">${
-                iconTarget(
-                    16, 'text-primary',
-                )
-            }</div>
-            <div>
-                <p class="${
-                    'text-xs text-muted'
-                }">Score</p>
-                <p class="${
-                    'text-sm font-medium'
-                }">${
-                    this.#priorityScore
                 }</p>
             </div>
         </div>

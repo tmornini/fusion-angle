@@ -85,13 +85,7 @@ export async function init(): Promise<void> {
                 Idea Flow:
             </span>
             Create &rarr;
-            <span
-                class="${
-                    'text-primary font-medium'
-                }">
-                Edge
-            </span>
-            &rarr; Review &rarr; Convert
+            Review &rarr; Convert
         </span>
         ${iconChevronRight(
             16, 'text-muted',
@@ -162,28 +156,11 @@ export async function init(): Promise<void> {
                 const actionButton =
                     e.target
                         .closest<HTMLElement>(
-                        '[data-idea-edge],'
-                        + ' [data-idea-review],'
+                        '[data-idea-review],'
                         + ' [data-idea-convert]',
                     );
                 if (actionButton) {
                     if (
-                        actionButton
-                            .hasAttribute(
-                            'data-idea-edge',
-                        )
-                    )
-                        navigateTo(
-                            'edge-detail',
-                            {
-                                ideaId: attr(
-                                    actionButton,
-                                    'data-idea'
-                                    + '-edge',
-                                ),
-                            },
-                        );
-                    else if (
                         actionButton
                             .hasAttribute(
                             'data-idea-review',

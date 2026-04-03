@@ -24,8 +24,18 @@ function formatDate(iso: string): string {
     const d = new Date(iso);
     if (isNaN(d.getTime())) return '—';
     return d.toLocaleDateString('en-US', {
-        month: 'short', day: 'numeric', year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        timeZone: 'UTC',
     });
+}
+
+function toDateInputValue(
+    iso: string,
+): string {
+    if (!iso) return '';
+    return iso.slice(0, 10);
 }
 
 function displayText(
@@ -39,6 +49,7 @@ export {
     formatDate,
     getTimeOfDay,
     initials,
+    toDateInputValue,
     durationInDays,
     formatCompactCurrency,
     SECONDS_PER_DAY,

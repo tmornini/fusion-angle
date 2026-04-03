@@ -11,28 +11,28 @@ import {
     iconGitBranch,
 } from '../app/icons';
 import { navigateTo } from '../app/core';
-import { getWorkflows } from '../app/adapters';
+import { getFlows } from '../app/adapters';
 import {
-    WorkflowPresenter,
+    FlowPresenter,
 } from '../app/presenters';
 
 export async function init(
 ): Promise<void> {
     const listEl = $(
-        '#workflow-list', document,
+        '#flow-list', document,
     );
     if (!listEl) return;
 
     const result = await withLoadingState(
         listEl,
         buildSkeleton('card-list', 4),
-        getWorkflows,
+        getFlows,
         init,
         {
             icon: iconGitBranch(24, ''),
-            title: 'No Workflows Yet',
+            title: 'No Flows Yet',
             description:
-                'Workflows are created'
+                'Flows are created'
                 + ' from the project'
                 + ' detail page.',
             action: {
@@ -44,13 +44,13 @@ export async function init(
         },
     );
     if (!result) return;
-    const workflows = result.map(
-        wf => new WorkflowPresenter(wf),
+    const flows = result.map(
+        wf => new FlowPresenter(wf),
     );
 
     setHtml(
         listEl,
-        html`${workflows.map(
+        html`${flows.map(
             wf => wf.buildCard(),
         )}`,
     );
@@ -65,15 +65,15 @@ export async function init(
             const card =
                 e.target
                     .closest<HTMLElement>(
-                    '[data-workflow-card]',
+                    '[data-flow-card]',
                 );
             if (card)
                 navigateTo(
                     'flow-detail',
                     {
-                        workflowId: attr(
+                        flowId: attr(
                             card,
-                            'data-workflow'
+                            'data-flow'
                             + '-card',
                         ),
                     },

@@ -19,9 +19,7 @@ import {
     getIdea,
     putIdea,
     putProject,
-    putMilestone,
     putProjectTeamMember,
-    putIdeaProjectLink,
 } from '../app/adapters';
 import {
     IdeaConversionPresenter,
@@ -50,7 +48,6 @@ type ConversionField =
     | 'target-end-date'
     | 'budget'
     | 'priority'
-    | 'first-milestone'
     | 'success-criteria';
 
 const ALL_FIELDS:
@@ -61,7 +58,6 @@ const ALL_FIELDS:
     'target-end-date',
     'budget',
     'priority',
-    'first-milestone',
     'success-criteria',
 ];
 
@@ -472,40 +468,16 @@ async function performConversion(
                 pd['budget']!,
         },
     );
-    await Promise.all([
-        putProjectTeamMember(
-            projectId,
-            leadUserId,
-            'lead',
-            'internal',
-        ),
-        putIdeaProjectLink(
-            ideaId,
-            projectId,
-        ),
-    ]);
+    await putProjectTeamMember(
+        projectId,
+        leadUserId,
+        'lead',
+        'internal',
+    );
     const existingIdea =
         await getIdea(ideaId);
     await putIdea(ideaId, {
         ...existingIdea,
         status: 'promoted',
     });
-    const mTitle =
-        pd['first-milestone'];
-    if (mTitle?.trim()) {
-        const milestoneId =
-            crypto.randomUUID();
-        await putMilestone(
-            projectId,
-            milestoneId,
-            {
-                title: mTitle,
-                status: 'pending',
-                date: pd[
-                    'target-end-date'
-                ]!,
-                sort_order: 1,
-            },
-        );
-    }
 }

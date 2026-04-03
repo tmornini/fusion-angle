@@ -108,124 +108,16 @@ const routes: Route[] = [
     route('projects', {
         get: (db) => db.projects.getAll(),
     }),
-    route('edges', {
-        get: (db) => db.edges.getAll(),
-    }),
     route('activities', {
         get: (db) => db.activities.getAll(),
-    }),
-    route('crunch-columns', {
-        get: (db) =>
-            db.crunchColumns.getAll(),
-    }),
-    route('crunch-column-acronyms', {
-        get: (db) =>
-            db.crunchColumnAcronyms
-                .getAll(),
-    }),
-    route('crunch-column-acronym-links', {
-        get: (db) =>
-            db.crunchColumnAcronymLinks
-                .getAll(),
-    }),
-    route('edge-outcomes', {
-        get: (db) =>
-            db.edgeOutcomes.getAll(),
-    }),
-    route('edge-outcome-edges', {
-        get: (db) =>
-            db.edgeOutcomeEdges.getAll(),
-    }),
-    route('edge-metrics', {
-        get: (db) =>
-            db.edgeMetrics.getAll(),
-    }),
-    route('edge-metric-outcomes', {
-        get: (db) =>
-            db.edgeMetricOutcomes
-                .getAll(),
     }),
     route('idea-submissions', {
         get: (db) =>
             db.ideaSubmissions.getAll(),
     }),
-    route('idea-project-links', {
-        get: (db) =>
-            db.ideaProjectLinks.getAll(),
-    }),
-    route('edge-ideas', {
-        get: (db) =>
-            db.edgeIdeas.getAll(),
-    }),
-    route('edge-ownerships', {
-        get: (db) =>
-            db.edgeOwnerships.getAll(),
-    }),
-    route('task-assignments', {
-        get: (db) =>
-            db.taskAssignments.getAll(),
-    }),
-    route('discussion-authorships', {
-        get: (db) =>
-            db.discussionAuthorships
-                .getAll(),
-    }),
-    route('discussion-projects', {
-        get: (db) =>
-            db.discussionProjects
-                .getAll(),
-    }),
-    route('version-authorships', {
-        get: (db) =>
-            db.versionAuthorships.getAll(),
-    }),
     route('activity-actors', {
         get: (db) =>
             db.activityActors.getAll(),
-    }),
-    route('clarification-answers', {
-        get: (db) =>
-            db.clarificationAnswers
-                .getAll(),
-    }),
-    route(
-        'clarification-answer-clarifications',
-        {
-            get: (db) =>
-                db
-                    .clarificationAnswerClarifications
-                    .getAll(),
-        },
-    ),
-    route('clarification-askers', {
-        get: (db) =>
-            db.clarificationAskers
-                .getAll(),
-    }),
-    route('clarification-answerers', {
-        get: (db) =>
-            db.clarificationAnswerers
-                .getAll(),
-    }),
-    route('clarification-projects', {
-        get: (db) =>
-            db.clarificationProjects
-                .getAll(),
-    }),
-    route('project-task-projects', {
-        get: (db) =>
-            db.projectTaskProjects
-                .getAll(),
-    }),
-    route('milestone-projects', {
-        get: (db) =>
-            db.milestoneProjects
-                .getAll(),
-    }),
-    route('project-version-projects', {
-        get: (db) =>
-            db.projectVersionProjects
-                .getAll(),
     }),
     route('team-memberships', {
         get: (db) =>
@@ -242,28 +134,28 @@ const routes: Route[] = [
                 .getAll(),
     }),
 
-    route('workflows', {
+    route('flows', {
         get: (db) =>
-            db.workflows.getAll(),
+            db.flows.getAll(),
         post: async (db, _params, body) => {
             const id =
                 body.id as string;
-            return db.workflows.put(
+            return db.flows.put(
                 id, body,
             );
         },
     }),
-    route('workflows/:id', {
+    route('flows/:id', {
         get: (db, params) =>
-            db.workflows.getById(
+            db.flows.getById(
                 param(params, 0),
             ),
         put: (db, params, body) =>
-            db.workflows.put(
+            db.flows.put(
                 param(params, 0), body,
             ),
         delete: (db, params) =>
-            db.workflows.delete(
+            db.flows.delete(
                 param(params, 0),
             ),
     }),
@@ -344,41 +236,41 @@ const routes: Route[] = [
                 param(params, 0),
             ),
     }),
-    route('project-workflows', {
+    route('project-flows', {
         get: (db) =>
-            db.projectWorkflows
+            db.projectFlows
                 .getAll(),
         post: async (
             db, _params, body,
         ) => {
             const id =
                 body.id as string;
-            return db.projectWorkflows
+            return db.projectFlows
                 .put(id, body);
         },
     }),
-    route('project-workflows/:id', {
+    route('project-flows/:id', {
         delete: (db, params) =>
-            db.projectWorkflows.delete(
+            db.projectFlows.delete(
                 param(params, 0),
             ),
     }),
-    route('wf-workflow-nodes', {
+    route('wf-flow-nodes', {
         get: (db) =>
-            db.wfWorkflowNodes
+            db.wfFlowNodes
                 .getAll(),
         post: async (
             db, _params, body,
         ) => {
             const id =
                 body.id as string;
-            return db.wfWorkflowNodes
+            return db.wfFlowNodes
                 .put(id, body);
         },
     }),
-    route('wf-workflow-nodes/:id', {
+    route('wf-flow-nodes/:id', {
         delete: (db, params) =>
-            db.wfWorkflowNodes.delete(
+            db.wfFlowNodes.delete(
                 param(params, 0),
             ),
     }),
@@ -470,17 +362,6 @@ const routes: Route[] = [
         delete: (db, p) =>
             db.projects.delete(param(p, 0)),
     }),
-    route('edges/:id', {
-        get: (db, p) =>
-            db.edges.getById(param(p, 0)),
-        put: (db, p, payload) =>
-            db.edges.put(
-                param(p, 0),
-                payload,
-            ),
-        delete: (db, p) =>
-            db.edges.delete(param(p, 0)),
-    }),
     route('activities/:id', {
         put: (db, p, payload) =>
             db.activities.put(
@@ -488,97 +369,9 @@ const routes: Route[] = [
                 payload,
             ),
     }),
-    route('crunch-columns/:id', {
-        put: (db, p, payload) =>
-            db.crunchColumns.put(
-                param(p, 0),
-                payload,
-            ),
-    }),
-    route('crunch-column-acronyms/:id', {
-        put: (db, p, payload) =>
-            db.crunchColumnAcronyms.put(
-                param(p, 0),
-                payload,
-            ),
-    }),
-    route(
-        'crunch-column-acronym-links/:id',
-        {
-            put: (db, p, payload) =>
-                db.crunchColumnAcronymLinks
-                    .put(
-                        param(p, 0),
-                        payload,
-                    ),
-        },
-    ),
     route('idea-submissions/:id', {
         put: (db, p, payload) =>
             db.ideaSubmissions.put(
-                param(p, 0),
-                payload,
-            ),
-    }),
-    route('idea-project-links/:id', {
-        put: (db, p, payload) =>
-            db.ideaProjectLinks.put(
-                param(p, 0),
-                payload,
-            ),
-    }),
-    route('edge-ideas/:id', {
-        put: (db, p, payload) =>
-            db.edgeIdeas.put(
-                param(p, 0),
-                payload,
-            ),
-    }),
-    route('edge-ownerships/:id', {
-        put: (db, p, payload) =>
-            db.edgeOwnerships.put(
-                param(p, 0),
-                payload,
-            ),
-    }),
-    route('edge-outcome-edges/:id', {
-        put: (db, p, payload) =>
-            db.edgeOutcomeEdges.put(
-                param(p, 0),
-                payload,
-            ),
-    }),
-    route('edge-metric-outcomes/:id', {
-        put: (db, p, payload) =>
-            db.edgeMetricOutcomes.put(
-                param(p, 0),
-                payload,
-            ),
-    }),
-    route('task-assignments/:id', {
-        put: (db, p, payload) =>
-            db.taskAssignments.put(
-                param(p, 0),
-                payload,
-            ),
-    }),
-    route('discussion-authorships/:id', {
-        put: (db, p, payload) =>
-            db.discussionAuthorships.put(
-                param(p, 0),
-                payload,
-            ),
-    }),
-    route('discussion-projects/:id', {
-        put: (db, p, payload) =>
-            db.discussionProjects.put(
-                param(p, 0),
-                payload,
-            ),
-    }),
-    route('version-authorships/:id', {
-        put: (db, p, payload) =>
-            db.versionAuthorships.put(
                 param(p, 0),
                 payload,
             ),
@@ -590,72 +383,6 @@ const routes: Route[] = [
                 payload,
             ),
     }),
-    route('clarification-answers/:id', {
-        put: (db, p, payload) =>
-            db.clarificationAnswers.put(
-                param(p, 0),
-                payload,
-            ),
-    }),
-    route(
-        'clarification-answer'
-        + '-clarifications/:id',
-        {
-            put: (db, p, payload) =>
-                db
-                    .clarificationAnswerClarifications
-                    .put(
-                        param(p, 0),
-                        payload,
-                    ),
-        },
-    ),
-    route('clarification-askers/:id', {
-        put: (db, p, payload) =>
-            db.clarificationAskers.put(
-                param(p, 0),
-                payload,
-            ),
-    }),
-    route('clarification-answerers/:id', {
-        put: (db, p, payload) =>
-            db.clarificationAnswerers.put(
-                param(p, 0),
-                payload,
-            ),
-    }),
-    route('clarification-projects/:id', {
-        put: (db, p, payload) =>
-            db.clarificationProjects.put(
-                param(p, 0),
-                payload,
-            ),
-    }),
-    route('project-task-projects/:id', {
-        put: (db, p, payload) =>
-            db.projectTaskProjects.put(
-                param(p, 0),
-                payload,
-            ),
-    }),
-    route('milestone-projects/:id', {
-        put: (db, p, payload) =>
-            db.milestoneProjects.put(
-                param(p, 0),
-                payload,
-            ),
-    }),
-    route(
-        'project-version-projects/:id',
-        {
-            put: (db, p, payload) =>
-                db.projectVersionProjects
-                    .put(
-                        param(p, 0),
-                        payload,
-                    ),
-        },
-    ),
     route('team-memberships/:id', {
         put: (db, p, payload) =>
             db.teamMemberships.put(
@@ -685,56 +412,6 @@ const routes: Route[] = [
                     ),
         },
     ),
-    route('ideas/:ideaId/edge', {
-        get: async (db, p) => {
-            const ideaId = param(p, 0);
-            const links =
-                await db.edgeIdeas
-                    .getAll();
-            const link = links.find(
-                l => l.idea_id === ideaId,
-            );
-            if (!link) return null;
-            return db.edges.getById(
-                link.edge_id,
-            );
-        },
-        put: async (db, p, payload) => {
-            const ideaId = param(p, 0);
-            const links =
-                await db.edgeIdeas
-                    .getAll();
-            const existing = links.find(
-                l => l.idea_id === ideaId,
-            );
-            const edgeId = existing
-                ? existing.edge_id
-                : crypto.randomUUID();
-            const result =
-                await db.edges.put(
-                    edgeId,
-                    {
-                        ...payload,
-                        updated_at: nowUtc(),
-                    },
-                );
-            if (!existing) {
-                const linkId =
-                    `ei-${edgeId}`;
-                await db.edgeIdeas.put(
-                    linkId,
-                    {
-                        id: linkId,
-                        edge_id: edgeId,
-                        idea_id: ideaId,
-                        created_at:
-                            nowUtc(),
-                    },
-                );
-            }
-            return result;
-        },
-    }),
     route('projects/:projectId/team', {
         get: async (db, p) => {
             const pid = param(p, 0);
@@ -786,177 +463,6 @@ const routes: Route[] = [
                 }));
         },
     }),
-    route(
-        'projects/:projectId/milestones',
-        {
-            get: async (db, p) => {
-                const pid = param(p, 0);
-                const [links, all] =
-                    await Promise.all([
-                        db.milestoneProjects
-                            .getAll(),
-                        db.milestones
-                            .getAll(),
-                    ]);
-                const ids = new Set(
-                    links
-                        .filter(
-                            l =>
-                                l.project_id
-                                === pid,
-                        )
-                        .map(
-                            l =>
-                                l.milestone_id,
-                        ),
-                );
-                return all
-                    .filter(
-                        m => ids.has(m.id),
-                    )
-                    .sort(
-                        (a, b) =>
-                            a.sort_order
-                            - b.sort_order,
-                    );
-            },
-        },
-    ),
-    route('projects/:projectId/tasks', {
-        get: async (db, p) => {
-            const pid = param(p, 0);
-            const [links, all] =
-                await Promise.all([
-                    db.projectTaskProjects
-                        .getAll(),
-                    db.projectTasks
-                        .getAll(),
-                ]);
-            const ids = new Set(
-                links
-                    .filter(
-                        l =>
-                            l.project_id
-                            === pid,
-                    )
-                    .map(
-                        l =>
-                            l.project_task_id,
-                    ),
-            );
-            return all.filter(
-                t => ids.has(t.id),
-            );
-        },
-    }),
-    route(
-        'projects/:projectId/discussions',
-        {
-            get: async (db, p) => {
-                const pid = param(p, 0);
-                const [links, all] =
-                    await Promise.all([
-                        db.discussionProjects
-                            .getAll(),
-                        db.discussions
-                            .getAll(),
-                    ]);
-                const ids = new Set(
-                    links
-                        .filter(
-                            l =>
-                                l.project_id
-                                === pid,
-                        )
-                        .map(
-                            l =>
-                                l.discussion_id,
-                        ),
-                );
-                return all
-                    .filter(
-                        d => ids.has(d.id),
-                    )
-                    .sort(
-                        (a, b) =>
-                            b.date
-                                .localeCompare(
-                                    a.date,
-                                ),
-                    );
-            },
-        },
-    ),
-    route(
-        'projects/:projectId/versions',
-        {
-            get: async (db, p) => {
-                const pid = param(p, 0);
-                const [links, all] =
-                    await Promise.all([
-                        db
-                            .projectVersionProjects
-                            .getAll(),
-                        db.projectVersions
-                            .getAll(),
-                    ]);
-                const ids = new Set(
-                    links
-                        .filter(
-                            l =>
-                                l.project_id
-                                === pid,
-                        )
-                        .map(
-                            l =>
-                                l
-                                    .project_version_id,
-                        ),
-                );
-                return all
-                    .filter(
-                        v => ids.has(v.id),
-                    )
-                    .sort(
-                        (a, b) =>
-                            b.date
-                                .localeCompare(
-                                    a.date,
-                                ),
-                    );
-            },
-        },
-    ),
-    route(
-        'projects/:projectId/clarifications',
-        {
-            get: async (db, p) => {
-                const pid = param(p, 0);
-                const [links, all] =
-                    await Promise.all([
-                        db.clarificationProjects
-                            .getAll(),
-                        db.clarifications
-                            .getAll(),
-                    ]);
-                const ids = new Set(
-                    links
-                        .filter(
-                            l =>
-                                l.project_id
-                                === pid,
-                        )
-                        .map(
-                            l =>
-                                l.clarification_id,
-                        ),
-                );
-                return all.filter(
-                    c => ids.has(c.id),
-                );
-            },
-        },
-    ),
 
     route(
         'projects/:projectId/team/:userId',
@@ -1020,300 +526,6 @@ const routes: Route[] = [
                         }),
                 ]);
                 return membership;
-            },
-        },
-    ),
-    route(
-        'projects/:projectId'
-        + '/milestones/:milestoneId',
-        {
-            put: async (db, p, payload) => {
-                const pid = param(p, 0);
-                const mid = param(p, 1);
-                const result =
-                    await db.milestones.put(
-                        mid, payload,
-                    );
-                const links =
-                    await db.milestoneProjects
-                        .getAll();
-                const hasLink = links.some(
-                    l =>
-                        l.milestone_id
-                            === mid
-                        && l.project_id
-                            === pid,
-                );
-                if (!hasLink) {
-                    const linkId =
-                        `mp-${mid}`;
-                    await db
-                        .milestoneProjects
-                        .put(linkId, {
-                            id: linkId,
-                            milestone_id:
-                                mid,
-                            project_id:
-                                pid,
-                            created_at:
-                                nowUtc(),
-                        });
-                }
-                return result;
-            },
-        },
-    ),
-    route(
-        'projects/:projectId'
-        + '/tasks/:taskId',
-        {
-            put: async (db, p, payload) => {
-                const pid = param(p, 0);
-                const tid = param(p, 1);
-                const result =
-                    await db.projectTasks
-                        .put(tid, payload);
-                const links =
-                    await db
-                        .projectTaskProjects
-                        .getAll();
-                const hasLink = links.some(
-                    l =>
-                        l.project_task_id
-                            === tid
-                        && l.project_id
-                            === pid,
-                );
-                if (!hasLink) {
-                    const linkId =
-                        `ptp-${tid}`;
-                    await db
-                        .projectTaskProjects
-                        .put(linkId, {
-                            id: linkId,
-                            project_task_id:
-                                tid,
-                            project_id:
-                                pid,
-                            created_at:
-                                nowUtc(),
-                        });
-                }
-                return result;
-            },
-        },
-    ),
-    route(
-        'projects/:projectId'
-        + '/discussions/:discussionId',
-        {
-            put: async (db, p, payload) => {
-                const pid = param(p, 0);
-                const did = param(p, 1);
-                const result =
-                    await db.discussions
-                        .put(did, payload);
-                const links =
-                    await db
-                        .discussionProjects
-                        .getAll();
-                const hasLink = links.some(
-                    l =>
-                        l.discussion_id
-                            === did
-                        && l.project_id
-                            === pid,
-                );
-                if (!hasLink) {
-                    const linkId =
-                        `dp-${did}`;
-                    await db
-                        .discussionProjects
-                        .put(linkId, {
-                            id: linkId,
-                            discussion_id:
-                                did,
-                            project_id:
-                                pid,
-                            created_at:
-                                nowUtc(),
-                        });
-                }
-                return result;
-            },
-        },
-    ),
-    route(
-        'projects/:projectId'
-        + '/versions/:versionId',
-        {
-            put: async (db, p, payload) => {
-                const pid = param(p, 0);
-                const vid = param(p, 1);
-                const result =
-                    await db.projectVersions
-                        .put(vid, payload);
-                const links =
-                    await db
-                        .projectVersionProjects
-                        .getAll();
-                const hasLink =
-                    links.some(
-                        l =>
-                            l
-                                .project_version_id
-                                === vid
-                            && l.project_id
-                                === pid,
-                    );
-                if (!hasLink) {
-                    const linkId =
-                        `pvp-${vid}`;
-                    await db
-                        .projectVersionProjects
-                        .put(linkId, {
-                            id: linkId,
-                            project_version_id:
-                                vid,
-                            project_id:
-                                pid,
-                            created_at:
-                                nowUtc(),
-                        });
-                }
-                return result;
-            },
-        },
-    ),
-    route(
-        'projects/:projectId'
-        + '/clarifications'
-        + '/:clarificationId',
-        {
-            put: (db, p, payload) =>
-                db.clarifications.put(
-                    param(p, 1),
-                    payload,
-                ),
-        },
-    ),
-
-    route('edges/:edgeId/outcomes', {
-        get: async (db, p) => {
-            const edgeId = param(p, 0);
-            const [links, outcomes] =
-                await Promise.all([
-                    db.edgeOutcomeEdges
-                        .getAll(),
-                    db.edgeOutcomes
-                        .getAll(),
-                ]);
-            const outcomeIds = new Set(
-                links
-                    .filter(
-                        l => l.edge_id
-                            === edgeId,
-                    )
-                    .map(
-                        l =>
-                            l.edge_outcome_id,
-                    ),
-            );
-            return outcomes.filter(
-                o => outcomeIds.has(o.id),
-            );
-        },
-    }),
-    route(
-        'edges/:edgeId'
-        + '/outcomes/:outcomeId',
-        {
-            put: async (db, p, payload) => {
-                const edgeId =
-                    param(p, 0);
-                const outcomeId =
-                    param(p, 1);
-                const result =
-                    await db.edgeOutcomes
-                        .put(
-                            outcomeId,
-                            payload,
-                        );
-                const links =
-                    await db
-                        .edgeOutcomeEdges
-                        .getAll();
-                const hasLink =
-                    links.some(
-                        l =>
-                            l.edge_outcome_id
-                                === outcomeId
-                            && l.edge_id
-                                === edgeId,
-                    );
-                if (!hasLink) {
-                    const linkId =
-                        `eoe-${outcomeId}`;
-                    await db
-                        .edgeOutcomeEdges
-                        .put(linkId, {
-                            id: linkId,
-                            edge_outcome_id:
-                                outcomeId,
-                            edge_id:
-                                edgeId,
-                            created_at:
-                                nowUtc(),
-                        });
-                }
-                return result;
-            },
-        },
-    ),
-    route(
-        'edges/:edgeId'
-        + '/outcomes/:outcomeId'
-        + '/metrics/:metricId',
-        {
-            put: async (db, p, payload) => {
-                const outcomeId =
-                    param(p, 1);
-                const metricId =
-                    param(p, 2);
-                const result =
-                    await db.edgeMetrics
-                        .put(
-                            metricId,
-                            payload,
-                        );
-                const links =
-                    await db
-                        .edgeMetricOutcomes
-                        .getAll();
-                const hasLink =
-                    links.some(
-                        l =>
-                            l.edge_metric_id
-                                === metricId
-                            && l.outcome_id
-                                === outcomeId,
-                    );
-                if (!hasLink) {
-                    const linkId =
-                        `emo-${metricId}`;
-                    await db
-                        .edgeMetricOutcomes
-                        .put(linkId, {
-                            id: linkId,
-                            edge_metric_id:
-                                metricId,
-                            outcome_id:
-                                outcomeId,
-                            created_at:
-                                nowUtc(),
-                        });
-                }
-                return result;
             },
         },
     ),

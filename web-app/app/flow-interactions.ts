@@ -24,7 +24,16 @@ export interface InteractionState {
     panStartY: number;
     viewBox: ViewBox;
     zoom: number;
+    activePointerId: number;
 }
+
+export type NodePositionLookup = (
+    id: string,
+) => {
+    x: number;
+    y: number;
+    isDraggable: boolean;
+} | null;
 
 export type InteractionCallback = () => void;
 
@@ -54,12 +63,13 @@ export function createInteractionState(
         panStartX: 0,
         panStartY: 0,
         viewBox: {
-            x: 0,
-            y: 0,
+            x: -viewBoxW / 2,
+            y: -viewBoxH / 2,
             w: viewBoxW,
             h: viewBoxH,
         },
         zoom: 1.0,
+        activePointerId: 0,
     };
 }
 
@@ -98,6 +108,7 @@ function handlePointerDown(
     svg: SVGSVGElement,
     state: InteractionState,
     onUpdate: InteractionCallback,
+    getNodePosition: NodePositionLookup,
 ): void {
     const target = e.target;
     if (!(target instanceof Element)) return;
@@ -118,6 +129,7 @@ function handlePointerDown(
         state.connectFromPort = portAttr;
         state.connectToX = svgPt.x;
         state.connectToY = svgPt.y;
+        state.activePointerId = e.pointerId;
         svg.setPointerCapture(e.pointerId);
         onUpdate();
         return;
@@ -129,12 +141,20 @@ function handlePointerDown(
     if (nodeId) {
         state.selectedNodeId = nodeId;
         state.selectedEdgeId = null;
+        const pos = getNodePosition(nodeId);
+        if (!pos || !pos.isDraggable) {
+            onUpdate();
+            return;
+        }
         state.isDragging = true;
         state.dragNodeId = nodeId;
+        state.dragCurrentX = pos.x;
+        state.dragCurrentY = pos.y;
         state.dragOffsetX =
-            svgPt.x - state.dragCurrentX;
+            svgPt.x - pos.x;
         state.dragOffsetY =
-            svgPt.y - state.dragCurrentY;
+            svgPt.y - pos.y;
+        state.activePointerId = e.pointerId;
         svg.setPointerCapture(e.pointerId);
         onUpdate();
         return;
@@ -155,6 +175,7 @@ function handlePointerDown(
     state.isPanning = true;
     state.panStartX = e.clientX;
     state.panStartY = e.clientY;
+    state.activePointerId = e.pointerId;
     svg.setPointerCapture(e.pointerId);
     onUpdate();
 }
@@ -226,6 +247,7 @@ function handlePointerUp(
         );
         state.isDragging = false;
         state.dragNodeId = null;
+        state.activePointerId = 0;
         svg.releasePointerCapture(
             e.pointerId,
         );
@@ -264,6 +286,7 @@ function handlePointerUp(
         state.isConnecting = false;
         state.connectFromNodeId = null;
         state.connectFromPort = null;
+        state.activePointerId = 0;
         svg.releasePointerCapture(
             e.pointerId,
         );
@@ -273,6 +296,7 @@ function handlePointerUp(
 
     if (state.isPanning) {
         state.isPanning = false;
+        state.activePointerId = 0;
         svg.releasePointerCapture(
             e.pointerId,
         );
@@ -326,11 +350,13 @@ export function bindInteractions(
         fromNodeId: string,
         toNodeId: string,
     ) => void,
+    getNodePosition: NodePositionLookup,
 ): void {
     svg.addEventListener(
         'pointerdown',
         (e) => handlePointerDown(
             e, svg, state, onUpdate,
+            getNodePosition,
         ),
     );
 

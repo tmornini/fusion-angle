@@ -7,13 +7,17 @@ import {
     buildSkeleton,
     withLoadingState,
 } from '../app/loading-states';
-import { navigateTo } from '../app/core';
 import {
-    getWorkflowGraph,
+    navigateTo,
+    openDialog,
+    closeDialog,
+} from '../app/core';
+import {
+    getFlowGraph,
 } from '../app/adapters';
 import {
     bindInteractions,
-} from '../app/workflow-interactions';
+} from '../app/flow-interactions';
 import {
     FlowDesignerPresenter,
 } from '../app/presenters';
@@ -26,6 +30,7 @@ function renderAndBind(
     presenter: FlowDesignerPresenter,
 ): void {
     presenter.render(container);
+    bindBackButton();
     bindSvgInteractions(
         container, presenter,
     );
@@ -35,6 +40,17 @@ function renderAndBind(
     bindPanelActions(
         container, presenter,
     );
+    bindAddStateDialog(
+        container, presenter,
+    );
+}
+
+function bindBackButton(): void {
+    $('#flow-back-btn', document)
+        ?.addEventListener(
+            'click',
+            () => navigateTo('flows'),
+        );
 }
 
 function bindSvgInteractions(
@@ -45,10 +61,11 @@ function bindSvgInteractions(
         'svg.wf-canvas',
     ) as SVGSVGElement | null;
     if (!svg) return;
-    presenter.initDragPositions();
+    const state =
+        presenter.interactionState();
     bindInteractions(
         svg,
-        presenter.interactionState(),
+        state,
         () => renderAndBind(
             container, presenter,
         ),
@@ -67,7 +84,26 @@ function bindSvgInteractions(
                     container, presenter,
                 ));
         },
+        (id) =>
+            presenter.getNodePosition(id),
     );
+    if (
+        (state.isDragging
+            || state.isConnecting
+            || state.isPanning)
+        && state.activePointerId > 0
+    ) {
+        try {
+            svg.setPointerCapture(
+                state.activePointerId,
+            );
+        } catch {
+            state.isDragging = false;
+            state.isConnecting = false;
+            state.isPanning = false;
+            state.dragNodeId = null;
+        }
+    }
 }
 
 function bindToolbarActions(
@@ -82,14 +118,32 @@ function bindToolbarActions(
             'data-action',
         );
         if (!action) continue;
-        if (action === 'add-state') {
+        if (action === 'undo') {
             btn.addEventListener(
                 'click',
                 () => void presenter
-                    .addNode()
+                    .performUndo()
                     .then(() => renderAndBind(
                         container, presenter,
                     )),
+            );
+        }
+        if (action === 'redo') {
+            btn.addEventListener(
+                'click',
+                () => void presenter
+                    .performRedo()
+                    .then(() => renderAndBind(
+                        container, presenter,
+                    )),
+            );
+        }
+        if (action === 'add-state') {
+            btn.addEventListener(
+                'click',
+                () => openDialog(
+                    'add-state',
+                ),
             );
         }
         if (action === 're-layout') {
@@ -134,16 +188,6 @@ function bindToolbarActions(
                         container, presenter,
                     );
                 },
-            );
-        }
-        if (action === 'save') {
-            btn.addEventListener(
-                'click',
-                () => void presenter
-                    .persist()
-                    .then(() => renderAndBind(
-                        container, presenter,
-                    )),
             );
         }
     }
@@ -380,21 +424,21 @@ async function handleSaveField(
 export async function init(
     params?: Record<string, string>,
 ): Promise<void> {
-    const workflowId =
-        params?.workflowId;
-    if (!workflowId) {
+    const flowId =
+        params?.flowId;
+    if (!flowId) {
         navigateTo('flow');
         return;
     }
     const container = $(
-        '#workflow-designer', document,
+        '#flow-designer', document,
     );
     if (!container) return;
 
     const graph = await withLoadingState(
         container,
         buildSkeleton('detail', 1),
-        () => getWorkflowGraph(workflowId),
+        () => getFlowGraph(flowId),
     );
     if (!graph) return;
 
@@ -403,4 +447,152 @@ export async function init(
             graph, CANVAS_W, CANVAS_H,
         );
     renderAndBind(container, presenter);
+    bindKeyboardShortcuts(
+        container, presenter,
+    );
+}
+
+function bindAddStateDialog(
+    container: HTMLElement,
+    presenter: FlowDesignerPresenter,
+): void {
+    const cancelBtn = $(
+        '#add-state-cancel', document,
+    );
+    const submitBtn = $(
+        '#add-state-submit', document,
+    );
+    const backdrop = $(
+        '#add-state-backdrop', document,
+    );
+
+    cancelBtn?.addEventListener(
+        'click',
+        () => closeDialog('add-state'),
+    );
+    backdrop?.addEventListener(
+        'click',
+        (e) => {
+            if (
+                e.target === e.currentTarget
+            ) {
+                closeDialog('add-state');
+            }
+        },
+    );
+
+    const dirBtns =
+        document.querySelectorAll(
+            '[data-direction]',
+        );
+    for (const btn of dirBtns) {
+        btn.addEventListener(
+            'click',
+            () => {
+                for (const b of dirBtns) {
+                    b.classList.remove(
+                        'active',
+                    );
+                }
+                btn.classList.add('active');
+            },
+        );
+    }
+
+    submitBtn?.addEventListener(
+        'click',
+        () => void handleAddState(
+            container, presenter,
+        ),
+    );
+}
+
+async function handleAddState(
+    container: HTMLElement,
+    presenter: FlowDesignerPresenter,
+): Promise<void> {
+    const nameEl = $input(
+        '#add-state-name', document,
+    );
+    const transEl = $input(
+        '#add-state-transition', document,
+    );
+    const name = nameEl?.value.trim() ?? '';
+    const transition =
+        transEl?.value.trim() ?? '';
+    if (name.length === 0) {
+        showToast(
+            'State name is required',
+            'error',
+        );
+        return;
+    }
+    if (transition.length === 0) {
+        showToast(
+            'Transition name is required',
+            'error',
+        );
+        return;
+    }
+    const activeDir =
+        document.querySelector(
+            '[data-direction].active',
+        );
+    const direction =
+        activeDir?.getAttribute(
+            'data-direction',
+        ) ?? 'right';
+
+    const ok =
+        await presenter.addNodeWithEdge(
+            name, transition, direction,
+        );
+    if (ok) {
+        closeDialog('add-state');
+        renderAndBind(
+            container, presenter,
+        );
+    }
+}
+
+function bindKeyboardShortcuts(
+    container: HTMLElement,
+    presenter: FlowDesignerPresenter,
+): void {
+    document.addEventListener(
+        'keydown',
+        (e: KeyboardEvent) => {
+            const mod =
+                e.metaKey || e.ctrlKey;
+            if (!mod) return;
+            if (
+                e.key === 'z'
+                && !e.shiftKey
+            ) {
+                e.preventDefault();
+                void presenter
+                    .performUndo()
+                    .then(
+                        () => renderAndBind(
+                            container,
+                            presenter,
+                        ),
+                    );
+            }
+            if (
+                e.key === 'z'
+                && e.shiftKey
+            ) {
+                e.preventDefault();
+                void presenter
+                    .performRedo()
+                    .then(
+                        () => renderAndBind(
+                            container,
+                            presenter,
+                        ),
+                    );
+            }
+        },
+    );
 }

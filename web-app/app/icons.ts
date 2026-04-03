@@ -1367,6 +1367,34 @@ function iconChevronUp(
     );
 }
 
+function iconUndo(
+    size: number,
+    cssClass: string,
+) {
+    return icon(
+        '<path d="M9 14 4 9l5-5"/>'
+        + '<path d="M4 9h10.5a5.5 5.5'
+        + ' 0 0 1 5.5 5.5 5.5 5.5'
+        + ' 0 0 1-5.5 5.5H11"/>',
+        size,
+        cssClass,
+    );
+}
+
+function iconRedo(
+    size: number,
+    cssClass: string,
+) {
+    return icon(
+        '<path d="m15 14 5-5-5-5"/>'
+        + '<path d="M20 9H9.5A5.5 5.5'
+        + ' 0 0 0 4 14.5 5.5 5.5'
+        + ' 0 0 0 9.5 20H13"/>',
+        size,
+        cssClass,
+    );
+}
+
 function iconHistory(size: number, cssClass: string) {
     return icon(
         '<path d="M3 12a9 9 0 1 0 9-9 9.75'
@@ -1478,6 +1506,8 @@ const _allIcons = [
     iconLayoutGrid,
     iconChevronUp,
     iconHistory,
+    iconUndo,
+    iconRedo,
 ];
 
 type IconFn =
@@ -1521,7 +1551,8 @@ export type IconName =
     | 'fileSpreadsheet' | 'listTodo'
     | 'toggleLeft' | 'type' | 'table'
     | 'slider' | 'dot' | 'layoutGrid'
-    | 'chevronUp' | 'history';
+    | 'chevronUp' | 'history'
+    | 'undo' | 'redo';
 
 const icons: Record<string, IconFn> = {};
 
@@ -1648,4 +1679,6 @@ export {
     iconLayoutGrid,
     iconChevronUp,
     iconHistory,
+    iconUndo,
+    iconRedo,
 };

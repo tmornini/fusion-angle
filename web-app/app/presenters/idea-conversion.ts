@@ -28,7 +28,6 @@ type ConversionField =
     | 'target-end-date'
     | 'budget'
     | 'priority'
-    | 'first-milestone'
     | 'success-criteria';
 
 const REQUIRED_FIELDS:
@@ -49,7 +48,6 @@ const ALL_FIELDS:
     'target-end-date',
     'budget',
     'priority',
-    'first-milestone',
     'success-criteria',
 ];
 
@@ -102,7 +100,6 @@ export class IdeaConversionPresenter {
             'target-end-date': '',
             'budget': '',
             'priority': '',
-            'first-milestone': '',
             'success-criteria': '',
         };
     }
@@ -815,44 +812,6 @@ export class IdeaConversionPresenter {
                     + 'column;'
                     + 'gap:1.5rem'
                 }">
-                    <div>
-                        <label class="${
-                            'label mb-2'
-                            + ' font-medium'
-                        }">
-                            ${'First'
-                                + ' Milestone'}
-                        </label>
-                        <input
-                            class="input"
-                            id=${'convert'
-                                + '-first'
-                                + '-milestone'}
-                            placeholder="${
-                                'e.g.,'
-                                + ' Complete'
-                                + ' data'
-                                + ' pipeline'
-                                + ' setup'
-                            }"
-                            value="${
-                                f[
-                                'first-milestone'
-                                ]
-                            }" />
-                        <p class="${
-                            'text-xs'
-                            + ' text-muted'
-                            + ' mt-1'
-                        }">
-                            ${'What is the'
-                                + ' first'
-                                + ' measurable'
-                                + ' goal for'
-                                + ' this'
-                                + ' project?'}
-                        </p>
-                    </div>
                     <div>
                         <label class="${
                             'label mb-2'

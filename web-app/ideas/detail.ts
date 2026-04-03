@@ -149,14 +149,6 @@ function bindIdeaEvents(
             },
         );
 
-    $('#idea-edge-btn', document)
-        ?.addEventListener(
-            'click',
-            () => navigateTo(
-                'edge-detail',
-                { ideaId },
-            ),
-        );
     $('#idea-review-btn', document)
         ?.addEventListener(
             'click',

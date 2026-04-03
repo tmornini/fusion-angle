@@ -55,15 +55,6 @@ export const PAGE_REGISTRY: Record<
         icon: 'folderKanban',
         searchable: false,
     },
-    'engineering-requirements': {
-        title: 'Engineering Requirements',
-        layout: 'sidebar',
-        sourceDir: 'projects',
-        sourceFile:
-            'engineering-requirements',
-        icon: 'fileText',
-        searchable: false,
-    },
     'idea-review-queue': {
         title: 'Review Queue',
         layout: 'sidebar',
@@ -72,44 +63,18 @@ export const PAGE_REGISTRY: Record<
         icon: 'clipboardCheck',
         keywords: 'review approve reject',
     },
-    edges: {
-        title: 'Edges',
-        layout: 'sidebar',
-        sourceDir: 'edges',
-        sourceFile: 'index',
-        icon: 'target',
-        keywords:
-            'edge outcomes metrics',
-    },
-    'edge-detail': {
-        title: 'Edge Detail',
-        layout: 'sidebar',
-        sourceDir: 'edges',
-        sourceFile: 'detail',
-        icon: 'target',
-        searchable: false,
-    },
-    crunch: {
-        title: 'Crunch',
-        layout: 'sidebar',
-        sourceDir: 'crunch',
-        sourceFile: 'index',
-        icon: 'database',
-        keywords:
-            'data labeling columns',
-    },
     flow: {
-        title: 'Workflows',
+        title: 'Flows',
         layout: 'sidebar',
         sourceDir: 'flow',
         sourceFile: 'index',
         icon: 'gitBranch',
         keywords:
-            'workflow, process,'
-            + ' state machine, flow',
+            'flow, process,'
+            + ' state machine',
     },
     'flow-detail': {
-        title: 'Workflow Designer',
+        title: 'Flow Designer',
         layout: 'sidebar',
         sourceDir: 'flow',
         sourceFile: 'detail',

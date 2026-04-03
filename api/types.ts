@@ -4,8 +4,6 @@ export type ConfidenceLevel = 'high' | 'medium' | 'low';
 
 export type PriorityLevel = 'high' | 'medium' | 'low';
 
-export type EdgeStatus = 'complete' | 'draft' | 'missing';
-
 export type WfFieldType =
     | 'text'
     | 'textarea'
@@ -31,15 +29,6 @@ export type ReadinessLevel =
     | 'ready'
     | 'needs-info'
     | 'incomplete';
-
-export type TaskPriority =
-    | 'High'
-    | 'Medium'
-    | 'Low';
-
-export type ClarificationStatus =
-    | 'pending'
-    | 'answered';
 
 export type IdeaStatus =
     | 'active'
@@ -181,18 +170,6 @@ export function isIdeaStatus(
     );
 }
 
-const EDGE_STATUSES:
-    readonly EdgeStatus[]
-    = ['complete', 'draft', 'missing'];
-
-export function isEdgeStatus(
-    v: string,
-): v is EdgeStatus {
-    return includes(
-        EDGE_STATUSES, v,
-    );
-}
-
 const USER_STATUSES: readonly UserStatus[] =
     ['active', 'pending', 'deactivated'];
 
@@ -213,18 +190,6 @@ export function isReadinessLevel(
 ): v is ReadinessLevel {
     return includes(
         READINESS_LEVELS, v,
-    );
-}
-
-const TASK_PRIORITIES:
-    readonly TaskPriority[] =
-    ['High', 'Medium', 'Low'];
-
-export function isTaskPriority(
-    v: string,
-): v is TaskPriority {
-    return includes(
-        TASK_PRIORITIES, v,
     );
 }
 
@@ -436,108 +401,6 @@ export interface TeamMembershipUserEntity {
     created_at: string;
 }
 
-export interface MilestoneEntity {
-    id: Id;
-    title: string;
-    status: MilestoneStatus;
-    date: string;
-    sort_order: number;
-}
-
-export interface MilestoneProjectEntity {
-    id: Id;
-    milestone_id: Id;
-    project_id: Id;
-    created_at: string;
-}
-
-export interface ProjectTaskEntity {
-    id: Id;
-    name: string;
-    priority: TaskPriority;
-    description: string;
-    skills: JsonArrayField;
-    duration: number; // seconds
-}
-
-export interface ProjectTaskProjectEntity {
-    id: Id;
-    project_task_id: Id;
-    project_id: Id;
-    created_at: string;
-}
-
-export interface DiscussionEntity {
-    id: Id;
-    date: string;
-    message: string;
-}
-
-export interface DiscussionProjectEntity {
-    id: Id;
-    discussion_id: Id;
-    project_id: Id;
-    created_at: string;
-}
-
-export interface ProjectVersionEntity {
-    id: Id;
-    version: string;
-    date: string;
-    changes: string;
-}
-
-export interface ProjectVersionProjectEntity {
-    id: Id;
-    project_version_id: Id;
-    project_id: Id;
-    created_at: string;
-}
-
-export interface EdgeEntity {
-    id: Id;
-    status: EdgeStatus;
-    confidence: ConfidenceLevel;
-    impact_short_term: string;
-    impact_mid_term: string;
-    impact_long_term: string;
-    updated_at: string;
-}
-
-export interface EdgeIdeaEntity {
-    id: Id;
-    edge_id: Id;
-    idea_id: Id;
-    created_at: string;
-}
-
-export interface EdgeOutcomeEntity {
-    id: Id;
-    description: string;
-}
-
-export interface EdgeOutcomeEdgeEntity {
-    id: Id;
-    edge_outcome_id: Id;
-    edge_id: Id;
-    created_at: string;
-}
-
-export interface EdgeMetricEntity {
-    id: Id;
-    name: string;
-    target: string;
-    unit: string;
-    current: string;
-}
-
-export interface EdgeMetricOutcomeEntity {
-    id: Id;
-    edge_metric_id: Id;
-    outcome_id: Id;
-    created_at: string;
-}
-
 export interface ActivityEntity {
     id: Id;
     type: string;
@@ -549,47 +412,7 @@ export interface ActivityEntity {
     comment: string;
 }
 
-export interface ClarificationEntity {
-    id: Id;
-    question: string;
-    asked_at: string;
-    status: ClarificationStatus;
-}
-
-export interface ClarificationAnswerEntity {
-    id: Id;
-    answer: string;
-}
-
-export interface ClarificationAnswerClarificationEntity {
-    id: Id;
-    clarification_answer_id: Id;
-    clarification_id: Id;
-    created_at: string;
-}
-
-export interface CrunchColumnEntity {
-    id: Id;
-    original_name: string;
-    friendly_name: string;
-    data_type: string;
-    description: string;
-    sample_values: JsonArrayField;
-}
-
-export interface CrunchColumnAcronymEntity {
-    id: Id;
-    expansion: string;
-}
-
-export interface CrunchColumnAcronymLinkEntity {
-    id: Id;
-    crunch_column_acronym_id: Id;
-    crunch_column_id: Id;
-    created_at: string;
-}
-
-export interface WorkflowEntity {
+export interface FlowEntity {
     id: Id;
     name: string;
     description: string;
@@ -667,41 +490,6 @@ export interface IdeaSubmissionEntity {
     created_at: string;
 }
 
-export interface IdeaProjectLinkEntity {
-    id: Id;
-    idea_id: Id;
-    project_id: Id;
-    created_at: string;
-}
-
-export interface EdgeOwnershipEntity {
-    id: Id;
-    edge_id: Id;
-    user_id: Id;
-    created_at: string;
-}
-
-export interface TaskAssignmentEntity {
-    id: Id;
-    task_id: Id;
-    user_id: Id;
-    created_at: string;
-}
-
-export interface DiscussionAuthorshipEntity {
-    id: Id;
-    discussion_id: Id;
-    user_id: Id;
-    created_at: string;
-}
-
-export interface VersionAuthorshipEntity {
-    id: Id;
-    version_id: Id;
-    user_id: Id;
-    created_at: string;
-}
-
 export interface ActivityActorEntity {
     id: Id;
     activity_id: Id;
@@ -709,37 +497,16 @@ export interface ActivityActorEntity {
     created_at: string;
 }
 
-export interface ClarificationAskerEntity {
-    id: Id;
-    clarification_id: Id;
-    user_id: Id;
-    created_at: string;
-}
-
-export interface ClarificationAnswererEntity {
-    id: Id;
-    clarification_id: Id;
-    user_id: Id;
-    created_at: string;
-}
-
-export interface ClarificationProjectEntity {
-    id: Id;
-    clarification_id: Id;
-    project_id: Id;
-    created_at: string;
-}
-
-export interface ProjectWorkflowEntity {
+export interface ProjectFlowEntity {
     id: Id;
     project_id: Id;
-    workflow_id: Id;
+    flow_id: Id;
     created_at: string;
 }
 
-export interface WfWorkflowNodeEntity {
+export interface WfFlowNodeEntity {
     id: Id;
-    workflow_id: Id;
+    flow_id: Id;
     node_id: Id;
     created_at: string;
 }
@@ -762,11 +529,6 @@ export interface WfNodeFieldEntity {
 export interface StatusDisplay {
     label: string;
     className: string;
-}
-
-export interface InlineStyleDisplay {
-    label: string;
-    style: string;
 }
 
 export const USER_STATUS_CONFIG: Record<
@@ -818,24 +580,6 @@ export const IDEA_STATUS_CONFIG: Record<
     'deleted': {
         label: 'Deleted',
         className: 'badge-default',
-    },
-};
-
-export const EDGE_STATUS_CONFIG: Record<
-    EdgeStatus,
-    StatusDisplay
-> = {
-    missing: {
-        label: 'Edge Missing',
-        className: 'badge-error',
-    },
-    draft: {
-        label: 'Edge Draft',
-        className: 'badge-warning',
-    },
-    complete: {
-        label: 'Edge Complete',
-        className: 'badge-success',
     },
 };
 
@@ -891,76 +635,6 @@ export const CONFIDENCE_CONFIG: Record<
     },
 };
 
-export interface MilestoneDisplay {
-    label: string;
-    textStyle: string;
-    iconBackground: string;
-}
-
-export type MilestoneStatus =
-    'completed'
-    | 'in_progress'
-    | 'pending';
-
-export const MILESTONE_STATUS_CONFIG:
-    Record<MilestoneStatus, MilestoneDisplay>
-= {
-    completed: {
-        label: 'Completed',
-        textStyle:
-            'color:hsl(var(--success))',
-        iconBackground:
-            'hsl(var(--success))',
-    },
-    in_progress: {
-        label: 'In Progress',
-        textStyle:
-            'color:hsl(var(--warning))',
-        iconBackground:
-            'hsl(var(--warning))',
-    },
-    pending: {
-        label: 'Pending',
-        textStyle: 'color:hsl(var('
-            + '--muted-foreground))',
-        iconBackground:
-            'hsl(var(--muted))',
-    },
-};
-
-export const TASK_PRIORITY_CONFIG: Record<
-    TaskPriority,
-    InlineStyleDisplay
-> = {
-    High: {
-        label: 'High',
-        style: 'background:hsl(var('
-            + '--error-soft));'
-            + 'color:hsl(var('
-            + '--error-text));'
-            + 'border:1px solid '
-            + 'hsl(var(--error-border))',
-    },
-    Medium: {
-        label: 'Medium',
-        style: 'background:hsl(var('
-            + '--warning-soft));'
-            + 'color:hsl(var('
-            + '--warning-text));'
-            + 'border:1px solid '
-            + 'hsl(var(--warning-border))',
-    },
-    Low: {
-        label: 'Low',
-        style: 'background:hsl(var('
-            + '--muted)/0.5);'
-            + 'color:hsl(var('
-            + '--muted-foreground));'
-            + 'border:1px solid '
-            + 'hsl(var(--border))',
-    },
-};
-
 export const READINESS_CONFIG: Record<
     ReadinessLevel,
     StatusDisplay
@@ -987,7 +661,6 @@ export class Idea {
     readonly estimatedCost: number;
     readonly priority: number;
     readonly status: IdeaStatus;
-    readonly edgeStatus: EdgeStatus;
     readonly problemStatement: string;
     readonly proposedSolution: string;
     readonly expectedOutcome: string;
@@ -1011,7 +684,6 @@ export class Idea {
     constructor(
         entity: IdeaEntity,
         submittedBy: string,
-        edgeStatus: EdgeStatus,
         submittedAt: string,
     ) {
         this.id = entity.id;
@@ -1024,7 +696,6 @@ export class Idea {
             entity.estimated_cost;
         this.priority = entity.priority;
         this.status = entity.status;
-        this.edgeStatus = edgeStatus;
         this.problemStatement =
             entity.problem_statement;
         this.proposedSolution =
@@ -1071,17 +742,11 @@ export class Idea {
     }
 
     isReviewable(): boolean {
-        return this.status === 'in-review'
-            && this.edgeStatus === 'complete';
+        return this.status === 'in-review';
     }
 
     isConvertible(): boolean {
         return this.status === 'approved';
-    }
-
-    needsEdgeDefinition(): boolean {
-        return this.edgeStatus === 'missing'
-            || this.edgeStatus === 'draft';
     }
 
     isReady(): boolean {
@@ -1104,18 +769,6 @@ export class Idea {
     statusClassName(): string {
         return (
             IDEA_STATUS_CONFIG[this.status]
-        )!.className;
-    }
-
-    edgeStatusLabel(): string {
-        return (
-            EDGE_STATUS_CONFIG[this.edgeStatus]
-        )!.label;
-    }
-
-    edgeStatusClassName(): string {
-        return (
-            EDGE_STATUS_CONFIG[this.edgeStatus]
         )!.className;
     }
 
@@ -1242,6 +895,34 @@ export class Project {
         );
     }
 
+    timelineProgress(): number {
+        if (this.status === 'completed')
+            return 100;
+        const start =
+            new Date(this.startDate);
+        const end =
+            new Date(this.targetEndDate);
+        if (
+            isNaN(start.getTime())
+            || isNaN(end.getTime())
+        ) return 0;
+        const total =
+            end.getTime()
+            - start.getTime();
+        if (total <= 0) return 0;
+        const elapsed =
+            Date.now() - start.getTime();
+        return Math.max(
+            0,
+            Math.min(
+                100,
+                Math.round(
+                    elapsed / total * 100,
+                ),
+            ),
+        );
+    }
+
     formattedCost(): string {
         return formatCompactCurrency(
             this.estimatedCost,
@@ -1264,104 +945,6 @@ export class Project {
         return (
             PROJECT_STATUS_CONFIG[this.status]
         )!.className;
-    }
-}
-
-export class Edge {
-    readonly id: string;
-    readonly status: EdgeStatus;
-    readonly confidence: ConfidenceLevel;
-    readonly impactShortTerm: string;
-    readonly impactMidTerm: string;
-    readonly impactLongTerm: string;
-    readonly updatedAt: string;
-
-    constructor(entity: EdgeEntity) {
-        this.id = entity.id;
-        this.status = entity.status;
-        this.confidence = entity.confidence;
-        this.impactShortTerm =
-            entity.impact_short_term;
-        this.impactMidTerm =
-            entity.impact_mid_term;
-        this.impactLongTerm =
-            entity.impact_long_term;
-        this.updatedAt = entity.updated_at;
-    }
-
-    isComplete(): boolean {
-        return this.status === 'complete';
-    }
-
-    isDraft(): boolean {
-        return this.status === 'draft';
-    }
-
-    isMissing(): boolean {
-        return this.status === 'missing';
-    }
-
-    statusLabel(): string {
-        return (
-            EDGE_STATUS_CONFIG[this.status]
-        )!.label;
-    }
-
-    statusClassName(): string {
-        return (
-            EDGE_STATUS_CONFIG[this.status]
-        )!.className;
-    }
-
-    confidenceLabel(): string {
-        return (
-            CONFIDENCE_CONFIG[this.confidence]
-        )!.label;
-    }
-
-    confidenceClassName(): string {
-        return (
-            CONFIDENCE_CONFIG[this.confidence]
-        )!.className;
-    }
-}
-
-export class EdgeListEntry {
-    readonly edge: Edge;
-    readonly ideaId: string;
-    readonly ideaTitle: string;
-    readonly outcomesCount: number;
-    readonly metricsCount: number;
-    readonly owner: string;
-
-    constructor(
-        entity: EdgeEntity,
-        ideaId: string,
-        ideaTitle: string,
-        outcomesCount: number,
-        metricsCount: number,
-        owner: string,
-    ) {
-        this.edge = new Edge(entity);
-        this.ideaId = ideaId;
-        this.ideaTitle = ideaTitle;
-        this.outcomesCount = outcomesCount;
-        this.metricsCount = metricsCount;
-        this.owner = owner;
-    }
-
-    matchesSearch(
-        term: string,
-    ): boolean {
-        const t = term.toLowerCase();
-        return (
-            this.ideaTitle
-                .toLowerCase()
-                .includes(t)
-            || this.owner
-                .toLowerCase()
-                .includes(t)
-        );
     }
 }
 
@@ -1553,8 +1136,3 @@ export function projectIsApproved(
     return e.status === 'approved';
 }
 
-export function clarificationIsPending(
-    e: { status: ClarificationStatus },
-): boolean {
-    return e.status === 'pending';
-}

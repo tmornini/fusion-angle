@@ -80,27 +80,6 @@
 
 .sidebar-collapsed .sidebar-nav { padding: 0.5rem; }
 
-.sidebar-section { margin-bottom: 1rem; }
-
-.sidebar-section-label {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  padding: 0.25rem 0.5rem;
-  font-size: var(--text-xs);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: hsl(var(--muted-foreground));
-  background: none;
-  border: none;
-  cursor: pointer;
-  transition: color var(--duration-fast) var(--ease-default);
-}
-.sidebar-section-label:hover { color: hsl(var(--foreground)); }
-.sidebar-collapsed .sidebar-section-label { display: none; }
-
 .sidebar-nav-item {
   display: flex;
   align-items: center;
@@ -407,7 +386,7 @@
 }
 .project-metrics-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(3, 1fr);
     gap: 1rem;
 }
 

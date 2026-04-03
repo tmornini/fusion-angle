@@ -13,8 +13,13 @@ export const NODE_WIDTH = 140;
 export const NODE_HEIGHT = 56;
 export const HORIZONTAL_GAP = 120;
 export const VERTICAL_GAP = 90;
-export const START_X = 40;
-export const START_Y = 30;
+export const START_X = 0;
+export const START_Y = 0;
+
+const GRID_MAX_W = 6000;
+const GRID_MAX_H = 4000;
+const HALF_MAX_W = GRID_MAX_W / 2;
+const HALF_MAX_H = GRID_MAX_H / 2;
 
 function buildAdjacency(
     edges: LayoutEdge[],
@@ -135,17 +140,31 @@ export function computeLayout(
             if (pos.y > maxY) maxY = pos.y;
         }
 
-        const rightEdge =
-            canvasWidth - NODE_WIDTH - START_X;
-        const bottomEdge =
-            canvasHeight - NODE_HEIGHT - START_Y;
         const beyondX = maxX + step;
         const beyondY = maxY + VERTICAL_GAP;
 
         positions.set(completeId, {
-            x: Math.max(rightEdge, beyondX),
-            y: Math.max(bottomEdge, beyondY),
+            x: beyondX,
+            y: beyondY,
         });
+    }
+
+    let sumX = 0;
+    let sumY = 0;
+    for (const pos of positions.values()) {
+        sumX += pos.x;
+        sumY += pos.y;
+    }
+    const count = positions.size;
+    if (count > 0) {
+        const offsetX = sumX / count;
+        const offsetY = sumY / count;
+        for (
+            const pos of positions.values()
+        ) {
+            pos.x -= offsetX;
+            pos.y -= offsetY;
+        }
     }
 
     return positions;
@@ -154,34 +173,15 @@ export function computeLayout(
 export function clampNodePosition(
     x: number,
     y: number,
-    isStart: boolean,
-    isComplete: boolean,
-    startPos: { x: number; y: number },
-    completePos: { x: number; y: number },
 ): { x: number; y: number } {
-    if (isStart) {
-        return { x: START_X, y: START_Y };
-    }
-
-    if (isComplete) {
-        return {
-            x: completePos.x,
-            y: completePos.y,
-        };
-    }
-
-    const halfGap = HORIZONTAL_GAP / 2;
-    const minX =
-        startPos.x + NODE_WIDTH + halfGap;
-    const maxX =
-        completePos.x - NODE_WIDTH - halfGap;
-    const minY =
-        startPos.y + NODE_HEIGHT + halfGap;
-    const maxY =
-        completePos.y - NODE_HEIGHT - halfGap;
-
     return {
-        x: Math.max(minX, Math.min(maxX, x)),
-        y: Math.max(minY, Math.min(maxY, y)),
+        x: Math.max(
+            -HALF_MAX_W,
+            Math.min(HALF_MAX_W, x),
+        ),
+        y: Math.max(
+            -HALF_MAX_H,
+            Math.min(HALF_MAX_H, y),
+        ),
     };
 }

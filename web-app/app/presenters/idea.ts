@@ -11,7 +11,6 @@ import {
     iconClipboardCheck,
     iconArrowRight,
     iconArrowLeft,
-    iconTarget,
     iconCheckCircle2,
     iconMessageSquare,
     iconAlertCircle,
@@ -48,8 +47,6 @@ export class IdeaPresenter {
     readonly #status: IdeaStatus;
     readonly #statusClassName: string;
     readonly #statusLabel: string;
-    readonly #edgeStatusClassName: string;
-    readonly #edgeStatusLabel: string;
     readonly #submittedBy: string;
     readonly #submittedAt: string;
     readonly #category: string;
@@ -61,7 +58,6 @@ export class IdeaPresenter {
     readonly #durationInDays: number;
     readonly #estimatedCost: number;
     readonly #estimatedImpact: number;
-    readonly #needsEdgeDefinition: boolean;
     readonly #isReviewable: boolean;
     readonly #isConvertible: boolean;
     readonly #isInReview: boolean;
@@ -84,10 +80,6 @@ export class IdeaPresenter {
             idea.statusClassName();
         this.#statusLabel =
             idea.statusLabel();
-        this.#edgeStatusClassName =
-            idea.edgeStatusClassName();
-        this.#edgeStatusLabel =
-            idea.edgeStatusLabel();
         this.#submittedBy = idea.submittedBy;
         this.#submittedAt = idea.submittedAt;
         this.#category = idea.category;
@@ -106,8 +98,6 @@ export class IdeaPresenter {
             idea.estimatedCost;
         this.#estimatedImpact =
             idea.estimatedImpact;
-        this.#needsEdgeDefinition =
-            idea.needsEdgeDefinition();
         this.#isReviewable =
             idea.isReviewable();
         this.#isConvertible =
@@ -268,16 +258,6 @@ export class IdeaPresenter {
             }">
                 ${this.#statusLabel}
             </span>
-            <span class="${
-                'badge '
-                + this.#edgeStatusClassName
-                + ' text-xs'
-            }" style="${
-                'justify-content:center'
-            }">
-                ${iconTarget(12, '')}
-                ${this.#edgeStatusLabel}
-            </span>
         </div>`;
     }
 
@@ -399,31 +379,6 @@ export class IdeaPresenter {
                 + 'padding-bottom:'
                 + '0.5rem'
             }">
-            ${this.#needsEdgeDefinition
-                ? html`
-            <button
-                class="${
-                    'btn btn-outline'
-                    + ' btn-sm gap-2'
-                }"
-                style="${
-                    'border-color:'
-                    + 'hsl('
-                    + 'var(--primary)'
-                    + '/0.3);'
-                    + 'color:hsl('
-                    + 'var(--primary))'
-                }"
-                data-idea-edge="${this.#id}">
-                ${iconTarget(16, '')}
-                <span
-                    class="${
-                        'hidden-'
-                        + 'mobile'
-                    }">
-                    Define Edge
-                </span>
-            </button>` : html``}
             ${this.#isReviewable
                 ? html`
             <button
@@ -499,16 +454,6 @@ export class IdeaPresenter {
                         rIcon(16, '')
                     } ${
                         this.#readinessLabel
-                    }</span>
-                    <span class="${
-                        'badge '
-                        + this
-                            .#edgeStatusClassName
-                        + ' text-xs'
-                    }">${
-                        iconTarget(12, '')
-                    } ${
-                        this.#edgeStatusLabel
                     }</span>
                 </div>
                 <h3 class="${
@@ -651,16 +596,6 @@ export class IdeaPresenter {
                             ${this
                                 .#statusLabel}
                         </span>
-                        <span class="badge
-                            ${this
-                                .#edgeStatusClassName}
-                            text-xs">
-                            ${iconTarget(
-                                12, '',
-                            )}
-                            ${this
-                                .#edgeStatusLabel}
-                        </span>
                     </div>
                     <p class="${
                         'text-sm text-muted'
@@ -676,24 +611,6 @@ export class IdeaPresenter {
                 class="${
                     'flex items-center gap-2'
                 }">
-                ${this.#needsEdgeDefinition
-                    ? html`
-                <button
-                    class="${
-                        'btn btn-outline'
-                        + ' btn-sm gap-2'
-                    }"
-                    style="${
-                        'border-color:hsl('
-                        + 'var(--primary)'
-                        + '/0.3);'
-                        + 'color:hsl('
-                        + 'var(--primary))'
-                    }"
-                    id="idea-edge-btn">
-                    ${iconTarget(16, '')}
-                    Define Edge
-                </button>` : html``}
                 ${this.#status === 'active'
                     ? html`
                 <button
