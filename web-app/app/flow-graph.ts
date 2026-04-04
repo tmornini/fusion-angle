@@ -30,6 +30,9 @@ const COMPLETE_INSET = 4;
 const COMPLETE_INNER_RADIUS = 7;
 const COMPLETE_INNER_STROKE = 1.5;
 
+const PORT_RADIUS = 5;
+const PORT_STROKE = 2;
+
 const NODE_LABEL_Y = 22;
 const NODE_LABEL_FONT = 14;
 const NODE_META_Y = 40;
@@ -40,9 +43,10 @@ const EDGE_STROKE_SELECTED = 3;
 const HIT_TARGET_WIDTH = 12;
 const CURVE_TENSION = 0.4;
 const BEZIER_MIDPOINT = 0.5;
+const BIDI_SPREAD = 20;
+const BIDI_LABEL_T_FWD = 0.35;
+const BIDI_LABEL_T_REV = 0.65;
 
-const CYCLE_DROP = 60;
-const CYCLE_LEFT_OFFSET = 40;
 const CYCLE_DASH = '6 3';
 
 const LABEL_CHAR_WIDTH = 7;
@@ -293,6 +297,22 @@ function buildNode(
         + escapeForHtml(meta)
         + '</text>';
 
+    if (!node.isStart && !node.isComplete) {
+        inner += '<circle'
+            + ' data-connect-port="1"'
+            + ` cx="${NODE_WIDTH}"`
+            + ` cy="${halfH}"`
+            + ` r="${PORT_RADIUS}"`
+            + ` fill="${BLUE}"`
+            + ' stroke="var('
+            + '--color-card-bg, #232940)"'
+            + ` stroke-width=`
+            + `"${PORT_STROKE}"`
+            + ' style='
+            + '"cursor:crosshair"'
+            + '/>';
+    }
+
     return trusted(
         '<g'
         + ` data-node-id="${node.id}"`
@@ -313,6 +333,7 @@ function buildEdge(
     fromNode: GraphNode,
     toNode: GraphNode,
     isSelected: boolean,
+    aimOffset: number,
 ): SafeHtml {
     const fromCx =
         fromNode.positionX
@@ -336,39 +357,79 @@ function buildEdge(
     let markerUrl: string;
     let dashAttr: string;
 
+    let aimFromX = toCx;
+    let aimFromY = toCy;
+    let aimToX = fromCx;
+    let aimToY = fromCy;
+
+    if (aimOffset !== 0) {
+        const dx = toCx - fromCx;
+        const dy = toCy - fromCy;
+        const len = Math.hypot(dx, dy);
+        if (len > 0) {
+            const px = -dy / len;
+            const py = dx / len;
+            const s =
+                aimOffset * BIDI_SPREAD;
+            aimFromX = toCx + px * s;
+            aimFromY = toCy + py * s;
+            aimToX = fromCx + px * s;
+            aimToY = fromCy + py * s;
+        }
+    }
+
+    const startPt = perimeterPoint(
+        fromNode.positionX,
+        fromNode.positionY,
+        NODE_WIDTH, NODE_HEIGHT,
+        aimFromX, aimFromY,
+    );
+    const endPt = perimeterPoint(
+        toNode.positionX,
+        toNode.positionY,
+        NODE_WIDTH, NODE_HEIGHT,
+        aimToX, aimToY,
+    );
+    const dist = Math.hypot(
+        endPt.x - startPt.x,
+        endPt.y - startPt.y,
+    );
+    const se = whichEdge(
+        startPt.x, startPt.y,
+        fromNode.positionX,
+        fromNode.positionY,
+        NODE_WIDTH, NODE_HEIGHT,
+    );
+    const ee = whichEdge(
+        endPt.x, endPt.y,
+        toNode.positionX,
+        toNode.positionY,
+        NODE_WIDTH, NODE_HEIGHT,
+    );
+    const cp1 =
+        controlOffset(se, dist);
+    const cp2 =
+        controlOffset(ee, dist);
+    pathD = 'M '
+        + String(startPt.x) + ' '
+        + String(startPt.y)
+        + ' C '
+        + String(
+            startPt.x + cp1.dx,
+        ) + ' '
+        + String(
+            startPt.y + cp1.dy,
+        ) + ', '
+        + String(
+            endPt.x + cp2.dx,
+        ) + ' '
+        + String(
+            endPt.y + cp2.dy,
+        ) + ', '
+        + String(endPt.x) + ' '
+        + String(endPt.y);
+
     if (isCycle) {
-        const botPt = perimeterPoint(
-            fromNode.positionX,
-            fromNode.positionY,
-            NODE_WIDTH, NODE_HEIGHT,
-            fromCx,
-            fromCy + NODE_HEIGHT * 2,
-        );
-        const leftPt = perimeterPoint(
-            toNode.positionX,
-            toNode.positionY,
-            NODE_WIDTH, NODE_HEIGHT,
-            toNode.positionX
-                - NODE_WIDTH,
-            toCy,
-        );
-        const dropY =
-            Math.max(
-                botPt.y, leftPt.y,
-            ) + CYCLE_DROP;
-        pathD = 'M '
-            + String(botPt.x) + ' '
-            + String(botPt.y)
-            + ' C '
-            + String(botPt.x) + ' '
-            + String(dropY) + ', '
-            + String(
-                leftPt.x
-                    - CYCLE_LEFT_OFFSET,
-            ) + ' '
-            + String(dropY) + ', '
-            + String(leftPt.x) + ' '
-            + String(leftPt.y);
         color = WARN;
         markerUrl =
             'url(#wf-arrow-warn)';
@@ -377,56 +438,6 @@ function buildEdge(
                 CYCLE_DASH
             }"`;
     } else {
-        const startPt = perimeterPoint(
-            fromNode.positionX,
-            fromNode.positionY,
-            NODE_WIDTH, NODE_HEIGHT,
-            toCx, toCy,
-        );
-        const endPt = perimeterPoint(
-            toNode.positionX,
-            toNode.positionY,
-            NODE_WIDTH, NODE_HEIGHT,
-            fromCx, fromCy,
-        );
-        const dist = Math.hypot(
-            endPt.x - startPt.x,
-            endPt.y - startPt.y,
-        );
-        const se = whichEdge(
-            startPt.x, startPt.y,
-            fromNode.positionX,
-            fromNode.positionY,
-            NODE_WIDTH, NODE_HEIGHT,
-        );
-        const ee = whichEdge(
-            endPt.x, endPt.y,
-            toNode.positionX,
-            toNode.positionY,
-            NODE_WIDTH, NODE_HEIGHT,
-        );
-        const cp1 =
-            controlOffset(se, dist);
-        const cp2 =
-            controlOffset(ee, dist);
-        pathD = 'M '
-            + String(startPt.x) + ' '
-            + String(startPt.y)
-            + ' C '
-            + String(
-                startPt.x + cp1.dx,
-            ) + ' '
-            + String(
-                startPt.y + cp1.dy,
-            ) + ', '
-            + String(
-                endPt.x + cp2.dx,
-            ) + ' '
-            + String(
-                endPt.y + cp2.dy,
-            ) + ', '
-            + String(endPt.x) + ' '
-            + String(endPt.y);
         color = BLUE;
         markerUrl = 'url(#wf-arrow)';
         dashAttr = '';
@@ -458,12 +469,14 @@ function buildEdge(
         + '"cursor:pointer"'
         + '/>';
 
-    const midX = computeMidpoint(
-        pathD,
-    );
-    const midY = computeMidpointY(
-        pathD,
-    );
+    const labelT = aimOffset === 0
+        ? BEZIER_MIDPOINT
+        : edge.fromNodeId < edge.toNodeId
+            ? BIDI_LABEL_T_FWD
+            : BIDI_LABEL_T_REV;
+    const mid = bezierAt(pathD, labelT);
+    const midX = mid.x;
+    const midY = mid.y;
     const labelEsc =
         escapeForHtml(edge.name);
     const labelLen = edge.name.length;
@@ -512,48 +525,35 @@ function buildEdge(
     );
 }
 
-function computeMidpoint(
+function bezierAt(
     pathD: string,
-): number {
+    t: number,
+): { x: number; y: number } {
     const parts = pathD.split(/[,\s]+/);
     const coords = parts
         .map(Number)
         .filter(n => !isNaN(n));
     if (coords.length < 8) {
-        return (coords[0] ?? 0);
+        return {
+            x: coords[0] ?? 0,
+            y: coords[1] ?? 0,
+        };
     }
-    const p0x = coords[0]!;
-    const cp1x = coords[2]!;
-    const cp2x = coords[4]!;
-    const p1x = coords[6]!;
-    const t = BEZIER_MIDPOINT;
     const u = 1 - t;
-    return u * u * u * p0x
-        + 3 * u * u * t * cp1x
-        + 3 * u * t * t * cp2x
-        + t * t * t * p1x;
-}
-
-function computeMidpointY(
-    pathD: string,
-): number {
-    const parts = pathD.split(/[,\s]+/);
-    const coords = parts
-        .map(Number)
-        .filter(n => !isNaN(n));
-    if (coords.length < 8) {
-        return (coords[1] ?? 0);
-    }
-    const p0y = coords[1]!;
-    const cp1y = coords[3]!;
-    const cp2y = coords[5]!;
-    const p1y = coords[7]!;
-    const t = BEZIER_MIDPOINT;
-    const u = 1 - t;
-    return u * u * u * p0y
-        + 3 * u * u * t * cp1y
-        + 3 * u * t * t * cp2y
-        + t * t * t * p1y;
+    const u2 = u * u;
+    const u3 = u2 * u;
+    const t2 = t * t;
+    const t3 = t2 * t;
+    return {
+        x: u3 * coords[0]!
+            + 3 * u2 * t * coords[2]!
+            + 3 * u * t2 * coords[4]!
+            + t3 * coords[6]!,
+        y: u3 * coords[1]!
+            + 3 * u2 * t * coords[3]!
+            + 3 * u * t2 * coords[5]!
+            + t3 * coords[7]!,
+    };
 }
 
 export function buildGraphSvg(
@@ -570,6 +570,29 @@ export function buildGraphSvg(
         nodes.map(n => [n.id, n]),
     );
 
+    const pairKey = (
+        a: string, b: string,
+    ): string =>
+        a < b
+            ? a + ':' + b
+            : b + ':' + a;
+    const pairCounts =
+        new Map<string, number>();
+    for (const edge of edges) {
+        const k = pairKey(
+            edge.fromNodeId,
+            edge.toNodeId,
+        );
+        pairCounts.set(
+            k,
+            (pairCounts.get(k) ?? 0) + 1,
+        );
+    }
+    const bidi = new Set<string>();
+    for (const [k, c] of pairCounts) {
+        if (c >= 2) bidi.add(k);
+    }
+
     let edgeMarkup = '';
     for (const edge of edges) {
         const fromNode =
@@ -579,12 +602,21 @@ export function buildGraphSvg(
         if (!fromNode || !toNode) continue;
         const isSelected =
             edge.id === selectedEdgeId;
+        let aimOffset = 0;
+        const k = pairKey(
+            edge.fromNodeId,
+            edge.toNodeId,
+        );
+        if (bidi.has(k)) {
+            aimOffset = 1;
+        }
         edgeMarkup +=
             buildEdge(
                 edge,
                 fromNode,
                 toNode,
                 isSelected,
+                aimOffset,
             ).toString();
     }
 

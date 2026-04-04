@@ -26,7 +26,7 @@ export type UndoActionType =
     | 'update-edge-desc'
     | 'add-field'
     | 'delete-field'
-    | 'relayout'
+    | 'auto-layout'
     | 'add-node-and-edge';
 
 export interface UndoAction {

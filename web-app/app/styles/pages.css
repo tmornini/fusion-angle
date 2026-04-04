@@ -848,9 +848,23 @@
    39. FLOW DESIGNER
    ========================================== */
 
+[data-page="flow-detail"] .page-content {
+  display: flex;
+  flex-direction: column;
+}
+
+#flow-designer {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
 .wf-designer {
   display: flex;
   flex-direction: column;
+  flex: 1;
+  min-height: 0;
 }
 
 .wf-designer-header {
@@ -875,7 +889,8 @@
 }
 
 .wf-canvas-wrap {
-  min-height: 400px;
+  flex: 1;
+  min-height: 250px;
   background-color: hsl(var(--background));
   border: 1px solid hsl(var(--border));
   border-radius: var(--radius-lg);

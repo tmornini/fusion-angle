@@ -262,6 +262,7 @@ ${dialog}`;
             position_x: x,
             position_y: y,
         });
+        this.#expandIfNeeded();
     }
 
     async addNode(): Promise<boolean> {
@@ -479,7 +480,7 @@ ${dialog}`;
         return true;
     }
 
-    relayout(): void {
+    autoLayout(): void {
         const oldPositions: UndoStep[] =
             this.#state.nodes.map(n => ({
                 op: 'put' as const,
@@ -533,10 +534,11 @@ ${dialog}`;
             });
         }
         this.#undo.push({
-            type: 'relayout',
+            type: 'auto-layout',
             forward: newPositions,
             reverse: oldPositions,
         });
+        this.#expandIfNeeded();
     }
 
     updateNodeName(
@@ -880,6 +882,7 @@ ${dialog}`;
                 },
             ],
         });
+        this.#expandIfNeeded();
         return true;
     }
 
@@ -935,6 +938,14 @@ ${dialog}`;
         this.#applyZoomToFit();
     }
 
+    updateCanvasSize(
+        w: number, h: number,
+    ): void {
+        this.#canvasW = w;
+        this.#canvasH = h;
+        this.#applyZoomToFit();
+    }
+
     #applyZoomToFit(): void {
         const positions =
             this.#state.nodes.map(
@@ -946,7 +957,29 @@ ${dialog}`;
         zoomToFitState(
             this.#state.interaction,
             positions,
+            this.#canvasW,
+            this.#canvasH,
         );
+    }
+
+    #expandIfNeeded(): void {
+        const vb =
+            this.#state.interaction.viewBox;
+        for (const n of this.#state.nodes) {
+            const r =
+                n.positionX + NODE_WIDTH;
+            const b =
+                n.positionY + NODE_HEIGHT;
+            if (
+                n.positionX < vb.x
+                || n.positionY < vb.y
+                || r > vb.x + vb.w
+                || b > vb.y + vb.h
+            ) {
+                this.#applyZoomToFit();
+                return;
+            }
+        }
     }
 
     #canDelete(): boolean {
@@ -1024,8 +1057,8 @@ class="wf-toolbar">
 </div>
 <div class="wf-toolbar-group">
 <button class="btn btn-ghost btn-sm"
-    data-action="re-layout"
-    >Re-layout</button>
+    data-action="auto-layout"
+    >Auto Layout</button>
 <button class="btn btn-ghost btn-sm"
     data-action="zoom-in"
     >Zoom +</button>

@@ -141,7 +141,10 @@ function handlePointerDown(
             onUpdate();
             return;
         }
-        if (!pos.isDraggable) {
+        const isPort = findAncestorAttr(
+            target, 'data-connect-port',
+        ) !== null;
+        if (isPort || !pos.isDraggable) {
             state.isConnecting = true;
             state.connectFromNodeId = nodeId;
             state.connectToX = svgPt.x;
@@ -447,10 +450,12 @@ export function zoomToFit(
         x: number;
         y: number;
     }[],
+    canvasW: number,
+    canvasH: number,
 ): void {
     if (nodePositions.length === 0) return;
 
-    const PAD = 80;
+    const PAD = 40;
     const NODE_W = 140;
     const NODE_H = 56;
 
@@ -470,11 +475,30 @@ export function zoomToFit(
         }
     }
 
-    state.viewBox.x = minX - PAD;
-    state.viewBox.y = minY - PAD;
-    state.viewBox.w =
+    const contentW =
         maxX - minX + PAD * 2;
-    state.viewBox.h =
+    const contentH =
         maxY - minY + PAD * 2;
-    state.zoom = 1.0;
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+
+    const containerAR = canvasW / canvasH;
+    const contentAR =
+        contentW / contentH;
+
+    let vbW: number;
+    let vbH: number;
+    if (contentAR > containerAR) {
+        vbW = contentW;
+        vbH = contentW / containerAR;
+    } else {
+        vbH = contentH;
+        vbW = contentH * containerAR;
+    }
+
+    state.viewBox.x = cx - vbW / 2;
+    state.viewBox.y = cy - vbH / 2;
+    state.viewBox.w = vbW;
+    state.viewBox.h = vbH;
+    state.zoom = canvasW / vbW;
 }
