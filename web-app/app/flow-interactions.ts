@@ -19,7 +19,6 @@ export interface InteractionState {
     dragCurrentY: number;
     isConnecting: boolean;
     connectFromNodeId: string | null;
-    connectFromPort: string | null;
     connectToX: number;
     connectToY: number;
     isPanning: boolean;
@@ -63,7 +62,6 @@ export function createInteractionState(
         dragCurrentY: 0,
         isConnecting: false,
         connectFromNodeId: null,
-        connectFromPort: null,
         connectToX: 0,
         connectToY: 0,
         isPanning: false,
@@ -124,24 +122,6 @@ function handlePointerDown(
         svg, e.clientX, e.clientY,
     );
 
-    const portAttr =
-        target.getAttribute('data-port');
-    if (portAttr !== null) {
-        const nodeId = findAncestorAttr(
-            target, 'data-node-id',
-        );
-        if (!nodeId) return;
-        state.isConnecting = true;
-        state.connectFromNodeId = nodeId;
-        state.connectFromPort = portAttr;
-        state.connectToX = svgPt.x;
-        state.connectToY = svgPt.y;
-        state.activePointerId = e.pointerId;
-        svg.setPointerCapture(e.pointerId);
-        onUpdate();
-        return;
-    }
-
     const nodeId = findAncestorAttr(
         target, 'data-node-id',
     );
@@ -157,7 +137,20 @@ function handlePointerDown(
         state.lastClickTime = now;
         state.isPanelOpen = isDbl;
         const pos = getNodePosition(nodeId);
-        if (!pos || !pos.isDraggable) {
+        if (!pos) {
+            onUpdate();
+            return;
+        }
+        if (!pos.isDraggable) {
+            state.isConnecting = true;
+            state.connectFromNodeId = nodeId;
+            state.connectToX = svgPt.x;
+            state.connectToY = svgPt.y;
+            state.activePointerId =
+                e.pointerId;
+            svg.setPointerCapture(
+                e.pointerId,
+            );
             onUpdate();
             return;
         }
@@ -285,33 +278,31 @@ function handlePointerUp(
         state.isConnecting
         && state.connectFromNodeId
     ) {
-        const target = e.target;
+        const target =
+            document.elementFromPoint(
+                e.clientX, e.clientY,
+            );
         if (target instanceof Element) {
-            const portAttr = target
-                .getAttribute('data-port');
-            if (portAttr !== null) {
-                const toNodeId =
-                    findAncestorAttr(
-                        target,
-                        'data-node-id',
-                    );
-                if (
-                    toNodeId
-                    && toNodeId
-                        !== state
-                            .connectFromNodeId
-                ) {
-                    onEdgeCreated(
-                        state
-                            .connectFromNodeId,
-                        toNodeId,
-                    );
-                }
+            const toNodeId =
+                findAncestorAttr(
+                    target,
+                    'data-node-id',
+                );
+            if (
+                toNodeId
+                && toNodeId
+                    !== state
+                        .connectFromNodeId
+            ) {
+                onEdgeCreated(
+                    state
+                        .connectFromNodeId,
+                    toNodeId,
+                );
             }
         }
         state.isConnecting = false;
         state.connectFromNodeId = null;
-        state.connectFromPort = null;
         state.activePointerId = 0;
         svg.releasePointerCapture(
             e.pointerId,

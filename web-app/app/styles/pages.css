@@ -930,18 +930,6 @@ svg.wf-canvas [data-node-id]:hover {
   opacity: 0.85;
 }
 
-svg.wf-canvas [data-port] {
-  cursor: crosshair;
-  opacity: 0.7;
-  transition:
-      opacity var(--duration-fast)
-      var(--ease-default);
-}
-
-svg.wf-canvas [data-port]:hover {
-  opacity: 1;
-}
-
 svg.wf-canvas [data-edge-id] {
   cursor: pointer;
 }

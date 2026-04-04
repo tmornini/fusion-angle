@@ -14,6 +14,8 @@ import {
 } from '../app/core';
 import {
     getFlowGraph,
+    exportFlowMermaid,
+    exportFlowZip,
 } from '../app/adapters';
 import {
     bindInteractions,
@@ -223,6 +225,109 @@ function bindToolbarActions(
                 },
             );
         }
+        if (action === 'copy-mermaid') {
+            btn.addEventListener(
+                'click',
+                () => void handleCopyMermaid(
+                    presenter,
+                ),
+            );
+        }
+        if (action === 'export-zip') {
+            btn.addEventListener(
+                'click',
+                () => void handleExportZip(
+                    presenter,
+                ),
+            );
+        }
+        if (action === 'delete-selected') {
+            btn.addEventListener(
+                'click',
+                () => {
+                    const nodeId =
+                        presenter
+                            .selectedNodeId();
+                    const edgeId =
+                        presenter
+                            .selectedEdgeId();
+                    if (nodeId !== null) {
+                        void presenter
+                            .deleteSelectedNode()
+                            .then(
+                                () => renderAndBind(
+                                    container,
+                                    presenter,
+                                ),
+                            );
+                        return;
+                    }
+                    if (edgeId !== null) {
+                        void presenter
+                            .deleteSelectedEdge()
+                            .then(
+                                () => renderAndBind(
+                                    container,
+                                    presenter,
+                                ),
+                            );
+                    }
+                },
+            );
+        }
+    }
+}
+
+async function handleCopyMermaid(
+    presenter: FlowDesignerPresenter,
+): Promise<void> {
+    try {
+        const flowId = presenter.flowId();
+        const text =
+            await exportFlowMermaid(flowId);
+        await navigator.clipboard
+            .writeText(text);
+        showToast(
+            'Mermaid copied to clipboard',
+            'success',
+        );
+    } catch {
+        showToast(
+            'Failed to copy Mermaid',
+            'error',
+        );
+    }
+}
+
+async function handleExportZip(
+    presenter: FlowDesignerPresenter,
+): Promise<void> {
+    try {
+        const flowId = presenter.flowId();
+        const result =
+            await exportFlowZip(flowId);
+        const blob = new Blob(
+            [result.data as
+                unknown as ArrayBuffer],
+            { type: 'application/zip' },
+        );
+        const url =
+            URL.createObjectURL(blob);
+        const a =
+            document.createElement('a');
+        a.href = url;
+        a.download = result.name;
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast(
+            'Flow exported',
+            'success',
+        );
+    } catch {
+        showToast(
+            'Failed to export flow',
+            'error',
+        );
     }
 }
 
@@ -237,9 +342,6 @@ function bindPanelActions(
         container, presenter,
     );
     bindEdgePanelInputs(
-        container, presenter,
-    );
-    bindDeleteActions(
         container, presenter,
     );
     bindFieldActions(
@@ -345,41 +447,6 @@ function bindEdgePanelInputs(
             );
         },
     );
-}
-
-function bindDeleteActions(
-    container: HTMLElement,
-    presenter: FlowDesignerPresenter,
-): void {
-    const delNodeBtn = container
-        .querySelector(
-            '[data-action="delete-node"]',
-        );
-    if (delNodeBtn) {
-        delNodeBtn.addEventListener(
-            'click',
-            () => void presenter
-                .deleteSelectedNode()
-                .then(() => renderAndBind(
-                    container, presenter,
-                )),
-        );
-    }
-
-    const delEdgeBtn = container
-        .querySelector(
-            '[data-action="delete-edge"]',
-        );
-    if (delEdgeBtn) {
-        delEdgeBtn.addEventListener(
-            'click',
-            () => void presenter
-                .deleteSelectedEdge()
-                .then(() => renderAndBind(
-                    container, presenter,
-                )),
-        );
-    }
 }
 
 function bindFieldActions(
@@ -650,6 +717,52 @@ function bindKeyboardShortcuts(
                     container, presenter,
                 );
                 return;
+            }
+            if (
+                (e.key === 'Delete'
+                    || e.key === 'Backspace')
+                && !(
+                    document.activeElement
+                    instanceof
+                    HTMLInputElement
+                    || document.activeElement
+                    instanceof
+                    HTMLTextAreaElement
+                    || document.activeElement
+                    instanceof
+                    HTMLSelectElement
+                )
+            ) {
+                const nodeId =
+                    presenter
+                        .selectedNodeId();
+                const edgeId =
+                    presenter
+                        .selectedEdgeId();
+                if (nodeId !== null) {
+                    e.preventDefault();
+                    void presenter
+                        .deleteSelectedNode()
+                        .then(
+                            () => renderAndBind(
+                                container,
+                                presenter,
+                            ),
+                        );
+                    return;
+                }
+                if (edgeId !== null) {
+                    e.preventDefault();
+                    void presenter
+                        .deleteSelectedEdge()
+                        .then(
+                            () => renderAndBind(
+                                container,
+                                presenter,
+                            ),
+                        );
+                    return;
+                }
             }
             const mod =
                 e.metaKey || e.ctrlKey;

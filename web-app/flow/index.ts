@@ -1,4 +1,6 @@
-import { $, attr } from '../app/dom';
+import {
+    $, $select, attr,
+} from '../app/dom';
 import {
     html,
     setHtml,
@@ -10,11 +12,21 @@ import {
 import {
     iconGitBranch,
 } from '../app/icons';
-import { navigateTo } from '../app/core';
-import { getFlows } from '../app/adapters';
+import {
+    navigateTo,
+    openDialog,
+    closeDialog,
+} from '../app/core';
+import {
+    getFlows,
+    getProjects,
+    importFlowFromMermaid,
+    importFlowFromZip,
+} from '../app/adapters';
 import {
     FlowPresenter,
 } from '../app/presenters';
+import { showToast } from '../app/toast';
 
 export async function init(
 ): Promise<void> {
@@ -80,4 +92,154 @@ export async function init(
                 );
         },
     );
+
+    bindImport();
+}
+
+function bindImport(): void {
+    const btn = $(
+        '#import-flow-btn', document,
+    );
+    const fileInput = $(
+        '#import-flow-input', document,
+    ) as HTMLInputElement | null;
+    const cancelBtn = $(
+        '#import-cancel', document,
+    );
+    const chooseBtn = $(
+        '#import-choose', document,
+    );
+
+    if (
+        !btn || !fileInput
+        || !cancelBtn || !chooseBtn
+    ) return;
+
+    btn.addEventListener(
+        'click',
+        () => void openImportDialog(),
+    );
+
+    cancelBtn.addEventListener(
+        'click',
+        () => closeDialog('import-flow'),
+    );
+
+    chooseBtn.addEventListener(
+        'click',
+        () => fileInput.click(),
+    );
+
+    fileInput.addEventListener(
+        'change',
+        () => void handleFileSelect(
+            fileInput,
+        ),
+    );
+}
+
+async function openImportDialog(
+): Promise<void> {
+    const select = $select(
+        '#import-project', document,
+    );
+    if (!select) return;
+
+    const projects = await getProjects();
+    if (projects.length === 0) {
+        showToast(
+            'No projects available',
+            'error',
+        );
+        return;
+    }
+
+    select.replaceChildren();
+    for (const p of projects) {
+        const opt =
+            document.createElement(
+                'option',
+            );
+        opt.value = p.id;
+        opt.textContent = p.title;
+        select.appendChild(opt);
+    }
+
+    openDialog('import-flow');
+}
+
+async function handleFileSelect(
+    input: HTMLInputElement,
+): Promise<void> {
+    const file = input.files?.[0];
+    if (!file) return;
+
+    const select = $select(
+        '#import-project', document,
+    );
+    const projectId = select?.value;
+    if (!projectId) {
+        showToast(
+            'Select a project first',
+            'error',
+        );
+        return;
+    }
+
+    closeDialog('import-flow');
+
+    try {
+        const ext = file.name
+            .split('.').pop()
+            ?.toLowerCase();
+        let flowId: string;
+        let warnings: string[];
+
+        if (ext === 'zip') {
+            const buf =
+                await file.arrayBuffer();
+            const data =
+                new Uint8Array(buf);
+            const r =
+                await importFlowFromZip(
+                    data, projectId,
+                );
+            flowId = r.flowId;
+            warnings = r.warnings;
+        } else {
+            const text = await file.text();
+            const r =
+                await importFlowFromMermaid(
+                    text, projectId,
+                );
+            flowId = r.flowId;
+            warnings = r.warnings;
+        }
+
+        if (warnings.length > 0) {
+            showToast(
+                'Imported with '
+                + String(warnings.length)
+                + ' warning(s)',
+                'warning',
+            );
+        } else {
+            showToast(
+                'Flow imported',
+                'success',
+            );
+        }
+
+        navigateTo(
+            'flow-detail',
+            { flowId },
+        );
+    } catch (err) {
+        const msg = err instanceof Error
+            ? err.message
+            : 'Import failed';
+        showToast(msg, 'error');
+    }
+
+    input.value = '';
 }

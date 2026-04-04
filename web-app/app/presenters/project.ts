@@ -1,10 +1,8 @@
 import { html, SafeHtml } from '../safe-html';
-import { displayText } from '../core';
 import {
     iconClock,
     iconDollarSign,
     iconTrendingUp,
-    iconTarget,
     iconGripVertical,
     iconCheckCircle2,
     iconAlertCircle,
@@ -15,6 +13,7 @@ import {
     type ProjectStatus,
     PROJECT_STATUS_CONFIG,
     COST_DIVISOR,
+    SECONDS_PER_DAY,
 } from '../../../api/types';
 
 const STATUS_ICONS: Record<
@@ -42,12 +41,12 @@ export class ProjectPresenter {
     readonly #priority: number;
     readonly #priorityScore: number;
     readonly #progress: number;
-    readonly #estimatedDuration: number;
-    readonly #actualDurationDays: number;
-    readonly #estimatedDurationDays: number;
-    readonly #actualCost: number;
-    readonly #actualImpact: number;
-    readonly #estimatedImpact: number;
+    readonly #timeCurrentDays: number;
+    readonly #timeBaselineDays: number;
+    readonly #costCurrentK: number;
+    readonly #costBaselineK: number;
+    readonly #impactCurrent: number;
+    readonly #impactBaseline: number;
 
     constructor(project: Project) {
         this.#id = project.id;
@@ -62,16 +61,37 @@ export class ProjectPresenter {
             project.priorityScore;
         this.#progress =
             project.timelineProgress();
-        this.#estimatedDuration =
-            project.estimatedDuration;
-        this.#actualDurationDays =
-            project.actualDurationDays();
-        this.#estimatedDurationDays =
-            project.estimatedDurationDays();
-        this.#actualCost = project.actualCost;
-        this.#actualImpact =
+        const start = new Date(
+            project.startDate,
+        ).getTime();
+        const end = new Date(
+            project.targetEndDate,
+        ).getTime();
+        const msPerDay =
+            SECONDS_PER_DAY * 1000;
+        this.#timeCurrentDays =
+            isNaN(start)
+                ? 0
+                : Math.max(0, Math.ceil(
+                    (Date.now() - start)
+                    / msPerDay,
+                ));
+        this.#timeBaselineDays =
+            isNaN(start) || isNaN(end)
+                ? 0
+                : Math.max(0, Math.ceil(
+                    (end - start)
+                    / msPerDay,
+                ));
+        this.#costCurrentK =
+            project.actualCost
+            / COST_DIVISOR;
+        this.#costBaselineK =
+            project.estimatedCost
+            / COST_DIVISOR;
+        this.#impactCurrent =
             project.actualImpact;
-        this.#estimatedImpact =
+        this.#impactBaseline =
             project.estimatedImpact;
     }
 
@@ -124,78 +144,62 @@ export class ProjectPresenter {
         style="padding:1.25rem"
         data-project-card="${this.#id}">
         <div class="${
-            'flex items-start gap-4'
+            'flex items-center gap-4'
         }">
             <div class="${
                 'hidden-mobile text-muted'
-            }" style="${
-                'margin-top:0.25rem;'
-                + 'cursor:grab'
-            }">${
+            }" style="cursor:grab">${
                 iconGripVertical(20, '')
             }</div>
-            <div style="flex:1;min-width:0">
+            <div style="${
+                'flex:1;min-width:0'
+            }">
                 <div class="${
-                    'flex items-start '
-                    + 'justify-between'
-                    + ' gap-4 mb-3'
+                    'flex flex-wrap '
+                    + 'items-center'
+                    + ' gap-2'
                 }">
-                    <div style="${
-                        'flex:1;min-width:0'
-                    }">
-                        <div class="${
-                            'flex flex-wrap '
-                            + 'items-center'
-                            + ' gap-2 mb-1'
-                        }">
-                            <h3 class="${
-                                'font-display '
-                                + 'font-semibold'
-                            }" style="${
-                                'white-space:'
-                                + 'nowrap;'
-                                + 'overflow:'
-                                + 'hidden;'
-                                + 'text-overflow'
-                                + ':ellipsis'
-                            }">${
-                                this.#title
-                            }</h3>
-                            <span class="${
-                                'badge '
-                                + this
-                                    .#statusClassName
-                                + ' text-xs'
-                            }">${
-                                statusIcon(
-                                    14, '',
-                                )
-                            } ${
-                                this
-                                    .#statusLabel
-                            }</span>
-                        </div>
-                        ${view === 'priority'
-                            ? html`<span
-                                class="${
-                                    'text-xs'
-                                    + ' text-muted'
-                                }">Priority #${
-                                    this.#priority
-                                }</span>`
-                            : html``}
-                    </div>
-                    ${this.#buildProgressRing()}
+                    <h3 class="${
+                        'font-display '
+                        + 'font-semibold'
+                    }" style="${
+                        'white-space:'
+                        + 'nowrap;'
+                        + 'overflow:'
+                        + 'hidden;'
+                        + 'text-overflow'
+                        + ':ellipsis'
+                    }">${
+                        this.#title
+                    }</h3>
+                    <span class="${
+                        'badge '
+                        + this
+                            .#statusClassName
+                        + ' text-xs'
+                    }">${
+                        statusIcon(
+                            14, '',
+                        )
+                    } ${
+                        this
+                            .#statusLabel
+                    }</span>
                 </div>
-                <div class="${
-                    'flex items-end '
-                    + 'justify-between gap-4'
-                }">
-                    ${this.#buildMetrics(
-                        metricBoxStyle,
-                    )}
-                </div>
+                ${view === 'priority'
+                    ? html`<span
+                        class="${
+                            'text-xs'
+                            + ' text-muted'
+                        }">Priority #${
+                            this.#priority
+                        }</span>`
+                    : html``}
             </div>
+            ${this.#buildMetrics(
+                metricBoxStyle,
+            )}
+            ${this.#buildProgressRing()}
         </div>
     </div>`;
     }
@@ -252,37 +256,34 @@ export class ProjectPresenter {
     #buildMetrics(
         boxStyle: string,
     ): SafeHtml {
-        const cost = this.#actualCost;
-        const impact =
-            this.#actualImpact
-            || this.#estimatedImpact;
+        const tb = this.#timeBaselineDays;
+        const tc = this.#timeCurrentDays;
+        const cb = this.#costBaselineK;
+        const cc = this.#costCurrentK;
+        const ib = this.#impactBaseline;
+        const ic = this.#impactCurrent;
+        const m = 'text-xs text-muted';
         return html`
     <div class="${
-        'project-metrics-grid'
-    }" style="flex:1">
+        'hidden-mobile flex'
+        + ' items-center gap-4'
+    }" style="flex-shrink:0">
         <div class="${
             'flex items-center gap-2'
         }">
             <div style="${boxStyle}">${
-                iconClock(16, 'text-primary')
+                iconClock(
+                    16, 'text-primary',
+                )
             }</div>
             <div>
-                <p class="${
-                    'text-xs text-muted'
-                }">Time</p>
+                <p class="${m}">Time</p>
                 <p class="${
                     'text-sm font-medium'
-                }">${
-                    this.#estimatedDuration
-                    ? html`${
-                        this
-                            .#actualDurationDays
-                    }d <span class="${
-                        'text-xs text-muted'
-                    }">/ ${
-                        this
-                            .#estimatedDurationDays
-                    }d</span>`
+                }">${tb
+                    ? html`${tc}d <span
+                        class="${m}"
+                        >/ ${tb}d</span>`
                     : html`&mdash;`
                 }</p>
             </div>
@@ -296,18 +297,15 @@ export class ProjectPresenter {
                 )
             }</div>
             <div>
-                <p class="${
-                    'text-xs text-muted'
-                }">Cost</p>
+                <p class="${m}">Cost</p>
                 <p class="${
                     'text-sm font-medium'
-                }">${
-                    cost
-                    ? '$'
-                        + (cost / COST_DIVISOR)
-                            .toFixed(0)
-                        + 'k'
-                    : '\u2014'
+                }">${cb
+                    ? html`${'$' + cc}k
+                        <span class="${m}"
+                        >/ ${'$'
+                        + cb}k</span>`
+                    : html`&mdash;`
                 }</p>
             </div>
         </div>
@@ -320,17 +318,14 @@ export class ProjectPresenter {
                 )
             }</div>
             <div>
-                <p class="${
-                    'text-xs text-muted'
-                }">Impact</p>
+                <p class="${m}">Impact</p>
                 <p class="${
                     'text-sm font-medium'
-                }">${
-                    displayText(
-                        impact
-                            ? String(impact)
-                            : '',
-                    )
+                }">${ib
+                    ? html`${ic} <span
+                        class="${m}"
+                        >/ ${ib}</span>`
+                    : html`&mdash;`
                 }</p>
             </div>
         </div>

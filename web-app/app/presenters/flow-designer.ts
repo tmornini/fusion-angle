@@ -7,6 +7,7 @@ import {
     iconArrowLeft,
     iconUndo,
     iconRedo,
+    iconTrash,
     iconX,
 } from '../icons';
 import {
@@ -31,6 +32,7 @@ import { UndoManager } from '../flow-undo';
 import type { UndoStep } from '../flow-undo';
 import {
     buildGraphSvg,
+    perimeterPoint,
 } from '../flow-graph';
 import {
     computeLayout,
@@ -190,9 +192,7 @@ export class FlowDesignerPresenter {
         return {
             x: node.positionX,
             y: node.positionY,
-            isDraggable:
-                !node.isStart
-                && !node.isComplete,
+            isDraggable: !node.isStart,
         };
     }
 
@@ -949,6 +949,25 @@ ${dialog}`;
         );
     }
 
+    #canDelete(): boolean {
+        const nodeId =
+            this.#state.interaction
+                .selectedNodeId;
+        if (nodeId !== null) {
+            const node =
+                this.#state.nodes.find(
+                    n => n.id === nodeId,
+                );
+            if (
+                node
+                && !node.isStart
+                && !node.isComplete
+            ) return true;
+        }
+        return this.#state.interaction
+            .selectedEdgeId !== null;
+    }
+
     #buildToolbar(): SafeHtml {
         const nodeCount =
             this.#state.nodes.length;
@@ -995,6 +1014,15 @@ class="wf-toolbar">
     )}>+ Add State</button>
 </div>
 <div class="wf-toolbar-group">
+<button
+    class="btn btn-ghost btn-icon"
+    data-action="delete-selected"${
+    trusted(
+        this.#canDelete()
+            ? '' : ' disabled',
+    )}>${iconTrash(18, '')}</button>
+</div>
+<div class="wf-toolbar-group">
 <button class="btn btn-ghost btn-sm"
     data-action="re-layout"
     >Re-layout</button>
@@ -1006,6 +1034,14 @@ class="wf-toolbar">
     >Zoom \u2212</button>
 <button class="btn btn-ghost btn-sm"
     data-action="fit">Fit</button>
+</div>
+<div class="wf-toolbar-group">
+<button class="btn btn-ghost btn-sm"
+    data-action="copy-mermaid"
+    >Copy Mermaid</button>
+<button class="btn btn-ghost btn-sm"
+    data-action="export-zip"
+    >Export .zip</button>
 </div>
 <div class="wf-toolbar-group">
 <span class="text-muted text-sm"
@@ -1198,10 +1234,6 @@ class="text-sm text-muted"
     : html`<div class="text-sm text-muted"
         >None</div>`}
 </div>
-<button
-class="btn btn-destructive btn-sm mt-4"
-data-action="delete-node"
->Delete State</button>
 </div>`;
     }
 
@@ -1253,10 +1285,6 @@ justify-content:space-between"
     >To</label>
 <div class="text-sm">${toName}</div>
 </div>
-<button
-class="btn btn-destructive btn-sm mt-4"
-data-action="delete-edge"
->Delete Transition</button>
 </div>`;
     }
 
@@ -1311,14 +1339,14 @@ data-action="delete-edge"
         return html``;
     }
 
-    #buildConnectPreview(): string {
+    #connectSourcePoint(): {
+        x: number;
+        y: number;
+    } | null {
         const interaction =
             this.#state.interaction;
-        if (!interaction.isConnecting) {
-            return '';
-        }
         if (!interaction.connectFromNodeId) {
-            return '';
+            return null;
         }
         const fromNode =
             this.#state.nodes.find(
@@ -1326,21 +1354,41 @@ data-action="delete-edge"
                     === interaction
                         .connectFromNodeId,
             );
-        if (!fromNode) return '';
-        const startX =
-            fromNode.positionX + NODE_WIDTH;
-        const startY =
-            fromNode.positionY
-            + NODE_HEIGHT / 2;
+        if (!fromNode) return null;
+        const endX =
+            interaction.connectToX;
+        const endY =
+            interaction.connectToY;
+        return perimeterPoint(
+            fromNode.positionX,
+            fromNode.positionY,
+            NODE_WIDTH, NODE_HEIGHT,
+            endX, endY,
+        );
+    }
+
+    #buildConnectPreview(): string {
+        const interaction =
+            this.#state.interaction;
+        if (!interaction.isConnecting) {
+            return '';
+        }
+        const src =
+            this.#connectSourcePoint();
+        if (!src) return '';
         const endX =
             interaction.connectToX;
         const endY =
             interaction.connectToY;
         return '<line'
-            + ' x1="' + String(startX) + '"'
-            + ' y1="' + String(startY) + '"'
-            + ' x2="' + String(endX) + '"'
-            + ' y2="' + String(endY) + '"'
+            + ' x1="'
+            + String(src.x) + '"'
+            + ' y1="'
+            + String(src.y) + '"'
+            + ' x2="'
+            + String(endX) + '"'
+            + ' y2="'
+            + String(endY) + '"'
             + ' stroke="#4B6CA1"'
             + ' stroke-width="2"'
             + ' stroke-dasharray="6 3"'

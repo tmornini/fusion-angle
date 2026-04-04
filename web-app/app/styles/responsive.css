@@ -40,7 +40,6 @@
   .detail-grid { grid-template-columns: 1fr !important; }
   .gauge-grid { grid-template-columns: 1fr; }
   .actions-grid { grid-template-columns: repeat(2, 1fr); }
-  .project-metrics-grid { grid-template-columns: repeat(2, 1fr); }
   .charts-grid { grid-template-columns: 1fr; }
 }
 

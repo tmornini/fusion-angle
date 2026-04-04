@@ -21,8 +21,6 @@ const ARROW_MARKER = 8;
 const GLOW_SPREAD = 4;
 const GLOW_OPACITY = 0.6;
 
-const PORT_RADIUS = 6;
-
 const STROKE_NORMAL = 2;
 const STROKE_START = 2.5;
 const STROKE_COMPLETE = 3;
@@ -55,6 +53,69 @@ const LABEL_RADIUS = 4;
 const LABEL_BG_OPACITY = 0.9;
 const LABEL_TEXT_OFFSET_Y = 4;
 const LABEL_FONT = 11;
+
+type RectEdge =
+    'right' | 'left' | 'top' | 'bottom';
+
+export function perimeterPoint(
+    rx: number, ry: number,
+    rw: number, rh: number,
+    fx: number, fy: number,
+): { x: number; y: number } {
+    const cx = rx + rw / 2;
+    const cy = ry + rh / 2;
+    const dx = fx - cx;
+    const dy = fy - cy;
+    if (dx === 0 && dy === 0) {
+        return { x: rx + rw, y: cy };
+    }
+    const sx = dx !== 0
+        ? (rw / 2) / Math.abs(dx)
+        : Infinity;
+    const sy = dy !== 0
+        ? (rh / 2) / Math.abs(dy)
+        : Infinity;
+    const s = Math.min(sx, sy);
+    return {
+        x: cx + dx * s,
+        y: cy + dy * s,
+    };
+}
+
+function whichEdge(
+    px: number, py: number,
+    rx: number, ry: number,
+    rw: number, rh: number,
+): RectEdge {
+    const dL = Math.abs(px - rx);
+    const dR = Math.abs(px - rx - rw);
+    const dT = Math.abs(py - ry);
+    const dB = Math.abs(py - ry - rh);
+    const min = Math.min(
+        dL, dR, dT, dB,
+    );
+    if (min === dR) return 'right';
+    if (min === dL) return 'left';
+    if (min === dT) return 'top';
+    return 'bottom';
+}
+
+function controlOffset(
+    edge: RectEdge,
+    dist: number,
+): { dx: number; dy: number } {
+    const d = dist * CURVE_TENSION;
+    switch (edge) {
+        case 'right':
+            return { dx: d, dy: 0 };
+        case 'left':
+            return { dx: -d, dy: 0 };
+        case 'top':
+            return { dx: 0, dy: -d };
+        case 'bottom':
+            return { dx: 0, dy: d };
+    }
+}
 
 function buildDefs(): string {
     const gridCenter = GRID_CELL / 2;
@@ -150,20 +211,6 @@ function buildGrid(
         + ' fill="url(#wf-grid)"/>';
 }
 
-function buildPort(
-    cx: number,
-    cy: number,
-    color: string,
-    label: string,
-): string {
-    return '<circle'
-        + ` cx="${cx}"`
-        + ` cy="${cy}"`
-        + ` r="${PORT_RADIUS}"`
-        + ` fill="${color}"`
-        + ` data-port="${label}"/>`;
-}
-
 function buildNode(
     node: GraphNode,
     isSelected: boolean,
@@ -246,25 +293,6 @@ function buildNode(
         + escapeForHtml(meta)
         + '</text>';
 
-    if (!node.isStart) {
-        inner += buildPort(
-            0, halfH, borderColor, 'left',
-        );
-    }
-    if (!node.isComplete) {
-        inner += buildPort(
-            NODE_WIDTH, halfH,
-            borderColor, 'right',
-        );
-    }
-
-    if (!node.isStart && !node.isComplete) {
-        inner += buildPort(
-            halfW, NODE_HEIGHT,
-            borderColor, 'bottom',
-        );
-    }
-
     return trusted(
         '<g'
         + ` data-node-id="${node.id}"`
@@ -286,13 +314,18 @@ function buildEdge(
     toNode: GraphNode,
     isSelected: boolean,
 ): SafeHtml {
-    const startX =
-        fromNode.positionX + NODE_WIDTH;
-    const startY =
-        fromNode.positionY + NODE_HEIGHT / 2;
-    const endX = toNode.positionX;
-    const endY =
-        toNode.positionY + NODE_HEIGHT / 2;
+    const fromCx =
+        fromNode.positionX
+        + NODE_WIDTH / 2;
+    const fromCy =
+        fromNode.positionY
+        + NODE_HEIGHT / 2;
+    const toCx =
+        toNode.positionX
+        + NODE_WIDTH / 2;
+    const toCy =
+        toNode.positionY
+        + NODE_HEIGHT / 2;
 
     const isCycle =
         toNode.positionX
@@ -304,50 +337,96 @@ function buildEdge(
     let dashAttr: string;
 
     if (isCycle) {
-        const botFromX =
-            fromNode.positionX
-            + NODE_WIDTH / 2;
-        const botFromY =
-            fromNode.positionY
-            + NODE_HEIGHT;
-        const leftToX = toNode.positionX;
-        const leftToY =
-            toNode.positionY
-            + NODE_HEIGHT / 2;
+        const botPt = perimeterPoint(
+            fromNode.positionX,
+            fromNode.positionY,
+            NODE_WIDTH, NODE_HEIGHT,
+            fromCx,
+            fromCy + NODE_HEIGHT * 2,
+        );
+        const leftPt = perimeterPoint(
+            toNode.positionX,
+            toNode.positionY,
+            NODE_WIDTH, NODE_HEIGHT,
+            toNode.positionX
+                - NODE_WIDTH,
+            toCy,
+        );
         const dropY =
-            Math.max(botFromY, leftToY)
-            + CYCLE_DROP;
+            Math.max(
+                botPt.y, leftPt.y,
+            ) + CYCLE_DROP;
         pathD = 'M '
-            + String(botFromX) + ' '
-            + String(botFromY)
+            + String(botPt.x) + ' '
+            + String(botPt.y)
             + ' C '
-            + String(botFromX) + ' '
+            + String(botPt.x) + ' '
             + String(dropY) + ', '
             + String(
-                leftToX - CYCLE_LEFT_OFFSET,
+                leftPt.x
+                    - CYCLE_LEFT_OFFSET,
             ) + ' '
             + String(dropY) + ', '
-            + String(leftToX) + ' '
-            + String(leftToY);
+            + String(leftPt.x) + ' '
+            + String(leftPt.y);
         color = WARN;
         markerUrl =
             'url(#wf-arrow-warn)';
         dashAttr =
-            ` stroke-dasharray="${CYCLE_DASH}"`;
+            ` stroke-dasharray="${
+                CYCLE_DASH
+            }"`;
     } else {
-        const dx = endX - startX;
-        const cpOffset =
-            Math.abs(dx) * CURVE_TENSION;
+        const startPt = perimeterPoint(
+            fromNode.positionX,
+            fromNode.positionY,
+            NODE_WIDTH, NODE_HEIGHT,
+            toCx, toCy,
+        );
+        const endPt = perimeterPoint(
+            toNode.positionX,
+            toNode.positionY,
+            NODE_WIDTH, NODE_HEIGHT,
+            fromCx, fromCy,
+        );
+        const dist = Math.hypot(
+            endPt.x - startPt.x,
+            endPt.y - startPt.y,
+        );
+        const se = whichEdge(
+            startPt.x, startPt.y,
+            fromNode.positionX,
+            fromNode.positionY,
+            NODE_WIDTH, NODE_HEIGHT,
+        );
+        const ee = whichEdge(
+            endPt.x, endPt.y,
+            toNode.positionX,
+            toNode.positionY,
+            NODE_WIDTH, NODE_HEIGHT,
+        );
+        const cp1 =
+            controlOffset(se, dist);
+        const cp2 =
+            controlOffset(ee, dist);
         pathD = 'M '
-            + String(startX) + ' '
-            + String(startY)
+            + String(startPt.x) + ' '
+            + String(startPt.y)
             + ' C '
-            + String(startX + cpOffset) + ' '
-            + String(startY) + ', '
-            + String(endX - cpOffset) + ' '
-            + String(endY) + ', '
-            + String(endX) + ' '
-            + String(endY);
+            + String(
+                startPt.x + cp1.dx,
+            ) + ' '
+            + String(
+                startPt.y + cp1.dy,
+            ) + ', '
+            + String(
+                endPt.x + cp2.dx,
+            ) + ' '
+            + String(
+                endPt.y + cp2.dy,
+            ) + ', '
+            + String(endPt.x) + ' '
+            + String(endPt.y);
         color = BLUE;
         markerUrl = 'url(#wf-arrow)';
         dashAttr = '';

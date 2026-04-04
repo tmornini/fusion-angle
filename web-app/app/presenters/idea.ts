@@ -158,50 +158,45 @@ export class IdeaPresenter {
     }
 
     buildCard(view: string): SafeHtml {
+        const metricBoxStyle =
+            'width:2rem;height:2rem;'
+            + 'border-radius:0.5rem;'
+            + 'background:'
+            + 'hsl(var(--primary)/0.1);'
+            + 'display:flex;'
+            + 'align-items:center;'
+            + 'justify-content:center';
         return html`
-    <div class="card card-hover p-5"
-        style="cursor:pointer"
+    <div class="card card-hover"
+        style="${
+            'padding:1.25rem;'
+            + 'cursor:pointer'
+        }"
         data-idea-card="${this.#id}">
-        <div class="flex items-start gap-4">
-            <div class="hidden-mobile"
-                style="color:hsl(
-                    var(--muted-foreground)
-                    /0.5);
-                    margin-top:0.25rem;
-                    cursor:grab">
-                ${iconGripVertical(20, '')}
+        <div class="${
+            'flex items-center gap-4'
+        }">
+            <div class="${
+                'hidden-mobile text-muted'
+            }" style="cursor:grab">${
+                iconGripVertical(20, '')
+            }</div>
+            <div style="${
+                'flex:1;min-width:0'
+            }">
+                ${this.#buildHeading(view)}
             </div>
-            <div style="flex:1;min-width:0">
-                <div class="flex items-start
-                    justify-between gap-4 mb-3">
-                    <div style="${
-                        'flex:1;min-width:0'
-                    }">
-                        ${this.#buildHeading(
-                            view,
-                        )}
-                    </div>
-                </div>
-                <div style="display:grid;
-                    grid-template-columns:
-                        3fr auto;
-                    gap:1rem;
-                    align-items:start">
-                    ${this.#buildEstimates()}
-                    <div style="${
-                        'display:flex;'
-                        + 'flex-direction:'
-                        + 'column;'
-                        + 'align-items:'
-                        + 'flex-end;'
-                        + 'gap:0.5rem;'
-                        + 'padding-right:'
-                        + '0.75rem'
-                    }">
-                        ${this.#buildBadges()}
-                        ${this.#buildActions()}
-                    </div>
-                </div>
+            ${this.#buildEstimates(
+                metricBoxStyle,
+            )}
+            <div style="${
+                'display:flex;'
+                + 'flex-direction:column;'
+                + 'align-items:flex-end;'
+                + 'gap:0.5rem'
+            }">
+                ${this.#buildBadges()}
+                ${this.#buildActions()}
             </div>
         </div>
     </div>`;
@@ -261,110 +256,80 @@ export class IdeaPresenter {
         </div>`;
     }
 
-    #buildEstimates(): SafeHtml {
-        const boxStyle =
-            'width:2rem;'
-            + 'height:2rem;'
-            + 'border-radius'
-            + ':var('
-            + '--radius-lg);'
-            + 'background:'
-            + 'hsl('
-            + 'var(--primary)'
-            + '/0.1);'
-            + 'display:flex;'
-            + 'align-items:'
-            + 'center;'
-            + 'justify-'
-            + 'content:'
-            + 'center';
+    #buildEstimates(
+        boxStyle: string,
+    ): SafeHtml {
         const days = this.#durationInDays;
         const cost = this.#estimatedCost;
         const impact = this.#estimatedImpact;
+        const m = 'text-xs text-muted';
         return html`
-        <div style="display:grid;
-            grid-template-columns:
-                repeat(3,1fr);
-            gap:1rem">
-            <div class="${
-                'flex items-center gap-2'
-            }">
-                <div style="${boxStyle}">
-                    ${iconClock(
-                        16, 'text-primary',
-                    )}
-                </div>
-                <div>
-                    <p class="${
-                        'text-xs text-muted'
-                    }">
-                        Time
-                    </p>
-                    <p class="${
-                        'text-sm font-medium'
-                    }">
-                        ${days
-                            ? `${days}d`
-                            : '\u2014'}
-                    </p>
-                </div>
+    <div class="${
+        'hidden-mobile flex'
+        + ' items-center gap-4'
+    }" style="flex-shrink:0">
+        <div class="${
+            'flex items-center gap-2'
+        }">
+            <div style="${boxStyle}">${
+                iconClock(
+                    16, 'text-primary',
+                )
+            }</div>
+            <div>
+                <p class="${m}">Time</p>
+                <p class="${
+                    'text-sm font-medium'
+                }">${
+                    days
+                        ? `${days}d`
+                        : '\u2014'
+                }</p>
             </div>
-            <div class="${
-                'flex items-center gap-2'
-            }">
-                <div style="${boxStyle}">
-                    ${iconDollarSign(
-                        16, 'text-primary',
-                    )}
-                </div>
-                <div>
-                    <p class="${
-                        'text-xs text-muted'
-                    }">
-                        Cost
-                    </p>
-                    <p class="${
-                        'text-sm font-medium'
-                    }">
-                        ${cost
-                            ? '$'
-                                + (
-                                    cost
-                                    / COST_DIVISOR
-                                ).toFixed(0)
-                                + 'k'
-                            : '\u2014'}
-                    </p>
-                </div>
+        </div>
+        <div class="${
+            'flex items-center gap-2'
+        }">
+            <div style="${boxStyle}">${
+                iconDollarSign(
+                    16, 'text-primary',
+                )
+            }</div>
+            <div>
+                <p class="${m}">Cost</p>
+                <p class="${
+                    'text-sm font-medium'
+                }">${
+                    cost
+                        ? '$'
+                            + (cost
+                                / COST_DIVISOR
+                            ).toFixed(0)
+                            + 'k'
+                        : '\u2014'
+                }</p>
             </div>
-            <div class="${
-                'flex items-center gap-2'
-            }">
-                <div style="${boxStyle}">
-                    ${iconTrendingUp(
-                        16, 'text-primary',
-                    )}
-                </div>
-                <div>
-                    <p class="${
-                        'text-xs text-muted'
-                    }">
-                        Impact
-                    </p>
-                    <p class="${
-                        'text-sm font-medium'
-                    }">
-                        ${displayText(
-                            impact
-                                ? String(
-                                    impact,
-                                )
-                                : '',
-                        )}
-                    </p>
-                </div>
+        </div>
+        <div class="${
+            'flex items-center gap-2'
+        }">
+            <div style="${boxStyle}">${
+                iconTrendingUp(
+                    16, 'text-primary',
+                )
+            }</div>
+            <div>
+                <p class="${m}">Impact</p>
+                <p class="${
+                    'text-sm font-medium'
+                }">${
+                    impact
+                        ? String(impact)
+                        : '\u2014'
+                }</p>
             </div>
-        </div>`;
+        </div>
+    </div>`;
     }
 
     #buildActions(): SafeHtml {
