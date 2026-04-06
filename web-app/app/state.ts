@@ -1,4 +1,8 @@
 import { showToast } from './toast';
+import {
+    readPreference,
+    writePreference,
+} from './preferences-store';
 
 const STORAGE_KEY_THEME = 'fusion-theme';
 const STORAGE_KEY_SIDEBAR =
@@ -33,8 +37,10 @@ class AppStateManager {
     constructor() {
         this.data = {
             theme: (() => {
-                const raw = localStorage
-                    .getItem(STORAGE_KEY_THEME);
+                const raw =
+                    readPreference(
+                        STORAGE_KEY_THEME,
+                    );
                 return isValidTheme(raw)
                     ? raw
                     : 'system';
@@ -45,7 +51,7 @@ class AppStateManager {
                 + 'px)',
             ).matches,
             isSidebarCollapsed:
-                localStorage.getItem(
+                readPreference(
                     STORAGE_KEY_SIDEBAR,
                 ) === 'true',
             isSidebarOpen: false,
@@ -103,7 +109,7 @@ class AppStateManager {
         theme: AppState['theme'],
     ): void {
         try {
-            localStorage.setItem(
+            writePreference(
                 STORAGE_KEY_THEME,
                 theme,
             );
@@ -122,7 +128,7 @@ class AppStateManager {
         collapsed: boolean,
     ): void {
         try {
-            localStorage.setItem(
+            writePreference(
                 STORAGE_KEY_SIDEBAR,
                 String(collapsed),
             );

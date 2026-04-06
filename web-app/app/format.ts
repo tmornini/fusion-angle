@@ -38,13 +38,18 @@ function toDateInputValue(
     return iso.slice(0, 10);
 }
 
+const DISPLAY_ABSENT = '\u2014';
+
 function displayText(
     value: string,
 ): string {
-    return value || '\u2014';
+    return value !== ''
+        ? value
+        : DISPLAY_ABSENT;
 }
 
 export {
+    DISPLAY_ABSENT,
     displayText,
     formatDate,
     getTimeOfDay,

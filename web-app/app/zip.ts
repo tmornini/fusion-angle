@@ -36,6 +36,7 @@ const CENTRAL_HEADER = 46;
 const END_RECORD = 22;
 const VERSION = 20;
 const STORE = 0;
+const DEFLATE = 8;
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -218,53 +219,149 @@ export function buildZip(
     return out;
 }
 
-export function readZip(
+function findEocd(
+    view: DataView,
+    length: number,
+): number {
+    const minOff = Math.max(
+        0, length - 65557,
+    );
+    for (
+        let i = length - END_RECORD;
+        i >= minOff;
+        i--
+    ) {
+        if (
+            view.getUint32(i, true)
+                === END_SIG
+        ) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+async function inflate(
+    raw: Uint8Array,
+): Promise<Uint8Array> {
+    const ds = new DecompressionStream(
+        'deflate-raw',
+    );
+    const stream =
+        new Blob(
+            [raw as unknown as ArrayBuffer],
+        )
+            .stream()
+            .pipeThrough(ds);
+    const buf = await new Response(stream)
+        .arrayBuffer();
+    return new Uint8Array(buf);
+}
+
+function readLocalData(
+    view: DataView,
     data: Uint8Array,
-): ZipEntry[] {
+    localOff: number,
+    compSz: number,
+): Uint8Array | null {
+    if (
+        localOff + LOCAL_HEADER
+            > data.byteLength
+    ) return null;
+
+    const lNameLen = view.getUint16(
+        localOff + 26, true,
+    );
+    const lExtraLen = view.getUint16(
+        localOff + 28, true,
+    );
+    const start =
+        localOff + LOCAL_HEADER
+        + lNameLen + lExtraLen;
+    return data.slice(
+        start, start + compSz,
+    );
+}
+
+export async function readZip(
+    data: Uint8Array,
+): Promise<ZipEntry[]> {
     const view = new DataView(
         data.buffer,
         data.byteOffset,
         data.byteLength,
     );
+
+    const eocd = findEocd(
+        view, data.byteLength,
+    );
+    if (eocd < 0) return [];
+
+    const count = view.getUint16(
+        eocd + 10, true,
+    );
+    const cdStart = view.getUint32(
+        eocd + 16, true,
+    );
+
     const entries: ZipEntry[] = [];
-    let offset = 0;
+    let off = cdStart;
 
-    while (
-        offset + LOCAL_HEADER
-            <= data.length
-    ) {
-        const sig = view.getUint32(
-            offset, true,
+    for (let i = 0; i < count; i++) {
+        if (
+            off + CENTRAL_HEADER
+                > data.byteLength
+        ) break;
+        if (
+            view.getUint32(off, true)
+                !== CENTRAL_SIG
+        ) break;
+
+        const method = view.getUint16(
+            off + 10, true,
         );
-        if (sig !== LOCAL_SIG) break;
-
-        const compSize = view.getUint32(
-            offset + 18, true,
+        const compSz = view.getUint32(
+            off + 20, true,
         );
         const nameLen = view.getUint16(
-            offset + 26, true,
+            off + 28, true,
         );
         const extraLen = view.getUint16(
-            offset + 28, true,
+            off + 30, true,
         );
-        offset += LOCAL_HEADER;
-
-        const nameBytes = data.slice(
-            offset, offset + nameLen,
+        const commentLen = view.getUint16(
+            off + 32, true,
         );
-        const name =
-            decoder.decode(nameBytes);
-        offset += nameLen + extraLen;
-
-        const fileData = data.slice(
-            offset, offset + compSize,
+        const localOff = view.getUint32(
+            off + 42, true,
         );
-        offset += compSize;
 
-        entries.push({
-            name,
-            data: fileData,
-        });
+        off += CENTRAL_HEADER;
+
+        const name = decoder.decode(
+            data.slice(
+                off, off + nameLen,
+            ),
+        );
+        off +=
+            nameLen + extraLen + commentLen;
+
+        const raw = readLocalData(
+            view, data, localOff, compSz,
+        );
+        if (!raw) continue;
+
+        if (method === DEFLATE) {
+            entries.push({
+                name,
+                data: await inflate(raw),
+            });
+        } else if (method === STORE) {
+            entries.push({
+                name,
+                data: raw,
+            });
+        }
     }
 
     return entries;

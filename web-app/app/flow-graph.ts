@@ -3,8 +3,12 @@ import { trusted, html, escapeForHtml } from './safe-html';
 import type {
     GraphNode, GraphEdge,
 } from './adapters/flows';
+import type {
+    Selection,
+} from './flow-interactions';
 import {
     NODE_WIDTH, NODE_HEIGHT,
+    buildAdjacency, assignRanks,
 } from './flow-layout';
 
 const BLUE = '#4B6CA1';
@@ -43,7 +47,7 @@ const EDGE_STROKE_SELECTED = 3;
 const HIT_TARGET_WIDTH = 12;
 const CURVE_TENSION = 0.4;
 const BEZIER_MIDPOINT = 0.5;
-const BIDI_SPREAD = 20;
+const BIDI_SPREAD = 40;
 const BIDI_LABEL_T_FWD = 0.35;
 const BIDI_LABEL_T_REV = 0.65;
 
@@ -161,11 +165,6 @@ function buildDefs(): string {
         + markerAttrs
         + `<path d="${arrowPath}"`
         + ` fill="${WARN}"/>`
-        + '</marker>'
-        + '<marker id="wf-arrow-ok"'
-        + markerAttrs
-        + `<path d="${arrowPath}"`
-        + ` fill="${GREEN}"/>`
         + '</marker>'
         + '<filter id="wf-glow"'
         + ' x="-20%" y="-20%"'
@@ -334,6 +333,7 @@ function buildEdge(
     toNode: GraphNode,
     isSelected: boolean,
     aimOffset: number,
+    isCycle: boolean,
 ): SafeHtml {
     const fromCx =
         fromNode.positionX
@@ -347,10 +347,6 @@ function buildEdge(
     const toCy =
         toNode.positionY
         + NODE_HEIGHT / 2;
-
-    const isCycle =
-        toNode.positionX
-            <= fromNode.positionX;
 
     let pathD: string;
     let color: string;
@@ -563,12 +559,43 @@ export function buildGraphSvg(
     viewBoxY: number,
     viewBoxW: number,
     viewBoxH: number,
-    selectedNodeId: string | null,
-    selectedEdgeId: string | null,
+    selection: Selection,
 ): SafeHtml {
     const nodeMap = new Map(
         nodes.map(n => [n.id, n]),
     );
+
+    const startNode =
+        nodes.find(n => n.isStart);
+    const startId =
+        startNode?.id
+        ?? nodes[0]?.id ?? '';
+    const adj = buildAdjacency(
+        edges.map(e => ({
+            fromId: e.fromNodeId,
+            toId: e.toNodeId,
+        })),
+    );
+    const allIds =
+        nodes.map(n => n.id);
+    const ranks = assignRanks(
+        startId, adj, allIds,
+    );
+    const cycleEdgeIds =
+        new Set<string>();
+    for (const edge of edges) {
+        const fromRank =
+            ranks.get(edge.fromNodeId);
+        const toRank =
+            ranks.get(edge.toNodeId);
+        if (
+            fromRank !== undefined
+            && toRank !== undefined
+            && toRank <= fromRank
+        ) {
+            cycleEdgeIds.add(edge.id);
+        }
+    }
 
     const pairKey = (
         a: string, b: string,
@@ -601,7 +628,9 @@ export function buildGraphSvg(
             nodeMap.get(edge.toNodeId);
         if (!fromNode || !toNode) continue;
         const isSelected =
-            edge.id === selectedEdgeId;
+            selection.kind === 'edge'
+            && edge.id
+                === selection.edgeId;
         let aimOffset = 0;
         const k = pairKey(
             edge.fromNodeId,
@@ -617,13 +646,18 @@ export function buildGraphSvg(
                 toNode,
                 isSelected,
                 aimOffset,
+                cycleEdgeIds.has(
+                    edge.id,
+                ),
             ).toString();
     }
 
     let nodeMarkup = '';
     for (const node of nodes) {
         const isSelected =
-            node.id === selectedNodeId;
+            selection.kind === 'node'
+            && node.id
+                === selection.nodeId;
         nodeMarkup +=
             buildNode(
                 node, isSelected,

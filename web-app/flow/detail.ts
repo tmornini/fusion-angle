@@ -28,42 +28,57 @@ const FALLBACK_W = 800;
 const FALLBACK_H = 600;
 const SAVE_DELAY_MS = 800;
 
-let saveTimer: ReturnType<
-    typeof setTimeout
-> | null = null;
-let pendingSave: (() => void) | null =
-    null;
+class Debouncer {
+    #timer: ReturnType<
+        typeof setTimeout
+    > | undefined = undefined;
+    #pending:
+        | (() => void)
+        | undefined = undefined;
+    readonly #delayMs: number;
 
-function debounceSave(
-    fn: () => void,
-): void {
-    if (saveTimer !== null) {
-        clearTimeout(saveTimer);
+    constructor(delayMs: number) {
+        this.#delayMs = delayMs;
     }
-    pendingSave = fn;
-    saveTimer = setTimeout(() => {
-        fn();
-        saveTimer = null;
-        pendingSave = null;
-    }, SAVE_DELAY_MS);
+
+    schedule(fn: () => void): void {
+        if (this.#timer !== undefined) {
+            clearTimeout(this.#timer);
+        }
+        this.#pending = fn;
+        this.#timer = setTimeout(
+            () => {
+                fn();
+                this.#timer = undefined;
+                this.#pending =
+                    undefined;
+            },
+            this.#delayMs,
+        );
+    }
+
+    flush(): void {
+        if (this.#timer !== undefined) {
+            clearTimeout(this.#timer);
+            this.#timer = undefined;
+        }
+        if (
+            this.#pending !== undefined
+        ) {
+            this.#pending();
+            this.#pending = undefined;
+        }
+    }
 }
 
-function flushPendingSave(): void {
-    if (saveTimer !== null) {
-        clearTimeout(saveTimer);
-        saveTimer = null;
-    }
-    if (pendingSave !== null) {
-        pendingSave();
-        pendingSave = null;
-    }
-}
+const saveDebouncer =
+    new Debouncer(SAVE_DELAY_MS);
 
 function renderAndBind(
     container: HTMLElement,
     presenter: FlowDesignerPresenter,
 ): void {
-    flushPendingSave();
+    saveDebouncer.flush();
     presenter.render(container);
     bindBackButton();
     bindSvgInteractions(
@@ -123,9 +138,11 @@ function bindSvgInteractions(
             presenter.getNodePosition(id),
     );
     if (
-        (state.isDragging
-            || state.isConnecting
-            || state.isPanning)
+        (state.drag.kind === 'dragging'
+            || state.connect.kind
+                === 'connecting'
+            || state.pan.kind
+                === 'panning')
         && state.activePointerId > 0
     ) {
         try {
@@ -133,10 +150,10 @@ function bindSvgInteractions(
                 state.activePointerId,
             );
         } catch {
-            state.isDragging = false;
-            state.isConnecting = false;
-            state.isPanning = false;
-            state.dragNodeId = null;
+            state.drag = { kind: 'idle' };
+            state.connect =
+                { kind: 'idle' };
+            state.pan = { kind: 'idle' };
         }
     }
 }
@@ -281,54 +298,69 @@ function bindToolbarActions(
 async function handleCopyMermaid(
     presenter: FlowDesignerPresenter,
 ): Promise<void> {
+    const flowId = presenter.flowId();
+    let text: string;
     try {
-        const flowId = presenter.flowId();
-        const text =
+        text =
             await exportFlowMermaid(flowId);
-        await navigator.clipboard
-            .writeText(text);
-        showToast(
-            'Mermaid copied to clipboard',
-            'success',
-        );
     } catch {
         showToast(
-            'Failed to copy Mermaid',
+            'Failed to export Mermaid',
             'error',
         );
+        return;
     }
+    try {
+        await navigator.clipboard
+            .writeText(text);
+    } catch {
+        showToast(
+            'Failed to copy to clipboard',
+            'error',
+        );
+        return;
+    }
+    showToast(
+        'Mermaid copied to clipboard',
+        'success',
+    );
 }
 
 async function handleExportZip(
     presenter: FlowDesignerPresenter,
 ): Promise<void> {
+    const flowId = presenter.flowId();
+    let result: {
+        data: Uint8Array;
+        name: string;
+    };
     try {
-        const flowId = presenter.flowId();
-        const result =
+        result =
             await exportFlowZip(flowId);
-        const blob = new Blob(
-            [result.data as
-                unknown as ArrayBuffer],
-            { type: 'application/zip' },
-        );
-        const url =
-            URL.createObjectURL(blob);
-        const a =
-            document.createElement('a');
-        a.href = url;
-        a.download = result.name;
-        a.click();
-        URL.revokeObjectURL(url);
-        showToast(
-            'Flow exported',
-            'success',
-        );
     } catch {
         showToast(
             'Failed to export flow',
             'error',
         );
+        return;
     }
+    const blob = new Blob(
+        [result.data as
+            unknown as ArrayBuffer],
+        { type: 'application/zip' },
+    );
+    const url =
+        URL.createObjectURL(blob);
+    const a =
+        document.createElement('a');
+    a.href = url;
+    a.download = result.name;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast(
+        'Flow exported',
+        'success',
+    );
 }
 
 function bindPanelActions(
@@ -388,7 +420,7 @@ function bindNodePanelInputs(
         'input',
         () => {
             const val = nameInput.value;
-            debounceSave(
+            saveDebouncer.schedule(
                 () => presenter
                     .updateNodeName(val),
             );
@@ -399,7 +431,7 @@ function bindNodePanelInputs(
         'input',
         () => {
             const val = descInput.value;
-            debounceSave(
+            saveDebouncer.schedule(
                 () => presenter
                     .updateNodeDescription(
                         val,
@@ -428,7 +460,7 @@ function bindEdgePanelInputs(
         'input',
         () => {
             const val = nameInput.value;
-            debounceSave(
+            saveDebouncer.schedule(
                 () => presenter
                     .updateEdgeName(val),
             );
@@ -439,7 +471,7 @@ function bindEdgePanelInputs(
         'input',
         () => {
             const val = descInput.value;
-            debounceSave(
+            saveDebouncer.schedule(
                 () => presenter
                     .updateEdgeDescription(
                         val,

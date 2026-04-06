@@ -1,27 +1,54 @@
-import { $, FOCUSABLE_SELECTOR } from './dom';
+import {
+    $required, FOCUSABLE_SELECTOR,
+} from './dom';
 
 const focusStack: HTMLElement[] = [];
 
-function openDialog(dialogId: string): void {
-    if (document.activeElement instanceof HTMLElement) {
-        focusStack.push(document.activeElement);
+function openDialog(
+    dialogId: string,
+): void {
+    if (
+        document.activeElement
+            instanceof HTMLElement
+    ) {
+        focusStack.push(
+            document.activeElement,
+        );
     }
-    $(`#${dialogId}-backdrop`, document)?.classList.remove('hidden');
-    const dialog = $(`#${dialogId}-dialog`, document);
-    dialog?.classList.remove('hidden');
-    dialog?.setAttribute('aria-hidden', 'false');
-    const focusable = dialog
-        ?.querySelector<HTMLElement>(
+    $required(
+        `#${dialogId}-backdrop`,
+        document,
+    ).classList.remove('hidden');
+    const dialog = $required(
+        `#${dialogId}-dialog`,
+        document,
+    );
+    dialog.classList.remove('hidden');
+    dialog.setAttribute(
+        'aria-hidden', 'false',
+    );
+    const focusable =
+        dialog.querySelector<HTMLElement>(
             FOCUSABLE_SELECTOR,
         );
     focusable?.focus();
 }
 
-function closeDialog(dialogId: string): void {
-    $(`#${dialogId}-backdrop`, document)?.classList.add('hidden');
-    const dialog = $(`#${dialogId}-dialog`, document);
-    dialog?.classList.add('hidden');
-    dialog?.setAttribute('aria-hidden', 'true');
+function closeDialog(
+    dialogId: string,
+): void {
+    $required(
+        `#${dialogId}-backdrop`,
+        document,
+    ).classList.add('hidden');
+    const dialog = $required(
+        `#${dialogId}-dialog`,
+        document,
+    );
+    dialog.classList.add('hidden');
+    dialog.setAttribute(
+        'aria-hidden', 'true',
+    );
     focusStack.pop()?.focus();
 }
 
@@ -111,34 +138,40 @@ function initDialog(
     const cancelId =
         `${dialogId}-cancel`;
 
-    $(`#${openBtnId}`, document)
-        ?.addEventListener(
-            'click',
-            () => openDialog(dialogId),
-        );
-    $(`#${cancelId}`, document)
-        ?.addEventListener(
-            'click',
-            () => closeDialog(dialogId),
-        );
-    $(`#${dialogId}-backdrop`, document)
-        ?.addEventListener(
-            'click',
-            (e) => {
-                if (
-                    e.target
-                    === e.currentTarget
-                ) {
-                    closeDialog(dialogId);
-                }
-            },
-        );
+    $required(
+        `#${openBtnId}`, document,
+    ).addEventListener(
+        'click',
+        () => openDialog(dialogId),
+    );
+    $required(
+        `#${cancelId}`, document,
+    ).addEventListener(
+        'click',
+        () => closeDialog(dialogId),
+    );
+    $required(
+        `#${dialogId}-backdrop`,
+        document,
+    ).addEventListener(
+        'click',
+        (e) => {
+            if (
+                e.target
+                === e.currentTarget
+            ) {
+                closeDialog(dialogId);
+            }
+        },
+    );
     if (onSubmit) {
-        $(`#${dialogId}-submit`, document)
-            ?.addEventListener(
-                'click',
-                onSubmit,
-            );
+        $required(
+            `#${dialogId}-submit`,
+            document,
+        ).addEventListener(
+            'click',
+            onSubmit,
+        );
     }
 }
 

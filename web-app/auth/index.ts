@@ -494,6 +494,15 @@ export async function init(): Promise<void> {
         'click',
         () => {
             isLogin = !isLogin;
+            if (form instanceof HTMLFormElement) {
+                form.reset();
+            }
+            emailInput.classList.remove(
+                'error',
+            );
+            passwordInput.classList.remove(
+                'error',
+            );
             emailError.classList.add(
                 'hidden',
             );

@@ -94,11 +94,9 @@ export async function init(
             new IdeaConversionPresenter(
                 convData.idea,
                 convData
-                    .estimatedDuration
-                    ?? '',
+                    .estimatedDuration,
                 convData
-                    .estimatedCost
-                    ?? '',
+                    .estimatedCost,
                 users,
             );
     } catch {

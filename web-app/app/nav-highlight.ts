@@ -1,0 +1,56 @@
+import { $$, attr } from './dom';
+import { getPageName } from './navigation';
+
+const NAV_GROUP_CHILDREN:
+    Record<string, string[]> = {
+        account: [
+            'profile',
+            'settings',
+            'users',
+            'activity-feed',
+        ],
+        ideas: [
+            'idea-create',
+            'idea-convert',
+            'idea-review-queue',
+            'approval-detail',
+        ],
+        projects: [
+            'project-detail',
+        ],
+    };
+
+export function initActiveNavItem(
+): void {
+    const pageName = getPageName();
+    $$(
+        '[data-page-link]', document,
+    ).forEach(
+        navLink => {
+            const linkPage = attr(
+                navLink,
+                'data-page-link',
+            );
+            const children =
+                NAV_GROUP_CHILDREN[
+                    linkPage
+                ];
+            const isActive =
+                linkPage === pageName
+                || (children
+                    ? children.includes(
+                        pageName,
+                    )
+                    : false);
+            if (isActive)
+                navLink.setAttribute(
+                    'aria-current',
+                    'page',
+                );
+            else
+                navLink.removeAttribute(
+                    'aria-current',
+                );
+        },
+    );
+}

@@ -120,8 +120,8 @@ export async function getReviewQueue(
 
 export interface ConversionData {
     idea: Idea;
-    estimatedDuration: string | null;
-    estimatedCost: string | null;
+    estimatedDuration: string;
+    estimatedCost: string;
 }
 
 export async function getIdeaForConversion(
@@ -150,8 +150,8 @@ export async function getIdeaForConversion(
             ),
             submission!.created_at,
         ),
-        estimatedDuration: null,
-        estimatedCost: null,
+        estimatedDuration: '',
+        estimatedCost: '',
     };
 }
 

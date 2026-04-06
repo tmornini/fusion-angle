@@ -1,3 +1,6 @@
+import {
+    EntityNotFound,
+} from './db';
 import type {
     DbAdapter,
     EntityStore,
@@ -164,15 +167,19 @@ function createEntityStore<
         },
         async getById(
             id: string,
-        ): Promise<T | null> {
+        ): Promise<T> {
             const rows = readTable<T>(
                 tableName, false,
             );
-            return (
-                rows.find(
-                    entity => entity.id === id,
-                ) ?? null
+            const row = rows.find(
+                entity => entity.id === id,
             );
+            if (!row) {
+                throw new EntityNotFound(
+                    tableName, id,
+                );
+            }
+            return row;
         },
         async put(
             id: string,
@@ -188,9 +195,6 @@ function createEntityStore<
                 fields, tableName,
             );
 
-            // ASSERT: spread merges validated
-            // row with serialized fields; id
-            // ensures T constraint is met
             if (index >= 0) {
                 rows[index] = {
                     ...rows[index]!,
@@ -226,9 +230,6 @@ function createEntityStore<
                 e => e.id === id,
             );
             if (idx >= 0) {
-                // ASSERT: spread preserves
-                // complete T; deleted_at is
-                // an event-table convention
                 rows[idx] = {
                     ...rows[idx]!,
                     deleted_at: nowUtc(),
@@ -270,9 +271,6 @@ function createSingletonStore<
                 entity => entity.id === '1',
             );
 
-            // ASSERT: spread merges validated
-            // singleton with serialized fields;
-            // id: '1' ensures T constraint
             if (index >= 0) {
                 rows[index] = {
                     ...rows[index]!,
@@ -410,8 +408,6 @@ export async function createLocalStorageAdapter(
                     + ' keys.',
                 );
             }
-            // ASSERT: typeof/null/Array
-            // guards above prove this shape
             const record = snapshot as Record<
                 string,
                 unknown

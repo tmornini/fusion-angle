@@ -11,8 +11,8 @@ export interface LayoutEdge {
 
 export const NODE_WIDTH = 140;
 export const NODE_HEIGHT = 56;
-export const HORIZONTAL_GAP = 120;
-export const VERTICAL_GAP = 90;
+export const HORIZONTAL_GAP = 60;
+export const VERTICAL_GAP = 180;
 export const START_X = 0;
 export const START_Y = 0;
 
@@ -21,7 +21,7 @@ const GRID_MAX_H = 4000;
 const HALF_MAX_W = GRID_MAX_W / 2;
 const HALF_MAX_H = GRID_MAX_H / 2;
 
-function buildAdjacency(
+export function buildAdjacency(
     edges: LayoutEdge[],
 ): Map<string, string[]> {
     const adj = new Map<string, string[]>();
@@ -36,7 +36,7 @@ function buildAdjacency(
     return adj;
 }
 
-function assignRanks(
+export function assignRanks(
     startId: string,
     adj: Map<string, string[]>,
     allIds: string[],
@@ -112,16 +112,20 @@ export function computeLayout(
     }
 
     const step = NODE_WIDTH + HORIZONTAL_GAP;
-    const intraRankGap = NODE_HEIGHT + 20;
+    const siblingStep = NODE_WIDTH + 100;
 
     for (const [rank, ids] of rankGroups) {
-        for (let i = 0; i < ids.length; i++) {
+        const n = ids.length;
+        const span = (n - 1) * siblingStep;
+        for (let i = 0; i < n; i++) {
             const id = ids[i]!;
-            const x = START_X + rank * step;
+            const x =
+                START_X + rank * step
+                + i * siblingStep
+                - span / 2;
             const y =
-                START_Y +
-                rank * VERTICAL_GAP +
-                i * intraRankGap;
+                START_Y
+                + rank * VERTICAL_GAP;
             positions.set(id, { x, y });
         }
     }

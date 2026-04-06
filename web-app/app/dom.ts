@@ -41,6 +41,23 @@ export function $textarea(
         );
 }
 
+export function $required(
+    selector: string,
+    parent: ParentNode,
+): HTMLElement {
+    const el =
+        parent.querySelector<HTMLElement>(
+            selector,
+        );
+    if (!el) {
+        throw new Error(
+            'Required element not'
+            + ' found: ' + selector,
+        );
+    }
+    return el;
+}
+
 export function attr(
     el: Element,
     name: string,

@@ -10,7 +10,7 @@ fi
 
 echo "Building Fusion AI..."
 
-BUILD_DIR=$(mktemp -d)
+BUILD_DIR=$(mktemp -d "${TMPDIR:-/tmp}/fusion-build.XXXXXX")
 trap 'rm -rf "$BUILD_DIR"' EXIT
 
 npx tsx web-app/app/compose.ts "$BUILD_DIR"

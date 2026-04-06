@@ -20,11 +20,20 @@ import type {
     WfNodeFieldEntity,
 } from './types';
 
+export class EntityNotFound {
+    readonly message: string;
+    constructor(
+        readonly table: string,
+        readonly id: string,
+    ) {
+        this.message =
+            `Not found: ${table}/${id}`;
+    }
+}
+
 export interface EntityStore<T> {
     getAll(): Promise<T[]>;
-    getById(
-        id: string,
-    ): Promise<T | null>;
+    getById(id: string): Promise<T>;
     put(
         id: string,
         fields: Partial<T>,

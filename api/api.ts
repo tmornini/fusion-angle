@@ -1,13 +1,12 @@
 import type { DbAdapter } from './db';
+import { EntityNotFound } from './db';
 import { nowUtc } from './types';
 
-export class ApiError extends Error {
+export class ApiError {
     constructor(
-        message: string,
-        public status: number,
-    ) {
-        super(message);
-    }
+        readonly message: string,
+        readonly status: number,
+    ) {}
 }
 
 const apiModule = (() => {
@@ -755,10 +754,20 @@ export async function handleRequest(
                 );
         }
     } catch (error) {
-        const status =
-            error instanceof ApiError
-                ? error.status
-                : 500;
+        if (error instanceof ApiError) {
+            return Response.json(
+                { error: error.message },
+                { status: error.status },
+            );
+        }
+        if (
+            error instanceof EntityNotFound
+        ) {
+            return Response.json(
+                { error: error.message },
+                { status: 404 },
+            );
+        }
         return Response.json(
             {
                 error:
@@ -766,7 +775,7 @@ export async function handleRequest(
                         ? error.message
                         : String(error),
             },
-            { status },
+            { status: 500 },
         );
     }
 }

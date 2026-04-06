@@ -117,7 +117,7 @@ import { navigateTo, openDialog, closeDialog } from '../app/core';
 - `get*` — adapter functions that fetch and transform data (reads)
 - `put*` — adapter functions that write entity data (writes)
 - Adapter function names use **domain nouns** (`getIdea`, `putProject`), never internal type names like `Entity` — the return type already communicates the shape
-- `deleteSchema`, `createSchema`, `loadMockData`, `importSnapshot`, `exportSnapshot`, `hasData` — snapshot lifecycle operations in `adapters/snapshots.ts`
+- `deleteSchema`, `postSchemaCreation`, `postMockDataLoad`, `postBootstrap`, `importSnapshot`, `exportSnapshot`, `hasData` — snapshot lifecycle operations in `adapters/snapshots.ts`
 - Boolean variables: `is*`, `has*`, `needs*` (use the prefix that reads naturally in English)
 - Config objects: `Record<StatusType, { label, className }>` in `api/types.ts`
 
@@ -166,7 +166,7 @@ build                         # Executable build script
 
 api/
   types.ts                    # Row types (snake_case), shared type aliases (Id, ConfidenceLevel, PriorityLevel, IdeaStatus), User class, toBool
-  db.ts                       # DbAdapter interface (EntityStore, SingletonStore, hasSchema, createSchema)
+  db.ts                       # DbAdapter interface (EntityStore, SingletonStore, hasSchema, createSchema), EntityNotFound
   db-localstorage.ts          # localStorage implementation with JSON serialization
   api.ts                      # GET/PUT/DELETE/POST URL routing
   seed.ts                     # Mock data seeding
@@ -178,19 +178,27 @@ web-app/
     components-layout.html     # Layout skeleton with component placeholders
     component-*.html          # UI components (sidebar, top-bar, mobile-header, mobile-sidebar)
     compose.ts                # Build-time script: layout + page → composed index.html
-    core.ts                   # Page dispatch + re-exports from format.ts, navigation.ts, dialog.ts
+    core.ts                   # DOMContentLoaded bootstrap + re-exports from format.ts, navigation.ts, dialog.ts
+    database-init.ts          # initDatabase(), handleDatabaseError()
+    page-loader.ts            # Page module registry, loadAndInitPage(), handlePageLoadError()
     page-registry.ts          # PAGE_REGISTRY: maps page names → sidebar/standalone classification + sourceDir/sourceFile overrides
-    format.ts                 # initials(), durationInDays(), formatCompactCurrency(), SECONDS_PER_DAY
-    layout.ts                 # Sidebar layout initialization and sidebar behavior
+    format.ts                 # initials(), durationInDays(), formatCompactCurrency(), SECONDS_PER_DAY, DISPLAY_ABSENT
+    layout.ts                 # Sidebar collapse/expand + initSidebarLayout() orchestrator
+    theme-toggle.ts           # Theme toggle icon, dropdown init
+    sidebar-user.ts           # Sidebar user info fetch and display
+    nav-highlight.ts          # Active nav item highlighting
+    mobile-drawer.ts          # Mobile sidebar drawer behavior
+    header-info.ts            # Header greeting and stats
     navigation.ts             # navigateTo(), getPageName(), URL construction, link prefetch
     dialog.ts                 # openDialog(), closeDialog(), initTabs() dialog/tab helpers
     icons.ts                  # ~100 SVG icon functions and lookup map
     state.ts                  # AppState, theme, mobile detection, pub-sub
+    preferences-store.ts      # localStorage adapter for user preferences (theme, sidebar, log-level)
     charts.ts                 # SVG chart rendering (bar, line, donut, area)
     command-palette.ts        # Cmd+K search overlay with keyboard navigation
-    dom.ts                    # querySelector wrappers ($, $$, $input, $select, $textarea), attr(), populateIcons(), initToggleGroup()
+    dom.ts                    # querySelector wrappers ($, $$, $required, $input, $select, $textarea), attr(), populateIcons(), initToggleGroup()
     toast.ts                  # showToast() auto-dismiss notifications
-    logger.ts                 # Lightweight logger respecting fusion-ai:log-level in localStorage
+    logger.ts                 # Lightweight logger using preferences-store for log-level
     safe-html.ts              # SafeHtml class, html tagged template, trusted(), setHtml()
     loading-states.ts         # Loading skeletons, error states, empty states, withLoadingState()
     adapters/                 # ~30 adapter functions (API → frontend shapes)
@@ -201,7 +209,12 @@ web-app/
       ideas.ts                # getIdeas, getIdeaDetail, getReviewQueue, getIdeaForConversion, getIdeaForApproval, getIdea, putIdea, putIdeaSubmission
       projects.ts             # getProjects, getProjectById, putProject, putProjectTeamMember
       teams.ts                # getTeamMembers, getManagedUsers
-      flows.ts                # getFlows, getFlowsByProject, getFlowGraph, postFlowCreation, putFlow, etc.
+      flows.ts                # Barrel re-export from flow-* modules
+      flow-queries.ts         # getFlows, getFlowsByProject, getFlowGraph + graph types
+      flow-mutations.ts       # postFlowCreation, postNodeAddition, postEdgeConnection, postFieldAddition, putFlow, putNode, putWfEdge, putField
+      flow-deletions.ts       # deleteNode/Edge/Field + capture functions for undo
+      flow-undo-adapter.ts    # executeUndoSteps
+      flow-export.ts          # exportFlowMermaid, exportFlowZip, importFlowFromMermaid, importFlowFromZip
       admin.ts                # getAccount, getProfile, getCompanySettings, getActivityFeed
     styles/                   # CSS modules (cascade-ordered) — build inputs
       fonts.css               # @font-face declarations

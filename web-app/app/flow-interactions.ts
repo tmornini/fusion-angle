@@ -5,25 +5,54 @@ export interface ViewBox {
     h: number;
 }
 
+export type Selection =
+    | { kind: 'none' }
+    | { kind: 'node'; nodeId: string }
+    | { kind: 'edge'; edgeId: string };
+
+export type DragMode =
+    | { kind: 'idle' }
+    | {
+        kind: 'dragging';
+        nodeId: string;
+        offsetX: number;
+        offsetY: number;
+        currentX: number;
+        currentY: number;
+    };
+
+export type ConnectMode =
+    | { kind: 'idle' }
+    | {
+        kind: 'connecting';
+        fromNodeId: string;
+        toX: number;
+        toY: number;
+    };
+
+export type PanMode =
+    | { kind: 'idle' }
+    | {
+        kind: 'panning';
+        startX: number;
+        startY: number;
+    };
+
+export type LastClick =
+    | { kind: 'none' }
+    | {
+        kind: 'clicked';
+        id: string;
+        time: number;
+    };
+
 export interface InteractionState {
-    selectedNodeId: string | null;
-    selectedEdgeId: string | null;
+    selection: Selection;
     isPanelOpen: boolean;
-    lastClickId: string | null;
-    lastClickTime: number;
-    isDragging: boolean;
-    dragNodeId: string | null;
-    dragOffsetX: number;
-    dragOffsetY: number;
-    dragCurrentX: number;
-    dragCurrentY: number;
-    isConnecting: boolean;
-    connectFromNodeId: string | null;
-    connectToX: number;
-    connectToY: number;
-    isPanning: boolean;
-    panStartX: number;
-    panStartY: number;
+    lastClick: LastClick;
+    drag: DragMode;
+    connect: ConnectMode;
+    pan: PanMode;
     viewBox: ViewBox;
     zoom: number;
     activePointerId: number;
@@ -49,24 +78,12 @@ export function createInteractionState(
     viewBoxH: number,
 ): InteractionState {
     return {
-        selectedNodeId: null,
-        selectedEdgeId: null,
+        selection: { kind: 'none' },
         isPanelOpen: false,
-        lastClickId: null,
-        lastClickTime: 0,
-        isDragging: false,
-        dragNodeId: null,
-        dragOffsetX: 0,
-        dragOffsetY: 0,
-        dragCurrentX: 0,
-        dragCurrentY: 0,
-        isConnecting: false,
-        connectFromNodeId: null,
-        connectToX: 0,
-        connectToY: 0,
-        isPanning: false,
-        panStartX: 0,
-        panStartY: 0,
+        lastClick: { kind: 'none' },
+        drag: { kind: 'idle' },
+        connect: { kind: 'idle' },
+        pan: { kind: 'idle' },
         viewBox: {
             x: -viewBoxW / 2,
             y: -viewBoxH / 2,
@@ -128,15 +145,23 @@ function handlePointerDown(
     if (nodeId) {
         const now = Date.now();
         const isDbl =
-            nodeId === state.lastClickId
-            && now - state.lastClickTime
+            state.lastClick.kind
+                === 'clicked'
+            && nodeId
+                === state.lastClick.id
+            && now - state.lastClick.time
                 < DBLCLICK_MS;
-        state.selectedNodeId = nodeId;
-        state.selectedEdgeId = null;
-        state.lastClickId = nodeId;
-        state.lastClickTime = now;
+        state.selection = {
+            kind: 'node', nodeId,
+        };
+        state.lastClick = {
+            kind: 'clicked',
+            id: nodeId,
+            time: now,
+        };
         state.isPanelOpen = isDbl;
-        const pos = getNodePosition(nodeId);
+        const pos =
+            getNodePosition(nodeId);
         if (!pos) {
             onUpdate();
             return;
@@ -145,10 +170,12 @@ function handlePointerDown(
             target, 'data-connect-port',
         ) !== null;
         if (isPort || !pos.isDraggable) {
-            state.isConnecting = true;
-            state.connectFromNodeId = nodeId;
-            state.connectToX = svgPt.x;
-            state.connectToY = svgPt.y;
+            state.connect = {
+                kind: 'connecting',
+                fromNodeId: nodeId,
+                toX: svgPt.x,
+                toY: svgPt.y,
+            };
             state.activePointerId =
                 e.pointerId;
             svg.setPointerCapture(
@@ -157,16 +184,19 @@ function handlePointerDown(
             onUpdate();
             return;
         }
-        state.isDragging = true;
-        state.dragNodeId = nodeId;
-        state.dragCurrentX = pos.x;
-        state.dragCurrentY = pos.y;
-        state.dragOffsetX =
-            svgPt.x - pos.x;
-        state.dragOffsetY =
-            svgPt.y - pos.y;
-        state.activePointerId = e.pointerId;
-        svg.setPointerCapture(e.pointerId);
+        state.drag = {
+            kind: 'dragging',
+            nodeId,
+            currentX: pos.x,
+            currentY: pos.y,
+            offsetX: svgPt.x - pos.x,
+            offsetY: svgPt.y - pos.y,
+        };
+        state.activePointerId =
+            e.pointerId;
+        svg.setPointerCapture(
+            e.pointerId,
+        );
         onUpdate();
         return;
     }
@@ -177,26 +207,33 @@ function handlePointerDown(
     if (edgeId) {
         const now = Date.now();
         const isDbl =
-            edgeId === state.lastClickId
-            && now - state.lastClickTime
+            state.lastClick.kind
+                === 'clicked'
+            && edgeId
+                === state.lastClick.id
+            && now - state.lastClick.time
                 < DBLCLICK_MS;
-        state.selectedEdgeId = edgeId;
-        state.selectedNodeId = null;
-        state.lastClickId = edgeId;
-        state.lastClickTime = now;
+        state.selection = {
+            kind: 'edge', edgeId,
+        };
+        state.lastClick = {
+            kind: 'clicked',
+            id: edgeId,
+            time: now,
+        };
         state.isPanelOpen = isDbl;
         onUpdate();
         return;
     }
 
-    state.selectedNodeId = null;
-    state.selectedEdgeId = null;
+    state.selection = { kind: 'none' };
     state.isPanelOpen = false;
-    state.lastClickId = null;
-    state.lastClickTime = 0;
-    state.isPanning = true;
-    state.panStartX = e.clientX;
-    state.panStartY = e.clientY;
+    state.lastClick = { kind: 'none' };
+    state.pan = {
+        kind: 'panning',
+        startX: e.clientX,
+        startY: e.clientY,
+    };
     state.activePointerId = e.pointerId;
     svg.setPointerCapture(e.pointerId);
     onUpdate();
@@ -208,40 +245,60 @@ function handlePointerMove(
     state: InteractionState,
     onUpdate: InteractionCallback,
 ): void {
-    if (state.isDragging) {
+    if (state.drag.kind === 'dragging') {
         const svgPt = screenToSvg(
             svg, e.clientX, e.clientY,
         );
-        state.dragCurrentX =
-            svgPt.x - state.dragOffsetX;
-        state.dragCurrentY =
-            svgPt.y - state.dragOffsetY;
+        state.drag = {
+            ...state.drag,
+            currentX:
+                svgPt.x
+                - state.drag.offsetX,
+            currentY:
+                svgPt.y
+                - state.drag.offsetY,
+        };
         onUpdate();
         return;
     }
 
-    if (state.isConnecting) {
+    if (
+        state.connect.kind
+            === 'connecting'
+    ) {
         const svgPt = screenToSvg(
             svg, e.clientX, e.clientY,
         );
-        state.connectToX = svgPt.x;
-        state.connectToY = svgPt.y;
+        state.connect = {
+            ...state.connect,
+            toX: svgPt.x,
+            toY: svgPt.y,
+        };
         onUpdate();
         return;
     }
 
-    if (state.isPanning) {
-        const dx = e.clientX - state.panStartX;
-        const dy = e.clientY - state.panStartY;
-        const rect = svg.getBoundingClientRect();
+    if (state.pan.kind === 'panning') {
+        const dx =
+            e.clientX
+            - state.pan.startX;
+        const dy =
+            e.clientY
+            - state.pan.startY;
+        const rect =
+            svg.getBoundingClientRect();
         const scaleX =
             state.viewBox.w / rect.width;
         const scaleY =
-            state.viewBox.h / rect.height;
+            state.viewBox.h
+            / rect.height;
         state.viewBox.x -= dx * scaleX;
         state.viewBox.y -= dy * scaleY;
-        state.panStartX = e.clientX;
-        state.panStartY = e.clientY;
+        state.pan = {
+            kind: 'panning',
+            startX: e.clientX,
+            startY: e.clientY,
+        };
         onUpdate();
     }
 }
@@ -261,14 +318,13 @@ function handlePointerUp(
         toNodeId: string,
     ) => void,
 ): void {
-    if (state.isDragging && state.dragNodeId) {
+    if (state.drag.kind === 'dragging') {
         onNodeDragEnd(
-            state.dragNodeId,
-            state.dragCurrentX,
-            state.dragCurrentY,
+            state.drag.nodeId,
+            state.drag.currentX,
+            state.drag.currentY,
         );
-        state.isDragging = false;
-        state.dragNodeId = null;
+        state.drag = { kind: 'idle' };
         state.activePointerId = 0;
         svg.releasePointerCapture(
             e.pointerId,
@@ -278,9 +334,11 @@ function handlePointerUp(
     }
 
     if (
-        state.isConnecting
-        && state.connectFromNodeId
+        state.connect.kind
+            === 'connecting'
     ) {
+        const fromId =
+            state.connect.fromNodeId;
         const target =
             document.elementFromPoint(
                 e.clientX, e.clientY,
@@ -293,19 +351,14 @@ function handlePointerUp(
                 );
             if (
                 toNodeId
-                && toNodeId
-                    !== state
-                        .connectFromNodeId
+                && toNodeId !== fromId
             ) {
                 onEdgeCreated(
-                    state
-                        .connectFromNodeId,
-                    toNodeId,
+                    fromId, toNodeId,
                 );
             }
         }
-        state.isConnecting = false;
-        state.connectFromNodeId = null;
+        state.connect = { kind: 'idle' };
         state.activePointerId = 0;
         svg.releasePointerCapture(
             e.pointerId,
@@ -314,8 +367,8 @@ function handlePointerUp(
         return;
     }
 
-    if (state.isPanning) {
-        state.isPanning = false;
+    if (state.pan.kind === 'panning') {
+        state.pan = { kind: 'idle' };
         state.activePointerId = 0;
         svg.releasePointerCapture(
             e.pointerId,

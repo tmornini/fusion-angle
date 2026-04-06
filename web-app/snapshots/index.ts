@@ -1,8 +1,8 @@
 import {
     deleteSchema,
-    createSchema,
-    bootstrapData,
-    loadMockData,
+    postSchemaCreation,
+    postBootstrap,
+    postMockDataLoad,
     importSnapshot,
     exportSnapshot,
     hasData,
@@ -305,8 +305,8 @@ export async function init(
                     'Create pristine'
                     + ' environment',
                     async () => {
-                        await createSchema();
-                        await bootstrapData();
+                        await postSchemaCreation();
+                        await postBootstrap();
                     },
                     'Are you sure you'
                     + ' want to create a'
@@ -332,8 +332,8 @@ export async function init(
                     reloadBtn,
                     'Load mock data',
                     async () => {
-                        await createSchema();
-                        await loadMockData();
+                        await postSchemaCreation();
+                        await postMockDataLoad();
                     },
                 ),
         );

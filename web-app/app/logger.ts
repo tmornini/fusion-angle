@@ -1,14 +1,22 @@
+import {
+    readPreference,
+} from './preferences-store';
+
 const STORAGE_KEY_LOG_LEVEL =
     'fusion-ai:log-level';
-const LEVELS = { debug: 0, info: 1, warn: 2, error: 3 } as const;
+const LEVELS = {
+    debug: 0, info: 1,
+    warn: 2, error: 3,
+} as const;
 type Level = keyof typeof LEVELS;
 
 function getConfiguredLevel(): Level {
-    try {
-        const raw = localStorage
-                .getItem(STORAGE_KEY_LOG_LEVEL);
-        if (raw && raw in LEVELS) return raw as Level;
-    } catch { /* localStorage unavailable */ }
+    const raw = readPreference(
+        STORAGE_KEY_LOG_LEVEL,
+    );
+    if (raw && raw in LEVELS) {
+        return raw as Level;
+    }
     return 'warn';
 }
 

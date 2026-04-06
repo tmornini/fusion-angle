@@ -163,6 +163,52 @@ SVG chart rendering functions in `web-app/app/charts.ts`. All charts use design 
 | Donut | `renderDonutChart()` | Proportions, status distribution |
 | Area | `renderAreaChart()` | Volume trends |
 
+### Flow Designer
+
+SVG workflow canvas in `web-app/app/flow-graph.ts`
+with interactions in `flow-interactions.ts` and
+presenter in `presenters/flow-designer.ts`.
+
+**Canvas**: Dot grid pattern, 24px cell size, on
+`--color-surface` background.
+
+**Nodes**: 140x56px rounded rectangles, 10px corner
+radius. Three types:
+
+| Type | Border | Port | Draggable |
+|------|--------|------|-----------|
+| Start (New) | Green, 2.5px | None | No |
+| Complete | Green double-border, 3px | None | Yes |
+| Regular | Blue `#4B6CA1`, 2px | Right side | Yes |
+
+**Edges**: Cubic bezier curves between node
+perimeters.
+
+| Type | Stroke | Arrow | Dash |
+|------|--------|-------|------|
+| Forward | Blue `#4B6CA1` | Blue | Solid |
+| Cycle | Amber `#d97706` | Amber | `6 3` |
+
+Edge classification uses graph distance from the
+start node (BFS rank), not geometric position. A
+forward edge moves further from start; a cycle edge
+moves closer or stays at the same distance.
+
+Labels render at the bezier midpoint in a pill with
+`--color-card-bg` background. Bidirectional pairs
+are separated with a perpendicular offset.
+
+**Selection**: Blue glow filter on selected node,
+thicker stroke (3px) on selected edge.
+
+**Constraints**:
+- No duplicate edges (same direction between a pair)
+- Start node: one outgoing edge, no incoming
+- Complete node: no outgoing edges, multiple incoming
+  allowed from different nodes
+- Bidirectional pairs separated with perpendicular
+  offset
+
 ### Dark Mode
 
 CSS custom properties on `:root` define light theme values. The `[data-theme="dark"]` selector overrides them for dark mode. Toggle is persisted to `localStorage` and respects `prefers-color-scheme` for initial detection.

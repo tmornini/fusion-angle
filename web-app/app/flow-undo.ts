@@ -49,20 +49,28 @@ export class UndoManager {
     }
 
     push(action: UndoAction): void {
-        this.#undoStack.push(action);
-        this.#redoStack.length = 0;
+        this.#undoStack = [
+            ...this.#undoStack,
+            action,
+        ];
+        this.#redoStack = [];
     }
 
     async undo(): Promise<
         UndoAction | null
     > {
         const action =
-            this.#undoStack.pop();
+            this.#undoStack.at(-1);
         if (!action) return null;
+        this.#undoStack =
+            this.#undoStack.slice(0, -1);
         await this.#executor(
             action.reverse,
         );
-        this.#redoStack.push(action);
+        this.#redoStack = [
+            ...this.#redoStack,
+            action,
+        ];
         return action;
     }
 
@@ -70,12 +78,17 @@ export class UndoManager {
         UndoAction | null
     > {
         const action =
-            this.#redoStack.pop();
+            this.#redoStack.at(-1);
         if (!action) return null;
+        this.#redoStack =
+            this.#redoStack.slice(0, -1);
         await this.#executor(
             action.forward,
         );
-        this.#undoStack.push(action);
+        this.#undoStack = [
+            ...this.#undoStack,
+            action,
+        ];
         return action;
     }
 

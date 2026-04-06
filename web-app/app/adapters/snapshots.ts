@@ -5,16 +5,23 @@ export async function deleteSchema(): Promise<void> {
     await DELETE('snapshots/schema');
 }
 
-export async function createSchema(): Promise<void> {
+export async function postSchemaCreation(
+): Promise<void> {
     await POST('snapshots/schema', {});
 }
 
-export async function loadMockData(): Promise<void> {
-    await POST('snapshots/mock-data', {});
+export async function postMockDataLoad(
+): Promise<void> {
+    await POST(
+        'snapshots/mock-data', {},
+    );
 }
 
-export async function bootstrapData(): Promise<void> {
-    await POST('snapshots/bootstrap', {});
+export async function postBootstrap(
+): Promise<void> {
+    await POST(
+        'snapshots/bootstrap', {},
+    );
 }
 
 export async function importSnapshot(json: string): Promise<void> {

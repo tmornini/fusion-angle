@@ -108,13 +108,8 @@ export const allStrengths = [
 export async function getProfile(
 ): Promise<Profile> {
     const user =
-        await GET<UserEntity | null>(
+        await GET<UserEntity>(
             'current-user',
-        );
-    if (!user || !user.email)
-        throw new Error(
-            'No current user found'
-            + ' — cannot load profile',
         );
     const userObj = new User(user);
     return {

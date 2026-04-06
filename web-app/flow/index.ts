@@ -188,58 +188,56 @@ async function handleFileSelect(
 
     closeDialog('import-flow');
 
+    const ext = file.name
+        .split('.').pop()
+        ?.toLowerCase();
+
+    let result: {
+        flowId: string;
+        warnings: string[];
+    };
     try {
-        const ext = file.name
-            .split('.').pop()
-            ?.toLowerCase();
-        let flowId: string;
-        let warnings: string[];
-
-        if (ext === 'zip') {
-            const buf =
-                await file.arrayBuffer();
-            const data =
-                new Uint8Array(buf);
-            const r =
-                await importFlowFromZip(
-                    data, projectId,
-                );
-            flowId = r.flowId;
-            warnings = r.warnings;
-        } else {
-            const text = await file.text();
-            const r =
-                await importFlowFromMermaid(
-                    text, projectId,
-                );
-            flowId = r.flowId;
-            warnings = r.warnings;
-        }
-
-        if (warnings.length > 0) {
-            showToast(
-                'Imported with '
-                + String(warnings.length)
-                + ' warning(s)',
-                'warning',
+        result = ext === 'zip'
+            ? await importFlowFromZip(
+                new Uint8Array(
+                    await file.arrayBuffer(),
+                ),
+                projectId,
+            )
+            : await importFlowFromMermaid(
+                await file.text(),
+                projectId,
             );
-        } else {
-            showToast(
-                'Flow imported',
-                'success',
-            );
-        }
-
-        navigateTo(
-            'flow-detail',
-            { flowId },
-        );
     } catch (err) {
-        const msg = err instanceof Error
-            ? err.message
-            : 'Import failed';
+        const msg =
+            err instanceof Error
+                ? err.message
+                : 'Import failed';
         showToast(msg, 'error');
+        input.value = '';
+        return;
     }
 
     input.value = '';
+
+    if (result.warnings.length > 0) {
+        showToast(
+            'Imported with '
+            + String(
+                result.warnings.length,
+            )
+            + ' warning(s)',
+            'warning',
+        );
+    } else {
+        showToast(
+            'Flow imported',
+            'success',
+        );
+    }
+
+    navigateTo(
+        'flow-detail',
+        { flowId: result.flowId },
+    );
 }
