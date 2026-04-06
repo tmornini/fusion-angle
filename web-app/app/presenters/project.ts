@@ -122,7 +122,9 @@ export class ProjectPresenter {
             'badge '
             + cfg.className
             + ' text-xs'
-        }">${
+        }" data-status="${
+            this.#status
+        }" style="cursor:pointer">${
             icon(14, '')
         } ${cfg.label}</span>`;
     }
@@ -338,6 +340,8 @@ export class ProjectListPresenter {
     readonly #statusBadges: SafeHtml;
     #view: 'priority' | 'performance' =
         'priority';
+    #filterStatus: ProjectStatus | null =
+        null;
 
     constructor(projects: Project[]) {
         this.#projects = projects.map(
@@ -377,9 +381,30 @@ export class ProjectListPresenter {
         return this.#statusBadges;
     }
 
+    toggleFilter(
+        status: ProjectStatus | null,
+    ): void {
+        this.#filterStatus =
+            this.#filterStatus === status
+                ? null
+                : status;
+    }
+
+    activeFilter():
+        ProjectStatus | null {
+        return this.#filterStatus;
+    }
+
     renderList(): SafeHtml {
+        const filtered =
+            this.#filterStatus
+                ? this.#projects.filter(
+                    p => p.statusGroup()
+                        === this.#filterStatus,
+                )
+                : this.#projects;
         const sorted =
-            [...this.#projects].sort(
+            [...filtered].sort(
                 (a, b) =>
                     this.#view === 'priority'
                         ? a.prioritySortKey()
@@ -393,7 +418,14 @@ export class ProjectListPresenter {
     }
 
     countLabel(): string {
-        const n = this.#projects.length;
+        const filtered =
+            this.#filterStatus
+                ? this.#projects.filter(
+                    p => p.statusGroup()
+                        === this.#filterStatus,
+                )
+                : this.#projects;
+        const n = filtered.length;
         return n
             + ' '
             + (n === 1

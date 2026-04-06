@@ -577,6 +577,7 @@ export class IdeaPresenter {
                     'flex items-center gap-2'
                 }">
                 ${this.#status === 'active'
+                    || this.#status === 'sent-back'
                     ? html`
                 <button
                     class="${

@@ -1,6 +1,6 @@
 # Fusion AI — Test Plan
 
-> **Encoding:** `- [ ]` = pending, `- [x]` = PASS, `- [FAIL]` = failure (add note)
+> **Encoding:** `- [ ]` = pending, `- [ ]` = PASS, `- [FAIL]` = failure (add note)
 
 ### Protocol
 

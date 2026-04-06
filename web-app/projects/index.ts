@@ -18,6 +18,10 @@ import {
     iconFolderKanban,
 } from '../app/icons';
 import { navigateTo } from '../app/core';
+import {
+    type ProjectStatus,
+    isProjectStatus,
+} from '../../api/types';
 import { getProjects } from '../app/adapters';
 import {
     ProjectListPresenter,
@@ -70,6 +74,61 @@ export async function init(): Promise<void> {
             badgesEl,
             presenter.renderStatusBadges(),
         );
+        badgesEl.addEventListener(
+            'click',
+            (e) => {
+                if (
+                    !(e.target
+                        instanceof
+                        HTMLElement)
+                ) return;
+                const badge =
+                    e.target.closest<
+                        HTMLElement
+                    >('[data-status]');
+                if (!badge) return;
+                const s = attr(
+                    badge,
+                    'data-status',
+                );
+                if (!isProjectStatus(s))
+                    return;
+                presenter.toggleFilter(
+                    s as ProjectStatus,
+                );
+                updateBadgeStyles(
+                    badgesEl,
+                    presenter
+                        .activeFilter(),
+                );
+                renderList();
+            },
+        );
+    }
+
+    function updateBadgeStyles(
+        container: Element,
+        active: ProjectStatus | null,
+    ): void {
+        container
+            .querySelectorAll(
+                '[data-status]',
+            )
+            .forEach(el => {
+                if (
+                    el instanceof
+                    HTMLElement
+                ) {
+                    el.style.opacity =
+                        active
+                        && attr(
+                            el,
+                            'data-status',
+                        ) !== active
+                            ? '0.4'
+                            : '1';
+                }
+            });
     }
 
     function renderList(): void {
