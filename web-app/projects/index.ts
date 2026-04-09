@@ -1,20 +1,15 @@
 import {
     $,
     attr,
-    populateIcons,
-    initToggleGroup,
 } from '../app/dom';
 import {
     setHtml,
-    html,
 } from '../app/safe-html';
 import {
     buildSkeleton,
     withLoadingState,
 } from '../app/loading-states';
 import {
-    iconLayoutGrid,
-    iconBarChart,
     iconFolderKanban,
 } from '../app/icons';
 import { navigateTo } from '../app/core';
@@ -22,10 +17,16 @@ import {
     type ProjectStatus,
     isProjectStatus,
 } from '../../api/types';
-import { getProjects } from '../app/adapters';
+import {
+    getProjects,
+    putProject,
+} from '../app/adapters';
 import {
     ProjectListPresenter,
 } from '../app/presenters';
+import {
+    initDragReorder,
+} from '../app/drag-reorder';
 
 export async function init(): Promise<void> {
     const listContainer =
@@ -54,17 +55,6 @@ export async function init(): Promise<void> {
     if (!result) return;
     const presenter =
         new ProjectListPresenter(result);
-
-    populateIcons([
-        [
-            '#priority-view-icon',
-            iconLayoutGrid(16, ''),
-        ],
-        [
-            '#performance-view-icon',
-            iconBarChart(16, ''),
-        ],
-    ]);
 
     const badgesEl = $(
         '#status-badges', document,
@@ -140,12 +130,6 @@ export async function init(): Promise<void> {
                 presenter.renderList(),
             );
         }
-        const info =
-            $('#projects-info', document);
-        if (info) {
-            info.textContent =
-                presenter.countLabel();
-        }
     }
 
     listContainer.addEventListener(
@@ -174,18 +158,21 @@ export async function init(): Promise<void> {
         },
     );
 
-    initToggleGroup(
-        '.view-toggle-btn',
-        'data-view',
-        (view) => {
-            presenter.setView(
-                view as
-                    | 'priority'
-                    | 'performance',
+    renderList();
+
+    initDragReorder(
+        listContainer,
+        '[data-project-card]',
+        'data-project-card',
+        async (id, newPosition) => {
+            await putProject(
+                id,
+                { position: newPosition },
             );
+            const updated =
+                await getProjects();
+            presenter.update(updated);
             renderList();
         },
     );
-
-    renderList();
 }

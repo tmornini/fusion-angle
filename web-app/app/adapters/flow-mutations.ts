@@ -1,10 +1,61 @@
 import {
-    POST, PUT,
+    GET, POST, PUT,
 } from '../../../api/api';
+import type {
+    FlowEntity,
+    GraphNode,
+    GraphEdge,
+    GraphField,
+    WfFieldType,
+} from '../../../api/types';
 import {
     nowUtc,
-    jsonArrayField,
+    jsonObjectField,
+    DEFAULT_LOCK_TIMEOUT,
 } from '../../../api/types';
+import { parseJson } from './helpers';
+
+interface StoredGraph {
+    nodes: GraphNode[];
+    edges: GraphEdge[];
+}
+
+function parseGraph(
+    raw: string,
+): StoredGraph {
+    return parseJson<StoredGraph>(
+        raw,
+        { nodes: [], edges: [] },
+    );
+}
+
+function saveGraph(
+    graph: StoredGraph,
+): string {
+    return jsonObjectField(
+        graph as unknown as Record<
+            string, unknown
+        >,
+    );
+}
+
+async function loadAndUpdate(
+    flowId: string,
+    mutate: (g: StoredGraph) => void,
+): Promise<void> {
+    const entity =
+        await GET<FlowEntity>(
+            `flows/${flowId}`,
+        );
+    const graph = parseGraph(
+        entity.graph,
+    );
+    mutate(graph);
+    await PUT(`flows/${flowId}`, {
+        graph: saveGraph(graph),
+        updated_at: nowUtc(),
+    });
+}
 
 const DEFAULT_START_NAME = 'New';
 const DEFAULT_COMPLETE_NAME = 'Complete';
@@ -22,7 +73,6 @@ export interface FlowCreationContext {
 
 export interface NodeAdditionContext {
     nodeId: string;
-    flowNodeId: string;
     flowId: string;
     name: string;
     positionX: number;
@@ -31,7 +81,7 @@ export interface NodeAdditionContext {
 
 export interface EdgeConnectionContext {
     edgeId: string;
-    nodeEdgeId: string;
+    flowId: string;
     name: string;
     fromNodeId: string;
     toNodeId: string;
@@ -39,7 +89,7 @@ export interface EdgeConnectionContext {
 
 export interface FieldAdditionContext {
     fieldId: string;
-    nodeFieldId: string;
+    flowId: string;
     nodeId: string;
     name: string;
     fieldType: string;
@@ -51,136 +101,107 @@ export interface FieldAdditionContext {
 export async function postFlowCreation(
     ctx: FlowCreationContext,
 ): Promise<void> {
-    const startNodeId =
-        crypto.randomUUID();
-    const completeNodeId =
-        crypto.randomUUID();
     const now = nowUtc();
+    const startNode: GraphNode = {
+        id: crypto.randomUUID(),
+        name: DEFAULT_START_NAME,
+        description: '',
+        positionX: DEFAULT_START_X,
+        positionY: DEFAULT_START_Y,
+        isStart: true,
+        isComplete: false,
+        fields: [],
+    };
+    const completeNode: GraphNode = {
+        id: crypto.randomUUID(),
+        name: DEFAULT_COMPLETE_NAME,
+        description: '',
+        positionX: DEFAULT_COMPLETE_X,
+        positionY: DEFAULT_COMPLETE_Y,
+        isStart: false,
+        isComplete: true,
+        fields: [],
+    };
+    const graph: StoredGraph = {
+        nodes: [startNode, completeNode],
+        edges: [],
+    };
 
     await POST<void>('flows', {
         id: ctx.flowId,
         name: ctx.name,
         description: ctx.description,
+        lock_timeout: DEFAULT_LOCK_TIMEOUT,
+        graph: saveGraph(graph),
         created_at: now,
         updated_at: now,
     });
 
-    await Promise.all([
-        POST<void>('wf-nodes', {
-            id: startNodeId,
-            name: DEFAULT_START_NAME,
-            description: '',
-            position_x: DEFAULT_START_X,
-            position_y: DEFAULT_START_Y,
-            is_start: 1,
-            is_complete: 0,
-            created_at: now,
-        }),
-        POST<void>('wf-nodes', {
-            id: completeNodeId,
-            name: DEFAULT_COMPLETE_NAME,
-            description: '',
-            position_x: DEFAULT_COMPLETE_X,
-            position_y: DEFAULT_COMPLETE_Y,
-            is_start: 0,
-            is_complete: 1,
-            created_at: now,
-        }),
-    ]);
-
-    await Promise.all([
-        POST<void>('project-flows', {
-            id: crypto.randomUUID(),
-            project_id: ctx.projectId,
-            flow_id: ctx.flowId,
-            created_at: now,
-        }),
-        POST<void>('wf-flow-nodes', {
-            id: crypto.randomUUID(),
-            flow_id: ctx.flowId,
-            node_id: startNodeId,
-            created_at: now,
-        }),
-        POST<void>('wf-flow-nodes', {
-            id: crypto.randomUUID(),
-            flow_id: ctx.flowId,
-            node_id: completeNodeId,
-            created_at: now,
-        }),
-    ]);
+    await POST<void>('project-flows', {
+        id: crypto.randomUUID(),
+        project_id: ctx.projectId,
+        flow_id: ctx.flowId,
+        created_at: now,
+    });
 }
 
 export async function postNodeAddition(
     ctx: NodeAdditionContext,
 ): Promise<void> {
-    const now = nowUtc();
-
-    await POST<void>('wf-nodes', {
+    const node: GraphNode = {
         id: ctx.nodeId,
         name: ctx.name,
         description: '',
-        position_x: ctx.positionX,
-        position_y: ctx.positionY,
-        is_start: 0,
-        is_complete: 0,
-        created_at: now,
-    });
-
-    await POST<void>(
-        'wf-flow-nodes',
-        {
-            id: ctx.flowNodeId,
-            flow_id: ctx.flowId,
-            node_id: ctx.nodeId,
-            created_at: now,
-        },
+        positionX: ctx.positionX,
+        positionY: ctx.positionY,
+        isStart: false,
+        isComplete: false,
+        fields: [],
+    };
+    await loadAndUpdate(
+        ctx.flowId,
+        g => { g.nodes.push(node); },
     );
 }
 
 export async function postEdgeConnection(
     ctx: EdgeConnectionContext,
 ): Promise<void> {
-    const now = nowUtc();
-
-    await POST<void>('wf-edges', {
+    const edge: GraphEdge = {
         id: ctx.edgeId,
         name: ctx.name,
         description: '',
-        created_at: now,
-    });
-
-    await POST<void>('wf-node-edges', {
-        id: ctx.nodeEdgeId,
-        wf_edge_id: ctx.edgeId,
-        from_node_id: ctx.fromNodeId,
-        to_node_id: ctx.toNodeId,
-        created_at: now,
-    });
+        fromNodeId: ctx.fromNodeId,
+        toNodeId: ctx.toNodeId,
+    };
+    await loadAndUpdate(
+        ctx.flowId,
+        g => { g.edges.push(edge); },
+    );
 }
 
 export async function postFieldAddition(
     ctx: FieldAdditionContext,
 ): Promise<void> {
-    const now = nowUtc();
-
-    await POST<void>('wf-fields', {
+    const ft =
+        ctx.fieldType as WfFieldType;
+    const field: GraphField = {
         id: ctx.fieldId,
         name: ctx.name,
-        field_type: ctx.fieldType,
-        sort_order: ctx.sortOrder,
-        is_required:
-            ctx.isRequired ? 1 : 0,
-        options:
-            jsonArrayField(ctx.options),
-        created_at: now,
-    });
-
-    await POST<void>('wf-node-fields', {
-        id: ctx.nodeFieldId,
-        node_id: ctx.nodeId,
-        field_id: ctx.fieldId,
-        created_at: now,
-    });
+        fieldType: ft,
+        sortOrder: ctx.sortOrder,
+        isRequired: ctx.isRequired,
+        options: ctx.options,
+    };
+    await loadAndUpdate(
+        ctx.flowId,
+        g => {
+            const node = g.nodes.find(
+                n => n.id === ctx.nodeId,
+            );
+            if (node) node.fields.push(field);
+        },
+    );
 }
 
 export async function putFlow(
@@ -196,51 +217,134 @@ export async function putFlow(
     });
 }
 
-export async function putNode(
+export async function putFlowLocked(
     id: string,
+    isLocked: boolean,
+): Promise<void> {
+    await PUT(`flows/${id}`, {
+        is_locked: isLocked,
+        updated_at: nowUtc(),
+    });
+}
+
+export async function putNode(
+    flowId: string,
+    nodeId: string,
     fields: {
         name?: string;
         description?: string;
-        position_x?: number;
-        position_y?: number;
+        positionX?: number;
+        positionY?: number;
     },
 ): Promise<void> {
-    await PUT(`wf-nodes/${id}`, fields);
+    await loadAndUpdate(
+        flowId,
+        g => {
+            const node = g.nodes.find(
+                n => n.id === nodeId,
+            );
+            if (!node) return;
+            if (fields.name !== undefined)
+                node.name = fields.name;
+            if (
+                fields.description
+                    !== undefined
+            )
+                node.description =
+                    fields.description;
+            if (
+                fields.positionX
+                    !== undefined
+            )
+                node.positionX =
+                    fields.positionX;
+            if (
+                fields.positionY
+                    !== undefined
+            )
+                node.positionY =
+                    fields.positionY;
+        },
+    );
 }
 
 export async function putWfEdge(
-    id: string,
+    flowId: string,
+    edgeId: string,
     fields: {
         name?: string;
         description?: string;
     },
 ): Promise<void> {
-    await PUT(`wf-edges/${id}`, fields);
+    await loadAndUpdate(
+        flowId,
+        g => {
+            const edge = g.edges.find(
+                e => e.id === edgeId,
+            );
+            if (!edge) return;
+            if (fields.name !== undefined)
+                edge.name = fields.name;
+            if (
+                fields.description
+                    !== undefined
+            )
+                edge.description =
+                    fields.description;
+        },
+    );
 }
 
 export async function putField(
-    id: string,
+    flowId: string,
+    nodeId: string,
+    fieldId: string,
     fields: {
         name?: string;
-        field_type?: string;
-        sort_order?: number;
-        is_required?: boolean;
+        fieldType?: string;
+        sortOrder?: number;
+        isRequired?: boolean;
         options?: string[];
     },
 ): Promise<void> {
-    const body: Record<string, unknown> =
-        {};
-    if (fields.name !== undefined)
-        body.name = fields.name;
-    if (fields.field_type !== undefined)
-        body.field_type = fields.field_type;
-    if (fields.sort_order !== undefined)
-        body.sort_order = fields.sort_order;
-    if (fields.is_required !== undefined)
-        body.is_required =
-            fields.is_required ? 1 : 0;
-    if (fields.options !== undefined)
-        body.options =
-            jsonArrayField(fields.options);
-    await PUT(`wf-fields/${id}`, body);
+    await loadAndUpdate(
+        flowId,
+        g => {
+            const node = g.nodes.find(
+                n => n.id === nodeId,
+            );
+            if (!node) return;
+            const field = node.fields.find(
+                f => f.id === fieldId,
+            );
+            if (!field) return;
+            if (fields.name !== undefined)
+                field.name = fields.name;
+            if (
+                fields.fieldType
+                    !== undefined
+            ) {
+                const ft =
+                    fields.fieldType as
+                        WfFieldType;
+                field.fieldType = ft;
+            }
+            if (
+                fields.sortOrder
+                    !== undefined
+            )
+                field.sortOrder =
+                    fields.sortOrder;
+            if (
+                fields.isRequired
+                    !== undefined
+            )
+                field.isRequired =
+                    fields.isRequired;
+            if (
+                fields.options !== undefined
+            )
+                field.options = fields.options;
+        },
+    );
 }

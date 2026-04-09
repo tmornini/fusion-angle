@@ -5,8 +5,10 @@ import {
     iconTrendingUp,
     iconGripVertical,
     iconCheckCircle2,
-    iconAlertCircle,
     iconXCircle,
+    iconLightbulb,
+    iconClipboardCheck,
+    iconArrowLeft,
 } from '../icons';
 import {
     type Project,
@@ -15,6 +17,9 @@ import {
     COST_DIVISOR,
     SECONDS_PER_DAY,
 } from '../../../api/types';
+import {
+    orderedKeys,
+} from './ordered-keys';
 
 const STATUS_ICONS: Record<
     ProjectStatus,
@@ -24,11 +29,11 @@ const STATUS_ICONS: Record<
     ) => SafeHtml
 > = {
     'submitted': iconClock,
-    'under-review': iconAlertCircle,
-    'sent-back': iconXCircle,
+    'under-review': iconClipboardCheck,
+    'sent-back': iconArrowLeft,
     'approved': iconCheckCircle2,
     'declined': iconXCircle,
-    'completed': iconCheckCircle2,
+    'completed': iconLightbulb,
     'deleted': iconXCircle,
 };
 
@@ -40,6 +45,7 @@ export class ProjectPresenter {
     readonly #statusLabel: string;
     readonly #priority: number;
     readonly #priorityScore: number;
+    readonly #position: number;
     readonly #progress: number;
     readonly #timeCurrentDays: number;
     readonly #timeBaselineDays: number;
@@ -59,6 +65,7 @@ export class ProjectPresenter {
         this.#priority = project.priority;
         this.#priorityScore =
             project.priorityScore;
+        this.#position = project.position;
         this.#progress =
             project.timelineProgress();
         const start = new Date(
@@ -107,6 +114,10 @@ export class ProjectPresenter {
         return this.#priorityScore;
     }
 
+    positionSortKey(): number {
+        return this.#position;
+    }
+
     statusGroup(): ProjectStatus {
         return this.#status;
     }
@@ -124,12 +135,19 @@ export class ProjectPresenter {
             + ' text-xs'
         }" data-status="${
             this.#status
-        }" style="cursor:pointer">${
+        }" style="${
+            'cursor:pointer;'
+            + 'min-width:6rem;'
+            + 'justify-content:center'
+        }">${
             icon(14, '')
         } ${cfg.label}</span>`;
     }
 
-    buildCard(view: string): SafeHtml {
+    buildCard(
+        view: string,
+        showGrip: boolean,
+    ): SafeHtml {
         const statusIcon = STATUS_ICONS[
             this.#status
         ]!;
@@ -144,59 +162,51 @@ export class ProjectPresenter {
         return html`
     <div class="card card-hover"
         style="padding:1.25rem"
-        data-project-card="${this.#id}">
+        data-project-card="${this.#id}"
+        data-position="${this.#position}">
         <div class="${
             'flex items-center gap-4'
         }">
-            <div class="${
+            ${showGrip ? html`<div class="${
                 'hidden-mobile text-muted'
             }" style="cursor:grab">${
                 iconGripVertical(20, '')
-            }</div>
+            }</div>` : html``}
             <div style="${
                 'flex:1;min-width:0'
             }">
-                <div class="${
-                    'flex flex-wrap '
-                    + 'items-center'
-                    + ' gap-2'
-                }">
-                    <h3 class="${
-                        'font-display '
-                        + 'font-semibold'
-                    }" style="${
-                        'white-space:'
-                        + 'nowrap;'
-                        + 'overflow:'
-                        + 'hidden;'
-                        + 'text-overflow'
-                        + ':ellipsis'
-                    }">${
-                        this.#title
-                    }</h3>
-                    <span class="${
-                        'badge '
-                        + this
-                            .#statusClassName
-                        + ' text-xs'
-                    }">${
-                        statusIcon(
-                            14, '',
-                        )
-                    } ${
-                        this
-                            .#statusLabel
-                    }</span>
-                </div>
-                ${view === 'priority'
-                    ? html`<span
-                        class="${
-                            'text-xs'
-                            + ' text-muted'
-                        }">Priority #${
-                            this.#priority
-                        }</span>`
-                    : html``}
+                <h3 class="${
+                    'font-display '
+                    + 'font-semibold'
+                }" style="${
+                    'white-space:'
+                    + 'nowrap;'
+                    + 'overflow:'
+                    + 'hidden;'
+                    + 'text-overflow'
+                    + ':ellipsis'
+                }">${
+                    this.#title
+                }</h3>
+                <span class="${
+                    'badge '
+                    + this
+                        .#statusClassName
+                    + ' text-xs'
+                }" style="${
+                    'justify-content:'
+                    + 'center;'
+                    + 'min-width:6rem;'
+                    + 'margin-top:'
+                    + '0.25rem'
+                }">${
+                    statusIcon(
+                        14, '',
+                    )
+                } ${
+                    this
+                        .#statusLabel
+                }</span>
             </div>
             ${this.#buildMetrics(
                 metricBoxStyle,
@@ -336,10 +346,8 @@ export class ProjectPresenter {
 }
 
 export class ProjectListPresenter {
-    readonly #projects: ProjectPresenter[];
+    #projects: ProjectPresenter[];
     readonly #statusBadges: SafeHtml;
-    #view: 'priority' | 'performance' =
-        'priority';
     #filterStatus: ProjectStatus | null =
         null;
 
@@ -351,8 +359,13 @@ export class ProjectListPresenter {
             this.#projects,
             p => p.statusGroup(),
         );
+        const order: ProjectStatus[] = [
+            'completed', 'under-review',
+            'sent-back', 'approved',
+        ];
         const badges =
-            Object.values(groups)
+            orderedKeys(groups, order)
+                .map(s => groups[s])
                 .filter(
                     items =>
                         items
@@ -366,15 +379,10 @@ export class ProjectListPresenter {
             html`${badges}`;
     }
 
-    setView(
-        view: 'priority' | 'performance',
-    ): void {
-        this.#view = view;
-    }
-
-    currentView():
-        'priority' | 'performance' {
-        return this.#view;
+    update(projects: Project[]): void {
+        this.#projects = projects.map(
+            p => new ProjectPresenter(p),
+        );
     }
 
     renderStatusBadges(): SafeHtml {
@@ -400,40 +408,22 @@ export class ProjectListPresenter {
             this.#filterStatus
                 ? this.#projects.filter(
                     p => p.statusGroup()
-                        === this.#filterStatus,
+                        === this
+                            .#filterStatus,
                 )
                 : this.#projects;
         const sorted =
             [...filtered].sort(
                 (a, b) =>
-                    this.#view === 'priority'
-                        ? a.prioritySortKey()
-                            - b.prioritySortKey()
-                        : b.scoreSortKey()
-                            - a.scoreSortKey(),
+                    a.positionSortKey()
+                    - b.positionSortKey(),
             );
+        const hasGrip =
+            !this.#filterStatus;
         return html`${sorted.map(
-            p => p.buildCard(this.#view),
+            p => p.buildCard(
+                'position', hasGrip,
+            ),
         )}`;
-    }
-
-    countLabel(): string {
-        const filtered =
-            this.#filterStatus
-                ? this.#projects.filter(
-                    p => p.statusGroup()
-                        === this.#filterStatus,
-                )
-                : this.#projects;
-        const n = filtered.length;
-        return n
-            + ' '
-            + (n === 1
-                ? 'project'
-                : 'projects')
-            + ' \u2022 '
-            + (this.#view === 'priority'
-                ? 'by priority'
-                : 'by score');
     }
 }

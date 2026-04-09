@@ -4,8 +4,9 @@
 
 ### Protocol
 
-All sections are executed over HTTP — serve the unzipped build via
-a local HTTP server (e.g. `python3 -m http.server 8080`).
+All sections are executed over HTTP — build with
+`./build --no-zip /tmp/fusion-test/` and serve via
+`cd /tmp/fusion-test/ && python3 -m http.server 8080`.
 
 ### Execution Order
 
@@ -36,8 +37,8 @@ run as a single continuous regression pass.
 ## A. Build & Setup
 
 - [ ] **A1** Run `./build` from a clean working directory. PASS: exits 0, prints no errors, creates `~/Desktop/fusion-ai-<sha>.zip`.
-- [ ] **A2** Unzip the archive into a temp directory (e.g. `/tmp/fusion-test`). PASS: directory contains `assets/app.js`, `assets/styles.css`, `assets/` (*.woff2 fonts), `index.html`, and 12 page directories containing 23 HTML page files, plus root `index.html`.
-- [ ] **A3** Start an HTTP server from the unzipped directory (e.g. `python3 -m http.server 8080`). PASS: server starts without errors.
+- [ ] **A2** Run `./build --no-zip /tmp/fusion-test/`. PASS: `/tmp/fusion-test/` contains `assets/app.js`, `assets/styles.css`, `assets/` (*.woff2 fonts), `index.html`, and 12 page directories containing 23 HTML page files, plus root `index.html`.
+- [ ] **A3** Start an HTTP server from the build directory (`cd /tmp/fusion-test/ && python3 -m http.server 8080`). PASS: server starts without errors.
 - [ ] **A4** Open `http://localhost:8080/` in the test browser. PASS: redirects to `snapshots/index.html` when no data exists, or `landing/index.html` (which auto-redirects to `dashboard/index.html` after ~2 seconds) when data has been loaded.
 - [ ] **A5** Open DevTools Console and confirm no JavaScript errors on initial load. PASS: console is clean (warnings from browser extensions are acceptable).
 
@@ -79,24 +80,28 @@ on. Run these in order.
 
 - [ ] **AA18** Navigate to idea #1 detail (status: active). Click "Submit for Review". PASS: status changes to "In Review", button disappears.
 - [ ] **AA19** Submit ideas 1, 4, 7, 8, 9, 10, 11 for review (matching mock data statuses). PASS: each transitions from active to in-review.
-- [ ] **AA20** Navigate to Review Queue. PASS: the 7 submitted ideas appear with priority badges and readiness status.
+- [ ] **AA20** Navigate to Ideas list and filter by "In Review" status badge. PASS: the 7 submitted ideas appear.
 
 ### AA7. Approve Ideas & Convert to Projects
 
-- [ ] **AA28** Navigate to Review Queue. Click idea #1. PASS: navigates to approval detail.
+- [ ] **AA28** On Ideas list, filter by "In Review". Click idea #1. PASS: navigates to idea detail with approval footer.
 - [ ] **AA29** Click "Approve". PASS: idea status changes to approved, confirmation shown.
 - [ ] **AA30** Approve idea #4 as well (it was submitted for review in AA19). Leave others in their current status. PASS: statuses match mock data (2 approved, rest in-review/active).
 - [ ] **AA31** Navigate to approved idea #1. Click "Convert". PASS: conversion form loads with 6 required fields (Project Name, Lead, Start Date, End Date, Budget, Priority).
 - [ ] **AA32** Fill all required fields: Project Name, select "Sarah Chen" as project lead, Start Date, Target End Date, Budget, Priority. Click "Create Project". PASS: navigates to project detail for the new project.
 - [ ] **AA33** On project detail, click "Edit". Set fields (title, description, status, start date, end date, cost baseline, impact baseline) to match mock data. Save. PASS: project data persists.
-- [ ] **AA34** Approve remaining ideas (7, 8, 9, 10) from Review Queue, then convert all 6 approved ideas to projects. PASS: Projects list shows all 6 with correct status, progress, and priority.
+- [ ] **AA34** Approve remaining ideas (7, 8, 9, 10) from Ideas list (filter by "In Review"), then convert all 6 approved ideas to projects. PASS: Projects list shows all 6 with correct status, progress, and priority.
 
 ### AA9. Create Flows
 
 - [ ] **AA35** Navigate to Projects. Click into
-  project #1 detail. PASS: a "Flows" section
-  is visible showing "No flows yet" empty
-  state and a "New Flow" button.
+  project #1 detail (status: approved). PASS:
+  a "Flows" section is visible showing "No
+  flows yet" empty state and a "New Flow"
+  button. Non-approved projects show an info
+  badge "Approve to add flows" instead of
+  the button, and empty state reads "Flow
+  creation limited to approved projects only".
 - [ ] **AA36** Click "New Flow". PASS: navigates
   to the flow designer page. The SVG canvas
   shows two nodes: "New" (start, top-left with
@@ -284,9 +289,9 @@ on. Run these in order.
 
 - [ ] **D19b** Click "Edit", then "Cancel". PASS: returns to view mode with original data unchanged.
 - [ ] **D19c** For an idea in "in_review"
-  status: "Review" action button is visible.
-  PASS: clicking it navigates to
-  `ideas/approval-detail.html` page.
+  status: clicking the card navigates to
+  `ideas/detail.html` page with approval
+  footer (Approve / Send Back / Clarify).
 - [ ] **D19e** For a convertible idea: "Convert" action button is visible. PASS: clicking it navigates to `ideas/convert.html` page.
 - [ ] **D19f** Navigate to `ideas/detail.html?ideaId=999` (non-existent). PASS: page handles gracefully — shows error state, no unhandled JS exception.
 
@@ -298,7 +303,7 @@ on. Run these in order.
 ### Idea Detail — Sent Back Re-Submit
 
 - [ ] **D19m** Navigate to an idea with status "sent-back" (after a reviewer sends it back). PASS: "Submit for Review" button is visible, allowing re-submission.
-- [ ] **D19n** Click "Edit", modify a field, click "Save". PASS: idea updates. Click "Submit for Review". PASS: status changes to "In Review", idea reappears in Review Queue.
+- [ ] **D19n** Click "Edit", modify a field, click "Save". PASS: idea updates. Click "Submit for Review". PASS: status changes to "In Review".
 
 ### Idea Convert (`ideas/convert.html`)
 
@@ -306,37 +311,26 @@ on. Run these in order.
 - [ ] **D20b** With required fields empty, "Create Project" button is disabled and progress bar shows 0/6. Fill fields one at a time. PASS: progress bar increments with each field, checkmarks appear next to completed fields, button enables only when all 6 required fields are filled.
 - [ ] **D21** Fill all required fields (progress bar reaches 100%), click "Create Project". PASS: navigates to project detail page for the newly created project.
 
-### Idea Review Queue (`ideas/review-queue.html`)
+### Idea Status Filtering (`ideas/index.html`)
 
-- [ ] **D22** Navigate to `ideas/review-queue.html`. PASS: page shows 3 stats cards (Pending Review, Ready to Decide, Avg. Wait Time) and a list of ideas pending review.
-- [ ] **D22b** Each review card shows readiness
-  status (Ready for Review/Needs Info/Incomplete),
-  title, submitter, category, days waiting,
-  impact, and effort. PASS: all fields render
-  with data.
-- [ ] **D23** At least one idea with `in-review` status appears in the queue. PASS: idea 7 ("AI-Powered Customer Support Chatbot") or similar is listed.
-- [ ] **D23b** Type a search term in the search input. PASS: review cards filter by title or submitter name in real-time.
-- [ ] **D23c** Select "Ready" from the readiness filter dropdown. PASS: list shows only ready items. Reset to "All Status" → full list returns.
-- [ ] **D23e** Apply search + filter that matches no items. PASS: empty state shows "No ideas match your filters" message.
-- [ ] **D24** Click a review item. PASS: navigates to `ideas/approval-detail.html?id=<ideaId>`.
+- [ ] **D22** Navigate to `ideas/index.html`. PASS: status badges appear showing each status present in the data (e.g., Active, In Review, Approved).
+- [ ] **D23** Click a status badge. PASS: list filters to show only ideas with that status, badge is highlighted, others are dimmed, count updates.
+- [ ] **D23b** Click the same badge again. PASS: filter clears, all ideas shown, all badges at full opacity.
+- [ ] **D23c** Click a different badge. PASS: filter switches to the new status.
 
-### Approval Detail (`ideas/approval-detail.html`)
+### Idea Detail — Approval Actions
 
-- [ ] **D25** Navigate to `ideas/approval-detail.html?id=7`. PASS: page loads with full idea details for idea 7.
-- [ ] **D26** Page shows the idea title, submitter, date, category, idea overview, expected impact, effort, cost, risks, assumptions, and alignments. PASS: all content sections populated.
-- [ ] **D27** "Approve" action is available.
-  PASS: clicking it shows confirmation or
-  success feedback.
-- [ ] **D29** "Reject" or "Send Back" action is available. PASS: clicking it shows confirmation or reason dialog.
-- [ ] **D29b** Confirm the reject dialog. PASS: idea status changes to "sent-back", page updates to reflect rejected state.
-- [ ] **D30** Click "Request Clarification" button. PASS: clarification dialog opens. Submit the dialog. PASS: toast "Clarification requested" appears and dialog closes.
+- [ ] **D25** Navigate to `ideas/detail.html?ideaId=7` (in-review idea). PASS: page loads with idea details and sticky approval footer showing Clarify / Send Back / Approve.
+- [ ] **D27** Click "Approve". PASS: success toast, navigates to ideas list, idea status is now "approved".
+- [ ] **D29** Click "Send Back". PASS: dialog opens asking for feedback. Confirm. PASS: idea status changes to "sent-back", navigates to ideas list.
+- [ ] **D30** Click "Request Clarification". PASS: dialog opens. Submit. PASS: toast "Clarification requested" appears, dialog closes.
+- [ ] **D25b** Navigate to idea detail for a non-in-review idea. PASS: no approval footer is shown.
 
 ### Ideas Workflow Integration
 
 - [ ] **D31** After completing the idea-create wizard through to idea convert, navigate back to `ideas/`. PASS: the ideas list still loads correctly with seed data.
 - [ ] **D32** Navigate from ideas list → idea convert → back button. PASS: navigates to ideas list.
 - [ ] **D33** Navigate to `ideas/convert.html?ideaId=999` (non-existent). PASS: page handles gracefully — shows empty/error state, no unhandled JS exception.
-- [ ] **D34** Navigate to `ideas/approval-detail.html` with no `id` parameter. PASS: page handles gracefully — no crash.
 
 ---
 
@@ -360,10 +354,17 @@ on. Run these in order.
   project team members with roles. PASS: team
   members render with names and role badges.
 - [ ] **E5** Flows section shows linked flows with
-  node/edge counts and a "New Flow" button. PASS:
-  at least one flow displayed or empty state with
-  button visible.
-- [ ] **E5b** Click "New Flow" button. PASS: a new flow is created and the browser navigates to the flow designer page. The new flow is associated with the current project.
+  node/edge counts. For approved projects, a "New
+  Flow" button is visible. For non-approved
+  projects, an info badge "Approve to add flows"
+  appears instead and empty state reads "Flow
+  creation limited to approved projects only".
+  PASS: correct UI for project status.
+- [ ] **E5b** On an approved project, click "New
+  Flow" button. PASS: a new flow is created and
+  the browser navigates to the flow designer
+  page. The new flow is associated with the
+  current project.
 
 ### Project Detail — Edit Mode
 
@@ -506,6 +507,96 @@ on. Run these in order.
 
 ---
 
+## F2. Workbox
+
+### Workbox Inbox (`workbox/`)
+
+- [ ] **WB1** Navigate to `workbox/`. PASS:
+  page shows "Workbox" title, subtitle "Your
+  work order inbox", Active/Archive tabs, and
+  a "+ New" button.
+- [ ] **WB2** With no work orders, the Active
+  tab shows an empty state with mail icon and
+  "No Active Work Orders" message.
+- [ ] **WB3** Click the Archive tab. PASS: tab
+  switches to show archive list (empty state
+  initially).
+
+### Workbox — Create Work Order
+
+- [ ] **WB4** Click "+ New". PASS: a "New Work
+  Order" dialog opens with a Flow dropdown
+  listing available flows and Create/Cancel
+  buttons.
+- [ ] **WB5** Select a flow (e.g. "Customer
+  Onboarding") and click Create. PASS: work
+  order is created, browser navigates to the
+  action screen at the first post-start state
+  (e.g. "Data Capture"). Display ID (8-char
+  hex) is visible in the header.
+
+### Workbox — Action Screen (`workbox/detail.html`)
+
+- [ ] **WB6** The action screen shows: back link
+  ("Workbox"), flow name, display ID, current
+  state badge, and dynamically rendered fields
+  matching the current node's field definitions
+  from the flow graph.
+- [ ] **WB7** Field types render correctly: text
+  inputs, textareas, selects, number inputs,
+  date inputs, file inputs, checkboxes, radio
+  buttons as appropriate for each field type
+  in the flow definition.
+- [ ] **WB8** Transition buttons appear below
+  the fields, one per outgoing edge from the
+  current node, labeled with the edge name.
+- [ ] **WB9** An "Unclaim" button is visible,
+  separate from transition buttons.
+- [ ] **WB10** A collapsible History section
+  shows all transitions with from/to state
+  names, user name, and relative timestamp.
+
+### Workbox — Transitions
+
+- [ ] **WB11** Fill in required fields and click
+  a transition button. PASS: transition is
+  recorded, work order moves to the next state,
+  browser navigates back to the inbox. The work
+  order appears in the Active tab (unclaimed).
+- [ ] **WB12** Click the work order row in the
+  Active tab. PASS: work order is claimed and
+  browser navigates to the action screen
+  showing the new state's fields.
+- [ ] **WB13** Click "Unclaim". PASS: browser
+  navigates to inbox, work order reappears in
+  the Active tab.
+
+### Workbox — Completion
+
+- [ ] **WB14** Transition a work order to the
+  completion node (is_complete=true). PASS:
+  work order moves to the Archive tab. It no
+  longer appears in Active.
+- [ ] **WB15** Click a completed work order in
+  the Archive tab. PASS: action screen shows
+  read-only view with history but no fields
+  or transition buttons.
+
+### Workbox — Data Integrity
+
+- [ ] **WB16** After creating and transitioning
+  a work order, check localStorage. PASS:
+  work_orders table has 1 row with display_id
+  and flow_graph JSON. work_order_transitions
+  has immutable event records with from/to
+  node IDs, user ID, values JSON, and
+  timestamps.
+- [ ] **WB17** Navigate away from the action
+  screen and return. PASS: all data persists
+  correctly across page navigation.
+
+---
+
 ## G. Admin Pages
 
 ### Team (`organization/teams.html`)
@@ -624,6 +715,39 @@ on. Run these in order.
 
 - [ ] **I18** Download a snapshot, wipe data (Create Pristine), upload the snapshot. PASS: all data restored correctly — spot-check 3 pages to confirm content matches pre-wipe state.
 
+### Keyboard Shortcuts — Edit Modes & Dialogs
+
+- [ ] **I20** Ideas detail: click Edit, press Enter
+  in the title field. PASS: idea saves, returns
+  to view mode with updated data.
+- [ ] **I20b** Ideas detail: click Edit, press
+  Escape. PASS: returns to view mode, no save.
+- [ ] **I20c** Projects detail: click Edit, press
+  Enter in the title field. PASS: project saves.
+- [ ] **I20d** Projects detail: click Edit, press
+  Escape. PASS: returns to view mode, no save.
+- [ ] **I20e** Flow designer: open field editor,
+  type a name, press Enter. PASS: field is added.
+- [ ] **I20f** Profile: press Enter in first name
+  field. PASS: profile saves.
+- [ ] **I20g** Settings: press Enter in company name
+  field. PASS: settings save.
+- [ ] **I20h** Manage Users: open invite dialog,
+  fill fields, press Enter in email field. PASS:
+  dialog submits.
+- [ ] **I20i** Teams: open add-member dialog, type
+  email, press Enter. PASS: invitation sent.
+- [ ] **I20j** Idea conversion: fill required fields,
+  press Enter in project name. PASS: conversion
+  submits (if all required fields complete).
+- [ ] **I20k** Idea create wizard: type a title,
+  press Enter. PASS: wizard advances to next step.
+- [ ] **I20l** Any dialog: press Escape. PASS: dialog
+  closes without submitting.
+- [ ] **I20m** Ideas detail: click Edit, press Enter
+  in a textarea (e.g. Problem Statement). PASS:
+  newline is inserted, does NOT trigger save.
+
 ### General
 
 - [ ] **I19** Check DevTools Console after navigating through 5+ different pages. PASS: no unhandled JavaScript errors (warnings and info messages from browser extensions are acceptable).
@@ -633,7 +757,7 @@ on. Run these in order.
 ## J. Teardown
 
 - [ ] **J1** Stop the HTTP server started in A3. PASS: process terminates.
-- [ ] **J2** Remove the temp test directory (`rm -rf /tmp/fusion-test` or equivalent). PASS: directory removed.
+- [ ] **J2** Remove the build directory (`rm -rf /tmp/fusion-test` or equivalent). PASS: directory removed.
 - [ ] **J3** Verify the ZIP file remains on `~/Desktop` for archival. PASS: `fusion-ai-<sha>.zip` exists.
 
 ---

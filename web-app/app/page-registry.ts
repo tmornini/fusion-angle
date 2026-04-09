@@ -22,6 +22,23 @@ export const PAGE_REGISTRY: Record<
         icon: 'home',
         keywords: 'home overview',
     },
+    workbox: {
+        title: 'Workbox',
+        layout: 'sidebar',
+        sourceDir: 'workbox',
+        sourceFile: 'index',
+        icon: 'mail',
+        keywords:
+            'workbox inbox work order',
+    },
+    'workbox-detail': {
+        title: 'Work Order',
+        layout: 'sidebar',
+        sourceDir: 'workbox',
+        sourceFile: 'detail',
+        icon: 'mail',
+        searchable: false,
+    },
     ideas: {
         title: 'Ideas',
         layout: 'sidebar',
@@ -54,14 +71,6 @@ export const PAGE_REGISTRY: Record<
         sourceFile: 'detail',
         icon: 'folderKanban',
         searchable: false,
-    },
-    'idea-review-queue': {
-        title: 'Review Queue',
-        layout: 'sidebar',
-        sourceDir: 'ideas',
-        sourceFile: 'review-queue',
-        icon: 'clipboardCheck',
-        keywords: 'review approve reject',
     },
     flow: {
         title: 'Flows',
@@ -166,14 +175,6 @@ export const PAGE_REGISTRY: Record<
         sourceDir: 'ideas',
         sourceFile: 'convert',
         icon: 'lightbulb',
-        searchable: false,
-    },
-    'approval-detail': {
-        title: 'Approval Detail',
-        layout: 'sidebar',
-        sourceDir: 'ideas',
-        sourceFile: 'approval-detail',
-        icon: 'clipboardCheck',
         searchable: false,
     },
     auth: {

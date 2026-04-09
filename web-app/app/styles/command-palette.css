@@ -95,8 +95,10 @@
 }
 
 .command-palette-item[aria-selected="true"] {
-  outline: 2px solid hsl(var(--ring) / 0.5);
-  outline-offset: -2px;
+  outline: var(--focus-ring-width) solid
+    hsl(var(--focus-ring-color));
+  outline-offset:
+    calc(-1 * var(--focus-ring-width));
 }
 
 .command-palette-item-icon {

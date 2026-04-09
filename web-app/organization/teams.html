@@ -1,15 +1,9 @@
 <div>
-    <div
-        class="flex items-center
-            justify-between gap-4 mb-6"
-    >
+    <div class="page-header">
         <div>
-            <h1
-                class="text-2xl font-display
-                    font-bold"
-            >Teams</h1>
+            <h1 class="page-title">Teams</h1>
             <p
-                class="text-sm text-muted mt-1"
+                class="text-sm text-muted"
                 id="team-summary"
             ></p>
         </div>
@@ -89,25 +83,17 @@
         aria-hidden="true"
         style="max-width:28rem"
     >
-        <div
-            style="padding:1.5rem;
-                border-bottom:1px solid
-                    hsl(var(--border))"
-        >
-            <h3
-                class="text-lg font-display
-                    font-semibold"
-            >Add Team Member</h3>
-            <p class="text-sm text-muted">
-                Invite a new member to join
-                your team.
+        <div class="dialog-header">
+            <h3 class="dialog-title">
+                Add Team Member
+            </h3>
+            <p class="dialog-description">
+                Invite a new member to
+                join your team.
             </p>
         </div>
         <div
-            style="padding:1.5rem;
-                display:flex;
-                flex-direction:column;
-                gap:1rem"
+            class="flex flex-col gap-4"
         >
             <div>
                 <label
@@ -130,7 +116,8 @@
                     class="input"
                     id="add-member-email"
                     type="email"
-                    placeholder="email@company.com"
+                    placeholder=
+                        "email@company.com"
                 />
             </div>
             <div>
@@ -157,23 +144,24 @@
                     <option value="">
                         Select department
                     </option>
-                    <option>Engineering</option>
+                    <option>
+                        Engineering
+                    </option>
                     <option>Design</option>
                     <option>Product</option>
-                    <option>Operations</option>
-                    <option>Analytics</option>
-                    <option>Marketing</option>
+                    <option>
+                        Operations
+                    </option>
+                    <option>
+                        Analytics
+                    </option>
+                    <option>
+                        Marketing
+                    </option>
                 </select>
             </div>
         </div>
-        <div
-            style="padding:1rem 1.5rem;
-                border-top:1px solid
-                    hsl(var(--border));
-                display:flex;
-                justify-content:flex-end;
-                gap:0.75rem"
-        >
+        <div class="dialog-footer">
             <button
                 class="btn btn-outline"
                 id="add-member-cancel"

@@ -1,15 +1,19 @@
-import { POST, PUT } from '../../../api/api';
-import { nowUtc } from '../../../api/types';
+import { POST } from '../../../api/api';
+import {
+    nowUtc,
+    jsonObjectField,
+    DEFAULT_LOCK_TIMEOUT,
+} from '../../../api/types';
+import type {
+    GraphNode,
+    GraphEdge,
+    WfFieldType,
+} from '../../../api/types';
 import { parseJson } from './helpers';
 import {
     getFlowGraph,
 } from './flow-queries';
 import type { FlowGraph } from './flow-queries';
-import {
-    postEdgeConnection,
-    postFieldAddition,
-    putWfEdge,
-} from './flow-mutations';
 import {
     generateMermaid,
 } from '../mermaid-generate';
@@ -190,55 +194,19 @@ function layoutParsedNodes(
     );
 }
 
-async function createFlowShell(
-    flowId: string,
-    projectId: string,
-    name: string,
-    description: string,
-): Promise<void> {
-    const now = nowUtc();
-    await POST<void>('flows', {
-        id: flowId,
-        name,
-        description,
-        created_at: now,
-        updated_at: now,
-    });
-    await POST<void>('project-flows', {
-        id: crypto.randomUUID(),
-        project_id: projectId,
-        flow_id: flowId,
-        created_at: now,
-    });
+interface StoredGraph {
+    nodes: GraphNode[];
+    edges: GraphEdge[];
 }
 
-async function createImportedNode(
-    flowId: string,
-    nodeId: string,
-    name: string,
-    description: string,
-    x: number,
-    y: number,
-    isStart: boolean,
-    isComplete: boolean,
-): Promise<void> {
-    const now = nowUtc();
-    await POST<void>('wf-nodes', {
-        id: nodeId,
-        name,
-        description,
-        position_x: x,
-        position_y: y,
-        is_start: isStart ? 1 : 0,
-        is_complete: isComplete ? 1 : 0,
-        created_at: now,
-    });
-    await POST<void>('wf-flow-nodes', {
-        id: crypto.randomUUID(),
-        flow_id: flowId,
-        node_id: nodeId,
-        created_at: now,
-    });
+function saveGraph(
+    graph: StoredGraph,
+): string {
+    return jsonObjectField(
+        graph as unknown as Record<
+            string, unknown
+        >,
+    );
 }
 
 export async function importFlowFromMermaid(
@@ -256,6 +224,7 @@ export async function importFlowFromMermaid(
     }
 
     const flowId = crypto.randomUUID();
+    const now = nowUtc();
     const positions = layoutParsedNodes(
         parsed.nodes, parsed.edges,
     );
@@ -269,44 +238,62 @@ export async function importFlowFromMermaid(
         );
     }
 
-    await createFlowShell(
-        flowId, projectId,
-        parsed.nodes[0]!.name
-            + ' (import)',
-        '',
-    );
+    const nodes: GraphNode[] =
+        parsed.nodes.map(n => {
+            const nodeId = idMap.get(
+                n.mermaidId,
+            )!;
+            const pos = positions.get(
+                n.mermaidId,
+            );
+            return {
+                id: nodeId,
+                name: n.name,
+                description: '',
+                positionX: pos?.x ?? 0,
+                positionY: pos?.y ?? 0,
+                isStart: n.isStart,
+                isComplete: n.isComplete,
+                fields: [],
+            };
+        });
 
-    for (const n of parsed.nodes) {
-        const nodeId = idMap.get(
-            n.mermaidId,
-        )!;
-        const pos = positions.get(
-            n.mermaidId,
-        );
-        const x = pos?.x ?? 0;
-        const y = pos?.y ?? 0;
-        await createImportedNode(
-            flowId, nodeId,
-            n.name, '',
-            x, y,
-            n.isStart, n.isComplete,
-        );
-    }
-
+    const edges: GraphEdge[] = [];
     for (const e of parsed.edges) {
         const fromId =
             idMap.get(e.fromId);
         const toId = idMap.get(e.toId);
         if (!fromId || !toId) continue;
-        await postEdgeConnection({
-            edgeId: crypto.randomUUID(),
-            nodeEdgeId:
-                crypto.randomUUID(),
+        edges.push({
+            id: crypto.randomUUID(),
             name: e.name,
+            description: '',
             fromNodeId: fromId,
             toNodeId: toId,
         });
     }
+
+    const graph: StoredGraph = {
+        nodes, edges,
+    };
+
+    await POST<void>('flows', {
+        id: flowId,
+        name: parsed.nodes[0]!.name
+            + ' (import)',
+        description: '',
+        lock_timeout: DEFAULT_LOCK_TIMEOUT,
+        graph: saveGraph(graph),
+        created_at: now,
+        updated_at: now,
+    });
+
+    await POST<void>('project-flows', {
+        id: crypto.randomUUID(),
+        project_id: projectId,
+        flow_id: flowId,
+        created_at: now,
+    });
 
     return {
         flowId,
@@ -406,16 +393,12 @@ export async function importFlowFromZip(
     );
 
     const flowId = crypto.randomUUID();
+    const now = nowUtc();
     const flowName = sidecar?.name
         ?? parsed.nodes[0]!.name
             + ' (import)';
     const flowDesc =
         sidecar?.description ?? '';
-
-    await createFlowShell(
-        flowId, projectId,
-        flowName, flowDesc,
-    );
 
     const idMap =
         new Map<string, string>();
@@ -426,50 +409,54 @@ export async function importFlowFromZip(
         );
     }
 
-    for (const n of parsed.nodes) {
-        const nodeId = idMap.get(
-            n.mermaidId,
-        )!;
-        const sc = sidecarNodeMap.get(
-            n.mermaidId,
-        );
-        const pos = sc
-            ? { x: sc.positionX,
-                y: sc.positionY }
-            : positions.get(n.mermaidId);
-        const x = pos?.x ?? 0;
-        const y = pos?.y ?? 0;
-        const desc =
-            sc?.description ?? '';
+    const nodes: GraphNode[] =
+        parsed.nodes.map(n => {
+            const nodeId = idMap.get(
+                n.mermaidId,
+            )!;
+            const sc = sidecarNodeMap.get(
+                n.mermaidId,
+            );
+            const pos = sc
+                ? {
+                    x: sc.positionX,
+                    y: sc.positionY,
+                }
+                : positions.get(
+                    n.mermaidId,
+                );
+            return {
+                id: nodeId,
+                name: n.name,
+                description:
+                    sc?.description ?? '',
+                positionX: pos?.x ?? 0,
+                positionY: pos?.y ?? 0,
+                isStart: n.isStart,
+                isComplete: n.isComplete,
+                fields: sc
+                    ? sc.fields.map(f => {
+                        const ft =
+                            f.fieldType as
+                                WfFieldType;
+                        return {
+                            id: crypto
+                                .randomUUID(),
+                            name: f.name,
+                            fieldType: ft,
+                            sortOrder:
+                                f.sortOrder,
+                            isRequired:
+                                f.isRequired,
+                            options:
+                                f.options,
+                        };
+                    })
+                    : [],
+            };
+        });
 
-        await createImportedNode(
-            flowId, nodeId,
-            n.name, desc,
-            x, y,
-            n.isStart, n.isComplete,
-        );
-
-        if (sc) {
-            for (const f of sc.fields) {
-                await postFieldAddition({
-                    fieldId:
-                        crypto.randomUUID(),
-                    nodeFieldId:
-                        crypto.randomUUID(),
-                    nodeId,
-                    name: f.name,
-                    fieldType:
-                        f.fieldType,
-                    sortOrder:
-                        f.sortOrder,
-                    isRequired:
-                        f.isRequired,
-                    options: f.options,
-                });
-            }
-        }
-    }
-
+    const edges: GraphEdge[] = [];
     for (const e of parsed.edges) {
         const fromId =
             idMap.get(e.fromId);
@@ -480,23 +467,36 @@ export async function importFlowFromZip(
                 e.fromId, e.toId,
             ),
         );
-        const edgeId =
-            crypto.randomUUID();
-        await postEdgeConnection({
-            edgeId,
-            nodeEdgeId:
-                crypto.randomUUID(),
+        edges.push({
+            id: crypto.randomUUID(),
             name: e.name,
+            description:
+                se?.description ?? '',
             fromNodeId: fromId,
             toNodeId: toId,
         });
-        if (se?.description) {
-            await putWfEdge(edgeId, {
-                description:
-                    se.description,
-            });
-        }
     }
+
+    const graph: StoredGraph = {
+        nodes, edges,
+    };
+
+    await POST<void>('flows', {
+        id: flowId,
+        name: flowName,
+        description: flowDesc,
+        lock_timeout: DEFAULT_LOCK_TIMEOUT,
+        graph: saveGraph(graph),
+        created_at: now,
+        updated_at: now,
+    });
+
+    await POST<void>('project-flows', {
+        id: crypto.randomUUID(),
+        project_id: projectId,
+        flow_id: flowId,
+        created_at: now,
+    });
 
     return {
         flowId,

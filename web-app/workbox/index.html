@@ -1,0 +1,111 @@
+<div>
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">
+                Workbox
+            </h1>
+            <p class="text-sm text-muted">
+                Your work order inbox
+            </p>
+        </div>
+        <div
+            class="flex flex-wrap
+                items-center gap-3"
+        >
+            <button
+                class="btn btn-primary gap-2"
+                id="new-wo-btn"
+            >
+                <span id="new-wo-btn-icon">
+                </span>
+                <span class="hidden-mobile"
+                >+ New</span><span
+                    class="visible-mobile"
+                >New</span>
+            </button>
+        </div>
+    </div>
+
+    <div
+        class="flex items-center gap-2 mb-6"
+    >
+        <button
+            class="btn btn-sm active"
+            data-tab="active"
+        >Active</button>
+        <button
+            class="btn btn-sm"
+            data-tab="archive"
+        >Archive</button>
+    </div>
+
+    <div
+        id="tab-active"
+        class="tab-panel"
+    >
+        <div
+            id="active-list"
+            class="flex flex-col gap-3"
+        >
+        </div>
+    </div>
+
+    <div
+        id="tab-archive"
+        class="tab-panel"
+        style="display:none"
+    >
+        <div
+            id="archive-list"
+            class="flex flex-col gap-3"
+        >
+        </div>
+    </div>
+</div>
+
+<!-- New Work Order Dialog -->
+<div
+    class="dialog-backdrop hidden"
+    id="new-wo-backdrop"
+>
+    <div
+        class="dialog hidden"
+        id="new-wo-dialog"
+        aria-hidden="true"
+        style="max-width:28rem"
+    >
+        <div class="dialog-header">
+            <h3 class="dialog-title">
+                New Work Order
+            </h3>
+            <p class="dialog-description">
+                Select a flow to create
+                a new work order.
+            </p>
+        </div>
+        <div>
+            <label
+                class="label mb-1"
+                for="new-wo-flow"
+            >Flow</label>
+            <select
+                class="input"
+                id="new-wo-flow"
+            >
+                <option value="">
+                    Select a flow...
+                </option>
+            </select>
+        </div>
+        <div class="dialog-footer">
+            <button
+                class="btn btn-outline"
+                id="new-wo-cancel"
+            >Cancel</button>
+            <button
+                class="btn btn-primary"
+                id="new-wo-submit"
+            >Create</button>
+        </div>
+    </div>
+</div>

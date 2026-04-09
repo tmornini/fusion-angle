@@ -32,14 +32,25 @@ python3 -m http.server 8080
 ## Build
 
 ```sh
-./build
+./build                          # ZIP to ~/Desktop/
+./build --no-zip /tmp/test/      # bundle to /tmp/test/
+./build dist/                    # ZIP to dist/
+./build --help                   # show usage
 ```
 
 Requires a clean git working directory. The build:
 1. Composes sidebar-layout pages by assembling `web-app/app/components-layout.html` with `component-*.html` files and each page's `index.html`
 2. Bundles TypeScript via esbuild into a single JS file
 3. Bundles and minifies CSS via esbuild into styles.css, copies *.woff2 and favicon.ico
-4. Produces a distribution ZIP named `fusion-ai-<sha>.zip`
+4. Creates a distribution ZIP named `fusion-ai-<sha>.zip`, or keeps the bundle directory with `--no-zip`
+
+### Build & Test Locally
+
+```sh
+./build --no-zip /tmp/fusion-test/
+cd /tmp/fusion-test/ && python3 -m http.server 8080
+# open http://localhost:8080/landing/index.html
+```
 
 ## Tech Stack
 

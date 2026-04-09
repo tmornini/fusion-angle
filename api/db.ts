@@ -7,17 +7,15 @@ import type {
     TeamMembershipUserEntity,
     ActivityEntity,
     FlowEntity,
-    WfNodeEntity,
-    WfEdgeEntity,
-    WfFieldEntity,
     CompanySettingsEntity,
     AccountEntity,
     IdeaSubmissionEntity,
     ActivityActorEntity,
     ProjectFlowEntity,
-    WfFlowNodeEntity,
-    WfNodeEdgeEntity,
-    WfNodeFieldEntity,
+    WorkOrderEntity,
+    FlowWorkOrderEntity,
+    WorkOrderTransitionEntity,
+    WorkOrderClaimEntity,
 } from './types';
 
 export class EntityNotFound {
@@ -81,24 +79,26 @@ export interface DbAdapter {
         EntityStore<ActivityEntity>;
     flows:
         EntityStore<FlowEntity>;
-    wfNodes:
-        EntityStore<WfNodeEntity>;
-    wfEdges:
-        EntityStore<WfEdgeEntity>;
-    wfFields:
-        EntityStore<WfFieldEntity>;
     projectFlows:
         EntityStore<
             ProjectFlowEntity
         >;
-    wfFlowNodes:
+    workOrders:
         EntityStore<
-            WfFlowNodeEntity
+            WorkOrderEntity
         >;
-    wfNodeEdges:
-        EntityStore<WfNodeEdgeEntity>;
-    wfNodeFields:
-        EntityStore<WfNodeFieldEntity>;
+    flowWorkOrders:
+        EntityStore<
+            FlowWorkOrderEntity
+        >;
+    workOrderTransitions:
+        EntityStore<
+            WorkOrderTransitionEntity
+        >;
+    workOrderClaims:
+        EntityStore<
+            WorkOrderClaimEntity
+        >;
     companySettings:
         SingletonStore<
             CompanySettingsEntity

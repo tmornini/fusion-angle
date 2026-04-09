@@ -8,10 +8,21 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 ./validate             # Type-check + lint (works on dirty tree)
-./build                # Compile, bundle, minify, and create distribution ZIP
+./build                # Compile, bundle, minify, ZIP to ~/Desktop/
+./build --no-zip dir/  # Bundle to dir/ without zipping (for testing)
+./build dir/           # ZIP to dir/ instead of ~/Desktop/
+./build --help         # Show usage
 ```
 
 **Always commit before building.** `./build` requires a clean working directory. Use `./validate` to catch type errors and lint issues before committing, then commit, then build.
+
+**Build and test locally:**
+
+```bash
+./build --no-zip /tmp/fusion-test/
+cd /tmp/fusion-test/ && python3 -m http.server 8080
+# open http://localhost:8080/landing/index.html
+```
 
 `./validate` runs `tsc --noEmit` (type checking) then enforces 78-character maximum line length on all `.ts`, `.html`, and `.css` files (excluding `compose.ts`).
 
@@ -26,7 +37,7 @@ Target: **ES2024** · Strict mode with `noUncheckedIndexedAccess`. Config at `we
 **Vanilla TypeScript** with zero runtime dependencies.
 This is an enterprise innovation management platform
 with modules for ideas, projects, teams, flows,
-and analytics. Every page is a standalone HTML file
+workbox, and analytics. Every page is a standalone HTML file
 served via HTTP. The code also supports `file:///`
 protocol locally, but testing is HTTP-only.
 
@@ -196,7 +207,7 @@ web-app/
     preferences-store.ts      # localStorage adapter for user preferences (theme, sidebar, log-level)
     charts.ts                 # SVG chart rendering (bar, line, donut, area)
     command-palette.ts        # Cmd+K search overlay with keyboard navigation
-    dom.ts                    # querySelector wrappers ($, $$, $required, $input, $select, $textarea), attr(), populateIcons(), initToggleGroup()
+    dom.ts                    # querySelector wrappers ($, $$, $required, $input, $select, $textarea), attr(), populateIcons(), initToggleGroup(), bindEnterToClick()
     toast.ts                  # showToast() auto-dismiss notifications
     logger.ts                 # Lightweight logger using preferences-store for log-level
     safe-html.ts              # SafeHtml class, html tagged template, trusted(), setHtml()
@@ -206,7 +217,7 @@ web-app/
       helpers.ts              # buildUserMap, userName, parseJson
       shared.ts               # getCurrentUser
       dashboard.ts            # getDashboardGauges, getDashboardStats, etc.
-      ideas.ts                # getIdeas, getIdeaDetail, getReviewQueue, getIdeaForConversion, getIdeaForApproval, getIdea, putIdea, putIdeaSubmission
+      ideas.ts                # getIdeas, getIdeaDetail, getIdeaForConversion, getIdea, putIdea, putIdeaSubmission
       projects.ts             # getProjects, getProjectById, putProject, putProjectTeamMember
       teams.ts                # getTeamMembers, getManagedUsers
       flows.ts                # Barrel re-export from flow-* modules
@@ -215,6 +226,7 @@ web-app/
       flow-deletions.ts       # deleteNode/Edge/Field + capture functions for undo
       flow-undo-adapter.ts    # executeUndoSteps
       flow-export.ts          # exportFlowMermaid, exportFlowZip, importFlowFromMermaid, importFlowFromZip
+      workbox.ts              # getWorkboxItems, getWorkboxItem, postWorkOrderCreation, postWorkOrderTransition, postWorkOrderClaim, deleteWorkOrderClaim
       admin.ts                # getAccount, getProfile, getCompanySettings, getActivityFeed
     styles/                   # CSS modules (cascade-ordered) — build inputs
       fonts.css               # @font-face declarations
@@ -231,9 +243,10 @@ web-app/
     favicon.ico               # Application favicon
     *.woff2                   # 9 self-hosted font files (IBM Plex Sans, Inter, IBM Plex Mono)
 
-  # Pages — 23 pages across page directories (most use index.ts + index.html; some use sourceFile naming)
+  # Pages — 25 pages across page directories (most use index.ts + index.html; some use sourceFile naming)
   dashboard/                # Dashboard with gauge cards
-  ideas/                    # Ideas list + detail, create, convert, review-queue, approval-detail (named files)
+  workbox/                  # Work order inbox + detail
+  ideas/                    # Ideas list + detail, create, convert (named files)
   projects/                 # Projects list + detail (named files)
   flow/                     # Flow list + detail (detail.ts/detail.html)
   organization/             # Account overview, users, teams, activity-feed, onboarding (named files)
@@ -245,7 +258,7 @@ web-app/
   auth/                     # Login/signup (standalone)
   not-found/                # 404 page (standalone)
 
-SCHEMA.md                     # Database schema (21 tables, columns, types, defaults)
+SCHEMA.md                     # Database schema (15 tables, columns, types, defaults)
 DESIGN-SYSTEM.md              # Design system specification
 TEST-PLAN.md                  # Human-executable test plan (176 cases)
 ```
@@ -258,14 +271,16 @@ temp directory -- no build artifacts in the repo.
 ## Build
 
 Build steps (requires clean git working directory):
-1. Composes HTML pages: runs `web-app/app/compose.ts` to assemble `components-layout.html` with `component-*.html` files and each sidebar-layout page's HTML file, producing 20 composed files in a temp build directory. Respects `sourceFile` for both input resolution and output placement. Exits with error if any page is missing.
+1. Composes HTML pages: runs `web-app/app/compose.ts` to assemble `components-layout.html` with `component-*.html` files and each sidebar-layout page's HTML file, producing 22 composed files in the build directory. Respects `sourceFile` for both input resolution and output placement. Exits with error if any page is missing.
 2. Copies 4 standalone pages' `index.html` to the
    build directory
 3. Bundles TypeScript into a single IIFE (`assets/app.js`) via esbuild into the build directory
 4. Concatenates CSS modules in cascade order and minifies via esbuild into `assets/styles.css`, copies `*.woff2` and `favicon.ico` to the build directory
-5. Creates a distribution ZIP (`fusion-ai-<sha>.zip`) on `~/Desktop`
+5. Creates a distribution ZIP (`fusion-ai-<sha>.zip`) at the output path (default `~/Desktop/`), or skips zipping with `--no-zip`
 
-No build artifacts are created in the repo — everything is assembled in `/tmp/`.
+CLI options: `./build [--no-zip] [path/]`. The trailing `/` on the path argument is required. Default output is `~/Desktop/`. With `--no-zip`, the bundle directory is kept for direct serving via HTTP.
+
+No build artifacts are created in the repo — build output goes to `/tmp/` by default.
 
 ## Gotchas
 

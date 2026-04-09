@@ -1,6 +1,6 @@
 # Database Schema
 
-21 tables stored in localStorage as JSON arrays. Each table is keyed as `fusion-ai:tableName`. All rows have a text `id` primary key. Column types: TEXT (string), INTEGER (number), REAL (float). JSON columns store stringified arrays or objects. All columns are NOT NULL — entity validation on creation ensures every field is present.
+19 tables stored in localStorage as JSON arrays. Each table is keyed as `fusion-ai:tableName`. All rows have a text `id` primary key. Column types: TEXT (string), INTEGER (number), REAL (float). JSON columns store stringified arrays or objects. All columns are NOT NULL — entity validation on creation ensures every field is present.
 
 **Duration convention:** All numeric duration fields are persisted in seconds. UI displays days via `durationInDays(seconds)` from `format.ts`.
 
@@ -40,6 +40,7 @@
 | estimated_duration | INTEGER (seconds) |
 | estimated_cost | INTEGER |
 | priority | INTEGER |
+| position | REAL |
 | status | TEXT |
 | problem_statement | TEXT |
 | proposed_solution | TEXT |
@@ -93,6 +94,7 @@
 | actual_impact | INTEGER |
 | priority | INTEGER |
 | priority_score | INTEGER |
+| position | REAL |
 | business_context | TEXT (JSON object) |
 | timeline_label | TEXT |
 | budget_label | TEXT |
@@ -113,42 +115,59 @@
 | id | TEXT | PRIMARY KEY |
 | name | TEXT | |
 | description | TEXT | |
+| is_locked | BOOLEAN | Default false |
+| lock_timeout | INTEGER | Seconds (default 28800 = 8h) |
+| graph | TEXT | JSON document (see below) |
 | created_at | TEXT | RFC-3339 Zulu |
 | updated_at | TEXT | RFC-3339 Zulu |
 
-### wf_nodes
+The `graph` column stores the entire flow
+definition as a JSON document:
+
+```json
+{
+  "nodes": [{
+    "id": "...",
+    "name": "...",
+    "description": "...",
+    "positionX": 0,
+    "positionY": 0,
+    "isStart": false,
+    "isComplete": false,
+    "fields": [{
+      "id": "...",
+      "name": "...",
+      "fieldType": "text",
+      "sortOrder": 1,
+      "isRequired": true,
+      "options": []
+    }]
+  }],
+  "edges": [{
+    "id": "...",
+    "name": "...",
+    "description": "...",
+    "fromNodeId": "...",
+    "toNodeId": "..."
+  }]
+}
+```
+
+## Workbox
+
+### work_orders
 
 | Column | Type | Notes |
 |--------|------|-------|
-| id | TEXT | PRIMARY KEY |
-| name | TEXT | |
-| description | TEXT | |
-| position_x | INTEGER | Canvas X coordinate |
-| position_y | INTEGER | Canvas Y coordinate |
-| is_start | INTEGER | Boolean (0/1) |
-| is_complete | INTEGER | Boolean (0/1) |
+| id | TEXT | PRIMARY KEY (UUID) |
+| display_id | TEXT | 8-char hex SHA-256 |
+| flow_graph | TEXT | JSON (WorkOrderFlowGraph) |
 | created_at | TEXT | RFC-3339 Zulu |
 
-### wf_edges
-
-| Column | Type | Notes |
-|--------|------|-------|
-| id | TEXT | PRIMARY KEY |
-| name | TEXT | Transition/button label |
-| description | TEXT | |
-| created_at | TEXT | RFC-3339 Zulu |
-
-### wf_fields
-
-| Column | Type | Notes |
-|--------|------|-------|
-| id | TEXT | PRIMARY KEY |
-| name | TEXT | Field label |
-| field_type | TEXT | Enum (see WfFieldType) |
-| sort_order | INTEGER | Display order |
-| is_required | INTEGER | Boolean (0/1) |
-| options | TEXT | JSON array for select/radio/multi_select |
-| created_at | TEXT | RFC-3339 Zulu |
+The `flow_graph` column stores a snapshot of the
+flow definition at work order creation time. Same
+structure as `flows.graph` plus flow-level metadata
+(`flowId`, `name`, `description`, `lockTimeout`).
 
 ## Platform
 
@@ -245,33 +264,39 @@ Singleton table (single row, `id = '1'`).
 | flow_id | TEXT | References flows |
 | created_at | TEXT | RFC-3339 Zulu |
 
-### wf_flow_nodes
+### flow_work_orders
 
 | Column | Type | Notes |
 |--------|------|-------|
 | id | TEXT | PRIMARY KEY |
 | flow_id | TEXT | References flows |
-| node_id | TEXT | References wf_nodes |
+| work_order_id | TEXT | References work_orders |
 | created_at | TEXT | RFC-3339 Zulu |
 
-### wf_node_edges
+### work_order_transitions
+
+Immutable event records — source of truth for
+work order state and history.
 
 | Column | Type | Notes |
 |--------|------|-------|
 | id | TEXT | PRIMARY KEY |
-| wf_edge_id | TEXT | References wf_edges |
-| from_node_id | TEXT | References wf_nodes |
-| to_node_id | TEXT | References wf_nodes |
-| created_at | TEXT | RFC-3339 Zulu |
+| work_order_id | TEXT | References work_orders |
+| from_node_id | TEXT | '' for creation |
+| to_node_id | TEXT | Node in flow_graph |
+| user_id | TEXT | References users |
+| values | TEXT | JSON {field_id: value} |
+| transitioned_at | TEXT | RFC-3339 Zulu |
 
-### wf_node_fields
+### work_order_claims
 
 | Column | Type | Notes |
 |--------|------|-------|
 | id | TEXT | PRIMARY KEY |
-| node_id | TEXT | References wf_nodes |
-| field_id | TEXT | References wf_fields |
-| created_at | TEXT | RFC-3339 Zulu |
+| work_order_id | TEXT | References work_orders |
+| user_id | TEXT | References users |
+| claimed_at | TEXT | RFC-3339 Zulu |
+
 ### team_membership_projects
 
 | Column | Type |

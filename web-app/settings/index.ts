@@ -1,4 +1,7 @@
-import { $ } from '../app/dom';
+import {
+    $, $input, $select,
+    bindEnterToClick,
+} from '../app/dom';
 import {
     setHtml,
 } from '../app/safe-html';
@@ -10,9 +13,6 @@ import {
     getCompanySettings,
     putCompanySettings,
 } from '../app/adapters';
-import {
-    $input, $select,
-} from '../app/dom';
 import {
     SettingsPresenter,
 } from '../app/presenters';
@@ -139,5 +139,15 @@ export async function init(): Promise<void> {
                 );
             }
         },
+    );
+
+    const saveSel =
+        '#company-settings-save-btn';
+    bindEnterToClick(
+        '#company-settings-name', saveSel,
+    );
+    bindEnterToClick(
+        '#company-settings-domain',
+        saveSel,
     );
 }

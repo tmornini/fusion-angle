@@ -77,6 +77,37 @@ export function assignRanks(
     return ranks;
 }
 
+export function isReachable(
+    sourceId: string,
+    targetId: string,
+    adj: Map<string, string[]>,
+): boolean {
+    const visited = new Set<string>();
+    const stack: string[] = [sourceId];
+    visited.add(sourceId);
+    while (stack.length > 0) {
+        const node = stack.pop()!;
+        const neighbors = adj.get(node);
+        if (!neighbors) continue;
+        for (const n of neighbors) {
+            if (n === targetId) return true;
+            if (visited.has(n)) continue;
+            visited.add(n);
+            stack.push(n);
+        }
+    }
+    return false;
+}
+
+export function wouldBeCycle(
+    fromId: string,
+    toId: string,
+    edges: LayoutEdge[],
+): boolean {
+    const adj = buildAdjacency(edges);
+    return isReachable(toId, fromId, adj);
+}
+
 export function computeLayout(
     nodes: LayoutInput[],
     edges: LayoutEdge[],

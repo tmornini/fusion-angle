@@ -21,6 +21,26 @@
             href="../assets/favicon.ico"
             sizes="any"
         />
+        <script>
+            (function() {
+                var t = localStorage
+                    .getItem('fusion-theme');
+                var dark = t === 'dark'
+                    || (t !== 'light'
+                        && matchMedia(
+                            '(prefers-color-scheme'
+                            + ': dark)'
+                        ).matches);
+                if (dark) {
+                    var d = document
+                        .documentElement;
+                    d.setAttribute(
+                        'data-theme', 'dark'
+                    );
+                    d.classList.add('dark');
+                }
+            })();
+        </script>
     </head>
     <body>
         <div id="page-root"></div>

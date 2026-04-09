@@ -9,7 +9,7 @@ import {
     iconArrowLeft, iconPlus,
     iconArrowUpRight, iconArrowDownRight,
     iconMinus,
-    iconGitBranch,
+    iconGitBranch, iconInfo,
     iconEdit, iconSave, iconX,
 } from '../icons';
 import {
@@ -677,15 +677,26 @@ export class ProjectDetailPresenter {
                 }">
                     Flows
                 </h2>
-                <button
-                    id="new-flow-btn"
-                    class="${
-                        'btn btn-primary '
-                        + 'btn-sm gap-2'
-                    }">
-                    ${iconPlus(14, '')}
-                    New Flow
-                </button>
+                ${this.#status === 'approved'
+                    ? html`<button
+                        id="new-flow-btn"
+                        class="${
+                            'btn btn-primary '
+                            + 'btn-sm gap-2'
+                        }">
+                        ${iconPlus(14, '')}
+                        New Flow
+                    </button>`
+                    : html`<span
+                        class="${
+                            'status-badge '
+                            + 'status-badge'
+                            + '-info'
+                        }">
+                        ${iconInfo(14, '')}
+                        Approve to add
+                        flows
+                    </span>`}
             </div>`;
 
         if (flows.length === 0) {
@@ -702,7 +713,14 @@ export class ProjectDetailPresenter {
                         <p class="${
                             'text-muted mt-4'
                         }">
-                            No flows yet
+                            ${this.#status
+                                === 'approved'
+                                ? 'No flows yet'
+                                : 'Flow creation'
+                                + ' limited to'
+                                + ' approved'
+                                + ' projects'
+                                + ' only'}
                         </p>
                     </div>
                 </div>`;
@@ -1045,6 +1063,64 @@ export class ProjectDetailPresenter {
                         projectId,
                     )}
                 </div>
+                ${this
+                    .#buildNewFlowDialog()}
             </div>`;
+    }
+
+    #buildNewFlowDialog(): SafeHtml {
+        return html`<div
+class="${'dialog-backdrop hidden'}"
+id="new-flow-backdrop">
+<div class="${'dialog hidden'}"
+    id="new-flow-dialog"
+    aria-hidden="true"
+    style="max-width:28rem">
+<div style="${
+    'padding:1.5rem;'
+    + 'border-bottom:1px solid'
+    + ' hsl(var(--border))'
+}">
+<h3 class="${
+    'text-lg font-display'
+    + ' font-semibold'
+}">New Flow</h3>
+<p class="text-sm text-muted"
+    >Name this flow</p>
+</div>
+<div style="${
+    'padding:1.5rem;'
+    + 'display:flex;'
+    + 'flex-direction:column;'
+    + 'gap:1rem'
+}">
+<div>
+<label class="label mb-1"
+    for="new-flow-name"
+    >Flow Name</label>
+<input class="input"
+    id="new-flow-name"
+    placeholder="${
+        'e.g., Customer Onboarding'
+    }" />
+</div>
+</div>
+<div style="${
+    'padding:1rem 1.5rem;'
+    + 'border-top:1px solid'
+    + ' hsl(var(--border));'
+    + 'display:flex;'
+    + 'justify-content:flex-end;'
+    + 'gap:0.75rem'
+}">
+<button class="btn btn-outline"
+    id="new-flow-cancel"
+    >Cancel</button>
+<button class="btn btn-primary"
+    id="new-flow-submit"
+    >Create</button>
+</div>
+</div>
+</div>`;
     }
 }

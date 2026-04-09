@@ -158,83 +158,6 @@ const routes: Route[] = [
                 param(params, 0),
             ),
     }),
-    route('wf-nodes', {
-        get: (db) =>
-            db.wfNodes.getAll(),
-        post: async (
-            db, _params, body,
-        ) => {
-            const id =
-                body.id as string;
-            return db.wfNodes.put(
-                id, body,
-            );
-        },
-    }),
-    route('wf-nodes/:id', {
-        get: (db, params) =>
-            db.wfNodes.getById(
-                param(params, 0),
-            ),
-        put: (db, params, body) =>
-            db.wfNodes.put(
-                param(params, 0), body,
-            ),
-        delete: (db, params) =>
-            db.wfNodes.delete(
-                param(params, 0),
-            ),
-    }),
-    route('wf-edges', {
-        get: (db) =>
-            db.wfEdges.getAll(),
-        post: async (
-            db, _params, body,
-        ) => {
-            const id =
-                body.id as string;
-            return db.wfEdges.put(
-                id, body,
-            );
-        },
-    }),
-    route('wf-edges/:id', {
-        get: (db, params) =>
-            db.wfEdges.getById(
-                param(params, 0),
-            ),
-        put: (db, params, body) =>
-            db.wfEdges.put(
-                param(params, 0), body,
-            ),
-        delete: (db, params) =>
-            db.wfEdges.delete(
-                param(params, 0),
-            ),
-    }),
-    route('wf-fields', {
-        get: (db) =>
-            db.wfFields.getAll(),
-        post: async (
-            db, _params, body,
-        ) => {
-            const id =
-                body.id as string;
-            return db.wfFields.put(
-                id, body,
-            );
-        },
-    }),
-    route('wf-fields/:id', {
-        put: (db, params, body) =>
-            db.wfFields.put(
-                param(params, 0), body,
-            ),
-        delete: (db, params) =>
-            db.wfFields.delete(
-                param(params, 0),
-            ),
-    }),
     route('project-flows', {
         get: (db) =>
             db.projectFlows
@@ -254,60 +177,72 @@ const routes: Route[] = [
                 param(params, 0),
             ),
     }),
-    route('wf-flow-nodes', {
+    route('work-orders', {
         get: (db) =>
-            db.wfFlowNodes
+            db.workOrders.getAll(),
+        post: async (
+            db, _params, body,
+        ) => {
+            const id =
+                body.id as string;
+            return db.workOrders.put(
+                id, body,
+            );
+        },
+    }),
+    route('work-orders/:id', {
+        get: (db, params) =>
+            db.workOrders.getById(
+                param(params, 0),
+            ),
+        put: (db, params, body) =>
+            db.workOrders.put(
+                param(params, 0), body,
+            ),
+    }),
+    route('flow-work-orders', {
+        get: (db) =>
+            db.flowWorkOrders.getAll(),
+        post: async (
+            db, _params, body,
+        ) => {
+            const id =
+                body.id as string;
+            return db.flowWorkOrders.put(
+                id, body,
+            );
+        },
+    }),
+    route('work-order-transitions', {
+        get: (db) =>
+            db.workOrderTransitions
                 .getAll(),
         post: async (
             db, _params, body,
         ) => {
             const id =
                 body.id as string;
-            return db.wfFlowNodes
+            return db
+                .workOrderTransitions
                 .put(id, body);
         },
     }),
-    route('wf-flow-nodes/:id', {
-        delete: (db, params) =>
-            db.wfFlowNodes.delete(
-                param(params, 0),
-            ),
-    }),
-    route('wf-node-edges', {
+    route('work-order-claims', {
         get: (db) =>
-            db.wfNodeEdges.getAll(),
+            db.workOrderClaims
+                .getAll(),
         post: async (
             db, _params, body,
         ) => {
             const id =
                 body.id as string;
-            return db.wfNodeEdges.put(
-                id, body,
-            );
+            return db.workOrderClaims
+                .put(id, body);
         },
     }),
-    route('wf-node-edges/:id', {
+    route('work-order-claims/:id', {
         delete: (db, params) =>
-            db.wfNodeEdges.delete(
-                param(params, 0),
-            ),
-    }),
-    route('wf-node-fields', {
-        get: (db) =>
-            db.wfNodeFields.getAll(),
-        post: async (
-            db, _params, body,
-        ) => {
-            const id =
-                body.id as string;
-            return db.wfNodeFields.put(
-                id, body,
-            );
-        },
-    }),
-    route('wf-node-fields/:id', {
-        delete: (db, params) =>
-            db.wfNodeFields.delete(
+            db.workOrderClaims.delete(
                 param(params, 0),
             ),
     }),

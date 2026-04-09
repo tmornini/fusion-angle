@@ -8,7 +8,7 @@ import type {
 } from './flow-interactions';
 import {
     NODE_WIDTH, NODE_HEIGHT,
-    buildAdjacency, assignRanks,
+    buildAdjacency, isReachable,
 } from './flow-layout';
 
 const BLUE = '#4B6CA1';
@@ -22,8 +22,6 @@ const ARROW_VIEWBOX = 10;
 const ARROW_MIDPOINT = 5;
 const ARROW_MARKER = 8;
 
-const GLOW_SPREAD = 4;
-const GLOW_OPACITY = 0.6;
 
 const STROKE_NORMAL = 2;
 const STROKE_START = 2.5;
@@ -43,7 +41,6 @@ const NODE_META_Y = 40;
 const NODE_META_FONT = 11;
 
 const EDGE_STROKE = 2;
-const EDGE_STROKE_SELECTED = 3;
 const HIT_TARGET_WIDTH = 12;
 const CURVE_TENSION = 0.4;
 const BEZIER_MIDPOINT = 0.5;
@@ -62,7 +59,7 @@ const LABEL_BG_OPACITY = 0.9;
 const LABEL_TEXT_OFFSET_Y = 4;
 const LABEL_FONT = 11;
 
-type RectEdge =
+export type RectEdge =
     'right' | 'left' | 'top' | 'bottom';
 
 export function perimeterPoint(
@@ -90,7 +87,108 @@ export function perimeterPoint(
     };
 }
 
-function whichEdge(
+function perimToXy(
+    t: number,
+): { x: number; y: number } {
+    const w = NODE_WIDTH;
+    const h = NODE_HEIGHT;
+    if (t < w) return { x: t, y: 0 };
+    if (t < w + h) {
+        return { x: w, y: t - w };
+    }
+    if (t < 2 * w + h) {
+        return {
+            x: w - (t - w - h), y: h,
+        };
+    }
+    return {
+        x: 0, y: h - (t - 2 * w - h),
+    };
+}
+
+function xyToPerim(
+    px: number, py: number,
+): number {
+    const w = NODE_WIDTH;
+    const h = NODE_HEIGHT;
+    const dT = Math.abs(py);
+    const dR = Math.abs(px - w);
+    const dB = Math.abs(py - h);
+    const dL = Math.abs(px);
+    const min = Math.min(
+        dT, dR, dB, dL,
+    );
+    if (min === dT) return px;
+    if (min === dR) return w + py;
+    if (min === dB) {
+        return w + h + (w - px);
+    }
+    return 2 * w + h + (h - py);
+}
+
+function computePortPos(
+    node: GraphNode,
+    edges: GraphEdge[],
+    nodeMap: Map<string, GraphNode>,
+): { x: number; y: number } {
+    const w = NODE_WIDTH;
+    const h = NODE_HEIGHT;
+    const perim = 2 * (w + h);
+    const params: number[] = [];
+    for (const e of edges) {
+        let otherId: string | null = null;
+        if (e.fromNodeId === node.id) {
+            otherId = e.toNodeId;
+        } else if (
+            e.toNodeId === node.id
+        ) {
+            otherId = e.fromNodeId;
+        }
+        if (!otherId) continue;
+        const other = nodeMap.get(otherId);
+        if (!other) continue;
+        const pt = perimeterPoint(
+            node.positionX,
+            node.positionY,
+            w, h,
+            other.positionX + w / 2,
+            other.positionY + h / 2,
+        );
+        const localX =
+            pt.x - node.positionX;
+        const localY =
+            pt.y - node.positionY;
+        params.push(
+            xyToPerim(localX, localY),
+        );
+    }
+    if (params.length === 0) {
+        return { x: w, y: h / 2 };
+    }
+    params.sort((a, b) => a - b);
+    let bestGap = 0;
+    let bestMid = w + h / 2;
+    for (let i = 0;
+        i < params.length; i++
+    ) {
+        const next =
+            params[(i + 1)
+                % params.length]!;
+        const cur = params[i]!;
+        const gap = i < params.length - 1
+            ? next - cur
+            : perim - cur + next;
+        if (gap > bestGap) {
+            bestGap = gap;
+            const mid =
+                (cur + gap / 2) % perim;
+            bestMid = mid;
+        }
+    }
+    return perimToXy(bestMid);
+}
+
+export function whichEdge(
     px: number, py: number,
     rx: number, ry: number,
     rw: number, rh: number,
@@ -108,7 +206,7 @@ function whichEdge(
     return 'bottom';
 }
 
-function controlOffset(
+export function controlOffset(
     edge: RectEdge,
     dist: number,
 ): { dx: number; dy: number } {
@@ -167,13 +265,36 @@ function buildDefs(): string {
         + ` fill="${WARN}"/>`
         + '</marker>'
         + '<filter id="wf-glow"'
-        + ' x="-20%" y="-20%"'
-        + ' width="140%" height="140%">'
-        + '<feDropShadow'
-        + ' dx="0" dy="0"'
-        + ` stdDeviation="${GLOW_SPREAD}"`
+        + ' x="-30%" y="-30%"'
+        + ' width="160%"'
+        + ' height="160%">'
+        + '<feGaussianBlur'
+        + ' in="SourceGraphic"'
+        + ' stdDeviation="4"'
+        + ' result="blur">'
+        + '<animate'
+        + ' attributeName='
+        + '"stdDeviation"'
+        + ' values="4;12;4"'
+        + ' dur="1.5s"'
+        + ' repeatCount='
+        + '"indefinite"/>'
+        + '</feGaussianBlur>'
+        + '<feFlood'
         + ` flood-color="${BLUE}"`
-        + ` flood-opacity="${GLOW_OPACITY}"/>`
+        + ' flood-opacity="0.8"'
+        + ' result="color"/>'
+        + '<feComposite'
+        + ' in="color"'
+        + ' in2="blur"'
+        + ' operator="in"'
+        + ' result="glow"/>'
+        + '<feMerge>'
+        + '<feMergeNode'
+        + ' in="glow"/>'
+        + '<feMergeNode'
+        + ' in="SourceGraphic"/>'
+        + '</feMerge>'
         + '</filter>'
         + '</defs>';
 }
@@ -217,6 +338,10 @@ function buildGrid(
 function buildNode(
     node: GraphNode,
     isSelected: boolean,
+    isLocked: boolean,
+    portPos: {
+        x: number; y: number;
+    } | null,
 ): SafeHtml {
     const { positionX, positionY } = node;
     const halfH = NODE_HEIGHT / 2;
@@ -231,7 +356,7 @@ function buildNode(
             : STROKE_START;
     }
 
-    const filterAttr = isSelected
+    const selAttr = isSelected
         ? ' filter="url(#wf-glow)"'
         : '';
 
@@ -296,11 +421,11 @@ function buildNode(
         + escapeForHtml(meta)
         + '</text>';
 
-    if (!node.isStart && !node.isComplete) {
+    if (portPos) {
         inner += '<circle'
             + ' data-connect-port="1"'
-            + ` cx="${NODE_WIDTH}"`
-            + ` cy="${halfH}"`
+            + ` cx="${portPos.x}"`
+            + ` cy="${portPos.y}"`
             + ` r="${PORT_RADIUS}"`
             + ` fill="${BLUE}"`
             + ' stroke="var('
@@ -308,8 +433,15 @@ function buildNode(
             + ` stroke-width=`
             + `"${PORT_STROKE}"`
             + ' style='
-            + '"cursor:crosshair"'
-            + '/>';
+            + '"cursor:crosshair">'
+            + '<title>'
+            + 'Click and drag to create'
+            + ' a new node attached here.'
+            + ' Hold Shift to connect'
+            + ' to an existing node'
+            + ' instead.'
+            + '</title>'
+            + '</circle>';
     }
 
     return trusted(
@@ -320,7 +452,7 @@ function buildNode(
         + ', '
         + String(positionY)
         + ')"'
-        + filterAttr
+        + selAttr
         + ' style="cursor:pointer">'
         + inner
         + '</g>',
@@ -439,11 +571,7 @@ function buildEdge(
         dashAttr = '';
     }
 
-    const sw = isSelected
-        ? EDGE_STROKE_SELECTED
-        : EDGE_STROKE;
-    const opacity = isSelected
-        ? ' opacity="1"' : '';
+    const sw = EDGE_STROKE;
 
     const hitPath = '<path'
         + ` d="${pathD}"`
@@ -459,7 +587,6 @@ function buildEdge(
         + ` stroke="${color}"`
         + ` stroke-width="${sw}"`
         + dashAttr
-        + opacity
         + ` marker-end="${markerUrl}"`;
     const visClose = ' style='
         + '"cursor:pointer"'
@@ -509,9 +636,13 @@ function buildEdge(
         + labelEsc
         + '</text>';
 
+    const edgeSelAttr = isSelected
+        ? ' filter="url(#wf-glow)"'
+        : '';
     return trusted(
         '<g'
         + ` data-edge-id="${edge.id}"`
+        + edgeSelAttr
         + '>'
         + hitPath
         + visPath + visClose
@@ -519,6 +650,85 @@ function buildEdge(
         + labelText
         + '</g>',
     );
+}
+
+export function buildEdgePreviewPath(
+    fromNode: GraphNode,
+    toNode: GraphNode,
+    isCycle: boolean,
+): string {
+    const fromCx =
+        fromNode.positionX
+        + NODE_WIDTH / 2;
+    const fromCy =
+        fromNode.positionY
+        + NODE_HEIGHT / 2;
+    const toCx =
+        toNode.positionX
+        + NODE_WIDTH / 2;
+    const toCy =
+        toNode.positionY
+        + NODE_HEIGHT / 2;
+    const startPt = perimeterPoint(
+        fromNode.positionX,
+        fromNode.positionY,
+        NODE_WIDTH, NODE_HEIGHT,
+        toCx, toCy,
+    );
+    const endPt = perimeterPoint(
+        toNode.positionX,
+        toNode.positionY,
+        NODE_WIDTH, NODE_HEIGHT,
+        fromCx, fromCy,
+    );
+    const dist = Math.hypot(
+        endPt.x - startPt.x,
+        endPt.y - startPt.y,
+    );
+    const se = whichEdge(
+        startPt.x, startPt.y,
+        fromNode.positionX,
+        fromNode.positionY,
+        NODE_WIDTH, NODE_HEIGHT,
+    );
+    const ee = whichEdge(
+        endPt.x, endPt.y,
+        toNode.positionX,
+        toNode.positionY,
+        NODE_WIDTH, NODE_HEIGHT,
+    );
+    const cp1 = controlOffset(se, dist);
+    const cp2 = controlOffset(ee, dist);
+    const pathD = 'M '
+        + String(startPt.x) + ' '
+        + String(startPt.y)
+        + ' C '
+        + String(startPt.x + cp1.dx)
+        + ' '
+        + String(startPt.y + cp1.dy)
+        + ', '
+        + String(endPt.x + cp2.dx)
+        + ' '
+        + String(endPt.y + cp2.dy)
+        + ', '
+        + String(endPt.x) + ' '
+        + String(endPt.y);
+    const color = isCycle ? WARN : BLUE;
+    const marker = isCycle
+        ? 'url(#wf-arrow-warn)'
+        : 'url(#wf-arrow)';
+    const dashAttr = isCycle
+        ? ' stroke-dasharray="'
+            + CYCLE_DASH + '"'
+        : '';
+    return '<path'
+        + ' d="' + pathD + '"'
+        + ' fill="none"'
+        + ` stroke="${color}"`
+        + ` stroke-width="${EDGE_STROKE}"`
+        + dashAttr
+        + ` marker-end="${marker}"`
+        + ' pointer-events="none"/>';
 }
 
 function bezierAt(
@@ -560,39 +770,27 @@ export function buildGraphSvg(
     viewBoxW: number,
     viewBoxH: number,
     selection: Selection,
+    isLocked: boolean,
+    isConnecting: boolean,
 ): SafeHtml {
     const nodeMap = new Map(
         nodes.map(n => [n.id, n]),
     );
 
-    const startNode =
-        nodes.find(n => n.isStart);
-    const startId =
-        startNode?.id
-        ?? nodes[0]?.id ?? '';
     const adj = buildAdjacency(
         edges.map(e => ({
             fromId: e.fromNodeId,
             toId: e.toNodeId,
         })),
     );
-    const allIds =
-        nodes.map(n => n.id);
-    const ranks = assignRanks(
-        startId, adj, allIds,
-    );
     const cycleEdgeIds =
         new Set<string>();
     for (const edge of edges) {
-        const fromRank =
-            ranks.get(edge.fromNodeId);
-        const toRank =
-            ranks.get(edge.toNodeId);
-        if (
-            fromRank !== undefined
-            && toRank !== undefined
-            && toRank <= fromRank
-        ) {
+        if (isReachable(
+            edge.toNodeId,
+            edge.fromNodeId,
+            adj,
+        )) {
             cycleEdgeIds.add(edge.id);
         }
     }
@@ -658,9 +856,18 @@ export function buildGraphSvg(
             selection.kind === 'node'
             && node.id
                 === selection.nodeId;
+        const showPort = !isLocked
+            && !node.isStart
+            && !node.isComplete;
+        const portPos = showPort
+            ? computePortPos(
+                node, edges, nodeMap,
+            )
+            : null;
         nodeMarkup +=
             buildNode(
                 node, isSelected,
+                isLocked, portPos,
             ).toString();
     }
 
@@ -669,12 +876,16 @@ export function buildGraphSvg(
         + ' ' + String(viewBoxW)
         + ' ' + String(viewBoxH);
 
+    const svgCls = isConnecting
+        ? 'wf-canvas wf-connecting'
+        : 'wf-canvas';
     return trusted(
         '<svg'
         + ' xmlns='
         + '"http://www.w3.org/2000/svg"'
-        + ' class="wf-canvas"'
+        + ` class="${svgCls}"`
         + ` viewBox="${vb}"`
+        + ' preserveAspectRatio="none"'
         + ' width="100%"'
         + ' height="100%"'
         + ' style="display:block">'

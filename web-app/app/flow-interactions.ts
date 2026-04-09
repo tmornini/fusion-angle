@@ -1,3 +1,7 @@
+import {
+    NODE_WIDTH, NODE_HEIGHT,
+} from './flow-layout';
+
 export interface ViewBox {
     x: number;
     y: number;
@@ -21,6 +25,10 @@ export type DragMode =
         currentY: number;
     };
 
+export type ConnectTarget =
+    | { kind: 'none' }
+    | { kind: 'node'; id: string };
+
 export type ConnectMode =
     | { kind: 'idle' }
     | {
@@ -28,6 +36,8 @@ export type ConnectMode =
         fromNodeId: string;
         toX: number;
         toY: number;
+        isShift: boolean;
+        target: ConnectTarget;
     };
 
 export type PanMode =
@@ -72,6 +82,7 @@ const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 2.0;
 const ZOOM_STEP = 0.1;
 const DBLCLICK_MS = 400;
+const MIN_DRAG_DISTANCE = 20;
 
 export function createInteractionState(
     viewBoxW: number,
@@ -175,6 +186,8 @@ function handlePointerDown(
                 fromNodeId: nodeId,
                 toX: svgPt.x,
                 toY: svgPt.y,
+                isShift: e.shiftKey,
+                target: { kind: 'none' },
             };
             state.activePointerId =
                 e.pointerId;
@@ -269,10 +282,34 @@ function handlePointerMove(
         const svgPt = screenToSvg(
             svg, e.clientX, e.clientY,
         );
+        let target: ConnectTarget =
+            { kind: 'none' };
+        const hit =
+            document.elementFromPoint(
+                e.clientX, e.clientY,
+            );
+        if (hit instanceof Element) {
+            const nid = findAncestorAttr(
+                hit, 'data-node-id',
+            );
+            if (
+                nid
+                && nid
+                    !== state.connect
+                        .fromNodeId
+            ) {
+                target = {
+                    kind: 'node',
+                    id: nid,
+                };
+            }
+        }
         state.connect = {
             ...state.connect,
             toX: svgPt.x,
             toY: svgPt.y,
+            isShift: e.shiftKey,
+            target,
         };
         onUpdate();
         return;
@@ -317,6 +354,12 @@ function handlePointerUp(
         fromNodeId: string,
         toNodeId: string,
     ) => void,
+    onNodeCreated: (
+        fromNodeId: string,
+        x: number,
+        y: number,
+    ) => void,
+    getNodePosition: NodePositionLookup,
 ): void {
     if (state.drag.kind === 'dragging') {
         onNodeDragEnd(
@@ -339,23 +382,51 @@ function handlePointerUp(
     ) {
         const fromId =
             state.connect.fromNodeId;
-        const target =
-            document.elementFromPoint(
-                e.clientX, e.clientY,
-            );
-        if (target instanceof Element) {
-            const toNodeId =
-                findAncestorAttr(
-                    target,
-                    'data-node-id',
+        const toX = state.connect.toX;
+        const toY = state.connect.toY;
+        if (e.shiftKey) {
+            const target =
+                document.elementFromPoint(
+                    e.clientX, e.clientY,
                 );
             if (
-                toNodeId
-                && toNodeId !== fromId
+                target instanceof Element
             ) {
-                onEdgeCreated(
-                    fromId, toNodeId,
+                const toNodeId =
+                    findAncestorAttr(
+                        target,
+                        'data-node-id',
+                    );
+                if (
+                    toNodeId
+                    && toNodeId !== fromId
+                ) {
+                    onEdgeCreated(
+                        fromId, toNodeId,
+                    );
+                }
+            }
+        } else {
+            const pos =
+                getNodePosition(fromId);
+            if (pos) {
+                const portX =
+                    pos.x + NODE_WIDTH;
+                const portY =
+                    pos.y
+                    + NODE_HEIGHT / 2;
+                const dx = toX - portX;
+                const dy = toY - portY;
+                const dist = Math.hypot(
+                    dx, dy,
                 );
+                if (
+                    dist > MIN_DRAG_DISTANCE
+                ) {
+                    onNodeCreated(
+                        fromId, toX, toY,
+                    );
+                }
             }
         }
         state.connect = { kind: 'idle' };
@@ -423,7 +494,13 @@ export function bindInteractions(
         fromNodeId: string,
         toNodeId: string,
     ) => void,
+    onNodeCreated: (
+        fromNodeId: string,
+        x: number,
+        y: number,
+    ) => void,
     getNodePosition: NodePositionLookup,
+    signal: AbortSignal,
 ): void {
     svg.addEventListener(
         'pointerdown',
@@ -431,6 +508,7 @@ export function bindInteractions(
             e, svg, state, onUpdate,
             getNodePosition,
         ),
+        { signal },
     );
 
     svg.addEventListener(
@@ -438,14 +516,19 @@ export function bindInteractions(
         (e) => handlePointerMove(
             e, svg, state, onUpdate,
         ),
+        { signal },
     );
 
     svg.addEventListener(
         'pointerup',
         (e) => handlePointerUp(
             e, svg, state, onUpdate,
-            onNodeDragEnd, onEdgeCreated,
+            onNodeDragEnd,
+            onEdgeCreated,
+            onNodeCreated,
+            getNodePosition,
         ),
+        { signal },
     );
 
     svg.addEventListener(
@@ -453,7 +536,30 @@ export function bindInteractions(
         (e) => handleWheel(
             e, svg, state, onUpdate,
         ),
-        { passive: false },
+        { passive: false, signal },
+    );
+
+    const handleShift = (
+        ke: KeyboardEvent,
+    ): void => {
+        if (ke.key !== 'Shift') return;
+        if (
+            state.connect.kind
+                !== 'connecting'
+        ) return;
+        state.connect = {
+            ...state.connect,
+            isShift: ke.shiftKey,
+        };
+        onUpdate();
+    };
+    window.addEventListener(
+        'keydown', handleShift,
+        { signal },
+    );
+    window.addEventListener(
+        'keyup', handleShift,
+        { signal },
     );
 }
 
@@ -508,7 +614,7 @@ export function zoomToFit(
 ): void {
     if (nodePositions.length === 0) return;
 
-    const PAD = 40;
+    const PAD = 70;
     const NODE_W = 140;
     const NODE_H = 56;
 
@@ -549,9 +655,14 @@ export function zoomToFit(
         vbW = contentH * containerAR;
     }
 
+    state.zoom = canvasW / vbW;
+    if (state.zoom > MAX_ZOOM) {
+        state.zoom = MAX_ZOOM;
+        vbW = canvasW / MAX_ZOOM;
+        vbH = canvasH / MAX_ZOOM;
+    }
     state.viewBox.x = cx - vbW / 2;
     state.viewBox.y = cy - vbH / 2;
     state.viewBox.w = vbW;
     state.viewBox.h = vbH;
-    state.zoom = canvasW / vbW;
 }

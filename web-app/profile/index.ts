@@ -2,6 +2,7 @@ import {
     $,
     populateIcons,
     attr,
+    bindEnterToClick,
 } from '../app/dom';
 import {
     ProfilePresenter,
@@ -266,5 +267,22 @@ export async function init(): Promise<void> {
                 'disabled',
             );
         },
+    );
+
+    const saveSel = '#profile-save-btn';
+    bindEnterToClick(
+        '#profile-first-name', saveSel,
+    );
+    bindEnterToClick(
+        '#profile-last-name', saveSel,
+    );
+    bindEnterToClick(
+        '#profile-email', saveSel,
+    );
+    bindEnterToClick(
+        '#profile-phone', saveSel,
+    );
+    bindEnterToClick(
+        '#profile-role', saveSel,
     );
 }

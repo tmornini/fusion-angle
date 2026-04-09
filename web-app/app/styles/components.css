@@ -88,6 +88,26 @@
 .btn-icon.btn-sm { height: 2rem; width: 2rem; }
 .btn-icon.btn-xs { height: 1.75rem; width: 1.75rem; }
 
+.btn-hero {
+  background: linear-gradient(135deg,
+      hsl(var(--primary)),
+      hsl(var(--primary) / 0.8));
+  color: hsl(var(--primary-foreground));
+  font-weight: 600;
+  box-shadow:
+    0 2px 8px hsl(var(--primary) / 0.3);
+}
+.btn-hero:hover {
+  opacity: 0.9;
+  box-shadow:
+    0 4px 12px hsl(var(--primary) / 0.4);
+}
+.btn-hero:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
 /* ==========================================
    7. INPUTS & FORMS
    ========================================== */
@@ -186,8 +206,8 @@
   display: inline-flex;
   align-items: center;
   gap: 0.375rem;
-  padding: 0.125rem 0.625rem;
-  border-radius: 9999px;
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-full);
   font-size: var(--text-xs);
   font-weight: 500;
   line-height: 1.25rem;
@@ -208,13 +228,43 @@
   background-color: hsl(var(--destructive));
   color: hsl(var(--destructive-foreground));
 }
+.badge-primary {
+  background: hsl(var(--primary) / 0.1);
+  color: hsl(var(--primary));
+  border-color: hsl(var(--primary) / 0.3);
+}
+.badge-success {
+  background: hsl(var(--success-soft));
+  color: hsl(var(--success-text));
+  border-color: hsl(var(--success) / 0.3);
+}
+.badge-warning {
+  background: hsl(var(--warning-soft));
+  color: hsl(var(--warning-text));
+  border-color: hsl(var(--warning) / 0.3);
+}
+.badge-error {
+  background: hsl(var(--error-soft));
+  color: hsl(var(--error-text));
+  border-color: hsl(var(--error) / 0.3);
+}
+.badge-default {
+  background: hsl(var(--muted));
+  color: hsl(var(--muted-foreground));
+  border-color: hsl(var(--border));
+}
+.badge-info {
+  background: hsl(var(--info) / 0.1);
+  color: hsl(var(--info-text));
+  border-color: hsl(var(--info) / 0.3);
+}
 
 /* Status Badges */
 .status-badge {
   display: inline-flex;
   align-items: center;
   gap: 0.375rem;
-  padding: 0.25rem 0.625rem;
+  padding: 0.25rem 0.5rem;
   border-radius: var(--radius);
   font-size: var(--text-xs);
   font-weight: 500;
@@ -249,8 +299,8 @@
   gap: 0.25rem;
   font-size: 0.625rem;
   font-weight: 600;
-  padding: 0.125rem 0.5rem;
-  border-radius: 9999px;
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-full);
   white-space: nowrap;
   text-transform: uppercase;
   letter-spacing: 0.025em;
@@ -263,7 +313,7 @@
   gap: 0.25rem;
   font-size: var(--text-xs);
   font-weight: 500;
-  padding: 0.125rem 0.5rem;
+  padding: 0.25rem 0.5rem;
   border-radius: var(--radius-sm);
   white-space: nowrap;
   background: hsl(var(--muted));
@@ -298,6 +348,10 @@
 
 /* Page header / title (used by snapshots and similar pages) */
 .page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
   margin-bottom: 1.5rem;
 }
 .page-title {
@@ -461,10 +515,15 @@
   text-align: left;
   transition: background-color var(--duration-instant) var(--ease-default);
 }
-.dropdown-item:hover,
+.dropdown-item:hover {
+  background-color: hsl(var(--muted));
+}
 .dropdown-item:focus-visible {
   background-color: hsl(var(--muted));
-  outline: none;
+  outline: var(--focus-ring-width) solid
+    hsl(var(--focus-ring-color));
+  outline-offset:
+    calc(-1 * var(--focus-ring-width));
 }
 
 .dropdown-label {
@@ -561,22 +620,23 @@
   height: 0.5rem;
   width: 100%;
   background-color: hsl(var(--muted));
-  border-radius: 9999px;
+  border-radius: var(--radius-full);
   overflow: hidden;
 }
 
 .progress-bar {
   height: 100%;
   background-color: hsl(var(--primary));
-  border-radius: 9999px;
+  border-radius: var(--radius-full);
   transition: width var(--duration-slow) var(--ease-default);
 }
 
 .progress-fill {
   height: 100%;
   background: hsl(var(--primary));
-  border-radius: 9999px;
-  transition: width 0.3s;
+  border-radius: var(--radius-full);
+  transition: width var(--duration-slow)
+    var(--ease-default);
 }
 
 /* ==========================================
@@ -589,7 +649,7 @@
   width: 2.75rem;
   height: 1.5rem;
   background-color: hsl(var(--muted));
-  border-radius: 9999px;
+  border-radius: var(--radius-full);
   border: none;
   cursor: pointer;
   transition: var(--transition-colors);
@@ -606,7 +666,7 @@
   width: 1.25rem;
   height: 1.25rem;
   background-color: hsl(var(--card));
-  border-radius: 9999px;
+  border-radius: var(--radius-full);
   transition: transform var(--duration-fast) var(--ease-default);
   box-shadow: var(--shadow-sm);
 }
@@ -692,13 +752,13 @@
 .skeleton-badge {
   height: 1.25rem;
   width: 4rem;
-  border-radius: 9999px;
+  border-radius: var(--radius-full);
 }
 
 .skeleton-avatar {
   width: 2.5rem;
   height: 2.5rem;
-  border-radius: 9999px;
+  border-radius: var(--radius-full);
   flex-shrink: 0;
 }
 

@@ -341,6 +341,7 @@ export interface IdeaEntity {
     estimated_duration: number;
     estimated_cost: number;
     priority: number;
+    position: number;
     status: IdeaStatus;
     problem_statement: string;
     proposed_solution: string;
@@ -376,6 +377,7 @@ export interface ProjectEntity {
     actual_impact: number;
     priority: number;
     priority_score: number;
+    position: number;
     business_context: JsonObjectField;
     timeline_label: string;
     budget_label: string;
@@ -412,40 +414,85 @@ export interface ActivityEntity {
     comment: string;
 }
 
+export interface GraphField {
+    id: string;
+    name: string;
+    fieldType: WfFieldType;
+    sortOrder: number;
+    isRequired: boolean;
+    options: string[];
+}
+
+export interface GraphNode {
+    id: string;
+    name: string;
+    description: string;
+    positionX: number;
+    positionY: number;
+    isStart: boolean;
+    isComplete: boolean;
+    fields: GraphField[];
+}
+
+export interface GraphEdge {
+    id: string;
+    name: string;
+    description: string;
+    fromNodeId: string;
+    toNodeId: string;
+}
+
+export const DEFAULT_LOCK_TIMEOUT = 28800;
+
 export interface FlowEntity {
     id: Id;
     name: string;
     description: string;
+    is_locked: boolean;
+    lock_timeout: number;
+    graph: JsonObjectField;
     created_at: string;
     updated_at: string;
 }
 
-export interface WfNodeEntity {
-    id: Id;
+export interface WorkOrderFlowGraph {
+    flowId: Id;
     name: string;
     description: string;
-    position_x: number;
-    position_y: number;
-    is_start: StoredBoolean;
-    is_complete: StoredBoolean;
+    lockTimeout: number;
+    nodes: GraphNode[];
+    edges: GraphEdge[];
+}
+
+export interface WorkOrderEntity {
+    id: Id;
+    display_id: string;
+    flow_graph: JsonObjectField;
     created_at: string;
 }
 
-export interface WfEdgeEntity {
+export interface FlowWorkOrderEntity {
     id: Id;
-    name: string;
-    description: string;
+    flow_id: Id;
+    work_order_id: Id;
     created_at: string;
 }
 
-export interface WfFieldEntity {
+export interface WorkOrderTransitionEntity {
     id: Id;
-    name: string;
-    field_type: WfFieldType;
-    sort_order: number;
-    is_required: StoredBoolean;
-    options: JsonArrayField;
-    created_at: string;
+    work_order_id: Id;
+    from_node_id: Id;
+    to_node_id: Id;
+    user_id: Id;
+    values: JsonObjectField;
+    transitioned_at: string;
+}
+
+export interface WorkOrderClaimEntity {
+    id: Id;
+    work_order_id: Id;
+    user_id: Id;
+    claimed_at: string;
 }
 
 export interface CompanySettingsEntity {
@@ -504,27 +551,6 @@ export interface ProjectFlowEntity {
     created_at: string;
 }
 
-export interface WfFlowNodeEntity {
-    id: Id;
-    flow_id: Id;
-    node_id: Id;
-    created_at: string;
-}
-
-export interface WfNodeEdgeEntity {
-    id: Id;
-    wf_edge_id: Id;
-    from_node_id: Id;
-    to_node_id: Id;
-    created_at: string;
-}
-
-export interface WfNodeFieldEntity {
-    id: Id;
-    node_id: Id;
-    field_id: Id;
-    created_at: string;
-}
 
 export interface StatusDisplay {
     label: string;
@@ -563,7 +589,7 @@ export const IDEA_STATUS_CONFIG: Record<
     },
     'approved': {
         label: 'Approved',
-        className: 'badge-primary',
+        className: 'badge-success',
     },
     'promoted': {
         label: 'Promoted',
@@ -592,12 +618,12 @@ export const PROJECT_STATUS_CONFIG: Record<
         className: 'badge-default',
     },
     'under-review': {
-        label: 'Under Review',
+        label: 'In Review',
         className: 'badge-warning',
     },
     'sent-back': {
         label: 'Sent Back',
-        className: 'badge-warning',
+        className: 'badge-error',
     },
     'approved': {
         label: 'Approved',
@@ -608,8 +634,8 @@ export const PROJECT_STATUS_CONFIG: Record<
         className: 'badge-error',
     },
     'completed': {
-        label: 'Completed',
-        className: 'badge-primary',
+        label: 'Active',
+        className: 'badge-success',
     },
     'deleted': {
         label: 'Deleted',
@@ -660,6 +686,7 @@ export class Idea {
     readonly estimatedDuration: number;
     readonly estimatedCost: number;
     readonly priority: number;
+    readonly position: number;
     readonly status: IdeaStatus;
     readonly problemStatement: string;
     readonly proposedSolution: string;
@@ -695,6 +722,7 @@ export class Idea {
         this.estimatedCost =
             entity.estimated_cost;
         this.priority = entity.priority;
+        this.position = entity.position;
         this.status = entity.status;
         this.problemStatement =
             entity.problem_statement;
@@ -835,6 +863,7 @@ export class Project {
     readonly actualImpact: number;
     readonly priority: number;
     readonly priorityScore: number;
+    readonly position: number;
     readonly businessContext: string;
     readonly timelineLabel: string;
     readonly budgetLabel: string;
@@ -862,6 +891,7 @@ export class Project {
         this.priority = entity.priority;
         this.priorityScore =
             entity.priority_score;
+        this.position = entity.position;
         this.businessContext =
             entity.business_context;
         this.timelineLabel =
@@ -1116,12 +1146,6 @@ export function ideaIsVisible(
 ): boolean {
     return e.status !== 'archived'
         && e.status !== 'deleted';
-}
-
-export function ideaIsInReview(
-    e: IdeaEntity,
-): boolean {
-    return e.status === 'in-review';
 }
 
 export function projectIsNotDeleted(

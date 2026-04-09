@@ -15,17 +15,15 @@ import type {
     TeamMembershipUserEntity,
     ActivityEntity,
     FlowEntity,
-    WfNodeEntity,
-    WfEdgeEntity,
-    WfFieldEntity,
     CompanySettingsEntity,
     AccountEntity,
     IdeaSubmissionEntity,
     ActivityActorEntity,
     ProjectFlowEntity,
-    WfFlowNodeEntity,
-    WfNodeEdgeEntity,
-    WfNodeFieldEntity,
+    WorkOrderEntity,
+    FlowWorkOrderEntity,
+    WorkOrderTransitionEntity,
+    WorkOrderClaimEntity,
 } from './types';
 import { nowUtc } from './types';
 
@@ -309,13 +307,11 @@ export const TABLE_NAMES = [
     'team_membership_users',
     'activities',
     'flows',
-    'wf_nodes',
-    'wf_edges',
-    'wf_fields',
     'project_flows',
-    'wf_flow_nodes',
-    'wf_node_edges',
-    'wf_node_fields',
+    'work_orders',
+    'flow_work_orders',
+    'work_order_transitions',
+    'work_order_claims',
     'company_settings',
     'account',
     'idea_submissions',
@@ -495,34 +491,26 @@ export async function createLocalStorageAdapter(
             createEntityStore<
                 FlowEntity
             >('flows'),
-        wfNodes:
-            createEntityStore<
-                WfNodeEntity
-            >('wf_nodes'),
-        wfEdges:
-            createEntityStore<
-                WfEdgeEntity
-            >('wf_edges'),
-        wfFields:
-            createEntityStore<
-                WfFieldEntity
-            >('wf_fields'),
         projectFlows:
             createEntityStore<
                 ProjectFlowEntity
             >('project_flows'),
-        wfFlowNodes:
+        workOrders:
             createEntityStore<
-                WfFlowNodeEntity
-            >('wf_flow_nodes'),
-        wfNodeEdges:
+                WorkOrderEntity
+            >('work_orders'),
+        flowWorkOrders:
             createEntityStore<
-                WfNodeEdgeEntity
-            >('wf_node_edges'),
-        wfNodeFields:
+                FlowWorkOrderEntity
+            >('flow_work_orders'),
+        workOrderTransitions:
             createEntityStore<
-                WfNodeFieldEntity
-            >('wf_node_fields'),
+                WorkOrderTransitionEntity
+            >('work_order_transitions'),
+        workOrderClaims:
+            createEntityStore<
+                WorkOrderClaimEntity
+            >('work_order_claims'),
 
         companySettings:
             createSingletonStore<

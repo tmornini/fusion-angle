@@ -78,7 +78,118 @@
 
 [data-theme="dark"] .dialog-backdrop,
 [data-theme="dark"] .sheet-backdrop,
-[data-theme="dark"] .command-palette-backdrop {
-  background-color: hsl(var(--backdrop) / 0.7);
+[data-theme="dark"]
+    .command-palette-backdrop {
+  background-color:
+    hsl(var(--backdrop) / 0.7);
+}
+
+/* ==========================================
+   COMPONENT DARK MODE OVERRIDES
+   ========================================== */
+
+/* Cards: stronger border for contrast */
+[data-theme="dark"] .card,
+[data-theme="dark"] .card-flat {
+  border-color: hsl(var(--gray-600));
+}
+
+/* Tables: subtle hover row */
+[data-theme="dark"]
+    .table tbody tr:hover {
+  background-color:
+    hsl(var(--gray-700) / 0.5);
+}
+
+/* Inputs: focus glow in dark */
+[data-theme="dark"]
+    .input:focus-visible,
+[data-theme="dark"]
+    .textarea:focus-visible {
+  box-shadow:
+    0 0 0 2px hsl(var(--ring) / 0.3);
+}
+
+/* Dropdowns: elevated surface */
+[data-theme="dark"] .dropdown-content {
+  border-color: hsl(var(--gray-600));
+  box-shadow:
+    0 8px 24px hsl(0 0% 0% / 0.4);
+}
+
+/* Tooltips: inverted for contrast */
+[data-theme="dark"] .tooltip {
+  background-color:
+    hsl(var(--gray-200));
+  color: hsl(var(--gray-900));
+}
+
+/* Progress bar: visible track */
+[data-theme="dark"] .progress {
+  background-color:
+    hsl(var(--gray-700));
+}
+
+/* Switch: visible track/thumb */
+[data-theme="dark"] .switch {
+  background-color:
+    hsl(var(--gray-600));
+}
+[data-theme="dark"] .switch-thumb {
+  background-color:
+    hsl(var(--gray-300));
+}
+
+/* Badges: visible borders */
+[data-theme="dark"] .badge {
+  border-color:
+    hsl(var(--border) / 0.5);
+}
+[data-theme="dark"] .status-badge {
+  border-color:
+    hsl(var(--border) / 0.5);
+}
+
+/* Flow designer: dark surfaces */
+[data-theme="dark"]
+    .wf-toolbar {
+  background-color:
+    hsl(var(--gray-800));
+  border-color: hsl(var(--gray-700));
+}
+[data-theme="dark"]
+    .wf-canvas-wrap {
+  background-color:
+    hsl(var(--gray-900));
+  border-color: hsl(var(--gray-700));
+}
+[data-theme="dark"]
+    .wf-props-panel {
+  background-color:
+    hsl(var(--gray-800));
+  border-color: hsl(var(--gray-700));
+}
+[data-theme="dark"]
+    .wf-field-row {
+  background-color:
+    hsl(var(--gray-700));
+}
+[data-theme="dark"]
+    .wf-field-editor {
+  background-color:
+    hsl(var(--gray-700));
+  border-color: hsl(var(--gray-600));
+}
+
+/* Hero button: softer glow in dark */
+[data-theme="dark"] .btn-hero {
+  box-shadow:
+    0 2px 8px hsl(var(--primary) / 0.2);
+}
+[data-theme="dark"]
+    .btn-hero:hover {
+  box-shadow:
+    0 4px 12px
+    hsl(var(--primary) / 0.3);
 }
 

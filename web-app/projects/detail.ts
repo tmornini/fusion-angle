@@ -1,5 +1,6 @@
 import {
     $, $$, $textarea, $input, $select,
+    bindEnterToClick,
 } from '../app/dom';
 import { setHtml } from '../app/safe-html';
 import { showToast } from '../app/toast';
@@ -8,6 +9,8 @@ import {
 } from '../app/loading-states';
 import {
     navigateTo,
+    openDialog,
+    closeDialog,
 } from '../app/core';
 import {
     getProjectById, putProject,
@@ -27,12 +30,62 @@ import {
     COST_DIVISOR,
 } from '../../api/types';
 
+let editEscapeHandler:
+    ((e: KeyboardEvent) => void) | null
+    = null;
+
 function bindProjectEvents(
     project: ProjectView,
     projectId: string,
     flows: FlowListItem[],
     isEditing: boolean,
 ): void {
+    if (editEscapeHandler) {
+        document.removeEventListener(
+            'keydown',
+            editEscapeHandler,
+        );
+        editEscapeHandler = null;
+    }
+    if (isEditing) {
+        editEscapeHandler = (
+            e: KeyboardEvent,
+        ) => {
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                $(
+                    '#project-cancel-btn',
+                    document,
+                )?.click();
+            }
+        };
+        document.addEventListener(
+            'keydown',
+            editEscapeHandler,
+        );
+        const saveSel =
+            '#project-save-btn';
+        bindEnterToClick(
+            '#project-edit-title',
+            saveSel,
+        );
+        bindEnterToClick(
+            '#project-edit-start-date',
+            saveSel,
+        );
+        bindEnterToClick(
+            '#project-edit-end-date',
+            saveSel,
+        );
+        bindEnterToClick(
+            '#project-edit-cost-baseline',
+            saveSel,
+        );
+        bindEnterToClick(
+            '#project-edit-impact-baseline',
+            saveSel,
+        );
+    }
     $('#project-back-btn', document)
         ?.addEventListener(
                 'click',
@@ -142,33 +195,9 @@ function bindProjectEvents(
     $('#new-flow-btn', document)
         ?.addEventListener(
             'click',
-            async () => {
-                const wfId =
-                    crypto.randomUUID();
-                try {
-                    await postFlowCreation(
-                        {
-                            flowId: wfId,
-                            projectId,
-                            name:
-                                'New Flow',
-                            description: '',
-                        },
-                    );
-                } catch {
-                    showToast(
-                        'Failed to create'
-                        + ' flow',
-                        'error',
-                    );
-                    return;
-                }
-                navigateTo(
-                    'flow-detail',
-                    { flowId: wfId },
-                );
-            },
+            () => openDialog('new-flow'),
         );
+    bindNewFlowDialog(projectId);
 
     $$('[data-flow-id]', document)
         .forEach(el => {
@@ -183,11 +212,99 @@ function bindProjectEvents(
                     if (!wfId) return;
                     navigateTo(
                         'flow-detail',
-                        { flowId: wfId },
+                        {
+                            flowId: wfId,
+                            projectId,
+                        },
                     );
                 },
             );
         });
+}
+
+function bindNewFlowDialog(
+    projectId: string,
+): void {
+    const backdrop = $(
+        '#new-flow-backdrop', document,
+    );
+    $('#new-flow-cancel', document)
+        ?.addEventListener(
+            'click',
+            () => closeDialog('new-flow'),
+        );
+    backdrop?.addEventListener(
+        'click',
+        (e) => {
+            if (
+                e.target === e.currentTarget
+            ) {
+                closeDialog('new-flow');
+            }
+        },
+    );
+    $('#new-flow-submit', document)
+        ?.addEventListener(
+            'click',
+            async () => {
+                const nameEl = $input(
+                    '#new-flow-name',
+                    document,
+                );
+                const name =
+                    nameEl?.value.trim()
+                    ?? '';
+                if (name.length === 0) {
+                    showToast(
+                        'Flow name is'
+                        + ' required',
+                        'error',
+                    );
+                    return;
+                }
+                const wfId =
+                    crypto.randomUUID();
+                try {
+                    await postFlowCreation(
+                        {
+                            flowId: wfId,
+                            projectId,
+                            name,
+                            description: '',
+                        },
+                    );
+                } catch {
+                    showToast(
+                        'Failed to create'
+                        + ' flow',
+                        'error',
+                    );
+                    return;
+                }
+                closeDialog('new-flow');
+                navigateTo(
+                    'flow-detail',
+                    {
+                        flowId: wfId,
+                        projectId,
+                    },
+                );
+            },
+        );
+    $input(
+        '#new-flow-name', document,
+    )?.addEventListener(
+        'keydown',
+        (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                $(
+                    '#new-flow-submit',
+                    document,
+                )?.click();
+            }
+        },
+    );
 }
 
 function mutateProjectPage(

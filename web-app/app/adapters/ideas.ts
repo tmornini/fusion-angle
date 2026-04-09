@@ -6,7 +6,6 @@ import type {
 import {
     Idea, nowUtc,
     ideaIsVisible,
-    ideaIsInReview,
 } from '../../../api/types';
 import {
     buildUserMap,
@@ -81,43 +80,6 @@ export async function getIdeaDetail(
     );
 }
 
-export async function getReviewQueue(
-): Promise<Idea[]> {
-    const [
-        ideas, userMap, submissions,
-    ] = await Promise.all([
-        GET<IdeaEntity[]>('ideas'),
-        buildUserMap(),
-        GET<IdeaSubmissionEntity[]>(
-            'idea-submissions',
-        ),
-    ]);
-    const submitterMap = new Map(
-        submissions.map(
-            s => [s.idea_id, s.user_id],
-        ),
-    );
-    const submittedAtMap = new Map(
-        submissions.map(
-            s => [
-                s.idea_id,
-                s.created_at,
-            ],
-        ),
-    );
-
-    return ideas
-        .filter(ideaIsInReview)
-        .map(idea => new Idea(
-            idea,
-            userName(
-                userMap,
-                submitterMap.get(idea.id)!,
-            ),
-            submittedAtMap.get(idea.id)!,
-        ));
-}
-
 export interface ConversionData {
     idea: Idea;
     estimatedDuration: string;
@@ -153,32 +115,6 @@ export async function getIdeaForConversion(
         estimatedDuration: '',
         estimatedCost: '',
     };
-}
-
-export async function getIdeaForApproval(
-    ideaId: string,
-): Promise<Idea> {
-    const [entity, userMap, submissions] =
-        await Promise.all([
-            GET<IdeaEntity>(
-                `ideas/${ideaId}`,
-            ),
-            buildUserMap(),
-            GET<IdeaSubmissionEntity[]>(
-                'idea-submissions',
-            ),
-        ]);
-    const submission = submissions.find(
-        s => s.idea_id === ideaId,
-    );
-    return new Idea(
-        entity,
-        userName(
-            userMap,
-            submission!.user_id,
-        ),
-        submission!.created_at,
-    );
 }
 
 export async function getIdea(

@@ -1,11 +1,7 @@
 export {
     IdeaPresenter,
     IdeaListPresenter,
-    ReviewQueuePresenter,
 } from './idea';
-export {
-    IdeaApprovalPresenter,
-} from './idea-approval';
 export {
     IdeaConversionPresenter,
 } from './idea-conversion';

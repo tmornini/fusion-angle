@@ -16,7 +16,7 @@
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  padding: 0.375rem 0.75rem;
+  padding: 0.5rem 0.75rem;
   border-radius: var(--radius);
   font-size: var(--text-sm);
   font-weight: 500;
@@ -55,6 +55,12 @@
   background-color: hsl(var(--card));
   color: hsl(var(--foreground));
   box-shadow: var(--shadow-sm);
+}
+
+/* Idea list — show actions on hover */
+.idea-actions {
+  transition:
+    opacity var(--duration-fast);
 }
 
 /* ==========================================
@@ -250,7 +256,7 @@
 
 .hero-blob {
   position: absolute;
-  border-radius: 9999px;
+  border-radius: var(--radius-full);
   filter: blur(64px);
   pointer-events: none;
 }
@@ -284,7 +290,7 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem 1rem;
-  border-radius: 9999px;
+  border-radius: var(--radius-full);
   background-color: hsl(var(--yellow-50));
   border: 1px solid hsl(var(--accent) / 0.2);
   margin-bottom: 2rem;
@@ -518,7 +524,7 @@
 .step-point-icon {
   width: 1.25rem;
   height: 1.25rem;
-  border-radius: 9999px;
+  border-radius: var(--radius-full);
   background-color: hsl(var(--accent) / 0.2);
   display: flex;
   align-items: center;
@@ -552,7 +558,7 @@
 
 .cta-blob {
   position: absolute;
-  border-radius: 9999px;
+  border-radius: var(--radius-full);
   filter: blur(64px);
   pointer-events: none;
 }
@@ -848,9 +854,19 @@
    39. FLOW DESIGNER
    ========================================== */
 
+[data-page="flow-detail"] .sidebar-layout {
+  height: 100vh;
+}
+
+[data-page="flow-detail"] .main-content {
+  min-height: 0;
+}
+
 [data-page="flow-detail"] .page-content {
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
 }
 
 #flow-designer {
@@ -868,14 +884,14 @@
 }
 
 .wf-designer-header {
-  padding: 16px;
+  padding: 1rem;
 }
 
 .wf-toolbar {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 16px;
+  gap: 0.75rem;
+  padding: 0.625rem 1rem;
   background-color: hsl(var(--card));
   border-bottom:
       1px solid hsl(var(--border));
@@ -885,13 +901,25 @@
 .wf-toolbar-group {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 0.5rem;
+}
+
+.wf-toolbar-spacer {
+  flex: 1;
+}
+
+.wf-canvas-area {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .wf-canvas-wrap {
-  flex: 1;
-  min-height: 250px;
-  background-color: hsl(var(--background));
+  width: 100%;
+  height: 100%;
+  background-color:
+      hsl(var(--background));
   border: 1px solid hsl(var(--border));
   border-radius: var(--radius-lg);
   overflow: hidden;
@@ -904,33 +932,41 @@
 
 svg.wf-canvas {
   width: 100%;
+  height: 100%;
   display: block;
 }
 
 .wf-props-panel {
-  padding: 16px;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  padding: 1rem;
   background-color: hsl(var(--card));
   border-bottom:
       1px solid hsl(var(--border));
-  max-height: 300px;
+  max-height: 18.75rem;
   overflow-y: auto;
 }
 
 .wf-field-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
-  background-color: hsl(var(--background));
+  gap: 0.5rem;
+  padding: 0.375rem 0.5rem;
+  background-color:
+      hsl(var(--background));
   border-radius: var(--radius-sm);
-  margin-bottom: 4px;
+  margin-bottom: 0.25rem;
   font-size: var(--text-sm);
 }
 
 .wf-field-editor {
-  margin-top: 8px;
-  padding: 12px;
-  background-color: hsl(var(--background));
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  background-color:
+      hsl(var(--background));
   border-radius: var(--radius-sm);
   border: 1px solid hsl(var(--border));
 }
@@ -945,13 +981,23 @@ svg.wf-canvas [data-node-id]:hover {
   opacity: 0.85;
 }
 
+svg.wf-canvas.wf-connecting {
+  cursor: crosshair;
+}
+
+svg.wf-canvas.wf-connecting
+    [data-node-id]:hover {
+  opacity: 1;
+  cursor: copy;
+}
+
 svg.wf-canvas [data-edge-id] {
   cursor: pointer;
 }
 
 @media (max-width: 767px) {
-  .wf-toolbar { gap: 8px; }
-  .wf-canvas-wrap { min-height: 250px; }
+  .wf-toolbar { gap: 0.5rem; }
+  .wf-toolbar-spacer { display: none; }
   .wf-props-panel { max-height: none; }
 }
 

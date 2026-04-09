@@ -99,3 +99,21 @@ export function initToggleGroup(
     }
 }
 
+export function bindEnterToClick(
+    inputSel: string,
+    btnSel: string,
+    root: ParentNode = document,
+): void {
+    $input(inputSel, root)
+        ?.addEventListener(
+            'keydown',
+            (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    $(btnSel, root)
+                        ?.click();
+                }
+            },
+        );
+}

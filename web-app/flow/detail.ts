@@ -1,5 +1,6 @@
 import {
     $, $input, $select,
+    bindEnterToClick,
 } from '../app/dom';
 import { setHtml } from '../app/safe-html';
 import { showToast } from '../app/toast';
@@ -9,8 +10,6 @@ import {
 } from '../app/loading-states';
 import {
     navigateTo,
-    openDialog,
-    closeDialog,
 } from '../app/core';
 import {
     getFlowGraph,
@@ -74,15 +73,26 @@ class Debouncer {
 const saveDebouncer =
     new Debouncer(SAVE_DELAY_MS);
 
+let currentProjectId:
+    string | undefined;
+
+let interactionAbortController:
+    AbortController | null = null;
+
 function renderAndBind(
     container: HTMLElement,
     presenter: FlowDesignerPresenter,
 ): void {
+    interactionAbortController?.abort();
+    interactionAbortController =
+        new AbortController();
+    const signal =
+        interactionAbortController.signal;
     saveDebouncer.flush();
     presenter.render(container);
     bindBackButton();
     bindSvgInteractions(
-        container, presenter,
+        container, presenter, signal,
     );
     bindToolbarActions(
         container, presenter,
@@ -90,8 +100,113 @@ function renderAndBind(
     bindPanelActions(
         container, presenter,
     );
-    bindAddStateDialog(
+    bindFlowNameEdit(
         container, presenter,
+    );
+    bindLockCheckbox(
+        container, presenter,
+    );
+}
+
+function bindFlowNameEdit(
+    container: HTMLElement,
+    presenter: FlowDesignerPresenter,
+): void {
+    $('#flow-name-edit-btn', document)
+        ?.addEventListener(
+            'click',
+            () => {
+                presenter
+                    .startEditingName();
+                renderAndBind(
+                    container, presenter,
+                );
+                const input = $input(
+                    '#flow-name-input',
+                    document,
+                );
+                if (input) {
+                    input.focus();
+                    input.select();
+                }
+            },
+        );
+    $('#flow-name-save-btn', document)
+        ?.addEventListener(
+            'click',
+            () => {
+                const name = $input(
+                    '#flow-name-input',
+                    document,
+                )?.value.trim() ?? '';
+                if (
+                    name.length === 0
+                ) {
+                    showToast(
+                        'Flow name is'
+                        + ' required',
+                        'error',
+                    );
+                    return;
+                }
+                presenter
+                    .updateFlowName(name);
+                renderAndBind(
+                    container, presenter,
+                );
+            },
+        );
+    $('#flow-name-cancel-btn', document)
+        ?.addEventListener(
+            'click',
+            () => {
+                presenter
+                    .cancelEditingName();
+                renderAndBind(
+                    container, presenter,
+                );
+            },
+        );
+    $input(
+        '#flow-name-input', document,
+    )?.addEventListener(
+        'keydown',
+        (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                e.stopPropagation();
+                $(
+                    '#flow-name-save-btn',
+                    document,
+                )?.click();
+            }
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                e.stopPropagation();
+                $(
+                    '#flow-name-cancel-btn',
+                    document,
+                )?.click();
+            }
+        },
+    );
+}
+
+function bindLockCheckbox(
+    container: HTMLElement,
+    presenter: FlowDesignerPresenter,
+): void {
+    const cb = $input(
+        '#flow-lock-checkbox', document,
+    );
+    cb?.addEventListener(
+        'change',
+        () => {
+            presenter.toggleLocked();
+            renderAndBind(
+                container, presenter,
+            );
+        },
     );
 }
 
@@ -99,13 +214,22 @@ function bindBackButton(): void {
     $('#flow-back-btn', document)
         ?.addEventListener(
             'click',
-            () => navigateTo('flows'),
+            () => currentProjectId
+                ? navigateTo(
+                    'project-detail',
+                    {
+                        projectId:
+                            currentProjectId,
+                    },
+                )
+                : navigateTo('flow'),
         );
 }
 
 function bindSvgInteractions(
     container: HTMLElement,
     presenter: FlowDesignerPresenter,
+    signal: AbortSignal,
 ): void {
     const svg = container.querySelector(
         'svg.wf-canvas',
@@ -134,8 +258,18 @@ function bindSvgInteractions(
                     container, presenter,
                 ));
         },
+        (fromId, x, y) => {
+            void presenter
+                .addNodeAtPosition(
+                    fromId, x, y,
+                )
+                .then(() => renderAndBind(
+                    container, presenter,
+                ));
+        },
         (id) =>
             presenter.getNodePosition(id),
+        signal,
     );
     if (
         (state.drag.kind === 'dragging'
@@ -173,29 +307,27 @@ function bindToolbarActions(
         if (action === 'undo') {
             btn.addEventListener(
                 'click',
-                () => void presenter
-                    .performUndo()
-                    .then(() => renderAndBind(
-                        container, presenter,
-                    )),
+                async () => {
+                    await presenter
+                        .performUndo();
+                    renderAndBind(
+                        container,
+                        presenter,
+                    );
+                },
             );
         }
         if (action === 'redo') {
             btn.addEventListener(
                 'click',
-                () => void presenter
-                    .performRedo()
-                    .then(() => renderAndBind(
-                        container, presenter,
-                    )),
-            );
-        }
-        if (action === 'add-state') {
-            btn.addEventListener(
-                'click',
-                () => openDialog(
-                    'add-state',
-                ),
+                async () => {
+                    await presenter
+                        .performRedo();
+                    renderAndBind(
+                        container,
+                        presenter,
+                    );
+                },
             );
         }
         if (action === 'auto-layout') {
@@ -543,6 +675,12 @@ function showFieldEditor(
                 container, presenter,
             ),
         );
+        bindEnterToClick(
+            '#new-field-name',
+            '[data-action='
+            + '"save-field"]',
+            slot,
+        );
     }
 }
 
@@ -599,6 +737,8 @@ export async function init(
 ): Promise<void> {
     const flowId =
         params?.flowId;
+    currentProjectId =
+        params?.projectId;
     if (!flowId) {
         navigateTo('flow');
         return;
@@ -624,126 +764,34 @@ export async function init(
         '.wf-canvas-wrap',
     );
     if (wrap) {
-        const rect =
-            wrap.getBoundingClientRect();
-        if (
-            rect.width > 0
-            && rect.height > 0
-        ) {
-            presenter.updateCanvasSize(
-                rect.width, rect.height,
-            );
-            renderAndBind(
-                container, presenter,
-            );
-        }
+        const ro = new ResizeObserver(
+            (entries) => {
+                const entry =
+                    entries[0];
+                if (!entry) return;
+                const cr =
+                    entry.contentRect;
+                if (
+                    cr.width > 0
+                    && cr.height > 0
+                ) {
+                    presenter
+                        .updateCanvasSize(
+                            cr.width,
+                            cr.height,
+                        );
+                    renderAndBind(
+                        container,
+                        presenter,
+                    );
+                }
+            },
+        );
+        ro.observe(wrap);
     }
     bindKeyboardShortcuts(
         container, presenter,
     );
-}
-
-function bindAddStateDialog(
-    container: HTMLElement,
-    presenter: FlowDesignerPresenter,
-): void {
-    const cancelBtn = $(
-        '#add-state-cancel', document,
-    );
-    const submitBtn = $(
-        '#add-state-submit', document,
-    );
-    const backdrop = $(
-        '#add-state-backdrop', document,
-    );
-
-    cancelBtn?.addEventListener(
-        'click',
-        () => closeDialog('add-state'),
-    );
-    backdrop?.addEventListener(
-        'click',
-        (e) => {
-            if (
-                e.target === e.currentTarget
-            ) {
-                closeDialog('add-state');
-            }
-        },
-    );
-
-    const dirBtns =
-        document.querySelectorAll(
-            '[data-direction]',
-        );
-    for (const btn of dirBtns) {
-        btn.addEventListener(
-            'click',
-            () => {
-                for (const b of dirBtns) {
-                    b.classList.remove(
-                        'active',
-                    );
-                }
-                btn.classList.add('active');
-            },
-        );
-    }
-
-    submitBtn?.addEventListener(
-        'click',
-        () => void handleAddState(
-            container, presenter,
-        ),
-    );
-}
-
-async function handleAddState(
-    container: HTMLElement,
-    presenter: FlowDesignerPresenter,
-): Promise<void> {
-    const nameEl = $input(
-        '#add-state-name', document,
-    );
-    const transEl = $input(
-        '#add-state-transition', document,
-    );
-    const name = nameEl?.value.trim() ?? '';
-    const transition =
-        transEl?.value.trim() ?? '';
-    if (name.length === 0) {
-        showToast(
-            'State name is required',
-            'error',
-        );
-        return;
-    }
-    if (transition.length === 0) {
-        showToast(
-            'Transition name is required',
-            'error',
-        );
-        return;
-    }
-    const activeDir =
-        document.querySelector(
-            '[data-direction].active',
-        );
-    const direction =
-        activeDir?.getAttribute(
-            'data-direction',
-        ) ?? 'right';
-
-    const ok =
-        await presenter.addNodeWithEdge(
-            name, transition, direction,
-        );
-    if (ok) {
-        closeDialog('add-state');
-        renderAndBind(
-            container, presenter,
-        );
-    }
 }
 
 function bindKeyboardShortcuts(
@@ -822,28 +870,28 @@ function bindKeyboardShortcuts(
                 && !e.shiftKey
             ) {
                 e.preventDefault();
-                void presenter
-                    .performUndo()
-                    .then(
-                        () => renderAndBind(
-                            container,
-                            presenter,
-                        ),
+                void (async () => {
+                    await presenter
+                        .performUndo();
+                    renderAndBind(
+                        container,
+                        presenter,
                     );
+                })();
             }
             if (
                 e.key === 'z'
                 && e.shiftKey
             ) {
                 e.preventDefault();
-                void presenter
-                    .performRedo()
-                    .then(
-                        () => renderAndBind(
-                            container,
-                            presenter,
-                        ),
+                void (async () => {
+                    await presenter
+                        .performRedo();
+                    renderAndBind(
+                        container,
+                        presenter,
                     );
+                })();
             }
         },
     );

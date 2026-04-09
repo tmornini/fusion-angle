@@ -1,134 +1,123 @@
-import {
-    GET, DELETE,
-} from '../../../api/api';
+import { GET, PUT } from '../../../api/api';
 import type {
-    WfNodeEntity,
-    WfEdgeEntity,
-    WfFieldEntity,
-    WfFlowNodeEntity,
-    WfNodeEdgeEntity,
-    WfNodeFieldEntity,
+    FlowEntity,
+    GraphNode,
+    GraphEdge,
 } from '../../../api/types';
-import type {
-    UndoStep,
-} from '../flow-undo';
 import {
-    executeUndoSteps,
-} from './flow-undo-adapter';
+    nowUtc,
+    jsonObjectField,
+} from '../../../api/types';
+import { parseJson } from './helpers';
+import type { UndoStep } from '../flow-undo';
+
+interface StoredGraph {
+    nodes: GraphNode[];
+    edges: GraphEdge[];
+}
+
+function parseGraph(
+    raw: string,
+): StoredGraph {
+    return parseJson<StoredGraph>(
+        raw,
+        { nodes: [], edges: [] },
+    );
+}
+
+function saveGraph(
+    graph: StoredGraph,
+): string {
+    return jsonObjectField(
+        graph as unknown as Record<
+            string, unknown
+        >,
+    );
+}
+
+function graphPutStep(
+    flowId: string,
+    graph: StoredGraph,
+): UndoStep {
+    return {
+        op: 'put',
+        resource: `flows/${flowId}`,
+        body: {
+            graph: saveGraph(graph),
+            updated_at: nowUtc(),
+        },
+    };
+}
 
 export async function deleteNode(
     nodeId: string,
     flowId: string,
 ): Promise<void> {
-    const [nodeEdges, flowNodes] =
-        await Promise.all([
-            GET<WfNodeEdgeEntity[]>(
-                'wf-node-edges',
-            ),
-            GET<WfFlowNodeEntity[]>(
-                'wf-flow-nodes',
-            ),
-        ]);
-
-    const affectedEdges = nodeEdges.filter(
-        ne =>
-            ne.from_node_id === nodeId
-            || ne.to_node_id === nodeId,
+    const entity =
+        await GET<FlowEntity>(
+            `flows/${flowId}`,
+        );
+    const graph = parseGraph(
+        entity.graph,
     );
-
-    const flowNodeLink =
-        flowNodes.find(
-            wn =>
-                wn.flow_id
-                    === flowId
-                && wn.node_id === nodeId,
-        );
-
-    const deletePromises: Promise<void>[] =
-        [];
-
-    for (const ne of affectedEdges) {
-        deletePromises.push(
-            DELETE(
-                `wf-node-edges/${ne.id}`,
-            ),
-        );
-        deletePromises.push(
-            DELETE(
-                `wf-edges/${ne.wf_edge_id}`,
-            ),
-        );
-    }
-
-    if (flowNodeLink) {
-        deletePromises.push(
-            DELETE(
-                'wf-flow-nodes/'
-                + flowNodeLink.id,
-            ),
-        );
-    }
-
-    deletePromises.push(
-        DELETE(`wf-nodes/${nodeId}`),
+    graph.edges = graph.edges.filter(
+        e =>
+            e.fromNodeId !== nodeId
+            && e.toNodeId !== nodeId,
     );
-
-    await Promise.all(deletePromises);
+    graph.nodes = graph.nodes.filter(
+        n => n.id !== nodeId,
+    );
+    await PUT(`flows/${flowId}`, {
+        graph: saveGraph(graph),
+        updated_at: nowUtc(),
+    });
 }
 
 export async function deleteEdge(
     edgeId: string,
+    flowId: string,
 ): Promise<void> {
-    const nodeEdges =
-        await GET<WfNodeEdgeEntity[]>(
-            'wf-node-edges',
+    const entity =
+        await GET<FlowEntity>(
+            `flows/${flowId}`,
         );
-
-    const link = nodeEdges.find(
-        ne => ne.wf_edge_id === edgeId,
+    const graph = parseGraph(
+        entity.graph,
     );
-
-    const deletePromises: Promise<void>[] =
-        [DELETE(`wf-edges/${edgeId}`)];
-
-    if (link) {
-        deletePromises.push(
-            DELETE(
-                `wf-node-edges/${link.id}`,
-            ),
-        );
-    }
-
-    await Promise.all(deletePromises);
+    graph.edges = graph.edges.filter(
+        e => e.id !== edgeId,
+    );
+    await PUT(`flows/${flowId}`, {
+        graph: saveGraph(graph),
+        updated_at: nowUtc(),
+    });
 }
 
 export async function deleteField(
     fieldId: string,
     nodeId: string,
+    flowId: string,
 ): Promise<void> {
-    const nodeFields =
-        await GET<WfNodeFieldEntity[]>(
-            'wf-node-fields',
+    const entity =
+        await GET<FlowEntity>(
+            `flows/${flowId}`,
         );
-
-    const link = nodeFields.find(
-        nf =>
-            nf.field_id === fieldId
-            && nf.node_id === nodeId,
+    const graph = parseGraph(
+        entity.graph,
     );
-
-    const deletePromises: Promise<void>[] =
-        [DELETE(`wf-fields/${fieldId}`)];
-
-    if (link) {
-        deletePromises.push(
-            DELETE(
-                `wf-node-fields/${link.id}`,
-            ),
+    const node = graph.nodes.find(
+        n => n.id === nodeId,
+    );
+    if (node) {
+        node.fields = node.fields.filter(
+            f => f.id !== fieldId,
         );
     }
-
-    await Promise.all(deletePromises);
+    await PUT(`flows/${flowId}`, {
+        graph: saveGraph(graph),
+        updated_at: nowUtc(),
+    });
 }
 
 export interface NodeDeletionCapture {
@@ -141,136 +130,45 @@ export async function deleteNodeCapture(
     nodeId: string,
     flowId: string,
 ): Promise<NodeDeletionCapture> {
-    const [
-        nodeEdges, flowNodes,
-        allNodes, allEdges,
-        nodeFields, allFields,
-    ] = await Promise.all([
-        GET<WfNodeEdgeEntity[]>(
-            'wf-node-edges',
-        ),
-        GET<WfFlowNodeEntity[]>(
-            'wf-flow-nodes',
-        ),
-        GET<WfNodeEntity[]>('wf-nodes'),
-        GET<WfEdgeEntity[]>('wf-edges'),
-        GET<WfNodeFieldEntity[]>(
-            'wf-node-fields',
-        ),
-        GET<WfFieldEntity[]>('wf-fields'),
-    ]);
-
-    const node = allNodes.find(
-        n => n.id === nodeId,
-    );
-    const flowNodeLink = flowNodes.find(
-        wn =>
-            wn.flow_id === flowId
-            && wn.node_id === nodeId,
-    );
-    const affected = nodeEdges.filter(
-        ne =>
-            ne.from_node_id === nodeId
-            || ne.to_node_id === nodeId,
-    );
-    const affectedFields =
-        nodeFields.filter(
-            nf => nf.node_id === nodeId,
+    const entity =
+        await GET<FlowEntity>(
+            `flows/${flowId}`,
         );
+    const before = parseGraph(
+        entity.graph,
+    );
 
-    const restoreSteps: UndoStep[] = [];
-    const deleteSteps: UndoStep[] = [];
-    const removedEdgeIds: string[] = [];
+    const removedEdgeIds = before.edges
+        .filter(
+            e =>
+                e.fromNodeId === nodeId
+                || e.toNodeId === nodeId,
+        )
+        .map(e => e.id);
 
-    if (node) {
-        restoreSteps.push({
-            op: 'post',
-            resource: 'wf-nodes',
-            body: { ...node },
-        });
-    }
-    if (flowNodeLink) {
-        restoreSteps.push({
-            op: 'post',
-            resource: 'wf-flow-nodes',
-            body: { ...flowNodeLink },
-        });
-    }
+    const after: StoredGraph = {
+        nodes: before.nodes.filter(
+            n => n.id !== nodeId,
+        ),
+        edges: before.edges.filter(
+            e =>
+                e.fromNodeId !== nodeId
+                && e.toNodeId !== nodeId,
+        ),
+    };
 
-    for (const ne of affected) {
-        const edge = allEdges.find(
-            e => e.id === ne.wf_edge_id,
-        );
-        if (edge) {
-            restoreSteps.push({
-                op: 'post',
-                resource: 'wf-edges',
-                body: { ...edge },
-            });
-            removedEdgeIds.push(edge.id);
-        }
-        restoreSteps.push({
-            op: 'post',
-            resource: 'wf-node-edges',
-            body: { ...ne },
-        });
-        deleteSteps.push({
-            op: 'delete',
-            resource:
-                `wf-node-edges/${ne.id}`,
-        });
-        deleteSteps.push({
-            op: 'delete',
-            resource:
-                'wf-edges/'
-                + ne.wf_edge_id,
-        });
-    }
+    const restoreSteps: UndoStep[] = [
+        graphPutStep(flowId, before),
+    ];
+    const deleteSteps: UndoStep[] = [
+        graphPutStep(flowId, after),
+    ];
 
-    for (const nf of affectedFields) {
-        const field = allFields.find(
-            f => f.id === nf.field_id,
-        );
-        if (field) {
-            restoreSteps.push({
-                op: 'post',
-                resource: 'wf-fields',
-                body: { ...field },
-            });
-        }
-        restoreSteps.push({
-            op: 'post',
-            resource: 'wf-node-fields',
-            body: { ...nf },
-        });
-        deleteSteps.push({
-            op: 'delete',
-            resource:
-                `wf-node-fields/${nf.id}`,
-        });
-        if (field) {
-            deleteSteps.push({
-                op: 'delete',
-                resource:
-                    `wf-fields/${field.id}`,
-            });
-        }
-    }
-
-    if (flowNodeLink) {
-        deleteSteps.push({
-            op: 'delete',
-            resource:
-                'wf-flow-nodes/'
-                + flowNodeLink.id,
-        });
-    }
-    deleteSteps.push({
-        op: 'delete',
-        resource: `wf-nodes/${nodeId}`,
+    await PUT(`flows/${flowId}`, {
+        graph: saveGraph(after),
+        updated_at: nowUtc(),
     });
 
-    await executeUndoSteps(deleteSteps);
     return {
         restoreSteps,
         deleteSteps,
@@ -285,51 +183,35 @@ export interface EdgeDeletionCapture {
 
 export async function deleteEdgeCapture(
     edgeId: string,
+    flowId: string,
 ): Promise<EdgeDeletionCapture> {
-    const [nodeEdges, allEdges] =
-        await Promise.all([
-            GET<WfNodeEdgeEntity[]>(
-                'wf-node-edges',
-            ),
-            GET<WfEdgeEntity[]>('wf-edges'),
-        ]);
-
-    const edge = allEdges.find(
-        e => e.id === edgeId,
+    const entity =
+        await GET<FlowEntity>(
+            `flows/${flowId}`,
+        );
+    const before = parseGraph(
+        entity.graph,
     );
-    const link = nodeEdges.find(
-        ne => ne.wf_edge_id === edgeId,
-    );
+    const after: StoredGraph = {
+        nodes: before.nodes,
+        edges: before.edges.filter(
+            e => e.id !== edgeId,
+        ),
+    };
 
-    const restoreSteps: UndoStep[] = [];
-    const deleteSteps: UndoStep[] = [];
-
-    if (edge) {
-        restoreSteps.push({
-            op: 'post',
-            resource: 'wf-edges',
-            body: { ...edge },
-        });
-    }
-    if (link) {
-        restoreSteps.push({
-            op: 'post',
-            resource: 'wf-node-edges',
-            body: { ...link },
-        });
-        deleteSteps.push({
-            op: 'delete',
-            resource:
-                `wf-node-edges/${link.id}`,
-        });
-    }
-    deleteSteps.push({
-        op: 'delete',
-        resource: `wf-edges/${edgeId}`,
+    await PUT(`flows/${flowId}`, {
+        graph: saveGraph(after),
+        updated_at: nowUtc(),
     });
 
-    await executeUndoSteps(deleteSteps);
-    return { restoreSteps, deleteSteps };
+    return {
+        restoreSteps: [
+            graphPutStep(flowId, before),
+        ],
+        deleteSteps: [
+            graphPutStep(flowId, after),
+        ],
+    };
 }
 
 export interface FieldDeletionCapture {
@@ -340,53 +222,39 @@ export interface FieldDeletionCapture {
 export async function deleteFieldCapture(
     fieldId: string,
     nodeId: string,
+    flowId: string,
 ): Promise<FieldDeletionCapture> {
-    const [nodeFields, allFields] =
-        await Promise.all([
-            GET<WfNodeFieldEntity[]>(
-                'wf-node-fields',
-            ),
-            GET<WfFieldEntity[]>(
-                'wf-fields',
-            ),
-        ]);
-
-    const field = allFields.find(
-        f => f.id === fieldId,
+    const entity =
+        await GET<FlowEntity>(
+            `flows/${flowId}`,
+        );
+    const before = parseGraph(
+        entity.graph,
     );
-    const link = nodeFields.find(
-        nf =>
-            nf.field_id === fieldId
-            && nf.node_id === nodeId,
-    );
+    const after: StoredGraph = {
+        nodes: before.nodes.map(n => {
+            if (n.id !== nodeId) return n;
+            return {
+                ...n,
+                fields: n.fields.filter(
+                    f => f.id !== fieldId,
+                ),
+            };
+        }),
+        edges: before.edges,
+    };
 
-    const restoreSteps: UndoStep[] = [];
-    const deleteSteps: UndoStep[] = [];
-
-    if (field) {
-        restoreSteps.push({
-            op: 'post',
-            resource: 'wf-fields',
-            body: { ...field },
-        });
-    }
-    if (link) {
-        restoreSteps.push({
-            op: 'post',
-            resource: 'wf-node-fields',
-            body: { ...link },
-        });
-        deleteSteps.push({
-            op: 'delete',
-            resource:
-                `wf-node-fields/${link.id}`,
-        });
-    }
-    deleteSteps.push({
-        op: 'delete',
-        resource: `wf-fields/${fieldId}`,
+    await PUT(`flows/${flowId}`, {
+        graph: saveGraph(after),
+        updated_at: nowUtc(),
     });
 
-    await executeUndoSteps(deleteSteps);
-    return { restoreSteps, deleteSteps };
+    return {
+        restoreSteps: [
+            graphPutStep(flowId, before),
+        ],
+        deleteSteps: [
+            graphPutStep(flowId, after),
+        ],
+    };
 }

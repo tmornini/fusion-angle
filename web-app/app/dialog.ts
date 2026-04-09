@@ -3,6 +3,27 @@ import {
 } from './dom';
 
 const focusStack: HTMLElement[] = [];
+const openDialogIds: string[] = [];
+
+function handleEscape(
+    e: KeyboardEvent,
+): void {
+    if (e.key !== 'Escape') return;
+    const topId =
+        openDialogIds.at(-1);
+    if (!topId) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const cancelBtn =
+        document.getElementById(
+            `${topId}-cancel`,
+        );
+    if (cancelBtn) {
+        cancelBtn.click();
+    } else {
+        closeDialog(topId);
+    }
+}
 
 function openDialog(
     dialogId: string,
@@ -27,6 +48,14 @@ function openDialog(
     dialog.setAttribute(
         'aria-hidden', 'false',
     );
+    openDialogIds.push(dialogId);
+    if (openDialogIds.length === 1) {
+        document.addEventListener(
+            'keydown',
+            handleEscape,
+            true,
+        );
+    }
     const focusable =
         dialog.querySelector<HTMLElement>(
             FOCUSABLE_SELECTOR,
@@ -49,6 +78,18 @@ function closeDialog(
     dialog.setAttribute(
         'aria-hidden', 'true',
     );
+    const idx =
+        openDialogIds.indexOf(dialogId);
+    if (idx >= 0) {
+        openDialogIds.splice(idx, 1);
+    }
+    if (openDialogIds.length === 0) {
+        document.removeEventListener(
+            'keydown',
+            handleEscape,
+            true,
+        );
+    }
     focusStack.pop()?.focus();
 }
 

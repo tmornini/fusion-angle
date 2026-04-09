@@ -1,5 +1,6 @@
 import {
     $, $input, $textarea,
+    bindEnterToClick,
 } from '../app/dom';
 import { setHtml } from '../app/safe-html';
 import { showToast } from '../app/toast';
@@ -9,6 +10,7 @@ import {
 } from '../app/loading-states';
 import {
     navigateTo, SECONDS_PER_DAY,
+    initDialog, closeDialog,
 } from '../app/core';
 import {
     getIdeaDetail,
@@ -19,11 +21,57 @@ import {
     IdeaPresenter,
 } from '../app/presenters';
 
+let editEscapeHandler:
+    ((e: KeyboardEvent) => void) | null
+    = null;
+
 function bindIdeaEvents(
     idea: Idea,
     ideaId: string,
     isEditing: boolean,
 ): void {
+    if (editEscapeHandler) {
+        document.removeEventListener(
+            'keydown',
+            editEscapeHandler,
+        );
+        editEscapeHandler = null;
+    }
+    if (isEditing) {
+        editEscapeHandler = (
+            e: KeyboardEvent,
+        ) => {
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                $(
+                    '#idea-cancel-btn',
+                    document,
+                )?.click();
+            }
+        };
+        document.addEventListener(
+            'keydown',
+            editEscapeHandler,
+        );
+        const saveSel = '#idea-save-btn';
+        bindEnterToClick(
+            '#idea-edit-title', saveSel,
+        );
+        bindEnterToClick(
+            '#idea-edit-category',
+            saveSel,
+        );
+        bindEnterToClick(
+            '#idea-edit-impact', saveSel,
+        );
+        bindEnterToClick(
+            '#idea-edit-time',
+            saveSel,
+        );
+        bindEnterToClick(
+            '#idea-edit-cost', saveSel,
+        );
+    }
     $('#idea-back-btn', document)
         ?.addEventListener(
             'click',
@@ -91,9 +139,9 @@ function bindIdeaEvents(
                         document,
                     )!.value,
                 );
-                const duration = Number(
+                const time = Number(
                     $input(
-                        '#idea-edit-duration',
+                        '#idea-edit-time',
                         document,
                     )!.value,
                 );
@@ -120,7 +168,7 @@ function bindIdeaEvents(
                         estimated_impact:
                             impact,
                         estimated_duration:
-                            duration
+                            time
                             * SECONDS_PER_DAY,
                         estimated_cost:
                             cost,
@@ -149,14 +197,9 @@ function bindIdeaEvents(
             },
         );
 
-    $('#idea-review-btn', document)
-        ?.addEventListener(
-            'click',
-            () => navigateTo(
-                'approval-detail',
-                { id: ideaId },
-            ),
-        );
+    if (idea.isReviewable()) {
+        bindApprovalEvents(ideaId);
+    }
     $('#idea-convert-btn', document)
         ?.addEventListener(
             'click',
@@ -196,6 +239,94 @@ function bindIdeaEvents(
             );
         },
     );
+}
+
+function bindApprovalEvents(
+    ideaId: string,
+): void {
+    $(
+        '#approval-approve-btn',
+        document,
+    )?.addEventListener(
+        'click',
+        async () => {
+            try {
+                await putIdea(
+                    ideaId,
+                    { status: 'approved' },
+                );
+            } catch {
+                showToast(
+                    'Failed to approve',
+                    'error',
+                );
+                return;
+            }
+            showToast(
+                'Idea approved'
+                + ' successfully',
+                'success',
+            );
+            navigateTo('ideas');
+        },
+    );
+
+    initDialog(
+        'approval-reject',
+        'approval-reject-btn',
+    );
+    $(
+        '#approval-reject-confirm',
+        document,
+    )?.addEventListener(
+        'click',
+        async () => {
+            try {
+                await putIdea(
+                    ideaId,
+                    { status: 'sent-back' },
+                );
+            } catch {
+                showToast(
+                    'Failed to send back',
+                    'error',
+                );
+                return;
+            }
+            showToast(
+                'Idea sent back'
+                + ' for revision',
+                'info',
+            );
+            closeDialog(
+                'approval-reject',
+            );
+            navigateTo('ideas');
+        },
+    );
+
+    initDialog(
+        'approval-clarify',
+        'approval-clarify-btn',
+    );
+    $(
+        '#approval-clarify-confirm',
+        document,
+    )?.addEventListener(
+        'click',
+        () => {
+            showToast(
+                'Clarification'
+                + ' requested',
+                'info',
+            );
+            closeDialog(
+                'approval-clarify',
+            );
+        },
+    );
+
+
 }
 
 function mutateIdeaPage(

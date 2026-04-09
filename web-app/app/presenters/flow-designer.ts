@@ -12,10 +12,14 @@ import {
     iconRedo,
     iconTrash,
     iconX,
+    iconEdit,
+    iconCheck,
 } from '../icons';
 import {
     putNode,
     putWfEdge,
+    putFlow,
+    putFlowLocked,
     postNodeAddition,
     postEdgeConnection,
     postFieldAddition,
@@ -31,14 +35,24 @@ import type {
     GraphField,
     FlowGraph,
 } from '../adapters/flows';
+import type { WfFieldType }
+    from '../../../api/types';
+import {
+    jsonObjectField,
+    nowUtc,
+} from '../../../api/types';
 import { UndoManager } from '../flow-undo';
 import type { UndoStep } from '../flow-undo';
 import {
     buildGraphSvg,
     perimeterPoint,
+    whichEdge,
+    controlOffset,
+    buildEdgePreviewPath,
 } from '../flow-graph';
 import {
     computeLayout,
+    wouldBeCycle,
     NODE_WIDTH,
     NODE_HEIGHT,
     HORIZONTAL_GAP,
@@ -56,19 +70,64 @@ import type {
     InteractionState,
 } from '../flow-interactions';
 
+function serializeGraph(
+    nodes: GraphNode[],
+    edges: GraphEdge[],
+): string {
+    return jsonObjectField(
+        { nodes, edges } as unknown as Record<
+            string, unknown
+        >,
+    );
+}
+
+function graphPutStep(
+    flowId: string,
+    nodes: GraphNode[],
+    edges: GraphEdge[],
+): UndoStep {
+    return {
+        op: 'put',
+        resource: `flows/${flowId}`,
+        body: {
+            graph: serializeGraph(
+                nodes, edges,
+            ),
+            updated_at: nowUtc(),
+        },
+    };
+}
+
+type SavedViewBox =
+    | { kind: 'none' }
+    | {
+        kind: 'saved';
+        x: number;
+        y: number;
+        w: number;
+        h: number;
+    };
+
 interface DesignerState {
     flowId: string;
     flowName: string;
     flowDescription: string;
+    isLocked: boolean;
+    isEditingName: boolean;
     nodes: GraphNode[];
     edges: GraphEdge[];
     interaction: InteractionState;
+    savedViewBox: SavedViewBox;
 }
+
+const PANEL_HEIGHT_PX = 300;
+const PANEL_PAD_PX = 40;
 
 export class FlowDesignerPresenter {
     #state: DesignerState;
     #canvasW: number;
     #canvasH: number;
+    #needsFit: boolean;
     #undo: UndoManager;
 
     constructor(
@@ -78,6 +137,7 @@ export class FlowDesignerPresenter {
     ) {
         this.#canvasW = canvasW;
         this.#canvasH = canvasH;
+        this.#needsFit = true;
         this.#undo = new UndoManager(
             executeUndoSteps,
         );
@@ -90,12 +150,56 @@ export class FlowDesignerPresenter {
             flowName: graph.name,
             flowDescription:
                 graph.description,
+            isLocked: graph.isLocked,
+            isEditingName: false,
             nodes: graph.nodes,
             edges: graph.edges,
             interaction,
+            savedViewBox:
+                { kind: 'none' },
         };
         this.#migrateToCenter();
         this.#applyZoomToFit();
+    }
+
+    startEditingName(): void {
+        this.#state.isEditingName = true;
+    }
+
+    cancelEditingName(): void {
+        this.#state.isEditingName = false;
+    }
+
+    isLocked(): boolean {
+        return this.#state.isLocked;
+    }
+
+    toggleLocked(): void {
+        const next = !this.#state.isLocked;
+        this.#state.isLocked = next;
+        void putFlowLocked(
+            this.#state.flowId, next,
+        );
+    }
+
+    #guardLocked(): boolean {
+        if (!this.#state.isLocked) {
+            return false;
+        }
+        showToast(
+            'Flow is locked', 'error',
+        );
+        return true;
+    }
+
+    updateFlowName(name: string): void {
+        if (this.#guardLocked()) return;
+        this.#state.flowName = name;
+        this.#state.isEditingName = false;
+        void putFlow(
+            this.#state.flowId,
+            { name },
+        );
     }
 
     canUndo(): boolean {
@@ -152,10 +256,14 @@ export class FlowDesignerPresenter {
         for (const n of nodes) {
             n.positionX -= cx;
             n.positionY -= cy;
-            void putNode(n.id, {
-                position_x: n.positionX,
-                position_y: n.positionY,
-            });
+            void putNode(
+                this.#state.flowId,
+                n.id,
+                {
+                    positionX: n.positionX,
+                    positionY: n.positionY,
+                },
+            );
         }
     }
 
@@ -202,31 +310,184 @@ export class FlowDesignerPresenter {
         };
     }
 
+    #panToRevealSelected(): void {
+        const vb =
+            this.#state.interaction
+                .viewBox;
+        const pxToSvg =
+            vb.w / this.#canvasW;
+        const panelH =
+            PANEL_HEIGHT_PX * pxToSvg;
+        const pad =
+            PANEL_PAD_PX * pxToSvg;
+        const sel =
+            this.#state.interaction
+                .selection;
+        let elementY: number | undefined;
+        if (sel.kind === 'node') {
+            const n =
+                this.#state.nodes.find(
+                    nd => nd.id
+                        === sel.nodeId,
+                );
+            if (n) {
+                elementY = n.positionY;
+            }
+        }
+        if (sel.kind === 'edge') {
+            const e =
+                this.#state.edges.find(
+                    ed => ed.id
+                        === sel.edgeId,
+                );
+            if (e) {
+                const fn =
+                    this.#state.nodes
+                        .find(
+                            nd => nd.id
+                                === e
+                                .fromNodeId,
+                        );
+                const tn =
+                    this.#state.nodes
+                        .find(
+                            nd => nd.id
+                                === e
+                                .toNodeId,
+                        );
+                if (fn && tn) {
+                    elementY = (
+                        fn.positionY
+                        + tn.positionY
+                    ) / 2;
+                }
+            }
+        }
+        if (
+            elementY === undefined
+        ) return;
+        const threshold =
+            vb.y + panelH + pad;
+        if (elementY < threshold) {
+            vb.y =
+                elementY - panelH - pad;
+        }
+    }
+
+    #handlePanelTransition(): void {
+        const saved =
+            this.#state.savedViewBox;
+        const isOpen =
+            this.#state.interaction
+                .isPanelOpen;
+        const wasOpen =
+            saved.kind === 'saved';
+        if (isOpen && !wasOpen) {
+            const vb =
+                this.#state.interaction
+                    .viewBox;
+            this.#state.savedViewBox = {
+                kind: 'saved',
+                x: vb.x,
+                y: vb.y,
+                w: vb.w,
+                h: vb.h,
+            };
+            this.#panToRevealSelected();
+        }
+        if (!isOpen && wasOpen) {
+            const vb =
+                this.#state.interaction
+                    .viewBox;
+            vb.x = saved.x;
+            vb.y = saved.y;
+            vb.w = saved.w;
+            vb.h = saved.h;
+            this.#state.savedViewBox =
+                { kind: 'none' };
+        }
+        if (isOpen && wasOpen) {
+            this.#panToRevealSelected();
+        }
+    }
+
     render(
         container: HTMLElement,
     ): void {
+        this.#handlePanelTransition();
         const toolbar =
             this.#buildToolbar();
         const panel =
             this.#buildPropsPanel();
         const canvas =
             this.#buildCanvas();
-        const dialog =
-            this.#buildAddStateDialog();
+        const nameHtml =
+            this.#state.isEditingName
+                ? html`<div class="${
+                    'flex items-center'
+                    + ' gap-2'
+                }">
+<input class="input"
+    id="flow-name-input"
+    value="${this.#state.flowName}"
+    style="${
+        'font-size:1.125rem;'
+        + 'font-weight:600;'
+        + 'padding:0.25rem 0.5rem'
+    }" />
+<button class="${
+    'btn btn-ghost btn-icon'
+}" id="flow-name-save-btn"
+    >${iconCheck(16, '')}</button>
+<button class="${
+    'btn btn-ghost btn-icon'
+}" id="flow-name-cancel-btn"
+    >${iconX(16, '')}</button>
+</div>`
+                : html`<div class="${
+                    'flex items-center'
+                    + ' gap-2'
+                }">
+<h2 class="${
+    'text-lg font-semibold'
+}">${this.#state.flowName}</h2>
+<button class="${
+    'btn btn-ghost btn-icon'
+}" id="flow-name-edit-btn"
+    style="opacity:0.5"
+    >${iconEdit(14, '')}</button>
+</div>`;
+        const lockedAttr =
+            this.#state.isLocked
+                ? ' checked' : '';
         const content = html`<div
 class="wf-designer">
 <div class="wf-designer-header">
-<h2 class="text-lg font-semibold"
-    >${this.#state.flowName}</h2>
+<div class="${
+    'flex items-center gap-4'
+}">
+<div style="flex:1">${nameHtml}
 <p class="text-sm text-muted"
     >${this.#state.flowDescription}</p>
 </div>
+<label class="${
+    'flex items-center gap-2'
+    + ' text-sm'
+}" style="${
+    'cursor:pointer;'
+    + 'white-space:nowrap'
+}"><input type="checkbox"
+    id="flow-lock-checkbox"${
+    trusted(lockedAttr)
+} /> Locked</label>
+</div>
+</div>
 ${toolbar}
-${panel}
+<div class="wf-canvas-area">${panel}
 <div class="wf-canvas-wrap"
     >${canvas}</div>
 </div>
-${dialog}`;
+</div>`;
         setHtml(container, content);
     }
 
@@ -235,38 +496,32 @@ ${dialog}`;
         x: number,
         y: number,
     ): void {
+        if (this.#guardLocked()) return;
         const node = this.#state.nodes.find(
             n => n.id === nodeId,
         );
         if (!node) return;
-        const oldX = node.positionX;
-        const oldY = node.positionY;
+        const fId = this.#state.flowId;
+        const reverseStep = graphPutStep(
+            fId,
+            this.#state.nodes,
+            this.#state.edges,
+        );
         node.positionX = x;
         node.positionY = y;
-        const resource =
-            `wf-nodes/${nodeId}`;
+        const forwardStep = graphPutStep(
+            fId,
+            this.#state.nodes,
+            this.#state.edges,
+        );
         this.#undo.push({
             type: 'move-node',
-            forward: [{
-                op: 'put',
-                resource,
-                body: {
-                    position_x: x,
-                    position_y: y,
-                },
-            }],
-            reverse: [{
-                op: 'put',
-                resource,
-                body: {
-                    position_x: oldX,
-                    position_y: oldY,
-                },
-            }],
+            forward: [forwardStep],
+            reverse: [reverseStep],
         });
-        void putNode(nodeId, {
-            position_x: x,
-            position_y: y,
+        void putNode(fId, nodeId, {
+            positionX: x,
+            positionY: y,
         });
         this.#expandIfNeeded();
     }
@@ -277,14 +532,16 @@ ${dialog}`;
             * (NODE_WIDTH + 120);
         const y = START_Y + 100;
         const nodeId = crypto.randomUUID();
-        const flowNodeId =
-            crypto.randomUUID();
+        const fId = this.#state.flowId;
+        const reverseStep = graphPutStep(
+            fId,
+            this.#state.nodes,
+            this.#state.edges,
+        );
         try {
             await postNodeAddition({
                 nodeId,
-                flowNodeId,
-                flowId:
-                    this.#state.flowId,
+                flowId: fId,
                 name: 'New State',
                 positionX: x,
                 positionY: y,
@@ -309,22 +566,15 @@ ${dialog}`;
                 fields: [],
             },
         ];
+        const forwardStep = graphPutStep(
+            fId,
+            this.#state.nodes,
+            this.#state.edges,
+        );
         this.#undo.push({
             type: 'add-node',
-            forward: [],
-            reverse: [
-                {
-                    op: 'delete',
-                    resource:
-                        'wf-flow-nodes/'
-                        + flowNodeId,
-                },
-                {
-                    op: 'delete',
-                    resource:
-                        `wf-nodes/${nodeId}`,
-                },
-            ],
+            forward: [forwardStep],
+            reverse: [reverseStep],
         });
         return true;
     }
@@ -333,6 +583,9 @@ ${dialog}`;
         fromId: string,
         toId: string,
     ): Promise<boolean> {
+        if (this.#guardLocked()) {
+            return false;
+        }
         const from =
             this.#state.nodes.find(
                 n => n.id === fromId,
@@ -386,19 +639,24 @@ ${dialog}`;
             }
         }
         const edgeId = crypto.randomUUID();
-        const nodeEdgeId =
-            crypto.randomUUID();
+        const fId = this.#state.flowId;
+        const reverseStep = graphPutStep(
+            fId,
+            this.#state.nodes,
+            this.#state.edges,
+        );
         try {
             await postEdgeConnection({
                 edgeId,
-                nodeEdgeId,
+                flowId: fId,
                 name: 'Transition',
                 fromNodeId: fromId,
                 toNodeId: toId,
             });
         } catch {
             showToast(
-                'Failed to create transition',
+                'Failed to create'
+                + ' transition',
                 'error',
             );
             return false;
@@ -413,28 +671,24 @@ ${dialog}`;
                 toNodeId: toId,
             },
         ];
+        const forwardStep = graphPutStep(
+            fId,
+            this.#state.nodes,
+            this.#state.edges,
+        );
         this.#undo.push({
             type: 'add-edge',
-            forward: [],
-            reverse: [
-                {
-                    op: 'delete',
-                    resource:
-                        'wf-node-edges/'
-                        + nodeEdgeId,
-                },
-                {
-                    op: 'delete',
-                    resource:
-                        `wf-edges/${edgeId}`,
-                },
-            ],
+            forward: [forwardStep],
+            reverse: [reverseStep],
         });
         return true;
     }
 
     async deleteSelectedNode(
     ): Promise<boolean> {
+        if (this.#guardLocked()) {
+            return false;
+        }
         const sel =
             this.#state.interaction
                 .selection;
@@ -488,6 +742,9 @@ ${dialog}`;
 
     async deleteSelectedEdge(
     ): Promise<boolean> {
+        if (this.#guardLocked()) {
+            return false;
+        }
         const sel =
             this.#state.interaction
                 .selection;
@@ -499,6 +756,7 @@ ${dialog}`;
             const capture =
                 await deleteEdgeCapture(
                     edgeId,
+                    this.#state.flowId,
                 );
             this.#undo.push({
                 type: 'delete-edge',
@@ -523,16 +781,13 @@ ${dialog}`;
     }
 
     autoLayout(): void {
-        const oldPositions: UndoStep[] =
-            this.#state.nodes.map(n => ({
-                op: 'put' as const,
-                resource:
-                    `wf-nodes/${n.id}`,
-                body: {
-                    position_x: n.positionX,
-                    position_y: n.positionY,
-                },
-            }));
+        if (this.#guardLocked()) return;
+        const fId = this.#state.flowId;
+        const reverseStep = graphPutStep(
+            fId,
+            this.#state.nodes,
+            this.#state.edges,
+        );
         const layoutInputs =
             this.#state.nodes.map(
                 n => ({
@@ -552,7 +807,6 @@ ${dialog}`;
             layoutInputs, layoutEdges,
             this.#canvasW, this.#canvasH,
         );
-        const newPositions: UndoStep[] = [];
         for (
             const node of this.#state.nodes
         ) {
@@ -561,24 +815,20 @@ ${dialog}`;
             if (!pos) continue;
             node.positionX = pos.x;
             node.positionY = pos.y;
-            newPositions.push({
-                op: 'put',
-                resource:
-                    `wf-nodes/${node.id}`,
-                body: {
-                    position_x: pos.x,
-                    position_y: pos.y,
-                },
-            });
-            void putNode(node.id, {
-                position_x: pos.x,
-                position_y: pos.y,
+            void putNode(fId, node.id, {
+                positionX: pos.x,
+                positionY: pos.y,
             });
         }
+        const forwardStep = graphPutStep(
+            fId,
+            this.#state.nodes,
+            this.#state.edges,
+        );
         this.#undo.push({
             type: 'auto-layout',
-            forward: newPositions,
-            reverse: oldPositions,
+            forward: [forwardStep],
+            reverse: [reverseStep],
         });
         this.#expandIfNeeded();
     }
@@ -586,6 +836,7 @@ ${dialog}`;
     updateNodeName(
         name: string,
     ): void {
+        if (this.#guardLocked()) return;
         const sel =
             this.#state.interaction
                 .selection;
@@ -595,27 +846,32 @@ ${dialog}`;
             n => n.id === nodeId,
         );
         if (!node) return;
-        const oldName = node.name;
+        const fId = this.#state.flowId;
+        const reverseStep = graphPutStep(
+            fId,
+            this.#state.nodes,
+            this.#state.edges,
+        );
         node.name = name;
-        const resource =
-            `wf-nodes/${nodeId}`;
+        const forwardStep = graphPutStep(
+            fId,
+            this.#state.nodes,
+            this.#state.edges,
+        );
         this.#undo.push({
             type: 'update-node-name',
-            forward: [{
-                op: 'put', resource,
-                body: { name },
-            }],
-            reverse: [{
-                op: 'put', resource,
-                body: { name: oldName },
-            }],
+            forward: [forwardStep],
+            reverse: [reverseStep],
         });
-        void putNode(nodeId, { name });
+        void putNode(
+            fId, nodeId, { name },
+        );
     }
 
     updateNodeDescription(
         desc: string,
     ): void {
+        if (this.#guardLocked()) return;
         const sel =
             this.#state.interaction
                 .selection;
@@ -625,31 +881,33 @@ ${dialog}`;
             n => n.id === nodeId,
         );
         if (!node) return;
-        const oldDesc = node.description;
+        const fId = this.#state.flowId;
+        const reverseStep = graphPutStep(
+            fId,
+            this.#state.nodes,
+            this.#state.edges,
+        );
         node.description = desc;
-        const resource =
-            `wf-nodes/${nodeId}`;
+        const forwardStep = graphPutStep(
+            fId,
+            this.#state.nodes,
+            this.#state.edges,
+        );
         this.#undo.push({
             type: 'update-node-desc',
-            forward: [{
-                op: 'put', resource,
-                body: { description: desc },
-            }],
-            reverse: [{
-                op: 'put', resource,
-                body: {
-                    description: oldDesc,
-                },
-            }],
+            forward: [forwardStep],
+            reverse: [reverseStep],
         });
         void putNode(
-            nodeId, { description: desc },
+            fId, nodeId,
+            { description: desc },
         );
     }
 
     updateEdgeName(
         name: string,
     ): void {
+        if (this.#guardLocked()) return;
         const sel =
             this.#state.interaction
                 .selection;
@@ -659,27 +917,32 @@ ${dialog}`;
             e => e.id === edgeId,
         );
         if (!edge) return;
-        const oldName = edge.name;
+        const fId = this.#state.flowId;
+        const reverseStep = graphPutStep(
+            fId,
+            this.#state.nodes,
+            this.#state.edges,
+        );
         edge.name = name;
-        const resource =
-            `wf-edges/${edgeId}`;
+        const forwardStep = graphPutStep(
+            fId,
+            this.#state.nodes,
+            this.#state.edges,
+        );
         this.#undo.push({
             type: 'update-edge-name',
-            forward: [{
-                op: 'put', resource,
-                body: { name },
-            }],
-            reverse: [{
-                op: 'put', resource,
-                body: { name: oldName },
-            }],
+            forward: [forwardStep],
+            reverse: [reverseStep],
         });
-        void putWfEdge(edgeId, { name });
+        void putWfEdge(
+            fId, edgeId, { name },
+        );
     }
 
     updateEdgeDescription(
         desc: string,
     ): void {
+        if (this.#guardLocked()) return;
         const sel =
             this.#state.interaction
                 .selection;
@@ -689,25 +952,26 @@ ${dialog}`;
             e => e.id === edgeId,
         );
         if (!edge) return;
-        const oldDesc = edge.description;
+        const fId = this.#state.flowId;
+        const reverseStep = graphPutStep(
+            fId,
+            this.#state.nodes,
+            this.#state.edges,
+        );
         edge.description = desc;
-        const resource =
-            `wf-edges/${edgeId}`;
+        const forwardStep = graphPutStep(
+            fId,
+            this.#state.nodes,
+            this.#state.edges,
+        );
         this.#undo.push({
             type: 'update-edge-desc',
-            forward: [{
-                op: 'put', resource,
-                body: { description: desc },
-            }],
-            reverse: [{
-                op: 'put', resource,
-                body: {
-                    description: oldDesc,
-                },
-            }],
+            forward: [forwardStep],
+            reverse: [reverseStep],
         });
         void putWfEdge(
-            edgeId, { description: desc },
+            fId, edgeId,
+            { description: desc },
         );
     }
 
@@ -717,6 +981,9 @@ ${dialog}`;
         isRequired: boolean,
         options: string[],
     ): Promise<boolean> {
+        if (this.#guardLocked()) {
+            return false;
+        }
         const sel =
             this.#state.interaction
                 .selection;
@@ -730,12 +997,16 @@ ${dialog}`;
         if (!node) return false;
         const sortOrder = node.fields.length;
         const fieldId = crypto.randomUUID();
-        const nodeFieldId =
-            crypto.randomUUID();
+        const fId = this.#state.flowId;
+        const reverseStep = graphPutStep(
+            fId,
+            this.#state.nodes,
+            this.#state.edges,
+        );
         try {
             await postFieldAddition({
                 fieldId,
-                nodeFieldId,
+                flowId: fId,
                 nodeId,
                 name,
                 fieldType,
@@ -750,34 +1021,28 @@ ${dialog}`;
             );
             return false;
         }
+        const typed =
+            fieldType as WfFieldType;
         node.fields = [
             ...node.fields,
             {
                 id: fieldId,
                 name,
-                fieldType,
+                fieldType: typed,
                 sortOrder,
                 isRequired,
                 options,
             },
         ];
+        const forwardStep = graphPutStep(
+            fId,
+            this.#state.nodes,
+            this.#state.edges,
+        );
         this.#undo.push({
             type: 'add-field',
-            forward: [],
-            reverse: [
-                {
-                    op: 'delete',
-                    resource:
-                        'wf-node-fields/'
-                        + nodeFieldId,
-                },
-                {
-                    op: 'delete',
-                    resource:
-                        'wf-fields/'
-                        + fieldId,
-                },
-            ],
+            forward: [forwardStep],
+            reverse: [reverseStep],
         });
         return true;
     }
@@ -785,6 +1050,9 @@ ${dialog}`;
     async deleteField(
         fieldId: string,
     ): Promise<boolean> {
+        if (this.#guardLocked()) {
+            return false;
+        }
         const sel =
             this.#state.interaction
                 .selection;
@@ -795,7 +1063,9 @@ ${dialog}`;
         try {
             const capture =
                 await deleteFieldCapture(
-                    fieldId, nodeId,
+                    fieldId,
+                    nodeId,
+                    this.#state.flowId,
                 );
             this.#undo.push({
                 type: 'delete-field',
@@ -835,11 +1105,129 @@ ${dialog}`;
         return node?.name ?? '';
     }
 
+    async addNodeAtPosition(
+        fromNodeId: string,
+        x: number,
+        y: number,
+    ): Promise<boolean> {
+        if (this.#guardLocked()) {
+            return false;
+        }
+        const fromNode =
+            this.#state.nodes.find(
+                n => n.id === fromNodeId,
+            );
+        if (!fromNode) return false;
+        if (fromNode.isComplete) {
+            showToast(
+                'Cannot create from'
+                + ' end state',
+                'error',
+            );
+            return false;
+        }
+        if (fromNode.isStart) {
+            const hasOut =
+                this.#state.edges.some(
+                    e => e.fromNodeId
+                        === fromNodeId,
+                );
+            if (hasOut) {
+                showToast(
+                    'Start state allows'
+                    + ' only one outgoing'
+                    + ' transition',
+                    'error',
+                );
+                return false;
+            }
+        }
+        const nodeId = crypto.randomUUID();
+        const edgeId = crypto.randomUUID();
+        const fId = this.#state.flowId;
+        const posX =
+            x - NODE_WIDTH / 2;
+        const posY =
+            y - NODE_HEIGHT / 2;
+        const reverseStep = graphPutStep(
+            fId,
+            this.#state.nodes,
+            this.#state.edges,
+        );
+        try {
+            await postNodeAddition({
+                nodeId,
+                flowId: fId,
+                name: 'New State',
+                positionX: posX,
+                positionY: posY,
+            });
+            await postEdgeConnection({
+                edgeId,
+                flowId: fId,
+                name: 'Transition',
+                fromNodeId,
+                toNodeId: nodeId,
+            });
+        } catch {
+            showToast(
+                'Failed to add state',
+                'error',
+            );
+            return false;
+        }
+        this.#state.nodes = [
+            ...this.#state.nodes,
+            {
+                id: nodeId,
+                name: 'New State',
+                description: '',
+                positionX: posX,
+                positionY: posY,
+                isStart: false,
+                isComplete: false,
+                fields: [],
+            },
+        ];
+        this.#state.edges = [
+            ...this.#state.edges,
+            {
+                id: edgeId,
+                name: 'Transition',
+                description: '',
+                fromNodeId,
+                toNodeId: nodeId,
+            },
+        ];
+        const forwardStep = graphPutStep(
+            fId,
+            this.#state.nodes,
+            this.#state.edges,
+        );
+        this.#undo.push({
+            type: 'add-node-and-edge',
+            forward: [forwardStep],
+            reverse: [reverseStep],
+        });
+        this.#state.interaction
+            .selection = {
+                kind: 'node',
+                nodeId,
+            };
+        this.#state.interaction
+            .isPanelOpen = false;
+        this.#expandIfNeeded();
+        return true;
+    }
+
     async addNodeWithEdge(
         name: string,
         transitionName: string,
         direction: string,
     ): Promise<boolean> {
+        if (this.#guardLocked()) {
+            return false;
+        }
         const sel =
             this.#state.interaction
                 .selection;
@@ -858,25 +1246,25 @@ ${dialog}`;
                 fromNode, direction,
             );
         const nodeId = crypto.randomUUID();
-        const flowNodeId =
-            crypto.randomUUID();
         const edgeId = crypto.randomUUID();
-        const nodeEdgeId =
-            crypto.randomUUID();
+        const fId = this.#state.flowId;
+        const reverseStep = graphPutStep(
+            fId,
+            this.#state.nodes,
+            this.#state.edges,
+        );
 
         try {
             await postNodeAddition({
                 nodeId,
-                flowNodeId,
-                flowId:
-                    this.#state.flowId,
+                flowId: fId,
                 name,
                 positionX: pos.x,
                 positionY: pos.y,
             });
             await postEdgeConnection({
                 edgeId,
-                nodeEdgeId,
+                flowId: fId,
                 name: transitionName,
                 fromNodeId,
                 toNodeId: nodeId,
@@ -911,33 +1299,15 @@ ${dialog}`;
                 toNodeId: nodeId,
             },
         ];
+        const forwardStep = graphPutStep(
+            fId,
+            this.#state.nodes,
+            this.#state.edges,
+        );
         this.#undo.push({
             type: 'add-node-and-edge',
-            forward: [],
-            reverse: [
-                {
-                    op: 'delete',
-                    resource:
-                        'wf-node-edges/'
-                        + nodeEdgeId,
-                },
-                {
-                    op: 'delete',
-                    resource:
-                        `wf-edges/${edgeId}`,
-                },
-                {
-                    op: 'delete',
-                    resource:
-                        'wf-flow-nodes/'
-                        + flowNodeId,
-                },
-                {
-                    op: 'delete',
-                    resource:
-                        `wf-nodes/${nodeId}`,
-                },
-            ],
+            forward: [forwardStep],
+            reverse: [reverseStep],
         });
         this.#expandIfNeeded();
         return true;
@@ -1000,7 +1370,22 @@ ${dialog}`;
     ): void {
         this.#canvasW = w;
         this.#canvasH = h;
-        this.#applyZoomToFit();
+        if (this.#needsFit) {
+            this.#needsFit = false;
+            this.#applyZoomToFit();
+            return;
+        }
+        const vb =
+            this.#state.interaction
+                .viewBox;
+        const cx = vb.x + vb.w / 2;
+        const cy = vb.y + vb.h / 2;
+        const z =
+            this.#state.interaction.zoom;
+        vb.w = w / z;
+        vb.h = h / z;
+        vb.x = cx - vb.w / 2;
+        vb.y = cy - vb.h / 2;
     }
 
     #applyZoomToFit(): void {
@@ -1058,18 +1443,8 @@ ${dialog}`;
         return sel.kind === 'edge';
     }
 
+
     #buildToolbar(): SafeHtml {
-        const nodeCount =
-            this.#state.nodes.length;
-        const edgeCount =
-            this.#state.edges.length;
-        const stats = String(nodeCount)
-            + ' state'
-            + (nodeCount !== 1 ? 's' : '')
-            + ' \u00b7 '
-            + String(edgeCount)
-            + ' transition'
-            + (edgeCount !== 1 ? 's' : '');
         return html`<div
 class="wf-toolbar">
 <div class="wf-toolbar-group">
@@ -1078,6 +1453,7 @@ class="wf-toolbar">
     id="flow-back-btn"
     >${iconArrowLeft(20, '')}</button>
 </div>
+<div class="wf-toolbar-spacer"></div>
 <div class="wf-toolbar-group">
 <button
     class="btn btn-ghost btn-icon"
@@ -1094,48 +1470,45 @@ class="wf-toolbar">
             ? '' : ' disabled',
     )}>${iconRedo(18, '')}</button>
 </div>
-<div class="wf-toolbar-group">
-<button class="btn btn-primary btn-sm"
-    data-action="add-state"${
-    trusted(
-        this.#state.interaction
-            .selection.kind === 'node'
-            ? '' : ' disabled',
-    )}>+ Add State</button>
-</div>
-<div class="wf-toolbar-group">
-<button
-    class="btn btn-ghost btn-icon"
-    data-action="delete-selected"${
-    trusted(
-        this.#canDelete()
-            ? '' : ' disabled',
-    )}>${iconTrash(18, '')}</button>
-</div>
+<div class="wf-toolbar-spacer"></div>
 <div class="wf-toolbar-group">
 <button class="btn btn-ghost btn-sm"
-    data-action="auto-layout"
-    >Auto Layout</button>
+    data-action="auto-layout"${
+    trusted(
+        this.#state.isLocked
+            ? ' disabled' : '',
+    )}>Auto Layout</button>
 <button class="btn btn-ghost btn-sm"
-    data-action="zoom-in"
-    >Zoom +</button>
+    data-action="fit">Fit</button>
+</div>
+<div class="wf-toolbar-spacer"></div>
+<div class="wf-toolbar-group">
 <button class="btn btn-ghost btn-sm"
     data-action="zoom-out"
     >Zoom \u2212</button>
 <button class="btn btn-ghost btn-sm"
-    data-action="fit">Fit</button>
+    data-action="zoom-in"
+    >Zoom +</button>
 </div>
+<div class="wf-toolbar-spacer"></div>
 <div class="wf-toolbar-group">
 <button class="btn btn-ghost btn-sm"
     data-action="copy-mermaid"
     >Copy Mermaid</button>
 <button class="btn btn-ghost btn-sm"
     data-action="export-zip"
-    >Export .zip</button>
+    >Export</button>
 </div>
+<div class="wf-toolbar-spacer"></div>
 <div class="wf-toolbar-group">
-<span class="text-muted text-sm"
-    >${stats}</span>
+<button
+    class="btn btn-ghost btn-icon"
+    data-action="delete-selected"${
+    trusted(
+        this.#canDelete()
+        && !this.#state.isLocked
+            ? '' : ' disabled',
+    )}>${iconTrash(18, '')}</button>
 </div>
 </div>`;
     }
@@ -1457,26 +1830,152 @@ justify-content:space-between"
 
     #buildConnectPreview(): string {
         const conn =
-            this.#state.interaction.connect;
+            this.#state.interaction
+                .connect;
         if (conn.kind !== 'connecting') {
             return '';
         }
         const src =
             this.#connectSourcePoint();
         if (!src) return '';
-        return '<line'
-            + ' x1="'
-            + String(src.x) + '"'
-            + ' y1="'
-            + String(src.y) + '"'
-            + ' x2="'
-            + String(conn.toX) + '"'
-            + ' y2="'
-            + String(conn.toY) + '"'
+        const fromNode =
+            this.#state.nodes.find(
+                n => n.id
+                    === conn.fromNodeId,
+            );
+        if (!fromNode) return '';
+        if (conn.isShift) {
+            if (
+                conn.target.kind === 'node'
+            ) {
+                const targetId =
+                    conn.target.id;
+                const toNode =
+                    this.#state.nodes.find(
+                        n => n.id
+                            === targetId,
+                    );
+                if (toNode) {
+                    const isCycle =
+                        wouldBeCycle(
+                            conn.fromNodeId,
+                            targetId,
+                            this.#state
+                                .edges
+                                .map(e => ({
+                                    fromId:
+                                        e
+                                        .fromNodeId,
+                                    toId:
+                                        e
+                                        .toNodeId,
+                                })),
+                        );
+                    return buildEdgePreviewPath(
+                        fromNode,
+                        toNode,
+                        isCycle,
+                    );
+                }
+            }
+            return '<line'
+                + ` x1="${src.x}"`
+                + ` y1="${src.y}"`
+                + ` x2="${conn.toX}"`
+                + ` y2="${conn.toY}"`
+                + ' stroke='
+                + '"var('
+                + '--color-muted-foreground,'
+                + ' #5a6480)"'
+                + ' stroke-width="2"'
+                + ' opacity="0.5"'
+                + ' pointer-events="none"/>';
+        }
+        const gx =
+            conn.toX - NODE_WIDTH / 2;
+        const gy =
+            conn.toY - NODE_HEIGHT / 2;
+        const halfW = NODE_WIDTH / 2;
+        const fromCx =
+            fromNode.positionX + halfW;
+        const fromCy =
+            fromNode.positionY
+            + NODE_HEIGHT / 2;
+        const endPt = perimeterPoint(
+            gx, gy,
+            NODE_WIDTH, NODE_HEIGHT,
+            fromCx, fromCy,
+        );
+        const dist = Math.hypot(
+            endPt.x - src.x,
+            endPt.y - src.y,
+        );
+        const se = whichEdge(
+            src.x, src.y,
+            fromNode.positionX,
+            fromNode.positionY,
+            NODE_WIDTH, NODE_HEIGHT,
+        );
+        const ee = whichEdge(
+            endPt.x, endPt.y,
+            gx, gy,
+            NODE_WIDTH, NODE_HEIGHT,
+        );
+        const cp1 = controlOffset(
+            se, dist,
+        );
+        const cp2 = controlOffset(
+            ee, dist,
+        );
+        const pathD = 'M '
+            + String(src.x) + ' '
+            + String(src.y)
+            + ' C '
+            + String(src.x + cp1.dx)
+            + ' '
+            + String(src.y + cp1.dy)
+            + ', '
+            + String(endPt.x + cp2.dx)
+            + ' '
+            + String(endPt.y + cp2.dy)
+            + ', '
+            + String(endPt.x) + ' '
+            + String(endPt.y);
+        return '<path'
+            + ' d="' + pathD + '"'
+            + ' fill="none"'
             + ' stroke="#4B6CA1"'
             + ' stroke-width="2"'
-            + ' stroke-dasharray="6 3"'
-            + ' opacity="0.6"/>';
+            + ' opacity="0.3"'
+            + ' marker-end='
+            + '"url(#wf-arrow)"'
+            + ' pointer-events='
+            + '"none"/>'
+            + '<g transform="translate('
+            + String(gx) + ', '
+            + String(gy) + ')"'
+            + ' opacity="0.3"'
+            + ' pointer-events="none">'
+            + '<rect'
+            + ` width="${NODE_WIDTH}"`
+            + ` height="${NODE_HEIGHT}"`
+            + ' rx="10"'
+            + ' fill="var('
+            + '--color-card-bg,'
+            + ' #232940)"'
+            + ' stroke="#4B6CA1"'
+            + ' stroke-width="2"/>'
+            + '<text'
+            + ` x="${halfW}"`
+            + ' y="22"'
+            + ' text-anchor="middle"'
+            + ' font-size="14"'
+            + ' font-weight="600"'
+            + ' fill="var('
+            + '--color-foreground,'
+            + ' #e0e4ef)">'
+            + 'New State</text>'
+            + '</g>';
     }
 
     #nodesForRender(): GraphNode[] {
@@ -1501,6 +2000,10 @@ justify-content:space-between"
         const nodes = this.#nodesForRender();
         const vb =
             this.#state.interaction.viewBox;
+        const isConn =
+            this.#state.interaction
+                .connect.kind
+                === 'connecting';
         const svgHtml = buildGraphSvg(
             nodes,
             this.#state.edges,
@@ -1510,6 +2013,8 @@ justify-content:space-between"
             vb.h,
             this.#state.interaction
                 .selection,
+            this.#state.isLocked,
+            isConn,
         );
         const preview =
             this.#buildConnectPreview();
@@ -1529,106 +2034,4 @@ justify-content:space-between"
         );
     }
 
-    #buildAddStateDialog(): SafeHtml {
-        const sel =
-            this.#state.interaction
-                .selection;
-        const selNode =
-            sel.kind === 'node'
-            ? this.#state.nodes.find(
-                n => n.id === sel.nodeId,
-            )
-            : undefined;
-        const fromName =
-            selNode?.name ?? '';
-        const dirStyle =
-            'padding:0.5rem;'
-            + 'border-radius:6px;'
-            + 'cursor:pointer;'
-            + 'text-align:center';
-        return html`<div
-class="dialog-backdrop hidden"
-id="add-state-backdrop">
-<div class="dialog hidden"
-    id="add-state-dialog"
-    aria-hidden="true"
-    style="max-width:28rem">
-<div style="${
-    'padding:1.5rem;'
-    + 'border-bottom:1px solid'
-    + ' hsl(var(--border))'
-}">
-<h3 class="text-lg font-display font-semibold"
-    >Add State</h3>
-<p class="text-sm text-muted"
-    >Connected from <strong
-    >${fromName}</strong></p>
-</div>
-<div style="${
-    'padding:1.5rem;'
-    + 'display:flex;'
-    + 'flex-direction:column;'
-    + 'gap:1rem'
-}">
-<div>
-<label class="label mb-1"
-    for="add-state-name"
-    >State Name</label>
-<input class="input"
-    id="add-state-name"
-    placeholder="e.g., Approved" />
-</div>
-<div>
-<label class="label mb-1"
-    for="add-state-transition"
-    >Transition Name</label>
-<input class="input"
-    id="add-state-transition"
-    placeholder="e.g., approve" />
-</div>
-<div>
-<label class="label mb-1"
-    >Placement Direction</label>
-<div style="${
-    'display:grid;'
-    + 'grid-template-columns:1fr 1fr;'
-    + 'gap:0.5rem'
-}">
-<button class="btn btn-outline active"
-    data-direction="right"
-    style="${dirStyle}"
-    >\u2192 Right</button>
-<button class="btn btn-outline"
-    data-direction="left"
-    style="${dirStyle}"
-    >\u2190 Left</button>
-<button class="btn btn-outline"
-    data-direction="above"
-    style="${dirStyle}"
-    >\u2191 Above</button>
-<button class="btn btn-outline"
-    data-direction="below"
-    style="${dirStyle}"
-    >\u2193 Below</button>
-</div>
-</div>
-</div>
-<div style="${
-    'padding:1rem 1.5rem;'
-    + 'border-top:1px solid'
-    + ' hsl(var(--border));'
-    + 'display:flex;'
-    + 'justify-content:flex-end;'
-    + 'gap:0.75rem'
-}">
-<button class="btn btn-outline"
-    id="add-state-cancel"
-    >Cancel</button>
-<button class="btn btn-primary"
-    id="add-state-submit"
-    >Add State</button>
-</div>
-</div>
-</div>`;
-    }
 }

@@ -1,5 +1,6 @@
 import {
     $, $input, $select,
+    bindEnterToClick,
 } from '../app/dom';
 import {
     html, setHtml,
@@ -770,11 +771,24 @@ export async function init(): Promise<void> {
             }
         },
     );
-    document.addEventListener(
-        'keydown',
-        (e) => {
-            if (e.key === 'Escape')
-                closeDialog('invite');
-        },
+
+    const submitSel = '#invite-submit';
+    bindEnterToClick(
+        '#invite-first', submitSel,
+    );
+    bindEnterToClick(
+        '#invite-last', submitSel,
+    );
+    bindEnterToClick(
+        '#invite-email', submitSel,
+    );
+    bindEnterToClick(
+        '#invite-phone', submitSel,
+    );
+    bindEnterToClick(
+        '#invite-avail', submitSel,
+    );
+    bindEnterToClick(
+        '#invite-perf', submitSel,
     );
 }
