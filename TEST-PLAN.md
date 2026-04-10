@@ -73,7 +73,7 @@ on. Run these in order.
 ### AA4. Create Ideas
 
 - [ ] **AA12** Navigate to Ideas. Click "Create Idea". Complete the 3-step wizard for "AI-Powered Customer Segmentation" (title, problem, solution, outcome, metrics). PASS: idea appears on ideas list.
-- [ ] **AA13** Navigate to the new idea's detail page. Click "Edit". Set remaining fields: category, estimated impact, duration (days), cost. Click "Save". PASS: toast confirms save, all fields persist.
+- [ ] **AA13** Navigate to the new idea's detail page. Click "Edit". Verify only title and text fields (problem, solution, outcome, target users, metrics) are editable. Click "Save". PASS: toast confirms save, all fields persist.
 - [ ] **AA14** Repeat creation and field entry for all 11 ideas matching mock data titles. PASS: ideas list shows all 11 with correct titles.
 
 ### AA5. Submit Ideas for Review
@@ -87,10 +87,10 @@ on. Run these in order.
 - [ ] **AA28** On Ideas list, filter by "In Review". Click idea #1. PASS: navigates to idea detail with approval footer.
 - [ ] **AA29** Click "Approve". PASS: idea status changes to approved, confirmation shown.
 - [ ] **AA30** Approve idea #4 as well (it was submitted for review in AA19). Leave others in their current status. PASS: statuses match mock data (2 approved, rest in-review/active).
-- [ ] **AA31** Navigate to approved idea #1. Click "Convert". PASS: conversion form loads with 6 required fields (Project Name, Lead, Start Date, End Date, Budget, Priority).
-- [ ] **AA32** Fill all required fields: Project Name, select "Sarah Chen" as project lead, Start Date, Target End Date, Budget, Priority. Click "Create Project". PASS: navigates to project detail for the new project.
+- [ ] **AA31** Navigate to approved idea #1. Click "Convert". PASS: conversion form loads with 5 required fields (Project Name, Lead, Start Date, End Date, Cost).
+- [ ] **AA32** Fill all required fields: Project Name, select "Sarah Chen" as project lead, Start Date, Target End Date, Cost. Click "Create Project". PASS: navigates to project detail for the new project.
 - [ ] **AA33** On project detail, click "Edit". Set fields (title, description, status, start date, end date, cost baseline, impact baseline) to match mock data. Save. PASS: project data persists.
-- [ ] **AA34** Approve remaining ideas (7, 8, 9, 10) from Ideas list (filter by "In Review"), then convert all 6 approved ideas to projects. PASS: Projects list shows all 6 with correct status, progress, and priority.
+- [ ] **AA34** Approve remaining ideas (7, 8, 9, 10) from Ideas list (filter by "In Review"), then convert all 6 approved ideas to projects. PASS: Projects list shows all 6 with correct status and progress.
 
 ### AA9. Create Flows
 
@@ -260,7 +260,7 @@ on. Run these in order.
 
 ### Ideas List (`ideas/`)
 
-- [ ] **D1** Navigate to `ideas/`. PASS: table/list shows 11 ideas with title, priority, status, and Time/Cost/Impact stats. Ideas without estimates show "—" (em-dash) instead of zero values.
+- [ ] **D1** Navigate to `ideas/`. PASS: table/list shows 11 ideas with title, status, and Time/Cost/Impact stats. Ideas without estimates show "—" (em-dash) instead of zero values.
 - [ ] **D1b** "Idea Flow" workflow banner is
   visible showing the 3 stages: Create → Review
   → Convert. PASS: banner renders with labeled
@@ -288,8 +288,8 @@ on. Run these in order.
 
 ### Idea Detail (`ideas/detail.html?ideaId=1`)
 
-- [ ] **D16** Navigate to `ideas/detail.html?ideaId=1`. PASS: page loads with idea title, status badge, "Submitted by" name, and submission date.
-- [ ] **D17** Page displays three cards: Problem & Solution (Problem Statement, Target Users, Proposed Solution, Expected Outcome, Success Metrics), Details (Category, Submitted by, Submitted at), and Estimates (Impact, Duration in days, Cost). PASS: all fields populated.
+- [ ] **D16** Navigate to `ideas/detail.html?ideaId=1`. PASS: page loads with idea title, status badge, and "Submitted by [name] @ [date/time]" in the header.
+- [ ] **D17** Page displays one card: Problem & Solution (Problem Statement, Target Users, Proposed Solution, Expected Outcome, Success Metrics). PASS: all fields populated. No Details or Estimates cards.
 - [ ] **D18** Click "Edit" button. PASS: text fields become editable inputs/textareas, Save and Cancel buttons appear, Edit button hides.
 - [ ] **D19** Modify a field (e.g. title), click "Save". PASS: toast "Idea saved" appears, page returns to view mode with updated data.
 
@@ -315,8 +315,8 @@ on. Run these in order.
 
 ### Idea Convert (`ideas/convert.html`)
 
-- [ ] **D20** Navigate to `ideas/convert.html?ideaId=<id>` for a convertible idea. PASS: page loads with conversion form showing 6 required fields: Project Name, Project Lead (dropdown of active users), Start Date, Target End Date, Budget (text input), Priority (select). Sticky sidebar shows idea summary (problem, solution, outcome).
-- [ ] **D20b** With required fields empty, "Create Project" button is disabled and progress bar shows 0/6. Fill fields one at a time. PASS: progress bar increments with each field, checkmarks appear next to completed fields, button enables only when all 6 required fields are filled.
+- [ ] **D20** Navigate to `ideas/convert.html?ideaId=<id>` for a convertible idea. PASS: page loads with conversion form showing 5 required fields: Project Name, Project Lead (dropdown of active users), Start Date, Target End Date, Cost (text input). Sticky sidebar shows "Problem & Solution" with title, problem, target users, solution, expected outcome, and success metrics.
+- [ ] **D20b** With required fields empty, "Create Project" button is disabled and progress bar shows 0/5. Fill fields one at a time. PASS: progress bar increments with each field, checkmarks appear next to completed fields, button enables only when all 5 required fields are filled.
 - [ ] **D21** Fill all required fields (progress bar reaches 100%), click "Create Project". PASS: navigates to project detail page for the newly created project.
 
 ### Idea Status Filtering (`ideas/index.html`)
@@ -346,8 +346,7 @@ on. Run these in order.
 
 ### Projects List (`projects/`)
 
-- [ ] **E1** Navigate to `projects/`. PASS: table/list shows 6 seeded projects with title, status, progress, and priority. Project cards show "—" (em-dash) for missing/zero metric values (time, cost, impact). Footer count uses correct singular/plural grammar (e.g. "1 project", "6 projects").
-- [ ] **E1b** Click the Priority/Performance view toggle. PASS: project list re-sorts by the selected criterion. Toggle button highlights for the active view.
+- [ ] **E1** Navigate to `projects/`. PASS: table/list shows 6 seeded projects with title, status, and progress. Project cards show "—" (em-dash) for missing/zero metric values (time, cost, impact). Footer count uses correct singular/plural grammar (e.g. "1 project", "6 projects").
 - [ ] **E1c** Click a status filter badge (e.g. "Active"). PASS: project list filters to show only projects with that status. Click the same badge again or "All". PASS: full list returns.
 - [ ] **E2** Click a project row. PASS: navigates to `projects/detail.html?projectId=<id>`.
 

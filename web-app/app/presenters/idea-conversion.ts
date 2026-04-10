@@ -2,9 +2,7 @@ import {
     html, SafeHtml, trusted,
 } from '../safe-html';
 import {
-    iconClock,
     iconDollarSign,
-    iconTrendingUp,
     iconArrowRight,
     iconArrowLeft,
     iconTarget,
@@ -62,8 +60,6 @@ export class IdeaConversionPresenter {
     readonly #problemStatement: string;
     readonly #proposedSolution: string;
     readonly #expectedOutcome: string;
-    readonly #estimatedDuration: string;
-    readonly #estimatedCost: string;
     readonly #leadOptions: LeadOption[];
     #fields: Record<
         ConversionField, string
@@ -71,8 +67,6 @@ export class IdeaConversionPresenter {
 
     constructor(
         idea: Idea,
-        estimatedDuration: string,
-        estimatedCost: string,
         users: User[],
     ) {
         this.#title = idea.title;
@@ -82,10 +76,6 @@ export class IdeaConversionPresenter {
             idea.proposedSolution;
         this.#expectedOutcome =
             idea.expectedOutcome;
-        this.#estimatedDuration =
-            estimatedDuration;
-        this.#estimatedCost =
-            estimatedCost;
         this.#leadOptions = users
             .filter(u => u.isActive())
             .map(u => ({
@@ -372,68 +362,8 @@ export class IdeaConversionPresenter {
                             }</p>
                         </div>
                     </div>
-                    <div style="${
-                        'border-top:'
-                        + '1px solid'
-                        + ' hsl(var('
-                        + '--border));'
-                        + 'padding-top:'
-                        + '1rem;'
-                        + 'display:flex;'
-                        + 'flex-direction:'
-                        + 'column;'
-                        + 'gap:0.75rem'
-                    }">
-                        ${this.#buildMetric(
-                            iconClock(16, ''),
-                            'Est. Time',
-                            this
-                            .#estimatedDuration,
-                            '',
-                        )}
-                        ${this.#buildMetric(
-                            iconDollarSign(
-                                16, '',
-                            ),
-                            'Est. Cost',
-                            this
-                            .#estimatedCost,
-                            '',
-                        )}
-                    </div>
                 </div>
             </div>`;
-    }
-
-    #buildMetric(
-        icon: SafeHtml,
-        label: string,
-        value: string | number,
-        style: string,
-    ): SafeHtml {
-        return html`
-        <div class="flex
-            items-center
-            justify-between">
-            <span class="${
-                'flex items-center'
-                + ' gap-2 text-muted'
-            }">
-                ${icon}
-                <span class="${
-                    'text-sm'
-                }">
-                    ${label}
-                </span>
-            </span>
-            <span
-                class="${
-                    'font-medium'
-                }"
-                style="${style}">${
-                value
-            }</span>
-        </div>`;
     }
 
     #buildForm(): SafeHtml {
@@ -681,15 +611,6 @@ export class IdeaConversionPresenter {
                                     + '1.75rem'
                                 }" />
                         </div>
-                        <p class="${
-                            'text-xs'
-                            + ' text-muted'
-                            + ' mt-1'
-                        }">
-                            AI estimate:
-                            ${this
-                            .#estimatedCost}
-                        </p>
                     </div>
                     <div>
                         <label class="${

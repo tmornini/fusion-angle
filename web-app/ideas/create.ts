@@ -164,24 +164,10 @@ export async function init():
                             .targetUsers,
                         status:
                             'active',
-                        estimated_impact:
-                            0,
-                        estimated_duration:
-                            0,
-                        estimated_cost:
-                            0,
-                        priority:
-                            0,
                         position:
                             0,
-                        category:
-                            '',
                         readiness:
                             'incomplete',
-                        impact_label:
-                            '',
-                        effort_label:
-                            '',
                         risks:
                             jsonArrayField(
                                 [],
@@ -194,14 +180,6 @@ export async function init():
                             jsonArrayField(
                                 [],
                             ),
-                        effort_duration_estimate:
-                            '',
-                        effort_team_size:
-                            '',
-                        cost_estimate:
-                            '',
-                        cost_breakdown:
-                            '',
                     },
                 );
                 await putIdeaSubmission(

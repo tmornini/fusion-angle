@@ -21,6 +21,7 @@ export {
     DISPLAY_ABSENT,
     displayText,
     formatDate,
+    formatDateTime,
     getTimeOfDay,
     initials,
     toDateInputValue,

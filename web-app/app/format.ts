@@ -31,6 +31,20 @@ function formatDate(iso: string): string {
     });
 }
 
+function formatDateTime(
+    iso: string,
+): string {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return '\u2014';
+    return d.toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+    });
+}
+
 function toDateInputValue(
     iso: string,
 ): string {
@@ -52,6 +66,7 @@ export {
     DISPLAY_ABSENT,
     displayText,
     formatDate,
+    formatDateTime,
     getTimeOfDay,
     initials,
     toDateInputValue,

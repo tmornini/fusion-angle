@@ -43,8 +43,6 @@ export class ProjectPresenter {
     readonly #status: ProjectStatus;
     readonly #statusClassName: string;
     readonly #statusLabel: string;
-    readonly #priority: number;
-    readonly #priorityScore: number;
     readonly #position: number;
     readonly #progress: number;
     readonly #timeCurrentDays: number;
@@ -62,9 +60,6 @@ export class ProjectPresenter {
             project.statusClassName();
         this.#statusLabel =
             project.statusLabel();
-        this.#priority = project.priority;
-        this.#priorityScore =
-            project.priorityScore;
         this.#position = project.position;
         this.#progress =
             project.timelineProgress();
@@ -104,14 +99,6 @@ export class ProjectPresenter {
 
     idForLink(): string {
         return this.#id;
-    }
-
-    prioritySortKey(): number {
-        return this.#priority;
-    }
-
-    scoreSortKey(): number {
-        return this.#priorityScore;
     }
 
     positionSortKey(): number {

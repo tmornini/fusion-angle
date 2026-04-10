@@ -79,7 +79,7 @@ The API layer is a set of TypeScript modules that provide a REST-style interface
 
 - **`api/types.ts`** — Row types (snake_case) matching
   schema, shared type aliases (`Id`,
-  `ConfidenceLevel`, `PriorityLevel`, `IdeaStatus`),
+  `ConfidenceLevel`, `IdeaStatus`),
   `User` class wrapping `UserEntity`, and `toBool`
   utility
 - **`api/db.ts`** — `DbAdapter` interface with `EntityStore<T>` and `SingletonStore<T>` patterns, plus `hasSchema()`/`createSchema()` lifecycle methods
@@ -114,7 +114,7 @@ import { iconPlus, iconTrash } from '../app/icons';
 import { navigateTo, openDialog, closeDialog } from '../app/core';
 ```
 
-`core.ts` re-exports from `format.ts`, `navigation.ts`, and `dialog.ts` so page modules can import `navigateTo`, `initials`, `durationInDays`, `formatCompactCurrency`, `SECONDS_PER_DAY`, `openDialog`, `closeDialog`, `initTabs` from `'../app/core'`. The `adapters/` directory retains its barrel re-export (`adapters/index.ts`).
+`core.ts` re-exports from `format.ts`, `navigation.ts`, and `dialog.ts` so page modules can import `navigateTo`, `initials`, `durationInDays`, `formatDateTime`, `formatCompactCurrency`, `SECONDS_PER_DAY`, `openDialog`, `closeDialog`, `initTabs` from `'../app/core'`. The `adapters/` directory retains its barrel re-export (`adapters/index.ts`).
 
 **Page modules never import from `api/api.ts`** — all data access (reads and writes) goes through the adapter layer (`adapters/`). Only adapter modules import from the API layer directly.
 
@@ -137,7 +137,7 @@ import { navigateTo, openDialog, closeDialog } from '../app/core';
 - **User-name fallback**: When a user ID can't resolve to a name, return `''` (empty string). UI renders `'\u2014'` (em dash) for display. Never use magical fallback strings like `'Unknown'`.
 - **Absent values**: Use `null` for semantically absent values in adapter return types (e.g., `confidence: ConfidenceLevel | null`). Persisted noun entities never use `null`.
 - **No adapter caching**: Each adapter function fetches its own data directly via `buildUserMap()`. No `cachedUserMap` or `prefetched*` parameters — simplicity over micro-optimization of localStorage reads.
-- **Shared types**: The `Metric` interface (`{ id, name, target, unit, current }`) is defined in `helpers.ts` and used across adapters. `PriorityLevel` (computed from score) is distinct from `ConfidenceLevel` (user-selected).
+- **Shared types**: The `Metric` interface (`{ id, name, target, unit, current }`) is defined in `helpers.ts` and used across adapters.
 
 ### Dark Mode
 
@@ -176,7 +176,7 @@ package.json                  # Project config (zero runtime dependencies)
 build                         # Executable build script
 
 api/
-  types.ts                    # Row types (snake_case), shared type aliases (Id, ConfidenceLevel, PriorityLevel, IdeaStatus), User class, toBool
+  types.ts                    # Row types (snake_case), shared type aliases (Id, ConfidenceLevel, IdeaStatus), User class, toBool
   db.ts                       # DbAdapter interface (EntityStore, SingletonStore, hasSchema, createSchema), EntityNotFound
   db-localstorage.ts          # localStorage implementation with JSON serialization
   api.ts                      # GET/PUT/DELETE/POST URL routing
@@ -193,7 +193,7 @@ web-app/
     database-init.ts          # initDatabase(), handleDatabaseError()
     page-loader.ts            # Page module registry, loadAndInitPage(), handlePageLoadError()
     page-registry.ts          # PAGE_REGISTRY: maps page names → sidebar/standalone classification + sourceDir/sourceFile overrides
-    format.ts                 # initials(), durationInDays(), formatCompactCurrency(), SECONDS_PER_DAY, DISPLAY_ABSENT
+    format.ts                 # initials(), durationInDays(), formatCompactCurrency(), formatDateTime(), SECONDS_PER_DAY, DISPLAY_ABSENT
     layout.ts                 # Sidebar collapse/expand + initSidebarLayout() orchestrator
     theme-toggle.ts           # Theme toggle icon, dropdown init
     sidebar-user.ts           # Sidebar user info fetch and display
@@ -290,7 +290,7 @@ No build artifacts are created in the repo — build output goes to `/tmp/` by d
 - **Cross-tab theme sync**: `state.ts` listens to `StorageEvent` and syncs theme changes across browser tabs automatically.
 - **Non-critical writes logged at warn**: localStorage writes for theme and sidebar state are wrapped in try/catch that log at `warn` level — quota errors don't break the app but are observable via the logger.
 - **Snapshots wipe-first**: All snapshot operations (pristine, mock data, import) call `DELETE('snapshots/schema')` before writing — there is no merge, only replace.
-- **Score thresholds**: `SCORE_THRESHOLD_HIGH = 80` and `SCORE_THRESHOLD_MEDIUM = 60` in `api/types.ts` determine `PriorityLevel` computation for projects. Availability thresholds: `AVAILABILITY_HIGH = 70`, `AVAILABILITY_LOW = 40`.
+- **Availability thresholds**: `AVAILABILITY_HIGH = 70`, `AVAILABILITY_LOW = 40`.
 - **`file:///` protocol**: Navigation detects file protocol and skips link prefetching. Page URLs use relative paths. Code supports `file:///` locally but testing is HTTP-only.
 
 ## Worktrees

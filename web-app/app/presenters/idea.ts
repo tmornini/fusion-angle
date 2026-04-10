@@ -1,11 +1,10 @@
 import { html, SafeHtml } from '../safe-html';
 import {
-    displayText, formatDate,
+    displayText, formatDateTime,
 } from '../core';
 import {
     iconGripVertical,
     iconClock,
-    iconDollarSign,
     iconTrendingUp,
     iconLightbulb,
     iconClipboardCheck,
@@ -27,7 +26,6 @@ import {
     orderedKeys,
 } from './ordered-keys';
 import {
-    COST_DIVISOR,
     IDEA_STATUS_CONFIG,
 } from '../../../api/types';
 
@@ -50,29 +48,23 @@ const STATUS_ICONS: Record<
 export class IdeaPresenter {
     readonly #id: string;
     readonly #title: string;
-    readonly #priority: number;
     readonly #position: number;
     readonly #status: IdeaStatus;
     readonly #statusClassName: string;
     readonly #statusLabel: string;
     readonly #submittedBy: string;
     readonly #submittedAt: string;
-    readonly #category: string;
     readonly #problemStatement: string;
     readonly #description: string;
     readonly #proposedSolution: string;
     readonly #expectedOutcome: string;
     readonly #successMetrics: string;
-    readonly #durationInDays: number;
-    readonly #estimatedCost: number;
-    readonly #estimatedImpact: number;
     readonly #isReviewable: boolean;
     readonly #isConvertible: boolean;
 
     constructor(idea: Idea) {
         this.#id = idea.id;
         this.#title = idea.title;
-        this.#priority = idea.priority;
         this.#position = idea.position;
         this.#status = idea.status;
         this.#statusClassName =
@@ -81,7 +73,6 @@ export class IdeaPresenter {
             idea.statusLabel();
         this.#submittedBy = idea.submittedBy;
         this.#submittedAt = idea.submittedAt;
-        this.#category = idea.category;
         this.#problemStatement =
             idea.problemStatement;
         this.#description = idea.description;
@@ -91,12 +82,6 @@ export class IdeaPresenter {
             idea.expectedOutcome;
         this.#successMetrics =
             idea.successMetrics;
-        this.#durationInDays =
-            idea.durationInDays();
-        this.#estimatedCost =
-            idea.estimatedCost;
-        this.#estimatedImpact =
-            idea.estimatedImpact;
         this.#isReviewable =
             idea.isReviewable();
         this.#isConvertible =
@@ -105,10 +90,6 @@ export class IdeaPresenter {
 
     idForLink(): string {
         return this.#id;
-    }
-
-    prioritySortKey(): number {
-        return this.#priority;
     }
 
     positionSortKey(): number {
@@ -145,14 +126,6 @@ export class IdeaPresenter {
         view: string,
         showGrip: boolean,
     ): SafeHtml {
-        const metricBoxStyle =
-            'width:2rem;height:2rem;'
-            + 'border-radius:0.5rem;'
-            + 'background:'
-            + 'hsl(var(--primary)/0.1);'
-            + 'display:flex;'
-            + 'align-items:center;'
-            + 'justify-content:center';
         return html`
     <div class="card card-hover"
         style="${
@@ -174,9 +147,6 @@ export class IdeaPresenter {
             }">
                 ${this.#buildHeading()}
             </div>
-            ${this.#buildEstimates(
-                metricBoxStyle,
-            )}
             <div style="${
                 'display:flex;'
                 + 'flex-direction:column;'
@@ -212,68 +182,6 @@ export class IdeaPresenter {
                 this.#status
             ]!(14, '')
         } ${this.#statusLabel}</span>`;
-    }
-
-    #buildEstimates(
-        boxStyle: string,
-    ): SafeHtml {
-        const days = this.#durationInDays;
-        const cost = this.#estimatedCost;
-        const impact =
-            this.#estimatedImpact;
-        if (!days && !cost && !impact)
-            return html``;
-        const m = 'text-xs text-muted';
-        const med = 'text-sm font-medium';
-        const cell =
-            'flex items-center gap-2';
-        return html`
-    <div class="${
-        'hidden-mobile flex'
-        + ' items-center gap-4'
-    }" style="flex-shrink:0">
-        ${days ? html`
-        <div class="${cell}">
-            <div style="${boxStyle}">${
-                iconClock(
-                    16, 'text-primary',
-                )
-            }</div>
-            <div>
-                <p class="${m}">Time</p>
-                <p class="${med}">${
-                    days}d</p>
-            </div>
-        </div>` : html``}
-        ${cost ? html`
-        <div class="${cell}">
-            <div style="${boxStyle}">${
-                iconDollarSign(
-                    16, 'text-primary',
-                )
-            }</div>
-            <div>
-                <p class="${m}">Cost</p>
-                <p class="${med}">$${
-                    (cost / COST_DIVISOR)
-                        .toFixed(0)
-                }k</p>
-            </div>
-        </div>` : html``}
-        ${impact ? html`
-        <div class="${cell}">
-            <div style="${boxStyle}">${
-                iconTrendingUp(
-                    16, 'text-primary',
-                )
-            }</div>
-            <div>
-                <p class="${m}">Impact</p>
-                <p class="${med}">${
-                    impact}</p>
-            </div>
-        </div>` : html``}
-    </div>`;
     }
 
     #buildActions(): SafeHtml {
@@ -415,6 +323,9 @@ export class IdeaPresenter {
                         ${displayText(
                             this.#submittedBy,
                         )}
+                        @ ${formatDateTime(
+                            this.#submittedAt,
+                        )}
                     </p>
                 </div>
             </div>
@@ -496,12 +407,6 @@ export class IdeaPresenter {
             flex-direction:column;
             gap:1.5rem">
             ${this.#buildProblemSolutionCard(
-                isEditing,
-            )}
-            ${this.#buildDetailsCard(
-                isEditing,
-            )}
-            ${this.#buildEstimatesCard(
                 isEditing,
             )}
         </div>
@@ -886,161 +791,6 @@ export class IdeaPresenter {
     </div>`;
     }
 
-    #buildDetailsCard(
-        isEditing: boolean,
-    ): SafeHtml {
-        return html`
-    <div class="card p-6">
-        <h2 class="text-lg font-display
-            font-semibold mb-4">
-            Details
-        </h2>
-        <div style="display:flex;
-            flex-direction:column;
-            gap:1rem">
-            <div>
-                <p class="${
-                    'text-xs text-muted mb-1'
-                }">
-                    Category
-                </p>
-                ${isEditing
-                    ? html`<input class="input"
-                        id="${
-                            'idea-edit-category'
-                        }"
-                        value="${
-                            this.#category
-                        }" />`
-                    : html`<p
-                        class="${
-                            'text-sm font-medium'
-                        }">
-                        ${displayText(
-                            this.#category,
-                        )}
-                    </p>`}
-            </div>
-            <div>
-                <p class="${
-                    'text-xs text-muted mb-1'
-                }">
-                    Submitted by
-                </p>
-                <p class="${
-                    'text-sm font-medium'
-                }">
-                    ${displayText(
-                        this.#submittedBy,
-                    )}
-                </p>
-            </div>
-            <div>
-                <p class="${
-                    'text-xs text-muted mb-1'
-                }">
-                    Submitted at
-                </p>
-                <p class="${
-                    'text-sm font-medium'
-                }">
-                    ${this.#submittedAt
-                        ? formatDate(
-                            this.#submittedAt,
-                        )
-                        : displayText('')}
-                </p>
-            </div>
-        </div>
-    </div>`;
-    }
-
-    #buildEstimatesCard(
-        isEditing: boolean,
-    ): SafeHtml {
-        return html`
-    <div class="card p-6">
-        <h2 class="text-lg font-display
-            font-semibold mb-4">
-            Estimates
-        </h2>
-        <div class="score-grid">
-            ${[
-              {
-                  label: 'Time',
-                  inputId: 'time',
-                  icon: iconClock,
-                  value:
-                      this.#durationInDays,
-                  unit: 'd',
-                  prefix: '',
-              },
-              {
-                  label: 'Cost',
-                  inputId: 'cost',
-                  icon: iconDollarSign,
-                  value:
-                      this.#estimatedCost,
-                  unit: '',
-                  prefix: '$',
-              },
-              {
-                  label: 'Impact',
-                  inputId: 'impact',
-                  icon: iconTrendingUp,
-                  value:
-                      this.#estimatedImpact,
-                  unit: ' pts',
-                  prefix: '',
-              },
-            ].map(metric => html`
-            <div style="padding:1rem;
-                border-radius:0.75rem;
-                background:hsl(
-                    var(--muted)/0.3);
-                border:1px solid
-                    hsl(var(--border))">
-                <div
-                    class="${
-                        'flex items-center'
-                        + ' gap-2 mb-3'
-                    }">
-                    ${metric.icon(
-                        20, 'text-primary',
-                    )}
-                    <span
-                        class="font-medium">
-                        ${metric.label}
-                    </span>
-                </div>
-                ${isEditing
-                    ? html`<input
-                        type="number"
-                        id="${
-                            'idea-edit-'
-                            + metric.inputId
-                        }"
-                        value="${String(
-                            metric.value,
-                        )}"
-                        class="input"
-                        style="width:100%"
-                        min="0"
-                        step="any" />`
-                    : html`<p
-                        class="${
-                            'text-lg'
-                            + ' font-bold'
-                        }">
-                        ${metric.value
-                            ? `${metric.prefix}${metric.value}${metric.unit}`
-                            : '\u2014'}
-                    </p>`}
-            </div>
-            `)}
-        </div>
-    </div>`;
-    }
 }
 
 export class IdeaListPresenter {

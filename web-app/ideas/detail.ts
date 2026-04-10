@@ -9,7 +9,7 @@ import {
     withLoadingState,
 } from '../app/loading-states';
 import {
-    navigateTo, SECONDS_PER_DAY,
+    navigateTo,
     initDialog, closeDialog,
 } from '../app/core';
 import {
@@ -57,20 +57,6 @@ function bindIdeaEvents(
         bindEnterToClick(
             '#idea-edit-title', saveSel,
         );
-        bindEnterToClick(
-            '#idea-edit-category',
-            saveSel,
-        );
-        bindEnterToClick(
-            '#idea-edit-impact', saveSel,
-        );
-        bindEnterToClick(
-            '#idea-edit-time',
-            saveSel,
-        );
-        bindEnterToClick(
-            '#idea-edit-cost', saveSel,
-        );
     }
     $('#idea-back-btn', document)
         ?.addEventListener(
@@ -108,11 +94,6 @@ function bindIdeaEvents(
                         '#idea-edit-target-users',
                         document,
                     )!.value;
-                const category =
-                    $input(
-                        '#idea-edit-category',
-                        document,
-                    )!.value;
                 const problemStatement =
                     $textarea(
                         '#idea-edit-problem',
@@ -133,30 +114,11 @@ function bindIdeaEvents(
                         '#idea-edit-metrics',
                         document,
                     )!.value;
-                const impact = Number(
-                    $input(
-                        '#idea-edit-impact',
-                        document,
-                    )!.value,
-                );
-                const time = Number(
-                    $input(
-                        '#idea-edit-time',
-                        document,
-                    )!.value,
-                );
-                const cost = Number(
-                    $input(
-                        '#idea-edit-cost',
-                        document,
-                    )!.value,
-                );
 
                 try {
                     await putIdea(ideaId, {
                         title,
                         description,
-                        category,
                         problem_statement:
                             problemStatement,
                         proposed_solution:
@@ -165,13 +127,6 @@ function bindIdeaEvents(
                             expectedOutcome,
                         success_metrics:
                             successMetrics,
-                        estimated_impact:
-                            impact,
-                        estimated_duration:
-                            time
-                            * SECONDS_PER_DAY,
-                        estimated_cost:
-                            cost,
                     });
                 } catch {
                     showToast(

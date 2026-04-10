@@ -80,15 +80,9 @@ export async function getIdeaDetail(
     );
 }
 
-export interface ConversionData {
-    idea: Idea;
-    estimatedDuration: string;
-    estimatedCost: string;
-}
-
 export async function getIdeaForConversion(
     ideaId: string,
-): Promise<ConversionData> {
+): Promise<Idea> {
     const [
         entity, userMap, submissions,
     ] = await Promise.all([
@@ -103,18 +97,14 @@ export async function getIdeaForConversion(
     const submission = submissions.find(
         s => s.idea_id === ideaId,
     );
-    return {
-        idea: new Idea(
-            entity,
-            userName(
-                userMap,
-                submission!.user_id,
-            ),
-            submission!.created_at,
+    return new Idea(
+        entity,
+        userName(
+            userMap,
+            submission!.user_id,
         ),
-        estimatedDuration: '',
-        estimatedCost: '',
-    };
+        submission!.created_at,
+    );
 }
 
 export async function getIdea(

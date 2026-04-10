@@ -2,8 +2,6 @@ export type Id = string;
 
 export type ConfidenceLevel = 'high' | 'medium' | 'low';
 
-export type PriorityLevel = 'high' | 'medium' | 'low';
-
 export type WfFieldType =
     | 'text'
     | 'textarea'
@@ -48,21 +46,8 @@ export type ProjectStatus =
     | 'completed'
     | 'deleted';
 
-export const SCORE_THRESHOLD_HIGH = 80;
-export const SCORE_THRESHOLD_MEDIUM = 60;
-
 export const AVAILABILITY_HIGH = 70;
 export const AVAILABILITY_LOW = 40;
-
-export function computePriority(
-    score: number,
-): PriorityLevel {
-    if (score >= SCORE_THRESHOLD_HIGH)
-        return 'high';
-    if (score >= SCORE_THRESHOLD_MEDIUM)
-        return 'medium';
-    return 'low';
-}
 
 export type StoredBoolean = 0 | 1;
 
@@ -337,27 +322,16 @@ export class User {
 export interface IdeaEntity {
     id: Id;
     title: string;
-    estimated_impact: number;
-    estimated_duration: number;
-    estimated_cost: number;
-    priority: number;
     position: number;
     status: IdeaStatus;
     problem_statement: string;
     proposed_solution: string;
     expected_outcome: string;
-    category: string;
     readiness: ReadinessLevel;
-    impact_label: string;
-    effort_label: string;
     description: string;
     risks: JsonArrayField;
     assumptions: JsonArrayField;
     alignments: JsonArrayField;
-    effort_duration_estimate: string;
-    effort_team_size: string;
-    cost_estimate: string;
-    cost_breakdown: string;
     success_metrics: string;
 }
 
@@ -375,8 +349,6 @@ export interface ProjectEntity {
     actual_cost: number;
     estimated_impact: number;
     actual_impact: number;
-    priority: number;
-    priority_score: number;
     position: number;
     business_context: JsonObjectField;
     timeline_label: string;
@@ -682,29 +654,18 @@ export const READINESS_CONFIG: Record<
 export class Idea {
     readonly id: string;
     readonly title: string;
-    readonly estimatedImpact: number;
-    readonly estimatedDuration: number;
-    readonly estimatedCost: number;
-    readonly priority: number;
     readonly position: number;
     readonly status: IdeaStatus;
     readonly problemStatement: string;
     readonly proposedSolution: string;
     readonly expectedOutcome: string;
-    readonly category: string;
     readonly readiness: ReadinessLevel;
     readonly waitingDays: number;
-    readonly impactLabel: string;
-    readonly effortLabel: string;
     readonly description: string;
     readonly submittedAt: string;
     readonly risks: string;
     readonly assumptions: string;
     readonly alignments: string;
-    readonly effortDurationEstimate: string;
-    readonly effortTeamSize: string;
-    readonly costEstimate: string;
-    readonly costBreakdown: string;
     readonly successMetrics: string;
     readonly submittedBy: string;
 
@@ -715,13 +676,6 @@ export class Idea {
     ) {
         this.id = entity.id;
         this.title = entity.title;
-        this.estimatedImpact =
-            entity.estimated_impact;
-        this.estimatedDuration =
-            entity.estimated_duration;
-        this.estimatedCost =
-            entity.estimated_cost;
-        this.priority = entity.priority;
         this.position = entity.position;
         this.status = entity.status;
         this.problemStatement =
@@ -730,10 +684,7 @@ export class Idea {
             entity.proposed_solution;
         this.expectedOutcome =
             entity.expected_outcome;
-        this.category = entity.category;
         this.readiness = entity.readiness;
-        this.impactLabel = entity.impact_label;
-        this.effortLabel = entity.effort_label;
         this.description = entity.description;
         this.submittedAt = submittedAt;
         this.waitingDays = this.submittedAt
@@ -749,13 +700,6 @@ export class Idea {
         this.risks = entity.risks;
         this.assumptions = entity.assumptions;
         this.alignments = entity.alignments;
-        this.effortDurationEstimate =
-            entity.effort_duration_estimate;
-        this.effortTeamSize =
-            entity.effort_team_size;
-        this.costEstimate = entity.cost_estimate;
-        this.costBreakdown =
-            entity.cost_breakdown;
         this.successMetrics =
             entity.success_metrics;
         this.submittedBy = submittedBy;
@@ -779,13 +723,6 @@ export class Idea {
 
     isReady(): boolean {
         return this.readiness === 'ready';
-    }
-
-    durationInDays(): number {
-        return Math.ceil(
-            this.estimatedDuration
-                / SECONDS_PER_DAY,
-        );
     }
 
     statusLabel(): string {
@@ -861,8 +798,6 @@ export class Project {
     readonly actualCost: number;
     readonly estimatedImpact: number;
     readonly actualImpact: number;
-    readonly priority: number;
-    readonly priorityScore: number;
     readonly position: number;
     readonly businessContext: string;
     readonly timelineLabel: string;
@@ -888,9 +823,6 @@ export class Project {
             entity.estimated_impact;
         this.actualImpact =
             entity.actual_impact;
-        this.priority = entity.priority;
-        this.priorityScore =
-            entity.priority_score;
         this.position = entity.position;
         this.businessContext =
             entity.business_context;
@@ -956,12 +888,6 @@ export class Project {
     formattedCost(): string {
         return formatCompactCurrency(
             this.estimatedCost,
-        );
-    }
-
-    priorityLevel(): PriorityLevel {
-        return computePriority(
-            this.priorityScore,
         );
     }
 

@@ -406,10 +406,6 @@ export async function populateMockData(
             id: 'd752cb3e-8e59-423f-95ba-d35a0f16f883',
             title: 'AI-Powered Customer'
                 + ' Segmentation',
-            estimated_impact: 85,
-            estimated_duration: 432000,
-            estimated_cost: 45000,
-            priority: 1,
             position: 1,
             status: 'in-review',
 
@@ -430,11 +426,8 @@ export async function populateMockData(
                 + ' by 80% and increase'
                 + ' conversion rates'
                 + ' by 25%.',
-            category: 'Marketing',
             readiness: 'ready',
 
-            impact_label: 'High',
-            effort_label: 'Medium',
             description:
                 'Helps marketing teams'
                 + ' target the right'
@@ -444,16 +437,6 @@ export async function populateMockData(
             risks: jsonArrayField([]),
             assumptions: jsonArrayField([]),
             alignments: jsonArrayField([]),
-            effort_duration_estimate:
-                '4-5 weeks',
-            effort_team_size:
-                '2-3 engineers',
-            cost_estimate:
-                '$40,000 - $50,000',
-            cost_breakdown:
-                'ML development: $30K,'
-                + ' data prep: $10K,'
-                + ' testing: $5K',
             success_metrics:
                 'Segmentation time reduced'
                 + ' from 20+ hours to under'
@@ -465,10 +448,6 @@ export async function populateMockData(
             id: 'e9a7b7c9-f449-46b6-92b1-7144d29f6612',
             title: 'Automated Report'
                 + ' Generation',
-            estimated_impact: 78,
-            estimated_duration: 288000,
-            estimated_cost: 32000,
-            priority: 2,
             position: 2,
             status: 'approved',
 
@@ -492,11 +471,8 @@ export async function populateMockData(
                 + ' reducing report delivery'
                 + ' time from days to'
                 + ' minutes.',
-            category: 'Engineering',
             readiness: 'ready',
 
-            impact_label: 'High',
-            effort_label: 'Low',
             description:
                 'Enables analysts and'
                 + ' managers to receive'
@@ -506,16 +482,6 @@ export async function populateMockData(
             risks: jsonArrayField([]),
             assumptions: jsonArrayField([]),
             alignments: jsonArrayField([]),
-            effort_duration_estimate:
-                '3-4 weeks',
-            effort_team_size:
-                '2 engineers',
-            cost_estimate:
-                '$25,000 - $35,000',
-            cost_breakdown:
-                'Pipeline dev: $20K,'
-                + ' template design: $5K,'
-                + ' QA: $5K',
             success_metrics:
                 '15 analyst-hours freed'
                 + ' per week; report'
@@ -527,10 +493,6 @@ export async function populateMockData(
             id: 'eef228e7-8ab1-42ed-afae-d095c214a85b',
             title: 'Predictive Maintenance'
                 + ' System',
-            estimated_impact: 90,
-            estimated_duration: 720000,
-            estimated_cost: 75000,
-            priority: 3,
             position: 3,
             status: 'active',
 
@@ -551,11 +513,8 @@ export async function populateMockData(
                 + ' equipment lifespan by'
                 + ' 20%, saving $150K'
                 + ' annually.',
-            category: 'Operations',
             readiness: 'needs-info',
 
-            impact_label: 'High',
-            effort_label: 'High',
             description:
                 'Serves operations and'
                 + ' facilities teams who'
@@ -565,16 +524,6 @@ export async function populateMockData(
             risks: jsonArrayField([]),
             assumptions: jsonArrayField([]),
             alignments: jsonArrayField([]),
-            effort_duration_estimate:
-                '8-10 weeks',
-            effort_team_size:
-                '3-4 engineers',
-            cost_estimate:
-                '$65,000 - $80,000',
-            cost_breakdown:
-                'IoT sensors: $25K,'
-                + ' ML models: $30K,'
-                + ' integration: $15K',
             success_metrics:
                 'Unplanned downtime'
                 + ' reduced by 70%;'
@@ -586,10 +535,6 @@ export async function populateMockData(
             id: 'f0582dd9-4f65-45bc-a23d-47ca7426582c',
             title: 'Real-time Analytics'
                 + ' Dashboard',
-            estimated_impact: 72,
-            estimated_duration: 216000,
-            estimated_cost: 28000,
-            priority: 4,
             position: 4,
             status: 'in-review',
 
@@ -612,11 +557,8 @@ export async function populateMockData(
                 + ' reducing response time'
                 + ' to market changes from'
                 + ' 5 days to under 1 hour.',
-            category: 'Product',
             readiness: 'ready',
 
-            impact_label: 'Medium',
-            effort_label: 'Low',
             description:
                 'Gives leadership and'
                 + ' analysts real-time'
@@ -626,16 +568,6 @@ export async function populateMockData(
             risks: jsonArrayField([]),
             assumptions: jsonArrayField([]),
             alignments: jsonArrayField([]),
-            effort_duration_estimate:
-                '2-3 weeks',
-            effort_team_size:
-                '2 engineers',
-            cost_estimate:
-                '$22,000 - $30,000',
-            cost_breakdown:
-                'Frontend: $15K,'
-                + ' streaming infra: $8K,'
-                + ' alerts: $5K',
             success_metrics:
                 'Market response time'
                 + ' under 1 hour; dashboard'
@@ -648,10 +580,6 @@ export async function populateMockData(
             id: 'b112a99b-4993-4ea3-8621-0ba9c6036896',
             title: 'Smart Inventory'
                 + ' Optimization',
-            estimated_impact: 68,
-            estimated_duration: 360000,
-            estimated_cost: 38000,
-            priority: 5,
             position: 5,
             status: 'active',
 
@@ -674,11 +602,8 @@ export async function populateMockData(
                 + ' incidents by 60%,'
                 + ' improving customer'
                 + ' satisfaction scores.',
-            category: 'Operations',
             readiness: 'needs-info',
 
-            impact_label: 'Medium',
-            effort_label: 'Medium',
             description:
                 'Helps supply chain and'
                 + ' warehouse teams balance'
@@ -688,16 +613,6 @@ export async function populateMockData(
             risks: jsonArrayField([]),
             assumptions: jsonArrayField([]),
             alignments: jsonArrayField([]),
-            effort_duration_estimate:
-                '4-5 weeks',
-            effort_team_size:
-                '2-3 engineers',
-            cost_estimate:
-                '$30,000 - $42,000',
-            cost_breakdown:
-                'Forecasting model: $20K,'
-                + ' ERP integration: $12K,'
-                + ' testing: $6K',
             success_metrics:
                 'Carrying costs reduced'
                 + ' 30%; stockout incidents'
@@ -709,10 +624,6 @@ export async function populateMockData(
             id: '48fe64d4-89f8-483b-b819-53045ecb9e5f',
             title: 'Employee Training'
                 + ' Assistant',
-            estimated_impact: 65,
-            estimated_duration: 324000,
-            estimated_cost: 35000,
-            priority: 6,
             position: 6,
             status: 'sent-back',
 
@@ -734,11 +645,8 @@ export async function populateMockData(
                 + ' hire productivity scores'
                 + ' by 40% in the first'
                 + ' quarter.',
-            category: 'Support',
             readiness: 'incomplete',
 
-            impact_label: 'Medium',
-            effort_label: 'Medium',
             description:
                 'Supports HR and team'
                 + ' leads in delivering'
@@ -748,16 +656,6 @@ export async function populateMockData(
             risks: jsonArrayField([]),
             assumptions: jsonArrayField([]),
             alignments: jsonArrayField([]),
-            effort_duration_estimate:
-                '3-4 weeks',
-            effort_team_size:
-                '2-3 engineers',
-            cost_estimate:
-                '$30,000 - $40,000',
-            cost_breakdown:
-                'AI model: $18K,'
-                + ' content platform: $12K,'
-                + ' rollout: $5K',
             success_metrics:
                 'Onboarding time reduced'
                 + ' to 3 weeks; new hire'
@@ -768,10 +666,6 @@ export async function populateMockData(
             id: '7cdd88db-2463-41cc-9303-89dd3254ad40',
             title: 'AI-Powered Customer'
                 + ' Support Chatbot',
-            estimated_impact: 0,
-            estimated_duration: 0,
-            estimated_cost: 0,
-            priority: 8,
             position: 8,
             status: 'in-review',
 
@@ -792,11 +686,8 @@ export async function populateMockData(
                 + ' tickets and cut'
                 + ' average response time'
                 + ' to under 30 seconds.',
-            category: 'Customer Experience',
             readiness: 'ready',
 
-            impact_label: 'High',
-            effort_label: 'Medium',
             description:
                 'Implement an intelligent'
                 + ' chatbot using GPT-4 to'
@@ -864,16 +755,6 @@ export async function populateMockData(
                 'Cost optimization'
                     + ' program',
             ]),
-            effort_duration_estimate:
-                '3-4 months',
-            effort_team_size:
-                '4-5 engineers',
-            cost_estimate:
-                '$120,000 - $150,000',
-            cost_breakdown:
-                'Development: $80K,'
-                + ' API costs: $20K/year,'
-                + ' Training: $10K',
             success_metrics:
                 'Tier-1 ticket deflection'
                 + ' rate of 60%; average'
@@ -885,10 +766,6 @@ export async function populateMockData(
             id: 'b46bd91c-1b7d-409b-8f1c-28e1c6996241',
             title: 'Mobile App Push'
                 + ' Notification Revamp',
-            estimated_impact: 0,
-            estimated_duration: 0,
-            estimated_cost: 0,
-            priority: 10,
             position: 10,
             status: 'in-review',
 
@@ -906,11 +783,8 @@ export async function populateMockData(
                 + ' under 20% and increase'
                 + ' notification engagement'
                 + ' by 35%.',
-            category: 'Product',
             readiness: 'needs-info',
 
-            impact_label: 'Medium',
-            effort_label: 'Low',
             description:
                 'Improves the mobile'
                 + ' experience for end'
@@ -920,16 +794,6 @@ export async function populateMockData(
             risks: jsonArrayField([]),
             assumptions: jsonArrayField([]),
             alignments: jsonArrayField([]),
-            effort_duration_estimate:
-                '2-3 weeks',
-            effort_team_size:
-                '1-2 engineers',
-            cost_estimate:
-                '$12,000 - $18,000',
-            cost_breakdown:
-                'Mobile dev: $10K,'
-                + ' ML tuning: $5K,'
-                + ' QA: $3K',
             success_metrics:
                 'Opt-out rate below 20%;'
                 + ' notification tap rate'
@@ -940,10 +804,6 @@ export async function populateMockData(
             id: '80450d9e-d3c5-4eaa-bd70-2bd4048edcc7',
             title: 'Sustainability Dashboard'
                 + ' for Operations',
-            estimated_impact: 0,
-            estimated_duration: 0,
-            estimated_cost: 0,
-            priority: 9,
             position: 9,
             status: 'in-review',
 
@@ -962,11 +822,8 @@ export async function populateMockData(
                 + ' energy costs and meet'
                 + ' annual ESG reporting'
                 + ' requirements.',
-            category: 'Operations',
             readiness: 'ready',
 
-            impact_label: 'High',
-            effort_label: 'High',
             description:
                 'Provides operations and'
                 + ' sustainability officers'
@@ -976,16 +833,6 @@ export async function populateMockData(
             risks: jsonArrayField([]),
             assumptions: jsonArrayField([]),
             alignments: jsonArrayField([]),
-            effort_duration_estimate:
-                '6-8 weeks',
-            effort_team_size:
-                '3-4 engineers',
-            cost_estimate:
-                '$55,000 - $70,000',
-            cost_breakdown:
-                'Data integration: $25K,'
-                + ' dashboard UI: $20K,'
-                + ' IoT feeds: $15K',
             success_metrics:
                 'Energy costs reduced'
                 + ' 15%; ESG reports'
@@ -997,10 +844,6 @@ export async function populateMockData(
             id: 'cd1bb80d-cb50-48c4-aa21-3a115fbbd114',
             title: 'Employee Wellness'
                 + ' Program Integration',
-            estimated_impact: 0,
-            estimated_duration: 0,
-            estimated_cost: 0,
-            priority: 11,
             position: 11,
             status: 'in-review',
 
@@ -1020,11 +863,8 @@ export async function populateMockData(
                 + ' by 50% and reduce'
                 + ' voluntary turnover'
                 + ' by 12%.',
-            category: 'HR',
             readiness: 'incomplete',
 
-            impact_label: 'Medium',
-            effort_label: 'Medium',
             description:
                 'Helps HR and employees'
                 + ' access wellness'
@@ -1034,16 +874,6 @@ export async function populateMockData(
             risks: jsonArrayField([]),
             assumptions: jsonArrayField([]),
             alignments: jsonArrayField([]),
-            effort_duration_estimate:
-                '4-6 weeks',
-            effort_team_size:
-                '2-3 engineers',
-            cost_estimate:
-                '$28,000 - $38,000',
-            cost_breakdown:
-                'Portal dev: $18K,'
-                + ' vendor APIs: $10K,'
-                + ' rollout: $5K',
             success_metrics:
                 'Wellness participation'
                 + ' up 50%; voluntary'
@@ -1055,10 +885,6 @@ export async function populateMockData(
             id: '9add8b29-d51e-49f9-b4e0-e17d23370732',
             title: 'Real-time Inventory'
                 + ' Tracking System',
-            estimated_impact: 0,
-            estimated_duration: 0,
-            estimated_cost: 0,
-            priority: 7,
             position: 7,
             status: 'in-review',
 
@@ -1077,11 +903,8 @@ export async function populateMockData(
                 + ' accuracy and eliminate'
                 + ' end-of-day manual'
                 + ' reconciliation.',
-            category: 'Operations',
             readiness: 'ready',
 
-            impact_label: 'High',
-            effort_label: 'Medium',
             description:
                 'Enables warehouse and'
                 + ' logistics staff to'
@@ -1091,16 +914,6 @@ export async function populateMockData(
             risks: jsonArrayField([]),
             assumptions: jsonArrayField([]),
             alignments: jsonArrayField([]),
-            effort_duration_estimate:
-                '5-6 weeks',
-            effort_team_size:
-                '3 engineers',
-            cost_estimate:
-                '$45,000 - $60,000',
-            cost_breakdown:
-                'Hardware: $20K,'
-                + ' software dev: $25K,'
-                + ' deployment: $10K',
             success_metrics:
                 'Inventory accuracy'
                 + ' at 99.5%; manual'
@@ -1169,8 +982,6 @@ export async function populateMockData(
             actual_cost: 38000,
             estimated_impact: 85,
             actual_impact: 78,
-            priority: 1,
-            priority_score: 92,
             position: 1,
             business_context: jsonObjectField({
                 problem:
@@ -1236,8 +1047,6 @@ export async function populateMockData(
             actual_cost: 28000,
             estimated_impact: 78,
             actual_impact: 82,
-            priority: 2,
-            priority_score: 87,
             position: 2,
             business_context: jsonObjectField({}),
             timeline_label: 'Completed',
@@ -1264,8 +1073,6 @@ export async function populateMockData(
             actual_cost: 18000,
             estimated_impact: 90,
             actual_impact: 0,
-            priority: 3,
-            priority_score: 84,
             position: 3,
             business_context: jsonObjectField({}),
             timeline_label: 'At Risk',
@@ -1291,8 +1098,6 @@ export async function populateMockData(
             actual_cost: 26000,
             estimated_impact: 72,
             actual_impact: 70,
-            priority: 4,
-            priority_score: 81,
             position: 4,
             business_context: jsonObjectField({}),
             timeline_label: 'Completed',
@@ -1319,8 +1124,6 @@ export async function populateMockData(
             actual_cost: 12000,
             estimated_impact: 68,
             actual_impact: 0,
-            priority: 5,
-            priority_score: 78,
             position: 5,
             business_context: jsonObjectField({}),
             timeline_label: 'Overdue',
@@ -1347,8 +1150,6 @@ export async function populateMockData(
             actual_cost: 8000,
             estimated_impact: 65,
             actual_impact: 0,
-            priority: 6,
-            priority_score: 74,
             position: 6,
             business_context: jsonObjectField({}),
             timeline_label: 'On Track',

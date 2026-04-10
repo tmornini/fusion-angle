@@ -85,7 +85,7 @@ export async function init(
     let presenter:
         IdeaConversionPresenter;
     try {
-        const [convData, users] =
+        const [idea, users] =
             await Promise.all([
                 getIdeaForConversion(
                     ideaId,
@@ -94,11 +94,7 @@ export async function init(
             ]);
         presenter =
             new IdeaConversionPresenter(
-                convData.idea,
-                convData
-                    .estimatedDuration,
-                convData
-                    .estimatedCost,
+                idea,
                 users,
             );
     } catch {
