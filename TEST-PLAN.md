@@ -25,12 +25,12 @@ run as a single continuous regression pass.
 | C. Core: Dashboard | 7 |
 | D. Core: Ideas Workflow | 48 |
 | E. Core: Projects | 11 |
-| F. Tools | 32 |
+| F. Tools | 36 |
 | G. Admin Pages | 34 |
 | H. Reference & System | 2 |
 | I. Cross-Cutting Concerns | 27 |
 | J. Teardown | 3 |
-| **Total** | **228** |
+| **Total** | **232** |
 
 ---
 
@@ -107,42 +107,50 @@ on. Run these in order.
   shows two nodes: "New" (start, top-left with
   green border) and "Complete" (end, bottom-right
   with double green border) connected by no edges.
-  Toolbar shows Undo, Redo, "+ Add State", Delete
-  (trash icon), Auto Layout, Zoom +/−, Fit, Copy
-  Mermaid, Export .zip. Changes auto-save (no
-  explicit Save button).
-- [ ] **AA37** Click the start node to select it.
-  Click "+ Add State". PASS: a dialog opens asking
-  for State Name, Transition Name, and Placement
-  Direction. Enter "Data Capture" and "begin".
-  Click "Add State". PASS: a new node appears on
-  the canvas with a blue border, connected from
-  the start node by an edge named "begin".
-- [ ] **AA38** Double-click the "Data Capture" node.
-  PASS: properties panel appears showing State
-  Name input, Description input, empty Fields
-  list, and outgoing transitions. The node gets a
-  blue glow selection effect on the canvas.
+  Toolbar shows Undo, Redo, Delete (trash icon),
+  Auto Layout, Zoom −/Show All/+,
+  Copy Mermaid, Export. Changes auto-save
+  (no explicit Save button).
+- [ ] **AA37** Drag the port circle on the start
+  node into empty canvas past 20 pixels. PASS:
+  during the drag a ghost "New State" card
+  follows the cursor along with a faint bezier
+  preview. On release, a new node appears at the
+  drop position with a blue border,
+  auto-connected from the start by an edge with
+  a default name. The start node is also
+  draggable by its body.
+- [ ] **AA38** Double-click the new blue-bordered
+  node. PASS: properties panel appears showing
+  State Name input, Description input, empty
+  Fields list, and outgoing transitions. The
+  node gets a blue glow selection effect on the
+  canvas.
 - [ ] **AA39** Edit the state name in the
-  properties panel. PASS: the node label updates
-  on the canvas immediately (auto-saves via
-  800ms debounce).
-- [ ] **AA40** Click the start node and drag to
-  "Data Capture". PASS: a dashed preview line
-  shows during the drag. On release, a new edge
-  appears with a default name. (Note: start nodes
-  have no visible port circles — clicking the
-  node itself initiates a connection.)
-- [ ] **AA41** Double-click the new edge label.
-  PASS: edge properties panel shows Name,
-  Description, From/To states. Rename it to
-  "begin".
-- [ ] **AA42** Repeat: add a "Review" state, connect
-  "Data Capture" to "Review" (name: "submit"),
-  connect "Review" to "Data Capture" (name: "needs
-  revision", should appear as dashed orange cycle
-  edge), connect "Review" to "Complete" (name:
-  "approve").
+  properties panel to "Data Capture". PASS: the
+  node label updates on the canvas immediately
+  (auto-saves via 800ms debounce).
+- [ ] **AA40** Double-click the edge between
+  start and "Data Capture". PASS: edge
+  properties panel shows Name, Description,
+  From/To states. Rename it to "begin".
+- [ ] **AA41** Drag from "Data Capture"'s port
+  into empty canvas past 20 pixels to create a
+  new middle node; rename it "Review" via its
+  properties panel. Rename the new edge
+  "submit".
+- [ ] **AA42** Hold Shift and drag from "Review"
+  onto "Data Capture". PASS: during the drag the
+  preview redraws as a dashed-orange curved
+  bezier because a forward path "Data Capture" →
+  "Review" already exists, and the reachability
+  check recognises the release would close a
+  loop. Release to create the cycle edge; rename
+  it "needs revision". Hold Shift and drag from
+  "Review" onto "Complete". PASS: preview is a
+  solid-blue curved bezier (no return path).
+  Release to create the edge; rename it
+  "approve".
 - [ ] **AA43** In the "Data Capture" properties
   panel, click "+ Add Field". Enter name "Company
   Name", type "text", check "Required". PASS:
@@ -376,16 +384,16 @@ on. Run these in order.
 
 ## F. Tools
 
-### Flow List (`flow/`)
+### Flow List (`flows/`)
 
-- [ ] **F11** Navigate to `flow/`. PASS: page shows
+- [ ] **F11** Navigate to `flows/`. PASS: page shows
   flow cards with name, description, project
   name badge, and state/transition counts.
 - [ ] **F12** Type in the search input (if present).
   PASS: filters flow cards by name or
   description in real-time.
 - [ ] **F13** Click a flow card. PASS: navigates
-  to `flow/detail.html?flowId=<id>`.
+  to `flows/detail.html?flowId=<id>`.
 
 ### Flow Import
 
@@ -393,12 +401,12 @@ on. Run these in order.
 - [ ] **F13c** Select a `.mmd` file via the file input and choose a project from the dropdown. Click "Import". PASS: flow is created, toast confirms import, and browser navigates to the flow designer for the imported flow.
 - [ ] **F13d** Repeat with a `.zip` file exported from a previous flow. PASS: imported flow contains the same nodes, edges, and fields as the original.
 
-### Flow Designer (`flow/detail.html?flowId=...`)
+### Flow Designer (`flows/detail.html?flowId=...`)
 
 - [ ] **F14** Navigate to a flow designer page.
-  PASS: toolbar at top with Undo, Redo, + Add
-  State, Delete (trash icon), Auto Layout, Zoom
-  +/−, Fit, Copy Mermaid, Export .zip. SVG canvas
+  PASS: toolbar at top with Undo, Redo, Delete
+  (trash icon), Auto Layout, Zoom −/Show All/+,
+  Copy Mermaid, Export, Lock Down. SVG canvas
   below with dot grid background showing the flow
   graph. Changes auto-save (no explicit Save
   button).
@@ -407,40 +415,84 @@ on. Run these in order.
   standard nodes have blue border with field count,
   complete node has double green border with "End
   state" subtitle.
-- [ ] **F16** Edges display correctly: forward edges
-  are solid blue lines with arrow markers and named
-  labels. Cycle edges (pointing backward in the
-  graph) are dashed orange.
+- [ ] **F16** Edges display correctly: forward
+  edges are solid blue lines with arrow markers
+  and named labels. Cycle edges — those that
+  close a loop because a return path from target
+  back to source already exists in the graph —
+  are dashed orange with a warning arrow. Sibling
+  transitions between nodes that have no return
+  path render as solid blue even when they share
+  a level.
 - [ ] **F17** Connection ports (small circles) are
-  visible on standard node edges (not on start or
-  complete nodes). Hover over a port. PASS: cursor
-  changes to crosshair.
+  visible on middle nodes (not on start or
+  complete, and not on any node when the flow is
+  locked). Each port sits on the longest open
+  perimeter gap of its node, not always the right
+  side. Hover over a port. PASS: cursor changes
+  to crosshair and a browser tooltip reads "Click
+  and drag to create a new node attached here.
+  Hold Shift to connect to an existing node
+  instead."
 - [ ] **F18** Click a node. PASS: node gets blue
   glow selection effect. Double-click the node.
   PASS: properties panel appears showing state
   name, description, form fields list, and
   outgoing transitions.
-- [ ] **F19** Select a node, then click "+ Add
-  State" in toolbar (button is disabled until a
-  node is selected). PASS: dialog opens asking
-  for State Name, Transition Name, and Placement
-  Direction. Fill and submit. PASS: new node
-  appears connected from the selected node.
+- [ ] **F19** Drag from a middle node's port into
+  empty canvas past 20 pixels, without holding
+  Shift. PASS: during the drag a faint bezier
+  preview plus a "New State" ghost card track the
+  cursor. On release, a new middle node is
+  created at the drop position and
+  auto-connected from the source node with a
+  default edge name.
 - [ ] **F19b** Drag a standard node to a new
   position. PASS: node follows the pointer and
   can be placed freely on the canvas.
 - [ ] **F19c** Attempt to drag the start node. PASS:
-  it does not move (clicking it initiates a
-  connection instead). The complete node is
-  draggable like standard nodes.
+  it does not move (the start node is
+  non-draggable — clicking anywhere on it
+  initiates a drag-from-start instead). The
+  complete node is draggable like standard nodes.
 - [ ] **F19d** Click "Auto Layout" in toolbar. PASS:
   all nodes reposition based on their rank from
   start. Start is placed top-left, complete
   bottom-right, others arranged by graph depth.
-- [ ] **F20** Drag from one node's port to another
-  node's port. PASS: a dashed preview line appears
-  during drag. On release over a valid port, a new
-  edge is created with a default name.
+- [ ] **F20** Hold Shift and drag from a middle
+  node's port over another middle node, then
+  release. PASS: during the drag the preview
+  re-draws from a ghosted grey straight line
+  (when the cursor is over empty canvas) into a
+  curved bezier with an arrowhead the moment the
+  cursor enters a valid target node. On release
+  over the target, a new edge is created with a
+  default name. No "New State" ghost card is
+  shown while Shift is held.
+- [ ] **F20a** Shift-drag forward (earlier node →
+  later node). PASS: the curved preview is solid
+  blue while over the target. The committed edge
+  matches the preview exactly.
+- [ ] **F20b** Shift-drag backward (later node →
+  earlier node). PASS: the curved preview is
+  dashed orange with a warning arrow while over
+  the target — the reachability check recognises
+  that target → … → source already exists. The
+  committed cycle edge matches the preview.
+- [ ] **F20c** Shift-drag and release in empty
+  canvas (no node under cursor). PASS: the grey
+  straight-line preview disappears and nothing
+  happens — no edge, no new node.
+- [ ] **F20d** Begin a plain drag from a port (no
+  Shift). While the mouse remains stationary,
+  press and hold Shift. PASS: without any mouse
+  movement the ghost "New State" card disappears
+  and the preview collapses to the grey line (or
+  curved bezier if the cursor is already over a
+  target). Release Shift — the ghost card
+  returns. Release the mouse with Shift held to
+  create an edge, or without Shift to create a
+  node.
 - [ ] **F21** Double-click a node, edit its name in
   the properties panel. PASS: the node label
   updates on the SVG canvas immediately (changes
@@ -463,14 +515,14 @@ on. Run these in order.
   removed from the canvas.
 - [ ] **F26** Click "Zoom +" and "Zoom -" in
   toolbar. PASS: canvas zooms in and out smoothly.
-  Click "Fit". PASS: canvas adjusts to show all
-  nodes.
+  Click "Show All". PASS: canvas adjusts to
+  show all nodes.
 - [ ] **F27** Edit a node name via the properties
   panel, wait 1 second for auto-save. Navigate
   away and return to the designer. PASS: all
   nodes, edges, fields, and positions persist.
 - [ ] **F28** Navigate to
-  `flow/detail.html?flowId=nonexistent`. PASS:
+  `flows/detail.html?flowId=nonexistent`. PASS:
   page handles gracefully — shows error state,
   no unhandled JS exception.
 

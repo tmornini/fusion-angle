@@ -58,8 +58,8 @@ protocol locally, but testing is HTTP-only.
   always use `sourceDir` when present -- both
   `compose.ts` and `navigateTo()` resolve output
   directory as `sourceDir || pageName`. This means a
-  page at `web-app/flow/detail.html` produces output
-  at `flow/detail.html`, and `navigateTo('account')`
+  page at `web-app/flows/detail.html` produces output
+  at `flows/detail.html`, and `navigateTo('account')`
   generates `../organization/index.html` because
   account's `sourceDir` is `'organization'`. The
   `sourceFile` property enables named files (e.g.,
@@ -95,7 +95,7 @@ Page folders contain `index.ts` and `index.html` by
 default. When `sourceFile` is set in `PAGE_REGISTRY`,
 the page uses `{sourceFile}.ts` and
 `{sourceFile}.html` instead (e.g.,
-`flow/detail.ts` + `flow/detail.html`). Each page
+`flows/detail.ts` + `flows/detail.html`). Each page
 module exports:
 - `init(): Promise<void>` — fetches data, populates DOM placeholders, binds event listeners
 
@@ -248,7 +248,7 @@ web-app/
   workbox/                  # Work order inbox + detail
   ideas/                    # Ideas list + detail, create, convert (named files)
   projects/                 # Projects list + detail (named files)
-  flow/                     # Flow list + detail (detail.ts/detail.html)
+  flows/                    # Flow list + detail (detail.ts/detail.html)
   organization/             # Account overview, users, teams, activity-feed, onboarding (named files)
   profile/                  # Profile settings
   settings/                 # Company settings

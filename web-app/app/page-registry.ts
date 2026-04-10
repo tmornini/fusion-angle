@@ -72,20 +72,20 @@ export const PAGE_REGISTRY: Record<
         icon: 'folderKanban',
         searchable: false,
     },
-    flow: {
+    flows: {
         title: 'Flows',
         layout: 'sidebar',
-        sourceDir: 'flow',
+        sourceDir: 'flows',
         sourceFile: 'index',
         icon: 'gitBranch',
         keywords:
             'flow, process,'
             + ' state machine',
     },
-    'flow-detail': {
+    'flows-detail': {
         title: 'Flow Designer',
         layout: 'sidebar',
-        sourceDir: 'flow',
+        sourceDir: 'flows',
         sourceFile: 'detail',
         icon: 'gitBranch',
         searchable: false,

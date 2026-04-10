@@ -306,7 +306,7 @@ export class FlowDesignerPresenter {
         return {
             x: node.positionX,
             y: node.positionY,
-            isDraggable: !node.isStart,
+            isDraggable: true,
         };
     }
 
@@ -1477,24 +1477,30 @@ class="wf-toolbar">
     trusted(
         this.#state.isLocked
             ? ' disabled' : '',
-    )}>Auto Layout</button>
-<button class="btn btn-ghost btn-sm"
-    data-action="fit">Fit</button>
+    )}><span class="wf-btn-stack"
+    >Auto<br>Layout</span></button>
 </div>
 <div class="wf-toolbar-spacer"></div>
 <div class="wf-toolbar-group">
 <button class="btn btn-ghost btn-sm"
     data-action="zoom-out"
-    >Zoom \u2212</button>
+    ><span class="wf-btn-stack"
+    >Zoom<br>\u2212</span></button>
+<button class="btn btn-ghost btn-sm"
+    data-action="fit"
+    ><span class="wf-btn-stack"
+    >Show<br>All</span></button>
 <button class="btn btn-ghost btn-sm"
     data-action="zoom-in"
-    >Zoom +</button>
+    ><span class="wf-btn-stack"
+    >Zoom<br>+</span></button>
 </div>
 <div class="wf-toolbar-spacer"></div>
 <div class="wf-toolbar-group">
 <button class="btn btn-ghost btn-sm"
     data-action="copy-mermaid"
-    >Copy Mermaid</button>
+    ><span class="wf-btn-stack"
+    >Copy<br>Mermaid</span></button>
 <button class="btn btn-ghost btn-sm"
     data-action="export-zip"
     >Export</button>

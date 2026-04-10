@@ -222,7 +222,7 @@ function bindBackButton(): void {
                             currentProjectId,
                     },
                 )
-                : navigateTo('flow'),
+                : navigateTo('flows'),
         );
 }
 
@@ -740,7 +740,7 @@ export async function init(
     currentProjectId =
         params?.projectId;
     if (!flowId) {
-        navigateTo('flow');
+        navigateTo('flows');
         return;
     }
     const container = $(

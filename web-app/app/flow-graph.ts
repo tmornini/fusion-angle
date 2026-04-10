@@ -35,10 +35,12 @@ const COMPLETE_INNER_STROKE = 1.5;
 const PORT_RADIUS = 5;
 const PORT_STROKE = 2;
 
-const NODE_LABEL_Y = 22;
-const NODE_LABEL_FONT = 14;
-const NODE_META_Y = 40;
+const NODE_LABEL_Y = 26;
+const NODE_LABEL_FONT = 13;
+const NODE_META_Y = 45;
 const NODE_META_FONT = 11;
+const NODE_MAX_CHARS = 18;
+const LABEL_MAX_WIDTH = 140;
 
 const EDGE_STROKE = 2;
 const HIT_TARGET_WIDTH = 12;
@@ -335,6 +337,16 @@ function buildGrid(
         + ' fill="url(#wf-grid)"/>';
 }
 
+function truncateLabel(
+    text: string,
+    maxChars: number,
+): string {
+    return text.length > maxChars
+        ? text.slice(0, maxChars - 1)
+            + '\u2026'
+        : text;
+}
+
 function buildNode(
     node: GraphNode,
     isSelected: boolean,
@@ -399,7 +411,11 @@ function buildNode(
                 + (node.fields.length !== 1
                     ? 's' : '');
 
-    const nameEsc = escapeForHtml(node.name);
+    const nameEsc = escapeForHtml(
+        truncateLabel(
+            node.name, NODE_MAX_CHARS,
+        ),
+    );
     inner += '<text'
         + ` x="${halfW}"`
         + ` y="${NODE_LABEL_Y}"`
@@ -600,13 +616,23 @@ function buildEdge(
     const mid = bezierAt(pathD, labelT);
     const midX = mid.x;
     const midY = mid.y;
+    const edgeMaxChars = Math.floor(
+        (LABEL_MAX_WIDTH - LABEL_PADDING)
+        / LABEL_CHAR_WIDTH,
+    );
+    const truncEdge = truncateLabel(
+        edge.name, edgeMaxChars,
+    );
     const labelEsc =
-        escapeForHtml(edge.name);
-    const labelLen = edge.name.length;
-    const labelW = Math.max(
-        labelLen * LABEL_CHAR_WIDTH
-            + LABEL_PADDING,
-        LABEL_MIN_WIDTH,
+        escapeForHtml(truncEdge);
+    const labelLen = truncEdge.length;
+    const labelW = Math.min(
+        Math.max(
+            labelLen * LABEL_CHAR_WIDTH
+                + LABEL_PADDING,
+            LABEL_MIN_WIDTH,
+        ),
+        LABEL_MAX_WIDTH,
     );
 
     const labelBg = '<rect'
@@ -856,9 +882,19 @@ export function buildGraphSvg(
             selection.kind === 'node'
             && node.id
                 === selection.nodeId;
+        const isSpecial =
+            node.isStart
+            || node.isComplete;
+        const hasEdges = isSpecial
+            && edges.some(
+                e =>
+                    e.fromNodeId
+                        === node.id
+                    || e.toNodeId
+                        === node.id,
+            );
         const showPort = !isLocked
-            && !node.isStart
-            && !node.isComplete;
+            && (!isSpecial || !hasEdges);
         const portPos = showPort
             ? computePortPos(
                 node, edges, nodeMap,

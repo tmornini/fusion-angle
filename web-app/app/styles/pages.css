@@ -908,6 +908,21 @@
   flex: 1;
 }
 
+.wf-toolbar .btn {
+  border: 1px solid hsl(var(--border));
+}
+.wf-toolbar .btn:hover {
+  border-color: transparent;
+}
+
+.wf-btn-stack {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.1;
+  font-size: 0.6875rem;
+}
+
 .wf-canvas-area {
   position: relative;
   flex: 1;
