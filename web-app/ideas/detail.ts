@@ -4,12 +4,14 @@ import {
 } from '../app/dom';
 import { setHtml } from '../app/safe-html';
 import { showToast } from '../app/toast';
+import { log } from '../app/logger';
 import {
     buildSkeleton,
     withLoadingState,
 } from '../app/loading-states';
 import {
     navigateTo,
+    trimStrings,
     initDialog, closeDialog,
 } from '../app/core';
 import {
@@ -21,37 +23,32 @@ import {
     IdeaPresenter,
 } from '../app/presenters';
 
-let editEscapeHandler:
-    ((e: KeyboardEvent) => void) | null
-    = null;
+const escapeController =
+    { current: new AbortController() };
 
 function bindIdeaEvents(
     idea: Idea,
-    ideaId: string,
     isEditing: boolean,
 ): void {
-    if (editEscapeHandler) {
-        document.removeEventListener(
-            'keydown',
-            editEscapeHandler,
-        );
-        editEscapeHandler = null;
-    }
+    escapeController.current.abort();
+    escapeController.current =
+        new AbortController();
     if (isEditing) {
-        editEscapeHandler = (
-            e: KeyboardEvent,
-        ) => {
-            if (e.key === 'Escape') {
-                e.preventDefault();
-                $(
-                    '#idea-cancel-btn',
-                    document,
-                )?.click();
-            }
-        };
         document.addEventListener(
             'keydown',
-            editEscapeHandler,
+            (e: KeyboardEvent) => {
+                if (e.key === 'Escape') {
+                    e.preventDefault();
+                    $(
+                        '#idea-cancel-btn',
+                        document,
+                    )?.click();
+                }
+            },
+            {
+                signal: escapeController
+                    .current.signal,
+            },
         );
         const saveSel = '#idea-save-btn';
         bindEnterToClick(
@@ -68,7 +65,7 @@ function bindIdeaEvents(
         ?.addEventListener(
             'click',
             () => mutateIdeaPage(
-                idea, ideaId, true,
+                idea, true,
             ),
         );
 
@@ -76,7 +73,7 @@ function bindIdeaEvents(
         ?.addEventListener(
             'click',
             () => mutateIdeaPage(
-                idea, ideaId, false,
+                idea, false,
             ),
         );
 
@@ -89,14 +86,14 @@ function bindIdeaEvents(
                         '#idea-edit-title',
                         document,
                     )!.value;
-                const description =
-                    $textarea(
-                        '#idea-edit-target-users',
-                        document,
-                    )!.value;
                 const problemStatement =
                     $textarea(
                         '#idea-edit-problem',
+                        document,
+                    )!.value;
+                const targetUsers =
+                    $input(
+                        '#idea-edit-target',
                         document,
                     )!.value;
                 const proposedSolution =
@@ -116,19 +113,28 @@ function bindIdeaEvents(
                     )!.value;
 
                 try {
-                    await putIdea(ideaId, {
-                        title,
-                        description,
-                        problem_statement:
-                            problemStatement,
-                        proposed_solution:
-                            proposedSolution,
-                        expected_outcome:
-                            expectedOutcome,
-                        success_metrics:
-                            successMetrics,
-                    });
-                } catch {
+                    await putIdea(
+                        idea.id,
+                        trimStrings({
+                            title,
+                            problem_statement:
+                                problemStatement,
+                            target_users:
+                                targetUsers,
+                            proposed_solution:
+                                proposedSolution,
+                            expected_outcome:
+                                expectedOutcome,
+                            success_metrics:
+                                successMetrics,
+                        }),
+                    );
+                } catch (err) {
+                    log.error(
+                        'putIdea failed',
+                        'ideas',
+                        err,
+                    );
                     showToast(
                         'Failed to save'
                         + ' idea',
@@ -142,25 +148,26 @@ function bindIdeaEvents(
                 );
                 const updated =
                     await getIdeaDetail(
-                        ideaId,
+                        idea.id,
                     );
                 mutateIdeaPage(
-                    updated,
-                    ideaId,
-                    false,
+                    updated, false,
                 );
             },
         );
 
     if (idea.isReviewable()) {
-        bindApprovalEvents(ideaId);
+        bindApprovalEvents(idea.id);
     }
     $('#idea-convert-btn', document)
         ?.addEventListener(
             'click',
             () => navigateTo(
                 'idea-convert',
-                { ideaId },
+                {
+                    ideaId: idea.id,
+                    from: 'detail',
+                },
             ),
         );
     $(
@@ -170,10 +177,15 @@ function bindIdeaEvents(
         'click',
         async () => {
             try {
-                await putIdea(ideaId, {
+                await putIdea(idea.id, {
                     status: 'in-review',
                 });
-            } catch {
+            } catch (err) {
+                log.error(
+                    'putIdea failed',
+                    'ideas',
+                    err,
+                );
                 showToast(
                     'Failed to submit',
                     'error',
@@ -184,14 +196,7 @@ function bindIdeaEvents(
                 'Submitted for review',
                 'success',
             );
-            const updated =
-                await getIdeaDetail(
-                    ideaId,
-                );
-            mutateIdeaPage(
-                updated, ideaId,
-                false,
-            );
+            navigateTo('ideas');
         },
     );
 }
@@ -210,7 +215,12 @@ function bindApprovalEvents(
                     ideaId,
                     { status: 'approved' },
                 );
-            } catch {
+            } catch (err) {
+                log.error(
+                    'putIdea failed',
+                    'ideas',
+                    err,
+                );
                 showToast(
                     'Failed to approve',
                     'error',
@@ -241,7 +251,12 @@ function bindApprovalEvents(
                     ideaId,
                     { status: 'sent-back' },
                 );
-            } catch {
+            } catch (err) {
+                log.error(
+                    'putIdea failed',
+                    'ideas',
+                    err,
+                );
                 showToast(
                     'Failed to send back',
                     'error',
@@ -260,33 +275,10 @@ function bindApprovalEvents(
         },
     );
 
-    initDialog(
-        'approval-clarify',
-        'approval-clarify-btn',
-    );
-    $(
-        '#approval-clarify-confirm',
-        document,
-    )?.addEventListener(
-        'click',
-        () => {
-            showToast(
-                'Clarification'
-                + ' requested',
-                'info',
-            );
-            closeDialog(
-                'approval-clarify',
-            );
-        },
-    );
-
-
 }
 
 function mutateIdeaPage(
     idea: Idea,
-    ideaId: string,
     isEditing: boolean,
 ): void {
     const container = $(
@@ -298,12 +290,10 @@ function mutateIdeaPage(
     setHtml(
         container,
         presenter.buildDetailView(
-            ideaId, isEditing,
+            idea.id, isEditing,
         ),
     );
-    bindIdeaEvents(
-        idea, ideaId, isEditing,
-    );
+    bindIdeaEvents(idea, isEditing);
 }
 
 export async function init(
@@ -325,5 +315,5 @@ export async function init(
     );
     if (!idea) return;
 
-    mutateIdeaPage(idea, ideaId, false);
+    mutateIdeaPage(idea, false);
 }

@@ -2,6 +2,9 @@ const INDICATOR_HEIGHT = 3;
 const INDICATOR_COLOR =
     'hsl(var(--primary))';
 const DRAGGING_OPACITY = '0.4';
+const FIRST_POSITION = 1;
+const POSITION_GAP = 1;
+const FALLBACK_POSITION = '0';
 
 export function initDragReorder(
     container: HTMLElement,
@@ -27,7 +30,7 @@ export function initDragReorder(
         ];
     }
 
-    function createIndicator():
+    function buildIndicator():
         HTMLElement {
         const el =
             document.createElement('div');
@@ -41,7 +44,7 @@ export function initDragReorder(
         return el;
     }
 
-    function removeIndicator(): void {
+    function clearIndicator(): void {
         indicator?.remove();
         indicator = null;
     }
@@ -105,11 +108,11 @@ export function initDragReorder(
             e.preventDefault();
             e.dataTransfer!.dropEffect =
                 'move';
-            removeIndicator();
+            clearIndicator();
             const idx = dropIndex(
                 e.clientY,
             );
-            indicator = createIndicator();
+            indicator = buildIndicator();
             const items = cards();
             if (idx < items.length) {
                 container.insertBefore(
@@ -135,7 +138,7 @@ export function initDragReorder(
                         : null,
                 )
             ) {
-                removeIndicator();
+                clearIndicator();
             }
         },
     );
@@ -145,7 +148,7 @@ export function initDragReorder(
         (e) => {
             e.preventDefault();
             if (!dragId) return;
-            removeIndicator();
+            clearIndicator();
             const items = cards();
             const idx = dropIndex(
                 e.clientY,
@@ -154,21 +157,22 @@ export function initDragReorder(
                 c => parseFloat(
                     c.getAttribute(
                         'data-position',
-                    ) ?? '0',
+                    ) ?? FALLBACK_POSITION,
                 ),
             );
             let newPos: number;
             if (items.length === 0) {
-                newPos = 1;
+                newPos = FIRST_POSITION;
             } else if (idx === 0) {
-                newPos = positions[0]! - 1;
+                newPos = positions[0]!
+                    - POSITION_GAP;
             } else if (
                 idx >= items.length
             ) {
                 newPos =
                     positions[
                         positions.length - 1
-                    ]! + 1;
+                    ]! + POSITION_GAP;
             } else {
                 newPos = (
                     positions[idx - 1]!
@@ -187,7 +191,7 @@ export function initDragReorder(
     container.addEventListener(
         'dragend',
         () => {
-            removeIndicator();
+            clearIndicator();
             dragId = null;
             for (const c of cards()) {
                 c.style.opacity = '';

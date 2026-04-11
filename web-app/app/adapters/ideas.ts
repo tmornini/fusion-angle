@@ -8,11 +8,16 @@ import {
     ideaIsVisible,
 } from '../../../api/types';
 import {
-    buildUserMap,
+    getUserMap,
     userName,
 } from './helpers';
 
-export { Idea } from '../../../api/types';
+export {
+    Idea,
+    type IdeaStatus,
+    isIdeaStatus,
+    IDEA_STATUS_CONFIG,
+} from '../../../api/types';
 
 export async function getIdeas(
 ): Promise<Idea[]> {
@@ -20,7 +25,7 @@ export async function getIdeas(
         ideas, userMap, submissions,
     ] = await Promise.all([
         GET<IdeaEntity[]>('ideas'),
-        buildUserMap(),
+        getUserMap(),
         GET<IdeaSubmissionEntity[]>(
             'idea-submissions',
         ),
@@ -59,7 +64,7 @@ export async function getIdeaDetail(
         GET<IdeaEntity>(
             `ideas/${ideaId}`,
         ),
-        buildUserMap(),
+        getUserMap(),
         GET<IdeaSubmissionEntity[]>(
             'idea-submissions',
         ),
@@ -89,7 +94,7 @@ export async function getIdeaForConversion(
         GET<IdeaEntity>(
             `ideas/${ideaId}`,
         ),
-        buildUserMap(),
+        getUserMap(),
         GET<IdeaSubmissionEntity[]>(
             'idea-submissions',
         ),

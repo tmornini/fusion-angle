@@ -1,4 +1,5 @@
 import { $ } from './dom';
+import { log } from './logger';
 import { showToast } from './toast';
 
 const SIDEBAR_USER_NAME_IDS = [
@@ -11,7 +12,7 @@ const SIDEBAR_USER_COMPANY_IDS = [
     'mobile-sidebar-user-company',
 ] as const;
 
-async function fetchSidebarUser(
+async function getSidebarUser(
 ): Promise<{
     name: string;
     company: string;
@@ -34,8 +35,13 @@ export async function mutateSidebarUser(
     };
     try {
         data =
-            await fetchSidebarUser();
-    } catch {
+            await getSidebarUser();
+    } catch (err) {
+        log.error(
+            'getSidebarUser failed',
+            'sidebar-user',
+            err,
+        );
         showToast(
             'Sidebar user info'
             + ' load failed',

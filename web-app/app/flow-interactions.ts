@@ -84,7 +84,7 @@ const ZOOM_STEP = 0.1;
 const DBLCLICK_MS = 400;
 const MIN_DRAG_DISTANCE = 20;
 
-export function createInteractionState(
+export function buildInteractionState(
     viewBoxW: number,
     viewBoxH: number,
 ): InteractionState {
@@ -122,7 +122,7 @@ function screenToSvg(
     return { x: svgPt.x, y: svgPt.y };
 }
 
-function findAncestorAttr(
+function ancestorAttr(
     el: Element,
     attrName: string,
 ): string | null {
@@ -150,7 +150,7 @@ function handlePointerDown(
         svg, e.clientX, e.clientY,
     );
 
-    const nodeId = findAncestorAttr(
+    const nodeId = ancestorAttr(
         target, 'data-node-id',
     );
     if (nodeId) {
@@ -177,7 +177,7 @@ function handlePointerDown(
             onUpdate();
             return;
         }
-        const isPort = findAncestorAttr(
+        const isPort = ancestorAttr(
             target, 'data-connect-port',
         ) !== null;
         if (isPort || !pos.isDraggable) {
@@ -214,7 +214,7 @@ function handlePointerDown(
         return;
     }
 
-    const edgeId = findAncestorAttr(
+    const edgeId = ancestorAttr(
         target, 'data-edge-id',
     );
     if (edgeId) {
@@ -289,7 +289,7 @@ function handlePointerMove(
                 e.clientX, e.clientY,
             );
         if (hit instanceof Element) {
-            const nid = findAncestorAttr(
+            const nid = ancestorAttr(
                 hit, 'data-node-id',
             );
             if (
@@ -393,7 +393,7 @@ function handlePointerUp(
                 target instanceof Element
             ) {
                 const toNodeId =
-                    findAncestorAttr(
+                    ancestorAttr(
                         target,
                         'data-node-id',
                     );
@@ -420,8 +420,22 @@ function handlePointerUp(
                 const dist = Math.hypot(
                     dx, dy,
                 );
+                const dropHit =
+                    document
+                        .elementFromPoint(
+                            e.clientX,
+                            e.clientY,
+                        );
+                const overNode =
+                    dropHit
+                        instanceof Element
+                    && ancestorAttr(
+                        dropHit,
+                        'data-node-id',
+                    ) !== null;
                 if (
                     dist > MIN_DRAG_DISTANCE
+                    && !overNode
                 ) {
                     onNodeCreated(
                         fromId, toX, toY,
@@ -565,42 +579,54 @@ export function bindInteractions(
 
 export function zoomIn(
     state: InteractionState,
+    focalPt?: {
+        x: number;
+        y: number;
+    } | null,
 ): void {
     const prevZoom = state.zoom;
     state.zoom = Math.min(
         MAX_ZOOM, prevZoom + ZOOM_STEP,
     );
     const ratio = prevZoom / state.zoom;
-    const cx =
-        state.viewBox.x + state.viewBox.w / 2;
-    const cy =
-        state.viewBox.y + state.viewBox.h / 2;
+    const cx = focalPt?.x
+        ?? state.viewBox.x
+            + state.viewBox.w / 2;
+    const cy = focalPt?.y
+        ?? state.viewBox.y
+            + state.viewBox.h / 2;
     state.viewBox.w *= ratio;
     state.viewBox.h *= ratio;
     state.viewBox.x =
-        cx - state.viewBox.w / 2;
+        cx - (cx - state.viewBox.x) * ratio;
     state.viewBox.y =
-        cy - state.viewBox.h / 2;
+        cy - (cy - state.viewBox.y) * ratio;
 }
 
 export function zoomOut(
     state: InteractionState,
+    focalPt?: {
+        x: number;
+        y: number;
+    } | null,
 ): void {
     const prevZoom = state.zoom;
     state.zoom = Math.max(
         MIN_ZOOM, prevZoom - ZOOM_STEP,
     );
     const ratio = prevZoom / state.zoom;
-    const cx =
-        state.viewBox.x + state.viewBox.w / 2;
-    const cy =
-        state.viewBox.y + state.viewBox.h / 2;
+    const cx = focalPt?.x
+        ?? state.viewBox.x
+            + state.viewBox.w / 2;
+    const cy = focalPt?.y
+        ?? state.viewBox.y
+            + state.viewBox.h / 2;
     state.viewBox.w *= ratio;
     state.viewBox.h *= ratio;
     state.viewBox.x =
-        cx - state.viewBox.w / 2;
+        cx - (cx - state.viewBox.x) * ratio;
     state.viewBox.y =
-        cy - state.viewBox.h / 2;
+        cy - (cy - state.viewBox.y) * ratio;
 }
 
 export function zoomToFit(
@@ -615,8 +641,6 @@ export function zoomToFit(
     if (nodePositions.length === 0) return;
 
     const PAD = 70;
-    const NODE_W = 140;
-    const NODE_H = 56;
 
     let minX = Infinity;
     let minY = Infinity;
@@ -626,11 +650,11 @@ export function zoomToFit(
     for (const pos of nodePositions) {
         if (pos.x < minX) minX = pos.x;
         if (pos.y < minY) minY = pos.y;
-        if (pos.x + NODE_W > maxX) {
-            maxX = pos.x + NODE_W;
+        if (pos.x + NODE_WIDTH > maxX) {
+            maxX = pos.x + NODE_WIDTH;
         }
-        if (pos.y + NODE_H > maxY) {
-            maxY = pos.y + NODE_H;
+        if (pos.y + NODE_HEIGHT > maxY) {
+            maxY = pos.y + NODE_HEIGHT;
         }
     }
 

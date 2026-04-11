@@ -7,7 +7,7 @@ import {
     iconEdit,
     iconArrowRight,
 } from '../icons';
-import type { Activity } from '../../../api/types';
+import type { Activity } from '../adapters';
 
 type ActivityType =
     | 'idea_created'

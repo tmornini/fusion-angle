@@ -16,11 +16,6 @@ export const VERTICAL_GAP = 180;
 export const START_X = 0;
 export const START_Y = 0;
 
-const GRID_MAX_W = 6000;
-const GRID_MAX_H = 4000;
-const HALF_MAX_W = GRID_MAX_W / 2;
-const HALF_MAX_H = GRID_MAX_H / 2;
-
 export function buildAdjacency(
     edges: LayoutEdge[],
 ): Map<string, string[]> {
@@ -203,20 +198,4 @@ export function computeLayout(
     }
 
     return positions;
-}
-
-export function clampNodePosition(
-    x: number,
-    y: number,
-): { x: number; y: number } {
-    return {
-        x: Math.max(
-            -HALF_MAX_W,
-            Math.min(HALF_MAX_W, x),
-        ),
-        y: Math.max(
-            -HALF_MAX_H,
-            Math.min(HALF_MAX_H, y),
-        ),
-    };
 }

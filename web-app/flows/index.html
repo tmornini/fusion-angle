@@ -33,13 +33,18 @@
                 <h3 class="dialog-title">
                     Import Flow
                 </h3>
-                <p class="dialog-description">
+                <p
+                    id="import-description"
+                    class="dialog-description"
+                >
                     Select a project and
                     choose a .mmd or
                     .zip file
                 </p>
             </div>
-            <div>
+            <div
+                id="import-project-section"
+            >
                 <label
                     class="label mb-1"
                     for="import-project"
@@ -54,6 +59,21 @@
                     class="btn btn-outline"
                     id="import-cancel"
                 >Cancel</button>
+                <button
+                    class="btn btn-primary
+                        hidden"
+                    id="import-overwrite"
+                >Overwrite</button>
+                <button
+                    class="btn btn-outline
+                        hidden"
+                    id="import-create-new"
+                >Create New</button>
+                <button
+                    class="btn btn-primary
+                        hidden"
+                    id="import-create"
+                >Create</button>
                 <button
                     class="btn btn-primary"
                     id="import-choose"

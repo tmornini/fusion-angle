@@ -18,21 +18,53 @@ import {
     jsonObjectField,
 } from '../../../api/types';
 import {
-    buildUserMap,
+    getUserMap,
     userName,
     parseJson,
 } from './helpers';
 
 /* ── Types ───────────────── */
 
-export interface WorkboxItem {
-    id: string;
-    displayId: string;
-    flowName: string;
-    currentStateName: string;
-    lastTransitionerName: string;
-    lastTransitionedAt: string;
-    isCompleted: boolean;
+export class WorkboxItem {
+    readonly id: string;
+    readonly displayId: string;
+    readonly flowName: string;
+    readonly lastTransitionedAt: string;
+    readonly #stateName: string;
+    readonly #transitionerName: string;
+    readonly #completed: boolean;
+
+    constructor(data: {
+        id: string;
+        displayId: string;
+        flowName: string;
+        stateName: string;
+        transitionerName: string;
+        lastTransitionedAt: string;
+        completed: boolean;
+    }) {
+        this.id = data.id;
+        this.displayId = data.displayId;
+        this.flowName = data.flowName;
+        this.#stateName = data.stateName;
+        this.#transitionerName =
+            data.transitionerName;
+        this.lastTransitionedAt =
+            data.lastTransitionedAt;
+        this.#completed = data.completed;
+    }
+
+    isCompleted(): boolean {
+        return this.#completed;
+    }
+
+    currentStateName(): string {
+        return this.#stateName;
+    }
+
+    lastTransitionerName(): string {
+        return this.#transitionerName;
+    }
 }
 
 interface TransitionValues {
@@ -52,20 +84,75 @@ export interface HistoryEntry {
     fieldValues: HistoryFieldValue[];
 }
 
-export interface WorkboxDetail {
-    id: string;
-    displayId: string;
-    flowName: string;
-    currentNode: GraphNode;
-    outgoingEdges: GraphEdge[];
-    body: Record<
+export type ClaimStatus =
+    | { kind: 'unclaimed' }
+    | {
+        kind: 'claimed';
+        claimId: string;
+        byCurrentUser: boolean;
+    };
+
+export class WorkboxDetail {
+    readonly id: string;
+    readonly displayId: string;
+    readonly flowName: string;
+    readonly outgoingEdges:
+        readonly GraphEdge[];
+    readonly body: Record<
         string,
         Record<string, string>
     >;
-    history: HistoryEntry[];
-    isClaimed: boolean;
-    claimedByCurrentUser: boolean;
-    claimId: string;
+    readonly history:
+        readonly HistoryEntry[];
+    readonly #currentNode: GraphNode;
+    readonly #claim: ClaimStatus;
+
+    constructor(data: {
+        id: string;
+        displayId: string;
+        flowName: string;
+        currentNode: GraphNode;
+        outgoingEdges: GraphEdge[];
+        body: Record<
+            string,
+            Record<string, string>
+        >;
+        history: HistoryEntry[];
+        claim: ClaimStatus;
+    }) {
+        this.id = data.id;
+        this.displayId = data.displayId;
+        this.flowName = data.flowName;
+        this.#currentNode =
+            data.currentNode;
+        this.outgoingEdges =
+            data.outgoingEdges;
+        this.body = data.body;
+        this.history = data.history;
+        this.#claim = data.claim;
+    }
+
+    isComplete(): boolean {
+        return this.#currentNode
+            .isComplete;
+    }
+
+    currentNodeName(): string {
+        return this.#currentNode.name;
+    }
+
+    currentNodeId(): string {
+        return this.#currentNode.id;
+    }
+
+    renderableFields():
+        readonly GraphField[] {
+        return this.#currentNode.fields;
+    }
+
+    claimStatus(): ClaimStatus {
+        return this.#claim;
+    }
 }
 
 /* ── Helpers ─────────────── */
@@ -75,14 +162,6 @@ function parseFlowGraph(
 ): WorkOrderFlowGraph {
     return parseJson<WorkOrderFlowGraph>(
         raw,
-        {
-            flowId: '',
-            name: '',
-            description: '',
-            lockTimeout: 28800,
-            nodes: [],
-            edges: [],
-        },
     );
 }
 
@@ -91,7 +170,6 @@ function parseValues(
 ): TransitionValues {
     return parseJson<TransitionValues>(
         raw,
-        {},
     );
 }
 
@@ -99,17 +177,23 @@ function nodeName(
     nodes: GraphNode[],
     nodeId: string,
 ): string {
-    return nodes.find(
+    const node = nodes.find(
         n => n.id === nodeId,
-    )?.name ?? '';
+    );
+    if (!node) {
+        throw new Error(
+            'Node not found: ' + nodeId,
+        );
+    }
+    return node.name;
 }
 
 function currentNodeId(
     transitions:
         WorkOrderTransitionEntity[],
-): string {
-    const last = transitions.at(-1);
-    return last?.to_node_id ?? '';
+): string | undefined {
+    return transitions.at(-1)
+        ?.to_node_id;
 }
 
 function isExpiredClaim(
@@ -160,7 +244,7 @@ export async function getWorkboxItems(
         GET<WorkOrderClaimEntity[]>(
             'work-order-claims',
         ),
-        buildUserMap(),
+        getUserMap(),
     ]);
 
     const transitionsByWo = Map.groupBy(
@@ -216,13 +300,13 @@ export async function getWorkboxItems(
         const last =
             woTransitions.at(-1);
 
-        items.push({
+        items.push(new WorkboxItem({
             id: wo.id,
             displayId: wo.display_id,
             flowName: fg.name,
-            currentStateName:
+            stateName:
                 curNode?.name ?? '',
-            lastTransitionerName:
+            transitionerName:
                 userName(
                     userMap,
                     last?.user_id,
@@ -230,8 +314,8 @@ export async function getWorkboxItems(
             lastTransitionedAt:
                 last?.transitioned_at
                     ?? wo.created_at,
-            isCompleted,
-        });
+            completed: isCompleted,
+        }));
     }
 
     return items;
@@ -241,7 +325,7 @@ export async function getWorkboxArchive(
 ): Promise<WorkboxItem[]> {
     const items = await getWorkboxItems();
     return items.filter(
-        i => i.isCompleted,
+        i => i.isCompleted(),
     );
 }
 
@@ -249,7 +333,7 @@ export async function getWorkboxActive(
 ): Promise<WorkboxItem[]> {
     const items = await getWorkboxItems();
     return items.filter(
-        i => !i.isCompleted,
+        i => !i.isCompleted(),
     );
 }
 
@@ -270,7 +354,7 @@ export async function getWorkboxItem(
         GET<WorkOrderClaimEntity[]>(
             'work-order-claims',
         ),
-        buildUserMap(),
+        getUserMap(),
     ]);
 
     const fg = parseFlowGraph(
@@ -378,7 +462,18 @@ export async function getWorkboxItem(
             ),
     );
 
-    return {
+    const claimData: ClaimStatus =
+        claim !== undefined
+            ? {
+                kind: 'claimed',
+                claimId: claim.id,
+                byCurrentUser:
+                    claim.user_id
+                        === currentUserId,
+            }
+            : { kind: 'unclaimed' };
+
+    return new WorkboxDetail({
         id: wo.id,
         displayId: wo.display_id,
         flowName: fg.name,
@@ -386,12 +481,8 @@ export async function getWorkboxItem(
         outgoingEdges: outgoing,
         body,
         history,
-        isClaimed: claim !== undefined,
-        claimedByCurrentUser:
-            claim?.user_id
-                === currentUserId,
-        claimId: claim?.id ?? '',
-    };
+        claim: claimData,
+    });
 }
 
 /* ── Operations ──────────── */
@@ -419,10 +510,7 @@ export async function postWorkOrderCreation(
     const graph = parseJson<{
         nodes: GraphNode[];
         edges: GraphEdge[];
-    }>(
-        flow.graph,
-        { nodes: [], edges: [] },
-    );
+    }>(flow.graph);
 
     const startNode = graph.nodes.find(
         n => n.isStart,
@@ -527,13 +615,21 @@ export async function postWorkOrderCreation(
     return woId;
 }
 
+export interface TransitionContext {
+    workOrderId: string;
+    edgeId: string;
+    values: Record<string, string>;
+    userId: string;
+    currentNodeId: string;
+}
+
 export async function postWorkOrderTransition(
-    workOrderId: string,
-    edgeId: string,
-    values: Record<string, string>,
-    userId: string,
-    currentNodeId: string,
+    ctx: TransitionContext,
 ): Promise<void> {
+    const {
+        workOrderId, edgeId, values,
+        userId, currentNodeId,
+    } = ctx;
     const wo = await GET<WorkOrderEntity>(
         `work-orders/${workOrderId}`,
     );

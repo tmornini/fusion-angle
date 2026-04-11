@@ -360,32 +360,6 @@ export class GaugePresenter {
                     <div style="${
                         dotBase
                         + 'background:'
-                        + 'hsl(var(--primary))'
-                    }"></div>
-                    <span class="${
-                        'text-xs text-muted'
-                    }" style="${
-                        'font-weight:500'
-                    }">${
-                        this.#outerLabel
-                    }</span>
-                </div>
-                <p class="${
-                    'text-2xl font-bold'
-                }">${
-                    this.#outerDisplay
-                }</p>
-            </div>
-            <div style="${cellStyle}">
-                <div class="${
-                    'flex items-center '
-                    + 'justify-center gap-2'
-                }" style="${
-                    'margin-bottom:0.25rem'
-                }">
-                    <div style="${
-                        dotBase
-                        + 'background:'
                         + 'hsl(var(--success))'
                     }"></div>
                     <span class="${
@@ -400,6 +374,32 @@ export class GaugePresenter {
                     'text-2xl font-bold'
                 }">${
                     this.#innerDisplay
+                }</p>
+            </div>
+            <div style="${cellStyle}">
+                <div class="${
+                    'flex items-center '
+                    + 'justify-center gap-2'
+                }" style="${
+                    'margin-bottom:0.25rem'
+                }">
+                    <div style="${
+                        dotBase
+                        + 'background:'
+                        + 'hsl(var(--primary))'
+                    }"></div>
+                    <span class="${
+                        'text-xs text-muted'
+                    }" style="${
+                        'font-weight:500'
+                    }">${
+                        this.#outerLabel
+                    }</span>
+                </div>
+                <p class="${
+                    'text-2xl font-bold'
+                }">${
+                    this.#outerDisplay
                 }</p>
             </div>
         </div>`;

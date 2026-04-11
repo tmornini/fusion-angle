@@ -3,11 +3,13 @@ import {
     postSchemaCreation,
     postBootstrap,
     postMockDataLoad,
-    importSnapshot,
-    exportSnapshot,
+    putSnapshot,
+    getSnapshot,
     hasData,
+    nowUtc,
 } from '../app/adapters';
 import { $ } from '../app/dom';
+import { log } from '../app/logger';
 import {
     html,
     setHtml,
@@ -26,7 +28,6 @@ import {
     iconDatabase,
     iconInfo,
 } from '../app/icons';
-import { nowUtc } from '../../api/types';
 
 const BANNER_ID = 'empty-banner';
 
@@ -107,7 +108,12 @@ export async function init(
         try {
             await deleteSchema();
             await action();
-        } catch {
+        } catch (err) {
+            log.error(
+                'snapshot action failed',
+                'snapshots',
+                err,
+            );
             showToast(
                 'Failed to '
                 + label.toLowerCase()
@@ -290,7 +296,7 @@ export async function init(
     </div>
     `);
 
-    await updateEmptyBanner(root);
+    await mutateEmptyBanner(root);
 
     const wipeBtn =
         document.querySelector<
@@ -353,10 +359,15 @@ export async function init(
                 const text =
                     await file.text();
                 await deleteSchema();
-                await importSnapshot(
+                await putSnapshot(
                     text,
                 );
-            } catch {
+            } catch (err) {
+                log.error(
+                    'putSnapshot failed',
+                    'snapshots',
+                    err,
+                );
                 showToast(
                     'Failed to upload'
                     + ' snapshot. Check'
@@ -379,8 +390,13 @@ export async function init(
             let json: string;
             try {
                 json =
-                    await exportSnapshot();
-            } catch {
+                    await getSnapshot();
+            } catch (err) {
+                log.error(
+                    'getSnapshot failed',
+                    'snapshots',
+                    err,
+                );
                 showToast(
                     'Failed to download'
                     + ' snapshot.',
@@ -451,7 +467,7 @@ export async function init(
     );
 }
 
-async function updateEmptyBanner(
+async function mutateEmptyBanner(
     root: HTMLElement,
 ): Promise<void> {
     const hasExistingData =

@@ -9,24 +9,24 @@ import { showToast } from '../app/toast';
 import {
     buildSkeleton, withLoadingState,
 } from '../app/loading-states';
+import { log } from '../app/logger';
 import {
     iconUsers, iconUserPlus, iconSearch,
     iconChevronRight, iconSend,
 } from '../app/icons';
 import {
-    initDialog, closeDialog, navigateTo,
+    initDialog, closeDialog,
+    navigateTo, trimStrings,
 } from '../app/core';
 import {
     getManagedUsers, putUser,
+    jsonArrayField,
+    jsonObjectField,
+    nowUtc,
 } from '../app/adapters';
 import {
     UserPresenter,
 } from '../app/presenters';
-import {
-    jsonArrayField,
-    jsonObjectField,
-    nowUtc,
-} from '../../api/types';
 
 const DEFAULT_DIM = 50;
 
@@ -724,45 +724,57 @@ export async function init(): Promise<void> {
                 >('#invite-bio')!.value;
             const id = crypto.randomUUID();
             try {
-                await putUser(id, {
-                    first_name: first,
-                    last_name: last,
-                    email,
-                    role,
-                    department: dept,
-                    status: status as
-                        'active'
-                        | 'pending'
-                        | 'deactivated',
-                    availability: avail,
-                    performance_score:
-                        perf,
-                    projects_completed: 0,
-                    current_projects: 0,
-                    strengths:
-                        jsonArrayField([]),
-                    team_dimensions:
-                        jsonObjectField({
-                            driver:
-                                DEFAULT_DIM,
-                            analytical:
-                                DEFAULT_DIM,
-                            expressive:
-                                DEFAULT_DIM,
-                            amiable:
-                                DEFAULT_DIM,
-                        }),
-                    phone,
-                    bio,
-                    last_active: nowUtc(),
-                });
+                await putUser(
+                    id,
+                    trimStrings({
+                        first_name: first,
+                        last_name: last,
+                        email,
+                        role,
+                        department: dept,
+                        status: status as
+                            'active'
+                            | 'pending'
+                            | 'deactivated',
+                        availability: avail,
+                        performance_score:
+                            perf,
+                        projects_completed:
+                            0,
+                        current_projects: 0,
+                        strengths:
+                            jsonArrayField(
+                                [],
+                            ),
+                        team_dimensions:
+                            jsonObjectField({
+                                driver:
+                                    DEFAULT_DIM,
+                                analytical:
+                                    DEFAULT_DIM,
+                                expressive:
+                                    DEFAULT_DIM,
+                                amiable:
+                                    DEFAULT_DIM,
+                            }),
+                        phone,
+                        bio,
+                        last_active:
+                            nowUtc(),
+                    }),
+                );
                 showToast(
                     'User created',
                     'success',
                 );
                 closeDialog('invite');
                 navigateTo('users');
-            } catch {
+            } catch (err) {
+                log.error(
+                    'putUser failed',
+                    'organization',
+                    err,
+                );
                 showToast(
                     'Failed to create'
                     + ' user',

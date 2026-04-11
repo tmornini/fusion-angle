@@ -3,128 +3,64 @@ import {
 } from '../safe-html';
 import {
     iconSparkles, iconArrowLeft,
-    iconArrowRight, iconLightbulb,
-    iconTarget, iconAlertCircle,
-    iconTrendingUp, iconWand,
-    iconCheck,
+    iconLightbulb, iconCheck,
 } from '../icons';
-
-const STEPS = [
-    {
-        id: 1,
-        title: 'The Problem',
-        icon: iconAlertCircle,
-        description:
-            'What challenge are you'
-            + ' trying to solve?',
-    },
-    {
-        id: 2,
-        title: 'The Solution',
-        icon: iconLightbulb,
-        description:
-            'How will you address'
-            + ' this problem?',
-    },
-    {
-        id: 3,
-        title: 'The Impact',
-        icon: iconTrendingUp,
-        description:
-            'What value will this'
-            + ' create?',
-    },
-];
 
 interface FormData {
     title: string;
     problemStatement: string;
+    targetUsers: string;
     proposedSolution: string;
     expectedOutcome: string;
-    targetUsers: string;
     successMetrics: string;
 }
 
 const EMPTY_FORM: FormData = {
     title: '',
     problemStatement: '',
+    targetUsers: '',
     proposedSolution: '',
     expectedOutcome: '',
-    targetUsers: '',
     successMetrics: '',
 };
 
 export class IdeaCreatePresenter {
-    #step = 1;
     #form: FormData = { ...EMPTY_FORM };
-
-    nextStep(): boolean {
-        if (!this.isStepComplete())
-            return false;
-        if (this.#step < STEPS.length) {
-            this.#step++;
-            return true;
-        }
-        return false;
-    }
-
-    prevStep(): boolean {
-        if (this.#step > 1) {
-            this.#step--;
-            return true;
-        }
-        return false;
-    }
-
-    isFirstStep(): boolean {
-        return this.#step === 1;
-    }
-
-    isLastStep(): boolean {
-        return this.#step === STEPS.length;
-    }
 
     syncFields(
         fields: Partial<FormData>,
     ): void {
-        this.#form = {
-            ...this.#form,
-            ...fields,
-        };
+        for (
+            const [k, v] of
+            Object.entries(fields)
+        ) {
+            if (v !== undefined) {
+                this.#form[
+                    k as keyof FormData
+                ] = v.trim();
+            }
+        }
     }
 
     formData(): FormData {
         return { ...this.#form };
     }
 
-    currentStep(): number {
-        return this.#step;
-    }
-
-    isStepComplete(): boolean {
-        switch (this.#step) {
-            case 1:
-                return this.#form
-                    .title.trim() !== ''
-                    && this.#form
-                        .problemStatement
-                        .trim() !== '';
-            case 2:
-                return this.#form
-                    .proposedSolution
-                    .trim() !== '';
-            case 3:
-                return this.#form
-                    .expectedOutcome
-                    .trim() !== '';
-            default:
-                return false;
-        }
+    isFormComplete(): boolean {
+        return this.#form
+            .title !== ''
+            && this.#form
+                .problemStatement
+                !== ''
+            && this.#form
+                .proposedSolution
+                !== ''
+            && this.#form
+                .expectedOutcome
+                !== '';
     }
 
     render(): SafeHtml {
-        const step =
-            STEPS[this.#step - 1]!;
         return html`
     <div class="${
         'flex items-center'
@@ -176,48 +112,25 @@ export class IdeaCreatePresenter {
                 </span>
             </div>
         </div>
-        <button
-            class="${
-                'btn btn-ghost'
-                + ' btn-sm gap-2'
-                + ' text-primary'
-            }">
-            ${iconWand(16, '')}
-            <span
-                class="hidden-mobile">
-                Generate with AI
-            </span>
-            <span
-                class="visible-mobile">
-                AI
-            </span>
-        </button>
-    </div>
-    <div
-        class="flex items-center
-            justify-between mb-8"
-        style="${'overflow-x:auto;'
-            + 'padding-bottom:'
-            + '0.5rem'}">
-        ${this.#buildProgressSteps()}
     </div>
     <div class="card p-6"
         id=${'idea-create'
             + '-step-content'}>
         <div class="mb-6">
-            <h2 class="${
-                'text-2xl'
-                + ' font-display'
-                + ' font-bold'
-                + ' mb-2'
-            }">${
-                step.title
-            }</h2>
-            <p class="text-muted">${
-                step.description
-            }</p>
+            <div class="${
+                'flex items-center gap-3'
+            }">
+                ${iconLightbulb(
+                    24, 'text-primary',
+                )}
+                <h2 class="${
+                    'text-2xl'
+                    + ' font-display'
+                    + ' font-bold'
+                }">Describe Your Idea</h2>
+            </div>
         </div>
-        ${this.#buildStepContent()}
+        ${this.#buildFormFields()}
         <div
             class="flex items-center
                 justify-between gap-3
@@ -234,16 +147,8 @@ export class IdeaCreatePresenter {
                 id=${'idea-create'
                     + '-step-back'}>
                 ${iconArrowLeft(16, '')}
-                ${this.#step === 1
-                    ? 'Cancel'
-                    : 'Back'}
+                Cancel
             </button>
-            <span class="text-sm
-                text-muted">
-                Step
-                ${this.#step}
-                of ${STEPS.length}
-            </span>
             <button
                 class="${
                     'btn btn-hero'
@@ -252,144 +157,18 @@ export class IdeaCreatePresenter {
                 id=${'idea-create'
                     + '-step-next'}
                 ${trusted(
-                    this.isStepComplete()
+                    this.isFormComplete()
                         ? ''
                         : 'disabled',
                 )}>
-                ${this.#step === 3
-                    ? html`${'Submit'
-                        + ' Idea'}
-                        ${iconCheck(16, '')}`
-                    : html`Continue
-                        ${iconArrowRight(
-                            16, '',
-                        )}`}
+                ${'Submit Idea'}
+                ${iconCheck(16, '')}
             </button>
         </div>
     </div>`;
     }
 
-    #buildProgressSteps(): SafeHtml {
-        return html`${STEPS.map(
-            (step, index) => {
-                const isCurrent =
-                    this.#step
-                    === step.id;
-                const isCompleted =
-                    this.#step
-                    > step.id;
-                const bgStyle =
-                    isCompleted
-                        ? 'background:'
-                            + 'hsl(var('
-                            + '--success));'
-                            + 'color:hsl(var('
-                            + '--success'
-                            + '-foreground))'
-                        : isCurrent
-                            ? 'background:'
-                                + 'hsl(var('
-                                + '--primary'
-                                + '));'
-                                + 'color:'
-                                + 'hsl(var('
-                                + '--primary'
-                                + '-foreground'
-                                + '))'
-                            : 'background:'
-                                + 'hsl(var('
-                                + '--muted));'
-                                + 'color:'
-                                + 'hsl(var('
-                                + '--muted'
-                                + '-foreground'
-                                + '))';
-
-                const isLast =
-                    index
-                    >= STEPS.length - 1;
-                const connector = !isLast
-                    ? html`<div
-                        class="${
-                            'hidden-mobile'
-                        }"
-                        style="${'flex:1;'
-                            + 'height:'
-                            + '0.25rem;'
-                            + 'margin:'
-                            + '0 1rem;'
-                            + 'border-radius'
-                            + ':9999px;'
-                            + (isCompleted
-                                ? 'background'
-                                    + ':hsl(var('
-                                    + '--success'
-                                    + '))'
-                                : 'background'
-                                    + ':hsl(var('
-                                    + '--muted'
-                                    + '))'
-                            )}">
-                        </div>`
-                    : html``;
-
-                return html`
-    <div
-        class="flex items-center"
-        style="${'flex-shrink:0'
-            + (isLast
-                ? ''
-                : ';flex:1')}">
-        <div class="flex flex-col
-            items-center">
-            <div style="${'width:3rem;'
-                + 'height:3rem;'
-                + 'border-radius:'
-                + '0.75rem;'
-                + 'display:flex;'
-                + 'align-items:center;'
-                + 'justify-content:'
-                + 'center;'
-                + bgStyle}">
-                ${isCompleted
-                    ? iconCheck(20, '')
-                    : step.icon(20, '')}
-            </div>
-            <span
-                class="mt-2 text-sm
-                    font-medium"
-                style="${'white-space:'
-                    + 'nowrap;'
-                    + 'color:'
-                    + (this.#step
-                        >= step.id
-                        ? 'hsl(var('
-                            + '--foreground'
-                            + '))'
-                        : 'hsl(var('
-                            + '--muted'
-                            + '-foreground'
-                            + '))')}">
-                ${step.title}
-            </span>
-        </div>
-        ${connector}
-    </div>`;
-            },
-        )}`;
-    }
-
-    #buildStepContent(): SafeHtml {
-        if (this.#step === 1) {
-            return this.#buildStep1();
-        }
-        if (this.#step === 2) {
-            return this.#buildStep2();
-        }
-        return this.#buildStep3();
-    }
-
-    #buildStep1(): SafeHtml {
+    #buildFormFields(): SafeHtml {
         return html`
     <div style="${'display:flex;'
         + 'flex-direction:column;'
@@ -458,34 +237,28 @@ export class IdeaCreatePresenter {
                 block font-medium">
                 ${'Who will benefit'
                     + ' from this?'}
-                <span class="text-muted"
-                    style="${
-                        'font-weight:'
-                        + 'normal'}">
-                    (optional)
-                </span>
             </label>
             <input class="input"
                 id=${'idea-create'
                     + '-field-target'}
-                placeholder="${'e.g.,'
-                    + ' Sales team,'
+                placeholder="${
+                    'e.g., Sales'
+                    + ' team,'
                     + ' customers,'
                     + ' operations'
-                    + ' managers'}"
+                    + ' managers'
+                }"
                 value="${
-                    this.#form
-                        .targetUsers
-                }" />
+                    this.#form.targetUsers
+                }"
+            />
+            <p class="text-xs text-muted
+                mt-1">
+                ${'Identify the people'
+                    + ' or teams who will'
+                    + ' use this'}
+            </p>
         </div>
-    </div>`;
-    }
-
-    #buildStep2(): SafeHtml {
-        return html`
-    <div style="${'display:flex;'
-        + 'flex-direction:column;'
-        + 'gap:1.5rem'}">
         <div>
             <label class="label mb-2
                 block font-medium">
@@ -504,7 +277,7 @@ export class IdeaCreatePresenter {
                     + ' process would'
                     + ' you use?'
                 }"
-                rows="7"
+                rows="5"
                 style="resize:none">${
                     this.#form
                         .proposedSolution
@@ -516,47 +289,6 @@ export class IdeaCreatePresenter {
                 best thinking
             </p>
         </div>
-        <div class="p-4 rounded-xl"
-            style="${'background:'
-                + 'hsl(var('
-                + '--primary)/0.05);'
-                + 'border:1px solid'
-                + ' hsl(var('
-                + '--primary)/0.1)'}">
-            <div class="flex items-start
-                gap-3">
-                ${iconTarget(
-                    20,
-                    'text-primary',
-                )}
-                <div>
-                    <p class="text-sm
-                        font-medium mb-1">
-                        Tip: Think scope
-                    </p>
-                    <p class="text-sm
-                        text-muted">
-                        ${'What is the smallest'
-                            + ' version of this'
-                            + ' idea'
-                            + ' that could'
-                            + ' prove value?'
-                            + ' Starting small'
-                            + ' often'
-                            + ' leads to faster'
-                            + ' wins.'}
-                    </p>
-                </div>
-            </div>
-        </div>
-    </div>`;
-    }
-
-    #buildStep3(): SafeHtml {
-        return html`
-    <div style="${'display:flex;'
-        + 'flex-direction:column;'
-        + 'gap:1.5rem'}">
         <div>
             <label class="label mb-2
                 block font-medium">
@@ -591,14 +323,8 @@ export class IdeaCreatePresenter {
         <div>
             <label class="label mb-2
                 block font-medium">
-                ${'How would you measure'
-                    + ' success?'}
-                <span class="text-muted"
-                    style="${
-                        'font-weight:'
-                        + 'normal'}">
-                    (optional)
-                </span>
+                ${'How would you'
+                    + ' measure success?'}
             </label>
             <textarea class="textarea"
                 id=${'idea-create'
@@ -619,39 +345,12 @@ export class IdeaCreatePresenter {
                     this.#form
                         .successMetrics
             }</textarea>
-        </div>
-        <div class="p-4 rounded-xl"
-            style="${'background:'
-                + 'hsl(var('
-                + '--success-soft));'
-                + 'border:1px solid'
-                + ' hsl(var('
-                + '--success)/0.2)'}">
-            <div class="flex items-start
-                gap-3">
-                ${iconTrendingUp(
-                    20,
-                    'text-success',
-                )}
-                <div>
-                    <p class="text-sm
-                        font-medium mb-1">
-                        ${'Next: Convert'
-                            + ' to Project'}
-                    </p>
-                    <p class="text-sm
-                        text-muted">
-                        ${'After submitting,'
-                            + ' you can'
-                            + ' convert this'
-                            + ' idea into a'
-                            + ' project with'
-                            + ' timeline,'
-                            + ' budget, and'
-                            + ' team details.'}
-                    </p>
-                </div>
-            </div>
+            <p class="text-xs text-muted
+                mt-1">
+                ${'Define measurable'
+                    + ' indicators of'
+                    + ' success'}
+            </p>
         </div>
     </div>`;
     }

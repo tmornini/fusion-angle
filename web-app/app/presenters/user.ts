@@ -21,7 +21,7 @@ import {
     AVAILABILITY_HIGH,
     AVAILABILITY_LOW,
     type User,
-} from '../../../api/types';
+} from '../adapters';
 
 function styleForAvailability(
     availability: number,

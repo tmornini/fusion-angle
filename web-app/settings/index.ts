@@ -9,6 +9,7 @@ import { showToast } from '../app/toast';
 import {
     buildErrorState,
 } from '../app/loading-states';
+import { log } from '../app/logger';
 import {
     getCompanySettings,
     putCompanySettings,
@@ -27,7 +28,12 @@ export async function init(): Promise<void> {
     try {
         settings =
             await getCompanySettings();
-    } catch {
+    } catch (err) {
+        log.error(
+            'getCompanySettings failed',
+            'settings',
+            err,
+        );
         setHtml(
             container,
             buildErrorState(
@@ -88,7 +94,7 @@ export async function init(): Promise<void> {
             const inp = (id: string) =>
                 $input(
                     '#' + id, document,
-                )!.value;
+                )!.value.trim();
             const sw = (id: string) =>
                 $(
                     '#switch-' + id,
@@ -131,7 +137,13 @@ export async function init(): Promise<void> {
                     'Settings saved',
                     'success',
                 );
-            } catch {
+            } catch (err) {
+                log.error(
+                    'putCompanySettings'
+                    + ' failed',
+                    'settings',
+                    err,
+                );
                 showToast(
                     'Failed to save'
                     + ' settings',

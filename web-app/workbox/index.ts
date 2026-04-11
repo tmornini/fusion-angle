@@ -4,6 +4,7 @@ import {
 import {
     html, setHtml,
 } from '../app/safe-html';
+import { log } from '../app/logger';
 import { showToast } from '../app/toast';
 import {
     buildSkeleton,
@@ -45,17 +46,19 @@ function relativeTime(
 function buildInboxRow(
     item: WorkboxItem,
 ): ReturnType<typeof html> {
-    const badge = item.isCompleted
+    const badge = item.isCompleted()
         ? html`<span
             class="badge badge-success"
             >Complete</span>`
         : html`<span
             class="badge badge-info"
-            >${item.currentStateName}</span>`;
-    const from =
-        item.lastTransitionerName
-            ? item.lastTransitionerName
-            : '\u2014';
+            >${
+            item.currentStateName()
+        }</span>`;
+    const name =
+        item.lastTransitionerName();
+    const from = name
+        ? name : '\u2014';
     return html`
     <div
         class="card"
@@ -195,7 +198,13 @@ async function initNewDialog(): Promise<
                         'workbox-detail',
                         { id: woId },
                     );
-                } catch {
+                } catch (err) {
+                    log.error(
+                        'work order creation'
+                        + ' failed',
+                        'workbox',
+                        err,
+                    );
                     showToast(
                         'Failed to create'
                         + ' work order',

@@ -9,10 +9,8 @@ import { navigateTo } from '../app/core';
 import {
     putIdea,
     putIdeaSubmission,
-} from '../app/adapters';
-import {
     jsonArrayField,
-} from '../../api/types';
+} from '../app/adapters';
 import {
     IdeaCreatePresenter,
 } from '../app/presenters';
@@ -31,62 +29,52 @@ export async function init():
     }
 
     function syncFormFields(): void {
-        const step =
-            presenter.currentStep();
-        if (step === 1) {
-            presenter.syncFields({
-                title:
-                    $input(
-                        '#idea-create'
-                        + '-field-title',
-                        document,
-                    )!.value,
-                problemStatement:
-                    $textarea(
-                        '#idea-create'
-                        + '-field'
-                        + '-problem',
-                        document,
-                    )!.value,
-                targetUsers:
-                    $input(
-                        '#idea-create'
-                        + '-field'
-                        + '-target',
-                        document,
-                    )!.value,
-            });
-        } else if (step === 2) {
-            presenter.syncFields({
-                proposedSolution:
-                    $textarea(
-                        '#idea-create'
-                        + '-field'
-                        + '-solution',
-                        document,
-                    )!.value,
-            });
-        } else if (step === 3) {
-            presenter.syncFields({
-                expectedOutcome:
-                    $textarea(
-                        '#idea-create'
-                        + '-field'
-                        + '-outcome',
-                        document,
-                    )!.value,
-                successMetrics:
-                    $textarea(
-                        '#idea-create'
-                        + '-field'
-                        + '-metrics',
-                        document,
-                    )!.value,
-            });
-        }
+        presenter.syncFields({
+            title:
+                $input(
+                    '#idea-create'
+                    + '-field-title',
+                    document,
+                )!.value,
+            problemStatement:
+                $textarea(
+                    '#idea-create'
+                    + '-field'
+                    + '-problem',
+                    document,
+                )!.value,
+            targetUsers:
+                $input(
+                    '#idea-create'
+                    + '-field'
+                    + '-target',
+                    document,
+                )!.value,
+            proposedSolution:
+                $textarea(
+                    '#idea-create'
+                    + '-field'
+                    + '-solution',
+                    document,
+                )!.value,
+            expectedOutcome:
+                $textarea(
+                    '#idea-create'
+                    + '-field'
+                    + '-outcome',
+                    document,
+                )!.value,
+            successMetrics:
+                $textarea(
+                    '#idea-create'
+                    + '-field'
+                    + '-metrics',
+                    document,
+                )!.value,
+        });
     }
 
-    function mutateNextButton(): void {
+    function mutateSubmitButton(): void {
         const btn = $(
             '#idea-create-step-next',
             document,
@@ -97,18 +85,13 @@ export async function init():
         ) {
             btn.disabled =
                 !presenter
-                    .isStepComplete();
+                    .isFormComplete();
         }
     }
 
     function bindEvents(): void {
         const goBack = () => {
-            syncFormFields();
-            if (!presenter.prevStep()) {
-                navigateTo('ideas');
-                return;
-            }
-            renderPage();
+            navigateTo('ideas');
         };
 
         $(
@@ -131,13 +114,6 @@ export async function init():
             'click',
             async () => {
                 syncFormFields();
-                if (
-                    !presenter.isLastStep()
-                ) {
-                    presenter.nextStep();
-                    renderPage();
-                    return;
-                }
                 const ideaId =
                     crypto.randomUUID();
                 const fd =
@@ -150,6 +126,9 @@ export async function init():
                         problem_statement:
                             fd
                             .problemStatement,
+                        target_users:
+                            fd
+                            .targetUsers,
                         proposed_solution:
                             fd
                             .proposedSolution,
@@ -159,9 +138,6 @@ export async function init():
                         success_metrics:
                             fd
                             .successMetrics,
-                        description:
-                            fd
-                            .targetUsers,
                         status:
                             'active',
                         position:
@@ -207,7 +183,7 @@ export async function init():
                     'input',
                     () => {
                         syncFormFields();
-                        mutateNextButton();
+                        mutateSubmitButton();
                     },
                 );
             });
@@ -216,10 +192,6 @@ export async function init():
             '#idea-create-step-next';
         bindEnterToClick(
             '#idea-create-field-title',
-            nextSel,
-        );
-        bindEnterToClick(
-            '#idea-create-field-target',
             nextSel,
         );
     }

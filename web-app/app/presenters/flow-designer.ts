@@ -2,6 +2,7 @@ import {
     html, setHtml, trusted,
 } from '../safe-html';
 import type { SafeHtml } from '../safe-html';
+import { log } from '../logger';
 import { showToast } from '../toast';
 import {
     DISPLAY_ABSENT,
@@ -17,6 +18,7 @@ import {
 } from '../icons';
 import {
     putNode,
+    putGraph,
     putWfEdge,
     putFlow,
     putFlowLocked,
@@ -36,11 +38,11 @@ import type {
     FlowGraph,
 } from '../adapters/flows';
 import type { WfFieldType }
-    from '../../../api/types';
+    from '../adapters/flows';
 import {
     jsonObjectField,
     nowUtc,
-} from '../../../api/types';
+} from '../adapters';
 import { UndoManager } from '../flow-undo';
 import type { UndoStep } from '../flow-undo';
 import {
@@ -61,7 +63,7 @@ import {
     START_Y,
 } from '../flow-layout';
 import {
-    createInteractionState,
+    buildInteractionState,
     zoomIn as zoomInState,
     zoomOut as zoomOutState,
     zoomToFit as zoomToFitState,
@@ -142,7 +144,7 @@ export class FlowDesignerPresenter {
             executeUndoSteps,
         );
         const interaction =
-            createInteractionState(
+            buildInteractionState(
                 canvasW, canvasH,
             );
         this.#state = {
@@ -159,7 +161,6 @@ export class FlowDesignerPresenter {
                 { kind: 'none' },
         };
         this.#migrateToCenter();
-        this.#applyZoomToFit();
     }
 
     startEditingName(): void {
@@ -194,6 +195,7 @@ export class FlowDesignerPresenter {
 
     updateFlowName(name: string): void {
         if (this.#guardLocked()) return;
+        name = name.trim();
         this.#state.flowName = name;
         this.#state.isEditingName = false;
         void putFlow(
@@ -256,15 +258,12 @@ export class FlowDesignerPresenter {
         for (const n of nodes) {
             n.positionX -= cx;
             n.positionY -= cy;
-            void putNode(
-                this.#state.flowId,
-                n.id,
-                {
-                    positionX: n.positionX,
-                    positionY: n.positionY,
-                },
-            );
         }
+        void putGraph(
+            this.#state.flowId,
+            nodes,
+            this.#state.edges,
+        );
     }
 
     selectedNodeId(): string | null {
@@ -546,7 +545,12 @@ ${toolbar}
                 positionX: x,
                 positionY: y,
             });
-        } catch {
+        } catch (err) {
+            log.error(
+                'postNodeAddition failed',
+                'flow-designer',
+                err,
+            );
             showToast(
                 'Failed to add state',
                 'error',
@@ -653,7 +657,12 @@ ${toolbar}
                 fromNodeId: fromId,
                 toNodeId: toId,
             });
-        } catch {
+        } catch (err) {
+            log.error(
+                'postEdgeConnection failed',
+                'flow-designer',
+                err,
+            );
             showToast(
                 'Failed to create'
                 + ' transition',
@@ -728,7 +737,12 @@ ${toolbar}
                         && e.toNodeId
                             !== nodeId,
                 );
-        } catch {
+        } catch (err) {
+            log.error(
+                'deleteNodeCapture failed',
+                'flow-designer',
+                err,
+            );
             showToast(
                 'Failed to delete state',
                 'error',
@@ -768,7 +782,12 @@ ${toolbar}
                 this.#state.edges.filter(
                     e => e.id !== edgeId,
                 );
-        } catch {
+        } catch (err) {
+            log.error(
+                'deleteEdgeCapture failed',
+                'flow-designer',
+                err,
+            );
             showToast(
                 'Failed to delete transition',
                 'error',
@@ -815,11 +834,12 @@ ${toolbar}
             if (!pos) continue;
             node.positionX = pos.x;
             node.positionY = pos.y;
-            void putNode(fId, node.id, {
-                positionX: pos.x,
-                positionY: pos.y,
-            });
         }
+        void putGraph(
+            fId,
+            this.#state.nodes,
+            this.#state.edges,
+        );
         const forwardStep = graphPutStep(
             fId,
             this.#state.nodes,
@@ -830,13 +850,14 @@ ${toolbar}
             forward: [forwardStep],
             reverse: [reverseStep],
         });
-        this.#expandIfNeeded();
+        this.#applyZoomToFit();
     }
 
     updateNodeName(
         name: string,
     ): void {
         if (this.#guardLocked()) return;
+        name = name.trim();
         const sel =
             this.#state.interaction
                 .selection;
@@ -872,6 +893,7 @@ ${toolbar}
         desc: string,
     ): void {
         if (this.#guardLocked()) return;
+        desc = desc.trim();
         const sel =
             this.#state.interaction
                 .selection;
@@ -908,6 +930,7 @@ ${toolbar}
         name: string,
     ): void {
         if (this.#guardLocked()) return;
+        name = name.trim();
         const sel =
             this.#state.interaction
                 .selection;
@@ -943,6 +966,7 @@ ${toolbar}
         desc: string,
     ): void {
         if (this.#guardLocked()) return;
+        desc = desc.trim();
         const sel =
             this.#state.interaction
                 .selection;
@@ -984,6 +1008,7 @@ ${toolbar}
         if (this.#guardLocked()) {
             return false;
         }
+        name = name.trim();
         const sel =
             this.#state.interaction
                 .selection;
@@ -1014,7 +1039,12 @@ ${toolbar}
                 isRequired,
                 options,
             });
-        } catch {
+        } catch (err) {
+            log.error(
+                'postFieldAddition failed',
+                'flow-designer',
+                err,
+            );
             showToast(
                 'Failed to add field',
                 'error',
@@ -1083,7 +1113,12 @@ ${toolbar}
                         f => f.id !== fieldId,
                     );
             }
-        } catch {
+        } catch (err) {
+            log.error(
+                'deleteFieldCapture failed',
+                'flow-designer',
+                err,
+            );
             showToast(
                 'Failed to delete field',
                 'error',
@@ -1169,7 +1204,12 @@ ${toolbar}
                 fromNodeId,
                 toNodeId: nodeId,
             });
-        } catch {
+        } catch (err) {
+            log.error(
+                'postNodeAddition failed',
+                'flow-designer',
+                err,
+            );
             showToast(
                 'Failed to add state',
                 'error',
@@ -1269,7 +1309,12 @@ ${toolbar}
                 fromNodeId,
                 toNodeId: nodeId,
             });
-        } catch {
+        } catch (err) {
+            log.error(
+                'postNodeAddition failed',
+                'flow-designer',
+                err,
+            );
             showToast(
                 'Failed to add state',
                 'error',
@@ -1352,13 +1397,66 @@ ${toolbar}
     zoomIn(): void {
         zoomInState(
             this.#state.interaction,
+            this.#selectedFocalPt(),
         );
     }
 
     zoomOut(): void {
         zoomOutState(
             this.#state.interaction,
+            this.#selectedFocalPt(),
         );
+    }
+
+    #selectedFocalPt(): {
+        x: number;
+        y: number;
+    } | null {
+        const sel =
+            this.#state.interaction
+                .selection;
+        if (sel.kind === 'node') {
+            const node =
+                this.#state.nodes.find(
+                    n => n.id
+                        === sel.nodeId,
+                );
+            if (!node) return null;
+            return {
+                x: node.positionX
+                    + NODE_WIDTH / 2,
+                y: node.positionY
+                    + NODE_HEIGHT / 2,
+            };
+        }
+        if (sel.kind === 'edge') {
+            const edge =
+                this.#state.edges.find(
+                    e => e.id
+                        === sel.edgeId,
+                );
+            if (!edge) return null;
+            const from =
+                this.#state.nodes.find(
+                    n => n.id
+                        === edge.fromNodeId,
+                );
+            const to =
+                this.#state.nodes.find(
+                    n => n.id
+                        === edge.toNodeId,
+                );
+            if (!from || !to) return null;
+            return {
+                x: (from.positionX
+                    + to.positionX
+                    + NODE_WIDTH) / 2,
+                y: (from.positionY
+                    + to.positionY
+                    + NODE_HEIGHT) / 2,
+            };
+        }
+        return null;
     }
 
     zoomToFit(): void {
@@ -1484,16 +1582,14 @@ class="wf-toolbar">
 <div class="wf-toolbar-group">
 <button class="btn btn-ghost btn-sm"
     data-action="zoom-out"
-    ><span class="wf-btn-stack"
-    >Zoom<br>\u2212</span></button>
+    >Zoom \u2212</button>
 <button class="btn btn-ghost btn-sm"
     data-action="fit"
     ><span class="wf-btn-stack"
     >Show<br>All</span></button>
 <button class="btn btn-ghost btn-sm"
     data-action="zoom-in"
-    ><span class="wf-btn-stack"
-    >Zoom<br>+</span></button>
+    >Zoom +</button>
 </div>
 <div class="wf-toolbar-spacer"></div>
 <div class="wf-toolbar-group">

@@ -82,7 +82,7 @@ export const PAGE_REGISTRY: Record<
             'flow, process,'
             + ' state machine',
     },
-    'flows-detail': {
+    'flow-detail': {
         title: 'Flow Designer',
         layout: 'sidebar',
         sourceDir: 'flows',

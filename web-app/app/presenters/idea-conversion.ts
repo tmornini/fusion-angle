@@ -2,6 +2,9 @@ import {
     html, SafeHtml, trusted,
 } from '../safe-html';
 import {
+    displayText,
+} from '../core';
+import {
     iconDollarSign,
     iconArrowRight,
     iconArrowLeft,
@@ -9,15 +12,13 @@ import {
     iconRocket,
     iconCalendar,
     iconUsers,
-    iconFolderKanban,
+    iconTrendingUp,
     iconCheckCircle2,
 } from '../icons';
-import type {
-    Idea,
-} from '../../../api/types';
 import {
+    type Idea,
     User,
-} from '../../../api/types';
+} from '../adapters';
 
 type ConversionField =
     | 'project-name'
@@ -25,7 +26,7 @@ type ConversionField =
     | 'start-date'
     | 'target-end-date'
     | 'budget'
-    | 'priority'
+    | 'impact'
     | 'success-criteria';
 
 const REQUIRED_FIELDS:
@@ -35,7 +36,7 @@ const REQUIRED_FIELDS:
     'start-date',
     'target-end-date',
     'budget',
-    'priority',
+    'impact',
 ];
 
 const ALL_FIELDS:
@@ -45,7 +46,7 @@ const ALL_FIELDS:
     'start-date',
     'target-end-date',
     'budget',
-    'priority',
+    'impact',
     'success-criteria',
 ];
 
@@ -58,8 +59,10 @@ interface LeadOption {
 export class IdeaConversionPresenter {
     readonly #title: string;
     readonly #problemStatement: string;
+    readonly #targetUsers: string;
     readonly #proposedSolution: string;
     readonly #expectedOutcome: string;
+    readonly #successMetrics: string;
     readonly #leadOptions: LeadOption[];
     #fields: Record<
         ConversionField, string
@@ -72,10 +75,14 @@ export class IdeaConversionPresenter {
         this.#title = idea.title;
         this.#problemStatement =
             idea.problemStatement;
+        this.#targetUsers =
+            idea.targetUsers;
         this.#proposedSolution =
             idea.proposedSolution;
         this.#expectedOutcome =
             idea.expectedOutcome;
+        this.#successMetrics =
+            idea.successMetrics;
         this.#leadOptions = users
             .filter(u => u.isActive())
             .map(u => ({
@@ -89,7 +96,7 @@ export class IdeaConversionPresenter {
             'start-date': '',
             'target-end-date': '',
             'budget': '',
-            'priority': '',
+            'impact': '',
             'success-criteria': '',
         };
     }
@@ -99,10 +106,16 @@ export class IdeaConversionPresenter {
             ConversionField, string
         >>,
     ): void {
-        this.#fields = {
-            ...this.#fields,
-            ...fields,
-        };
+        for (
+            const [k, v] of
+            Object.entries(fields)
+        ) {
+            if (v !== undefined) {
+                this.#fields[
+                    k as ConversionField
+                ] = v.trim();
+            }
+        }
     }
 
     projectDetails(): Record<
@@ -113,20 +126,19 @@ export class IdeaConversionPresenter {
 
     isReady(): boolean {
         return REQUIRED_FIELDS.every(
-            f => this.#fields[f].trim(),
+            f => this.#fields[f] !== '',
         );
     }
 
     fieldReady(
         field: ConversionField,
     ): boolean {
-        return !!this.#fields[field]
-            .trim();
+        return this.#fields[field] !== '';
     }
 
     completedCount(): number {
         return REQUIRED_FIELDS.filter(
-            f => this.#fields[f].trim(),
+            f => this.#fields[f] !== '',
         ).length;
     }
 
@@ -138,7 +150,7 @@ export class IdeaConversionPresenter {
         field: ConversionField,
     ): SafeHtml {
         const isSet =
-            this.#fields[field].trim();
+            this.#fields[field] !== '';
         return html`<span
             id="check-${field}"
             style="${'color:'
@@ -284,81 +296,117 @@ export class IdeaConversionPresenter {
                         + 'sticky;'
                         + 'top:6rem'
                     }">
-                    <div class="${
-                        'flex items-center'
-                        + ' gap-2 text-sm'
-                        + ' font-medium'
-                        + ' text-muted'
+                    <h2 class="${
+                        'text-lg'
+                        + ' font-display'
+                        + ' font-semibold'
                         + ' mb-4'
                     }">
-                        ${iconFolderKanban(
-                            16, '',
-                        )}
-                        Idea Summary
-                    </div>
-                    <h2 class="${
+                        ${'Problem'
+                            + ' & Solution'}
+                    </h2>
+                    <p class="${
                         'text-xl'
                         + ' font-display'
                         + ' font-bold'
                         + ' mb-4'
                     }">${
                         this.#title
-                    }</h2>
+                    }</p>
                     <div style="${
                         'display:flex;'
                         + 'flex-direction:'
                         + 'column;'
-                        + 'gap:1rem;'
-                        + 'margin-bottom:'
-                        + '1.5rem'
+                        + 'gap:1.25rem'
                     }">
                         <div>
-                            <h4 class="${
-                                'text-sm'
-                                + ' font-medium'
+                            <p class="${
+                                'text-xs'
                                 + ' text-muted'
                                 + ' mb-1'
                             }">
-                                Problem
-                            </h4>
+                                ${'Problem'
+                                + ' Statement'}
+                            </p>
                             <p class="${
                                 'text-sm'
                             }">${
+                                displayText(
                                 this
                                 .#problemStatement
+                                )
                             }</p>
                         </div>
                         <div>
-                            <h4 class="${
-                                'text-sm'
-                                + ' font-medium'
+                            <p class="${
+                                'text-xs'
                                 + ' text-muted'
                                 + ' mb-1'
                             }">
-                                Solution
-                            </h4>
+                                ${'Target'
+                                + ' Users'}
+                            </p>
                             <p class="${
                                 'text-sm'
                             }">${
+                                displayText(
                                 this
-                                .#proposedSolution
+                                .#targetUsers
+                                )
                             }</p>
                         </div>
                         <div>
-                            <h4 class="${
+                            <p class="${
+                                'text-xs'
+                                + ' text-muted'
+                                + ' mb-1'
+                            }">
+                                ${'Proposed'
+                                + ' Solution'}
+                            </p>
+                            <p class="${
                                 'text-sm'
-                                + ' font-medium'
+                            }">${
+                                displayText(
+                                this
+                                .#proposedSolution
+                                )
+                            }</p>
+                        </div>
+                        <div>
+                            <p class="${
+                                'text-xs'
                                 + ' text-muted'
                                 + ' mb-1'
                             }">
                                 ${'Expected'
-                                    + ' Outcome'}
-                            </h4>
+                                + ' Outcome'}
+                            </p>
                             <p class="${
                                 'text-sm'
                             }">${
+                                displayText(
                                 this
                                 .#expectedOutcome
+                                )
+                            }</p>
+                        </div>
+                        <div>
+                            <p class="${
+                                'text-xs'
+                                + ' text-muted'
+                                + ' mb-1'
+                            }">
+                                ${'Success'
+                                + ' Metrics'}
+                            </p>
+                            <p class="${
+                                'text-sm'
+                            }">${
+                                displayText(
+                                this
+                                .#successMetrics
+                                )
                             }</p>
                         </div>
                     </div>
@@ -559,8 +607,7 @@ export class IdeaConversionPresenter {
                                 16,
                                 'text-muted',
                             )}
-                            ${'Allocated'
-                                + ' Budget'}
+                            Cost
                             ${this.#fieldCheck(
                                 'budget',
                             )}
@@ -620,84 +667,61 @@ export class IdeaConversionPresenter {
                             + ' items-center'
                             + ' gap-2'
                         }">
-                            Priority Level
+                            ${iconTrendingUp(
+                                16,
+                                'text-muted',
+                            )}
+                            Impact
                             ${this.#fieldCheck(
-                                'priority',
+                                'impact',
                             )}
                         </label>
-                        <select
-                            class="input"
-                            id="${
-                                'convert'
-                                + '-priority'
-                            }">
-                            <option value="">
-                                ${'How urgent'
-                                    + ' is this'
-                                    + ' project?'}
-                            </option>
-                            <option
-                                value="${
-                                    'critical'
+                        <div style="${
+                            'position:'
+                            + 'relative'
+                        }">
+                            <span style="${
+                                'position:'
+                                + 'absolute;'
+                                + 'right:'
+                                + '0.75rem;'
+                                + 'top:50%;'
+                                + 'transform:'
+                                + 'translateY'
+                                + '(-50%);'
+                                + 'color:'
+                                + 'hsl(var('
+                                + '--muted-'
+                                + 'foreground'
+                                + '));'
+                                + 'pointer-'
+                                + 'events:'
+                                + 'none'
+                            }">pts</span>
+                            <input
+                                class="input"
+                                type="text"
+                                inputmode="${
+                                    'numeric'
                                 }"
-                                ${trusted(
-                                    f[
-                                    'priority'
-                                    ] ===
-                                    'critical'
-                                    ? 'selected'
-                                    : '',
-                                )}>
-                                ${'Critical'
-                                    + ' - Must'
-                                    + ' start'
-                                    + ' immediately'}
-                            </option>
-                            <option
-                                value="high"
-                                ${trusted(
-                                    f[
-                                    'priority'
-                                    ] ===
-                                    'high'
-                                    ? 'selected'
-                                    : '',
-                                )}>
-                                ${'High'
-                                    + ' - Start'
-                                    + ' within'
-                                    + ' 2 weeks'}
-                            </option>
-                            <option
-                                value="medium"
-                                ${trusted(
-                                    f[
-                                    'priority'
-                                    ] ===
-                                    'medium'
-                                    ? 'selected'
-                                    : '',
-                                )}>
-                                ${'Medium'
-                                    + ' - Start'
-                                    + ' within'
-                                    + ' 1 month'}
-                            </option>
-                            <option
-                                value="low"
-                                ${trusted(
-                                    f[
-                                    'priority'
-                                    ] ===
-                                    'low'
-                                    ? 'selected'
-                                    : '',
-                                )}>
-                                ${'Low - Can'
-                                    + ' wait for'
-                                    + ' capacity'}
-                            </option>
-                        </select>
+                                id="${
+                                    'convert'
+                                    + '-impact'
+                                }"
+                                placeholder="${
+                                    'Enter'
+                                    + ' impact'
+                                    + ' points'
+                                }"
+                                value="${
+                                    f['impact']
+                                }"
+                                style="${
+                                    'padding-'
+                                    + 'right:'
+                                    + '2.5rem'
+                                }" />
+                        </div>
                     </div>
                 </div>
             </div>`;

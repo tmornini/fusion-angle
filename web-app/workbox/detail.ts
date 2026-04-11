@@ -3,6 +3,7 @@ import {
     html, setHtml,
 } from '../app/safe-html';
 import type { SafeHtml } from '../app/safe-html';
+import { log } from '../app/logger';
 import { showToast } from '../app/toast';
 import {
     buildSkeleton,
@@ -20,14 +21,12 @@ import type {
     WorkboxDetail,
     HistoryEntry,
     HistoryFieldValue,
+    GraphField,
 } from '../app/adapters';
 import {
     iconArrowLeft,
     iconClock,
 } from '../app/icons';
-import type {
-    GraphField,
-} from '../../api/types';
 
 /* ── Helpers ─────────────── */
 
@@ -67,13 +66,36 @@ function collectFieldValues(
                 ? 'true'
                 : 'false';
         } else {
-            values[fieldId] = input.value;
+            values[fieldId] =
+                input.value.trim();
         }
     }
     return values;
 }
 
 /* ── Build functions ─────── */
+
+const FIELD_HTML_TYPE: Record<
+    string,
+    { type: string; extra?: string }
+> = {
+    text: { type: 'text' },
+    number: { type: 'number' },
+    date: { type: 'date' },
+    email: { type: 'email' },
+    url: { type: 'url' },
+    phone: { type: 'tel' },
+    currency: {
+        type: 'number',
+        extra: 'step="0.01"',
+    },
+    checkbox: { type: 'checkbox' },
+    file: { type: 'file' },
+    image: {
+        type: 'file',
+        extra: 'accept="image/*"',
+    },
+};
 
 function buildFieldInput(
     field: GraphField,
@@ -82,123 +104,74 @@ function buildFieldInput(
     const req = field.isRequired
         ? 'required'
         : '';
-    switch (field.fieldType) {
-        case 'text':
-            return html`<input
-                type="text"
-                class="input"
-                data-field-id="${id}"
-                ${req} />`;
-        case 'textarea':
-            return html`<textarea
-                class="input"
-                rows="3"
-                data-field-id="${id}"
-                ${req}></textarea>`;
-        case 'number':
-            return html`<input
-                type="number"
-                class="input"
-                data-field-id="${id}"
-                ${req} />`;
-        case 'date':
-            return html`<input
-                type="date"
-                class="input"
-                data-field-id="${id}"
-                ${req} />`;
-        case 'email':
-            return html`<input
-                type="email"
-                class="input"
-                data-field-id="${id}"
-                ${req} />`;
-        case 'url':
-            return html`<input
-                type="url"
-                class="input"
-                data-field-id="${id}"
-                ${req} />`;
-        case 'phone':
-            return html`<input
-                type="tel"
-                class="input"
-                data-field-id="${id}"
-                ${req} />`;
-        case 'currency':
-            return html`<input
-                type="number"
-                step="0.01"
-                class="input"
-                data-field-id="${id}"
-                ${req} />`;
-        case 'checkbox':
-            return html`<input
-                type="checkbox"
-                data-field-id="${id}" />`;
-        case 'select':
-            return html`<select
-                class="input"
-                data-field-id="${id}"
-                ${req}>
-                <option value="">
-                    Select...
-                </option>
-                ${field.options.map(
-                    o => html`<option
-                        value="${o}"
-                        >${o}</option>`,
-                )}
-            </select>`;
-        case 'radio':
-            return html`<div
-                class="flex flex-col
-                    gap-2">
-                ${field.options.map(
-                    o => html`<label
-                        class="flex
-                            items-center
-                            gap-2">
-                        <input
-                            type="radio"
-                            name="${id}"
-                            value="${o}"
-                            data-field-id
-                                ="${id}" />
-                        ${o}
-                    </label>`,
-                )}
-            </div>`;
-        case 'multi_select':
-            return html`<div
-                class="flex flex-col
-                    gap-2">
-                ${field.options.map(
-                    o => html`<label
-                        class="flex
-                            items-center
-                            gap-2">
-                        <input
-                            type="checkbox"
-                            value="${o}"
-                            data-field-id
-                                ="${id}" />
-                        ${o}
-                    </label>`,
-                )}
-            </div>`;
-        case 'file':
-            return html`<input
-                type="file"
-                class="input"
-                data-field-id="${id}" />`;
-        case 'image':
-            return html`<input
-                type="file"
-                accept="image/*"
-                class="input"
-                data-field-id="${id}" />`;
+    if (field.fieldType === 'textarea') {
+        return html`<textarea
+            class="input"
+            rows="3"
+            data-field-id="${id}"
+            ${req}></textarea>`;
     }
+    if (field.fieldType === 'select') {
+        return html`<select
+            class="input"
+            data-field-id="${id}"
+            ${req}>
+            <option value="">
+                Select...
+            </option>
+            ${field.options.map(
+                o => html`<option
+                    value="${o}"
+                    >${o}</option>`,
+            )}
+        </select>`;
+    }
+    if (
+        field.fieldType === 'radio'
+        || field.fieldType
+            === 'multi_select'
+    ) {
+        const inputType =
+            field.fieldType === 'radio'
+                ? 'radio' : 'checkbox';
+        return html`<div
+            class="flex flex-col
+                gap-2">
+            ${field.options.map(
+                o => html`<label
+                    class="flex
+                        items-center
+                        gap-2">
+                    <input
+                        type="${inputType}"
+                        name="${id}"
+                        value="${o}"
+                        data-field-id
+                            ="${id}" />
+                    ${o}
+                </label>`,
+            )}
+        </div>`;
+    }
+    const spec =
+        FIELD_HTML_TYPE[field.fieldType];
+    if (!spec) {
+        return html`<input
+            type="text"
+            class="input"
+            data-field-id="${id}"
+            ${req} />`;
+    }
+    const extra = spec.extra ?? '';
+    const cls =
+        spec.type === 'checkbox'
+            ? '' : 'class="input"';
+    return html`<input
+        type="${spec.type}"
+        ${cls}
+        data-field-id="${id}"
+        ${extra}
+        ${req} />`;
 }
 
 function buildFieldRow(
@@ -269,11 +242,9 @@ function buildHistoryEntry(
 function buildDetailView(
     detail: WorkboxDetail,
 ): SafeHtml {
-    const isComplete =
-        detail.currentNode.isComplete
-            === true;
+    const complete = detail.isComplete();
 
-    const fields = isComplete
+    const fields = complete
         ? html``
         : html`<div id="wo-fields"
             class="card mb-6 p-6">
@@ -281,7 +252,7 @@ function buildDetailView(
                 font-semibold mb-4">
                 Fields
             </h3>
-            ${detail.currentNode.fields
+            ${detail.renderableFields()
                 .toSorted(
                     (a, b) =>
                         a.sortOrder
@@ -290,7 +261,7 @@ function buildDetailView(
                 .map(buildFieldRow)}
         </div>`;
 
-    const transitions = isComplete
+    const transitions = complete
         ? html``
         : html`<div id="wo-transitions"
             class="flex gap-3 mb-6
@@ -304,7 +275,7 @@ function buildDetailView(
             )}
         </div>`;
 
-    const unclaimBtn = isComplete
+    const unclaimBtn = complete
         ? html``
         : html`<button
             id="unclaim-btn"
@@ -336,8 +307,8 @@ function buildDetailView(
                 <span
                     class="badge
                         badge-info">
-                    ${detail.currentNode
-                        .name}
+                    ${detail
+                        .currentNodeName()}
                 </span>
             </div>
         </div>
@@ -396,8 +367,8 @@ function initTransitionButtons(
                         container,
                     );
                 const hasEmpty =
-                    detail.currentNode
-                        .fields
+                    detail
+                        .renderableFields()
                         .filter(
                             f => f.isRequired,
                         )
@@ -417,21 +388,30 @@ function initTransitionButtons(
                 }
                 try {
                     await
-                        postWorkOrderTransition(
-                            detail.id,
+                        postWorkOrderTransition({
+                            workOrderId:
+                                detail.id,
                             edgeId,
                             values,
                             userId,
-                            detail.currentNode
-                                .id,
-                        );
+                            currentNodeId:
+                                detail
+                                    .currentNodeId(),
+                        });
                     showToast(
                         'Transition'
                         + ' complete',
                         'success',
                     );
                     navigateTo('workbox');
-                } catch {
+                } catch (err) {
+                    log.error(
+                        'work order'
+                        + ' transition'
+                        + ' failed',
+                        'workbox',
+                        err,
+                    );
                     showToast(
                         'Transition'
                         + ' failed',
@@ -451,19 +431,28 @@ function initUnclaimButton(
         '#unclaim-btn', container,
     );
     if (!btn) return;
+    const claim = detail.claimStatus();
+    if (claim.kind !== 'claimed') return;
+    const claimId = claim.claimId;
     btn.addEventListener(
         'click',
         async () => {
             try {
                 await deleteWorkOrderClaim(
-                    detail.claimId,
+                    claimId,
                 );
                 showToast(
                     'Work order released',
                     'success',
                 );
                 navigateTo('workbox');
-            } catch {
+            } catch (err) {
+                log.error(
+                    'work order release'
+                    + ' failed',
+                    'workbox',
+                    err,
+                );
                 showToast(
                     'Failed to release'
                     + ' work order',
@@ -500,9 +489,12 @@ export async function init(
             let wo = await getWorkboxItem(
                 id, user.id,
             );
+            const claim =
+                wo.claimStatus();
             if (
-                !wo.claimedByCurrentUser
-                && !wo.currentNode.isComplete
+                (claim.kind !== 'claimed'
+                    || !claim.byCurrentUser)
+                && !wo.isComplete()
             ) {
                 await postWorkOrderClaim(
                     id, user.id,
@@ -536,7 +528,7 @@ export async function init(
     }
 
     if (
-        !detail.currentNode.isComplete
+        !detail.isComplete()
     ) {
         initTransitionButtons(
             container, detail, user.id,

@@ -12,7 +12,7 @@ import {
     handleDatabaseError,
 } from './database-init';
 import {
-    loadAndInitPage,
+    initPageModule,
     handlePageLoadError,
 } from './page-loader';
 
@@ -25,6 +25,7 @@ export {
     getTimeOfDay,
     initials,
     toDateInputValue,
+    trimStrings,
     durationInDays,
     formatCompactCurrency,
     SECONDS_PER_DAY,
@@ -113,7 +114,7 @@ document.addEventListener(
             ));
 
         try {
-            await loadAndInitPage(
+            await initPageModule(
                 pageName,
             );
         } catch (err) {

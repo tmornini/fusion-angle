@@ -26,13 +26,15 @@ import {
 import {
     buildErrorState,
 } from '../app/loading-states';
+import { log } from '../app/logger';
+import {
+    trimStrings,
+} from '../app/core';
 import {
     getProfile, putProfile,
     allStrengths,
-} from '../app/adapters';
-import {
     jsonArrayField,
-} from '../../api/types';
+} from '../app/adapters';
 
 export async function init(): Promise<void> {
     const selectedStrengths = new Set<string>(
@@ -67,7 +69,12 @@ export async function init(): Promise<void> {
     >;
     try {
         profile = await getProfile();
-    } catch {
+    } catch (err) {
+        log.error(
+            'getProfile failed',
+            'profile',
+            err,
+        );
         setHtml(
             container,
             buildErrorState(
@@ -220,22 +227,29 @@ export async function init(): Promise<void> {
                 'disabled', '',
             );
             try {
-                await putProfile({
-                    first_name:
-                        firstName.value,
-                    last_name:
-                        lastName.value,
-                    email: email.value,
-                    phone: phone.value,
-                    role: role.value,
-                    department:
-                        department.value,
-                    bio: bio.value,
-                    strengths:
-                        jsonArrayField(
-                            [...selectedStrengths],
-                        ),
-                });
+                await putProfile(
+                    trimStrings({
+                        first_name:
+                            firstName.value,
+                        last_name:
+                            lastName.value,
+                        email:
+                            email.value,
+                        phone:
+                            phone.value,
+                        role:
+                            role.value,
+                        department:
+                            department.value,
+                        bio: bio.value,
+                        strengths:
+                            jsonArrayField(
+                                [
+                                    ...selectedStrengths,
+                                ],
+                            ),
+                    }),
+                );
                 setHtml(
                     btn,
                     html`${
@@ -256,7 +270,12 @@ export async function init(): Promise<void> {
                         } Save Changes`,
                     );
                 }, 2000);
-            } catch {
+            } catch (err) {
+                log.error(
+                    'putProfile failed',
+                    'profile',
+                    err,
+                );
                 showToast(
                     'Failed to save'
                     + ' profile',

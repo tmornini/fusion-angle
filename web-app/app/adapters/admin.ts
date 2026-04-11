@@ -16,7 +16,7 @@ import {
 } from '../../../api/types';
 export type { Account };
 import {
-    buildUserMap,
+    getUserMap,
     userName,
 } from './helpers';
 
@@ -36,7 +36,7 @@ export async function getAccount(
         GET<ActivityEntity[]>(
             'activities',
         ),
-        buildUserMap(),
+        getUserMap(),
         GET<ActivityActorEntity[]>(
             'activity-actors',
         ),
@@ -188,7 +188,7 @@ export async function getActivityFeed(
         GET<ActivityEntity[]>(
             'activities',
         ),
-        buildUserMap(),
+        getUserMap(),
         GET<ActivityActorEntity[]>(
             'activity-actors',
         ),

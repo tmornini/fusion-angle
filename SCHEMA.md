@@ -1,6 +1,6 @@
 # Database Schema
 
-19 tables stored in localStorage as JSON arrays. Each table is keyed as `fusion-ai:tableName`. All rows have a text `id` primary key. Column types: TEXT (string), INTEGER (number), REAL (float). JSON columns store stringified arrays or objects. All columns are NOT NULL — entity validation on creation ensures every field is present.
+17 tables stored in localStorage as JSON arrays. Each table is keyed as `fusion-ai:tableName`. All rows have a text `id` primary key. Column types: TEXT (string), INTEGER (number), REAL (float). JSON columns store stringified arrays or objects. All columns are NOT NULL — entity validation on creation ensures every field is present.
 
 **Duration convention:** All numeric duration fields are persisted in seconds. UI displays days via `durationInDays(seconds)` from `format.ts`.
 
@@ -38,30 +38,14 @@
 | position | REAL |
 | status | TEXT |
 | problem_statement | TEXT |
+| target_users | TEXT |
 | proposed_solution | TEXT |
 | expected_outcome | TEXT |
+| success_metrics | TEXT |
 | readiness | TEXT |
-| description | TEXT |
 | risks | TEXT (JSON array) |
 | assumptions | TEXT (JSON array) |
 | alignments | TEXT (JSON array) |
-| success_metrics | TEXT |
-
-### idea_scores
-
-| Column | Type |
-|--------|------|
-| id | TEXT |
-| overall | INTEGER |
-| impact_score | INTEGER |
-| impact_breakdown | TEXT (JSON array) |
-| feasibility_score | INTEGER |
-| feasibility_breakdown | TEXT (JSON array) |
-| efficiency_score | INTEGER |
-| efficiency_breakdown | TEXT (JSON array) |
-| estimated_duration | TEXT |
-| estimated_cost | TEXT |
-| recommendation | TEXT |
 
 ### projects
 
@@ -215,15 +199,6 @@ Singleton table (single row, `id = '1'`).
 | active_users | INTEGER |
 
 ## Relationships
-
-### idea_score_ideas
-
-| Column | Type |
-|--------|------|
-| id | TEXT |
-| idea_score_id | TEXT (FK → idea_scores) |
-| idea_id | TEXT (FK → ideas) |
-| created_at | TEXT |
 
 ### idea_submissions
 

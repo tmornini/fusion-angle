@@ -5,6 +5,7 @@ import {
     html, setHtml,
 } from '../app/safe-html';
 import { showToast } from '../app/toast';
+import { log } from '../app/logger';
 import {
     buildSkeleton, buildErrorState,
 } from '../app/loading-states';
@@ -13,35 +14,17 @@ import {
 } from '../app/icons';
 import { navigateTo } from '../app/core';
 import {
-    jsonObjectField,
-} from '../../api/types';
-import {
     getIdeaForConversion,
     getManagedUsers,
     getIdea,
     putIdea,
     putProject,
     putProjectTeamMember,
+    jsonObjectField,
 } from '../app/adapters';
 import {
     IdeaConversionPresenter,
 } from '../app/presenters/idea-conversion';
-
-type PriorityRank =
-    | 'critical'
-    | 'high'
-    | 'medium'
-    | 'low';
-
-const PRIORITY_RANKS: Record<
-    PriorityRank,
-    number
-> = {
-    critical: 1,
-    high: 2,
-    medium: 3,
-    low: 4,
-};
 
 type ConversionField =
     | 'project-name'
@@ -49,7 +32,7 @@ type ConversionField =
     | 'start-date'
     | 'target-end-date'
     | 'budget'
-    | 'priority'
+    | 'impact'
     | 'success-criteria';
 
 const ALL_FIELDS:
@@ -59,7 +42,7 @@ const ALL_FIELDS:
     'start-date',
     'target-end-date',
     'budget',
-    'priority',
+    'impact',
     'success-criteria',
 ];
 
@@ -97,7 +80,13 @@ export async function init(
                 idea,
                 users,
             );
-    } catch {
+    } catch (err) {
+        log.error(
+            'getIdeaForConversion'
+            + ' failed',
+            'ideas',
+            err,
+        );
         setHtml(
             root,
             buildErrorState(
@@ -132,7 +121,8 @@ export async function init(
                 || el instanceof
                     HTMLTextAreaElement
             ) {
-                fields[field] = el.value;
+                fields[field] =
+                    el.value.trim();
             }
         }
         presenter.syncFields(fields);
@@ -343,6 +333,9 @@ export async function init(
         bindEnterToClick(
             '#convert-budget', submitSel,
         );
+        bindEnterToClick(
+            '#convert-impact', submitSel,
+        );
 
         $(
             '#convert-submit-btn',
@@ -381,7 +374,13 @@ export async function init(
                         presenter
                             .projectDetails(),
                     );
-                } catch {
+                } catch (err) {
+                    log.error(
+                        'performConversion'
+                        + ' failed',
+                        'ideas',
+                        err,
+                    );
                     showToast(
                         'Failed to create'
                         + ' project.'
@@ -418,19 +417,26 @@ export async function init(
             },
         );
 
+        const goBack =
+            params?.['from'] === 'detail'
+                ? () => navigateTo(
+                    'idea-detail',
+                    { ideaId },
+                )
+                : () => navigateTo(
+                    'ideas',
+                );
         $(
             '#convert-back-to-ideas',
             document,
         )?.addEventListener(
-            'click',
-            () => navigateTo('ideas'),
+            'click', goBack,
         );
         $(
             '#convert-back-to-ideas-2',
             document,
         )?.addEventListener(
-            'click',
-            () => navigateTo('ideas'),
+            'click', goBack,
         );
     }
 
@@ -444,9 +450,6 @@ async function performConversion(
 ): Promise<void> {
     const leadUserId =
         pd['project-lead']!;
-    const priorityKey = pd[
-        'priority'
-    ]! as PriorityRank;
     await putProject(
         projectId,
         {
@@ -466,15 +469,16 @@ async function performConversion(
                 ]!,
             estimated_duration: 0,
             actual_duration: 0,
-            estimated_cost: 0,
+            estimated_cost:
+                Number(
+                    pd['budget']!,
+                ) || 0,
             actual_cost: 0,
-            estimated_impact: 0,
+            estimated_impact:
+                Number(
+                    pd['impact']!,
+                ) || 0,
             actual_impact: 0,
-            priority:
-                PRIORITY_RANKS[
-                    priorityKey
-                ],
-            priority_score: 0,
             position: 0,
             business_context:
                 jsonObjectField({}),
@@ -483,12 +487,12 @@ async function performConversion(
                 pd['budget']!,
         },
     );
-    await putProjectTeamMember(
+    await putProjectTeamMember({
         projectId,
-        leadUserId,
-        'lead',
-        'internal',
-    );
+        userId: leadUserId,
+        role: 'lead',
+        type: 'internal',
+    });
     const existingIdea =
         await getIdea(ideaId);
     await putIdea(ideaId, {

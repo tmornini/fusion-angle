@@ -1,5 +1,5 @@
 import {
-    readPreference,
+    getPreference,
 } from './preferences-store';
 
 const STORAGE_KEY_LOG_LEVEL =
@@ -11,7 +11,7 @@ const LEVELS = {
 type Level = keyof typeof LEVELS;
 
 function getConfiguredLevel(): Level {
-    const raw = readPreference(
+    const raw = getPreference(
         STORAGE_KEY_LOG_LEVEL,
     );
     if (raw && raw in LEVELS) {

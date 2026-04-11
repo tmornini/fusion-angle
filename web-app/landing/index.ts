@@ -621,8 +621,9 @@ export async function init(): Promise<void> {
             );
         });
 
+    const AUTO_REDIRECT_MS = 2000;
     setTimeout(() => {
         window.location.href =
             '../dashboard/index.html';
-    }, 2000);
+    }, AUTO_REDIRECT_MS);
 }

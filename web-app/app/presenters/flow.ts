@@ -15,7 +15,8 @@ export class FlowPresenter {
     readonly #description: string;
     readonly #nodeCount: number;
     readonly #edgeCount: number;
-    readonly #projectName: string | null;
+    readonly #projectName:
+        string | undefined;
 
     constructor(wf: FlowSummary) {
         this.#id = wf.id;

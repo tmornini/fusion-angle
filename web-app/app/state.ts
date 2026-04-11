@@ -1,6 +1,7 @@
+import { log } from './logger';
 import { showToast } from './toast';
 import {
-    readPreference,
+    getPreference,
     writePreference,
 } from './preferences-store';
 
@@ -38,7 +39,7 @@ class AppStateManager {
         this.data = {
             theme: (() => {
                 const raw =
-                    readPreference(
+                    getPreference(
                         STORAGE_KEY_THEME,
                     );
                 return isValidTheme(raw)
@@ -51,7 +52,7 @@ class AppStateManager {
                 + 'px)',
             ).matches,
             isSidebarCollapsed:
-                readPreference(
+                getPreference(
                     STORAGE_KEY_SIDEBAR,
                 ) === 'true',
             isSidebarOpen: false,
@@ -113,7 +114,12 @@ class AppStateManager {
                 STORAGE_KEY_THEME,
                 theme,
             );
-        } catch {
+        } catch (err) {
+            log.warn(
+                'theme write failed',
+                'state',
+                err,
+            );
             showToast(
                 'Failed to save theme'
                 + ' preference.',
@@ -132,7 +138,12 @@ class AppStateManager {
                 STORAGE_KEY_SIDEBAR,
                 String(collapsed),
             );
-        } catch {
+        } catch (err) {
+            log.warn(
+                'sidebar write failed',
+                'state',
+                err,
+            );
             showToast(
                 'Failed to save'
                 + ' sidebar state.',

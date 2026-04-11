@@ -6,11 +6,15 @@ import type {
     GraphNode,
     GraphEdge,
     GraphField,
+    WfFieldType,
 } from '../../../api/types';
 import { toBool } from '../../../api/types';
 import { parseJson } from './helpers';
 
-export type { GraphNode, GraphEdge, GraphField };
+export type {
+    GraphNode, GraphEdge, GraphField,
+    WfFieldType,
+};
 
 export interface FlowGraph {
     id: string;
@@ -35,7 +39,7 @@ export interface FlowSummary {
     description: string;
     nodeCount: number;
     edgeCount: number;
-    projectName: string | null;
+    projectName: string | undefined;
 }
 
 interface StoredGraph {
@@ -46,10 +50,7 @@ interface StoredGraph {
 function parseGraph(
     raw: string,
 ): StoredGraph {
-    return parseJson<StoredGraph>(
-        raw,
-        { nodes: [], edges: [] },
-    );
+    return parseJson<StoredGraph>(raw);
 }
 
 export async function getFlows(
@@ -69,15 +70,17 @@ export async function getFlows(
     );
 
     const projectByFlow = new Map<
-        string, string | null
+        string, string
     >();
     for (const pw of projectFlows) {
-        projectByFlow.set(
-            pw.flow_id,
-            projectMap.get(
-                pw.project_id,
-            ) ?? null,
+        const name = projectMap.get(
+            pw.project_id,
         );
+        if (name !== undefined) {
+            projectByFlow.set(
+                pw.flow_id, name,
+            );
+        }
     }
 
     return flows.map(f => {
@@ -87,8 +90,7 @@ export async function getFlows(
             name: f.name,
             description: f.description,
             projectName:
-                projectByFlow.get(f.id)
-                    ?? null,
+                projectByFlow.get(f.id),
             nodeCount: g.nodes.length,
             edgeCount: g.edges.length,
         };

@@ -1,4 +1,5 @@
 import { $ } from './dom';
+import { log } from './logger';
 import { navigateTo } from './navigation';
 import { showToast } from './toast';
 
@@ -12,7 +13,7 @@ interface HeaderData {
     }>;
 }
 
-async function fetchHeaderData(
+async function getHeaderData(
 ): Promise<HeaderData> {
     const {
         getCurrentUser,
@@ -37,8 +38,13 @@ export async function mutateHeaderInfo(
 ): Promise<void> {
     let data: HeaderData;
     try {
-        data = await fetchHeaderData();
-    } catch {
+        data = await getHeaderData();
+    } catch (err) {
+        log.error(
+            'getHeaderData failed',
+            'header-info',
+            err,
+        );
         showToast(
             'Header info load failed',
             'error',

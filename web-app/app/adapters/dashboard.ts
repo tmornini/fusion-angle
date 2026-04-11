@@ -73,7 +73,7 @@ export async function getDashboardGauges(
         }
         sumCurrentDays += Math.max(
             0,
-            Math.ceil(
+            Math.floor(
                 (now - start) / msPerDay,
             ),
         );

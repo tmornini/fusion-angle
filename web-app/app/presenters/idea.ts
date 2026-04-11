@@ -13,7 +13,6 @@ import {
     iconCheckCircle,
     iconCheckCircle2,
     iconXCircle,
-    iconMessageSquare,
     iconEdit,
     iconSave,
     iconX,
@@ -21,13 +20,13 @@ import {
 import type {
     Idea,
     IdeaStatus,
-} from '../../../api/types';
+} from '../adapters';
+import {
+    IDEA_STATUS_CONFIG,
+} from '../adapters';
 import {
     orderedKeys,
 } from './ordered-keys';
-import {
-    IDEA_STATUS_CONFIG,
-} from '../../../api/types';
 
 const STATUS_ICONS: Record<
     IdeaStatus,
@@ -55,7 +54,7 @@ export class IdeaPresenter {
     readonly #submittedBy: string;
     readonly #submittedAt: string;
     readonly #problemStatement: string;
-    readonly #description: string;
+    readonly #targetUsers: string;
     readonly #proposedSolution: string;
     readonly #expectedOutcome: string;
     readonly #successMetrics: string;
@@ -75,7 +74,8 @@ export class IdeaPresenter {
         this.#submittedAt = idea.submittedAt;
         this.#problemStatement =
             idea.problemStatement;
-        this.#description = idea.description;
+        this.#targetUsers =
+            idea.targetUsers;
         this.#proposedSolution =
             idea.proposedSolution;
         this.#expectedOutcome =
@@ -196,33 +196,6 @@ export class IdeaPresenter {
                 + 'padding-bottom:'
                 + '0.5rem'
             }">
-            ${this.#isReviewable
-                ? html`
-            <button
-                class="${
-                    'btn btn-outline'
-                    + ' btn-sm gap-2'
-                }"
-                style="${
-                    'border-color:'
-                    + 'hsl('
-                    + 'var(--warning)'
-                    + '/0.3);'
-                    + 'color:hsl('
-                    + 'var(--warning))'
-                }"
-                data-idea-review="${this.#id}">
-                ${iconClipboardCheck(
-                    16, '',
-                )}
-                <span
-                    class="${
-                        'hidden-'
-                        + 'mobile'
-                    }">
-                    Review
-                </span>
-            </button>` : html``}
             ${this.#isConvertible
                 ? html`
             <button
@@ -425,33 +398,7 @@ export class IdeaPresenter {
                 'action-footer-inner'
             }">
                 <div class="flex items-center
-                    justify-between gap-4">
-                    <button
-                        class="${
-                            'btn btn-outline'
-                            + ' gap-2'
-                        }"
-                        id="${
-                            'approval-clarify'
-                            + '-btn'
-                        }">
-                        ${iconMessageSquare(
-                            16, '',
-                        )}
-                        <span class="${
-                            'hidden-mobile'
-                        }">
-                            ${'Request'
-                                + ' Clarification'}
-                        </span>
-                        <span
-                            class="${
-                                'visible-'
-                                + 'mobile'
-                            }">
-                            Clarify
-                        </span>
-                    </button>
+                    justify-end gap-4">
                     <div class="flex gap-3">
                         <button
                             class="${
@@ -577,80 +524,6 @@ export class IdeaPresenter {
                     Send Back
                 </button>
             </div>
-        </div>
-
-        <div
-            id="${
-                'approval-clarify'
-                + '-backdrop'
-            }"
-            class="${
-                'dialog-backdrop hidden'
-            }">
-        </div>
-        <div
-            id="${
-                'approval-clarify'
-                + '-dialog'
-            }"
-            class="dialog hidden"
-            role="dialog"
-            aria-modal="true"
-            style="max-width:28rem">
-            <div class="dialog-header">
-                <h3 class="dialog-title">
-                    ${'Request'
-                        + ' Clarification'}
-                </h3>
-                <p class="${
-                    'dialog-description'
-                }">
-                    ${'Ask the submitter'
-                        + ' for additional'
-                        + ' details before'
-                        + ' making a'
-                        + ' decision.'}
-                </p>
-            </div>
-            <div class="py-4">
-                <textarea
-                    class="${
-                        'textarea'
-                        + ' resize-none'
-                    }"
-                    id=${'approval'
-                        + '-clarify'
-                        + '-feedback'}
-                    placeholder="${
-                        'What additional'
-                        + ' information'
-                        + ' do you'
-                        + ' need?'
-                    }"
-                    rows="4">
-                </textarea>
-            </div>
-            <div class="dialog-footer">
-                <button
-                    class="${
-                        'btn btn-outline'
-                    }"
-                    id="${
-                        'approval-clarify'
-                        + '-cancel'
-                    }">
-                    Cancel
-                </button>
-                <button
-                    class="${
-                        'btn btn-primary'
-                    }"
-                    id=${'approval'
-                        + '-clarify'
-                        + '-confirm'}>
-                    Send Request
-                </button>
-            </div>
         </div>`;
     }
 
@@ -695,20 +568,19 @@ export class IdeaPresenter {
                     Target Users
                 </p>
                 ${isEditing
-                    ? html`<textarea
-                        class="textarea"
+                    ? html`<input
+                        class="input"
                         id="${
                             'idea-edit-'
-                            + 'target-users'
+                            + 'target'
                         }"
-                        rows="2"
-                        style="resize:none"
-                        >${this
-                            .#description
-                        }</textarea>`
+                        value="${
+                            this.#targetUsers
+                        }" />`
                     : html`<p class="text-sm">
                         ${displayText(
-                            this.#description,
+                            this
+                                .#targetUsers,
                         )}
                         </p>`}
             </div>

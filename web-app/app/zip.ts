@@ -219,7 +219,7 @@ export function buildZip(
     return out;
 }
 
-function findEocd(
+function locateEocd(
     view: DataView,
     length: number,
 ): number {
@@ -258,7 +258,7 @@ async function inflate(
     return new Uint8Array(buf);
 }
 
-function readLocalData(
+function getLocalData(
     view: DataView,
     data: Uint8Array,
     localOff: number,
@@ -283,7 +283,7 @@ function readLocalData(
     );
 }
 
-export async function readZip(
+export async function getZipEntries(
     data: Uint8Array,
 ): Promise<ZipEntry[]> {
     const view = new DataView(
@@ -292,7 +292,7 @@ export async function readZip(
         data.byteLength,
     );
 
-    const eocd = findEocd(
+    const eocd = locateEocd(
         view, data.byteLength,
     );
     if (eocd < 0) return [];
@@ -346,7 +346,7 @@ export async function readZip(
         off +=
             nameLen + extraLen + commentLen;
 
-        const raw = readLocalData(
+        const raw = getLocalData(
             view, data, localOff, compSz,
         );
         if (!raw) continue;

@@ -23,21 +23,21 @@ run as a single continuous regression pass.
 | AA. Data Entry Workflow | 43 |
 | B. Entry Pages | 16 |
 | C. Core: Dashboard | 7 |
-| D. Core: Ideas Workflow | 48 |
-| E. Core: Projects | 11 |
-| F. Tools | 36 |
+| D. Core: Ideas Workflow | 35 |
+| E. Core: Projects | 10 |
+| F. Tools | 53 |
 | G. Admin Pages | 34 |
 | H. Reference & System | 2 |
 | I. Cross-Cutting Concerns | 27 |
 | J. Teardown | 3 |
-| **Total** | **232** |
+| **Total** | **235** |
 
 ---
 
 ## A. Build & Setup
 
 - [ ] **A1** Run `./build` from a clean working directory. PASS: exits 0, prints no errors, creates `~/Desktop/fusion-ai-<sha>.zip`.
-- [ ] **A2** Run `./build --no-zip /tmp/fusion-test/`. PASS: `/tmp/fusion-test/` contains `assets/app.js`, `assets/styles.css`, `assets/` (*.woff2 fonts), `index.html`, and 12 page directories containing 23 HTML page files, plus root `index.html`.
+- [ ] **A2** Run `./build --no-zip /tmp/fusion-test/`. PASS: `/tmp/fusion-test/` contains `assets/app.js`, `assets/styles.css`, `assets/` (*.woff2 fonts), `index.html`, and 13 page directories containing 23 HTML page files, plus root `index.html`.
 - [ ] **A3** Start an HTTP server from the build directory (`cd /tmp/fusion-test/ && python3 -m http.server 8080`). PASS: server starts without errors.
 - [ ] **A4** Open `http://localhost:8080/` in the test browser. PASS: redirects to `snapshots/index.html` when no data exists, or `landing/index.html` (which auto-redirects to `dashboard/index.html` after ~2 seconds) when data has been loaded.
 - [ ] **A5** Open DevTools Console and confirm no JavaScript errors on initial load. PASS: console is clean (warnings from browser extensions are acceptable).
@@ -53,7 +53,7 @@ on. Run these in order.
 ### AA1. Create Pristine Environment
 
 - [ ] **AA1** Navigate to `snapshots/`. Click "Create Pristine Environment" and confirm the wipe dialog. PASS: redirects to dashboard. Dashboard shows empty/minimal state.
-- [ ] **AA2** Open DevTools, verify localStorage has `fusion-ai:*` keys (19 tables as empty arrays plus bootstrap data).
+- [ ] **AA2** Open DevTools, verify localStorage has `fusion-ai:*` keys (17 tables as empty arrays plus bootstrap data).
 - [ ] **AA3** Verify bootstrap data exists: user "Tony Stark" (id: `current`), company "Stark Industries" with "Business" plan.
 
 ### AA2. Create Users
@@ -72,8 +72,8 @@ on. Run these in order.
 
 ### AA4. Create Ideas
 
-- [ ] **AA12** Navigate to Ideas. Click "Create Idea". Complete the 3-step wizard for "AI-Powered Customer Segmentation" (title, problem, solution, outcome, metrics). PASS: idea appears on ideas list.
-- [ ] **AA13** Navigate to the new idea's detail page. Click "Edit". Verify only title and text fields (problem, solution, outcome, target users, metrics) are editable. Click "Save". PASS: toast confirms save, all fields persist.
+- [ ] **AA12** Navigate to Ideas. Click "Create Idea". Fill in title, problem, solution, and outcome for "AI-Powered Customer Segmentation". Click "Submit Idea". PASS: idea appears on ideas list.
+- [ ] **AA13** Navigate to the new idea's detail page. Click "Edit". Verify title and text fields (problem, solution, outcome) are editable. Click "Save". PASS: toast confirms save, all fields persist.
 - [ ] **AA14** Repeat creation and field entry for all 11 ideas matching mock data titles. PASS: ideas list shows all 11 with correct titles.
 
 ### AA5. Submit Ideas for Review
@@ -240,9 +240,9 @@ on. Run these in order.
 
 - [ ] **C1** Navigate to `dashboard/`. PASS: page loads with sidebar, header, and main content area.
 - [ ] **C2** Sidebar shows flat navigation
-  links: Dashboard, Ideas, Projects, Flows,
-  Organization, Teams, Snapshots, Design
-  System. PASS: all links present and styled.
+  links: Dashboard, Workbox, Ideas, Projects,
+  Flows, Organization, Teams, Snapshots,
+  Design System. PASS: all links present and styled.
 - [ ] **C3** Header shows search bar, greeting
   ("Good {morning/afternoon/evening}, Tony
   Stark" — varies by time of day), company
@@ -261,10 +261,6 @@ on. Run these in order.
 ### Ideas List (`ideas/`)
 
 - [ ] **D1** Navigate to `ideas/`. PASS: table/list shows 11 ideas with title, status, and Time/Cost/Impact stats. Ideas without estimates show "—" (em-dash) instead of zero values.
-- [ ] **D1b** "Idea Flow" workflow banner is
-  visible showing the 3 stages: Create → Review
-  → Convert. PASS: banner renders with labeled
-  steps.
 - [ ] **D2** Each idea row shows a status badge
   (Active, In Review, Approved, Promoted, Sent
   Back, or Archived). PASS: badges render with
@@ -272,24 +268,22 @@ on. Run these in order.
 - [ ] **D3** Click an idea row/title. PASS: navigates to the idea's detail or scoring page with the correct `ideaId` parameter.
 - [ ] **D4** "New Idea" or "Create Idea" button is visible. PASS: clicking it navigates to `ideas/create.html`.
 
-### Idea Create Wizard (`ideas/create.html`)
+### Idea Create Form (`ideas/create.html`)
 
-- [ ] **D5** Page loads showing Step 1 of 3 ("The Problem") with a progress bar. PASS: step indicator shows step 1 active, steps 2 and 3 inactive.
-- [ ] **D6** "Continue" button is disabled when Title and Problem Statement are empty. PASS: button is visually disabled and not clickable.
-- [ ] **D7** Enter a Title and Problem Statement. PASS: "Continue" button becomes enabled.
-- [ ] **D8** Click "Continue". PASS: advances to Step 2 ("The Solution"), progress bar updates.
-- [ ] **D9** Step 2 shows "Proposed Solution" textarea (required). "Continue" is disabled until text is entered. PASS: button enables after typing.
-- [ ] **D10** Click "Continue". PASS: advances to Step 3 ("The Impact"), button label changes to "Submit Idea".
-- [ ] **D11** Step 3 shows "Expected Outcome" (required) and "Success Metrics" (optional). "Submit Idea" disabled until Expected Outcome is filled. PASS: button enables after typing in Expected Outcome.
+- [ ] **D5** Page loads showing a single-page form with six fields: Title, Problem Statement, Target Users, Proposed Solution, Expected Outcome, Success Metrics. PASS: all six fields visible.
+- [ ] **D6** "Submit Idea" button is disabled when any required field is empty. PASS: button is visually disabled and not clickable.
+- [ ] **D7** Fill in all required fields (Title,
+  Problem Statement, Proposed Solution,
+  Expected Outcome). PASS: "Submit Idea" button becomes enabled.
 - [ ] **D12** Click "Submit Idea". PASS: navigates to `ideas/index.html`.
-- [ ] **D13** On Step 2, click "Back". PASS: returns to Step 1 with previously entered data preserved.
-- [ ] **D14** On Step 1, click "Cancel" (or "Back"). PASS: navigates to `ideas/` list.
-- [ ] **D15** "Generate with AI" button is present in the header. PASS: button is visible (no action expected — UI placeholder).
+- [ ] **D14** Click "Cancel". PASS: navigates to `ideas/` list.
 
 ### Idea Detail (`ideas/detail.html?ideaId=1`)
 
 - [ ] **D16** Navigate to `ideas/detail.html?ideaId=1`. PASS: page loads with idea title, status badge, and "Submitted by [name] @ [date/time]" in the header.
-- [ ] **D17** Page displays one card: Problem & Solution (Problem Statement, Target Users, Proposed Solution, Expected Outcome, Success Metrics). PASS: all fields populated. No Details or Estimates cards.
+- [ ] **D17** Page displays one card: Problem & Solution (Problem Statement,
+  Target Users, Proposed Solution, Expected
+  Outcome, Success Metrics). PASS: all fields populated. No Details or Estimates cards.
 - [ ] **D18** Click "Edit" button. PASS: text fields become editable inputs/textareas, Save and Cancel buttons appear, Edit button hides.
 - [ ] **D19** Modify a field (e.g. title), click "Save". PASS: toast "Idea saved" appears, page returns to view mode with updated data.
 
@@ -299,7 +293,7 @@ on. Run these in order.
 - [ ] **D19c** For an idea in "in_review"
   status: clicking the card navigates to
   `ideas/detail.html` page with approval
-  footer (Approve / Send Back / Clarify).
+  footer (Approve / Send Back).
 - [ ] **D19e** For a convertible idea: "Convert" action button is visible. PASS: clicking it navigates to `ideas/convert.html` page.
 - [ ] **D19f** Navigate to `ideas/detail.html?ideaId=999` (non-existent). PASS: page handles gracefully — shows error state, no unhandled JS exception.
 
@@ -315,8 +309,8 @@ on. Run these in order.
 
 ### Idea Convert (`ideas/convert.html`)
 
-- [ ] **D20** Navigate to `ideas/convert.html?ideaId=<id>` for a convertible idea. PASS: page loads with conversion form showing 5 required fields: Project Name, Project Lead (dropdown of active users), Start Date, Target End Date, Cost (text input). Sticky sidebar shows "Problem & Solution" with title, problem, target users, solution, expected outcome, and success metrics.
-- [ ] **D20b** With required fields empty, "Create Project" button is disabled and progress bar shows 0/5. Fill fields one at a time. PASS: progress bar increments with each field, checkmarks appear next to completed fields, button enables only when all 5 required fields are filled.
+- [ ] **D20** Navigate to `ideas/convert.html?ideaId=<id>` for a convertible idea. PASS: page loads with conversion form showing 6 required fields: Project Name, Project Lead (dropdown of active users), Start Date, Target End Date, Budget, Impact. Sticky sidebar shows "Problem & Solution" with title, problem, solution, and expected outcome.
+- [ ] **D20b** With required fields empty, "Create Project" button is disabled and progress bar shows 0/6. Fill fields one at a time. PASS: progress bar increments with each field, checkmarks appear next to completed fields, button enables only when all 6 required fields are filled.
 - [ ] **D21** Fill all required fields (progress bar reaches 100%), click "Create Project". PASS: navigates to project detail page for the newly created project.
 
 ### Idea Status Filtering (`ideas/index.html`)
@@ -328,15 +322,14 @@ on. Run these in order.
 
 ### Idea Detail — Approval Actions
 
-- [ ] **D25** Navigate to `ideas/detail.html?ideaId=7` (in-review idea). PASS: page loads with idea details and sticky approval footer showing Clarify / Send Back / Approve.
+- [ ] **D25** Navigate to `ideas/detail.html?ideaId=7` (in-review idea). PASS: page loads with idea details and sticky approval footer showing Send Back / Approve.
 - [ ] **D27** Click "Approve". PASS: success toast, navigates to ideas list, idea status is now "approved".
 - [ ] **D29** Click "Send Back". PASS: dialog opens asking for feedback. Confirm. PASS: idea status changes to "sent-back", navigates to ideas list.
-- [ ] **D30** Click "Request Clarification". PASS: dialog opens. Submit. PASS: toast "Clarification requested" appears, dialog closes.
 - [ ] **D25b** Navigate to idea detail for a non-in-review idea. PASS: no approval footer is shown.
 
 ### Ideas Workflow Integration
 
-- [ ] **D31** After completing the idea-create wizard through to idea convert, navigate back to `ideas/`. PASS: the ideas list still loads correctly with seed data.
+- [ ] **D31** After creating an idea and converting it to a project, navigate back to `ideas/`. PASS: the ideas list still loads correctly with seed data.
 - [ ] **D32** Navigate from ideas list → idea convert → back button. PASS: navigates to ideas list.
 - [ ] **D33** Navigate to `ideas/convert.html?ideaId=999` (non-existent). PASS: page handles gracefully — shows empty/error state, no unhandled JS exception.
 
@@ -346,7 +339,7 @@ on. Run these in order.
 
 ### Projects List (`projects/`)
 
-- [ ] **E1** Navigate to `projects/`. PASS: table/list shows 6 seeded projects with title, status, and progress. Project cards show "—" (em-dash) for missing/zero metric values (time, cost, impact). Footer count uses correct singular/plural grammar (e.g. "1 project", "6 projects").
+- [ ] **E1** Navigate to `projects/`. PASS: table/list shows 6 seeded projects with title, status, and progress. Project cards show "—" (em-dash) for missing/zero metric values (time, cost, impact).
 - [ ] **E1c** Click a status filter badge (e.g. "Active"). PASS: project list filters to show only projects with that status. Click the same badge again or "All". PASS: full list returns.
 - [ ] **E2** Click a project row. PASS: navigates to `projects/detail.html?projectId=<id>`.
 
@@ -405,7 +398,8 @@ on. Run these in order.
 - [ ] **F14** Navigate to a flow designer page.
   PASS: toolbar at top with Undo, Redo, Delete
   (trash icon), Auto Layout, Zoom −/Show All/+,
-  Copy Mermaid, Export, Lock Down. SVG canvas
+  Copy Mermaid, Export. Locked checkbox in
+  header controls edit lock. SVG canvas
   below with dot grid background showing the flow
   graph. Changes auto-save (no explicit Save
   button).
@@ -568,7 +562,7 @@ on. Run these in order.
   a "+ New" button.
 - [ ] **WB2** With no work orders, the Active
   tab shows an empty state with mail icon and
-  "No Active Work Orders" message.
+  "No Active Work Orders Yet" message.
 - [ ] **WB3** Click the Archive tab. PASS: tab
   switches to show archive list (empty state
   initially).
@@ -601,7 +595,8 @@ on. Run these in order.
 - [ ] **WB8** Transition buttons appear below
   the fields, one per outgoing edge from the
   current node, labeled with the edge name.
-- [ ] **WB9** An "Unclaim" button is visible,
+- [ ] **WB9** A "Release Work Order" button is
+  visible,
   separate from transition buttons.
 - [ ] **WB10** A collapsible History section
   shows all transitions with from/to state
@@ -701,7 +696,7 @@ on. Run these in order.
 
 - [ ] **G18** Navigate to `snapshots/`. PASS: shows 4 operation cards: Create Pristine Environment, Wipe and Load Mock Data, Upload Snapshot, Download Snapshot.
 - [ ] **G19** Click "Download Snapshot". PASS: browser downloads `fusion-ai-snapshot-YYYY-MM-DD.json`. File contains valid JSON with entity data.
-- [ ] **G20** Click "Create Pristine Environment", confirm the dialog. PASS: redirects to `dashboard/index.html`. Dashboard renders with zeroed-out metrics (empty database). All 19 `fusion-ai:*` keys exist in localStorage as empty arrays.
+- [ ] **G20** Click "Create Pristine Environment", confirm the dialog. PASS: redirects to `dashboard/index.html`. Dashboard renders with zeroed-out metrics (empty database). All 17 `fusion-ai:*` keys exist in localStorage as empty arrays.
 - [ ] **G21** Click "Wipe and Load Mock Data". PASS: redirects to `dashboard/index.html`. Navigate to `ideas/` — 11 ideas are back.
 - [ ] **G22** Return to `snapshots/`, wipe data, then use "Upload Snapshot" file input and select the previously downloaded JSON file. PASS: redirects to `dashboard/index.html`. Data matches the snapshot.
 
@@ -765,39 +760,6 @@ on. Run these in order.
 ### Snapshot Round-Trip
 
 - [ ] **I18** Download a snapshot, wipe data (Create Pristine), upload the snapshot. PASS: all data restored correctly — spot-check 3 pages to confirm content matches pre-wipe state.
-
-### Keyboard Shortcuts — Edit Modes & Dialogs
-
-- [ ] **I20** Ideas detail: click Edit, press Enter
-  in the title field. PASS: idea saves, returns
-  to view mode with updated data.
-- [ ] **I20b** Ideas detail: click Edit, press
-  Escape. PASS: returns to view mode, no save.
-- [ ] **I20c** Projects detail: click Edit, press
-  Enter in the title field. PASS: project saves.
-- [ ] **I20d** Projects detail: click Edit, press
-  Escape. PASS: returns to view mode, no save.
-- [ ] **I20e** Flow designer: open field editor,
-  type a name, press Enter. PASS: field is added.
-- [ ] **I20f** Profile: press Enter in first name
-  field. PASS: profile saves.
-- [ ] **I20g** Settings: press Enter in company name
-  field. PASS: settings save.
-- [ ] **I20h** Manage Users: open invite dialog,
-  fill fields, press Enter in email field. PASS:
-  dialog submits.
-- [ ] **I20i** Teams: open add-member dialog, type
-  email, press Enter. PASS: invitation sent.
-- [ ] **I20j** Idea conversion: fill required fields,
-  press Enter in project name. PASS: conversion
-  submits (if all required fields complete).
-- [ ] **I20k** Idea create wizard: type a title,
-  press Enter. PASS: wizard advances to next step.
-- [ ] **I20l** Any dialog: press Escape. PASS: dialog
-  closes without submitting.
-- [ ] **I20m** Ideas detail: click Edit, press Enter
-  in a textarea (e.g. Problem Statement). PASS:
-  newline is inserted, does NOT trigger save.
 
 ### General
 

@@ -13,7 +13,6 @@ import {
 } from '../app/loading-states';
 import {
     iconPlus,
-    iconWand,
     iconLightbulb,
 } from '../app/icons';
 import {
@@ -22,11 +21,9 @@ import {
 import {
     getIdeas,
     putIdea,
-} from '../app/adapters';
-import {
     type IdeaStatus,
     isIdeaStatus,
-} from '../../api/types';
+} from '../app/adapters';
 import {
     IdeaListPresenter,
 } from '../app/presenters';
@@ -53,8 +50,7 @@ export async function init(): Promise<void> {
                 + ' your first idea.',
             action: {
                 label: html`${iconPlus(16, '')}
-                    Create Your First Idea
-                    ${iconWand(16, '')}`,
+                    Create Your First Idea`,
                 href:
                     'create.html',
             },
@@ -73,10 +69,6 @@ export async function init(): Promise<void> {
         [
             '#create-btn-icon',
             iconPlus(16, ''),
-        ],
-        [
-            '#create-btn-accent',
-            iconWand(16, ''),
         ],
     ]);
 
@@ -173,45 +165,23 @@ export async function init(): Promise<void> {
                     !(e.target
                         instanceof Element)
                 ) return;
-                const actionButton =
+                const convertBtn =
                     e.target
                         .closest<HTMLElement>(
-                        '[data-idea-review],'
-                        + ' [data-idea-convert]',
+                        '[data-idea-convert]',
                     );
-                if (actionButton) {
-                    if (
-                        actionButton
-                            .hasAttribute(
-                            'data-idea-review',
-                        )
-                    )
-                        navigateTo(
-                            'idea-detail',
-                            {
-                                ideaId: attr(
-                                    actionButton,
-                                    'data-idea'
-                                    + '-review',
-                                ),
-                            },
-                        );
-                    else if (
-                        actionButton
-                            .hasAttribute(
-                            'data-idea-convert',
-                        )
-                    )
-                        navigateTo(
-                            'idea-convert',
-                            {
-                                ideaId: attr(
-                                    actionButton,
-                                    'data-idea'
-                                    + '-convert',
-                                ),
-                            },
-                        );
+                if (convertBtn) {
+                    navigateTo(
+                        'idea-convert',
+                        {
+                            ideaId: attr(
+                                convertBtn,
+                                'data-idea'
+                                + '-convert',
+                            ),
+                            from: 'list',
+                        },
+                    );
                     return;
                 }
                 const card =

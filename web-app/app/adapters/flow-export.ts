@@ -1,10 +1,17 @@
-import { POST } from '../../../api/api';
+import {
+    GET, POST, PUT,
+} from '../../../api/api';
 import {
     nowUtc,
     jsonObjectField,
     DEFAULT_LOCK_TIMEOUT,
+    toBool,
+    projectIsNotDeleted,
 } from '../../../api/types';
 import type {
+    FlowEntity,
+    ProjectFlowEntity,
+    ProjectEntity,
     GraphNode,
     GraphEdge,
     WfFieldType,
@@ -22,7 +29,7 @@ import type {
     ParsedNode,
 } from '../mermaid-parse';
 import {
-    buildZip, readZip,
+    buildZip, getZipEntries,
 } from '../zip';
 import {
     computeLayout,
@@ -33,7 +40,7 @@ import type {
 
 /* ── Mermaid export ──────────────── */
 
-export async function exportFlowMermaid(
+export async function getFlowMermaid(
     flowId: string,
 ): Promise<string> {
     const graph =
@@ -128,22 +135,185 @@ function buildFlowTxt(
         + minuteUtc(':') + '\n';
 }
 
-export async function exportFlowZip(
+/* ── v2 backup format ───────────── */
+
+export interface BackupV2 {
+    version: 2;
+    exportedAt: string;
+    projectId: string | undefined;
+    flow: {
+        id: string;
+        name: string;
+        description: string;
+        lockTimeout: number;
+        graph: {
+            nodes: GraphNode[];
+            edges: GraphEdge[];
+        };
+    };
+}
+
+export interface ImportDialogConfig {
+    description: string;
+    showProject: boolean;
+    showOverwrite: boolean;
+    showCreateNew: boolean;
+    showCreate: boolean;
+    hasKnownProject: boolean;
+}
+
+export interface ImportResolution {
+    dialog: ImportDialogConfig;
+}
+
+function buildDialogConfig(
+    flowName: string,
+    projectName: string | undefined,
+    flowExists: boolean,
+): ImportDialogConfig {
+    if (projectName && flowExists) {
+        return {
+            description:
+                '\u2018' + flowName
+                + '\u2019 already exists'
+                + ' in \u2018'
+                + projectName + '\u2019.',
+            showProject: false,
+            showOverwrite: true,
+            showCreateNew: true,
+            showCreate: false,
+            hasKnownProject: true,
+        };
+    }
+    if (projectName) {
+        return {
+            description:
+                'Project \u2018'
+                + projectName
+                + '\u2019 found. \u2018'
+                + flowName
+                + '\u2019 will be'
+                + ' created.',
+            showProject: false,
+            showOverwrite: false,
+            showCreateNew: true,
+            showCreate: false,
+            hasKnownProject: true,
+        };
+    }
+    if (flowExists) {
+        return {
+            description:
+                '\u2018' + flowName
+                + '\u2019 exists but its'
+                + ' project does not.',
+            showProject: false,
+            showOverwrite: true,
+            showCreateNew: false,
+            showCreate: false,
+            hasKnownProject: false,
+        };
+    }
+    return {
+        description:
+            'Neither \u2018' + flowName
+            + '\u2019 nor its project'
+            + ' exist. Select a'
+            + ' project.',
+        showProject: true,
+        showOverwrite: false,
+        showCreateNew: false,
+        showCreate: true,
+        hasKnownProject: false,
+    };
+}
+
+async function getFlowBackupData(
+    flowId: string,
+): Promise<{
+    flow: FlowEntity;
+    projectId: string | undefined;
+}> {
+    const [flow, projectFlows] =
+        await Promise.all([
+            GET<FlowEntity>(
+                'flows/' + flowId,
+            ),
+            GET<ProjectFlowEntity[]>(
+                'project-flows',
+            ),
+        ]);
+    const pf = projectFlows.find(
+        r => r.flow_id === flowId,
+    );
+    return {
+        flow,
+        projectId: pf?.project_id,
+    };
+}
+
+function buildBackupJson(
+    flow: FlowEntity,
+    projectId: string | undefined,
+): string {
+    const graph = parseJson<{
+        nodes: GraphNode[];
+        edges: GraphEdge[];
+    }>(flow.graph);
+    const backup: BackupV2 = {
+        version: 2,
+        exportedAt: minuteUtc(':'),
+        projectId,
+        flow: {
+            id: flow.id,
+            name: flow.name,
+            description:
+                flow.description,
+            lockTimeout:
+                flow.lock_timeout,
+            graph,
+        },
+    };
+    return JSON.stringify(
+        backup, null, 2,
+    );
+}
+
+export async function getFlowZip(
     flowId: string,
 ): Promise<{
     data: Uint8Array;
     name: string;
 }> {
-    const graph =
-        await getFlowGraph(flowId);
+    const { flow, projectId } =
+        await getFlowBackupData(flowId);
+
+    const graph = parseJson<{
+        nodes: GraphNode[];
+        edges: GraphEdge[];
+    }>(flow.graph);
+
+    const mermaidGraph: FlowGraph = {
+        id: flow.id,
+        name: flow.name,
+        description: flow.description,
+        isLocked: toBool(
+            flow.is_locked,
+        ),
+        nodes: graph.nodes,
+        edges: graph.edges,
+    };
 
     const enc = new TextEncoder();
-    const mmd =
-        enc.encode(generateMermaid(graph));
-    const json =
-        enc.encode(buildSidecar(graph));
-    const txt =
-        enc.encode(buildFlowTxt(flowId));
+    const mmd = enc.encode(
+        generateMermaid(mermaidGraph),
+    );
+    const json = enc.encode(
+        buildBackupJson(flow, projectId),
+    );
+    const txt = enc.encode(
+        buildFlowTxt(flowId),
+    );
 
     const data = buildZip([
         { name: 'flow.txt', data: txt },
@@ -151,7 +321,7 @@ export async function exportFlowZip(
         { name: 'flow.json', data: json },
     ]);
 
-    const safeName = graph.name
+    const safeName = flow.name
         .replaceAll(
             /[^a-zA-Z0-9_-]/g, '-',
         )
@@ -165,10 +335,190 @@ export async function exportFlowZip(
     };
 }
 
+/* ── v2 import ───────────────── */
+
+export async function getZipBackup(
+    data: Uint8Array,
+): Promise<BackupV2> {
+    const entries = await getZipEntries(data);
+    const jsonEntry = entries.find(
+        e => e.name === 'flow.json'
+            || e.name.endsWith(
+                '/flow.json',
+            ),
+    );
+    if (!jsonEntry) {
+        throw new Error(
+            'ZIP missing flow.json',
+        );
+    }
+    const dec = new TextDecoder();
+    const text =
+        dec.decode(jsonEntry.data);
+    const parsed = JSON.parse(text) as {
+        version?: unknown;
+    };
+    if (parsed.version !== 2) {
+        throw new Error(
+            'Unsupported backup version: '
+            + String(parsed.version),
+        );
+    }
+    return parsed as
+        unknown as BackupV2;
+}
+
+export async function getFlowBackupResolution(
+    backup: BackupV2,
+): Promise<ImportResolution> {
+    const [flows, projects] =
+        await Promise.all([
+            GET<FlowEntity[]>('flows'),
+            GET<ProjectEntity[]>(
+                'projects',
+            ),
+        ]);
+    const flowExists = flows.some(
+        f => f.id === backup.flow.id,
+    );
+    const project = backup.projectId
+        ? projects.find(
+            p => p.id
+                === backup.projectId
+                && projectIsNotDeleted(
+                    p,
+                ),
+        )
+        : undefined;
+
+    return {
+        dialog: buildDialogConfig(
+            backup.flow.name,
+            project?.title,
+            flowExists,
+        ),
+    };
+}
+
+export async function overwriteFlow(
+    backup: BackupV2,
+): Promise<string> {
+    await PUT(
+        'flows/' + backup.flow.id,
+        {
+            name: backup.flow.name,
+            description:
+                backup.flow.description,
+            lock_timeout:
+                backup.flow.lockTimeout,
+            graph: putFlowGraph(
+                backup.flow.graph,
+            ),
+            updated_at: nowUtc(),
+        },
+    );
+    return backup.flow.id;
+}
+
+export async function postFlowFromBackup(
+    backup: BackupV2,
+    projectId: string,
+): Promise<string> {
+    const flowId = crypto.randomUUID();
+    const now = nowUtc();
+
+    const idMap =
+        new Map<string, string>();
+    for (
+        const n
+            of backup.flow.graph.nodes
+    ) {
+        idMap.set(
+            n.id,
+            crypto.randomUUID(),
+        );
+    }
+
+    const nodes: GraphNode[] =
+        backup.flow.graph.nodes.map(
+            n => ({
+                id: idMap.get(n.id)!,
+                name: n.name,
+                description:
+                    n.description,
+                positionX: n.positionX,
+                positionY: n.positionY,
+                isStart: n.isStart,
+                isComplete: n.isComplete,
+                fields: n.fields.map(
+                    f => ({
+                        id: crypto
+                            .randomUUID(),
+                        name: f.name,
+                        fieldType:
+                            f.fieldType,
+                        sortOrder:
+                            f.sortOrder,
+                        isRequired:
+                            f.isRequired,
+                        options:
+                            f.options,
+                    }),
+                ),
+            }),
+        );
+
+    const edges: GraphEdge[] =
+        backup.flow.graph.edges.map(
+            e => ({
+                id: crypto.randomUUID(),
+                name: e.name,
+                description:
+                    e.description,
+                fromNodeId:
+                    idMap.get(
+                        e.fromNodeId,
+                    )!,
+                toNodeId:
+                    idMap.get(
+                        e.toNodeId,
+                    )!,
+            }),
+        );
+
+    await POST<void>('flows', {
+        id: flowId,
+        name: backup.flow.name,
+        description:
+            backup.flow.description,
+        lock_timeout:
+            backup.flow.lockTimeout,
+        graph: putFlowGraph({
+            nodes, edges,
+        }),
+        created_at: now,
+        updated_at: now,
+    });
+
+    await POST<void>(
+        'project-flows',
+        {
+            id: crypto.randomUUID(),
+            project_id: projectId,
+            flow_id: flowId,
+            created_at: now,
+        },
+    );
+
+    return flowId;
+}
+
 /* ── Mermaid import ──────────────── */
 
 const IMPORT_CANVAS_W = 1200;
 const IMPORT_CANVAS_H = 800;
+const IMPORT_DEFAULT_DESCRIPTION = '';
+const IMPORT_FALLBACK_POSITION = 0;
 
 function layoutParsedNodes(
     nodes: ParsedNode[],
@@ -199,7 +549,7 @@ interface StoredGraph {
     edges: GraphEdge[];
 }
 
-function saveGraph(
+function putFlowGraph(
     graph: StoredGraph,
 ): string {
     return jsonObjectField(
@@ -209,7 +559,7 @@ function saveGraph(
     );
 }
 
-export async function importFlowFromMermaid(
+export async function postFlowFromMermaid(
     text: string,
     projectId: string,
 ): Promise<{
@@ -249,9 +599,12 @@ export async function importFlowFromMermaid(
             return {
                 id: nodeId,
                 name: n.name,
-                description: '',
-                positionX: pos?.x ?? 0,
-                positionY: pos?.y ?? 0,
+                description:
+                    IMPORT_DEFAULT_DESCRIPTION,
+                positionX: pos?.x
+                    ?? IMPORT_FALLBACK_POSITION,
+                positionY: pos?.y
+                    ?? IMPORT_FALLBACK_POSITION,
                 isStart: n.isStart,
                 isComplete: n.isComplete,
                 fields: [],
@@ -267,7 +620,8 @@ export async function importFlowFromMermaid(
         edges.push({
             id: crypto.randomUUID(),
             name: e.name,
-            description: '',
+            description:
+                IMPORT_DEFAULT_DESCRIPTION,
             fromNodeId: fromId,
             toNodeId: toId,
         });
@@ -283,7 +637,7 @@ export async function importFlowFromMermaid(
             + ' (import)',
         description: '',
         lock_timeout: DEFAULT_LOCK_TIMEOUT,
-        graph: saveGraph(graph),
+        graph: putFlowGraph(graph),
         created_at: now,
         updated_at: now,
     });
@@ -309,7 +663,7 @@ interface SidecarData {
     edges: SidecarEdge[];
 }
 
-export async function importFlowFromZip(
+export async function postFlowFromZip(
     data: Uint8Array,
     projectId: string,
 ): Promise<{
@@ -317,7 +671,7 @@ export async function importFlowFromZip(
     warnings: string[];
 }> {
     const dec = new TextDecoder();
-    const entries = await readZip(data);
+    const entries = await getZipEntries(data);
 
     const mmdEntry = entries.find(
         e => e.name === 'flow.mmd'
@@ -346,17 +700,14 @@ export async function importFlowFromZip(
         );
     }
 
-    const fallback =
-        null as unknown as SidecarData;
-    const sidecar: SidecarData | null =
+    const sidecar: SidecarData | undefined =
         jsonEntry
             ? parseJson<SidecarData>(
                 dec.decode(
                     jsonEntry.data,
                 ),
-                fallback,
             )
-            : null;
+            : undefined;
 
     const sidecarNodeMap = new Map<
         string, SidecarNode
@@ -398,7 +749,8 @@ export async function importFlowFromZip(
         ?? parsed.nodes[0]!.name
             + ' (import)';
     const flowDesc =
-        sidecar?.description ?? '';
+        sidecar?.description
+        ?? IMPORT_DEFAULT_DESCRIPTION;
 
     const idMap =
         new Map<string, string>();
@@ -429,9 +781,12 @@ export async function importFlowFromZip(
                 id: nodeId,
                 name: n.name,
                 description:
-                    sc?.description ?? '',
-                positionX: pos?.x ?? 0,
-                positionY: pos?.y ?? 0,
+                    sc?.description
+                    ?? IMPORT_DEFAULT_DESCRIPTION,
+                positionX: pos?.x
+                    ?? IMPORT_FALLBACK_POSITION,
+                positionY: pos?.y
+                    ?? IMPORT_FALLBACK_POSITION,
                 isStart: n.isStart,
                 isComplete: n.isComplete,
                 fields: sc
@@ -471,7 +826,8 @@ export async function importFlowFromZip(
             id: crypto.randomUUID(),
             name: e.name,
             description:
-                se?.description ?? '',
+                se?.description
+                ?? IMPORT_DEFAULT_DESCRIPTION,
             fromNodeId: fromId,
             toNodeId: toId,
         });
@@ -486,7 +842,7 @@ export async function importFlowFromZip(
         name: flowName,
         description: flowDesc,
         lock_timeout: DEFAULT_LOCK_TIMEOUT,
-        graph: saveGraph(graph),
+        graph: putFlowGraph(graph),
         created_at: now,
         updated_at: now,
     });

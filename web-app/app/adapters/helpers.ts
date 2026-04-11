@@ -4,9 +4,15 @@ import type {
     UserEntity,
 } from '../../../api/types';
 import { User } from '../../../api/types';
-import { log } from '../logger';
-
-export async function buildUserMap(): Promise<Map<Id, User>> {
+export {
+    jsonArrayField,
+    jsonObjectField,
+    nowUtc,
+    SECONDS_PER_DAY,
+    durationInDays,
+    formatCompactCurrency,
+} from '../../../api/types';
+export async function getUserMap(): Promise<Map<Id, User>> {
     const users = await GET<UserEntity[]>('users');
     return new Map(users.map(entity => [entity.id, new User(entity)]));
 }
@@ -22,20 +28,9 @@ export function userName(
 
 export function parseJson<T>(
     value: string | T,
-    recoveryShape: T,
 ): T {
     if (typeof value === 'string') {
-        try {
-            return JSON.parse(value) as T;
-        } catch {
-            log.warn(
-                'Failed to parse JSON'
-                + ' value: '
-                + value.slice(0, 100),
-                'parseJson',
-            );
-            return recoveryShape;
-        }
+        return JSON.parse(value) as T;
     }
     return value;
 }

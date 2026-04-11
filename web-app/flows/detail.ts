@@ -2,6 +2,7 @@ import {
     $, $input, $select,
     bindEnterToClick,
 } from '../app/dom';
+import { log } from '../app/logger';
 import { setHtml } from '../app/safe-html';
 import { showToast } from '../app/toast';
 import {
@@ -13,8 +14,8 @@ import {
 } from '../app/core';
 import {
     getFlowGraph,
-    exportFlowMermaid,
-    exportFlowZip,
+    getFlowMermaid,
+    getFlowZip,
 } from '../app/adapters';
 import {
     bindInteractions,
@@ -73,21 +74,21 @@ class Debouncer {
 const saveDebouncer =
     new Debouncer(SAVE_DELAY_MS);
 
-let currentProjectId:
-    string | undefined;
-
-let interactionAbortController:
-    AbortController | null = null;
+const pageState = {
+    projectId: undefined as
+        string | undefined,
+    interaction: new AbortController(),
+};
 
 function renderAndBind(
     container: HTMLElement,
     presenter: FlowDesignerPresenter,
 ): void {
-    interactionAbortController?.abort();
-    interactionAbortController =
+    pageState.interaction.abort();
+    pageState.interaction =
         new AbortController();
     const signal =
-        interactionAbortController.signal;
+        pageState.interaction.signal;
     saveDebouncer.flush();
     presenter.render(container);
     bindBackButton();
@@ -214,12 +215,12 @@ function bindBackButton(): void {
     $('#flow-back-btn', document)
         ?.addEventListener(
             'click',
-            () => currentProjectId
+            () => pageState.projectId
                 ? navigateTo(
                     'project-detail',
                     {
                         projectId:
-                            currentProjectId,
+                            pageState.projectId,
                     },
                 )
                 : navigateTo('flows'),
@@ -283,7 +284,12 @@ function bindSvgInteractions(
             svg.setPointerCapture(
                 state.activePointerId,
             );
-        } catch {
+        } catch (err) {
+            log.warn(
+                'setPointerCapture failed',
+                'flow-detail',
+                err,
+            );
             state.drag = { kind: 'idle' };
             state.connect =
                 { kind: 'idle' };
@@ -434,8 +440,13 @@ async function handleCopyMermaid(
     let text: string;
     try {
         text =
-            await exportFlowMermaid(flowId);
-    } catch {
+            await getFlowMermaid(flowId);
+    } catch (err) {
+        log.error(
+            'getFlowMermaid failed',
+            'flow-detail',
+            err,
+        );
         showToast(
             'Failed to export Mermaid',
             'error',
@@ -445,7 +456,12 @@ async function handleCopyMermaid(
     try {
         await navigator.clipboard
             .writeText(text);
-    } catch {
+    } catch (err) {
+        log.error(
+            'clipboard write failed',
+            'flow-detail',
+            err,
+        );
         showToast(
             'Failed to copy to clipboard',
             'error',
@@ -468,8 +484,13 @@ async function handleExportZip(
     };
     try {
         result =
-            await exportFlowZip(flowId);
-    } catch {
+            await getFlowZip(flowId);
+    } catch (err) {
+        log.error(
+            'getFlowZip failed',
+            'flow-detail',
+            err,
+        );
         showToast(
             'Failed to export flow',
             'error',
@@ -737,7 +758,7 @@ export async function init(
 ): Promise<void> {
     const flowId =
         params?.flowId;
-    currentProjectId =
+    pageState.projectId =
         params?.projectId;
     if (!flowId) {
         navigateTo('flows');

@@ -16,7 +16,7 @@ import {
     PROJECT_STATUS_CONFIG,
     COST_DIVISOR,
     SECONDS_PER_DAY,
-} from '../../../api/types';
+} from '../adapters';
 import {
     orderedKeys,
 } from './ordered-keys';
@@ -74,7 +74,7 @@ export class ProjectPresenter {
         this.#timeCurrentDays =
             isNaN(start)
                 ? 0
-                : Math.max(0, Math.ceil(
+                : Math.max(0, Math.floor(
                     (Date.now() - start)
                     / msPerDay,
                 ));

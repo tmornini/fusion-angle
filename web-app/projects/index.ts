@@ -14,12 +14,10 @@ import {
 } from '../app/icons';
 import { navigateTo } from '../app/core';
 import {
-    type ProjectStatus,
-    isProjectStatus,
-} from '../../api/types';
-import {
     getProjects,
     putProject,
+    type ProjectStatus,
+    isProjectStatus,
 } from '../app/adapters';
 import {
     ProjectListPresenter,

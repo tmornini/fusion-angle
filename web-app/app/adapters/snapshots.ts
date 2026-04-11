@@ -24,11 +24,11 @@ export async function postBootstrap(
     );
 }
 
-export async function importSnapshot(json: string): Promise<void> {
+export async function putSnapshot(json: string): Promise<void> {
     await PUT('snapshots/import', { json });
 }
 
-export async function exportSnapshot(): Promise<string> {
+export async function getSnapshot(): Promise<string> {
     return GET<string>('snapshots/schema');
 }
 

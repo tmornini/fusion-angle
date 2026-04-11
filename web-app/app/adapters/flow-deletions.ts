@@ -19,13 +19,10 @@ interface StoredGraph {
 function parseGraph(
     raw: string,
 ): StoredGraph {
-    return parseJson<StoredGraph>(
-        raw,
-        { nodes: [], edges: [] },
-    );
+    return parseJson<StoredGraph>(raw);
 }
 
-function saveGraph(
+function putFlowGraph(
     graph: StoredGraph,
 ): string {
     return jsonObjectField(
@@ -43,7 +40,7 @@ function graphPutStep(
         op: 'put',
         resource: `flows/${flowId}`,
         body: {
-            graph: saveGraph(graph),
+            graph: putFlowGraph(graph),
             updated_at: nowUtc(),
         },
     };
@@ -69,7 +66,7 @@ export async function deleteNode(
         n => n.id !== nodeId,
     );
     await PUT(`flows/${flowId}`, {
-        graph: saveGraph(graph),
+        graph: putFlowGraph(graph),
         updated_at: nowUtc(),
     });
 }
@@ -89,7 +86,7 @@ export async function deleteEdge(
         e => e.id !== edgeId,
     );
     await PUT(`flows/${flowId}`, {
-        graph: saveGraph(graph),
+        graph: putFlowGraph(graph),
         updated_at: nowUtc(),
     });
 }
@@ -115,7 +112,7 @@ export async function deleteField(
         );
     }
     await PUT(`flows/${flowId}`, {
-        graph: saveGraph(graph),
+        graph: putFlowGraph(graph),
         updated_at: nowUtc(),
     });
 }
@@ -165,7 +162,7 @@ export async function deleteNodeCapture(
     ];
 
     await PUT(`flows/${flowId}`, {
-        graph: saveGraph(after),
+        graph: putFlowGraph(after),
         updated_at: nowUtc(),
     });
 
@@ -200,7 +197,7 @@ export async function deleteEdgeCapture(
     };
 
     await PUT(`flows/${flowId}`, {
-        graph: saveGraph(after),
+        graph: putFlowGraph(after),
         updated_at: nowUtc(),
     });
 
@@ -245,7 +242,7 @@ export async function deleteFieldCapture(
     };
 
     await PUT(`flows/${flowId}`, {
-        graph: saveGraph(after),
+        graph: putFlowGraph(after),
         updated_at: nowUtc(),
     });
 

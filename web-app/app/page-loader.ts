@@ -39,7 +39,7 @@ const pageModules: Record<
         import('../ideas/convert'),
     flows: () =>
         import('../flows/index'),
-    'flows-detail': () =>
+    'flow-detail': () =>
         import('../flows/detail'),
     teams: () =>
         import(
@@ -81,7 +81,7 @@ const pageModules: Record<
         import('../not-found/index'),
 };
 
-export async function loadAndInitPage(
+export async function initPageModule(
     pageName: string,
 ): Promise<void> {
     const loader =

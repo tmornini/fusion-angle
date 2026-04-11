@@ -10,13 +10,16 @@ import {
     SECONDS_PER_DAY,
 } from '../../../api/types';
 import {
-    buildUserMap,
+    getUserMap,
     userName,
 } from './helpers';
 
 export {
     Project,
     type ProjectStatus,
+    isProjectStatus,
+    PROJECT_STATUS_CONFIG,
+    COST_DIVISOR,
 } from '../../../api/types';
 
 interface TeamMemberRow {
@@ -124,7 +127,7 @@ export class ProjectView {
             this.project.startDate,
         ).getTime();
         if (isNaN(start)) return 0;
-        return Math.max(0, Math.ceil(
+        return Math.max(0, Math.floor(
             (Date.now() - start)
             / (SECONDS_PER_DAY * 1000),
         ));
@@ -162,7 +165,7 @@ export async function getProjectById(
         GET<TeamMemberRow[]>(
             `projects/${projectId}/team`,
         ),
-        buildUserMap(),
+        getUserMap(),
     ]);
 
     const project = new Project(entity);
@@ -193,16 +196,23 @@ export async function putProject(
     await PUT(`projects/${id}`, entity);
 }
 
+export interface TeamMemberAssignment {
+    projectId: string;
+    userId: string;
+    role: string;
+    type: string;
+}
+
 export async function
 putProjectTeamMember(
-    projectId: string,
-    userId: string,
-    role: string,
-    type: string,
+    ctx: TeamMemberAssignment,
 ): Promise<void> {
     await PUT(
-        `projects/${projectId}`
-            + `/team/${userId}`,
-        { role, type },
+        `projects/${ctx.projectId}`
+            + `/team/${ctx.userId}`,
+        {
+            role: ctx.role,
+            type: ctx.type,
+        },
     );
 }

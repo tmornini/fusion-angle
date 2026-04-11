@@ -61,6 +61,8 @@ const LABEL_BG_OPACITY = 0.9;
 const LABEL_TEXT_OFFSET_Y = 4;
 const LABEL_FONT = 11;
 
+const BEZIER_ORIGIN = 0;
+
 export type RectEdge =
     'right' | 'left' | 'top' | 'bottom';
 
@@ -301,39 +303,22 @@ function buildDefs(): string {
         + '</defs>';
 }
 
-const GRID_MIN_W = 1600;
-const GRID_MIN_H = 1000;
-
 function buildGrid(
     vbX: number,
     vbY: number,
     vbW: number,
     vbH: number,
 ): string {
-    const gx = Math.min(
-        vbX, -GRID_MIN_W / 2,
-    );
-    const gy = Math.min(
-        vbY, -GRID_MIN_H / 2,
-    );
-    const gw = Math.max(
-        vbW, GRID_MIN_W,
-        vbX + vbW - gx,
-    );
-    const gh = Math.max(
-        vbH, GRID_MIN_H,
-        vbY + vbH - gy,
-    );
     return '<rect'
-        + ` x="${gx}" y="${gy}"`
-        + ` width="${gw}"`
-        + ` height="${gh}"`
+        + ` x="${vbX}" y="${vbY}"`
+        + ` width="${vbW}"`
+        + ` height="${vbH}"`
         + ' fill="var('
         + '--color-surface, #1a1f2e)"/>'
         + '<rect'
-        + ` x="${gx}" y="${gy}"`
-        + ` width="${gw}"`
-        + ` height="${gh}"`
+        + ` x="${vbX}" y="${vbY}"`
+        + ` width="${vbW}"`
+        + ` height="${vbH}"`
         + ' fill="url(#wf-grid)"/>';
 }
 
@@ -767,8 +752,8 @@ function bezierAt(
         .filter(n => !isNaN(n));
     if (coords.length < 8) {
         return {
-            x: coords[0] ?? 0,
-            y: coords[1] ?? 0,
+            x: coords[0] ?? BEZIER_ORIGIN,
+            y: coords[1] ?? BEZIER_ORIGIN,
         };
     }
     const u = 1 - t;
@@ -921,7 +906,8 @@ export function buildGraphSvg(
         + '"http://www.w3.org/2000/svg"'
         + ` class="${svgCls}"`
         + ` viewBox="${vb}"`
-        + ' preserveAspectRatio="none"'
+        + ' preserveAspectRatio='
+        + '"xMidYMid meet"'
         + ' width="100%"'
         + ' height="100%"'
         + ' style="display:block">'

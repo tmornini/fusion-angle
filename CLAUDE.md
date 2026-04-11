@@ -128,7 +128,7 @@ import { navigateTo, openDialog, closeDialog } from '../app/core';
 - `get*` — adapter functions that fetch and transform data (reads)
 - `put*` — adapter functions that write entity data (writes)
 - Adapter function names use **domain nouns** (`getIdea`, `putProject`), never internal type names like `Entity` — the return type already communicates the shape
-- `deleteSchema`, `postSchemaCreation`, `postMockDataLoad`, `postBootstrap`, `importSnapshot`, `exportSnapshot`, `hasData` — snapshot lifecycle operations in `adapters/snapshots.ts`
+- `deleteSchema`, `postSchemaCreation`, `postMockDataLoad`, `postBootstrap`, `putSnapshot`, `getSnapshot`, `hasData` — snapshot lifecycle operations in `adapters/snapshots.ts`
 - Boolean variables: `is*`, `has*`, `needs*` (use the prefix that reads naturally in English)
 - Config objects: `Record<StatusType, { label, className }>` in `api/types.ts`
 
@@ -136,7 +136,7 @@ import { navigateTo, openDialog, closeDialog } from '../app/core';
 
 - **User-name fallback**: When a user ID can't resolve to a name, return `''` (empty string). UI renders `'\u2014'` (em dash) for display. Never use magical fallback strings like `'Unknown'`.
 - **Absent values**: Use `null` for semantically absent values in adapter return types (e.g., `confidence: ConfidenceLevel | null`). Persisted noun entities never use `null`.
-- **No adapter caching**: Each adapter function fetches its own data directly via `buildUserMap()`. No `cachedUserMap` or `prefetched*` parameters — simplicity over micro-optimization of localStorage reads.
+- **No adapter caching**: Each adapter function fetches its own data directly via `getUserMap()`. No `cachedUserMap` or `prefetched*` parameters — simplicity over micro-optimization of localStorage reads.
 - **Shared types**: The `Metric` interface (`{ id, name, target, unit, current }`) is defined in `helpers.ts` and used across adapters.
 
 ### Dark Mode
@@ -214,7 +214,7 @@ web-app/
     loading-states.ts         # Loading skeletons, error states, empty states, withLoadingState()
     adapters/                 # ~30 adapter functions (API → frontend shapes)
       index.ts                # Barrel re-export
-      helpers.ts              # buildUserMap, userName, parseJson
+      helpers.ts              # getUserMap, userName, parseJson
       shared.ts               # getCurrentUser
       dashboard.ts            # getDashboardGauges, getDashboardStats, etc.
       ideas.ts                # getIdeas, getIdeaDetail, getIdeaForConversion, getIdea, putIdea, putIdeaSubmission
@@ -225,7 +225,7 @@ web-app/
       flow-mutations.ts       # postFlowCreation, postNodeAddition, postEdgeConnection, postFieldAddition, putFlow, putNode, putWfEdge, putField
       flow-deletions.ts       # deleteNode/Edge/Field + capture functions for undo
       flow-undo-adapter.ts    # executeUndoSteps
-      flow-export.ts          # exportFlowMermaid, exportFlowZip, importFlowFromMermaid, importFlowFromZip
+      flow-export.ts          # getFlowMermaid, getFlowZip, postFlowFromMermaid, postFlowFromZip
       workbox.ts              # getWorkboxItems, getWorkboxItem, postWorkOrderCreation, postWorkOrderTransition, postWorkOrderClaim, deleteWorkOrderClaim
       admin.ts                # getAccount, getProfile, getCompanySettings, getActivityFeed
     styles/                   # CSS modules (cascade-ordered) — build inputs
@@ -258,7 +258,7 @@ web-app/
   auth/                     # Login/signup (standalone)
   not-found/                # 404 page (standalone)
 
-SCHEMA.md                     # Database schema (15 tables, columns, types, defaults)
+SCHEMA.md                     # Database schema (17 tables, columns, types, defaults)
 DESIGN-SYSTEM.md              # Design system specification
 TEST-PLAN.md                  # Human-executable test plan (176 cases)
 ```

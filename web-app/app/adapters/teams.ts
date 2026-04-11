@@ -5,7 +5,11 @@ import type {
     UserEntity,
 } from '../../../api/types';
 import { User } from '../../../api/types';
-export { User } from '../../../api/types';
+export {
+    User,
+    AVAILABILITY_HIGH,
+    AVAILABILITY_LOW,
+} from '../../../api/types';
 
 const TOP_MEMBERS_COUNT = 6;
 

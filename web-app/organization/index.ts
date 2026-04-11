@@ -3,6 +3,7 @@ import { setHtml } from '../app/safe-html';
 import {
     buildSkeleton, buildErrorState,
 } from '../app/loading-states';
+import { log } from '../app/logger';
 import {
     navigateTo,
 } from '../app/core';
@@ -28,7 +29,12 @@ export async function init(): Promise<void> {
     >;
     try {
         account = await getAccount();
-    } catch {
+    } catch (err) {
+        log.error(
+            'getAccount failed',
+            'organization',
+            err,
+        );
         setHtml(
             container,
             buildErrorState(
