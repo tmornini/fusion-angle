@@ -69,10 +69,7 @@ export async function init(): Promise<void> {
         ).length;
 
     setHtml(container, html`
-        <div style="${
-            'max-width:72rem;'
-            + 'margin:0 auto'
-        }">
+        <div class="content-wrap-lg">
             <nav class="${
                 'flex items-center '
                 + 'gap-2 text-sm '
@@ -124,12 +121,9 @@ export async function init(): Promise<void> {
                     + 'gap-4 mb-6'
                 }">
                 <div class="${
-                    'search-wrapper'
-                }"
-                    style="${
-                        'flex:1;'
-                        + 'max-width:20rem'
-                    }">
+                    'search-wrapper flex-1'
+                    + ' search-wrapper-md'
+                }">
                     <span class="${
                         'search-icon'
                     }">
@@ -148,10 +142,9 @@ export async function init(): Promise<void> {
                             + ' or email'
                         }" />
                 </div>
-                <select class="input"
-                    style="${
-                        'width:10rem'
-                    }"
+                <select class="${
+                    'input input-narrow'
+                }"
                     id="role-filter"
                     aria-label="${
                         'Filter by role'
@@ -178,10 +171,9 @@ export async function init(): Promise<void> {
                         Viewer
                     </option>
                 </select>
-                <select class="input"
-                    style="${
-                        'width:10rem'
-                    }"
+                <select class="${
+                    'input input-narrow'
+                }"
                     id="status-filter"
                     aria-label="${
                         'Filter by status'
@@ -207,59 +199,41 @@ export async function init(): Promise<void> {
                 </select>
             </div>
 
-            <div class="card"
-                style="${
-                    'overflow:hidden'
-                }">
+            <div class="${
+                'card overflow-hidden'
+            }">
                 <div class="${
                     'flex items-center '
-                    + 'gap-4 p-4'
-                }"
-                    style="${
-                        'background:'
-                        + 'hsl(var(--muted)'
-                        + '/0.3);'
-                        + 'border-bottom:'
-                        + '1px solid '
-                        + 'hsl(var(--border))'
+                    + 'gap-4 p-4 '
+                    + 'table-header-row'
+                }">
+                    <div class="${
+                        'flex-2 text-xs '
+                        + 'font-medium text-muted'
                     }">
-                    <div style="flex:2"
-                        class="${
-                            'text-xs '
-                            + 'font-medium '
-                            + 'text-muted'
-                        }">
                         User
                     </div>
-                    <div style="flex:1"
-                        class="${
-                            'text-xs '
-                            + 'font-medium '
-                            + 'text-muted'
-                        }">
+                    <div class="${
+                        'flex-1 text-xs '
+                        + 'font-medium text-muted'
+                    }">
                         Role
                     </div>
-                    <div style="flex:1"
-                        class="${
-                            'text-xs '
-                            + 'font-medium '
-                            + 'text-muted'
-                        }">
+                    <div class="${
+                        'flex-1 text-xs '
+                        + 'font-medium text-muted'
+                    }">
                         Department
                     </div>
-                    <div style="flex:1"
-                        class="${
-                            'text-xs '
-                            + 'font-medium '
-                            + 'text-muted'
-                        }">
+                    <div class="${
+                        'flex-1 text-xs '
+                        + 'font-medium text-muted'
+                    }">
                         Status
                     </div>
-                    <div
-                        style="${
-                            'flex:0 0 auto;'
-                            + 'width:2.5rem'
-                        }">
+                    <div class="${
+                        'table-action-cell'
+                    }">
                     </div>
                 </div>
                 <div id="user-list">
@@ -280,12 +254,11 @@ export async function init(): Promise<void> {
             <div id="${
                 'invite-dialog'
             }"
-                class="dialog hidden"
+                class="${
+                    'dialog dialog-wide hidden'
+                }"
                 role="dialog"
-                aria-modal="true"
-                style="${
-                    'max-width:36rem'
-                }">
+                aria-modal="true">
                 <div class="${
                     'dialog-header'
                 }">
@@ -304,15 +277,12 @@ export async function init(): Promise<void> {
                     class="${
                         'flex flex-col '
                         + 'gap-3 py-4'
-                    }"
-                    style="${
-                        'max-height:60vh;'
-                        + 'overflow-y:auto'
+                        + ' dialog-scroll'
                     }">
                     <div class="${
                         'flex gap-3'
                     }">
-                        <div style="flex:1">
+                        <div class="flex-1">
                             <label
                                 class="${
                                     'label '
@@ -331,7 +301,7 @@ export async function init(): Promise<void> {
                                     'First name'
                                 }" />
                         </div>
-                        <div style="flex:1">
+                        <div class="flex-1">
                             <label
                                 class="${
                                     'label '
@@ -374,7 +344,7 @@ export async function init(): Promise<void> {
                     <div class="${
                         'flex gap-3'
                     }">
-                        <div style="flex:1">
+                        <div class="flex-1">
                             <label
                                 class="${
                                     'label '
@@ -415,7 +385,7 @@ export async function init(): Promise<void> {
                                 </option>
                             </select>
                         </div>
-                        <div style="flex:1">
+                        <div class="flex-1">
                             <label
                                 class="${
                                     'label '
@@ -472,7 +442,7 @@ export async function init(): Promise<void> {
                     <div class="${
                         'flex gap-3'
                     }">
-                        <div style="flex:1">
+                        <div class="flex-1">
                             <label
                                 class="${
                                     'label '
@@ -507,7 +477,7 @@ export async function init(): Promise<void> {
                                 </option>
                             </select>
                         </div>
-                        <div style="flex:1">
+                        <div class="flex-1">
                             <label
                                 class="${
                                     'label '
@@ -531,7 +501,7 @@ export async function init(): Promise<void> {
                     <div class="${
                         'flex gap-3'
                     }">
-                        <div style="flex:1">
+                        <div class="flex-1">
                             <label
                                 class="${
                                     'label '
@@ -553,7 +523,7 @@ export async function init(): Promise<void> {
                                     '0-100'
                                 }" />
                         </div>
-                        <div style="flex:1">
+                        <div class="flex-1">
                             <label
                                 class="${
                                     'label '

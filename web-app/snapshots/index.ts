@@ -31,40 +31,19 @@ import {
 
 const BANNER_ID = 'empty-banner';
 
-const iconBoxStyle =
-    (cssVar: string) =>
-    'width:2.5rem;height:2.5rem;'
-    + 'border-radius:0.5rem;'
-    + 'background:hsl(var(--'
-    + cssVar
-    + ')/0.1);'
-    + 'display:flex;'
-    + 'align-items:center;'
-    + 'justify-content:center;'
-    + 'color:hsl(var(--'
-    + cssVar
-    + '))';
-
-const cardStyle =
-    'padding:1.5rem;'
-    + 'display:flex;'
-    + 'flex-direction:column;'
-    + 'gap:0.75rem';
+type SnapshotTone =
+    'success' | 'warning' | 'error';
 
 function buildOutlineBtn(
     id: string,
     label: string,
-    cssVar: string,
+    tone: SnapshotTone,
 ): SafeHtml {
     return html`<button
         class="btn btn-outline"
         id="${id}"
-        style="${
-            'border-color:hsl(var(--'
-            + cssVar + '));'
-            + 'color:hsl(var(--'
-            + cssVar + '))'
-        }">${label}</button>`;
+        data-tone="${tone}"
+        >${label}</button>`;
 }
 
 type PendingState =
@@ -165,16 +144,12 @@ export async function init(
     }
 
     setHtml(root, html`
-    <div class="card"
-        style="${cardStyle}">
-        <div style="${
-            'display:flex;'
-            + 'align-items:center;'
-            + 'gap:0.75rem'
+    <div class="card snapshot-card">
+        <div class="${
+            'flex items-center gap-3'
         }">
-            <div style="${
-                iconBoxStyle('success')
-            }">${
+            <div class="icon-box"
+                data-tone="success">${
                 iconDownload(20, '')
             }</div>
             <div>
@@ -196,16 +171,12 @@ export async function init(
         )}
     </div>
 
-    <div class="card"
-        style="${cardStyle}">
-        <div style="${
-            'display:flex;'
-            + 'align-items:center;'
-            + 'gap:0.75rem'
+    <div class="card snapshot-card">
+        <div class="${
+            'flex items-center gap-3'
         }">
-            <div style="${
-                iconBoxStyle('success')
-            }">${
+            <div class="icon-box"
+                data-tone="success">${
                 iconUpload(20, '')
             }</div>
             <div>
@@ -221,33 +192,25 @@ export async function init(
                 }</p>
             </div>
         </div>
-        <label class="btn btn-outline"
-            style="${
-                'cursor:pointer;'
-                + 'text-align:center;'
-                + 'border-color:'
-                + 'hsl(var(--success));'
-                + 'color:'
-                + 'hsl(var(--success))'
-            }">
+        <label class="${
+            'btn btn-outline'
+            + ' cursor-pointer text-center'
+        }"
+            data-tone="success">
             Upload Snapshot
             <input type="file"
                 accept=".json"
                 id="upload-input"
-                style="display:none" />
+                class="hidden" />
         </label>
     </div>
 
-    <div class="card"
-        style="${cardStyle}">
-        <div style="${
-            'display:flex;'
-            + 'align-items:center;'
-            + 'gap:0.75rem'
+    <div class="card snapshot-card">
+        <div class="${
+            'flex items-center gap-3'
         }">
-            <div style="${
-                iconBoxStyle('warning')
-            }">${
+            <div class="icon-box"
+                data-tone="warning">${
                 iconDatabase(20, '')
             }</div>
             <div>
@@ -273,16 +236,12 @@ export async function init(
         )}
     </div>
 
-    <div class="card"
-        style="${cardStyle}">
-        <div style="${
-            'display:flex;'
-            + 'align-items:center;'
-            + 'gap:0.75rem'
+    <div class="card snapshot-card">
+        <div class="${
+            'flex items-center gap-3'
         }">
-            <div style="${
-                iconBoxStyle('error')
-            }">${
+            <div class="icon-box"
+                data-tone="error">${
                 iconTrash(20, '')
             }</div>
             <div>
@@ -496,30 +455,14 @@ async function mutateEmptyBanner(
                     'div',
                 );
             banner.id = BANNER_ID;
-            banner.className = 'card';
-            banner.style.cssText =
-                'padding:1rem 1.25rem;'
-                + 'display:flex;'
-                + 'align-items:center;'
-                + 'gap:0.75rem;'
-                + 'grid-column:1/-1;'
-                + 'background:'
-                + 'hsl(var(--primary)'
-                + '/0.06);'
-                + 'border:1px solid '
-                + 'hsl(var(--primary)'
-                + '/0.2)';
+            banner.className =
+                'card empty-banner';
             setHtml(
                 banner,
-                html`<span style="${
-                    'color:'
-                    + 'hsl(var(--primary));'
-                    + 'flex-shrink:0'
-                }">${
-                    iconInfo(20, '')
-                }</span>
-                <p class="text-sm"
-                    style="margin:0">${
+                html`<span
+                    class="empty-banner-icon"
+                    >${iconInfo(20, '')}</span>
+                <p class="text-sm m-0">${
                     'Your database is'
                     + ' empty.'
                 }</p>`,

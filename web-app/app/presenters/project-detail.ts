@@ -53,14 +53,14 @@ export class ProjectDetailPresenter {
         const icon = diff < 0
             ? iconArrowDownRight(16, '')
             : iconArrowUpRight(16, '');
-        const color = good
-            ? 'color:hsl(var(--success))'
-            : 'color:hsl(var(--error))';
+        const tone = good
+            ? 'variance-good'
+            : 'variance-bad';
         return html`<span
-            style="${color}"
             class="${
                 'flex items-center '
-                + 'gap-1 font-bold text-sm'
+                + 'gap-1 font-bold text-sm '
+                + tone
             }">${icon} ${
                 prefix
             }${Math.abs(diff)}${
@@ -84,15 +84,13 @@ export class ProjectDetailPresenter {
                     ? html`<textarea
                         class="${
                             'textarea mb-6'
+                            + ' resize-none'
                         }"
                         id="${
                             'project-edit-'
                             + 'description'
                         }"
-                        rows="3"
-                        style="${
-                            'resize:none'
-                        }">${
+                        rows="3">${
                             this.#view.descriptionText()
                         }</textarea>`
                     : html`<p class="${
@@ -101,24 +99,13 @@ export class ProjectDetailPresenter {
                     }">${
                         this.#view.descriptionText()
                     }</p>`}
-                <div style="${
-                    'display:grid;'
-                    + 'grid-template-columns:'
-                    + '1fr 1fr;'
-                    + 'gap:1rem'
+                <div class="${
+                    'grid grid-cols-2 gap-4'
                 }">
                     <div class="${
                         'flex items-center '
-                        + 'gap-3'
-                    }"
-                        style="${
-                            'padding:0.75rem;'
-                            + 'border-radius:'
-                            + '0.5rem;'
-                            + 'background:'
-                            + 'hsl(var(--muted)'
-                            + '/0.5)'
-                        }">
+                        + 'gap-3 summary-stat-cell'
+                    }">
                         ${iconCalendar(
                             20, 'text-primary',
                         )}
@@ -145,10 +132,8 @@ export class ProjectDetailPresenter {
                                                 .startDateValue(),
                                         )
                                     }"
-                                    class="input"
-                                    style="${
-                                        'margin-top'
-                                        + ':0.25rem'
+                                    class="${
+                                        'input mt-1'
                                     }" />`
                                 : html`<p
                                     class="${
@@ -166,16 +151,8 @@ export class ProjectDetailPresenter {
                     </div>
                     <div class="${
                         'flex items-center '
-                        + 'gap-3'
-                    }"
-                        style="${
-                            'padding:0.75rem;'
-                            + 'border-radius:'
-                            + '0.5rem;'
-                            + 'background:'
-                            + 'hsl(var(--muted)'
-                            + '/0.5)'
-                        }">
+                        + 'gap-3 summary-stat-cell'
+                    }">
                         ${iconTarget(
                             20, 'text-primary',
                         )}
@@ -201,10 +178,8 @@ export class ProjectDetailPresenter {
                                                 .targetEndDateValue(),
                                         )
                                     }"
-                                    class="input"
-                                    style="${
-                                        'margin-top'
-                                        + ':0.25rem'
+                                    class="${
+                                        'input mt-1'
                                     }" />`
                                 : html`<p
                                     class="${
@@ -221,9 +196,7 @@ export class ProjectDetailPresenter {
                         </div>
                     </div>
                 </div>
-                <div style="${
-                    'margin-top:1.5rem'
-                }">
+                <div class="mt-6">
                     <div class="${
                         'flex items-center '
                         + 'justify-between mb-2'
@@ -248,7 +221,7 @@ export class ProjectDetailPresenter {
                         class="${
                             'progress-fill'
                         }"
-                        style="width:${
+                        style="--progress-fill:${
                             this.#view.progressPercent()
                         }%"
                         ></div></div>
@@ -326,16 +299,7 @@ export class ProjectDetailPresenter {
                             editable: true,
                         },
                     ].map(metric => html`
-                        <div style="${
-                            'padding:1rem;'
-                            + 'border-radius:'
-                            + '0.75rem;'
-                            + 'background:'
-                            + 'hsl(var(--muted)'
-                            + '/0.3);'
-                            + 'border:1px solid '
-                            + 'hsl(var(--border))'
-                        }">
+                        <div class="metric-cell">
                             <div
                                 class="${
                                     'flex '
@@ -354,11 +318,9 @@ export class ProjectDetailPresenter {
                                     }
                                 </span>
                             </div>
-                            <div style="${
-                                'display:flex;'
-                                + 'flex-direction'
-                                + ':column;'
-                                + 'gap:0.5rem'
+                            <div class="${
+                                'flex flex-col'
+                                + ' gap-2'
                             }">
                                 <div class="${
                                     'flex '
@@ -426,13 +388,9 @@ export class ProjectDetailPresenter {
                                             }"
                                             class="${
                                                 'input'
-                                            }"
-                                            style="${
-                                                'width'
-                                                + ':5rem'
-                                                + ';text'
-                                                + '-align'
-                                                + ':right'
+                                                + ' input'
+                                                + '-narrow'
+                                                + '-num'
                                             }"
                                             min="0"
                                             step="${
@@ -456,21 +414,13 @@ export class ProjectDetailPresenter {
                                                     : '\u2014'
                                             }</span>`}
                                 </div>
-                                <div style="${
-                                    'padding-top:'
-                                    + '0.5rem;'
-                                    + 'border-top:'
-                                    + '1px solid '
-                                    + 'hsl(var('
-                                    + '--border))'
-                                }"
-                                    class="${
-                                        'flex '
-                                        + 'items-'
-                                        + 'center '
-                                        + 'justify-'
-                                        + 'between'
-                                    }">
+                                <div class="${
+                                    'flex '
+                                    + 'items-center '
+                                    + 'justify-between '
+                                    + 'metric-cell'
+                                    + '-row-divider'
+                                }">
                                     <span class="${
                                         'text-xs '
                                         + 'font-'
@@ -507,11 +457,7 @@ export class ProjectDetailPresenter {
     ): SafeHtml {
 
         return html`
-            <div style="${
-                'display:flex;'
-                + 'flex-direction:column;'
-                + 'gap:1.5rem'
-            }">
+            <div class="stack-lg">
                 <div class="card p-6">
                     <div class="${
                         'flex items-center '
@@ -532,11 +478,8 @@ export class ProjectDetailPresenter {
                             } Add
                         </button>
                     </div>
-                    <div style="${
-                        'display:flex;'
-                        + 'flex-direction:'
-                        + 'column;'
-                        + 'gap:0.75rem'
+                    <div class="${
+                        'flex flex-col gap-3'
                     }">
                         ${this.#view.teamMembers().map(
                             teamMember => html`
@@ -546,28 +489,9 @@ export class ProjectDetailPresenter {
                                     + 'items-center'
                                     + ' gap-3'
                                 }">
-                                <div style="${
-                                    'width:'
-                                    + '2.25rem;'
-                                    + 'height:'
-                                    + '2.25rem;'
-                                    + 'border-'
-                                    + 'radius:'
-                                    + '0.5rem;'
-                                    + 'background:'
-                                    + 'hsl(var('
-                                    + '--primary)'
-                                    + '/0.1);'
-                                    + 'display:'
-                                    + 'flex;'
-                                    + 'align-'
-                                    + 'items:'
-                                    + 'center;'
-                                    + 'justify-'
-                                    + 'content:'
-                                    + 'center;'
-                                    + 'flex-'
-                                    + 'shrink:0'
+                                <div class="${
+                                    'team-member'
+                                    + '-avatar'
                                 }">
                                     <span class="${
                                         'text-xs '
@@ -581,27 +505,14 @@ export class ProjectDetailPresenter {
                                         )}
                                     </span>
                                 </div>
-                                <div
-                                    style="${
-                                        'flex:1;'
-                                        + 'min-'
-                                        + 'width:0'
-                                    }">
+                                <div class="${
+                                    'flex-fill'
+                                }">
                                     <p class="${
                                         'text-sm '
-                                        + 'font-'
-                                        + 'medium'
-                                    }"
-                                        style="${
-                                            'white-'
-                                            + 'space:'
-                                            + 'nowrap;'
-                                            + 'overflow'
-                                            + ':hidden;'
-                                            + 'text-'
-                                            + 'overflow'
-                                            + ':ellipsis'
-                                        }">
+                                        + 'font-medium '
+                                        + 'truncate'
+                                    }">
                                         ${teamMember
                                             .name}
                                     </p>
@@ -667,9 +578,8 @@ export class ProjectDetailPresenter {
             return html`
                 <div class="card p-6">
                     ${header}
-                    <div style="${
-                        'text-align:center;'
-                        + 'padding:2rem 0'
+                    <div class="${
+                        'text-center py-8'
                     }">
                         ${iconGitBranch(
                             48, 'text-muted',
@@ -693,10 +603,8 @@ export class ProjectDetailPresenter {
         return html`
             <div class="card p-6">
                 ${header}
-                <div style="${
-                    'display:flex;'
-                    + 'flex-direction:column;'
-                    + 'gap:0.75rem'
+                <div class="${
+                    'flex flex-col gap-3'
                 }">
                     ${flows.map(wf =>
                         html`
@@ -707,38 +615,23 @@ export class ProjectDetailPresenter {
                             }"
                             class="${
                                 'card card-hover'
-                            }"
-                            style="${
-                                'padding:1rem;'
-                                + 'text-decoration'
-                                + ':none;'
-                                + 'color:inherit;'
-                                + 'display:block'
+                                + ' flow-card-link'
                             }">
                             <div class="${
                                 'flex '
                                 + 'items-center '
                                 + 'gap-3'
                             }">
-                                <div style="${
-                                    'padding:'
-                                    + '0.5rem;'
-                                    + 'border-'
-                                    + 'radius:'
-                                    + '0.5rem;'
-                                    + 'background:'
-                                    + 'hsl(var('
-                                    + '--primary)'
-                                    + '/0.1)'
+                                <div class="${
+                                    'flow-icon-pill'
                                 }">
                                     ${iconGitBranch(
                                         20,
                                         'text-primary',
                                     )}
                                 </div>
-                                <div style="${
-                                    'min-width:0;'
-                                    + 'flex:1'
+                                <div class="${
+                                    'flex-fill'
                                 }">
                                     <p class="${
                                         'font-medium'
@@ -818,9 +711,8 @@ export class ProjectDetailPresenter {
                 );
 
         return html`
-            <div style="${
-                'max-width:64rem;'
-                + 'margin:0 auto'
+            <div class="${
+                'project-detail-wrap'
             }">
                 <div class="${
                     'flex items-center '
@@ -871,6 +763,8 @@ export class ProjectDetailPresenter {
                                     ? html`<input
                                         class="${
                                             'input'
+                                            + ' input-md'
+                                            + '-bold'
                                         }"
                                         id="${
                                             'project'
@@ -881,15 +775,6 @@ export class ProjectDetailPresenter {
                                             this
                                                 .#view
                                                 .titleText()
-                                        }"
-                                        style="${
-                                            'font-'
-                                            + 'size:'
-                                            + '1.125'
-                                            + 'rem;'
-                                            + 'font-'
-                                            + 'weight'
-                                            + ':700'
                                         }" />`
                                     : html`<h1
                                         class="${
@@ -909,15 +794,13 @@ export class ProjectDetailPresenter {
                                     ? html`<select
                                         class="${
                                             'input'
+                                            + ' select'
+                                            + '-auto'
                                         }"
                                         id="${
                                             'project'
                                             + '-edit-'
                                             + 'status'
-                                        }"
-                                        style="${
-                                            'width:'
-                                            + 'auto'
                                         }">
                                         ${
                                             statusOptions
@@ -1011,14 +894,9 @@ export class ProjectDetailPresenter {
 
                 <div class="${
                     'detail-grid'
-                }"
-                    style="gap:2rem">
-                    <div style="${
-                        'display:flex;'
-                        + 'flex-direction:'
-                        + 'column;'
-                        + 'gap:1.5rem'
-                    }">
+                    + ' detail-grid-spaced'
+                }">
+                    <div class="stack-lg">
                         ${this
                             .#buildProjectSummary(
                             isEditing,
@@ -1043,14 +921,14 @@ export class ProjectDetailPresenter {
         return html`<div
 class="${'dialog-backdrop hidden'}"
 id="new-flow-backdrop">
-<div class="${'dialog hidden'}"
+<div class="${
+    'dialog dialog-narrow hidden'
+}"
     id="new-flow-dialog"
-    aria-hidden="true"
-    style="max-width:28rem">
-<div style="${
-    'padding:1.5rem;'
-    + 'border-bottom:1px solid'
-    + ' hsl(var(--border))'
+    aria-hidden="true">
+<div class="${
+    'dialog-section'
+    + ' dialog-section-divider-bottom'
 }">
 <h3 class="${
     'text-lg font-display'
@@ -1059,11 +937,8 @@ id="new-flow-backdrop">
 <p class="text-sm text-muted"
     >Name this flow</p>
 </div>
-<div style="${
-    'padding:1.5rem;'
-    + 'display:flex;'
-    + 'flex-direction:column;'
-    + 'gap:1rem'
+<div class="${
+    'dialog-section flex flex-col gap-4'
 }">
 <div>
 <label class="label mb-1"
@@ -1076,13 +951,9 @@ id="new-flow-backdrop">
     }" />
 </div>
 </div>
-<div style="${
-    'padding:1rem 1.5rem;'
-    + 'border-top:1px solid'
-    + ' hsl(var(--border));'
-    + 'display:flex;'
-    + 'justify-content:flex-end;'
-    + 'gap:0.75rem'
+<div class="${
+    'dialog-actions-row'
+    + ' dialog-section-divider-top'
 }">
 <button class="btn btn-outline"
     id="new-flow-cancel"

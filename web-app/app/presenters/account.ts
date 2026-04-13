@@ -22,7 +22,7 @@ export class AccountPresenter {
 
     buildPage(): SafeHtml {
         return html`
-    <div style="max-width:64rem;margin:0 auto">
+    <div class="content-wrap-xl">
         <div class="mb-8">
             <h1
                 class="text-3xl font-display
@@ -40,25 +40,14 @@ export class AccountPresenter {
                    sm:grid-cols-3 gap-4 mb-8"
         >
             <button
-                class="btn btn-outline"
-                style="height:auto;
-                       padding:0.75rem 1rem;
-                       justify-content:flex-start;
-                       gap:0.75rem"
+                class="${
+                    'btn btn-outline'
+                    + ' btn-quick-action'
+                }"
                 data-nav-to="profile"
             >
-                <div
-                    style="width:2.5rem;
-                           height:2.5rem;
-                           border-radius:var(
-                           --radius-lg);
-                           background:hsl(var(
-                           --primary) / 0.1);
-                           display:flex;
-                           align-items:center;
-                           justify-content:center;
-                           color:hsl(var(
-                           --primary))"
+                <div class="icon-box"
+                    data-tone="primary"
                 >${iconUser(20, '')}</div>
                 <div class="text-left">
                     <p class="font-medium text-sm">
@@ -70,25 +59,14 @@ export class AccountPresenter {
                 </div>
             </button>
             <button
-                class="btn btn-outline"
-                style="height:auto;
-                       padding:0.75rem 1rem;
-                       justify-content:flex-start;
-                       gap:0.75rem"
+                class="${
+                    'btn btn-outline'
+                    + ' btn-quick-action'
+                }"
                 data-nav-to="settings"
             >
-                <div
-                    style="width:2.5rem;
-                           height:2.5rem;
-                           border-radius:var(
-                           --radius-lg);
-                           background:hsl(var(
-                           --info-soft));
-                           display:flex;
-                           align-items:center;
-                           justify-content:center;
-                           color:hsl(var(
-                           --info-text))"
+                <div class="icon-box"
+                    data-tone="info"
                 >${iconSettings(20, '')}</div>
                 <div class="text-left">
                     <p class="font-medium text-sm">
@@ -100,24 +78,13 @@ export class AccountPresenter {
                 </div>
             </button>
             <button
-                class="btn btn-outline"
-                style="height:auto;
-                       padding:0.75rem 1rem;
-                       justify-content:flex-start;
-                       gap:0.75rem"
+                class="${
+                    'btn btn-outline'
+                    + ' btn-quick-action'
+                }"
             >
-                <div
-                    style="width:2.5rem;
-                           height:2.5rem;
-                           border-radius:var(
-                           --radius-lg);
-                           background:hsl(var(
-                           --success-soft));
-                           display:flex;
-                           align-items:center;
-                           justify-content:center;
-                           color:hsl(var(
-                           --success-text))"
+                <div class="icon-box"
+                    data-tone="success"
                 >${iconCreditCard(20, '')}</div>
                 <div class="text-left">
                     <p class="font-medium text-sm">
@@ -133,34 +100,20 @@ export class AccountPresenter {
         <!-- Company Overview -->
         <div class="card card-hover p-6 mb-6">
             <div
-                class="flex items-center
-                       justify-between gap-4
-                       mb-6"
-                style="flex-wrap:wrap"
+                class="${
+                    'flex items-center'
+                    + ' justify-between gap-4'
+                    + ' mb-6 flex-wrap'
+                }"
             >
                 <div
-                    class="flex items-center
-                           gap-4"
-                    style="flex:1"
+                    class="${
+                        'flex items-center'
+                        + ' gap-4 flex-1'
+                    }"
                 >
-                    <div
-                        style="width:3.5rem;
-                               height:3.5rem;
-                               border-radius:var(
-                               --radius-xl);
-                               background:
-                               linear-gradient(
-                               135deg,
-                               hsl(var(--primary)
-                               / 0.2),
-                               hsl(var(--primary)
-                               / 0.05));
-                               display:flex;
-                               align-items:center;
-                               justify-content:
-                               center;
-                               color:hsl(var(
-                               --primary))"
+                    <div class="icon-box-lg"
+                        data-tone="primary"
                     >${iconBuilding(28, '')}</div>
                     <div>
                         <h2
@@ -201,9 +154,10 @@ export class AccountPresenter {
                     </div>
                 </div>
                 <div
-                    class="status-badge-success"
-                    style="padding:0.5rem 1rem;
-                           align-self:flex-start"
+                    class="${
+                        'status-badge-success'
+                        + ' health-badge'
+                    }"
                 >
                     <div
                         class="flex items-center
@@ -230,11 +184,7 @@ export class AccountPresenter {
                 class="grid grid-cols-2
                        lg:grid-cols-4 gap-4"
             >
-                <div
-                    class="p-4 rounded-lg"
-                    style="background:hsl(var(
-                           --muted) / 0.3)"
-                >
+                <div class="stat-cell">
                     <div
                         class="flex items-center
                                gap-2 text-muted
@@ -259,11 +209,7 @@ export class AccountPresenter {
                         }</span>
                     </p>
                 </div>
-                <div
-                    class="p-4 rounded-lg"
-                    style="background:hsl(var(
-                           --muted) / 0.3)"
-                >
+                <div class="stat-cell">
                     <div
                         class="flex items-center
                                gap-2 text-muted
@@ -284,11 +230,7 @@ export class AccountPresenter {
                         }
                     </p>
                 </div>
-                <div
-                    class="p-4 rounded-lg"
-                    style="background:hsl(var(
-                           --muted) / 0.3)"
-                >
+                <div class="stat-cell">
                     <div
                         class="flex items-center
                                gap-2 text-muted
@@ -307,11 +249,7 @@ export class AccountPresenter {
                         }
                     </p>
                 </div>
-                <div
-                    class="p-4 rounded-lg"
-                    style="background:hsl(var(
-                           --muted) / 0.3)"
-                >
+                <div class="stat-cell">
                     <div
                         class="flex items-center
                                gap-2 text-muted
@@ -397,14 +335,9 @@ export class AccountPresenter {
                     class="admin-link-card"
                     data-nav-to="users"
                 >
-                    <span
-                        style="color:hsl(var(
-                               --muted-foreground
-                               ))"
+                    <span class="text-muted"
                     >${iconUsers(20, '')}</span>
-                    <div
-                        style="flex:1;
-                               min-width:0"
+                    <div class="flex-fill"
                     >
                         <p class="${
                             'font-medium text-sm'
@@ -426,16 +359,11 @@ export class AccountPresenter {
                 <button
                     class="admin-link-card"
                 >
-                    <span
-                        style="color:hsl(var(
-                               --muted-foreground
-                               ))"
+                    <span class="text-muted"
                     >${iconCreditCard(
                         20, '',
                     )}</span>
-                    <div
-                        style="flex:1;
-                               min-width:0"
+                    <div class="flex-fill"
                     >
                         <p class="${
                             'font-medium text-sm'
@@ -461,28 +389,25 @@ export class AccountPresenter {
     static readonly USAGE_DANGER = 90;
     static readonly USAGE_WARNING = 70;
 
-    #styleForUsageLevel(
+    #levelForUsage(
         current: number,
         limit: number,
-    ): string {
+    ): 'danger' | 'warning' | 'normal' {
         const percentage =
             (current / limit) * 100;
         if (percentage
             >= AccountPresenter
                 .USAGE_DANGER
         ) {
-            return 'background:'
-                + 'hsl(var(--error))';
+            return 'danger';
         }
         if (percentage
             >= AccountPresenter
                 .USAGE_WARNING
         ) {
-            return 'background:'
-                + 'hsl(var(--warning))';
+            return 'warning';
         }
-        return 'background:'
-            + 'hsl(var(--primary))';
+        return 'normal';
     }
 
     #buildUsageBar(
@@ -493,6 +418,10 @@ export class AccountPresenter {
         const percentage = Math.min(
             100, (current / limit) * 100,
         );
+        const level =
+            this.#levelForUsage(
+                current, limit,
+            );
         return html`
     <div>
         <div
@@ -510,10 +439,11 @@ export class AccountPresenter {
         <div class="progress">
             <div
                 class="progress-bar"
-                style="width:${percentage}%;${
-                    this.#styleForUsageLevel(
-                        current, limit,
-                    )}"
+                data-level="${level}"
+                style="${
+                    '--progress-fill:'
+                    + percentage + '%'
+                }"
             ></div>
         </div>
     </div>`;

@@ -51,52 +51,30 @@ export async function init(): Promise<void> {
     }">
         <div class="auth-branding hidden"
             id="auth-branding">
-            <div style="${
-                'position:relative;z-index:10;'
-                + 'display:flex;'
-                + 'flex-direction:column;'
-                + 'justify-content:center;'
-                + 'padding:3rem 5rem;'
-                + 'height:100%'
+            <div class="${
+                'auth-branding-content'
             }">
                 <div class="mb-8">
                     <div class="${
                         'flex items-center '
                         + 'gap-3 mb-6'
                     }">
-                        <div style="${
-                            'width:3rem;'
-                            + 'height:3rem;'
-                            + 'border-radius:'
-                            + 'var(--radius-xl);'
-                            + 'background:'
-                            + 'hsl(var(--accent));'
-                            + 'display:flex;'
-                            + 'align-items:center;'
-                            + 'justify-content:'
-                            + 'center'
+                        <div class="${
+                            'auth-brand-icon'
                         }">
                             ${iconSparkles(24, '')}
                         </div>
                         <span class="${
                             'text-3xl '
                             + 'font-display '
-                            + 'font-bold'
-                        }" style="${
-                            'color:hsl(var('
-                            + '--primary-'
-                            + 'foreground))'
+                            + 'font-bold '
+                            + 'auth-brand-name'
                         }">Fusion AI</span>
                     </div>
                 </div>
                 <h1 class="${
-                    'font-display font-bold'
-                }" style="${
-                    'font-size:2.5rem;'
-                    + 'color:hsl(var('
-                    + '--primary-foreground));'
-                    + 'line-height:1.2;'
-                    + 'margin-bottom:1.5rem'
+                    'font-display font-bold '
+                    + 'auth-headline'
                 }">
                     ${
                         'Transform your business'
@@ -104,13 +82,7 @@ export async function init(): Promise<void> {
                         + ' automation'
                     }
                 </h1>
-                <p style="${
-                    'font-size:var(--text-lg);'
-                    + 'color:hsl(var('
-                    + '--primary-foreground)'
-                    + ' / 0.8);'
-                    + 'max-width:28rem'
-                }">
+                <p class="auth-subhead">
                     ${
                         'Join thousands of'
                         + ' companies using'
@@ -128,57 +100,36 @@ export async function init(): Promise<void> {
                         <div class="${
                             'text-3xl '
                             + 'font-display '
-                            + 'font-bold'
-                        }" style="${
-                            'color:'
-                            + 'hsl(var('
-                            + '--accent))'
+                            + 'font-bold '
+                            + 'auth-stat-value'
                         }">10K+</div>
                         <div class="${
-                            'text-sm'
-                        }" style="${
-                            'color:hsl(var('
-                            + '--primary-'
-                            + 'foreground)'
-                            + ' / 0.7)'
+                            'text-sm '
+                            + 'auth-stat-label'
                         }">Active Users</div>
                     </div>
                     <div>
                         <div class="${
                             'text-3xl '
                             + 'font-display '
-                            + 'font-bold'
-                        }" style="${
-                            'color:'
-                            + 'hsl(var('
-                            + '--accent))'
+                            + 'font-bold '
+                            + 'auth-stat-value'
                         }">98%</div>
                         <div class="${
-                            'text-sm'
-                        }" style="${
-                            'color:hsl(var('
-                            + '--primary-'
-                            + 'foreground)'
-                            + ' / 0.7)'
+                            'text-sm '
+                            + 'auth-stat-label'
                         }">Satisfaction</div>
                     </div>
                     <div>
                         <div class="${
                             'text-3xl '
                             + 'font-display '
-                            + 'font-bold'
-                        }" style="${
-                            'color:'
-                            + 'hsl(var('
-                            + '--accent))'
+                            + 'font-bold '
+                            + 'auth-stat-value'
                         }">50+</div>
                         <div class="${
-                            'text-sm'
-                        }" style="${
-                            'color:hsl(var('
-                            + '--primary-'
-                            + 'foreground)'
-                            + ' / 0.7)'
+                            'text-sm '
+                            + 'auth-stat-label'
                         }">Integrations</div>
                     </div>
                 </div>
@@ -187,10 +138,7 @@ export async function init(): Promise<void> {
 
         <div class="auth-form-wrapper"
             id="auth-form-wrapper">
-            <div style="${
-                'width:100%;'
-                + 'max-width:28rem'
-            }">
+            <div class="auth-form-card">
                 <div class="${
                     'flex items-center gap-3 '
                     + 'mb-8 justify-center'
@@ -199,10 +147,8 @@ export async function init(): Promise<void> {
                         'gradient-hero '
                         + 'rounded-xl '
                         + 'flex items-center '
-                        + 'justify-center'
-                    }" style="${
-                        'width:2.5rem;'
-                        + 'height:2.5rem'
+                        + 'justify-center '
+                        + 'auth-mobile-logo'
                     }">
                         ${iconSparkles(20, '')}
                     </div>
@@ -339,12 +285,7 @@ export async function init(): Promise<void> {
                             class="${
                                 'btn btn-primary'
                                 + ' w-full'
-                            }"
-                            style="${
-                                'height:3rem;'
-                                + 'font-size:'
-                                + 'var(--text-'
-                                + 'base)'
+                                + ' auth-submit-btn'
                             }" id="submit-btn">
                             Sign in ${
                                 iconArrowRight(20, '')
@@ -367,17 +308,10 @@ export async function init(): Promise<void> {
                                     'text-primary'
                                     + ' font-'
                                     + 'medium ml-2'
+                                    + ' btn-link'
                                 }"
                                 id="${
                                     'toggle-mode'
-                                }"
-                                style="${
-                                    'background:'
-                                    + 'none;'
-                                    + 'border:'
-                                    + 'none;'
-                                    + 'cursor:'
-                                    + 'pointer'
                                 }">${
                                     'Sign up'
                             }</button>

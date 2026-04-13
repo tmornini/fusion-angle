@@ -89,16 +89,8 @@ export class IdeaCreatePresenter {
                         + ' flex'
                         + ' items-center'
                         + ' justify-center'
-                    }"
-                    style="${'width:'
-                        + '2.25rem;'
-                        + 'height:'
-                        + '2.25rem;'
-                        + 'color:'
-                        + 'hsl(var('
-                        + '--primary'
-                        + '-foreground'
-                        + '))'}">
+                        + ' idea-create-icon'
+                    }">
                     ${iconSparkles(
                         20, '',
                     )}
@@ -132,13 +124,12 @@ export class IdeaCreatePresenter {
         </div>
         ${this.#buildFormFields()}
         <div
-            class="flex items-center
-                justify-between gap-3
-                mt-8 pt-6"
-            style="${'border-top:'
-                + '1px solid'
-                + ' hsl(var('
-                + '--border))'}">
+            class="${
+                'flex items-center'
+                + ' justify-between gap-3'
+                + ' mt-8 pt-6'
+                + ' section-divider-top'
+            }">
             <button
                 class="${
                     'btn btn-ghost'
@@ -170,15 +161,15 @@ export class IdeaCreatePresenter {
 
     #buildFormFields(): SafeHtml {
         return html`
-    <div style="${'display:flex;'
-        + 'flex-direction:column;'
-        + 'gap:1.5rem'}">
+    <div class="flex flex-col gap-6">
         <div>
             <label class="label mb-2
                 block font-medium">
                 Give your idea a clear title
             </label>
-            <input class="input"
+            <input class="${
+                'input input-large-title'
+            }"
                 id=${'idea-create'
                     + '-field-title'}
                 placeholder="${'e.g.,'
@@ -188,11 +179,6 @@ export class IdeaCreatePresenter {
                 value="${
                     this.#form.title
                 }"
-                style="${
-                    'font-size:'
-                    + '1.125rem;'
-                    + 'padding:'
-                    + '0.75rem 1rem'}"
             />
             <p class="text-xs text-muted
                 mt-1">
@@ -207,7 +193,9 @@ export class IdeaCreatePresenter {
                 ${'What problem does'
                     + ' this solve?'}
             </label>
-            <textarea class="textarea"
+            <textarea class="${
+                'textarea resize-none'
+            }"
                 id=${'idea-create'
                     + '-field-problem'}
                 placeholder="${
@@ -220,8 +208,7 @@ export class IdeaCreatePresenter {
                     + ' is the cost of'
                     + ' not solving it?'
                 }"
-                rows="5"
-                style="resize:none">${
+                rows="5">${
                     this.#form
                         .problemStatement
             }</textarea>
@@ -264,7 +251,9 @@ export class IdeaCreatePresenter {
                 block font-medium">
                 How would you solve this?
             </label>
-            <textarea class="textarea"
+            <textarea class="${
+                'textarea resize-none'
+            }"
                 id=${'idea-create'
                     + '-field-solution'}
                 placeholder="${
@@ -277,8 +266,7 @@ export class IdeaCreatePresenter {
                     + ' process would'
                     + ' you use?'
                 }"
-                rows="5"
-                style="resize:none">${
+                rows="5">${
                     this.#form
                         .proposedSolution
             }</textarea>
@@ -295,7 +283,9 @@ export class IdeaCreatePresenter {
                 ${'What outcome do'
                     + ' you expect?'}
             </label>
-            <textarea class="textarea"
+            <textarea class="${
+                'textarea resize-none'
+            }"
                 id=${'idea-create'
                     + '-field-outcome'}
                 placeholder="${
@@ -308,8 +298,7 @@ export class IdeaCreatePresenter {
                     + ' satisfaction'
                     + ' improved...'
                 }"
-                rows="5"
-                style="resize:none">${
+                rows="5">${
                     this.#form
                         .expectedOutcome
             }</textarea>
@@ -326,7 +315,9 @@ export class IdeaCreatePresenter {
                 ${'How would you'
                     + ' measure success?'}
             </label>
-            <textarea class="textarea"
+            <textarea class="${
+                'textarea resize-none'
+            }"
                 id=${'idea-create'
                     + '-field-metrics'}
                 placeholder="${
@@ -340,8 +331,7 @@ export class IdeaCreatePresenter {
                     + ' improvement'
                     + ' of 10 points'
                 }"
-                rows="4"
-                style="resize:none">${
+                rows="4">${
                     this.#form
                         .successMetrics
             }</textarea>

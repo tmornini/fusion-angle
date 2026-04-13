@@ -73,13 +73,10 @@ export class IdeaPresenter {
         return html`<span class="${
             'badge '
             + cfg.className
-            + ' text-xs'
+            + ' text-xs badge-fixed-w'
+            + ' cursor-pointer'
         }" data-status="${
             this.#idea.statusValue()
-        }" style="${
-            'cursor:pointer;'
-            + 'min-width:6rem;'
-            + 'justify-content:center'
         }">${
             icon(14, '')
         } ${cfg.label}</span>`;
@@ -90,11 +87,9 @@ export class IdeaPresenter {
         showGrip: boolean,
     ): SafeHtml {
         return html`
-    <div class="card card-hover"
-        style="${
-            'padding:1.25rem;'
-            + 'cursor:pointer'
-        }"
+    <div class="${
+        'card card-hover p-5 cursor-pointer'
+    }"
         data-idea-card="${this.#idea.idForLink()}"
         data-position="${
             this.#idea.positionSortKey()}">
@@ -103,20 +98,16 @@ export class IdeaPresenter {
         }">
             ${showGrip ? html`<div class="${
                 'hidden-mobile text-muted'
-            }" style="cursor:grab">${
+                + ' cursor-grab'
+            }">${
                 iconGripVertical(20, '')
             }</div>` : html``}
-            <div style="${
-                'flex:1;min-width:0'
-            }">
+            <div class="flex-fill">
                 ${this.#buildHeading()}
             </div>
-            <div style="${
-                'display:flex;'
-                + 'flex-direction:column;'
-                + 'align-items:flex-end;'
-                + 'gap:0.5rem;'
-                + 'margin-left:1.5rem'
+            <div class="${
+                'flex flex-col items-end'
+                + ' gap-2 ml-6'
             }">
                 ${this.#buildActions()}
             </div>
@@ -136,11 +127,7 @@ export class IdeaPresenter {
         <span class="${
             'badge '
             + this.#idea.statusClassName()
-            + ' text-xs'
-        }" style="${
-            'justify-content:center;'
-            + 'min-width:6rem;'
-            + 'margin-top:0.25rem'
+            + ' text-xs badge-fixed-w mt-1'
         }">${
             STATUS_ICONS[
                 this.#idea.statusValue()
@@ -151,14 +138,9 @@ export class IdeaPresenter {
     #buildActions(): SafeHtml {
         return html`
         <div
-            class="flex idea-actions"
-            style="${
-                'flex-direction:column;'
-                + 'align-items:stretch;'
-                + 'gap:0.5rem;'
-                + 'min-width:8rem;'
-                + 'padding-bottom:'
-                + '0.5rem'
+            class="${
+                'flex idea-actions'
+                + ' idea-actions-stack'
             }">
             ${this.#idea.isConvertible()
                 ? html`
@@ -185,14 +167,13 @@ export class IdeaPresenter {
         ideaId: string,
         isEditing: boolean,
     ): SafeHtml {
-        const pad = this.#idea.isReviewable()
-            ? ';padding-bottom:10rem'
-            : '';
+        const wrapClass =
+            this.#idea.isReviewable()
+                ? 'idea-detail-wrap'
+                  + ' has-footer-actions'
+                : 'idea-detail-wrap';
         return html`
-    <div
-        style="${'max-width:48rem;'
-            + 'margin:0 auto'
-            + pad}">
+    <div class="${wrapClass}">
         <div class="flex items-center gap-2
             text-sm text-muted mb-4">
             <a href="../ideas/index.html"
@@ -223,7 +204,11 @@ export class IdeaPresenter {
                         mb-2">
                         ${isEditing
                             ? html`<input
-                                class="input"
+                                class="${
+                                    'input'
+                                    + ' idea-edit'
+                                    + '-title'
+                                }"
                                 id="${
                                     'idea-edit'
                                     + '-title'
@@ -231,12 +216,6 @@ export class IdeaPresenter {
                                 value="${
                                     this.#idea
                                         .titleText()
-                                }"
-                                style="${
-                                    'font-size:'
-                                    + '1.125rem;'
-                                    + 'font-weight'
-                                    + ':700'
                                 }" />`
                             : html`<h1
                                 class="${
@@ -346,9 +325,7 @@ export class IdeaPresenter {
             </div>
         </div>
 
-        <div style="display:flex;
-            flex-direction:column;
-            gap:1.5rem">
+        <div class="stack-lg">
             ${this.#buildProblemSolutionCard(
                 isEditing,
             )}
@@ -434,10 +411,11 @@ export class IdeaPresenter {
             id="${
                 'approval-reject-dialog'
             }"
-            class="dialog hidden"
+            class="${
+                'dialog dialog-narrow hidden'
+            }"
             role="dialog"
-            aria-modal="true"
-            style="max-width:28rem">
+            aria-modal="true">
             <div class="dialog-header">
                 <h3 class="dialog-title">
                     ${'Send Back for'
@@ -506,9 +484,9 @@ export class IdeaPresenter {
             font-semibold mb-4">
             Problem &amp; Solution
         </h2>
-        <div style="display:flex;
-            flex-direction:column;
-            gap:1.25rem">
+        <div class="${
+            'flex flex-col gap-5'
+        }">
             <div>
                 <p class="${
                     'text-xs text-muted mb-1'
@@ -517,10 +495,12 @@ export class IdeaPresenter {
                 </p>
                 ${isEditing
                     ? html`<textarea
-                        class="textarea"
+                        class="${
+                            'textarea'
+                            + ' resize-none'
+                        }"
                         id="idea-edit-problem"
                         rows="3"
-                        style="resize:none"
                         >${this
                             .#idea
                             .problemStatementText()
@@ -564,13 +544,15 @@ export class IdeaPresenter {
                 </p>
                 ${isEditing
                     ? html`<textarea
-                        class="textarea"
+                        class="${
+                            'textarea'
+                            + ' resize-none'
+                        }"
                         id="${
                             'idea-edit-'
                             + 'solution'
                         }"
                         rows="3"
-                        style="resize:none"
                         >${this
                             .#idea
                             .proposedSolutionText()
@@ -590,13 +572,15 @@ export class IdeaPresenter {
                 </p>
                 ${isEditing
                     ? html`<textarea
-                        class="textarea"
+                        class="${
+                            'textarea'
+                            + ' resize-none'
+                        }"
                         id="${
                             'idea-edit-'
                             + 'outcome'
                         }"
                         rows="3"
-                        style="resize:none"
                         >${this
                             .#idea
                             .expectedOutcomeText()
@@ -616,13 +600,15 @@ export class IdeaPresenter {
                 </p>
                 ${isEditing
                     ? html`<textarea
-                        class="textarea"
+                        class="${
+                            'textarea'
+                            + ' resize-none'
+                        }"
                         id="${
                             'idea-edit-'
                             + 'metrics'
                         }"
                         rows="3"
-                        style="resize:none"
                         >${this
                             .#idea
                             .successMetricsText()

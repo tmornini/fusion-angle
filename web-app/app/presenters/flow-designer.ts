@@ -506,14 +506,9 @@ export class FlowDesignerPresenter {
                     'flex items-center'
                     + ' gap-2'
                 }">
-<input class="input"
+<input class="input wf-name-input"
     id="flow-name-input"
-    value="${this.#state.flowName}"
-    style="${
-        'font-size:1.125rem;'
-        + 'font-weight:600;'
-        + 'padding:0.25rem 0.5rem'
-    }" />
+    value="${this.#state.flowName}" />
 <button class="${
     'btn btn-ghost btn-icon'
 }" id="flow-name-save-btn"
@@ -532,8 +527,8 @@ export class FlowDesignerPresenter {
 }">${this.#state.flowName}</h2>
 <button class="${
     'btn btn-ghost btn-icon'
+    + ' wf-name-edit-btn'
 }" id="flow-name-edit-btn"
-    style="opacity:0.5"
     >${iconEdit(14, '')}</button>
 </div>`;
         const lockedAttr =
@@ -545,16 +540,13 @@ class="wf-designer">
 <div class="${
     'flex items-center gap-4'
 }">
-<div style="flex:1">${nameHtml}
+<div class="flex-1">${nameHtml}
 <p class="text-sm text-muted"
     >${this.#state.flowDescription}</p>
 </div>
 <label class="${
     'flex items-center gap-2'
-    + ' text-sm'
-}" style="${
-    'cursor:pointer;'
-    + 'white-space:nowrap'
+    + ' text-sm wf-lock-label'
 }"><input type="checkbox"
     id="flow-lock-checkbox"${
     trusted(lockedAttr)
@@ -1647,11 +1639,9 @@ class="badge badge-outline text-xs"
         field: GraphField,
     ): SafeHtml {
         const req = field.isRequired
-            ? html`<span class="text-xs"
-                style="${
-                    'color:'
-                    + 'hsl(var(--error))'
-                }"> *</span>`
+            ? html`<span class="${
+                'text-xs wf-required-mark'
+            }"> *</span>`
             : html``;
         return html`<div
 class="wf-field-row"
@@ -1740,9 +1730,7 @@ Required</label>
                 ? 'Start' : 'End';
             return html`<div
 class="wf-props-panel">
-<div style="display:flex;
-align-items:center;
-justify-content:space-between"
+<div class="wf-props-header"
 ><h3 class="text-sm font-semibold"
     >${kind} State</h3>
 <button
@@ -1772,9 +1760,7 @@ class="text-sm text-muted"
             .map(f => this.#buildFieldRow(f));
         return html`<div
 class="wf-props-panel">
-<div style="display:flex;
-align-items:center;
-justify-content:space-between"
+<div class="wf-props-header"
 ><h3 class="text-sm font-semibold"
     >State Properties</h3>
 <button
@@ -1831,9 +1817,7 @@ class="text-sm text-muted"
         const toName = toNode.name;
         return html`<div
 class="wf-props-panel">
-<div style="display:flex;
-align-items:center;
-justify-content:space-between"
+<div class="wf-props-header"
 ><h3 class="text-sm font-semibold"
     >Transition Properties</h3>
 <button

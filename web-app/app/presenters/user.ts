@@ -23,45 +23,26 @@ import {
     type User,
 } from '../adapters';
 
-function styleForAvailability(
+type AvailabilityTone =
+    'success' | 'warning' | 'error';
+
+function toneForAvailability(
     availability: number,
-): string {
+): AvailabilityTone {
     if (availability >= AVAILABILITY_HIGH)
-        return 'background:'
-            + 'hsl(var(--success-soft));'
-            + 'color:'
-            + 'hsl(var(--success-text))';
+        return 'success';
     if (availability >= AVAILABILITY_LOW)
-        return 'background:'
-            + 'hsl(var(--warning-soft));'
-            + 'color:'
-            + 'hsl(var(--warning-text))';
-    return 'background:'
-        + 'hsl(var(--error-soft));'
-        + 'color:'
-        + 'hsl(var(--error-text))';
+        return 'warning';
+    return 'error';
 }
 
 function buildStatusDot(
     availability: number,
 ): SafeHtml {
-    const color =
-        availability >= AVAILABILITY_HIGH
-            ? 'hsl(var(--success))'
-            : availability >= AVAILABILITY_LOW
-                ? 'hsl(var(--warning))'
-                : 'hsl(var(--error))';
-    return html`<div style="${
-        'position:absolute;'
-        + 'bottom:-2px;'
-        + 'right:-2px;'
-        + 'width:0.875rem;'
-        + 'height:0.875rem;'
-        + 'border-radius:var(--radius-full);'
-        + 'border:2px solid '
-        + 'hsl(var(--card));'
-        + 'background:' + color
-    }"></div>`;
+    const tone =
+        toneForAvailability(availability);
+    return html`<div class="status-dot"
+        data-tone="${tone}"></div>`;
 }
 
 const DIMENSION_ICONS: Record<
@@ -151,42 +132,23 @@ export class UserPresenter {
     buildMemberCard(
         selectedId: string | null,
     ): SafeHtml {
-        const cardStyle =
+        const selectedClass =
             selectedId === this.#user.idForLink()
-                ? 'box-shadow:0 0 0 2px'
-                  + ' hsl(var(--primary))'
+                ? ' card-selected'
                 : '';
         return html`
     <div
-        class="card card-hover"
-        style="padding:1.25rem;
-            cursor:pointer;${cardStyle}"
+        class="${
+            'card card-hover p-5'
+            + ' cursor-pointer'
+            + selectedClass
+        }"
         data-member-card="${this.#user.idForLink()}"
     >
         <div class="flex items-start gap-4">
-            <div
-                style="position:relative;
-                    flex-shrink:0"
-            >
-                <div
-                    style="${
-                        'width:3.5rem;'
-                        + 'height:3.5rem;'
-                        + 'border-radius:'
-                        + '0.75rem;'
-                        + 'background:'
-                        + 'linear-gradient('
-                        + '135deg,'
-                        + 'hsl(var(--primary)'
-                        + '/0.2),'
-                        + 'hsl(var(--primary)'
-                        + '/0.05));'
-                        + 'display:flex;'
-                        + 'align-items:center;'
-                        + 'justify-content:'
-                        + 'center'
-                    }"
-                >
+            <div class="avatar-frame">
+                <div class="icon-box-lg"
+                    data-tone="primary">
                     <span
                         class="${
                             'text-lg font-bold'
@@ -202,7 +164,7 @@ export class UserPresenter {
                     this.#user.availabilityScore(),
                 )}
             </div>
-            <div style="flex:1;min-width:0">
+            <div class="flex-fill">
                 <div
                     class="${
                         'flex flex-wrap'
@@ -218,8 +180,8 @@ export class UserPresenter {
                     </h3>
                     <span
                         class="pill"
-                        style="${
-                            styleForAvailability(
+                        data-tone="${
+                            toneForAvailability(
                                 this.#user
                                 .availabilityScore(),
                             )
@@ -245,13 +207,9 @@ export class UserPresenter {
                         .slice(0, 3)
                         .map(s => html`
                     <span
-                        class="pill-tag"
-                        style="${
-                            'background:'
-                            + 'hsl(var(--muted)'
-                            + '/0.5);'
-                            + 'font-size:'
-                            + '0.625rem'
+                        class="${
+                            'pill-tag'
+                            + ' pill-tag-strength'
                         }"
                     >
                         ${iconStar(10, '')}
@@ -315,29 +273,15 @@ export class UserPresenter {
 
     buildMemberDetail(): SafeHtml {
         return html`
-    <div style="padding:1.5rem">
-        <div
-            style="text-align:center;
-                margin-bottom:1.5rem"
-        >
-            <div
-                style="${
-                    'width:5rem;height:5rem;'
-                    + 'border-radius:1rem;'
-                    + 'background:'
-                    + 'linear-gradient('
-                    + '135deg,'
-                    + 'hsl(var(--primary)'
-                    + '/0.2),'
-                    + 'hsl(var(--primary)'
-                    + '/0.05));'
-                    + 'display:flex;'
-                    + 'align-items:center;'
-                    + 'justify-content:'
-                    + 'center;'
-                    + 'margin:0 auto 1rem'
-                }"
-            >
+    <div class="user-detail-wrap">
+        <div class="${
+            'user-detail-header'
+        }">
+            <div class="${
+                'avatar avatar-2xl'
+                + ' avatar-tinted'
+                + ' mx-auto mb-4'
+            }">
                 <span
                     class="${
                         'text-2xl font-bold'
@@ -371,38 +315,16 @@ export class UserPresenter {
         return html`
         <div class="${
             'flex items-center '
-            + 'gap-4 p-4 '
+            + 'gap-4 p-4 user-row-divider '
             + (this.#user.isDeactivated()
                 ? 'opacity-50' : '')
-        }"
-            style="${
-                'border-bottom:'
-                + '1px solid '
-                + 'hsl(var(--border))'
+        }">
+            <div class="${
+                'flex items-center'
+                + ' gap-3 flex-2 min-w-0'
             }">
-            <div style="${
-                'flex:2;display:flex;'
-                + 'align-items:center;'
-                + 'gap:0.75rem;'
-                + 'min-width:0'
-            }">
-                <div style="${
-                    'width:2.5rem;'
-                    + 'height:2.5rem;'
-                    + 'border-radius:'
-                    + 'var(--radius-full);'
-                    + 'background:'
-                    + 'linear-gradient('
-                    + '135deg,'
-                    + 'hsl(var(--primary)'
-                    + '/0.2),'
-                    + 'hsl(var(--primary)'
-                    + '/0.05));'
-                    + 'display:flex;'
-                    + 'align-items:center;'
-                    + 'justify-content:'
-                    + 'center;'
-                    + 'flex-shrink:0'
+                <div class="${
+                    'avatar avatar-tinted'
                 }">
                     <span
                         class="${
@@ -415,8 +337,8 @@ export class UserPresenter {
                         )}
                     </span>
                 </div>
-                <div style="${
-                    'min-width:0'
+                <div class="${
+                    'min-w-0'
                 }">
                     <p class="${
                         'font-medium '
@@ -434,16 +356,16 @@ export class UserPresenter {
                     </p>
                 </div>
             </div>
-            <div style="flex:1">
+            <div class="flex-1">
                 ${this.#buildRoleBadge()}
             </div>
-            <div style="flex:1"
-                class="${
-                    'text-sm text-muted'
-                }">
+            <div class="${
+                'flex-1'
+                + ' text-sm text-muted'
+            }">
                 ${this.#user.departmentLabel()}
             </div>
-            <div style="flex:1">
+            <div class="flex-1">
                 ${this.#buildStatusBadge()}
                 <p class="${
                     'text-xs text-muted'
@@ -458,9 +380,7 @@ export class UserPresenter {
                             )}
                 </p>
             </div>
-            <div style="${
-                'flex:0 0 auto'
-            }">
+            <div class="flex-shrink-0">
                 <button
                     class="${
                         'btn btn-ghost '
@@ -523,9 +443,8 @@ export class UserPresenter {
     #buildDimensionsTab(): SafeHtml {
         return html`
         <div
-            class="tabs"
+            class="tabs mb-4"
             role="tablist"
-            style="margin-bottom:1rem"
         >
             <button
                 class="tab active"
@@ -542,13 +461,10 @@ export class UserPresenter {
             id="tab-dimensions"
             class="tab-panel"
         >
-            <p
-                class="text-xs text-muted"
-                style="${
-                    'text-align:center;'
-                    + 'margin-bottom:1rem'
-                }"
-            >
+            <p class="${
+                'text-xs text-muted'
+                + ' text-center mb-4'
+            }">
                 Team Dimensions Assessment
                 Results
             </p>
@@ -557,17 +473,11 @@ export class UserPresenter {
                     .parsedTeamDimensions(),
             ).map(([key, value]) =>
                     html`
-            <div style="${
-                'margin-bottom:1rem'
-            }">
+            <div class="user-dim-row">
                 <div
                     class="${
                         'flex items-center'
-                        + ' justify-between'
-                    }"
-                    style="${
-                        'margin-bottom:'
-                        + '0.5rem'
+                        + ' justify-between mb-2'
                     }"
                 >
                     <div
@@ -585,10 +495,7 @@ export class UserPresenter {
                             class="${
                                 'text-sm'
                                 + ' font-medium'
-                            }"
-                            style="${
-                                'text-transform'
-                                + ':capitalize'
+                                + ' text-capitalize'
                             }"
                         >${key}</span>
                     </div>
@@ -601,14 +508,16 @@ export class UserPresenter {
                     >${value}%</span>
                 </div>
                 <div
-                    class="progress"
-                    style="height:0.5rem"
+                    class="${
+                        'progress'
+                        + ' user-dim-progress'
+                    }"
                 >
                     <div
                         class="progress-fill"
                         style="${
-                            'width:' + value
-                            + '%'
+                            '--progress-fill:'
+                            + value + '%'
                         }"
                     ></div>
                 </div>
@@ -621,24 +530,9 @@ export class UserPresenter {
         return html`
         <div
             id="tab-performance"
-            class="tab-panel"
-            style="display:none"
+            class="tab-panel hidden"
         >
-            <div
-                style="${
-                    'padding:1rem;'
-                    + 'border-radius:0.75rem;'
-                    + 'background:'
-                    + 'linear-gradient('
-                    + '135deg,'
-                    + 'hsl(var(--primary)'
-                    + '/0.1),'
-                    + 'hsl(var(--primary)'
-                    + '/0.05));'
-                    + 'text-align:center;'
-                    + 'margin-bottom:1rem'
-                }"
-            >
+            <div class="perf-hero">
                 ${iconBarChart(
                     32, 'text-primary',
                 )}
@@ -646,9 +540,7 @@ export class UserPresenter {
                     class="${
                         'text-3xl font-bold'
                         + ' text-primary'
-                    }"
-                    style="${
-                        'margin:0.5rem 0'
+                        + ' perf-hero-value'
                     }"
                 >${
                     this.#user.performanceScoreValue()
@@ -660,35 +552,19 @@ export class UserPresenter {
                 </p>
             </div>
             <div
-                style="${
-                    'display:grid;'
-                    + 'grid-template-columns'
-                    + ':1fr 1fr;'
-                    + 'gap:0.75rem'
+                class="${
+                    'grid grid-cols-2 gap-3'
                 }"
             >
-                <div
-                    style="${
-                        'padding:0.75rem;'
-                        + 'border-radius:'
-                        + '0.5rem;'
-                        + 'background:'
-                        + 'hsl(var(--muted)'
-                        + '/0.3);'
-                        + 'text-align:center'
-                    }"
-                >
+                <div class="perf-stat-cell">
                     ${iconCheckCircle2(
                         20, 'text-success',
                     )}
                     <div
                         class="${
                             'text-lg '
-                            + 'font-bold'
-                        }"
-                        style="${
-                            'margin:'
-                            + '0.25rem 0'
+                            + 'font-bold '
+                            + 'perf-stat-value'
                         }"
                     >${
                         this.#user
@@ -700,28 +576,15 @@ export class UserPresenter {
                         Completed
                     </p>
                 </div>
-                <div
-                    style="${
-                        'padding:0.75rem;'
-                        + 'border-radius:'
-                        + '0.5rem;'
-                        + 'background:'
-                        + 'hsl(var(--muted)'
-                        + '/0.3);'
-                        + 'text-align:center'
-                    }"
-                >
+                <div class="perf-stat-cell">
                     ${iconAlertCircle(
                         20, 'text-warning',
                     )}
                     <div
                         class="${
                             'text-lg '
-                            + 'font-bold'
-                        }"
-                        style="${
-                            'margin:'
-                            + '0.25rem 0'
+                            + 'font-bold '
+                            + 'perf-stat-value'
                         }"
                     >${
                         this.#user

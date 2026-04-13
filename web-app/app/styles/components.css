@@ -139,6 +139,25 @@
 .input-error { border-color: hsl(var(--destructive)); }
 .input-error:focus { box-shadow: 0 0 0 2px hsl(var(--destructive) / 0.2); }
 .input-narrow { width: 10rem; }
+.search-wrapper-md { max-width: 20rem; }
+
+.dialog-wide { max-width: 36rem; }
+
+.dialog-scroll {
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.table-header-row {
+  background: hsl(var(--muted) / 0.3);
+  border-bottom: 1px solid
+    hsl(var(--border));
+}
+
+.table-action-cell {
+  flex: 0 0 auto;
+  width: 2.5rem;
+}
 
 .textarea {
   display: block;
@@ -327,6 +346,24 @@
   color: hsl(var(--muted-foreground));
 }
 
+.pill-tag-strength {
+  background: hsl(var(--muted) / 0.5);
+  font-size: 0.625rem;
+}
+
+.pill[data-tone="success"] {
+  background: hsl(var(--success-soft));
+  color: hsl(var(--success-text));
+}
+.pill[data-tone="warning"] {
+  background: hsl(var(--warning-soft));
+  color: hsl(var(--warning-text));
+}
+.pill[data-tone="error"] {
+  background: hsl(var(--error-soft));
+  color: hsl(var(--error-text));
+}
+
 /* Admin link card — bordered card with hover highlight */
 .admin-link-card {
   display: flex;
@@ -343,6 +380,39 @@
 }
 .admin-link-card:hover {
   border-color: hsl(var(--primary) / 0.5);
+}
+
+/* Quick-action button: outline btn variant
+   that sits at top-left with vertical icon+label */
+.btn-quick-action {
+  height: auto;
+  padding: 0.75rem 1rem;
+  justify-content: flex-start;
+  gap: 0.75rem;
+}
+
+/* Stat cell tinted card (used by account, idea, project) */
+.stat-cell {
+  padding: 1rem;
+  border-radius: var(--radius-lg);
+  background: hsl(var(--muted) / 0.3);
+}
+
+/* Health badge — status-badge with extra padding */
+.health-badge {
+  padding: 0.5rem 1rem;
+  align-self: flex-start;
+}
+
+/* Progress bar with usage level tint */
+.progress-bar[data-level="danger"] {
+  background-color: hsl(var(--error));
+}
+.progress-bar[data-level="warning"] {
+  background-color: hsl(var(--warning));
+}
+.progress-bar[data-level="normal"] {
+  background-color: hsl(var(--primary));
 }
 
 /* Activity row — subtle hover highlight */
@@ -633,6 +703,7 @@
 
 .progress-bar {
   height: 100%;
+  width: var(--progress-fill, 0%);
   background-color: hsl(var(--primary));
   border-radius: var(--radius-full);
   transition: width var(--duration-slow) var(--ease-default);
@@ -640,6 +711,7 @@
 
 .progress-fill {
   height: 100%;
+  width: var(--progress-fill, 0%);
   background: hsl(var(--primary));
   border-radius: var(--radius-full);
   transition: width var(--duration-slow)
@@ -767,6 +839,20 @@
   height: 2.5rem;
   border-radius: var(--radius-full);
   flex-shrink: 0;
+}
+
+.skeleton-avatar-sm {
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--radius-full);
+  flex-shrink: 0;
+}
+
+.skeleton-grid {
+  display: grid;
+  grid-template-columns:
+    repeat(auto-fill, minmax(16rem, 1fr));
+  gap: 1.5rem;
 }
 
 /* State containers (error, empty) */
@@ -970,6 +1056,20 @@
   height: 3.5rem;
   font-size: var(--text-lg);
 }
+.avatar-2xl {
+  width: 5rem;
+  height: 5rem;
+  font-size: var(--text-2xl);
+  border-radius: 1rem;
+}
+
+/* Variant: tinted gradient (used by user / account) */
+.avatar-tinted {
+  background: linear-gradient(135deg,
+    hsl(var(--primary) / 0.2),
+    hsl(var(--primary) / 0.05));
+  color: hsl(var(--primary));
+}
 
 /* ==========================================
    24. STATUS DOT (positioned overlay)
@@ -1069,6 +1169,11 @@
   margin-left: auto;
   margin-right: auto;
 }
+.content-wrap-xl {
+  max-width: 64rem;
+  margin-left: auto;
+  margin-right: auto;
+}
 .content-wrap-lg {
   max-width: 72rem;
   margin-left: auto;
@@ -1099,5 +1204,108 @@
 .action-card:hover {
   border-color: hsl(var(--primary) / 0.5);
   background: hsl(var(--card) / 0.5);
+}
+
+/* Snapshot card — vertical stack with header row */
+.snapshot-card {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* Tone-bordered outline button (success/warning/error) */
+.btn-outline[data-tone="success"] {
+  border-color: hsl(var(--success));
+  color: hsl(var(--success-text));
+}
+.btn-outline[data-tone="warning"] {
+  border-color: hsl(var(--warning));
+  color: hsl(var(--warning-text));
+}
+.btn-outline[data-tone="error"] {
+  border-color: hsl(var(--error));
+  color: hsl(var(--error-text));
+}
+
+/* Empty-state info banner */
+.empty-banner {
+  padding: 1rem 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  grid-column: 1 / -1;
+  background: hsl(var(--primary) / 0.06);
+  border: 1px solid hsl(var(--primary) / 0.2);
+}
+.empty-banner-icon {
+  color: hsl(var(--primary));
+  flex-shrink: 0;
+}
+
+/* ==========================================
+   29. METRIC ICON BOX (small inline)
+   ========================================== */
+
+.metric-icon-box {
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--radius);
+  background: hsl(var(--primary) / 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* ==========================================
+   30. STATUS PILL BADGE (centered fixed)
+   ========================================== */
+
+.badge-fixed-w {
+  min-width: 6rem;
+  justify-content: center;
+}
+
+/* ==========================================
+   30b. CARD SELECTED RING
+   ========================================== */
+
+.card-selected {
+  box-shadow:
+    0 0 0 2px hsl(var(--primary));
+}
+
+/* ==========================================
+   30c. AVATAR FRAME (relative wrapper)
+   ========================================== */
+
+.avatar-frame {
+  position: relative;
+  flex-shrink: 0;
+}
+
+/* ==========================================
+   31. PROGRESS RING (small SVG)
+   ========================================== */
+
+.progress-ring {
+  position: relative;
+  width: 3rem;
+  height: 3rem;
+}
+
+.progress-ring-svg {
+  transform: rotate(-90deg);
+}
+
+.progress-ring-text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.625rem;
+  font-weight: 700;
 }
 

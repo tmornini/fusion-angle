@@ -133,7 +133,7 @@ import { navigateTo, openDialog, closeDialog } from '../app/core';
 - `build*` — construct and return a value (data structure, HTML, chart)
 - `mutate*` — find existing DOM element(s) and update their content (side-effecting)
 - `init*` — set up event listeners and initial behavior
-- `styleFor*` — map a status/value to a CSS inline style string
+- `toneFor*` / `levelFor*` — map a status/value to a string enum (`'success' | 'warning' | 'error'` etc.) used as a `data-tone` or `data-level` attribute value. Replaces the older `styleFor*` pattern that returned inline-style strings.
 - `compute*` — pure calculation returning a derived value
 - `get*` — adapter functions that fetch and transform data (reads)
 - `put*` — adapter functions that write entity data (writes)
@@ -154,6 +154,38 @@ import { navigateTo, openDialog, closeDialog } from '../app/core';
 CSS custom properties on `:root` (light) and `[data-theme="dark"]` (dark). Toggle persists to `localStorage` and carries across page navigation. Supports system preference detection via `prefers-color-scheme`.
 
 ## UI & Styling
+
+### CSS-first styling (no inline `style=""` strings)
+
+All visual styling lives in CSS files under `web-app/app/styles/`. TypeScript presenters and page modules emit semantic class names plus `data-*` attributes for variants. Inline `style="..."` strings are forbidden except for two narrow cases:
+
+1. **Dynamic per-element values** — values computed at render time from entity data (progress bar widths, animation durations, fill percentages). These pass via CSS custom properties: `style="--progress-fill:${value}%"` consumed by a CSS rule that reads `var(--progress-fill, 0%)`. The value is **data**, not styling.
+2. **Bootstrap fallbacks** — `database-init.ts` shows an error UI when the app fails to bootstrap and CSS may not have loaded. Inline styles are intentional there. A file-header comment marks the exception.
+
+The **theme/variant pattern** is `data-tone` or `data-level` attributes on a base class:
+
+```typescript
+// presenter
+return html`<div class="icon-box" data-tone="${tone}">...</div>`;
+```
+
+```css
+/* components.css */
+.icon-box[data-tone="primary"] { background: ...; }
+.icon-box[data-tone="success"] { background: ...; }
+```
+
+`tone` comes from a `toneFor*` / `levelFor*` helper that returns a string enum. The TS type system and the CSS attribute selectors share a single source of truth: the enum values.
+
+When migrating or extending visual code:
+
+- **Look for an existing utility first** (`.flex`, `.gap-4`, `.mb-5`, `.text-sm`, `.bg-primary`, `.shadow-lg`).
+- **Look for an existing component class** (`.card`, `.icon-box`, `.avatar`, `.status-dot`, `.legend-cell`, `.action-card`, `.stat-cell`, `.pill[data-tone]`).
+- **Add to `components.css`** when a pattern appears in 3+ files. Group with sibling classes and modifiers.
+- **Add to `pages.css`** in a numbered section when the pattern is page-scoped (only used by one feature).
+- **Add to `utilities.css`** for new single-property primitives.
+- **Never use raw hex colors** in new CSS rules — always `hsl(var(--token))`. The token system is the single source of truth for color.
+- **Demonstrating the design system**: `design-system/index.ts` consumes the **same** `.bg-*`, `.shadow-*`, `.text-*` classes that production code uses. There is no parallel demonstration-only style universe — if `--primary` changes, every `.bg-primary` instance updates including the swatch on the design-system page.
 
 ### Component Library
 

@@ -67,12 +67,9 @@ export class ProjectPresenter {
         return html`<span class="${
             'badge '
             + cfg.className
-            + ' text-xs'
-        }" data-status="${s}" style="${
-            'cursor:pointer;'
-            + 'min-width:6rem;'
-            + 'justify-content:center'
-        }">${
+            + ' text-xs badge-fixed-w'
+            + ' cursor-pointer'
+        }" data-status="${s}">${
             icon(14, '')
         } ${cfg.label}</span>`;
     }
@@ -84,17 +81,8 @@ export class ProjectPresenter {
         const statusIcon = STATUS_ICONS[
             this.#project.statusValue()
         ]!;
-        const metricBoxStyle =
-            'width:2rem;height:2rem;'
-            + 'border-radius:0.5rem;'
-            + 'background:'
-            + 'hsl(var(--primary)/0.1);'
-            + 'display:flex;'
-            + 'align-items:center;'
-            + 'justify-content:center';
         return html`
-    <div class="card card-hover"
-        style="padding:1.25rem"
+    <div class="card card-hover p-5"
         data-project-card="${
             this.#project.idForLink()
         }"
@@ -106,22 +94,14 @@ export class ProjectPresenter {
         }">
             ${showGrip ? html`<div class="${
                 'hidden-mobile text-muted'
-            }" style="cursor:grab">${
+                + ' cursor-grab'
+            }">${
                 iconGripVertical(20, '')
             }</div>` : html``}
-            <div style="${
-                'flex:1;min-width:0'
-            }">
+            <div class="flex-fill">
                 <h3 class="${
                     'font-display '
-                    + 'font-semibold'
-                }" style="${
-                    'white-space:'
-                    + 'nowrap;'
-                    + 'overflow:'
-                    + 'hidden;'
-                    + 'text-overflow'
-                    + ':ellipsis'
+                    + 'font-semibold truncate'
                 }">${
                     this.#project
                         .titleText()
@@ -131,12 +111,7 @@ export class ProjectPresenter {
                     + this.#project
                         .statusClassName()
                     + ' text-xs'
-                }" style="${
-                    'justify-content:'
-                    + 'center;'
-                    + 'min-width:6rem;'
-                    + 'margin-top:'
-                    + '0.25rem'
+                    + ' badge-fixed-w mt-1'
                 }">${
                     statusIcon(
                         14, '',
@@ -146,9 +121,7 @@ export class ProjectPresenter {
                         .statusLabel()
                 }</span>
             </div>
-            ${this.#buildMetrics(
-                metricBoxStyle,
-            )}
+            ${this.#buildMetrics()}
             ${this.#buildProgressRing()}
         </div>
     </div>`;
@@ -161,14 +134,9 @@ export class ProjectPresenter {
         const circumference =
             2 * Math.PI * radius;
         return html`
-    <div style="${
-        'position:relative;'
-        + 'width:3rem;height:3rem'
-    }">
+    <div class="progress-ring">
         <svg width="48" height="48"
-            style="${
-                'transform:rotate(-90deg)'
-            }">
+            class="progress-ring-svg">
             <circle
                 cx="${center}"
                 cy="${center}"
@@ -192,20 +160,12 @@ export class ProjectPresenter {
                     * circumference / 100
                 } ${circumference}"/>
         </svg>
-        <span style="${
-            'position:absolute;inset:0;'
-            + 'display:flex;'
-            + 'align-items:center;'
-            + 'justify-content:center;'
-            + 'font-size:0.625rem;'
-            + 'font-weight:700'
-        }">${percent}%</span>
+        <span class="progress-ring-text"
+            >${percent}%</span>
     </div>`;
     }
 
-    #buildMetrics(
-        boxStyle: string,
-    ): SafeHtml {
+    #buildMetrics(): SafeHtml {
         const p = this.#project;
         const s = new Date(
             p.startDateValue(),
@@ -237,11 +197,12 @@ export class ProjectPresenter {
     <div class="${
         'hidden-mobile flex'
         + ' items-center gap-4'
-    }" style="flex-shrink:0">
+        + ' flex-shrink-0'
+    }">
         <div class="${
             'flex items-center gap-2'
         }">
-            <div style="${boxStyle}">${
+            <div class="metric-icon-box">${
                 iconClock(
                     16, 'text-primary',
                 )
@@ -261,7 +222,7 @@ export class ProjectPresenter {
         <div class="${
             'flex items-center gap-2'
         }">
-            <div style="${boxStyle}">${
+            <div class="metric-icon-box">${
                 iconDollarSign(
                     16, 'text-primary',
                 )
@@ -282,7 +243,7 @@ export class ProjectPresenter {
         <div class="${
             'flex items-center gap-2'
         }">
-            <div style="${boxStyle}">${
+            <div class="metric-icon-box">${
                 iconTrendingUp(
                     16, 'text-primary',
                 )

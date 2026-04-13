@@ -13,54 +13,16 @@ import type {
     GaugeTheme,
 } from '../adapters/dashboard';
 
-type ThemeStyle = {
-    bg: string;
-    iconBg: string;
-    border: string;
-};
-const THEME_CONFIG: Record<
+type GaugeTone =
+    'primary' | 'success' | 'warning';
+
+const THEME_TONE: Record<
     GaugeTheme,
-    ThemeStyle
+    GaugeTone
 > = {
-    blue: {
-        bg:
-            'background:'
-            + 'hsl(var(--primary)/0.04)',
-        iconBg:
-            'background:linear-gradient('
-            + '135deg,'
-            + 'hsl(var(--primary)/0.2),'
-            + 'hsl(var(--primary)/0.1))',
-        border:
-            'border-color:'
-            + 'hsl(var(--primary)/0.15)',
-    },
-    green: {
-        bg:
-            'background:'
-            + 'hsl(var(--success)/0.04)',
-        iconBg:
-            'background:linear-gradient('
-            + '135deg,'
-            + 'hsl(var(--success)/0.2),'
-            + 'hsl(var(--success)/0.1))',
-        border:
-            'border-color:'
-            + 'hsl(var(--success)/0.15)',
-    },
-    amber: {
-        bg:
-            'background:'
-            + 'hsl(var(--warning)/0.04)',
-        iconBg:
-            'background:linear-gradient('
-            + '135deg,'
-            + 'hsl(var(--warning)/0.2),'
-            + 'hsl(var(--warning)/0.1))',
-        border:
-            'border-color:'
-            + 'hsl(var(--warning)/0.15)',
-    },
+    blue: 'primary',
+    green: 'success',
+    amber: 'warning',
 };
 
 const ICON_FNS: Record<
@@ -82,7 +44,7 @@ export class GaugePresenter
     implements GaugeReceiver
 {
     #title = '';
-    #ts: ThemeStyle = THEME_CONFIG.blue;
+    #tone: GaugeTone = 'primary';
     #iconFn: (
         size: number,
         cls: string,
@@ -103,7 +65,7 @@ export class GaugePresenter
     }
 
     theme(name: GaugeTheme): void {
-        this.#ts = THEME_CONFIG[name];
+        this.#tone = THEME_TONE[name];
     }
 
     icon(
@@ -149,25 +111,13 @@ export class GaugePresenter
             .replace(/\s+/g, '-')
             .toLowerCase();
         return html`
-    <div class="card" style="${
-        'border:2px solid transparent;'
-        + this.#ts.border + ';'
-        + this.#ts.bg + ';'
-        + 'border-radius:0.75rem;'
-        + 'transition:all 0.3s'
-    }">
+    <div class="card gauge-card"
+        data-tone="${this.#tone}">
         <div class="${
             'flex items-center gap-3 mb-5'
         }">
-            <div style="${
-                'width:2.5rem;'
-                + 'height:2.5rem;'
-                + 'border-radius:0.5rem;'
-                + this.#ts.iconBg + ';'
-                + 'display:flex;'
-                + 'align-items:center;'
-                + 'justify-content:center'
-            }">
+            <div class="icon-box"
+                data-tone="${this.#tone}">
                 ${this.#iconFn(
                     20, this.#iconCss,
                 )}
@@ -251,7 +201,7 @@ export class GaugePresenter
         return html`
         <svg width="180" height="95"
             viewBox="0 0 180 95"
-            style="overflow:visible">
+            class="overflow-visible">
             <defs>
                 <linearGradient
                     id="${
@@ -365,75 +315,39 @@ export class GaugePresenter
     }
 
     #renderLegend(): SafeHtml {
-        const cellStyle =
-            'text-align:center;'
-            + 'padding:0.75rem;'
-            + 'border-radius:0.5rem;'
-            + 'background:'
-            + 'hsl(var(--card)/0.8);'
-            + 'border:1px solid '
-            + 'hsl(var(--border)/0.5)';
-        const dotBase =
-            'width:0.625rem;'
-            + 'height:0.625rem;'
-            + 'border-radius:'
-            + 'var(--radius-full);';
         return html`
-        <div style="${
-            'display:grid;'
-            + 'grid-template-columns:'
-            + '1fr 1fr;'
-            + 'gap:1rem'
+        <div class="${
+            'grid grid-cols-2 gap-4'
         }">
-            <div style="${cellStyle}">
+            <div class="legend-cell">
                 <div class="${
                     'flex items-center '
-                    + 'justify-center gap-2'
-                }" style="${
-                    'margin-bottom:0.25rem'
+                    + 'justify-center gap-2 mb-1'
                 }">
-                    <div style="${
-                        dotBase
-                        + 'background:'
-                        + 'hsl(var(--success))'
-                    }"></div>
-                    <span class="${
-                        'text-xs text-muted'
-                    }" style="${
-                        'font-weight:500'
-                    }">${
-                        this.#innerLabel
-                    }</span>
+                    <div class="legend-dot"
+                        data-tone="success">
+                    </div>
+                    <span
+                        class="legend-cell-label"
+                    >${this.#innerLabel}</span>
                 </div>
-                <p class="${
-                    'text-2xl font-bold'
-                }">${
+                <p class="legend-cell-value">${
                     this.#innerDisplay
                 }</p>
             </div>
-            <div style="${cellStyle}">
+            <div class="legend-cell">
                 <div class="${
                     'flex items-center '
-                    + 'justify-center gap-2'
-                }" style="${
-                    'margin-bottom:0.25rem'
+                    + 'justify-center gap-2 mb-1'
                 }">
-                    <div style="${
-                        dotBase
-                        + 'background:'
-                        + 'hsl(var(--primary))'
-                    }"></div>
-                    <span class="${
-                        'text-xs text-muted'
-                    }" style="${
-                        'font-weight:500'
-                    }">${
-                        this.#outerLabel
-                    }</span>
+                    <div class="legend-dot"
+                        data-tone="primary">
+                    </div>
+                    <span
+                        class="legend-cell-label"
+                    >${this.#outerLabel}</span>
                 </div>
-                <p class="${
-                    'text-2xl font-bold'
-                }">${
+                <p class="legend-cell-value">${
                     this.#outerDisplay
                 }</p>
             </div>

@@ -757,6 +757,76 @@
   .auth-form-wrapper { width: 50%; }
 }
 
+.auth-branding-content {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 3rem 5rem;
+  height: 100%;
+}
+
+.auth-form-card {
+  width: 100%;
+  max-width: 28rem;
+}
+
+.auth-mobile-logo {
+  width: 2.5rem;
+  height: 2.5rem;
+}
+
+.auth-brand-icon {
+  width: 3rem;
+  height: 3rem;
+  border-radius: var(--radius-xl);
+  background: hsl(var(--accent));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.auth-brand-name {
+  color: hsl(var(--primary-foreground));
+}
+
+.auth-headline {
+  font-size: 2.5rem;
+  color: hsl(var(--primary-foreground));
+  line-height: 1.2;
+  margin-bottom: 1.5rem;
+}
+
+.auth-subhead {
+  font-size: var(--text-lg);
+  color: hsl(
+    var(--primary-foreground) / 0.8
+  );
+  max-width: 28rem;
+}
+
+.auth-stat-value {
+  color: hsl(var(--accent));
+}
+
+.auth-stat-label {
+  color: hsl(
+    var(--primary-foreground) / 0.7
+  );
+}
+
+.auth-submit-btn {
+  height: 3rem;
+  font-size: var(--text-base);
+}
+
+.btn-link {
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
 /* ==========================================
    36b. ACTION FOOTER (Approval Detail)
    ========================================== */
@@ -1027,6 +1097,31 @@ svg.wf-canvas {
   border: 1px solid hsl(var(--border));
 }
 
+.wf-name-input {
+  font-size: 1.125rem;
+  font-weight: 600;
+  padding: 0.25rem 0.5rem;
+}
+
+.wf-name-edit-btn {
+  opacity: 0.5;
+}
+
+.wf-lock-label {
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.wf-required-mark {
+  color: hsl(var(--error));
+}
+
+.wf-props-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
 svg.wf-canvas [data-node-id] {
   transition:
       opacity var(--duration-fast)
@@ -1066,8 +1161,23 @@ svg.wf-canvas [data-edge-id] {
    40. DASHBOARD GAUGES
    ========================================== */
 
-#gauge-container .card {
+.gauge-card {
   padding: 1rem 1.5rem 1.5rem;
+}
+
+.gauge-card[data-tone="primary"] {
+  background: hsl(var(--primary) / 0.04);
+  border-color: hsl(var(--primary) / 0.15);
+}
+
+.gauge-card[data-tone="success"] {
+  background: hsl(var(--success) / 0.04);
+  border-color: hsl(var(--success) / 0.15);
+}
+
+.gauge-card[data-tone="warning"] {
+  background: hsl(var(--warning) / 0.04);
+  border-color: hsl(var(--warning) / 0.15);
 }
 
 .gauge-arc-container {
@@ -1114,5 +1224,520 @@ svg.wf-canvas [data-edge-id] {
   width: 4rem;
   height: 4rem;
   box-shadow: var(--shadow-lg);
+}
+
+/* ==========================================
+   43a. IDEA CREATE PAGE
+   ========================================== */
+
+.idea-create-icon {
+  width: 2.25rem;
+  height: 2.25rem;
+  color: hsl(var(--primary-foreground));
+}
+
+.input-large-title {
+  font-size: 1.125rem;
+  padding: 0.75rem 1rem;
+}
+
+.section-divider-top {
+  border-top: 1px solid hsl(var(--border));
+}
+
+/* ==========================================
+   43. IDEA / IDEA CONVERSION DETAIL
+   ========================================== */
+
+.idea-actions-stack {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.5rem;
+  min-width: 8rem;
+  padding-bottom: 0.5rem;
+}
+
+.idea-detail-wrap {
+  max-width: 48rem;
+  margin: 0 auto;
+}
+
+.idea-detail-wrap.has-footer-actions {
+  padding-bottom: 10rem;
+}
+
+.idea-edit-title {
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+
+.dialog-narrow {
+  max-width: 28rem;
+}
+
+/* ==========================================
+   44. PROJECT DETAIL
+   ========================================== */
+
+/* .project-detail-wrap is now an alias
+   for .content-wrap-xl */
+.project-detail-wrap {
+  max-width: 64rem;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.detail-grid-spaced {
+  gap: 2rem;
+}
+
+.metric-cell {
+  padding: 1rem;
+  border-radius: var(--radius-lg);
+  background: hsl(var(--muted) / 0.3);
+  border: 1px solid hsl(var(--border));
+}
+
+.metric-cell-row-divider {
+  padding-top: 0.5rem;
+  border-top: 1px solid
+    hsl(var(--border));
+}
+
+.summary-stat-cell {
+  padding: 0.75rem;
+  border-radius: var(--radius);
+  background: hsl(var(--muted) / 0.5);
+}
+
+.team-member-avatar {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: var(--radius);
+  background: hsl(var(--primary) / 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.flow-icon-pill {
+  padding: 0.5rem;
+  border-radius: var(--radius);
+  background: hsl(var(--primary) / 0.1);
+}
+
+.flow-card-link {
+  padding: 1rem;
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+
+.input-narrow-num {
+  width: 5rem;
+  text-align: right;
+}
+
+.variance-good {
+  color: hsl(var(--success-text));
+}
+.variance-bad {
+  color: hsl(var(--error-text));
+}
+
+.dialog-section {
+  padding: 1.5rem;
+}
+.dialog-section-divider-bottom {
+  border-bottom: 1px solid
+    hsl(var(--border));
+}
+.dialog-section-divider-top {
+  border-top: 1px solid
+    hsl(var(--border));
+}
+.dialog-actions-row {
+  padding: 1rem 1.5rem;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.select-auto {
+  width: auto;
+}
+
+.input-md-bold {
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+
+/* ==========================================
+   45. USER / TEAM MEMBER PRESENTER
+   ========================================== */
+
+.user-detail-wrap {
+  padding: 1.5rem;
+}
+
+.user-detail-header {
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+
+.user-row-divider {
+  border-bottom: 1px solid
+    hsl(var(--border));
+}
+
+.user-dim-row {
+  margin-bottom: 1rem;
+}
+
+.user-dim-progress {
+  height: 0.5rem;
+}
+
+.text-capitalize {
+  text-transform: capitalize;
+}
+
+.perf-hero {
+  padding: 1rem;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg,
+    hsl(var(--primary) / 0.1),
+    hsl(var(--primary) / 0.05));
+  text-align: center;
+  margin-bottom: 1rem;
+}
+
+.perf-hero-value {
+  margin: 0.5rem 0;
+}
+
+.perf-stat-cell {
+  padding: 0.75rem;
+  border-radius: var(--radius);
+  background: hsl(var(--muted) / 0.3);
+  text-align: center;
+}
+
+.perf-stat-value {
+  margin: 0.25rem 0;
+}
+
+/* ==========================================
+   46. IDEA CONVERSION
+   ========================================== */
+
+.convert-icon {
+  width: 2.25rem;
+  height: 2.25rem;
+  color: hsl(var(--primary-foreground));
+}
+
+.convert-grid-2-3 {
+  grid-template-columns: 2fr 3fr;
+  gap: 2rem;
+}
+
+.convert-progress-bar {
+  width: 6rem;
+  height: 0.5rem;
+  background: hsl(var(--muted));
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.convert-progress-fill {
+  height: 100%;
+  background: hsl(var(--success));
+  transition: width 0.3s;
+  width: var(--convert-progress, 0%);
+}
+
+.convert-summary-sticky {
+  position: sticky;
+  top: 6rem;
+}
+
+.field-check {
+  color: hsl(var(--success));
+}
+
+.input-prefix-wrap {
+  position: relative;
+}
+
+.input-prefix-symbol {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: hsl(var(--muted-foreground));
+  pointer-events: none;
+}
+
+.input-suffix-symbol {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: hsl(var(--muted-foreground));
+  pointer-events: none;
+}
+
+.input-with-prefix {
+  padding-left: 1.75rem;
+}
+
+.input-with-suffix {
+  padding-right: 2.5rem;
+}
+
+.convert-confirm-section {
+  border: 2px solid transparent;
+}
+
+.convert-confirm-section[data-ready="true"] {
+  border-color:
+    hsl(var(--success) / 0.3);
+  background:
+    hsl(var(--success) / 0.05);
+}
+
+.convert-confirm-icon {
+  width: 3rem;
+  height: 3rem;
+  border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: hsl(var(--muted));
+  color: hsl(var(--muted-foreground));
+}
+
+.convert-confirm-icon[data-ready="true"] {
+  background: hsl(var(--success));
+  color: hsl(var(--success-foreground));
+}
+
+/* ==========================================
+   47. DESIGN SYSTEM SHOWCASE
+   ========================================== */
+
+.ds-page {
+  display: flex;
+  flex-direction: column;
+  gap: 3rem;
+  padding-bottom: 4rem;
+}
+
+.ds-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.ds-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+.ds-grid-3 {
+  display: grid;
+  grid-template-columns:
+    repeat(3, 1fr);
+  gap: 1.5rem;
+}
+.ds-grid-4 {
+  display: grid;
+  grid-template-columns:
+    repeat(4, 1fr);
+  gap: 1.5rem;
+}
+.ds-grid-5 {
+  display: grid;
+  grid-template-columns:
+    repeat(5, 1fr);
+  gap: 1.5rem;
+}
+.ds-grid-6 {
+  display: grid;
+  grid-template-columns:
+    repeat(6, 1fr);
+  gap: 1.5rem;
+}
+
+.ds-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.ds-hr {
+  border: none;
+  border-top: 1px solid
+    hsl(var(--border));
+}
+
+.color-swatch {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.color-swatch-block {
+  height: 4rem;
+  width: 100%;
+  border-radius: var(--radius);
+  border: 1px solid hsl(var(--border));
+}
+.color-swatch-block-2 {
+  border-width: 2px;
+}
+
+.shadow-swatch {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.shadow-swatch-block {
+  width: 100%;
+  height: 5rem;
+  border-radius: var(--radius-lg);
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+}
+
+.type-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid
+    hsl(var(--border));
+}
+
+.icon-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  width: 3.5rem;
+}
+
+.icon-size-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.ds-soft-row {
+  padding: 1rem;
+  border-radius: var(--radius);
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+.ds-soft-row[data-tone="error"] {
+  background: hsl(var(--error-soft));
+  border: 1px solid
+    hsl(var(--error-border));
+}
+.ds-soft-row[data-tone="warning"] {
+  background: hsl(var(--warning-soft));
+  border: 1px solid
+    hsl(var(--warning-border));
+}
+
+.ds-upload-fail {
+  padding: 1.5rem;
+  border-radius: var(--radius-lg);
+  background: hsl(var(--error-soft));
+  border: 1px solid
+    hsl(var(--error-border));
+  text-align: center;
+}
+
+.ds-do-card {
+  padding: 1.5rem;
+  border-color:
+    hsl(var(--success) / 0.3);
+  background:
+    hsl(var(--success-soft) / 0.3);
+}
+.ds-dont-card {
+  padding: 1.5rem;
+  border-color:
+    hsl(var(--error) / 0.3);
+  background:
+    hsl(var(--error-soft) / 0.3);
+}
+
+.ds-space-bar {
+  height: 1rem;
+  width: var(--space-w, 0);
+  background: hsl(var(--primary));
+  border-radius: 0.25rem;
+}
+
+.ds-prop-panel {
+  padding: 1rem;
+  border-radius: var(--radius-lg);
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  max-width: 18rem;
+}
+
+.ds-prop-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.ds-fullpage-err-desc {
+  max-width: 28rem;
+  margin: 0.5rem auto 0;
+}
+
+.ds-success-border {
+  border-color: hsl(var(--success));
+}
+
+.ds-accent-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 500;
+  background: hsl(var(--accent-soft));
+  color: hsl(var(--accent-text));
+  border: 1px solid
+    hsl(var(--accent) / 0.3);
+}
+
+.ds-soft-btn[data-tone="primary"] {
+  background: hsl(var(--primary) / 0.1);
+  color: hsl(var(--primary));
+}
+.ds-soft-btn[data-tone="success"] {
+  background: hsl(var(--success-soft));
+  color: hsl(var(--success-text));
+}
+.ds-soft-btn[data-tone="warning"] {
+  background: hsl(var(--warning-soft));
+  color: hsl(var(--warning-text));
+}
+.ds-soft-btn[data-tone="error"] {
+  background: hsl(var(--error-soft));
+  color: hsl(var(--error-text));
 }
 

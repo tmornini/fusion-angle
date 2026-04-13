@@ -24,8 +24,7 @@ function buildSkeletonCard(): SafeHtml {
     <div class="${SHIMMER_CLASS}
         skeleton-text"></div>
     <div class="${SHIMMER_CLASS}
-        skeleton-text"
-        style="width:80%"></div>
+        skeleton-text w-80"></div>
     </div>`;
 }
 
@@ -38,12 +37,9 @@ function buildSkeletonListItem(
         skeleton-avatar"></div>
     <div class="flex-1">
         <div class="${SHIMMER_CLASS}
-            skeleton-text"
-            style="width:60%;
-margin-bottom:0.375rem"></div>
+            skeleton-text w-60 mb-1"></div>
         <div class="${SHIMMER_CLASS}
-            skeleton-text-sm"
-            style="width:40%"></div>
+            skeleton-text-sm w-40"></div>
     </div>
     <div class="${SHIMMER_CLASS}
         skeleton-badge"></div>
@@ -57,11 +53,11 @@ function buildSkeletonStatsRow(
     ${Array(4).fill(trusted(
         `<div class="skeleton-card p-4">`
         + `<div class="${SHIMMER_CLASS}`
-        + ` skeleton-text-sm mb-2"`
-        + ` style="width:50%"></div>`
+        + ` skeleton-text-sm mb-2 w-50">`
+        + `</div>`
         + `<div class="${SHIMMER_CLASS}`
-        + ` skeleton-heading"`
-        + ` style="width:40%"></div>`
+        + ` skeleton-heading w-40">`
+        + `</div>`
         + `</div>`,
     ))}
     </div>`;
@@ -74,9 +70,7 @@ export function buildSkeleton(
     switch (type) {
         case 'card-grid':
             return html`<div
-style="display:grid;
-grid-template-columns:repeat(auto-fill,minmax(16rem,1fr));
-gap:1.5rem">
+                class="skeleton-grid">
                 ${Array(count).fill(
                     buildSkeletonCard(),
                 )}
@@ -91,18 +85,14 @@ gap:1.5rem">
         case 'detail':
             return html`<div>
         <div class="${SHIMMER_CLASS}
-            skeleton-heading mb-6"
-            style="width:40%"></div>
+            skeleton-heading mb-6 w-40"></div>
         <div class="skeleton-card mb-6">
             <div class="${SHIMMER_CLASS}
-                skeleton-text"
-                style="width:90%"></div>
+                skeleton-text w-90"></div>
             <div class="${SHIMMER_CLASS}
-                skeleton-text"
-                style="width:75%"></div>
+                skeleton-text w-75"></div>
             <div class="${SHIMMER_CLASS}
-                skeleton-text mb-4"
-                style="width:60%"></div>
+                skeleton-text mb-4 w-60"></div>
             <div
                 class="grid grid-cols-3 gap-4">
                 ${Array(3).fill(trusted(
@@ -113,9 +103,8 @@ gap:1.5rem">
                     + `</div>`
                     + `<div class="`
                     + `${SHIMMER_CLASS}`
-                    + ` skeleton-heading"`
-                    + ` style="width:60%">`
-                    + `</div>`
+                    + ` skeleton-heading`
+                    + ` w-60"></div>`
                     + `</div>`,
                 ))}
             </div>
@@ -125,35 +114,26 @@ gap:1.5rem">
             return html`<div
         class="skeleton-card p-0
             overflow-hidden">
-        <div style="padding:1rem;
-border-bottom:1px solid hsl(var(--border))">
+        <div class="p-4 border-b">
             <div class="${SHIMMER_CLASS}
-                skeleton-text"
-                style="width:30%"></div>
+                skeleton-text w-30"></div>
         </div>
         ${Array(count).fill(trusted(
             '<div'
             + ' class="flex items-center'
-            + ' gap-4"'
-            + ' style="padding:0.75rem'
-            + ' 1rem;border-bottom:1px'
-            + ' solid'
-            + ' hsl(var(--border))">'
+            + ' gap-4 py-3 px-4 border-b">'
             + `<div class="`
             + `${SHIMMER_CLASS}`
-            + ` skeleton-avatar"`
-            + ` style="width:2rem;`
-            + `height:2rem"></div>`
+            + ` skeleton-avatar-sm">`
+            + `</div>`
             + `<div class="`
             + `${SHIMMER_CLASS}`
-            + ` skeleton-text"`
-            + ` style="width:25%;`
-            + `margin:0"></div>`
+            + ` skeleton-text w-25 m-0">`
+            + `</div>`
             + `<div class="`
             + `${SHIMMER_CLASS}`
-            + ` skeleton-text"`
-            + ` style="width:20%;`
-            + `margin:0"></div>`
+            + ` skeleton-text w-20 m-0">`
+            + `</div>`
             + `<div class="`
             + `${SHIMMER_CLASS}`
             + ` skeleton-badge`
