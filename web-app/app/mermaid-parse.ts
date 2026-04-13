@@ -17,6 +17,37 @@ export interface ParsedFlowchart {
     warnings: string[];
 }
 
+/* ── Diagram type dispatch ─────────── */
+
+type DiagramType = 'flowchart' | 'state';
+
+function detectDiagramType(
+    text: string,
+): DiagramType | null {
+    for (const raw of text.split('\n')) {
+        const line = raw.trim();
+        if (
+            line.length === 0
+            || line.startsWith('%%')
+        ) {
+            continue;
+        }
+        if (/^(flowchart|graph)\b/.test(line)) {
+            return 'flowchart';
+        }
+        if (
+            /^stateDiagram(-v2)?\b/
+                .test(line)
+        ) {
+            return 'state';
+        }
+        return null;
+    }
+    return null;
+}
+
+/* ── Flowchart parser ──────────────── */
+
 const HEADER_RE =
     /^flowchart\s+(LR|TD|TB|BT|RL)\s*$/;
 
@@ -125,6 +156,23 @@ function ensureNode(
 export function parseMermaid(
     text: string,
 ): ParsedFlowchart {
+    const type = detectDiagramType(text);
+    if (type === 'flowchart') {
+        return parseFlowchart(text);
+    }
+    if (type === 'state') {
+        return parseStateDiagram(text);
+    }
+    throw new Error(
+        'Unsupported mermaid diagram type.'
+        + ' Expected flowchart or'
+        + ' stateDiagram.',
+    );
+}
+
+function parseFlowchart(
+    text: string,
+): ParsedFlowchart {
     const lines = text.split('\n');
     const nodes =
         new Map<string, ParsedNode>();
@@ -204,58 +252,210 @@ export function parseMermaid(
         }
     }
 
-    const result = [...nodes.values()];
-
-    inferStartEnd(result, edges);
-
     return {
-        nodes: result,
+        nodes: [...nodes.values()],
         edges,
         warnings,
     };
 }
 
-function inferStartEnd(
-    nodes: ParsedNode[],
-    edges: ParsedEdge[],
-): void {
-    const hasStart = nodes.some(
-        n => n.isStart,
-    );
-    const hasComplete = nodes.some(
-        n => n.isComplete,
-    );
+/* ── State diagram parser ──────────── */
 
-    if (!hasStart && nodes.length > 0) {
-        const incoming = new Set(
-            edges.map(e => e.toId),
-        );
-        const candidate = nodes.find(
-            n => !incoming.has(n.mermaidId),
-        );
-        if (candidate) {
-            candidate.isStart = true;
-        } else {
-            nodes[0]!.isStart = true;
+const STATE_HEADER_RE =
+    /^stateDiagram(-v2)?\s*$/;
+const STATE_EDGE_RE = new RegExp(
+    '^(\\[\\*\\]|\\S+)\\s+-->\\s+'
+    + '(\\[\\*\\]|\\S+)'
+    + '(?:\\s*:\\s*(.+?))?\\s*$',
+);
+const STATE_DECL_QUOTED_RE =
+    /^state\s+"(.+?)"\s+as\s+(\S+)\s*$/;
+const STATE_DECL_BARE_RE =
+    /^state\s+(\S+)\s*$/;
+const NOTE_SINGLE_RE =
+    /^note\s+(right|left|above|below)\s+of\s+\S+\s*:.*$/;
+const NOTE_BLOCK_START_RE =
+    /^note\s+(right|left|above|below)\s+of\s+\S+\s*$/;
+const NOTE_BLOCK_END_RE =
+    /^end\s+note\s*$/;
+const COMPOSITE_OPEN_RE =
+    /^state\s+\S+\s*\{\s*$/;
+const COMPOSITE_CLOSE_RE =
+    /^\}\s*$/;
+
+const STATE_PSEUDO = '[*]';
+const STATE_START_NAME = 'Start';
+const STATE_COMPLETE_NAME = 'Complete';
+
+function parseStateDiagram(
+    text: string,
+): ParsedFlowchart {
+    const lines = text.split('\n');
+    const nodes =
+        new Map<string, ParsedNode>();
+    const edges: ParsedEdge[] = [];
+    const warnings: string[] = [];
+    let inNoteBlock = false;
+    let compositeDepth = 0;
+    let pseudoCounter = 0;
+
+    const addPseudo = (
+        kind: 'start' | 'complete',
+    ): string => {
+        pseudoCounter += 1;
+        const id =
+            '__' + kind + '_'
+            + String(pseudoCounter)
+            + '__';
+        nodes.set(id, {
+            mermaidId: id,
+            name: kind === 'start'
+                ? STATE_START_NAME
+                : STATE_COMPLETE_NAME,
+            isStart: kind === 'start',
+            isComplete: kind === 'complete',
+        });
+        return id;
+    };
+
+    const ensureStateNode = (
+        id: string,
+    ): void => {
+        if (!nodes.has(id)) {
+            nodes.set(id, {
+                mermaidId: id,
+                name: id,
+                isStart: false,
+                isComplete: false,
+            });
         }
-    }
+    };
 
-    if (!hasComplete && nodes.length > 0) {
-        const outgoing = new Set(
-            edges.map(e => e.fromId),
-        );
-        const candidate = nodes.find(
-            n => !outgoing.has(n.mermaidId)
-                && !n.isStart,
-        );
-        if (candidate) {
-            candidate.isComplete = true;
-        } else {
-            const last =
-                nodes[nodes.length - 1];
-            if (last) {
-                last.isComplete = true;
+    const resolveToken = (
+        token: string,
+        pseudoKind: 'start' | 'complete',
+    ): string => {
+        if (token === STATE_PSEUDO) {
+            return addPseudo(pseudoKind);
+        }
+        ensureStateNode(token);
+        return token;
+    };
+
+    for (const raw of lines) {
+        const line = raw.trim();
+        if (
+            line.length === 0
+            || line.startsWith('%%')
+        ) {
+            continue;
+        }
+
+        if (inNoteBlock) {
+            if (
+                NOTE_BLOCK_END_RE.test(line)
+            ) {
+                inNoteBlock = false;
             }
+            continue;
         }
+
+        if (STATE_HEADER_RE.test(line)) {
+            continue;
+        }
+
+        if (
+            COMPOSITE_CLOSE_RE.test(line)
+        ) {
+            if (compositeDepth > 0) {
+                compositeDepth -= 1;
+            }
+            continue;
+        }
+
+        if (COMPOSITE_OPEN_RE.test(line)) {
+            compositeDepth += 1;
+            warnings.push(
+                'Composite state skipped:'
+                + ' ' + line,
+            );
+            continue;
+        }
+
+        if (compositeDepth > 0) {
+            warnings.push(
+                'Skipped inside composite:'
+                + ' ' + line,
+            );
+            continue;
+        }
+
+        if (
+            NOTE_BLOCK_START_RE.test(line)
+        ) {
+            inNoteBlock = true;
+            warnings.push(
+                'Skipped note: ' + line,
+            );
+            continue;
+        }
+        if (NOTE_SINGLE_RE.test(line)) {
+            warnings.push(
+                'Skipped note: ' + line,
+            );
+            continue;
+        }
+
+        const quoted =
+            STATE_DECL_QUOTED_RE
+                .exec(line);
+        if (quoted) {
+            const displayName = quoted[1]!;
+            const id = quoted[2]!;
+            nodes.set(id, {
+                mermaidId: id,
+                name: displayName,
+                isStart: false,
+                isComplete: false,
+            });
+            continue;
+        }
+        const bare =
+            STATE_DECL_BARE_RE.exec(line);
+        if (bare) {
+            ensureStateNode(bare[1]!);
+            continue;
+        }
+
+        const edgeMatch =
+            STATE_EDGE_RE.exec(line);
+        if (edgeMatch) {
+            const fromToken = edgeMatch[1]!;
+            const toToken = edgeMatch[2]!;
+            const label =
+                edgeMatch[3] !== undefined
+                    ? edgeMatch[3].trim()
+                    : '';
+            const fromId = resolveToken(
+                fromToken, 'start',
+            );
+            const toId = resolveToken(
+                toToken, 'complete',
+            );
+            edges.push({
+                fromId,
+                toId,
+                name: label,
+            });
+            continue;
+        }
+
+        warnings.push('Skipped: ' + line);
     }
+
+    return {
+        nodes: [...nodes.values()],
+        edges,
+        warnings,
+    };
 }

@@ -1,4 +1,7 @@
-import { html, SafeHtml } from '../safe-html';
+import {
+    html,
+    SafeHtml,
+} from '../safe-html';
 import {
     iconCircle,
     iconShare,
@@ -6,39 +9,56 @@ import {
     iconFolderKanban,
 } from '../icons';
 import type {
-    FlowSummary,
+    FlowCardReceiver,
 } from '../adapters/flows';
 
-export class FlowPresenter {
-    readonly #id: string;
-    readonly #name: string;
-    readonly #description: string;
-    readonly #nodeCount: number;
-    readonly #edgeCount: number;
-    readonly #projectName:
-        string | undefined;
+export class FlowPresenter
+    implements FlowCardReceiver
+{
+    #id = '';
+    #name = '';
+    #description = '';
+    #nodeCount = 0;
+    #edgeCount = 0;
+    #projectName: string | undefined;
 
-    constructor(wf: FlowSummary) {
-        this.#id = wf.id;
-        this.#name = wf.name;
-        this.#description = wf.description;
-        this.#nodeCount = wf.nodeCount;
-        this.#edgeCount = wf.edgeCount;
-        this.#projectName = wf.projectName;
+    flowId(id: string): void {
+        this.#id = id;
     }
 
-    buildCard(): SafeHtml {
+    name(text: string): void {
+        this.#name = text;
+    }
+
+    description(text: string): void {
+        this.#description = text;
+    }
+
+    stats(
+        nodeCount: number,
+        edgeCount: number,
+    ): void {
+        this.#nodeCount = nodeCount;
+        this.#edgeCount = edgeCount;
+    }
+
+    projectName(
+        name: string | undefined,
+    ): void {
+        this.#projectName = name;
+    }
+
+    render(): SafeHtml {
         return html`
-    <div class="card card-hover p-4"
-        style="cursor:pointer"
+    <div class="${
+        'card card-hover p-4 cursor-pointer'
+    }"
         data-flow-card="${this.#id}">
         <div class="${
             'flex items-start '
             + 'justify-between gap-4'
         }">
-            <div style="${
-                'flex:1;min-width:0'
-            }">
+            <div class="flex-fill">
                 <div class="${
                     'flex flex-wrap '
                     + 'items-center'

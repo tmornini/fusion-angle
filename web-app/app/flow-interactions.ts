@@ -11,18 +11,25 @@ export interface ViewBox {
 
 export type Selection =
     | { kind: 'none' }
-    | { kind: 'node'; nodeId: string }
+    | {
+        kind: 'nodes';
+        nodeIds: Set<string>;
+    }
     | { kind: 'edge'; edgeId: string };
 
 export type DragMode =
     | { kind: 'idle' }
     | {
         kind: 'dragging';
-        nodeId: string;
-        offsetX: number;
-        offsetY: number;
-        currentX: number;
-        currentY: number;
+        anchorNodeId: string;
+        startPointerX: number;
+        startPointerY: number;
+        currentPointerX: number;
+        currentPointerY: number;
+        initialPositions: Map<
+            string,
+            { x: number; y: number }
+        >;
     };
 
 export type ConnectTarget =
@@ -48,6 +55,16 @@ export type PanMode =
         startY: number;
     };
 
+export type MarqueeMode =
+    | { kind: 'idle' }
+    | {
+        kind: 'selecting';
+        startX: number;
+        startY: number;
+        currentX: number;
+        currentY: number;
+    };
+
 export type LastClick =
     | { kind: 'none' }
     | {
@@ -63,9 +80,12 @@ export interface InteractionState {
     drag: DragMode;
     connect: ConnectMode;
     pan: PanMode;
+    marquee: MarqueeMode;
     viewBox: ViewBox;
     zoom: number;
     activePointerId: number;
+    autoFitEnabled: boolean;
+    isSpaceDown: boolean;
 }
 
 export type NodePositionLookup = (
@@ -74,7 +94,14 @@ export type NodePositionLookup = (
     x: number;
     y: number;
     isDraggable: boolean;
-} | null;
+};
+
+export type NodeListLookup = (
+) => Iterable<{
+    id: string;
+    x: number;
+    y: number;
+}>;
 
 export type InteractionCallback = () => void;
 
@@ -95,6 +122,7 @@ export function buildInteractionState(
         drag: { kind: 'idle' },
         connect: { kind: 'idle' },
         pan: { kind: 'idle' },
+        marquee: { kind: 'idle' },
         viewBox: {
             x: -viewBoxW / 2,
             y: -viewBoxH / 2,
@@ -103,6 +131,8 @@ export function buildInteractionState(
         },
         zoom: 1.0,
         activePointerId: 0,
+        autoFitEnabled: true,
+        isSpaceDown: false,
     };
 }
 
@@ -146,6 +176,8 @@ function handlePointerDown(
     const target = e.target;
     if (!(target instanceof Element)) return;
 
+    if (state.isSpaceDown) return;
+
     const svgPt = screenToSvg(
         svg, e.clientX, e.clientY,
     );
@@ -162,25 +194,22 @@ function handlePointerDown(
                 === state.lastClick.id
             && now - state.lastClick.time
                 < DBLCLICK_MS;
-        state.selection = {
-            kind: 'node', nodeId,
-        };
         state.lastClick = {
             kind: 'clicked',
             id: nodeId,
             time: now,
         };
-        state.isPanelOpen = isDbl;
-        const pos =
-            getNodePosition(nodeId);
-        if (!pos) {
-            onUpdate();
-            return;
-        }
         const isPort = ancestorAttr(
             target, 'data-connect-port',
         ) !== null;
+        const pos =
+            getNodePosition(nodeId);
         if (isPort || !pos.isDraggable) {
+            state.selection = {
+                kind: 'nodes',
+                nodeIds: new Set([nodeId]),
+            };
+            state.isPanelOpen = isDbl;
             state.connect = {
                 kind: 'connecting',
                 fromNodeId: nodeId,
@@ -197,13 +226,34 @@ function handlePointerDown(
             onUpdate();
             return;
         }
+        applyNodeClickSelection(
+            state, nodeId, e,
+        );
+        state.isPanelOpen = isDbl;
+        const sel = state.selection;
+        const ids =
+            sel.kind === 'nodes'
+                ? sel.nodeIds
+                : new Set<string>();
+        const initialPositions =
+            new Map<
+                string,
+                { x: number; y: number }
+            >();
+        for (const id of ids) {
+            const p = getNodePosition(id);
+            initialPositions.set(
+                id, { x: p.x, y: p.y },
+            );
+        }
         state.drag = {
             kind: 'dragging',
-            nodeId,
-            currentX: pos.x,
-            currentY: pos.y,
-            offsetX: svgPt.x - pos.x,
-            offsetY: svgPt.y - pos.y,
+            anchorNodeId: nodeId,
+            startPointerX: svgPt.x,
+            startPointerY: svgPt.y,
+            currentPointerX: svgPt.x,
+            currentPointerY: svgPt.y,
+            initialPositions,
         };
         state.activePointerId =
             e.pointerId;
@@ -226,30 +276,90 @@ function handlePointerDown(
                 === state.lastClick.id
             && now - state.lastClick.time
                 < DBLCLICK_MS;
-        state.selection = {
-            kind: 'edge', edgeId,
-        };
         state.lastClick = {
             kind: 'clicked',
             id: edgeId,
             time: now,
         };
-        state.isPanelOpen = isDbl;
+        if (isDbl) {
+            state.selection = {
+                kind: 'edge', edgeId,
+            };
+            state.isPanelOpen = true;
+            onUpdate();
+            return;
+        }
+        startBackgroundDrag(e, svg, state);
         onUpdate();
         return;
     }
 
-    state.selection = { kind: 'none' };
-    state.isPanelOpen = false;
     state.lastClick = { kind: 'none' };
-    state.pan = {
-        kind: 'panning',
-        startX: e.clientX,
-        startY: e.clientY,
+    startBackgroundDrag(e, svg, state);
+    onUpdate();
+}
+
+function startBackgroundDrag(
+    e: PointerEvent,
+    svg: SVGSVGElement,
+    state: InteractionState,
+): void {
+    state.isPanelOpen = false;
+    const svgPt = screenToSvg(
+        svg, e.clientX, e.clientY,
+    );
+    state.selection = { kind: 'none' };
+    state.marquee = {
+        kind: 'selecting',
+        startX: svgPt.x,
+        startY: svgPt.y,
+        currentX: svgPt.x,
+        currentY: svgPt.y,
     };
     state.activePointerId = e.pointerId;
     svg.setPointerCapture(e.pointerId);
-    onUpdate();
+}
+
+function applyNodeClickSelection(
+    state: InteractionState,
+    nodeId: string,
+    e: PointerEvent,
+): void {
+    const sel = state.selection;
+    const current =
+        sel.kind === 'nodes'
+            ? sel.nodeIds
+            : new Set<string>();
+    if (e.shiftKey) {
+        const next = new Set(current);
+        next.add(nodeId);
+        state.selection = {
+            kind: 'nodes', nodeIds: next,
+        };
+        return;
+    }
+    if (e.metaKey || e.ctrlKey) {
+        const next = new Set(current);
+        if (next.has(nodeId)) {
+            next.delete(nodeId);
+        } else {
+            next.add(nodeId);
+        }
+        state.selection = next.size === 0
+            ? { kind: 'none' }
+            : {
+                kind: 'nodes',
+                nodeIds: next,
+            };
+        return;
+    }
+    if (current.has(nodeId)) {
+        return;
+    }
+    state.selection = {
+        kind: 'nodes',
+        nodeIds: new Set([nodeId]),
+    };
 }
 
 function handlePointerMove(
@@ -264,12 +374,8 @@ function handlePointerMove(
         );
         state.drag = {
             ...state.drag,
-            currentX:
-                svgPt.x
-                - state.drag.offsetX,
-            currentY:
-                svgPt.y
-                - state.drag.offsetY,
+            currentPointerX: svgPt.x,
+            currentPointerY: svgPt.y,
         };
         onUpdate();
         return;
@@ -337,6 +443,21 @@ function handlePointerMove(
             startY: e.clientY,
         };
         onUpdate();
+        return;
+    }
+
+    if (
+        state.marquee.kind === 'selecting'
+    ) {
+        const svgPt = screenToSvg(
+            svg, e.clientX, e.clientY,
+        );
+        state.marquee = {
+            ...state.marquee,
+            currentX: svgPt.x,
+            currentY: svgPt.y,
+        };
+        onUpdate();
     }
 }
 
@@ -345,10 +466,12 @@ function handlePointerUp(
     svg: SVGSVGElement,
     state: InteractionState,
     onUpdate: InteractionCallback,
-    onNodeDragEnd: (
-        nodeId: string,
-        x: number,
-        y: number,
+    onNodesDragEnd: (
+        updates: Array<{
+            nodeId: string;
+            x: number;
+            y: number;
+        }>,
     ) => void,
     onEdgeCreated: (
         fromNodeId: string,
@@ -360,13 +483,30 @@ function handlePointerUp(
         y: number,
     ) => void,
     getNodePosition: NodePositionLookup,
+    getAllNodes: NodeListLookup,
 ): void {
     if (state.drag.kind === 'dragging') {
-        onNodeDragEnd(
-            state.drag.nodeId,
-            state.drag.currentX,
-            state.drag.currentY,
-        );
+        const dx =
+            state.drag.currentPointerX
+            - state.drag.startPointerX;
+        const dy =
+            state.drag.currentPointerY
+            - state.drag.startPointerY;
+        const updates: Array<{
+            nodeId: string;
+            x: number;
+            y: number;
+        }> = [];
+        for (const [
+            id, init,
+        ] of state.drag.initialPositions) {
+            updates.push({
+                nodeId: id,
+                x: init.x + dx,
+                y: init.y + dy,
+            });
+        }
+        onNodesDragEnd(updates);
         state.drag = { kind: 'idle' };
         state.activePointerId = 0;
         svg.releasePointerCapture(
@@ -409,38 +549,36 @@ function handlePointerUp(
         } else {
             const pos =
                 getNodePosition(fromId);
-            if (pos) {
-                const portX =
-                    pos.x + NODE_WIDTH;
-                const portY =
-                    pos.y
-                    + NODE_HEIGHT / 2;
-                const dx = toX - portX;
-                const dy = toY - portY;
-                const dist = Math.hypot(
-                    dx, dy,
-                );
-                const dropHit =
-                    document
-                        .elementFromPoint(
-                            e.clientX,
-                            e.clientY,
-                        );
-                const overNode =
-                    dropHit
-                        instanceof Element
-                    && ancestorAttr(
-                        dropHit,
-                        'data-node-id',
-                    ) !== null;
-                if (
-                    dist > MIN_DRAG_DISTANCE
-                    && !overNode
-                ) {
-                    onNodeCreated(
-                        fromId, toX, toY,
+            const portX =
+                pos.x + NODE_WIDTH;
+            const portY =
+                pos.y
+                + NODE_HEIGHT / 2;
+            const dx = toX - portX;
+            const dy = toY - portY;
+            const dist = Math.hypot(
+                dx, dy,
+            );
+            const dropHit =
+                document
+                    .elementFromPoint(
+                        e.clientX,
+                        e.clientY,
                     );
-                }
+            const overNode =
+                dropHit
+                    instanceof Element
+                && ancestorAttr(
+                    dropHit,
+                    'data-node-id',
+                ) !== null;
+            if (
+                dist > MIN_DRAG_DISTANCE
+                && !overNode
+            ) {
+                onNodeCreated(
+                    fromId, toX, toY,
+                );
             }
         }
         state.connect = { kind: 'idle' };
@@ -452,12 +590,47 @@ function handlePointerUp(
         return;
     }
 
-    if (state.pan.kind === 'panning') {
-        state.pan = { kind: 'idle' };
+    if (
+        state.marquee.kind === 'selecting'
+    ) {
+        const m = state.marquee;
+        const minX = Math.min(
+            m.startX, m.currentX,
+        );
+        const minY = Math.min(
+            m.startY, m.currentY,
+        );
+        const maxX = Math.max(
+            m.startX, m.currentX,
+        );
+        const maxY = Math.max(
+            m.startY, m.currentY,
+        );
+        const hits = new Set<string>();
+        for (const n of getAllNodes()) {
+            const nr = n.x + NODE_WIDTH;
+            const nb = n.y + NODE_HEIGHT;
+            const overlaps =
+                n.x < maxX
+                && nr > minX
+                && n.y < maxY
+                && nb > minY;
+            if (overlaps) {
+                hits.add(n.id);
+            }
+        }
+        state.selection = hits.size === 0
+            ? { kind: 'none' }
+            : {
+                kind: 'nodes',
+                nodeIds: hits,
+            };
+        state.marquee = { kind: 'idle' };
         state.activePointerId = 0;
         svg.releasePointerCapture(
             e.pointerId,
         );
+        onUpdate();
     }
 }
 
@@ -492,6 +665,7 @@ function handleWheel(
         svgPt.y
         - (svgPt.y - state.viewBox.y) * ratio;
 
+    state.autoFitEnabled = false;
     onUpdate();
 }
 
@@ -499,10 +673,12 @@ export function bindInteractions(
     svg: SVGSVGElement,
     state: InteractionState,
     onUpdate: InteractionCallback,
-    onNodeDragEnd: (
-        nodeId: string,
-        x: number,
-        y: number,
+    onNodesDragEnd: (
+        updates: Array<{
+            nodeId: string;
+            x: number;
+            y: number;
+        }>,
     ) => void,
     onEdgeCreated: (
         fromNodeId: string,
@@ -514,8 +690,12 @@ export function bindInteractions(
         y: number,
     ) => void,
     getNodePosition: NodePositionLookup,
+    getAllNodes: NodeListLookup,
     signal: AbortSignal,
 ): void {
+    let lastClientX = 0;
+    let lastClientY = 0;
+
     svg.addEventListener(
         'pointerdown',
         (e) => handlePointerDown(
@@ -527,9 +707,13 @@ export function bindInteractions(
 
     svg.addEventListener(
         'pointermove',
-        (e) => handlePointerMove(
-            e, svg, state, onUpdate,
-        ),
+        (e) => {
+            lastClientX = e.clientX;
+            lastClientY = e.clientY;
+            handlePointerMove(
+                e, svg, state, onUpdate,
+            );
+        },
         { signal },
     );
 
@@ -537,10 +721,11 @@ export function bindInteractions(
         'pointerup',
         (e) => handlePointerUp(
             e, svg, state, onUpdate,
-            onNodeDragEnd,
+            onNodesDragEnd,
             onEdgeCreated,
             onNodeCreated,
             getNodePosition,
+            getAllNodes,
         ),
         { signal },
     );
@@ -575,6 +760,54 @@ export function bindInteractions(
         'keyup', handleShift,
         { signal },
     );
+
+    const isFormFocused = (): boolean => {
+        const a = document.activeElement;
+        if (!a) return false;
+        const tag = a.tagName.toLowerCase();
+        if (
+            tag === 'input'
+            || tag === 'textarea'
+            || tag === 'select'
+            || tag === 'button'
+            || tag === 'a'
+        ) return true;
+        return (
+            a as HTMLElement
+        ).isContentEditable;
+    };
+
+    const handleSpace = (
+        ke: KeyboardEvent,
+    ): void => {
+        if (ke.key !== ' ') return;
+        if (isFormFocused()) return;
+        ke.preventDefault();
+        const next = ke.type === 'keydown';
+        if (state.isSpaceDown === next) {
+            return;
+        }
+        state.isSpaceDown = next;
+        if (next) {
+            state.pan = {
+                kind: 'panning',
+                startX: lastClientX,
+                startY: lastClientY,
+            };
+            state.autoFitEnabled = false;
+        } else {
+            state.pan = { kind: 'idle' };
+        }
+        onUpdate();
+    };
+    window.addEventListener(
+        'keydown', handleSpace,
+        { signal },
+    );
+    window.addEventListener(
+        'keyup', handleSpace,
+        { signal },
+    );
 }
 
 export function zoomIn(
@@ -584,23 +817,9 @@ export function zoomIn(
         y: number;
     } | null,
 ): void {
-    const prevZoom = state.zoom;
-    state.zoom = Math.min(
-        MAX_ZOOM, prevZoom + ZOOM_STEP,
+    applyButtonZoom(
+        state, ZOOM_STEP, focalPt,
     );
-    const ratio = prevZoom / state.zoom;
-    const cx = focalPt?.x
-        ?? state.viewBox.x
-            + state.viewBox.w / 2;
-    const cy = focalPt?.y
-        ?? state.viewBox.y
-            + state.viewBox.h / 2;
-    state.viewBox.w *= ratio;
-    state.viewBox.h *= ratio;
-    state.viewBox.x =
-        cx - (cx - state.viewBox.x) * ratio;
-    state.viewBox.y =
-        cy - (cy - state.viewBox.y) * ratio;
 }
 
 export function zoomOut(
@@ -610,23 +829,40 @@ export function zoomOut(
         y: number;
     } | null,
 ): void {
+    applyButtonZoom(
+        state, -ZOOM_STEP, focalPt,
+    );
+}
+
+function applyButtonZoom(
+    state: InteractionState,
+    delta: number,
+    focalPt: {
+        x: number;
+        y: number;
+    } | null | undefined,
+): void {
+    const prevCx = state.viewBox.x
+        + state.viewBox.w / 2;
+    const prevCy = state.viewBox.y
+        + state.viewBox.h / 2;
     const prevZoom = state.zoom;
     state.zoom = Math.max(
-        MIN_ZOOM, prevZoom - ZOOM_STEP,
+        MIN_ZOOM,
+        Math.min(
+            MAX_ZOOM, prevZoom + delta,
+        ),
     );
     const ratio = prevZoom / state.zoom;
-    const cx = focalPt?.x
-        ?? state.viewBox.x
-            + state.viewBox.w / 2;
-    const cy = focalPt?.y
-        ?? state.viewBox.y
-            + state.viewBox.h / 2;
     state.viewBox.w *= ratio;
     state.viewBox.h *= ratio;
+    const cx = focalPt?.x ?? prevCx;
+    const cy = focalPt?.y ?? prevCy;
     state.viewBox.x =
-        cx - (cx - state.viewBox.x) * ratio;
+        cx - state.viewBox.w / 2;
     state.viewBox.y =
-        cy - (cy - state.viewBox.y) * ratio;
+        cy - state.viewBox.h / 2;
+    state.autoFitEnabled = false;
 }
 
 export function zoomToFit(

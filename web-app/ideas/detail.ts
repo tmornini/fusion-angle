@@ -17,6 +17,7 @@ import {
 import {
     getIdeaDetail,
     putIdea,
+    ideaChanged,
     type Idea,
 } from '../app/adapters';
 import {
@@ -114,7 +115,7 @@ function bindIdeaEvents(
 
                 try {
                     await putIdea(
-                        idea.id,
+                        idea.idForLink(),
                         trimStrings({
                             title,
                             problem_statement:
@@ -146,18 +147,23 @@ function bindIdeaEvents(
                     'Idea saved',
                     'success',
                 );
-                const updated =
-                    await getIdeaDetail(
-                        idea.id,
-                    );
-                mutateIdeaPage(
-                    updated, false,
-                );
             },
         );
 
+    ideaChanged.subscribe(async () => {
+        const updated =
+            await getIdeaDetail(
+                idea.idForLink(),
+            );
+        mutateIdeaPage(
+            updated, false,
+        );
+    });
+
     if (idea.isReviewable()) {
-        bindApprovalEvents(idea.id);
+        bindApprovalEvents(
+            idea.idForLink(),
+        );
     }
     $('#idea-convert-btn', document)
         ?.addEventListener(
@@ -165,7 +171,7 @@ function bindIdeaEvents(
             () => navigateTo(
                 'idea-convert',
                 {
-                    ideaId: idea.id,
+                    ideaId: idea.idForLink(),
                     from: 'detail',
                 },
             ),
@@ -177,7 +183,7 @@ function bindIdeaEvents(
         'click',
         async () => {
             try {
-                await putIdea(idea.id, {
+                await putIdea(idea.idForLink(), {
                     status: 'in-review',
                 });
             } catch (err) {
@@ -290,7 +296,7 @@ function mutateIdeaPage(
     setHtml(
         container,
         presenter.buildDetailView(
-            idea.id, isEditing,
+            idea.idForLink(), isEditing,
         ),
     );
     bindIdeaEvents(idea, isEditing);

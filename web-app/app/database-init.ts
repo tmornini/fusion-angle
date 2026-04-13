@@ -25,6 +25,11 @@ export async function initDatabase(
     return schema !== null;
 }
 
+// Inline styles here are intentional: this error is shown
+// when the database fails to initialize, which may indicate
+// a deeper bootstrap problem. We can't trust any class-based
+// styling to render, so the error UI uses raw CSS values that
+// don't depend on tokens or component classes loading correctly.
 export function handleDatabaseError(
     err: unknown,
 ): void {

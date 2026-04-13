@@ -36,6 +36,7 @@ export {
     initDialog,
     initTabs,
 } from './dialog';
+export { initDropdown } from './theme-toggle';
 
 window.addEventListener(
     'unhandledrejection',

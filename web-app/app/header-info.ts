@@ -59,7 +59,7 @@ export async function mutateHeaderInfo(
         setHtml(
             greetingEl,
             html`<span
-style="font-weight:400">Good ${
+class="font-normal">Good ${
 data.greeting},</span> ${
 data.userName}`,
         );

@@ -11,6 +11,12 @@ import {
     getUserMap,
     userName,
 } from './helpers';
+import {
+    createChannel,
+} from '../channels';
+
+export const ideaChanged =
+    createChannel<void>();
 
 export {
     Idea,
@@ -123,6 +129,7 @@ export async function putIdea(
     entity: Partial<IdeaEntity>,
 ): Promise<void> {
     await PUT(`ideas/${id}`, entity);
+    ideaChanged.send();
 }
 
 export async function putIdeaSubmission(

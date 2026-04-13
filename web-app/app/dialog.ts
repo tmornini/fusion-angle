@@ -2,15 +2,48 @@ import {
     $required, FOCUSABLE_SELECTOR,
 } from './dom';
 
-const focusStack: HTMLElement[] = [];
-const openDialogIds: string[] = [];
+class DialogStack {
+    readonly #focus: HTMLElement[] = [];
+    readonly #ids: string[] = [];
+
+    topId(): string | undefined {
+        return this.#ids.at(-1);
+    }
+
+    isEmpty(): boolean {
+        return this.#ids.length === 0;
+    }
+
+    hasSingle(): boolean {
+        return this.#ids.length === 1;
+    }
+
+    pushFocus(el: HTMLElement): void {
+        this.#focus.push(el);
+    }
+
+    popFocus(): HTMLElement | undefined {
+        return this.#focus.pop();
+    }
+
+    pushId(id: string): void {
+        this.#ids.push(id);
+    }
+
+    removeId(id: string): void {
+        const idx =
+            this.#ids.indexOf(id);
+        this.#ids.splice(idx, 1);
+    }
+}
+
+const stack = new DialogStack();
 
 function handleEscape(
     e: KeyboardEvent,
 ): void {
     if (e.key !== 'Escape') return;
-    const topId =
-        openDialogIds.at(-1);
+    const topId = stack.topId();
     if (!topId) return;
     e.preventDefault();
     e.stopPropagation();
@@ -32,7 +65,7 @@ function openDialog(
         document.activeElement
             instanceof HTMLElement
     ) {
-        focusStack.push(
+        stack.pushFocus(
             document.activeElement,
         );
     }
@@ -48,8 +81,8 @@ function openDialog(
     dialog.setAttribute(
         'aria-hidden', 'false',
     );
-    openDialogIds.push(dialogId);
-    if (openDialogIds.length === 1) {
+    stack.pushId(dialogId);
+    if (stack.hasSingle()) {
         document.addEventListener(
             'keydown',
             handleEscape,
@@ -78,19 +111,15 @@ function closeDialog(
     dialog.setAttribute(
         'aria-hidden', 'true',
     );
-    const idx =
-        openDialogIds.indexOf(dialogId);
-    if (idx >= 0) {
-        openDialogIds.splice(idx, 1);
-    }
-    if (openDialogIds.length === 0) {
+    stack.removeId(dialogId);
+    if (stack.isEmpty()) {
         document.removeEventListener(
             'keydown',
             handleEscape,
             true,
         );
     }
-    focusStack.pop()?.focus();
+    stack.popFocus()?.focus();
 }
 
 function initTabs(

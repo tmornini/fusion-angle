@@ -24,6 +24,16 @@ cd /tmp/fusion-test/ && python3 -m http.server 8080
 # open http://localhost:8080/landing/index.html
 ```
 
+**When running under the Claude Code sandbox**, the defaults above fail two ways: `/tmp/` is not writable, and the tsx IPC pipe used by the `npx tsx` step inside `./build` lands in `$TMPDIR/tsx-501/…` which is outside the sandbox's allowed Unix-socket path (`/tmp/claude/tsx-501`). Use this invocation instead:
+
+```bash
+TMPDIR=/tmp/claude ./build --no-zip ~/Desktop/fusion-test/
+cd ~/Desktop/fusion-test/ && python3 -m http.server 8080
+# open http://localhost:8080/landing/index.html
+```
+
+`~/Desktop/` is in the sandbox write allowlist; `TMPDIR=/tmp/claude` redirects tsx's IPC socket into the allowed path. `localhost` is reachable from the sandbox, so the Chrome MCP tools can drive the page normally.
+
 `./validate` runs `tsc --noEmit` (type checking) then enforces 78-character maximum line length on all `.ts`, `.html`, and `.css` files (excluding `compose.ts`).
 
 No test framework is configured.
@@ -222,9 +232,9 @@ web-app/
       teams.ts                # getTeamMembers, getManagedUsers
       flows.ts                # Barrel re-export from flow-* modules
       flow-queries.ts         # getFlows, getFlowsByProject, getFlowGraph + graph types
-      flow-mutations.ts       # postFlowCreation, postNodeAddition, postEdgeConnection, postFieldAddition, putFlow, putNode, putWfEdge, putField
-      flow-deletions.ts       # deleteNode/Edge/Field + capture functions for undo
-      flow-undo-adapter.ts    # executeUndoSteps
+      flow-mutations.ts       # postFlowCreation, postNodeAddition, postEdgeConnection, postFieldAddition, putFlow, putGraph, putGraphSilent, putNode, putWfEdge, putField
+      flow-deletions.ts       # deleteNode, deleteEdge, deleteField
+      flow-versions.ts        # postFlowVersion, getFlowVersions, getLatestFlowVersion, deleteFlowVersion, putFlowFromVersion (persistent undo history)
       flow-export.ts          # getFlowMermaid, getFlowZip, postFlowFromMermaid, postFlowFromZip
       workbox.ts              # getWorkboxItems, getWorkboxItem, postWorkOrderCreation, postWorkOrderTransition, postWorkOrderClaim, deleteWorkOrderClaim
       admin.ts                # getAccount, getProfile, getCompanySettings, getActivityFeed

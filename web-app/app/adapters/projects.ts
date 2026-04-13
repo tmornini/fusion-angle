@@ -7,12 +7,18 @@ import {
     Project,
     projectIsNotDeleted,
     COST_DIVISOR,
-    SECONDS_PER_DAY,
+    MS_PER_DAY,
 } from '../../../api/types';
 import {
     getUserMap,
     userName,
 } from './helpers';
+import {
+    createChannel,
+} from '../channels';
+
+export const projectChanged =
+    createChannel<void>();
 
 export {
     Project,
@@ -53,9 +59,9 @@ export interface DetailTeamMember {
 }
 
 export class ProjectView {
-    private readonly project: Project;
-    readonly projectLead: string;
-    readonly team:
+    readonly #project: Project;
+    readonly #projectLead: string;
+    readonly #team:
         readonly DetailTeamMember[];
 
     constructor(
@@ -64,92 +70,112 @@ export class ProjectView {
         team:
             readonly DetailTeamMember[],
     ) {
-        this.project = project;
-        this.projectLead = projectLead;
-        this.team = team;
+        this.#project = project;
+        this.#projectLead = projectLead;
+        this.#team = team;
     }
 
-    get id(): string {
-        return this.project.id;
+    idForLink(): string {
+        return this.#project.idForLink();
     }
 
-    get title(): string {
-        return this.project.title;
+    titleText(): string {
+        return this.#project.titleText();
     }
 
-    get description(): string {
-        return this.project.description;
+    descriptionText(): string {
+        return this.#project
+            .descriptionText();
     }
 
-    get status(): ProjectStatus {
-        return this.project.status;
+    statusValue(): ProjectStatus {
+        return this.#project
+            .statusValue();
     }
 
-    get progress(): number {
-        return this.project
+    progressPercent(): number {
+        return this.#project
             .timelineProgress();
     }
 
-    get startDate(): string {
-        return this.project.startDate;
+    startDateValue(): string {
+        return this.#project
+            .startDateValue();
     }
 
-    get targetEndDate(): string {
-        return this.project.targetEndDate;
+    targetEndDateValue(): string {
+        return this.#project
+            .targetEndDateValue();
+    }
+
+    projectLeadName(): string {
+        return this.#projectLead;
+    }
+
+    teamMembers():
+        readonly DetailTeamMember[] {
+        return this.#team;
     }
 
     statusLabel(): string {
-        return this.project.statusLabel();
+        return this.#project
+            .statusLabel();
     }
 
     statusClassName(): string {
-        return this.project
+        return this.#project
             .statusClassName();
     }
 
     timeBaselineDays(): number {
         const start = new Date(
-            this.project.startDate,
+            this.#project
+                .startDateValue(),
         ).getTime();
         const end = new Date(
-            this.project.targetEndDate,
+            this.#project
+                .targetEndDateValue(),
         ).getTime();
         if (isNaN(start) || isNaN(end))
             return 0;
         return Math.max(0, Math.ceil(
             (end - start)
-            / (SECONDS_PER_DAY * 1000),
+            / (MS_PER_DAY),
         ));
     }
 
     timeCurrentDays(): number {
         const start = new Date(
-            this.project.startDate,
+            this.#project
+                .startDateValue(),
         ).getTime();
         if (isNaN(start)) return 0;
         return Math.max(0, Math.floor(
             (Date.now() - start)
-            / (SECONDS_PER_DAY * 1000),
+            / (MS_PER_DAY),
         ));
     }
 
     costBaselineK(): number {
-        return this.project.estimatedCost
+        return this.#project
+            .estimatedCostAmount()
             / COST_DIVISOR;
     }
 
     costCurrentK(): number {
-        return this.project.actualCost
+        return this.#project
+            .actualCostAmount()
             / COST_DIVISOR;
     }
 
     impactBaseline(): number {
-        return this.project
-            .estimatedImpact;
+        return this.#project
+            .estimatedImpactScore();
     }
 
     impactCurrent(): number {
-        return this.project.actualImpact;
+        return this.#project
+            .actualImpactScore();
     }
 }
 
@@ -194,6 +220,7 @@ export async function putProject(
     entity: Partial<ProjectEntity>,
 ): Promise<void> {
     await PUT(`projects/${id}`, entity);
+    projectChanged.send();
 }
 
 export interface TeamMemberAssignment {

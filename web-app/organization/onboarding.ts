@@ -14,23 +14,15 @@ export async function init(): Promise<void> {
             + ' items-center'
             + ' justify-center p-6'
         }">
-            <div class="text-center"
-                style="${
-                    'max-width:28rem'
-                }">
+            <div class="text-center max-w-md">
                 <div class="${
                     'gradient-hero '
                     + 'rounded-xl '
                     + 'flex items-center '
                     + 'justify-center '
-                    + 'mx-auto mb-6'
-                }"
-                    style="${
-                        'width:4rem;'
-                        + 'height:4rem;'
-                        + 'box-shadow:'
-                        + 'var(--shadow-lg)'
-                    }">
+                    + 'mx-auto mb-6 '
+                    + 'welcome-icon-box'
+                }">
                     ${iconSparkles(
                         32,
                         'text-primary'

@@ -24,7 +24,7 @@ import {
     postFlowFromZip,
     getZipBackup,
     getFlowBackupResolution,
-    overwriteFlow,
+    putFlowFromBackup,
     postFlowFromBackup,
 } from '../app/adapters';
 import type {
@@ -45,9 +45,32 @@ type ImportState =
         resolution: ImportResolution;
     };
 
-const importStore = {
-    state: { kind: 'idle' } as ImportState,
-};
+class ImportStore {
+    #state: ImportState = {
+        kind: 'idle',
+    };
+
+    current(): ImportState {
+        return this.#state;
+    }
+
+    setPending(
+        backup: BackupV2,
+        resolution: ImportResolution,
+    ): void {
+        this.#state = {
+            kind: 'pending',
+            backup,
+            resolution,
+        };
+    }
+
+    reset(): void {
+        this.#state = { kind: 'idle' };
+    }
+}
+
+const importStore = new ImportStore();
 
 export async function init(
 ): Promise<void> {
@@ -77,15 +100,15 @@ export async function init(
         },
     );
     if (!result) return;
-    const flows = result.map(
-        wf => new FlowPresenter(wf),
-    );
+    const rendered = result.map(wf => {
+        const p = new FlowPresenter();
+        wf.presentCardInto(p);
+        return p.render();
+    });
 
     setHtml(
         listEl,
-        html`${flows.map(
-            wf => wf.buildCard(),
-        )}`,
+        html`${rendered}`,
     );
 
     listEl.addEventListener(
@@ -153,7 +176,7 @@ function bindImport(): void {
     cancelBtn.addEventListener(
         'click',
         () => {
-            importStore.state = { kind: 'idle' };
+            importStore.reset();
             resetImportDialog();
             closeDialog('import-flow');
         },
@@ -201,7 +224,7 @@ async function openImportDialog(
     if (!select) return;
 
     resetImportDialog();
-    importStore.state = { kind: 'idle' };
+    importStore.reset();
 
     const projects = await getProjects();
     if (projects.length === 0) {
@@ -218,8 +241,9 @@ async function openImportDialog(
             document.createElement(
                 'option',
             );
-        opt.value = p.id;
-        opt.textContent = p.title;
+        opt.value = p.idForLink();
+        opt.textContent =
+            p.titleText();
         select.appendChild(opt);
     }
 
@@ -345,11 +369,9 @@ async function handleV2Zip(
         input.value = '';
         return;
     }
-    importStore.state = {
-        kind: 'pending',
-        backup,
-        resolution,
-    };
+    importStore.setPending(
+        backup, resolution,
+    );
     configureResolutionDialog(
         resolution,
     );
@@ -444,21 +466,20 @@ function resetImportDialog(): void {
 function clearPending(
     input: HTMLInputElement,
 ): void {
-    importStore.state = { kind: 'idle' };
+    importStore.reset();
     input.value = '';
 }
 
 async function handleOverwrite(
     input: HTMLInputElement,
 ): Promise<void> {
-    if (importStore.state.kind !== 'pending')
-        return;
-    const { backup } = importStore.state;
+    const stOw = importStore.current();
+    if (stOw.kind !== 'pending') return;
     closeDialog('import-flow');
     resetImportDialog();
     try {
         const flowId =
-            await overwriteFlow(backup);
+            await putFlowFromBackup(stOw.backup);
         clearPending(input);
         showToast(
             'Flow overwritten',
@@ -481,21 +502,20 @@ async function handleOverwrite(
 async function handleCreateNew(
     input: HTMLInputElement,
 ): Promise<void> {
-    if (importStore.state.kind !== 'pending')
-        return;
-    const { backup, resolution } =
-        importStore.state;
-    if (!resolution.dialog
+    const stRe = importStore.current();
+    if (stRe.kind !== 'pending') return;
+    if (!stRe.resolution.dialog
         .hasKnownProject
     ) return;
-    const projectId = backup.projectId;
+    const projectId =
+        stRe.backup.projectId;
     if (!projectId) return;
     closeDialog('import-flow');
     resetImportDialog();
     try {
         const flowId =
             await postFlowFromBackup(
-                backup, projectId,
+                stRe.backup, projectId,
             );
         clearPending(input);
         showToast(
@@ -519,9 +539,8 @@ async function handleCreateNew(
 async function handleCreate(
     input: HTMLInputElement,
 ): Promise<void> {
-    if (importStore.state.kind !== 'pending')
-        return;
-    const { backup } = importStore.state;
+    const stNw = importStore.current();
+    if (stNw.kind !== 'pending') return;
     const select = $select(
         '#import-project', document,
     );
@@ -538,7 +557,7 @@ async function handleCreate(
     try {
         const flowId =
             await postFlowFromBackup(
-                backup, projectId,
+                stNw.backup, projectId,
             );
         clearPending(input);
         showToast(

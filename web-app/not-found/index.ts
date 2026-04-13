@@ -10,28 +10,13 @@ export async function init(): Promise<void> {
     <div class="${
         'flex min-h-screen '
         + 'items-center justify-center'
-    }"
-        style="${
-            'background:'
-            + 'hsl(var(--background))'
+        + ' bg-background'
+    }">
+        <div class="${
+            'text-center max-w-sm p-8'
         }">
-        <div class="text-center"
-            style="${
-                'max-width:24rem;'
-                + 'padding:2rem'
-            }">
-            <div style="${
-                'display:inline-flex;'
-                + 'align-items:center;'
-                + 'justify-content:center;'
-                + 'width:3.5rem;'
-                + 'height:3.5rem;'
-                + 'border-radius:'
-                + 'var(--radius-lg);'
-                + 'background:'
-                + 'hsl(var(--primary)/0.1);'
-                + 'margin-bottom:1.5rem'
-            }">
+            <div class="icon-box-lg mb-6"
+                data-tone="primary">
                 ${iconSparkles(
                     28, 'text-primary',
                 )}
@@ -39,11 +24,7 @@ export async function init(): Promise<void> {
             <h1 class="${
                 'text-4xl font-display '
                 + 'font-bold mb-2'
-            }"
-                style="${
-                    'color:'
-                    + 'hsl(var(--foreground))'
-                }">
+            }">
                 404
             </h1>
             <p class="text-muted mb-6">

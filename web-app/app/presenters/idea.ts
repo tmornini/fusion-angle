@@ -45,74 +45,37 @@ const STATUS_ICONS: Record<
 };
 
 export class IdeaPresenter {
-    readonly #id: string;
-    readonly #title: string;
-    readonly #position: number;
-    readonly #status: IdeaStatus;
-    readonly #statusClassName: string;
-    readonly #statusLabel: string;
-    readonly #submittedBy: string;
-    readonly #submittedAt: string;
-    readonly #problemStatement: string;
-    readonly #targetUsers: string;
-    readonly #proposedSolution: string;
-    readonly #expectedOutcome: string;
-    readonly #successMetrics: string;
-    readonly #isReviewable: boolean;
-    readonly #isConvertible: boolean;
+    readonly #idea: Idea;
 
     constructor(idea: Idea) {
-        this.#id = idea.id;
-        this.#title = idea.title;
-        this.#position = idea.position;
-        this.#status = idea.status;
-        this.#statusClassName =
-            idea.statusClassName();
-        this.#statusLabel =
-            idea.statusLabel();
-        this.#submittedBy = idea.submittedBy;
-        this.#submittedAt = idea.submittedAt;
-        this.#problemStatement =
-            idea.problemStatement;
-        this.#targetUsers =
-            idea.targetUsers;
-        this.#proposedSolution =
-            idea.proposedSolution;
-        this.#expectedOutcome =
-            idea.expectedOutcome;
-        this.#successMetrics =
-            idea.successMetrics;
-        this.#isReviewable =
-            idea.isReviewable();
-        this.#isConvertible =
-            idea.isConvertible();
+        this.#idea = idea;
     }
 
     idForLink(): string {
-        return this.#id;
+        return this.#idea.idForLink();
     }
 
     positionSortKey(): number {
-        return this.#position;
+        return this.#idea.positionSortKey();
     }
 
     statusGroup(): IdeaStatus {
-        return this.#status;
+        return this.#idea.statusValue();
     }
 
     buildStatusBadge(): SafeHtml {
         const cfg = IDEA_STATUS_CONFIG[
-            this.#status
+            this.#idea.statusValue()
         ]!;
         const icon = STATUS_ICONS[
-            this.#status
+            this.#idea.statusValue()
         ]!;
         return html`<span class="${
             'badge '
             + cfg.className
             + ' text-xs'
         }" data-status="${
-            this.#status
+            this.#idea.statusValue()
         }" style="${
             'cursor:pointer;'
             + 'min-width:6rem;'
@@ -132,8 +95,9 @@ export class IdeaPresenter {
             'padding:1.25rem;'
             + 'cursor:pointer'
         }"
-        data-idea-card="${this.#id}"
-        data-position="${this.#position}">
+        data-idea-card="${this.#idea.idForLink()}"
+        data-position="${
+            this.#idea.positionSortKey()}">
         <div class="${
             'flex items-center gap-4'
         }">
@@ -167,11 +131,11 @@ export class IdeaPresenter {
             + ' font-semibold'
             + ' truncate'
         }">
-            ${this.#title}
+            ${this.#idea.titleText()}
         </h3>
         <span class="${
             'badge '
-            + this.#statusClassName
+            + this.#idea.statusClassName()
             + ' text-xs'
         }" style="${
             'justify-content:center;'
@@ -179,9 +143,9 @@ export class IdeaPresenter {
             + 'margin-top:0.25rem'
         }">${
             STATUS_ICONS[
-                this.#status
+                this.#idea.statusValue()
             ]!(14, '')
-        } ${this.#statusLabel}</span>`;
+        } ${this.#idea.statusLabel()}</span>`;
     }
 
     #buildActions(): SafeHtml {
@@ -196,7 +160,7 @@ export class IdeaPresenter {
                 + 'padding-bottom:'
                 + '0.5rem'
             }">
-            ${this.#isConvertible
+            ${this.#idea.isConvertible()
                 ? html`
             <button
                 class="${
@@ -204,7 +168,7 @@ export class IdeaPresenter {
                     + ' btn-sm gap-2'
                 }"
                 data-idea-convert="${
-                    this.#id}">
+                    this.#idea.idForLink()}">
                 ${iconArrowRight(16, '')}
                 <span
                     class="${
@@ -221,7 +185,7 @@ export class IdeaPresenter {
         ideaId: string,
         isEditing: boolean,
     ): SafeHtml {
-        const pad = this.#isReviewable
+        const pad = this.#idea.isReviewable()
             ? ';padding-bottom:10rem'
             : '';
         return html`
@@ -236,7 +200,7 @@ export class IdeaPresenter {
                 Ideas
             </a>
             <span>/</span>
-            <span>${this.#title}</span>
+            <span>${this.#idea.titleText()}</span>
         </div>
 
         <div class="flex items-start
@@ -265,7 +229,8 @@ export class IdeaPresenter {
                                     + '-title'
                                 }"
                                 value="${
-                                    this.#title
+                                    this.#idea
+                                        .titleText()
                                 }"
                                 style="${
                                     'font-size:'
@@ -279,14 +244,15 @@ export class IdeaPresenter {
                                     + ' font-display'
                                     + ' font-bold'
                                 }">
-                                ${this.#title}
+                                ${this.#idea
+                                    .titleText()}
                             </h1>`}
                         <span class="badge
-                            ${this
-                                .#statusClassName}
+                            ${this.#idea
+                                .statusClassName()}
                             text-xs">
-                            ${this
-                                .#statusLabel}
+                            ${this.#idea
+                                .statusLabel()}
                         </span>
                     </div>
                     <p class="${
@@ -294,10 +260,12 @@ export class IdeaPresenter {
                     }">
                         Submitted by
                         ${displayText(
-                            this.#submittedBy,
+                            this.#idea
+                                .submittedByName(),
                         )}
                         @ ${formatDateTime(
-                            this.#submittedAt,
+                            this.#idea
+                                .submittedAtDate(),
                         )}
                     </p>
                 </div>
@@ -306,8 +274,10 @@ export class IdeaPresenter {
                 class="${
                     'flex items-center gap-2'
                 }">
-                ${this.#status === 'active'
-                    || this.#status === 'sent-back'
+                ${this.#idea.statusValue()
+                    === 'active'
+                    || this.#idea.statusValue()
+                    === 'sent-back'
                     ? html`
                 <button
                     class="${
@@ -323,7 +293,7 @@ export class IdeaPresenter {
                     )}
                     Submit for Review
                 </button>` : html``}
-                ${this.#isConvertible
+                ${this.#idea.isConvertible()
                     ? html`
                 <button
                     class="${
@@ -384,7 +354,7 @@ export class IdeaPresenter {
             )}
         </div>
     </div>
-    ${this.#isReviewable
+    ${this.#idea.isReviewable()
         ? html`
             ${this.#buildApprovalFooter()}
             ${this.#buildApprovalDialogs()}`
@@ -552,12 +522,13 @@ export class IdeaPresenter {
                         rows="3"
                         style="resize:none"
                         >${this
-                            .#problemStatement
+                            .#idea
+                            .problemStatementText()
                         }</textarea>`
                     : html`<p class="text-sm">
                         ${displayText(
-                            this
-                                .#problemStatement,
+                            this.#idea
+                            .problemStatementText(),
                         )}
                         </p>`}
             </div>
@@ -575,12 +546,13 @@ export class IdeaPresenter {
                             + 'target'
                         }"
                         value="${
-                            this.#targetUsers
+                            this.#idea
+                                .targetUsersText()
                         }" />`
                     : html`<p class="text-sm">
                         ${displayText(
-                            this
-                                .#targetUsers,
+                            this.#idea
+                                .targetUsersText(),
                         )}
                         </p>`}
             </div>
@@ -600,12 +572,13 @@ export class IdeaPresenter {
                         rows="3"
                         style="resize:none"
                         >${this
-                            .#proposedSolution
+                            .#idea
+                            .proposedSolutionText()
                         }</textarea>`
                     : html`<p class="text-sm">
                         ${displayText(
-                            this
-                                .#proposedSolution,
+                            this.#idea
+                            .proposedSolutionText(),
                         )}
                         </p>`}
             </div>
@@ -625,12 +598,13 @@ export class IdeaPresenter {
                         rows="3"
                         style="resize:none"
                         >${this
-                            .#expectedOutcome
+                            .#idea
+                            .expectedOutcomeText()
                         }</textarea>`
                     : html`<p class="text-sm">
                         ${displayText(
-                            this
-                                .#expectedOutcome,
+                            this.#idea
+                            .expectedOutcomeText(),
                         )}
                         </p>`}
             </div>
@@ -650,12 +624,13 @@ export class IdeaPresenter {
                         rows="3"
                         style="resize:none"
                         >${this
-                            .#successMetrics
+                            .#idea
+                            .successMetricsText()
                         }</textarea>`
                     : html`<p class="text-sm">
                         ${displayText(
-                            this
-                                .#successMetrics,
+                            this.#idea
+                            .successMetricsText(),
                         )}
                         </p>`}
             </div>
@@ -668,8 +643,12 @@ export class IdeaPresenter {
 export class IdeaListPresenter {
     #ideas: IdeaPresenter[];
     readonly #statusBadges: SafeHtml;
-    #filterStatus: IdeaStatus | null =
-        null;
+    #filter:
+        | { kind: 'all' }
+        | {
+            kind: 'filtered';
+            status: IdeaStatus;
+        } = { kind: 'all' };
 
     constructor(ideas: Idea[]) {
         this.#ideas = ideas.map(
@@ -712,24 +691,33 @@ export class IdeaListPresenter {
     toggleFilter(
         status: IdeaStatus,
     ): void {
-        this.#filterStatus =
-            this.#filterStatus === status
-                ? null
-                : status;
+        this.#filter =
+            this.#filter.kind
+                === 'filtered'
+            && this.#filter.status
+                === status
+                ? { kind: 'all' }
+                : {
+                    kind: 'filtered',
+                    status,
+                };
     }
 
     activeFilter():
         IdeaStatus | null {
-        return this.#filterStatus;
+        return this.#filter.kind
+            === 'filtered'
+            ? this.#filter.status
+            : null;
     }
 
     renderList(): SafeHtml {
+        const f = this.#filter;
         const filtered =
-            this.#filterStatus
+            f.kind === 'filtered'
                 ? this.#ideas.filter(
                     i => i.statusGroup()
-                        === this
-                            .#filterStatus,
+                        === f.status,
                 )
                 : this.#ideas;
         const sorted =
@@ -739,7 +727,7 @@ export class IdeaListPresenter {
                     - b.positionSortKey(),
             );
         const hasGrip =
-            !this.#filterStatus;
+            f.kind === 'all';
         return html`${sorted.map(
             idea => idea.buildCard(
                 'position', hasGrip,

@@ -180,6 +180,8 @@ export function isReadinessLevel(
 
 export const MS_PER_SECOND = 1000;
 export const SECONDS_PER_DAY = 86400;
+export const MS_PER_DAY =
+    SECONDS_PER_DAY * MS_PER_SECOND;
 export const COST_DIVISOR = 1000;
 
 export function durationInDays(
@@ -229,93 +231,271 @@ export interface UserEntity {
     last_active: string;
 }
 
+export interface UserCardReceiver {
+    identity(
+        id: string,
+        fullName: string,
+        initials: string,
+    ): void;
+    role(text: string): void;
+    department(text: string): void;
+    email(text: string): void;
+    status(
+        label: string,
+        className: string,
+        isActive: boolean,
+        isPending: boolean,
+        isDeactivated: boolean,
+    ): void;
+    availability(value: number): void;
+    performance(
+        score: number,
+        projectsCompleted: number,
+        currentProjects: number,
+    ): void;
+    strengths(items: string[]): void;
+    teamDimensions(
+        dims: Record<string, number>,
+    ): void;
+    lastActive(isoDate: string): void;
+}
+
+export interface UserProfileReceiver {
+    populateField(
+        field: string,
+        value: string,
+    ): void;
+}
+
 export class User {
-    readonly id: string;
-    readonly firstName: string;
-    readonly lastName: string;
-    readonly email: string;
-    readonly role: string;
-    readonly department: string;
-    readonly status: UserStatus;
-    readonly availability: number;
-    readonly performanceScore: number;
-    readonly projectsCompleted: number;
-    readonly currentProjects: number;
-    readonly strengths: string;
-    readonly teamDimensions: string;
-    readonly phone: string;
-    readonly bio: string;
-    readonly lastActive: string;
+    readonly #id: string;
+    readonly #firstName: string;
+    readonly #lastName: string;
+    readonly #email: string;
+    readonly #role: string;
+    readonly #department: string;
+    readonly #status: UserStatus;
+    readonly #availability: number;
+    readonly #performanceScore: number;
+    readonly #projectsCompleted: number;
+    readonly #currentProjects: number;
+    readonly #strengths: string;
+    readonly #teamDimensions: string;
+    readonly #phone: string;
+    readonly #bio: string;
+    readonly #lastActive: string;
 
     constructor(entity: UserEntity) {
-        this.id = entity.id;
-        this.firstName = entity.first_name;
-        this.lastName = entity.last_name;
-        this.email = entity.email;
-        this.role = entity.role;
-        this.department = entity.department;
-        this.status = entity.status;
-        this.availability = entity.availability;
-        this.performanceScore = entity.performance_score;
-        this.projectsCompleted = entity.projects_completed;
-        this.currentProjects = entity.current_projects;
-        this.strengths = entity.strengths;
-        this.teamDimensions = entity.team_dimensions;
-        this.phone = entity.phone;
-        this.bio = entity.bio;
-        this.lastActive = entity.last_active;
+        this.#id = entity.id;
+        this.#firstName =
+            entity.first_name;
+        this.#lastName =
+            entity.last_name;
+        this.#email = entity.email;
+        this.#role = entity.role;
+        this.#department =
+            entity.department;
+        this.#status = entity.status;
+        this.#availability =
+            entity.availability;
+        this.#performanceScore =
+            entity.performance_score;
+        this.#projectsCompleted =
+            entity.projects_completed;
+        this.#currentProjects =
+            entity.current_projects;
+        this.#strengths =
+            entity.strengths;
+        this.#teamDimensions =
+            entity.team_dimensions;
+        this.#phone = entity.phone;
+        this.#bio = entity.bio;
+        this.#lastActive =
+            entity.last_active;
+    }
+
+    idForLink(): string {
+        return this.#id;
     }
 
     fullName(): string {
         return (
-            `${this.firstName}`
-            + ` ${this.lastName}`
+            `${this.#firstName}`
+            + ` ${this.#lastName}`
         ).trim();
     }
 
+    roleLabel(): string {
+        return this.#role;
+    }
+
+    departmentLabel(): string {
+        return this.#department;
+    }
+
+    emailAddress(): string {
+        return this.#email;
+    }
+
     isActive(): boolean {
-        return this.status === 'active';
+        return this.#status === 'active';
     }
 
     isPending(): boolean {
-        return this.status === 'pending';
+        return (
+            this.#status === 'pending'
+        );
     }
 
     isDeactivated(): boolean {
-        return this.status === 'deactivated';
+        return (
+            this.#status === 'deactivated'
+        );
     }
 
     statusLabel(): string {
         return (
-            USER_STATUS_CONFIG[this.status]
+            USER_STATUS_CONFIG[
+                this.#status
+            ]
         )!.label;
     }
 
     statusClassName(): string {
         return (
-            USER_STATUS_CONFIG[this.status]
+            USER_STATUS_CONFIG[
+                this.#status
+            ]
         )!.className;
     }
 
     hasDepartment(): boolean {
-        return this.department !== '';
+        return this.#department !== '';
     }
 
     hasPerformanceScore(): boolean {
-        return this.performanceScore > 0;
+        return this.#performanceScore > 0;
+    }
+
+    availabilityScore(): number {
+        return this.#availability;
+    }
+
+    performanceScoreValue(): number {
+        return this.#performanceScore;
+    }
+
+    projectsCompletedCount(): number {
+        return this.#projectsCompleted;
+    }
+
+    currentProjectsCount(): number {
+        return this.#currentProjects;
+    }
+
+    lastActiveDate(): string {
+        return this.#lastActive;
+    }
+
+    statusValue(): UserStatus {
+        return this.#status;
     }
 
     parsedStrengths(): string[] {
         return JSON.parse(
-            this.strengths,
+            this.#strengths,
         ) as string[];
     }
 
     parsedTeamDimensions():
         Record<string, number> {
         return JSON.parse(
-            this.teamDimensions,
+            this.#teamDimensions,
         ) as Record<string, number>;
+    }
+
+    matchesSearch(term: string): boolean {
+        const t = term.toLowerCase();
+        return (
+            this.fullName()
+                .toLowerCase()
+                .includes(t)
+            || this.#email
+                .toLowerCase()
+                .includes(t)
+            || this.#role
+                .toLowerCase()
+                .includes(t)
+            || this.#department
+                .toLowerCase()
+                .includes(t)
+        );
+    }
+
+    presentCardInto(
+        r: UserCardReceiver,
+    ): void {
+        const fn = this.fullName();
+        const parts = fn.split(/\s+/);
+        const ini = parts.length >= 2
+            ? (parts[0]![0] ?? '')
+                + (parts[parts.length - 1]
+                    ?.[0] ?? '')
+            : fn.slice(0, 2);
+        r.identity(
+            this.#id,
+            fn,
+            ini.toUpperCase(),
+        );
+        r.role(this.#role);
+        r.department(this.#department);
+        r.email(this.#email);
+        r.status(
+            this.statusLabel(),
+            this.statusClassName(),
+            this.isActive(),
+            this.isPending(),
+            this.isDeactivated(),
+        );
+        r.availability(this.#availability);
+        r.performance(
+            this.#performanceScore,
+            this.#projectsCompleted,
+            this.#currentProjects,
+        );
+        r.strengths(
+            this.parsedStrengths(),
+        );
+        r.teamDimensions(
+            this.parsedTeamDimensions(),
+        );
+        r.lastActive(this.#lastActive);
+    }
+
+    presentProfileInto(
+        r: UserProfileReceiver,
+    ): void {
+        r.populateField(
+            'firstName', this.#firstName,
+        );
+        r.populateField(
+            'lastName', this.#lastName,
+        );
+        r.populateField(
+            'email', this.#email,
+        );
+        r.populateField(
+            'phone', this.#phone,
+        );
+        r.populateField(
+            'role', this.#role,
+        );
+        r.populateField(
+            'department', this.#department,
+        );
+        r.populateField(
+            'bio', this.#bio,
+        );
     }
 }
 
@@ -425,6 +605,16 @@ export interface FlowEntity {
     graph: JsonObjectField;
     created_at: string;
     updated_at: string;
+}
+
+export interface FlowVersionEntity {
+    id: Id;
+    flow_id: Id;
+    name: string;
+    description: string;
+    lock_timeout: number;
+    graph: JsonObjectField;
+    created_at: string;
 }
 
 export interface WorkOrderFlowGraph {
@@ -652,101 +842,101 @@ export const READINESS_CONFIG: Record<
 };
 
 export class Idea {
-    readonly id: string;
-    readonly title: string;
-    readonly position: number;
-    readonly status: IdeaStatus;
-    readonly problemStatement: string;
-    readonly targetUsers: string;
-    readonly proposedSolution: string;
-    readonly expectedOutcome: string;
-    readonly successMetrics: string;
-    readonly readiness: ReadinessLevel;
-    readonly waitingDays: number;
-    readonly submittedAt: string;
-    readonly risks: string;
-    readonly assumptions: string;
-    readonly alignments: string;
-    readonly submittedBy: string;
+    readonly #id: string;
+    readonly #title: string;
+    readonly #position: number;
+    readonly #status: IdeaStatus;
+    readonly #problemStatement: string;
+    readonly #targetUsers: string;
+    readonly #proposedSolution: string;
+    readonly #expectedOutcome: string;
+    readonly #successMetrics: string;
+    readonly #readiness: ReadinessLevel;
+    readonly #waitingDays: number;
+    readonly #submittedAt: string;
+    readonly #risks: string;
+    readonly #assumptions: string;
+    readonly #alignments: string;
+    readonly #submittedBy: string;
 
     constructor(
         entity: IdeaEntity,
         submittedBy: string,
         submittedAt: string,
     ) {
-        this.id = entity.id;
-        this.title = entity.title;
-        this.position = entity.position;
-        this.status = entity.status;
-        this.problemStatement =
+        this.#id = entity.id;
+        this.#title = entity.title;
+        this.#position = entity.position;
+        this.#status = entity.status;
+        this.#problemStatement =
             entity.problem_statement;
-        this.targetUsers =
+        this.#targetUsers =
             entity.target_users;
-        this.proposedSolution =
+        this.#proposedSolution =
             entity.proposed_solution;
-        this.expectedOutcome =
+        this.#expectedOutcome =
             entity.expected_outcome;
-        this.successMetrics =
+        this.#successMetrics =
             entity.success_metrics;
-        this.readiness = entity.readiness;
-        this.submittedAt = submittedAt;
-        this.waitingDays = this.submittedAt
+        this.#readiness = entity.readiness;
+        this.#submittedAt = submittedAt;
+        this.#waitingDays = this.#submittedAt
             ? Math.max(0, Math.ceil(
                 (Date.now()
                     - new Date(
-                        this.submittedAt,
+                        this.#submittedAt,
                     ).getTime())
                 / MS_PER_SECOND
                 / SECONDS_PER_DAY,
             ))
             : 0;
-        this.risks = entity.risks;
-        this.assumptions = entity.assumptions;
-        this.alignments = entity.alignments;
-        this.submittedBy = submittedBy;
+        this.#risks = entity.risks;
+        this.#assumptions = entity.assumptions;
+        this.#alignments = entity.alignments;
+        this.#submittedBy = submittedBy;
     }
 
     isDeleted(): boolean {
-        return this.status === 'deleted';
+        return this.#status === 'deleted';
     }
 
     isInReview(): boolean {
-        return this.status === 'in-review';
+        return this.#status === 'in-review';
     }
 
     isReviewable(): boolean {
-        return this.status === 'in-review';
+        return this.#status === 'in-review';
     }
 
     isConvertible(): boolean {
-        return this.status === 'approved';
+        return this.#status === 'approved';
     }
 
     isReady(): boolean {
-        return this.readiness === 'ready';
+        return this.#readiness === 'ready';
     }
 
     statusLabel(): string {
         return (
-            IDEA_STATUS_CONFIG[this.status]
+            IDEA_STATUS_CONFIG[this.#status]
         )!.label;
     }
 
     statusClassName(): string {
         return (
-            IDEA_STATUS_CONFIG[this.status]
+            IDEA_STATUS_CONFIG[this.#status]
         )!.className;
     }
 
     readinessLabel(): string {
         return (
-            READINESS_CONFIG[this.readiness]
+            READINESS_CONFIG[this.#readiness]
         )!.label;
     }
 
     readinessClassName(): string {
         return (
-            READINESS_CONFIG[this.readiness]
+            READINESS_CONFIG[this.#readiness]
         )!.className;
     }
 
@@ -754,7 +944,7 @@ export class Idea {
         severity: string;
         mitigation: string }[] {
         return JSON.parse(
-            this.risks,
+            this.#risks,
         ) as { title: string;
             severity: string;
             mitigation: string }[];
@@ -762,109 +952,167 @@ export class Idea {
 
     parsedAssumptions(): string[] {
         return JSON.parse(
-            this.assumptions,
+            this.#assumptions,
         ) as string[];
     }
 
     parsedAlignments(): string[] {
         return JSON.parse(
-            this.alignments,
+            this.#alignments,
         ) as string[];
     }
 
     matchesSearch(term: string): boolean {
         const t = term.toLowerCase();
         return (
-            this.title
+            this.#title
                 .toLowerCase()
                 .includes(t)
-            || this.submittedBy
+            || this.#submittedBy
                 .toLowerCase()
                 .includes(t)
         );
     }
+
+    idForLink(): string {
+        return this.#id;
+    }
+
+    titleText(): string {
+        return this.#title;
+    }
+
+    positionSortKey(): number {
+        return this.#position;
+    }
+
+    statusValue(): IdeaStatus {
+        return this.#status;
+    }
+
+    problemStatementText(): string {
+        return this.#problemStatement;
+    }
+
+    targetUsersText(): string {
+        return this.#targetUsers;
+    }
+
+    proposedSolutionText(): string {
+        return this.#proposedSolution;
+    }
+
+    expectedOutcomeText(): string {
+        return this.#expectedOutcome;
+    }
+
+    successMetricsText(): string {
+        return this.#successMetrics;
+    }
+
+    readinessValue(): ReadinessLevel {
+        return this.#readiness;
+    }
+
+    waitingDaysCount(): number {
+        return this.#waitingDays;
+    }
+
+    submittedAtDate(): string {
+        return this.#submittedAt;
+    }
+
+    submittedByName(): string {
+        return this.#submittedBy;
+    }
 }
 
 export class Project {
-    readonly id: string;
-    readonly title: string;
-    readonly description: string;
-    readonly status: ProjectStatus;
-    readonly progress: number;
-    readonly startDate: string;
-    readonly targetEndDate: string;
-    readonly estimatedDuration: number;
-    readonly actualDuration: number;
-    readonly estimatedCost: number;
-    readonly actualCost: number;
-    readonly estimatedImpact: number;
-    readonly actualImpact: number;
-    readonly position: number;
-    readonly businessContext: string;
-    readonly timelineLabel: string;
-    readonly budgetLabel: string;
+    readonly #id: string;
+    readonly #title: string;
+    readonly #description: string;
+    readonly #status: ProjectStatus;
+    readonly #progress: number;
+    readonly #startDate: string;
+    readonly #targetEndDate: string;
+    readonly #estimatedDuration: number;
+    readonly #actualDuration: number;
+    readonly #estimatedCost: number;
+    readonly #actualCost: number;
+    readonly #estimatedImpact: number;
+    readonly #actualImpact: number;
+    readonly #position: number;
+    readonly #businessContext: string;
+    readonly #timelineLabel: string;
+    readonly #budgetLabel: string;
 
     constructor(entity: ProjectEntity) {
-        this.id = entity.id;
-        this.title = entity.title;
-        this.description = entity.description;
-        this.status = entity.status;
-        this.progress = entity.progress;
-        this.startDate = entity.start_date;
-        this.targetEndDate =
+        this.#id = entity.id;
+        this.#title = entity.title;
+        this.#description =
+            entity.description;
+        this.#status = entity.status;
+        this.#progress = entity.progress;
+        this.#startDate =
+            entity.start_date;
+        this.#targetEndDate =
             entity.target_end_date;
-        this.estimatedDuration =
+        this.#estimatedDuration =
             entity.estimated_duration;
-        this.actualDuration =
+        this.#actualDuration =
             entity.actual_duration;
-        this.estimatedCost =
+        this.#estimatedCost =
             entity.estimated_cost;
-        this.actualCost = entity.actual_cost;
-        this.estimatedImpact =
+        this.#actualCost =
+            entity.actual_cost;
+        this.#estimatedImpact =
             entity.estimated_impact;
-        this.actualImpact =
+        this.#actualImpact =
             entity.actual_impact;
-        this.position = entity.position;
-        this.businessContext =
+        this.#position = entity.position;
+        this.#businessContext =
             entity.business_context;
-        this.timelineLabel =
+        this.#timelineLabel =
             entity.timeline_label;
-        this.budgetLabel = entity.budget_label;
+        this.#budgetLabel =
+            entity.budget_label;
     }
 
     isDeleted(): boolean {
-        return this.status === 'deleted';
+        return this.#status === 'deleted';
     }
 
     isOverBudget(): boolean {
-        return this.actualCost
-            > this.estimatedCost;
+        return this.#actualCost
+            > this.#estimatedCost;
     }
 
     isOverdue(): boolean {
-        return this.actualDuration
-            > this.estimatedDuration;
+        return this.#actualDuration
+            > this.#estimatedDuration;
     }
 
     estimatedDurationDays(): number {
         return durationInDays(
-            this.estimatedDuration,
+            this.#estimatedDuration,
         );
     }
 
     actualDurationDays(): number {
         return durationInDays(
-            this.actualDuration,
+            this.#actualDuration,
         );
     }
 
     timelineProgress(): number {
-        if (this.status === 'completed')
+        if (this.#status === 'completed')
             return 100;
         const start =
-            new Date(this.startDate);
+            new Date(this.#startDate);
         const end =
-            new Date(this.targetEndDate);
+            new Date(
+                this.#targetEndDate,
+            );
         if (
             isNaN(start.getTime())
             || isNaN(end.getTime())
@@ -888,57 +1136,169 @@ export class Project {
 
     formattedCost(): string {
         return formatCompactCurrency(
-            this.estimatedCost,
+            this.#estimatedCost,
         );
     }
 
     statusLabel(): string {
         return (
-            PROJECT_STATUS_CONFIG[this.status]
+            PROJECT_STATUS_CONFIG[
+                this.#status
+            ]
         )!.label;
     }
 
     statusClassName(): string {
         return (
-            PROJECT_STATUS_CONFIG[this.status]
+            PROJECT_STATUS_CONFIG[
+                this.#status
+            ]
         )!.className;
+    }
+
+    idForLink(): string {
+        return this.#id;
+    }
+
+    titleText(): string {
+        return this.#title;
+    }
+
+    descriptionText(): string {
+        return this.#description;
+    }
+
+    statusValue(): ProjectStatus {
+        return this.#status;
+    }
+
+    progressPercent(): number {
+        return this.#progress;
+    }
+
+    startDateValue(): string {
+        return this.#startDate;
+    }
+
+    targetEndDateValue(): string {
+        return this.#targetEndDate;
+    }
+
+    estimatedCostAmount(): number {
+        return this.#estimatedCost;
+    }
+
+    actualCostAmount(): number {
+        return this.#actualCost;
+    }
+
+    estimatedImpactScore(): number {
+        return this.#estimatedImpact;
+    }
+
+    actualImpactScore(): number {
+        return this.#actualImpact;
+    }
+
+    positionSortKey(): number {
+        return this.#position;
+    }
+
+    matchesSearch(term: string): boolean {
+        const t = term.toLowerCase();
+        return this.#title
+            .toLowerCase()
+            .includes(t);
     }
 }
 
 export class Activity {
-    readonly id: string;
-    readonly type: string;
-    readonly action: string;
-    readonly target: string;
-    readonly timestamp: string;
-    readonly score: number;
-    readonly status: string;
-    readonly comment: string;
-    readonly actor: string;
+    readonly #id: string;
+    readonly #type: string;
+    readonly #action: string;
+    readonly #target: string;
+    readonly #timestamp: string;
+    readonly #score: number;
+    readonly #status: string;
+    readonly #comment: string;
+    readonly #actor: string;
 
     constructor(
         entity: ActivityEntity,
         actor: string,
     ) {
-        this.id = entity.id;
-        this.type = entity.type;
-        this.action = entity.action;
-        this.target = entity.target;
-        this.timestamp = entity.timestamp;
-        this.score = entity.score;
-        this.status = entity.status;
-        this.comment = entity.comment;
-        this.actor = actor;
+        this.#id = entity.id;
+        this.#type = entity.type;
+        this.#action = entity.action;
+        this.#target = entity.target;
+        this.#timestamp =
+            entity.timestamp;
+        this.#score = entity.score;
+        this.#status = entity.status;
+        this.#comment = entity.comment;
+        this.#actor = actor;
     }
 
     formattedDescription(): string {
         const prefix =
-            this.actor !== null
-                ? `${this.actor} `
+            this.#actor !== null
+                ? `${this.#actor} `
                 : '';
         return prefix
-            + `${this.action}`
-            + ` ${this.target}`;
+            + `${this.#action}`
+            + ` ${this.#target}`;
+    }
+
+    typeValue(): string {
+        return this.#type;
+    }
+
+    actionText(): string {
+        return this.#action;
+    }
+
+    targetText(): string {
+        return this.#target;
+    }
+
+    timestampValue(): string {
+        return this.#timestamp;
+    }
+
+    statusText(): string {
+        return this.#status;
+    }
+
+    hasStatus(): boolean {
+        return this.#status !== '';
+    }
+
+    commentText(): string {
+        return this.#comment;
+    }
+
+    hasComment(): boolean {
+        return this.#comment !== '';
+    }
+
+    actorName(): string {
+        return this.#actor;
+    }
+
+    matchesActor(term: string): boolean {
+        return this.#actor
+            .toLowerCase()
+            .includes(term);
+    }
+
+    matchesTarget(term: string): boolean {
+        return this.#target
+            .toLowerCase()
+            .includes(term);
+    }
+
+    hasType(type: string): boolean {
+        return this.#type === type;
     }
 }
 
@@ -949,25 +1309,25 @@ export interface RecentActivityItem {
 }
 
 export class Account {
-    readonly companyName: string;
-    readonly plan: string;
-    readonly planStatus: string;
-    readonly nextBilling: string;
-    readonly seats: number;
-    readonly usedSeats: number;
-    readonly projectsCurrent: number;
-    readonly projectsLimit: number;
-    readonly ideasCurrent: number;
-    readonly ideasLimit: number;
-    readonly storageCurrent: number;
-    readonly storageLimit: number;
-    readonly aiCreditsCurrent: number;
-    readonly aiCreditsLimit: number;
-    readonly healthScore: number;
-    readonly healthStatus: string;
-    readonly lastActivity: string;
-    readonly activeUsers: number;
-    readonly recentActivity:
+    readonly #companyName: string;
+    readonly #plan: string;
+    readonly #planStatus: string;
+    readonly #nextBilling: string;
+    readonly #seats: number;
+    readonly #usedSeats: number;
+    readonly #projectsCurrent: number;
+    readonly #projectsLimit: number;
+    readonly #ideasCurrent: number;
+    readonly #ideasLimit: number;
+    readonly #storageCurrent: number;
+    readonly #storageLimit: number;
+    readonly #aiCreditsCurrent: number;
+    readonly #aiCreditsLimit: number;
+    readonly #healthScore: number;
+    readonly #healthStatus: string;
+    readonly #lastActivity: string;
+    readonly #activeUsers: number;
+    readonly #recentActivity:
         RecentActivityItem[];
 
     constructor(
@@ -976,58 +1336,130 @@ export class Account {
         recentActivity:
             RecentActivityItem[],
     ) {
-        this.companyName = companyName;
-        this.plan = entity.plan;
-        this.planStatus =
+        this.#companyName = companyName;
+        this.#plan = entity.plan;
+        this.#planStatus =
             entity.plan_status;
-        this.nextBilling =
+        this.#nextBilling =
             entity.next_billing;
-        this.seats = entity.seats;
-        this.usedSeats =
+        this.#seats = entity.seats;
+        this.#usedSeats =
             entity.used_seats;
-        this.projectsCurrent =
+        this.#projectsCurrent =
             entity.projects_current;
-        this.projectsLimit =
+        this.#projectsLimit =
             entity.projects_limit;
-        this.ideasCurrent =
+        this.#ideasCurrent =
             entity.ideas_current;
-        this.ideasLimit =
+        this.#ideasLimit =
             entity.ideas_limit;
-        this.storageCurrent =
+        this.#storageCurrent =
             entity.storage_current;
-        this.storageLimit =
+        this.#storageLimit =
             entity.storage_limit;
-        this.aiCreditsCurrent =
+        this.#aiCreditsCurrent =
             entity.ai_credits_current;
-        this.aiCreditsLimit =
+        this.#aiCreditsLimit =
             entity.ai_credits_limit;
-        this.healthScore =
+        this.#healthScore =
             entity.health_score;
-        this.healthStatus =
+        this.#healthStatus =
             entity.health_status;
-        this.lastActivity =
+        this.#lastActivity =
             entity.last_activity;
-        this.activeUsers =
+        this.#activeUsers =
             entity.active_users;
-        this.recentActivity =
+        this.#recentActivity =
             recentActivity;
     }
 
+    companyNameText(): string {
+        return this.#companyName;
+    }
+
+    planName(): string {
+        return this.#plan;
+    }
+
+    planStatusText(): string {
+        return this.#planStatus;
+    }
+
+    nextBillingDate(): string {
+        return this.#nextBilling;
+    }
+
+    seatCount(): number {
+        return this.#seats;
+    }
+
+    usedSeatCount(): number {
+        return this.#usedSeats;
+    }
+
+    projectsCurrentCount(): number {
+        return this.#projectsCurrent;
+    }
+
+    projectsLimitCount(): number {
+        return this.#projectsLimit;
+    }
+
+    ideasCurrentCount(): number {
+        return this.#ideasCurrent;
+    }
+
+    ideasLimitCount(): number {
+        return this.#ideasLimit;
+    }
+
+    storageCurrentValue(): number {
+        return this.#storageCurrent;
+    }
+
+    storageLimitValue(): number {
+        return this.#storageLimit;
+    }
+
+    aiCreditsCurrentValue(): number {
+        return this.#aiCreditsCurrent;
+    }
+
+    aiCreditsLimitValue(): number {
+        return this.#aiCreditsLimit;
+    }
+
+    healthScoreValue(): number {
+        return this.#healthScore;
+    }
+
+    healthStatusText(): string {
+        return this.#healthStatus;
+    }
+
+    lastActivityDate(): string {
+        return this.#lastActivity;
+    }
+
+    activeUserCount(): number {
+        return this.#activeUsers;
+    }
+
     seatUsagePercent(): number {
-        return this.seats > 0
+        return this.#seats > 0
             ? Math.min(
-                (this.usedSeats
-                    / this.seats) * 100,
+                (this.#usedSeats
+                    / this.#seats) * 100,
                 100,
             )
             : 0;
     }
 
     projectUsagePercent(): number {
-        return this.projectsLimit > 0
+        return this.#projectsLimit > 0
             ? Math.min(
-                (this.projectsCurrent
-                    / this.projectsLimit)
+                (this.#projectsCurrent
+                    / this.#projectsLimit)
                     * 100,
                 100,
             )
@@ -1035,10 +1467,10 @@ export class Account {
     }
 
     ideaUsagePercent(): number {
-        return this.ideasLimit > 0
+        return this.#ideasLimit > 0
             ? Math.min(
-                (this.ideasCurrent
-                    / this.ideasLimit)
+                (this.#ideasCurrent
+                    / this.#ideasLimit)
                     * 100,
                 100,
             )
@@ -1046,10 +1478,10 @@ export class Account {
     }
 
     aiCreditUsagePercent(): number {
-        return this.aiCreditsLimit > 0
+        return this.#aiCreditsLimit > 0
             ? Math.min(
-                (this.aiCreditsCurrent
-                    / this.aiCreditsLimit)
+                (this.#aiCreditsCurrent
+                    / this.#aiCreditsLimit)
                     * 100,
                 100,
             )
@@ -1057,10 +1489,10 @@ export class Account {
     }
 
     storageUsagePercent(): number {
-        return this.storageLimit > 0
+        return this.#storageLimit > 0
             ? Math.min(
-                (this.storageCurrent
-                    / this.storageLimit)
+                (this.#storageCurrent
+                    / this.#storageLimit)
                     * 100,
                 100,
             )

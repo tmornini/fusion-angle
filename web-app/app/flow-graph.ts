@@ -138,19 +138,17 @@ function computePortPos(
     const w = NODE_WIDTH;
     const h = NODE_HEIGHT;
     const perim = 2 * (w + h);
-    const params: number[] = [];
-    for (const e of edges) {
-        let otherId: string | null = null;
-        if (e.fromNodeId === node.id) {
-            otherId = e.toNodeId;
-        } else if (
-            e.toNodeId === node.id
-        ) {
-            otherId = e.fromNodeId;
-        }
-        if (!otherId) continue;
-        const other = nodeMap.get(otherId);
-        if (!other) continue;
+    const params = edges.flatMap(e => {
+        const otherId =
+            e.fromNodeId === node.id
+                ? e.toNodeId
+                : e.toNodeId === node.id
+                    ? e.fromNodeId
+                    : null;
+        if (!otherId) return [];
+        const other =
+            nodeMap.get(otherId);
+        if (!other) return [];
         const pt = perimeterPoint(
             node.positionX,
             node.positionY,
@@ -158,18 +156,14 @@ function computePortPos(
             other.positionX + w / 2,
             other.positionY + h / 2,
         );
-        const localX =
-            pt.x - node.positionX;
-        const localY =
-            pt.y - node.positionY;
-        params.push(
-            xyToPerim(localX, localY),
-        );
-    }
+        return [xyToPerim(
+            pt.x - node.positionX,
+            pt.y - node.positionY,
+        )];
+    }).toSorted((a, b) => a - b);
     if (params.length === 0) {
         return { x: w, y: h / 2 };
     }
-    params.sort((a, b) => a - b);
     let bestGap = 0;
     let bestMid = w + h / 2;
     for (let i = 0;
@@ -364,7 +358,7 @@ function buildNode(
         + ` height="${NODE_HEIGHT}"`
         + ` rx="${NODE_RADIUS}"`
         + ' fill="var('
-        + '--color-card-bg, #232940)"'
+        + '--color-card-bg)"'
         + ` stroke="${borderColor}"`
         + ` stroke-width="${strokeW}"/>`;
 
@@ -430,11 +424,9 @@ function buildNode(
             + ` r="${PORT_RADIUS}"`
             + ` fill="${BLUE}"`
             + ' stroke="var('
-            + '--color-card-bg, #232940)"'
+            + '--color-card-bg)"'
             + ` stroke-width=`
-            + `"${PORT_STROKE}"`
-            + ' style='
-            + '"cursor:crosshair">'
+            + `"${PORT_STROKE}">`
             + '<title>'
             + 'Click and drag to create'
             + ' a new node attached here.'
@@ -454,7 +446,7 @@ function buildNode(
         + String(positionY)
         + ')"'
         + selAttr
-        + ' style="cursor:pointer">'
+        + '>'
         + inner
         + '</g>',
     );
@@ -464,7 +456,6 @@ function buildEdge(
     edge: GraphEdge,
     fromNode: GraphNode,
     toNode: GraphNode,
-    isSelected: boolean,
     aimOffset: number,
     isCycle: boolean,
 ): SafeHtml {
@@ -579,8 +570,7 @@ function buildEdge(
         + ' fill="none"'
         + ' stroke="transparent"'
         + ` stroke-width="`
-        + `${HIT_TARGET_WIDTH}"`
-        + ' style="cursor:pointer"/>';
+        + `${HIT_TARGET_WIDTH}"/>`;
 
     const visPath = '<path'
         + ` d="${pathD}"`
@@ -589,9 +579,7 @@ function buildEdge(
         + ` stroke-width="${sw}"`
         + dashAttr
         + ` marker-end="${markerUrl}"`;
-    const visClose = ' style='
-        + '"cursor:pointer"'
-        + '/>';
+    const visClose = '/>';
 
     const labelT = aimOffset === 0
         ? BEZIER_MIDPOINT
@@ -629,7 +617,7 @@ function buildEdge(
         + ` height="${LABEL_HEIGHT}"`
         + ` rx="${LABEL_RADIUS}"`
         + ' fill="var('
-        + '--color-card-bg, #232940)"'
+        + '--color-card-bg)"'
         + ` stroke="${color}"`
         + ' stroke-width="1"'
         + ` opacity="${LABEL_BG_OPACITY}"/>`;
@@ -647,13 +635,9 @@ function buildEdge(
         + labelEsc
         + '</text>';
 
-    const edgeSelAttr = isSelected
-        ? ' filter="url(#wf-glow)"'
-        : '';
     return trusted(
         '<g'
         + ` data-edge-id="${edge.id}"`
-        + edgeSelAttr
         + '>'
         + hitPath
         + visPath + visClose
@@ -783,6 +767,13 @@ export function buildGraphSvg(
     selection: Selection,
     isLocked: boolean,
     isConnecting: boolean,
+    marqueeRect: {
+        x: number;
+        y: number;
+        w: number;
+        h: number;
+    } | null,
+    isPanCursor: boolean,
 ): SafeHtml {
     const nodeMap = new Map(
         nodes.map(n => [n.id, n]),
@@ -836,10 +827,6 @@ export function buildGraphSvg(
         const toNode =
             nodeMap.get(edge.toNodeId);
         if (!fromNode || !toNode) continue;
-        const isSelected =
-            selection.kind === 'edge'
-            && edge.id
-                === selection.edgeId;
         let aimOffset = 0;
         const k = pairKey(
             edge.fromNodeId,
@@ -853,7 +840,6 @@ export function buildGraphSvg(
                 edge,
                 fromNode,
                 toNode,
-                isSelected,
                 aimOffset,
                 cycleEdgeIds.has(
                     edge.id,
@@ -861,12 +847,14 @@ export function buildGraphSvg(
             ).toString();
     }
 
+    const selectedNodeIds =
+        selection.kind === 'nodes'
+            ? selection.nodeIds
+            : new Set<string>();
     let nodeMarkup = '';
     for (const node of nodes) {
         const isSelected =
-            selection.kind === 'node'
-            && node.id
-                === selection.nodeId;
+            selectedNodeIds.has(node.id);
         const isSpecial =
             node.isStart
             || node.isComplete;
@@ -897,9 +885,24 @@ export function buildGraphSvg(
         + ' ' + String(viewBoxW)
         + ' ' + String(viewBoxH);
 
-    const svgCls = isConnecting
-        ? 'wf-canvas wf-connecting'
-        : 'wf-canvas';
+    let svgCls = 'wf-canvas';
+    if (isConnecting) {
+        svgCls += ' wf-connecting';
+    }
+    if (isPanCursor) {
+        svgCls += ' wf-pan-cursor';
+    }
+
+    let marqueeMarkup = '';
+    if (marqueeRect) {
+        marqueeMarkup = '<rect'
+            + ` x="${marqueeRect.x}"`
+            + ` y="${marqueeRect.y}"`
+            + ` width="${marqueeRect.w}"`
+            + ` height="${marqueeRect.h}"`
+            + ' class="wf-marquee"/>';
+    }
+
     return trusted(
         '<svg'
         + ' xmlns='
@@ -909,8 +912,7 @@ export function buildGraphSvg(
         + ' preserveAspectRatio='
         + '"xMidYMid meet"'
         + ' width="100%"'
-        + ' height="100%"'
-        + ' style="display:block">'
+        + ' height="100%">'
         + buildDefs()
         + buildGrid(
             viewBoxX, viewBoxY,
@@ -918,6 +920,7 @@ export function buildGraphSvg(
         )
         + edgeMarkup
         + nodeMarkup
+        + marqueeMarkup
         + '</svg>',
     );
 }

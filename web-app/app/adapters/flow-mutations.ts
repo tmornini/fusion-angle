@@ -14,6 +14,7 @@ import {
     DEFAULT_LOCK_TIMEOUT,
 } from '../../../api/types';
 import { parseJson } from './helpers';
+import { postFlowVersion } from './flow-versions';
 
 interface StoredGraph {
     nodes: GraphNode[];
@@ -38,8 +39,11 @@ function putFlowGraph(
 
 async function putGraphMutation(
     flowId: string,
-    mutate: (g: StoredGraph) => void,
+    transform: (
+        g: StoredGraph,
+    ) => StoredGraph,
 ): Promise<void> {
+    await postFlowVersion(flowId);
     const entity =
         await GET<FlowEntity>(
             `flows/${flowId}`,
@@ -47,9 +51,9 @@ async function putGraphMutation(
     const graph = parseGraph(
         entity.graph,
     );
-    mutate(graph);
+    const updated = transform(graph);
     await PUT(`flows/${flowId}`, {
-        graph: putFlowGraph(graph),
+        graph: putFlowGraph(updated),
         updated_at: nowUtc(),
     });
 }
@@ -60,6 +64,34 @@ const DEFAULT_START_X = -300;
 const DEFAULT_START_Y = 0;
 const DEFAULT_COMPLETE_X = 300;
 const DEFAULT_COMPLETE_Y = 200;
+
+export function buildDefaultStartEnd(): {
+    start: GraphNode;
+    complete: GraphNode;
+} {
+    return {
+        start: {
+            id: crypto.randomUUID(),
+            name: DEFAULT_START_NAME,
+            description: '',
+            positionX: DEFAULT_START_X,
+            positionY: DEFAULT_START_Y,
+            isStart: true,
+            isComplete: false,
+            fields: [],
+        },
+        complete: {
+            id: crypto.randomUUID(),
+            name: DEFAULT_COMPLETE_NAME,
+            description: '',
+            positionX: DEFAULT_COMPLETE_X,
+            positionY: DEFAULT_COMPLETE_Y,
+            isStart: false,
+            isComplete: true,
+            fields: [],
+        },
+    };
+}
 
 export interface FlowCreationContext {
     flowId: string;
@@ -99,28 +131,10 @@ export async function postFlowCreation(
     ctx: FlowCreationContext,
 ): Promise<void> {
     const now = nowUtc();
-    const startNode: GraphNode = {
-        id: crypto.randomUUID(),
-        name: DEFAULT_START_NAME,
-        description: '',
-        positionX: DEFAULT_START_X,
-        positionY: DEFAULT_START_Y,
-        isStart: true,
-        isComplete: false,
-        fields: [],
-    };
-    const completeNode: GraphNode = {
-        id: crypto.randomUUID(),
-        name: DEFAULT_COMPLETE_NAME,
-        description: '',
-        positionX: DEFAULT_COMPLETE_X,
-        positionY: DEFAULT_COMPLETE_Y,
-        isStart: false,
-        isComplete: true,
-        fields: [],
-    };
+    const { start, complete } =
+        buildDefaultStartEnd();
     const graph: StoredGraph = {
-        nodes: [startNode, completeNode],
+        nodes: [start, complete],
         edges: [],
     };
 
@@ -157,7 +171,10 @@ export async function postNodeAddition(
     };
     await putGraphMutation(
         ctx.flowId,
-        g => { g.nodes.push(node); },
+        g => ({
+            ...g,
+            nodes: [...g.nodes, node],
+        }),
     );
 }
 
@@ -173,7 +190,10 @@ export async function postEdgeConnection(
     };
     await putGraphMutation(
         ctx.flowId,
-        g => { g.edges.push(edge); },
+        g => ({
+            ...g,
+            edges: [...g.edges, edge],
+        }),
     );
 }
 
@@ -192,12 +212,20 @@ export async function postFieldAddition(
     };
     await putGraphMutation(
         ctx.flowId,
-        g => {
-            const node = g.nodes.find(
-                n => n.id === ctx.nodeId,
-            );
-            if (node) node.fields.push(field);
-        },
+        g => ({
+            ...g,
+            nodes: g.nodes.map(
+                n => n.id === ctx.nodeId
+                    ? {
+                        ...n,
+                        fields: [
+                            ...n.fields,
+                            field,
+                        ],
+                    }
+                    : n,
+            ),
+        }),
     );
 }
 
@@ -208,6 +236,7 @@ export async function putFlow(
         description?: string;
     },
 ): Promise<void> {
+    await postFlowVersion(id);
     await PUT(`flows/${id}`, {
         ...fields,
         updated_at: nowUtc(),
@@ -224,89 +253,92 @@ export async function putFlowLocked(
     });
 }
 
+export interface GraphUpdateContext {
+    flowId: string;
+    nodes: GraphNode[];
+    edges: GraphEdge[];
+}
+
 export async function putGraph(
-    flowId: string,
-    nodes: GraphNode[],
-    edges: GraphEdge[],
+    ctx: GraphUpdateContext,
 ): Promise<void> {
-    await PUT(`flows/${flowId}`, {
-        graph: putFlowGraph({ nodes, edges }),
+    await postFlowVersion(ctx.flowId);
+    await putGraphSilent(ctx);
+}
+
+// No capture: internal migration, not user edit.
+export async function putGraphSilent(
+    ctx: GraphUpdateContext,
+): Promise<void> {
+    await PUT(`flows/${ctx.flowId}`, {
+        graph: putFlowGraph({
+            nodes: ctx.nodes,
+            edges: ctx.edges,
+        }),
         updated_at: nowUtc(),
     });
 }
 
-export async function putNode(
-    flowId: string,
-    nodeId: string,
+export interface NodeUpdateContext {
+    flowId: string;
+    nodeId: string;
     fields: {
         name?: string;
         description?: string;
         positionX?: number;
         positionY?: number;
-    },
+    };
+}
+
+export async function putNode(
+    ctx: NodeUpdateContext,
 ): Promise<void> {
     await putGraphMutation(
-        flowId,
-        g => {
-            const node = g.nodes.find(
-                n => n.id === nodeId,
-            );
-            if (!node) return;
-            if (fields.name !== undefined)
-                node.name = fields.name;
-            if (
-                fields.description
-                    !== undefined
-            )
-                node.description =
-                    fields.description;
-            if (
-                fields.positionX
-                    !== undefined
-            )
-                node.positionX =
-                    fields.positionX;
-            if (
-                fields.positionY
-                    !== undefined
-            )
-                node.positionY =
-                    fields.positionY;
-        },
+        ctx.flowId,
+        g => ({
+            ...g,
+            nodes: g.nodes.map(
+                n => n.id === ctx.nodeId
+                    ? {
+                        ...n,
+                        ...ctx.fields,
+                    }
+                    : n,
+            ),
+        }),
     );
 }
 
-export async function putWfEdge(
-    flowId: string,
-    edgeId: string,
+export interface EdgeUpdateContext {
+    flowId: string;
+    edgeId: string;
     fields: {
         name?: string;
         description?: string;
-    },
+    };
+}
+
+export async function putWfEdge(
+    ctx: EdgeUpdateContext,
 ): Promise<void> {
     await putGraphMutation(
-        flowId,
-        g => {
-            const edge = g.edges.find(
-                e => e.id === edgeId,
-            );
-            if (!edge) return;
-            if (fields.name !== undefined)
-                edge.name = fields.name;
-            if (
-                fields.description
-                    !== undefined
-            )
-                edge.description =
-                    fields.description;
-        },
+        ctx.flowId,
+        g => ({
+            ...g,
+            edges: g.edges.map(
+                e => e.id === ctx.edgeId
+                    ? {
+                        ...e,
+                        ...ctx.fields,
+                    }
+                    : e,
+            ),
+        }),
     );
 }
 
-export async function putField(
-    flowId: string,
-    nodeId: string,
-    fieldId: string,
+function applyFieldUpdate(
+    f: GraphField,
     fields: {
         name?: string;
         fieldType?: string;
@@ -314,45 +346,53 @@ export async function putField(
         isRequired?: boolean;
         options?: string[];
     },
+): GraphField {
+    const ft = fields.fieldType
+        ? (fields.fieldType as WfFieldType)
+        : f.fieldType;
+    return {
+        ...f,
+        ...fields,
+        fieldType: ft,
+    };
+}
+
+export interface FieldUpdateContext {
+    flowId: string;
+    nodeId: string;
+    fieldId: string;
+    fields: {
+        name?: string;
+        fieldType?: string;
+        sortOrder?: number;
+        isRequired?: boolean;
+        options?: string[];
+    };
+}
+
+export async function putField(
+    ctx: FieldUpdateContext,
 ): Promise<void> {
     await putGraphMutation(
-        flowId,
-        g => {
-            const node = g.nodes.find(
-                n => n.id === nodeId,
-            );
-            if (!node) return;
-            const field = node.fields.find(
-                f => f.id === fieldId,
-            );
-            if (!field) return;
-            if (fields.name !== undefined)
-                field.name = fields.name;
-            if (
-                fields.fieldType
-                    !== undefined
-            ) {
-                const ft =
-                    fields.fieldType as
-                        WfFieldType;
-                field.fieldType = ft;
-            }
-            if (
-                fields.sortOrder
-                    !== undefined
-            )
-                field.sortOrder =
-                    fields.sortOrder;
-            if (
-                fields.isRequired
-                    !== undefined
-            )
-                field.isRequired =
-                    fields.isRequired;
-            if (
-                fields.options !== undefined
-            )
-                field.options = fields.options;
-        },
+        ctx.flowId,
+        g => ({
+            ...g,
+            nodes: g.nodes.map(
+                n => n.id === ctx.nodeId
+                    ? {
+                        ...n,
+                        fields: n.fields.map(
+                            f => f.id
+                                === ctx.fieldId
+                                ? applyFieldUpdate(
+                                    f,
+                                    ctx.fields,
+                                )
+                                : f,
+                        ),
+                    }
+                    : n,
+            ),
+        }),
     );
 }

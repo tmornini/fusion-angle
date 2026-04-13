@@ -66,11 +66,12 @@ export async function getAccount(
             const activity =
                 new Activity(a, actor);
             return {
-                type: activity.type,
+                type: activity.typeValue(),
                 description:
                     activity
                     .formattedDescription(),
-                time: activity.timestamp,
+                time: activity
+                    .timestampValue(),
             };
         });
 

@@ -133,7 +133,7 @@ function buildWfNodeSvg(
         + ` height="${NH}"`
         + ' rx="10"'
         + ' fill="var('
-        + '--color-card-bg, #232940)"'
+        + '--color-card-bg)"'
         + ` stroke="${borderColor}"`
         + ` stroke-width="${sw}"/>`;
     if (isComplete) {
@@ -220,7 +220,7 @@ function buildWfEdgeSvg(
         + ` height="${lh}"`
         + ' rx="4"'
         + ' fill="var('
-        + '--color-card-bg, #232940)"'
+        + '--color-card-bg)"'
         + ` stroke="${color}"`
         + ' stroke-width="1"'
         + ' opacity="0.9"/>'
@@ -397,7 +397,7 @@ export async function init(): Promise<void> {
         + ';align-items:center'
         + ';gap:0.25rem'
         + ';padding:0.25rem 0.75rem'
-        + ';border-radius:9999px'
+        + ';border-radius:var(--radius-full)'
         + ';font-size:0.75rem'
         + ';font-weight:500'
         + ';background:hsl(var(--accent-soft))'

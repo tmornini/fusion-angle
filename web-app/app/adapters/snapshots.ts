@@ -32,7 +32,7 @@ export async function getSnapshot(): Promise<string> {
     return GET<string>('snapshots/schema');
 }
 
-export async function hasData(): Promise<boolean> {
+export async function getDataPresent(): Promise<boolean> {
     const users = await GET<UserEntity[]>('users');
     return users.length > 0;
 }

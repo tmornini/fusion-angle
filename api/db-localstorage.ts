@@ -15,6 +15,7 @@ import type {
     TeamMembershipUserEntity,
     ActivityEntity,
     FlowEntity,
+    FlowVersionEntity,
     CompanySettingsEntity,
     AccountEntity,
     IdeaSubmissionEntity,
@@ -238,6 +239,32 @@ function createEntityStore<
     };
 }
 
+// History tables hold immutable point-in-time facts.
+// Their only valid removal is eviction (for cap
+// enforcement), never soft deletion.
+function createHistoryEntityStore<
+    T extends { id: string },
+>(tableName: string): EntityStore<T> {
+    const base = createEntityStore<T>(tableName);
+    return {
+        getAll: base.getAll,
+        getById: base.getById,
+        put: base.put,
+        async delete(id: string): Promise<void> {
+            const rows = readTable<T>(
+                tableName, false,
+            );
+            const idx = rows.findIndex(
+                e => e.id === id,
+            );
+            if (idx >= 0) {
+                rows.splice(idx, 1);
+                writeTable(tableName, rows);
+            }
+        },
+    };
+}
+
 function createSingletonStore<
     T extends { id: string },
 >(tableName: string): SingletonStore<T> {
@@ -307,6 +334,7 @@ export const TABLE_NAMES = [
     'team_membership_users',
     'activities',
     'flows',
+    'flow_versions',
     'project_flows',
     'work_orders',
     'flow_work_orders',
@@ -491,6 +519,10 @@ export async function createLocalStorageAdapter(
             createEntityStore<
                 FlowEntity
             >('flows'),
+        flowVersions:
+            createHistoryEntityStore<
+                FlowVersionEntity
+            >('flow_versions'),
         projectFlows:
             createEntityStore<
                 ProjectFlowEntity

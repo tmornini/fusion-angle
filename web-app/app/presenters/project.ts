@@ -15,7 +15,7 @@ import {
     type ProjectStatus,
     PROJECT_STATUS_CONFIG,
     COST_DIVISOR,
-    SECONDS_PER_DAY,
+    MS_PER_DAY,
 } from '../adapters';
 import {
     orderedKeys,
@@ -38,91 +38,37 @@ const STATUS_ICONS: Record<
 };
 
 export class ProjectPresenter {
-    readonly #id: string;
-    readonly #title: string;
-    readonly #status: ProjectStatus;
-    readonly #statusClassName: string;
-    readonly #statusLabel: string;
-    readonly #position: number;
-    readonly #progress: number;
-    readonly #timeCurrentDays: number;
-    readonly #timeBaselineDays: number;
-    readonly #costCurrentK: number;
-    readonly #costBaselineK: number;
-    readonly #impactCurrent: number;
-    readonly #impactBaseline: number;
+    readonly #project: Project;
 
     constructor(project: Project) {
-        this.#id = project.id;
-        this.#title = project.title;
-        this.#status = project.status;
-        this.#statusClassName =
-            project.statusClassName();
-        this.#statusLabel =
-            project.statusLabel();
-        this.#position = project.position;
-        this.#progress =
-            project.timelineProgress();
-        const start = new Date(
-            project.startDate,
-        ).getTime();
-        const end = new Date(
-            project.targetEndDate,
-        ).getTime();
-        const msPerDay =
-            SECONDS_PER_DAY * 1000;
-        this.#timeCurrentDays =
-            isNaN(start)
-                ? 0
-                : Math.max(0, Math.floor(
-                    (Date.now() - start)
-                    / msPerDay,
-                ));
-        this.#timeBaselineDays =
-            isNaN(start) || isNaN(end)
-                ? 0
-                : Math.max(0, Math.ceil(
-                    (end - start)
-                    / msPerDay,
-                ));
-        this.#costCurrentK =
-            project.actualCost
-            / COST_DIVISOR;
-        this.#costBaselineK =
-            project.estimatedCost
-            / COST_DIVISOR;
-        this.#impactCurrent =
-            project.actualImpact;
-        this.#impactBaseline =
-            project.estimatedImpact;
+        this.#project = project;
     }
 
     idForLink(): string {
-        return this.#id;
+        return this.#project.idForLink();
     }
 
     positionSortKey(): number {
-        return this.#position;
+        return this.#project
+            .positionSortKey();
     }
 
     statusGroup(): ProjectStatus {
-        return this.#status;
+        return this.#project
+            .statusValue();
     }
 
     buildStatusBadge(): SafeHtml {
-        const cfg = PROJECT_STATUS_CONFIG[
-            this.#status
-        ]!;
-        const icon = STATUS_ICONS[
-            this.#status
-        ]!;
+        const s =
+            this.#project.statusValue();
+        const cfg =
+            PROJECT_STATUS_CONFIG[s]!;
+        const icon = STATUS_ICONS[s]!;
         return html`<span class="${
             'badge '
             + cfg.className
             + ' text-xs'
-        }" data-status="${
-            this.#status
-        }" style="${
+        }" data-status="${s}" style="${
             'cursor:pointer;'
             + 'min-width:6rem;'
             + 'justify-content:center'
@@ -136,7 +82,7 @@ export class ProjectPresenter {
         showGrip: boolean,
     ): SafeHtml {
         const statusIcon = STATUS_ICONS[
-            this.#status
+            this.#project.statusValue()
         ]!;
         const metricBoxStyle =
             'width:2rem;height:2rem;'
@@ -149,8 +95,12 @@ export class ProjectPresenter {
         return html`
     <div class="card card-hover"
         style="padding:1.25rem"
-        data-project-card="${this.#id}"
-        data-position="${this.#position}">
+        data-project-card="${
+            this.#project.idForLink()
+        }"
+        data-position="${
+            this.#project.positionSortKey()
+        }">
         <div class="${
             'flex items-center gap-4'
         }">
@@ -173,12 +123,13 @@ export class ProjectPresenter {
                     + 'text-overflow'
                     + ':ellipsis'
                 }">${
-                    this.#title
+                    this.#project
+                        .titleText()
                 }</h3>
                 <span class="${
                     'badge '
-                    + this
-                        .#statusClassName
+                    + this.#project
+                        .statusClassName()
                     + ' text-xs'
                 }" style="${
                     'justify-content:'
@@ -191,8 +142,8 @@ export class ProjectPresenter {
                         14, '',
                     )
                 } ${
-                    this
-                        .#statusLabel
+                    this.#project
+                        .statusLabel()
                 }</span>
             </div>
             ${this.#buildMetrics(
@@ -204,7 +155,7 @@ export class ProjectPresenter {
     }
 
     #buildProgressRing(): SafeHtml {
-        const percent = this.#progress;
+        const percent = this.#project.timelineProgress();
         const radius = 20;
         const center = 24;
         const circumference =
@@ -255,12 +206,32 @@ export class ProjectPresenter {
     #buildMetrics(
         boxStyle: string,
     ): SafeHtml {
-        const tb = this.#timeBaselineDays;
-        const tc = this.#timeCurrentDays;
-        const cb = this.#costBaselineK;
-        const cc = this.#costCurrentK;
-        const ib = this.#impactBaseline;
-        const ic = this.#impactCurrent;
+        const p = this.#project;
+        const s = new Date(
+            p.startDateValue(),
+        ).getTime();
+        const e = new Date(
+            p.targetEndDateValue(),
+        ).getTime();
+        const tb = isNaN(s) || isNaN(e)
+            ? 0
+            : Math.max(0, Math.ceil(
+                (e - s) / MS_PER_DAY,
+            ));
+        const tc = isNaN(s)
+            ? 0
+            : Math.max(0, Math.floor(
+                (Date.now() - s)
+                / MS_PER_DAY,
+            ));
+        const cb = p.estimatedCostAmount()
+            / COST_DIVISOR;
+        const cc = p.actualCostAmount()
+            / COST_DIVISOR;
+        const ib =
+            p.estimatedImpactScore();
+        const ic =
+            p.actualImpactScore();
         const m = 'text-xs text-muted';
         return html`
     <div class="${
@@ -335,8 +306,12 @@ export class ProjectPresenter {
 export class ProjectListPresenter {
     #projects: ProjectPresenter[];
     readonly #statusBadges: SafeHtml;
-    #filterStatus: ProjectStatus | null =
-        null;
+    #filter:
+        | { kind: 'all' }
+        | {
+            kind: 'filtered';
+            status: ProjectStatus;
+        } = { kind: 'all' };
 
     constructor(projects: Project[]) {
         this.#projects = projects.map(
@@ -377,26 +352,35 @@ export class ProjectListPresenter {
     }
 
     toggleFilter(
-        status: ProjectStatus | null,
+        status: ProjectStatus,
     ): void {
-        this.#filterStatus =
-            this.#filterStatus === status
-                ? null
-                : status;
+        this.#filter =
+            this.#filter.kind
+                === 'filtered'
+            && this.#filter.status
+                === status
+                ? { kind: 'all' }
+                : {
+                    kind: 'filtered',
+                    status,
+                };
     }
 
     activeFilter():
         ProjectStatus | null {
-        return this.#filterStatus;
+        return this.#filter.kind
+            === 'filtered'
+            ? this.#filter.status
+            : null;
     }
 
     renderList(): SafeHtml {
+        const f = this.#filter;
         const filtered =
-            this.#filterStatus
+            f.kind === 'filtered'
                 ? this.#projects.filter(
                     p => p.statusGroup()
-                        === this
-                            .#filterStatus,
+                        === f.status,
                 )
                 : this.#projects;
         const sorted =
@@ -406,7 +390,7 @@ export class ProjectListPresenter {
                     - b.positionSortKey(),
             );
         const hasGrip =
-            !this.#filterStatus;
+            f.kind === 'all';
         return html`${sorted.map(
             p => p.buildCard(
                 'position', hasGrip,

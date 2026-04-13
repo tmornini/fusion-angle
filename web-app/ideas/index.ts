@@ -21,6 +21,7 @@ import {
 import {
     getIdeas,
     putIdea,
+    ideaChanged,
     type IdeaStatus,
     isIdeaStatus,
 } from '../app/adapters';
@@ -205,6 +206,13 @@ export async function init(): Promise<void> {
 
     renderList();
 
+    ideaChanged.subscribe(async () => {
+        const updated =
+            await getIdeas();
+        presenter.update(updated);
+        renderList();
+    });
+
     initDragReorder(
         listContainer,
         '[data-idea-card]',
@@ -214,10 +222,6 @@ export async function init(): Promise<void> {
                 id,
                 { position: newPosition },
             );
-            const updated =
-                await getIdeas();
-            presenter.update(updated);
-            renderList();
         },
     );
 }

@@ -38,7 +38,7 @@ export function mutateThemeToggleIcon(
     });
 }
 
-function initDropdown(
+export function initDropdown(
     toggleId: string,
     contentId: string,
 ): void {

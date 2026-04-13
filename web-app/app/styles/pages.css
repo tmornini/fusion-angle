@@ -915,6 +915,46 @@
   border-color: transparent;
 }
 
+.wf-toolbar-toggle.wf-toolbar-toggle-on {
+  background-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border-color: hsl(var(--primary));
+}
+.wf-toolbar-toggle.wf-toolbar-toggle-on:hover {
+  background-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border-color: hsl(var(--primary));
+}
+
+svg.wf-canvas.wf-pan-cursor,
+svg.wf-canvas.wf-pan-cursor *,
+svg.wf-canvas.wf-pan-cursor [data-node-id],
+svg.wf-canvas.wf-pan-cursor [data-edge-id],
+svg.wf-canvas.wf-pan-cursor [data-connect-port] {
+  cursor: grab;
+}
+svg.wf-canvas.wf-pan-cursor:active,
+svg.wf-canvas.wf-pan-cursor:active *,
+svg.wf-canvas.wf-pan-cursor:active [data-node-id],
+svg.wf-canvas.wf-pan-cursor:active [data-edge-id],
+svg.wf-canvas.wf-pan-cursor:active [data-connect-port] {
+  cursor: grabbing;
+}
+
+svg.wf-canvas.wf-pan-cursor {
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: -2px;
+}
+
+.wf-marquee {
+  fill: hsl(var(--primary) / 0.12);
+  stroke: hsl(var(--primary));
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
 .wf-btn-stack {
   display: inline-flex;
   flex-direction: column;
@@ -938,17 +978,18 @@
   border: 1px solid hsl(var(--border));
   border-radius: var(--radius-lg);
   overflow: hidden;
-  cursor: grab;
+  cursor: cell;
 }
 
 .wf-canvas-wrap:active {
-  cursor: grabbing;
+  cursor: cell;
 }
 
 svg.wf-canvas {
   width: 100%;
   height: 100%;
   display: block;
+  user-select: none;
 }
 
 .wf-props-panel {
@@ -990,10 +1031,15 @@ svg.wf-canvas [data-node-id] {
   transition:
       opacity var(--duration-fast)
       var(--ease-default);
+  cursor: pointer;
 }
 
 svg.wf-canvas [data-node-id]:hover {
   opacity: 0.85;
+}
+
+svg.wf-canvas [data-connect-port] {
+  cursor: crosshair;
 }
 
 svg.wf-canvas.wf-connecting {
@@ -1014,5 +1060,59 @@ svg.wf-canvas [data-edge-id] {
   .wf-toolbar { gap: 0.5rem; }
   .wf-toolbar-spacer { display: none; }
   .wf-props-panel { max-height: none; }
+}
+
+/* ==========================================
+   40. DASHBOARD GAUGES
+   ========================================== */
+
+#gauge-container .card {
+  padding: 1rem 1.5rem 1.5rem;
+}
+
+.gauge-arc-container {
+  display: flex;
+  justify-content: center;
+  margin-top: -3.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.gauge-arc-outer,
+.gauge-arc-inner {
+  animation: gauge-draw 2s ease-out;
+}
+
+.gauge-arc-inner.overrun {
+  animation:
+    gauge-draw 2s ease-out,
+    gauge-flash var(--flash-speed, 0.5s)
+      infinite;
+}
+
+@keyframes gauge-draw {
+  from {
+    stroke-dashoffset: var(--dash-full);
+  }
+}
+
+/* ==========================================
+   41. WORKBOX
+   ========================================== */
+
+.wo-history-fields {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.25rem 0.75rem;
+  font-size: 0.8125rem;
+}
+
+/* ==========================================
+   42. ONBOARDING
+   ========================================== */
+
+.welcome-icon-box {
+  width: 4rem;
+  height: 4rem;
+  box-shadow: var(--shadow-lg);
 }
 

@@ -56,15 +56,9 @@ function mutateList(
             member
                 ? member.buildMemberDetail()
                 : html`
-            <div
-                style="padding:1.5rem;
-                       text-align:center"
-            >
+            <div class="p-6 text-center">
                 ${iconUsers(48, 'text-muted')}
-                <p
-                    class="text-muted"
-                    style="margin-top:1rem"
-                >
+                <p class="text-muted mt-4">
                     ${'Select a team member'
                         + ' to view details'}
                 </p>
@@ -197,10 +191,7 @@ export async function init(): Promise<void> {
     if (placeholderEl) {
         setHtml(placeholderEl, html`
             ${iconUsers(48, 'text-muted')}
-            <p
-                class="text-muted"
-                style="margin-top:1rem"
-            >
+            <p class="text-muted mt-4">
                 ${'Select a team member'
                     + ' to view details'}
             </p>`);

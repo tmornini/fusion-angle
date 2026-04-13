@@ -51,16 +51,14 @@ const COMPONENTS = [
 function compose(): void {
     const appDir = join(ROOT, 'app');
 
-    const missing: string[] = [];
     const allPages = [
             ...sidebarPages,
             ...standalonePages,
     ];
-    for (const { name, sourceDir, sourceFile } of allPages) {
-        const file = sourceFile;
-        const path = join(ROOT, sourceDir, `${file}.html`);
-        if (!existsSync(path)) missing.push(name);
-    }
+    const missing = allPages
+        .filter(({ sourceDir, sourceFile }) =>
+            !existsSync(join(ROOT, sourceDir, `${sourceFile}.html`)))
+        .map(({ name }) => name);
     if (missing.length > 0) {
         const count = missing.length;
         const list = missing.join('\n  ');
@@ -79,13 +77,11 @@ function compose(): void {
         layout = layout.replace(placeholder, content);
     }
 
-    let composed = 0;
     for (const { name, title, sourceDir, sourceFile } of sidebarPages) {
-        const file = sourceFile;
-        const pageHtmlPath = join(ROOT, sourceDir, `${file}.html`);
+        const pageHtmlPath = join(ROOT, sourceDir, `${sourceFile}.html`);
         const pageContent = readFileSync(pageHtmlPath, 'utf-8');
 
-        let html = layout
+        const html = layout
             .replace('{{PAGE_NAME}}', name)
             .replace('{{PAGE_TITLE}}', title)
             .replace('<!-- PAGE_CONTENT -->', pageContent);
@@ -93,26 +89,22 @@ function compose(): void {
         const outDir = join(OUT, sourceDir);
         if (!existsSync(outDir)) mkdirSync(outDir, { recursive: true });
 
-        const outPath = join(outDir, `${file}.html`);
+        const outPath = join(outDir, `${sourceFile}.html`);
         writeFileSync(outPath, html, 'utf-8');
-        composed++;
     }
 
-    console.log(`Composed ${composed} sidebar pages.`);
+    console.log(`Composed ${sidebarPages.length} sidebar pages.`);
 
-    let copied = 0;
-    for (const { name, sourceDir, sourceFile } of standalonePages) {
-        const file = sourceFile;
-        const srcPath = join(ROOT, sourceDir, `${file}.html`);
+    for (const { sourceDir, sourceFile } of standalonePages) {
+        const srcPath = join(ROOT, sourceDir, `${sourceFile}.html`);
 
         const outDir = join(OUT, sourceDir);
         if (!existsSync(outDir)) mkdirSync(outDir, { recursive: true });
 
-        copyFileSync(srcPath, join(outDir, `${file}.html`));
-        copied++;
+        copyFileSync(srcPath, join(outDir, `${sourceFile}.html`));
     }
 
-    console.log(`Copied ${copied} standalone pages.`);
+    console.log(`Copied ${standalonePages.length} standalone pages.`);
 }
 
 compose();

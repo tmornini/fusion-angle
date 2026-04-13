@@ -18,6 +18,7 @@ import {
     getProjectById, putProject,
     getFlowsByProject,
     postFlowCreation,
+    projectChanged,
     ProjectView,
     isProjectStatus,
     COST_DIVISOR,
@@ -125,7 +126,7 @@ function bindProjectEvents(
         const status: ProjectStatus =
                 isProjectStatus(statusValue)
                         ? statusValue
-                        : project.status;
+                        : project.statusValue();
         const startDate =
                 $input(
                     '#project-edit-start-date',
@@ -150,7 +151,7 @@ function bindProjectEvents(
         );
         try {
             await putProject(
-                project.id,
+                project.idForLink(),
                 trimStrings({
                     title,
                     description,
@@ -180,24 +181,31 @@ function bindProjectEvents(
         showToast(
             'Project saved', 'success',
         );
-        const [updated, updatedWfs] =
-            await Promise.all([
-                getProjectById(project.id),
-                getFlowsByProject(
-                    project.id,
-                ),
-            ]);
-        mutateProjectPage(
-            updated, updatedWfs, false,
-        );
     });
+
+    projectChanged.subscribe(
+        async () => {
+            const [upd, updWfs] =
+                await Promise.all([
+                    getProjectById(
+                        project.idForLink(),
+                    ),
+                    getFlowsByProject(
+                        project.idForLink(),
+                    ),
+                ]);
+            mutateProjectPage(
+                upd, updWfs, false,
+            );
+        },
+    );
 
     $('#new-flow-btn', document)
         ?.addEventListener(
             'click',
             () => openDialog('new-flow'),
         );
-    bindNewFlowDialog(project.id);
+    bindNewFlowDialog(project.idForLink());
 
     $$('[data-flow-id]', document)
         .forEach(el => {
@@ -215,7 +223,7 @@ function bindProjectEvents(
                         {
                             flowId: wfId,
                             projectId:
-                                project.id,
+                                project.idForLink(),
                         },
                     );
                 },
@@ -328,7 +336,7 @@ function mutateProjectPage(
     setHtml(
         container,
         presenter.buildDetailView(
-            project.id, flows, isEditing,
+            project.idForLink(), flows, isEditing,
         ),
     );
     bindProjectEvents(

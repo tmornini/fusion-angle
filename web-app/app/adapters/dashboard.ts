@@ -8,7 +8,7 @@ import {
     ideaIsVisible,
     projectIsApproved,
     projectIsNotDeleted,
-    SECONDS_PER_DAY,
+    MS_PER_DAY,
 } from '../../../api/types';
 import {
     formatCompactCurrency,
@@ -19,24 +19,98 @@ export type GaugeIcon =
     | 'dollarSign'
     | 'zap';
 
-export interface GaugeCard {
-    title: string;
-    icon: GaugeIcon;
-    iconCssClass: string;
-    theme: 'blue' | 'green' | 'amber';
-    outer: {
-        value: number;
-        max: number;
-        label: string;
-        display: string;
-    };
-    inner: {
-        value: number;
-        max: number;
-        label: string;
-        display: string;
-    };
-    hasOverrunWarning: boolean;
+export type GaugeTheme =
+    | 'blue'
+    | 'green'
+    | 'amber';
+
+export interface GaugeReceiver {
+    title(text: string): void;
+    theme(name: GaugeTheme): void;
+    icon(
+        name: GaugeIcon,
+        cssClass: string,
+    ): void;
+    outerArc(
+        value: number,
+        max: number,
+        label: string,
+        display: string,
+    ): void;
+    innerArc(
+        value: number,
+        max: number,
+        label: string,
+        display: string,
+    ): void;
+    overrunWarning(
+        enabled: boolean,
+    ): void;
+}
+
+interface ArcData {
+    readonly value: number;
+    readonly max: number;
+    readonly label: string;
+    readonly display: string;
+}
+
+interface GaugeCardInit {
+    readonly title: string;
+    readonly icon: GaugeIcon;
+    readonly iconCssClass: string;
+    readonly theme: GaugeTheme;
+    readonly outer: ArcData;
+    readonly inner: ArcData;
+    readonly hasOverrunWarning: boolean;
+}
+
+export class GaugeCard {
+    readonly #title: string;
+    readonly #icon: GaugeIcon;
+    readonly #iconCssClass: string;
+    readonly #theme: GaugeTheme;
+    readonly #outer: ArcData;
+    readonly #inner: ArcData;
+    readonly #hasOverrunWarning: boolean;
+
+    constructor(init: GaugeCardInit) {
+        this.#title = init.title;
+        this.#icon = init.icon;
+        this.#iconCssClass =
+            init.iconCssClass;
+        this.#theme = init.theme;
+        this.#outer = init.outer;
+        this.#inner = init.inner;
+        this.#hasOverrunWarning =
+            init.hasOverrunWarning;
+    }
+
+    presentGaugeInto(
+        r: GaugeReceiver,
+    ): void {
+        r.title(this.#title);
+        r.theme(this.#theme);
+        r.icon(
+            this.#icon,
+            this.#iconCssClass,
+        );
+        r.outerArc(
+            this.#outer.value,
+            this.#outer.max,
+            this.#outer.label,
+            this.#outer.display,
+        );
+        r.innerArc(
+            this.#inner.value,
+            this.#inner.max,
+            this.#inner.label,
+            this.#inner.display,
+        );
+        r.overrunWarning(
+            this.#hasOverrunWarning,
+        );
+    }
 }
 
 export async function getDashboardGauges(
@@ -49,8 +123,7 @@ export async function getDashboardGauges(
         projectIsApproved,
     );
 
-    const msPerDay =
-        SECONDS_PER_DAY * 1000;
+    const msPerDay = MS_PER_DAY;
     const now = Date.now();
     let sumBaselineDays = 0;
     let sumCurrentDays = 0;
@@ -113,7 +186,7 @@ export async function getDashboardGauges(
     );
 
     return [
-        {
+        new GaugeCard({
             title: 'Time',
             icon: 'clock',
             iconCssClass: 'text-success',
@@ -133,8 +206,8 @@ export async function getDashboardGauges(
                     `${sumCurrentDays}d`,
             },
             hasOverrunWarning: true,
-        },
-        {
+        }),
+        new GaugeCard({
             title: 'Cost',
             icon: 'dollarSign',
             iconCssClass: 'text-primary',
@@ -158,8 +231,8 @@ export async function getDashboardGauges(
                     ),
             },
             hasOverrunWarning: true,
-        },
-        {
+        }),
+        new GaugeCard({
             title: 'Impact',
             icon: 'zap',
             iconCssClass: 'text-warning',
@@ -181,7 +254,7 @@ export async function getDashboardGauges(
                     + ` pts`,
             },
             hasOverrunWarning: false,
-        },
+        }),
     ];
 }
 

@@ -16,12 +16,15 @@ type ActivityType =
     | 'status_changed'
     | 'idea_converted';
 
+type IconTone =
+    'primary' | 'success' | 'warning' | 'info';
+
 type IconEntry = {
     icon: (
         size: number,
         cssClass: string,
     ) => SafeHtml;
-    bg: string;
+    tone: IconTone;
 };
 
 const ICON_MAP: Record<
@@ -30,59 +33,31 @@ const ICON_MAP: Record<
 > = {
     idea_created: {
         icon: iconLightbulb,
-        bg: 'background:'
-            + 'hsl(var(--warning-soft));'
-            + 'color:'
-            + 'hsl(var(--warning-text))',
+        tone: 'warning',
     },
     project_created: {
         icon: iconFolderKanban,
-        bg: 'background:'
-            + 'hsl(var(--primary) / 0.1);'
-            + 'color:'
-            + 'hsl(var(--primary))',
+        tone: 'primary',
     },
     user_joined: {
         icon: iconUserPlus,
-        bg: 'background:'
-            + 'hsl(var(--info-soft));'
-            + 'color:'
-            + 'hsl(var(--info-text))',
+        tone: 'info',
     },
     status_changed: {
         icon: iconEdit,
-        bg: 'background:'
-            + 'hsl(var(--warning-soft));'
-            + 'color:'
-            + 'hsl(var(--warning-text))',
+        tone: 'warning',
     },
     idea_converted: {
         icon: iconArrowRight,
-        bg: 'background:'
-            + 'hsl(var(--success-soft));'
-            + 'color:'
-            + 'hsl(var(--success-text))',
+        tone: 'success',
     },
 };
 
 export class ActivityPresenter {
-    readonly #type: string;
-    readonly #action: string;
-    readonly #target: string;
-    readonly #timestamp: string;
-    readonly #status: string;
-    readonly #comment: string;
-    readonly #actor: string;
+    readonly #activity: Activity;
 
     constructor(activity: Activity) {
-        this.#type = activity.type;
-        this.#action = activity.action;
-        this.#target = activity.target;
-        this.#timestamp =
-            activity.timestamp;
-        this.#status = activity.status;
-        this.#comment = activity.comment;
-        this.#actor = activity.actor;
+        this.#activity = activity;
     }
 
     matchesFilter(
@@ -92,67 +67,69 @@ export class ActivityPresenter {
             | undefined,
     ): boolean {
         if (query
-            && !this.#actor
-                .toLowerCase()
-                .includes(query)
-            && !this.#target
-                .toLowerCase()
-                .includes(query))
+            && !this.#activity
+                .matchesActor(query)
+            && !this.#activity
+                .matchesTarget(query))
             return false;
         if (types
-            && !types.includes(
-                this.#type,
+            && !types.some(
+                t => this.#activity
+                    .hasType(t),
             ))
             return false;
         return true;
     }
 
     buildActivity(): SafeHtml {
-        const meta = this.#status
+        const meta =
+            this.#activity.hasStatus()
                 ? html`<div
                     class="${
                         'badge badge-default'
                         + ' text-xs mt-1'
                     }">${
-                    this.#status
+                    this.#activity
+                        .statusText()
                 }</div>`
-                : this.#comment
+                : this.#activity
+                    .hasComment()
                     ? html`<p
                         class="${
                             'text-sm'
                             + ' text-muted'
-                            + ' mt-1'
-                        }"
-                        style="${
-                            'font-style'
-                            + ':italic'
+                            + ' mt-1 italic'
                         }"
                         >"${
-                        this.#comment
+                        this.#activity
+                            .commentText()
                     }"</p>`
                     : html``;
         return html`
     <div class="flex items-start gap-4
         p-4 rounded-lg activity-row">
         ${this.#buildIcon()}
-        <div style="flex:1;min-width:0">
+        <div class="flex-fill">
             <p class="text-sm">
                 <span class="${
                     'font-medium'
                 }">${
                     displayText(
-                        this.#actor,
+                        this.#activity
+                            .actorName(),
                     )
                 }</span>
                 <span class="${
                     'text-muted'
                 }"> ${
-                    this.#action
+                    this.#activity
+                        .actionText()
                 } </span>
                 <span class="${
                     'font-medium'
                 }">${
-                    this.#target
+                    this.#activity
+                        .targetText()
                 }</span>
             </p>
             ${meta}
@@ -160,7 +137,8 @@ export class ActivityPresenter {
                 'text-xs text-muted mt-1'
             }">${
                 formatDate(
-                    this.#timestamp,
+                    this.#activity
+                        .timestampValue(),
                 )
             }</p>
         </div>
@@ -168,22 +146,13 @@ export class ActivityPresenter {
     }
 
     #buildIcon(): SafeHtml {
-        const actType =
-            this.#type as ActivityType;
+        const actType = this.#activity
+            .typeValue() as ActivityType;
         const entry =
             ICON_MAP[actType]
             ?? ICON_MAP.idea_created;
-        return html`<div style="${
-            'width:2.5rem;'
-            + 'height:2.5rem;'
-            + 'border-radius:'
-            + 'var(--radius-lg);'
-            + 'display:flex;'
-            + 'align-items:center;'
-            + 'justify-content:center;'
-            + 'flex-shrink:0;'
-            + entry.bg
-        }">${
+        return html`<div class="icon-box"
+            data-tone="${entry.tone}">${
             entry.icon(20, '')
         }</div>`;
     }

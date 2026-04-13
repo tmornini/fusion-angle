@@ -14,6 +14,7 @@ import type {
     ProjectEntity,
     GraphNode,
     GraphEdge,
+    GraphField,
     WfFieldType,
 } from '../../../api/types';
 import { parseJson } from './helpers';
@@ -27,10 +28,14 @@ import {
 import { parseMermaid } from '../mermaid-parse';
 import type {
     ParsedNode,
+    ParsedEdge,
 } from '../mermaid-parse';
 import {
     buildZip, getZipEntries,
 } from '../zip';
+import {
+    buildDefaultStartEnd,
+} from './flow-mutations';
 import {
     computeLayout,
 } from '../flow-layout';
@@ -300,6 +305,7 @@ export async function getFlowZip(
         isLocked: toBool(
             flow.is_locked,
         ),
+        lockTimeout: flow.lock_timeout,
         nodes: graph.nodes,
         edges: graph.edges,
     };
@@ -400,7 +406,7 @@ export async function getFlowBackupResolution(
     };
 }
 
-export async function overwriteFlow(
+export async function putFlowFromBackup(
     backup: BackupV2,
 ): Promise<string> {
     await PUT(
@@ -520,28 +526,160 @@ const IMPORT_CANVAS_H = 800;
 const IMPORT_DEFAULT_DESCRIPTION = '';
 const IMPORT_FALLBACK_POSITION = 0;
 
-function layoutParsedNodes(
-    nodes: ParsedNode[],
-    edges: {
-        fromId: string;
-        toId: string;
-    }[],
+interface IntermediateParsed {
+    parsed: ParsedNode;
+    newId: string;
+}
+
+interface RemappedGraph {
+    intermediates: IntermediateParsed[];
+    idMap: Map<string, string>;
+}
+
+function remapParsedToDefaults(
+    parsed: ParsedNode[],
+    startId: string,
+    completeId: string,
+): RemappedGraph {
+    const idMap = new Map<string, string>();
+    const intermediates: IntermediateParsed[] =
+        [];
+    for (const n of parsed) {
+        if (n.isStart) {
+            idMap.set(n.mermaidId, startId);
+            continue;
+        }
+        if (n.isComplete) {
+            idMap.set(
+                n.mermaidId, completeId,
+            );
+            continue;
+        }
+        const newId = crypto.randomUUID();
+        idMap.set(n.mermaidId, newId);
+        intermediates.push({
+            parsed: n, newId,
+        });
+    }
+    return { intermediates, idMap };
+}
+
+function layoutImportedGraph(
+    startId: string,
+    completeId: string,
+    intermediates: IntermediateParsed[],
+    edges: GraphEdge[],
 ): Map<string, { x: number; y: number }> {
-    const inputs: LayoutInput[] =
-        nodes.map(n => ({
-            id: n.mermaidId,
-            isStart: n.isStart,
-            isComplete: n.isComplete,
-        }));
+    const inputs: LayoutInput[] = [
+        {
+            id: startId,
+            isStart: true,
+            isComplete: false,
+        },
+        ...intermediates.map(
+            ({ newId }) => ({
+                id: newId,
+                isStart: false,
+                isComplete: false,
+            }),
+        ),
+        {
+            id: completeId,
+            isStart: false,
+            isComplete: true,
+        },
+    ];
     const layoutEdges: LayoutEdge[] =
         edges.map(e => ({
-            fromId: e.fromId,
-            toId: e.toId,
+            fromId: e.fromNodeId,
+            toId: e.toNodeId,
         }));
     return computeLayout(
         inputs, layoutEdges,
         IMPORT_CANVAS_W, IMPORT_CANVAS_H,
     );
+}
+
+function buildImportedEdges(
+    parsedEdges: ParsedEdge[],
+    idMap: Map<string, string>,
+    sidecarEdgeMap?: Map<
+        string, SidecarEdge
+    >,
+): GraphEdge[] {
+    const edges: GraphEdge[] = [];
+    const seen = new Set<string>();
+    for (const e of parsedEdges) {
+        const fromId = idMap.get(e.fromId);
+        const toId = idMap.get(e.toId);
+        if (!fromId || !toId) continue;
+        if (fromId === toId) continue;
+        const key =
+            fromId + '->'
+            + toId + ':' + e.name;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const sc = sidecarEdgeMap?.get(
+            e.fromId + '->' + e.toId,
+        );
+        edges.push({
+            id: crypto.randomUUID(),
+            name: e.name,
+            description:
+                sc?.description
+                ?? IMPORT_DEFAULT_DESCRIPTION,
+            fromNodeId: fromId,
+            toNodeId: toId,
+        });
+    }
+    return edges;
+}
+
+function autoWireDefaults(
+    startId: string,
+    completeId: string,
+    intermediateIds: string[],
+    edges: GraphEdge[],
+    wireStart: boolean,
+    wireEnd: boolean,
+): GraphEdge[] {
+    if (!wireStart && !wireEnd) return edges;
+    const incoming = new Set(
+        edges.map(e => e.toNodeId),
+    );
+    const outgoing = new Set(
+        edges.map(e => e.fromNodeId),
+    );
+    const extras: GraphEdge[] = [];
+    if (wireStart) {
+        for (const id of intermediateIds) {
+            if (!incoming.has(id)) {
+                extras.push({
+                    id: crypto.randomUUID(),
+                    name: '',
+                    description:
+                        IMPORT_DEFAULT_DESCRIPTION,
+                    fromNodeId: startId,
+                    toNodeId: id,
+                });
+            }
+        }
+    }
+    if (wireEnd) {
+        for (const id of intermediateIds) {
+            if (!outgoing.has(id)) {
+                extras.push({
+                    id: crypto.randomUUID(),
+                    name: '',
+                    description:
+                        IMPORT_DEFAULT_DESCRIPTION,
+                    fromNodeId: id,
+                    toNodeId: completeId,
+                });
+            }
+        }
+    }
+    return [...edges, ...extras];
 }
 
 interface StoredGraph {
@@ -567,74 +705,102 @@ export async function postFlowFromMermaid(
     warnings: string[];
 }> {
     const parsed = parseMermaid(text);
-    if (parsed.nodes.length === 0) {
+    if (
+        parsed.nodes.length === 0
+        && parsed.edges.length === 0
+    ) {
         throw new Error(
-            'No nodes found in Mermaid text',
+            'No nodes or transitions found',
         );
     }
 
     const flowId = crypto.randomUUID();
     const now = nowUtc();
-    const positions = layoutParsedNodes(
-        parsed.nodes, parsed.edges,
+    const { start, complete } =
+        buildDefaultStartEnd();
+
+    const { intermediates, idMap } =
+        remapParsedToDefaults(
+            parsed.nodes,
+            start.id,
+            complete.id,
+        );
+
+    const hasExplicitStart =
+        parsed.nodes.some(n => n.isStart);
+    const hasExplicitComplete =
+        parsed.nodes.some(n => n.isComplete);
+
+    const intermediateIds = intermediates
+        .map(({ newId }) => newId);
+    const rewiredEdges = buildImportedEdges(
+        parsed.edges, idMap,
+    );
+    const edges = autoWireDefaults(
+        start.id,
+        complete.id,
+        intermediateIds,
+        rewiredEdges,
+        !hasExplicitStart,
+        !hasExplicitComplete,
     );
 
-    const idMap =
-        new Map<string, string>();
-    for (const n of parsed.nodes) {
-        idMap.set(
-            n.mermaidId,
-            crypto.randomUUID(),
+    const positions = layoutImportedGraph(
+        start.id,
+        complete.id,
+        intermediates,
+        edges,
+    );
+
+    const startPos = positions.get(start.id);
+    if (startPos) {
+        start.positionX = startPos.x;
+        start.positionY = startPos.y;
+    }
+    const completePos =
+        positions.get(complete.id);
+    if (completePos) {
+        complete.positionX = completePos.x;
+        complete.positionY = completePos.y;
+    }
+
+    const intermediateNodes: GraphNode[] =
+        intermediates.map(
+            ({ parsed: p, newId }) => {
+                const pos = positions.get(
+                    newId,
+                );
+                return {
+                    id: newId,
+                    name: p.name,
+                    description:
+                        IMPORT_DEFAULT_DESCRIPTION,
+                    positionX: pos?.x
+                        ?? IMPORT_FALLBACK_POSITION,
+                    positionY: pos?.y
+                        ?? IMPORT_FALLBACK_POSITION,
+                    isStart: false,
+                    isComplete: false,
+                    fields: [],
+                };
+            },
         );
-    }
-
-    const nodes: GraphNode[] =
-        parsed.nodes.map(n => {
-            const nodeId = idMap.get(
-                n.mermaidId,
-            )!;
-            const pos = positions.get(
-                n.mermaidId,
-            );
-            return {
-                id: nodeId,
-                name: n.name,
-                description:
-                    IMPORT_DEFAULT_DESCRIPTION,
-                positionX: pos?.x
-                    ?? IMPORT_FALLBACK_POSITION,
-                positionY: pos?.y
-                    ?? IMPORT_FALLBACK_POSITION,
-                isStart: n.isStart,
-                isComplete: n.isComplete,
-                fields: [],
-            };
-        });
-
-    const edges: GraphEdge[] = [];
-    for (const e of parsed.edges) {
-        const fromId =
-            idMap.get(e.fromId);
-        const toId = idMap.get(e.toId);
-        if (!fromId || !toId) continue;
-        edges.push({
-            id: crypto.randomUUID(),
-            name: e.name,
-            description:
-                IMPORT_DEFAULT_DESCRIPTION,
-            fromNodeId: fromId,
-            toNodeId: toId,
-        });
-    }
 
     const graph: StoredGraph = {
-        nodes, edges,
+        nodes: [
+            start,
+            ...intermediateNodes,
+            complete,
+        ],
+        edges,
     };
 
+    const firstName =
+        intermediateNodes[0]?.name
+        ?? 'Imported flow';
     await POST<void>('flows', {
         id: flowId,
-        name: parsed.nodes[0]!.name
-            + ' (import)',
+        name: firstName + ' (import)',
         description: '',
         lock_timeout: DEFAULT_LOCK_TIMEOUT,
         graph: putFlowGraph(graph),
@@ -661,6 +827,32 @@ interface SidecarData {
     description: string;
     nodes: SidecarNode[];
     edges: SidecarEdge[];
+}
+
+function sidecarFieldsToGraph(
+    sc: SidecarNode,
+): GraphField[] {
+    return sc.fields.map(f => ({
+        id: crypto.randomUUID(),
+        name: f.name,
+        fieldType:
+            f.fieldType as WfFieldType,
+        sortOrder: f.sortOrder,
+        isRequired: f.isRequired,
+        options: f.options,
+    }));
+}
+
+function applySidecarToDefault(
+    node: GraphNode,
+    sc: SidecarNode | undefined,
+): void {
+    if (!sc) return;
+    node.name = sc.name;
+    node.description = sc.description;
+    node.positionX = sc.positionX;
+    node.positionY = sc.positionY;
+    node.fields = sidecarFieldsToGraph(sc);
 }
 
 export async function postFlowFromZip(
@@ -694,9 +886,12 @@ export async function postFlowFromZip(
     const mmdText =
         dec.decode(mmdEntry.data);
     const parsed = parseMermaid(mmdText);
-    if (parsed.nodes.length === 0) {
+    if (
+        parsed.nodes.length === 0
+        && parsed.edges.length === 0
+    ) {
         throw new Error(
-            'No nodes found in flow.mmd',
+            'No nodes or transitions found',
         );
     }
 
@@ -739,103 +934,128 @@ export async function postFlowFromZip(
         }
     }
 
-    const positions = layoutParsedNodes(
-        parsed.nodes, parsed.edges,
+    const { start, complete } =
+        buildDefaultStartEnd();
+
+    const { intermediates, idMap } =
+        remapParsedToDefaults(
+            parsed.nodes,
+            start.id,
+            complete.id,
+        );
+
+    const sidecarStart = sidecar?.nodes.find(
+        n => n.isStart,
     );
+    const sidecarComplete =
+        sidecar?.nodes.find(
+            n => n.isComplete,
+        );
+    applySidecarToDefault(
+        start, sidecarStart,
+    );
+    applySidecarToDefault(
+        complete, sidecarComplete,
+    );
+
+    const hasExplicitStart =
+        parsed.nodes.some(n => n.isStart);
+    const hasExplicitComplete =
+        parsed.nodes.some(n => n.isComplete);
+
+    const intermediateIds = intermediates
+        .map(({ newId }) => newId);
+    const rewiredEdges = buildImportedEdges(
+        parsed.edges,
+        idMap,
+        sidecarEdgeMap,
+    );
+    const edges = autoWireDefaults(
+        start.id,
+        complete.id,
+        intermediateIds,
+        rewiredEdges,
+        !hasExplicitStart,
+        !hasExplicitComplete,
+    );
+
+    const positions = sidecar
+        ? new Map<
+            string, { x: number; y: number }
+        >()
+        : layoutImportedGraph(
+            start.id,
+            complete.id,
+            intermediates,
+            edges,
+        );
+
+    if (!sidecar) {
+        const sp = positions.get(start.id);
+        if (sp) {
+            start.positionX = sp.x;
+            start.positionY = sp.y;
+        }
+        const cp = positions.get(
+            complete.id,
+        );
+        if (cp) {
+            complete.positionX = cp.x;
+            complete.positionY = cp.y;
+        }
+    }
+
+    const intermediateNodes: GraphNode[] =
+        intermediates.map(
+            ({ parsed: p, newId }) => {
+                const sc = sidecarNodeMap.get(
+                    p.mermaidId,
+                );
+                const pos = sc
+                    ? {
+                        x: sc.positionX,
+                        y: sc.positionY,
+                    }
+                    : positions.get(newId);
+                return {
+                    id: newId,
+                    name: sc?.name ?? p.name,
+                    description:
+                        sc?.description
+                        ?? IMPORT_DEFAULT_DESCRIPTION,
+                    positionX: pos?.x
+                        ?? IMPORT_FALLBACK_POSITION,
+                    positionY: pos?.y
+                        ?? IMPORT_FALLBACK_POSITION,
+                    isStart: false,
+                    isComplete: false,
+                    fields: sc
+                        ? sidecarFieldsToGraph(
+                            sc,
+                        )
+                        : [],
+                };
+            },
+        );
+
+    const graph: StoredGraph = {
+        nodes: [
+            start,
+            ...intermediateNodes,
+            complete,
+        ],
+        edges,
+    };
 
     const flowId = crypto.randomUUID();
     const now = nowUtc();
     const flowName = sidecar?.name
-        ?? parsed.nodes[0]!.name
+        ?? (intermediateNodes[0]?.name
+            ?? 'Imported flow')
             + ' (import)';
     const flowDesc =
         sidecar?.description
         ?? IMPORT_DEFAULT_DESCRIPTION;
-
-    const idMap =
-        new Map<string, string>();
-    for (const n of parsed.nodes) {
-        idMap.set(
-            n.mermaidId,
-            crypto.randomUUID(),
-        );
-    }
-
-    const nodes: GraphNode[] =
-        parsed.nodes.map(n => {
-            const nodeId = idMap.get(
-                n.mermaidId,
-            )!;
-            const sc = sidecarNodeMap.get(
-                n.mermaidId,
-            );
-            const pos = sc
-                ? {
-                    x: sc.positionX,
-                    y: sc.positionY,
-                }
-                : positions.get(
-                    n.mermaidId,
-                );
-            return {
-                id: nodeId,
-                name: n.name,
-                description:
-                    sc?.description
-                    ?? IMPORT_DEFAULT_DESCRIPTION,
-                positionX: pos?.x
-                    ?? IMPORT_FALLBACK_POSITION,
-                positionY: pos?.y
-                    ?? IMPORT_FALLBACK_POSITION,
-                isStart: n.isStart,
-                isComplete: n.isComplete,
-                fields: sc
-                    ? sc.fields.map(f => {
-                        const ft =
-                            f.fieldType as
-                                WfFieldType;
-                        return {
-                            id: crypto
-                                .randomUUID(),
-                            name: f.name,
-                            fieldType: ft,
-                            sortOrder:
-                                f.sortOrder,
-                            isRequired:
-                                f.isRequired,
-                            options:
-                                f.options,
-                        };
-                    })
-                    : [],
-            };
-        });
-
-    const edges: GraphEdge[] = [];
-    for (const e of parsed.edges) {
-        const fromId =
-            idMap.get(e.fromId);
-        const toId = idMap.get(e.toId);
-        if (!fromId || !toId) continue;
-        const se = sidecarEdgeMap.get(
-            sidecarEdgeKey(
-                e.fromId, e.toId,
-            ),
-        );
-        edges.push({
-            id: crypto.randomUUID(),
-            name: e.name,
-            description:
-                se?.description
-                ?? IMPORT_DEFAULT_DESCRIPTION,
-            fromNodeId: fromId,
-            toNodeId: toId,
-        });
-    }
-
-    const graph: StoredGraph = {
-        nodes, edges,
-    };
 
     await POST<void>('flows', {
         id: flowId,

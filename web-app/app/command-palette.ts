@@ -200,10 +200,11 @@ export function initCommandPalette(
         const ideaItems:
             SearchItem[] =
             ideas.map(idea => ({
-                id: `idea-${idea.id}`,
-                title: idea.title,
+                id: `idea-${
+                    idea.idForLink()}`,
+                title: idea.titleText(),
                 meta:
-                    idea.status
+                    idea.statusValue()
                         .replace(
                             /-/g,
                             ' ',
@@ -215,26 +216,35 @@ export function initCommandPalette(
                     'idea-convert',
                     {
                         ideaId:
-                            idea.id,
+                            idea.idForLink(),
                     },
                 ),
                 keywords:
-                    `${idea.submittedBy}`
-                    + ` ${idea.status}`,
+                    `${idea.submittedByName()}`
+                    + ` ${idea.statusValue()}`,
             }));
 
         const projectItems:
             SearchItem[] =
             projects.map(
                 project => ({
-                    id: `project-`
-                        + `${project.id}`,
+                    id: 'project-'
+                        + project
+                            .idForLink(),
                     title:
-                        project.title,
+                        project
+                            .titleText(),
                     meta:
-                        `Progress:`
-                        + ` ${project.progress}%`
-                        + ` · ${project.status.replace(/-/g, ' ')}`,
+                        'Progress: '
+                        + project
+                            .progressPercent()
+                        + '% \u00B7 '
+                        + project
+                            .statusValue()
+                            .replace(
+                                /-/g,
+                                ' ',
+                            ),
                     category:
                         'projects',
                     icon:
@@ -246,11 +256,13 @@ export function initCommandPalette(
                             'project-detail',
                             {
                                 projectId:
-                                    project.id,
+                                    project
+                                        .idForLink(),
                             },
                         ),
                     keywords:
-                        `${project.status}`,
+                        project
+                            .statusValue(),
                 }),
             );
 
@@ -259,12 +271,15 @@ export function initCommandPalette(
             members.map(
                 member => ({
                     id: `person-`
-                        + `${member.id}`,
+                        + member
+                            .idForLink(),
                     title:
                         member.fullName(),
                     meta:
-                        `${member.role}`
-                        + ` · ${member.department}`,
+                        member.roleLabel()
+                        + ' \u00B7 '
+                        + member
+                            .departmentLabel(),
                     category:
                         'people',
                     icon:
@@ -274,9 +289,13 @@ export function initCommandPalette(
                             'teams',
                         ),
                     keywords:
-                        `${member.role}`
-                        + ` ${member.department}`
-                        + ` ${member.email}`,
+                        member.roleLabel()
+                        + ' '
+                        + member
+                            .departmentLabel()
+                        + ' '
+                        + member
+                            .emailAddress(),
                 }),
             );
 

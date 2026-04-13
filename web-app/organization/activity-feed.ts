@@ -48,12 +48,10 @@ export async function init(
     );
 
     setHtml(container, html`
-    <div style="max-width:48rem;
-        margin:0 auto">
+    <div class="content-wrap">
         <div class="flex items-center
             gap-4 mb-6">
-            <div class="search-wrapper"
-                style="flex:1">
+            <div class="search-wrapper flex-1">
                 <span class="search-icon">${
                     iconSearch(16, '')}</span>
                 <input class="input search-input"
@@ -62,8 +60,7 @@ export async function init(
                     aria-label="Search activity"
                 />
             </div>
-            <select class="input"
-                style="width:10rem"
+            <select class="input input-narrow"
                 id="activity-filter"
                 aria-label="Filter by activity type">
                 <option value="all"

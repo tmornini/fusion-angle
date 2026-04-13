@@ -16,6 +16,7 @@ import type {
 import {
     nowUtc,
     jsonObjectField,
+    MS_PER_SECOND,
 } from '../../../api/types';
 import {
     getUserMap,
@@ -26,10 +27,10 @@ import {
 /* ── Types ───────────────── */
 
 export class WorkboxItem {
-    readonly id: string;
-    readonly displayId: string;
-    readonly flowName: string;
-    readonly lastTransitionedAt: string;
+    readonly #id: string;
+    readonly #displayId: string;
+    readonly #flowName: string;
+    readonly #lastTransitionedAt: string;
     readonly #stateName: string;
     readonly #transitionerName: string;
     readonly #completed: boolean;
@@ -43,15 +44,31 @@ export class WorkboxItem {
         lastTransitionedAt: string;
         completed: boolean;
     }) {
-        this.id = data.id;
-        this.displayId = data.displayId;
-        this.flowName = data.flowName;
+        this.#id = data.id;
+        this.#displayId = data.displayId;
+        this.#flowName = data.flowName;
         this.#stateName = data.stateName;
         this.#transitionerName =
             data.transitionerName;
-        this.lastTransitionedAt =
+        this.#lastTransitionedAt =
             data.lastTransitionedAt;
         this.#completed = data.completed;
+    }
+
+    idForLink(): string {
+        return this.#id;
+    }
+
+    displayIdText(): string {
+        return this.#displayId;
+    }
+
+    flowNameText(): string {
+        return this.#flowName;
+    }
+
+    lastTransitionedAtDate(): string {
+        return this.#lastTransitionedAt;
     }
 
     isCompleted(): boolean {
@@ -93,16 +110,16 @@ export type ClaimStatus =
     };
 
 export class WorkboxDetail {
-    readonly id: string;
-    readonly displayId: string;
-    readonly flowName: string;
-    readonly outgoingEdges:
+    readonly #id: string;
+    readonly #displayId: string;
+    readonly #flowName: string;
+    readonly #outgoingEdges:
         readonly GraphEdge[];
-    readonly body: Record<
+    readonly #body: Record<
         string,
         Record<string, string>
     >;
-    readonly history:
+    readonly #history:
         readonly HistoryEntry[];
     readonly #currentNode: GraphNode;
     readonly #claim: ClaimStatus;
@@ -120,16 +137,42 @@ export class WorkboxDetail {
         history: HistoryEntry[];
         claim: ClaimStatus;
     }) {
-        this.id = data.id;
-        this.displayId = data.displayId;
-        this.flowName = data.flowName;
+        this.#id = data.id;
+        this.#displayId = data.displayId;
+        this.#flowName = data.flowName;
         this.#currentNode =
             data.currentNode;
-        this.outgoingEdges =
+        this.#outgoingEdges =
             data.outgoingEdges;
-        this.body = data.body;
-        this.history = data.history;
+        this.#body = data.body;
+        this.#history = data.history;
         this.#claim = data.claim;
+    }
+
+    idValue(): string {
+        return this.#id;
+    }
+
+    displayIdText(): string {
+        return this.#displayId;
+    }
+
+    flowNameText(): string {
+        return this.#flowName;
+    }
+
+    outgoingEdgeList():
+        readonly GraphEdge[] {
+        return this.#outgoingEdges;
+    }
+
+    historyEntries():
+        readonly HistoryEntry[] {
+        return this.#history;
+    }
+
+    hasHistory(): boolean {
+        return this.#history.length > 0;
     }
 
     isComplete(): boolean {
@@ -205,7 +248,8 @@ function isExpiredClaim(
         - new Date(
             claim.claimed_at,
         ).getTime();
-    const ms = lockTimeout * 1000;
+    const ms =
+        lockTimeout * MS_PER_SECOND;
     return elapsed >= ms;
 }
 
@@ -281,9 +325,9 @@ export async function getWorkboxItems(
             currentNodeId(woTransitions);
         const curNode = fg.nodes.find(
             n => n.id === curId,
-        );
+        )!;
         const isCompleted =
-            curNode?.isComplete === true;
+            curNode.isComplete;
 
         const claim =
             claimByWo.get(wo.id);
@@ -304,8 +348,7 @@ export async function getWorkboxItems(
             id: wo.id,
             displayId: wo.display_id,
             flowName: fg.name,
-            stateName:
-                curNode?.name ?? '',
+            stateName: curNode.name,
             transitionerName:
                 userName(
                     userMap,

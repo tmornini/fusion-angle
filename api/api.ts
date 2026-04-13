@@ -9,33 +9,28 @@ export class ApiError {
     ) {}
 }
 
-const apiModule = (() => {
-    let db: DbAdapter | null = null;
-    return {
-        init(dbAdapter: DbAdapter): void {
-            db = dbAdapter;
-        },
-        get(): DbAdapter {
-            if (!db) {
-                throw new Error(
-                    'API not initialized.'
-                    + ' Call initApi()'
-                    + ' first.',
-                );
-            }
-            return db;
-        },
-    };
-})();
+let adapter: DbAdapter | undefined;
 
 export function initApi(
     dbAdapter: DbAdapter,
 ): void {
-    apiModule.init(dbAdapter);
+    if (adapter) {
+        throw new Error(
+            'initApi() already called.',
+        );
+    }
+    adapter = dbAdapter;
 }
 
-export function getDbAdapter(): DbAdapter {
-    return apiModule.get();
+function getDbAdapter(): DbAdapter {
+    if (!adapter) {
+        throw new Error(
+            'API not initialized.'
+            + ' Call initApi()'
+            + ' first.',
+        );
+    }
+    return adapter;
 }
 
 type GetHandler = (
@@ -155,6 +150,27 @@ const routes: Route[] = [
             ),
         delete: (db, params) =>
             db.flows.delete(
+                param(params, 0),
+            ),
+    }),
+    route('flow-versions', {
+        get: (db) =>
+            db.flowVersions.getAll(),
+        post: async (db, _params, body) => {
+            const id =
+                body.id as string;
+            return db.flowVersions.put(
+                id, body,
+            );
+        },
+    }),
+    route('flow-versions/:id', {
+        get: (db, params) =>
+            db.flowVersions.getById(
+                param(params, 0),
+            ),
+        delete: (db, params) =>
+            db.flowVersions.delete(
                 param(params, 0),
             ),
     }),
@@ -579,6 +595,10 @@ export async function handleRequest(
     const method = request.method;
     const db = getDbAdapter();
 
+    // HTTP boundary handler: each case
+    // calls a single route handler; the
+    // catch translates domain exceptions
+    // to HTTP responses.
     try {
         switch (method) {
             case 'GET': {

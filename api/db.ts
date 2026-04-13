@@ -7,6 +7,7 @@ import type {
     TeamMembershipUserEntity,
     ActivityEntity,
     FlowEntity,
+    FlowVersionEntity,
     CompanySettingsEntity,
     AccountEntity,
     IdeaSubmissionEntity,
@@ -79,6 +80,8 @@ export interface DbAdapter {
         EntityStore<ActivityEntity>;
     flows:
         EntityStore<FlowEntity>;
+    flowVersions:
+        EntityStore<FlowVersionEntity>;
     projectFlows:
         EntityStore<
             ProjectFlowEntity

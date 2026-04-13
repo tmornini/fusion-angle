@@ -16,30 +16,27 @@ export type {
     WfFieldType,
 };
 
+export interface FlowCardReceiver {
+    flowId(id: string): void;
+    name(text: string): void;
+    description(text: string): void;
+    stats(
+        nodeCount: number,
+        edgeCount: number,
+    ): void;
+    projectName(
+        name: string | undefined,
+    ): void;
+}
+
 export interface FlowGraph {
     id: string;
     name: string;
     description: string;
     isLocked: boolean;
+    lockTimeout: number;
     nodes: GraphNode[];
     edges: GraphEdge[];
-}
-
-export interface FlowListItem {
-    id: string;
-    name: string;
-    description: string;
-    nodeCount: number;
-    edgeCount: number;
-}
-
-export interface FlowSummary {
-    id: string;
-    name: string;
-    description: string;
-    nodeCount: number;
-    edgeCount: number;
-    projectName: string | undefined;
 }
 
 interface StoredGraph {
@@ -51,6 +48,56 @@ function parseGraph(
     raw: string,
 ): StoredGraph {
     return parseJson<StoredGraph>(raw);
+}
+
+export class FlowSummary {
+    readonly #id: string;
+    readonly #name: string;
+    readonly #description: string;
+    readonly #nodeCount: number;
+    readonly #edgeCount: number;
+    readonly #projectName:
+        string | undefined;
+
+    constructor(init: {
+        readonly id: string;
+        readonly name: string;
+        readonly description: string;
+        readonly nodeCount: number;
+        readonly edgeCount: number;
+        readonly projectName:
+            string | undefined;
+    }) {
+        this.#id = init.id;
+        this.#name = init.name;
+        this.#description =
+            init.description;
+        this.#nodeCount = init.nodeCount;
+        this.#edgeCount = init.edgeCount;
+        this.#projectName =
+            init.projectName;
+    }
+
+    presentCardInto(
+        r: FlowCardReceiver,
+    ): void {
+        r.flowId(this.#id);
+        r.name(this.#name);
+        r.description(this.#description);
+        r.stats(
+            this.#nodeCount,
+            this.#edgeCount,
+        );
+        r.projectName(this.#projectName);
+    }
+}
+
+export interface FlowListItem {
+    id: string;
+    name: string;
+    description: string;
+    nodeCount: number;
+    edgeCount: number;
 }
 
 export async function getFlows(
@@ -85,7 +132,7 @@ export async function getFlows(
 
     return flows.map(f => {
         const g = parseGraph(f.graph);
-        return {
+        return new FlowSummary({
             id: f.id,
             name: f.name,
             description: f.description,
@@ -93,7 +140,7 @@ export async function getFlows(
                 projectByFlow.get(f.id),
             nodeCount: g.nodes.length,
             edgeCount: g.edges.length,
-        };
+        });
     });
 }
 
@@ -153,6 +200,7 @@ export async function getFlowGraph(
         isLocked: toBool(
             flow.is_locked,
         ),
+        lockTimeout: flow.lock_timeout,
         nodes: g.nodes,
         edges: g.edges,
     };

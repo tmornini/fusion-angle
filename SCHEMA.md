@@ -234,6 +234,23 @@ Singleton table (single row, `id = '1'`).
 | work_order_id | TEXT | References work_orders |
 | created_at | TEXT | RFC-3339 Zulu |
 
+### flow_versions
+
+History table. Captures a point-in-time snapshot of
+a flow's editable state before each mutation. Per-flow
+cap of 10; oldest rows are hard-deleted on overflow.
+Powers persistent undo on the flows/detail page.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | TEXT | PRIMARY KEY (UUID) |
+| flow_id | TEXT | References flows |
+| name | TEXT | Snapshot of flows.name |
+| description | TEXT | Snapshot of flows.description |
+| lock_timeout | INTEGER | Snapshot of flows.lock_timeout |
+| graph | TEXT | Snapshot of flows.graph (JSON) |
+| created_at | TEXT | RFC-3339 Zulu — capture time |
+
 ### work_order_transitions
 
 Immutable event records — source of truth for

@@ -14,7 +14,8 @@ import {
     GaugePresenter,
 } from '../app/presenters';
 
-export async function init(): Promise<void> {
+export async function init(
+): Promise<void> {
     const container =
         $('#gauge-container', document);
     if (!container) return;
@@ -28,13 +29,13 @@ export async function init(): Promise<void> {
         );
     if (!gauges) return;
 
-    const presenters = gauges.map(
-        g => new GaugePresenter(g),
-    );
+    const rendered = gauges.map(g => {
+        const p = new GaugePresenter();
+        g.presentGaugeInto(p);
+        return p.render();
+    });
     setHtml(
         container,
-        html`${presenters.map(
-            g => g.buildGauge(),
-        )}`,
+        html`${rendered}`,
     );
 }

@@ -138,6 +138,7 @@
 .input:disabled { opacity: 0.5; cursor: not-allowed; }
 .input-error { border-color: hsl(var(--destructive)); }
 .input-error:focus { box-shadow: 0 0 0 2px hsl(var(--destructive) / 0.2); }
+.input-narrow { width: 10rem; }
 
 .textarea {
   display: block;
@@ -258,6 +259,12 @@
   color: hsl(var(--info-text));
   border-color: hsl(var(--info) / 0.3);
 }
+
+.badge[data-tab] {
+  transition: opacity
+    var(--duration-fast) var(--ease-default);
+}
+.badge[data-tab]:not(.active) { opacity: 0.4; }
 
 /* Status Badges */
 .status-badge {
@@ -862,4 +869,235 @@
 }
 .metric-widget-trend-up { color: hsl(var(--success-text)); }
 .metric-widget-trend-down { color: hsl(var(--error-text)); }
+
+/* ==========================================
+   22. ICON BOX
+   ========================================== */
+
+.icon-box {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.icon-box-lg {
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.icon-box[data-tone="primary"],
+.icon-box-lg[data-tone="primary"] {
+  background: linear-gradient(135deg,
+    hsl(var(--primary) / 0.2),
+    hsl(var(--primary) / 0.05));
+  color: hsl(var(--primary));
+}
+
+.icon-box[data-tone="success"],
+.icon-box-lg[data-tone="success"] {
+  background: linear-gradient(135deg,
+    hsl(var(--success) / 0.2),
+    hsl(var(--success) / 0.05));
+  color: hsl(var(--success-text));
+}
+
+.icon-box[data-tone="warning"],
+.icon-box-lg[data-tone="warning"] {
+  background: linear-gradient(135deg,
+    hsl(var(--warning) / 0.2),
+    hsl(var(--warning) / 0.05));
+  color: hsl(var(--warning-text));
+}
+
+.icon-box[data-tone="error"],
+.icon-box-lg[data-tone="error"] {
+  background: linear-gradient(135deg,
+    hsl(var(--error) / 0.2),
+    hsl(var(--error) / 0.05));
+  color: hsl(var(--error-text));
+}
+
+.icon-box[data-tone="info"],
+.icon-box-lg[data-tone="info"] {
+  background: linear-gradient(135deg,
+    hsl(var(--info) / 0.2),
+    hsl(var(--info) / 0.05));
+  color: hsl(var(--info-text));
+}
+
+/* ==========================================
+   23. AVATAR
+   ========================================== */
+
+.avatar {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: linear-gradient(135deg,
+    hsl(var(--primary)),
+    hsl(var(--primary) / 0.7));
+  color: hsl(var(--primary-foreground));
+  font-weight: 600;
+  font-size: var(--text-sm);
+  position: relative;
+}
+
+.avatar-sm {
+  width: 2rem;
+  height: 2rem;
+  font-size: var(--text-xs);
+}
+.avatar-lg {
+  width: 3rem;
+  height: 3rem;
+  font-size: var(--text-base);
+}
+.avatar-xl {
+  width: 3.5rem;
+  height: 3.5rem;
+  font-size: var(--text-lg);
+}
+
+/* ==========================================
+   24. STATUS DOT (positioned overlay)
+   ========================================== */
+
+.status-dot {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 0.875rem;
+  height: 0.875rem;
+  border-radius: var(--radius-full);
+  border: 2px solid hsl(var(--card));
+}
+
+.status-dot[data-tone="success"] {
+  background: hsl(var(--success));
+}
+.status-dot[data-tone="warning"] {
+  background: hsl(var(--warning));
+}
+.status-dot[data-tone="error"] {
+  background: hsl(var(--error));
+}
+.status-dot[data-tone="muted"] {
+  background: hsl(var(--muted-foreground));
+}
+
+/* ==========================================
+   25. LEGEND CELL
+   ========================================== */
+
+.legend-cell {
+  text-align: center;
+  padding: 0.75rem;
+  border-radius: var(--radius);
+  background: hsl(var(--card) / 0.8);
+  border: 1px solid hsl(var(--border) / 0.5);
+}
+
+.legend-cell-label {
+  font-size: var(--text-xs);
+  color: hsl(var(--muted-foreground));
+  font-weight: 500;
+}
+
+.legend-cell-value {
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  color: hsl(var(--foreground));
+}
+
+.legend-dot {
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: var(--radius-full);
+  display: inline-block;
+}
+.legend-dot[data-tone="success"] {
+  background: hsl(var(--success));
+}
+.legend-dot[data-tone="primary"] {
+  background: hsl(var(--primary));
+}
+
+/* ==========================================
+   26. STACK (column flex with gap)
+   ========================================== */
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.stack-sm {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.stack-lg {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* ==========================================
+   27. CONTENT WRAP (max-width + auto margin)
+   ========================================== */
+
+.content-wrap {
+  max-width: 48rem;
+  margin-left: auto;
+  margin-right: auto;
+}
+.content-wrap-md {
+  max-width: 56rem;
+  margin-left: auto;
+  margin-right: auto;
+}
+.content-wrap-lg {
+  max-width: 72rem;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* ==========================================
+   28. ACTION CARD
+   ========================================== */
+
+.action-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1.25rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--card));
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  transition:
+    border-color var(--duration-fast)
+      var(--ease-default),
+    background-color var(--duration-fast)
+      var(--ease-default);
+}
+.action-card:hover {
+  border-color: hsl(var(--primary) / 0.5);
+  background: hsl(var(--card) / 0.5);
+}
 

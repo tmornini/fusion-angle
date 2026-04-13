@@ -16,6 +16,7 @@ import {
     getFlowGraph,
     getFlowMermaid,
     getFlowZip,
+    getFlowVersions,
 } from '../app/adapters';
 import {
     bindInteractions,
@@ -74,21 +75,37 @@ class Debouncer {
 const saveDebouncer =
     new Debouncer(SAVE_DELAY_MS);
 
-const pageState = {
-    projectId: undefined as
-        string | undefined,
-    interaction: new AbortController(),
-};
+class PageState {
+    #projectId: string | undefined;
+    #interaction = new AbortController();
+
+    projectId(): string | undefined {
+        return this.#projectId;
+    }
+
+    setProjectId(id: string): void {
+        this.#projectId = id;
+    }
+
+    signal(): AbortSignal {
+        return this.#interaction.signal;
+    }
+
+    resetInteraction(): void {
+        this.#interaction.abort();
+        this.#interaction =
+            new AbortController();
+    }
+}
+
+const pageState = new PageState();
 
 function renderAndBind(
     container: HTMLElement,
     presenter: FlowDesignerPresenter,
 ): void {
-    pageState.interaction.abort();
-    pageState.interaction =
-        new AbortController();
-    const signal =
-        pageState.interaction.signal;
+    pageState.resetInteraction();
+    const signal = pageState.signal();
     saveDebouncer.flush();
     presenter.render(container);
     bindBackButton();
@@ -215,15 +232,18 @@ function bindBackButton(): void {
     $('#flow-back-btn', document)
         ?.addEventListener(
             'click',
-            () => pageState.projectId
-                ? navigateTo(
-                    'project-detail',
-                    {
-                        projectId:
-                            pageState.projectId,
-                    },
-                )
-                : navigateTo('flows'),
+            () => {
+                const pid =
+                    pageState.projectId();
+                if (pid) {
+                    navigateTo(
+                        'project-detail',
+                        { projectId: pid },
+                    );
+                } else {
+                    navigateTo('flows');
+                }
+            },
         );
 }
 
@@ -244,10 +264,8 @@ function bindSvgInteractions(
         () => renderAndBind(
             container, presenter,
         ),
-        (nodeId, x, y) => {
-            presenter.moveNode(
-                nodeId, x, y,
-            );
+        (updates) => {
+            presenter.moveNodes(updates);
             renderAndBind(
                 container, presenter,
             );
@@ -270,6 +288,7 @@ function bindSvgInteractions(
         },
         (id) =>
             presenter.getNodePosition(id),
+        () => presenter.getAllNodes(),
         signal,
     );
     if (
@@ -369,11 +388,12 @@ function bindToolbarActions(
                 },
             );
         }
-        if (action === 'fit') {
+        if (action === 'auto-fit') {
             btn.addEventListener(
                 'click',
                 () => {
-                    presenter.zoomToFit();
+                    presenter
+                        .enableAutoFit();
                     renderAndBind(
                         container, presenter,
                     );
@@ -400,33 +420,14 @@ function bindToolbarActions(
             btn.addEventListener(
                 'click',
                 () => {
-                    const nodeId =
-                        presenter
-                            .selectedNodeId();
-                    const edgeId =
-                        presenter
-                            .selectedEdgeId();
-                    if (nodeId !== null) {
-                        void presenter
-                            .deleteSelectedNode()
-                            .then(
-                                () => renderAndBind(
-                                    container,
-                                    presenter,
-                                ),
-                            );
-                        return;
-                    }
-                    if (edgeId !== null) {
-                        void presenter
-                            .deleteSelectedEdge()
-                            .then(
-                                () => renderAndBind(
-                                    container,
-                                    presenter,
-                                ),
-                            );
-                    }
+                    void presenter
+                        .deleteSelected()
+                        .then(
+                            () => renderAndBind(
+                                container,
+                                presenter,
+                            ),
+                        );
                 },
             );
         }
@@ -758,8 +759,11 @@ export async function init(
 ): Promise<void> {
     const flowId =
         params?.flowId;
-    pageState.projectId =
-        params?.projectId;
+    if (params?.projectId) {
+        pageState.setProjectId(
+            params.projectId,
+        );
+    }
     if (!flowId) {
         navigateTo('flows');
         return;
@@ -769,16 +773,26 @@ export async function init(
     );
     if (!container) return;
 
-    const graph = await withLoadingState(
+    const loaded = await withLoadingState(
         container,
         buildSkeleton('detail', 1),
-        () => getFlowGraph(flowId),
+        async () => {
+            const [graph, versions] =
+                await Promise.all([
+                    getFlowGraph(flowId),
+                    getFlowVersions(flowId),
+                ]);
+            return { graph, versions };
+        },
     );
-    if (!graph) return;
+    if (!loaded) return;
 
     const presenter =
         new FlowDesignerPresenter(
-            graph, FALLBACK_W, FALLBACK_H,
+            loaded.graph,
+            FALLBACK_W,
+            FALLBACK_H,
+            loaded.versions.length > 0,
         );
     renderAndBind(container, presenter);
     const wrap = container.querySelector(
@@ -852,36 +866,15 @@ function bindKeyboardShortcuts(
                     HTMLSelectElement
                 )
             ) {
-                const nodeId =
-                    presenter
-                        .selectedNodeId();
-                const edgeId =
-                    presenter
-                        .selectedEdgeId();
-                if (nodeId !== null) {
-                    e.preventDefault();
-                    void presenter
-                        .deleteSelectedNode()
-                        .then(
-                            () => renderAndBind(
-                                container,
-                                presenter,
-                            ),
-                        );
-                    return;
-                }
-                if (edgeId !== null) {
-                    e.preventDefault();
-                    void presenter
-                        .deleteSelectedEdge()
-                        .then(
-                            () => renderAndBind(
-                                container,
-                                presenter,
-                            ),
-                        );
-                    return;
-                }
+                e.preventDefault();
+                void presenter
+                    .deleteSelected()
+                    .then(
+                        () => renderAndBind(
+                            container,
+                            presenter,
+                        ),
+                    );
             }
             const mod =
                 e.metaKey || e.ctrlKey;

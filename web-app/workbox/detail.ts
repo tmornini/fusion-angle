@@ -1,6 +1,6 @@
 import { $, $required } from '../app/dom';
 import {
-    html, setHtml,
+    html, setHtml, trusted,
 } from '../app/safe-html';
 import type { SafeHtml } from '../app/safe-html';
 import { log } from '../app/logger';
@@ -162,13 +162,17 @@ function buildFieldInput(
             data-field-id="${id}"
             ${req} />`;
     }
-    const extra = spec.extra ?? '';
-    const cls =
-        spec.type === 'checkbox'
-            ? '' : 'class="input"';
+    if (spec.type === 'checkbox') {
+        return html`<input
+            type="checkbox"
+            data-field-id="${id}"
+            ${req} />`;
+    }
+    const extra =
+        trusted(spec.extra ?? '');
     return html`<input
         type="${spec.type}"
-        ${cls}
+        class="input"
         data-field-id="${id}"
         ${extra}
         ${req} />`;
@@ -192,12 +196,8 @@ function buildHistoryEntry(
         entry.fieldValues.length > 0;
     const valuesHtml = hasValues
         ? html`<div
-            class="mt-2 ml-6"
-            style="display:grid;
-                grid-template-columns:
-                    auto 1fr;
-                gap:0.25rem 0.75rem;
-                font-size:0.8125rem">
+            class="mt-2 ml-6
+                wo-history-fields">
             ${entry.fieldValues.map(
                 fv => html`
                 <span
@@ -208,9 +208,7 @@ function buildHistoryEntry(
         </div>`
         : html``;
     return html`<div
-        class="py-3"
-        style="border-bottom:1px solid
-            hsl(var(--border))">
+        class="py-3 border-b">
         <div
             class="flex items-center
                 gap-3"
@@ -266,7 +264,7 @@ function buildDetailView(
         : html`<div id="wo-transitions"
             class="flex gap-3 mb-6
                 flex-wrap">
-            ${detail.outgoingEdges.map(
+            ${detail.outgoingEdgeList().map(
                 e => html`<button
                     class="btn btn-primary"
                     data-edge-id="${e.id}">
@@ -286,23 +284,22 @@ function buildDetailView(
     return html`<div>
         <a href="#" id="wo-back-btn"
             class="flex items-center
-                gap-1 text-muted mb-4"
-            style="text-decoration:none;
-                cursor:pointer">
+                gap-1 text-muted mb-4
+                cursor-pointer">
             ${iconArrowLeft(16, '')}
             Workbox
         </a>
         <div id="wo-header" class="mb-6">
             <h1 class="text-2xl
                 font-bold mb-1">
-                ${detail.flowName}
+                ${detail.flowNameText()}
             </h1>
             <div class="flex items-center
                 gap-3">
                 <span
                     class="badge
                         badge-neutral">
-                    #${detail.displayId}
+                    #${detail.displayIdText()}
                 </span>
                 <span
                     class="badge
@@ -323,17 +320,17 @@ function buildDetailView(
         <details id="wo-history" open>
             <summary
                 class="text-lg
-                    font-semibold mb-3"
-                style="cursor:pointer">
+                    font-semibold mb-3
+                    cursor-pointer">
                 History
             </summary>
             <div class="card p-4">
-                ${detail.history.length === 0
+                ${!detail.hasHistory()
                     ? html`<p
                         class="text-muted">
                         No history yet.
                     </p>`
-                    : detail.history
+                    : detail.historyEntries()
                         .toReversed()
                         .map(
                             buildHistoryEntry,
@@ -390,7 +387,7 @@ function initTransitionButtons(
                     await
                         postWorkOrderTransition({
                             workOrderId:
-                                detail.id,
+                                detail.idValue(),
                             edgeId,
                             values,
                             userId,
@@ -487,7 +484,7 @@ export async function init(
         buildSkeleton('detail', 4),
         async () => {
             let wo = await getWorkboxItem(
-                id, user.id,
+                id, user.idForLink(),
             );
             const claim =
                 wo.claimStatus();
@@ -497,10 +494,10 @@ export async function init(
                 && !wo.isComplete()
             ) {
                 await postWorkOrderClaim(
-                    id, user.id,
+                    id, user.idForLink(),
                 );
                 wo = await getWorkboxItem(
-                    id, user.id,
+                    id, user.idForLink(),
                 );
             }
             return wo;
@@ -531,7 +528,8 @@ export async function init(
         !detail.isComplete()
     ) {
         initTransitionButtons(
-            container, detail, user.id,
+            container, detail,
+            user.idForLink(),
         );
         initUnclaimButton(
             container, detail,

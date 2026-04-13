@@ -72,26 +72,26 @@ export class IdeaConversionPresenter {
         idea: Idea,
         users: User[],
     ) {
-        this.#title = idea.title;
+        this.#title = idea.titleText();
         this.#problemStatement =
-            idea.problemStatement;
+            idea.problemStatementText();
         this.#targetUsers =
-            idea.targetUsers;
+            idea.targetUsersText();
         this.#proposedSolution =
-            idea.proposedSolution;
+            idea.proposedSolutionText();
         this.#expectedOutcome =
-            idea.expectedOutcome;
+            idea.expectedOutcomeText();
         this.#successMetrics =
-            idea.successMetrics;
+            idea.successMetricsText();
         this.#leadOptions = users
             .filter(u => u.isActive())
             .map(u => ({
-                id: u.id,
+                id: u.idForLink(),
                 fullName: u.fullName(),
-                role: u.role,
+                role: u.roleLabel(),
             }));
         this.#fields = {
-            'project-name': idea.title,
+            'project-name': idea.titleText(),
             'project-lead': '',
             'start-date': '',
             'target-end-date': '',
@@ -253,7 +253,7 @@ export class IdeaConversionPresenter {
                     + 'hsl(var(--muted)'
                     + ');'
                     + 'border-radius:'
-                    + '9999px;'
+                    + 'var(--radius-full);'
                     + 'overflow:'
                     + 'hidden'
                 }">

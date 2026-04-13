@@ -1,6 +1,4 @@
-import {
-    $, $select,
-} from '../app/dom';
+import { $, populateIcons } from '../app/dom';
 import {
     html, setHtml,
 } from '../app/safe-html';
@@ -10,12 +8,14 @@ import {
     buildSkeleton,
     withLoadingState,
 } from '../app/loading-states';
-import { iconMail } from '../app/icons';
+import {
+    iconMail,
+    iconPlus,
+} from '../app/icons';
 import {
     navigateTo,
     initTabs,
-    openDialog,
-    closeDialog,
+    initDropdown,
 } from '../app/core';
 import {
     getWorkboxActive,
@@ -61,10 +61,8 @@ function buildInboxRow(
         ? name : '\u2014';
     return html`
     <div
-        class="card"
-        style="padding:1rem;
-            cursor:pointer"
-        data-wo-card="${item.id}"
+        class="card p-4 cursor-pointer"
+        data-wo-card="${item.idForLink()}"
     >
         <div
             class="flex items-center
@@ -72,10 +70,10 @@ function buildInboxRow(
         >
             <span
                 class="font-semibold"
-            >${item.flowName}</span>
+            >${item.flowNameText()}</span>
             <span
                 class="text-xs text-muted"
-            >#${item.displayId}</span>
+            >#${item.displayIdText()}</span>
         </div>
         <div
             class="flex items-center
@@ -86,7 +84,7 @@ function buildInboxRow(
             <span
                 class="ml-auto"
             >${relativeTime(
-                item.lastTransitionedAt,
+                item.lastTransitionedAtDate(),
             )}</span>
         </div>
     </div>`;
@@ -126,93 +124,106 @@ function initRowNavigation(
     );
 }
 
-async function initNewDialog(): Promise<
-    void
-> {
-    const flowSelect = $select(
-        '#new-wo-flow', document,
+async function createWorkOrderForFlow(
+    flowId: string,
+): Promise<void> {
+    let auth: Awaited<
+        ReturnType<typeof getCurrentUser>
+    >;
+    try {
+        auth = await getCurrentUser();
+    } catch (err) {
+        log.error(
+            'getCurrentUser failed',
+            'workbox',
+            err,
+        );
+        showToast(
+            'Failed to load user',
+            'error',
+        );
+        return;
+    }
+    try {
+        const woId =
+            await postWorkOrderCreation(
+                flowId,
+                auth.user.idForLink(),
+            );
+        showToast(
+            'Work order created',
+            'success',
+        );
+        navigateTo(
+            'workbox-detail',
+            { id: woId },
+        );
+    } catch (err) {
+        log.error(
+            'work order creation failed',
+            'workbox',
+            err,
+        );
+        showToast(
+            'Failed to create work order',
+            'error',
+        );
+    }
+}
+
+async function initCreateDropdown(
+): Promise<void> {
+    populateIcons([
+        [
+            '#create-wo-btn-icon',
+            iconPlus(16, ''),
+        ],
+    ]);
+
+    const dropdownEl = $(
+        '#create-wo-dropdown',
+        document,
     );
-    if (!flowSelect) return;
+    if (!dropdownEl) return;
 
     const flows =
         await getFlowsForCreation();
-    for (const f of flows) {
-        const opt =
-            document.createElement(
-                'option',
-            );
-        opt.value = f.id;
-        opt.textContent = f.name;
-        flowSelect.appendChild(opt);
-    }
 
-    $('#new-wo-btn', document)
-        ?.addEventListener(
-            'click',
-            () => openDialog('new-wo'),
-        );
-    $('#new-wo-cancel', document)
-        ?.addEventListener(
-            'click',
-            () => closeDialog('new-wo'),
-        );
-    $('#new-wo-backdrop', document)
-        ?.addEventListener(
-            'click',
-            (e) => {
-                if (
-                    e.target
-                    === e.currentTarget
-                ) {
-                    closeDialog('new-wo');
-                }
-            },
-        );
-    $('#new-wo-submit', document)
-        ?.addEventListener(
-            'click',
-            async () => {
-                const flowId =
-                    flowSelect.value;
-                if (!flowId) {
-                    showToast(
-                        'Select a flow',
-                        'error',
-                    );
-                    return;
-                }
-                try {
-                    const auth =
-                        await getCurrentUser();
-                    const woId =
-                        await postWorkOrderCreation(
-                            flowId,
-                            auth.user.id,
-                        );
-                    closeDialog('new-wo');
-                    showToast(
-                        'Work order created',
-                        'success',
-                    );
-                    navigateTo(
-                        'workbox-detail',
-                        { id: woId },
-                    );
-                } catch (err) {
-                    log.error(
-                        'work order creation'
-                        + ' failed',
-                        'workbox',
-                        err,
-                    );
-                    showToast(
-                        'Failed to create'
-                        + ' work order',
-                        'error',
-                    );
-                }
-            },
-        );
+    setHtml(
+        dropdownEl,
+        html`${flows.map(f => html`<button
+            class="dropdown-item"
+            data-flow-id="${f.id}"
+        >${f.name}</button>`)}`,
+    );
+
+    initDropdown(
+        'create-wo-btn',
+        'create-wo-dropdown',
+    );
+
+    dropdownEl.addEventListener(
+        'click',
+        (e) => {
+            if (
+                !(e.target instanceof Element)
+            ) return;
+            const item =
+                e.target.closest<HTMLElement>(
+                    '[data-flow-id]',
+                );
+            if (!item) return;
+            const flowId =
+                item.getAttribute(
+                    'data-flow-id',
+                );
+            if (!flowId) return;
+            dropdownEl.classList.add('hidden');
+            void createWorkOrderForFlow(
+                flowId,
+            );
+        },
+    );
 }
 
 export async function init(
@@ -287,5 +298,5 @@ export async function init(
         }
     }
 
-    await initNewDialog();
+    await initCreateDropdown();
 }

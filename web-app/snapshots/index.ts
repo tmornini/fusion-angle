@@ -5,7 +5,7 @@ import {
     postMockDataLoad,
     putSnapshot,
     getSnapshot,
-    hasData,
+    getDataPresent,
     nowUtc,
 } from '../app/adapters';
 import { $ } from '../app/dom';
@@ -67,11 +67,14 @@ function buildOutlineBtn(
         }">${label}</button>`;
 }
 
-interface PendingAction {
-    action: (() => Promise<void>) | null;
-    button: HTMLButtonElement | null;
-    label: string | null;
-}
+type PendingState =
+    | { kind: 'idle' }
+    | {
+        kind: 'pending';
+        action: () => Promise<void>;
+        button: HTMLButtonElement;
+        label: string;
+    };
 
 export async function init(
 ): Promise<void> {
@@ -80,25 +83,16 @@ export async function init(
     );
     if (!root) return;
 
-    const pending: PendingAction = {
-        action: null,
-        button: null,
-        label: null,
-    };
-
-    function clearPending(): void {
-        pending.action = null;
-        pending.button = null;
-        pending.label = null;
-    }
+    let pending: PendingState =
+        { kind: 'idle' };
 
     async function executePending(
     ): Promise<void> {
+        if (pending.kind !== 'pending')
+            return;
         const { action, button, label }
             = pending;
-        clearPending();
-        if (!button || !action || !label)
-            return;
+        pending = { kind: 'idle' };
 
         closeDialog('confirm-wipe');
         const originalText =
@@ -107,10 +101,26 @@ export async function init(
         button.textContent = 'Working...';
         try {
             await deleteSchema();
+        } catch (err) {
+            log.error(
+                'schema deletion failed',
+                'snapshots',
+                err,
+            );
+            showToast(
+                'Failed to clear schema.',
+                'error',
+            );
+            button.disabled = false;
+            button.textContent =
+                originalText;
+            return;
+        }
+        try {
             await action();
         } catch (err) {
             log.error(
-                'snapshot action failed',
+                label + ' failed',
                 'snapshots',
                 err,
             );
@@ -134,9 +144,12 @@ export async function init(
         action: () => Promise<void>,
         message?: string,
     ): void {
-        pending.action = action;
-        pending.button = button;
-        pending.label = label;
+        pending = {
+            kind: 'pending',
+            action,
+            button,
+            label,
+        };
         if (message) {
             const msg = $(
                 '#confirm-wipe-message',
@@ -439,7 +452,7 @@ export async function init(
     )?.addEventListener(
         'click',
         () => {
-            clearPending();
+            pending = { kind: 'idle' };
             closeDialog('confirm-wipe');
         },
     );
@@ -452,7 +465,7 @@ export async function init(
                 e.target
                 === e.currentTarget
             ) {
-                clearPending();
+                pending = { kind: 'idle' };
                 closeDialog(
                     'confirm-wipe',
                 );
@@ -471,7 +484,7 @@ async function mutateEmptyBanner(
     root: HTMLElement,
 ): Promise<void> {
     const hasExistingData =
-        await hasData();
+        await getDataPresent();
     const existing =
         document.getElementById(
             BANNER_ID,
