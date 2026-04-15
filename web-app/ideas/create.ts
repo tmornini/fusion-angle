@@ -159,6 +159,7 @@ export async function init():
                     },
                 );
                 await putIdeaSubmission(
+                    crypto.randomUUID(),
                     ideaId,
                     'current',
                 );

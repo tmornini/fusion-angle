@@ -301,6 +301,7 @@ async function handleFileSelect(
     try {
         result = ext === 'zip'
             ? await postFlowFromZip(
+                crypto.randomUUID(),
                 new Uint8Array(
                     await file
                         .arrayBuffer(),
@@ -308,6 +309,7 @@ async function handleFileSelect(
                 projectId,
             )
             : await postFlowFromMermaid(
+                crypto.randomUUID(),
                 await file.text(),
                 projectId,
             );
@@ -515,6 +517,7 @@ async function handleCreateNew(
     try {
         const flowId =
             await postFlowFromBackup(
+                crypto.randomUUID(),
                 stRe.backup, projectId,
             );
         clearPending(input);
@@ -557,6 +560,7 @@ async function handleCreate(
     try {
         const flowId =
             await postFlowFromBackup(
+                crypto.randomUUID(),
                 stNw.backup, projectId,
             );
         clearPending(input);

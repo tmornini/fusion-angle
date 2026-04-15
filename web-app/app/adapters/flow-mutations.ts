@@ -138,7 +138,7 @@ export async function postFlowCreation(
         edges: [],
     };
 
-    await POST<void>('flows', {
+    await PUT<void>('flows', {
         id: ctx.flowId,
         name: ctx.name,
         description: ctx.description,
@@ -148,7 +148,7 @@ export async function postFlowCreation(
         updated_at: now,
     });
 
-    await POST<void>('project-flows', {
+    await PUT<void>('project-flows', {
         id: crypto.randomUUID(),
         project_id: ctx.projectId,
         flow_id: ctx.flowId,

@@ -131,7 +131,7 @@ const routes: Route[] = [
     route('flows', {
         get: (db) =>
             db.flows.getAll(),
-        post: async (db, _params, body) => {
+        put: async (db, _params, body) => {
             const id =
                 body.id as string;
             return db.flows.put(
@@ -156,7 +156,7 @@ const routes: Route[] = [
     route('flow-versions', {
         get: (db) =>
             db.flowVersions.getAll(),
-        post: async (db, _params, body) => {
+        put: async (db, _params, body) => {
             const id =
                 body.id as string;
             return db.flowVersions.put(
@@ -178,7 +178,7 @@ const routes: Route[] = [
         get: (db) =>
             db.projectFlows
                 .getAll(),
-        post: async (
+        put: async (
             db, _params, body,
         ) => {
             const id =
@@ -196,7 +196,7 @@ const routes: Route[] = [
     route('work-orders', {
         get: (db) =>
             db.workOrders.getAll(),
-        post: async (
+        put: async (
             db, _params, body,
         ) => {
             const id =
@@ -219,7 +219,7 @@ const routes: Route[] = [
     route('flow-work-orders', {
         get: (db) =>
             db.flowWorkOrders.getAll(),
-        post: async (
+        put: async (
             db, _params, body,
         ) => {
             const id =
@@ -233,7 +233,7 @@ const routes: Route[] = [
         get: (db) =>
             db.workOrderTransitions
                 .getAll(),
-        post: async (
+        put: async (
             db, _params, body,
         ) => {
             const id =
@@ -247,7 +247,7 @@ const routes: Route[] = [
         get: (db) =>
             db.workOrderClaims
                 .getAll(),
-        post: async (
+        put: async (
             db, _params, body,
         ) => {
             const id =

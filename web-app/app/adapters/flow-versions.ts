@@ -51,7 +51,7 @@ export async function postFlowVersion(
     const flow = await GET<FlowEntity>(
         'flows/' + flowId,
     );
-    await POST<void>('flow-versions', {
+    await PUT<void>('flow-versions', {
         id: crypto.randomUUID(),
         flow_id: flowId,
         name: flow.name,

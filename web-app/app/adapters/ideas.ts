@@ -136,12 +136,13 @@ export async function putIdea(
 }
 
 export async function putIdeaSubmission(
+    submissionId: string,
     ideaId: string,
     userId: string,
 ): Promise<void> {
     await PUT(
-        `idea-submissions/`
-            + crypto.randomUUID(),
+        'idea-submissions/'
+            + submissionId,
         {
             idea_id: ideaId,
             user_id: userId,

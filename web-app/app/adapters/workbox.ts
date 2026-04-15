@@ -631,7 +631,7 @@ export async function postWorkOrderCreation(
             edges: graph.edges,
         };
 
-    await POST<void>('work-orders', {
+    await PUT<void>('work-orders', {
         id: woId,
         display_id: displayId,
         flow_graph: jsonObjectField(
@@ -643,7 +643,7 @@ export async function postWorkOrderCreation(
         created_at: now,
     });
 
-    await POST<void>(
+    await PUT<void>(
         'flow-work-orders',
         {
             id: crypto.randomUUID(),
@@ -657,7 +657,7 @@ export async function postWorkOrderCreation(
         {} as Record<string, unknown>,
     );
 
-    await POST<void>(
+    await PUT<void>(
         'work-order-transitions',
         {
             id: crypto.randomUUID(),
@@ -670,7 +670,7 @@ export async function postWorkOrderCreation(
         },
     );
 
-    await POST<void>(
+    await PUT<void>(
         'work-order-transitions',
         {
             id: crypto.randomUUID(),
@@ -683,7 +683,7 @@ export async function postWorkOrderCreation(
         },
     );
 
-    await POST<void>(
+    await PUT<void>(
         'work-order-claims',
         {
             id: crypto.randomUUID(),
@@ -729,7 +729,7 @@ export async function postWorkOrderTransition(
 
     const now = nowUtc();
 
-    await POST<void>(
+    await PUT<void>(
         'work-order-transitions',
         {
             id: crypto.randomUUID(),
@@ -775,7 +775,7 @@ export async function postWorkOrderClaim(
     const now = nowUtc();
     const claimId = crypto.randomUUID();
 
-    await POST<void>(
+    await PUT<void>(
         'work-order-claims',
         {
             id: claimId,
