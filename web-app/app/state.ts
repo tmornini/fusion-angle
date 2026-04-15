@@ -53,188 +53,140 @@ function loadStoredSidebarCollapsed(
     );
 }
 
-class AppStateManager {
-    private readonly data: AppState;
-    private readonly subs =
-        new Set<StateListener>();
-    readonly state: Readonly<AppState>;
+const data: AppState = {
+    theme: loadStoredTheme(),
+    isMobile: window.matchMedia(
+        '(max-width: '
+        + MOBILE_BREAKPOINT_PX
+        + 'px)',
+    ).matches,
+    isSidebarCollapsed:
+        loadStoredSidebarCollapsed(),
+    isSidebarOpen: false,
+    isSearchOpen: false,
+    searchQuery: '',
+};
 
-    constructor() {
-        this.data = {
-            theme: loadStoredTheme(),
-            isMobile: window.matchMedia(
-                '(max-width: '
-                + MOBILE_BREAKPOINT_PX
-                + 'px)',
-            ).matches,
-            isSidebarCollapsed:
-                loadStoredSidebarCollapsed(),
-            isSidebarOpen: false,
-            isSearchOpen: false,
-            searchQuery: '',
-        };
-        this.state = this.data;
-        this.initListeners();
-    }
+const state: Readonly<AppState> = data;
 
-    setState(
-        partial: Partial<AppState>,
-    ): void {
-        Object.assign(this.data, partial);
-        this.subs.forEach(fn => fn());
-    }
-
-    subscribe(
-        fn: StateListener,
-    ): () => void {
-        this.subs.add(fn);
-        return () => {
-            this.subs.delete(fn);
-        };
-    }
-
-    computeTheme(): 'light' | 'dark' {
-        if (this.state.theme === 'system') {
-            const q = '(prefers-color-scheme'
-                + ': dark)';
-            return window
-                .matchMedia(q).matches
-                ? 'dark'
-                : 'light';
-        }
-        return this.state.theme;
-    }
-
-    applyTheme(): void {
-        const resolved =
-            this.computeTheme();
-        document.documentElement
-            .setAttribute(
-                'data-theme',
-                resolved,
-            );
-        document.documentElement
-            .classList.toggle(
-                'dark',
-                resolved === 'dark',
-            );
-    }
-
-    setTheme(
-        theme: AppState['theme'],
-    ): void {
-        writePreference(
-            STORAGE_KEY_THEME,
-            theme,
-        );
-        this.setState({ theme });
-        this.applyTheme();
-    }
-
-    setSidebarCollapsed(
-        collapsed: boolean,
-    ): void {
-        writePreference(
-            STORAGE_KEY_SIDEBAR,
-            String(collapsed),
-        );
-        this.setState({
-            isSidebarCollapsed: collapsed,
-        });
-    }
-
-    private initListeners(): void {
-        const darkQ =
-            '(prefers-color-scheme: dark)';
-        window.matchMedia(darkQ)
-            .addEventListener(
-                'change',
-                () => {
-                    if (
-                        this.state.theme
-                            === 'system'
-                    ) {
-                        this.applyTheme();
-                    }
-                },
-            );
-
-        const mobileQ = '(max-width: '
-            + MOBILE_BREAKPOINT_PX
-            + 'px)';
-        window.matchMedia(mobileQ)
-            .addEventListener(
-                'change',
-                (e) => {
-                    this.setState({
-                        isMobile: e.matches,
-                    });
-                    if (!e.matches) {
-                        this.setState({
-                            isSidebarOpen:
-                                false,
-                            isSearchOpen:
-                                false,
-                        });
-                    }
-                },
-            );
-
-        window.addEventListener(
-            'storage',
-            (e) => {
-                if (
-                    e.key
-                        === STORAGE_KEY_THEME
-                    && isValidTheme(
-                        e.newValue,
-                    )
-                ) {
-                    this.setState({
-                        theme: e.newValue,
-                    });
-                    this.applyTheme();
-                }
-            },
-        );
-    }
-}
-
-const mgr = new AppStateManager();
-
-const state: Readonly<AppState> = mgr.state;
+const subs = new Set<StateListener>();
 
 function setState(
     partial: Partial<AppState>,
 ): void {
-    mgr.setState(partial);
+    Object.assign(data, partial);
+    subs.forEach(fn => fn());
 }
 
 function subscribe(
     fn: StateListener,
 ): () => void {
-    return mgr.subscribe(fn);
+    subs.add(fn);
+    return () => {
+        subs.delete(fn);
+    };
 }
 
 function computeTheme(): 'light' | 'dark' {
-    return mgr.computeTheme();
+    if (state.theme === 'system') {
+        const q = '(prefers-color-scheme'
+            + ': dark)';
+        return window
+            .matchMedia(q).matches
+            ? 'dark'
+            : 'light';
+    }
+    return state.theme;
 }
 
 function applyTheme(): void {
-    mgr.applyTheme();
+    const resolved = computeTheme();
+    document.documentElement
+        .setAttribute(
+            'data-theme',
+            resolved,
+        );
+    document.documentElement
+        .classList.toggle(
+            'dark',
+            resolved === 'dark',
+        );
 }
 
 function setTheme(
     theme: AppState['theme'],
 ): void {
-    mgr.setTheme(theme);
+    writePreference(
+        STORAGE_KEY_THEME,
+        theme,
+    );
+    setState({ theme });
+    applyTheme();
 }
 
 function setSidebarCollapsed(
     collapsed: boolean,
 ): void {
-    mgr.setSidebarCollapsed(collapsed);
+    writePreference(
+        STORAGE_KEY_SIDEBAR,
+        String(collapsed),
+    );
+    setState({
+        isSidebarCollapsed: collapsed,
+    });
 }
+
+function initListeners(): void {
+    const darkQ =
+        '(prefers-color-scheme: dark)';
+    window.matchMedia(darkQ)
+        .addEventListener(
+            'change',
+            () => {
+                if (
+                    state.theme === 'system'
+                ) {
+                    applyTheme();
+                }
+            },
+        );
+
+    const mobileQ = '(max-width: '
+        + MOBILE_BREAKPOINT_PX
+        + 'px)';
+    window.matchMedia(mobileQ)
+        .addEventListener(
+            'change',
+            (e) => {
+                setState({
+                    isMobile: e.matches,
+                });
+                if (!e.matches) {
+                    setState({
+                        isSidebarOpen: false,
+                        isSearchOpen: false,
+                    });
+                }
+            },
+        );
+
+    window.addEventListener(
+        'storage',
+        (e) => {
+            if (
+                e.key === STORAGE_KEY_THEME
+                && isValidTheme(e.newValue)
+            ) {
+                setState({
+                    theme: e.newValue,
+                });
+                applyTheme();
+            }
+        },
+    );
+}
+
+initListeners();
 
 export type { AppState };
 export {

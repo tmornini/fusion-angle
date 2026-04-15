@@ -637,13 +637,18 @@ export async function handleRequest(
                         string,
                         unknown
                     >;
-                return Response.json(
+                const result =
                     await matched.put(
                         db,
                         params,
                         payload,
-                    ),
-                );
+                    );
+                if (result === undefined) {
+                    return new Response(null, {
+                        status: 204,
+                    });
+                }
+                return Response.json(result);
             }
             case 'DELETE': {
                 if (!matched.delete) {

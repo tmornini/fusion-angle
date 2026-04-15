@@ -1,38 +1,28 @@
-import {
-    GET, POST, PUT, DELETE,
-} from '../../../api/api';
+import { GET } from '../../../api/api';
 import type {
-    Id,
     FlowEntity,
     WorkOrderEntity,
-    FlowWorkOrderEntity,
     WorkOrderTransitionEntity,
     WorkOrderClaimEntity,
     WorkOrderFlowGraph,
-    StoredGraph,
     GraphNode,
     GraphEdge,
     GraphField,
 } from '../../../api/types';
 import {
-    nowUtc,
-    jsonObjectField,
+    msSinceUtc,
     MS_PER_SECOND,
 } from '../../../api/types';
 import {
-    validateStoredGraphJson,
     validateWorkOrderFlowGraphJson,
     validateTransitionValuesJson,
 } from '../../../api/validators';
 import {
     getUserMap,
     userName,
-} from './helpers';
+} from './shared';
 
 /* ── Types ───────────────── */
-
-const FIRST_POSITION = 1;
-const POSITION_STEP = 1;
 
 export class WorkboxItem {
     readonly #id: string;
@@ -98,9 +88,6 @@ export class WorkboxItem {
         return this.#position;
     }
 }
-
-type TransitionValues =
-    Record<string, string>;
 
 export interface HistoryFieldValue {
     fieldName: string;
@@ -214,19 +201,11 @@ export class WorkboxDetail {
 
 /* ── Helpers ─────────────── */
 
-function parseFlowGraph(
+export function parseWorkOrderFlowGraph(
     raw: string,
 ): WorkOrderFlowGraph {
     return validateWorkOrderFlowGraphJson(
         raw, 'workOrder.flowGraph',
-    );
-}
-
-function parseValues(
-    raw: string,
-): TransitionValues {
-    return validateTransitionValuesJson(
-        raw, 'transition.values',
     );
 }
 
@@ -245,7 +224,7 @@ function nodeName(
     return node.name;
 }
 
-function currentNodeId(
+function lastTransitionToNodeId(
     transitions:
         WorkOrderTransitionEntity[],
 ): string | undefined {
@@ -253,36 +232,16 @@ function currentNodeId(
         ?.to_node_id;
 }
 
-function isExpiredClaim(
+export function isExpiredClaim(
     claim: WorkOrderClaimEntity,
     lockTimeout: number,
 ): boolean {
-    const elapsed =
-        Date.now()
-        - new Date(
-            claim.claimed_at,
-        ).getTime();
+    const elapsed = msSinceUtc(
+        claim.claimed_at,
+    );
     const ms =
         lockTimeout * MS_PER_SECOND;
     return elapsed >= ms;
-}
-
-async function generateDisplayId(
-    uuid: string,
-): Promise<string> {
-    const data = new TextEncoder()
-        .encode(uuid);
-    const hash = await crypto.subtle
-        .digest('SHA-256', data);
-    const bytes = new Uint8Array(hash);
-    let hex = '';
-    const ID_LENGTH = 4;
-    for (let i = 0; i < ID_LENGTH; i++) {
-        hex += (bytes[i]!)
-            .toString(16)
-            .padStart(2, '0');
-    }
-    return hex;
 }
 
 /* ── Reads ───────────────── */
@@ -322,7 +281,7 @@ export async function getWorkboxItems(
 
     const items: WorkboxItem[] = [];
     for (const wo of workOrders) {
-        const fg = parseFlowGraph(
+        const fg = parseWorkOrderFlowGraph(
             wo.flow_graph,
         );
         const woTransitions = (
@@ -336,7 +295,9 @@ export async function getWorkboxItems(
                     ),
         );
         const curId =
-            currentNodeId(woTransitions);
+            lastTransitionToNodeId(
+                woTransitions,
+            );
         const curNode = fg.nodes.find(
             n => n.id === curId,
         )!;
@@ -421,7 +382,7 @@ export async function getWorkboxItem(
         getUserMap(),
     ]);
 
-    const fg = parseFlowGraph(
+    const fg = parseWorkOrderFlowGraph(
         wo.flow_graph,
     );
 
@@ -439,7 +400,9 @@ export async function getWorkboxItem(
         );
 
     const curId =
-        currentNodeId(woTransitions);
+        lastTransitionToNodeId(
+            woTransitions,
+        );
     const curNode = fg.nodes.find(
         n => n.id === curId,
     );
@@ -460,7 +423,11 @@ export async function getWorkboxItem(
     > = {};
     for (const t of woTransitions) {
         if (t.from_node_id === '') continue;
-        const vals = parseValues(t.values);
+        const vals =
+            validateTransitionValuesJson(
+                t.values,
+                'transition.values',
+            );
         if (
             Object.keys(vals).length > 0
         ) {
@@ -482,9 +449,12 @@ export async function getWorkboxItem(
     const history: HistoryEntry[] =
         woTransitions.map(t => {
             const vals =
-                parseValues(t.values);
-            const fieldValues: HistoryFieldValue[]
-                = [];
+                validateTransitionValuesJson(
+                    t.values,
+                    'transition.values',
+                );
+            const fieldValues:
+                HistoryFieldValue[] = [];
             for (
                 const [fId, val]
                 of Object.entries(vals)
@@ -549,8 +519,6 @@ export async function getWorkboxItem(
     });
 }
 
-/* ── Operations ──────────── */
-
 export async function getFlowsForCreation(
 ): Promise<{
     id: string;
@@ -562,236 +530,4 @@ export async function getFlowsForCreation(
         id: f.id,
         name: f.name,
     }));
-}
-
-async function nextWorkOrderPosition(
-): Promise<number> {
-    const existing = await GET<
-        WorkOrderEntity[]
-    >('work-orders');
-    if (existing.length === 0) {
-        return FIRST_POSITION;
-    }
-    const maxPosition = Math.max(
-        ...existing.map(w => w.position),
-    );
-    return maxPosition + POSITION_STEP;
-}
-
-export async function postWorkOrderCreation(
-    flowId: string,
-    userId: string,
-): Promise<string> {
-    const flow = await GET<FlowEntity>(
-        `flows/${flowId}`,
-    );
-    const graph: StoredGraph =
-        validateStoredGraphJson(
-            flow.graph, 'flow.graph',
-        );
-
-    const startNode = graph.nodes.find(
-        n => n.isStart,
-    );
-    if (!startNode) {
-        throw new Error(
-            'Flow has no start node',
-        );
-    }
-
-    const postStartEdges =
-        graph.edges.filter(
-            e => e.fromNodeId
-                === startNode.id,
-        );
-    if (postStartEdges.length !== 1) {
-        throw new Error(
-            'Start node must have'
-            + ' exactly one outgoing'
-            + ' edge',
-        );
-    }
-    const postStartNodeId =
-        postStartEdges[0]!.toNodeId;
-
-    const woId = crypto.randomUUID();
-    const displayId =
-        await generateDisplayId(woId);
-    const position =
-        await nextWorkOrderPosition();
-    const now = nowUtc();
-
-    const flowGraph: WorkOrderFlowGraph =
-        {
-            flowId: flow.id,
-            name: flow.name,
-            description: flow.description,
-            lockTimeout: flow.lock_timeout,
-            nodes: graph.nodes,
-            edges: graph.edges,
-        };
-
-    await PUT<void>('work-orders', {
-        id: woId,
-        display_id: displayId,
-        flow_graph: jsonObjectField(
-            flowGraph as unknown as Record<
-                string, unknown
-            >,
-        ),
-        position,
-        created_at: now,
-    });
-
-    await PUT<void>(
-        'flow-work-orders',
-        {
-            id: crypto.randomUUID(),
-            flow_id: flowId,
-            work_order_id: woId,
-            created_at: now,
-        },
-    );
-
-    const emptyValues = jsonObjectField(
-        {} as Record<string, unknown>,
-    );
-
-    await PUT<void>(
-        'work-order-transitions',
-        {
-            id: crypto.randomUUID(),
-            work_order_id: woId,
-            from_node_id: '',
-            to_node_id: startNode.id,
-            user_id: userId,
-            values: emptyValues,
-            transitioned_at: now,
-        },
-    );
-
-    await PUT<void>(
-        'work-order-transitions',
-        {
-            id: crypto.randomUUID(),
-            work_order_id: woId,
-            from_node_id: startNode.id,
-            to_node_id: postStartNodeId,
-            user_id: userId,
-            values: emptyValues,
-            transitioned_at: now,
-        },
-    );
-
-    await PUT<void>(
-        'work-order-claims',
-        {
-            id: crypto.randomUUID(),
-            work_order_id: woId,
-            user_id: userId,
-            claimed_at: now,
-        },
-    );
-
-    return woId;
-}
-
-export interface TransitionContext {
-    workOrderId: string;
-    edgeId: string;
-    values: Record<string, string>;
-    userId: string;
-    currentNodeId: string;
-}
-
-export async function postWorkOrderTransition(
-    ctx: TransitionContext,
-): Promise<void> {
-    const {
-        workOrderId, edgeId, values,
-        userId, currentNodeId,
-    } = ctx;
-    const wo = await GET<WorkOrderEntity>(
-        `work-orders/${workOrderId}`,
-    );
-    const fg = parseFlowGraph(
-        wo.flow_graph,
-    );
-
-    const edge = fg.edges.find(
-        e => e.id === edgeId,
-    );
-    if (!edge) {
-        throw new Error(
-            'Edge not found: ' + edgeId,
-        );
-    }
-
-    const now = nowUtc();
-
-    await PUT<void>(
-        'work-order-transitions',
-        {
-            id: crypto.randomUUID(),
-            work_order_id: workOrderId,
-            from_node_id: currentNodeId,
-            to_node_id: edge.toNodeId,
-            user_id: userId,
-            values: jsonObjectField(
-                values as Record<
-                    string, unknown
-                >,
-            ),
-            transitioned_at: now,
-        },
-    );
-
-    const claims =
-        await GET<WorkOrderClaimEntity[]>(
-            'work-order-claims',
-        );
-    const claim = claims.find(
-        c => c.work_order_id
-            === workOrderId,
-    );
-    if (claim) {
-        await DELETE(
-            `work-order-claims/${claim.id}`,
-        );
-    }
-}
-
-export async function putWorkOrder(
-    id: string,
-    patch: { position: number },
-): Promise<void> {
-    await PUT(`work-orders/${id}`, patch);
-}
-
-export async function postWorkOrderClaim(
-    workOrderId: string,
-    userId: string,
-): Promise<string> {
-    const now = nowUtc();
-    const claimId = crypto.randomUUID();
-
-    await PUT<void>(
-        'work-order-claims',
-        {
-            id: claimId,
-            work_order_id: workOrderId,
-            user_id: userId,
-            claimed_at: now,
-        },
-    );
-
-    return claimId;
-}
-
-export async function deleteWorkOrderClaim(
-    claimId: string,
-): Promise<void> {
-    await DELETE(
-        `work-order-claims/${claimId}`,
-    );
 }

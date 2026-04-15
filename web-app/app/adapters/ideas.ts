@@ -10,7 +10,7 @@ import {
 import {
     getUserMap,
     userName,
-} from './helpers';
+} from './shared';
 import {
     createChannel,
 } from '../channels';

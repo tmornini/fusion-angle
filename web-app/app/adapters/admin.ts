@@ -18,7 +18,7 @@ export type { Account };
 import {
     getUserMap,
     userName,
-} from './helpers';
+} from './shared';
 
 const RECENT_ACTIVITY_COUNT = 3;
 

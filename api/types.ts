@@ -221,6 +221,13 @@ export function nowUtc(): string {
     return new Date().toISOString();
 }
 
+export function msSinceUtc(
+    iso: string,
+): number {
+    return Date.now()
+        - new Date(iso).getTime();
+}
+
 export interface UserEntity {
     id: Id;
     first_name: string;
@@ -901,10 +908,9 @@ export class Idea {
         this.#submittedAt = submittedAt;
         this.#waitingDays = this.#submittedAt
             ? Math.max(0, Math.ceil(
-                (Date.now()
-                    - new Date(
-                        this.#submittedAt,
-                    ).getTime())
+                msSinceUtc(
+                    this.#submittedAt,
+                )
                 / MS_PER_SECOND
                 / SECONDS_PER_DAY,
             ))
@@ -1139,7 +1145,7 @@ export class Project {
             - start.getTime();
         if (total <= 0) return 0;
         const elapsed =
-            Date.now() - start.getTime();
+            msSinceUtc(this.#startDate);
         return Math.max(
             0,
             Math.min(
