@@ -155,6 +155,38 @@ export class FlowDesignerPresenter {
         this.#redoStack = [];
     }
 
+    async #reloadGraphFromStore(
+    ): Promise<void> {
+        const g = await getFlowGraph(
+            this.#state.flowId,
+        );
+        this.#state.flowName = g.name;
+        this.#state.flowDescription =
+            g.description;
+        this.#state.isLocked = g.isLocked;
+        this.#state.lockTimeout =
+            g.lockTimeout;
+        this.#state.nodes = g.nodes;
+        this.#state.edges = g.edges;
+        this.#state.interaction
+            .selection = { kind: 'none' };
+    }
+
+    async #handleMutationError(
+        err: unknown,
+        context: string,
+        userMessage: string,
+    ): Promise<void> {
+        log.error(
+            context + ' failed',
+            'flow-designer',
+            err,
+        );
+        showToast(userMessage, 'error');
+        await this
+            .#reloadGraphFromStore();
+    }
+
     startEditingName(): void {
         this.#state.isEditingName = true;
     }
@@ -630,15 +662,12 @@ ${toolbar}
                 positionY: y,
             });
         } catch (err) {
-            log.error(
-                'postNodeAddition failed',
-                'flow-designer',
-                err,
-            );
-            showToast(
-                'Failed to add state',
-                'error',
-            );
+            await this
+                .#handleMutationError(
+                    err,
+                    'addNode',
+                    'Failed to add state',
+                );
             return false;
         }
         this.#state.nodes = [
@@ -728,16 +757,13 @@ ${toolbar}
                 toNodeId: toId,
             });
         } catch (err) {
-            log.error(
-                'postEdgeConnection failed',
-                'flow-designer',
-                err,
-            );
-            showToast(
-                'Failed to create'
-                + ' transition',
-                'error',
-            );
+            await this
+                .#handleMutationError(
+                    err,
+                    'addEdge',
+                    'Failed to create'
+                    + ' transition',
+                );
             return false;
         }
         this.#state.edges = [
@@ -764,11 +790,11 @@ ${toolbar}
         if (ids.length === 0) return false;
         const fId = this.#state.flowId;
         const idSet = new Set(ids);
-        this.#state.nodes =
+        const nextNodes =
             this.#state.nodes.filter(
                 n => !idSet.has(n.id),
             );
-        this.#state.edges =
+        const nextEdges =
             this.#state.edges.filter(
                 e =>
                     !idSet.has(
@@ -781,21 +807,20 @@ ${toolbar}
         try {
             await putGraph({
                 flowId: fId,
-                nodes: this.#state.nodes,
-                edges: this.#state.edges,
+                nodes: nextNodes,
+                edges: nextEdges,
             });
         } catch (err) {
-            log.error(
-                'putGraph failed',
-                'flow-designer',
-                err,
-            );
-            showToast(
-                'Failed to delete state',
-                'error',
-            );
+            await this
+                .#handleMutationError(
+                    err,
+                    'deleteSelectedNodes',
+                    'Failed to delete state',
+                );
             return false;
         }
+        this.#state.nodes = nextNodes;
+        this.#state.edges = nextEdges;
         this.#noteMutation();
         this.#state.interaction
             .selection = { kind: 'none' };
@@ -841,23 +866,21 @@ ${toolbar}
                 edgeId,
                 this.#state.flowId,
             );
-            this.#state.edges =
-                this.#state.edges.filter(
-                    e => e.id !== edgeId,
-                );
-            this.#noteMutation();
         } catch (err) {
-            log.error(
-                'deleteEdge failed',
-                'flow-designer',
-                err,
-            );
-            showToast(
-                'Failed to delete transition',
-                'error',
-            );
+            await this
+                .#handleMutationError(
+                    err,
+                    'deleteSelectedEdge',
+                    'Failed to delete'
+                    + ' transition',
+                );
             return false;
         }
+        this.#state.edges =
+            this.#state.edges.filter(
+                e => e.id !== edgeId,
+            );
+        this.#noteMutation();
         this.#state.interaction
             .selection = { kind: 'none' };
         return true;
@@ -1079,15 +1102,12 @@ ${toolbar}
                 options,
             });
         } catch (err) {
-            log.error(
-                'postFieldAddition failed',
-                'flow-designer',
-                err,
-            );
-            showToast(
-                'Failed to add field',
-                'error',
-            );
+            await this
+                .#handleMutationError(
+                    err,
+                    'addField',
+                    'Failed to add field',
+                );
             return false;
         }
         const typed =
@@ -1131,32 +1151,29 @@ ${toolbar}
                 nodeId,
                 this.#state.flowId,
             );
-            this.#state.nodes =
-                this.#state.nodes.map(
-                    n => n.id === nodeId
-                        ? {
-                            ...n,
-                            fields:
-                                n.fields.filter(
-                                    f => f.id
-                                        !== fieldId,
-                                ),
-                        }
-                        : n,
-                );
-            this.#noteMutation();
         } catch (err) {
-            log.error(
-                'deleteField failed',
-                'flow-designer',
-                err,
-            );
-            showToast(
-                'Failed to delete field',
-                'error',
-            );
+            await this
+                .#handleMutationError(
+                    err,
+                    'deleteField',
+                    'Failed to delete field',
+                );
             return false;
         }
+        this.#state.nodes =
+            this.#state.nodes.map(
+                n => n.id === nodeId
+                    ? {
+                        ...n,
+                        fields:
+                            n.fields.filter(
+                                f => f.id
+                                    !== fieldId,
+                            ),
+                    }
+                    : n,
+            );
+        this.#noteMutation();
         return true;
     }
 
@@ -1222,15 +1239,12 @@ ${toolbar}
                 positionY: posY,
             });
         } catch (err) {
-            log.error(
-                'postNodeAddition failed',
-                'flow-designer',
-                err,
-            );
-            showToast(
-                'Failed to add state',
-                'error',
-            );
+            await this
+                .#handleMutationError(
+                    err,
+                    'addNodeAtPosition',
+                    'Failed to add state',
+                );
             return false;
         }
         try {
@@ -1242,16 +1256,13 @@ ${toolbar}
                 toNodeId: nodeId,
             });
         } catch (err) {
-            log.error(
-                'postEdgeConnection failed',
-                'flow-designer',
-                err,
-            );
-            showToast(
-                'Failed to connect'
-                + ' transition',
-                'error',
-            );
+            await this
+                .#handleMutationError(
+                    err,
+                    'addNodeAtPosition',
+                    'Failed to connect'
+                    + ' transition',
+                );
             return false;
         }
         this.#state.nodes = [
@@ -1323,15 +1334,12 @@ ${toolbar}
                 positionY: pos.y,
             });
         } catch (err) {
-            log.error(
-                'postNodeAddition failed',
-                'flow-designer',
-                err,
-            );
-            showToast(
-                'Failed to add state',
-                'error',
-            );
+            await this
+                .#handleMutationError(
+                    err,
+                    'addNodeWithEdge',
+                    'Failed to add state',
+                );
             return false;
         }
         try {
@@ -1343,16 +1351,13 @@ ${toolbar}
                 toNodeId: nodeId,
             });
         } catch (err) {
-            log.error(
-                'postEdgeConnection failed',
-                'flow-designer',
-                err,
-            );
-            showToast(
-                'Failed to connect'
-                + ' transition',
-                'error',
-            );
+            await this
+                .#handleMutationError(
+                    err,
+                    'addNodeWithEdge',
+                    'Failed to connect'
+                    + ' transition',
+                );
             return false;
         }
         this.#state.nodes = [

@@ -1,5 +1,4 @@
 import { applyTheme } from './state';
-import { log } from './logger';
 import {
     getPageName,
     initPrefetch,
@@ -94,30 +93,19 @@ document.addEventListener(
 
         const pageName = getPageName();
 
-        if (
-            document.querySelector(
-                '.sidebar-layout',
-            )
-        ) {
-            await initSidebarLayout();
-        }
-
-        import('./command-palette')
-            .then(
-                m =>
-                    m.initCommandPalette(),
-            )
-            .catch(err => log.error(
-                'Failed to load'
-                + ' command palette',
-                'core',
-                err,
-            ));
-
         try {
-            await initPageModule(
-                pageName,
+            if (
+                document.querySelector(
+                    '.sidebar-layout',
+                )
+            ) {
+                await initSidebarLayout();
+            }
+            const cp = await import(
+                './command-palette'
             );
+            cp.initCommandPalette();
+            await initPageModule(pageName);
         } catch (err) {
             handlePageLoadError(
                 pageName, err,

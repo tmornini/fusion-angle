@@ -177,7 +177,7 @@ import { navigateTo, openDialog, closeDialog } from '../app/core';
 
 ### Adapter Conventions
 
-- **User-name fallback**: When a user ID can't resolve to a name, return `''` (empty string). UI renders `'\u2014'` (em dash) for display. Never use magical fallback strings like `'Unknown'`.
+- **User-name resolution**: `userName(userMap, userId)` returns `''` only when `userId` itself is absent (legitimately unassigned). When `userId` is present but the user is not in the map, the function **throws** — a dangling reference is a data-integrity bug, not a formatting case. UI renders `'\u2014'` (em dash) for the legitimate-absence empty string. Never use magical fallback strings like `'Unknown'`.
 - **Absent values**: Use `null` for semantically absent values in adapter return types (e.g., `confidence: ConfidenceLevel | null`). Persisted noun entities never use `null`.
 - **No adapter caching**: Each adapter function fetches its own data directly via `getUserMap()`. No `cachedUserMap` or `prefetched*` parameters — simplicity over micro-optimization of localStorage reads.
 - **Shared types**: The `Metric` interface (`{ id, name, target, unit, current }`) is defined in `helpers.ts` and used across adapters.

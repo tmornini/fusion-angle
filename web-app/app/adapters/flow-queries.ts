@@ -6,10 +6,13 @@ import type {
     GraphNode,
     GraphEdge,
     GraphField,
+    StoredGraph,
     WfFieldType,
 } from '../../../api/types';
 import { toBool } from '../../../api/types';
-import { parseJson } from './helpers';
+import {
+    validateStoredGraphJson,
+} from '../../../api/validators';
 
 export type {
     GraphNode, GraphEdge, GraphField,
@@ -39,15 +42,12 @@ export interface FlowGraph {
     edges: GraphEdge[];
 }
 
-interface StoredGraph {
-    nodes: GraphNode[];
-    edges: GraphEdge[];
-}
-
 function parseGraph(
     raw: string,
 ): StoredGraph {
-    return parseJson<StoredGraph>(raw);
+    return validateStoredGraphJson(
+        raw, 'flow.graph',
+    );
 }
 
 export class FlowSummary {

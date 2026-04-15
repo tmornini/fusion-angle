@@ -240,7 +240,7 @@ function assignLayers(
         if (!predsList || !outList) continue;
         predsList.push(e.fromId);
         outList.push(e.toId);
-        inDeg.set(e.toId, (inDeg.get(e.toId) ?? 0) + 1);
+        inDeg.set(e.toId, inDeg.get(e.toId)! + 1);
     }
 
     const remInDeg = new Map(inDeg);
@@ -255,9 +255,9 @@ function assignLayers(
     while (queue.length > 0) {
         const id = queue.shift()!;
         topo.push(id);
-        const outs = outAdj.get(id) ?? [];
+        const outs = outAdj.get(id)!;
         for (const t of outs) {
-            const rem = (remInDeg.get(t) ?? 0) - 1;
+            const rem = remInDeg.get(t)! - 1;
             remInDeg.set(t, rem);
             if (rem === 0) {
                 queue.push(t);
@@ -267,13 +267,13 @@ function assignLayers(
 
     const layerOf = new Map<string, number>();
     for (const id of topo) {
-        const ps = preds.get(id) ?? [];
+        const ps = preds.get(id)!;
         if (ps.length === 0) {
             layerOf.set(id, 0);
         } else {
             let maxPred = 0;
             for (const p of ps) {
-                const pl = layerOf.get(p) ?? 0;
+                const pl = layerOf.get(p)!;
                 if (pl > maxPred) maxPred = pl;
             }
             layerOf.set(id, maxPred + 1);
@@ -341,13 +341,13 @@ function reduceCrossings(
         neighbors: Map<string, string[]>,
     ): string[] => {
         const withBary = ids.map((id, idx) => {
-            const ns = neighbors.get(id) ?? [];
+            const ns = neighbors.get(id)!;
             if (ns.length === 0) {
                 return { id, bary: idx };
             }
             let sum = 0;
             for (const n of ns) {
-                sum += neighborPos.get(n) ?? 0;
+                sum += neighborPos.get(n)!;
             }
             return { id, bary: sum / ns.length };
         });
@@ -410,7 +410,7 @@ function reduceCrossings(
             });
             const pairs: [number, number][] = [];
             top.forEach((t, ti) => {
-                const ns = downN.get(t) ?? [];
+                const ns = downN.get(t)!;
                 for (const d of ns) {
                     const bi = botPos.get(d);
                     if (bi !== undefined) {
@@ -505,10 +505,10 @@ function assignCoordinates(
     for (let l = 1; l < orderedLayers.length; l++) {
         const layer = orderedLayers[l]!;
         const raw = layer.map(id => {
-            const ps = upN.get(id) ?? [];
+            const ps = upN.get(id)!;
             if (ps.length === 0) return 0;
             const vals = ps
-                .map(p => ys.get(p) ?? 0)
+                .map(p => ys.get(p)!)
                 .sort((a, b) => a - b);
             const mid = Math.floor(vals.length / 2);
             if (vals.length % 2 === 1) {
@@ -531,7 +531,7 @@ function assignCoordinates(
         if (fl >= orderedLayers.length) {
             continue;
         }
-        const w = maxLabelByLayer[fl] ?? 0;
+        const w = maxLabelByLayer[fl]!;
         if (e.labelWidth > w) {
             maxLabelByLayer[fl] =
                 e.labelWidth;
@@ -548,7 +548,7 @@ function assignCoordinates(
         l++
     ) {
         const labelW =
-            maxLabelByLayer[l - 1] ?? 0;
+            maxLabelByLayer[l - 1]!;
         const needed = NODE_WIDTH
             + labelW
             + LABEL_SAFETY_MARGIN;
@@ -556,15 +556,15 @@ function assignCoordinates(
             MIN_LAYER_STEP, needed,
         );
         xByLayer[l] =
-            (xByLayer[l - 1] ?? 0) + step;
+            xByLayer[l - 1]! + step;
     }
 
     orderedLayers.forEach((layer, l) => {
-        const x = xByLayer[l] ?? 0;
+        const x = xByLayer[l]!;
         for (const id of layer) {
             positions.set(id, {
                 x,
-                y: ys.get(id) ?? 0,
+                y: ys.get(id)!,
             });
         }
     });
@@ -577,8 +577,8 @@ function enforceSpacing(
     ys: Map<string, number>,
 ): void {
     for (let i = 1; i < layer.length; i++) {
-        const prev = ys.get(layer[i - 1]!) ?? 0;
-        const cur = ys.get(layer[i]!) ?? 0;
+        const prev = ys.get(layer[i - 1]!)!;
+        const cur = ys.get(layer[i]!)!;
         if (cur - prev < SIBLING_STEP) {
             ys.set(layer[i]!, prev + SIBLING_STEP);
         }

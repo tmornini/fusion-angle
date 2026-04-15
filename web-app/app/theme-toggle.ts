@@ -5,6 +5,7 @@ import {
 } from './state';
 import { $, $$ } from './dom';
 import { setHtml } from './safe-html';
+import { showToast } from './toast';
 import {
     iconSun,
     iconMoon,
@@ -118,7 +119,17 @@ export function initThemeAndDropdowns(
                     if (
                         isValidTheme(theme)
                     ) {
-                        setTheme(theme);
+                        try {
+                            setTheme(theme);
+                        } catch {
+                            showToast(
+                                'Failed to'
+                                + ' save theme'
+                                + ' preference.',
+                                'error',
+                            );
+                            return;
+                        }
                         mutateThemeToggleIcon();
                         $$(
                             '.dropdown-content',

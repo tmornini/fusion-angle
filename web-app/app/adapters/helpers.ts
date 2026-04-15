@@ -23,15 +23,12 @@ export function userName(
     userId: string | undefined,
 ): string {
     if (!userId) return '';
-    return userMap.get(userId)?.fullName()
-        ?? '';
-}
-
-export function parseJson<T>(
-    value: string | T,
-): T {
-    if (typeof value === 'string') {
-        return JSON.parse(value) as T;
+    const user = userMap.get(userId);
+    if (!user) {
+        throw new Error(
+            'userName: unknown user '
+                + userId,
+        );
     }
-    return value;
+    return user.fullName();
 }

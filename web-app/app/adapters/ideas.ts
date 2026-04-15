@@ -78,8 +78,11 @@ export async function getIdeaDetail(
     const submission = submissions.find(
         s => s.idea_id === ideaId,
     );
-    if (!idea || !submission) {
-        throw new Error('Idea not found');
+    if (!submission) {
+        throw new Error(
+            'Idea submission not found'
+                + ' for idea ' + ideaId,
+        );
     }
     return new Idea(
         idea,

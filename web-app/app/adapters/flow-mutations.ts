@@ -6,6 +6,7 @@ import type {
     GraphNode,
     GraphEdge,
     GraphField,
+    StoredGraph,
     WfFieldType,
 } from '../../../api/types';
 import {
@@ -13,18 +14,17 @@ import {
     jsonObjectField,
     DEFAULT_LOCK_TIMEOUT,
 } from '../../../api/types';
-import { parseJson } from './helpers';
+import {
+    validateStoredGraphJson,
+} from '../../../api/validators';
 import { postFlowVersion } from './flow-versions';
-
-interface StoredGraph {
-    nodes: GraphNode[];
-    edges: GraphEdge[];
-}
 
 function parseGraph(
     raw: string,
 ): StoredGraph {
-    return parseJson<StoredGraph>(raw);
+    return validateStoredGraphJson(
+        raw, 'flow.graph',
+    );
 }
 
 function putFlowGraph(

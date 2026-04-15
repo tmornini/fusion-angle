@@ -1,7 +1,5 @@
 import { $ } from './dom';
-import { log } from './logger';
 import { navigateTo } from './navigation';
-import { showToast } from './toast';
 
 interface HeaderData {
     userName: string;
@@ -36,21 +34,7 @@ async function getHeaderData(
 
 export async function mutateHeaderInfo(
 ): Promise<void> {
-    let data: HeaderData;
-    try {
-        data = await getHeaderData();
-    } catch (err) {
-        log.error(
-            'getHeaderData failed',
-            'header-info',
-            err,
-        );
-        showToast(
-            'Header info load failed',
-            'error',
-        );
-        return;
-    }
+    const data = await getHeaderData();
     const { html, setHtml } =
         await import('./safe-html');
     const greetingEl =

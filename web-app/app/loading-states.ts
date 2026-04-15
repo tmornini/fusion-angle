@@ -215,6 +215,34 @@ export interface EmptyStateConfig {
     onEmpty?: () => void;
 }
 
+export class TimeoutError extends Error {
+    constructor() {
+        super(
+            'Request timed out.'
+            + ' Please try again.',
+        );
+        this.name = 'TimeoutError';
+    }
+}
+
+async function fetchWithTimeout<T>(
+    fetchFn: () => Promise<T>,
+    timeoutMs: number,
+): Promise<T> {
+    return Promise.race([
+        fetchFn(),
+        new Promise<never>(
+            (_, reject) =>
+                setTimeout(
+                    () => reject(
+                        new TimeoutError(),
+                    ),
+                    timeoutMs,
+                ),
+        ),
+    ]);
+}
+
 export async function withLoadingState<T>(
     container: HTMLElement,
     skeletonHtml: SafeHtml,
@@ -224,29 +252,14 @@ export async function withLoadingState<T>(
     timeoutMs?: number,
 ): Promise<T | null> {
     setHtml(container, skeletonHtml);
+    const run = timeoutMs
+        ? () => fetchWithTimeout(
+            fetchFn, timeoutMs,
+        )
+        : fetchFn;
     let data: T;
     try {
-        data = timeoutMs
-            ? await Promise.race([
-                fetchFn(),
-                new Promise<never>(
-                    (_, reject) =>
-                        setTimeout(
-                            () => reject(
-                                new Error(
-                                    'Request'
-                                    + ' timed'
-                                    + ' out.'
-                                    + ' Please'
-                                    + ' try'
-                                    + ' again.',
-                                ),
-                            ),
-                            timeoutMs,
-                        ),
-                ),
-            ])
-            : await fetchFn();
+        data = await run();
     } catch (e) {
         setHtml(
             container,

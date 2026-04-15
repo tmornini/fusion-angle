@@ -1,25 +1,23 @@
 import { GET, PUT } from '../../../api/api';
 import type {
     FlowEntity,
-    GraphNode,
-    GraphEdge,
+    StoredGraph,
 } from '../../../api/types';
 import {
     nowUtc,
     jsonObjectField,
 } from '../../../api/types';
-import { parseJson } from './helpers';
+import {
+    validateStoredGraphJson,
+} from '../../../api/validators';
 import { postFlowVersion } from './flow-versions';
-
-interface StoredGraph {
-    nodes: GraphNode[];
-    edges: GraphEdge[];
-}
 
 function parseGraph(
     raw: string,
 ): StoredGraph {
-    return parseJson<StoredGraph>(raw);
+    return validateStoredGraphJson(
+        raw, 'flow.graph',
+    );
 }
 
 function putFlowGraph(

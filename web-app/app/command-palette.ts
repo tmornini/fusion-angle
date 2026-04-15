@@ -2,9 +2,6 @@ import {
     $,
 } from './dom';
 import {
-    log,
-} from './logger';
-import {
     html,
     setHtml,
     SafeHtml,
@@ -169,33 +166,12 @@ export function initCommandPalette(
             }),
         );
 
-        let ideas: Awaited<
-            ReturnType<typeof getIdeas>
-        >;
-        let projects: Awaited<
-            ReturnType<typeof getProjects>
-        >;
-        let members: Awaited<
-            ReturnType<
-                typeof getTeamMembers
-            >
-        >;
-        try {
-            [ideas, projects, members] =
-                await Promise.all([
-                    getIdeas(),
-                    getProjects(),
-                    getTeamMembers(),
-                ]);
-        } catch (err) {
-            log.warn(
-                'Failed to load'
-                + ' search data',
-                'command-palette',
-                err,
-            );
-            return;
-        }
+        const [ideas, projects, members] =
+            await Promise.all([
+                getIdeas(),
+                getProjects(),
+                getTeamMembers(),
+            ]);
 
         const ideaItems:
             SearchItem[] =

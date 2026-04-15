@@ -9,6 +9,7 @@ import type {
     WorkOrderTransitionEntity,
     WorkOrderClaimEntity,
     WorkOrderFlowGraph,
+    StoredGraph,
     GraphNode,
     GraphEdge,
     GraphField,
@@ -19,9 +20,13 @@ import {
     MS_PER_SECOND,
 } from '../../../api/types';
 import {
+    validateStoredGraphJson,
+    validateWorkOrderFlowGraphJson,
+    validateTransitionValuesJson,
+} from '../../../api/validators';
+import {
     getUserMap,
     userName,
-    parseJson,
 } from './helpers';
 
 /* ── Types ───────────────── */
@@ -94,9 +99,8 @@ export class WorkboxItem {
     }
 }
 
-interface TransitionValues {
-    [fieldId: string]: string;
-}
+type TransitionValues =
+    Record<string, string>;
 
 export interface HistoryFieldValue {
     fieldName: string;
@@ -213,16 +217,16 @@ export class WorkboxDetail {
 function parseFlowGraph(
     raw: string,
 ): WorkOrderFlowGraph {
-    return parseJson<WorkOrderFlowGraph>(
-        raw,
+    return validateWorkOrderFlowGraphJson(
+        raw, 'workOrder.flowGraph',
     );
 }
 
 function parseValues(
     raw: string,
 ): TransitionValues {
-    return parseJson<TransitionValues>(
-        raw,
+    return validateTransitionValuesJson(
+        raw, 'transition.values',
     );
 }
 
@@ -581,10 +585,10 @@ export async function postWorkOrderCreation(
     const flow = await GET<FlowEntity>(
         `flows/${flowId}`,
     );
-    const graph = parseJson<{
-        nodes: GraphNode[];
-        edges: GraphEdge[];
-    }>(flow.graph);
+    const graph: StoredGraph =
+        validateStoredGraphJson(
+            flow.graph, 'flow.graph',
+        );
 
     const startNode = graph.nodes.find(
         n => n.isStart,

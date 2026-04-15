@@ -3,6 +3,7 @@ import {
         as persistSidebarCollapsed,
 } from './state';
 import { $required } from './dom';
+import { showToast } from './toast';
 import {
     initActiveNavItem,
 } from './nav-highlight';
@@ -22,10 +23,27 @@ import {
 
 function initSidebar(): void {
     function toggleSidebar(): void {
-        const isCollapsed = document
-            .documentElement.classList
-            .toggle('sidebar-collapsed');
-        persistSidebarCollapsed(isCollapsed);
+        const root =
+            document.documentElement;
+        const isCollapsed = !root
+            .classList
+            .contains('sidebar-collapsed');
+        try {
+            persistSidebarCollapsed(
+                isCollapsed,
+            );
+        } catch {
+            showToast(
+                'Failed to save'
+                + ' sidebar state.',
+                'error',
+            );
+            return;
+        }
+        root.classList.toggle(
+            'sidebar-collapsed',
+            isCollapsed,
+        );
     }
 
     $required(
