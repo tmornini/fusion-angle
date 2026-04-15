@@ -62,24 +62,25 @@ protocol locally, but testing is HTTP-only.
 - **Navigation**: Standard `<a href>` links between pages. Parameterized pages use query strings (`?ideaId=1`). `navigateTo(page, params?)` helper constructs relative URLs for programmatic navigation.
 - **Layout**: Sidebar-layout pages share a layout template with sidebar, header, search, and theme toggle. Mobile layout uses CSS media queries (not JS) to swap between desktop sidebar and mobile drawer.
 - **Page Detection**: `page-registry.ts` defines `PAGE_REGISTRY` mapping page names to `'sidebar'` or `'standalone'` layout type. `<html data-page="dashboard">` attribute is read by JS on `DOMContentLoaded` to dispatch to the correct page module's `init()`. Pages with `sourceDir` in `PAGE_REGISTRY` have source files at a different path than their page name.
-- **Source = Output Alignment**: Build output paths
-  always use `sourceDir` when present -- both
-  `compose.ts` and `navigateTo()` resolve output
-  directory as `sourceDir || pageName`. This means a
-  page at `web-app/flows/detail.html` produces output
-  at `flows/detail.html`, and `navigateTo('account')`
-  generates `../organization/index.html` because
-  account's `sourceDir` is `'organization'`. The
-  `sourceFile` property enables named files (e.g.,
-  `detail.html`) alongside the default `index.html`
-  convention. This keeps the developer's mental model
-  simple: the file you edit is the file the browser
-  loads.
+- **Source = Output Alignment**: Build output paths always use the registry's `sourceDir` and `sourceFile` (both are required fields on `PageEntry`). Both `compose.ts` and `navigateTo()` resolve output as `{sourceDir}/{sourceFile}.html`. So a page registered as `flow-detail` with `sourceDir: 'flows'` and `sourceFile: 'detail'` produces output at `flows/detail.html`, and `navigateTo('account')` generates `../organization/index.html` because `account` has `sourceDir: 'organization'`, `sourceFile: 'index'`. This keeps the developer's mental model simple: the file you edit is the file the browser loads.
 - **Auth**: Mock auth returning `demo@example.com`.
-- **Data**: REST-style API layer (`api/`) backed by localStorage. The `web-app/app/adapters/` directory contains ~30 adapter functions (split into domain modules with barrel re-export) that call `GET()`/`PUT()`/`POST()` and convert normalized DB rows into the denormalized shapes pages expect.
+- **Data**: REST-style API layer (`api/`) backed by localStorage. The `web-app/app/adapters/` directory contains ~70 adapter functions across 16 modules (with barrel re-export) that call `GET()`/`PUT()`/`POST()` and convert normalized DB rows into the denormalized shapes pages expect.
+- **Presentation**: The `web-app/app/presenters/` directory contains 14 presenter classes (with barrel re-export) that wrap adapter-returned shapes and emit `SafeHtml`. Page modules instantiate presenters and call `build*` methods on them to produce markup — keeping rendering logic out of page modules and out of adapters.
 - **Database**: localStorage with JSON serialization, persisted across page navigations. Each table is stored as a `fusion-ai:tableName` key containing a JSON array of row objects. When no schema exists (no `fusion-ai:*` keys in localStorage), non-entry pages redirect to snapshots so users can initialize the environment. A snapshots page provides create pristine environment, wipe and load mock data, upload snapshot, and download snapshot operations.
 - **State**: Simple module-level variables + pub-sub pattern for theme (persisted to localStorage), mobile detection (matchMedia), auth, and sidebar state.
 - **Durations**: All numeric durations are persisted in seconds. UI displays days via `durationInDays(seconds)` from `format.ts`.
+
+### Flow Canvas
+
+The "Flow Designer" page (`flows/detail.html`) renders an SVG canvas of a flow graph with pan, marquee selection, drag, and edge connection. Layers:
+
+- **`flow-layout.ts`** — Sugiyama-style layered layout (`computeLayout()`), aspect-aware scaling, reachability and adjacency helpers. Exports node-size constants used by the renderer.
+- **`flow-graph.ts`** — Pure SVG renderer that consumes a laid-out graph and emits nodes (ports, label boxes, start/complete decorations) and bezier edges (with bidirectional spread and dashed cycles).
+- **`flow-interactions.ts`** — Discriminated-union state machines (`Selection`, `DragMode`, `ConnectMode`, `PanMode`, `MarqueeMode`) that the page module wires to pointer and keyboard events. Pan requires Space + mousedown.
+- **`mermaid-generate.ts` / `mermaid-parse.ts`** — Round-trip between `FlowGraph` and Mermaid flowchart / stateDiagram text. Used by `adapters/flow-export.ts`.
+- **`zip.ts`** — Minimal in-browser ZIP (DEFLATE + CRC-32) used to package a flow as a downloadable bundle.
+
+`adapters/flow-export.ts` is the integration point: it calls `generateMermaid`, `parseMermaid`, `buildZip`, `getZipEntries`, `computeLayout`, and `computeEdgeLabelWidth` to produce `getFlowMermaid`, `getFlowZip`, `postFlowFromMermaid`, and `postFlowFromZip`.
 
 ### API Layer (`/api`)
 
@@ -93,21 +94,55 @@ The API layer is a set of TypeScript modules that provide a REST-style interface
 - **`api/db.ts`** — `DbAdapter` interface with `EntityStore<T>` and `SingletonStore<T>` patterns, plus `hasSchema()`/`createSchema()` lifecycle methods
 - **`api/db-localstorage.ts`** — localStorage implementation with JSON serialization
 - **`api/api.ts`** — `GET(resource)` / `PUT(resource, body)` / `DELETE(resource)` / `POST(resource, body)` URL routing
-- **`api/seed.ts`** — Mock data seeding function
+- **`api/mock-data.ts`** — Mock data seed payload + apply helper
 
 The `DbAdapter` interface is designed for easy migration to Postgres or other backends — implement the same interface and swap the import.
 
 ### Page Module Pattern
 
-Page folders contain `index.ts` and `index.html` by
-default. When `sourceFile` is set in `PAGE_REGISTRY`,
-the page uses `{sourceFile}.ts` and
-`{sourceFile}.html` instead (e.g.,
-`flows/detail.ts` + `flows/detail.html`). Each page
-module exports:
+Every entry in `PAGE_REGISTRY` declares both `sourceDir` and `sourceFile` explicitly (e.g., `flow-detail` → `web-app/flows/detail.ts` + `web-app/flows/detail.html`). The most common values are `index`, `detail`, `create`, `convert`, and the named `organization/` files (`teams`, `users`, `activity-feed`, `onboarding`). Each page module exports:
 - `init(): Promise<void>` — fetches data, populates DOM placeholders, binds event listeners
 
 Sidebar-layout pages have `index.html` containing page content that gets composed with the layout template. Standalone pages have a complete hand-written `index.html` with a `<div id="page-root">` that `init()` renders into.
+
+### Presenter Pattern
+
+Presenters live in `web-app/app/presenters/` and wrap
+adapter-returned shapes to produce `SafeHtml`. They are
+the single place where rendering logic lives: page
+modules fetch data via adapters, instantiate the
+relevant presenter, and call `build*` methods on it to
+generate the markup the page injects into the DOM.
+
+- **Construction**: each presenter takes the
+  adapter-returned shape in its constructor. Example:
+  `new IdeaPresenter(idea)` wraps an `Idea` and exposes
+  `buildStatusBadge()`, `idForLink()`,
+  `positionSortKey()`, etc.
+- **Receiver variant**: a few presenters implement a
+  `*Receiver` interface (e.g.,
+  `GaugePresenter implements GaugeReceiver`) so the
+  adapter can tell the presenter its values via method
+  calls rather than returning a data shape — a
+  tell-don't-ask flavor for simpler components.
+- **No state beyond construction args**: presenters
+  are pure view objects. They never fetch data, never
+  mutate, and never touch the DOM directly. Page
+  modules are responsible for the DOM; presenters are
+  responsible for the HTML they hand over.
+- **Barrel**: `presenters/index.ts` re-exports every
+  presenter class. Page modules import via
+  `from '../app/presenters'`.
+- **Shared helpers**: `presenters/ordered-keys.ts` is
+  an internal helper used by several presenters; it is
+  not itself a presenter and is not re-exported from
+  the barrel.
+- **File list** (14 presenters, 15 files):
+  `account`, `activity`, `flow`, `flow-designer`,
+  `gauge`, `idea`, `idea-conversion`, `idea-create`,
+  `profile`, `project`, `project-detail`, `settings`,
+  `user`, plus `index` (barrel) and `ordered-keys`
+  (helper).
 
 ### Import Conventions
 
@@ -136,7 +171,7 @@ import { navigateTo, openDialog, closeDialog } from '../app/core';
 - `get*` — adapter functions that fetch and transform data (reads)
 - `put*` — adapter functions that write entity data (writes)
 - Adapter function names use **domain nouns** (`getIdea`, `putProject`), never internal type names like `Entity` — the return type already communicates the shape
-- `deleteSchema`, `postSchemaCreation`, `postMockDataLoad`, `postBootstrap`, `putSnapshot`, `getSnapshot`, `hasData` — snapshot lifecycle operations in `adapters/snapshots.ts`
+- `deleteSchema`, `postSchemaCreation`, `postMockDataLoad`, `postBootstrap`, `putSnapshot`, `getSnapshot`, `getDataPresent` — snapshot lifecycle operations in `adapters/snapshots.ts`
 - Boolean variables: `is*`, `has*`, `needs*` (use the prefix that reads naturally in English)
 - Config objects: `Record<StatusType, { label, className }>` in `api/types.ts`
 
@@ -220,7 +255,7 @@ api/
   db.ts                       # DbAdapter interface (EntityStore, SingletonStore, hasSchema, createSchema), EntityNotFound
   db-localstorage.ts          # localStorage implementation with JSON serialization
   api.ts                      # GET/PUT/DELETE/POST URL routing
-  seed.ts                     # Mock data seeding
+  mock-data.ts                # Mock data seed payload
 
 web-app/
   index.html                  # Redirects to landing/index.html
@@ -245,14 +280,22 @@ web-app/
     icons.ts                  # ~100 SVG icon functions and lookup map
     state.ts                  # AppState, theme, mobile detection, pub-sub
     preferences-store.ts      # localStorage adapter for user preferences (theme, sidebar, log-level)
+    channels.ts               # createChannel<T>() pub/sub for cross-page change notifications
     charts.ts                 # SVG chart rendering (bar, line, donut, area)
     command-palette.ts        # Cmd+K search overlay with keyboard navigation
     dom.ts                    # querySelector wrappers ($, $$, $required, $input, $select, $textarea), attr(), populateIcons(), initToggleGroup(), bindEnterToClick()
+    drag-reorder.ts           # initDragReorder() pointer-driven list reordering with hysteresis indicator
+    flow-graph.ts             # SVG renderer for flow canvas (nodes, ports, bezier edges, label boxes)
+    flow-interactions.ts      # Pointer/keyboard state machines: selection, drag, connect, pan, marquee
+    flow-layout.ts            # Sugiyama-style layered graph layout (computeLayout, NODE_WIDTH, reachability)
+    mermaid-generate.ts       # generateMermaid(graph): serialize FlowGraph to Mermaid flowchart text
+    mermaid-parse.ts          # parseMermaid(text): parse Mermaid flowchart/stateDiagram into ParsedFlowchart
+    zip.ts                    # In-browser ZIP build/read (DEFLATE + CRC-32) for flow export/import
     toast.ts                  # showToast() auto-dismiss notifications
     logger.ts                 # Lightweight logger using preferences-store for log-level
     safe-html.ts              # SafeHtml class, html tagged template, trusted(), setHtml()
     loading-states.ts         # Loading skeletons, error states, empty states, withLoadingState()
-    adapters/                 # ~30 adapter functions (API → frontend shapes)
+    adapters/                 # ~70 adapter functions across 16 modules (API → frontend shapes)
       index.ts                # Barrel re-export
       helpers.ts              # getUserMap, userName, parseJson
       shared.ts               # getCurrentUser
@@ -268,6 +311,23 @@ web-app/
       flow-export.ts          # getFlowMermaid, getFlowZip, postFlowFromMermaid, postFlowFromZip
       workbox.ts              # getWorkboxItems, getWorkboxItem, postWorkOrderCreation, postWorkOrderTransition, postWorkOrderClaim, deleteWorkOrderClaim
       admin.ts                # getAccount, getProfile, getCompanySettings, getActivityFeed
+      snapshots.ts            # deleteSchema, postSchemaCreation, postMockDataLoad, postBootstrap, putSnapshot, getSnapshot, getDataPresent
+    presenters/               # 14 presenter classes (adapter shapes → SafeHtml)
+      index.ts                # Barrel re-export
+      ordered-keys.ts         # Internal helper (not a presenter)
+      account.ts              # AccountPresenter
+      activity.ts             # ActivityPresenter
+      flow.ts                 # FlowPresenter
+      flow-designer.ts        # FlowDesignerPresenter (flow canvas page)
+      gauge.ts                # GaugePresenter (dashboard gauges, receiver-style)
+      idea.ts                 # IdeaPresenter, IdeaListPresenter
+      idea-conversion.ts      # IdeaConversionPresenter (idea → project flow)
+      idea-create.ts          # IdeaCreatePresenter
+      profile.ts              # ProfilePresenter
+      project.ts              # ProjectPresenter, ProjectListPresenter
+      project-detail.ts       # ProjectDetailPresenter
+      settings.ts             # SettingsPresenter
+      user.ts                 # UserPresenter
     styles/                   # CSS modules (cascade-ordered) — build inputs
       fonts.css               # @font-face declarations
       tokens.css              # :root custom properties (light mode)
@@ -283,7 +343,7 @@ web-app/
     favicon.ico               # Application favicon
     *.woff2                   # 9 self-hosted font files (IBM Plex Sans, Inter, IBM Plex Mono)
 
-  # Pages — 25 pages across page directories (most use index.ts + index.html; some use sourceFile naming)
+  # Pages — 23 entries in PAGE_REGISTRY (19 sidebar-layout + 4 standalone). Most page directories hold multiple pages (e.g., flows/index + flows/detail).
   dashboard/                # Dashboard with gauge cards
   workbox/                  # Work order inbox + detail
   ideas/                    # Ideas list + detail, create, convert (named files)
@@ -311,9 +371,8 @@ temp directory -- no build artifacts in the repo.
 ## Build
 
 Build steps (requires clean git working directory):
-1. Composes HTML pages: runs `web-app/app/compose.ts` to assemble `components-layout.html` with `component-*.html` files and each sidebar-layout page's HTML file, producing 22 composed files in the build directory. Respects `sourceFile` for both input resolution and output placement. Exits with error if any page is missing.
-2. Copies 4 standalone pages' `index.html` to the
-   build directory
+1. Composes HTML pages: runs `web-app/app/compose.ts` to assemble `components-layout.html` with `component-*.html` files and each sidebar-layout page's HTML file, producing 19 composed files in the build directory. Respects `sourceDir` and `sourceFile` for both input resolution and output placement. Exits with error if any page is missing.
+2. Copies 4 standalone pages (`auth`, `landing`, `onboarding`, `not-found`) — also handled by `compose.ts`, which uses `copyFileSync` for standalone entries instead of templating
 3. Bundles TypeScript into a single IIFE (`assets/app.js`) via esbuild into the build directory
 4. Concatenates CSS modules in cascade order and minifies via esbuild into `assets/styles.css`, copies `*.woff2` and `favicon.ico` to the build directory
 5. Creates a distribution ZIP (`fusion-ai-<sha>.zip`) at the output path (default `~/Desktop/`), or skips zipping with `--no-zip`
