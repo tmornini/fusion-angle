@@ -576,6 +576,21 @@ function iconMail(size: number, cssClass: string) {
     );
 }
 
+function iconArchive(
+    size: number,
+    cssClass: string,
+) {
+    return icon(
+        '<rect width="20" height="5" x="2"'
+        + ' y="3" rx="1"/>'
+        + '<path d="M4 8v11a2 2 0 0 0 2 2h12'
+        + 'a2 2 0 0 0 2-2V8"/>'
+        + '<path d="M10 12h4"/>',
+        size,
+        cssClass,
+    );
+}
+
 function iconPhone(size: number, cssClass: string) {
     return icon(
         '<path d="M22 16.92v3a2 2 0 0'
@@ -1449,6 +1464,7 @@ const _allIcons = [
     iconCheckCircle,
     iconInfo,
     iconMail,
+    iconArchive,
     iconPhone,
     iconCalendar,
     iconClock,
@@ -1530,6 +1546,7 @@ export type IconName =
     | 'trendingUp' | 'trendingDown'
     | 'alertCircle' | 'alertTriangle'
     | 'checkCircle' | 'info' | 'mail'
+    | 'archive'
     | 'phone' | 'calendar' | 'clock'
     | 'upload' | 'download' | 'trash'
     | 'edit' | 'eye' | 'copy' | 'save'
@@ -1622,6 +1639,7 @@ export {
     iconCheckCircle,
     iconInfo,
     iconMail,
+    iconArchive,
     iconPhone,
     iconCalendar,
     iconClock,

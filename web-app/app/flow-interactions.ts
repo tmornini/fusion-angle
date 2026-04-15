@@ -176,7 +176,20 @@ function handlePointerDown(
     const target = e.target;
     if (!(target instanceof Element)) return;
 
-    if (state.isSpaceDown) return;
+    if (state.isSpaceDown) {
+        state.pan = {
+            kind: 'panning',
+            startX: e.clientX,
+            startY: e.clientY,
+        };
+        state.activePointerId =
+            e.pointerId;
+        svg.setPointerCapture(
+            e.pointerId,
+        );
+        onUpdate();
+        return;
+    }
 
     const svgPt = screenToSvg(
         svg, e.clientX, e.clientY,
@@ -276,20 +289,15 @@ function handlePointerDown(
                 === state.lastClick.id
             && now - state.lastClick.time
                 < DBLCLICK_MS;
+        state.selection = {
+            kind: 'edge', edgeId,
+        };
         state.lastClick = {
             kind: 'clicked',
             id: edgeId,
             time: now,
         };
-        if (isDbl) {
-            state.selection = {
-                kind: 'edge', edgeId,
-            };
-            state.isPanelOpen = true;
-            onUpdate();
-            return;
-        }
-        startBackgroundDrag(e, svg, state);
+        state.isPanelOpen = isDbl;
         onUpdate();
         return;
     }
@@ -485,6 +493,16 @@ function handlePointerUp(
     getNodePosition: NodePositionLookup,
     getAllNodes: NodeListLookup,
 ): void {
+    if (state.pan.kind === 'panning') {
+        state.pan = { kind: 'idle' };
+        state.activePointerId = 0;
+        svg.releasePointerCapture(
+            e.pointerId,
+        );
+        onUpdate();
+        return;
+    }
+
     if (state.drag.kind === 'dragging') {
         const dx =
             state.drag.currentPointerX
@@ -693,8 +711,13 @@ export function bindInteractions(
     getAllNodes: NodeListLookup,
     signal: AbortSignal,
 ): void {
-    let lastClientX = 0;
-    let lastClientY = 0;
+    const cursorHost =
+        svg.parentElement as HTMLElement;
+    if (state.isSpaceDown) {
+        cursorHost.classList.add(
+            'wf-pan-cursor',
+        );
+    }
 
     svg.addEventListener(
         'pointerdown',
@@ -707,13 +730,9 @@ export function bindInteractions(
 
     svg.addEventListener(
         'pointermove',
-        (e) => {
-            lastClientX = e.clientX;
-            lastClientY = e.clientY;
-            handlePointerMove(
-                e, svg, state, onUpdate,
-            );
-        },
+        (e) => handlePointerMove(
+            e, svg, state, onUpdate,
+        ),
         { signal },
     );
 
@@ -789,16 +808,20 @@ export function bindInteractions(
         }
         state.isSpaceDown = next;
         if (next) {
-            state.pan = {
-                kind: 'panning',
-                startX: lastClientX,
-                startY: lastClientY,
-            };
             state.autoFitEnabled = false;
+            cursorHost.classList.add(
+                'wf-pan-cursor',
+            );
         } else {
-            state.pan = { kind: 'idle' };
+            cursorHost.classList.remove(
+                'wf-pan-cursor',
+            );
+            if (
+                state.pan.kind === 'panning'
+            ) {
+                state.pan = { kind: 'idle' };
+            }
         }
-        onUpdate();
     };
     window.addEventListener(
         'keydown', handleSpace,

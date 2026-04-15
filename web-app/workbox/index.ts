@@ -10,7 +10,9 @@ import {
 } from '../app/loading-states';
 import {
     iconMail,
+    iconArchive,
     iconPlus,
+    iconGripVertical,
 } from '../app/icons';
 import {
     navigateTo,
@@ -22,11 +24,15 @@ import {
     getWorkboxArchive,
     getFlowsForCreation,
     postWorkOrderCreation,
+    putWorkOrder,
     getCurrentUser,
 } from '../app/adapters';
 import type {
     WorkboxItem,
 } from '../app/adapters';
+import {
+    initDragReorder,
+} from '../app/drag-reorder';
 
 function relativeTime(
     iso: string,
@@ -45,6 +51,7 @@ function relativeTime(
 
 function buildInboxRow(
     item: WorkboxItem,
+    showGrip: boolean,
 ): ReturnType<typeof html> {
     const badge = item.isCompleted()
         ? html`<span
@@ -59,41 +66,72 @@ function buildInboxRow(
         item.lastTransitionerName();
     const from = name
         ? name : '\u2014';
+    const grip = showGrip
+        ? html`<div class="${
+            'hidden-mobile text-muted'
+            + ' cursor-grab'
+        }">${
+            iconGripVertical(20, '')
+        }</div>`
+        : html``;
     return html`
     <div
         class="card p-4 cursor-pointer"
         data-wo-card="${item.idForLink()}"
+        data-position="${
+            item.positionSortKey()
+        }"
     >
         <div
-            class="flex items-center
-                gap-2 mb-1"
+            class="flex items-center gap-4"
         >
-            <span
-                class="font-semibold"
-            >${item.flowNameText()}</span>
-            <span
-                class="text-xs text-muted"
-            >#${item.displayIdText()}</span>
-        </div>
-        <div
-            class="flex items-center
-                gap-2 text-sm text-muted"
-        >
-            ${badge}
-            <span>from ${from}</span>
-            <span
-                class="ml-auto"
-            >${relativeTime(
-                item.lastTransitionedAtDate(),
-            )}</span>
+            ${grip}
+            <div class="flex-fill">
+                <div
+                    class="flex items-center
+                        gap-2 mb-1"
+                >
+                    <span
+                        class="font-semibold"
+                    >${
+                        item.flowNameText()
+                    }</span>
+                    <span
+                        class="${
+                            'text-xs text-muted'
+                        }"
+                    >#${
+                        item.displayIdText()
+                    }</span>
+                </div>
+                <div
+                    class="${
+                        'flex items-center'
+                        + ' gap-2 text-sm'
+                        + ' text-muted'
+                    }"
+                >
+                    ${badge}
+                    <span>from ${from}</span>
+                    <span
+                        class="ml-auto"
+                    >${relativeTime(
+                        item
+                            .lastTransitionedAtDate(),
+                    )}</span>
+                </div>
+            </div>
         </div>
     </div>`;
 }
 
 function buildInboxList(
     items: WorkboxItem[],
+    showGrip: boolean,
 ): ReturnType<typeof html> {
-    return html`${items.map(buildInboxRow)}`;
+    return html`${items.map(
+        item => buildInboxRow(item, showGrip),
+    )}`;
 }
 
 function initRowNavigation(
@@ -229,6 +267,26 @@ async function initCreateDropdown(
 export async function init(
     _params?: Record<string, string>,
 ): Promise<void> {
+    const tabsEl = $(
+        '#workbox-tabs', document,
+    );
+    if (tabsEl) {
+        setHtml(
+            tabsEl,
+            html`<span
+                class="badge badge-success
+                    text-xs cursor-pointer
+                    active"
+                data-tab="active"
+            >${iconMail(14, '')} Active</span>
+            <span
+                class="badge badge-default
+                    text-xs cursor-pointer"
+                data-tab="archive"
+            >${iconArchive(14, '')} Archive</span>`,
+        );
+    }
+
     initTabs(
         '[data-tab]',
         '.tab-panel',
@@ -263,9 +321,44 @@ export async function init(
         if (active) {
             setHtml(
                 activeEl,
-                buildInboxList(active),
+                buildInboxList(active, true),
             );
             initRowNavigation(activeEl);
+            initDragReorder(
+                activeEl,
+                '[data-wo-card]',
+                'data-wo-card',
+                async (id, newPosition) => {
+                    try {
+                        await putWorkOrder(
+                            id,
+                            {
+                                position:
+                                    newPosition,
+                            },
+                        );
+                    } catch (err) {
+                        log.error(
+                            'reorder failed',
+                            'workbox', err,
+                        );
+                        showToast(
+                            'Failed to save'
+                            + ' order',
+                            'error',
+                        );
+                        return;
+                    }
+                    const updated =
+                        await getWorkboxActive();
+                    setHtml(
+                        activeEl,
+                        buildInboxList(
+                            updated, true,
+                        ),
+                    );
+                },
+            );
         }
     }
 
@@ -292,7 +385,9 @@ export async function init(
         if (archive) {
             setHtml(
                 archiveEl,
-                buildInboxList(archive),
+                buildInboxList(
+                    archive, false,
+                ),
             );
             initRowNavigation(archiveEl);
         }

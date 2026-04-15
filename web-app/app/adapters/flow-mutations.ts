@@ -58,8 +58,8 @@ async function putGraphMutation(
     });
 }
 
-const DEFAULT_START_NAME = 'New';
-const DEFAULT_COMPLETE_NAME = 'Complete';
+const DEFAULT_START_NAME = 'Start';
+const DEFAULT_COMPLETE_NAME = 'End';
 const DEFAULT_START_X = -300;
 const DEFAULT_START_Y = 0;
 const DEFAULT_COMPLETE_X = 300;

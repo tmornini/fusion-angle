@@ -104,8 +104,8 @@ on. Run these in order.
   creation limited to approved projects only".
 - [ ] **AA36** Click "New Flow". PASS: navigates
   to the flow designer page. The SVG canvas
-  shows two nodes: "New" (start, top-left with
-  green border) and "Complete" (end, bottom-right
+  shows two nodes: "Start" (start, top-left with
+  green border) and "End" (end, bottom-right
   with double green border) connected by no edges.
   Toolbar shows Undo, Redo, Delete (trash icon),
   Auto Layout, Zoom −/Show All/+,
@@ -131,9 +131,11 @@ on. Run these in order.
   node label updates on the canvas immediately
   (auto-saves via 800ms debounce).
 - [ ] **AA40** Double-click the edge between
-  start and "Data Capture". PASS: edge
-  properties panel shows Name, Description,
-  From/To states. Rename it to "begin".
+  start and "Data Capture". PASS: no properties
+  panel opens — the outgoing edge from Start is
+  intentionally not interactive. The edge has no
+  name label visible on the canvas, just a plain
+  blue arrow.
 - [ ] **AA41** Drag from "Data Capture"'s port
   into empty canvas past 20 pixels to create a
   new middle node; rename it "Review" via its
@@ -147,7 +149,7 @@ on. Run these in order.
   check recognises the release would close a
   loop. Release to create the cycle edge; rename
   it "needs revision". Hold Shift and drag from
-  "Review" onto "Complete". PASS: preview is a
+  "Review" onto "End". PASS: preview is a
   solid-blue curved bezier (no return path).
   Release to create the edge; rename it
   "approve".
@@ -396,18 +398,22 @@ on. Run these in order.
 ### Flow Designer (`flows/detail.html?flowId=...`)
 
 - [ ] **F14** Navigate to a flow designer page.
-  PASS: toolbar at top with Undo, Redo, Delete
-  (trash icon), Auto Layout, Zoom −/Show All/+,
-  Copy Mermaid, Export. Locked checkbox in
-  header controls edit lock. SVG canvas
-  below with dot grid background showing the flow
-  graph. Changes auto-save (no explicit Save
-  button).
+  PASS: toolbar runs vertically along the left
+  edge of the canvas with Back at the top, Delete
+  (trash icon) at the bottom, and Undo/Redo, Auto
+  Layout, Zoom −/Auto Fit/+, Copy Mermaid, Export
+  distributed between them. Locked checkbox in
+  header controls edit lock. SVG canvas to the
+  right of the toolbar with dot grid background
+  showing the flow graph. Opening a properties
+  panel automatically disables Auto Fit. Changes
+  auto-save (no explicit Save button).
 - [ ] **F15** Nodes display correctly: start node
-  has green border with "Start state" subtitle,
-  standard nodes have blue border with field count,
-  complete node has double green border with "End
-  state" subtitle.
+  has green border with its name centered in the
+  card and no subtitle, standard nodes have blue
+  border with field count subtitle, complete node
+  has double green border with its name centered
+  in the card and no subtitle.
 - [ ] **F16** Edges display correctly: forward
   edges are solid blue lines with arrow markers
   and named labels. Cycle edges — those that
@@ -432,6 +438,20 @@ on. Run these in order.
   PASS: properties panel appears showing state
   name, description, form fields list, and
   outgoing transitions.
+- [ ] **F18a** Pan so a node sits near the right
+  edge of the canvas, then double-click it. PASS:
+  the properties panel slides out from the
+  toolbar edge over ~200ms and the canvas
+  re-centers so the node sits at the visual center
+  of the canvas region not covered by the panel.
+- [ ] **F18b** While the panel is open, double-click
+  a different node. PASS: panel content updates to
+  the new selection and the canvas re-centers on
+  it.
+- [ ] **F18c** Enable Auto Fit, then double-click a
+  node. PASS: panel opens, Auto Fit toggles off
+  (button no longer highlighted), and the canvas
+  centers on the node.
 - [ ] **F19** Drag from a middle node's port into
   empty canvas past 20 pixels, without holding
   Shift. PASS: during the drag a faint bezier
@@ -448,7 +468,8 @@ on. Run these in order.
   non-draggable — clicking anywhere on it
   initiates a drag-from-start instead). The
   complete node is draggable like standard nodes.
-- [ ] **F19d** Click "Auto Layout" in toolbar. PASS:
+- [ ] **F19d** Click "Auto Layout" in the vertical
+  toolbar on the left. PASS:
   all nodes reposition based on their rank from
   start. Start is placed top-left, complete
   bottom-right, others arranged by graph depth.

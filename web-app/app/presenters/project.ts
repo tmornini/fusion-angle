@@ -195,9 +195,7 @@ export class ProjectPresenter {
         const m = 'text-xs text-muted';
         return html`
     <div class="${
-        'hidden-mobile flex'
-        + ' items-center gap-4'
-        + ' flex-shrink-0'
+        'hidden-mobile project-metric-grid'
     }">
         <div class="${
             'flex items-center gap-2'

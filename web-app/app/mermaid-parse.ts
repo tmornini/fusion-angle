@@ -285,7 +285,7 @@ const COMPOSITE_CLOSE_RE =
 
 const STATE_PSEUDO = '[*]';
 const STATE_START_NAME = 'Start';
-const STATE_COMPLETE_NAME = 'Complete';
+const STATE_COMPLETE_NAME = 'End';
 
 function parseStateDiagram(
     text: string,

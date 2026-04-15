@@ -1197,7 +1197,7 @@ export async function populateMockData(
                         id: '7c6c4356-a06b'
                             + '-4f43-99ac'
                             + '-9a481baf70f1',
-                        name: 'New',
+                        name: 'Start',
                         description: '',
                         positionX: 40,
                         positionY: 30,
@@ -1394,7 +1394,7 @@ export async function populateMockData(
                         id: 'cfdd1f8c-8415'
                             + '-4610-8c6f'
                             + '-7504eb54ef4f',
-                        name: 'Complete',
+                        name: 'End',
                         description: '',
                         positionX: 680,
                         positionY: 370,
@@ -1485,7 +1485,7 @@ export async function populateMockData(
                         id: '207852d5-38f5'
                             + '-4271-bf42'
                             + '-73339e9ec0e8',
-                        name: 'New',
+                        name: 'Start',
                         description: '',
                         positionX: -702,
                         positionY: -236,
@@ -1497,7 +1497,7 @@ export async function populateMockData(
                         id: 'f59ba944-c3fc'
                             + '-45a1-841e'
                             + '-b7f1174aa7fa',
-                        name: 'Complete',
+                        name: 'End',
                         description: '',
                         positionX: 436,
                         positionY: 358,
@@ -2061,6 +2061,7 @@ export async function populateMockData(
                     woFlowGraph,
                 ).edges,
             }),
+            position: 1,
             created_at: woCreated,
         },
     ];

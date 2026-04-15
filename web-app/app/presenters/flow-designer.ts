@@ -47,6 +47,7 @@ import {
 } from '../adapters';
 import {
     buildGraphSvg,
+    computeEdgeLabelWidth,
     perimeterPoint,
     whichEdge,
     controlOffset,
@@ -106,8 +107,9 @@ interface DesignerState {
     savedViewBox: SavedViewBox;
 }
 
-const PANEL_HEIGHT_PX = 300;
-const PANEL_PAD_PX = 40;
+// Must match .wf-props-panel width in pages.css
+// (18rem = 288px at 16px root).
+const PANEL_WIDTH_PX = 288;
 
 export class FlowDesignerPresenter {
     #state: DesignerState;
@@ -389,19 +391,18 @@ export class FlowDesignerPresenter {
     }
 
     #panToRevealSelected(): void {
-        const vb =
-            this.#state.interaction
-                .viewBox;
-        const pxToSvg =
-            vb.w / this.#canvasW;
-        const panelH =
-            PANEL_HEIGHT_PX * pxToSvg;
-        const pad =
-            PANEL_PAD_PX * pxToSvg;
+        // Center the selection in the visible canvas
+        // region (the area not covered by the panel).
+        // The panel is anchored at the left edge of
+        // .wf-canvas-area with width PANEL_WIDTH_PX,
+        // so visible X spans [PANEL_WIDTH_PX, canvasW].
+        // Solving for vb.x such that selX lands at the
+        // visible center yields:
+        //   vb.x = selX - (vb.w + panelW_svg) / 2
         const sel =
-            this.#state.interaction
-                .selection;
-        let elementY: number | undefined;
+            this.#state.interaction.selection;
+        let selX: number | undefined;
+        let selY: number | undefined;
         const singleId = this
             .#singleSelectedNodeId();
         if (singleId) {
@@ -410,7 +411,10 @@ export class FlowDesignerPresenter {
                     nd => nd.id === singleId,
                 );
             if (n) {
-                elementY = n.positionY;
+                selX = n.positionX
+                    + NODE_WIDTH / 2;
+                selY = n.positionY
+                    + NODE_HEIGHT / 2;
             }
         }
         if (sel.kind === 'edge') {
@@ -435,22 +439,29 @@ export class FlowDesignerPresenter {
                                 .toNodeId,
                         );
                 if (fn && tn) {
-                    elementY = (
-                        fn.positionY
-                        + tn.positionY
-                    ) / 2;
+                    const fx = fn.positionX
+                        + NODE_WIDTH / 2;
+                    const fy = fn.positionY
+                        + NODE_HEIGHT / 2;
+                    const tx = tn.positionX
+                        + NODE_WIDTH / 2;
+                    const ty = tn.positionY
+                        + NODE_HEIGHT / 2;
+                    selX = (fx + tx) / 2;
+                    selY = (fy + ty) / 2;
                 }
             }
         }
-        if (
-            elementY === undefined
-        ) return;
-        const threshold =
-            vb.y + panelH + pad;
-        if (elementY < threshold) {
-            vb.y =
-                elementY - panelH - pad;
-        }
+        if (selX === undefined) return;
+        if (selY === undefined) return;
+        const vb =
+            this.#state.interaction.viewBox;
+        const panelW_svg =
+            PANEL_WIDTH_PX
+            * vb.w / this.#canvasW;
+        vb.x = selX
+            - (vb.w + panelW_svg) / 2;
+        vb.y = selY - vb.h / 2;
     }
 
     #handlePanelTransition(): void {
@@ -472,6 +483,10 @@ export class FlowDesignerPresenter {
                 w: vb.w,
                 h: vb.h,
             };
+            // Disable Auto Fit so the centering
+            // call below sticks across renders.
+            this.#state.interaction
+                .autoFitEnabled = false;
             this.#panToRevealSelected();
         }
         if (!isOpen && wasOpen) {
@@ -553,10 +568,12 @@ class="wf-designer">
 } /> Locked</label>
 </div>
 </div>
+<div class="wf-designer-body">
 ${toolbar}
 <div class="wf-canvas-area">${panel}
 <div class="wf-canvas-wrap"
     >${canvas}</div>
+</div>
 </div>
 </div>`;
         setHtml(container, content);
@@ -865,6 +882,11 @@ ${toolbar}
     autoLayout(): void {
         if (this.#guardLocked()) return;
         const fId = this.#state.flowId;
+        const nodeById = new Map(
+            this.#state.nodes.map(
+                n => [n.id, n],
+            ),
+        );
         const layoutInputs =
             this.#state.nodes.map(
                 n => ({
@@ -874,15 +896,32 @@ ${toolbar}
                 }),
             );
         const layoutEdges =
-            this.#state.edges.map(
-                e => ({
+            this.#state.edges.map(e => {
+                const from =
+                    nodeById.get(e.fromNodeId);
+                const isStart =
+                    from?.isStart === true;
+                return {
                     fromId: e.fromNodeId,
                     toId: e.toNodeId,
-                }),
-            );
+                    labelWidth: isStart
+                        ? 0
+                        : computeEdgeLabelWidth(
+                            e.name,
+                        ),
+                };
+            });
+        const panelOpen = this.#state
+            .interaction.isPanelOpen;
+        const effectiveW = panelOpen
+            ? Math.max(
+                0,
+                this.#canvasW - PANEL_WIDTH_PX,
+            )
+            : this.#canvasW;
         const positions = computeLayout(
             layoutInputs, layoutEdges,
-            this.#canvasW, this.#canvasH,
+            effectiveW, this.#canvasH,
         );
         this.#state.nodes =
             this.#state.nodes.map(n => {
@@ -2141,8 +2180,6 @@ class="wf-props-panel">
             this.#state.isLocked,
             isConn,
             marqueeRect,
-            this.#state.interaction
-                .isSpaceDown,
         );
         const preview =
             this.#buildConnectPreview();

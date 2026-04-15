@@ -42,6 +42,9 @@ import {
 import type {
     LayoutInput, LayoutEdge,
 } from '../flow-layout';
+import {
+    computeEdgeLabelWidth,
+} from '../flow-graph';
 
 /* ── Mermaid export ──────────────── */
 
@@ -593,6 +596,12 @@ function layoutImportedGraph(
         edges.map(e => ({
             fromId: e.fromNodeId,
             toId: e.toNodeId,
+            labelWidth:
+                e.fromNodeId === startId
+                    ? 0
+                    : computeEdgeLabelWidth(
+                        e.name,
+                    ),
         }));
     return computeLayout(
         inputs, layoutEdges,

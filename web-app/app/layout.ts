@@ -1,5 +1,4 @@
 import {
-    state,
     setSidebarCollapsed
         as persistSidebarCollapsed,
 } from './state';
@@ -22,47 +21,17 @@ import {
 } from './header-info';
 
 function initSidebar(): void {
-    const sidebar = $required(
-        '#desktop-sidebar', document,
-    );
-    const mainContent = $required(
-        '.main-content', document,
-    );
-
-    if (state.isSidebarCollapsed) {
-        sidebar.classList.add(
-            'sidebar-collapsed',
-        );
-        mainContent.classList.add(
-            'sidebar-collapsed',
-        );
-    }
-
-    function setSidebarCollapsed(
-        collapsed: boolean,
-    ): void {
-        const action = collapsed
-            ? 'add' : 'remove';
-        sidebar.classList[action](
-            'sidebar-collapsed',
-        );
-        mainContent.classList[action](
-            'sidebar-collapsed',
-        );
-        persistSidebarCollapsed(collapsed);
+    function toggleSidebar(): void {
+        const isCollapsed = document
+            .documentElement.classList
+            .toggle('sidebar-collapsed');
+        persistSidebarCollapsed(isCollapsed);
     }
 
     $required(
-        '#sidebar-collapse', document,
+        '#sidebar-toggle', document,
     ).addEventListener(
-        'click',
-        () => setSidebarCollapsed(true),
-    );
-    $required(
-        '#sidebar-expand', document,
-    ).addEventListener(
-        'click',
-        () => setSidebarCollapsed(false),
+        'click', toggleSidebar,
     );
 }
 

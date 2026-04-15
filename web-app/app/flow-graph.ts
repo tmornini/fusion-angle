@@ -36,6 +36,7 @@ const PORT_RADIUS = 5;
 const PORT_STROKE = 2;
 
 const NODE_LABEL_Y = 26;
+const NODE_LABEL_Y_CENTERED = 38;
 const NODE_LABEL_FONT = 13;
 const NODE_META_Y = 45;
 const NODE_META_FONT = 11;
@@ -47,8 +48,7 @@ const HIT_TARGET_WIDTH = 12;
 const CURVE_TENSION = 0.4;
 const BEZIER_MIDPOINT = 0.5;
 const BIDI_SPREAD = 40;
-const BIDI_LABEL_T_FWD = 0.35;
-const BIDI_LABEL_T_REV = 0.65;
+const BIDI_LABEL_T = 0.42;
 
 const CYCLE_DASH = '6 3';
 
@@ -326,6 +326,30 @@ function truncateLabel(
         : text;
 }
 
+function truncateEdgeLabel(
+    name: string,
+): string {
+    const maxChars = Math.floor(
+        (LABEL_MAX_WIDTH - LABEL_PADDING)
+        / LABEL_CHAR_WIDTH,
+    );
+    return truncateLabel(name, maxChars);
+}
+
+export function computeEdgeLabelWidth(
+    name: string,
+): number {
+    const trunc = truncateEdgeLabel(name);
+    return Math.min(
+        Math.max(
+            trunc.length * LABEL_CHAR_WIDTH
+                + LABEL_PADDING,
+            LABEL_MIN_WIDTH,
+        ),
+        LABEL_MAX_WIDTH,
+    );
+}
+
 function buildNode(
     node: GraphNode,
     isSelected: boolean,
@@ -381,14 +405,11 @@ function buildNode(
             + `${COMPLETE_INNER_STROKE}"/>`;
     }
 
-    const meta = node.isStart
-        ? 'Start state'
-        : node.isComplete
-            ? 'End state'
-            : String(node.fields.length)
-                + ' field'
-                + (node.fields.length !== 1
-                    ? 's' : '');
+    const isSpecial =
+        node.isStart || node.isComplete;
+    const labelY = isSpecial
+        ? NODE_LABEL_Y_CENTERED
+        : NODE_LABEL_Y;
 
     const nameEsc = escapeForHtml(
         truncateLabel(
@@ -397,7 +418,7 @@ function buildNode(
     );
     inner += '<text'
         + ` x="${halfW}"`
-        + ` y="${NODE_LABEL_Y}"`
+        + ` y="${labelY}"`
         + ' text-anchor="middle"'
         + ` font-size="${NODE_LABEL_FONT}"`
         + ' font-weight="600"'
@@ -405,16 +426,22 @@ function buildNode(
         + '--color-foreground, #e0e4ef)">'
         + nameEsc + '</text>';
 
-    inner += '<text'
-        + ` x="${halfW}"`
-        + ` y="${NODE_META_Y}"`
-        + ' text-anchor="middle"'
-        + ` font-size="${NODE_META_FONT}"`
-        + ' fill="var('
-        + '--color-muted-foreground,'
-        + ' #5a6480)">'
-        + escapeForHtml(meta)
-        + '</text>';
+    if (!isSpecial) {
+        const meta = String(node.fields.length)
+            + ' field'
+            + (node.fields.length !== 1
+                ? 's' : '');
+        inner += '<text'
+            + ` x="${halfW}"`
+            + ` y="${NODE_META_Y}"`
+            + ' text-anchor="middle"'
+            + ` font-size="${NODE_META_FONT}"`
+            + ' fill="var('
+            + '--color-muted-foreground,'
+            + ' #5a6480)">'
+            + escapeForHtml(meta)
+            + '</text>';
+    }
 
     if (portPos) {
         inner += '<circle'
@@ -456,6 +483,7 @@ function buildEdge(
     edge: GraphEdge,
     fromNode: GraphNode,
     toNode: GraphNode,
+    isSelected: boolean,
     aimOffset: number,
     isCycle: boolean,
 ): SafeHtml {
@@ -482,19 +510,23 @@ function buildEdge(
     let aimToX = fromCx;
     let aimToY = fromCy;
 
+    let perpX = 0;
+    let perpY = 0;
+    let spread = 0;
+
     if (aimOffset !== 0) {
         const dx = toCx - fromCx;
         const dy = toCy - fromCy;
         const len = Math.hypot(dx, dy);
         if (len > 0) {
-            const px = -dy / len;
-            const py = dx / len;
-            const s =
+            perpX = -dy / len;
+            perpY = dx / len;
+            spread =
                 aimOffset * BIDI_SPREAD;
-            aimFromX = toCx + px * s;
-            aimFromY = toCy + py * s;
-            aimToX = fromCx + px * s;
-            aimToY = fromCy + py * s;
+            aimFromX = toCx + perpX * spread;
+            aimFromY = toCy + perpY * spread;
+            aimToX = fromCx + perpX * spread;
+            aimToY = fromCy + perpY * spread;
         }
     }
 
@@ -530,22 +562,22 @@ function buildEdge(
         controlOffset(se, dist);
     const cp2 =
         controlOffset(ee, dist);
+    const cp1X =
+        startPt.x + cp1.dx + perpX * spread;
+    const cp1Y =
+        startPt.y + cp1.dy + perpY * spread;
+    const cp2X =
+        endPt.x + cp2.dx + perpX * spread;
+    const cp2Y =
+        endPt.y + cp2.dy + perpY * spread;
     pathD = 'M '
         + String(startPt.x) + ' '
         + String(startPt.y)
         + ' C '
-        + String(
-            startPt.x + cp1.dx,
-        ) + ' '
-        + String(
-            startPt.y + cp1.dy,
-        ) + ', '
-        + String(
-            endPt.x + cp2.dx,
-        ) + ' '
-        + String(
-            endPt.y + cp2.dy,
-        ) + ', '
+        + String(cp1X) + ' '
+        + String(cp1Y) + ', '
+        + String(cp2X) + ' '
+        + String(cp2Y) + ', '
         + String(endPt.x) + ' '
         + String(endPt.y);
 
@@ -565,6 +597,20 @@ function buildEdge(
 
     const sw = EDGE_STROKE;
 
+    if (fromNode.isStart) {
+        return trusted(
+            '<g>'
+            + '<path'
+            + ` d="${pathD}"`
+            + ' fill="none"'
+            + ` stroke="${color}"`
+            + ` stroke-width="${sw}"`
+            + dashAttr
+            + ` marker-end="${markerUrl}"/>`
+            + '</g>',
+        );
+    }
+
     const hitPath = '<path'
         + ` d="${pathD}"`
         + ' fill="none"'
@@ -583,30 +629,16 @@ function buildEdge(
 
     const labelT = aimOffset === 0
         ? BEZIER_MIDPOINT
-        : edge.fromNodeId < edge.toNodeId
-            ? BIDI_LABEL_T_FWD
-            : BIDI_LABEL_T_REV;
+        : BIDI_LABEL_T;
     const mid = bezierAt(pathD, labelT);
     const midX = mid.x;
     const midY = mid.y;
-    const edgeMaxChars = Math.floor(
-        (LABEL_MAX_WIDTH - LABEL_PADDING)
-        / LABEL_CHAR_WIDTH,
-    );
-    const truncEdge = truncateLabel(
-        edge.name, edgeMaxChars,
-    );
+    const truncEdge =
+        truncateEdgeLabel(edge.name);
     const labelEsc =
         escapeForHtml(truncEdge);
-    const labelLen = truncEdge.length;
-    const labelW = Math.min(
-        Math.max(
-            labelLen * LABEL_CHAR_WIDTH
-                + LABEL_PADDING,
-            LABEL_MIN_WIDTH,
-        ),
-        LABEL_MAX_WIDTH,
-    );
+    const labelW =
+        computeEdgeLabelWidth(edge.name);
 
     const labelBg = '<rect'
         + ` x="${midX - labelW / 2}"`
@@ -635,9 +667,13 @@ function buildEdge(
         + labelEsc
         + '</text>';
 
+    const edgeSelAttr = isSelected
+        ? ' filter="url(#wf-glow)"'
+        : '';
     return trusted(
         '<g'
         + ` data-edge-id="${edge.id}"`
+        + edgeSelAttr
         + '>'
         + hitPath
         + visPath + visClose
@@ -773,7 +809,6 @@ export function buildGraphSvg(
         w: number;
         h: number;
     } | null,
-    isPanCursor: boolean,
 ): SafeHtml {
     const nodeMap = new Map(
         nodes.map(n => [n.id, n]),
@@ -835,11 +870,15 @@ export function buildGraphSvg(
         if (bidi.has(k)) {
             aimOffset = 1;
         }
+        const isSelected =
+            selection.kind === 'edge'
+            && edge.id === selection.edgeId;
         edgeMarkup +=
             buildEdge(
                 edge,
                 fromNode,
                 toNode,
+                isSelected,
                 aimOffset,
                 cycleEdgeIds.has(
                     edge.id,
@@ -888,9 +927,6 @@ export function buildGraphSvg(
     let svgCls = 'wf-canvas';
     if (isConnecting) {
         svgCls += ' wf-connecting';
-    }
-    if (isPanCursor) {
-        svgCls += ' wf-pan-cursor';
     }
 
     let marqueeMarkup = '';

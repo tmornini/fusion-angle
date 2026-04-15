@@ -1,5 +1,5 @@
 import {
-    GET, POST, DELETE,
+    GET, POST, PUT, DELETE,
 } from '../../../api/api';
 import type {
     Id,
@@ -26,6 +26,9 @@ import {
 
 /* ── Types ───────────────── */
 
+const FIRST_POSITION = 1;
+const POSITION_STEP = 1;
+
 export class WorkboxItem {
     readonly #id: string;
     readonly #displayId: string;
@@ -34,6 +37,7 @@ export class WorkboxItem {
     readonly #stateName: string;
     readonly #transitionerName: string;
     readonly #completed: boolean;
+    readonly #position: number;
 
     constructor(data: {
         id: string;
@@ -43,6 +47,7 @@ export class WorkboxItem {
         transitionerName: string;
         lastTransitionedAt: string;
         completed: boolean;
+        position: number;
     }) {
         this.#id = data.id;
         this.#displayId = data.displayId;
@@ -53,6 +58,7 @@ export class WorkboxItem {
         this.#lastTransitionedAt =
             data.lastTransitionedAt;
         this.#completed = data.completed;
+        this.#position = data.position;
     }
 
     idForLink(): string {
@@ -81,6 +87,10 @@ export class WorkboxItem {
 
     lastTransitionerName(): string {
         return this.#transitionerName;
+    }
+
+    positionSortKey(): number {
+        return this.#position;
     }
 }
 
@@ -358,8 +368,15 @@ export async function getWorkboxItems(
                 last?.transitioned_at
                     ?? wo.created_at,
             completed: isCompleted,
+            position: wo.position,
         }));
     }
+
+    items.sort(
+        (a, b) =>
+            a.positionSortKey()
+            - b.positionSortKey(),
+    );
 
     return items;
 }
@@ -543,6 +560,20 @@ export async function getFlowsForCreation(
     }));
 }
 
+async function nextWorkOrderPosition(
+): Promise<number> {
+    const existing = await GET<
+        WorkOrderEntity[]
+    >('work-orders');
+    if (existing.length === 0) {
+        return FIRST_POSITION;
+    }
+    const maxPosition = Math.max(
+        ...existing.map(w => w.position),
+    );
+    return maxPosition + POSITION_STEP;
+}
+
 export async function postWorkOrderCreation(
     flowId: string,
     userId: string,
@@ -582,6 +613,8 @@ export async function postWorkOrderCreation(
     const woId = crypto.randomUUID();
     const displayId =
         await generateDisplayId(woId);
+    const position =
+        await nextWorkOrderPosition();
     const now = nowUtc();
 
     const flowGraph: WorkOrderFlowGraph =
@@ -602,6 +635,7 @@ export async function postWorkOrderCreation(
                 string, unknown
             >,
         ),
+        position,
         created_at: now,
     });
 
@@ -721,6 +755,13 @@ export async function postWorkOrderTransition(
             `work-order-claims/${claim.id}`,
         );
     }
+}
+
+export async function putWorkOrder(
+    id: string,
+    patch: { position: number },
+): Promise<void> {
+    await PUT(`work-orders/${id}`, patch);
 }
 
 export async function postWorkOrderClaim(

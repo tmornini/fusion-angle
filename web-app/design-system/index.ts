@@ -136,8 +136,9 @@ function buildWfNodeSvg(
             + ` stroke="${WF_GREEN}"`
             + ' stroke-width="1.5"/>';
     }
+    const labelY = subtitle === '' ? 34 : 22;
     inner += '<text'
-        + ` x="${halfW}" y="22"`
+        + ` x="${halfW}" y="${labelY}"`
         + ' text-anchor="middle"'
         + ' font-size="14"'
         + ' font-weight="600"'
@@ -145,14 +146,16 @@ function buildWfNodeSvg(
         + '--color-foreground,'
         + ' #e0e4ef)">'
         + label + '</text>';
-    inner += '<text'
-        + ` x="${halfW}" y="40"`
-        + ' text-anchor="middle"'
-        + ' font-size="11"'
-        + ' fill="var('
-        + '--color-muted-foreground,'
-        + ' #5a6480)">'
-        + subtitle + '</text>';
+    if (subtitle !== '') {
+        inner += '<text'
+            + ` x="${halfW}" y="40"`
+            + ' text-anchor="middle"'
+            + ' font-size="11"'
+            + ' fill="var('
+            + '--color-muted-foreground,'
+            + ' #5a6480)">'
+            + subtitle + '</text>';
+    }
     inner += '<circle'
         + ' cx="0"'
         + ` cy="${NH / 2}"`
@@ -1680,8 +1683,8 @@ export async function init(): Promise<void> {
                         }text-xs text-muted">${''
                         }Start Node</code>
                     ${buildWfNodeSvg(
-                        'New',
-                        'Start state',
+                        'Start',
+                        '',
                         WF_GREEN,
                         false,
                     )}
@@ -1702,8 +1705,8 @@ export async function init(): Promise<void> {
                         }text-xs text-muted">${''
                         }Complete Node</code>
                     ${buildWfNodeSvg(
-                        'Complete',
-                        'End state',
+                        'End',
+                        '',
                         WF_GREEN,
                         true,
                     )}

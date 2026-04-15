@@ -65,3 +65,14 @@ cd /tmp/fusion-test/ && python3 -m http.server 8080
 - ~100 inline SVG icons
 - Self-hosted IBM Plex Sans, Inter, and IBM Plex Mono fonts
 
+## Development Standards
+
+All code in this repository must adhere to the standards defined by the [`church-of-code`](https://github.com/The-Church-of-Code/church-of-code) Claude Code plugin.
+
+Install it into Claude Code:
+
+```
+/plugin marketplace add The-Church-of-Code/church-of-code
+/plugin install church-of-code@church-of-code-marketplace
+```
+

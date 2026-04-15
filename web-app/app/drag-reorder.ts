@@ -5,6 +5,7 @@ const DRAGGING_OPACITY = '0.4';
 const FIRST_POSITION = 1;
 const POSITION_GAP = 1;
 const FALLBACK_POSITION = '0';
+const HYSTERESIS_PX = 8;
 
 type DragState =
     | { kind: 'idle' }
@@ -12,6 +13,7 @@ type DragState =
         kind: 'active';
         id: string;
         indicator: HTMLElement | null;
+        idx: number | null;
     };
 
 export function initDragReorder(
@@ -58,11 +60,13 @@ export function initDragReorder(
             kind: 'active',
             id: drag.id,
             indicator: null,
+            idx: null,
         };
     }
 
     function dropIndex(
         y: number,
+        lastIdx: number | null,
     ): number {
         const items = cards();
         for (
@@ -73,7 +77,15 @@ export function initDragReorder(
                     .getBoundingClientRect();
             const mid =
                 rect.top + rect.height / 2;
-            if (y < mid) return i;
+            let boundary = mid;
+            if (lastIdx === i) {
+                boundary =
+                    mid + HYSTERESIS_PX;
+            } else if (lastIdx === i + 1) {
+                boundary =
+                    mid - HYSTERESIS_PX;
+            }
+            if (y < boundary) return i;
         }
         return items.length;
     }
@@ -97,7 +109,7 @@ export function initDragReorder(
             if (!card) return;
             const handle =
                 pointerTarget?.closest(
-                    '[style*="grab"]',
+                    '.cursor-grab',
                 );
             if (!handle) {
                 e.preventDefault();
@@ -109,6 +121,7 @@ export function initDragReorder(
                     idAttribute,
                 ) || '',
                 indicator: null,
+                idx: null,
             };
             card.style.opacity =
                 DRAGGING_OPACITY;
@@ -125,16 +138,23 @@ export function initDragReorder(
             e.preventDefault();
             e.dataTransfer!.dropEffect =
                 'move';
-            clearIndicator();
-            const idx = dropIndex(
+            const newIdx = dropIndex(
                 e.clientY,
+                drag.idx,
             );
+            if (
+                newIdx === drag.idx
+                && drag.indicator
+            ) {
+                return;
+            }
+            drag.indicator?.remove();
             const ind = buildIndicator();
             const items = cards();
-            if (idx < items.length) {
+            if (newIdx < items.length) {
                 container.insertBefore(
                     ind,
-                    items[idx]!,
+                    items[newIdx]!,
                 );
             } else {
                 container.appendChild(ind);
@@ -143,6 +163,7 @@ export function initDragReorder(
                 kind: 'active',
                 id: drag.id,
                 indicator: ind,
+                idx: newIdx,
             };
         },
     );
@@ -170,12 +191,14 @@ export function initDragReorder(
             if (drag.kind !== 'active')
                 return;
             const draggedId = drag.id;
+            const committedIdx =
+                drag.idx ?? dropIndex(
+                    e.clientY, null,
+                );
             clearIndicator();
             drag = { kind: 'idle' };
             const items = cards();
-            const idx = dropIndex(
-                e.clientY,
-            );
+            const idx = committedIdx;
             const positions = items.map(
                 c => parseFloat(
                     c.getAttribute(
