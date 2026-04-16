@@ -5,15 +5,6 @@ import type { SafeHtml } from '../safe-html';
 import { log } from '../logger';
 import { showToast } from '../toast';
 import {
-    iconArrowLeft,
-    iconUndo,
-    iconRedo,
-    iconTrash,
-    iconX,
-    iconEdit,
-    iconCheck,
-} from '../icons';
-import {
     putNode,
     putGraph,
     putGraphSilent,
@@ -73,6 +64,14 @@ import type {
     InteractionState,
 } from '../flow-interactions';
 import { FlowHistory } from '../flow-history';
+import { iconArrowLeft } from '../icons';
+import {
+    buildToolbar,
+    buildFieldEditor,
+    buildNodePanel,
+    buildEdgePanel,
+    buildFlowNameHeader,
+} from './flow-designer-view';
 
 function serializeGraph(
     nodes: GraphNode[],
@@ -553,36 +552,10 @@ export class FlowDesignerPresenter {
         const canvas =
             this.#buildCanvas();
         const nameHtml =
-            this.#state.isEditingName
-                ? html`<div class="${
-                    'flex items-center'
-                    + ' gap-2'
-                }">
-<input class="input wf-name-input"
-    id="flow-name-input"
-    value="${this.#state.flowName}" />
-<button class="${
-    'btn btn-ghost btn-icon'
-}" id="flow-name-save-btn"
-    >${iconCheck(16, '')}</button>
-<button class="${
-    'btn btn-ghost btn-icon'
-}" id="flow-name-cancel-btn"
-    >${iconX(16, '')}</button>
-</div>`
-                : html`<div class="${
-                    'flex items-center'
-                    + ' gap-2'
-                }">
-<h2 class="${
-    'text-lg font-semibold'
-}">${this.#state.flowName}</h2>
-<button class="${
-    'btn btn-ghost btn-icon'
-    + ' wf-name-edit-btn'
-}" id="flow-name-edit-btn"
-    >${iconEdit(14, '')}</button>
-</div>`;
+            buildFlowNameHeader(
+                this.#state.flowName,
+                this.#state.isEditingName,
+            );
         const lockedAttr =
             this.#state.isLocked
                 ? ' checked' : '';
@@ -592,6 +565,12 @@ class="wf-designer">
 <div class="${
     'flex items-center gap-4'
 }">
+<button
+    class="btn btn-ghost btn-icon"
+    id="flow-back-btn"
+    title="Back"
+    aria-label="Back"
+    >${iconArrowLeft(20, '')}</button>
 <div class="flex-1">${nameHtml}
 <p class="text-sm text-muted"
     >${this.#state.flowDescription}</p>
@@ -1595,313 +1574,20 @@ ${toolbar}
 
 
     #buildToolbar(): SafeHtml {
-        const autoFitCls =
+        return buildToolbar(
             this.#state.interaction
-                .autoFitEnabled
-                ? ' wf-toolbar-toggle-on'
-                : '';
-        return html`<div
-class="wf-toolbar">
-<div class="wf-toolbar-group">
-<button
-    class="btn btn-ghost btn-icon"
-    id="flow-back-btn"
-    >${iconArrowLeft(20, '')}</button>
-</div>
-<div class="wf-toolbar-spacer"></div>
-<div class="wf-toolbar-group">
-<button
-    class="btn btn-ghost btn-icon"
-    data-action="undo"${
-    trusted(
-        this.canUndo()
-            ? '' : ' disabled',
-    )}>${iconUndo(18, '')}</button>
-<button
-    class="btn btn-ghost btn-icon"
-    data-action="redo"${
-    trusted(
-        this.canRedo()
-            ? '' : ' disabled',
-    )}>${iconRedo(18, '')}</button>
-</div>
-<div class="wf-toolbar-spacer"></div>
-<div class="wf-toolbar-group">
-<button class="btn btn-ghost btn-sm"
-    data-action="auto-layout"${
-    trusted(
-        this.#state.isLocked
-            ? ' disabled' : '',
-    )}><span class="wf-btn-stack"
-    >Auto<br>Layout</span></button>
-</div>
-<div class="wf-toolbar-spacer"></div>
-<div class="wf-toolbar-group">
-<button class="btn btn-ghost btn-sm"
-    data-action="zoom-out"
-    >Zoom \u2212</button>
-<button class="${trusted(
-    'btn btn-ghost btn-sm'
-    + ' wf-toolbar-toggle'
-    + autoFitCls,
-)}"
-    data-action="auto-fit"
-    ><span class="wf-btn-stack"
-    >Auto<br>Fit</span></button>
-<button class="btn btn-ghost btn-sm"
-    data-action="zoom-in"
-    >Zoom +</button>
-</div>
-<div class="wf-toolbar-spacer"></div>
-<div class="wf-toolbar-group">
-<button class="btn btn-ghost btn-sm"
-    data-action="copy-mermaid"
-    ><span class="wf-btn-stack"
-    >Copy<br>Mermaid</span></button>
-<button class="btn btn-ghost btn-sm"
-    data-action="export-zip"
-    >Export</button>
-</div>
-<div class="wf-toolbar-spacer"></div>
-<div class="wf-toolbar-group">
-<button
-    class="btn btn-ghost btn-icon"
-    data-action="delete-selected"${
-    trusted(
-        this.#canDelete()
-        && !this.#state.isLocked
-            ? '' : ' disabled',
-    )}>${iconTrash(18, '')}</button>
-</div>
-</div>`;
-    }
-
-    #buildFieldBadge(
-        fieldType: string,
-    ): SafeHtml {
-        return html`<span
-class="badge badge-outline text-xs"
->${fieldType}</span>`;
-    }
-
-    #buildFieldRow(
-        field: GraphField,
-    ): SafeHtml {
-        const req = field.isRequired
-            ? html`<span class="${
-                'text-xs wf-required-mark'
-            }"> *</span>`
-            : html``;
-        return html`<div
-class="wf-field-row"
-data-field-id="${field.id}">
-${this.#buildFieldBadge(field.fieldType)}
-<span class="text-sm"
-    >${field.name}</span>
-${req}
-<button
-    class="btn btn-ghost btn-xs ml-auto"
-    data-action="delete-field"
-    data-field-id="${field.id}"
-    >&times;</button>
-</div>`;
+                .autoFitEnabled,
+            this.canUndo(),
+            this.canRedo(),
+            this.#state.isLocked,
+            this.#canDelete(),
+        );
     }
 
     buildFieldEditor(): SafeHtml {
-        const nodeId = this
-            .#singleSelectedNodeId();
-        if (!nodeId) {
-            return html``;
-        }
-        return html`<div
-class="wf-field-editor"
-data-node-id="${nodeId}">
-<h4 class="text-sm font-semibold mb-2"
-    >Add Field</h4>
-<div class="mb-2">
-<input type="text"
-    class="input input-sm"
-    id="new-field-name"
-    placeholder="Field name" />
-</div>
-<div class="mb-2">
-<select class="input input-sm"
-    id="new-field-type">
-<option value="text">text</option>
-<option value="textarea"
-    >textarea</option>
-<option value="number">number</option>
-<option value="date">date</option>
-<option value="select">select</option>
-<option value="checkbox"
-    >checkbox</option>
-<option value="file">file</option>
-<option value="email">email</option>
-<option value="url">url</option>
-<option value="phone">phone</option>
-<option value="currency"
-    >currency</option>
-<option value="multi_select"
-    >multi_select</option>
-<option value="radio">radio</option>
-<option value="image">image</option>
-</select>
-</div>
-<div class="mb-2">
-<label class="text-sm">
-<input type="checkbox"
-    id="new-field-required" />
-Required</label>
-</div>
-<div class="mb-2">
-<textarea
-    class="input input-sm"
-    id="new-field-options"
-    placeholder="${
-        'Options (one per line)'
-    }"
-    rows="2"></textarea>
-</div>
-<button class="btn btn-primary btn-xs"
-    data-action="save-field"
-    >Add</button>
-</div>`;
-    }
-
-    #buildNodePanel(
-        node: GraphNode,
-        outgoing: GraphEdge[],
-    ): SafeHtml {
-        const isSpecial =
-            node.isStart || node.isComplete;
-        if (isSpecial) {
-            const kind = node.isStart
-                ? 'Start' : 'End';
-            return html`<div
-class="wf-props-panel">
-<div class="wf-props-header"
-><h3 class="text-sm font-semibold"
-    >${kind} State</h3>
-<button
-    class="btn btn-ghost btn-icon btn-xs"
-    data-action="close-panel"
-    aria-label="Close"
-    >${iconX(14, '')}</button>
-</div>
-<div class="mb-2">
-<label class="text-xs text-muted"
-    >Name</label>
-<div class="text-sm">${node.name}</div>
-</div>
-<div class="mb-3">
-<label class="text-xs text-muted"
-    >Outgoing Transitions</label>
-${outgoing.length > 0
-    ? outgoing.map(e => html`<div
-class="text-sm text-muted"
->\u2192 ${e.name}</div>`)
-    : html`<div class="text-sm text-muted"
-        >None</div>`}
-</div>
-</div>`;
-        }
-        const fieldRows = node.fields
-            .map(f => this.#buildFieldRow(f));
-        return html`<div
-class="wf-props-panel">
-<div class="wf-props-header"
-><h3 class="text-sm font-semibold"
-    >State Properties</h3>
-<button
-    class="btn btn-ghost btn-icon btn-xs"
-    data-action="close-panel"
-    aria-label="Close"
-    >${iconX(14, '')}</button>
-</div>
-<div class="mb-2">
-<label class="text-xs text-muted"
-    >Name</label>
-<input type="text"
-    class="input input-sm"
-    id="prop-node-name"
-    value="${node.name}" />
-</div>
-<div class="mb-2">
-<label class="text-xs text-muted"
-    >Description</label>
-<input type="text"
-    class="input input-sm"
-    id="prop-node-desc"
-    value="${node.description}" />
-</div>
-<div class="mb-3">
-<label class="text-xs text-muted"
-    >Fields</label>
-${fieldRows}
-<button
-    class="btn btn-ghost btn-xs mt-1"
-    data-action="add-field"
-    >+ Add Field</button>
-<div id="field-editor-slot"></div>
-</div>
-<div class="mb-3">
-<label class="text-xs text-muted"
-    >Outgoing Transitions</label>
-${outgoing.length > 0
-    ? outgoing.map(e => html`<div
-class="text-sm text-muted"
->\u2192 ${e.name}</div>`)
-    : html`<div class="text-sm text-muted"
-        >None</div>`}
-</div>
-</div>`;
-    }
-
-    #buildEdgePanel(
-        edge: GraphEdge,
-        fromNode: GraphNode,
-        toNode: GraphNode,
-    ): SafeHtml {
-        const fromName = fromNode.name;
-        const toName = toNode.name;
-        return html`<div
-class="wf-props-panel">
-<div class="wf-props-header"
-><h3 class="text-sm font-semibold"
-    >Transition Properties</h3>
-<button
-    class="btn btn-ghost btn-icon btn-xs"
-    data-action="close-panel"
-    aria-label="Close"
-    >${iconX(14, '')}</button>
-</div>
-<div class="mb-2">
-<label class="text-xs text-muted"
-    >Name</label>
-<input type="text"
-    class="input input-sm"
-    id="prop-edge-name"
-    value="${edge.name}" />
-</div>
-<div class="mb-2">
-<label class="text-xs text-muted"
-    >Description</label>
-<input type="text"
-    class="input input-sm"
-    id="prop-edge-desc"
-    value="${edge.description}" />
-</div>
-<div class="mb-2">
-<label class="text-xs text-muted"
-    >From</label>
-<div class="text-sm">${fromName}</div>
-</div>
-<div class="mb-2">
-<label class="text-xs text-muted"
-    >To</label>
-<div class="text-sm">${toName}</div>
-</div>
-</div>`;
+        return buildFieldEditor(
+            this.#singleSelectedNodeId(),
+        );
     }
 
     #buildPropsPanel(): SafeHtml {
@@ -1925,7 +1611,7 @@ class="wf-props-panel">
                     e => e.fromNodeId
                         === singleNodeId,
                 );
-            return this.#buildNodePanel(
+            return buildNodePanel(
                 node, outgoing,
             );
         }
@@ -1946,7 +1632,7 @@ class="wf-props-panel">
                     n => n.id
                         === edge.toNodeId,
                 )!;
-            return this.#buildEdgePanel(
+            return buildEdgePanel(
                 edge, fromNode, toNode,
             );
         }

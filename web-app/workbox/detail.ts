@@ -282,31 +282,34 @@ function buildDetailView(
         </button>`;
 
     return html`<div>
-        <a href="#" id="wo-back-btn"
+        <div id="wo-header"
             class="flex items-center
-                gap-1 text-muted mb-4
-                cursor-pointer">
-            ${iconArrowLeft(16, '')}
-            Workbox
-        </a>
-        <div id="wo-header" class="mb-6">
-            <h1 class="text-2xl
-                font-bold mb-1">
-                ${detail.flowNameText()}
-            </h1>
-            <div class="flex items-center
-                gap-3">
-                <span
-                    class="badge
-                        badge-neutral">
-                    #${detail.displayIdText()}
-                </span>
-                <span
-                    class="badge
-                        badge-info">
-                    ${detail
-                        .currentNodeName()}
-                </span>
+                gap-4 mb-6">
+            <button id="wo-back-btn"
+                class="btn btn-ghost
+                    btn-icon">
+                ${iconArrowLeft(20, '')}
+            </button>
+            <div>
+                <h1 class="text-2xl
+                    font-bold mb-1">
+                    ${detail.flowNameText()}
+                </h1>
+                <div class="flex items-center
+                    gap-3">
+                    <span
+                        class="badge
+                            badge-neutral">
+                        #${detail
+                            .displayIdText()}
+                    </span>
+                    <span
+                        class="badge
+                            badge-info">
+                        ${detail
+                            .currentNodeName()}
+                    </span>
+                </div>
             </div>
         </div>
 
@@ -517,10 +520,7 @@ export async function init(
     if (backBtn) {
         backBtn.addEventListener(
             'click',
-            (e) => {
-                e.preventDefault();
-                navigateTo('workbox');
-            },
+            () => navigateTo('workbox'),
         );
     }
 

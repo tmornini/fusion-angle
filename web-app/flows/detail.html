@@ -1,1 +1,46 @@
-<div id="flow-designer"></div>
+<!DOCTYPE html>
+<html lang="en" data-page="flow-detail">
+    <head>
+        <meta charset="UTF-8" />
+        <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1.0"
+        />
+        <title>Flow Designer | Fusion AI</title>
+        <link
+            rel="stylesheet"
+            href="../assets/styles.css"
+        />
+        <link
+            rel="icon"
+            href="../assets/favicon.ico"
+            sizes="any"
+        />
+        <script>
+            (function() {
+                var t = localStorage
+                    .getItem('fusion-theme');
+                var dark = t === 'dark'
+                    || (t !== 'light'
+                        && matchMedia(
+                            '(prefers-color-scheme'
+                            + ': dark)'
+                        ).matches);
+                if (dark) {
+                    var d = document
+                        .documentElement;
+                    d.setAttribute(
+                        'data-theme', 'dark'
+                    );
+                    d.classList.add('dark');
+                }
+            })();
+        </script>
+    </head>
+    <body>
+        <div id="page-root">
+            <div id="flow-designer"></div>
+        </div>
+        <script src="../assets/app.js"></script>
+    </body>
+</html>
