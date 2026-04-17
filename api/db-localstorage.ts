@@ -76,7 +76,14 @@ function readTable<T>(
         }
         return parsed as T[];
     } catch (e) {
-        if (e instanceof Error) throw e;
+        if (e instanceof Error) {
+            throw new Error(
+                'Reading table "'
+                + tableName
+                + '" failed: '
+                + e.message,
+            );
+        }
         throw new Error(
             'Table "' + tableName
             + '" has corrupt JSON.'

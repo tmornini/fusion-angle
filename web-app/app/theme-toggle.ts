@@ -6,6 +6,7 @@ import {
 import { $, $$ } from './dom';
 import { setHtml } from './safe-html';
 import { showToast } from './toast';
+import { log } from './logger';
 import {
     iconSun,
     iconMoon,
@@ -121,7 +122,13 @@ export function initThemeAndDropdowns(
                     ) {
                         try {
                             setTheme(theme);
-                        } catch {
+                        } catch (e) {
+                            log.warn(
+                                'setTheme'
+                                + ' failed',
+                                'theme-toggle',
+                                e,
+                            );
                             showToast(
                                 'Failed to'
                                 + ' save theme'

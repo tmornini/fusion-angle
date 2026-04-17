@@ -4,7 +4,6 @@ const INDICATOR_COLOR =
 const DRAGGING_OPACITY = '0.4';
 const FIRST_POSITION = 1;
 const POSITION_GAP = 1;
-const FALLBACK_POSITION = '0';
 const HYSTERESIS_PX = 8;
 
 type DragState =
@@ -115,11 +114,20 @@ export function initDragReorder(
                 e.preventDefault();
                 return;
             }
+            const id = card.getAttribute(
+                idAttribute,
+            );
+            if (id === null) {
+                throw new Error(
+                    'drag-reorder: card'
+                    + ' missing '
+                    + idAttribute
+                    + ' attribute',
+                );
+            }
             drag = {
                 kind: 'active',
-                id: card.getAttribute(
-                    idAttribute,
-                ) || '',
+                id,
                 indicator: null,
                 idx: null,
             };
@@ -200,11 +208,20 @@ export function initDragReorder(
             const items = cards();
             const idx = committedIdx;
             const positions = items.map(
-                c => parseFloat(
-                    c.getAttribute(
-                        'data-position',
-                    ) ?? FALLBACK_POSITION,
-                ),
+                c => {
+                    const raw =
+                        c.getAttribute(
+                            'data-position',
+                        );
+                    if (raw === null) {
+                        throw new Error(
+                            'drag-reorder:'
+                            + ' card missing'
+                            + ' data-position',
+                        );
+                    }
+                    return parseFloat(raw);
+                },
             );
             let newPos: number;
             if (items.length === 0) {

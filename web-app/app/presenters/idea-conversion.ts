@@ -110,11 +110,9 @@ export class IdeaConversionPresenter {
             const [k, v] of
             Object.entries(fields)
         ) {
-            if (v !== undefined) {
-                this.#fields[
-                    k as ConversionField
-                ] = v.trim();
-            }
+            this.#fields[
+                k as ConversionField
+            ] = v!.trim();
         }
     }
 
