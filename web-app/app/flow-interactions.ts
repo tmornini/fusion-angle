@@ -84,7 +84,6 @@ export interface InteractionState {
     viewBox: ViewBox;
     zoom: number;
     activePointerId: number;
-    autoFitEnabled: boolean;
     isSpaceDown: boolean;
 }
 
@@ -131,7 +130,6 @@ export function buildInteractionState(
         },
         zoom: 1.0,
         activePointerId: 0,
-        autoFitEnabled: true,
         isSpaceDown: false,
     };
 }
@@ -657,6 +655,7 @@ function handleWheel(
     svg: SVGSVGElement,
     state: InteractionState,
     onUpdate: InteractionCallback,
+    onAutoFitDisable: InteractionCallback,
 ): void {
     e.preventDefault();
 
@@ -683,7 +682,7 @@ function handleWheel(
         svgPt.y
         - (svgPt.y - state.viewBox.y) * ratio;
 
-    state.autoFitEnabled = false;
+    onAutoFitDisable();
     onUpdate();
 }
 
@@ -691,6 +690,7 @@ export function bindInteractions(
     svg: SVGSVGElement,
     state: InteractionState,
     onUpdate: InteractionCallback,
+    onAutoFitDisable: InteractionCallback,
     onNodesDragEnd: (
         updates: Array<{
             nodeId: string;
@@ -753,6 +753,7 @@ export function bindInteractions(
         'wheel',
         (e) => handleWheel(
             e, svg, state, onUpdate,
+            onAutoFitDisable,
         ),
         { passive: false, signal },
     );
@@ -808,7 +809,7 @@ export function bindInteractions(
         }
         state.isSpaceDown = next;
         if (next) {
-            state.autoFitEnabled = false;
+            onAutoFitDisable();
             cursorHost.classList.add(
                 'wf-pan-cursor',
             );
@@ -885,7 +886,6 @@ function applyButtonZoom(
         cx - state.viewBox.w / 2;
     state.viewBox.y =
         cy - state.viewBox.h / 2;
-    state.autoFitEnabled = false;
 }
 
 export function zoomToFit(

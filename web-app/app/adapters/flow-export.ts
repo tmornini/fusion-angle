@@ -317,8 +317,11 @@ export async function getFlowZip(
         isLocked: toBool(
             flow.is_locked,
         ),
-        isManualLayout: toBool(
-            flow.is_manual_layout,
+        isAutoLayout: toBool(
+            flow.is_auto_layout,
+        ),
+        isAutoFit: toBool(
+            flow.is_auto_fit,
         ),
         lockTimeout: flow.lock_timeout,
         nodes: graph.nodes,
@@ -671,7 +674,7 @@ function layoutImportedGraph(
         edges: layoutEdges,
         canvasWidth: IMPORT_CANVAS_W,
         canvasHeight: IMPORT_CANVAS_H,
-    });
+    }).positions;
 }
 
 function buildImportedEdges(

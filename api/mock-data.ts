@@ -1189,7 +1189,8 @@ export async function populateMockData(
                 'Standard customer'
                 + ' onboarding process',
             is_locked: false,
-            is_manual_layout: false,
+            is_auto_layout: true,
+            is_auto_fit: true,
             lock_timeout:
                 DEFAULT_LOCK_TIMEOUT,
             graph: jsonObjectField({
@@ -1478,7 +1479,8 @@ export async function populateMockData(
             name: 'Fusion Flow',
             description: '',
             is_locked: false,
-            is_manual_layout: false,
+            is_auto_layout: true,
+            is_auto_fit: true,
             lock_timeout:
                 DEFAULT_LOCK_TIMEOUT,
             graph: jsonObjectField({
@@ -1996,7 +1998,8 @@ export async function populateMockData(
                 + ' decisions, convergence, and'
                 + ' cycles for Auto Layout testing',
             is_locked: false,
-            is_manual_layout: false,
+            is_auto_layout: true,
+            is_auto_fit: true,
             lock_timeout: DEFAULT_LOCK_TIMEOUT,
             graph: jsonObjectField({
                 nodes: [

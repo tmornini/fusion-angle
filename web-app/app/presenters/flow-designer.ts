@@ -11,7 +11,8 @@ import {
     putWfEdge,
     putFlow,
     putFlowLocked,
-    putFlowManualLayout,
+    putFlowAutoLayout,
+    putFlowAutoFit,
     postNodeAddition,
     postEdgeConnection,
     postFieldAddition,
@@ -47,6 +48,7 @@ import {
 } from '../flow-graph';
 import {
     computeLayout,
+    edgeWaypointKey,
     wouldBeCycle,
     NODE_WIDTH,
     NODE_HEIGHT,
@@ -100,13 +102,40 @@ interface DesignerState {
     flowName: string;
     flowDescription: string;
     isLocked: boolean;
-    isManualLayout: boolean;
+    isAutoLayout: boolean;
+    isAutoFit: boolean;
     lockTimeout: number;
     isEditingName: boolean;
     nodes: GraphNode[];
     edges: GraphEdge[];
+    edgeWaypoints: Map<string, Waypoint[]>;
     interaction: InteractionState;
     savedViewBox: SavedViewBox;
+}
+
+type Waypoint = { x: number; y: number };
+
+function mapWaypointsByEdgeId(
+    edges: readonly GraphEdge[],
+    byPair: Map<string, Waypoint[]>,
+): Map<string, Waypoint[]> {
+    const result =
+        new Map<string, Waypoint[]>();
+    for (const e of edges) {
+        const key = edgeWaypointKey(
+            e.fromNodeId, e.toNodeId,
+        );
+        const wp = byPair.get(key);
+        if (wp && wp.length > 0) {
+            result.set(e.id, wp);
+        }
+    }
+    return result;
+}
+
+function emptyWaypoints(
+): Map<string, Waypoint[]> {
+    return new Map<string, Waypoint[]>();
 }
 
 // Must match .wf-props-panel width in pages.css
@@ -142,12 +171,13 @@ export class FlowDesignerPresenter {
             flowDescription:
                 graph.description,
             isLocked: graph.isLocked,
-            isManualLayout:
-                graph.isManualLayout,
+            isAutoLayout: graph.isAutoLayout,
+            isAutoFit: graph.isAutoFit,
             lockTimeout: graph.lockTimeout,
             isEditingName: false,
             nodes: graph.nodes,
             edges: graph.edges,
+            edgeWaypoints: emptyWaypoints(),
             interaction,
             savedViewBox:
                 { kind: 'none' },
@@ -211,17 +241,35 @@ export class FlowDesignerPresenter {
         );
     }
 
-    isManualLayout(): boolean {
-        return this.#state.isManualLayout;
+    isAutoLayout(): boolean {
+        return this.#state.isAutoLayout;
     }
 
-    toggleManualLayout(): void {
+    toggleAutoLayout(): void {
         const next =
-            !this.#state.isManualLayout;
-        this.#state.isManualLayout = next;
-        void putFlowManualLayout(
+            !this.#state.isAutoLayout;
+        this.#state.isAutoLayout = next;
+        void putFlowAutoLayout(
             this.#state.flowId, next,
         );
+        if (next) {
+            this.reconcileLayout();
+        }
+    }
+
+    isAutoFit(): boolean {
+        return this.#state.isAutoFit;
+    }
+
+    toggleAutoFit(): void {
+        const next = !this.#state.isAutoFit;
+        this.#state.isAutoFit = next;
+        void putFlowAutoFit(
+            this.#state.flowId, next,
+        );
+        if (next) {
+            this.#applyZoomToFit();
+        }
     }
 
     #guardLocked(): boolean {
@@ -287,12 +335,7 @@ export class FlowDesignerPresenter {
         this.#history.setHasUndoHistory(
             remaining.length > 0,
         );
-        if (
-            this.#state.interaction
-                .autoFitEnabled
-        ) {
-            this.#applyZoomToFit();
-        }
+        this.reconcileLayout();
         return true;
     }
 
@@ -308,12 +351,7 @@ export class FlowDesignerPresenter {
             .setHasUndoHistory(true);
         await putFlowFromVersion(snapshot);
         await this.#refreshState();
-        if (
-            this.#state.interaction
-                .autoFitEnabled
-        ) {
-            this.#applyZoomToFit();
-        }
+        this.reconcileLayout();
         return true;
     }
 
@@ -536,10 +574,7 @@ export class FlowDesignerPresenter {
                 w: vb.w,
                 h: vb.h,
             };
-            // Disable Auto Fit so the centering
-            // call below sticks across renders.
-            this.#state.interaction
-                .autoFitEnabled = false;
+            this.disableAutoFit();
             this.#panToRevealSelected();
         }
         if (!isOpen && wasOpen) {
@@ -575,10 +610,12 @@ export class FlowDesignerPresenter {
             );
         const lockedChecked =
             String(this.#state.isLocked);
-        const manualChecked =
+        const autoLayoutChecked =
             String(
-                this.#state.isManualLayout,
+                this.#state.isAutoLayout,
             );
+        const autoFitChecked =
+            String(this.#state.isAutoFit);
         const content = html`<div
 class="wf-designer">
 <div class="wf-designer-header">
@@ -611,11 +648,21 @@ Locked</label>
     + ' text-sm wf-lock-label'
 }"><button class="switch"
     role="switch"
-    aria-checked="${manualChecked}"
-    id="flow-manual-layout-switch"
+    aria-checked="${autoLayoutChecked}"
+    id="flow-auto-layout-switch"
     ><span class="switch-thumb"
     ></span></button>
-Manual Layout</label>
+Auto Layout</label>
+<label class="${
+    'flex items-center gap-2'
+    + ' text-sm wf-lock-label'
+}"><button class="switch"
+    role="switch"
+    aria-checked="${autoFitChecked}"
+    id="flow-auto-fit-switch"
+    ><span class="switch-thumb"
+    ></span></button>
+Auto Fit</label>
 </div>
 </div>
 </div>
@@ -662,7 +709,7 @@ ${toolbar}
             edges: this.#state.edges,
         });
         this.#noteMutation();
-        this.#expandIfNeeded();
+        this.reconcileLayout();
     }
 
     async addNode(): Promise<boolean> {
@@ -703,6 +750,7 @@ ${toolbar}
             },
         ];
         this.#noteMutation();
+        this.reconcileLayout();
         return true;
     }
 
@@ -796,6 +844,7 @@ ${toolbar}
             },
         ];
         this.#noteMutation();
+        this.reconcileLayout();
         return true;
     }
 
@@ -843,6 +892,7 @@ ${toolbar}
         this.#noteMutation();
         this.#state.interaction
             .selection = { kind: 'none' };
+        this.reconcileLayout();
         return true;
     }
 
@@ -902,6 +952,7 @@ ${toolbar}
         this.#noteMutation();
         this.#state.interaction
             .selection = { kind: 'none' };
+        this.reconcileLayout();
         return true;
     }
 
@@ -921,10 +972,19 @@ ${toolbar}
         return false;
     }
 
-    autoLayout(): void {
-        if (this.#guardLocked()) return;
-        if (this.#state.isManualLayout) return;
-        const fId = this.#state.flowId;
+    reconcileLayout(): void {
+        if (
+            this.#state.isAutoLayout
+            && !this.#state.isLocked
+        ) {
+            this.#runAutoLayout();
+        }
+        if (this.#state.isAutoFit) {
+            this.#applyZoomToFit();
+        }
+    }
+
+    #runAutoLayout(): void {
         const nodeById = new Map(
             this.#state.nodes.map(
                 n => [n.id, n],
@@ -962,7 +1022,7 @@ ${toolbar}
                 this.#canvasW - PANEL_WIDTH_PX,
             )
             : this.#canvasW;
-        const positions = computeLayout({
+        const result = computeLayout({
             nodes: layoutInputs,
             edges: layoutEdges,
             canvasWidth: effectiveW,
@@ -971,20 +1031,23 @@ ${toolbar}
         this.#state.nodes =
             this.#state.nodes.map(n => {
                 const pos =
-                    positions.get(n.id)!;
+                    result.positions.get(n.id)!;
                 return {
                     ...n,
                     positionX: pos.x,
                     positionY: pos.y,
                 };
             });
-        void putGraph({
-            flowId: fId,
+        this.#state.edgeWaypoints =
+            mapWaypointsByEdgeId(
+                this.#state.edges,
+                result.waypoints,
+            );
+        void putGraphSilent({
+            flowId: this.#state.flowId,
             nodes: this.#state.nodes,
             edges: this.#state.edges,
         });
-        this.#noteMutation();
-        this.#applyZoomToFit();
     }
 
     updateNodeName(
@@ -1318,7 +1381,7 @@ ${toolbar}
             };
         this.#state.interaction
             .isPanelOpen = false;
-        this.#expandIfNeeded();
+        this.reconcileLayout();
         return true;
     }
 
@@ -1406,7 +1469,7 @@ ${toolbar}
             },
         ];
         this.#noteMutation();
-        this.#expandIfNeeded();
+        this.reconcileLayout();
         return true;
     }
 
@@ -1451,6 +1514,7 @@ ${toolbar}
             this.#state.interaction,
             this.#selectedFocalPt(),
         );
+        this.disableAutoFit();
     }
 
     zoomOut(): void {
@@ -1458,6 +1522,7 @@ ${toolbar}
             this.#state.interaction,
             this.#selectedFocalPt(),
         );
+        this.disableAutoFit();
     }
 
     #selectedFocalPt(): {
@@ -1529,10 +1594,12 @@ ${toolbar}
         return null;
     }
 
-    enableAutoFit(): void {
-        this.#state.interaction
-            .autoFitEnabled = true;
-        this.#applyZoomToFit();
+    disableAutoFit(): void {
+        if (!this.#state.isAutoFit) return;
+        this.#state.isAutoFit = false;
+        void putFlowAutoFit(
+            this.#state.flowId, false,
+        );
     }
 
     updateCanvasSize(
@@ -1574,30 +1641,6 @@ ${toolbar}
         );
     }
 
-    #expandIfNeeded(): void {
-        if (
-            !this.#state.interaction
-                .autoFitEnabled
-        ) return;
-        const vb =
-            this.#state.interaction.viewBox;
-        for (const n of this.#state.nodes) {
-            const r =
-                n.positionX + NODE_WIDTH;
-            const b =
-                n.positionY + NODE_HEIGHT;
-            if (
-                n.positionX < vb.x
-                || n.positionY < vb.y
-                || r > vb.x + vb.w
-                || b > vb.y + vb.h
-            ) {
-                this.#applyZoomToFit();
-                return;
-            }
-        }
-    }
-
     #canDelete(): boolean {
         const sel =
             this.#state.interaction
@@ -1613,12 +1656,9 @@ ${toolbar}
 
     #buildToolbar(): SafeHtml {
         return buildToolbar(
-            this.#state.interaction
-                .autoFitEnabled,
             this.canUndo(),
             this.canRedo(),
             this.#state.isLocked,
-            this.#state.isManualLayout,
             this.#canDelete(),
         );
     }
@@ -1915,6 +1955,7 @@ ${toolbar}
             this.#state.isLocked,
             isConn,
             marqueeRect,
+            this.#state.edgeWaypoints,
         );
         const preview =
             this.#buildConnectPreview();

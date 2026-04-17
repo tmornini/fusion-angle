@@ -465,6 +465,42 @@ function buildNode(
     );
 }
 
+function buildWaypointPath(
+    start: { x: number; y: number },
+    end: { x: number; y: number },
+    waypoints: readonly {
+        x: number;
+        y: number;
+    }[],
+): string {
+    const pts = [start, ...waypoints, end];
+    let d = 'M '
+        + String(pts[0]!.x) + ' '
+        + String(pts[0]!.y);
+    for (let i = 1; i < pts.length; i++) {
+        const prev = pts[i - 1]!;
+        const curr = pts[i]!;
+        const mx = (prev.x + curr.x) / 2;
+        const my = (prev.y + curr.y) / 2;
+        if (i === 1) {
+            d += ' Q '
+                + String(prev.x) + ' '
+                + String(prev.y) + ' '
+                + String(mx) + ' '
+                + String(my);
+        } else {
+            d += ' T '
+                + String(mx) + ' '
+                + String(my);
+        }
+    }
+    const last = pts[pts.length - 1]!;
+    d += ' T '
+        + String(last.x) + ' '
+        + String(last.y);
+    return d;
+}
+
 function buildEdge(
     edge: GraphEdge,
     fromNode: GraphNode,
@@ -472,6 +508,10 @@ function buildEdge(
     isSelected: boolean,
     aimOffset: number,
     isCycle: boolean,
+    waypoints: readonly {
+        x: number;
+        y: number;
+    }[],
 ): SafeHtml {
     const fromCx =
         fromNode.positionX
@@ -550,24 +590,30 @@ function buildEdge(
         toNode.positionY,
         NODE_WIDTH, NODE_HEIGHT,
     );
-    const cp1 =
-        controlOffset(se, dist);
-    const cp2 =
-        controlOffset(ee, dist);
-    const cp1X = startPt.x + cp1.dx;
-    const cp1Y = startPt.y + cp1.dy;
-    const cp2X = endPt.x + cp2.dx;
-    const cp2Y = endPt.y + cp2.dy;
-    pathD = 'M '
-        + String(startPt.x) + ' '
-        + String(startPt.y)
-        + ' C '
-        + String(cp1X) + ' '
-        + String(cp1Y) + ', '
-        + String(cp2X) + ' '
-        + String(cp2Y) + ', '
-        + String(endPt.x) + ' '
-        + String(endPt.y);
+    if (waypoints.length > 0) {
+        pathD = buildWaypointPath(
+            startPt, endPt, waypoints,
+        );
+    } else {
+        const cp1 =
+            controlOffset(se, dist);
+        const cp2 =
+            controlOffset(ee, dist);
+        const cp1X = startPt.x + cp1.dx;
+        const cp1Y = startPt.y + cp1.dy;
+        const cp2X = endPt.x + cp2.dx;
+        const cp2Y = endPt.y + cp2.dy;
+        pathD = 'M '
+            + String(startPt.x) + ' '
+            + String(startPt.y)
+            + ' C '
+            + String(cp1X) + ' '
+            + String(cp1Y) + ', '
+            + String(cp2X) + ' '
+            + String(cp2Y) + ', '
+            + String(endPt.x) + ' '
+            + String(endPt.y);
+    }
 
     if (isCycle) {
         color = WARN;
@@ -799,6 +845,10 @@ export function buildGraphSvg(
         w: number;
         h: number;
     } | null,
+    edgeWaypoints: ReadonlyMap<
+        string,
+        readonly { x: number; y: number }[]
+    >,
 ): SafeHtml {
     const nodeMap = new Map(
         nodes.map(n => [n.id, n]),
@@ -884,6 +934,8 @@ export function buildGraphSvg(
                 cycleEdgeIds.has(
                     edge.id,
                 ),
+                edgeWaypoints.get(edge.id)
+                    ?? [],
             ).toString();
     }
 

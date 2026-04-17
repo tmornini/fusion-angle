@@ -86,7 +86,8 @@
 | name | TEXT | |
 | description | TEXT | |
 | is_locked | BOOLEAN | Default false |
-| is_manual_layout | BOOLEAN | Default false |
+| is_auto_layout | BOOLEAN | Default true |
+| is_auto_fit | BOOLEAN | Default true |
 | lock_timeout | INTEGER | Seconds (default 28800 = 8h) |
 | graph | TEXT | JSON document (see below) |
 | created_at | TEXT | RFC-3339 Zulu |

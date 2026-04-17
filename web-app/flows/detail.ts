@@ -226,13 +226,25 @@ function bindSwitches(
         },
     );
     $(
-        '#flow-manual-layout-switch',
+        '#flow-auto-layout-switch',
         document,
     )?.addEventListener(
         'click',
         () => {
             presenter
-                .toggleManualLayout();
+                .toggleAutoLayout();
+            renderAndBind(
+                container, presenter,
+            );
+        },
+    );
+    $(
+        '#flow-auto-fit-switch',
+        document,
+    )?.addEventListener(
+        'click',
+        () => {
+            presenter.toggleAutoFit();
             renderAndBind(
                 container, presenter,
             );
@@ -276,6 +288,9 @@ function bindSvgInteractions(
         () => renderAndBind(
             container, presenter,
         ),
+        () => {
+            presenter.disableAutoFit();
+        },
         (updates) => {
             presenter.moveNodes(updates);
             renderAndBind(
@@ -367,17 +382,6 @@ function bindToolbarActions(
                 },
             );
         }
-        if (action === 'auto-layout') {
-            btn.addEventListener(
-                'click',
-                () => {
-                    presenter.autoLayout();
-                    renderAndBind(
-                        container, presenter,
-                    );
-                },
-            );
-        }
         if (action === 'zoom-in') {
             btn.addEventListener(
                 'click',
@@ -394,18 +398,6 @@ function bindToolbarActions(
                 'click',
                 () => {
                     presenter.zoomOut();
-                    renderAndBind(
-                        container, presenter,
-                    );
-                },
-            );
-        }
-        if (action === 'auto-fit') {
-            btn.addEventListener(
-                'click',
-                () => {
-                    presenter
-                        .enableAutoFit();
                     renderAndBind(
                         container, presenter,
                     );
@@ -815,6 +807,10 @@ export async function init(
         const h = initialWrap.clientHeight;
         if (w > 0 && h > 0) {
             presenter.updateCanvasSize(w, h);
+            presenter.reconcileLayout();
+            renderAndBind(
+                container, presenter,
+            );
         }
     }
     const ro = new ResizeObserver(() => {

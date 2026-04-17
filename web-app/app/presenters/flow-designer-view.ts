@@ -9,10 +9,8 @@ import {
     iconX,
     iconEdit,
     iconCheck,
-    iconLayoutGrid,
     iconMinus,
     iconPlus,
-    iconTarget,
     iconCopy,
     iconDownload,
 } from '../icons';
@@ -288,16 +286,11 @@ class="wf-props-panel">
 }
 
 export function buildToolbar(
-    isAutoFitEnabled: boolean,
     canUndo: boolean,
     canRedo: boolean,
     isLocked: boolean,
-    isManualLayout: boolean,
     canDelete: boolean,
 ): SafeHtml {
-    const autoFitCls = isAutoFitEnabled
-        ? ' wf-toolbar-toggle-on'
-        : '';
     return html`<div
 class="wf-toolbar">
 <div class="wf-toolbar-group">
@@ -322,31 +315,10 @@ class="wf-toolbar">
 <div class="wf-toolbar-group">
 <button
     class="btn btn-ghost btn-icon"
-    data-action="auto-layout"
-    title="Auto layout"
-    aria-label="Auto layout"${
-    trusted(
-        isLocked || isManualLayout
-            ? ' disabled' : '',
-    )}>${iconLayoutGrid(18, '')}</button>
-</div>
-<div class="wf-toolbar-spacer"></div>
-<div class="wf-toolbar-group">
-<button
-    class="btn btn-ghost btn-icon"
     data-action="zoom-out"
     title="Zoom out"
     aria-label="Zoom out"
     >${iconMinus(18, '')}</button>
-<button class="${trusted(
-    'btn btn-ghost btn-icon'
-    + ' wf-toolbar-toggle'
-    + autoFitCls,
-)}"
-    data-action="auto-fit"
-    title="Auto fit"
-    aria-label="Auto fit"
-    >${iconTarget(18, '')}</button>
 <button
     class="btn btn-ghost btn-icon"
     data-action="zoom-in"

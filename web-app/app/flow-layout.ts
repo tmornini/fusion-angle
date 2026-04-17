@@ -31,11 +31,28 @@ export const LABEL_SAFETY_MARGIN = 16;
 type Position = { x: number; y: number };
 type Layers = readonly (readonly string[])[];
 
+interface AugmentedEdge extends LayoutEdge {
+    origFromId: string;
+    origToId: string;
+}
+
+const DUMMY_PREFIX = '__dummy__';
+
+function isDummy(id: string): boolean {
+    return id.startsWith(DUMMY_PREFIX);
+}
+
+export function edgeWaypointKey(
+    fromId: string, toId: string,
+): string {
+    return `${fromId}->${toId}`;
+}
+
 const MIN_LAYER_STEP =
     NODE_WIDTH + HORIZONTAL_GAP;
 const SIBLING_STEP =
     Math.max(NODE_WIDTH, NODE_HEIGHT) + 100;
-const CROSSING_SWEEP_COUNT = 12;
+const CROSSING_SWEEP_COUNT = 24;
 const COORD_ITERATIONS = 4;
 const MAX_ASPECT_STRETCH = 2.5;
 const MIN_SNAKE_NODES = 4;
@@ -86,15 +103,23 @@ export function wouldBeCycle(
     return isReachable(toId, fromId, adj);
 }
 
+export interface LayoutResult {
+    positions: Map<string, Position>;
+    waypoints: Map<string, Position[]>;
+}
+
 export function computeLayout(
     context: LayoutContext,
-): Map<string, Position> {
+): LayoutResult {
     const {
         nodes, edges,
         canvasWidth, canvasHeight,
     } = context;
     if (nodes.length === 0) {
-        return new Map();
+        return {
+            positions: new Map(),
+            waypoints: new Map(),
+        };
     }
 
     const startNode = nodes.find(n => n.isStart);
@@ -104,9 +129,12 @@ export function computeLayout(
 
     const { forwardEdges } = removeCycles(nodes, edges);
 
-    const layers = assignLayers(nodes, forwardEdges);
-    const ordered = reduceCrossings(layers, forwardEdges);
-    const topo = ordered.flat();
+    const baseLayers = assignLayers(nodes, forwardEdges);
+    const aug = insertDummies(baseLayers, forwardEdges);
+    const ordered = reduceCrossings(aug.layers, aug.edges);
+    const topo = ordered
+        .flat()
+        .filter(id => !isDummy(id));
 
     const hasWideFan = [
         ...buildAdjacency(forwardEdges).values(),
@@ -121,7 +149,7 @@ export function computeLayout(
         );
         if (k > 0) {
             const sugiPos = assignCoordinates(
-                ordered, forwardEdges,
+                ordered, aug.edges,
             );
             const snakePos = computeTopoSnake(
                 topo, k, forwardEdges,
@@ -134,27 +162,137 @@ export function computeLayout(
                 / Math.min(a, canvasAspect);
             if (mis(computeBboxAspect(snakePos))
                 < mis(computeBboxAspect(sugiPos))) {
-                return fitToCanvas(
-                    snakePos,
-                    canvasWidth, canvasHeight,
-                    nodes,
-                );
+                return {
+                    positions: fitToCanvas(
+                        snakePos,
+                        canvasWidth, canvasHeight,
+                        nodes,
+                    ),
+                    waypoints: new Map(),
+                };
             }
-            return fitToCanvas(
-                sugiPos,
-                canvasWidth, canvasHeight,
-                nodes,
+            return finalizeLayout(
+                sugiPos, aug.edges,
+                canvasWidth, canvasHeight, nodes,
             );
         }
     }
 
     const natural = assignCoordinates(
-        ordered, forwardEdges,
+        ordered, aug.edges,
     );
-    return fitToCanvas(
-        natural, canvasWidth, canvasHeight,
-        nodes,
+    return finalizeLayout(
+        natural, aug.edges,
+        canvasWidth, canvasHeight, nodes,
     );
+}
+
+function finalizeLayout(
+    natural: Map<string, Position>,
+    edges: readonly AugmentedEdge[],
+    canvasW: number,
+    canvasH: number,
+    nodes: readonly LayoutInput[],
+): LayoutResult {
+    const fitted = fitToCanvas(
+        natural, canvasW, canvasH, nodes,
+    );
+    const positions = new Map<string, Position>();
+    const dummyPositions =
+        new Map<string, Position>();
+    for (const [id, p] of fitted) {
+        if (isDummy(id)) {
+            dummyPositions.set(id, p);
+        } else {
+            positions.set(id, p);
+        }
+    }
+    const waypoints = extractWaypoints(
+        edges, dummyPositions,
+    );
+    return { positions, waypoints };
+}
+
+function insertDummies(
+    layers: Layers,
+    edges: readonly LayoutEdge[],
+): {
+    layers: string[][];
+    edges: AugmentedEdge[];
+} {
+    const layerOf = new Map<string, number>();
+    layers.forEach((l, i) => {
+        for (const id of l) {
+            layerOf.set(id, i);
+        }
+    });
+    const out: string[][] =
+        layers.map(l => [...l]);
+    const augEdges: AugmentedEdge[] = [];
+    let counter = 0;
+    for (const e of edges) {
+        const fl = layerOf.get(e.fromId);
+        const tl = layerOf.get(e.toId);
+        if (
+            fl === undefined
+            || tl === undefined
+            || tl - fl <= 1
+        ) {
+            augEdges.push({
+                ...e,
+                origFromId: e.fromId,
+                origToId: e.toId,
+            });
+            continue;
+        }
+        let prev = e.fromId;
+        for (let i = fl + 1; i < tl; i++) {
+            const id =
+                `${DUMMY_PREFIX}${counter++}`;
+            out[i]!.push(id);
+            layerOf.set(id, i);
+            augEdges.push({
+                fromId: prev,
+                toId: id,
+                labelWidth: 0,
+                origFromId: e.fromId,
+                origToId: e.toId,
+            });
+            prev = id;
+        }
+        augEdges.push({
+            fromId: prev,
+            toId: e.toId,
+            labelWidth: 0,
+            origFromId: e.fromId,
+            origToId: e.toId,
+        });
+    }
+    return { layers: out, edges: augEdges };
+}
+
+function extractWaypoints(
+    edges: readonly AugmentedEdge[],
+    dummyPositions: Map<string, Position>,
+): Map<string, Position[]> {
+    const result = new Map<string, Position[]>();
+    for (const e of edges) {
+        if (
+            !isDummy(e.fromId)
+            && !isDummy(e.toId)
+        ) continue;
+        const key = edgeWaypointKey(
+            e.origFromId, e.origToId,
+        );
+        const list = result.get(key) ?? [];
+        if (isDummy(e.toId)) {
+            const pos =
+                dummyPositions.get(e.toId);
+            if (pos) list.push(pos);
+        }
+        result.set(key, list);
+    }
+    return result;
 }
 
 function removeCycles(
