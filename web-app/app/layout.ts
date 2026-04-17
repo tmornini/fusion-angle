@@ -54,16 +54,19 @@ function initSidebar(): void {
 }
 
 async function initSidebarLayout(
+    hasSchema = true,
 ): Promise<void> {
     initActiveNavItem();
     initSidebar();
     initThemeAndDropdowns();
     initMobileDrawer();
     mutateThemeToggleIcon();
-    await Promise.all([
-        mutateSidebarUser(),
-        mutateHeaderInfo(),
-    ]);
+    if (hasSchema) {
+        await Promise.all([
+            mutateSidebarUser(),
+            mutateHeaderInfo(),
+        ]);
+    }
 }
 
 export { initSidebarLayout };

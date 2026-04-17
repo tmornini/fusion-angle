@@ -121,7 +121,7 @@ function renderAndBind(
     bindFlowNameEdit(
         container, presenter,
     );
-    bindLockCheckbox(
+    bindSwitches(
         container, presenter,
     );
 }
@@ -210,17 +210,29 @@ function bindFlowNameEdit(
     );
 }
 
-function bindLockCheckbox(
+function bindSwitches(
     container: HTMLElement,
     presenter: FlowDesignerPresenter,
 ): void {
-    const cb = $input(
-        '#flow-lock-checkbox', document,
-    );
-    cb?.addEventListener(
-        'change',
+    $(
+        '#flow-lock-switch', document,
+    )?.addEventListener(
+        'click',
         () => {
             presenter.toggleLocked();
+            renderAndBind(
+                container, presenter,
+            );
+        },
+    );
+    $(
+        '#flow-manual-layout-switch',
+        document,
+    )?.addEventListener(
+        'click',
+        () => {
+            presenter
+                .toggleManualLayout();
             renderAndBind(
                 container, presenter,
             );
@@ -795,6 +807,16 @@ export async function init(
             loaded.versions.length > 0,
         );
     renderAndBind(container, presenter);
+    const initialWrap = container.querySelector(
+        '.wf-canvas-wrap',
+    );
+    if (initialWrap instanceof HTMLElement) {
+        const w = initialWrap.clientWidth;
+        const h = initialWrap.clientHeight;
+        if (w > 0 && h > 0) {
+            presenter.updateCanvasSize(w, h);
+        }
+    }
     const ro = new ResizeObserver(() => {
         const liveWrap = container.querySelector(
             '.wf-canvas-wrap',

@@ -13,6 +13,13 @@ export interface LayoutEdge extends EdgePair {
     labelWidth: number;
 }
 
+export interface LayoutContext {
+    readonly nodes: readonly LayoutInput[];
+    readonly edges: readonly LayoutEdge[];
+    readonly canvasWidth: number;
+    readonly canvasHeight: number;
+}
+
 export const NODE_WIDTH = 160;
 export const NODE_HEIGHT = 64;
 export const HORIZONTAL_GAP = 60;
@@ -26,9 +33,12 @@ type Layers = readonly (readonly string[])[];
 
 const MIN_LAYER_STEP =
     NODE_WIDTH + HORIZONTAL_GAP;
-const SIBLING_STEP = NODE_HEIGHT + 100;
+const SIBLING_STEP =
+    Math.max(NODE_WIDTH, NODE_HEIGHT) + 100;
 const CROSSING_SWEEP_COUNT = 12;
-const MAX_ASPECT_STRETCH = 1.4;
+const COORD_ITERATIONS = 4;
+const MAX_ASPECT_STRETCH = 2.5;
+const MIN_SNAKE_NODES = 4;
 
 export function buildAdjacency(
     edges: readonly EdgePair[],
@@ -77,11 +87,12 @@ export function wouldBeCycle(
 }
 
 export function computeLayout(
-    nodes: readonly LayoutInput[],
-    edges: readonly LayoutEdge[],
-    canvasWidth: number,
-    canvasHeight: number,
+    context: LayoutContext,
 ): Map<string, Position> {
+    const {
+        nodes, edges,
+        canvasWidth, canvasHeight,
+    } = context;
     if (nodes.length === 0) {
         return new Map();
     }
@@ -92,10 +103,58 @@ export function computeLayout(
     }
 
     const { forwardEdges } = removeCycles(nodes, edges);
+
     const layers = assignLayers(nodes, forwardEdges);
     const ordered = reduceCrossings(layers, forwardEdges);
-    const natural = assignCoordinates(ordered, forwardEdges);
-    return fitToCanvas(natural, canvasWidth, canvasHeight);
+    const topo = ordered.flat();
+
+    const hasWideFan = [
+        ...buildAdjacency(forwardEdges).values(),
+    ].some(a => a.length >= 3);
+
+    if (
+        !hasWideFan
+        && topo.length >= MIN_SNAKE_NODES
+    ) {
+        const k = computeSnakeWrap(
+            topo.length, canvasWidth, canvasHeight,
+        );
+        if (k > 0) {
+            const sugiPos = assignCoordinates(
+                ordered, forwardEdges,
+            );
+            const snakePos = computeTopoSnake(
+                topo, k, forwardEdges,
+                canvasWidth, canvasHeight,
+            );
+            const canvasAspect =
+                canvasWidth / canvasHeight;
+            const mis = (a: number): number =>
+                Math.max(a, canvasAspect)
+                / Math.min(a, canvasAspect);
+            if (mis(computeBboxAspect(snakePos))
+                < mis(computeBboxAspect(sugiPos))) {
+                return fitToCanvas(
+                    snakePos,
+                    canvasWidth, canvasHeight,
+                    nodes,
+                );
+            }
+            return fitToCanvas(
+                sugiPos,
+                canvasWidth, canvasHeight,
+                nodes,
+            );
+        }
+    }
+
+    const natural = assignCoordinates(
+        ordered, forwardEdges,
+    );
+    return fitToCanvas(
+        natural, canvasWidth, canvasHeight,
+        nodes,
+    );
 }
 
 function removeCycles(
@@ -109,103 +168,53 @@ function removeCycles(
         e => e.fromId !== e.toId,
     );
 
-    const outN = new Map<string, Set<string>>();
-    const inN = new Map<string, Set<string>>();
+    const outAdj =
+        new Map<string, string[]>();
     for (const n of nodes) {
-        outN.set(n.id, new Set());
-        inN.set(n.id, new Set());
+        outAdj.set(n.id, []);
     }
     for (const e of validEdges) {
-        outN.get(e.fromId)!.add(e.toId);
-        inN.get(e.toId)!.add(e.fromId);
+        outAdj.get(e.fromId)!.push(e.toId);
     }
 
-    const sources: string[] = [];
-    const sinks: string[] = [];
-    const remaining = new Set(nodes.map(n => n.id));
+    const backPairs = new Set<string>();
+    const visited = new Set<string>();
+    const onStack = new Set<string>();
 
-    const removeNode = (id: string): void => {
-        for (const t of outN.get(id)!) {
-            inN.get(t)!.delete(id);
+    const dfs = (id: string): void => {
+        visited.add(id);
+        onStack.add(id);
+        const neighbors =
+            outAdj.get(id) ?? [];
+        for (const n of neighbors) {
+            if (onStack.has(n)) {
+                backPairs.add(
+                    id + ':' + n,
+                );
+            } else if (!visited.has(n)) {
+                dfs(n);
+            }
         }
-        for (const s of inN.get(id)!) {
-            outN.get(s)!.delete(id);
-        }
-        remaining.delete(id);
+        onStack.delete(id);
     };
 
-    const startNode = nodes.find(n => n.isStart);
-    const completeNode = nodes.find(n => n.isComplete);
-
-    if (startNode && remaining.has(startNode.id)) {
-        sources.push(startNode.id);
-        removeNode(startNode.id);
+    const startNode =
+        nodes.find(n => n.isStart);
+    if (startNode) {
+        dfs(startNode.id);
     }
-    if (
-        completeNode
-        && completeNode.id !== startNode?.id
-        && remaining.has(completeNode.id)
-    ) {
-        sinks.push(completeNode.id);
-        removeNode(completeNode.id);
-    }
-
-    while (remaining.size > 0) {
-        let pulled = true;
-        while (pulled) {
-            pulled = false;
-            for (const id of Array.from(remaining)) {
-                if (outN.get(id)!.size === 0) {
-                    sinks.push(id);
-                    removeNode(id);
-                    pulled = true;
-                }
-            }
-        }
-        pulled = true;
-        while (pulled) {
-            pulled = false;
-            for (const id of Array.from(remaining)) {
-                if (inN.get(id)!.size === 0) {
-                    sources.push(id);
-                    removeNode(id);
-                    pulled = true;
-                }
-            }
-        }
-        if (remaining.size > 0) {
-            let best: string | null = null;
-            let bestScore = -Infinity;
-            for (const id of remaining) {
-                const score =
-                    outN.get(id)!.size
-                    - inN.get(id)!.size;
-                if (score > bestScore) {
-                    bestScore = score;
-                    best = id;
-                }
-            }
-            if (best !== null) {
-                sources.push(best);
-                removeNode(best);
-            }
+    for (const n of nodes) {
+        if (!visited.has(n.id)) {
+            dfs(n.id);
         }
     }
-
-    const sigma = [...sources, ...sinks.reverse()];
-    const position = new Map<string, number>();
-    sigma.forEach((id, i) => position.set(id, i));
 
     const forwardEdges: LayoutEdge[] = [];
     const reversedIds = new Set<string>();
     for (const e of validEdges) {
-        const fp = position.get(e.fromId);
-        const tp = position.get(e.toId);
-        if (fp === undefined || tp === undefined) {
-            forwardEdges.push(e);
-            continue;
-        }
-        if (tp < fp) {
+        const key =
+            e.fromId + ':' + e.toId;
+        if (backPairs.has(key)) {
             forwardEdges.push({
                 fromId: e.toId,
                 toId: e.fromId,
@@ -479,8 +488,12 @@ function assignCoordinates(
     });
 
     const upN = new Map<string, string[]>();
+    const downN = new Map<string, string[]>();
     for (const l of orderedLayers) {
-        for (const id of l) upN.set(id, []);
+        for (const id of l) {
+            upN.set(id, []);
+            downN.set(id, []);
+        }
     }
     for (const e of forwardEdges) {
         const fl = layerOf.get(e.fromId);
@@ -489,6 +502,7 @@ function assignCoordinates(
         if (tl === undefined) continue;
         if (tl - fl !== 1) continue;
         upN.get(e.toId)!.push(e.fromId);
+        downN.get(e.fromId)!.push(e.toId);
     }
 
     const ys = new Map<string, number>();
@@ -503,23 +517,30 @@ function assignCoordinates(
     }
 
     for (let l = 1; l < orderedLayers.length; l++) {
-        const layer = orderedLayers[l]!;
-        const raw = layer.map(id => {
-            const ps = upN.get(id)!;
-            if (ps.length === 0) return 0;
-            const vals = ps
-                .map(p => ys.get(p)!)
-                .sort((a, b) => a - b);
-            const mid = Math.floor(vals.length / 2);
-            if (vals.length % 2 === 1) {
-                return vals[mid]!;
-            }
-            return (vals[mid - 1]! + vals[mid]!) / 2;
-        });
-        layer.forEach((id, i) => {
-            ys.set(id, raw[i]!);
-        });
-        enforceSpacing(layer, ys);
+        forwardPassLayer(
+            orderedLayers[l]!, upN, ys,
+        );
+    }
+
+    const fanOwned = computeFanOwned(
+        orderedLayers, upN,
+    );
+
+    for (let it = 0; it < COORD_ITERATIONS; it++) {
+        for (
+            let l = orderedLayers.length - 2;
+            l >= 0;
+            l--
+        ) {
+            backwardPassLayer(
+                orderedLayers[l]!, downN, ys, fanOwned,
+            );
+        }
+        for (let l = 1; l < orderedLayers.length; l++) {
+            forwardPassLayer(
+                orderedLayers[l]!, upN, ys,
+            );
+        }
     }
 
     const maxLabelByLayer = new Array<number>(
@@ -572,6 +593,128 @@ function assignCoordinates(
     return positions;
 }
 
+function medianY(
+    ids: readonly string[],
+    ys: Map<string, number>,
+): number {
+    const vals = ids
+        .map(id => ys.get(id)!)
+        .sort((a, b) => a - b);
+    const mid = Math.floor(vals.length / 2);
+    if (vals.length % 2 === 1) {
+        return vals[mid]!;
+    }
+    return (vals[mid - 1]! + vals[mid]!) / 2;
+}
+
+function centerGroupAround(
+    group: readonly string[],
+    centerY: number,
+    ys: Map<string, number>,
+): void {
+    const k = group.length;
+    group.forEach((id, i) => {
+        const offset =
+            (i - (k - 1) / 2) * SIBLING_STEP;
+        ys.set(id, centerY + offset);
+    });
+}
+
+function forwardPassLayer(
+    layer: readonly string[],
+    upN: Map<string, string[]>,
+    ys: Map<string, number>,
+): void {
+    let i = 0;
+    while (i < layer.length) {
+        const id = layer[i]!;
+        const ps = upN.get(id)!;
+        if (ps.length !== 1) {
+            ys.set(id, medianY(ps, ys));
+            i++;
+            continue;
+        }
+        const pred = ps[0]!;
+        let j = i + 1;
+        while (j < layer.length) {
+            const nid = layer[j]!;
+            const nps = upN.get(nid)!;
+            if (
+                nps.length === 1
+                && nps[0] === pred
+            ) {
+                j++;
+            } else {
+                break;
+            }
+        }
+        const group = layer.slice(i, j);
+        centerGroupAround(
+            group, ys.get(pred)!, ys,
+        );
+        i = j;
+    }
+    enforceSpacing(layer, ys);
+}
+
+function backwardPassLayer(
+    layer: readonly string[],
+    downN: Map<string, string[]>,
+    ys: Map<string, number>,
+    fanOwned: ReadonlySet<string>,
+): void {
+    for (const id of layer) {
+        if (fanOwned.has(id)) continue;
+        const succs = downN.get(id)!;
+        if (succs.length === 0) continue;
+        ys.set(id, medianY(succs, ys));
+    }
+    enforceSpacing(layer, ys);
+}
+
+function computeFanOwned(
+    orderedLayers: Layers,
+    upN: Map<string, string[]>,
+): ReadonlySet<string> {
+    const fanOwned = new Set<string>();
+    for (const layer of orderedLayers) {
+        for (const id of layer) {
+            const ps = upN.get(id)!;
+            if (ps.length === 1 && fanOwned.has(ps[0]!)) {
+                fanOwned.add(id);
+            }
+        }
+        let i = 0;
+        while (i < layer.length) {
+            const ps = upN.get(layer[i]!)!;
+            if (ps.length !== 1) {
+                i++;
+                continue;
+            }
+            const pred = ps[0]!;
+            let j = i + 1;
+            while (j < layer.length) {
+                const nps = upN.get(layer[j]!)!;
+                if (
+                    nps.length === 1
+                    && nps[0] === pred
+                ) {
+                    j++;
+                } else {
+                    break;
+                }
+            }
+            if (j - i >= 2) {
+                for (let k = i; k < j; k++) {
+                    fanOwned.add(layer[k]!);
+                }
+            }
+            i = j;
+        }
+    }
+    return fanOwned;
+}
+
 function enforceSpacing(
     layer: readonly string[],
     ys: Map<string, number>,
@@ -589,6 +732,7 @@ function fitToCanvas(
     positions: Map<string, Position>,
     canvasW: number,
     canvasH: number,
+    nodes: readonly LayoutInput[],
 ): Map<string, Position> {
     if (positions.size === 0) return new Map();
 
@@ -628,10 +772,7 @@ function fitToCanvas(
         let sY = Infinity;
         if (rotW > 0 && tW > 0) sX = tW / rotW;
         if (rotH > 0 && tH > 0) sY = tH / rotH;
-        if (
-            isFinite(sX) && sX >= 1
-            && isFinite(sY) && sY >= 1
-        ) {
+        if (isFinite(sX) && isFinite(sY)) {
             const sSmall = Math.min(sX, sY);
             const sBig = Math.max(sX, sY);
             const capped = Math.min(
@@ -644,6 +785,8 @@ function fitToCanvas(
             scaleY = sY > sX
                 ? capped
                 : sSmall;
+            scaleX = Math.max(scaleX, 1);
+            scaleY = Math.max(scaleY, 0.4);
         }
     }
 
@@ -662,5 +805,198 @@ function fitToCanvas(
         });
     }
 
+    const startId = nodes.find(
+        n => n.isStart,
+    )?.id;
+    const endId = nodes.find(
+        n => n.isComplete,
+    )?.id;
+    if (
+        startId && endId
+        && startId !== endId
+    ) {
+        const sp = result.get(startId);
+        const ep = result.get(endId);
+        if (sp && ep) {
+            const flipX = sp.x > ep.x;
+            const flipY = sp.y > ep.y;
+            if (flipX || flipY) {
+                let rMinX = Infinity;
+                let rMaxX = -Infinity;
+                let rMinY = Infinity;
+                let rMaxY = -Infinity;
+                for (
+                    const rp
+                    of result.values()
+                ) {
+                    if (rp.x < rMinX) {
+                        rMinX = rp.x;
+                    }
+                    if (rp.x > rMaxX) {
+                        rMaxX = rp.x;
+                    }
+                    if (rp.y < rMinY) {
+                        rMinY = rp.y;
+                    }
+                    if (rp.y > rMaxY) {
+                        rMaxY = rp.y;
+                    }
+                }
+                for (
+                    const [, rp] of result
+                ) {
+                    if (flipX) {
+                        rp.x =
+                            rMinX + rMaxX
+                            - rp.x;
+                    }
+                    if (flipY) {
+                        rp.y =
+                            rMinY + rMaxY
+                            - rp.y;
+                    }
+                }
+            }
+        }
+    }
+
     return result;
+}
+
+function computeSnakeWrap(
+    nodeCount: number,
+    _canvasW: number,
+    canvasH: number,
+): number {
+    if (nodeCount < MIN_SNAKE_NODES) return 0;
+    if (canvasH <= 0) return 0;
+
+    const cellH = NODE_HEIGHT + VERTICAL_GAP;
+    const targetH = canvasH - NODE_HEIGHT;
+    if (targetH <= 0) return 0;
+    const numRows = Math.max(
+        2, Math.floor(targetH / cellH),
+    );
+    const k = Math.max(
+        2,
+        Math.min(
+            Math.ceil(nodeCount / numRows),
+            nodeCount - 1,
+        ),
+    );
+    return k;
+}
+
+function computeBboxAspect(
+    positions: ReadonlyMap<string, Position>,
+): number {
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    for (const p of positions.values()) {
+        if (p.x < minX) minX = p.x;
+        if (p.x > maxX) maxX = p.x;
+        if (p.y < minY) minY = p.y;
+        if (p.y > maxY) maxY = p.y;
+    }
+    const w = maxX - minX + NODE_WIDTH;
+    const h = maxY - minY + NODE_HEIGHT;
+    if (h <= 0) return Infinity;
+    return w / h;
+}
+
+function snakeColRow(
+    i: number,
+    k: number,
+): { col: number; row: number } {
+    const row = Math.floor(i / k);
+    const rowEven = row % 2 === 0;
+    const col = rowEven
+        ? (i % k)
+        : (k - 1 - (i % k));
+    return { col, row };
+}
+
+function computeTopoSnake(
+    topo: readonly string[],
+    k: number,
+    forwardEdges: readonly LayoutEdge[],
+    canvasW: number,
+    canvasH: number,
+): Map<string, Position> {
+    const numRows = Math.ceil(topo.length / k);
+
+    const edgeLabel = new Map<string, number>();
+    for (const e of forwardEdges) {
+        const key = e.fromId + '\0' + e.toId;
+        const cur = edgeLabel.get(key) ?? 0;
+        if (e.labelWidth > cur) {
+            edgeLabel.set(key, e.labelWidth);
+        }
+    }
+
+    const colGap = new Array<number>(
+        Math.max(0, k - 1),
+    ).fill(HORIZONTAL_GAP);
+    for (let i = 0; i < topo.length - 1; i++) {
+        const a = snakeColRow(i, k);
+        const b = snakeColRow(i + 1, k);
+        if (a.row !== b.row) continue;
+        const g = Math.min(a.col, b.col);
+        const fwd =
+            topo[i]! + '\0' + topo[i + 1]!;
+        const rev =
+            topo[i + 1]! + '\0' + topo[i]!;
+        const labelW = Math.max(
+            edgeLabel.get(fwd) ?? 0,
+            edgeLabel.get(rev) ?? 0,
+        );
+        const need = labelW + LABEL_SAFETY_MARGIN;
+        if (need > colGap[g]!) colGap[g] = need;
+    }
+
+    const colX = new Array<number>(k);
+    colX[0] = 0;
+    for (let c = 1; c < k; c++) {
+        const step = Math.max(
+            MIN_LAYER_STEP,
+            NODE_WIDTH + colGap[c - 1]!,
+        );
+        colX[c] = colX[c - 1]! + step;
+    }
+
+    const lastCol = colX[k - 1]!;
+    const targetW = canvasW - NODE_WIDTH;
+    if (
+        k > 1
+        && lastCol > 0
+        && targetW > lastCol
+    ) {
+        const scale = targetW / lastCol;
+        for (let c = 1; c < k; c++) {
+            colX[c] = colX[c]! * scale;
+        }
+    }
+
+    const rowY = new Array<number>(numRows);
+    rowY[0] = 0;
+    if (numRows > 1) {
+        const span = canvasH - NODE_HEIGHT;
+        const step = span / (numRows - 1);
+        for (let r = 1; r < numRows; r++) {
+            rowY[r] = r * step;
+        }
+    }
+
+    const positions = new Map<string, Position>();
+    for (let i = 0; i < topo.length; i++) {
+        const { col, row } = snakeColRow(i, k);
+        positions.set(topo[i]!, {
+            x: colX[col]!,
+            y: rowY[row]!,
+        });
+    }
+
+    return positions;
 }

@@ -37,6 +37,7 @@ export interface FlowGraph {
     name: string;
     description: string;
     isLocked: boolean;
+    isManualLayout: boolean;
     lockTimeout: number;
     nodes: GraphNode[];
     edges: GraphEdge[];
@@ -199,6 +200,9 @@ export async function getFlowGraph(
         description: flow.description,
         isLocked: toBool(
             flow.is_locked,
+        ),
+        isManualLayout: toBool(
+            flow.is_manual_layout,
         ),
         lockTimeout: flow.lock_timeout,
         nodes: g.nodes,

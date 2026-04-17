@@ -1189,6 +1189,7 @@ export async function populateMockData(
                 'Standard customer'
                 + ' onboarding process',
             is_locked: false,
+            is_manual_layout: false,
             lock_timeout:
                 DEFAULT_LOCK_TIMEOUT,
             graph: jsonObjectField({
@@ -1477,6 +1478,7 @@ export async function populateMockData(
             name: 'Fusion Flow',
             description: '',
             is_locked: false,
+            is_manual_layout: false,
             lock_timeout:
                 DEFAULT_LOCK_TIMEOUT,
             graph: jsonObjectField({
@@ -1985,6 +1987,403 @@ export async function populateMockData(
             created_at: wfTimestamp,
             updated_at: wfTimestamp,
         },
+        {
+            id: '1a700001-0000-4000-8000-000000000001',
+            name:
+                'Layout Test: Proposal Review Cycle',
+            description:
+                'Exercises multi-exit fans, nested'
+                + ' decisions, convergence, and'
+                + ' cycles for Auto Layout testing',
+            is_locked: false,
+            is_manual_layout: false,
+            lock_timeout: DEFAULT_LOCK_TIMEOUT,
+            graph: jsonObjectField({
+                nodes: [
+                    {
+                        id: '1a700001-0002-4000-8000-000000000001',
+                        name: 'Start',
+                        description: '',
+                        positionX: 0,
+                        positionY: 0,
+                        isStart: true,
+                        isComplete: false,
+                        fields: [],
+                    },
+                    {
+                        id: '1a700001-0002-4000-8000-000000000002',
+                        name: 'Draft',
+                        description: '',
+                        positionX: 0,
+                        positionY: 0,
+                        isStart: false,
+                        isComplete: false,
+                        fields: [],
+                    },
+                    {
+                        id: '1a700001-0002-4000-8000-000000000003',
+                        name: 'Submit',
+                        description: '',
+                        positionX: 0,
+                        positionY: 0,
+                        isStart: false,
+                        isComplete: false,
+                        fields: [],
+                    },
+                    {
+                        id: '1a700001-0002-4000-8000-000000000004',
+                        name: 'Triage',
+                        description: '',
+                        positionX: 0,
+                        positionY: 0,
+                        isStart: false,
+                        isComplete: false,
+                        fields: [],
+                    },
+                    {
+                        id: '1a700001-0002-4000-8000-000000000005',
+                        name: 'Quick Review',
+                        description: '',
+                        positionX: 0,
+                        positionY: 0,
+                        isStart: false,
+                        isComplete: false,
+                        fields: [],
+                    },
+                    {
+                        id: '1a700001-0002-4000-8000-000000000006',
+                        name: 'Standard Review',
+                        description: '',
+                        positionX: 0,
+                        positionY: 0,
+                        isStart: false,
+                        isComplete: false,
+                        fields: [],
+                    },
+                    {
+                        id: '1a700001-0002-4000-8000-000000000007',
+                        name: 'Deep Review',
+                        description: '',
+                        positionX: 0,
+                        positionY: 0,
+                        isStart: false,
+                        isComplete: false,
+                        fields: [],
+                    },
+                    {
+                        id: '1a700001-0002-4000-8000-000000000008',
+                        name: 'Panel A',
+                        description: '',
+                        positionX: 0,
+                        positionY: 0,
+                        isStart: false,
+                        isComplete: false,
+                        fields: [],
+                    },
+                    {
+                        id: '1a700001-0002-4000-8000-000000000009',
+                        name: 'Panel B',
+                        description: '',
+                        positionX: 0,
+                        positionY: 0,
+                        isStart: false,
+                        isComplete: false,
+                        fields: [],
+                    },
+                    {
+                        id: '1a700001-0002-4000-8000-000000000010',
+                        name: 'Panel C',
+                        description: '',
+                        positionX: 0,
+                        positionY: 0,
+                        isStart: false,
+                        isComplete: false,
+                        fields: [],
+                    },
+                    {
+                        id: '1a700001-0002-4000-8000-000000000011',
+                        name: 'Panel D',
+                        description: '',
+                        positionX: 0,
+                        positionY: 0,
+                        isStart: false,
+                        isComplete: false,
+                        fields: [],
+                    },
+                    {
+                        id: '1a700001-0002-4000-8000-000000000012',
+                        name: 'Consolidate',
+                        description: '',
+                        positionX: 0,
+                        positionY: 0,
+                        isStart: false,
+                        isComplete: false,
+                        fields: [],
+                    },
+                    {
+                        id: '1a700001-0002-4000-8000-000000000013',
+                        name: 'Decision',
+                        description: '',
+                        positionX: 0,
+                        positionY: 0,
+                        isStart: false,
+                        isComplete: false,
+                        fields: [],
+                    },
+                    {
+                        id: '1a700001-0002-4000-8000-000000000014',
+                        name: 'Approved',
+                        description: '',
+                        positionX: 0,
+                        positionY: 0,
+                        isStart: false,
+                        isComplete: false,
+                        fields: [],
+                    },
+                    {
+                        id: '1a700001-0002-4000-8000-000000000015',
+                        name: 'Revise',
+                        description: '',
+                        positionX: 0,
+                        positionY: 0,
+                        isStart: false,
+                        isComplete: false,
+                        fields: [],
+                    },
+                    {
+                        id: '1a700001-0002-4000-8000-000000000016',
+                        name: 'Rejected',
+                        description: '',
+                        positionX: 0,
+                        positionY: 0,
+                        isStart: false,
+                        isComplete: false,
+                        fields: [],
+                    },
+                    {
+                        id: '1a700001-0002-4000-8000-000000000017',
+                        name: 'End',
+                        description: '',
+                        positionX: 0,
+                        positionY: 0,
+                        isStart: false,
+                        isComplete: true,
+                        fields: [],
+                    },
+                ],
+                edges: [
+                    {
+                        id: '1a700001-0003-4000-8000-000000000001',
+                        name: 'begin',
+                        description: '',
+                        fromNodeId:
+                            '1a700001-0002-4000-8000-000000000001',
+                        toNodeId:
+                            '1a700001-0002-4000-8000-000000000002',
+                    },
+                    {
+                        id: '1a700001-0003-4000-8000-000000000002',
+                        name: 'ready',
+                        description: '',
+                        fromNodeId:
+                            '1a700001-0002-4000-8000-000000000002',
+                        toNodeId:
+                            '1a700001-0002-4000-8000-000000000003',
+                    },
+                    {
+                        id: '1a700001-0003-4000-8000-000000000003',
+                        name: 'submitted',
+                        description: '',
+                        fromNodeId:
+                            '1a700001-0002-4000-8000-000000000003',
+                        toNodeId:
+                            '1a700001-0002-4000-8000-000000000004',
+                    },
+                    {
+                        id: '1a700001-0003-4000-8000-000000000004',
+                        name: 'quick',
+                        description: '',
+                        fromNodeId:
+                            '1a700001-0002-4000-8000-000000000004',
+                        toNodeId:
+                            '1a700001-0002-4000-8000-000000000005',
+                    },
+                    {
+                        id: '1a700001-0003-4000-8000-000000000005',
+                        name: 'standard',
+                        description: '',
+                        fromNodeId:
+                            '1a700001-0002-4000-8000-000000000004',
+                        toNodeId:
+                            '1a700001-0002-4000-8000-000000000006',
+                    },
+                    {
+                        id: '1a700001-0003-4000-8000-000000000006',
+                        name: 'deep',
+                        description: '',
+                        fromNodeId:
+                            '1a700001-0002-4000-8000-000000000004',
+                        toNodeId:
+                            '1a700001-0002-4000-8000-000000000007',
+                    },
+                    {
+                        id: '1a700001-0003-4000-8000-000000000007',
+                        name: 'panel A',
+                        description: '',
+                        fromNodeId:
+                            '1a700001-0002-4000-8000-000000000007',
+                        toNodeId:
+                            '1a700001-0002-4000-8000-000000000008',
+                    },
+                    {
+                        id: '1a700001-0003-4000-8000-000000000008',
+                        name: 'panel B',
+                        description: '',
+                        fromNodeId:
+                            '1a700001-0002-4000-8000-000000000007',
+                        toNodeId:
+                            '1a700001-0002-4000-8000-000000000009',
+                    },
+                    {
+                        id: '1a700001-0003-4000-8000-000000000009',
+                        name: 'panel C',
+                        description: '',
+                        fromNodeId:
+                            '1a700001-0002-4000-8000-000000000007',
+                        toNodeId:
+                            '1a700001-0002-4000-8000-000000000010',
+                    },
+                    {
+                        id: '1a700001-0003-4000-8000-000000000010',
+                        name: 'panel D',
+                        description: '',
+                        fromNodeId:
+                            '1a700001-0002-4000-8000-000000000007',
+                        toNodeId:
+                            '1a700001-0002-4000-8000-000000000011',
+                    },
+                    {
+                        id: '1a700001-0003-4000-8000-000000000011',
+                        name: 'A done',
+                        description: '',
+                        fromNodeId:
+                            '1a700001-0002-4000-8000-000000000008',
+                        toNodeId:
+                            '1a700001-0002-4000-8000-000000000012',
+                    },
+                    {
+                        id: '1a700001-0003-4000-8000-000000000012',
+                        name: 'B done',
+                        description: '',
+                        fromNodeId:
+                            '1a700001-0002-4000-8000-000000000009',
+                        toNodeId:
+                            '1a700001-0002-4000-8000-000000000012',
+                    },
+                    {
+                        id: '1a700001-0003-4000-8000-000000000013',
+                        name: 'C done',
+                        description: '',
+                        fromNodeId:
+                            '1a700001-0002-4000-8000-000000000010',
+                        toNodeId:
+                            '1a700001-0002-4000-8000-000000000012',
+                    },
+                    {
+                        id: '1a700001-0003-4000-8000-000000000014',
+                        name: 'D done',
+                        description: '',
+                        fromNodeId:
+                            '1a700001-0002-4000-8000-000000000011',
+                        toNodeId:
+                            '1a700001-0002-4000-8000-000000000012',
+                    },
+                    {
+                        id: '1a700001-0003-4000-8000-000000000015',
+                        name: 'to decision',
+                        description: '',
+                        fromNodeId:
+                            '1a700001-0002-4000-8000-000000000005',
+                        toNodeId:
+                            '1a700001-0002-4000-8000-000000000013',
+                    },
+                    {
+                        id: '1a700001-0003-4000-8000-000000000016',
+                        name: 'to decision',
+                        description: '',
+                        fromNodeId:
+                            '1a700001-0002-4000-8000-000000000006',
+                        toNodeId:
+                            '1a700001-0002-4000-8000-000000000013',
+                    },
+                    {
+                        id: '1a700001-0003-4000-8000-000000000017',
+                        name: 'synthesized',
+                        description: '',
+                        fromNodeId:
+                            '1a700001-0002-4000-8000-000000000012',
+                        toNodeId:
+                            '1a700001-0002-4000-8000-000000000013',
+                    },
+                    {
+                        id: '1a700001-0003-4000-8000-000000000018',
+                        name: 'approve',
+                        description: '',
+                        fromNodeId:
+                            '1a700001-0002-4000-8000-000000000013',
+                        toNodeId:
+                            '1a700001-0002-4000-8000-000000000014',
+                    },
+                    {
+                        id: '1a700001-0003-4000-8000-000000000019',
+                        name: 'revise',
+                        description: '',
+                        fromNodeId:
+                            '1a700001-0002-4000-8000-000000000013',
+                        toNodeId:
+                            '1a700001-0002-4000-8000-000000000015',
+                    },
+                    {
+                        id: '1a700001-0003-4000-8000-000000000020',
+                        name: 'reject',
+                        description: '',
+                        fromNodeId:
+                            '1a700001-0002-4000-8000-000000000013',
+                        toNodeId:
+                            '1a700001-0002-4000-8000-000000000016',
+                    },
+                    {
+                        id: '1a700001-0003-4000-8000-000000000021',
+                        name: 'done',
+                        description: '',
+                        fromNodeId:
+                            '1a700001-0002-4000-8000-000000000014',
+                        toNodeId:
+                            '1a700001-0002-4000-8000-000000000017',
+                    },
+                    {
+                        id: '1a700001-0003-4000-8000-000000000022',
+                        name: 'done',
+                        description: '',
+                        fromNodeId:
+                            '1a700001-0002-4000-8000-000000000016',
+                        toNodeId:
+                            '1a700001-0002-4000-8000-000000000017',
+                    },
+                    {
+                        id: '1a700001-0003-4000-8000-000000000023',
+                        name: 'back to draft',
+                        description: '',
+                        fromNodeId:
+                            '1a700001-0002-4000-8000-000000000015',
+                        toNodeId:
+                            '1a700001-0002-4000-8000-000000000002',
+                    },
+                ],
+            }),
+            created_at: wfTimestamp,
+            updated_at: wfTimestamp,
+        },
     ];
 
     const woId =
@@ -2152,6 +2551,12 @@ export async function populateMockData(
             id: 'c7e5a302-1b34-4f56-9d78-ab9c0d1e2f3a',
             project_id: '8b75e9ca-76ed-42c0-b496-699eb5a2e400',
             flow_id: '5569e404-e4ea-4310-83f8-0225a5f95311',
+            created_at: wfTimestamp,
+        },
+        {
+            id: '1a700001-0001-4000-8000-000000000001',
+            project_id: 'd04b29ad-cc85-4830-adc2-96b1e434d1d0',
+            flow_id: '1a700001-0000-4000-8000-000000000001',
             created_at: wfTimestamp,
         },
     ];

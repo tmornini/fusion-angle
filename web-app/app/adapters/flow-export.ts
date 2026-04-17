@@ -317,6 +317,9 @@ export async function getFlowZip(
         isLocked: toBool(
             flow.is_locked,
         ),
+        isManualLayout: toBool(
+            flow.is_manual_layout,
+        ),
         lockTimeout: flow.lock_timeout,
         nodes: graph.nodes,
         edges: graph.edges,
@@ -663,10 +666,12 @@ function layoutImportedGraph(
                         e.name,
                     ),
         }));
-    return computeLayout(
-        inputs, layoutEdges,
-        IMPORT_CANVAS_W, IMPORT_CANVAS_H,
-    );
+    return computeLayout({
+        nodes: inputs,
+        edges: layoutEdges,
+        canvasWidth: IMPORT_CANVAS_W,
+        canvasHeight: IMPORT_CANVAS_H,
+    });
 }
 
 function buildImportedEdges(

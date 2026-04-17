@@ -11,6 +11,7 @@ import {
     putWfEdge,
     putFlow,
     putFlowLocked,
+    putFlowManualLayout,
     postNodeAddition,
     postEdgeConnection,
     postFieldAddition,
@@ -99,6 +100,7 @@ interface DesignerState {
     flowName: string;
     flowDescription: string;
     isLocked: boolean;
+    isManualLayout: boolean;
     lockTimeout: number;
     isEditingName: boolean;
     nodes: GraphNode[];
@@ -140,6 +142,8 @@ export class FlowDesignerPresenter {
             flowDescription:
                 graph.description,
             isLocked: graph.isLocked,
+            isManualLayout:
+                graph.isManualLayout,
             lockTimeout: graph.lockTimeout,
             isEditingName: false,
             nodes: graph.nodes,
@@ -203,6 +207,19 @@ export class FlowDesignerPresenter {
         const next = !this.#state.isLocked;
         this.#state.isLocked = next;
         void putFlowLocked(
+            this.#state.flowId, next,
+        );
+    }
+
+    isManualLayout(): boolean {
+        return this.#state.isManualLayout;
+    }
+
+    toggleManualLayout(): void {
+        const next =
+            !this.#state.isManualLayout;
+        this.#state.isManualLayout = next;
+        void putFlowManualLayout(
             this.#state.flowId, next,
         );
     }
@@ -556,9 +573,12 @@ export class FlowDesignerPresenter {
                 this.#state.flowName,
                 this.#state.isEditingName,
             );
-        const lockedAttr =
-            this.#state.isLocked
-                ? ' checked' : '';
+        const lockedChecked =
+            String(this.#state.isLocked);
+        const manualChecked =
+            String(
+                this.#state.isManualLayout,
+            );
         const content = html`<div
 class="wf-designer">
 <div class="wf-designer-header">
@@ -575,13 +595,28 @@ class="wf-designer">
 <p class="text-sm text-muted"
     >${this.#state.flowDescription}</p>
 </div>
+<div class="flex flex-col gap-2">
 <label class="${
     'flex items-center gap-2'
     + ' text-sm wf-lock-label'
-}"><input type="checkbox"
-    id="flow-lock-checkbox"${
-    trusted(lockedAttr)
-} /> Locked</label>
+}"><button class="switch"
+    role="switch"
+    aria-checked="${lockedChecked}"
+    id="flow-lock-switch"
+    ><span class="switch-thumb"
+    ></span></button>
+Locked</label>
+<label class="${
+    'flex items-center gap-2'
+    + ' text-sm wf-lock-label'
+}"><button class="switch"
+    role="switch"
+    aria-checked="${manualChecked}"
+    id="flow-manual-layout-switch"
+    ><span class="switch-thumb"
+    ></span></button>
+Manual Layout</label>
+</div>
 </div>
 </div>
 <div class="wf-designer-body">
@@ -888,6 +923,7 @@ ${toolbar}
 
     autoLayout(): void {
         if (this.#guardLocked()) return;
+        if (this.#state.isManualLayout) return;
         const fId = this.#state.flowId;
         const nodeById = new Map(
             this.#state.nodes.map(
@@ -926,10 +962,12 @@ ${toolbar}
                 this.#canvasW - PANEL_WIDTH_PX,
             )
             : this.#canvasW;
-        const positions = computeLayout(
-            layoutInputs, layoutEdges,
-            effectiveW, this.#canvasH,
-        );
+        const positions = computeLayout({
+            nodes: layoutInputs,
+            edges: layoutEdges,
+            canvasWidth: effectiveW,
+            canvasHeight: this.#canvasH,
+        });
         this.#state.nodes =
             this.#state.nodes.map(n => {
                 const pos =
@@ -1580,6 +1618,7 @@ ${toolbar}
             this.canUndo(),
             this.canRedo(),
             this.#state.isLocked,
+            this.#state.isManualLayout,
             this.#canDelete(),
         );
     }

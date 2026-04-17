@@ -292,6 +292,7 @@ export function buildToolbar(
     canUndo: boolean,
     canRedo: boolean,
     isLocked: boolean,
+    isManualLayout: boolean,
     canDelete: boolean,
 ): SafeHtml {
     const autoFitCls = isAutoFitEnabled
@@ -325,7 +326,8 @@ class="wf-toolbar">
     title="Auto layout"
     aria-label="Auto layout"${
     trusted(
-        isLocked ? ' disabled' : '',
+        isLocked || isManualLayout
+            ? ' disabled' : '',
     )}>${iconLayoutGrid(18, '')}</button>
 </div>
 <div class="wf-toolbar-spacer"></div>

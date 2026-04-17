@@ -99,7 +99,9 @@ document.addEventListener(
                     '.sidebar-layout',
                 )
             ) {
-                await initSidebarLayout();
+                await initSidebarLayout(
+                    hasSchema,
+                );
             }
             const cp = await import(
                 './command-palette'

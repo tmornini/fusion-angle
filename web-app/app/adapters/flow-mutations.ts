@@ -253,6 +253,16 @@ export async function putFlowLocked(
     });
 }
 
+export async function putFlowManualLayout(
+    id: string,
+    isManualLayout: boolean,
+): Promise<void> {
+    await PUT(`flows/${id}`, {
+        is_manual_layout: isManualLayout,
+        updated_at: nowUtc(),
+    });
+}
+
 export interface GraphUpdateContext {
     flowId: string;
     nodes: GraphNode[];

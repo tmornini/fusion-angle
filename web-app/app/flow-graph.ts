@@ -8,12 +8,12 @@ import type {
 } from './flow-interactions';
 import {
     NODE_WIDTH, NODE_HEIGHT,
-    buildAdjacency, isReachable,
 } from './flow-layout';
 
 const BLUE = '#4B6CA1';
 const WARN = '#d97706';
 const GREEN = '#16a34a';
+const RED = '#b91c1c';
 
 const GRID_CELL = 24;
 const GRID_DOT_RADIUS = 0.7;
@@ -28,9 +28,6 @@ const STROKE_START = 2.5;
 const STROKE_COMPLETE = 3;
 
 const NODE_RADIUS = 10;
-const COMPLETE_INSET = 4;
-const COMPLETE_INNER_RADIUS = 7;
-const COMPLETE_INNER_STROKE = 1.5;
 
 const PORT_RADIUS = 5;
 const PORT_STROKE = 2;
@@ -45,10 +42,14 @@ const LABEL_MAX_WIDTH = 140;
 
 const EDGE_STROKE = 2;
 const HIT_TARGET_WIDTH = 12;
-const CURVE_TENSION = 0.4;
+const CURVE_TENSION = 0.25;
+const MAX_CONTROL_ARM = 50;
 const BEZIER_MIDPOINT = 0.5;
-const BIDI_SPREAD = 40;
-const BIDI_LABEL_T = 0.42;
+const BIDI_SPREAD_FRAC = 0.08;
+const BIDI_SPREAD_MIN = 20;
+const BIDI_SPREAD_MAX = 80;
+const BIDI_LABEL_T = 0.47;
+const BIDI_LABEL_OFFSET = 12;
 
 const CYCLE_DASH = '6 3';
 
@@ -208,7 +209,10 @@ export function controlOffset(
     edge: RectEdge,
     dist: number,
 ): { dx: number; dy: number } {
-    const d = dist * CURVE_TENSION;
+    const d = Math.min(
+        dist * CURVE_TENSION,
+        MAX_CONTROL_ARM,
+    );
     switch (edge) {
         case 'right':
             return { dx: d, dy: 0 };
@@ -364,11 +368,12 @@ function buildNode(
 
     let borderColor = BLUE;
     let strokeW = STROKE_NORMAL;
-    if (node.isStart || node.isComplete) {
+    if (node.isStart) {
         borderColor = GREEN;
-        strokeW = node.isComplete
-            ? STROKE_COMPLETE
-            : STROKE_START;
+        strokeW = STROKE_START;
+    } else if (node.isComplete) {
+        borderColor = RED;
+        strokeW = STROKE_COMPLETE;
     }
 
     const selAttr = isSelected
@@ -385,25 +390,6 @@ function buildNode(
         + '--color-card-bg)"'
         + ` stroke="${borderColor}"`
         + ` stroke-width="${strokeW}"/>`;
-
-    if (node.isComplete) {
-        inner += '<rect'
-            + ` x="${COMPLETE_INSET}"`
-            + ` y="${COMPLETE_INSET}"`
-            + ` width="${
-                NODE_WIDTH
-                - COMPLETE_INSET * 2
-            }"`
-            + ` height="${
-                NODE_HEIGHT
-                - COMPLETE_INSET * 2
-            }"`
-            + ` rx="${COMPLETE_INNER_RADIUS}"`
-            + ' fill="none"'
-            + ` stroke="${GREEN}"`
-            + ` stroke-width="`
-            + `${COMPLETE_INNER_STROKE}"/>`;
-    }
 
     const isSpecial =
         node.isStart || node.isComplete;
@@ -522,7 +508,13 @@ function buildEdge(
             perpX = -dy / len;
             perpY = dx / len;
             spread =
-                aimOffset * BIDI_SPREAD;
+                aimOffset * Math.min(
+                    BIDI_SPREAD_MAX,
+                    Math.max(
+                        BIDI_SPREAD_MIN,
+                        len * BIDI_SPREAD_FRAC,
+                    ),
+                );
             aimFromX = toCx + perpX * spread;
             aimFromY = toCy + perpY * spread;
             aimToX = fromCx + perpX * spread;
@@ -562,14 +554,10 @@ function buildEdge(
         controlOffset(se, dist);
     const cp2 =
         controlOffset(ee, dist);
-    const cp1X =
-        startPt.x + cp1.dx + perpX * spread;
-    const cp1Y =
-        startPt.y + cp1.dy + perpY * spread;
-    const cp2X =
-        endPt.x + cp2.dx + perpX * spread;
-    const cp2Y =
-        endPt.y + cp2.dy + perpY * spread;
+    const cp1X = startPt.x + cp1.dx;
+    const cp1Y = startPt.y + cp1.dy;
+    const cp2X = endPt.x + cp2.dx;
+    const cp2Y = endPt.y + cp2.dy;
     pathD = 'M '
         + String(startPt.x) + ' '
         + String(startPt.y)
@@ -631,8 +619,10 @@ function buildEdge(
         ? BEZIER_MIDPOINT
         : BIDI_LABEL_T;
     const mid = bezierAt(pathD, labelT);
-    const midX = mid.x;
-    const midY = mid.y;
+    const midX = mid.x
+        + perpX * BIDI_LABEL_OFFSET;
+    const midY = mid.y
+        + perpY * BIDI_LABEL_OFFSET;
     const truncEdge =
         truncateEdgeLabel(edge.name);
     const labelEsc =
@@ -814,22 +804,33 @@ export function buildGraphSvg(
         nodes.map(n => [n.id, n]),
     );
 
-    const adj = buildAdjacency(
-        edges.map(e => ({
-            fromId: e.fromNodeId,
-            toId: e.toNodeId,
-        })),
-    );
-    const cycleEdgeIds =
-        new Set<string>();
+    const outAdj = new Map<string, GraphEdge[]>();
+    for (const n of nodes) {
+        outAdj.set(n.id, []);
+    }
     for (const edge of edges) {
-        if (isReachable(
-            edge.toNodeId,
-            edge.fromNodeId,
-            adj,
-        )) {
-            cycleEdgeIds.add(edge.id);
+        outAdj.get(edge.fromNodeId)?.push(edge);
+    }
+    const cycleEdgeIds = new Set<string>();
+    const visited = new Set<string>();
+    const onStack = new Set<string>();
+    const dfs = (id: string): void => {
+        visited.add(id);
+        onStack.add(id);
+        const outs = outAdj.get(id) ?? [];
+        for (const e of outs) {
+            if (onStack.has(e.toNodeId)) {
+                cycleEdgeIds.add(e.id);
+            } else if (!visited.has(e.toNodeId)) {
+                dfs(e.toNodeId);
+            }
         }
+        onStack.delete(id);
+    };
+    const startNode = nodes.find(n => n.isStart);
+    if (startNode) dfs(startNode.id);
+    for (const n of nodes) {
+        if (!visited.has(n.id)) dfs(n.id);
     }
 
     const pairKey = (
