@@ -170,6 +170,7 @@ function handlePointerDown(
     state: InteractionState,
     onUpdate: InteractionCallback,
     getNodePosition: NodePositionLookup,
+    isLocked: () => boolean,
 ): void {
     const target = e.target;
     if (!(target instanceof Element)) return;
@@ -241,6 +242,10 @@ function handlePointerDown(
             state, nodeId, e,
         );
         state.isPanelOpen = isDbl;
+        if (isLocked()) {
+            onUpdate();
+            return;
+        }
         const sel = state.selection;
         const ids =
             sel.kind === 'nodes'
@@ -655,9 +660,10 @@ function handleWheel(
     svg: SVGSVGElement,
     state: InteractionState,
     onUpdate: InteractionCallback,
-    onAutoFitDisable: InteractionCallback,
+    isAutoFit: () => boolean,
 ): void {
     e.preventDefault();
+    if (isAutoFit()) return;
 
     const svgPt = screenToSvg(
         svg, e.clientX, e.clientY,
@@ -682,7 +688,6 @@ function handleWheel(
         svgPt.y
         - (svgPt.y - state.viewBox.y) * ratio;
 
-    onAutoFitDisable();
     onUpdate();
 }
 
@@ -690,7 +695,6 @@ export function bindInteractions(
     svg: SVGSVGElement,
     state: InteractionState,
     onUpdate: InteractionCallback,
-    onAutoFitDisable: InteractionCallback,
     onNodesDragEnd: (
         updates: Array<{
             nodeId: string;
@@ -709,6 +713,8 @@ export function bindInteractions(
     ) => void,
     getNodePosition: NodePositionLookup,
     getAllNodes: NodeListLookup,
+    isAutoFit: () => boolean,
+    isLocked: () => boolean,
     signal: AbortSignal,
 ): void {
     const cursorHost =
@@ -723,7 +729,7 @@ export function bindInteractions(
         'pointerdown',
         (e) => handlePointerDown(
             e, svg, state, onUpdate,
-            getNodePosition,
+            getNodePosition, isLocked,
         ),
         { signal },
     );
@@ -753,7 +759,7 @@ export function bindInteractions(
         'wheel',
         (e) => handleWheel(
             e, svg, state, onUpdate,
-            onAutoFitDisable,
+            isAutoFit,
         ),
         { passive: false, signal },
     );
@@ -807,9 +813,11 @@ export function bindInteractions(
         if (state.isSpaceDown === next) {
             return;
         }
+        if (next && isAutoFit()) {
+            return;
+        }
         state.isSpaceDown = next;
         if (next) {
-            onAutoFitDisable();
             cursorHost.classList.add(
                 'wf-pan-cursor',
             );

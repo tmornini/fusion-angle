@@ -30,6 +30,7 @@ class="badge badge-outline text-xs"
 
 export function buildFieldRow(
     field: GraphField,
+    isLocked: boolean,
 ): SafeHtml {
     const req = field.isRequired
         ? html`<span class="${
@@ -46,8 +47,9 @@ ${req}
 <button
     class="btn btn-ghost btn-xs ml-auto"
     data-action="delete-field"
-    data-field-id="${field.id}"
-    >&times;</button>
+    data-field-id="${field.id}"${
+    trusted(isLocked ? ' disabled' : '')
+    }>&times;</button>
 </div>`;
 }
 
@@ -115,6 +117,7 @@ Required</label>
 export function buildFlowNameHeader(
     flowName: string,
     isEditingName: boolean,
+    isLocked: boolean,
 ): SafeHtml {
     if (isEditingName) {
         return html`<div class="${
@@ -144,14 +147,16 @@ export function buildFlowNameHeader(
 <button class="${
     'btn btn-ghost btn-icon'
     + ' wf-name-edit-btn'
-}" id="flow-name-edit-btn"
-    >${iconEdit(14, '')}</button>
+}" id="flow-name-edit-btn"${
+    trusted(isLocked ? ' disabled' : '')
+    }>${iconEdit(14, '')}</button>
 </div>`;
 }
 
 export function buildNodePanel(
     node: GraphNode,
     outgoing: GraphEdge[],
+    isLocked: boolean,
 ): SafeHtml {
     const isSpecial =
         node.isStart || node.isComplete;
@@ -187,7 +192,9 @@ class="text-sm text-muted"
 </div>`;
     }
     const fieldRows = node.fields
-        .map(f => buildFieldRow(f));
+        .map(f => buildFieldRow(f, isLocked));
+    const lockAttr =
+        trusted(isLocked ? ' disabled' : '');
     return html`<div
 class="wf-props-panel">
 <div class="wf-props-header"
@@ -205,7 +212,7 @@ class="wf-props-panel">
 <input type="text"
     class="input input-sm"
     id="prop-node-name"
-    value="${node.name}" />
+    value="${node.name}"${lockAttr} />
 </div>
 <div class="mb-2">
 <label class="text-xs text-muted"
@@ -213,7 +220,8 @@ class="wf-props-panel">
 <input type="text"
     class="input input-sm"
     id="prop-node-desc"
-    value="${node.description}" />
+    value="${node.description}"${
+    lockAttr} />
 </div>
 <div class="mb-3">
 <label class="text-xs text-muted"
@@ -221,7 +229,7 @@ class="wf-props-panel">
 ${fieldRows}
 <button
     class="btn btn-ghost btn-xs mt-1"
-    data-action="add-field"
+    data-action="add-field"${lockAttr}
     >+ Add Field</button>
 <div id="field-editor-slot"></div>
 </div>
@@ -242,9 +250,12 @@ export function buildEdgePanel(
     edge: GraphEdge,
     fromNode: GraphNode,
     toNode: GraphNode,
+    isLocked: boolean,
 ): SafeHtml {
     const fromName = fromNode.name;
     const toName = toNode.name;
+    const lockAttr =
+        trusted(isLocked ? ' disabled' : '');
     return html`<div
 class="wf-props-panel">
 <div class="wf-props-header"
@@ -262,7 +273,7 @@ class="wf-props-panel">
 <input type="text"
     class="input input-sm"
     id="prop-edge-name"
-    value="${edge.name}" />
+    value="${edge.name}"${lockAttr} />
 </div>
 <div class="mb-2">
 <label class="text-xs text-muted"
@@ -270,7 +281,8 @@ class="wf-props-panel">
 <input type="text"
     class="input input-sm"
     id="prop-edge-desc"
-    value="${edge.description}" />
+    value="${edge.description}"${
+    lockAttr} />
 </div>
 <div class="mb-2">
 <label class="text-xs text-muted"
@@ -290,6 +302,7 @@ export function buildToolbar(
     canRedo: boolean,
     isLocked: boolean,
     canDelete: boolean,
+    isAutoFit: boolean,
 ): SafeHtml {
     return html`<div
 class="wf-toolbar">
@@ -300,7 +313,8 @@ class="wf-toolbar">
     title="Undo"
     aria-label="Undo"${
     trusted(
-        canUndo ? '' : ' disabled',
+        canUndo && !isLocked
+            ? '' : ' disabled',
     )}>${iconUndo(18, '')}</button>
 <button
     class="btn btn-ghost btn-icon"
@@ -308,7 +322,8 @@ class="wf-toolbar">
     title="Redo"
     aria-label="Redo"${
     trusted(
-        canRedo ? '' : ' disabled',
+        canRedo && !isLocked
+            ? '' : ' disabled',
     )}>${iconRedo(18, '')}</button>
 </div>
 <div class="wf-toolbar-spacer"></div>
@@ -317,14 +332,16 @@ class="wf-toolbar">
     class="btn btn-ghost btn-icon"
     data-action="zoom-out"
     title="Zoom out"
-    aria-label="Zoom out"
-    >${iconMinus(18, '')}</button>
+    aria-label="Zoom out"${
+    trusted(isAutoFit ? ' disabled' : '')
+    }>${iconMinus(18, '')}</button>
 <button
     class="btn btn-ghost btn-icon"
     data-action="zoom-in"
     title="Zoom in"
-    aria-label="Zoom in"
-    >${iconPlus(18, '')}</button>
+    aria-label="Zoom in"${
+    trusted(isAutoFit ? ' disabled' : '')
+    }>${iconPlus(18, '')}</button>
 </div>
 <div class="wf-toolbar-spacer"></div>
 <div class="wf-toolbar-group">

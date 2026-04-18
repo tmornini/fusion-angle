@@ -236,6 +236,9 @@ export class FlowDesignerPresenter {
     toggleLocked(): void {
         const next = !this.#state.isLocked;
         this.#state.isLocked = next;
+        if (next && this.#state.isEditingName) {
+            this.#state.isEditingName = false;
+        }
         void putFlowLocked(
             this.#state.flowId, next,
         );
@@ -556,6 +559,7 @@ export class FlowDesignerPresenter {
     }
 
     #handlePanelTransition(): void {
+        if (this.#state.isAutoFit) return;
         const saved =
             this.#state.savedViewBox;
         const isOpen =
@@ -574,7 +578,6 @@ export class FlowDesignerPresenter {
                 w: vb.w,
                 h: vb.h,
             };
-            this.disableAutoFit();
             this.#panToRevealSelected();
         }
         if (!isOpen && wasOpen) {
@@ -607,6 +610,7 @@ export class FlowDesignerPresenter {
             buildFlowNameHeader(
                 this.#state.flowName,
                 this.#state.isEditingName,
+                this.#state.isLocked,
             );
         const lockedChecked =
             String(this.#state.isLocked);
@@ -1514,7 +1518,6 @@ ${toolbar}
             this.#state.interaction,
             this.#selectedFocalPt(),
         );
-        this.disableAutoFit();
     }
 
     zoomOut(): void {
@@ -1522,7 +1525,6 @@ ${toolbar}
             this.#state.interaction,
             this.#selectedFocalPt(),
         );
-        this.disableAutoFit();
     }
 
     #selectedFocalPt(): {
@@ -1594,14 +1596,6 @@ ${toolbar}
         return null;
     }
 
-    disableAutoFit(): void {
-        if (!this.#state.isAutoFit) return;
-        this.#state.isAutoFit = false;
-        void putFlowAutoFit(
-            this.#state.flowId, false,
-        );
-    }
-
     updateCanvasSize(
         w: number, h: number,
     ): void {
@@ -1660,6 +1654,7 @@ ${toolbar}
             this.canRedo(),
             this.#state.isLocked,
             this.#canDelete(),
+            this.#state.isAutoFit,
         );
     }
 
@@ -1692,6 +1687,7 @@ ${toolbar}
                 );
             return buildNodePanel(
                 node, outgoing,
+                this.#state.isLocked,
             );
         }
 
@@ -1713,6 +1709,7 @@ ${toolbar}
                 )!;
             return buildEdgePanel(
                 edge, fromNode, toNode,
+                this.#state.isLocked,
             );
         }
 

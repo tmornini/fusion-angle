@@ -288,9 +288,6 @@ function bindSvgInteractions(
         () => renderAndBind(
             container, presenter,
         ),
-        () => {
-            presenter.disableAutoFit();
-        },
         (updates) => {
             presenter.moveNodes(updates);
             renderAndBind(
@@ -316,6 +313,8 @@ function bindSvgInteractions(
         (id) =>
             presenter.getNodePosition(id),
         () => presenter.getAllNodes(),
+        () => presenter.isAutoFit(),
+        () => presenter.isLocked(),
         signal,
     );
     if (
