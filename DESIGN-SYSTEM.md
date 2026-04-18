@@ -154,14 +154,14 @@ Cmd+K (or Ctrl+K) overlay for quick navigation and search. Implemented in `web-a
 
 ### Charts
 
-SVG chart rendering functions in `web-app/app/charts.ts`. All charts use design system colors and respond to dark mode.
+`build*` functions in `web-app/app/charts.ts` return `SafeHtml` for inline SVG charts. All charts use design system colors and respond to dark mode.
 
 | Type | Function | Usage |
 |------|----------|-------|
-| Bar | `renderBarChart()` | Comparisons, category breakdowns |
-| Line | `renderLineChart()` | Trends over time |
-| Donut | `renderDonutChart()` | Proportions, status distribution |
-| Area | `renderAreaChart()` | Volume trends |
+| Bar | `buildBarChart()` | Comparisons, category breakdowns |
+| Line | `buildLineChart()` | Trends over time |
+| Donut | `buildDonutChart()` | Proportions, status distribution |
+| Area | `buildAreaChart()` | Volume trends |
 
 ### Flow Designer
 
@@ -172,14 +172,14 @@ presenter in `presenters/flow-designer.ts`.
 **Canvas**: Dot grid pattern, 24px cell size, on
 `--color-surface` background.
 
-**Nodes**: 140x56px rounded rectangles, 10px corner
+**Nodes**: 160×64 px rounded rectangles, 10 px corner
 radius. Three types:
 
 | Type | Border | Port | Draggable |
 |------|--------|------|-----------|
-| Start (New) | Green, 2.5px | None | No |
-| Complete | Green double-border, 3px | None | Yes |
-| Regular | Blue `#4B6CA1`, 2px | Right side | Yes |
+| Start (New) | Green `#16a34a`, 2.5 px | None | No |
+| Complete | Red `#b91c1c`, 3 px | None | Yes |
+| Regular | Blue `#4B6CA1`, 2 px | Right side | Yes |
 
 **Edges**: Cubic bezier curves between node
 perimeters.
@@ -189,10 +189,14 @@ perimeters.
 | Forward | Blue `#4B6CA1` | Blue | Solid |
 | Cycle | Amber `#d97706` | Amber | `6 3` |
 
-Edge classification uses graph distance from the
-start node (BFS rank), not geometric position. A
-forward edge moves further from start; a cycle edge
-moves closer or stays at the same distance.
+Edge classification at render time uses DFS
+back-edge detection in `removeCycles`: during a
+depth-first traversal from the start node, any edge
+whose target is currently on the DFS stack is a
+back-edge and renders as a cycle. During a shift-drag
+to create a new edge, the separate `wouldBeCycle`
+helper uses reachability (`isReachable`) to preview
+whether the prospective edge would close a loop.
 
 Labels render at the bezier midpoint in a pill with
 `--color-card-bg` background. Bidirectional pairs

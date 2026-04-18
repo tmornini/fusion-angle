@@ -222,6 +222,7 @@ export class FlowDesignerPresenter {
     }
 
     startEditingName(): void {
+        if (this.#guardLocked()) return;
         this.#state.isEditingName = true;
     }
 
@@ -281,6 +282,17 @@ export class FlowDesignerPresenter {
         }
         showToast(
             'Flow is locked', 'error',
+        );
+        return true;
+    }
+
+    #guardAutoFit(): boolean {
+        if (!this.#state.isAutoFit) {
+            return false;
+        }
+        showToast(
+            'Disable Auto-Fit to change the view',
+            'error',
         );
         return true;
     }
@@ -610,7 +622,6 @@ export class FlowDesignerPresenter {
             buildFlowNameHeader(
                 this.#state.flowName,
                 this.#state.isEditingName,
-                this.#state.isLocked,
             );
         const lockedChecked =
             String(this.#state.isLocked);
@@ -1514,6 +1525,7 @@ ${toolbar}
     }
 
     zoomIn(): void {
+        if (this.#guardAutoFit()) return;
         zoomInState(
             this.#state.interaction,
             this.#selectedFocalPt(),
@@ -1521,6 +1533,7 @@ ${toolbar}
     }
 
     zoomOut(): void {
+        if (this.#guardAutoFit()) return;
         zoomOutState(
             this.#state.interaction,
             this.#selectedFocalPt(),
@@ -1652,9 +1665,7 @@ ${toolbar}
         return buildToolbar(
             this.canUndo(),
             this.canRedo(),
-            this.#state.isLocked,
             this.#canDelete(),
-            this.#state.isAutoFit,
         );
     }
 

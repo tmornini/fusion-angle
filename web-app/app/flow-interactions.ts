@@ -1,6 +1,22 @@
 import {
     NODE_WIDTH, NODE_HEIGHT,
 } from './flow-layout';
+import { showToast } from './toast';
+
+const AUTOFIT_TOAST_MSG =
+    'Disable Auto-Fit to change the view';
+const WHEEL_TOAST_COOLDOWN_MS = 2000;
+let lastWheelToastAt = 0;
+
+function toastAutoFitWheel(): void {
+    const now = Date.now();
+    if (
+        now - lastWheelToastAt
+        < WHEEL_TOAST_COOLDOWN_MS
+    ) return;
+    lastWheelToastAt = now;
+    showToast(AUTOFIT_TOAST_MSG, 'error');
+}
 
 export interface ViewBox {
     x: number;
@@ -663,7 +679,10 @@ function handleWheel(
     isAutoFit: () => boolean,
 ): void {
     e.preventDefault();
-    if (isAutoFit()) return;
+    if (isAutoFit()) {
+        toastAutoFitWheel();
+        return;
+    }
 
     const svgPt = screenToSvg(
         svg, e.clientX, e.clientY,
@@ -814,6 +833,9 @@ export function bindInteractions(
             return;
         }
         if (next && isAutoFit()) {
+            showToast(
+                AUTOFIT_TOAST_MSG, 'error',
+            );
             return;
         }
         state.isSpaceDown = next;

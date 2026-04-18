@@ -23,14 +23,15 @@ run as a single continuous regression pass.
 | AA. Data Entry Workflow | 43 |
 | B. Entry Pages | 16 |
 | C. Core: Dashboard | 7 |
-| D. Core: Ideas Workflow | 35 |
-| E. Core: Projects | 10 |
-| F. Tools | 53 |
-| G. Admin Pages | 34 |
+| D. Core: Ideas Workflow | 37 |
+| E. Core: Projects | 11 |
+| F. Tools | 46 |
+| F2. Workbox | 19 |
+| G. Admin Pages | 36 |
 | H. Reference & System | 2 |
-| I. Cross-Cutting Concerns | 27 |
+| I. Cross-Cutting Concerns | 28 |
 | J. Teardown | 3 |
-| **Total** | **235** |
+| **Total** | **253** |
 
 ---
 
@@ -53,7 +54,7 @@ on. Run these in order.
 ### AA1. Create Pristine Environment
 
 - [ ] **AA1** Navigate to `snapshots/`. Click "Create Pristine Environment" and confirm the wipe dialog. PASS: redirects to dashboard. Dashboard shows empty/minimal state.
-- [ ] **AA2** Open DevTools, verify localStorage has `fusion-ai:*` keys (17 tables as empty arrays plus bootstrap data).
+- [ ] **AA2** Open DevTools, verify localStorage has `fusion-ai:*` keys (18 tables as empty arrays plus bootstrap data).
 - [ ] **AA3** Verify bootstrap data exists: user "Tony Stark" (id: `current`), company "Stark Industries" with "Business" plan.
 
 ### AA2. Create Users
@@ -78,23 +79,23 @@ on. Run these in order.
 
 ### AA5. Submit Ideas for Review
 
-- [ ] **AA18** Navigate to idea #1 detail (status: active). Click "Submit for Review". PASS: status changes to "In Review", button disappears.
-- [ ] **AA19** Submit ideas 1, 4, 7, 8, 9, 10, 11 for review (matching mock data statuses). PASS: each transitions from active to in-review.
-- [ ] **AA20** Navigate to Ideas list and filter by "In Review" status badge. PASS: the 7 submitted ideas appear.
+- [ ] **AA15** Navigate to idea #1 detail (status: active). Click "Submit for Review". PASS: status changes to "In Review", button disappears.
+- [ ] **AA16** Submit ideas 1, 4, 7, 8, 9, 10, 11 for review (matching mock data statuses). PASS: each transitions from active to in-review.
+- [ ] **AA17** Navigate to Ideas list and filter by "In Review" status badge. PASS: the 7 submitted ideas appear.
 
 ### AA7. Approve Ideas & Convert to Projects
 
-- [ ] **AA28** On Ideas list, filter by "In Review". Click idea #1. PASS: navigates to idea detail with approval footer.
-- [ ] **AA29** Click "Approve". PASS: idea status changes to approved, confirmation shown.
-- [ ] **AA30** Approve idea #4 as well (it was submitted for review in AA19). Leave others in their current status. PASS: statuses match mock data (2 approved, rest in-review/active).
-- [ ] **AA31** Navigate to approved idea #1. Click "Convert". PASS: conversion form loads with 5 required fields (Project Name, Lead, Start Date, End Date, Cost).
-- [ ] **AA32** Fill all required fields: Project Name, select "Sarah Chen" as project lead, Start Date, Target End Date, Cost. Click "Create Project". PASS: navigates to project detail for the new project.
-- [ ] **AA33** On project detail, click "Edit". Set fields (title, description, status, start date, end date, cost baseline, impact baseline) to match mock data. Save. PASS: project data persists.
-- [ ] **AA34** Approve remaining ideas (7, 8, 9, 10) from Ideas list (filter by "In Review"), then convert all 6 approved ideas to projects. PASS: Projects list shows all 6 with correct status and progress.
+- [ ] **AA18** On Ideas list, filter by "In Review". Click idea #1. PASS: navigates to idea detail with approval footer.
+- [ ] **AA19** Click "Approve". PASS: idea status changes to approved, confirmation shown.
+- [ ] **AA20** Approve idea #4 as well (it was submitted for review in AA16). Leave others in their current status. PASS: statuses match mock data (2 approved, rest in-review/active).
+- [ ] **AA21** Navigate to approved idea #1. Click "Convert". PASS: conversion form loads with 5 required fields (Project Name, Lead, Start Date, End Date, Cost).
+- [ ] **AA22** Fill all required fields: Project Name, select "Sarah Chen" as project lead, Start Date, Target End Date, Cost. Click "Create Project". PASS: navigates to project detail for the new project.
+- [ ] **AA23** On project detail, click "Edit". Set fields (title, description, status, start date, end date, cost baseline, impact baseline) to match mock data. Save. PASS: project data persists.
+- [ ] **AA24** Approve remaining ideas (7, 8, 9, 10) from Ideas list (filter by "In Review"), then convert all 6 approved ideas to projects. PASS: Projects list shows all 6 with correct status and progress.
 
 ### AA9. Create Flows
 
-- [ ] **AA35** Navigate to Projects. Click into
+- [ ] **AA25** Navigate to Projects. Click into
   project #1 detail (status: approved). PASS:
   a "Flows" section is visible showing "No
   flows yet" empty state and a "New Flow"
@@ -102,16 +103,16 @@ on. Run these in order.
   badge "Approve to add flows" instead of
   the button, and empty state reads "Flow
   creation limited to approved projects only".
-- [ ] **AA36** Click "New Flow". PASS: navigates
+- [ ] **AA26** Click "New Flow". PASS: navigates
   to the flow designer page. The SVG canvas
   shows two nodes: "Start" (start, top-left with
   green border) and "End" (end, bottom-right
-  with double green border) connected by no edges.
+  with red 3-px border) connected by no edges.
   Toolbar shows Undo, Redo, Delete (trash icon),
   Auto Layout, Zoom −/Show All/+,
   Copy Mermaid, Export. Changes auto-save
   (no explicit Save button).
-- [ ] **AA37** Drag the port circle on the start
+- [ ] **AA27** Drag the port circle on the start
   node into empty canvas past 20 pixels. PASS:
   during the drag a ghost "New State" card
   follows the cursor along with a faint bezier
@@ -120,28 +121,28 @@ on. Run these in order.
   auto-connected from the start by an edge with
   a default name. The start node is also
   draggable by its body.
-- [ ] **AA38** Double-click the new blue-bordered
+- [ ] **AA28** Double-click the new blue-bordered
   node. PASS: properties panel appears showing
   State Name input, Description input, empty
   Fields list, and outgoing transitions. The
   node gets a blue glow selection effect on the
   canvas.
-- [ ] **AA39** Edit the state name in the
+- [ ] **AA29** Edit the state name in the
   properties panel to "Data Capture". PASS: the
   node label updates on the canvas immediately
   (auto-saves via 800ms debounce).
-- [ ] **AA40** Double-click the edge between
+- [ ] **AA30** Double-click the edge between
   start and "Data Capture". PASS: no properties
   panel opens — the outgoing edge from Start is
   intentionally not interactive. The edge has no
   name label visible on the canvas, just a plain
   blue arrow.
-- [ ] **AA41** Drag from "Data Capture"'s port
+- [ ] **AA31** Drag from "Data Capture"'s port
   into empty canvas past 20 pixels to create a
   new middle node; rename it "Review" via its
   properties panel. Rename the new edge
   "submit".
-- [ ] **AA42** Hold Shift and drag from "Review"
+- [ ] **AA32** Hold Shift and drag from "Review"
   onto "Data Capture". PASS: during the drag the
   preview redraws as a dashed-orange curved
   bezier because a forward path "Data Capture" →
@@ -153,50 +154,50 @@ on. Run these in order.
   solid-blue curved bezier (no return path).
   Release to create the edge; rename it
   "approve".
-- [ ] **AA43** In the "Data Capture" properties
+- [ ] **AA33** In the "Data Capture" properties
   panel, click "+ Add Field". Enter name "Company
   Name", type "text", check "Required". PASS:
   field appears in the fields list with a "text"
   badge and a red asterisk (*) required indicator.
-- [ ] **AA44** Add more fields to "Data Capture":
+- [ ] **AA34** Add more fields to "Data Capture":
   Contact Email (email, required), Industry (select
   with options "Technology, Finance, Healthcare"),
   Company Logo (image). PASS: all fields appear
   with correct type badges.
-- [ ] **AA45** Wait for auto-save (800ms debounce).
+- [ ] **AA35** Wait for auto-save (800ms debounce).
   Navigate away and back. PASS: all nodes, edges,
   and fields persist.
 
 ### AA10. Verify Dashboard
 
-- [ ] **AA46** Navigate to Dashboard. PASS: gauge
+- [ ] **AA36** Navigate to Dashboard. PASS: gauge
   cards (Time, Cost, Impact) show aggregated values
   computed from the entered project data.
-- [ ] **AA47** Header stats reflect entered data
+- [ ] **AA37** Header stats reflect entered data
   counts (ideas, projects, flows). PASS:
   counts are non-zero and match.
 
 ### AA11. Edit & Verify Cycle
 
-- [ ] **AA48** Edit idea #1: change title. Save,
+- [ ] **AA38** Edit idea #1: change title. Save,
   navigate to ideas list, return to detail. PASS:
   changed title persists.
-- [ ] **AA49** Edit project #1: change description.
+- [ ] **AA39** Edit project #1: change description.
   Save, navigate away, return. PASS: changed
   description persists.
-- [ ] **AA50** Edit flow: navigate to flow
+- [ ] **AA40** Edit flow: navigate to flow
   designer, rename a state (auto-saves). Navigate
   away, return. PASS: changed state name persists.
-- [ ] **AA52** Edit profile: change phone number.
+- [ ] **AA41** Edit profile: change phone number.
   Save, navigate away, return. PASS: changed phone
   persists.
-- [ ] **AA53** Edit company settings: change
+- [ ] **AA42** Edit company settings: change
   timezone. Save, navigate away, return. PASS:
   changed timezone persists.
 
 ### AA12. Snapshot Round-Trip
 
-- [ ] **AA54** Navigate to Snapshots. Click
+- [ ] **AA43** Navigate to Snapshots. Click
   "Download Snapshot". PASS: JSON file downloads
   with all manually-entered data. Click "Create
   Pristine Environment", confirm. PASS: all data
@@ -252,9 +253,9 @@ on. Run these in order.
   6 Projects · 1 Flows"), and theme toggle.
   PASS: elements visible and styled.
 - [ ] **C4** Dashboard displays 3 gauge/metric cards (Time, Cost, Impact) with baseline and current values. PASS: cards render with non-zero values and concentric arc gauges.
-- [ ] **C6** Sidebar navigation links all function correctly. PASS: clicking a sidebar link navigates to the expected page.
-- [ ] **C7** Scroll the page. PASS: sidebar stays fixed, main content scrolls independently.
-- [ ] **C8** Check that seed data populates all dashboard widgets. PASS: no "No data" empty states on initial load (seed data provides content for all widgets).
+- [ ] **C5** Sidebar navigation links all function correctly. PASS: clicking a sidebar link navigates to the expected page.
+- [ ] **C6** Scroll the page. PASS: sidebar stays fixed, main content scrolls independently.
+- [ ] **C7** Check that seed data populates all dashboard widgets. PASS: no "No data" empty states on initial load (seed data provides content for all widgets).
 
 ---
 
@@ -277,63 +278,75 @@ on. Run these in order.
 - [ ] **D7** Fill in all required fields (Title,
   Problem Statement, Proposed Solution,
   Expected Outcome). PASS: "Submit Idea" button becomes enabled.
-- [ ] **D12** Click "Submit Idea". PASS: navigates to `ideas/index.html`.
-- [ ] **D14** Click "Cancel". PASS: navigates to `ideas/` list.
+- [ ] **D8** Click "Submit Idea". PASS: navigates to `ideas/index.html`.
+- [ ] **D9** Click "Cancel". PASS: navigates to `ideas/` list.
 
 ### Idea Detail (`ideas/detail.html?ideaId=1`)
 
-- [ ] **D16** Navigate to `ideas/detail.html?ideaId=1`. PASS: page loads with idea title, status badge, and "Submitted by [name] @ [date/time]" in the header.
-- [ ] **D17** Page displays one card: Problem & Solution (Problem Statement,
+- [ ] **D10** Navigate to `ideas/detail.html?ideaId=1`. PASS: page loads with idea title, status badge, and "Submitted by [name] @ [date/time]" in the header.
+- [ ] **D11** Page displays one card: Problem & Solution (Problem Statement,
   Target Users, Proposed Solution, Expected
   Outcome, Success Metrics). PASS: all fields populated. No Details or Estimates cards.
-- [ ] **D18** Click "Edit" button. PASS: text fields become editable inputs/textareas, Save and Cancel buttons appear, Edit button hides.
-- [ ] **D19** Modify a field (e.g. title), click "Save". PASS: toast "Idea saved" appears, page returns to view mode with updated data.
+- [ ] **D12** Click "Edit" button. PASS: text fields become editable inputs/textareas, Save and Cancel buttons appear, Edit button hides.
+- [ ] **D13** Modify a field (e.g. title), click "Save". PASS: toast "Idea saved" appears, page returns to view mode with updated data.
 
 ### Idea Detail — Edit & Actions
 
-- [ ] **D19b** Click "Edit", then "Cancel". PASS: returns to view mode with original data unchanged.
-- [ ] **D19c** For an idea in "in_review"
+- [ ] **D14** Click "Edit", then "Cancel". PASS: returns to view mode with original data unchanged.
+- [ ] **D15** For an idea in "in_review"
   status: clicking the card navigates to
   `ideas/detail.html` page with approval
   footer (Approve / Send Back).
-- [ ] **D19e** For a convertible idea: "Convert" action button is visible. PASS: clicking it navigates to `ideas/convert.html` page.
-- [ ] **D19f** Navigate to `ideas/detail.html?ideaId=999` (non-existent). PASS: page handles gracefully — shows error state, no unhandled JS exception.
+- [ ] **D16** For a convertible idea: "Convert" action button is visible. PASS: clicking it navigates to `ideas/convert.html` page.
+- [ ] **D17** Navigate to `ideas/detail.html?ideaId=999` (non-existent). PASS: page handles gracefully — shows error state, no unhandled JS exception.
 
 ### Idea Detail — Submit for Review
 
-- [ ] **D19k** Navigate to an idea with status "active". PASS: "Submit for Review" button is visible in the header area.
-- [ ] **D19l** Click "Submit for Review". PASS: status changes to "In Review", button disappears, status badge updates.
+- [ ] **D18** Navigate to an idea with status "active". PASS: "Submit for Review" button is visible in the header area.
+- [ ] **D19** Click "Submit for Review". PASS: status changes to "In Review", button disappears, status badge updates.
 
 ### Idea Detail — Sent Back Re-Submit
 
-- [ ] **D19m** Navigate to an idea with status "sent-back" (after a reviewer sends it back). PASS: "Submit for Review" button is visible, allowing re-submission.
-- [ ] **D19n** Click "Edit", modify a field, click "Save". PASS: idea updates. Click "Submit for Review". PASS: status changes to "In Review".
+- [ ] **D20** Navigate to an idea with status "sent-back" (after a reviewer sends it back). PASS: "Submit for Review" button is visible, allowing re-submission.
+- [ ] **D21** Click "Edit", modify a field, click "Save". PASS: idea updates. Click "Submit for Review". PASS: status changes to "In Review".
 
 ### Idea Convert (`ideas/convert.html`)
 
-- [ ] **D20** Navigate to `ideas/convert.html?ideaId=<id>` for a convertible idea. PASS: page loads with conversion form showing 6 required fields: Project Name, Project Lead (dropdown of active users), Start Date, Target End Date, Budget, Impact. Sticky sidebar shows "Problem & Solution" with title, problem, solution, and expected outcome.
-- [ ] **D20b** With required fields empty, "Create Project" button is disabled and progress bar shows 0/6. Fill fields one at a time. PASS: progress bar increments with each field, checkmarks appear next to completed fields, button enables only when all 6 required fields are filled.
-- [ ] **D21** Fill all required fields (progress bar reaches 100%), click "Create Project". PASS: navigates to project detail page for the newly created project.
+- [ ] **D22** Navigate to `ideas/convert.html?ideaId=<id>` for a convertible idea. PASS: page loads with conversion form showing 6 required fields: Project Name, Project Lead (dropdown of active users), Start Date, Target End Date, Budget, Impact. Sticky sidebar shows "Problem & Solution" with title, problem, solution, and expected outcome.
+- [ ] **D23** With required fields empty, "Create Project" button is disabled and progress bar shows 0/6. Fill fields one at a time. PASS: progress bar increments with each field, checkmarks appear next to completed fields, button enables only when all 6 required fields are filled.
+- [ ] **D24** Fill all required fields (progress bar reaches 100%), click "Create Project". PASS: navigates to project detail page for the newly created project.
 
 ### Idea Status Filtering (`ideas/index.html`)
 
-- [ ] **D22** Navigate to `ideas/index.html`. PASS: status badges appear showing each status present in the data (e.g., Active, In Review, Approved).
-- [ ] **D23** Click a status badge. PASS: list filters to show only ideas with that status, badge is highlighted, others are dimmed, count updates.
-- [ ] **D23b** Click the same badge again. PASS: filter clears, all ideas shown, all badges at full opacity.
-- [ ] **D23c** Click a different badge. PASS: filter switches to the new status.
+- [ ] **D25** Navigate to `ideas/index.html`. PASS: status badges appear showing each status present in the data (e.g., Active, In Review, Approved).
+- [ ] **D26** Click a status badge. PASS: list filters to show only ideas with that status, badge is highlighted, others are dimmed, count updates.
+- [ ] **D27** Click the same badge again. PASS: filter clears, all ideas shown, all badges at full opacity.
+- [ ] **D28** Click a different badge. PASS: filter switches to the new status.
 
 ### Idea Detail — Approval Actions
 
-- [ ] **D25** Navigate to `ideas/detail.html?ideaId=7` (in-review idea). PASS: page loads with idea details and sticky approval footer showing Send Back / Approve.
-- [ ] **D27** Click "Approve". PASS: success toast, navigates to ideas list, idea status is now "approved".
-- [ ] **D29** Click "Send Back". PASS: dialog opens asking for feedback. Confirm. PASS: idea status changes to "sent-back", navigates to ideas list.
-- [ ] **D25b** Navigate to idea detail for a non-in-review idea. PASS: no approval footer is shown.
+- [ ] **D29** Navigate to `ideas/detail.html?ideaId=7` (in-review idea). PASS: page loads with idea details and sticky approval footer showing Send Back / Approve.
+- [ ] **D30** Click "Approve". PASS: success toast, navigates to ideas list, idea status is now "approved".
+- [ ] **D31** Click "Send Back". PASS: dialog opens asking for feedback. Confirm. PASS: idea status changes to "sent-back", navigates to ideas list.
+- [ ] **D32** Navigate to idea detail for a non-in-review idea. PASS: no approval footer is shown.
 
 ### Ideas Workflow Integration
 
-- [ ] **D31** After creating an idea and converting it to a project, navigate back to `ideas/`. PASS: the ideas list still loads correctly with seed data.
-- [ ] **D32** Navigate from ideas list → idea convert → back button. PASS: navigates to ideas list.
-- [ ] **D33** Navigate to `ideas/convert.html?ideaId=999` (non-existent). PASS: page handles gracefully — shows empty/error state, no unhandled JS exception.
+- [ ] **D33** After creating an idea and converting it to a project, navigate back to `ideas/`. PASS: the ideas list still loads correctly with seed data.
+- [ ] **D34** Navigate from ideas list → idea convert → back button. PASS: navigates to ideas list.
+- [ ] **D35** Navigate to `ideas/convert.html?ideaId=999` (non-existent). PASS: page handles gracefully — shows empty/error state, no unhandled JS exception.
+
+### Ideas List — Drag-reorder
+
+- [ ] **D36** On `ideas/index.html`, press and hold on an idea row then
+  drag it upward past another row's midpoint. PASS: during the drag a
+  hysteresis indicator appears at the target drop position, the
+  dragged row follows the pointer, and on release the ideas list
+  reorders in place. Reload the page — new order persists.
+- [ ] **D37** During a drag, hover slowly across the midpoint of a
+  neighbouring row. PASS: the drop indicator line only flips to the
+  new target once the pointer crosses the hysteresis threshold, not
+  on the first pixel over the midpoint.
 
 ---
 
@@ -342,27 +355,27 @@ on. Run these in order.
 ### Projects List (`projects/`)
 
 - [ ] **E1** Navigate to `projects/`. PASS: table/list shows 6 seeded projects with title, status, and progress. Project cards show "—" (em-dash) for missing/zero metric values (time, cost, impact).
-- [ ] **E1c** Click a status filter badge (e.g. "Active"). PASS: project list filters to show only projects with that status. Click the same badge again or "All". PASS: full list returns.
-- [ ] **E2** Click a project row. PASS: navigates to `projects/detail.html?projectId=<id>`.
+- [ ] **E2** Click a status filter badge (e.g. "Active"). PASS: project list filters to show only projects with that status. Click the same badge again or "All". PASS: full list returns.
+- [ ] **E3** Click a project row. PASS: navigates to `projects/detail.html?projectId=<id>`.
 
 ### Project Detail (`projects/detail.html?projectId=1`)
 
-- [ ] **E3** Page loads with project summary
+- [ ] **E4** Page loads with project summary
   card (description, dates, progress bar) and
   baseline vs. current metrics. PASS: all cards
   render with data. Baseline/current metrics
   show em dash when values are zero or missing.
-- [ ] **E4** Sidebar shows Team card listing
+- [ ] **E5** Sidebar shows Team card listing
   project team members with roles. PASS: team
   members render with names and role badges.
-- [ ] **E5** Flows section shows linked flows with
+- [ ] **E6** Flows section shows linked flows with
   node/edge counts. For approved projects, a "New
   Flow" button is visible. For non-approved
   projects, an info badge "Approve to add flows"
   appears instead and empty state reads "Flow
   creation limited to approved projects only".
   PASS: correct UI for project status.
-- [ ] **E5b** On an approved project, click "New
+- [ ] **E7** On an approved project, click "New
   Flow" button. PASS: a new flow is created and
   the browser navigates to the flow designer
   page. The new flow is associated with the
@@ -370,9 +383,16 @@ on. Run these in order.
 
 ### Project Detail — Edit Mode
 
-- [ ] **E9b** Click "Edit" button on project detail. PASS: fields become editable inputs/textareas, Save and Cancel buttons appear.
-- [ ] **E9c** Modify a field, click "Save". PASS: project saves successfully, returns to view mode with updated data.
-- [ ] **E9d** Click "Edit", then "Cancel". PASS: returns to view mode with original data unchanged.
+- [ ] **E8** Click "Edit" button on project detail. PASS: fields become editable inputs/textareas, Save and Cancel buttons appear.
+- [ ] **E9** Modify a field, click "Save". PASS: project saves successfully, returns to view mode with updated data.
+- [ ] **E10** Click "Edit", then "Cancel". PASS: returns to view mode with original data unchanged.
+
+### Projects List — Drag-reorder
+
+- [ ] **E11** On `projects/index.html`, press and hold on a project
+  card then drag it to a new position. PASS: drop indicator appears,
+  card follows the pointer, and on release the projects list
+  reorders. Reload the page — new order persists.
 
 ---
 
@@ -380,24 +400,24 @@ on. Run these in order.
 
 ### Flow List (`flows/`)
 
-- [ ] **F11** Navigate to `flows/`. PASS: page shows
+- [ ] **F1** Navigate to `flows/`. PASS: page shows
   flow cards with name, description, project
   name badge, and state/transition counts.
-- [ ] **F12** Type in the search input (if present).
+- [ ] **F2** Type in the search input (if present).
   PASS: filters flow cards by name or
   description in real-time.
-- [ ] **F13** Click a flow card. PASS: navigates
+- [ ] **F3** Click a flow card. PASS: navigates
   to `flows/detail.html?flowId=<id>`.
 
 ### Flow Import
 
-- [ ] **F13b** Click "Import Flow" button on the flows list page. PASS: import dialog opens with a file upload input and a project selector dropdown.
-- [ ] **F13c** Select a `.mmd` file via the file input and choose a project from the dropdown. Click "Import". PASS: flow is created, toast confirms import, and browser navigates to the flow designer for the imported flow.
-- [ ] **F13d** Repeat with a `.zip` file exported from a previous flow. PASS: imported flow contains the same nodes, edges, and fields as the original.
+- [ ] **F4** Click "Import Flow" button on the flows list page. PASS: import dialog opens with a file upload input and a project selector dropdown.
+- [ ] **F5** Select a `.mmd` file via the file input and choose a project from the dropdown. Click "Import". PASS: flow is created, toast confirms import, and browser navigates to the flow designer for the imported flow.
+- [ ] **F6** Repeat with a `.zip` file exported from a previous flow. PASS: imported flow contains the same nodes, edges, and fields as the original.
 
 ### Flow Designer (`flows/detail.html?flowId=...`)
 
-- [ ] **F14** Navigate to a flow designer page.
+- [ ] **F7** Navigate to a flow designer page.
   PASS: toolbar runs vertically along the left
   edge of the canvas with Back at the top, Delete
   (trash icon) at the bottom, and Undo/Redo, Auto
@@ -408,13 +428,13 @@ on. Run these in order.
   showing the flow graph. Opening a properties
   panel automatically disables Auto Fit. Changes
   auto-save (no explicit Save button).
-- [ ] **F15** Nodes display correctly: start node
+- [ ] **F8** Nodes display correctly: start node
   has green border with its name centered in the
   card and no subtitle, standard nodes have blue
   border with field count subtitle, complete node
-  has double green border with its name centered
+  has a red 3-px border with its name centered
   in the card and no subtitle.
-- [ ] **F16** Edges display correctly: forward
+- [ ] **F9** Edges display correctly: forward
   edges are solid blue lines with arrow markers
   and named labels. Cycle edges — those that
   close a loop because a return path from target
@@ -423,7 +443,7 @@ on. Run these in order.
   transitions between nodes that have no return
   path render as solid blue even when they share
   a level.
-- [ ] **F17** Connection ports (small circles) are
+- [ ] **F10** Connection ports (small circles) are
   visible on middle nodes (not on start or
   complete, and not on any node when the flow is
   locked). Each port sits on the longest open
@@ -433,26 +453,26 @@ on. Run these in order.
   and drag to create a new node attached here.
   Hold Shift to connect to an existing node
   instead."
-- [ ] **F18** Click a node. PASS: node gets blue
+- [ ] **F11** Click a node. PASS: node gets blue
   glow selection effect. Double-click the node.
   PASS: properties panel appears showing state
   name, description, form fields list, and
   outgoing transitions.
-- [ ] **F18a** Pan so a node sits near the right
+- [ ] **F12** Pan so a node sits near the right
   edge of the canvas, then double-click it. PASS:
   the properties panel slides out from the
   toolbar edge over ~200ms and the canvas
   re-centers so the node sits at the visual center
   of the canvas region not covered by the panel.
-- [ ] **F18b** While the panel is open, double-click
+- [ ] **F13** While the panel is open, double-click
   a different node. PASS: panel content updates to
   the new selection and the canvas re-centers on
   it.
-- [ ] **F18c** Enable Auto Fit, then double-click a
+- [ ] **F14** Enable Auto Fit, then double-click a
   node. PASS: panel opens, Auto Fit toggles off
   (button no longer highlighted), and the canvas
   centers on the node.
-- [ ] **F19** Drag from a middle node's port into
+- [ ] **F15** Drag from a middle node's port into
   empty canvas past 20 pixels, without holding
   Shift. PASS: during the drag a faint bezier
   preview plus a "New State" ghost card track the
@@ -460,20 +480,20 @@ on. Run these in order.
   created at the drop position and
   auto-connected from the source node with a
   default edge name.
-- [ ] **F19b** Drag a standard node to a new
+- [ ] **F16** Drag a standard node to a new
   position. PASS: node follows the pointer and
   can be placed freely on the canvas.
-- [ ] **F19c** Attempt to drag the start node. PASS:
+- [ ] **F17** Attempt to drag the start node. PASS:
   it does not move (the start node is
   non-draggable — clicking anywhere on it
   initiates a drag-from-start instead). The
   complete node is draggable like standard nodes.
-- [ ] **F19d** Click "Auto Layout" in the vertical
+- [ ] **F18** Click "Auto Layout" in the vertical
   toolbar on the left. PASS:
   all nodes reposition based on their rank from
   start. Start is placed top-left, complete
   bottom-right, others arranged by graph depth.
-- [ ] **F20** Hold Shift and drag from a middle
+- [ ] **F19** Hold Shift and drag from a middle
   node's port over another middle node, then
   release. PASS: during the drag the preview
   re-draws from a ghosted grey straight line
@@ -483,21 +503,21 @@ on. Run these in order.
   over the target, a new edge is created with a
   default name. No "New State" ghost card is
   shown while Shift is held.
-- [ ] **F20a** Shift-drag forward (earlier node →
+- [ ] **F20** Shift-drag forward (earlier node →
   later node). PASS: the curved preview is solid
   blue while over the target. The committed edge
   matches the preview exactly.
-- [ ] **F20b** Shift-drag backward (later node →
+- [ ] **F21** Shift-drag backward (later node →
   earlier node). PASS: the curved preview is
   dashed orange with a warning arrow while over
   the target — the reachability check recognises
   that target → … → source already exists. The
   committed cycle edge matches the preview.
-- [ ] **F20c** Shift-drag and release in empty
+- [ ] **F22** Shift-drag and release in empty
   canvas (no node under cursor). PASS: the grey
   straight-line preview disappears and nothing
   happens — no edge, no new node.
-- [ ] **F20d** Begin a plain drag from a port (no
+- [ ] **F23** Begin a plain drag from a port (no
   Shift). While the mouse remains stationary,
   press and hold Shift. PASS: without any mouse
   movement the ghost "New State" card disappears
@@ -507,69 +527,103 @@ on. Run these in order.
   returns. Release the mouse with Shift held to
   create an edge, or without Shift to create a
   node.
-- [ ] **F21** Double-click a node, edit its name in
+- [ ] **F24** Double-click a node, edit its name in
   the properties panel. PASS: the node label
   updates on the SVG canvas immediately (changes
   auto-save after 800ms debounce).
-- [ ] **F22** Double-click a node, click "+ Add
+- [ ] **F25** Double-click a node, click "+ Add
   Field". Enter field name, select type from
   dropdown, toggle required. PASS: field appears
   in the fields list with lowercase type badge
   (e.g. "text") and red asterisk (*) if required.
-- [ ] **F23** Click an edge to select it (blue glow).
+- [ ] **F26** Click an edge to select it (blue glow).
   Double-click to open properties panel. PASS:
   panel shows transition name, description,
   from/to state names. Edit the name. PASS: label
   updates on the canvas.
-- [ ] **F24** Select a non-start/non-complete node,
+- [ ] **F27** Select a non-start/non-complete node,
   click the Delete (trash) button in toolbar.
   PASS: node and all connected edges are removed.
-- [ ] **F25** Select an edge, click the Delete
+- [ ] **F28** Select an edge, click the Delete
   (trash) button in toolbar. PASS: edge is
   removed from the canvas.
-- [ ] **F26** Click "Zoom +" and "Zoom -" in
+- [ ] **F29** Click "Zoom +" and "Zoom -" in
   toolbar. PASS: canvas zooms in and out smoothly.
   Click "Show All". PASS: canvas adjusts to
   show all nodes.
-- [ ] **F27** Edit a node name via the properties
+- [ ] **F30** Edit a node name via the properties
   panel, wait 1 second for auto-save. Navigate
   away and return to the designer. PASS: all
   nodes, edges, fields, and positions persist.
-- [ ] **F28** Navigate to
+- [ ] **F31** Navigate to
   `flows/detail.html?flowId=nonexistent`. PASS:
   page handles gracefully — shows error state,
   no unhandled JS exception.
 
 ### Flow Designer — Undo/Redo
 
-- [ ] **F29** After adding a state, click the Undo
+- [ ] **F32** After adding a state, click the Undo
   toolbar button. PASS: the state and its
   connecting edge are removed. Redo button
   becomes enabled.
-- [ ] **F30** Click the Redo toolbar button. PASS:
+- [ ] **F33** Click the Redo toolbar button. PASS:
   the state and edge reappear.
-- [ ] **F31** After moving a node, press Cmd+Z (Mac)
+- [ ] **F34** After moving a node, press Cmd+Z (Mac)
   or Ctrl+Z. PASS: node returns to its previous
   position.
-- [ ] **F32** After deleting a state, undo. PASS:
+- [ ] **F35** After deleting a state, undo. PASS:
   the state and all its connected edges are
   restored.
-- [ ] **F33** Undo and Redo buttons are disabled
+- [ ] **F36** Undo and Redo buttons are disabled
   when their respective stacks are empty. PASS:
   buttons show disabled state initially.
-- [ ] **F34** Perform an action, undo, then perform
+- [ ] **F37** Perform an action, undo, then perform
   a new action. PASS: the redo stack is cleared
   (redo button disabled).
 
 ### Flow Designer — Keyboard Shortcuts
 
-- [ ] **F35** Press Delete or Backspace with a node
+- [ ] **F38** Press Delete or Backspace with a node
   or edge selected (not focused in an input).
   PASS: selected item is deleted.
-- [ ] **F36** Press Cmd+Z / Ctrl+Z to undo, press
+- [ ] **F39** Press Cmd+Z / Ctrl+Z to undo, press
   Cmd+Shift+Z / Ctrl+Shift+Z to redo. PASS:
   keyboard shortcuts match toolbar button
   behavior.
+
+### Flow Designer — Additional Coverage
+
+- [ ] **F40** Toggle the Locked checkbox in the designer header.
+  PASS: connection ports disappear from all middle nodes, Delete and
+  Auto Layout toolbar buttons become disabled, and opening a
+  properties panel shows fields as read-only (inputs `disabled`).
+  Untoggle Locked: ports return, buttons re-enable, fields editable.
+- [ ] **F41** With a non-trivial flow loaded, click "Copy Mermaid"
+  in the toolbar. PASS: toast confirms the clipboard copy. Paste the
+  clipboard contents into a text editor — the result is valid Mermaid
+  flowchart syntax that round-trips through `parseMermaid` without
+  losing nodes, edges, or field definitions.
+- [ ] **F42** Click "Export" in the toolbar. PASS: a `.zip` file
+  downloads. Unzip the archive — it contains at least a `flow.mmd`
+  Mermaid source and a `layout.json` with node positions.
+- [ ] **F43** On `flows/index.html` click "Import Flow", select a
+  `.mmd` file previously exported from a known flow, choose a
+  project, and submit. PASS: the imported flow opens in the designer
+  with the same node count, edge count, and field definitions as the
+  original (compare to source flow side-by-side).
+- [ ] **F44** Repeat F43 with a `.zip` archive. PASS: node
+  positions are preserved as well as structural data — the imported
+  flow looks visually identical to the original, not auto-laid-out.
+- [ ] **F45** Make 11 edits in the flow designer (e.g. rename 11
+  nodes one at a time, waiting for each auto-save). PASS: the
+  persistent undo history retains at most 10 versions (inspect
+  `fusion-ai:flow_versions` in DevTools — at most 10 rows for this
+  `flow_id`; the oldest has been hard-deleted).
+- [ ] **F46** Edit a flow (rename a state), let auto-save complete.
+  Navigate away from the designer to `flows/index.html`. Re-open the
+  same flow. Click Undo. PASS: the rename reverts — the undo history
+  survived navigation because versions are persisted to the schema,
+  not held in memory.
 
 ---
 
@@ -662,6 +716,19 @@ on. Run these in order.
   screen and return. PASS: all data persists
   correctly across page navigation.
 
+### Workbox — Concurrency & Integrity
+
+- [ ] **WB18** Open the same unclaimed work order in two browser
+  tabs. In tab 1, click the row to claim it. In tab 2, attempt the
+  same. PASS: tab 2 either navigates to a read-only/already-claimed
+  view or the claim is rejected — no duplicate row exists in
+  `fusion-ai:work_order_claims` for this work order.
+- [ ] **WB19** After transitioning a work order through at least
+  two states, read `fusion-ai:work_order_transitions` from DevTools.
+  PASS: each row has an immutable shape (from_node_id, to_node_id,
+  user_id, values, transitioned_at). Verify no app code path mutates
+  an existing transition row — transitions are append-only.
+
 ---
 
 ## G. Admin Pages
@@ -669,57 +736,70 @@ on. Run these in order.
 ### Team (`organization/teams.html`)
 
 - [ ] **G1** Navigate to `organization/teams.html`. PASS: shows roster of seeded team members with initials avatars, names, roles, departments, availability percentage badges, strength chips, performance stats (percentage, active count, completed count), and status dots (green=available, yellow=busy, red=limited). Search input and "Activity Feed" / "Add Member" buttons visible.
-- [ ] **G1b** Click a team member card. PASS: right-side detail panel populates with member name, role, email, and large avatar with initials.
-- [ ] **G1c** Detail panel shows two tabs (Dimensions, Performance). Click between tabs. PASS: tab content switches — Dimensions shows Driver/Analytical/Expressive/Amiable scores with progress bars.
-- [ ] **G1d** Click a different team member card. PASS: detail panel updates to show the newly selected member's information.
-- [ ] **G1e** Type a name in the search input. PASS: team member cards filter in real-time by name, role, or department.
-- [ ] **G1f** Click "Add Member" button. PASS: add-member dialog opens with an email field and send button.
-- [ ] **G1g** Enter an email address and click send. PASS: toast confirms invitation, dialog closes.
-- [ ] **G2** Member status dots render with distinct colors (green for available, yellow for busy, red for limited). PASS: at least 2 different statuses visible.
+- [ ] **G2** Click a team member card. PASS: right-side detail panel populates with member name, role, email, and large avatar with initials.
+- [ ] **G3** Detail panel shows two tabs (Dimensions, Performance). Click between tabs. PASS: tab content switches — Dimensions shows Driver/Analytical/Expressive/Amiable scores with progress bars.
+- [ ] **G4** Click a different team member card. PASS: detail panel updates to show the newly selected member's information.
+- [ ] **G5** Type a name in the search input. PASS: team member cards filter in real-time by name, role, or department.
+- [ ] **G6** Click "Add Member" button. PASS: add-member dialog opens with an email field and send button.
+- [ ] **G7** Enter an email address and click send. PASS: toast confirms invitation, dialog closes.
+- [ ] **G8** Member status dots render with distinct colors (green for available, yellow for busy, red for limited). PASS: at least 2 different statuses visible.
 
 ### Account (`organization/index.html`)
 
-- [ ] **G3** Navigate to `organization/index.html`. PASS: shows account overview with plan info (Business plan), billing date, seat usage (18/25), and resource usage bars.
-- [ ] **G4** Health score (92, "excellent") is displayed. PASS: score and label visible.
+- [ ] **G9** Navigate to `organization/index.html`. PASS: shows account overview with plan info (Business plan), billing date, seat usage (18/25), and resource usage bars.
+- [ ] **G10** Health score (92, "excellent") is displayed. PASS: score and label visible.
 
 ### Profile (`profile/`)
 
-- [ ] **G5** Navigate to `profile/`. PASS: shows profile form with avatar (initials), First Name, Last Name, Email, Phone, Role, Department (dropdown), and Bio fields for the current user (Tony Stark / demo@example.com).
-- [ ] **G5b** Strength chips are displayed with pre-selected strengths shown in primary style with checkmark icons. Click an unselected chip. PASS: chip toggles to primary/selected style. Click a selected chip. PASS: chip toggles to secondary/unselected style.
-- [ ] **G6** Edit a field (e.g. phone), toggle strengths, and click "Save Changes". PASS: toast "Profile saved" appears.
-- [ ] **G6b** Navigate away from Profile (e.g. to Dashboard), then return to Profile. PASS: the edited field retains the saved value — data was persisted to the database, not just displayed via toast.
+- [ ] **G11** Navigate to `profile/`. PASS: shows profile form with avatar (initials), First Name, Last Name, Email, Phone, Role, Department (dropdown), and Bio fields for the current user (Tony Stark / demo@example.com).
+- [ ] **G12** Strength chips are displayed with pre-selected strengths shown in primary style with checkmark icons. Click an unselected chip. PASS: chip toggles to primary/selected style. Click a selected chip. PASS: chip toggles to secondary/unselected style.
+- [ ] **G13** Edit a field (e.g. phone), toggle strengths, and click "Save Changes". PASS: toast "Profile saved" appears.
+- [ ] **G14** Navigate away from Profile (e.g. to Dashboard), then return to Profile. PASS: the edited field retains the saved value — data was persisted to the database, not just displayed via toast.
 
 ### Company Settings (`settings/`)
 
-- [ ] **G7** Navigate to `settings/`. PASS: shows company info (Stark Industries, acmecorp.com, Technology, 51-200).
-- [ ] **G8** Security settings visible: SSO (off), 2FA (on), IP Whitelist (off). PASS: toggle/indicator states match seed data.
-- [ ] **G9** Edit a setting (e.g. timezone or language) and save. PASS: success toast or save completes without error.
-- [ ] **G9b** Navigate away from Settings, then return. PASS: the edited setting retains the saved value — data was persisted to the database.
+- [ ] **G15** Navigate to `settings/`. PASS: shows company info (Stark Industries, acmecorp.com, Technology, 51-200).
+- [ ] **G16** Security settings visible: SSO (off), 2FA (on), IP Whitelist (off). PASS: toggle/indicator states match seed data.
+- [ ] **G17** Edit a setting (e.g. timezone or language) and save. PASS: success toast or save completes without error.
+- [ ] **G18** Navigate away from Settings, then return. PASS: the edited setting retains the saved value — data was persisted to the database.
 
 ### Manage Users (`organization/users.html`)
 
-- [ ] **G10** Navigate to `organization/users.html`. PASS: shows user table with avatar, name, email, role badge (job title), department, status badge (Active/Pending/Deactivated), and last active time. Header shows active/pending user counts. Search input and two filter dropdowns (All Roles, All Status) visible.
-- [ ] **G10b** Type in the search input. PASS: filters user list by name or email in real-time. Role and status dropdowns also filter the list.
-- [ ] **G11** Deactivated user (James Miller) is visually distinguished with "Deactivated" badge (X icon) and reduced opacity styling. PASS: clearly different from active users.
-- [ ] **G11b** Pending users show "Pending" badge with clock icon and "Invite sent" text. PASS: visually distinct from active users.
-- [ ] **G12** "Invite User" button is visible. PASS: clicking it opens the invite dialog with fields for First Name, Last Name, Email, Role, Department, Status, Phone, Availability %, Performance, and Bio.
-- [ ] **G12b** Fill all required fields and submit the invite dialog. PASS: toast confirms user creation, new user appears in the user list with correct name, email, role, and status badge.
+- [ ] **G19** Navigate to `organization/users.html`. PASS: shows user table with avatar, name, email, role badge (job title), department, status badge (Active/Pending/Deactivated), and last active time. Header shows active/pending user counts. Search input and two filter dropdowns (All Roles, All Status) visible.
+- [ ] **G20** Type in the search input. PASS: filters user list by name or email in real-time. Role and status dropdowns also filter the list.
+- [ ] **G21** Deactivated user (James Miller) is visually distinguished with "Deactivated" badge (X icon) and reduced opacity styling. PASS: clearly different from active users.
+- [ ] **G22** Pending users show "Pending" badge with clock icon and "Invite sent" text. PASS: visually distinct from active users.
+- [ ] **G23** "Invite User" button is visible. PASS: clicking it opens the invite dialog with fields for First Name, Last Name, Email, Role, Department, Status, Phone, Availability %, Performance, and Bio.
+- [ ] **G24** Fill all required fields and submit the invite dialog. PASS: toast confirms user creation, new user appears in the user list with correct name, email, role, and status badge.
 
 ### Activity Feed (`organization/activity-feed.html`)
 
-- [ ] **G13** Navigate to `organization/activity-feed.html`. PASS: shows seeded activity entries with type icons and timestamps. Search input ("Search activity...") and type filter dropdown ("All Activity") visible.
-- [ ] **G14** Activity types include idea created, project created, user joined, status changed, idea converted, and comment added. PASS: multiple distinct types visible with appropriate icons (lightbulb, folder, user-plus, edit, arrow-right).
-- [ ] **G14b** Each activity entry shows actor name, action verb, target name, and meta info (score badge, status badge, or quoted comment text). PASS: entries have full context.
-- [ ] **G14c** Type in the search input. PASS: activity entries filter by actor name or target name in real-time.
-- [ ] **G14d** Select a type from the filter dropdown (e.g. "Ideas"). PASS: only activities of that type shown. Filter options: All Activity, Ideas, Projects, Teams. Reset to "All Activity" → full list returns.
+- [ ] **G25** Navigate to `organization/activity-feed.html`. PASS: shows seeded activity entries with type icons and timestamps. Search input ("Search activity...") and type filter dropdown ("All Activity") visible.
+- [ ] **G26** Activity types include idea created, project created, user joined, status changed, idea converted, and comment added. PASS: multiple distinct types visible with appropriate icons (lightbulb, folder, user-plus, edit, arrow-right).
+- [ ] **G27** Each activity entry shows actor name, action verb, target name, and meta info (score badge, status badge, or quoted comment text). PASS: entries have full context.
+- [ ] **G28** Type in the search input. PASS: activity entries filter by actor name or target name in real-time.
+- [ ] **G29** Select a type from the filter dropdown (e.g. "Ideas"). PASS: only activities of that type shown. Filter options: All Activity, Ideas, Projects, Teams. Reset to "All Activity" → full list returns.
 
 ### Snapshots (`snapshots/`) — Run These Last
 
-- [ ] **G18** Navigate to `snapshots/`. PASS: shows 4 operation cards: Create Pristine Environment, Wipe and Load Mock Data, Upload Snapshot, Download Snapshot.
-- [ ] **G19** Click "Download Snapshot". PASS: browser downloads `fusion-ai-snapshot-YYYY-MM-DD.json`. File contains valid JSON with entity data.
-- [ ] **G20** Click "Create Pristine Environment", confirm the dialog. PASS: redirects to `dashboard/index.html`. Dashboard renders with zeroed-out metrics (empty database). All 17 `fusion-ai:*` keys exist in localStorage as empty arrays.
-- [ ] **G21** Click "Wipe and Load Mock Data". PASS: redirects to `dashboard/index.html`. Navigate to `ideas/` — 11 ideas are back.
-- [ ] **G22** Return to `snapshots/`, wipe data, then use "Upload Snapshot" file input and select the previously downloaded JSON file. PASS: redirects to `dashboard/index.html`. Data matches the snapshot.
+- [ ] **G30** Navigate to `snapshots/`. PASS: shows 4 operation cards: Create Pristine Environment, Wipe and Load Mock Data, Upload Snapshot, Download Snapshot.
+- [ ] **G31** Click "Download Snapshot". PASS: browser downloads `fusion-ai-snapshot-YYYY-MM-DD.json`. File contains valid JSON with entity data.
+- [ ] **G32** Click "Create Pristine Environment", confirm the dialog. PASS: redirects to `dashboard/index.html`. Dashboard renders with zeroed-out metrics (empty database). All 18 `fusion-ai:*` keys exist in localStorage as empty arrays.
+- [ ] **G33** Click "Wipe and Load Mock Data". PASS: redirects to `dashboard/index.html`. Navigate to `ideas/` — 11 ideas are back.
+- [ ] **G34** Return to `snapshots/`, wipe data, then use "Upload Snapshot" file input and select the previously downloaded JSON file. PASS: redirects to `dashboard/index.html`. Data matches the snapshot.
+
+### Snapshot & User Lifecycle — Error/Edge Cases
+
+- [ ] **G35** On `snapshots/`, click "Upload Snapshot" and select a
+  malformed JSON file (e.g. truncated mid-object). PASS: a toast or
+  inline error reports the upload failed with a human-readable
+  message; existing data in localStorage is untouched (verify via
+  DevTools that no fusion-ai:* keys were overwritten or cleared).
+- [ ] **G36** On `organization/users.html`, open the row menu of an
+  active user and choose "Deactivate" (or equivalent). PASS: a
+  confirmation dialog appears; on confirm the user's status badge
+  changes to "Deactivated" with reduced opacity styling, and the
+  user's row no longer counts toward the active-user header stat.
 
 ---
 
@@ -739,52 +819,59 @@ on. Run these in order.
 - [ ] **I3** Select "Light" theme. PASS: page returns to light theme.
 - [ ] **I4** Select "System" theme. PASS: theme follows OS preference (matches `prefers-color-scheme`).
 - [ ] **I5** Reload the page. PASS: theme choice persists (stored in `localStorage` key `fusion-theme`).
-- [ ] **I5b** Open the app in a second browser tab. Change theme in the first tab. PASS: second tab updates to the new theme without manual reload (cross-tab sync via StorageEvent).
+- [ ] **I6** Open the app in a second browser tab. Change theme in the first tab. PASS: second tab updates to the new theme without manual reload (cross-tab sync via StorageEvent).
 
 ### Sidebar
 
-- [ ] **I6** Click the sidebar collapse button. PASS: sidebar collapses to icon-only view, main content area expands.
-- [ ] **I7** Navigate to another page. PASS:
+- [ ] **I7** Click the sidebar collapse button. PASS: sidebar collapses to icon-only view, main content area expands.
+- [ ] **I8** Navigate to another page. PASS:
   collapsed state persists (stored in
   `localStorage` key
   `fusion-sidebar-collapsed`).
-- [ ] **I8** Click the expand button. PASS: sidebar returns to full width with labels.
+- [ ] **I9** Click the expand button. PASS: sidebar returns to full width with labels.
 
 ### Mobile Responsive
 
-- [ ] **I9** Resize browser to ≤768px width (or use DevTools device emulation). PASS: desktop sidebar disappears, mobile header with hamburger menu appears.
-- [ ] **I10** Tap/click the hamburger menu. PASS: mobile sidebar sheet slides in from the left with navigation links.
-- [ ] **I11** Tap/click the backdrop or a nav link. PASS: mobile sidebar closes.
-- [ ] **I11b** Tap a navigation link in the mobile sidebar. PASS: navigates to the target page and mobile sidebar closes.
-- [ ] **I11c** Open the mobile sidebar, press `Escape`. PASS: sidebar closes.
-- [ ] **I11d** Open the mobile sidebar, press `Tab` repeatedly. PASS: focus cycles through focusable elements inside the sidebar without escaping to the page behind it. `Shift+Tab` at the first element wraps to the last.
+- [ ] **I10** Resize browser to ≤768px width (or use DevTools device emulation). PASS: desktop sidebar disappears, mobile header with hamburger menu appears.
+- [ ] **I11** Tap/click the hamburger menu. PASS: mobile sidebar sheet slides in from the left with navigation links.
+- [ ] **I12** Tap/click the backdrop or a nav link. PASS: mobile sidebar closes.
+- [ ] **I13** Tap a navigation link in the mobile sidebar. PASS: navigates to the target page and mobile sidebar closes.
+- [ ] **I14** Open the mobile sidebar, press `Escape`. PASS: sidebar closes.
+- [ ] **I15** Open the mobile sidebar, press `Tab` repeatedly. PASS: focus cycles through focusable elements inside the sidebar without escaping to the page behind it. `Shift+Tab` at the first element wraps to the last.
 
 ### Command Palette
 
-- [ ] **I12** Press `Cmd+K` (Mac) or `Ctrl+K` (Windows/Linux). PASS: command palette overlay appears with search input focused.
-- [ ] **I13** Type a search term (e.g. "ideas"). PASS: filtered results appear. Select a result — navigates to the corresponding page.
-- [ ] **I14** Press `Escape`. PASS: command palette closes.
-- [ ] **I14b** Open command palette, type a search term. Use `Down Arrow` and `Up Arrow` to navigate results. PASS: active result highlight moves with arrow keys. Press `Enter`. PASS: navigates to the highlighted result.
-- [ ] **I14c** Open command palette with an empty search field. PASS: results are grouped by category (Pages, Ideas, Projects, People) with category headers. Type a term that matches no results. PASS: result list is empty or shows a no-results message.
+- [ ] **I16** Press `Cmd+K` (Mac) or `Ctrl+K` (Windows/Linux). PASS: command palette overlay appears with search input focused.
+- [ ] **I17** Type a search term (e.g. "ideas"). PASS: filtered results appear. Select a result — navigates to the corresponding page.
+- [ ] **I18** Press `Escape`. PASS: command palette closes.
+- [ ] **I19** Open command palette, type a search term. Use `Down Arrow` and `Up Arrow` to navigate results. PASS: active result highlight moves with arrow keys. Press `Enter`. PASS: navigates to the highlighted result.
+- [ ] **I20** Open command palette with an empty search field. PASS: results are grouped by category (Pages, Ideas, Projects, People) with category headers. Type a term that matches no results. PASS: result list is empty or shows a no-results message.
 
 ### Loading States
 
-- [ ] **I15** Navigate to a data-dependent page with mock data loaded. PASS: loading skeleton (card-grid, card-list, or detail pattern) appears briefly before content renders.
-- [ ] **I16** If an error occurs loading a page (e.g. corrupted localStorage), error state with "Try Again" retry button is shown. PASS: clicking retry re-attempts data loading.
+- [ ] **I21** Navigate to a data-dependent page with mock data loaded. PASS: loading skeleton (card-grid, card-list, or detail pattern) appears briefly before content renders.
+- [ ] **I22** If an error occurs loading a page (e.g. corrupted localStorage), error state with "Try Again" retry button is shown. PASS: clicking retry re-attempts data loading.
 
 ### Toasts
 
-- [ ] **I17** Trigger a toast (e.g. save profile, or use DB Admin reload). PASS: toast appears at bottom or corner of screen, auto-dismisses after ~3 seconds with fade-out.
-- [ ] **I17b** While a toast is visible, click its close button (×). PASS: toast dismisses immediately without waiting for auto-dismiss timer.
-- [ ] **I17c** Trigger multiple toasts in rapid succession (e.g. save profile repeatedly). PASS: toasts stack visibly (up to 5). When a 6th toast arrives, the oldest is removed.
+- [ ] **I23** Trigger a toast (e.g. save profile, or use DB Admin reload). PASS: toast appears at bottom or corner of screen, auto-dismisses after ~3 seconds with fade-out.
+- [ ] **I24** While a toast is visible, click its close button (×). PASS: toast dismisses immediately without waiting for auto-dismiss timer.
+- [ ] **I25** Trigger multiple toasts in rapid succession (e.g. save profile repeatedly). PASS: toasts stack visibly (up to 5). When a 6th toast arrives, the oldest is removed.
 
 ### Snapshot Round-Trip
 
-- [ ] **I18** Download a snapshot, wipe data (Create Pristine), upload the snapshot. PASS: all data restored correctly — spot-check 3 pages to confirm content matches pre-wipe state.
+- [ ] **I26** Download a snapshot, wipe data (Create Pristine), upload the snapshot. PASS: all data restored correctly — spot-check 3 pages to confirm content matches pre-wipe state.
 
 ### General
 
-- [ ] **I19** Check DevTools Console after navigating through 5+ different pages. PASS: no unhandled JavaScript errors (warnings and info messages from browser extensions are acceptable).
+- [ ] **I27** Check DevTools Console after navigating through 5+ different pages. PASS: no unhandled JavaScript errors (warnings and info messages from browser extensions are acceptable).
+
+### Sidebar Cross-Tab Sync
+
+- [ ] **I28** Open the app in two tabs. In tab 1 collapse the
+  sidebar. PASS: tab 2 reflects the collapsed state without manual
+  reload (cross-tab sync via StorageEvent on
+  `fusion-sidebar-collapsed`).
 
 ---
 
@@ -805,7 +892,7 @@ on. Run these in order.
 | Browser & Version | |
 | OS | |
 | Build SHA | |
-| Tests Passed | /228 |
-| Tests Failed | /228 |
-| Tests Skipped | /228 |
+| Tests Passed | /253 |
+| Tests Failed | /253 |
+| Tests Skipped | /253 |
 | Notes | |

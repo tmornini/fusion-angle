@@ -682,6 +682,12 @@ function showFieldEditor(
     if (
         presenter.selectedNodeId() === null
     ) return;
+    if (presenter.isLocked()) {
+        showToast(
+            'Flow is locked', 'error',
+        );
+        return;
+    }
     const slot = $(
         '#field-editor-slot', container,
     );

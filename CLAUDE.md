@@ -57,15 +57,15 @@ protocol locally, but testing is HTTP-only.
   skeleton) with `component-*.html` files and each
   page's `index.html` to produce standalone composed
   `index.html` files in a temp build directory.
-  4 standalone pages have hand-written `index.html`
-  that are copied directly to the build output.
+  5 standalone pages have hand-written HTML
+  that is copied directly to the build output.
 - **Navigation**: Standard `<a href>` links between pages. Parameterized pages use query strings (`?ideaId=1`). `navigateTo(page, params?)` helper constructs relative URLs for programmatic navigation.
 - **Layout**: Sidebar-layout pages share a layout template with sidebar, header, search, and theme toggle. Mobile layout uses CSS media queries (not JS) to swap between desktop sidebar and mobile drawer.
 - **Page Detection**: `page-registry.ts` defines `PAGE_REGISTRY` mapping page names to `'sidebar'` or `'standalone'` layout type. `<html data-page="dashboard">` attribute is read by JS on `DOMContentLoaded` to dispatch to the correct page module's `init()`. Pages with `sourceDir` in `PAGE_REGISTRY` have source files at a different path than their page name.
 - **Source = Output Alignment**: Build output paths always use the registry's `sourceDir` and `sourceFile` (both are required fields on `PageEntry`). Both `compose.ts` and `navigateTo()` resolve output as `{sourceDir}/{sourceFile}.html`. So a page registered as `flow-detail` with `sourceDir: 'flows'` and `sourceFile: 'detail'` produces output at `flows/detail.html`, and `navigateTo('account')` generates `../organization/index.html` because `account` has `sourceDir: 'organization'`, `sourceFile: 'index'`. This keeps the developer's mental model simple: the file you edit is the file the browser loads.
 - **Auth**: Mock auth returning `demo@example.com`.
-- **Data**: REST-style API layer (`api/`) backed by localStorage. The `web-app/app/adapters/` directory contains ~70 adapter functions across 16 modules (with barrel re-export) that call `GET()`/`PUT()`/`POST()` and convert normalized DB rows into the denormalized shapes pages expect.
-- **Presentation**: The `web-app/app/presenters/` directory contains 14 presenter classes (with barrel re-export) that wrap adapter-returned shapes and emit `SafeHtml`. Page modules instantiate presenters and call `build*` methods on them to produce markup — keeping rendering logic out of page modules and out of adapters.
+- **Data**: REST-style API layer (`api/`) backed by localStorage. The `web-app/app/adapters/` directory contains adapter functions across 16 modules (with barrel re-export) that call `GET()`/`PUT()`/`POST()` and convert normalized DB rows into the denormalized shapes pages expect.
+- **Presentation**: The `web-app/app/presenters/` directory contains 15 presenter classes across 14 files (with barrel re-export) that wrap adapter-returned shapes and emit `SafeHtml`. Page modules instantiate presenters and call `build*` methods on them to produce markup — keeping rendering logic out of page modules and out of adapters.
 - **Database**: localStorage with JSON serialization, persisted across page navigations. Each table is stored as a `fusion-ai:tableName` key containing a JSON array of row objects. When no schema exists (no `fusion-ai:*` keys in localStorage), non-entry pages redirect to snapshots so users can initialize the environment. A snapshots page provides create pristine environment, wipe and load mock data, upload snapshot, and download snapshot operations.
 - **State**: Simple module-level variables + pub-sub pattern for theme (persisted to localStorage), mobile detection (matchMedia), auth, and sidebar state.
 - **Durations**: All numeric durations are persisted in seconds. UI displays days via `durationInDays(seconds)` from `format.ts`.
@@ -137,12 +137,17 @@ generate the markup the page injects into the DOM.
   an internal helper used by several presenters; it is
   not itself a presenter and is not re-exported from
   the barrel.
-- **File list** (14 presenters, 15 files):
+- **File list** (15 classes across 14 presenter
+  files, 17 files total including helpers):
   `account`, `activity`, `flow`, `flow-designer`,
-  `gauge`, `idea`, `idea-conversion`, `idea-create`,
-  `profile`, `project`, `project-detail`, `settings`,
-  `user`, plus `index` (barrel) and `ordered-keys`
-  (helper).
+  `gauge`, `idea` (exports `IdeaPresenter` plus
+  `IdeaListPresenter`), `idea-conversion`,
+  `idea-create`, `profile`, `project` (exports
+  `ProjectPresenter` plus `ProjectListPresenter`),
+  `project-detail`, `settings`, `user`, plus
+  `index` (barrel), `ordered-keys` (helper), and
+  `flow-designer-view` (helper for the flow
+  designer page, exporting `build*` functions).
 
 ### Import Conventions
 
@@ -180,7 +185,7 @@ import { navigateTo, openDialog, closeDialog } from '../app/core';
 - **User-name resolution**: `userName(userMap, userId)` returns `''` only when `userId` itself is absent (legitimately unassigned). When `userId` is present but the user is not in the map, the function **throws** — a dangling reference is a data-integrity bug, not a formatting case. UI renders `'\u2014'` (em dash) for the legitimate-absence empty string. Never use magical fallback strings like `'Unknown'`.
 - **Absent values**: Use `null` for semantically absent values in adapter return types (e.g., `confidence: ConfidenceLevel | null`). Persisted noun entities never use `null`.
 - **No adapter caching**: Each adapter function fetches its own data directly via `getUserMap()`. No `cachedUserMap` or `prefetched*` parameters — simplicity over micro-optimization of localStorage reads.
-- **Shared types**: The `Metric` interface (`{ id, name, target, unit, current }`) is defined in `helpers.ts` and used across adapters.
+- **Shared helpers**: `adapters/shared.ts` exports cross-module utilities (`getUserMap`, `userName`, `getCurrentUser`, `AuthContext`).
 
 ### Dark Mode
 
@@ -295,10 +300,9 @@ web-app/
     logger.ts                 # Lightweight logger using preferences-store for log-level
     safe-html.ts              # SafeHtml class, html tagged template, trusted(), setHtml()
     loading-states.ts         # Loading skeletons, error states, empty states, withLoadingState()
-    adapters/                 # ~70 adapter functions across 16 modules (API → frontend shapes)
+    adapters/                 # adapter functions across 16 modules (API → frontend shapes)
       index.ts                # Barrel re-export
-      helpers.ts              # getUserMap, userName, parseJson
-      shared.ts               # getCurrentUser
+      shared.ts               # getUserMap, userName, getCurrentUser, AuthContext
       dashboard.ts            # getDashboardGauges, getDashboardStats, etc.
       ideas.ts                # getIdeas, getIdeaDetail, getIdeaForConversion, getIdea, putIdea, putIdeaSubmission
       projects.ts             # getProjects, getProjectById, putProject, putProjectTeamMember
@@ -309,10 +313,12 @@ web-app/
       flow-deletions.ts       # deleteNode, deleteEdge, deleteField
       flow-versions.ts        # postFlowVersion, getFlowVersions, getLatestFlowVersion, deleteFlowVersion, putFlowFromVersion (persistent undo history)
       flow-export.ts          # getFlowMermaid, getFlowZip, postFlowFromMermaid, postFlowFromZip
-      workbox.ts              # getWorkboxItems, getWorkboxItem, postWorkOrderCreation, postWorkOrderTransition, postWorkOrderClaim, deleteWorkOrderClaim
+      workbox-queries.ts      # getWorkboxItems, getWorkboxActive, getWorkboxArchive, getWorkboxItem, getFlowsForCreation
+      workbox-mutations.ts    # postWorkOrderCreation, postWorkOrderTransition, postWorkOrderClaim, putWorkOrder
+      workbox-deletions.ts    # deleteWorkOrderClaim
       admin.ts                # getAccount, getProfile, getCompanySettings, getActivityFeed
       snapshots.ts            # deleteSchema, postSchemaCreation, postMockDataLoad, postBootstrap, putSnapshot, getSnapshot, getDataPresent
-    presenters/               # 14 presenter classes (adapter shapes → SafeHtml)
+    presenters/               # 15 presenter classes across 14 files (adapter shapes → SafeHtml)
       index.ts                # Barrel re-export
       ordered-keys.ts         # Internal helper (not a presenter)
       account.ts              # AccountPresenter
@@ -343,7 +349,7 @@ web-app/
     favicon.ico               # Application favicon
     *.woff2                   # 9 self-hosted font files (IBM Plex Sans, Inter, IBM Plex Mono)
 
-  # Pages — 23 entries in PAGE_REGISTRY (19 sidebar-layout + 4 standalone). Most page directories hold multiple pages (e.g., flows/index + flows/detail).
+  # Pages — 23 entries in PAGE_REGISTRY (18 sidebar-layout + 5 standalone). Most page directories hold multiple pages (e.g., flows/index + flows/detail).
   dashboard/                # Dashboard with gauge cards
   workbox/                  # Work order inbox + detail
   ideas/                    # Ideas list + detail, create, convert (named files)
@@ -358,7 +364,7 @@ web-app/
   auth/                     # Login/signup (standalone)
   not-found/                # 404 page (standalone)
 
-SCHEMA.md                     # Database schema (17 tables, columns, types, defaults)
+SCHEMA.md                     # Database schema (18 tables, columns, types, defaults)
 DESIGN-SYSTEM.md              # Design system specification
 TEST-PLAN.md                  # Human-executable test plan (176 cases)
 ```
@@ -371,8 +377,8 @@ temp directory -- no build artifacts in the repo.
 ## Build
 
 Build steps (requires clean git working directory):
-1. Composes HTML pages: runs `web-app/app/compose.ts` to assemble `components-layout.html` with `component-*.html` files and each sidebar-layout page's HTML file, producing 19 composed files in the build directory. Respects `sourceDir` and `sourceFile` for both input resolution and output placement. Exits with error if any page is missing.
-2. Copies 4 standalone pages (`auth`, `landing`, `onboarding`, `not-found`) — also handled by `compose.ts`, which uses `copyFileSync` for standalone entries instead of templating
+1. Composes HTML pages: runs `web-app/app/compose.ts` to assemble `components-layout.html` with `component-*.html` files and each sidebar-layout page's HTML file, producing 18 composed files in the build directory. Respects `sourceDir` and `sourceFile` for both input resolution and output placement. Exits with error if any page is missing.
+2. Copies 5 standalone pages (`auth`, `landing`, `onboarding`, `not-found`, `flow-detail`) — also handled by `compose.ts`, which uses `copyFileSync` for standalone entries instead of templating
 3. Bundles TypeScript into a single IIFE (`assets/app.js`) via esbuild into the build directory
 4. Concatenates CSS modules in cascade order and minifies via esbuild into `assets/styles.css`, copies `*.woff2` and `favicon.ico` to the build directory
 5. Creates a distribution ZIP (`fusion-ai-<sha>.zip`) at the output path (default `~/Desktop/`), or skips zipping with `--no-zip`

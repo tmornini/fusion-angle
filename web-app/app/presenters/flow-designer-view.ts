@@ -30,7 +30,6 @@ class="badge badge-outline text-xs"
 
 export function buildFieldRow(
     field: GraphField,
-    isLocked: boolean,
 ): SafeHtml {
     const req = field.isRequired
         ? html`<span class="${
@@ -47,9 +46,8 @@ ${req}
 <button
     class="btn btn-ghost btn-xs ml-auto"
     data-action="delete-field"
-    data-field-id="${field.id}"${
-    trusted(isLocked ? ' disabled' : '')
-    }>&times;</button>
+    data-field-id="${field.id}"
+    >&times;</button>
 </div>`;
 }
 
@@ -117,7 +115,6 @@ Required</label>
 export function buildFlowNameHeader(
     flowName: string,
     isEditingName: boolean,
-    isLocked: boolean,
 ): SafeHtml {
     if (isEditingName) {
         return html`<div class="${
@@ -147,9 +144,8 @@ export function buildFlowNameHeader(
 <button class="${
     'btn btn-ghost btn-icon'
     + ' wf-name-edit-btn'
-}" id="flow-name-edit-btn"${
-    trusted(isLocked ? ' disabled' : '')
-    }>${iconEdit(14, '')}</button>
+}" id="flow-name-edit-btn"
+    >${iconEdit(14, '')}</button>
 </div>`;
 }
 
@@ -192,7 +188,7 @@ class="text-sm text-muted"
 </div>`;
     }
     const fieldRows = node.fields
-        .map(f => buildFieldRow(f, isLocked));
+        .map(f => buildFieldRow(f));
     const lockAttr =
         trusted(isLocked ? ' disabled' : '');
     return html`<div
@@ -229,7 +225,7 @@ class="wf-props-panel">
 ${fieldRows}
 <button
     class="btn btn-ghost btn-xs mt-1"
-    data-action="add-field"${lockAttr}
+    data-action="add-field"
     >+ Add Field</button>
 <div id="field-editor-slot"></div>
 </div>
@@ -300,9 +296,7 @@ class="wf-props-panel">
 export function buildToolbar(
     canUndo: boolean,
     canRedo: boolean,
-    isLocked: boolean,
     canDelete: boolean,
-    isAutoFit: boolean,
 ): SafeHtml {
     return html`<div
 class="wf-toolbar">
@@ -312,19 +306,15 @@ class="wf-toolbar">
     data-action="undo"
     title="Undo"
     aria-label="Undo"${
-    trusted(
-        canUndo && !isLocked
-            ? '' : ' disabled',
-    )}>${iconUndo(18, '')}</button>
+    trusted(canUndo ? '' : ' disabled')
+    }>${iconUndo(18, '')}</button>
 <button
     class="btn btn-ghost btn-icon"
     data-action="redo"
     title="Redo"
     aria-label="Redo"${
-    trusted(
-        canRedo && !isLocked
-            ? '' : ' disabled',
-    )}>${iconRedo(18, '')}</button>
+    trusted(canRedo ? '' : ' disabled')
+    }>${iconRedo(18, '')}</button>
 </div>
 <div class="wf-toolbar-spacer"></div>
 <div class="wf-toolbar-group">
@@ -332,16 +322,14 @@ class="wf-toolbar">
     class="btn btn-ghost btn-icon"
     data-action="zoom-out"
     title="Zoom out"
-    aria-label="Zoom out"${
-    trusted(isAutoFit ? ' disabled' : '')
-    }>${iconMinus(18, '')}</button>
+    aria-label="Zoom out"
+    >${iconMinus(18, '')}</button>
 <button
     class="btn btn-ghost btn-icon"
     data-action="zoom-in"
     title="Zoom in"
-    aria-label="Zoom in"${
-    trusted(isAutoFit ? ' disabled' : '')
-    }>${iconPlus(18, '')}</button>
+    aria-label="Zoom in"
+    >${iconPlus(18, '')}</button>
 </div>
 <div class="wf-toolbar-spacer"></div>
 <div class="wf-toolbar-group">
@@ -365,10 +353,8 @@ class="wf-toolbar">
     data-action="delete-selected"
     title="Delete"
     aria-label="Delete"${
-    trusted(
-        canDelete && !isLocked
-            ? '' : ' disabled',
-    )}>${iconTrash(18, '')}</button>
+    trusted(canDelete ? '' : ' disabled')
+    }>${iconTrash(18, '')}</button>
 </div>
 </div>`;
 }

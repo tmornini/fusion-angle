@@ -981,6 +981,9 @@ export function buildGraphSvg(
     if (isConnecting) {
         svgCls += ' wf-connecting';
     }
+    if (isLocked) {
+        svgCls += ' wf-canvas-locked';
+    }
 
     let marqueeMarkup = '';
     if (marqueeRect) {
