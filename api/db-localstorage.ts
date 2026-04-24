@@ -10,14 +10,14 @@ import type {
     UserEntity,
     IdeaEntity,
     ProjectEntity,
-    TeamMembershipEntity,
-    TeamMembershipProjectEntity,
-    TeamMembershipUserEntity,
+    TeamEntity,
+    TeamProjectEntity,
+    TeamUserEntity,
     ActivityEntity,
     FlowEntity,
     FlowVersionEntity,
     CompanySettingsEntity,
-    AccountEntity,
+    OrganizationEntity,
     IdeaSubmissionEntity,
     ActivityActorEntity,
     ProjectFlowEntity,
@@ -136,19 +136,14 @@ function serializeValue(
     return value;
 }
 
-function serializeRecord<T>(
-    record: Partial<T>,
+function serializeRecord(
+    record: Record<string, unknown>,
     tableName: string,
 ): Record<string, unknown> {
     const result: Record<string, unknown> = {};
     for (
         const [key, value]
-        of Object.entries(
-            record as Record<
-                string,
-                unknown
-            >,
-        )
+        of Object.entries(record)
     ) {
         result[key] = serializeValue(
             value, key, tableName,
@@ -189,7 +184,7 @@ function createEntityStore<
         },
         async put(
             id: string,
-            fields: Partial<T>,
+            fields: Omit<T, 'id'>,
         ): Promise<T> {
             const rows = readTable<T>(
                 tableName, false,
@@ -198,19 +193,19 @@ function createEntityStore<
                 entity => entity.id === id,
             );
             const serialized = serializeRecord(
-                fields, tableName,
+                fields as Record<string, unknown>,
+                tableName,
             );
 
             if (index >= 0) {
                 rows[index] = {
-                    ...rows[index]!,
                     ...serialized,
                     id,
                 } as T;
             } else {
                 rows.push({
-                    id,
                     ...serialized,
+                    id,
                 } as T);
             }
 
@@ -291,13 +286,14 @@ function createSingletonStore<
             );
         },
         async put(
-            fields: Partial<T>,
+            fields: Omit<T, 'id'>,
         ): Promise<T> {
             const rows = readTable<T>(
                 tableName, false,
             );
             const serialized = serializeRecord(
-                fields, tableName,
+                fields as Record<string, unknown>,
+                tableName,
             );
             const index = rows.findIndex(
                 entity => entity.id === '1',
@@ -305,14 +301,13 @@ function createSingletonStore<
 
             if (index >= 0) {
                 rows[index] = {
-                    ...rows[index]!,
                     ...serialized,
                     id: '1',
                 } as T;
             } else {
                 rows.push({
-                    id: '1',
                     ...serialized,
+                    id: '1',
                 } as T);
             }
 
@@ -336,9 +331,9 @@ export const TABLE_NAMES = [
     'users',
     'ideas',
     'projects',
-    'team_memberships',
-    'team_membership_projects',
-    'team_membership_users',
+    'teams',
+    'team_projects',
+    'team_users',
     'activities',
     'flows',
     'flow_versions',
@@ -348,7 +343,7 @@ export const TABLE_NAMES = [
     'work_order_transitions',
     'work_order_claims',
     'company_settings',
-    'account',
+    'organization',
     'idea_submissions',
     'activity_actors',
 ];
@@ -504,18 +499,18 @@ export async function createLocalStorageAdapter(
                 'projects',
             ),
 
-        teamMemberships:
+        teams:
             createEntityStore<
-                TeamMembershipEntity
-            >('team_memberships'),
-        teamMembershipProjects:
+                TeamEntity
+            >('teams'),
+        teamProjects:
             createEntityStore<
-                TeamMembershipProjectEntity
-            >('team_membership_projects'),
-        teamMembershipUsers:
+                TeamProjectEntity
+            >('team_projects'),
+        teamUsers:
             createEntityStore<
-                TeamMembershipUserEntity
-            >('team_membership_users'),
+                TeamUserEntity
+            >('team_users'),
 
         activities:
             createEntityStore<ActivityEntity>(
@@ -556,9 +551,9 @@ export async function createLocalStorageAdapter(
                 CompanySettingsEntity
             >('company_settings'),
 
-        account:
-            createSingletonStore<AccountEntity>(
-                'account',
+        organization:
+            createSingletonStore<OrganizationEntity>(
+                'organization',
             ),
 
         ideaSubmissions:

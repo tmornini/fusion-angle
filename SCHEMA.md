@@ -1,6 +1,8 @@
 # Database Schema
 
-18 tables stored in localStorage as JSON arrays. Each table is keyed as `fusion-ai:tableName`. All rows have a text `id` primary key. Column types: TEXT (string), INTEGER (number), REAL (float). JSON columns store stringified arrays or objects. All columns are NOT NULL — entity validation on creation ensures every field is present.
+18 tables stored in localStorage as JSON arrays. Each table is keyed as `fusion-ai:tableName`. All rows have a text `id` primary key. Column types: TEXT (string), INTEGER (number), REAL (float), BOOLEAN (see below). JSON columns store stringified arrays or objects. All columns are NOT NULL — entity validation on creation ensures every field is present.
+
+**Boolean storage:** BOOLEAN columns are typed as `boolean` in TypeScript (`api/types.ts`) but persisted as INTEGER `0`|`1` by `db-localstorage.ts::serializeValue` on write and deserialized back on read. The in-memory and API-boundary shape is always a real boolean; the `0`|`1` form never escapes the storage layer.
 
 **Duration convention:** All numeric duration fields are persisted in seconds. UI displays days via `durationInDays(seconds)` from `format.ts`.
 
@@ -69,7 +71,10 @@
 | timeline_label | TEXT |
 | budget_label | TEXT |
 
-### team_memberships
+### teams
+
+A team is a named role group (identified by `role` and `type`) that can be
+attached to projects (via `team_projects`) and users (via `team_users`).
 
 | Column | Type |
 |--------|------|
@@ -167,16 +172,8 @@ Singleton table (single row, `id = '1'`).
 | id | TEXT |
 | name | TEXT |
 | domain | TEXT |
-| industry | TEXT |
-| size | TEXT |
-| timezone | TEXT |
-| language | TEXT |
-| is_sso_enforced | INTEGER |
-| is_two_factor_enabled | INTEGER |
-| is_ip_whitelist_enabled | INTEGER |
-| data_retention | TEXT |
 
-### account
+### organization
 
 Singleton table (single row, `id = '1'`).
 
@@ -250,6 +247,9 @@ Powers persistent undo on the flows/detail page.
 | flow_id | TEXT | References flows |
 | name | TEXT | Snapshot of flows.name |
 | description | TEXT | Snapshot of flows.description |
+| is_locked | BOOLEAN | Snapshot of flows.is_locked |
+| is_auto_layout | BOOLEAN | Snapshot of flows.is_auto_layout |
+| is_auto_fit | BOOLEAN | Snapshot of flows.is_auto_fit |
 | lock_timeout | INTEGER | Snapshot of flows.lock_timeout |
 | graph | TEXT | Snapshot of flows.graph (JSON) |
 | created_at | TEXT | RFC-3339 Zulu — capture time |
@@ -278,20 +278,20 @@ work order state and history.
 | user_id | TEXT | References users |
 | claimed_at | TEXT | RFC-3339 Zulu |
 
-### team_membership_projects
+### team_projects
 
 | Column | Type |
 |--------|------|
 | id | TEXT |
-| team_membership_id | TEXT (FK → team_memberships) |
+| team_id | TEXT (FK → teams) |
 | project_id | TEXT (FK → projects) |
 | created_at | TEXT |
 
-### team_membership_users
+### team_users
 
 | Column | Type |
 |--------|------|
 | id | TEXT |
-| team_membership_id | TEXT (FK → team_memberships) |
+| team_id | TEXT (FK → teams) |
 | user_id | TEXT (FK → users) |
 | created_at | TEXT |

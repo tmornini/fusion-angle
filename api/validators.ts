@@ -4,7 +4,7 @@ import type {
     GraphField,
     StoredGraph,
     WorkOrderFlowGraph,
-    WfFieldType,
+    FlowFieldType,
 } from './types';
 
 export interface Risk {
@@ -13,8 +13,8 @@ export interface Risk {
     mitigation: string;
 }
 
-const WF_FIELD_TYPE_VALUES:
-    readonly WfFieldType[] = [
+const FLOW_FIELD_TYPE_VALUES:
+    readonly FlowFieldType[] = [
         'text', 'textarea', 'number',
         'date', 'select', 'checkbox',
         'file', 'email', 'url', 'phone',
@@ -121,21 +121,21 @@ export function asBoolean(
     return value;
 }
 
-export function asWfFieldType(
+export function asFlowFieldType(
     value: unknown,
     label: string,
-): WfFieldType {
+): FlowFieldType {
     const str = asString(value, label);
     if (
-        !(WF_FIELD_TYPE_VALUES as
+        !(FLOW_FIELD_TYPE_VALUES as
             readonly string[]).includes(str)
     ) {
         throw new Error(
-            'expected WfFieldType for '
+            'expected FlowFieldType for '
                 + label + ', got ' + str,
         );
     }
-    return str as WfFieldType;
+    return str as FlowFieldType;
 }
 
 function typeName(value: unknown): string {
@@ -221,7 +221,7 @@ function asGraphField(
         name: asString(
             obj['name'], label + '.name',
         ),
-        fieldType: asWfFieldType(
+        fieldType: asFlowFieldType(
             obj['fieldType'],
             label + '.fieldType',
         ),

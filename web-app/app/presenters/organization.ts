@@ -2,7 +2,6 @@ import {
     html, SafeHtml,
 } from '../safe-html';
 import {
-    iconUser, iconSettings,
     iconCreditCard, iconBuilding,
     iconCrown, iconCheckCircle2,
     iconActivity, iconUsers,
@@ -11,13 +10,13 @@ import {
     iconExternalLink,
 } from '../icons';
 import { formatDate } from '../core';
-import type { Account } from '../adapters';
+import type { Organization } from '../adapters';
 
-export class AccountPresenter {
-    readonly #account: Account;
+export class OrganizationPresenter {
+    readonly #organization: Organization;
 
-    constructor(account: Account) {
-        this.#account = account;
+    constructor(organization: Organization) {
+        this.#organization = organization;
     }
 
     buildPage(): SafeHtml {
@@ -32,69 +31,6 @@ export class AccountPresenter {
                 ${'Manage your organization,'
                     + ' users, and billing'}
             </p>
-        </div>
-
-        <!-- Quick Actions -->
-        <div
-            class="grid grid-cols-1
-                   sm:grid-cols-3 gap-4 mb-8"
-        >
-            <button
-                class="${
-                    'btn btn-outline'
-                    + ' btn-quick-action'
-                }"
-                data-nav-to="profile"
-            >
-                <div class="icon-box"
-                    data-tone="primary"
-                >${iconUser(20, '')}</div>
-                <div class="text-left">
-                    <p class="font-medium text-sm">
-                        My Profile
-                    </p>
-                    <p class="text-xs text-muted">
-                        Personal settings
-                    </p>
-                </div>
-            </button>
-            <button
-                class="${
-                    'btn btn-outline'
-                    + ' btn-quick-action'
-                }"
-                data-nav-to="settings"
-            >
-                <div class="icon-box"
-                    data-tone="info"
-                >${iconSettings(20, '')}</div>
-                <div class="text-left">
-                    <p class="font-medium text-sm">
-                        Company Settings
-                    </p>
-                    <p class="text-xs text-muted">
-                        Organization config
-                    </p>
-                </div>
-            </button>
-            <button
-                class="${
-                    'btn btn-outline'
-                    + ' btn-quick-action'
-                }"
-            >
-                <div class="icon-box"
-                    data-tone="success"
-                >${iconCreditCard(20, '')}</div>
-                <div class="text-left">
-                    <p class="font-medium text-sm">
-                        Billing
-                    </p>
-                    <p class="text-xs text-muted">
-                        Plans & invoices
-                    </p>
-                </div>
-            </button>
         </div>
 
         <!-- Company Overview -->
@@ -121,7 +57,7 @@ export class AccountPresenter {
                                    font-display
                                    font-semibold"
                         >${
-                            this.#account
+                            this.#organization
                                 .companyNameText()
                         }</h2>
                         <div
@@ -137,7 +73,7 @@ export class AccountPresenter {
                                 ${iconCrown(
                                     12, '',
                                 )}
-                                ${this.#account
+                                ${this.#organization
                                     .planName()
                                 } Plan
                             </span>
@@ -167,13 +103,13 @@ export class AccountPresenter {
                         <span class="${
                             'text-sm font-medium'
                         }">
-                            ${this.#account
+                            ${this.#organization
                                 .healthStatusText()}
                         </span>
                     </div>
                     <p class="text-xs mt-1">
                         ${'Health Score: '
-                            + this.#account
+                            + this.#organization
                                 .healthScoreValue()
                             + '%'}
                     </p>
@@ -198,13 +134,13 @@ export class AccountPresenter {
                     <p class="${
                         'text-2xl font-bold'
                     }">
-                        ${this.#account
+                        ${this.#organization
                             .usedSeatCount()
                         }<span
                             class="text-sm
                                    font-normal
                                    text-muted"
-                        >/${this.#account
+                        >/${this.#organization
                             .seatCount()
                         }</span>
                     </p>
@@ -225,7 +161,7 @@ export class AccountPresenter {
                     <p class="${
                         'text-2xl font-bold'
                     }">
-                        ${this.#account
+                        ${this.#organization
                             .projectsCurrentCount()
                         }
                     </p>
@@ -244,7 +180,7 @@ export class AccountPresenter {
                     <p class="${
                         'text-2xl font-bold'
                     }">
-                        ${this.#account
+                        ${this.#organization
                             .ideasCurrentCount()
                         }
                     </p>
@@ -264,7 +200,7 @@ export class AccountPresenter {
                         'text-lg font-bold'
                     }">
                         ${formatDate(
-                            this.#account
+                            this.#organization
                                 .nextBillingDate(),
                         )}
                     </p>
@@ -285,37 +221,37 @@ export class AccountPresenter {
             <div class="flex flex-col gap-4">
                 ${this.#buildUsageBar(
                     'User Seats',
-                    this.#account
+                    this.#organization
                         .usedSeatCount(),
-                    this.#account
+                    this.#organization
                         .seatCount(),
                 )}
                 ${this.#buildUsageBar(
                     'Projects',
-                    this.#account
+                    this.#organization
                         .projectsCurrentCount(),
-                    this.#account
+                    this.#organization
                         .projectsLimitCount(),
                 )}
                 ${this.#buildUsageBar(
                     'Ideas',
-                    this.#account
+                    this.#organization
                         .ideasCurrentCount(),
-                    this.#account
+                    this.#organization
                         .ideasLimitCount(),
                 )}
                 ${this.#buildUsageBar(
                     'AI Credits',
-                    this.#account
+                    this.#organization
                         .aiCreditsCurrentValue(),
-                    this.#account
+                    this.#organization
                         .aiCreditsLimitValue(),
                 )}
                 ${this.#buildUsageBar(
                     'Storage (GB)',
-                    this.#account
+                    this.#organization
                         .storageCurrentValue(),
-                    this.#account
+                    this.#organization
                         .storageLimitValue(),
                 )}
             </div>
@@ -396,13 +332,13 @@ export class AccountPresenter {
         const percentage =
             (current / limit) * 100;
         if (percentage
-            >= AccountPresenter
+            >= OrganizationPresenter
                 .USAGE_DANGER
         ) {
             return 'danger';
         }
         if (percentage
-            >= AccountPresenter
+            >= OrganizationPresenter
                 .USAGE_WARNING
         ) {
             return 'warning';

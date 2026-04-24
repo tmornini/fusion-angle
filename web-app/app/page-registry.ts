@@ -98,15 +98,14 @@ export const PAGE_REGISTRY: Record<
         icon: 'users',
         keywords: 'team members roster',
     },
-    account: {
+    organization: {
         title: 'Organization',
         layout: 'sidebar',
         sourceDir: 'organization',
         sourceFile: 'index',
         icon: 'settings',
         keywords:
-            'account organization'
-            + ' billing plan',
+            'organization billing plan',
     },
     profile: {
         title: 'Profile',
@@ -126,6 +125,16 @@ export const PAGE_REGISTRY: Record<
         keywords:
             'company organization'
             + ' settings',
+    },
+    billing: {
+        title: 'Billing',
+        layout: 'sidebar',
+        sourceDir: 'billing',
+        sourceFile: 'index',
+        icon: 'creditCard',
+        keywords:
+            'billing plan invoices'
+            + ' payment',
     },
     users: {
         title: 'Users',

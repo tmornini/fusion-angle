@@ -62,10 +62,10 @@ protocol locally, but testing is HTTP-only.
 - **Navigation**: Standard `<a href>` links between pages. Parameterized pages use query strings (`?ideaId=1`). `navigateTo(page, params?)` helper constructs relative URLs for programmatic navigation.
 - **Layout**: Sidebar-layout pages share a layout template with sidebar, header, search, and theme toggle. Mobile layout uses CSS media queries (not JS) to swap between desktop sidebar and mobile drawer.
 - **Page Detection**: `page-registry.ts` defines `PAGE_REGISTRY` mapping page names to `'sidebar'` or `'standalone'` layout type. `<html data-page="dashboard">` attribute is read by JS on `DOMContentLoaded` to dispatch to the correct page module's `init()`. Pages with `sourceDir` in `PAGE_REGISTRY` have source files at a different path than their page name.
-- **Source = Output Alignment**: Build output paths always use the registry's `sourceDir` and `sourceFile` (both are required fields on `PageEntry`). Both `compose.ts` and `navigateTo()` resolve output as `{sourceDir}/{sourceFile}.html`. So a page registered as `flow-detail` with `sourceDir: 'flows'` and `sourceFile: 'detail'` produces output at `flows/detail.html`, and `navigateTo('account')` generates `../organization/index.html` because `account` has `sourceDir: 'organization'`, `sourceFile: 'index'`. This keeps the developer's mental model simple: the file you edit is the file the browser loads.
+- **Source = Output Alignment**: Build output paths always use the registry's `sourceDir` and `sourceFile` (both are required fields on `PageEntry`). Both `compose.ts` and `navigateTo()` resolve output as `{sourceDir}/{sourceFile}.html`. So a page registered as `flow-detail` with `sourceDir: 'flows'` and `sourceFile: 'detail'` produces output at `flows/detail.html`, and `navigateTo('idea-detail')` generates `../ideas/detail.html` because `idea-detail` has `sourceDir: 'ideas'`, `sourceFile: 'detail'`. This keeps the developer's mental model simple: the file you edit is the file the browser loads.
 - **Auth**: Mock auth returning `demo@example.com`.
 - **Data**: REST-style API layer (`api/`) backed by localStorage. The `web-app/app/adapters/` directory contains adapter functions across 16 modules (with barrel re-export) that call `GET()`/`PUT()`/`POST()` and convert normalized DB rows into the denormalized shapes pages expect.
-- **Presentation**: The `web-app/app/presenters/` directory contains 15 presenter classes across 14 files (with barrel re-export) that wrap adapter-returned shapes and emit `SafeHtml`. Page modules instantiate presenters and call `build*` methods on them to produce markup — keeping rendering logic out of page modules and out of adapters.
+- **Presentation**: The `web-app/app/presenters/` directory contains 15 presenter classes across 13 files (with barrel re-export) that wrap adapter-returned shapes and emit `SafeHtml`. Page modules instantiate presenters and call `build*` methods on them to produce markup — keeping rendering logic out of page modules and out of adapters.
 - **Database**: localStorage with JSON serialization, persisted across page navigations. Each table is stored as a `fusion-ai:tableName` key containing a JSON array of row objects. When no schema exists (no `fusion-ai:*` keys in localStorage), non-entry pages redirect to snapshots so users can initialize the environment. A snapshots page provides create pristine environment, wipe and load mock data, upload snapshot, and download snapshot operations.
 - **State**: Simple module-level variables + pub-sub pattern for theme (persisted to localStorage), mobile detection (matchMedia), auth, and sidebar state.
 - **Durations**: All numeric durations are persisted in seconds. UI displays days via `durationInDays(seconds)` from `format.ts`.
@@ -137,8 +137,8 @@ generate the markup the page injects into the DOM.
   an internal helper used by several presenters; it is
   not itself a presenter and is not re-exported from
   the barrel.
-- **File list** (15 classes across 14 presenter
-  files, 17 files total including helpers):
+- **File list** (15 classes across 13 presenter
+  files, 16 files total including helpers):
   `account`, `activity`, `flow`, `flow-designer`,
   `gauge`, `idea` (exports `IdeaPresenter` plus
   `IdeaListPresenter`), `idea-conversion`,
@@ -241,7 +241,7 @@ Full spec in `DESIGN-SYSTEM.md`. Key constraints:
 - **Typography**: Display = IBM Plex Sans, Body = Inter, Mono = IBM Plex Mono. Self-hosted woff2 files at `web-app/assets/*.woff2`.
 - **Spacing**: 8px grid system.
 - **Icons**: ~100 inline SVG functions in `web-app/app/icons.ts`. Each returns a `SafeHtml` value: `iconSparkles(size, cssClass)`. Pages import icons directly from `icons.ts`.
-- **Toasts**: `showToast(message, type)` function with auto-dismiss.
+- **Toasts**: `showToast(message, variant)` function with auto-dismiss.
 - **Charts**: SVG rendering functions in `web-app/app/charts.ts` (bar, line, donut, area).
 - **Dark mode**: CSS custom properties with `data-theme` attribute.
 
@@ -261,6 +261,7 @@ api/
   db-localstorage.ts          # localStorage implementation with JSON serialization
   api.ts                      # GET/PUT/DELETE/POST URL routing
   mock-data.ts                # Mock data seed payload
+  validators.ts               # JSON validators for Risk[], StoredGraph, WorkOrderFlowGraph, transition values
 
 web-app/
   index.html                  # Redirects to landing/index.html
@@ -278,6 +279,7 @@ web-app/
     theme-toggle.ts           # Theme toggle icon, dropdown init
     sidebar-user.ts           # Sidebar user info fetch and display
     nav-highlight.ts          # Active nav item highlighting
+    nav-items.ts              # SIDEBAR_NAV_ITEMS + buildSidebarNavItemsHtml(), single source of truth for sidebar links
     mobile-drawer.ts          # Mobile sidebar drawer behavior
     header-info.ts            # Header greeting and stats
     navigation.ts             # navigateTo(), getPageName(), URL construction, link prefetch
@@ -291,6 +293,7 @@ web-app/
     dom.ts                    # querySelector wrappers ($, $$, $required, $input, $select, $textarea), attr(), populateIcons(), initToggleGroup(), bindEnterToClick()
     drag-reorder.ts           # initDragReorder() pointer-driven list reordering with hysteresis indicator
     flow-graph.ts             # SVG renderer for flow canvas (nodes, ports, bezier edges, label boxes)
+    flow-history.ts           # FlowHistory class: tracks undo/redo stack for the flow designer page
     flow-interactions.ts      # Pointer/keyboard state machines: selection, drag, connect, pan, marquee
     flow-layout.ts            # Sugiyama-style layered graph layout (computeLayout, NODE_WIDTH, reachability)
     mermaid-generate.ts       # generateMermaid(graph): serialize FlowGraph to Mermaid flowchart text
@@ -318,7 +321,7 @@ web-app/
       workbox-deletions.ts    # deleteWorkOrderClaim
       admin.ts                # getAccount, getProfile, getCompanySettings, getActivityFeed
       snapshots.ts            # deleteSchema, postSchemaCreation, postMockDataLoad, postBootstrap, putSnapshot, getSnapshot, getDataPresent
-    presenters/               # 15 presenter classes across 14 files (adapter shapes → SafeHtml)
+    presenters/               # 15 presenter classes across 13 files (adapter shapes → SafeHtml)
       index.ts                # Barrel re-export
       ordered-keys.ts         # Internal helper (not a presenter)
       account.ts              # AccountPresenter
@@ -349,7 +352,7 @@ web-app/
     favicon.ico               # Application favicon
     *.woff2                   # 9 self-hosted font files (IBM Plex Sans, Inter, IBM Plex Mono)
 
-  # Pages — 23 entries in PAGE_REGISTRY (18 sidebar-layout + 5 standalone). Most page directories hold multiple pages (e.g., flows/index + flows/detail).
+  # Pages — 24 entries in PAGE_REGISTRY (19 sidebar-layout + 5 standalone). Most page directories hold multiple pages (e.g., flows/index + flows/detail).
   dashboard/                # Dashboard with gauge cards
   workbox/                  # Work order inbox + detail
   ideas/                    # Ideas list + detail, create, convert (named files)
@@ -358,6 +361,7 @@ web-app/
   organization/             # Account overview, users, teams, activity-feed, onboarding (named files)
   profile/                  # Profile settings
   settings/                 # Company settings
+  billing/                  # Billing page — STUB (init() is empty; page renders a placeholder)
   snapshots/                # Snapshots (wipe, reload, upload/download snapshots)
   design-system/            # Component gallery
   landing/                  # Landing page (standalone)
@@ -366,7 +370,7 @@ web-app/
 
 SCHEMA.md                     # Database schema (18 tables, columns, types, defaults)
 DESIGN-SYSTEM.md              # Design system specification
-TEST-PLAN.md                  # Human-executable test plan (176 cases)
+TEST-PLAN.md                  # Human-executable test plan (254 cases)
 ```
 
 Most pages use `index.ts` + `index.html`. Pages with

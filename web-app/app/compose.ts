@@ -7,6 +7,7 @@ import {
 } from 'fs';
 import { join, dirname } from 'path';
 import { PAGE_REGISTRY } from './page-registry';
+import { buildSidebarNavItemsHtml } from './nav-items';
 
 const ROOT = join(dirname(new URL(import.meta.url).pathname), '..');
 const outArg = process.argv[2];
@@ -76,6 +77,12 @@ function compose(): void {
         const content = readFileSync(join(appDir, file), 'utf-8');
         layout = layout.replace(placeholder, content);
     }
+
+    const navHtml = buildSidebarNavItemsHtml();
+    layout = layout.replaceAll(
+        '<!-- SIDEBAR_NAV_ITEMS -->',
+        navHtml,
+    );
 
     for (const { name, title, sourceDir, sourceFile } of sidebarPages) {
         const pageHtmlPath = join(ROOT, sourceDir, `${sourceFile}.html`);

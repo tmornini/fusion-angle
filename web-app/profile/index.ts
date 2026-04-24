@@ -31,9 +31,9 @@ import {
     trimStrings,
 } from '../app/core';
 import {
-    getProfile, putProfile,
+    getProfile,
+    putProfile,
     allStrengths,
-    jsonArrayField,
 } from '../app/adapters';
 
 export async function init(): Promise<void> {
@@ -227,29 +227,21 @@ export async function init(): Promise<void> {
                 'disabled', '',
             );
             try {
-                await putProfile(
-                    trimStrings({
-                        first_name:
-                            firstName.value,
-                        last_name:
-                            lastName.value,
-                        email:
-                            email.value,
-                        phone:
-                            phone.value,
-                        role:
-                            role.value,
-                        department:
-                            department.value,
-                        bio: bio.value,
-                        strengths:
-                            jsonArrayField(
-                                [
-                                    ...selectedStrengths,
-                                ],
-                            ),
-                    }),
-                );
+                await putProfile(trimStrings({
+                    firstName:
+                        firstName.value,
+                    lastName:
+                        lastName.value,
+                    email: email.value,
+                    phone: phone.value,
+                    role: role.value,
+                    department:
+                        department.value,
+                    bio: bio.value,
+                    strengths: [
+                        ...selectedStrengths,
+                    ],
+                }));
                 setHtml(
                     btn,
                     html`${

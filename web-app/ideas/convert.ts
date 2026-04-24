@@ -14,9 +14,9 @@ import {
 } from '../app/icons';
 import { navigateTo } from '../app/core';
 import {
-    getIdeaForConversion,
-    getManagedUsers,
     getIdea,
+    getManagedUsers,
+    getIdeaEntity,
     putIdea,
     putProject,
     putProjectTeamMember,
@@ -70,7 +70,7 @@ export async function init(
     try {
         const [idea, users] =
             await Promise.all([
-                getIdeaForConversion(
+                getIdea(
                     ideaId,
                 ),
                 getManagedUsers(),
@@ -82,7 +82,7 @@ export async function init(
             );
     } catch (err) {
         log.error(
-            'getIdeaForConversion'
+            'getIdea'
             + ' failed',
             'ideas',
             err,
@@ -494,7 +494,7 @@ async function performConversion(
         type: 'internal',
     });
     const existingIdea =
-        await getIdea(ideaId);
+        await getIdeaEntity(ideaId);
     await putIdea(ideaId, {
         ...existingIdea,
         status: 'promoted',

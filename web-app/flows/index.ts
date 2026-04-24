@@ -22,8 +22,8 @@ import {
     getProjects,
     postFlowFromMermaid,
     postFlowFromZip,
-    getZipBackup,
-    getFlowBackupResolution,
+    readZipBackup,
+    computeFlowBackupResolution,
     putFlowFromBackup,
     postFlowFromBackup,
 } from '../app/adapters';
@@ -100,9 +100,9 @@ export async function init(
         },
     );
     if (!result) return;
-    const rendered = result.map(wf => {
+    const rendered = result.map(flow => {
         const p = new FlowPresenter();
-        wf.presentCardInto(p);
+        flow.presentCardInto(p);
         return p.render();
     });
 
@@ -266,7 +266,7 @@ async function handleFileSelect(
         );
         try {
             const backup =
-                await getZipBackup(bytes);
+                await readZipBackup(bytes);
             await handleV2Zip(
                 backup, input,
             );
@@ -354,12 +354,12 @@ async function handleV2Zip(
     let resolution: ImportResolution;
     try {
         resolution =
-            await getFlowBackupResolution(
+            await computeFlowBackupResolution(
                 backup,
             );
     } catch (err) {
         log.error(
-            'getFlowBackupResolution'
+            'computeFlowBackupResolution'
             + ' failed',
             'flows',
             err,

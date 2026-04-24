@@ -24,7 +24,7 @@ import {
 
 /* ── Types ───────────────── */
 
-export class WorkboxItem {
+export class WorkOrderInboxRow {
     readonly #id: string;
     readonly #displayId: string;
     readonly #flowName: string;
@@ -110,7 +110,7 @@ export type ClaimStatus =
         byCurrentUser: boolean;
     };
 
-export class WorkboxDetail {
+export class WorkOrderDetail {
     readonly #id: string;
     readonly #displayId: string;
     readonly #flowName: string;
@@ -201,7 +201,7 @@ export class WorkboxDetail {
 
 /* ── Helpers ─────────────── */
 
-export function parseWorkOrderFlowGraph(
+export function validateWorkOrderFlowGraph(
     raw: string,
 ): WorkOrderFlowGraph {
     return validateWorkOrderFlowGraphJson(
@@ -246,8 +246,8 @@ export function isExpiredClaim(
 
 /* ── Reads ───────────────── */
 
-export async function getWorkboxItems(
-): Promise<WorkboxItem[]> {
+export async function getAllWorkOrders(
+): Promise<WorkOrderInboxRow[]> {
     const [
         workOrders, transitions,
         claims, userMap,
@@ -279,9 +279,9 @@ export async function getWorkboxItems(
         );
     }
 
-    const items: WorkboxItem[] = [];
+    const items: WorkOrderInboxRow[] = [];
     for (const wo of workOrders) {
-        const fg = parseWorkOrderFlowGraph(
+        const fg = validateWorkOrderFlowGraph(
             wo.flow_graph,
         );
         const woTransitions = (
@@ -319,7 +319,7 @@ export async function getWorkboxItems(
         const last =
             woTransitions.at(-1);
 
-        items.push(new WorkboxItem({
+        items.push(new WorkOrderInboxRow({
             id: wo.id,
             displayId: wo.display_id,
             flowName: fg.name,
@@ -346,26 +346,34 @@ export async function getWorkboxItems(
     return items;
 }
 
-export async function getWorkboxArchive(
-): Promise<WorkboxItem[]> {
-    const items = await getWorkboxItems();
+export async function getArchivedWorkOrders(
+): Promise<WorkOrderInboxRow[]> {
+    const items = await getAllWorkOrders();
     return items.filter(
         i => i.isCompleted(),
     );
 }
 
-export async function getWorkboxActive(
-): Promise<WorkboxItem[]> {
-    const items = await getWorkboxItems();
+export async function getActiveWorkOrders(
+): Promise<WorkOrderInboxRow[]> {
+    const items = await getAllWorkOrders();
     return items.filter(
         i => !i.isCompleted(),
     );
 }
 
-export async function getWorkboxItem(
+export async function getWorkOrder(
+    id: string,
+): Promise<WorkOrderEntity> {
+    return GET<WorkOrderEntity>(
+        `work-orders/${id}`,
+    );
+}
+
+export async function getWorkOrderDetail(
     workOrderId: string,
     currentUserId: string,
-): Promise<WorkboxDetail> {
+): Promise<WorkOrderDetail> {
     const [
         wo, transitions,
         claims, userMap,
@@ -382,7 +390,7 @@ export async function getWorkboxItem(
         getUserMap(),
     ]);
 
-    const fg = parseWorkOrderFlowGraph(
+    const fg = validateWorkOrderFlowGraph(
         wo.flow_graph,
     );
 
@@ -507,7 +515,7 @@ export async function getWorkboxItem(
             }
             : { kind: 'unclaimed' };
 
-    return new WorkboxDetail({
+    return new WorkOrderDetail({
         id: wo.id,
         displayId: wo.display_id,
         flowName: fg.name,

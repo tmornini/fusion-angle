@@ -870,16 +870,8 @@ export async function populateMockData(
         adapter.companySettings.put({
             name: 'Stark Industries',
             domain: 'acmecorp.com',
-            industry: 'Technology',
-            size: '51-200',
-            timezone: 'America/New_York',
-            language: 'English',
-            is_sso_enforced: 0,
-            is_two_factor_enabled: 1,
-            is_ip_whitelist_enabled: 0,
-            data_retention: '12 months',
         }),
-        adapter.account.put({
+        adapter.organization.put({
             plan: 'Business',
             plan_status: 'active',
             next_billing: dt(-300, 0),
@@ -2577,14 +2569,14 @@ export async function populateMockData(
                 activity,
             ),
         ),
-        ...mockFlows.map(wf =>
+        ...mockFlows.map(flow =>
             adapter.flows.put(
-                wf.id, wf,
+                flow.id, flow,
             ),
         ),
     ]);
 
-    const teamMemberships: {
+    const teams: {
         id: string;
         project_id: string;
         user_id: string;
@@ -2656,32 +2648,29 @@ export async function populateMockData(
         },
     ];
     await Promise.all([
-        ...teamMemberships.map(tm =>
-            adapter.teamMemberships.put(
+        ...teams.map(tm =>
+            adapter.teams.put(
                 tm.id,
                 {
-                    id: tm.id,
                     role: tm.role,
                     type: tm.type,
                 },
             ),
         ),
-        ...teamMemberships.map(tm =>
-            adapter.teamMembershipProjects
+        ...teams.map(tm =>
+            adapter.teamProjects
                 .put(`tmp-${tm.id}`, {
-                    id: `tmp-${tm.id}`,
-                    team_membership_id:
+                    team_id:
                         tm.id,
                     project_id:
                         tm.project_id,
                     created_at: dt(75),
                 }),
         ),
-        ...teamMemberships.map(tm =>
-            adapter.teamMembershipUsers
+        ...teams.map(tm =>
+            adapter.teamUsers
                 .put(`tmu-${tm.id}`, {
-                    id: `tmu-${tm.id}`,
-                    team_membership_id:
+                    team_id:
                         tm.id,
                     user_id: tm.user_id,
                     created_at: dt(75),
@@ -2891,16 +2880,8 @@ export async function populateBootstrapData(
         adapter.companySettings.put({
             name: 'Stark Industries',
             domain: 'acmecorp.com',
-            industry: 'Technology',
-            size: '51-200',
-            timezone: 'America/New_York',
-            language: 'English',
-            is_sso_enforced: 0,
-            is_two_factor_enabled: 1,
-            is_ip_whitelist_enabled: 0,
-            data_retention: '12 months',
         }),
-        adapter.account.put({
+        adapter.organization.put({
             plan: 'Business',
             plan_status: 'active',
             next_billing: dt(-300, 0),

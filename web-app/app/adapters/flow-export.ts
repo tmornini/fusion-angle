@@ -16,7 +16,7 @@ import type {
     GraphEdge,
     GraphField,
     StoredGraph,
-    WfFieldType,
+    FlowFieldType,
 } from '../../../api/types';
 import {
     validateStoredGraphJson,
@@ -27,7 +27,7 @@ import {
     asNumber,
     asBoolean,
     asStoredGraph,
-    asWfFieldType,
+    asFlowFieldType,
 } from '../../../api/validators';
 import {
     getFlowGraph,
@@ -45,8 +45,8 @@ import {
     buildZip, getZipEntries,
 } from '../zip';
 import {
-    buildDefaultStartEnd,
-} from './flow-mutations';
+    buildStartAndCompleteNodes,
+} from './flow-defaults';
 import {
     computeLayout,
 } from '../flow-layout';
@@ -69,7 +69,7 @@ export async function getFlowMermaid(
 
 interface SidecarField {
     name: string;
-    fieldType: WfFieldType;
+    fieldType: FlowFieldType;
     sortOrder: number;
     isRequired: boolean;
     options: string[];
@@ -164,6 +164,9 @@ export interface BackupV2 {
         id: string;
         name: string;
         description: string;
+        isLocked: boolean;
+        isAutoLayout: boolean;
+        isAutoFit: boolean;
         lockTimeout: number;
         graph: {
             nodes: GraphNode[];
@@ -287,6 +290,15 @@ function buildBackupJson(
             name: flow.name,
             description:
                 flow.description,
+            isLocked: toBool(
+                flow.is_locked,
+            ),
+            isAutoLayout: toBool(
+                flow.is_auto_layout,
+            ),
+            isAutoFit: toBool(
+                flow.is_auto_fit,
+            ),
             lockTimeout:
                 flow.lock_timeout,
             graph,
@@ -324,6 +336,7 @@ export async function getFlowZip(
             flow.is_auto_fit,
         ),
         lockTimeout: flow.lock_timeout,
+        createdAt: flow.created_at,
         nodes: graph.nodes,
         edges: graph.edges,
     };
@@ -411,6 +424,15 @@ function validateBackupV2Json(
                 label
                     + '.flow.description',
             ),
+            isLocked:
+                flowObj['isLocked']
+                    === true,
+            isAutoLayout:
+                flowObj['isAutoLayout']
+                    === true,
+            isAutoFit:
+                flowObj['isAutoFit']
+                    === true,
             lockTimeout: asNumber(
                 flowObj['lockTimeout'],
                 label
@@ -424,7 +446,7 @@ function validateBackupV2Json(
     };
 }
 
-export async function getZipBackup(
+export async function readZipBackup(
     data: Uint8Array,
 ): Promise<BackupV2> {
     const entries = await getZipEntries(data);
@@ -445,7 +467,7 @@ export async function getZipBackup(
     return validateBackupV2Json(text);
 }
 
-export async function getFlowBackupResolution(
+export async function computeFlowBackupResolution(
     backup: BackupV2,
 ): Promise<ImportResolution> {
     const [flows, projects] =
@@ -480,17 +502,28 @@ export async function getFlowBackupResolution(
 export async function putFlowFromBackup(
     backup: BackupV2,
 ): Promise<string> {
+    const current = await GET<FlowEntity>(
+        'flows/' + backup.flow.id,
+    );
     await PUT(
         'flows/' + backup.flow.id,
         {
             name: backup.flow.name,
             description:
                 backup.flow.description,
+            is_locked:
+                backup.flow.isLocked,
+            is_auto_layout:
+                backup.flow.isAutoLayout,
+            is_auto_fit:
+                backup.flow.isAutoFit,
             lock_timeout:
                 backup.flow.lockTimeout,
             graph: putFlowGraph(
                 backup.flow.graph,
             ),
+            created_at:
+                current.created_at,
             updated_at: nowUtc(),
         },
     );
@@ -568,6 +601,11 @@ export async function postFlowFromBackup(
         name: backup.flow.name,
         description:
             backup.flow.description,
+        is_locked: backup.flow.isLocked,
+        is_auto_layout:
+            backup.flow.isAutoLayout,
+        is_auto_fit:
+            backup.flow.isAutoFit,
         lock_timeout:
             backup.flow.lockTimeout,
         graph: putFlowGraph({
@@ -787,7 +825,7 @@ export async function postFlowFromMermaid(
 
     const now = nowUtc();
     const { start, complete } =
-        buildDefaultStartEnd();
+        buildStartAndCompleteNodes();
 
     const { intermediates, idMap } =
         remapParsedToDefaults(
@@ -930,7 +968,7 @@ function asSidecarField(
         name: asString(
             obj['name'], label + '.name',
         ),
-        fieldType: asWfFieldType(
+        fieldType: asFlowFieldType(
             obj['fieldType'],
             label + '.fieldType',
         ),
@@ -1169,7 +1207,7 @@ export async function postFlowFromZip(
     }
 
     const { start, complete } =
-        buildDefaultStartEnd();
+        buildStartAndCompleteNodes();
 
     const { intermediates, idMap } =
         remapParsedToDefaults(

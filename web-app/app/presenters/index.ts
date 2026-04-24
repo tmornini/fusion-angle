@@ -28,8 +28,8 @@ export {
     ProjectDetailPresenter,
 } from './project-detail';
 export {
-    AccountPresenter,
-} from './account';
+    OrganizationPresenter,
+} from './organization';
 export {
     ProfilePresenter,
 } from './profile';

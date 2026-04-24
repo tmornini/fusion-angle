@@ -740,7 +740,7 @@ export function bindInteractions(
         svg.parentElement as HTMLElement;
     if (state.isSpaceDown) {
         cursorHost.classList.add(
-            'wf-pan-cursor',
+            'flow-pan-cursor',
         );
     }
 
@@ -841,11 +841,11 @@ export function bindInteractions(
         state.isSpaceDown = next;
         if (next) {
             cursorHost.classList.add(
-                'wf-pan-cursor',
+                'flow-pan-cursor',
             );
         } else {
             cursorHost.classList.remove(
-                'wf-pan-cursor',
+                'flow-pan-cursor',
             );
             if (
                 state.pan.kind === 'panning'

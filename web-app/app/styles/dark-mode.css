@@ -156,30 +156,30 @@
 
 /* Flow designer: dark surfaces */
 [data-theme="dark"]
-    .wf-toolbar {
+    .flow-toolbar {
   background-color:
     hsl(var(--gray-800));
   border-color: hsl(var(--gray-700));
 }
 [data-theme="dark"]
-    .wf-canvas-wrap {
+    .flow-canvas-wrap {
   background-color:
     hsl(var(--gray-900));
   border-color: hsl(var(--gray-700));
 }
 [data-theme="dark"]
-    .wf-props-panel {
+    .flow-props-panel {
   background-color:
     hsl(var(--gray-800));
   border-color: hsl(var(--gray-700));
 }
 [data-theme="dark"]
-    .wf-field-row {
+    .flow-field-row {
   background-color:
     hsl(var(--gray-700));
 }
 [data-theme="dark"]
-    .wf-field-editor {
+    .flow-field-editor {
   background-color:
     hsl(var(--gray-700));
   border-color: hsl(var(--gray-600));

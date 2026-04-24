@@ -45,7 +45,7 @@ const pageModules: Record<
         import(
             '../organization/teams'
         ),
-    account: () =>
+    organization: () =>
         import(
             '../organization/index'
         ),
@@ -53,6 +53,8 @@ const pageModules: Record<
         import('../profile/index'),
     settings: () =>
         import('../settings/index'),
+    billing: () =>
+        import('../billing/index'),
     users: () =>
         import(
             '../organization/users'

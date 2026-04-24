@@ -61,7 +61,7 @@ export async function getIdeas(
         ));
 }
 
-export async function getIdeaDetail(
+export async function getIdea(
     ideaId: string,
 ): Promise<Idea> {
     const [
@@ -94,34 +94,7 @@ export async function getIdeaDetail(
     );
 }
 
-export async function getIdeaForConversion(
-    ideaId: string,
-): Promise<Idea> {
-    const [
-        entity, userMap, submissions,
-    ] = await Promise.all([
-        GET<IdeaEntity>(
-            `ideas/${ideaId}`,
-        ),
-        getUserMap(),
-        GET<IdeaSubmissionEntity[]>(
-            'idea-submissions',
-        ),
-    ]);
-    const submission = submissions.find(
-        s => s.idea_id === ideaId,
-    );
-    return new Idea(
-        entity,
-        userName(
-            userMap,
-            submission!.user_id,
-        ),
-        submission!.created_at,
-    );
-}
-
-export async function getIdea(
+export async function getIdeaEntity(
     id: string,
 ): Promise<IdeaEntity> {
     return GET<IdeaEntity>(`ideas/${id}`);
@@ -129,7 +102,7 @@ export async function getIdea(
 
 export async function putIdea(
     id: string,
-    entity: Partial<IdeaEntity>,
+    entity: Omit<IdeaEntity, 'id'>,
 ): Promise<void> {
     await PUT(`ideas/${id}`, entity);
     ideaChanged.send();

@@ -406,7 +406,7 @@
   gap: var(--space-3);
 }
 
-/* Stat cell tinted card (used by account, idea, project) */
+/* Stat cell tinted card (used by organization, idea, project) */
 .stat-cell {
   padding: var(--space-4);
   border-radius: var(--radius-lg);
@@ -1081,7 +1081,7 @@
   border-radius: 1rem;
 }
 
-/* Variant: tinted gradient (used by user / account) */
+/* Variant: tinted gradient (used by user / organization) */
 .avatar-tinted {
   background: linear-gradient(135deg,
     hsl(var(--primary) / 0.2),

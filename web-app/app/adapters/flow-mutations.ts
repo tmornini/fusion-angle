@@ -1,5 +1,5 @@
 import {
-    GET, POST, PUT,
+    GET, PUT,
 } from '../../../api/api';
 import type {
     FlowEntity,
@@ -7,7 +7,7 @@ import type {
     GraphEdge,
     GraphField,
     StoredGraph,
-    WfFieldType,
+    FlowFieldType,
 } from '../../../api/types';
 import {
     nowUtc,
@@ -18,6 +18,9 @@ import {
     validateStoredGraphJson,
 } from '../../../api/validators';
 import { postFlowVersion } from './flow-versions';
+import {
+    buildStartAndCompleteNodes,
+} from './flow-defaults';
 
 function parseGraph(
     raw: string,
@@ -53,44 +56,10 @@ async function putGraphMutation(
     );
     const updated = transform(graph);
     await PUT(`flows/${flowId}`, {
+        ...entity,
         graph: putFlowGraph(updated),
         updated_at: nowUtc(),
     });
-}
-
-const DEFAULT_START_NAME = 'Start';
-const DEFAULT_COMPLETE_NAME = 'End';
-const DEFAULT_START_X = -300;
-const DEFAULT_START_Y = 0;
-const DEFAULT_COMPLETE_X = 300;
-const DEFAULT_COMPLETE_Y = 200;
-
-export function buildDefaultStartEnd(): {
-    start: GraphNode;
-    complete: GraphNode;
-} {
-    return {
-        start: {
-            id: crypto.randomUUID(),
-            name: DEFAULT_START_NAME,
-            description: '',
-            positionX: DEFAULT_START_X,
-            positionY: DEFAULT_START_Y,
-            isStart: true,
-            isComplete: false,
-            fields: [],
-        },
-        complete: {
-            id: crypto.randomUUID(),
-            name: DEFAULT_COMPLETE_NAME,
-            description: '',
-            positionX: DEFAULT_COMPLETE_X,
-            positionY: DEFAULT_COMPLETE_Y,
-            isStart: false,
-            isComplete: true,
-            fields: [],
-        },
-    };
 }
 
 export interface FlowCreationContext {
@@ -132,7 +101,7 @@ export async function postFlowCreation(
 ): Promise<void> {
     const now = nowUtc();
     const { start, complete } =
-        buildDefaultStartEnd();
+        buildStartAndCompleteNodes();
     const graph: StoredGraph = {
         nodes: [start, complete],
         edges: [],
@@ -142,6 +111,9 @@ export async function postFlowCreation(
         id: ctx.flowId,
         name: ctx.name,
         description: ctx.description,
+        is_locked: false,
+        is_auto_layout: false,
+        is_auto_fit: false,
         lock_timeout: DEFAULT_LOCK_TIMEOUT,
         graph: putFlowGraph(graph),
         created_at: now,
@@ -201,7 +173,7 @@ export async function postFieldAddition(
     ctx: FieldAdditionContext,
 ): Promise<void> {
     const ft =
-        ctx.fieldType as WfFieldType;
+        ctx.fieldType as FlowFieldType;
     const field: GraphField = {
         id: ctx.fieldId,
         name: ctx.name,
@@ -231,188 +203,7 @@ export async function postFieldAddition(
 
 export async function putFlow(
     id: string,
-    fields: {
-        name?: string;
-        description?: string;
-    },
+    entity: Omit<FlowEntity, 'id'>,
 ): Promise<void> {
-    await postFlowVersion(id);
-    await PUT(`flows/${id}`, {
-        ...fields,
-        updated_at: nowUtc(),
-    });
-}
-
-export async function putFlowLocked(
-    id: string,
-    isLocked: boolean,
-): Promise<void> {
-    await PUT(`flows/${id}`, {
-        is_locked: isLocked,
-        updated_at: nowUtc(),
-    });
-}
-
-export async function putFlowAutoLayout(
-    id: string,
-    isAutoLayout: boolean,
-): Promise<void> {
-    await PUT(`flows/${id}`, {
-        is_auto_layout: isAutoLayout,
-        updated_at: nowUtc(),
-    });
-}
-
-export async function putFlowAutoFit(
-    id: string,
-    isAutoFit: boolean,
-): Promise<void> {
-    await PUT(`flows/${id}`, {
-        is_auto_fit: isAutoFit,
-        updated_at: nowUtc(),
-    });
-}
-
-export interface GraphUpdateContext {
-    flowId: string;
-    nodes: GraphNode[];
-    edges: GraphEdge[];
-}
-
-export async function putGraph(
-    ctx: GraphUpdateContext,
-): Promise<void> {
-    await postFlowVersion(ctx.flowId);
-    await putGraphSilent(ctx);
-}
-
-// No capture: internal migration, not user edit.
-export async function putGraphSilent(
-    ctx: GraphUpdateContext,
-): Promise<void> {
-    await PUT(`flows/${ctx.flowId}`, {
-        graph: putFlowGraph({
-            nodes: ctx.nodes,
-            edges: ctx.edges,
-        }),
-        updated_at: nowUtc(),
-    });
-}
-
-export interface NodeUpdateContext {
-    flowId: string;
-    nodeId: string;
-    fields: {
-        name?: string;
-        description?: string;
-        positionX?: number;
-        positionY?: number;
-    };
-}
-
-export async function putNode(
-    ctx: NodeUpdateContext,
-): Promise<void> {
-    await putGraphMutation(
-        ctx.flowId,
-        g => ({
-            ...g,
-            nodes: g.nodes.map(
-                n => n.id === ctx.nodeId
-                    ? {
-                        ...n,
-                        ...ctx.fields,
-                    }
-                    : n,
-            ),
-        }),
-    );
-}
-
-export interface EdgeUpdateContext {
-    flowId: string;
-    edgeId: string;
-    fields: {
-        name?: string;
-        description?: string;
-    };
-}
-
-export async function putWfEdge(
-    ctx: EdgeUpdateContext,
-): Promise<void> {
-    await putGraphMutation(
-        ctx.flowId,
-        g => ({
-            ...g,
-            edges: g.edges.map(
-                e => e.id === ctx.edgeId
-                    ? {
-                        ...e,
-                        ...ctx.fields,
-                    }
-                    : e,
-            ),
-        }),
-    );
-}
-
-function applyFieldUpdate(
-    f: GraphField,
-    fields: {
-        name?: string;
-        fieldType?: string;
-        sortOrder?: number;
-        isRequired?: boolean;
-        options?: string[];
-    },
-): GraphField {
-    const ft = fields.fieldType
-        ? (fields.fieldType as WfFieldType)
-        : f.fieldType;
-    return {
-        ...f,
-        ...fields,
-        fieldType: ft,
-    };
-}
-
-export interface FieldUpdateContext {
-    flowId: string;
-    nodeId: string;
-    fieldId: string;
-    fields: {
-        name?: string;
-        fieldType?: string;
-        sortOrder?: number;
-        isRequired?: boolean;
-        options?: string[];
-    };
-}
-
-export async function putField(
-    ctx: FieldUpdateContext,
-): Promise<void> {
-    await putGraphMutation(
-        ctx.flowId,
-        g => ({
-            ...g,
-            nodes: g.nodes.map(
-                n => n.id === ctx.nodeId
-                    ? {
-                        ...n,
-                        fields: n.fields.map(
-                            f => f.id
-                                === ctx.fieldId
-                                ? applyFieldUpdate(
-                                    f,
-                                    ctx.fields,
-                                )
-                                : f,
-                        ),
-                    }
-                    : n,
-            ),
-        }),
-    );
+    await PUT(`flows/${id}`, entity);
 }

@@ -1,5 +1,5 @@
 import {
-    $, $input, $select,
+    $, $input,
     bindEnterToClick,
 } from '../app/dom';
 import {
@@ -60,48 +60,16 @@ export async function init(): Promise<void> {
         presenter.buildPage(),
     );
 
-    document
-        .querySelectorAll<HTMLElement>(
-            '.switch[role="switch"]',
-        )
-        .forEach(switchElement => {
-            switchElement.addEventListener(
-                'click',
-                () => {
-                    const isChecked =
-                        switchElement
-                            .getAttribute(
-                                'aria-checked',
-                            ) === 'true';
-                    switchElement.setAttribute(
-                        'aria-checked',
-                        String(!isChecked),
-                    );
-                },
-            );
-        });
-
     $(
         '#company-settings-save-btn',
         document,
     )?.addEventListener(
         'click',
         async () => {
-            const sel = (id: string) =>
-                $select(
-                    '#' + id, document,
-                )!.value;
             const inp = (id: string) =>
                 $input(
                     '#' + id, document,
                 )!.value.trim();
-            const sw = (id: string) =>
-                $(
-                    '#switch-' + id,
-                    document,
-                )?.getAttribute(
-                    'aria-checked',
-                ) === 'true' ? 1 : 0;
             const p =
                 'company-settings-';
             try {
@@ -109,28 +77,6 @@ export async function init(): Promise<void> {
                     name: inp(p + 'name'),
                     domain: inp(
                         p + 'domain',
-                    ),
-                    industry: sel(
-                        p + 'industry',
-                    ),
-                    size: sel(p + 'size'),
-                    timezone: sel(
-                        p + 'timezone',
-                    ),
-                    language: sel(
-                        p + 'language',
-                    ),
-                    is_sso_enforced:
-                        sw(p + 'sso'),
-                    is_two_factor_enabled:
-                        sw(p + '2fa'),
-                    is_ip_whitelist_enabled:
-                        sw(
-                            p
-                            + 'ip-whitelist',
-                        ),
-                    data_retention: sel(
-                        p + 'retention',
                     ),
                 });
                 showToast(

@@ -15,6 +15,7 @@ import {
 import { navigateTo } from '../app/core';
 import {
     getProjects,
+    getProjectEntity,
     putProject,
     type ProjectStatus,
     isProjectStatus,
@@ -163,10 +164,12 @@ export async function init(): Promise<void> {
         '[data-project-card]',
         'data-project-card',
         async (id, newPosition) => {
-            await putProject(
-                id,
-                { position: newPosition },
-            );
+            const entity =
+                await getProjectEntity(id);
+            await putProject(id, {
+                ...entity,
+                position: newPosition,
+            });
             const updated =
                 await getProjects();
             presenter.update(updated);

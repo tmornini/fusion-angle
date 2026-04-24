@@ -179,7 +179,7 @@ export class ProjectView {
     }
 }
 
-export async function getProjectById(
+export async function getProject(
     projectId: string,
 ): Promise<ProjectView> {
     const [
@@ -215,9 +215,17 @@ export async function getProjectById(
     );
 }
 
+export async function getProjectEntity(
+    id: string,
+): Promise<ProjectEntity> {
+    return GET<ProjectEntity>(
+        `projects/${id}`,
+    );
+}
+
 export async function putProject(
     id: string,
-    entity: Partial<ProjectEntity>,
+    entity: Omit<ProjectEntity, 'id'>,
 ): Promise<void> {
     await PUT(`projects/${id}`, entity);
     projectChanged.send();

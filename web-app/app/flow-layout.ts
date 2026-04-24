@@ -127,7 +127,8 @@ export function computeLayout(
         throw new Error('Flow has no start node');
     }
 
-    const { forwardEdges } = removeCycles(nodes, edges);
+    const { forwardEdges, reversedIds } =
+        removeCycles(nodes, edges);
 
     const baseLayers = assignLayers(nodes, forwardEdges);
     const aug = insertDummies(baseLayers, forwardEdges);
@@ -174,6 +175,7 @@ export function computeLayout(
             return finalizeLayout(
                 sugiPos, aug.edges,
                 canvasWidth, canvasHeight, nodes,
+                reversedIds,
             );
         }
     }
@@ -184,6 +186,7 @@ export function computeLayout(
     return finalizeLayout(
         natural, aug.edges,
         canvasWidth, canvasHeight, nodes,
+        reversedIds,
     );
 }
 
@@ -193,6 +196,7 @@ function finalizeLayout(
     canvasW: number,
     canvasH: number,
     nodes: readonly LayoutInput[],
+    reversedIds: ReadonlySet<string>,
 ): LayoutResult {
     const fitted = fitToCanvas(
         natural, canvasW, canvasH, nodes,
@@ -208,7 +212,7 @@ function finalizeLayout(
         }
     }
     const waypoints = extractWaypoints(
-        edges, dummyPositions,
+        edges, dummyPositions, reversedIds,
     );
     return { positions, waypoints };
 }
@@ -274,6 +278,7 @@ function insertDummies(
 function extractWaypoints(
     edges: readonly AugmentedEdge[],
     dummyPositions: Map<string, Position>,
+    reversedIds: ReadonlySet<string>,
 ): Map<string, Position[]> {
     const result = new Map<string, Position[]>();
     for (const e of edges) {
@@ -281,9 +286,14 @@ function extractWaypoints(
             !isDummy(e.fromId)
             && !isDummy(e.toId)
         ) continue;
-        const key = edgeWaypointKey(
-            e.origFromId, e.origToId,
+        const originalKey = edgeWaypointKey(
+            e.origToId, e.origFromId,
         );
+        const key = reversedIds.has(originalKey)
+            ? originalKey
+            : edgeWaypointKey(
+                e.origFromId, e.origToId,
+            );
         const list = result.get(key) ?? [];
         if (isDummy(e.toId)) {
             const pos =
@@ -291,6 +301,12 @@ function extractWaypoints(
             if (pos) list.push(pos);
         }
         result.set(key, list);
+    }
+    for (const key of reversedIds) {
+        const list = result.get(key);
+        if (list && list.length > 1) {
+            result.set(key, [...list].reverse());
+        }
     }
     return result;
 }

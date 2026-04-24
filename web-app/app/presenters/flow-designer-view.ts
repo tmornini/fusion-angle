@@ -33,11 +33,11 @@ export function buildFieldRow(
 ): SafeHtml {
     const req = field.isRequired
         ? html`<span class="${
-            'text-xs wf-required-mark'
+            'text-xs flow-required-mark'
         }"> *</span>`
         : html``;
     return html`<div
-class="wf-field-row"
+class="flow-field-row"
 data-field-id="${field.id}">
 ${buildFieldBadge(field.fieldType)}
 <span class="text-sm"
@@ -58,7 +58,7 @@ export function buildFieldEditor(
         return html``;
     }
     return html`<div
-class="wf-field-editor"
+class="flow-field-editor"
 data-node-id="${nodeId}">
 <h4 class="text-sm font-semibold mb-2"
     >Add Field</h4>
@@ -121,7 +121,7 @@ export function buildFlowNameHeader(
             'flex items-center'
             + ' gap-2'
         }">
-<input class="input wf-name-input"
+<input class="input flow-name-input"
     id="flow-name-input"
     value="${flowName}" />
 <button class="${
@@ -143,7 +143,7 @@ export function buildFlowNameHeader(
 }">${flowName}</h2>
 <button class="${
     'btn btn-ghost btn-icon'
-    + ' wf-name-edit-btn'
+    + ' flow-name-edit-btn'
 }" id="flow-name-edit-btn"
     >${iconEdit(14, '')}</button>
 </div>`;
@@ -160,8 +160,8 @@ export function buildNodePanel(
         const kind = node.isStart
             ? 'Start' : 'End';
         return html`<div
-class="wf-props-panel">
-<div class="wf-props-header"
+class="flow-props-panel">
+<div class="flow-props-header"
 ><h3 class="text-sm font-semibold"
     >${kind} State</h3>
 <button
@@ -192,8 +192,8 @@ class="text-sm text-muted"
     const lockAttr =
         trusted(isLocked ? ' disabled' : '');
     return html`<div
-class="wf-props-panel">
-<div class="wf-props-header"
+class="flow-props-panel">
+<div class="flow-props-header"
 ><h3 class="text-sm font-semibold"
     >State Properties</h3>
 <button
@@ -253,8 +253,8 @@ export function buildEdgePanel(
     const lockAttr =
         trusted(isLocked ? ' disabled' : '');
     return html`<div
-class="wf-props-panel">
-<div class="wf-props-header"
+class="flow-props-panel">
+<div class="flow-props-header"
 ><h3 class="text-sm font-semibold"
     >Transition Properties</h3>
 <button
@@ -299,8 +299,8 @@ export function buildToolbar(
     canDelete: boolean,
 ): SafeHtml {
     return html`<div
-class="wf-toolbar">
-<div class="wf-toolbar-group">
+class="flow-toolbar">
+<div class="flow-toolbar-group">
 <button
     class="btn btn-ghost btn-icon"
     data-action="undo"
@@ -316,8 +316,8 @@ class="wf-toolbar">
     trusted(canRedo ? '' : ' disabled')
     }>${iconRedo(18, '')}</button>
 </div>
-<div class="wf-toolbar-spacer"></div>
-<div class="wf-toolbar-group">
+<div class="flow-toolbar-spacer"></div>
+<div class="flow-toolbar-group">
 <button
     class="btn btn-ghost btn-icon"
     data-action="zoom-out"
@@ -331,8 +331,8 @@ class="wf-toolbar">
     aria-label="Zoom in"
     >${iconPlus(18, '')}</button>
 </div>
-<div class="wf-toolbar-spacer"></div>
-<div class="wf-toolbar-group">
+<div class="flow-toolbar-spacer"></div>
+<div class="flow-toolbar-group">
 <button
     class="btn btn-ghost btn-icon"
     data-action="copy-mermaid"
@@ -346,8 +346,8 @@ class="wf-toolbar">
     aria-label="Export ZIP"
     >${iconDownload(18, '')}</button>
 </div>
-<div class="wf-toolbar-spacer"></div>
-<div class="wf-toolbar-group">
+<div class="flow-toolbar-spacer"></div>
+<div class="flow-toolbar-group">
 <button
     class="btn btn-ghost btn-icon"
     data-action="delete-selected"

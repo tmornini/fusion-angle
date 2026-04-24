@@ -5,14 +5,7 @@ import type { SafeHtml } from '../safe-html';
 import { log } from '../logger';
 import { showToast } from '../toast';
 import {
-    putNode,
-    putGraph,
-    putGraphSilent,
-    putWfEdge,
     putFlow,
-    putFlowLocked,
-    putFlowAutoLayout,
-    putFlowAutoFit,
     postNodeAddition,
     postEdgeConnection,
     postFieldAddition,
@@ -25,6 +18,7 @@ import {
     deleteFlowVersion,
     putFlowFromVersion,
 } from '../adapters';
+import type { FlowEntity } from '../../../api/types';
 import type {
     GraphNode,
     GraphEdge,
@@ -32,7 +26,7 @@ import type {
     FlowGraph,
     FlowVersion,
 } from '../adapters/flows';
-import type { WfFieldType }
+import type { FlowFieldType }
     from '../adapters/flows';
 import {
     jsonObjectField,
@@ -105,6 +99,7 @@ interface DesignerState {
     isAutoLayout: boolean;
     isAutoFit: boolean;
     lockTimeout: number;
+    createdAt: string;
     isEditingName: boolean;
     nodes: GraphNode[];
     edges: GraphEdge[];
@@ -138,7 +133,7 @@ function emptyWaypoints(
     return new Map<string, Waypoint[]>();
 }
 
-// Must match .wf-props-panel width in pages.css
+// Must match .flow-props-panel width in pages.css
 // (18rem = 288px at 16px root).
 const PANEL_WIDTH_PX = 288;
 
@@ -174,6 +169,7 @@ export class FlowDesignerPresenter {
             isAutoLayout: graph.isAutoLayout,
             isAutoFit: graph.isAutoFit,
             lockTimeout: graph.lockTimeout,
+            createdAt: graph.createdAt,
             isEditingName: false,
             nodes: graph.nodes,
             edges: graph.edges,
@@ -200,10 +196,52 @@ export class FlowDesignerPresenter {
         this.#state.isLocked = g.isLocked;
         this.#state.lockTimeout =
             g.lockTimeout;
+        this.#state.createdAt = g.createdAt;
         this.#state.nodes = g.nodes;
         this.#state.edges = g.edges;
         this.#state.interaction
             .selection = { kind: 'none' };
+    }
+
+    #buildFlowEntity(
+    ): Omit<FlowEntity, 'id'> {
+        return {
+            name: this.#state.flowName,
+            description:
+                this.#state.flowDescription,
+            is_locked: this.#state.isLocked,
+            is_auto_layout:
+                this.#state.isAutoLayout,
+            is_auto_fit:
+                this.#state.isAutoFit,
+            lock_timeout:
+                this.#state.lockTimeout,
+            graph: jsonObjectField({
+                nodes: this.#state
+                    .nodes as unknown as
+                    Record<string, unknown>[],
+                edges: this.#state
+                    .edges as unknown as
+                    Record<string, unknown>[],
+            }),
+            created_at:
+                this.#state.createdAt,
+            updated_at: nowUtc(),
+        };
+    }
+
+    async #saveFlow(
+        versioned: boolean,
+    ): Promise<void> {
+        if (versioned) {
+            await postFlowVersion(
+                this.#state.flowId,
+            );
+        }
+        await putFlow(
+            this.#state.flowId,
+            this.#buildFlowEntity(),
+        );
     }
 
     async #handleMutationError(
@@ -240,9 +278,7 @@ export class FlowDesignerPresenter {
         if (next && this.#state.isEditingName) {
             this.#state.isEditingName = false;
         }
-        void putFlowLocked(
-            this.#state.flowId, next,
-        );
+        void this.#saveFlow(false);
     }
 
     isAutoLayout(): boolean {
@@ -253,9 +289,7 @@ export class FlowDesignerPresenter {
         const next =
             !this.#state.isAutoLayout;
         this.#state.isAutoLayout = next;
-        void putFlowAutoLayout(
-            this.#state.flowId, next,
-        );
+        void this.#saveFlow(false);
         if (next) {
             this.reconcileLayout();
         }
@@ -268,9 +302,7 @@ export class FlowDesignerPresenter {
     toggleAutoFit(): void {
         const next = !this.#state.isAutoFit;
         this.#state.isAutoFit = next;
-        void putFlowAutoFit(
-            this.#state.flowId, next,
-        );
+        void this.#saveFlow(false);
         if (next) {
             this.#applyZoomToFit();
         }
@@ -302,10 +334,7 @@ export class FlowDesignerPresenter {
         name = name.trim();
         this.#state.flowName = name;
         this.#state.isEditingName = false;
-        void putFlow(
-            this.#state.flowId,
-            { name },
-        );
+        void this.#saveFlow(true);
         this.#noteMutation();
     }
 
@@ -333,6 +362,11 @@ export class FlowDesignerPresenter {
             name: this.#state.flowName,
             description:
                 this.#state.flowDescription,
+            isLocked: this.#state.isLocked,
+            isAutoLayout:
+                this.#state.isAutoLayout,
+            isAutoFit:
+                this.#state.isAutoFit,
             lockTimeout:
                 this.#state.lockTimeout,
             graph: serializeGraph(
@@ -378,8 +412,14 @@ export class FlowDesignerPresenter {
         this.#state.flowDescription =
             graph.description;
         this.#state.isLocked = graph.isLocked;
+        this.#state.isAutoLayout =
+            graph.isAutoLayout;
+        this.#state.isAutoFit =
+            graph.isAutoFit;
         this.#state.lockTimeout =
             graph.lockTimeout;
+        this.#state.createdAt =
+            graph.createdAt;
         this.#state.nodes = graph.nodes;
         this.#state.edges = graph.edges;
         this.#state.interaction
@@ -412,11 +452,7 @@ export class FlowDesignerPresenter {
                     n.positionY - cy,
             }),
         );
-        void putGraphSilent({
-            flowId: this.#state.flowId,
-            nodes: this.#state.nodes,
-            edges: this.#state.edges,
-        });
+        void this.#saveFlow(false);
     }
 
     selectedNodeId(): string | null {
@@ -500,7 +536,7 @@ export class FlowDesignerPresenter {
         // Center the selection in the visible canvas
         // region (the area not covered by the panel).
         // The panel is anchored at the left edge of
-        // .wf-canvas-area with width PANEL_WIDTH_PX,
+        // .flow-canvas-area with width PANEL_WIDTH_PX,
         // so visible X spans [PANEL_WIDTH_PX, canvasW].
         // Solving for vb.x such that selX lands at the
         // visible center yields:
@@ -632,8 +668,8 @@ export class FlowDesignerPresenter {
         const autoFitChecked =
             String(this.#state.isAutoFit);
         const content = html`<div
-class="wf-designer">
-<div class="wf-designer-header">
+class="flow-designer">
+<div class="flow-designer-header">
 <div class="${
     'flex items-center gap-4'
 }">
@@ -650,7 +686,7 @@ class="wf-designer">
 <div class="flex flex-col gap-2">
 <label class="${
     'flex items-center gap-2'
-    + ' text-sm wf-lock-label'
+    + ' text-sm flow-lock-label'
 }"><button class="switch"
     role="switch"
     aria-checked="${lockedChecked}"
@@ -660,7 +696,7 @@ class="wf-designer">
 Locked</label>
 <label class="${
     'flex items-center gap-2'
-    + ' text-sm wf-lock-label'
+    + ' text-sm flow-lock-label'
 }"><button class="switch"
     role="switch"
     aria-checked="${autoLayoutChecked}"
@@ -670,7 +706,7 @@ Locked</label>
 Auto Layout</label>
 <label class="${
     'flex items-center gap-2'
-    + ' text-sm wf-lock-label'
+    + ' text-sm flow-lock-label'
 }"><button class="switch"
     role="switch"
     aria-checked="${autoFitChecked}"
@@ -681,10 +717,10 @@ Auto Fit</label>
 </div>
 </div>
 </div>
-<div class="wf-designer-body">
+<div class="flow-designer-body">
 ${toolbar}
-<div class="wf-canvas-area">${panel}
-<div class="wf-canvas-wrap"
+<div class="flow-canvas-area">${panel}
+<div class="flow-canvas-wrap"
     >${canvas}</div>
 </div>
 </div>
@@ -718,11 +754,7 @@ ${toolbar}
                     positionY: u.y,
                 };
             });
-        void putGraph({
-            flowId: fId,
-            nodes: this.#state.nodes,
-            edges: this.#state.edges,
-        });
+        void this.#saveFlow(true);
         this.#noteMutation();
         this.reconcileLayout();
     }
@@ -871,7 +903,6 @@ ${toolbar}
         const ids = this
             .#deletableNodeIds();
         if (ids.length === 0) return false;
-        const fId = this.#state.flowId;
         const idSet = new Set(ids);
         const nextNodes =
             this.#state.nodes.filter(
@@ -887,13 +918,15 @@ ${toolbar}
                         e.toNodeId,
                     ),
             );
+        const prevNodes = this.#state.nodes;
+        const prevEdges = this.#state.edges;
+        this.#state.nodes = nextNodes;
+        this.#state.edges = nextEdges;
         try {
-            await putGraph({
-                flowId: fId,
-                nodes: nextNodes,
-                edges: nextEdges,
-            });
+            await this.#saveFlow(true);
         } catch (err) {
+            this.#state.nodes = prevNodes;
+            this.#state.edges = prevEdges;
             await this
                 .#handleMutationError(
                     err,
@@ -902,8 +935,6 @@ ${toolbar}
                 );
             return false;
         }
-        this.#state.nodes = nextNodes;
-        this.#state.edges = nextEdges;
         this.#noteMutation();
         this.#state.interaction
             .selection = { kind: 'none' };
@@ -1058,11 +1089,7 @@ ${toolbar}
                 this.#state.edges,
                 result.waypoints,
             );
-        void putGraphSilent({
-            flowId: this.#state.flowId,
-            nodes: this.#state.nodes,
-            edges: this.#state.edges,
-        });
+        void this.#saveFlow(false);
     }
 
     updateNodeName(
@@ -1073,18 +1100,13 @@ ${toolbar}
         const nodeId = this
             .#singleSelectedNodeId();
         if (!nodeId) return;
-        const fId = this.#state.flowId;
         this.#state.nodes =
             this.#state.nodes.map(
                 n => n.id === nodeId
                     ? { ...n, name }
                     : n,
             );
-        void putNode({
-            flowId: fId,
-            nodeId,
-            fields: { name },
-        });
+        void this.#saveFlow(true);
         this.#noteMutation();
     }
 
@@ -1096,7 +1118,6 @@ ${toolbar}
         const nodeId = this
             .#singleSelectedNodeId();
         if (!nodeId) return;
-        const fId = this.#state.flowId;
         this.#state.nodes =
             this.#state.nodes.map(
                 n => n.id === nodeId
@@ -1106,13 +1127,7 @@ ${toolbar}
                     }
                     : n,
             );
-        void putNode({
-            flowId: fId,
-            nodeId,
-            fields: {
-                description: desc,
-            },
-        });
+        void this.#saveFlow(true);
         this.#noteMutation();
     }
 
@@ -1126,18 +1141,13 @@ ${toolbar}
                 .selection;
         if (sel.kind !== 'edge') return;
         const edgeId = sel.edgeId;
-        const fId = this.#state.flowId;
         this.#state.edges =
             this.#state.edges.map(
                 e => e.id === edgeId
                     ? { ...e, name }
                     : e,
             );
-        void putWfEdge({
-            flowId: fId,
-            edgeId,
-            fields: { name },
-        });
+        void this.#saveFlow(true);
         this.#noteMutation();
     }
 
@@ -1151,7 +1161,6 @@ ${toolbar}
                 .selection;
         if (sel.kind !== 'edge') return;
         const edgeId = sel.edgeId;
-        const fId = this.#state.flowId;
         this.#state.edges =
             this.#state.edges.map(
                 e => e.id === edgeId
@@ -1161,13 +1170,7 @@ ${toolbar}
                     }
                     : e,
             );
-        void putWfEdge({
-            flowId: fId,
-            edgeId,
-            fields: {
-                description: desc,
-            },
-        });
+        void this.#saveFlow(true);
         this.#noteMutation();
     }
 
@@ -1211,7 +1214,7 @@ ${toolbar}
             return false;
         }
         const typed =
-            fieldType as WfFieldType;
+            fieldType as FlowFieldType;
         const newField: GraphField = {
             id: fieldId,
             name,
@@ -1870,7 +1873,7 @@ ${toolbar}
             + ' stroke-width="2"'
             + ' opacity="0.3"'
             + ' marker-end='
-            + '"url(#wf-arrow)"'
+            + '"url(#flow-arrow)"'
             + ' pointer-events='
             + '"none"/>'
             + '<g transform="translate('

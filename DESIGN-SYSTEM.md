@@ -68,6 +68,23 @@ All grays are derived from blue tones for brand cohesion. **Never use pure black
 - Button text on primary: **6.8:1** ✓
 - Status text on soft bg: **5.1:1+** ✓
 
+### Variants via `[data-tone]` and `[data-level]`
+
+Components apply semantic variants through `data-*` attributes on a base class rather than distinct class names. Presenters emit the attribute value; the attribute selectors in `components.css` bind it to the matching token set. The TypeScript enum returned by `toneFor*()` / `levelFor*()` helpers and the CSS selectors share a single source of truth.
+
+```html
+<div class="icon-box" data-tone="success">…</div>
+<div class="progress-bar" data-level="warning" style="--progress-fill:60%">…</div>
+```
+
+**`[data-tone]` values**: `primary`, `success`, `warning`, `error`, `info`, `muted`.
+Applied to: `.pill`, `.icon-box`, `.status-dot`, `.legend-dot`, `.btn-outline`, `.action-card`, `.stat-cell`.
+
+**`[data-level]` values**: `normal`, `warning`, `danger`.
+Applied to: `.progress-bar`, `.gauge` fill regions.
+
+Helper naming: `toneFor*(status)` returns a `[data-tone]` value, `levelFor*(value)` returns a `[data-level]` value. Replaces the older `styleFor*` pattern that returned inline-style strings.
+
 ## 4. Spacing System (8pt Grid)
 
 | Token | Value | Pixels |

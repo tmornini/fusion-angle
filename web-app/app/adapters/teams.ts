@@ -47,7 +47,7 @@ export async function getManagedUsers(
 
 export async function putUser(
     id: string,
-    entity: Partial<UserEntity>,
+    entity: Omit<UserEntity, 'id'>,
 ): Promise<void> {
     await PUT(`users/${id}`, entity);
 }

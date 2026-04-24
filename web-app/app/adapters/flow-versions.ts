@@ -1,18 +1,24 @@
 import {
-    GET, PUT, POST, DELETE,
+    GET, PUT, DELETE,
 } from '../../../api/api';
 import type {
     FlowEntity,
     FlowVersionEntity,
     JsonObjectField,
 } from '../../../api/types';
-import { nowUtc } from '../../../api/types';
+import {
+    nowUtc,
+    toBool,
+} from '../../../api/types';
 
 export interface FlowVersion {
     id: string;
     flowId: string;
     name: string;
     description: string;
+    isLocked: boolean;
+    isAutoLayout: boolean;
+    isAutoFit: boolean;
     lockTimeout: number;
     graph: JsonObjectField;
     createdAt: string;
@@ -28,6 +34,11 @@ function toFlowVersion(
         flowId: row.flow_id,
         name: row.name,
         description: row.description,
+        isLocked: toBool(row.is_locked),
+        isAutoLayout: toBool(
+            row.is_auto_layout,
+        ),
+        isAutoFit: toBool(row.is_auto_fit),
         lockTimeout: row.lock_timeout,
         graph: row.graph,
         createdAt: row.created_at,
@@ -56,6 +67,9 @@ export async function postFlowVersion(
         flow_id: flowId,
         name: flow.name,
         description: flow.description,
+        is_locked: flow.is_locked,
+        is_auto_layout: flow.is_auto_layout,
+        is_auto_fit: flow.is_auto_fit,
         lock_timeout: flow.lock_timeout,
         graph: flow.graph,
         created_at: nowUtc(),
@@ -102,11 +116,18 @@ export async function deleteFlowVersion(
 export async function putFlowFromVersion(
     version: FlowVersion,
 ): Promise<void> {
+    const current = await GET<FlowEntity>(
+        'flows/' + version.flowId,
+    );
     await PUT('flows/' + version.flowId, {
         name: version.name,
         description: version.description,
+        is_locked: version.isLocked,
+        is_auto_layout: version.isAutoLayout,
+        is_auto_fit: version.isAutoFit,
         lock_timeout: version.lockTimeout,
         graph: version.graph,
+        created_at: current.created_at,
         updated_at: nowUtc(),
     });
 }

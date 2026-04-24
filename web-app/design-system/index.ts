@@ -67,14 +67,14 @@ function buildShadowBox(
     </div>`;
 }
 
-const WF_BLUE = '#4B6CA1';
-const WF_WARN = '#d97706';
-const WF_GREEN = '#16a34a';
+const FLOW_BLUE = '#4B6CA1';
+const FLOW_WARN = '#d97706';
+const FLOW_GREEN = '#16a34a';
 
 const NW = 140;
 const NH = 56;
 
-function buildWfDefs(): string {
+function buildFlowDefs(): string {
     return '<defs>'
         + '<marker id="ds-arrow"'
         + ' viewBox="0 0 10 10"'
@@ -84,7 +84,7 @@ function buildWfDefs(): string {
         + ' orient="auto">'
         + '<path d="M 0 0 L 10 5'
         + ' L 0 10 z"'
-        + ` fill="${WF_BLUE}"/>`
+        + ` fill="${FLOW_BLUE}"/>`
         + '</marker>'
         + '<marker id="ds-arrow-warn"'
         + ' viewBox="0 0 10 10"'
@@ -94,7 +94,7 @@ function buildWfDefs(): string {
         + ' orient="auto">'
         + '<path d="M 0 0 L 10 5'
         + ' L 0 10 z"'
-        + ` fill="${WF_WARN}"/>`
+        + ` fill="${FLOW_WARN}"/>`
         + '</marker>'
         + '<marker id="ds-arrow-ok"'
         + ' viewBox="0 0 10 10"'
@@ -104,12 +104,12 @@ function buildWfDefs(): string {
         + ' orient="auto">'
         + '<path d="M 0 0 L 10 5'
         + ' L 0 10 z"'
-        + ` fill="${WF_GREEN}"/>`
+        + ` fill="${FLOW_GREEN}"/>`
         + '</marker>'
         + '</defs>';
 }
 
-function buildWfNodeSvg(
+function buildFlowNodeSvg(
     label: string,
     subtitle: string,
     borderColor: string,
@@ -117,7 +117,7 @@ function buildWfNodeSvg(
 ): SafeHtml {
     const halfW = NW / 2;
     const sw = isComplete ? 3
-        : borderColor === WF_GREEN
+        : borderColor === FLOW_GREEN
             ? 2.5 : 2;
     let inner = '<rect'
         + ` width="${NW}"`
@@ -133,7 +133,7 @@ function buildWfNodeSvg(
             + ` width="${NW - 8}"`
             + ` height="${NH - 8}"`
             + ' rx="7" fill="none"'
-            + ` stroke="${WF_GREEN}"`
+            + ` stroke="${FLOW_GREEN}"`
             + ' stroke-width="1.5"/>';
     }
     const labelY = subtitle === '' ? 34 : 22;
@@ -180,7 +180,7 @@ function buildWfNodeSvg(
     );
 }
 
-function buildWfEdgeSvg(
+function buildFlowEdgeSvg(
     label: string,
     color: string,
     markerRef: string,
@@ -198,7 +198,7 @@ function buildWfEdgeSvg(
     const lh = 20;
     return trusted(
         `<svg width="${w}" height="${h}">`
-        + buildWfDefs()
+        + buildFlowDefs()
         + '<path'
         + ` d="M ${x1} ${y}`
         + ` L ${x2} ${y}"`
@@ -231,7 +231,7 @@ function buildWfEdgeSvg(
     );
 }
 
-function buildWfPortSvg(
+function buildFlowPortSvg(
     color: string,
     label: string,
 ): SafeHtml {
@@ -250,7 +250,7 @@ function buildWfPortSvg(
     );
 }
 
-function buildWfPropPanel(): SafeHtml {
+function buildFlowPropPanel(): SafeHtml {
     return html`
     <div class="ds-prop-panel">
         <h4 class="${''
@@ -1682,10 +1682,10 @@ export async function init(): Promise<void> {
                     <code class="${''
                         }text-xs text-muted">${''
                         }Start Node</code>
-                    ${buildWfNodeSvg(
+                    ${buildFlowNodeSvg(
                         'Start',
                         '',
-                        WF_GREEN,
+                        FLOW_GREEN,
                         false,
                     )}
                 </div>
@@ -1693,10 +1693,10 @@ export async function init(): Promise<void> {
                     <code class="${''
                         }text-xs text-muted">${''
                         }Standard Node</code>
-                    ${buildWfNodeSvg(
+                    ${buildFlowNodeSvg(
                         'Data Capture',
                         '8 fields',
-                        WF_BLUE,
+                        FLOW_BLUE,
                         false,
                     )}
                 </div>
@@ -1704,10 +1704,10 @@ export async function init(): Promise<void> {
                     <code class="${''
                         }text-xs text-muted">${''
                         }Complete Node</code>
-                    ${buildWfNodeSvg(
+                    ${buildFlowNodeSvg(
                         'End',
                         '',
-                        WF_GREEN,
+                        FLOW_GREEN,
                         true,
                     )}
                 </div>
@@ -1721,9 +1721,9 @@ export async function init(): Promise<void> {
                     <code class="${''
                         }text-xs text-muted">${''
                         }Forward Edge</code>
-                    ${buildWfEdgeSvg(
+                    ${buildFlowEdgeSvg(
                         'submit',
-                        WF_BLUE,
+                        FLOW_BLUE,
                         'url(#ds-arrow)',
                         false,
                     )}
@@ -1732,9 +1732,9 @@ export async function init(): Promise<void> {
                     <code class="${''
                         }text-xs text-muted">${''
                         }Cycle Edge</code>
-                    ${buildWfEdgeSvg(
+                    ${buildFlowEdgeSvg(
                         'needs revision',
-                        WF_WARN,
+                        FLOW_WARN,
                         'url(#ds-arrow-warn)',
                         true,
                     )}
@@ -1743,9 +1743,9 @@ export async function init(): Promise<void> {
                     <code class="${''
                         }text-xs text-muted">${''
                         }Completion Edge</code>
-                    ${buildWfEdgeSvg(
+                    ${buildFlowEdgeSvg(
                         'approve',
-                        WF_GREEN,
+                        FLOW_GREEN,
                         'url(#ds-arrow-ok)',
                         false,
                     )}
@@ -1760,31 +1760,31 @@ export async function init(): Promise<void> {
                     <code class="${''
                         }text-xs text-muted">${''
                         }Standard</code>
-                    ${buildWfPortSvg(
-                        WF_BLUE, 'port',
+                    ${buildFlowPortSvg(
+                        FLOW_BLUE, 'port',
                     )}
                 </div>
                 <div class="ds-stack">
                     <code class="${''
                         }text-xs text-muted">${''
                         }Start / End</code>
-                    ${buildWfPortSvg(
-                        WF_GREEN, 'port',
+                    ${buildFlowPortSvg(
+                        FLOW_GREEN, 'port',
                     )}
                 </div>
                 <div class="ds-stack">
                     <code class="${''
                         }text-xs text-muted">${''
                         }Cycle</code>
-                    ${buildWfPortSvg(
-                        WF_WARN, 'port',
+                    ${buildFlowPortSvg(
+                        FLOW_WARN, 'port',
                     )}
                 </div>
             </div>
 
             <h3 class="font-semibold">${''
                 }Properties Panel</h3>
-            ${buildWfPropPanel()}
+            ${buildFlowPropPanel()}
         </section>
     </div>`);
 }

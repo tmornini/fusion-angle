@@ -277,7 +277,7 @@ function bindSvgInteractions(
     signal: AbortSignal,
 ): void {
     const svg = container.querySelector(
-        'svg.wf-canvas',
+        'svg.flow-canvas',
     ) as SVGSVGElement | null;
     if (!svg) return;
     const state =
@@ -805,7 +805,7 @@ export async function init(
         );
     renderAndBind(container, presenter);
     const initialWrap = container.querySelector(
-        '.wf-canvas-wrap',
+        '.flow-canvas-wrap',
     );
     if (initialWrap instanceof HTMLElement) {
         const w = initialWrap.clientWidth;
@@ -820,7 +820,7 @@ export async function init(
     }
     const ro = new ResizeObserver(() => {
         const liveWrap = container.querySelector(
-            '.wf-canvas-wrap',
+            '.flow-canvas-wrap',
         );
         if (!(liveWrap instanceof HTMLElement)) {
             return;

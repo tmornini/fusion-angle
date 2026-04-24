@@ -606,12 +606,12 @@ export class ProjectDetailPresenter {
                 <div class="${
                     'flex flex-col gap-3'
                 }">
-                    ${flows.map(wf =>
+                    ${flows.map(flow =>
                         html`
                         <a
                             href="#"
                             data-flow-id="${
-                                wf.id
+                                flow.id
                             }"
                             class="${
                                 'card card-hover'
@@ -637,16 +637,16 @@ export class ProjectDetailPresenter {
                                         'font-medium'
                                         + ' text-sm'
                                     }">
-                                        ${wf.name}
+                                        ${flow.name}
                                     </p>
-                                    ${wf.description
+                                    ${flow.description
                                         ? html`<p
                                             class="${
                                                 'text-xs'
                                                 + ' text-'
                                                 + 'muted'
                                             }">${
-                                                wf
+                                                flow
                                                 .description
                                             }</p>`
                                         : html``}
@@ -662,7 +662,7 @@ export class ProjectDetailPresenter {
                                             + ' text-xs'
                                         }">
                                         ${String(
-                                            wf
+                                            flow
                                             .nodeCount,
                                         )} nodes
                                     </span>
@@ -674,7 +674,7 @@ export class ProjectDetailPresenter {
                                             + ' text-xs'
                                         }">
                                         ${String(
-                                            wf
+                                            flow
                                             .edgeCount,
                                         )} edges
                                     </span>

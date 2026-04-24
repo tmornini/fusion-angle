@@ -946,14 +946,14 @@
   min-height: 0;
 }
 
-.wf-designer {
+.flow-designer {
   display: flex;
   flex-direction: column;
   flex: 1;
   min-height: 0;
 }
 
-.wf-designer-header {
+.flow-designer-header {
   padding: var(--space-4) var(--space-6);
 }
 
@@ -968,12 +968,12 @@ html[data-page="flow-detail"] #page-root {
   display: flex;
   flex-direction: column;
 }
-html[data-page="flow-detail"] .wf-designer-header {
+html[data-page="flow-detail"] .flow-designer-header {
   border-bottom:
       1px solid hsl(var(--border));
 }
 
-.wf-toolbar {
+.flow-toolbar {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -986,63 +986,63 @@ html[data-page="flow-detail"] .wf-designer-header {
       1px solid hsl(var(--border));
 }
 
-.wf-toolbar-group {
+.flow-toolbar-group {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: var(--space-2);
 }
 
-.wf-toolbar-spacer {
+.flow-toolbar-spacer {
   flex: 1;
 }
 
-.wf-designer-body {
+.flow-designer-body {
   display: flex;
   flex-direction: row;
   flex: 1;
   min-height: 0;
 }
 
-.wf-toolbar .btn {
+.flow-toolbar .btn {
   border: 1px solid hsl(var(--border));
 }
-.wf-toolbar .btn:hover {
+.flow-toolbar .btn:hover {
   border-color: transparent;
 }
 
-.wf-toolbar-toggle.wf-toolbar-toggle-on {
+.flow-toolbar-toggle.flow-toolbar-toggle-on {
   background-color: hsl(var(--primary));
   color: hsl(var(--primary-foreground));
   border-color: hsl(var(--primary));
 }
-.wf-toolbar-toggle.wf-toolbar-toggle-on:hover {
+.flow-toolbar-toggle.flow-toolbar-toggle-on:hover {
   background-color: hsl(var(--primary));
   color: hsl(var(--primary-foreground));
   border-color: hsl(var(--primary));
 }
 
-.wf-canvas-wrap.wf-pan-cursor,
-.wf-canvas-wrap.wf-pan-cursor *,
-.wf-canvas-wrap.wf-pan-cursor [data-node-id],
-.wf-canvas-wrap.wf-pan-cursor [data-edge-id],
-.wf-canvas-wrap.wf-pan-cursor [data-connect-port] {
+.flow-canvas-wrap.flow-pan-cursor,
+.flow-canvas-wrap.flow-pan-cursor *,
+.flow-canvas-wrap.flow-pan-cursor [data-node-id],
+.flow-canvas-wrap.flow-pan-cursor [data-edge-id],
+.flow-canvas-wrap.flow-pan-cursor [data-connect-port] {
   cursor: grab;
 }
-.wf-canvas-wrap.wf-pan-cursor:active,
-.wf-canvas-wrap.wf-pan-cursor:active *,
-.wf-canvas-wrap.wf-pan-cursor:active [data-node-id],
-.wf-canvas-wrap.wf-pan-cursor:active [data-edge-id],
-.wf-canvas-wrap.wf-pan-cursor:active [data-connect-port] {
+.flow-canvas-wrap.flow-pan-cursor:active,
+.flow-canvas-wrap.flow-pan-cursor:active *,
+.flow-canvas-wrap.flow-pan-cursor:active [data-node-id],
+.flow-canvas-wrap.flow-pan-cursor:active [data-edge-id],
+.flow-canvas-wrap.flow-pan-cursor:active [data-connect-port] {
   cursor: grabbing;
 }
 
-.wf-canvas-wrap.wf-pan-cursor {
+.flow-canvas-wrap.flow-pan-cursor {
   outline: 2px solid hsl(var(--primary));
   outline-offset: -2px;
 }
 
-.wf-marquee {
+.flow-marquee {
   fill: hsl(var(--primary) / 0.12);
   stroke: hsl(var(--primary));
   stroke-width: 1;
@@ -1051,14 +1051,14 @@ html[data-page="flow-detail"] .wf-designer-header {
   pointer-events: none;
 }
 
-.wf-canvas-area {
+.flow-canvas-area {
   position: relative;
   flex: 1;
   min-height: 0;
   overflow: hidden;
 }
 
-.wf-canvas-wrap {
+.flow-canvas-wrap {
   width: 100%;
   height: 100%;
   background-color:
@@ -1069,22 +1069,26 @@ html[data-page="flow-detail"] .wf-designer-header {
   cursor: cell;
 }
 
-.wf-canvas-wrap:active {
+.flow-canvas-wrap:active {
   cursor: cell;
 }
 
-svg.wf-canvas {
+svg.flow-canvas {
   width: 100%;
   height: 100%;
   display: block;
   user-select: none;
 }
 
-svg.wf-canvas.wf-canvas-locked #wf-grid circle {
+svg.flow-canvas.flow-canvas-locked .flow-grid-bg {
   fill: hsl(var(--yellow-300));
 }
 
-.wf-props-panel {
+svg.flow-canvas.flow-canvas-locked #flow-grid circle {
+  fill: hsl(var(--blue-900));
+}
+
+.flow-props-panel {
   position: absolute;
   top: 0;
   left: 0;
@@ -1102,7 +1106,7 @@ svg.wf-canvas.wf-canvas-locked #wf-grid circle {
       slide-in-left 0.2s var(--ease-out);
 }
 
-.wf-field-row {
+.flow-field-row {
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -1114,7 +1118,7 @@ svg.wf-canvas.wf-canvas-locked #wf-grid circle {
   font-size: var(--text-sm);
 }
 
-.wf-field-editor {
+.flow-field-editor {
   margin-top: var(--space-2);
   padding: var(--space-3);
   background-color:
@@ -1123,65 +1127,65 @@ svg.wf-canvas.wf-canvas-locked #wf-grid circle {
   border: 1px solid hsl(var(--border));
 }
 
-.wf-name-input {
+.flow-name-input {
   font-size: 1.125rem;
   font-weight: var(--font-weight-semibold);
   padding: var(--space-1) var(--space-2);
 }
 
-.wf-name-edit-btn {
+.flow-name-edit-btn {
   opacity: 0.5;
 }
 
-.wf-lock-label {
+.flow-lock-label {
   cursor: pointer;
   white-space: nowrap;
 }
 
-.wf-required-mark {
+.flow-required-mark {
   color: hsl(var(--error));
 }
 
-.wf-props-header {
+.flow-props-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
 
-svg.wf-canvas [data-node-id] {
+svg.flow-canvas [data-node-id] {
   transition:
       opacity var(--duration-fast)
       var(--ease-default);
   cursor: pointer;
 }
 
-svg.wf-canvas [data-node-id]:hover {
+svg.flow-canvas [data-node-id]:hover {
   opacity: 0.85;
 }
 
-svg.wf-canvas [data-connect-port] {
+svg.flow-canvas [data-connect-port] {
   cursor: crosshair;
 }
 
-svg.wf-canvas.wf-connecting {
+svg.flow-canvas.flow-connecting {
   cursor: crosshair;
 }
 
-svg.wf-canvas.wf-connecting
+svg.flow-canvas.flow-connecting
     [data-node-id]:hover {
   opacity: 1;
   cursor: copy;
 }
 
-svg.wf-canvas [data-edge-id] {
+svg.flow-canvas [data-edge-id] {
   cursor: pointer;
 }
 
 @media (max-width: 767px) {
-  .wf-designer-body {
+  .flow-designer-body {
     flex-direction: column;
   }
-  .wf-toolbar {
+  .flow-toolbar {
     flex-direction: row;
     flex-wrap: wrap;
     width: auto;
@@ -1191,13 +1195,13 @@ svg.wf-canvas [data-edge-id] {
         1px solid hsl(var(--border));
     gap: var(--space-2);
   }
-  .wf-toolbar-group {
+  .flow-toolbar-group {
     flex-direction: row;
   }
-  .wf-toolbar-spacer {
+  .flow-toolbar-spacer {
     display: none;
   }
-  .wf-props-panel {
+  .flow-props-panel {
     left: 0;
     right: 0;
     bottom: auto;
@@ -1264,7 +1268,7 @@ svg.wf-canvas [data-edge-id] {
    41. WORKBOX
    ========================================== */
 
-.wo-history-fields {
+.work-order-history-fields {
   display: grid;
   grid-template-columns: auto 1fr;
   gap: var(--space-1) var(--space-3);

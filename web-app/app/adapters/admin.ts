@@ -3,18 +3,18 @@ import {
 } from '../../../api/api';
 import type {
     UserEntity,
-    AccountEntity,
+    OrganizationEntity,
     CompanySettingsEntity,
     ActivityEntity,
     ActivityActorEntity,
 } from '../../../api/types';
 import {
-    toBool,
     Activity,
-    Account,
+    Organization,
     User,
+    jsonArrayField,
 } from '../../../api/types';
-export type { Account };
+export type { Organization };
 import {
     getUserMap,
     userName,
@@ -22,14 +22,14 @@ import {
 
 const RECENT_ACTIVITY_COUNT = 3;
 
-export async function getAccount(
-): Promise<Account> {
+export async function getOrganization(
+): Promise<Organization> {
     const [
         entity, settings,
         activities, userMap,
         activityActors,
     ] = await Promise.all([
-        GET<AccountEntity>('account'),
+        GET<OrganizationEntity>('organization'),
         GET<CompanySettingsEntity>(
             'company-settings',
         ),
@@ -44,7 +44,7 @@ export async function getAccount(
 
     if (!entity.plan)
         throw new Error(
-            'Account not configured',
+            'Organization not configured',
         );
 
     const actorMap = new Map(
@@ -75,7 +75,7 @@ export async function getAccount(
             };
         });
 
-    return new Account(
+    return new Organization(
         entity,
         settings.name,
         recent,
@@ -127,22 +127,30 @@ export async function getProfile(
 }
 
 export async function putProfile(
-    entity: Partial<UserEntity>,
+    profile: Profile,
 ): Promise<void> {
-    await PUT('users/current', entity);
+    const current =
+        await GET<UserEntity>('current-user');
+    const updated:
+        Omit<UserEntity, 'id'> = {
+            ...current,
+            first_name: profile.firstName,
+            last_name: profile.lastName,
+            email: profile.email,
+            phone: profile.phone,
+            role: profile.role,
+            department: profile.department,
+            bio: profile.bio,
+            strengths: jsonArrayField(
+                profile.strengths,
+            ),
+        };
+    await PUT('users/current', updated);
 }
 
 export interface CompanySettings {
     name: string;
     domain: string;
-    industry: string;
-    size: string;
-    timezone: string;
-    language: string;
-    isSsoEnforced: boolean;
-    isTwoFactorEnabled: boolean;
-    isIpWhitelistEnabled: boolean;
-    dataRetention: string;
 }
 
 export async function getCompanySettings(
@@ -154,28 +162,13 @@ export async function getCompanySettings(
     return {
         name: row.name,
         domain: row.domain,
-        industry: row.industry,
-        size: row.size,
-        timezone: row.timezone,
-        language: row.language,
-        isSsoEnforced:
-            toBool(row.is_sso_enforced),
-        isTwoFactorEnabled:
-            toBool(
-                row.is_two_factor_enabled,
-            ),
-        isIpWhitelistEnabled:
-            toBool(
-                row.is_ip_whitelist_enabled,
-            ),
-        dataRetention: row.data_retention,
     };
 }
 
 export async function putCompanySettings(
-    entity: Partial<CompanySettingsEntity>,
+    settings: CompanySettings,
 ): Promise<void> {
-    await PUT('company-settings', entity);
+    await PUT('company-settings', { ...settings });
 }
 
 export { Activity } from '../../../api/types';

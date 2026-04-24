@@ -11,7 +11,7 @@ export type Id = string;
 
 export type ConfidenceLevel = 'high' | 'medium' | 'low';
 
-export type WfFieldType =
+export type FlowFieldType =
     | 'text'
     | 'textarea'
     | 'number'
@@ -111,8 +111,8 @@ export function isConfidenceLevel(
     );
 }
 
-const WF_FIELD_TYPES:
-    readonly WfFieldType[]
+const FLOW_FIELD_TYPES:
+    readonly FlowFieldType[]
     = [
         'text', 'textarea', 'number',
         'date', 'select', 'checkbox',
@@ -122,11 +122,11 @@ const WF_FIELD_TYPES:
         'image',
     ];
 
-export function isWfFieldType(
+export function isFlowFieldType(
     v: string,
-): v is WfFieldType {
+): v is FlowFieldType {
     return includes(
-        WF_FIELD_TYPES, v,
+        FLOW_FIELD_TYPES, v,
     );
 }
 
@@ -555,22 +555,22 @@ export interface ProjectEntity {
     budget_label: string;
 }
 
-export interface TeamMembershipEntity {
+export interface TeamEntity {
     id: Id;
     role: string;
     type: string;
 }
 
-export interface TeamMembershipProjectEntity {
+export interface TeamProjectEntity {
     id: Id;
-    team_membership_id: Id;
+    team_id: Id;
     project_id: Id;
     created_at: string;
 }
 
-export interface TeamMembershipUserEntity {
+export interface TeamUserEntity {
     id: Id;
-    team_membership_id: Id;
+    team_id: Id;
     user_id: Id;
     created_at: string;
 }
@@ -589,7 +589,7 @@ export interface ActivityEntity {
 export interface GraphField {
     id: string;
     name: string;
-    fieldType: WfFieldType;
+    fieldType: FlowFieldType;
     sortOrder: number;
     isRequired: boolean;
     options: string[];
@@ -639,6 +639,9 @@ export interface FlowVersionEntity {
     flow_id: Id;
     name: string;
     description: string;
+    is_locked: boolean;
+    is_auto_layout: boolean;
+    is_auto_fit: boolean;
     lock_timeout: number;
     graph: JsonObjectField;
     created_at: string;
@@ -689,17 +692,9 @@ export interface CompanySettingsEntity {
     id: Id;
     name: string;
     domain: string;
-    industry: string;
-    size: string;
-    timezone: string;
-    language: string;
-    is_sso_enforced: StoredBoolean;
-    is_two_factor_enabled: StoredBoolean;
-    is_ip_whitelist_enabled: StoredBoolean;
-    data_retention: string;
 }
 
-export interface AccountEntity {
+export interface OrganizationEntity {
     id: Id;
     plan: string;
     plan_status: string;
@@ -1333,7 +1328,7 @@ export interface RecentActivityItem {
     time: string;
 }
 
-export class Account {
+export class Organization {
     readonly #companyName: string;
     readonly #plan: string;
     readonly #planStatus: string;
@@ -1356,7 +1351,7 @@ export class Account {
         RecentActivityItem[];
 
     constructor(
-        entity: AccountEntity,
+        entity: OrganizationEntity,
         companyName: string,
         recentActivity:
             RecentActivityItem[],

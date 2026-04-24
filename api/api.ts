@@ -1,6 +1,26 @@
 import type { DbAdapter } from './db';
 import { EntityNotFound } from './db';
 import { nowUtc } from './types';
+import type {
+    UserEntity,
+    IdeaEntity,
+    ProjectEntity,
+    ActivityEntity,
+    IdeaSubmissionEntity,
+    ActivityActorEntity,
+    TeamEntity,
+    TeamProjectEntity,
+    TeamUserEntity,
+    FlowEntity,
+    FlowVersionEntity,
+    ProjectFlowEntity,
+    WorkOrderEntity,
+    FlowWorkOrderEntity,
+    WorkOrderTransitionEntity,
+    WorkOrderClaimEntity,
+    CompanySettingsEntity,
+    OrganizationEntity,
+} from './types';
 
 export class ApiError {
     constructor(
@@ -92,6 +112,13 @@ function param(
     return value;
 }
 
+function fields<T extends { id: string }>(
+    body: Record<string, unknown>,
+): Omit<T, 'id'> {
+    const { id: _id, ...rest } = body;
+    return rest as Omit<T, 'id'>;
+}
+
 const routes: Route[] = [
     route('users', {
         get: (db) => db.users.getAll(),
@@ -113,31 +140,29 @@ const routes: Route[] = [
         get: (db) =>
             db.activityActors.getAll(),
     }),
-    route('team-memberships', {
+    route('teams', {
         get: (db) =>
-            db.teamMemberships.getAll(),
+            db.teams.getAll(),
     }),
-    route('team-membership-projects', {
+    route('team-projects', {
         get: (db) =>
-            db.teamMembershipProjects
+            db.teamProjects
                 .getAll(),
     }),
-    route('team-membership-users', {
+    route('team-users', {
         get: (db) =>
-            db.teamMembershipUsers
+            db.teamUsers
                 .getAll(),
     }),
 
     route('flows', {
         get: (db) =>
             db.flows.getAll(),
-        put: async (db, _params, body) => {
-            const id =
-                body.id as string;
-            return db.flows.put(
-                id, body,
-            );
-        },
+        put: (db, _params, body) =>
+            db.flows.put(
+                body.id as string,
+                fields<FlowEntity>(body),
+            ),
     }),
     route('flows/:id', {
         get: (db, params) =>
@@ -146,7 +171,8 @@ const routes: Route[] = [
             ),
         put: (db, params, body) =>
             db.flows.put(
-                param(params, 0), body,
+                param(params, 0),
+                fields<FlowEntity>(body),
             ),
         delete: (db, params) =>
             db.flows.delete(
@@ -156,13 +182,11 @@ const routes: Route[] = [
     route('flow-versions', {
         get: (db) =>
             db.flowVersions.getAll(),
-        put: async (db, _params, body) => {
-            const id =
-                body.id as string;
-            return db.flowVersions.put(
-                id, body,
-            );
-        },
+        put: (db, _params, body) =>
+            db.flowVersions.put(
+                body.id as string,
+                fields<FlowVersionEntity>(body),
+            ),
     }),
     route('flow-versions/:id', {
         get: (db, params) =>
@@ -178,14 +202,11 @@ const routes: Route[] = [
         get: (db) =>
             db.projectFlows
                 .getAll(),
-        put: async (
-            db, _params, body,
-        ) => {
-            const id =
-                body.id as string;
-            return db.projectFlows
-                .put(id, body);
-        },
+        put: (db, _params, body) =>
+            db.projectFlows.put(
+                body.id as string,
+                fields<ProjectFlowEntity>(body),
+            ),
     }),
     route('project-flows/:id', {
         delete: (db, params) =>
@@ -196,15 +217,11 @@ const routes: Route[] = [
     route('work-orders', {
         get: (db) =>
             db.workOrders.getAll(),
-        put: async (
-            db, _params, body,
-        ) => {
-            const id =
-                body.id as string;
-            return db.workOrders.put(
-                id, body,
-            );
-        },
+        put: (db, _params, body) =>
+            db.workOrders.put(
+                body.id as string,
+                fields<WorkOrderEntity>(body),
+            ),
     }),
     route('work-orders/:id', {
         get: (db, params) =>
@@ -213,48 +230,44 @@ const routes: Route[] = [
             ),
         put: (db, params, body) =>
             db.workOrders.put(
-                param(params, 0), body,
+                param(params, 0),
+                fields<WorkOrderEntity>(body),
             ),
     }),
     route('flow-work-orders', {
         get: (db) =>
             db.flowWorkOrders.getAll(),
-        put: async (
-            db, _params, body,
-        ) => {
-            const id =
-                body.id as string;
-            return db.flowWorkOrders.put(
-                id, body,
-            );
-        },
+        put: (db, _params, body) =>
+            db.flowWorkOrders.put(
+                body.id as string,
+                fields<FlowWorkOrderEntity>(
+                    body,
+                ),
+            ),
     }),
     route('work-order-transitions', {
         get: (db) =>
             db.workOrderTransitions
                 .getAll(),
-        put: async (
-            db, _params, body,
-        ) => {
-            const id =
-                body.id as string;
-            return db
-                .workOrderTransitions
-                .put(id, body);
-        },
+        put: (db, _params, body) =>
+            db.workOrderTransitions.put(
+                body.id as string,
+                fields<
+                    WorkOrderTransitionEntity
+                >(body),
+            ),
     }),
     route('work-order-claims', {
         get: (db) =>
             db.workOrderClaims
                 .getAll(),
-        put: async (
-            db, _params, body,
-        ) => {
-            const id =
-                body.id as string;
-            return db.workOrderClaims
-                .put(id, body);
-        },
+        put: (db, _params, body) =>
+            db.workOrderClaims.put(
+                body.id as string,
+                fields<
+                    WorkOrderClaimEntity
+                >(body),
+            ),
     }),
     route('work-order-claims/:id', {
         delete: (db, params) =>
@@ -267,12 +280,20 @@ const routes: Route[] = [
         get: (db) =>
             db.companySettings.get(),
         put: (db, _, payload) =>
-            db.companySettings.put(payload),
+            db.companySettings.put(
+                fields<
+                    CompanySettingsEntity
+                >(payload),
+            ),
     }),
-    route('account', {
-        get: (db) => db.account.get(),
+    route('organization', {
+        get: (db) => db.organization.get(),
         put: (db, _, payload) =>
-            db.account.put(payload),
+            db.organization.put(
+                fields<OrganizationEntity>(
+                    payload,
+                ),
+            ),
     }),
     route('current-user', {
         get: (db) =>
@@ -285,7 +306,7 @@ const routes: Route[] = [
         put: (db, p, payload) =>
             db.users.put(
                 param(p, 0),
-                payload,
+                fields<UserEntity>(payload),
             ),
     }),
     route('ideas/:id', {
@@ -294,7 +315,7 @@ const routes: Route[] = [
         put: (db, p, payload) =>
             db.ideas.put(
                 param(p, 0),
-                payload,
+                fields<IdeaEntity>(payload),
             ),
         delete: (db, p) =>
             db.ideas.delete(param(p, 0)),
@@ -307,7 +328,7 @@ const routes: Route[] = [
         put: (db, p, payload) =>
             db.projects.put(
                 param(p, 0),
-                payload,
+                fields<ProjectEntity>(payload),
             ),
         delete: (db, p) =>
             db.projects.delete(param(p, 0)),
@@ -316,49 +337,61 @@ const routes: Route[] = [
         put: (db, p, payload) =>
             db.activities.put(
                 param(p, 0),
-                payload,
+                fields<ActivityEntity>(
+                    payload,
+                ),
             ),
     }),
     route('idea-submissions/:id', {
         put: (db, p, payload) =>
             db.ideaSubmissions.put(
                 param(p, 0),
-                payload,
+                fields<
+                    IdeaSubmissionEntity
+                >(payload),
             ),
     }),
     route('activity-actors/:id', {
         put: (db, p, payload) =>
             db.activityActors.put(
                 param(p, 0),
-                payload,
+                fields<
+                    ActivityActorEntity
+                >(payload),
             ),
     }),
-    route('team-memberships/:id', {
+    route('teams/:id', {
         put: (db, p, payload) =>
-            db.teamMemberships.put(
+            db.teams.put(
                 param(p, 0),
-                payload,
+                fields<
+                    TeamEntity
+                >(payload),
             ),
     }),
     route(
-        'team-membership-projects/:id',
+        'team-projects/:id',
         {
             put: (db, p, payload) =>
-                db.teamMembershipProjects
+                db.teamProjects
                     .put(
                         param(p, 0),
-                        payload,
+                        fields<
+                            TeamProjectEntity
+                        >(payload),
                     ),
         },
     ),
     route(
-        'team-membership-users/:id',
+        'team-users/:id',
         {
             put: (db, p, payload) =>
-                db.teamMembershipUsers
+                db.teamUsers
                     .put(
                         param(p, 0),
-                        payload,
+                        fields<
+                            TeamUserEntity
+                        >(payload),
                     ),
         },
     ),
@@ -370,11 +403,11 @@ const routes: Route[] = [
                 memberships,
                 tmUsers,
             ] = await Promise.all([
-                db.teamMembershipProjects
+                db.teamProjects
                     .getAll(),
-                db.teamMemberships
+                db.teams
                     .getAll(),
-                db.teamMembershipUsers
+                db.teamUsers
                     .getAll(),
             ]);
             const membershipIds = new Set(
@@ -385,13 +418,13 @@ const routes: Route[] = [
                     )
                     .map(
                         l =>
-                            l.team_membership_id,
+                            l.team_id,
                     ),
             );
             const userByMembership = new Map(
                 tmUsers.map(
                     u => [
-                        u.team_membership_id,
+                        u.team_id,
                         u.user_id,
                     ],
                 ),
@@ -445,30 +478,31 @@ const routes: Route[] = [
                 const tmId =
                     `tm-${pid}-${uid}`;
                 const membership =
-                    await db.teamMemberships
+                    await db.teams
                         .put(tmId, {
-                            id: tmId,
-                            role: payload.role,
-                            type: payload.type,
+                            role:
+                                payload.role as
+                                    string,
+                            type:
+                                payload.type as
+                                    string,
                         });
                 const projLinkId =
                     `tmp-${tmId}`;
                 const userLinkId =
                     `tmu-${tmId}`;
                 await Promise.all([
-                    db.teamMembershipProjects
+                    db.teamProjects
                         .put(projLinkId, {
-                            id: projLinkId,
-                            team_membership_id:
+                            team_id:
                                 tmId,
                             project_id: pid,
                             created_at:
                                 nowUtc(),
                         }),
-                    db.teamMembershipUsers
+                    db.teamUsers
                         .put(userLinkId, {
-                            id: userLinkId,
-                            team_membership_id:
+                            team_id:
                                 tmId,
                             user_id: uid,
                             created_at:

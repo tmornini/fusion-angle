@@ -15,7 +15,8 @@ import {
     initDialog, closeDialog,
 } from '../app/core';
 import {
-    getIdeaDetail,
+    getIdea,
+    getIdeaEntity,
     putIdea,
     ideaChanged,
     type Idea,
@@ -114,21 +115,28 @@ function bindIdeaEvents(
                     )!.value;
 
                 try {
+                    const entity =
+                        await getIdeaEntity(
+                            idea.idForLink(),
+                        );
                     await putIdea(
                         idea.idForLink(),
-                        trimStrings({
-                            title,
-                            problem_statement:
-                                problemStatement,
-                            target_users:
-                                targetUsers,
-                            proposed_solution:
-                                proposedSolution,
-                            expected_outcome:
-                                expectedOutcome,
-                            success_metrics:
-                                successMetrics,
-                        }),
+                        {
+                            ...entity,
+                            ...trimStrings({
+                                title,
+                                problem_statement:
+                                    problemStatement,
+                                target_users:
+                                    targetUsers,
+                                proposed_solution:
+                                    proposedSolution,
+                                expected_outcome:
+                                    expectedOutcome,
+                                success_metrics:
+                                    successMetrics,
+                            }),
+                        },
                     );
                 } catch (err) {
                     log.error(
@@ -152,7 +160,7 @@ function bindIdeaEvents(
 
     ideaChanged.subscribe(async () => {
         const updated =
-            await getIdeaDetail(
+            await getIdea(
                 idea.idForLink(),
             );
         mutateIdeaPage(
@@ -183,9 +191,17 @@ function bindIdeaEvents(
         'click',
         async () => {
             try {
-                await putIdea(idea.idForLink(), {
-                    status: 'in-review',
-                });
+                const entity =
+                    await getIdeaEntity(
+                        idea.idForLink(),
+                    );
+                await putIdea(
+                    idea.idForLink(),
+                    {
+                        ...entity,
+                        status: 'in-review',
+                    },
+                );
             } catch (err) {
                 log.error(
                     'putIdea failed',
@@ -217,9 +233,14 @@ function bindApprovalEvents(
         'click',
         async () => {
             try {
+                const entity =
+                    await getIdeaEntity(ideaId);
                 await putIdea(
                     ideaId,
-                    { status: 'approved' },
+                    {
+                        ...entity,
+                        status: 'approved',
+                    },
                 );
             } catch (err) {
                 log.error(
@@ -253,9 +274,14 @@ function bindApprovalEvents(
         'click',
         async () => {
             try {
+                const entity =
+                    await getIdeaEntity(ideaId);
                 await putIdea(
                     ideaId,
-                    { status: 'sent-back' },
+                    {
+                        ...entity,
+                        status: 'sent-back',
+                    },
                 );
             } catch (err) {
                 log.error(
@@ -316,7 +342,7 @@ export async function init(
     const idea = await withLoadingState(
         container,
         buildSkeleton('detail', 4),
-        () => getIdeaDetail(ideaId),
+        () => getIdea(ideaId),
         () => init(params),
     );
     if (!idea) return;

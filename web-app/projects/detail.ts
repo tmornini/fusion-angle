@@ -15,7 +15,8 @@ import {
     closeDialog,
 } from '../app/core';
 import {
-    getProjectById, putProject,
+    getProject, getProjectEntity,
+    putProject,
     getFlowsByProject,
     postFlowCreation,
     projectChanged,
@@ -150,21 +151,28 @@ function bindProjectEvents(
                 )!.value,
         );
         try {
+            const entity =
+                await getProjectEntity(
+                    project.idForLink(),
+                );
             await putProject(
                 project.idForLink(),
-                trimStrings({
-                    title,
-                    description,
-                    status,
-                    start_date: startDate,
-                    target_end_date:
-                        targetEndDate,
-                    estimated_cost:
-                        costBaseline
-                        * COST_DIVISOR,
-                    estimated_impact:
-                        impactBaseline,
-                }),
+                {
+                    ...entity,
+                    ...trimStrings({
+                        title,
+                        description,
+                        status,
+                        start_date: startDate,
+                        target_end_date:
+                            targetEndDate,
+                        estimated_cost:
+                            costBaseline
+                            * COST_DIVISOR,
+                        estimated_impact:
+                            impactBaseline,
+                    }),
+                },
             );
         } catch (err) {
             log.error(
@@ -185,9 +193,9 @@ function bindProjectEvents(
 
     projectChanged.subscribe(
         async () => {
-            const [upd, updWfs] =
+            const [upd, updFlows] =
                 await Promise.all([
-                    getProjectById(
+                    getProject(
                         project.idForLink(),
                     ),
                     getFlowsByProject(
@@ -195,7 +203,7 @@ function bindProjectEvents(
                     ),
                 ]);
             mutateProjectPage(
-                upd, updWfs, false,
+                upd, updFlows, false,
             );
         },
     );
@@ -364,14 +372,14 @@ export async function init(
     try {
         [project, flows] =
             await Promise.all([
-                getProjectById(projectId),
+                getProject(projectId),
                 getFlowsByProject(
                     projectId,
                 ),
             ]);
     } catch (err) {
         log.error(
-            'getProjectById failed',
+            'getProject failed',
             'projects',
             err,
         );

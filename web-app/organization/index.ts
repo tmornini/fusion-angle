@@ -8,15 +8,15 @@ import {
     navigateTo,
 } from '../app/core';
 import {
-    getAccount,
+    getOrganization,
 } from '../app/adapters';
 import {
-    AccountPresenter,
+    OrganizationPresenter,
 } from '../app/presenters';
 
 export async function init(): Promise<void> {
     const container =
-        $('#account-content', document);
+        $('#organization-content', document);
     if (!container) return;
 
     setHtml(
@@ -24,14 +24,14 @@ export async function init(): Promise<void> {
         buildSkeleton('detail', 4),
     );
 
-    let account: Awaited<
-        ReturnType<typeof getAccount>
+    let organization: Awaited<
+        ReturnType<typeof getOrganization>
     >;
     try {
-        account = await getAccount();
+        organization = await getOrganization();
     } catch (err) {
         log.error(
-            'getAccount failed',
+            'getOrganization failed',
             'organization',
             err,
         );
@@ -39,7 +39,7 @@ export async function init(): Promise<void> {
             container,
             buildErrorState(
                 'Failed to load'
-                + ' account data.',
+                + ' organization data.',
                 'Try Again',
             ),
         );
@@ -54,7 +54,7 @@ export async function init(): Promise<void> {
     }
 
     const presenter =
-        new AccountPresenter(account);
+        new OrganizationPresenter(organization);
     setHtml(
         container,
         presenter.buildPage(),

@@ -11,14 +11,14 @@ import {
 } from '../app/loading-states';
 import { navigateTo } from '../app/core';
 import {
-    getWorkboxItem,
+    getWorkOrderDetail,
     postWorkOrderTransition,
     postWorkOrderClaim,
     deleteWorkOrderClaim,
     getCurrentUser,
 } from '../app/adapters';
 import type {
-    WorkboxDetail,
+    WorkOrderDetail,
     HistoryEntry,
     HistoryFieldValue,
     GraphField,
@@ -197,7 +197,7 @@ function buildHistoryEntry(
     const valuesHtml = hasValues
         ? html`<div
             class="mt-2 ml-6
-                wo-history-fields">
+                work-order-history-fields">
             ${entry.fieldValues.map(
                 fv => html`
                 <span
@@ -238,13 +238,13 @@ function buildHistoryEntry(
 }
 
 function buildDetailView(
-    detail: WorkboxDetail,
+    detail: WorkOrderDetail,
 ): SafeHtml {
     const complete = detail.isComplete();
 
     const fields = complete
         ? html``
-        : html`<div id="wo-fields"
+        : html`<div id="work-order-fields"
             class="card mb-6 p-6">
             <h3 class="text-lg
                 font-semibold mb-4">
@@ -261,7 +261,7 @@ function buildDetailView(
 
     const transitions = complete
         ? html``
-        : html`<div id="wo-transitions"
+        : html`<div id="work-order-transitions"
             class="flex gap-3 mb-6
                 flex-wrap">
             ${detail.outgoingEdgeList().map(
@@ -281,11 +281,11 @@ function buildDetailView(
             Release Work Order
         </button>`;
 
-    return html`<div>
-        <div id="wo-header"
+    return html`<div class="content-wrap">
+        <div id="work-order-header"
             class="flex items-center
                 gap-4 mb-6">
-            <button id="wo-back-btn"
+            <button id="work-order-back-btn"
                 class="btn btn-ghost
                     btn-icon">
                 ${iconArrowLeft(20, '')}
@@ -320,7 +320,7 @@ function buildDetailView(
             ${unclaimBtn}
         </div>
 
-        <details id="wo-history" open>
+        <details id="work-order-history" open>
             <summary
                 class="text-lg
                     font-semibold mb-3
@@ -347,7 +347,7 @@ function buildDetailView(
 
 function initTransitionButtons(
     container: HTMLElement,
-    detail: WorkboxDetail,
+    detail: WorkOrderDetail,
     userId: string,
 ): void {
     const buttons =
@@ -425,7 +425,7 @@ function initTransitionButtons(
 
 function initUnclaimButton(
     container: HTMLElement,
-    detail: WorkboxDetail,
+    detail: WorkOrderDetail,
 ): void {
     const btn = $(
         '#unclaim-btn', container,
@@ -475,7 +475,7 @@ export async function init(
     }
 
     const container = $(
-        '#wo-detail-content', document,
+        '#work-order-detail-content', document,
     );
     if (!container) return;
 
@@ -486,7 +486,7 @@ export async function init(
         container,
         buildSkeleton('detail', 4),
         async () => {
-            let wo = await getWorkboxItem(
+            let wo = await getWorkOrderDetail(
                 id, user.idForLink(),
             );
             const claim =
@@ -499,7 +499,7 @@ export async function init(
                 await postWorkOrderClaim(
                     id, user.idForLink(),
                 );
-                wo = await getWorkboxItem(
+                wo = await getWorkOrderDetail(
                     id, user.idForLink(),
                 );
             }
@@ -515,7 +515,7 @@ export async function init(
     );
 
     const backBtn = $(
-        '#wo-back-btn', container,
+        '#work-order-back-btn', container,
     );
     if (backBtn) {
         backBtn.addEventListener(
