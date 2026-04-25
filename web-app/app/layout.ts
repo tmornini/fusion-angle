@@ -3,6 +3,7 @@ import {
         as persistSidebarCollapsed,
 } from './state';
 import { $required } from './dom';
+import { log } from './logger';
 import { showToast } from './toast';
 import {
     initActiveNavItem,
@@ -32,7 +33,12 @@ function initSidebar(): void {
             persistSidebarCollapsed(
                 isCollapsed,
             );
-        } catch {
+        } catch (err) {
+            log.warn(
+                'sidebar persist failed',
+                'layout',
+                err,
+            );
             showToast(
                 'Failed to save'
                 + ' sidebar state.',

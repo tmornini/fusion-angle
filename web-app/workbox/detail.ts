@@ -410,6 +410,8 @@ function initTransitionButtons(
                             + ' #'
                             + detail
                                 .displayIdText(),
+                        status: '',
+                        feedback: '',
                     });
                     showToast(
                         'Transition'

@@ -1,15 +1,10 @@
-import {
-    $, $$, $input, $select, $textarea,
-    attr, bindEnterToClick,
-} from '../app/dom';
+import { $ } from '../app/dom';
 import {
     ProfilePresenter,
+    type ProfileFieldKey,
 } from '../app/presenters';
-import {
-    html, setHtml,
-} from '../app/safe-html';
+import { setHtml } from '../app/safe-html';
 import { showToast } from '../app/toast';
-import { iconCheckCircle2 } from '../app/icons';
 import {
     buildErrorState,
 } from '../app/loading-states';
@@ -21,190 +16,23 @@ import {
     type Profile,
 } from '../app/adapters';
 
-const escapeController =
-    { current: new AbortController() };
+const pageAbort = new AbortController();
+const signal = pageAbort.signal;
 
-let currentProfile: Profile | null = null;
-let selectedStrengths: Set<string> =
-    new Set();
+let presenter: ProfilePresenter | null = null;
+let pageContainer: HTMLElement | null = null;
 
-function mutateProfilePage(
-    profile: Profile,
-    isEditing: boolean,
-): void {
-    currentProfile = profile;
-    selectedStrengths =
-        new Set(profile.strengths);
-    const container = $(
-        '#profile-content', document,
-    );
-    if (!container) return;
-    const presenter =
-        new ProfilePresenter(profile);
-    setHtml(
-        container,
-        presenter.buildPage(
-            isEditing,
-            selectedStrengths,
-        ),
-    );
-    bindProfileEvents(profile, isEditing);
-}
+const FIELDS: ReadonlySet<ProfileFieldKey> =
+    new Set([
+        'firstName', 'lastName', 'email',
+        'phone', 'role', 'department', 'bio',
+    ]);
 
-function bindProfileEvents(
-    profile: Profile,
-    isEditing: boolean,
-): void {
-    escapeController.current.abort();
-    escapeController.current =
-        new AbortController();
-    if (isEditing) {
-        document.addEventListener(
-            'keydown',
-            (e: KeyboardEvent) => {
-                if (e.key === 'Escape') {
-                    e.preventDefault();
-                    $(
-                        '#profile-cancel-btn',
-                        document,
-                    )?.click();
-                }
-            },
-            {
-                signal: escapeController
-                    .current.signal,
-            },
-        );
-        bindStrengthChips();
-        bindEditFieldEnter();
-    }
-    $('#profile-edit-btn', document)
-        ?.addEventListener(
-            'click',
-            () => mutateProfilePage(
-                profile, true,
-            ),
-        );
-    $('#profile-cancel-btn', document)
-        ?.addEventListener(
-            'click',
-            () => mutateProfilePage(
-                profile, false,
-            ),
-        );
-    $('#profile-save-btn', document)
-        ?.addEventListener(
-            'click',
-            handleSave,
-        );
-}
-
-function bindStrengthChips(): void {
-    $$('.strength-chip', document)
-        .forEach(chip => {
-            chip.addEventListener(
-                'click',
-                () => toggleChip(chip),
-            );
-        });
-}
-
-function toggleChip(
-    chip: HTMLElement,
-): void {
-    const name =
-        attr(chip, 'data-strength');
-    if (selectedStrengths.has(name)) {
-        selectedStrengths.delete(name);
-        chip.className =
-            'strength-chip btn'
-            + ' btn-secondary btn-sm';
-        chip.textContent = name;
-    } else {
-        selectedStrengths.add(name);
-        chip.className =
-            'strength-chip btn'
-            + ' btn-primary btn-sm';
-        setHtml(
-            chip,
-            html`${
-                iconCheckCircle2(12, '')
-            } ${name}`,
-        );
-    }
-}
-
-function bindEditFieldEnter(): void {
-    const saveSel = '#profile-save-btn';
-    bindEnterToClick(
-        '#profile-first-name', saveSel,
-    );
-    bindEnterToClick(
-        '#profile-last-name', saveSel,
-    );
-    bindEnterToClick(
-        '#profile-email', saveSel,
-    );
-    bindEnterToClick(
-        '#profile-phone', saveSel,
-    );
-    bindEnterToClick(
-        '#profile-role', saveSel,
-    );
-}
-
-async function handleSave(): Promise<void> {
-    if (!currentProfile) return;
-    const updated = readFormValues(
-        currentProfile,
-    );
-    try {
-        await putProfile(updated);
-    } catch (err) {
-        log.error(
-            'putProfile failed',
-            'profile',
-            err,
-        );
-        showToast(
-            'Failed to save profile',
-            'error',
-        );
-        return;
-    }
-    showToast('Profile saved', 'success');
-    mutateProfilePage(updated, false);
-}
-
-function readFormValues(
-    profile: Profile,
-): Profile {
-    return trimStrings({
-        firstName: $input(
-            '#profile-first-name', document,
-        )!.value,
-        lastName: $input(
-            '#profile-last-name', document,
-        )!.value,
-        email: $input(
-            '#profile-email', document,
-        )!.value,
-        phone: $input(
-            '#profile-phone', document,
-        )!.value,
-        role: $input(
-            '#profile-role', document,
-        )!.value,
-        department: $select(
-            '#profile-department', document,
-        )!.value,
-        bio: $textarea(
-            '#profile-bio', document,
-        )!.value,
-        strengths: [...selectedStrengths],
-        teamDimensions:
-            profile.teamDimensions,
-    });
+function isFieldKey(
+    s: string | null,
+): s is ProfileFieldKey {
+    return s !== null
+        && FIELDS.has(s as ProfileFieldKey);
 }
 
 export async function init(): Promise<void> {
@@ -212,6 +40,8 @@ export async function init(): Promise<void> {
         '#profile-content', document,
     );
     if (!container) return;
+    pageContainer = container;
+
     let profile: Profile;
     try {
         profile = await getProfile();
@@ -229,14 +59,154 @@ export async function init(): Promise<void> {
             ),
         );
         container
-            .querySelector(
-                '[data-retry-btn]',
-            )
+            .querySelector('[data-retry-btn]')
             ?.addEventListener(
                 'click',
                 () => init(),
+                { signal },
             );
         return;
     }
-    mutateProfilePage(profile, false);
+
+    presenter = new ProfilePresenter(profile);
+    presenter.renderShell(container);
+    bindStableListeners(container, presenter);
+}
+
+function bindStableListeners(
+    container: HTMLElement,
+    p: ProfilePresenter,
+): void {
+    container.addEventListener(
+        'click', e => onClick(e, container, p),
+        { signal },
+    );
+    container.addEventListener(
+        'input', e => onInput(e, p),
+        { signal },
+    );
+    container.addEventListener(
+        'change', e => onInput(e, p),
+        { signal },
+    );
+    container.addEventListener(
+        'keydown',
+        e => onContainerKeydown(e),
+        { signal },
+    );
+    document.addEventListener(
+        'keydown',
+        e => onDocumentKeydown(
+            e, container, p,
+        ),
+        { signal },
+    );
+}
+
+function onClick(
+    e: MouseEvent,
+    container: HTMLElement,
+    p: ProfilePresenter,
+): void {
+    const target = e.target as Element | null;
+    if (!target) return;
+
+    const actionEl = target.closest(
+        '[data-profile-action]',
+    );
+    const action = actionEl?.getAttribute(
+        'data-profile-action',
+    );
+    if (action === 'edit') {
+        p.beginEdit();
+        p.renderUpdate(container);
+        return;
+    }
+    if (action === 'cancel') {
+        p.cancelEdit();
+        p.renderUpdate(container);
+        return;
+    }
+    if (action === 'save') {
+        void handleSave();
+        return;
+    }
+
+    const chip = target.closest(
+        '.strength-chip',
+    );
+    if (chip && p.isEditing()) {
+        const name = chip.getAttribute(
+            'data-strength',
+        );
+        if (name) {
+            p.toggleStrength(name);
+            p.renderUpdate(container);
+        }
+    }
+}
+
+function onInput(
+    e: Event,
+    p: ProfilePresenter,
+): void {
+    const target = e.target as
+        | HTMLInputElement
+        | HTMLSelectElement
+        | HTMLTextAreaElement
+        | null;
+    if (!target) return;
+    const field = target.getAttribute(
+        'data-profile-field',
+    );
+    if (!isFieldKey(field)) return;
+    p.setDraftField(field, target.value);
+}
+
+function onContainerKeydown(
+    e: KeyboardEvent,
+): void {
+    if (e.key !== 'Enter') return;
+    const target = e.target as HTMLElement;
+    if (!target.matches('input.input')) return;
+    e.preventDefault();
+    e.stopPropagation();
+    void handleSave();
+}
+
+function onDocumentKeydown(
+    e: KeyboardEvent,
+    container: HTMLElement,
+    p: ProfilePresenter,
+): void {
+    if (e.key !== 'Escape') return;
+    if (!p.isEditing()) return;
+    e.preventDefault();
+    p.cancelEdit();
+    p.renderUpdate(container);
+}
+
+async function handleSave(): Promise<void> {
+    if (!presenter || !pageContainer) return;
+    if (!presenter.isEditing()) return;
+    const updated = trimStrings(
+        presenter.draft(),
+    );
+    try {
+        await putProfile(updated);
+    } catch (err) {
+        log.error(
+            'putProfile failed',
+            'profile',
+            err,
+        );
+        showToast(
+            'Failed to save profile',
+            'error',
+        );
+        return;
+    }
+    showToast('Profile saved', 'success');
+    presenter.update(updated);
+    presenter.renderUpdate(pageContainer);
 }

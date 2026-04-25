@@ -169,6 +169,8 @@ export async function init():
                     action:
                         'submitted new idea',
                     target: fd.title,
+                    status: '',
+                    feedback: '',
                 });
                 navigateTo('ideas');
             },

@@ -417,12 +417,16 @@ export async function init(
                         'converted idea to'
                         + ' project',
                     target: projectName,
+                    status: '',
+                    feedback: '',
                 });
                 await postActivity({
                     type: 'project_created',
                     action:
                         'created new project',
                     target: projectName,
+                    status: '',
+                    feedback: '',
                 });
                 showToast(
                     'Project created'

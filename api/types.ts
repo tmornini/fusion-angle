@@ -581,9 +581,8 @@ export interface ActivityEntity {
     action: string;
     target: string;
     timestamp: string;
-    score: number;
     status: string;
-    comment: string;
+    feedback: string;
 }
 
 export interface GraphField {
@@ -1238,9 +1237,8 @@ export class Activity {
     readonly #action: string;
     readonly #target: string;
     readonly #timestamp: string;
-    readonly #score: number;
     readonly #status: string;
-    readonly #comment: string;
+    readonly #feedback: string;
     readonly #actor: string;
 
     constructor(
@@ -1253,9 +1251,8 @@ export class Activity {
         this.#target = entity.target;
         this.#timestamp =
             entity.timestamp;
-        this.#score = entity.score;
         this.#status = entity.status;
-        this.#comment = entity.comment;
+        this.#feedback = entity.feedback;
         this.#actor = actor;
     }
 
@@ -1293,12 +1290,12 @@ export class Activity {
         return this.#status !== '';
     }
 
-    commentText(): string {
-        return this.#comment;
+    feedbackText(): string {
+        return this.#feedback;
     }
 
-    hasComment(): boolean {
-        return this.#comment !== '';
+    hasFeedback(): boolean {
+        return this.#feedback !== '';
     }
 
     actorName(): string {

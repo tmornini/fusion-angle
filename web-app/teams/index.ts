@@ -1,7 +1,6 @@
 import {
-    $, $$, $input, populateIcons,
+    $, $input, populateIcons,
 } from '../app/dom';
-import { html, setHtml } from '../app/safe-html';
 import { showToast } from '../app/toast';
 import {
     buildSkeleton, withLoadingState,
@@ -15,86 +14,20 @@ import {
 } from '../app/core';
 import { getTeamMembers } from '../app/adapters';
 import {
-    UserPresenter,
+    TeamListPresenter,
 } from '../app/presenters';
 
-function mutateList(
-    members: readonly UserPresenter[],
-    selectedMemberId: string | null,
-): void {
-    const search =
-        $input('#team-search', document)!
-            .value.toLowerCase();
-    const filtered = members.filter(
-        member => member.matchesSearch(search),
-    );
-    const list = $('#team-list', document);
-    if (list) {
-        setHtml(
-            list,
-            html`${filtered.map(
-                m => m.buildMemberCard(
-                    selectedMemberId,
-                ),
-            )}`,
-        );
-    }
+const pageAbort = new AbortController();
+const signal = pageAbort.signal;
 
-    const panel = $(
-        '#team-detail-panel', document,
-    );
-    const member = selectedMemberId
-        ? members.find(
-            candidate =>
-                candidate.idForLink()
-                === selectedMemberId,
-        )
-        : null;
-    if (panel) {
-        setHtml(
-            panel,
-            member
-                ? member.buildMemberDetail()
-                : html`
-            <div class="p-6 text-center">
-                ${iconUsers(48, 'text-muted')}
-                <p class="text-muted mt-4">
-                    ${'Select a team member'
-                        + ' to view details'}
-                </p>
-            </div>`,
-        );
-    }
-    bindCards(members);
-    bindDetailTabs();
-}
-
-function bindCards(
-    members: readonly UserPresenter[],
-): void {
-    $$('[data-member-card]', document)
-        .forEach(card => {
-            card.addEventListener(
-                'click',
-                () => mutateList(
-                    members,
-                    card.getAttribute(
-                        'data-member-card',
-                    ),
-                ),
-            );
-        });
-}
-
-function bindDetailTabs(): void {
-    initTabs(
-        '[data-tab]', '.tab-panel', 'active',
-    );
-}
+let presenter: TeamListPresenter | null = null;
+let listEl: HTMLElement | null = null;
+let panelEl: HTMLElement | null = null;
 
 export async function init(): Promise<void> {
-    const teamListEl =
-        $('#team-list', document);
+    const teamListEl = $(
+        '#team-list', document,
+    );
     if (!teamListEl) return;
 
     const result = await withLoadingState(
@@ -104,13 +37,13 @@ export async function init(): Promise<void> {
         init,
         {
             icon: iconUsers(24, ''),
-            title: 'No Team Members'
-                + ' Yet',
+            title: 'No Team Members Yet',
             description:
                 'Invite team members to start'
                 + ' collaborating on projects.',
         },
     );
+
     populateIcons([
         [
             '#activity-feed-btn-icon',
@@ -126,20 +59,42 @@ export async function init(): Promise<void> {
         ],
     ]);
 
-    initDialog(
-        'add-member',
-        'team-add-btn',
+    bindAddMemberDialog();
+
+    if (!result) return;
+
+    presenter = new TeamListPresenter(result);
+    listEl = teamListEl;
+    panelEl = $(
+        '#team-detail-panel', document,
     );
-    const sendBtn =
-        $('#add-member-send', document);
+
+    const summaryEl = $(
+        '#team-summary', document,
+    );
+    if (summaryEl) {
+        summaryEl.textContent =
+            presenter.summary();
+    }
+
+    presenter.renderList(listEl);
+    if (panelEl) {
+        presenter.renderDetail(panelEl);
+    }
+    bindStableListeners(listEl);
+}
+
+function bindAddMemberDialog(): void {
+    initDialog('add-member', 'team-add-btn');
+    const sendBtn = $(
+        '#add-member-send', document,
+    );
     sendBtn?.addEventListener(
         'click',
         () => {
-            const email =
-                $input(
-                    '#add-member-email',
-                    document,
-                )?.value;
+            const email = $input(
+                '#add-member-email', document,
+            )?.value;
             showToast(
                 email
                     ? 'Invitation sent to '
@@ -149,61 +104,66 @@ export async function init(): Promise<void> {
             );
             closeDialog('add-member');
         },
+        { signal },
     );
     $input(
         '#add-member-email', document,
     )?.addEventListener(
         'keydown',
-        (e) => {
+        e => {
             if (e.key === 'Enter') {
                 e.preventDefault();
                 sendBtn?.click();
             }
         },
+        { signal },
     );
+}
 
-    if (!result) return;
-    const members = result;
-    const presenters = members.map(
-        m => new UserPresenter(m),
+function bindStableListeners(
+    teamListEl: HTMLElement,
+): void {
+    teamListEl.addEventListener(
+        'click', onCardClick,
+        { signal },
     );
-
-    const summaryEl = $(
-        '#team-summary', document,
-    );
-    if (summaryEl) {
-        const word =
-            presenters.length === 1
-                ? 'member'
-                : 'members';
-        summaryEl.textContent =
-            presenters.length + ' ' + word
-            + ' \u2022 Manage roles,'
-            + ' strengths,'
-            + ' and availability';
-    }
-
-    const placeholderEl =
-        $(
-            '#team-detail-placeholder',
-            document,
-        );
-    if (placeholderEl) {
-        setHtml(placeholderEl, html`
-            ${iconUsers(48, 'text-muted')}
-            <p class="text-muted mt-4">
-                ${'Select a team member'
-                    + ' to view details'}
-            </p>`);
-    }
-
     $('#team-search', document)
         ?.addEventListener(
             'input',
-            () => mutateList(
-                presenters, null,
-            ),
+            onSearchInput,
+            { signal },
         );
+}
 
-    mutateList(presenters, null);
+function onCardClick(e: MouseEvent): void {
+    if (
+        !(e.target instanceof Element)
+        || !presenter
+    ) return;
+    const card = e.target.closest(
+        '[data-member-card]',
+    );
+    if (!card) return;
+    const id = card.getAttribute(
+        'data-member-card',
+    );
+    presenter.select(id);
+    if (listEl) {
+        presenter.renderList(listEl);
+    }
+    if (panelEl) {
+        presenter.renderDetail(panelEl);
+        initTabs(
+            '[data-tab]',
+            '.tab-panel',
+            'active',
+        );
+    }
+}
+
+function onSearchInput(e: Event): void {
+    if (!presenter || !listEl) return;
+    const target = e.target as HTMLInputElement;
+    presenter.setSearch(target.value);
+    presenter.renderList(listEl);
 }

@@ -100,13 +100,6 @@ export async function getFlowVersions(
         .map(toFlowVersion);
 }
 
-export async function getLatestFlowVersion(
-    flowId: string,
-): Promise<FlowVersion | null> {
-    const versions = await getFlowVersions(flowId);
-    return versions[0] ?? null;
-}
-
 export async function deleteFlowVersion(
     versionId: string,
 ): Promise<void> {

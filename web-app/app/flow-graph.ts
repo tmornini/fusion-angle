@@ -64,6 +64,10 @@ const LABEL_FONT = 11;
 
 const BEZIER_ORIGIN = 0;
 
+const NODE_ROLE = 'button';
+const EDGE_ROLE = 'button';
+const FOCUSABLE_TABINDEX = '0';
+
 export type RectEdge =
     'right' | 'left' | 'top' | 'bottom';
 
@@ -451,9 +455,17 @@ function buildNode(
             + '</circle>';
     }
 
+    const labelEsc = escapeForHtml(node.name);
+    const ariaCurrent = isSelected
+        ? ' aria-current="true"' : '';
     return trusted(
         '<g'
         + ` data-node-id="${node.id}"`
+        + ' class="flow-node"'
+        + ` role="${NODE_ROLE}"`
+        + ` tabindex="${FOCUSABLE_TABINDEX}"`
+        + ` aria-label="${labelEsc}"`
+        + ariaCurrent
         + ' transform="translate('
         + String(positionX)
         + ', '
@@ -461,6 +473,7 @@ function buildNode(
         + ')"'
         + selAttr
         + '>'
+        + `<title>${labelEsc}</title>`
         + inner
         + '</g>',
     );
@@ -634,7 +647,7 @@ function buildEdge(
 
     if (fromNode.isStart) {
         return trusted(
-            '<g>'
+            '<g aria-hidden="true">'
             + '<path'
             + ` d="${pathD}"`
             + ' fill="none"'
@@ -707,11 +720,25 @@ function buildEdge(
     const edgeSelAttr = isSelected
         ? ' filter="url(#flow-glow)"'
         : '';
+    const ariaCurrent = isSelected
+        ? ' aria-current="true"' : '';
+    const ariaLabel =
+        escapeForHtml(fromNode.name)
+        + ' to '
+        + escapeForHtml(toNode.name)
+        + ': '
+        + escapeForHtml(edge.name);
     return trusted(
         '<g'
         + ` data-edge-id="${edge.id}"`
+        + ' class="flow-edge"'
+        + ` role="${EDGE_ROLE}"`
+        + ` tabindex="${FOCUSABLE_TABINDEX}"`
+        + ` aria-label="${ariaLabel}"`
+        + ariaCurrent
         + edgeSelAttr
         + '>'
+        + `<title>${ariaLabel}</title>`
         + hitPath
         + visPath + visClose
         + labelBg
@@ -993,14 +1020,28 @@ export function buildGraphSvg(
             + ` y="${marqueeRect.y}"`
             + ` width="${marqueeRect.w}"`
             + ` height="${marqueeRect.h}"`
+            + ' aria-hidden="true"'
             + ' class="flow-marquee"/>';
     }
+
+    const stateLabel =
+        nodes.length === 1
+            ? '1 state' : `${nodes.length} states`;
+    const transitionLabel =
+        edges.length === 1
+            ? '1 transition'
+            : `${edges.length} transitions`;
+    const canvasLabel =
+        `Flow designer canvas: ${stateLabel}, `
+        + transitionLabel;
 
     return trusted(
         '<svg'
         + ' xmlns='
         + '"http://www.w3.org/2000/svg"'
         + ` class="${svgCls}"`
+        + ' role="application"'
+        + ` aria-label="${canvasLabel}"`
         + ` viewBox="${vb}"`
         + ' preserveAspectRatio='
         + '"xMidYMid meet"'

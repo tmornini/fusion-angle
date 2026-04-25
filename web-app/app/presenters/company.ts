@@ -1,6 +1,7 @@
 import {
-    html, SafeHtml,
+    html, setHtml, SafeHtml,
 } from '../safe-html';
+import { $ } from '../dom';
 import {
     iconBuilding, iconSave,
     iconEdit, iconX,
@@ -8,29 +9,98 @@ import {
 import type {
     Company,
 } from '../adapters';
+import type { EditMode } from './edit-mode';
+
+export type CompanyFieldKey =
+    | 'name' | 'domain';
 
 export class CompanyPresenter {
-    readonly #company: Company;
+    #company: Company;
+    #mode: EditMode<Company>
+        = { kind: 'reading' };
 
-    constructor(
-        company: Company,
-    ) {
+    constructor(company: Company) {
         this.#company = company;
     }
 
-    buildPage(
-        isEditing: boolean,
-    ): SafeHtml {
-        return html`
-    <div class="content-wrap">
-        ${this.#buildHeader(isEditing)}
-        ${this.#buildCard(isEditing)}
-    </div>`;
+    update(company: Company): void {
+        this.#company = company;
+        this.#mode = { kind: 'reading' };
     }
 
-    #buildHeader(
-        isEditing: boolean,
-    ): SafeHtml {
+    beginEdit(): void {
+        this.#mode = {
+            kind: 'editing',
+            draft: { ...this.#company },
+        };
+    }
+
+    cancelEdit(): void {
+        this.#mode = { kind: 'reading' };
+    }
+
+    isEditing(): boolean {
+        return this.#mode.kind === 'editing';
+    }
+
+    setDraftField(
+        field: CompanyFieldKey,
+        value: string,
+    ): void {
+        if (this.#mode.kind !== 'editing') {
+            throw new Error(
+                'setDraftField requires'
+                + ' editing mode',
+            );
+        }
+        this.#mode.draft[field] = value;
+    }
+
+    draft(): Company {
+        return this.#mode.kind === 'editing'
+            ? this.#mode.draft
+            : this.#company;
+    }
+
+    renderShell(
+        container: HTMLElement,
+    ): void {
+        setHtml(container, html`
+<div class="content-wrap">
+    <div class="company-header-slot"></div>
+    <div class="company-body-slot"></div>
+</div>`);
+        this.renderUpdate(container);
+    }
+
+    renderUpdate(
+        container: HTMLElement,
+    ): void {
+        this.#updateHeader(container);
+        this.#updateBody(container);
+    }
+
+    #updateHeader(
+        container: HTMLElement,
+    ): void {
+        const slot = $(
+            '.company-header-slot', container,
+        );
+        if (!slot) return;
+        setHtml(slot, this.#buildHeader());
+    }
+
+    #updateBody(
+        container: HTMLElement,
+    ): void {
+        const slot = $(
+            '.company-body-slot', container,
+        );
+        if (!slot) return;
+        setHtml(slot, this.#buildCard());
+    }
+
+    #buildHeader(): SafeHtml {
         return html`
         <div class="page-header">
             <div>
@@ -43,26 +113,24 @@ export class CompanyPresenter {
                     + ' configuration'
                 }</p>
             </div>
-            ${this.#buildHeaderButtons(
-                isEditing,
-            )}
+            ${this.#buildHeaderButtons()}
         </div>`;
     }
 
-    #buildHeaderButtons(
-        isEditing: boolean,
-    ): SafeHtml {
-        if (isEditing) {
+    #buildHeaderButtons(): SafeHtml {
+        if (this.isEditing()) {
             return html`
             <div class="flex gap-2">
                 <button class="${
                     'btn btn-outline gap-2'
-                }" id="company-cancel-btn">
+                }" id="company-cancel-btn"
+                    data-company-action="cancel">
                     ${iconX(16, '')} Cancel
                 </button>
                 <button class="${
                     'btn btn-primary gap-2'
-                }" id="company-save-btn">
+                }" id="company-save-btn"
+                    data-company-action="save">
                     ${iconSave(16, '')} Save
                 </button>
             </div>`;
@@ -70,14 +138,14 @@ export class CompanyPresenter {
         return html`
             <button class="${
                 'btn btn-outline gap-2'
-            }" id="company-edit-btn">
+            }" id="company-edit-btn"
+                data-company-action="edit">
                 ${iconEdit(16, '')} Edit
             </button>`;
     }
 
-    #buildCard(
-        isEditing: boolean,
-    ): SafeHtml {
+    #buildCard(): SafeHtml {
+        const c = this.draft();
         return html`
         <div class="${
             'card card-hover p-6 mb-6'
@@ -93,24 +161,24 @@ export class CompanyPresenter {
                 'grid grid-cols-2 gap-4'
             }">
                 ${this.#buildField(
-                    isEditing,
                     'company-name',
+                    'name',
                     'Company Name',
-                    this.#company.name,
+                    c.name,
                 )}
                 ${this.#buildField(
-                    isEditing,
                     'company-domain',
+                    'domain',
                     'Domain',
-                    this.#company.domain,
+                    c.domain,
                 )}
             </div>
         </div>`;
     }
 
     #buildField(
-        isEditing: boolean,
         id: string,
+        field: CompanyFieldKey,
         label: string,
         value: string,
     ): SafeHtml {
@@ -121,10 +189,13 @@ export class CompanyPresenter {
                     }" for="${id}">${
                         label
                     }</label>
-                    ${isEditing
+                    ${this.isEditing()
                         ? html`<input
                             class="input"
                             id="${id}"
+                            data-company-field="${
+                                field
+                            }"
                             value="${value}" />`
                         : html`<p class="${
                             'text-sm'

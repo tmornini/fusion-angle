@@ -1,12 +1,9 @@
-import {
-    $, $$, $textarea, $input, $select,
-    bindEnterToClick,
-} from '../app/dom';
-import { setHtml } from '../app/safe-html';
+import { $, $input } from '../app/dom';
 import { showToast } from '../app/toast';
 import {
     buildSkeleton, buildErrorState,
 } from '../app/loading-states';
+import { setHtml } from '../app/safe-html';
 import { log } from '../app/logger';
 import {
     navigateTo,
@@ -20,388 +17,348 @@ import {
     getFlowsByProject,
     postFlowCreation,
     projectChanged,
-    ProjectView,
-    isProjectStatus,
-    COST_DIVISOR,
+    type ProjectView,
 } from '../app/adapters';
 import type {
     FlowListItem,
-    ProjectStatus,
 } from '../app/adapters';
 import {
     ProjectDetailPresenter,
+    type ProjectFieldKey,
 } from '../app/presenters';
 
-const escapeController =
-    { current: new AbortController() };
+const pageAbort = new AbortController();
+const signal = pageAbort.signal;
 
-function bindProjectEvents(
-    project: ProjectView,
-    flows: FlowListItem[],
-    isEditing: boolean,
-): void {
-    escapeController.current.abort();
-    escapeController.current =
-        new AbortController();
-    if (isEditing) {
-        document.addEventListener(
-            'keydown',
-            (e: KeyboardEvent) => {
-                if (e.key === 'Escape') {
-                    e.preventDefault();
-                    $(
-                        '#project-cancel-btn',
-                        document,
-                    )?.click();
-                }
-            },
-            {
-                signal: escapeController
-                    .current.signal,
-            },
-        );
-        const saveSel =
-            '#project-save-btn';
-        bindEnterToClick(
-            '#project-edit-title',
-            saveSel,
-        );
-        bindEnterToClick(
-            '#project-edit-start-date',
-            saveSel,
-        );
-        bindEnterToClick(
-            '#project-edit-end-date',
-            saveSel,
-        );
-        bindEnterToClick(
-            '#project-edit-cost-baseline',
-            saveSel,
-        );
-        bindEnterToClick(
-            '#project-edit-impact-baseline',
-            saveSel,
-        );
-    }
-    $('#project-back-btn', document)
-        ?.addEventListener(
-                'click',
-                () => navigateTo('projects'),
-        );
+let presenter:
+    ProjectDetailPresenter | null = null;
+let pageContainer:
+    HTMLElement | null = null;
 
-    $('#project-edit-btn', document)
-        ?.addEventListener(
-            'click',
-            () => mutateProjectPage(
-                project, flows, true,
-            ),
-        );
+const FIELDS: ReadonlySet<ProjectFieldKey> =
+    new Set([
+        'title', 'description', 'status',
+        'startDate', 'targetEndDate',
+        'costBaseline', 'impactBaseline',
+    ]);
 
-    $('#project-cancel-btn', document)
-        ?.addEventListener(
-            'click',
-            () => mutateProjectPage(
-                project, flows, false,
-            ),
-        );
-
-    $('#project-save-btn', document)
-        ?.addEventListener(
-                'click',
-                async () => {
-        const title =
-                $input(
-                    '#project-edit-title',
-                    document,
-                )!.value;
-        const description =
-                $textarea(
-                    '#project-edit-description',
-                    document,
-                )!.value;
-        const statusValue =
-                $select(
-                    '#project-edit-status',
-                    document,
-                )!.value;
-        const status: ProjectStatus =
-                isProjectStatus(statusValue)
-                        ? statusValue
-                        : project.statusValue();
-        const startDate =
-                $input(
-                    '#project-edit-start-date',
-                    document,
-                )!.value;
-        const targetEndDate =
-                $input(
-                    '#project-edit-end-date',
-                    document,
-                )!.value;
-            const costBaseline = Number(
-                $input(
-                    '#project-edit-cost-baseline',
-                    document,
-                )!.value,
-        );
-        const impactBaseline = Number(
-                $input(
-                    '#project-edit-impact-baseline',
-                    document,
-                )!.value,
-        );
-        try {
-            const entity =
-                await getProjectEntity(
-                    project.idForLink(),
-                );
-            await putProject(
-                project.idForLink(),
-                {
-                    ...entity,
-                    ...trimStrings({
-                        title,
-                        description,
-                        status,
-                        start_date: startDate,
-                        target_end_date:
-                            targetEndDate,
-                        estimated_cost:
-                            costBaseline
-                            * COST_DIVISOR,
-                        estimated_impact:
-                            impactBaseline,
-                    }),
-                },
-            );
-        } catch (err) {
-            log.error(
-                'putProject failed',
-                'projects',
-                err,
-            );
-            showToast(
-                'Failed to save project',
-                'error',
-            );
-            return;
-        }
-        showToast(
-            'Project saved', 'success',
-        );
-    });
-
-    projectChanged.subscribe(
-        async () => {
-            const [upd, updFlows] =
-                await Promise.all([
-                    getProject(
-                        project.idForLink(),
-                    ),
-                    getFlowsByProject(
-                        project.idForLink(),
-                    ),
-                ]);
-            mutateProjectPage(
-                upd, updFlows, false,
-            );
-        },
-    );
-
-    $('#new-flow-btn', document)
-        ?.addEventListener(
-            'click',
-            () => openDialog('new-flow'),
-        );
-    bindNewFlowDialog(project.idForLink());
-
-    $$('[data-flow-id]', document)
-        .forEach(el => {
-            el.addEventListener(
-                'click',
-                (e) => {
-                    e.preventDefault();
-                    const wfId =
-                        el.getAttribute(
-                            'data-flow-id',
-                        );
-                    if (!wfId) return;
-                    navigateTo(
-                        'flow-detail',
-                        {
-                            flowId: wfId,
-                            projectId:
-                                project.idForLink(),
-                        },
-                    );
-                },
-            );
-        });
-}
-
-function bindNewFlowDialog(
-    projectId: string,
-): void {
-    const backdrop = $(
-        '#new-flow-backdrop', document,
-    );
-    $('#new-flow-cancel', document)
-        ?.addEventListener(
-            'click',
-            () => closeDialog('new-flow'),
-        );
-    backdrop?.addEventListener(
-        'click',
-        (e) => {
-            if (
-                e.target === e.currentTarget
-            ) {
-                closeDialog('new-flow');
-            }
-        },
-    );
-    $('#new-flow-submit', document)
-        ?.addEventListener(
-            'click',
-            async () => {
-                const nameEl = $input(
-                    '#new-flow-name',
-                    document,
-                );
-                const name =
-                    nameEl?.value.trim()
-                    ?? '';
-                if (name.length === 0) {
-                    showToast(
-                        'Flow name is'
-                        + ' required',
-                        'error',
-                    );
-                    return;
-                }
-                const wfId =
-                    crypto.randomUUID();
-                try {
-                    await postFlowCreation(
-                        {
-                            flowId: wfId,
-                            projectId,
-                            name,
-                            description: '',
-                        },
-                    );
-                } catch (err) {
-                    log.error(
-                        'postFlowCreation'
-                        + ' failed',
-                        'projects',
-                        err,
-                    );
-                    showToast(
-                        'Failed to create'
-                        + ' flow',
-                        'error',
-                    );
-                    return;
-                }
-                closeDialog('new-flow');
-                navigateTo(
-                    'flow-detail',
-                    {
-                        flowId: wfId,
-                        projectId,
-                    },
-                );
-            },
-        );
-    $input(
-        '#new-flow-name', document,
-    )?.addEventListener(
-        'keydown',
-        (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                $(
-                    '#new-flow-submit',
-                    document,
-                )?.click();
-            }
-        },
-    );
-}
-
-function mutateProjectPage(
-    project: ProjectView,
-    flows: FlowListItem[],
-    isEditing: boolean,
-): void {
-    const container = $(
-        '#project-detail-content', document,
-    );
-    if (!container) return;
-    const presenter =
-        new ProjectDetailPresenter(project);
-    setHtml(
-        container,
-        presenter.buildDetailView(
-            project.idForLink(), flows, isEditing,
-        ),
-    );
-    bindProjectEvents(
-        project, flows, isEditing,
-    );
+function isFieldKey(
+    s: string | null,
+): s is ProjectFieldKey {
+    return s !== null
+        && FIELDS.has(s as ProjectFieldKey);
 }
 
 export async function init(
     params?: Record<string, string>,
 ): Promise<void> {
     const projectId = params?.projectId;
-    if (!projectId) { navigateTo('projects'); return; }
+    if (!projectId) {
+        navigateTo('projects');
+        return;
+    }
 
     const container = $(
-            '#project-detail-content', document,
+        '#project-detail-content', document,
     );
     if (!container) return;
+    pageContainer = container;
     setHtml(
-            container,
-            buildSkeleton('detail', 4),
+        container, buildSkeleton('detail', 4),
     );
 
     let project: ProjectView;
     let flows: FlowListItem[];
     try {
-        [project, flows] =
-            await Promise.all([
-                getProject(projectId),
-                getFlowsByProject(
-                    projectId,
-                ),
-            ]);
+        [project, flows] = await Promise.all([
+            getProject(projectId),
+            getFlowsByProject(projectId),
+        ]);
     } catch (err) {
         log.error(
             'getProject failed',
-            'projects',
-            err,
+            'projects', err,
         );
         setHtml(
-                container,
-                buildErrorState(
-                        'Failed to load project'
-                        + ' details. The project'
-                        + ' may not exist.',
-                        'Try Again',
-                ),
+            container,
+            buildErrorState(
+                'Failed to load project'
+                + ' details. The project'
+                + ' may not exist.',
+                'Try Again',
+            ),
         );
         container
             .querySelector('[data-retry-btn]')
             ?.addEventListener(
-                    'click',
-                    () => init(params),
+                'click',
+                () => init(params),
+                { signal },
             );
         return;
     }
 
-    mutateProjectPage(
-        project, flows, false,
+    presenter = new ProjectDetailPresenter(
+        project, flows,
     );
+    presenter.renderShell(container);
+    bindStableListeners(container, presenter);
+
+    projectChanged.subscribe(async () => {
+        if (!presenter || !pageContainer) {
+            return;
+        }
+        const [upd, updFlows] =
+            await Promise.all([
+                getProject(projectId),
+                getFlowsByProject(projectId),
+            ]);
+        presenter.update(upd, updFlows);
+        presenter.renderUpdate(pageContainer);
+    });
+}
+
+function bindStableListeners(
+    container: HTMLElement,
+    p: ProjectDetailPresenter,
+): void {
+    container.addEventListener(
+        'click', e => onClick(e, container, p),
+        { signal },
+    );
+    container.addEventListener(
+        'input', e => onInput(e, p),
+        { signal },
+    );
+    container.addEventListener(
+        'change', e => onInput(e, p),
+        { signal },
+    );
+    container.addEventListener(
+        'keydown',
+        e => onContainerKeydown(e),
+        { signal },
+    );
+    document.addEventListener(
+        'keydown',
+        e => onDocumentKeydown(e, container, p),
+        { signal },
+    );
+}
+
+function onClick(
+    e: MouseEvent,
+    container: HTMLElement,
+    p: ProjectDetailPresenter,
+): void {
+    const target = e.target as Element | null;
+    if (!target) return;
+
+    if (handleDialogClicks(target)) return;
+    if (handleFlowCardClick(e, target, p)) {
+        return;
+    }
+    handleProjectActions(target, container, p);
+}
+
+function handleDialogClicks(
+    target: Element,
+): boolean {
+    if (target.classList.contains(
+        'dialog-backdrop',
+    )) {
+        const id = target.getAttribute(
+            'data-dialog-id',
+        );
+        if (id) closeDialog(id);
+        return true;
+    }
+    const openEl = target.closest(
+        '[data-dialog-open]',
+    );
+    if (openEl) {
+        const id = openEl.getAttribute(
+            'data-dialog-open',
+        );
+        if (id) openDialog(id);
+        return true;
+    }
+    const cancelEl = target.closest(
+        '[data-dialog-cancel]',
+    );
+    if (cancelEl) {
+        const id = cancelEl.getAttribute(
+            'data-dialog-cancel',
+        );
+        if (id) closeDialog(id);
+        return true;
+    }
+    return false;
+}
+
+function handleFlowCardClick(
+    e: MouseEvent,
+    target: Element,
+    p: ProjectDetailPresenter,
+): boolean {
+    const card = target.closest(
+        '[data-flow-id]',
+    );
+    if (!card) return false;
+    e.preventDefault();
+    const flowId = card.getAttribute(
+        'data-flow-id',
+    );
+    if (!flowId) return true;
+    navigateTo('flow-detail', {
+        flowId,
+        projectId: p.idForLink(),
+    });
+    return true;
+}
+
+function handleProjectActions(
+    target: Element,
+    container: HTMLElement,
+    p: ProjectDetailPresenter,
+): void {
+    const actionEl = target.closest(
+        '[data-project-action]',
+    );
+    const action = actionEl?.getAttribute(
+        'data-project-action',
+    );
+    if (!action) return;
+    switch (action) {
+        case 'back':
+            navigateTo('projects');
+            return;
+        case 'edit':
+            p.beginEdit();
+            p.renderUpdate(container);
+            return;
+        case 'cancel':
+            p.cancelEdit();
+            p.renderUpdate(container);
+            return;
+        case 'save':
+            void handleSave();
+            return;
+        case 'new-flow-submit':
+            void handleNewFlowSubmit(
+                p.idForLink(),
+            );
+            return;
+    }
+}
+
+function onInput(
+    e: Event,
+    p: ProjectDetailPresenter,
+): void {
+    const target = e.target as
+        | HTMLInputElement
+        | HTMLSelectElement
+        | HTMLTextAreaElement
+        | null;
+    if (!target) return;
+    const field = target.getAttribute(
+        'data-project-field',
+    );
+    if (!isFieldKey(field)) return;
+    p.setDraftField(field, target.value);
+}
+
+function onContainerKeydown(
+    e: KeyboardEvent,
+): void {
+    if (e.key !== 'Enter') return;
+    const target = e.target as HTMLElement;
+    if (!target.matches('input.input')) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (target.id === 'new-flow-name') {
+        const projectId =
+            presenter?.idForLink();
+        if (projectId) {
+            void handleNewFlowSubmit(projectId);
+        }
+        return;
+    }
+    void handleSave();
+}
+
+function onDocumentKeydown(
+    e: KeyboardEvent,
+    container: HTMLElement,
+    p: ProjectDetailPresenter,
+): void {
+    if (e.key !== 'Escape') return;
+    if (!p.isEditing()) return;
+    e.preventDefault();
+    p.cancelEdit();
+    p.renderUpdate(container);
+}
+
+async function handleSave(): Promise<void> {
+    if (!presenter) return;
+    if (!presenter.isEditing()) return;
+    const patch = presenter.buildEntityPatch();
+    const projectId = presenter.idForLink();
+    try {
+        const entity = await getProjectEntity(
+            projectId,
+        );
+        await putProject(projectId, {
+            ...entity,
+            ...trimStrings(patch),
+        });
+    } catch (err) {
+        log.error(
+            'putProject failed',
+            'projects', err,
+        );
+        showToast(
+            'Failed to save project', 'error',
+        );
+        return;
+    }
+    showToast('Project saved', 'success');
+}
+
+async function handleNewFlowSubmit(
+    projectId: string,
+): Promise<void> {
+    const nameEl = $input(
+        '#new-flow-name', document,
+    );
+    const name = nameEl?.value.trim() ?? '';
+    if (name.length === 0) {
+        showToast(
+            'Flow name is required', 'error',
+        );
+        return;
+    }
+    const flowId = crypto.randomUUID();
+    try {
+        await postFlowCreation({
+            flowId,
+            projectId,
+            name,
+            description: '',
+        });
+    } catch (err) {
+        log.error(
+            'postFlowCreation failed',
+            'projects', err,
+        );
+        showToast(
+            'Failed to create flow', 'error',
+        );
+        return;
+    }
+    closeDialog('new-flow');
+    navigateTo('flow-detail', {
+        flowId, projectId,
+    });
 }

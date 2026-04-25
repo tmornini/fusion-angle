@@ -58,6 +58,23 @@ export function $required(
     return el;
 }
 
+export function $inputRequired(
+    selector: string,
+    parent: ParentNode,
+): HTMLInputElement {
+    const el =
+        parent.querySelector<HTMLInputElement>(
+            selector,
+        );
+    if (!el) {
+        throw new Error(
+            'Required input not'
+            + ' found: ' + selector,
+        );
+    }
+    return el;
+}
+
 export function attr(
     el: Element,
     name: string,

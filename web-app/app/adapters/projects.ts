@@ -24,6 +24,7 @@ export const projectChanged =
 export {
     Project,
     type ProjectStatus,
+    type ProjectEntity,
     isProjectStatus,
     PROJECT_STATUS_CONFIG,
     COST_DIVISOR,

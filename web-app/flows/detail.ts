@@ -1,6 +1,5 @@
 import {
     $, $input, $select,
-    bindEnterToClick,
 } from '../app/dom';
 import { log } from '../app/logger';
 import { setHtml } from '../app/safe-html';
@@ -77,7 +76,8 @@ const saveDebouncer =
 
 class PageState {
     #projectId: string | undefined;
-    #interaction = new AbortController();
+    readonly #interaction =
+        new AbortController();
 
     projectId(): string | undefined {
         return this.#projectId;
@@ -90,76 +90,65 @@ class PageState {
     signal(): AbortSignal {
         return this.#interaction.signal;
     }
-
-    resetInteraction(): void {
-        this.#interaction.abort();
-        this.#interaction =
-            new AbortController();
-    }
 }
 
 const pageState = new PageState();
 
-function renderAndBind(
+function update(
     container: HTMLElement,
     presenter: FlowDesignerPresenter,
 ): void {
-    pageState.resetInteraction();
-    const signal = pageState.signal();
     saveDebouncer.flush();
-    presenter.render(container);
-    bindBackButton();
-    bindSvgInteractions(
-        container, presenter, signal,
-    );
-    bindToolbarActions(
-        container, presenter,
-    );
-    bindPanelActions(
-        container, presenter,
-    );
-    bindFlowNameEdit(
-        container, presenter,
-    );
-    bindSwitches(
-        container, presenter,
-    );
+    presenter.renderUpdate(container);
 }
 
 function bindFlowNameEdit(
     container: HTMLElement,
     presenter: FlowDesignerPresenter,
+    signal: AbortSignal,
 ): void {
-    $('#flow-name-edit-btn', document)
-        ?.addEventListener(
-            'click',
-            () => {
+    const slot = $(
+        '.flow-name-header-slot',
+        container,
+    );
+    if (!slot) return;
+    slot.addEventListener(
+        'click',
+        (e) => {
+            const target = e.target;
+            if (
+                !(target instanceof Element)
+            ) return;
+            const btn = target.closest(
+                'button',
+            );
+            if (!btn) return;
+            if (
+                btn.id
+                    === 'flow-name-edit-btn'
+            ) {
                 presenter
                     .startEditingName();
-                renderAndBind(
+                update(
                     container, presenter,
                 );
                 const input = $input(
                     '#flow-name-input',
-                    document,
+                    container,
                 );
                 if (input) {
                     input.focus();
                     input.select();
                 }
-            },
-        );
-    $('#flow-name-save-btn', document)
-        ?.addEventListener(
-            'click',
-            () => {
+            } else if (
+                btn.id
+                    === 'flow-name-save-btn'
+            ) {
                 const name = $input(
                     '#flow-name-input',
-                    document,
+                    container,
                 )?.value.trim() ?? '';
-                if (
-                    name.length === 0
-                ) {
+                if (name.length === 0) {
                     showToast(
                         'Flow name is'
                         + ' required',
@@ -169,91 +158,100 @@ function bindFlowNameEdit(
                 }
                 presenter
                     .updateFlowName(name);
-                renderAndBind(
+                update(
                     container, presenter,
                 );
-            },
-        );
-    $('#flow-name-cancel-btn', document)
-        ?.addEventListener(
-            'click',
-            () => {
+            } else if (
+                btn.id
+                    === 'flow-name-cancel-btn'
+            ) {
                 presenter
                     .cancelEditingName();
-                renderAndBind(
+                update(
                     container, presenter,
                 );
-            },
-        );
-    $input(
-        '#flow-name-input', document,
-    )?.addEventListener(
+            }
+        },
+        { signal },
+    );
+    slot.addEventListener(
         'keydown',
         (e) => {
+            const target = e.target;
+            if (
+                !(
+                    target instanceof
+                    HTMLInputElement
+                )
+            ) return;
+            if (
+                target.id
+                    !== 'flow-name-input'
+            ) return;
             if (e.key === 'Enter') {
                 e.preventDefault();
                 e.stopPropagation();
                 $(
                     '#flow-name-save-btn',
-                    document,
+                    container,
                 )?.click();
-            }
-            if (e.key === 'Escape') {
+            } else if (e.key === 'Escape') {
                 e.preventDefault();
                 e.stopPropagation();
                 $(
                     '#flow-name-cancel-btn',
-                    document,
+                    container,
                 )?.click();
             }
         },
+        { signal },
     );
 }
 
 function bindSwitches(
     container: HTMLElement,
     presenter: FlowDesignerPresenter,
+    signal: AbortSignal,
 ): void {
     $(
-        '#flow-lock-switch', document,
+        '#flow-lock-switch', container,
     )?.addEventListener(
         'click',
         () => {
             presenter.toggleLocked();
-            renderAndBind(
-                container, presenter,
-            );
+            update(container, presenter);
         },
+        { signal },
     );
     $(
         '#flow-auto-layout-switch',
-        document,
+        container,
     )?.addEventListener(
         'click',
         () => {
-            presenter
-                .toggleAutoLayout();
-            renderAndBind(
-                container, presenter,
-            );
+            presenter.toggleAutoLayout();
+            update(container, presenter);
         },
+        { signal },
     );
     $(
         '#flow-auto-fit-switch',
-        document,
+        container,
     )?.addEventListener(
         'click',
         () => {
             presenter.toggleAutoFit();
-            renderAndBind(
-                container, presenter,
-            );
+            update(container, presenter);
         },
+        { signal },
     );
 }
 
-function bindBackButton(): void {
-    $('#flow-back-btn', document)
+function bindBackButton(
+    container: HTMLElement,
+    signal: AbortSignal,
+): void {
+    $('#flow-back-btn', container)
         ?.addEventListener(
             'click',
             () => {
@@ -268,36 +266,35 @@ function bindBackButton(): void {
                     navigateTo('flows');
                 }
             },
+            { signal },
         );
 }
 
-function bindSvgInteractions(
+function bindCanvasInteractions(
     container: HTMLElement,
     presenter: FlowDesignerPresenter,
     signal: AbortSignal,
 ): void {
-    const svg = container.querySelector(
-        'svg.flow-canvas',
-    ) as SVGSVGElement | null;
-    if (!svg) return;
+    const wrap = container.querySelector(
+        '.flow-canvas-wrap',
+    );
+    if (!(wrap instanceof HTMLElement)) {
+        return;
+    }
     const state =
         presenter.interactionState();
     bindInteractions(
-        svg,
+        wrap,
         state,
-        () => renderAndBind(
-            container, presenter,
-        ),
+        () => update(container, presenter),
         (updates) => {
             presenter.moveNodes(updates);
-            renderAndBind(
-                container, presenter,
-            );
+            update(container, presenter);
         },
         (fromId, toId) => {
             void presenter
                 .addEdge(fromId, toId)
-                .then(() => renderAndBind(
+                .then(() => update(
                     container, presenter,
                 ));
         },
@@ -306,7 +303,7 @@ function bindSvgInteractions(
                 .addNodeAtPosition(
                     fromId, x, y,
                 )
-                .then(() => renderAndBind(
+                .then(() => update(
                     container, presenter,
                 ));
         },
@@ -317,124 +314,80 @@ function bindSvgInteractions(
         () => presenter.isLocked(),
         signal,
     );
-    if (
-        (state.drag.kind === 'dragging'
-            || state.connect.kind
-                === 'connecting'
-            || state.pan.kind
-                === 'panning')
-        && state.activePointerId > 0
-    ) {
-        try {
-            svg.setPointerCapture(
-                state.activePointerId,
-            );
-        } catch (err) {
-            log.warn(
-                'setPointerCapture failed',
-                'flow-detail',
-                err,
-            );
-            state.drag = { kind: 'idle' };
-            state.connect =
-                { kind: 'idle' };
-            state.pan = { kind: 'idle' };
-        }
-    }
 }
 
 function bindToolbarActions(
     container: HTMLElement,
     presenter: FlowDesignerPresenter,
+    signal: AbortSignal,
 ): void {
-    const btns = container.querySelectorAll(
-        '[data-action]',
+    const slot = $(
+        '.flow-toolbar-slot', container,
     );
-    for (const btn of btns) {
-        const action = btn.getAttribute(
-            'data-action',
-        );
-        if (!action) continue;
-        if (action === 'undo') {
-            btn.addEventListener(
-                'click',
-                async () => {
+    if (!slot) return;
+    slot.addEventListener(
+        'click',
+        (e) => {
+            const target = e.target;
+            if (
+                !(target instanceof Element)
+            ) return;
+            const btn = target.closest(
+                '[data-action]',
+            );
+            if (!btn) return;
+            const action = btn.getAttribute(
+                'data-action',
+            );
+            if (!action) return;
+            if (action === 'undo') {
+                void (async () => {
                     await presenter
                         .performUndo();
-                    renderAndBind(
-                        container,
-                        presenter,
+                    update(
+                        container, presenter,
                     );
-                },
-            );
-        }
-        if (action === 'redo') {
-            btn.addEventListener(
-                'click',
-                async () => {
+                })();
+            } else if (action === 'redo') {
+                void (async () => {
                     await presenter
                         .performRedo();
-                    renderAndBind(
-                        container,
-                        presenter,
-                    );
-                },
-            );
-        }
-        if (action === 'zoom-in') {
-            btn.addEventListener(
-                'click',
-                () => {
-                    presenter.zoomIn();
-                    renderAndBind(
+                    update(
                         container, presenter,
                     );
-                },
-            );
-        }
-        if (action === 'zoom-out') {
-            btn.addEventListener(
-                'click',
-                () => {
-                    presenter.zoomOut();
-                    renderAndBind(
+                })();
+            } else if (action === 'zoom-in') {
+                presenter.zoomIn();
+                update(container, presenter);
+            } else if (
+                action === 'zoom-out'
+            ) {
+                presenter.zoomOut();
+                update(container, presenter);
+            } else if (
+                action === 'copy-mermaid'
+            ) {
+                void handleCopyMermaid(
+                    presenter,
+                );
+            } else if (
+                action === 'export-zip'
+            ) {
+                void handleExportZip(
+                    presenter,
+                );
+            } else if (
+                action === 'delete-selected'
+            ) {
+                void presenter
+                    .deleteSelected()
+                    .then(() => update(
                         container, presenter,
-                    );
-                },
-            );
-        }
-        if (action === 'copy-mermaid') {
-            btn.addEventListener(
-                'click',
-                () => void handleCopyMermaid(
-                    presenter,
-                ),
-            );
-        }
-        if (action === 'export-zip') {
-            btn.addEventListener(
-                'click',
-                () => void handleExportZip(
-                    presenter,
-                ),
-            );
-        }
-        if (action === 'delete-selected') {
-            btn.addEventListener(
-                'click',
-                () => {
-                    void presenter
-                        .deleteSelected()
-                        .then(
-                            () => renderAndBind(
-                                container,
-                                presenter,
-                            ),
-                        );
-                },
-            );
-        }
-    }
+                    ));
+            }
+        },
+        { signal },
+    );
 }
 
 async function handleCopyMermaid(
@@ -523,156 +476,141 @@ async function handleExportZip(
 function bindPanelActions(
     container: HTMLElement,
     presenter: FlowDesignerPresenter,
+    signal: AbortSignal,
 ): void {
-    bindClosePanelAction(
-        container, presenter,
+    const slot = $(
+        '.flow-props-slot', container,
     );
-    bindNodePanelInputs(
-        container, presenter,
-    );
-    bindEdgePanelInputs(
-        container, presenter,
-    );
-    bindFieldActions(
-        container, presenter,
-    );
-}
-
-function bindClosePanelAction(
-    container: HTMLElement,
-    presenter: FlowDesignerPresenter,
-): void {
-    const btn = container.querySelector(
-        '[data-action="close-panel"]',
-    );
-    if (!btn) return;
-    btn.addEventListener(
+    if (!slot) return;
+    slot.addEventListener(
         'click',
-        () => {
-            presenter.interactionState()
-                .isPanelOpen = false;
-            renderAndBind(
-                container, presenter,
+        (e) => {
+            const target = e.target;
+            if (
+                !(target instanceof Element)
+            ) return;
+            const btn = target.closest(
+                '[data-action]',
             );
-        },
-    );
-}
-
-function bindNodePanelInputs(
-    container: HTMLElement,
-    presenter: FlowDesignerPresenter,
-): void {
-    const nameInput = $input(
-        '#prop-node-name', container,
-    );
-    const descInput = $input(
-        '#prop-node-desc', container,
-    );
-    if (!nameInput || !descInput) return;
-    if (
-        presenter.selectedNodeId() === null
-    ) return;
-
-    nameInput.addEventListener(
-        'input',
-        () => {
-            const val = nameInput.value;
-            saveDebouncer.schedule(
-                () => presenter
-                    .updateNodeName(val),
+            if (!btn) return;
+            const action = btn.getAttribute(
+                'data-action',
             );
-        },
-    );
-
-    descInput.addEventListener(
-        'input',
-        () => {
-            const val = descInput.value;
-            saveDebouncer.schedule(
-                () => presenter
-                    .updateNodeDescription(
-                        val,
-                    ),
-            );
-        },
-    );
-}
-
-function bindEdgePanelInputs(
-    container: HTMLElement,
-    presenter: FlowDesignerPresenter,
-): void {
-    const nameInput = $input(
-        '#prop-edge-name', container,
-    );
-    const descInput = $input(
-        '#prop-edge-desc', container,
-    );
-    if (!nameInput || !descInput) return;
-    if (
-        presenter.selectedEdgeId() === null
-    ) return;
-
-    nameInput.addEventListener(
-        'input',
-        () => {
-            const val = nameInput.value;
-            saveDebouncer.schedule(
-                () => presenter
-                    .updateEdgeName(val),
-            );
-        },
-    );
-
-    descInput.addEventListener(
-        'input',
-        () => {
-            const val = descInput.value;
-            saveDebouncer.schedule(
-                () => presenter
-                    .updateEdgeDescription(
-                        val,
-                    ),
-            );
-        },
-    );
-}
-
-function bindFieldActions(
-    container: HTMLElement,
-    presenter: FlowDesignerPresenter,
-): void {
-    const addFieldBtn = container
-        .querySelector(
-            '[data-action="add-field"]',
-        );
-    if (addFieldBtn) {
-        addFieldBtn.addEventListener(
-            'click',
-            () => showFieldEditor(
-                container, presenter,
-            ),
-        );
-    }
-
-    const delFieldBtns = container
-        .querySelectorAll(
-            '[data-action="delete-field"]',
-        );
-    for (const btn of delFieldBtns) {
-        const fieldId = btn.getAttribute(
-            'data-field-id',
-        );
-        if (!fieldId) continue;
-        btn.addEventListener(
-            'click',
-            () => void presenter
-                .deleteField(fieldId)
-                .then(() => renderAndBind(
+            if (action === 'close-panel') {
+                presenter
+                    .interactionState()
+                    .isPanelOpen = false;
+                update(
                     container, presenter,
-                )),
-        );
-    }
+                );
+            } else if (
+                action === 'add-field'
+            ) {
+                showFieldEditor(
+                    container, presenter,
+                );
+            } else if (
+                action === 'delete-field'
+            ) {
+                const fieldId = btn
+                    .getAttribute(
+                        'data-field-id',
+                    );
+                if (!fieldId) return;
+                void presenter
+                    .deleteField(fieldId)
+                    .then(() => update(
+                        container, presenter,
+                    ));
+            } else if (
+                action === 'save-field'
+            ) {
+                void handleSaveField(
+                    container, presenter,
+                );
+            }
+        },
+        { signal },
+    );
+    slot.addEventListener(
+        'input',
+        (e) => {
+            const target = e.target;
+            if (
+                !(
+                    target instanceof
+                    HTMLInputElement
+                )
+                && !(
+                    target instanceof
+                    HTMLTextAreaElement
+                )
+            ) return;
+            const id = target.id;
+            const value = target.value;
+            if (id === 'prop-node-name') {
+                saveDebouncer.schedule(
+                    () => presenter
+                        .updateNodeName(
+                            value,
+                        ),
+                );
+            } else if (
+                id === 'prop-node-desc'
+            ) {
+                saveDebouncer.schedule(
+                    () => presenter
+                        .updateNodeDescription(
+                            value,
+                        ),
+                );
+            } else if (
+                id === 'prop-edge-name'
+            ) {
+                saveDebouncer.schedule(
+                    () => presenter
+                        .updateEdgeName(
+                            value,
+                        ),
+                );
+            } else if (
+                id === 'prop-edge-desc'
+            ) {
+                saveDebouncer.schedule(
+                    () => presenter
+                        .updateEdgeDescription(
+                            value,
+                        ),
+                );
+            }
+        },
+        { signal },
+    );
+    slot.addEventListener(
+        'keydown',
+        (e) => {
+            const target = e.target;
+            if (
+                !(
+                    target instanceof
+                    HTMLInputElement
+                )
+            ) return;
+            if (
+                target.id !== 'new-field-name'
+            ) return;
+            if (e.key !== 'Enter') return;
+            e.preventDefault();
+            e.stopPropagation();
+            slot.querySelector<
+                HTMLElement
+            >(
+                '[data-action='
+                + '"save-field"]',
+            )?.click();
+        },
+        { signal },
+    );
 }
 
 function showFieldEditor(
@@ -696,23 +634,6 @@ function showFieldEditor(
         slot,
         presenter.buildFieldEditor(),
     );
-    const saveBtn = slot.querySelector(
-        '[data-action="save-field"]',
-    );
-    if (saveBtn) {
-        saveBtn.addEventListener(
-            'click',
-            () => void handleSaveField(
-                container, presenter,
-            ),
-        );
-        bindEnterToClick(
-            '#new-field-name',
-            '[data-action='
-            + '"save-field"]',
-            slot,
-        );
-    }
 }
 
 async function handleSaveField(
@@ -760,7 +681,7 @@ async function handleSaveField(
         fieldName, fieldType,
         isRequired, options,
     );
-    renderAndBind(container, presenter);
+    update(container, presenter);
 }
 
 export async function init(
@@ -803,7 +724,27 @@ export async function init(
             FALLBACK_H,
             loaded.versions.length > 0,
         );
-    renderAndBind(container, presenter);
+    const signal = pageState.signal();
+    presenter.renderShell(container);
+    bindBackButton(container, signal);
+    bindCanvasInteractions(
+        container, presenter, signal,
+    );
+    bindToolbarActions(
+        container, presenter, signal,
+    );
+    bindPanelActions(
+        container, presenter, signal,
+    );
+    bindFlowNameEdit(
+        container, presenter, signal,
+    );
+    bindSwitches(
+        container, presenter, signal,
+    );
+    bindKeyboardShortcuts(
+        container, presenter, signal,
+    );
     const initialWrap = container.querySelector(
         '.flow-canvas-wrap',
     );
@@ -813,9 +754,7 @@ export async function init(
         if (w > 0 && h > 0) {
             presenter.updateCanvasSize(w, h);
             presenter.reconcileLayout();
-            renderAndBind(
-                container, presenter,
-            );
+            update(container, presenter);
         }
     }
     const ro = new ResizeObserver(() => {
@@ -829,18 +768,16 @@ export async function init(
         const h = liveWrap.clientHeight;
         if (w > 0 && h > 0) {
             presenter.updateCanvasSize(w, h);
-            renderAndBind(container, presenter);
+            update(container, presenter);
         }
     });
     ro.observe(container);
-    bindKeyboardShortcuts(
-        container, presenter,
-    );
 }
 
 function bindKeyboardShortcuts(
     container: HTMLElement,
     presenter: FlowDesignerPresenter,
+    signal: AbortSignal,
 ): void {
     document.addEventListener(
         'keydown',
@@ -855,7 +792,7 @@ function bindKeyboardShortcuts(
                 presenter
                     .interactionState()
                     .isPanelOpen = false;
-                renderAndBind(
+                update(
                     container, presenter,
                 );
                 return;
@@ -878,12 +815,9 @@ function bindKeyboardShortcuts(
                 e.preventDefault();
                 void presenter
                     .deleteSelected()
-                    .then(
-                        () => renderAndBind(
-                            container,
-                            presenter,
-                        ),
-                    );
+                    .then(() => update(
+                        container, presenter,
+                    ));
             }
             const mod =
                 e.metaKey || e.ctrlKey;
@@ -896,9 +830,8 @@ function bindKeyboardShortcuts(
                 void (async () => {
                     await presenter
                         .performUndo();
-                    renderAndBind(
-                        container,
-                        presenter,
+                    update(
+                        container, presenter,
                     );
                 })();
             }
@@ -910,12 +843,12 @@ function bindKeyboardShortcuts(
                 void (async () => {
                     await presenter
                         .performRedo();
-                    renderAndBind(
-                        container,
-                        presenter,
+                    update(
+                        container, presenter,
                     );
                 })();
             }
         },
+        { signal },
     );
 }

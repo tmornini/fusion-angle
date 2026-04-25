@@ -1088,6 +1088,17 @@ svg.flow-canvas.flow-canvas-locked #flow-grid circle {
   fill: hsl(var(--blue-900));
 }
 
+.flow-node:focus,
+.flow-edge:focus {
+  outline: none;
+}
+
+.flow-node:focus-visible,
+.flow-edge:focus-visible {
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: 2px;
+}
+
 .flow-props-panel {
   position: absolute;
   top: 0;

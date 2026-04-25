@@ -28,8 +28,8 @@ function pad(n: number): string {
 
 function dt(
     daysAgo: number,
-    hour = 9,
-    minute = 0,
+    hour: number,
+    minute: number,
 ): string {
     const d = new Date(Date.UTC(
         now.getUTCFullYear(),
@@ -89,7 +89,7 @@ export async function populateMockData(
                 + ' thrives on aligning'
                 + ' cross-functional teams'
                 + ' around strategic goals.',
-            last_active: dt(0, 16),
+            last_active: dt(0, 16, 0),
         },
         {
             id: '846cf47c-26b9-4b65-8a45-6584380a7307',
@@ -149,7 +149,7 @@ export async function populateMockData(
                 + ' about turning complex'
                 + ' datasets into actionable'
                 + ' business insights.',
-            last_active: dt(0, 17),
+            last_active: dt(0, 17, 0),
         },
         {
             id: 'a2d59bdf-71bd-40bf-b891-d0d4ddb190f7',
@@ -179,7 +179,7 @@ export async function populateMockData(
                 + ' builds reliable APIs'
                 + ' and loves optimizing'
                 + ' database performance.',
-            last_active: dt(0, 14),
+            last_active: dt(0, 14, 0),
         },
         {
             id: 'b088941a-bf05-409d-b910-37ea7031f382',
@@ -298,7 +298,7 @@ export async function populateMockData(
                 + ' cares deeply about'
                 + ' performance and'
                 + ' accessible UI patterns.',
-            last_active: dt(2, 14),
+            last_active: dt(2, 14, 0),
         },
         {
             id: '670a5e43-dab1-4f54-958f-be483d568dd1',
@@ -327,7 +327,7 @@ export async function populateMockData(
                 + ' builds lasting client'
                 + ' relationships through'
                 + ' consultative selling.',
-            last_active: dt(1, 18),
+            last_active: dt(1, 18, 0),
         },
         {
             id: '8a4e81f6-58dc-4f06-b850-dd5bc1c66f10',
@@ -356,7 +356,7 @@ export async function populateMockData(
                 + ' strong Python skills'
                 + ' and a focus on clean'
                 + ' architecture.',
-            last_active: dt(7, 18),
+            last_active: dt(7, 18, 0),
         },
         {
             id: 'current',
@@ -385,7 +385,7 @@ export async function populateMockData(
             bio: 'Passionate about building'
                 + ' products that solve'
                 + ' real problems.',
-            last_active: dt(0, 18),
+            last_active: dt(0, 18, 0),
         },
     ];
 
@@ -874,7 +874,7 @@ export async function populateMockData(
         adapter.organization.put({
             plan: 'Business',
             plan_status: 'active',
-            next_billing: dt(-300, 0),
+            next_billing: dt(-300, 0, 0),
             seats: 25,
             used_seats: 18,
             projects_limit: 50,
@@ -887,7 +887,7 @@ export async function populateMockData(
             ai_credits_current: 850,
             health_score: 92,
             health_status: 'excellent',
-            last_activity: dt(0, 16),
+            last_activity: dt(0, 16, 0),
             active_users: 14,
         }),
     ]);
@@ -906,8 +906,8 @@ export async function populateMockData(
                 + ' patterns.',
             status: 'approved',
             progress: 72,
-            start_date: dt(60, 0),
-            target_end_date: dt(-30, 0),
+            start_date: dt(60, 0, 0),
+            target_end_date: dt(-30, 0, 0),
             estimated_duration: 432000,
             actual_duration: 306000,
             estimated_cost: 45000,
@@ -971,8 +971,8 @@ export async function populateMockData(
                 + ' reports on a schedule.',
             status: 'completed',
             progress: 100,
-            start_date: dt(90),
-            target_end_date: dt(57),
+            start_date: dt(90, 9, 0),
+            target_end_date: dt(57, 9, 0),
             estimated_duration: 288000,
             actual_duration: 216000,
             estimated_cost: 32000,
@@ -997,8 +997,8 @@ export async function populateMockData(
                 + ' downtime.',
             status: 'under-review',
             progress: 22,
-            start_date: dt(45),
-            target_end_date: dt(-28),
+            start_date: dt(45, 9, 0),
+            target_end_date: dt(-28, 9, 0),
             estimated_duration: 720000,
             actual_duration: 162000,
             estimated_cost: 75000,
@@ -1022,8 +1022,8 @@ export async function populateMockData(
                 + ' leadership.',
             status: 'completed',
             progress: 100,
-            start_date: dt(75),
-            target_end_date: dt(47),
+            start_date: dt(75, 9, 0),
+            target_end_date: dt(47, 9, 0),
             estimated_duration: 216000,
             actual_duration: 198000,
             estimated_cost: 28000,
@@ -1048,8 +1048,8 @@ export async function populateMockData(
                 + ' stockout incidents.',
             status: 'sent-back',
             progress: 15,
-            start_date: dt(50),
-            target_end_date: dt(7),
+            start_date: dt(50, 9, 0),
+            target_end_date: dt(7, 9, 0),
             estimated_duration: 360000,
             actual_duration: 108000,
             estimated_cost: 38000,
@@ -1074,8 +1074,8 @@ export async function populateMockData(
                 + ' for new hires.',
             status: 'under-review',
             progress: 18,
-            start_date: dt(14),
-            target_end_date: dt(-28),
+            start_date: dt(14, 9, 0),
+            target_end_date: dt(-28, 9, 0),
             estimated_duration: 324000,
             actual_duration: 72000,
             estimated_cost: 35000,
@@ -1095,10 +1095,9 @@ export async function populateMockData(
             type: 'idea_created',
             action: 'submitted new idea',
             target: 'Mobile App Redesign',
-            timestamp: dt(0, 17),
-            score: 0,
+            timestamp: dt(0, 17, 0),
             status: 'active',
-            comment:
+            feedback:
                 'Addresses top user'
                 + ' feedback themes.',
         },
@@ -1108,10 +1107,9 @@ export async function populateMockData(
             action: 'commented on',
             target:
                 'Q1 Analytics Dashboard',
-            timestamp: dt(0, 16),
-            score: 0,
+            timestamp: dt(0, 16, 0),
             status: 'active',
-            comment:
+            feedback:
                 'Great progress on the'
                 + ' charts!',
         },
@@ -1120,10 +1118,9 @@ export async function populateMockData(
             type: 'user_joined',
             action: 'joined the team',
             target: 'Product Innovation',
-            timestamp: dt(0, 15),
-            score: 0,
+            timestamp: dt(0, 15, 0),
             status: 'active',
-            comment:
+            feedback:
                 'Excited to contribute'
                 + ' to the team.',
         },
@@ -1133,10 +1130,9 @@ export async function populateMockData(
             action: 'changed status of',
             target:
                 'Customer Feedback Portal',
-            timestamp: dt(0, 14),
-            score: 0,
+            timestamp: dt(0, 14, 0),
             status: 'In Progress',
-            comment:
+            feedback:
                 'Development sprint'
                 + ' started this week.',
         },
@@ -1147,10 +1143,9 @@ export async function populateMockData(
                 'converted idea to project',
             target: 'Automated Testing'
                 + ' Framework',
-            timestamp: dt(0, 13),
-            score: 0,
+            timestamp: dt(0, 13, 0),
             status: 'completed',
-            comment:
+            feedback:
                 'Approved by engineering'
                 + ' leadership.',
         },
@@ -1160,16 +1155,15 @@ export async function populateMockData(
             action: 'created new project',
             target: 'Performance'
                 + ' Optimization Initiative',
-            timestamp: dt(0, 12),
-            score: 0,
+            timestamp: dt(0, 12, 0),
             status: 'active',
-            comment:
+            feedback:
                 'Targeting 40% latency'
                 + ' reduction.',
         },
     ];
 
-    const wfTimestamp = dt(60);
+    const wfTimestamp = dt(60, 9, 0);
 
     const mockFlows:
         FlowEntity[] = [
@@ -2664,7 +2658,7 @@ export async function populateMockData(
                         tm.id,
                     project_id:
                         tm.project_id,
-                    created_at: dt(75),
+                    created_at: dt(75, 9, 0),
                 }),
         ),
         ...teams.map(tm =>
@@ -2673,7 +2667,7 @@ export async function populateMockData(
                     team_id:
                         tm.id,
                     user_id: tm.user_id,
-                    created_at: dt(75),
+                    created_at: dt(75, 9, 0),
                 }),
         ),
     ]);
@@ -2690,61 +2684,61 @@ export async function populateMockData(
             id: '8d875ac4-94c8-4790-a6d9-94276acc6322',
             idea_id: 'e9a7b7c9-f449-46b6-92b1-7144d29f6612',
             user_id: '846cf47c-26b9-4b65-8a45-6584380a7307',
-            created_at: dt(70),
+            created_at: dt(70, 9, 0),
         },
         {
             id: '7c786515-ba8e-4a08-850c-20a4625719ff',
             idea_id: 'eef228e7-8ab1-42ed-afae-d095c214a85b',
             user_id: 'b088941a-bf05-409d-b910-37ea7031f382',
-            created_at: dt(65),
+            created_at: dt(65, 9, 0),
         },
         {
             id: 'd972a716-aebd-4f80-bf0c-8e1070c7411e',
             idea_id: 'f0582dd9-4f65-45bc-a23d-47ca7426582c',
             user_id: 'b862fb83-77e8-438e-a562-a9a56c8c6d92',
-            created_at: dt(55),
+            created_at: dt(55, 9, 0),
         },
         {
             id: 'd4844b65-f935-4e5d-8e74-ff2e6e8ec027',
             idea_id: 'b112a99b-4993-4ea3-8621-0ba9c6036896',
             user_id: '670a5e43-dab1-4f54-958f-be483d568dd1',
-            created_at: dt(50),
+            created_at: dt(50, 9, 0),
         },
         {
             id: '572210aa-a086-4e11-bd4c-1c2b4900c2a5',
             idea_id: '48fe64d4-89f8-483b-b819-53045ecb9e5f',
             user_id: '36b9389e-c788-4c83-aca3-78d6086b6612',
-            created_at: dt(45),
+            created_at: dt(45, 9, 0),
         },
         {
             id: 'b9ad0066-acbf-47ce-90de-8b1fe4d0f196',
             idea_id: '7cdd88db-2463-41cc-9303-89dd3254ad40',
             user_id: 'a0facefa-e853-4d92-b796-373da78aba93',
-            created_at: dt(75, 10),
+            created_at: dt(75, 10, 0),
         },
         {
             id: '94a8b845-273f-400f-b9c3-8dd4c834bc90',
             idea_id: 'b46bd91c-1b7d-409b-8f1c-28e1c6996241',
             user_id: '8f84d90c-ca19-4a95-ae71-e7af7fd23cdf',
-            created_at: dt(35),
+            created_at: dt(35, 9, 0),
         },
         {
             id: '79cfa715-4c0c-4c0f-b44a-0d056bcf9c52',
             idea_id: '80450d9e-d3c5-4eaa-bd70-2bd4048edcc7',
             user_id: 'b088941a-bf05-409d-b910-37ea7031f382',
-            created_at: dt(30),
+            created_at: dt(30, 9, 0),
         },
         {
             id: 'd7fc26bc-2f52-4a25-9b2c-9b8640f3f99e',
             idea_id: 'cd1bb80d-cb50-48c4-aa21-3a115fbbd114',
             user_id: 'b862fb83-77e8-438e-a562-a9a56c8c6d92',
-            created_at: dt(25),
+            created_at: dt(25, 9, 0),
         },
         {
             id: '5c6380e6-f3ce-4f24-a199-4083dec49ec9',
             idea_id: '9add8b29-d51e-49f9-b4e0-e17d23370732',
             user_id: '670a5e43-dab1-4f54-958f-be483d568dd1',
-            created_at: dt(20),
+            created_at: dt(20, 9, 0),
         },
     ];
 
@@ -2766,49 +2760,49 @@ export async function populateMockData(
             id: '38c0651f-eea9-4ee4-8e73-587cb6fc6ec0',
             activity_id: 'edc2a974-ea45-4988-902b-34e99a881d58',
             user_id: 'b088941a-bf05-409d-b910-37ea7031f382',
-            created_at: dt(0, 17),
+            created_at: dt(0, 17, 0),
         },
         {
             id: '80331324-cd07-412a-b844-084f10b7242b',
             activity_id: '94c4e07d-80e9-465f-86af-bd2e7e3cc200',
             user_id: 'a2d59bdf-71bd-40bf-b891-d0d4ddb190f7',
-            created_at: dt(0, 16),
+            created_at: dt(0, 16, 0),
         },
         {
             id: '44db67b1-4012-4009-b1e2-79216a5df29f',
             activity_id: 'dfa054fe-4619-4c9e-9fa6-2d053192c145',
             user_id: '713d7886-41f0-48c6-978e-f90a2eb4082a',
-            created_at: dt(0, 15),
+            created_at: dt(0, 15, 0),
         },
         {
             id: 'a741d74e-5db4-46ad-b810-365c5625feaf',
             activity_id: 'f2553dc5-b375-4cd4-8959-bbbd30b64fc4',
             user_id: '670a5e43-dab1-4f54-958f-be483d568dd1',
-            created_at: dt(0, 14),
+            created_at: dt(0, 14, 0),
         },
         {
             id: '7b2b0937-f284-4881-90ff-194b168a9d80',
             activity_id: '54883b41-11ca-4d7a-926a-bbca8523357d',
             user_id: '8a4e81f6-58dc-4f06-b850-dd5bc1c66f10',
-            created_at: dt(0, 13),
+            created_at: dt(0, 13, 0),
         },
         {
             id: '4172c884-230e-4d7f-92a2-84cdc220c198',
             activity_id: '561cbb6e-a8f1-4b52-8365-5559bc32c017',
             user_id: 'a0facefa-e853-4d92-b796-373da78aba93',
-            created_at: dt(0, 12),
+            created_at: dt(0, 12, 0),
         },
         {
             id: '983b7750-6a7e-45a3-a5d4-d78db67e59f5',
             activity_id: 'e67fade5-95b3-42d8-b927-9be199c98ed0',
             user_id: 'b088941a-bf05-409d-b910-37ea7031f382',
-            created_at: dt(1, 18),
+            created_at: dt(1, 18, 0),
         },
         {
             id: 'b7d2f6d4-18e4-4eb8-a7f4-dcebb7243950',
             activity_id: 'c55e8c4e-17b6-4c0b-838a-9fbabceefec1',
             user_id: '8f84d90c-ca19-4a95-ae71-e7af7fd23cdf',
-            created_at: dt(1, 15),
+            created_at: dt(1, 15, 0),
         },
     ];
 
@@ -2875,7 +2869,7 @@ export async function populateBootstrapData(
             bio: 'Passionate about building'
                 + ' products that solve'
                 + ' real problems.',
-            last_active: dt(0, 18),
+            last_active: dt(0, 18, 0),
         }),
         adapter.company.put({
             name: 'Stark Industries',
@@ -2884,7 +2878,7 @@ export async function populateBootstrapData(
         adapter.organization.put({
             plan: 'Business',
             plan_status: 'active',
-            next_billing: dt(-300, 0),
+            next_billing: dt(-300, 0, 0),
             seats: 25,
             used_seats: 18,
             projects_limit: 50,
@@ -2897,7 +2891,7 @@ export async function populateBootstrapData(
             ai_credits_current: 850,
             health_score: 92,
             health_status: 'excellent',
-            last_activity: dt(0, 16),
+            last_activity: dt(0, 16, 0),
             active_users: 14,
         }),
     ]);

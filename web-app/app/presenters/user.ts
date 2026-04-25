@@ -1,6 +1,9 @@
-import { html, SafeHtml } from '../safe-html';
+import {
+    html, setHtml, SafeHtml,
+} from '../safe-html';
 import { initials, formatDate } from '../core';
 import {
+    iconUsers,
     iconStar,
     iconTrendingUp,
     iconBriefcase,
@@ -561,5 +564,157 @@ export class UserPresenter {
                 </div>
             </div>
         </div>`;
+    }
+}
+
+export class ManagedUsersPresenter {
+    #presenters: UserPresenter[];
+    #search: string;
+    #role: string;
+    #status: string;
+
+    constructor(users: User[]) {
+        this.#presenters = users.map(
+            u => new UserPresenter(u),
+        );
+        this.#search = '';
+        this.#role = 'all';
+        this.#status = 'all';
+    }
+
+    update(users: User[]): void {
+        this.#presenters = users.map(
+            u => new UserPresenter(u),
+        );
+    }
+
+    setSearch(query: string): void {
+        this.#search = query.toLowerCase();
+    }
+
+    setRole(role: string): void {
+        this.#role = role;
+    }
+
+    setStatus(status: string): void {
+        this.#status = status;
+    }
+
+    activeCount(): number {
+        return this.#presenters.filter(
+            p => p.matchesStatusFilter(
+                'active',
+            ),
+        ).length;
+    }
+
+    pendingCount(): number {
+        return this.#presenters.filter(
+            p => p.matchesStatusFilter(
+                'pending',
+            ),
+        ).length;
+    }
+
+    renderList(
+        container: HTMLElement,
+    ): void {
+        const filtered = this.#presenters
+            .filter(p =>
+                (this.#search === ''
+                    || p.matchesUserSearch(
+                        this.#search,
+                    ))
+                && p.matchesRoleFilter(
+                    this.#role,
+                )
+                && p.matchesStatusFilter(
+                    this.#status,
+                ),
+            );
+        setHtml(container, html`${filtered.map(
+            p => p.buildUserRow(),
+        )}`);
+    }
+}
+
+export class TeamListPresenter {
+    #presenters: UserPresenter[];
+    #selectedId: string | null;
+    #search: string;
+
+    constructor(users: User[]) {
+        this.#presenters = users.map(
+            u => new UserPresenter(u),
+        );
+        this.#selectedId = null;
+        this.#search = '';
+    }
+
+    update(users: User[]): void {
+        this.#presenters = users.map(
+            u => new UserPresenter(u),
+        );
+    }
+
+    setSearch(query: string): void {
+        this.#search = query.toLowerCase();
+    }
+
+    select(id: string | null): void {
+        this.#selectedId = id;
+    }
+
+    selectedId(): string | null {
+        return this.#selectedId;
+    }
+
+    summary(): string {
+        const n = this.#presenters.length;
+        const word = n === 1
+            ? 'member'
+            : 'members';
+        return n + ' ' + word
+            + ' • Manage roles,'
+            + ' strengths, and availability';
+    }
+
+    renderList(
+        container: HTMLElement,
+    ): void {
+        const filtered = this.#presenters
+            .filter(p => p.matchesSearch(
+                this.#search,
+            ));
+        setHtml(container, html`${filtered.map(
+            p => p.buildMemberCard(
+                this.#selectedId,
+            ),
+        )}`);
+    }
+
+    renderDetail(
+        container: HTMLElement,
+    ): void {
+        const member = this.#selectedId
+            ? this.#presenters.find(
+                p => p.idForLink()
+                    === this.#selectedId,
+            )
+            : undefined;
+        setHtml(container, member
+            ? member.buildMemberDetail()
+            : this.#buildPlaceholder());
+    }
+
+    #buildPlaceholder(): SafeHtml {
+        return html`
+            <div class="p-6 text-center">
+                ${iconUsers(48, 'text-muted')}
+                <p class="text-muted mt-4">
+                    ${'Select a team member'
+                        + ' to view details'}
+                </p>
+            </div>`;
     }
 }

@@ -1,24 +1,16 @@
-import {
-    $,
-    attr,
-} from '../app/dom';
-import {
-    setHtml,
-} from '../app/safe-html';
+import { $, attr } from '../app/dom';
 import {
     buildSkeleton,
     withLoadingState,
 } from '../app/loading-states';
-import {
-    iconFolderKanban,
-} from '../app/icons';
+import { iconFolderKanban } from '../app/icons';
 import { navigateTo } from '../app/core';
 import {
     getProjects,
     getProjectEntity,
     putProject,
-    type ProjectStatus,
     isProjectStatus,
+    type ProjectStatus,
 } from '../app/adapters';
 import {
     ProjectListPresenter,
@@ -27,13 +19,17 @@ import {
     initDragReorder,
 } from '../app/drag-reorder';
 
-export async function init(): Promise<void> {
-    const listContainer =
-        $('#projects-list', document);
-    if (!listContainer) return;
+const pageAbort = new AbortController();
+const signal = pageAbort.signal;
 
-    const result = await withLoadingState(
-        listContainer,
+export async function init(): Promise<void> {
+    const listEl = $(
+        '#projects-list', document,
+    );
+    if (!listEl) return;
+
+    const projects = await withLoadingState(
+        listEl,
         buildSkeleton('card-list', 4),
         getProjects,
         init,
@@ -46,121 +42,38 @@ export async function init(): Promise<void> {
                 + ' tracking progress.',
             action: {
                 label: 'View Ideas',
-                href:
-                    '../ideas/index.html',
+                href: '../ideas/index.html',
             },
         },
     );
-    if (!result) return;
+    if (!projects) return;
+
     const presenter =
-        new ProjectListPresenter(result);
+        new ProjectListPresenter(projects);
 
     const badgesEl = $(
         '#status-badges', document,
     );
     if (badgesEl) {
-        setHtml(
-            badgesEl,
-            presenter.renderStatusBadges(),
-        );
+        presenter.renderBadges(badgesEl);
         badgesEl.addEventListener(
             'click',
-            (e) => {
-                if (
-                    !(e.target
-                        instanceof
-                        HTMLElement)
-                ) return;
-                const badge =
-                    e.target.closest<
-                        HTMLElement
-                    >('[data-status]');
-                if (!badge) return;
-                const s = attr(
-                    badge,
-                    'data-status',
-                );
-                if (!isProjectStatus(s))
-                    return;
-                presenter.toggleFilter(
-                    s as ProjectStatus,
-                );
-                updateBadgeStyles(
-                    badgesEl,
-                    presenter
-                        .activeFilter(),
-                );
-                renderList();
-            },
+            e => onBadgeClick(
+                e, badgesEl, presenter,
+            ),
+            { signal },
         );
     }
 
-    function updateBadgeStyles(
-        container: Element,
-        active: ProjectStatus | null,
-    ): void {
-        container
-            .querySelectorAll(
-                '[data-status]',
-            )
-            .forEach(el => {
-                if (
-                    el instanceof
-                    HTMLElement
-                ) {
-                    el.style.opacity =
-                        active
-                        && attr(
-                            el,
-                            'data-status',
-                        ) !== active
-                            ? '0.4'
-                            : '1';
-                }
-            });
-    }
-
-    function renderList(): void {
-        const container =
-            $('#projects-list', document);
-        if (container) {
-            setHtml(
-                container,
-                presenter.renderList(),
-            );
-        }
-    }
-
-    listContainer.addEventListener(
+    presenter.renderList(listEl);
+    listEl.addEventListener(
         'click',
-        (e) => {
-            if (
-                !(e.target
-                    instanceof Element)
-            ) return;
-            const card =
-                e.target
-                    .closest<HTMLElement>(
-                        '[data-project-card]',
-                    );
-            if (card)
-                navigateTo(
-                    'project-detail',
-                    {
-                        projectId: attr(
-                            card,
-                            'data-project'
-                            + '-card',
-                        ),
-                    },
-                );
-        },
+        e => onCardClick(e),
+        { signal },
     );
 
-    renderList();
-
     initDragReorder(
-        listContainer,
+        listEl,
         '[data-project-card]',
         'data-project-card',
         async (id, newPosition) => {
@@ -173,7 +86,45 @@ export async function init(): Promise<void> {
             const updated =
                 await getProjects();
             presenter.update(updated);
-            renderList();
+            presenter.renderList(listEl);
         },
     );
+}
+
+function onBadgeClick(
+    e: MouseEvent,
+    badgesEl: HTMLElement,
+    p: ProjectListPresenter,
+): void {
+    if (
+        !(e.target instanceof HTMLElement)
+    ) return;
+    const badge = e.target.closest<HTMLElement>(
+        '[data-status]',
+    );
+    if (!badge) return;
+    const s = attr(badge, 'data-status');
+    if (!isProjectStatus(s)) return;
+    p.toggleFilter(s as ProjectStatus);
+    p.renderBadges(badgesEl);
+    const listEl = $(
+        '#projects-list', document,
+    );
+    if (listEl) p.renderList(listEl);
+}
+
+function onCardClick(e: MouseEvent): void {
+    if (
+        !(e.target instanceof Element)
+    ) return;
+    const card = e.target
+        .closest<HTMLElement>(
+            '[data-project-card]',
+        );
+    if (!card) return;
+    navigateTo('project-detail', {
+        projectId: attr(
+            card, 'data-project-card',
+        ),
+    });
 }

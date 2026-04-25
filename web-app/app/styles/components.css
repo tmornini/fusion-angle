@@ -305,6 +305,9 @@
 .badge[data-tab].active {
   box-shadow: 0 0 0 2px hsl(var(--primary));
 }
+.badge[data-dimmed="true"] {
+  opacity: 0.4;
+}
 
 /* Status Badges */
 .status-badge {

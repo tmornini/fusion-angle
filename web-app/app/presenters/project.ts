@@ -1,4 +1,6 @@
-import { html, SafeHtml } from '../safe-html';
+import {
+    html, setHtml, SafeHtml,
+} from '../safe-html';
 import {
     iconClock,
     iconDollarSign,
@@ -58,18 +60,25 @@ export class ProjectPresenter {
             .statusValue();
     }
 
-    buildStatusBadge(): SafeHtml {
+    buildStatusBadge(
+        isActive: boolean | null,
+    ): SafeHtml {
         const s =
             this.#project.statusValue();
         const cfg =
             PROJECT_STATUS_CONFIG[s]!;
         const icon = STATUS_ICONS[s]!;
+        const dimmed = isActive === false
+            ? 'true'
+            : 'false';
         return html`<span class="${
             'badge '
             + cfg.className
             + ' text-xs badge-fixed-w'
             + ' cursor-pointer'
-        }" data-status="${s}">${
+        }" data-status="${s}" data-dimmed="${
+            dimmed
+        }">${
             icon(14, '')
         } ${cfg.label}</span>`;
     }
@@ -264,7 +273,6 @@ export class ProjectPresenter {
 
 export class ProjectListPresenter {
     #projects: ProjectPresenter[];
-    readonly #statusBadges: SafeHtml;
     #filter:
         | { kind: 'all' }
         | {
@@ -276,38 +284,12 @@ export class ProjectListPresenter {
         this.#projects = projects.map(
             p => new ProjectPresenter(p),
         );
-        const groups = Object.groupBy(
-            this.#projects,
-            p => p.statusGroup(),
-        );
-        const order: ProjectStatus[] = [
-            'completed', 'under-review',
-            'sent-back', 'approved',
-        ];
-        const badges =
-            orderedKeys(groups, order)
-                .map(s => groups[s])
-                .filter(
-                    items =>
-                        items
-                        && items.length > 0,
-                )
-                .map(items =>
-                    items![0]!
-                        .buildStatusBadge(),
-                );
-        this.#statusBadges =
-            html`${badges}`;
     }
 
     update(projects: Project[]): void {
         this.#projects = projects.map(
             p => new ProjectPresenter(p),
         );
-    }
-
-    renderStatusBadges(): SafeHtml {
-        return this.#statusBadges;
     }
 
     toggleFilter(
@@ -333,7 +315,51 @@ export class ProjectListPresenter {
             : null;
     }
 
-    renderList(): SafeHtml {
+    renderBadges(
+        container: HTMLElement,
+    ): void {
+        setHtml(
+            container, this.#buildBadges(),
+        );
+    }
+
+    renderList(
+        container: HTMLElement,
+    ): void {
+        setHtml(container, this.#buildList());
+    }
+
+    #buildBadges(): SafeHtml {
+        const active = this.activeFilter();
+        const groups = Object.groupBy(
+            this.#projects,
+            p => p.statusGroup(),
+        );
+        const order: ProjectStatus[] = [
+            'completed', 'under-review',
+            'sent-back', 'approved',
+        ];
+        const badges = orderedKeys(
+            groups, order,
+        )
+            .map(s => ({
+                status: s,
+                items: groups[s],
+            }))
+            .filter(
+                g => g.items
+                    && g.items.length > 0,
+            )
+            .map(g => g.items![0]!
+                .buildStatusBadge(
+                    active === null
+                        ? null
+                        : g.status === active,
+                ));
+        return html`${badges}`;
+    }
+
+    #buildList(): SafeHtml {
         const f = this.#filter;
         const filtered =
             f.kind === 'filtered'

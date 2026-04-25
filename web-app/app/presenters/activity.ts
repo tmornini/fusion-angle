@@ -82,7 +82,7 @@ export class ActivityPresenter {
     }
 
     buildActivity(): SafeHtml {
-        const meta =
+        const meta = html`${
             this.#activity.hasStatus()
                 ? html`<div
                     class="${
@@ -92,19 +92,21 @@ export class ActivityPresenter {
                     this.#activity
                         .statusText()
                 }</div>`
-                : this.#activity
-                    .hasComment()
-                    ? html`<p
-                        class="${
-                            'text-sm'
-                            + ' text-muted'
-                            + ' mt-1 italic'
-                        }"
-                        >"${
-                        this.#activity
-                            .commentText()
-                    }"</p>`
-                    : html``;
+                : html``
+        }${
+            this.#activity.hasFeedback()
+                ? html`<p
+                    class="${
+                        'text-sm'
+                        + ' text-muted'
+                        + ' mt-1 italic'
+                    }"
+                    >"${
+                    this.#activity
+                        .feedbackText()
+                }"</p>`
+                : html``
+        }`;
         return html`
     <div class="flex items-start gap-4
         p-4 rounded-lg activity-row">

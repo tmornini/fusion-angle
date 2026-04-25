@@ -2,6 +2,7 @@ import {
     html, setHtml, trusted,
 } from '../safe-html';
 import type { SafeHtml } from '../safe-html';
+import { $ } from '../dom';
 import { log } from '../logger';
 import { showToast } from '../toast';
 import {
@@ -14,7 +15,6 @@ import {
     getFlowGraph,
     postFlowVersion,
     getFlowVersions,
-    getLatestFlowVersion,
     deleteFlowVersion,
     putFlowFromVersion,
 } from '../adapters';
@@ -348,9 +348,10 @@ export class FlowDesignerPresenter {
 
     async performUndo(): Promise<boolean> {
         if (this.#guardLocked()) return false;
-        const version = await getLatestFlowVersion(
+        const versions = await getFlowVersions(
             this.#state.flowId,
         );
+        const version = versions[0];
         if (!version) {
             this.#history
                 .setHasUndoHistory(false);
@@ -644,30 +645,10 @@ export class FlowDesignerPresenter {
         }
     }
 
-    render(
+    renderShell(
         container: HTMLElement,
     ): void {
-        this.#handlePanelTransition();
-        const toolbar =
-            this.#buildToolbar();
-        const panel =
-            this.#buildPropsPanel();
-        const canvas =
-            this.#buildCanvas();
-        const nameHtml =
-            buildFlowNameHeader(
-                this.#state.flowName,
-                this.#state.isEditingName,
-            );
-        const lockedChecked =
-            String(this.#state.isLocked);
-        const autoLayoutChecked =
-            String(
-                this.#state.isAutoLayout,
-            );
-        const autoFitChecked =
-            String(this.#state.isAutoFit);
-        const content = html`<div
+        const shell = html`<div
 class="flow-designer">
 <div class="flow-designer-header">
 <div class="${
@@ -679,17 +660,15 @@ class="flow-designer">
     title="Back"
     aria-label="Back"
     >${iconArrowLeft(20, '')}</button>
-<div class="flex-1">${nameHtml}
-<p class="text-sm text-muted"
-    >${this.#state.flowDescription}</p>
-</div>
+<div class="flex-1 flow-name-header-slot"
+    ></div>
 <div class="flex flex-col gap-2">
 <label class="${
     'flex items-center gap-2'
     + ' text-sm flow-lock-label'
 }"><button class="switch"
     role="switch"
-    aria-checked="${lockedChecked}"
+    aria-checked="false"
     id="flow-lock-switch"
     ><span class="switch-thumb"
     ></span></button>
@@ -699,7 +678,7 @@ Locked</label>
     + ' text-sm flow-lock-label'
 }"><button class="switch"
     role="switch"
-    aria-checked="${autoLayoutChecked}"
+    aria-checked="false"
     id="flow-auto-layout-switch"
     ><span class="switch-thumb"
     ></span></button>
@@ -709,7 +688,7 @@ Auto Layout</label>
     + ' text-sm flow-lock-label'
 }"><button class="switch"
     role="switch"
-    aria-checked="${autoFitChecked}"
+    aria-checked="false"
     id="flow-auto-fit-switch"
     ><span class="switch-thumb"
     ></span></button>
@@ -718,14 +697,107 @@ Auto Fit</label>
 </div>
 </div>
 <div class="flow-designer-body">
-${toolbar}
-<div class="flow-canvas-area">${panel}
+<div class="flow-toolbar-slot"></div>
+<div class="flow-canvas-area"
+    ><div class="flow-props-slot"></div>
 <div class="flow-canvas-wrap"
-    >${canvas}</div>
+    ><div class="flow-canvas-host"
+    ></div></div>
 </div>
 </div>
 </div>`;
-        setHtml(container, content);
+        setHtml(container, shell);
+        this.renderUpdate(container);
+    }
+
+    renderUpdate(
+        container: HTMLElement,
+    ): void {
+        this.#handlePanelTransition();
+        this.#mutateSwitches(container);
+        this.#updateNameHeader(container);
+        this.#updateToolbar(container);
+        this.#updatePanel(container);
+        this.#updateCanvas(container);
+    }
+
+    #mutateSwitches(
+        container: HTMLElement,
+    ): void {
+        const set = (
+            id: string, value: boolean,
+        ): void => {
+            const el = $(id, container);
+            if (el) {
+                el.setAttribute(
+                    'aria-checked',
+                    String(value),
+                );
+            }
+        };
+        set(
+            '#flow-lock-switch',
+            this.#state.isLocked,
+        );
+        set(
+            '#flow-auto-layout-switch',
+            this.#state.isAutoLayout,
+        );
+        set(
+            '#flow-auto-fit-switch',
+            this.#state.isAutoFit,
+        );
+    }
+
+    #updateNameHeader(
+        container: HTMLElement,
+    ): void {
+        const slot = $(
+            '.flow-name-header-slot',
+            container,
+        );
+        if (!slot) return;
+        const nameHtml =
+            buildFlowNameHeader(
+                this.#state.flowName,
+                this.#state.isEditingName,
+            );
+        setHtml(slot, html`${nameHtml}
+<p class="text-sm text-muted"
+    >${this.#state.flowDescription}</p>`);
+    }
+
+    #updateToolbar(
+        container: HTMLElement,
+    ): void {
+        const slot = $(
+            '.flow-toolbar-slot',
+            container,
+        );
+        if (!slot) return;
+        setHtml(slot, this.#buildToolbar());
+    }
+
+    #updatePanel(
+        container: HTMLElement,
+    ): void {
+        const slot = $(
+            '.flow-props-slot',
+            container,
+        );
+        if (!slot) return;
+        setHtml(slot, this.#buildPropsPanel());
+    }
+
+    #updateCanvas(
+        container: HTMLElement,
+    ): void {
+        const slot = $(
+            '.flow-canvas-host',
+            container,
+        );
+        if (!slot) return;
+        setHtml(slot, this.#buildCanvas());
     }
 
     moveNodes(

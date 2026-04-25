@@ -63,7 +63,7 @@ function displayText(
 }
 
 function trimStrings<
-    T extends Record<string, unknown>,
+    T extends object,
 >(obj: T): T {
     const r = { ...obj };
     for (const k of Object.keys(r)) {

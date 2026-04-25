@@ -21,6 +21,7 @@ export const ideaChanged =
 export {
     Idea,
     type IdeaStatus,
+    type IdeaEntity,
     isIdeaStatus,
     IDEA_STATUS_CONFIG,
 } from '../../../api/types';
