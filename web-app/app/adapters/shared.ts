@@ -2,7 +2,7 @@ import { GET } from '../../../api/api';
 import type {
     Id,
     UserEntity,
-    CompanySettingsEntity,
+    CompanyEntity,
 } from '../../../api/types';
 import { User } from '../../../api/types';
 
@@ -13,16 +13,14 @@ export interface AuthContext {
 
 export async function getCurrentUser(
 ): Promise<AuthContext> {
-    const [row, settings] =
+    const [row, company] =
         await Promise.all([
             GET<UserEntity>('current-user'),
-            GET<CompanySettingsEntity>(
-                'company-settings',
-            ),
+            GET<CompanyEntity>('company'),
         ]);
     return {
         user: new User(row),
-        company: settings.name,
+        company: company.name,
     };
 }
 

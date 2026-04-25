@@ -7,6 +7,7 @@ import {
 } from '../app/safe-html';
 import { navigateTo } from '../app/core';
 import {
+    postActivity,
     putIdea,
     putIdeaSubmission,
     jsonArrayField,
@@ -163,6 +164,12 @@ export async function init():
                     ideaId,
                     'current',
                 );
+                await postActivity({
+                    type: 'idea_created',
+                    action:
+                        'submitted new idea',
+                    target: fd.title,
+                });
                 navigateTo('ideas');
             },
         );

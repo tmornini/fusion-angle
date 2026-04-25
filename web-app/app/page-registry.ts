@@ -93,8 +93,8 @@ export const PAGE_REGISTRY: Record<
     teams: {
         title: 'Teams',
         layout: 'sidebar',
-        sourceDir: 'organization',
-        sourceFile: 'teams',
+        sourceDir: 'teams',
+        sourceFile: 'index',
         icon: 'users',
         keywords: 'team members roster',
     },
@@ -116,15 +116,13 @@ export const PAGE_REGISTRY: Record<
         keywords:
             'profile settings personal',
     },
-    settings: {
-        title: 'Company Settings',
+    company: {
+        title: 'Company',
         layout: 'sidebar',
-        sourceDir: 'settings',
+        sourceDir: 'company',
         sourceFile: 'index',
         icon: 'settings',
-        keywords:
-            'company organization'
-            + ' settings',
+        keywords: 'company organization',
     },
     billing: {
         title: 'Billing',

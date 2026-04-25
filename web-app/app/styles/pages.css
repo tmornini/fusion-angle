@@ -1808,3 +1808,40 @@ svg.flow-canvas [data-edge-id] {
   color: hsl(var(--error-text));
 }
 
+/* ==========================================
+   PROFILE
+   ========================================== */
+
+.profile-avatar-wrap {
+  position: relative;
+}
+
+.profile-avatar {
+  width: 6rem;
+  height: 6rem;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg,
+    hsl(var(--primary) / 0.2),
+    hsl(var(--primary) / 0.05));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.profile-avatar-btn {
+  position: absolute;
+  bottom: -0.5rem;
+  right: -0.5rem;
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--radius-full);
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  cursor: pointer;
+  box-shadow: var(--shadow-lg);
+}
+

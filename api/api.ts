@@ -18,7 +18,7 @@ import type {
     FlowWorkOrderEntity,
     WorkOrderTransitionEntity,
     WorkOrderClaimEntity,
-    CompanySettingsEntity,
+    CompanyEntity,
     OrganizationEntity,
 } from './types';
 
@@ -276,14 +276,12 @@ const routes: Route[] = [
             ),
     }),
 
-    route('company-settings', {
+    route('company', {
         get: (db) =>
-            db.companySettings.get(),
+            db.company.get(),
         put: (db, _, payload) =>
-            db.companySettings.put(
-                fields<
-                    CompanySettingsEntity
-                >(payload),
+            db.company.put(
+                fields<CompanyEntity>(payload),
             ),
     }),
     route('organization', {

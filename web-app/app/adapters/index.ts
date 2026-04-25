@@ -13,6 +13,7 @@ export * from './ideas';
 export * from './projects';
 export * from './teams';
 export * from './admin';
+export * from './activities';
 export * from './snapshots';
 export * from './flow-queries';
 export * from './flow-mutations';

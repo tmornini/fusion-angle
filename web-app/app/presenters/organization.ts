@@ -26,10 +26,9 @@ export class OrganizationPresenter {
             <h1
                 class="text-3xl font-display
                        font-bold mb-2"
-            >Administration</h1>
+            >Organization</h1>
             <p class="text-muted">
-                ${'Manage your organization,'
-                    + ' users, and billing'}
+                Manage your organization
             </p>
         </div>
 

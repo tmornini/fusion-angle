@@ -55,7 +55,7 @@ export const SIDEBAR_NAV_ITEMS: readonly SidebarNavItem[] = [
     {
         href: '../profile/index.html',
         pageLink: 'profile',
-        label: 'My Profile',
+        label: 'Profile',
         icon: iconUser,
     },
     {
@@ -65,15 +65,15 @@ export const SIDEBAR_NAV_ITEMS: readonly SidebarNavItem[] = [
         icon: iconBuilding,
     },
     {
-        href: '../organization/teams.html',
+        href: '../teams/index.html',
         pageLink: 'teams',
         label: 'Teams',
         icon: iconUsers,
     },
     {
-        href: '../settings/index.html',
-        pageLink: 'settings',
-        label: 'Company Settings',
+        href: '../company/index.html',
+        pageLink: 'company',
+        label: 'Company',
         icon: iconSettings,
     },
     {

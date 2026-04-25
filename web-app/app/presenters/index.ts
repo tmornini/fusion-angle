@@ -34,8 +34,11 @@ export {
     ProfilePresenter,
 } from './profile';
 export {
-    SettingsPresenter,
-} from './settings';
+    CompanyPresenter,
+} from './company';
 export {
     FlowDesignerPresenter,
 } from './flow-designer';
+export {
+    WorkingStylesPresenter,
+} from './working-styles';

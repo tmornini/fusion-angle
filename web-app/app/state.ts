@@ -182,6 +182,25 @@ function initListeners(): void {
                 });
                 applyTheme();
             }
+            if (
+                e.key === STORAGE_KEY_SIDEBAR
+                && (
+                    e.newValue === 'true'
+                    || e.newValue === 'false'
+                )
+            ) {
+                const collapsed =
+                    e.newValue === 'true';
+                setState({
+                    isSidebarCollapsed:
+                        collapsed,
+                });
+                document.documentElement
+                    .classList.toggle(
+                        'sidebar-collapsed',
+                        collapsed,
+                    );
+            }
         },
     );
 }

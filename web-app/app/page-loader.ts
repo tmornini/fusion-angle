@@ -42,17 +42,15 @@ const pageModules: Record<
     'flow-detail': () =>
         import('../flows/detail'),
     teams: () =>
-        import(
-            '../organization/teams'
-        ),
+        import('../teams/index'),
     organization: () =>
         import(
             '../organization/index'
         ),
     profile: () =>
         import('../profile/index'),
-    settings: () =>
-        import('../settings/index'),
+    company: () =>
+        import('../company/index'),
     billing: () =>
         import('../billing/index'),
     users: () =>

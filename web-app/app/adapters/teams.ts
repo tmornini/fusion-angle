@@ -45,6 +45,12 @@ export async function getManagedUsers(
         .map(entity => new User(entity));
 }
 
+export async function getUserEntity(
+    id: string,
+): Promise<UserEntity> {
+    return GET<UserEntity>(`users/${id}`);
+}
+
 export async function putUser(
     id: string,
     entity: Omit<UserEntity, 'id'>,

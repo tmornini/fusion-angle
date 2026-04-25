@@ -11,10 +11,7 @@ import {
     iconAlertCircle,
     iconClock,
     iconUserX,
-    iconHeart,
-    iconTarget,
-    iconMessageSquare,
-    iconZap,
+    iconUserCheck,
     iconShield,
 } from '../icons';
 import {
@@ -22,6 +19,9 @@ import {
     AVAILABILITY_LOW,
     type User,
 } from '../adapters';
+import {
+    WorkingStylesPresenter,
+} from './working-styles';
 
 type AvailabilityTone =
     'success' | 'warning' | 'error';
@@ -44,19 +44,6 @@ function buildStatusDot(
     return html`<div class="status-dot"
         data-tone="${tone}"></div>`;
 }
-
-const DIMENSION_ICONS: Record<
-    string,
-    (
-        size: number,
-        cssClass: string,
-    ) => SafeHtml
-> = {
-    analytical: iconTarget,
-    driver: iconZap,
-    expressive: iconMessageSquare,
-    amiable: iconHeart,
-};
 
 const ROLE_LABELS: Record<
     string,
@@ -381,16 +368,41 @@ export class UserPresenter {
                 </p>
             </div>
             <div class="flex-shrink-0">
-                <button
-                    class="${
-                        'btn btn-ghost '
-                        + 'btn-icon btn-sm'
-                    }"
-                    data-edit-user="${
-                        this.#user.idForLink()
-                    }">
-                    ${iconStar(16, '')}
-                </button>
+                ${this.#user.isDeactivated()
+                    ? html`<button
+                        class="${
+                            'btn btn-ghost '
+                            + 'btn-icon btn-sm'
+                        }"
+                        data-reactivate-user="${
+                            this.#user
+                                .idForLink()
+                        }"
+                        title="Reactivate user"
+                        aria-label="${
+                            'Reactivate user'
+                        }">
+                        ${iconUserCheck(
+                            16, '',
+                        )}
+                    </button>`
+                    : html`<button
+                        class="${
+                            'btn btn-ghost '
+                            + 'btn-icon btn-sm'
+                        }"
+                        data-deactivate-user="${
+                            this.#user
+                                .idForLink()
+                        }"
+                        title="Deactivate user"
+                        aria-label="${
+                            'Deactivate user'
+                        }">
+                        ${iconUserX(
+                            16, '',
+                        )}
+                    </button>`}
             </div>
         </div>`;
     }
@@ -441,6 +453,11 @@ export class UserPresenter {
     }
 
     #buildDimensionsTab(): SafeHtml {
+        const styles =
+            new WorkingStylesPresenter(
+                this.#user
+                    .parsedTeamDimensions(),
+            );
         return html`
         <div
             class="tabs mb-4"
@@ -468,61 +485,7 @@ export class UserPresenter {
                 Team Dimensions Assessment
                 Results
             </p>
-            ${Object.entries(
-                this.#user
-                    .parsedTeamDimensions(),
-            ).map(([key, value]) =>
-                    html`
-            <div class="user-dim-row">
-                <div
-                    class="${
-                        'flex items-center'
-                        + ' justify-between mb-2'
-                    }"
-                >
-                    <div
-                        class="${
-                            'flex items-center'
-                            + ' gap-2'
-                        }"
-                    >
-                        ${(DIMENSION_ICONS[key]
-                            ?? iconStar)(
-                            16,
-                            'text-primary',
-                        )}
-                        <span
-                            class="${
-                                'text-sm'
-                                + ' font-medium'
-                                + ' text-capitalize'
-                            }"
-                        >${key}</span>
-                    </div>
-                    <span
-                        class="${
-                            'text-sm '
-                            + 'font-bold '
-                            + 'text-primary'
-                        }"
-                    >${value}%</span>
-                </div>
-                <div
-                    class="${
-                        'progress'
-                        + ' user-dim-progress'
-                    }"
-                >
-                    <div
-                        class="progress-fill"
-                        style="${
-                            '--progress-fill:'
-                            + value + '%'
-                        }"
-                    ></div>
-                </div>
-            </div>
-                `)}
+            ${styles.buildRows()}
         </div>`;
     }
 

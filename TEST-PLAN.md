@@ -4,16 +4,30 @@
 
 ### Protocol
 
-All sections are executed over HTTP — build with
-`./build --no-zip /tmp/fusion-test/` and serve via
-`cd /tmp/fusion-test/ && python3 -m http.server 8080`.
+All sections are executed over HTTP. Two execution modes:
+
+- **Serial (single human tester)**:
+  `./build --no-zip /tmp/fusion-test/` then
+  `cd /tmp/fusion-test/ && python3 -m http.server 8080`. Run
+  sections in document order.
+- **Parallel (Claude Code agents)**:
+  `TMPDIR=/tmp/claude ./build --no-zip ~/Desktop/fusion-test/`
+  then `cd ~/Desktop/fusion-test/ && python3 -m http.server 8080`.
+  See `CLAUDE.md` section `## Testing` for the six-phase agent
+  protocol, entity mutation domain scoping, and known MCP
+  limitations (flow-designer gestures, `resize_window`, file I/O).
 
 ### Execution Order
 
 Sections A through AA establish a pristine environment and populate
-it with data through the UI. Sections B through J then verify every
-page renders correctly against that data. The plan is designed to
-run as a single continuous regression pass.
+it through the UI. Sections B through J then verify every page
+renders correctly against that data.
+
+In the serial run the plan is a single continuous regression pass.
+In the parallel run B–J split across seven agents each with its
+own browser tab and disjoint entity mutation domain; I runs alone
+(global UI state); G30–G35 run alone last (they wipe the database).
+See `CLAUDE.md` section `## Testing`.
 
 ## Summary
 
@@ -38,7 +52,7 @@ run as a single continuous regression pass.
 ## A. Build & Setup
 
 - [ ] **A1** Run `./build` from a clean working directory. PASS: exits 0, prints no errors, creates `~/Desktop/fusion-ai-<sha>.zip`.
-- [ ] **A2** Run `./build --no-zip /tmp/fusion-test/`. PASS: `/tmp/fusion-test/` contains `assets/app.js`, `assets/styles.css`, `assets/` (*.woff2 fonts), `index.html`, and 13 page directories containing 23 HTML page files, plus root `index.html`.
+- [ ] **A2** Run `./build --no-zip /tmp/fusion-test/`. PASS: `/tmp/fusion-test/` contains `assets/app.js`, `assets/styles.css`, `assets/` (*.woff2 fonts), `index.html`, and 14 page directories containing 24 HTML page files, plus root `index.html`.
 - [ ] **A3** Start an HTTP server from the build directory (`cd /tmp/fusion-test/ && python3 -m http.server 8080`). PASS: server starts without errors.
 - [ ] **A4** Open `http://localhost:8080/` in the test browser. PASS: redirects to `snapshots/index.html` when no data exists, or `landing/index.html` (which auto-redirects to `dashboard/index.html` after ~2 seconds) when data has been loaded.
 - [ ] **A5** Open DevTools Console and confirm no JavaScript errors on initial load. PASS: console is clean (warnings from browser extensions are acceptable).
@@ -64,11 +78,11 @@ on. Run these in order.
 - [ ] **AA6** Repeat for all 10 users: Sarah Chen, Mike Thompson, Jessica Park, David Martinez, Emily Rodriguez (pending), Alex Kim, Marcus Johnson, David Kim, Lisa Wang, James Miller (deactivated). PASS: all 10 appear on Users page with correct name, email, role, and status badge.
 - [ ] **AA7** Navigate to Teams page. PASS: users display with correct availability color coding and performance stats.
 
-### AA3. Profile & Company Settings
+### AA3. Profile & Company
 
 - [ ] **AA8** Navigate to Profile. Edit fields (phone, bio, strengths). Click "Save Changes". PASS: toast "Profile saved" appears.
 - [ ] **AA9** Navigate away, return to Profile. PASS: edited fields persist with saved values.
-- [ ] **AA10** Navigate to Company Settings. Edit a field (e.g. timezone). Click save. PASS: success toast appears.
+- [ ] **AA10** Navigate to Company. Edit a field (e.g. timezone). Click save. PASS: success toast appears.
 - [ ] **AA11** Navigate away, return to Settings. PASS: edited field persists with saved value.
 
 ### AA4. Create Ideas
@@ -191,7 +205,7 @@ on. Run these in order.
 - [ ] **AA41** Edit profile: change phone number.
   Save, navigate away, return. PASS: changed phone
   persists.
-- [ ] **AA42** Edit company settings: change
+- [ ] **AA42** Edit company: change
   timezone. Save, navigate away, return. PASS:
   changed timezone persists.
 
@@ -244,8 +258,8 @@ on. Run these in order.
 - [ ] **C1** Navigate to `dashboard/`. PASS: page loads with sidebar, header, and main content area.
 - [ ] **C2** Sidebar shows flat navigation
   links in this order: Dashboard, Ideas,
-  Projects, Flows, Workbox, My Profile,
-  Organization, Teams, Company Settings,
+  Projects, Flows, Workbox, Profile,
+  Organization, Teams, Company,
   Billing, Snapshots, Design System. PASS:
   all 12 links present, in order, and styled.
 - [ ] **C3** Header shows search bar, greeting
@@ -265,7 +279,7 @@ on. Run these in order.
 
 ### Ideas List (`ideas/`)
 
-- [ ] **D1** Navigate to `ideas/`. PASS: table/list shows 11 ideas with title, status, and Time/Cost/Impact stats. Ideas without estimates show "—" (em-dash) instead of zero values.
+- [ ] **D1** Navigate to `ideas/`. PASS: list shows 11 ideas as cards, each with a drag-handle grip, title, status badge, and (for approved ideas) a Convert button. Ideas represent the problem-and-proposed-solution shape and do not carry time/cost/impact estimates; those fields live on projects created by conversion.
 - [ ] **D2** Each idea row shows a status badge
   (Active, In Review, Approved, Promoted, Sent
   Back, or Archived). PASS: badges render with
@@ -290,7 +304,7 @@ on. Run these in order.
   Target Users, Proposed Solution, Expected
   Outcome, Success Metrics). PASS: all fields populated. No Details or Estimates cards.
 - [ ] **D12** Click "Edit" button. PASS: text fields become editable inputs/textareas, Save and Cancel buttons appear, Edit button hides.
-- [ ] **D13** Modify a field (e.g. title), click "Save". PASS: toast "Idea saved" appears, page returns to view mode with updated data.
+- [ ] **D13** Modify a field (e.g. Problem Statement or Expected Outcome — inline edit exposes the four textarea fields only; title is not editable here), click "Save". PASS: toast "Idea saved" appears, page returns to view mode with updated data.
 
 ### Idea Detail — Edit & Actions
 
@@ -378,10 +392,12 @@ on. Run these in order.
   creation limited to approved projects only".
   PASS: correct UI for project status.
 - [ ] **E7** On an approved project, click "New
-  Flow" button. PASS: a new flow is created and
-  the browser navigates to the flow designer
-  page. The new flow is associated with the
-  current project.
+  Flow" button. PASS: a "New Flow" dialog opens
+  with a Flow Name input and Create/Cancel
+  buttons. Enter a name and click Create. PASS:
+  a new flow is created and the browser
+  navigates to the flow designer page. The new
+  flow is associated with the current project.
 
 ### Project Detail — Edit Mode
 
@@ -427,8 +443,12 @@ on. Run these in order.
   distributed between them. Locked checkbox in
   header controls edit lock. SVG canvas to the
   right of the toolbar with dot grid background
-  showing the flow graph. Opening a properties
-  panel automatically disables Auto Fit. Changes
+  showing the flow graph. When Auto Fit is on,
+  conflicting interactions (drag, pan, zoom
+  buttons, panel pan) are gated with a fire-and-
+  toast "blocked" message rather than being
+  silently absorbed; the user either turns Auto
+  Fit off or accepts the constraint. Changes
   auto-save (no explicit Save button).
 - [ ] **F8** Nodes display correctly: start node
   has green border with its name centered in the
@@ -471,9 +491,10 @@ on. Run these in order.
   the new selection and the canvas re-centers on
   it.
 - [ ] **F14** Enable Auto Fit, then double-click a
-  node. PASS: panel opens, Auto Fit toggles off
-  (button no longer highlighted), and the canvas
-  centers on the node.
+  node. PASS: the panel-open gesture is gated by
+  Auto Fit — a toast reports the action is blocked.
+  Turn Auto Fit off and double-click again. PASS:
+  panel opens and the canvas centers on the node.
 - [ ] **F15** Drag from a middle node's port into
   empty canvas past 20 pixels, without holding
   Shift. PASS: during the drag a faint bezier
@@ -485,11 +506,13 @@ on. Run these in order.
 - [ ] **F16** Drag a standard node to a new
   position. PASS: node follows the pointer and
   can be placed freely on the canvas.
-- [ ] **F17** Attempt to drag the start node. PASS:
-  it does not move (the start node is
-  non-draggable — clicking anywhere on it
-  initiates a drag-from-start instead). The
-  complete node is draggable like standard nodes.
+- [ ] **F17** Drag the start node. PASS: it moves
+  freely like any standard node (start and
+  complete nodes are both draggable; Auto Layout
+  restores them to upper-left and lower-right
+  respectively when invoked). Clicking the start
+  node's port still initiates a drag-from-start
+  to create a new state.
 - [ ] **F18** Click "Auto Layout" in the vertical
   toolbar on the left. PASS:
   all nodes reposition based on their rank from
@@ -596,18 +619,21 @@ on. Run these in order.
 ### Flow Designer — Additional Coverage
 
 - [ ] **F40** Toggle the Locked checkbox in the designer header.
-  PASS: connection ports disappear from all middle nodes, Delete and
-  Auto Layout toolbar buttons become disabled, and opening a
-  properties panel shows fields as read-only (inputs `disabled`).
-  Untoggle Locked: ports return, buttons re-enable, fields editable.
+  PASS: connection ports disappear from all middle nodes, the
+  Delete toolbar button becomes disabled, and opening a properties
+  panel shows fields as read-only (inputs `disabled`). Auto Layout
+  remains enabled because it only repositions nodes without
+  changing structure. Untoggle Locked: ports return, the Delete
+  button re-enables, fields become editable.
 - [ ] **F41** With a non-trivial flow loaded, click "Copy Mermaid"
   in the toolbar. PASS: toast confirms the clipboard copy. Paste the
   clipboard contents into a text editor — the result is valid Mermaid
   flowchart syntax that round-trips through `parseMermaid` without
   losing nodes, edges, or field definitions.
 - [ ] **F42** Click "Export" in the toolbar. PASS: a `.zip` file
-  downloads. Unzip the archive — it contains at least a `flow.mmd`
-  Mermaid source and a `layout.json` with node positions.
+  downloads. Unzip the archive — it contains `flow.mmd` (Mermaid
+  source), `flow.json` (graph with node positions), and a
+  human-readable `flow.txt`.
 - [ ] **F43** On `flows/index.html` click "Import Flow", select a
   `.mmd` file previously exported from a known flow, choose a
   project, and submit. PASS: the imported flow opens in the designer
@@ -636,7 +662,7 @@ on. Run these in order.
 - [ ] **WB1** Navigate to `workbox/`. PASS:
   page shows "Workbox" title, subtitle "Your
   work order inbox", Active/Archive tabs, and
-  a "+ New" button.
+  a "+ Create Work Order" button.
 - [ ] **WB2** With no work orders, the Active
   tab shows an empty state with mail icon and
   "No Active Work Orders Yet" message.
@@ -646,10 +672,10 @@ on. Run these in order.
 
 ### Workbox — Create Work Order
 
-- [ ] **WB4** Click "+ New". PASS: a "New Work
-  Order" dialog opens with a Flow dropdown
-  listing available flows and Create/Cancel
-  buttons.
+- [ ] **WB4** Click "+ Create Work Order". PASS:
+  a dropdown menu opens listing available flows
+  by name. (No separate dialog or Cancel button;
+  the flow listing itself is the selector.)
 - [ ] **WB5** Select a flow (e.g. "Customer
   Onboarding") and click Create. PASS: work
   order is created, browser navigates to the
@@ -690,9 +716,10 @@ on. Run these in order.
   Active tab. PASS: work order is claimed and
   browser navigates to the action screen
   showing the new state's fields.
-- [ ] **WB13** Click "Unclaim". PASS: browser
-  navigates to inbox, work order reappears in
-  the Active tab.
+- [ ] **WB13** Click "Release Work Order". PASS:
+  a single click soft-deletes the active claim
+  and the browser navigates to the inbox, where
+  the work order reappears in the Active tab.
 
 ### Workbox — Completion
 
@@ -735,9 +762,9 @@ on. Run these in order.
 
 ## G. Admin Pages
 
-### Team (`organization/teams.html`)
+### Team (`teams/index.html`)
 
-- [ ] **G1** Navigate to `organization/teams.html`. PASS: shows roster of seeded team members with initials avatars, names, roles, departments, availability percentage badges, strength chips, performance stats (percentage, active count, completed count), and status dots (green=available, yellow=busy, red=limited). Search input and "Activity Feed" / "Add Member" buttons visible.
+- [ ] **G1** Navigate to `teams/index.html`. PASS: shows roster of seeded team members with initials avatars, names, roles, departments, availability percentage badges, strength chips, performance stats (percentage, active count, completed count), and status dots (green=available, yellow=busy, red=limited). Search input and "Activity Feed" / "Add Member" buttons visible.
 - [ ] **G2** Click a team member card. PASS: right-side detail panel populates with member name, role, email, and large avatar with initials.
 - [ ] **G3** Detail panel shows two tabs (Dimensions, Performance). Click between tabs. PASS: tab content switches — Dimensions shows Driver/Analytical/Expressive/Amiable scores with progress bars.
 - [ ] **G4** Click a different team member card. PASS: detail panel updates to show the newly selected member's information.
@@ -748,8 +775,8 @@ on. Run these in order.
 
 ### Account (`organization/index.html`)
 
-- [ ] **G9** Navigate to `organization/index.html`. PASS: shows account overview with plan info (Business plan), billing date, seat usage (18/25), and resource usage bars.
-- [ ] **G10** Health score (92, "excellent") is displayed. PASS: score and label visible.
+- [ ] **G9** Navigate to `organization/index.html`. PASS: shows account overview with plan info, billing date, seat usage, and resource usage bars. (The overview values on this page are currently hardcoded placeholders — 18/25 seats, 12 Projects, 47 Ideas — not computed from live tables. Verify the page renders without error; numeric accuracy will be addressed when the values are wired to the database.)
+- [ ] **G10** Health score (92, "excellent") is displayed. PASS: score and label visible. (Also hardcoded; see G9.)
 
 ### Profile (`profile/`)
 
@@ -758,11 +785,11 @@ on. Run these in order.
 - [ ] **G13** Edit a field (e.g. phone), toggle strengths, and click "Save Changes". PASS: toast "Profile saved" appears.
 - [ ] **G14** Navigate away from Profile (e.g. to Dashboard), then return to Profile. PASS: the edited field retains the saved value — data was persisted to the database, not just displayed via toast.
 
-### Company Settings (`settings/`)
+### Company (`company/`)
 
-- [ ] **G15** Navigate to `settings/`. PASS: shows company info (Stark Industries, acmecorp.com, Technology, 51-200).
-- [ ] **G16** Security settings visible: SSO (off), 2FA (on), IP Whitelist (off). PASS: toggle/indicator states match seed data.
-- [ ] **G17** Edit a setting (e.g. timezone or language) and save. PASS: success toast or save completes without error.
+- [ ] **G15** Navigate to `company/`. PASS: shows the current Company form — Name (e.g. "Stark Industries") and Domain (e.g. "acmecorp.com"). The broader settings feature is being reduced; additional fields may be removed in upcoming work.
+- [ ] **G16** _[RETIRED]_ Security settings (SSO, 2FA, IP Whitelist) are not present in the current Company UI. This test is retired pending removal of the broader feature.
+- [ ] **G17** Edit Name (or Domain) and click save. PASS: success toast or save completes without error.
 - [ ] **G18** Navigate away from Settings, then return. PASS: the edited setting retains the saved value — data was persisted to the database.
 
 ### Manage Users (`organization/users.html`)
@@ -797,11 +824,17 @@ on. Run these in order.
   inline error reports the upload failed with a human-readable
   message; existing data in localStorage is untouched (verify via
   DevTools that no fusion-ai:* keys were overwritten or cleared).
-- [ ] **G36** On `organization/users.html`, open the row menu of an
-  active user and choose "Deactivate" (or equivalent). PASS: a
-  confirmation dialog appears; on confirm the user's status badge
-  changes to "Deactivated" with reduced opacity styling, and the
-  user's row no longer counts toward the active-user header stat.
+- [ ] **G36** On `organization/users.html`, each active or pending
+  user row shows a user-X icon button (aria-label "Deactivate
+  user") and each deactivated row shows a user-check icon button
+  ("Reactivate user"). Click an active user's deactivate button.
+  PASS: a toast "User deactivated" fires and the list reloads with
+  the user's badge changed to "Deactivated" and reduced opacity
+  styling; the user no longer counts toward the active header
+  stat. Click the reactivate button on a deactivated row. PASS: a
+  toast "User reactivated" fires and the user returns to active.
+  The action is intentionally reversible with a single click, so
+  no confirmation dialog is required.
 
 ### Billing (`billing/`) — STUB
 
@@ -861,12 +894,12 @@ feature is implemented.
 - [ ] **I17** Type a search term (e.g. "ideas"). PASS: filtered results appear. Select a result — navigates to the corresponding page.
 - [ ] **I18** Press `Escape`. PASS: command palette closes.
 - [ ] **I19** Open command palette, type a search term. Use `Down Arrow` and `Up Arrow` to navigate results. PASS: active result highlight moves with arrow keys. Press `Enter`. PASS: navigates to the highlighted result.
-- [ ] **I20** Open command palette with an empty search field. PASS: results are grouped by category (Pages, Ideas, Projects, People) with category headers. Type a term that matches no results. PASS: result list is empty or shows a no-results message.
+- [ ] **I20** Open command palette with an empty search field. PASS: results list shows up to 12 items from the combined index, grouped by category (Pages, Ideas, Projects, People) with category headers — when the dataset is sparse enough for multiple categories to fit in 12 items, multiple groups appear; otherwise a single group is shown. Type a multi-category term (e.g. "dashboard") that matches across groups. PASS: results regroup under multiple category headers. Type a term that matches no results. PASS: result list is empty or shows a no-results message.
 
 ### Loading States
 
 - [ ] **I21** Navigate to a data-dependent page with mock data loaded. PASS: loading skeleton (card-grid, card-list, or detail pattern) appears briefly before content renders.
-- [ ] **I22** If an error occurs loading a page (e.g. corrupted localStorage), error state with "Try Again" retry button is shown. PASS: clicking retry re-attempts data loading.
+- [ ] **I22** If an error occurs inside a `withLoadingState()` fetch path (e.g. a data-dependent page hits a thrown adapter error after the database initialized successfully), the error state with "Try Again" retry button is shown. PASS: clicking retry re-attempts data loading. (Note: errors surfaced from `initDatabase` itself — e.g. corrupted localStorage that fails before the page renders — show a separate "Failed to initialize database" error UI via `handleDatabaseError`, without a retry button. Both are valid error states for different layers.)
 
 ### Toasts
 

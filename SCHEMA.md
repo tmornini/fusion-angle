@@ -163,7 +163,7 @@ structure as `flows.graph` plus flow-level metadata
 | comment | TEXT |
 ## Admin
 
-### company_settings
+### company
 
 Singleton table (single row, `id = '1'`).
 

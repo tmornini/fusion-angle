@@ -299,6 +299,12 @@
   transition: opacity
     var(--duration-fast) var(--ease-default);
 }
+.badge[data-tab]:not(.active) {
+  opacity: 0.5;
+}
+.badge[data-tab].active {
+  box-shadow: 0 0 0 2px hsl(var(--primary));
+}
 
 /* Status Badges */
 .status-badge {

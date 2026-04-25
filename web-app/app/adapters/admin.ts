@@ -4,7 +4,7 @@ import {
 import type {
     UserEntity,
     OrganizationEntity,
-    CompanySettingsEntity,
+    CompanyEntity,
     ActivityEntity,
     ActivityActorEntity,
 } from '../../../api/types';
@@ -25,14 +25,12 @@ const RECENT_ACTIVITY_COUNT = 3;
 export async function getOrganization(
 ): Promise<Organization> {
     const [
-        entity, settings,
+        entity, company,
         activities, userMap,
         activityActors,
     ] = await Promise.all([
         GET<OrganizationEntity>('organization'),
-        GET<CompanySettingsEntity>(
-            'company-settings',
-        ),
+        GET<CompanyEntity>('company'),
         GET<ActivityEntity[]>(
             'activities',
         ),
@@ -77,7 +75,7 @@ export async function getOrganization(
 
     return new Organization(
         entity,
-        settings.name,
+        company.name,
         recent,
     );
 }
@@ -91,6 +89,7 @@ export interface Profile {
     department: string;
     bio: string;
     strengths: string[];
+    teamDimensions: Record<string, number>;
 }
 
 export const allStrengths = [
@@ -123,6 +122,8 @@ export async function getProfile(
         bio: user.bio,
         strengths:
             userObj.parsedStrengths(),
+        teamDimensions:
+            userObj.parsedTeamDimensions(),
     };
 }
 
@@ -148,27 +149,25 @@ export async function putProfile(
     await PUT('users/current', updated);
 }
 
-export interface CompanySettings {
+export interface Company {
     name: string;
     domain: string;
 }
 
-export async function getCompanySettings(
-): Promise<CompanySettings> {
+export async function getCompany(
+): Promise<Company> {
     const row =
-        await GET<CompanySettingsEntity>(
-            'company-settings',
-        );
+        await GET<CompanyEntity>('company');
     return {
         name: row.name,
         domain: row.domain,
     };
 }
 
-export async function putCompanySettings(
-    settings: CompanySettings,
+export async function putCompany(
+    company: Company,
 ): Promise<void> {
-    await PUT('company-settings', { ...settings });
+    await PUT('company', { ...company });
 }
 
 export { Activity } from '../../../api/types';

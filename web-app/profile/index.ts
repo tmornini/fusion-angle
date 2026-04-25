@@ -1,72 +1,218 @@
 import {
-    $,
-    populateIcons,
-    attr,
-    bindEnterToClick,
+    $, $$, $input, $select, $textarea,
+    attr, bindEnterToClick,
 } from '../app/dom';
 import {
     ProfilePresenter,
 } from '../app/presenters';
 import {
-    html,
-    setHtml,
-    SafeHtml,
+    html, setHtml,
 } from '../app/safe-html';
 import { showToast } from '../app/toast';
-import {
-    iconMail,
-    iconPhone,
-    iconBriefcase,
-    iconStar,
-    iconSave,
-    iconCheckCircle2,
-    iconCamera,
-    iconChevronRight,
-} from '../app/icons';
+import { iconCheckCircle2 } from '../app/icons';
 import {
     buildErrorState,
 } from '../app/loading-states';
 import { log } from '../app/logger';
-import {
-    trimStrings,
-} from '../app/core';
+import { trimStrings } from '../app/core';
 import {
     getProfile,
     putProfile,
-    allStrengths,
+    type Profile,
 } from '../app/adapters';
 
-export async function init(): Promise<void> {
-    const selectedStrengths = new Set<string>(
+const escapeController =
+    { current: new AbortController() };
+
+let currentProfile: Profile | null = null;
+let selectedStrengths: Set<string> =
+    new Set();
+
+function mutateProfilePage(
+    profile: Profile,
+    isEditing: boolean,
+): void {
+    currentProfile = profile;
+    selectedStrengths =
+        new Set(profile.strengths);
+    const container = $(
+        '#profile-content', document,
     );
-
-    function buildStrengthChip(
-        name: string,
-    ): SafeHtml {
-        const isActive =
-            selectedStrengths.has(name);
-        return html`<button class="${
-            'strength-chip btn '
-            + (isActive
-                ? 'btn-primary'
-                : 'btn-secondary')
-            + ' btn-sm'
-        }" data-strength="${name}">
-    ${
-        isActive
-            ? html`${
-                iconCheckCircle2(12, '')
-            } `
-            : html``
-    }${name}
-    </button>`;
-    }
-
-    const container = $('.page-content', document);
     if (!container) return;
-    let profile: Awaited<
-        ReturnType<typeof getProfile>
-    >;
+    const presenter =
+        new ProfilePresenter(profile);
+    setHtml(
+        container,
+        presenter.buildPage(
+            isEditing,
+            selectedStrengths,
+        ),
+    );
+    bindProfileEvents(profile, isEditing);
+}
+
+function bindProfileEvents(
+    profile: Profile,
+    isEditing: boolean,
+): void {
+    escapeController.current.abort();
+    escapeController.current =
+        new AbortController();
+    if (isEditing) {
+        document.addEventListener(
+            'keydown',
+            (e: KeyboardEvent) => {
+                if (e.key === 'Escape') {
+                    e.preventDefault();
+                    $(
+                        '#profile-cancel-btn',
+                        document,
+                    )?.click();
+                }
+            },
+            {
+                signal: escapeController
+                    .current.signal,
+            },
+        );
+        bindStrengthChips();
+        bindEditFieldEnter();
+    }
+    $('#profile-edit-btn', document)
+        ?.addEventListener(
+            'click',
+            () => mutateProfilePage(
+                profile, true,
+            ),
+        );
+    $('#profile-cancel-btn', document)
+        ?.addEventListener(
+            'click',
+            () => mutateProfilePage(
+                profile, false,
+            ),
+        );
+    $('#profile-save-btn', document)
+        ?.addEventListener(
+            'click',
+            handleSave,
+        );
+}
+
+function bindStrengthChips(): void {
+    $$('.strength-chip', document)
+        .forEach(chip => {
+            chip.addEventListener(
+                'click',
+                () => toggleChip(chip),
+            );
+        });
+}
+
+function toggleChip(
+    chip: HTMLElement,
+): void {
+    const name =
+        attr(chip, 'data-strength');
+    if (selectedStrengths.has(name)) {
+        selectedStrengths.delete(name);
+        chip.className =
+            'strength-chip btn'
+            + ' btn-secondary btn-sm';
+        chip.textContent = name;
+    } else {
+        selectedStrengths.add(name);
+        chip.className =
+            'strength-chip btn'
+            + ' btn-primary btn-sm';
+        setHtml(
+            chip,
+            html`${
+                iconCheckCircle2(12, '')
+            } ${name}`,
+        );
+    }
+}
+
+function bindEditFieldEnter(): void {
+    const saveSel = '#profile-save-btn';
+    bindEnterToClick(
+        '#profile-first-name', saveSel,
+    );
+    bindEnterToClick(
+        '#profile-last-name', saveSel,
+    );
+    bindEnterToClick(
+        '#profile-email', saveSel,
+    );
+    bindEnterToClick(
+        '#profile-phone', saveSel,
+    );
+    bindEnterToClick(
+        '#profile-role', saveSel,
+    );
+}
+
+async function handleSave(): Promise<void> {
+    if (!currentProfile) return;
+    const updated = readFormValues(
+        currentProfile,
+    );
+    try {
+        await putProfile(updated);
+    } catch (err) {
+        log.error(
+            'putProfile failed',
+            'profile',
+            err,
+        );
+        showToast(
+            'Failed to save profile',
+            'error',
+        );
+        return;
+    }
+    showToast('Profile saved', 'success');
+    mutateProfilePage(updated, false);
+}
+
+function readFormValues(
+    profile: Profile,
+): Profile {
+    return trimStrings({
+        firstName: $input(
+            '#profile-first-name', document,
+        )!.value,
+        lastName: $input(
+            '#profile-last-name', document,
+        )!.value,
+        email: $input(
+            '#profile-email', document,
+        )!.value,
+        phone: $input(
+            '#profile-phone', document,
+        )!.value,
+        role: $input(
+            '#profile-role', document,
+        )!.value,
+        department: $select(
+            '#profile-department', document,
+        )!.value,
+        bio: $textarea(
+            '#profile-bio', document,
+        )!.value,
+        strengths: [...selectedStrengths],
+        teamDimensions:
+            profile.teamDimensions,
+    });
+}
+
+export async function init(): Promise<void> {
+    const container = $(
+        '#profile-content', document,
+    );
+    if (!container) return;
+    let profile: Profile;
     try {
         profile = await getProfile();
     } catch (err) {
@@ -92,208 +238,5 @@ export async function init(): Promise<void> {
             );
         return;
     }
-
-    const presenter =
-        new ProfilePresenter(profile);
-    presenter.initStrengths(
-        selectedStrengths,
-    );
-
-    populateIcons([
-        [
-            '#profile-breadcrumb-separator',
-            iconChevronRight(14, ''),
-        ],
-        [
-            '#profile-save-btn-icon',
-            iconSave(16, ''),
-        ],
-        [
-            '#profile-avatar-btn',
-            iconCamera(14, ''),
-        ],
-        [
-            '#profile-email-label',
-            html`${iconMail(16, '')} Email`,
-        ],
-        [
-            '#profile-phone-label',
-            html`${iconPhone(16, '')} Phone`,
-        ],
-        [
-            '#profile-role-label',
-            html`${
-                iconBriefcase(16, '')
-            } Role`,
-        ],
-        [
-            '#profile-strengths-header',
-            html`${
-                iconStar(20, 'text-primary')
-            } My Strengths`,
-        ],
-    ]);
-
-    presenter.populateForm();
-    const firstName = $(
-        '#profile-first-name', document,
-    )! as HTMLInputElement;
-    const lastName = $(
-        '#profile-last-name', document,
-    )! as HTMLInputElement;
-    const email = $(
-        '#profile-email', document,
-    )! as HTMLInputElement;
-    const phone = $(
-        '#profile-phone', document,
-    )! as HTMLInputElement;
-    const role = $(
-        '#profile-role', document,
-    )! as HTMLInputElement;
-    const department = $(
-        '#profile-department', document,
-    )! as HTMLSelectElement;
-    const bio = $(
-        '#profile-bio', document,
-    )! as HTMLTextAreaElement;
-    const strengthsContainer = $(
-        '#profile-strengths', document,
-    );
-    if (strengthsContainer) {
-        setHtml(
-            strengthsContainer,
-            html`${allStrengths.map(
-                buildStrengthChip,
-            )}`,
-        );
-        strengthsContainer
-            .querySelectorAll<HTMLElement>(
-                '.strength-chip',
-            )
-            .forEach(chip => {
-                chip.addEventListener(
-                    'click',
-                    () => {
-                        const name = attr(
-                            chip,
-                            'data-strength',
-                        );
-                        if (
-                            selectedStrengths
-                                .has(name)
-                        ) {
-                            selectedStrengths
-                                .delete(name);
-                            chip.className =
-                                'strength-chip'
-                                + ' btn'
-                                + ' btn-secondary'
-                                + ' btn-sm';
-                            chip.textContent =
-                                name;
-                        } else {
-                            selectedStrengths
-                                .add(name);
-                            chip.className =
-                                'strength-chip'
-                                + ' btn'
-                                + ' btn-primary'
-                                + ' btn-sm';
-                            setHtml(
-                                chip,
-                                html`${
-                                    iconCheckCircle2(
-                                        12, '',
-                                    )
-                                } ${name}`,
-                            );
-                        }
-                    },
-                );
-            });
-    }
-
-    $(
-        '#profile-save-btn', document,
-    )?.addEventListener(
-        'click',
-        async () => {
-            const btn = $(
-                '#profile-save-btn',
-                document,
-            )!;
-            btn.textContent = 'Saving...';
-            btn.setAttribute(
-                'disabled', '',
-            );
-            try {
-                await putProfile(trimStrings({
-                    firstName:
-                        firstName.value,
-                    lastName:
-                        lastName.value,
-                    email: email.value,
-                    phone: phone.value,
-                    role: role.value,
-                    department:
-                        department.value,
-                    bio: bio.value,
-                    strengths: [
-                        ...selectedStrengths,
-                    ],
-                }));
-                setHtml(
-                    btn,
-                    html`${
-                        iconCheckCircle2(
-                            16, '',
-                        )
-                    } Saved!`,
-                );
-                showToast(
-                    'Profile saved',
-                    'success',
-                );
-                setTimeout(() => {
-                    setHtml(
-                        btn,
-                        html`${
-                            iconSave(16, '')
-                        } Save Changes`,
-                    );
-                }, 2000);
-            } catch (err) {
-                log.error(
-                    'putProfile failed',
-                    'profile',
-                    err,
-                );
-                showToast(
-                    'Failed to save'
-                    + ' profile',
-                    'error',
-                );
-            }
-            btn.removeAttribute(
-                'disabled',
-            );
-        },
-    );
-
-    const saveSel = '#profile-save-btn';
-    bindEnterToClick(
-        '#profile-first-name', saveSel,
-    );
-    bindEnterToClick(
-        '#profile-last-name', saveSel,
-    );
-    bindEnterToClick(
-        '#profile-email', saveSel,
-    );
-    bindEnterToClick(
-        '#profile-phone', saveSel,
-    );
-    bindEnterToClick(
-        '#profile-role', saveSel,
-    );
+    mutateProfilePage(profile, false);
 }

@@ -12,6 +12,7 @@ import {
 import { navigateTo } from '../app/core';
 import {
     getWorkOrderDetail,
+    postActivity,
     postWorkOrderTransition,
     postWorkOrderClaim,
     deleteWorkOrderClaim,
@@ -398,6 +399,18 @@ function initTransitionButtons(
                                 detail
                                     .currentNodeId(),
                         });
+                    await postActivity({
+                        type: 'status_changed',
+                        action:
+                            'transitioned'
+                            + ' work order',
+                        target:
+                            detail
+                                .flowNameText()
+                            + ' #'
+                            + detail
+                                .displayIdText(),
+                    });
                     showToast(
                         'Transition'
                         + ' complete',

@@ -17,6 +17,7 @@ import {
     getIdea,
     getManagedUsers,
     getIdeaEntity,
+    postActivity,
     putIdea,
     putProject,
     putProjectTeamMember,
@@ -405,6 +406,24 @@ export async function init(
                     }
                     return;
                 }
+                const projectName =
+                    presenter
+                        .projectDetails()[
+                            'project-name'
+                        ] ?? '';
+                await postActivity({
+                    type: 'idea_converted',
+                    action:
+                        'converted idea to'
+                        + ' project',
+                    target: projectName,
+                });
+                await postActivity({
+                    type: 'project_created',
+                    action:
+                        'created new project',
+                    target: projectName,
+                });
                 showToast(
                     'Project created'
                     + ' successfully!',

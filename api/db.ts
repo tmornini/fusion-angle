@@ -8,7 +8,7 @@ import type {
     ActivityEntity,
     FlowEntity,
     FlowVersionEntity,
-    CompanySettingsEntity,
+    CompanyEntity,
     OrganizationEntity,
     IdeaSubmissionEntity,
     ActivityActorEntity,
@@ -106,10 +106,8 @@ export interface DbAdapter {
         EntityStore<
             WorkOrderClaimEntity
         >;
-    companySettings:
-        SingletonStore<
-            CompanySettingsEntity
-        >;
+    company:
+        SingletonStore<CompanyEntity>;
     organization:
         SingletonStore<OrganizationEntity>;
     ideaSubmissions:

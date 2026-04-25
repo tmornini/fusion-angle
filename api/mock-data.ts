@@ -867,7 +867,7 @@ export async function populateMockData(
         ...ideas.map(idea =>
             adapter.ideas.put(idea.id, idea),
         ),
-        adapter.companySettings.put({
+        adapter.company.put({
             name: 'Stark Industries',
             domain: 'acmecorp.com',
         }),
@@ -2877,7 +2877,7 @@ export async function populateBootstrapData(
                 + ' real problems.',
             last_active: dt(0, 18),
         }),
-        adapter.companySettings.put({
+        adapter.company.put({
             name: 'Stark Industries',
             domain: 'acmecorp.com',
         }),

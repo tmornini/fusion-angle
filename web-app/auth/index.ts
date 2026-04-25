@@ -517,7 +517,9 @@ export async function init(): Promise<void> {
                     + ' been created.',
                     'success',
                 );
-                navigateTo('onboarding');
+                setTimeout(() => {
+                    navigateTo('onboarding');
+                }, 1500);
             }
         }, 800);
     });

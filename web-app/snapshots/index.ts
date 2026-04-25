@@ -330,7 +330,6 @@ export async function init(
             try {
                 const text =
                     await file.text();
-                await deleteSchema();
                 await putSnapshot(
                     text,
                 );

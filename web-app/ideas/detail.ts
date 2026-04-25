@@ -17,6 +17,7 @@ import {
 import {
     getIdea,
     getIdeaEntity,
+    postActivity,
     putIdea,
     ideaChanged,
     type Idea,
@@ -190,11 +191,13 @@ function bindIdeaEvents(
     )?.addEventListener(
         'click',
         async () => {
+            let title = '';
             try {
                 const entity =
                     await getIdeaEntity(
                         idea.idForLink(),
                     );
+                title = entity.title;
                 await putIdea(
                     idea.idForLink(),
                     {
@@ -214,6 +217,13 @@ function bindIdeaEvents(
                 );
                 return;
             }
+            await postActivity({
+                type: 'status_changed',
+                action: 'submitted idea'
+                    + ' for review',
+                target: title,
+                status: 'in-review',
+            });
             showToast(
                 'Submitted for review',
                 'success',
@@ -232,9 +242,11 @@ function bindApprovalEvents(
     )?.addEventListener(
         'click',
         async () => {
+            let title = '';
             try {
                 const entity =
                     await getIdeaEntity(ideaId);
+                title = entity.title;
                 await putIdea(
                     ideaId,
                     {
@@ -254,6 +266,12 @@ function bindApprovalEvents(
                 );
                 return;
             }
+            await postActivity({
+                type: 'status_changed',
+                action: 'approved idea',
+                target: title,
+                status: 'approved',
+            });
             showToast(
                 'Idea approved'
                 + ' successfully',
@@ -273,9 +291,11 @@ function bindApprovalEvents(
     )?.addEventListener(
         'click',
         async () => {
+            let title = '';
             try {
                 const entity =
                     await getIdeaEntity(ideaId);
+                title = entity.title;
                 await putIdea(
                     ideaId,
                     {
@@ -295,6 +315,13 @@ function bindApprovalEvents(
                 );
                 return;
             }
+            await postActivity({
+                type: 'status_changed',
+                action: 'sent idea back'
+                    + ' for revision',
+                target: title,
+                status: 'sent-back',
+            });
             showToast(
                 'Idea sent back'
                 + ' for revision',

@@ -688,7 +688,7 @@ export interface WorkOrderClaimEntity {
     claimed_at: string;
 }
 
-export interface CompanySettingsEntity {
+export interface CompanyEntity {
     id: Id;
     name: string;
     domain: string;

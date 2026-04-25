@@ -62,6 +62,7 @@ export class IdeaCreatePresenter {
 
     render(): SafeHtml {
         return html`
+    <div class="idea-detail-wrap">
     <div class="${
         'flex items-center'
         + ' justify-between'
@@ -156,6 +157,7 @@ export class IdeaCreatePresenter {
                 ${iconCheck(16, '')}
             </button>
         </div>
+    </div>
     </div>`;
     }
 

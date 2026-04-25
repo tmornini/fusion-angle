@@ -19,7 +19,8 @@ import {
     navigateTo, trimStrings,
 } from '../app/core';
 import {
-    getManagedUsers, putUser,
+    getManagedUsers, getUserEntity, putUser,
+    postActivity,
     jsonArrayField,
     jsonObjectField,
     nowUtc,
@@ -79,7 +80,7 @@ export async function init(): Promise<void> {
                     class="${
                         'text-primary'
                     }">
-                    Administration
+                    Organization
                 </a>
                 ${iconChevronRight(14, '')}
                 <span>Manage Users</span>
@@ -643,6 +644,77 @@ export async function init(): Promise<void> {
         'change', filterUsers,
     );
 
+    async function changeUserStatus(
+        userId: string,
+        next:
+            | 'active' | 'deactivated',
+    ): Promise<void> {
+        try {
+            const entity =
+                await getUserEntity(userId);
+            const {
+                id: _id, ...rest
+            } = entity;
+            await putUser(userId, {
+                ...rest,
+                status: next,
+            });
+            showToast(
+                next === 'deactivated'
+                    ? 'User deactivated'
+                    : 'User reactivated',
+                'success',
+            );
+            navigateTo('users');
+        } catch (err) {
+            log.error(
+                'changeUserStatus failed',
+                'organization',
+                err,
+            );
+            showToast(
+                'Failed to update user'
+                + ' status',
+                'error',
+            );
+        }
+    }
+
+    userList?.addEventListener(
+        'click',
+        (e) => {
+            const target = e.target;
+            if (
+                !(target instanceof Element)
+            ) return;
+            const deactivate = target.closest(
+                '[data-deactivate-user]',
+            );
+            if (deactivate) {
+                const id = deactivate
+                    .getAttribute(
+                        'data-deactivate-user',
+                    );
+                if (id) void changeUserStatus(
+                    id, 'deactivated',
+                );
+                return;
+            }
+            const reactivate = target.closest(
+                '[data-reactivate-user]',
+            );
+            if (reactivate) {
+                const id = reactivate
+                    .getAttribute(
+                        'data-reactivate-user',
+                    );
+                if (id) void changeUserStatus(
+                    id, 'active',
+                );
+            }
+        },
+    );
+
     initDialog('invite', 'invite-btn',
         async () => {
             const first = $input(
@@ -733,6 +805,11 @@ export async function init(): Promise<void> {
                             nowUtc(),
                     }),
                 );
+                await postActivity({
+                    type: 'user_joined',
+                    action: 'joined the team',
+                    target: `${first} ${last}`,
+                });
                 showToast(
                     'User created',
                     'success',
