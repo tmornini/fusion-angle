@@ -1,13 +1,21 @@
 import { PUT } from '../../../api/api';
 import { nowUtc } from '../../../api/types';
+import {
+    isActivityType,
+} from '../../../api/types';
+import type {
+    ActivityType,
+} from '../../../api/types';
 import { getCurrentUser } from './shared';
 
-export type ActivityType =
-    | 'idea_created'
-    | 'project_created'
-    | 'user_joined'
-    | 'status_changed'
-    | 'idea_converted';
+export {
+    isActivityType,
+    isDimensionKey,
+} from '../../../api/types';
+export type {
+    ActivityType,
+    DimensionKey,
+} from '../../../api/types';
 
 export interface ActivityInput {
     type: ActivityType;

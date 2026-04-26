@@ -53,7 +53,7 @@ function loadStoredSidebarCollapsed(
     );
 }
 
-const data: AppState = {
+let state: Readonly<AppState> = {
     theme: loadStoredTheme(),
     isMobile: window.matchMedia(
         '(max-width: '
@@ -67,14 +67,12 @@ const data: AppState = {
     searchQuery: '',
 };
 
-const state: Readonly<AppState> = data;
-
 const subs = new Set<StateListener>();
 
 function setState(
     partial: Partial<AppState>,
 ): void {
-    Object.assign(data, partial);
+    state = { ...state, ...partial };
     subs.forEach(fn => fn());
 }
 
@@ -89,10 +87,11 @@ function subscribe(
 
 function computeTheme(): 'light' | 'dark' {
     if (state.theme === 'system') {
-        const q = '(prefers-color-scheme'
-            + ': dark)';
+        const darkMediaQuery
+            = '(prefers-color-scheme: dark)';
         return window
-            .matchMedia(q).matches
+            .matchMedia(darkMediaQuery)
+            .matches
             ? 'dark'
             : 'light';
     }

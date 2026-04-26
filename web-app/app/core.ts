@@ -37,21 +37,6 @@ export {
 } from './dialog';
 export { initDropdown } from './theme-toggle';
 
-window.addEventListener(
-    'unhandledrejection',
-    event => {
-        const reason = event.reason as
-            DOMException | undefined;
-        const name = reason?.name;
-        if (
-            name === 'InvalidStateError'
-            || name === 'AbortError'
-        ) {
-            event.preventDefault();
-        }
-    },
-);
-
 document.addEventListener(
     'DOMContentLoaded',
     async () => {

@@ -41,6 +41,16 @@ export function $textarea(
         );
 }
 
+export function $button(
+    selector: string,
+    parent: ParentNode,
+): HTMLButtonElement | null {
+    return parent
+        .querySelector<HTMLButtonElement>(
+            selector,
+        );
+}
+
 export function $required(
     selector: string,
     parent: ParentNode,
@@ -73,6 +83,14 @@ export function $inputRequired(
         );
     }
     return el;
+}
+
+export function createElement<
+    K extends keyof HTMLElementTagNameMap
+>(
+    tag: K,
+): HTMLElementTagNameMap[K] {
+    return document.createElement(tag);
 }
 
 export function attr(

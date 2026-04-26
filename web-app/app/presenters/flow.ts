@@ -9,51 +9,23 @@ import {
     iconFolderKanban,
 } from '../icons';
 import type {
-    FlowCardReceiver,
+    FlowSummary,
 } from '../adapters/flows';
 
-export class FlowPresenter
-    implements FlowCardReceiver
-{
-    #id = '';
-    #name = '';
-    #description = '';
-    #nodeCount = 0;
-    #edgeCount = 0;
-    #projectName: string | undefined;
+export class FlowPresenter {
+    readonly #flow: FlowSummary;
 
-    flowId(id: string): void {
-        this.#id = id;
-    }
-
-    name(text: string): void {
-        this.#name = text;
-    }
-
-    description(text: string): void {
-        this.#description = text;
-    }
-
-    stats(
-        nodeCount: number,
-        edgeCount: number,
-    ): void {
-        this.#nodeCount = nodeCount;
-        this.#edgeCount = edgeCount;
-    }
-
-    projectName(
-        name: string | undefined,
-    ): void {
-        this.#projectName = name;
+    constructor(flow: FlowSummary) {
+        this.#flow = flow;
     }
 
     render(): SafeHtml {
+        const f = this.#flow;
         return html`
     <div class="${
         'card card-hover p-4 cursor-pointer'
     }"
-        data-flow-card="${this.#id}">
+        data-flow-card="${f.id}">
         <div class="${
             'flex items-start '
             + 'justify-between gap-4'
@@ -64,7 +36,7 @@ export class FlowPresenter
                     + 'items-center'
                     + ' gap-2 mb-2'
                 }">
-                    ${this.#projectName
+                    ${f.projectName
                         ? html`<span
                             class="${
                                 'badge'
@@ -75,19 +47,19 @@ export class FlowPresenter
                                 12, '',
                             )
                         } ${
-                            this.#projectName
+                            f.projectName
                         }</span>`
                         : html``}
                 </div>
                 <h3 class="${
                     'font-semibold mb-1'
-                }">${this.#name}</h3>
+                }">${f.name}</h3>
                 <p class="${
                     'text-sm'
                     + ' text-muted mb-2'
                     + ' truncate'
                 }">${
-                    this.#description
+                    f.description
                 }</p>
                 <div class="${
                     'flex flex-wrap '
@@ -103,9 +75,9 @@ export class FlowPresenter
                     }">${
                         iconCircle(14, '')
                     } ${
-                        this.#nodeCount
+                        f.nodeCount
                     } ${
-                        this.#nodeCount === 1
+                        f.nodeCount === 1
                             ? 'state'
                             : 'states'
                     }</span>
@@ -116,9 +88,9 @@ export class FlowPresenter
                     }">${
                         iconShare(14, '')
                     } ${
-                        this.#edgeCount
+                        f.edgeCount
                     } ${
-                        this.#edgeCount === 1
+                        f.edgeCount === 1
                             ? 'transition'
                             : 'transitions'
                     }</span>

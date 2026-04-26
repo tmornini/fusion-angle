@@ -3,10 +3,12 @@ import {
 } from './db';
 import type {
     DbAdapter,
+    DeletedStore,
     EntityStore,
     SingletonStore,
 } from './db';
 import type {
+    Deleted,
     UserEntity,
     IdeaEntity,
     ProjectEntity,
@@ -46,7 +48,6 @@ function isRowShaped(
 
 function readTable<T>(
     tableName: string,
-    includeDeleted: boolean,
 ): T[] {
     const raw = localStorage.getItem(
         KEY_PREFIX + tableName,
@@ -69,13 +70,6 @@ function readTable<T>(
                 + ' Clear data or import'
                 + ' a valid snapshot.',
             );
-        }
-        if (!includeDeleted) {
-            return parsed.filter(
-                (row: Record<
-                    string, unknown
-                >) => !row.deleted_at,
-            ) as T[];
         }
         return parsed as T[];
     } catch (e) {
@@ -162,19 +156,68 @@ function generateCompositeId(
     return `${prefix}-${parts.join('-')}`;
 }
 
+function createDeletedStore(): DeletedStore {
+    const TABLE = 'deleted';
+    return {
+        async isDeleted(
+            id: string,
+        ): Promise<boolean> {
+            const rows = readTable<Deleted>(
+                TABLE,
+            );
+            return rows.some(r => r.id === id);
+        },
+        async record(id: string): Promise<void> {
+            const rows = readTable<Deleted>(
+                TABLE,
+            );
+            if (
+                rows.some(r => r.id === id)
+            ) return;
+            rows.push({
+                id,
+                deleted_at: nowUtc(),
+            });
+            writeTable(TABLE, rows);
+        },
+        async allDeletedIds(
+        ): Promise<Set<string>> {
+            const rows = readTable<Deleted>(
+                TABLE,
+            );
+            return new Set(
+                rows.map(r => r.id),
+            );
+        },
+    };
+}
+
 function createEntityStore<
     T extends { id: string },
->(tableName: string): EntityStore<T> {
+>(
+    tableName: string,
+    deletedStore: DeletedStore,
+): EntityStore<T> {
     return {
         async getAll(): Promise<T[]> {
-            return readTable<T>(tableName, false);
+            const rows = readTable<T>(tableName);
+            const deletedIds =
+                await deletedStore.allDeletedIds();
+            return rows.filter(
+                row => !deletedIds.has(row.id),
+            );
         },
         async getById(
             id: string,
         ): Promise<T> {
-            const rows = readTable<T>(
-                tableName, false,
-            );
+            if (
+                await deletedStore.isDeleted(id)
+            ) {
+                throw new EntityNotFound(
+                    tableName, id,
+                );
+            }
+            const rows = readTable<T>(tableName);
             const row = rows.find(
                 entity => entity.id === id,
             );
@@ -189,9 +232,7 @@ function createEntityStore<
             id: string,
             fields: Omit<T, 'id'>,
         ): Promise<T> {
-            const rows = readTable<T>(
-                tableName, false,
-            );
+            const rows = readTable<T>(tableName);
             const index = rows.findIndex(
                 entity => entity.id === id,
             );
@@ -226,39 +267,75 @@ function createEntityStore<
             return written;
         },
         async delete(id: string): Promise<void> {
-            const rows = readTable<T>(
-                tableName,
-                true,
-            );
-            const idx = rows.findIndex(
-                e => e.id === id,
-            );
-            if (idx >= 0) {
-                rows[idx] = {
-                    ...rows[idx]!,
-                    deleted_at: nowUtc(),
-                } as T;
-                writeTable(tableName, rows);
-            }
+            await deletedStore.record(id);
         },
     };
 }
 
 // History tables hold immutable point-in-time facts.
 // Their only valid removal is eviction (for cap
-// enforcement), never soft deletion.
+// enforcement) — true hard delete, no tombstone.
 function createHistoryEntityStore<
     T extends { id: string },
 >(tableName: string): EntityStore<T> {
-    const base = createEntityStore<T>(tableName);
     return {
-        getAll: base.getAll,
-        getById: base.getById,
-        put: base.put,
-        async delete(id: string): Promise<void> {
-            const rows = readTable<T>(
-                tableName, false,
+        async getAll(): Promise<T[]> {
+            return readTable<T>(tableName);
+        },
+        async getById(
+            id: string,
+        ): Promise<T> {
+            const rows = readTable<T>(tableName);
+            const row = rows.find(
+                entity => entity.id === id,
             );
+            if (!row) {
+                throw new EntityNotFound(
+                    tableName, id,
+                );
+            }
+            return row;
+        },
+        async put(
+            id: string,
+            fields: Omit<T, 'id'>,
+        ): Promise<T> {
+            const rows = readTable<T>(tableName);
+            const index = rows.findIndex(
+                entity => entity.id === id,
+            );
+            const serialized = serializeRecord(
+                fields as Record<string, unknown>,
+                tableName,
+            );
+
+            if (index >= 0) {
+                rows[index] = {
+                    ...serialized,
+                    id,
+                } as T;
+            } else {
+                rows.push({
+                    ...serialized,
+                    id,
+                } as T);
+            }
+
+            writeTable(tableName, rows);
+            const pos = index >= 0
+                ? index
+                : rows.length - 1;
+            const written = rows[pos];
+            if (!written) {
+                throw new Error(
+                    'Internal error: entity'
+                    + ' not found after write',
+                );
+            }
+            return written;
+        },
+        async delete(id: string): Promise<void> {
+            const rows = readTable<T>(tableName);
             const idx = rows.findIndex(
                 e => e.id === id,
             );
@@ -275,9 +352,7 @@ function createSingletonStore<
 >(tableName: string): SingletonStore<T> {
     return {
         async get(): Promise<T> {
-            const rows = readTable<T>(
-                tableName, false,
-            );
+            const rows = readTable<T>(tableName);
             const row = rows.find(
                 entity => entity.id === '1',
             );
@@ -291,9 +366,7 @@ function createSingletonStore<
         async put(
             fields: Omit<T, 'id'>,
         ): Promise<T> {
-            const rows = readTable<T>(
-                tableName, false,
-            );
+            const rows = readTable<T>(tableName);
             const serialized = serializeRecord(
                 fields as Record<string, unknown>,
                 tableName,
@@ -349,11 +422,14 @@ export const TABLE_NAMES = [
     'organization',
     'idea_submissions',
     'activity_actors',
+    'deleted',
 ];
 
 
 export async function createLocalStorageAdapter(
 ): Promise<DbAdapter> {
+    const deletedStore = createDeletedStore();
+
     const adapter: DbAdapter = {
         async initialize(): Promise<void> {
         },
@@ -404,7 +480,6 @@ export async function createLocalStorageAdapter(
             ) {
                 snapshot[table] = readTable(
                     table,
-                    true,
                 );
             }
             return JSON.stringify(
@@ -491,39 +566,43 @@ export async function createLocalStorageAdapter(
         users:
             createEntityStore<UserEntity>(
                 'users',
+                deletedStore,
             ),
         ideas:
             createEntityStore<IdeaEntity>(
                 'ideas',
+                deletedStore,
             ),
 
         projects:
             createEntityStore<ProjectEntity>(
                 'projects',
+                deletedStore,
             ),
 
         teams:
             createEntityStore<
                 TeamEntity
-            >('teams'),
+            >('teams', deletedStore),
         teamProjects:
             createEntityStore<
                 TeamProjectEntity
-            >('team_projects'),
+            >('team_projects', deletedStore),
         teamUsers:
             createEntityStore<
                 TeamUserEntity
-            >('team_users'),
+            >('team_users', deletedStore),
 
         activities:
             createEntityStore<ActivityEntity>(
                 'activities',
+                deletedStore,
             ),
 
         flows:
             createEntityStore<
                 FlowEntity
-            >('flows'),
+            >('flows', deletedStore),
         flowVersions:
             createHistoryEntityStore<
                 FlowVersionEntity
@@ -531,23 +610,29 @@ export async function createLocalStorageAdapter(
         projectFlows:
             createEntityStore<
                 ProjectFlowEntity
-            >('project_flows'),
+            >('project_flows', deletedStore),
         workOrders:
             createEntityStore<
                 WorkOrderEntity
-            >('work_orders'),
+            >('work_orders', deletedStore),
         flowWorkOrders:
             createEntityStore<
                 FlowWorkOrderEntity
-            >('flow_work_orders'),
+            >('flow_work_orders', deletedStore),
         workOrderTransitions:
             createEntityStore<
                 WorkOrderTransitionEntity
-            >('work_order_transitions'),
+            >(
+                'work_order_transitions',
+                deletedStore,
+            ),
         workOrderClaims:
             createEntityStore<
                 WorkOrderClaimEntity
-            >('work_order_claims'),
+            >(
+                'work_order_claims',
+                deletedStore,
+            ),
 
         company:
             createSingletonStore<CompanyEntity>(
@@ -562,11 +647,12 @@ export async function createLocalStorageAdapter(
         ideaSubmissions:
             createEntityStore<
                 IdeaSubmissionEntity
-            >('idea_submissions'),
+            >('idea_submissions', deletedStore),
         activityActors:
             createEntityStore<
                 ActivityActorEntity
-            >('activity_actors'),
+            >('activity_actors', deletedStore),
+        deleted: deletedStore,
     };
 
     return withSimulatedLatency(adapter);

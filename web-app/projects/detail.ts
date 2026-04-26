@@ -1,4 +1,6 @@
-import { $, $input } from '../app/dom';
+import {
+    $, $inputRequired,
+} from '../app/dom';
 import { showToast } from '../app/toast';
 import {
     buildSkeleton, buildErrorState,
@@ -12,8 +14,8 @@ import {
     closeDialog,
 } from '../app/core';
 import {
-    getProject, getProjectEntity,
-    putProject,
+    getProject,
+    putProjectPatch,
     getFlowsByProject,
     postFlowCreation,
     projectChanged,
@@ -24,14 +26,30 @@ import type {
 } from '../app/adapters';
 import {
     ProjectDetailPresenter,
+    ProjectDetailEditPresenter,
+    projectDraftFromView,
+    projectPatchFromDraft,
     type ProjectFieldKey,
+    type ProjectDraftFields,
 } from '../app/presenters';
 
 const pageAbort = new AbortController();
 const signal = pageAbort.signal;
 
-let presenter:
-    ProjectDetailPresenter | null = null;
+type PageState =
+    | {
+        kind: 'reading';
+        view: ProjectView;
+        flows: FlowListItem[];
+    }
+    | {
+        kind: 'editing';
+        view: ProjectView;
+        flows: FlowListItem[];
+        draft: ProjectDraftFields;
+    };
+
+let state: PageState | null = null;
 let pageContainer:
     HTMLElement | null = null;
 
@@ -47,6 +65,30 @@ function isFieldKey(
 ): s is ProjectFieldKey {
     return s !== null
         && FIELDS.has(s as ProjectFieldKey);
+}
+
+function buildPresenter():
+    | ProjectDetailPresenter
+    | ProjectDetailEditPresenter
+{
+    if (state === null) {
+        throw new Error(
+            'state not initialized',
+        );
+    }
+    return state.kind === 'reading'
+        ? new ProjectDetailPresenter(
+            state.view, state.flows,
+        )
+        : new ProjectDetailEditPresenter(
+            state.view, state.flows, state.draft,
+        );
+}
+
+function rerender(): void {
+    if (!pageContainer) return;
+    buildPresenter()
+        .renderUpdate(pageContainer);
 }
 
 export async function init(
@@ -98,14 +140,16 @@ export async function init(
         return;
     }
 
-    presenter = new ProjectDetailPresenter(
-        project, flows,
-    );
-    presenter.renderShell(container);
-    bindStableListeners(container, presenter);
+    state = {
+        kind: 'reading',
+        view: project,
+        flows,
+    };
+    buildPresenter().renderShell(container);
+    bindStableListeners(container);
 
     projectChanged.subscribe(async () => {
-        if (!presenter || !pageContainer) {
+        if (!state || !pageContainer) {
             return;
         }
         const [upd, updFlows] =
@@ -113,25 +157,28 @@ export async function init(
                 getProject(projectId),
                 getFlowsByProject(projectId),
             ]);
-        presenter.update(upd, updFlows);
-        presenter.renderUpdate(pageContainer);
+        state = {
+            kind: 'reading',
+            view: upd,
+            flows: updFlows,
+        };
+        rerender();
     });
 }
 
 function bindStableListeners(
     container: HTMLElement,
-    p: ProjectDetailPresenter,
 ): void {
     container.addEventListener(
-        'click', e => onClick(e, container, p),
+        'click', e => onClick(e),
         { signal },
     );
     container.addEventListener(
-        'input', e => onInput(e, p),
+        'input', e => onInput(e),
         { signal },
     );
     container.addEventListener(
-        'change', e => onInput(e, p),
+        'change', e => onInput(e),
         { signal },
     );
     container.addEventListener(
@@ -141,24 +188,22 @@ function bindStableListeners(
     );
     document.addEventListener(
         'keydown',
-        e => onDocumentKeydown(e, container, p),
+        e => onDocumentKeydown(e),
         { signal },
     );
 }
 
 function onClick(
     e: MouseEvent,
-    container: HTMLElement,
-    p: ProjectDetailPresenter,
 ): void {
     const target = e.target as Element | null;
     if (!target) return;
 
     if (handleDialogClicks(target)) return;
-    if (handleFlowCardClick(e, target, p)) {
+    if (handleFlowCardClick(e, target)) {
         return;
     }
-    handleProjectActions(target, container, p);
+    handleProjectActions(target);
 }
 
 function handleDialogClicks(
@@ -199,8 +244,8 @@ function handleDialogClicks(
 function handleFlowCardClick(
     e: MouseEvent,
     target: Element,
-    p: ProjectDetailPresenter,
 ): boolean {
+    if (!state) return false;
     const card = target.closest(
         '[data-flow-id]',
     );
@@ -212,16 +257,15 @@ function handleFlowCardClick(
     if (!flowId) return true;
     navigateTo('flow-detail', {
         flowId,
-        projectId: p.idForLink(),
+        projectId: state.view.idForLink(),
     });
     return true;
 }
 
 function handleProjectActions(
     target: Element,
-    container: HTMLElement,
-    p: ProjectDetailPresenter,
 ): void {
+    if (!state) return;
     const actionEl = target.closest(
         '[data-project-action]',
     );
@@ -234,19 +278,36 @@ function handleProjectActions(
             navigateTo('projects');
             return;
         case 'edit':
-            p.beginEdit();
-            p.renderUpdate(container);
+            if (state.kind !== 'reading') {
+                return;
+            }
+            state = {
+                kind: 'editing',
+                view: state.view,
+                flows: state.flows,
+                draft: projectDraftFromView(
+                    state.view,
+                ),
+            };
+            rerender();
             return;
         case 'cancel':
-            p.cancelEdit();
-            p.renderUpdate(container);
+            if (state.kind !== 'editing') {
+                return;
+            }
+            state = {
+                kind: 'reading',
+                view: state.view,
+                flows: state.flows,
+            };
+            rerender();
             return;
         case 'save':
             void handleSave();
             return;
         case 'new-flow-submit':
             void handleNewFlowSubmit(
-                p.idForLink(),
+                state.view.idForLink(),
             );
             return;
     }
@@ -254,8 +315,10 @@ function handleProjectActions(
 
 function onInput(
     e: Event,
-    p: ProjectDetailPresenter,
 ): void {
+    if (!state || state.kind !== 'editing') {
+        return;
+    }
     const target = e.target as
         | HTMLInputElement
         | HTMLSelectElement
@@ -266,7 +329,13 @@ function onInput(
         'data-project-field',
     );
     if (!isFieldKey(field)) return;
-    p.setDraftField(field, target.value);
+    state = {
+        ...state,
+        draft: {
+            ...state.draft,
+            [field]: target.value,
+        },
+    };
 }
 
 function onContainerKeydown(
@@ -278,11 +347,10 @@ function onContainerKeydown(
     e.preventDefault();
     e.stopPropagation();
     if (target.id === 'new-flow-name') {
-        const projectId =
-            presenter?.idForLink();
-        if (projectId) {
-            void handleNewFlowSubmit(projectId);
-        }
+        if (!state) return;
+        void handleNewFlowSubmit(
+            state.view.idForLink(),
+        );
         return;
     }
     void handleSave();
@@ -290,32 +358,36 @@ function onContainerKeydown(
 
 function onDocumentKeydown(
     e: KeyboardEvent,
-    container: HTMLElement,
-    p: ProjectDetailPresenter,
 ): void {
     if (e.key !== 'Escape') return;
-    if (!p.isEditing()) return;
+    if (!state || state.kind !== 'editing') {
+        return;
+    }
     e.preventDefault();
-    p.cancelEdit();
-    p.renderUpdate(container);
+    state = {
+        kind: 'reading',
+        view: state.view,
+        flows: state.flows,
+    };
+    rerender();
 }
 
 async function handleSave(): Promise<void> {
-    if (!presenter) return;
-    if (!presenter.isEditing()) return;
-    const patch = presenter.buildEntityPatch();
-    const projectId = presenter.idForLink();
+    if (!state || state.kind !== 'editing') {
+        return;
+    }
+    const projectId = state.view.idForLink();
+    const patch = projectPatchFromDraft(
+        state.draft,
+        state.view.statusValue(),
+    );
     try {
-        const entity = await getProjectEntity(
-            projectId,
+        await putProjectPatch(
+            projectId, trimStrings(patch),
         );
-        await putProject(projectId, {
-            ...entity,
-            ...trimStrings(patch),
-        });
     } catch (err) {
         log.error(
-            'putProject failed',
+            'putProjectPatch failed',
             'projects', err,
         );
         showToast(
@@ -329,10 +401,9 @@ async function handleSave(): Promise<void> {
 async function handleNewFlowSubmit(
     projectId: string,
 ): Promise<void> {
-    const nameEl = $input(
+    const name = $inputRequired(
         '#new-flow-name', document,
-    );
-    const name = nameEl?.value.trim() ?? '';
+    ).value.trim();
     if (name.length === 0) {
         showToast(
             'Flow name is required', 'error',

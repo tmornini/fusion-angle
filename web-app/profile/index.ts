@@ -1,6 +1,7 @@
 import { $ } from '../app/dom';
 import {
     ProfilePresenter,
+    ProfileEditPresenter,
     type ProfileFieldKey,
 } from '../app/presenters';
 import { setHtml } from '../app/safe-html';
@@ -19,7 +20,18 @@ import {
 const pageAbort = new AbortController();
 const signal = pageAbort.signal;
 
-let presenter: ProfilePresenter | null = null;
+type PageState =
+    | {
+        kind: 'reading';
+        profile: Profile;
+    }
+    | {
+        kind: 'editing';
+        profile: Profile;
+        draft: Profile;
+    };
+
+let state: PageState | null = null;
 let pageContainer: HTMLElement | null = null;
 
 const FIELDS: ReadonlySet<ProfileFieldKey> =
@@ -33,6 +45,27 @@ function isFieldKey(
 ): s is ProfileFieldKey {
     return s !== null
         && FIELDS.has(s as ProfileFieldKey);
+}
+
+function buildPresenter():
+    ProfilePresenter | ProfileEditPresenter
+{
+    if (state === null) {
+        throw new Error(
+            'state not initialized',
+        );
+    }
+    return state.kind === 'reading'
+        ? new ProfilePresenter(state.profile)
+        : new ProfileEditPresenter(
+            state.profile, state.draft,
+        );
+}
+
+function rerender(): void {
+    if (!pageContainer) return;
+    buildPresenter()
+        .renderUpdate(pageContainer);
 }
 
 export async function init(): Promise<void> {
@@ -68,25 +101,24 @@ export async function init(): Promise<void> {
         return;
     }
 
-    presenter = new ProfilePresenter(profile);
-    presenter.renderShell(container);
-    bindStableListeners(container, presenter);
+    state = { kind: 'reading', profile };
+    buildPresenter().renderShell(container);
+    bindStableListeners(container);
 }
 
 function bindStableListeners(
     container: HTMLElement,
-    p: ProfilePresenter,
 ): void {
     container.addEventListener(
-        'click', e => onClick(e, container, p),
+        'click', e => onClick(e),
         { signal },
     );
     container.addEventListener(
-        'input', e => onInput(e, p),
+        'input', e => onInput(e),
         { signal },
     );
     container.addEventListener(
-        'change', e => onInput(e, p),
+        'change', e => onInput(e),
         { signal },
     );
     container.addEventListener(
@@ -96,17 +128,13 @@ function bindStableListeners(
     );
     document.addEventListener(
         'keydown',
-        e => onDocumentKeydown(
-            e, container, p,
-        ),
+        e => onDocumentKeydown(e),
         { signal },
     );
 }
 
 function onClick(
     e: MouseEvent,
-    container: HTMLElement,
-    p: ProfilePresenter,
 ): void {
     const target = e.target as Element | null;
     if (!target) return;
@@ -118,13 +146,33 @@ function onClick(
         'data-profile-action',
     );
     if (action === 'edit') {
-        p.beginEdit();
-        p.renderUpdate(container);
+        if (
+            !state
+            || state.kind !== 'reading'
+        ) return;
+        state = {
+            kind: 'editing',
+            profile: state.profile,
+            draft: {
+                ...state.profile,
+                strengths: [
+                    ...state.profile.strengths,
+                ],
+            },
+        };
+        rerender();
         return;
     }
     if (action === 'cancel') {
-        p.cancelEdit();
-        p.renderUpdate(container);
+        if (
+            !state
+            || state.kind !== 'editing'
+        ) return;
+        state = {
+            kind: 'reading',
+            profile: state.profile,
+        };
+        rerender();
         return;
     }
     if (action === 'save') {
@@ -135,21 +183,40 @@ function onClick(
     const chip = target.closest(
         '.strength-chip',
     );
-    if (chip && p.isEditing()) {
+    if (
+        chip
+        && state
+        && state.kind === 'editing'
+    ) {
         const name = chip.getAttribute(
             'data-strength',
         );
         if (name) {
-            p.toggleStrength(name);
-            p.renderUpdate(container);
+            const cur = state.draft.strengths;
+            const i = cur.indexOf(name);
+            const next = i >= 0
+                ? cur.filter(
+                    (_, idx) => idx !== i,
+                )
+                : [...cur, name];
+            state = {
+                ...state,
+                draft: {
+                    ...state.draft,
+                    strengths: next,
+                },
+            };
+            rerender();
         }
     }
 }
 
 function onInput(
     e: Event,
-    p: ProfilePresenter,
 ): void {
+    if (!state || state.kind !== 'editing') {
+        return;
+    }
     const target = e.target as
         | HTMLInputElement
         | HTMLSelectElement
@@ -160,7 +227,13 @@ function onInput(
         'data-profile-field',
     );
     if (!isFieldKey(field)) return;
-    p.setDraftField(field, target.value);
+    state = {
+        ...state,
+        draft: {
+            ...state.draft,
+            [field]: target.value,
+        },
+    };
 }
 
 function onContainerKeydown(
@@ -176,22 +249,24 @@ function onContainerKeydown(
 
 function onDocumentKeydown(
     e: KeyboardEvent,
-    container: HTMLElement,
-    p: ProfilePresenter,
 ): void {
     if (e.key !== 'Escape') return;
-    if (!p.isEditing()) return;
+    if (!state || state.kind !== 'editing') {
+        return;
+    }
     e.preventDefault();
-    p.cancelEdit();
-    p.renderUpdate(container);
+    state = {
+        kind: 'reading',
+        profile: state.profile,
+    };
+    rerender();
 }
 
 async function handleSave(): Promise<void> {
-    if (!presenter || !pageContainer) return;
-    if (!presenter.isEditing()) return;
-    const updated = trimStrings(
-        presenter.draft(),
-    );
+    if (!state || state.kind !== 'editing') {
+        return;
+    }
+    const updated = trimStrings(state.draft);
     try {
         await putProfile(updated);
     } catch (err) {
@@ -207,6 +282,9 @@ async function handleSave(): Promise<void> {
         return;
     }
     showToast('Profile saved', 'success');
-    presenter.update(updated);
-    presenter.renderUpdate(pageContainer);
+    state = {
+        kind: 'reading',
+        profile: updated,
+    };
+    rerender();
 }

@@ -50,8 +50,10 @@ export function edgeWaypointKey(
 
 const MIN_LAYER_STEP =
     NODE_WIDTH + HORIZONTAL_GAP;
+const SIBLING_NODE_GAP = 100;
 const SIBLING_STEP =
-    Math.max(NODE_WIDTH, NODE_HEIGHT) + 100;
+    Math.max(NODE_WIDTH, NODE_HEIGHT)
+    + SIBLING_NODE_GAP;
 const CROSSING_SWEEP_COUNT = 24;
 const COORD_ITERATIONS = 4;
 const MAX_ASPECT_STRETCH = 2.5;

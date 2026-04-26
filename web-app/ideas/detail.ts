@@ -1,9 +1,12 @@
 import { $, $textarea } from '../app/dom';
 import {
     IdeaPresenter,
+    IdeaEditPresenter,
+    ideaDraftFromIdea,
+    ideaPatchFromDraft,
     type IdeaFieldKey,
+    type IdeaDraftFields,
 } from '../app/presenters';
-import { setHtml } from '../app/safe-html';
 import { showToast } from '../app/toast';
 import { log } from '../app/logger';
 import {
@@ -22,12 +25,26 @@ import {
     postActivity,
     putIdea,
     ideaChanged,
+    type Idea,
 } from '../app/adapters';
 
 const pageAbort = new AbortController();
 const signal = pageAbort.signal;
 
-let presenter: IdeaPresenter | null = null;
+const NO_FEEDBACK = '';
+
+type PageState =
+    | {
+        kind: 'reading';
+        idea: Idea;
+    }
+    | {
+        kind: 'editing';
+        idea: Idea;
+        draft: IdeaDraftFields;
+    };
+
+let state: PageState | null = null;
 let pageContainer: HTMLElement | null = null;
 
 const FIELDS: ReadonlySet<IdeaFieldKey> =
@@ -86,7 +103,7 @@ const TRANSITION_CONFIG:
 async function transitionIdea(
     ideaId: string,
     toStatus: IdeaTransition,
-    feedback?: string,
+    feedback: string,
 ): Promise<void> {
     const cfg = TRANSITION_CONFIG[toStatus]!;
     let title = '';
@@ -110,13 +127,34 @@ async function transitionIdea(
         action: cfg.activityAction,
         target: title,
         status: toStatus,
-        feedback: feedback ?? '',
+        feedback,
     });
     showToast(
         cfg.successToast,
         cfg.successVariant,
     );
     navigateTo('ideas');
+}
+
+function buildPresenter():
+    IdeaPresenter | IdeaEditPresenter
+{
+    if (state === null) {
+        throw new Error(
+            'state not initialized',
+        );
+    }
+    return state.kind === 'reading'
+        ? new IdeaPresenter(state.idea)
+        : new IdeaEditPresenter(
+            state.idea, state.draft,
+        );
+}
+
+function rerender(): void {
+    if (!pageContainer) return;
+    buildPresenter()
+        .renderUpdate(pageContainer);
 }
 
 export async function init(
@@ -142,30 +180,27 @@ export async function init(
     );
     if (!idea) return;
 
-    presenter = new IdeaPresenter(idea);
-    presenter.renderShell(container);
-    bindStableListeners(container, presenter);
+    state = { kind: 'reading', idea };
+    buildPresenter().renderShell(container);
+    bindStableListeners(container);
 
     ideaChanged.subscribe(async () => {
-        if (!presenter || !pageContainer) {
-            return;
-        }
+        if (!pageContainer || !state) return;
         const fresh = await getIdea(ideaId);
-        presenter.update(fresh);
-        presenter.renderUpdate(pageContainer);
+        state = { kind: 'reading', idea: fresh };
+        rerender();
     });
 }
 
 function bindStableListeners(
     container: HTMLElement,
-    p: IdeaPresenter,
 ): void {
     container.addEventListener(
-        'click', e => onClick(e, container, p),
+        'click', e => onClick(e),
         { signal },
     );
     container.addEventListener(
-        'input', e => onInput(e, p),
+        'input', e => onInput(e),
         { signal },
     );
     container.addEventListener(
@@ -175,21 +210,19 @@ function bindStableListeners(
     );
     document.addEventListener(
         'keydown',
-        e => onDocumentKeydown(e, container, p),
+        e => onDocumentKeydown(e),
         { signal },
     );
 }
 
 function onClick(
     e: MouseEvent,
-    container: HTMLElement,
-    p: IdeaPresenter,
 ): void {
     const target = e.target as Element | null;
     if (!target) return;
 
     if (handleDialogClicks(target)) return;
-    if (handleIdeaActions(target, container, p)) {
+    if (handleIdeaActions(target)) {
         return;
     }
 }
@@ -231,9 +264,8 @@ function handleDialogClicks(
 
 function handleIdeaActions(
     target: Element,
-    container: HTMLElement,
-    p: IdeaPresenter,
 ): boolean {
+    if (!state) return false;
     const actionEl = target.closest(
         '[data-idea-action]',
     );
@@ -241,18 +273,33 @@ function handleIdeaActions(
         'data-idea-action',
     );
     if (!action) return false;
-    const ideaId = p.idForLink();
+    const ideaId = state.idea.idForLink();
     switch (action) {
         case 'back':
             navigateTo('ideas');
             return true;
         case 'edit':
-            p.beginEdit();
-            p.renderUpdate(container);
+            if (state.kind !== 'reading') {
+                return true;
+            }
+            state = {
+                kind: 'editing',
+                idea: state.idea,
+                draft: ideaDraftFromIdea(
+                    state.idea,
+                ),
+            };
+            rerender();
             return true;
         case 'cancel':
-            p.cancelEdit();
-            p.renderUpdate(container);
+            if (state.kind !== 'editing') {
+                return true;
+            }
+            state = {
+                kind: 'reading',
+                idea: state.idea,
+            };
+            rerender();
             return true;
         case 'save':
             void handleSave();
@@ -265,11 +312,13 @@ function handleIdeaActions(
         case 'submit-review':
             void transitionIdea(
                 ideaId, 'in-review',
+                NO_FEEDBACK,
             );
             return true;
         case 'approve':
             void transitionIdea(
                 ideaId, 'approved',
+                NO_FEEDBACK,
             );
             return true;
         case 'send-back-confirm':
@@ -287,8 +336,13 @@ async function handleSendBackConfirm(
         '#approval-send-back-feedback',
         document,
     );
-    const feedback =
-        ta?.value.trim() || undefined;
+    if (!ta) {
+        throw new Error(
+            'Required:'
+            + ' #approval-send-back-feedback',
+        );
+    }
+    const feedback = ta.value.trim();
     closeDialog('approval-send-back');
     await transitionIdea(
         ideaId, 'sent-back', feedback,
@@ -297,8 +351,10 @@ async function handleSendBackConfirm(
 
 function onInput(
     e: Event,
-    p: IdeaPresenter,
 ): void {
+    if (!state || state.kind !== 'editing') {
+        return;
+    }
     const target = e.target as
         | HTMLInputElement
         | HTMLTextAreaElement
@@ -308,7 +364,13 @@ function onInput(
         'data-idea-field',
     );
     if (!isFieldKey(field)) return;
-    p.setDraftField(field, target.value);
+    state = {
+        ...state,
+        draft: {
+            ...state.draft,
+            [field]: target.value,
+        },
+    };
 }
 
 function onContainerKeydown(
@@ -324,21 +386,27 @@ function onContainerKeydown(
 
 function onDocumentKeydown(
     e: KeyboardEvent,
-    container: HTMLElement,
-    p: IdeaPresenter,
 ): void {
     if (e.key !== 'Escape') return;
-    if (!p.isEditing()) return;
+    if (!state || state.kind !== 'editing') {
+        return;
+    }
     e.preventDefault();
-    p.cancelEdit();
-    p.renderUpdate(container);
+    state = {
+        kind: 'reading',
+        idea: state.idea,
+    };
+    rerender();
 }
 
 async function handleSave(): Promise<void> {
-    if (!presenter) return;
-    if (!presenter.isEditing()) return;
-    const patch = presenter.buildEntityPatch();
-    const ideaId = presenter.idForLink();
+    if (!state || state.kind !== 'editing') {
+        return;
+    }
+    const patch = ideaPatchFromDraft(
+        state.draft,
+    );
+    const ideaId = state.idea.idForLink();
     try {
         const entity = await getIdeaEntity(
             ideaId,

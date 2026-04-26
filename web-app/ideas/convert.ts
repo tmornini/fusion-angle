@@ -25,27 +25,17 @@ import {
 } from '../app/adapters';
 import {
     IdeaConversionPresenter,
-} from '../app/presenters/idea-conversion';
-
-type ConversionField =
-    | 'project-name'
-    | 'project-lead'
-    | 'start-date'
-    | 'target-end-date'
-    | 'budget'
-    | 'impact'
-    | 'success-criteria';
-
-const ALL_FIELDS:
-    ConversionField[] = [
-    'project-name',
-    'project-lead',
-    'start-date',
-    'target-end-date',
-    'budget',
-    'impact',
-    'success-criteria',
-];
+    initialConversionFields,
+    conversionRequiredCount,
+    conversionCompletedCount,
+    conversionIsReady,
+    conversionFieldIsReady,
+    ALL_CONVERSION_FIELDS,
+} from '../app/presenters';
+import type {
+    ConversionField,
+    ConversionFields,
+} from '../app/presenters';
 
 export async function init(
     params?: Record<string, string>,
@@ -66,6 +56,7 @@ export async function init(
         buildSkeleton('detail', 4),
     );
 
+    let fields: ConversionFields;
     let presenter:
         IdeaConversionPresenter;
     try {
@@ -76,10 +67,13 @@ export async function init(
                 ),
                 getManagedUsers(),
             ]);
+        fields =
+            initialConversionFields(idea);
         presenter =
             new IdeaConversionPresenter(
                 idea,
                 users,
+                fields,
             );
     } catch (err) {
         log.error(
@@ -106,10 +100,12 @@ export async function init(
     }
 
     function syncFormFields(): void {
-        const fields: Partial<Record<
-            ConversionField, string
-        >> = {};
-        for (const field of ALL_FIELDS) {
+        const next = {
+            ...fields,
+        } as ConversionFields;
+        for (
+            const field of ALL_CONVERSION_FIELDS
+        ) {
             const el = $(
                 `#convert-${field}`,
                 document,
@@ -122,11 +118,11 @@ export async function init(
                 || el instanceof
                     HTMLTextAreaElement
             ) {
-                fields[field] =
+                next[field] =
                     el.value.trim();
             }
         }
-        presenter.syncFields(fields);
+        fields = next;
     }
 
     function renderPage(): void {
@@ -144,25 +140,24 @@ export async function init(
 
     function mutateValidation(): void {
         for (
-            const field of ALL_FIELDS
+            const field of ALL_CONVERSION_FIELDS
         ) {
-            const chk =
-                document.getElementById(
-                    `check-${field}`,
-                );
+            const chk = $(
+                `#check-${field}`, document,
+            );
             if (chk) {
                 chk.style.display =
-                    presenter.fieldReady(
-                        field,
+                    conversionFieldIsReady(
+                        fields, field,
                     )
                         ? ''
                         : 'none';
             }
         }
         const count =
-            presenter.completedCount();
+            conversionCompletedCount(fields);
         const total =
-            presenter.requiredCount();
+            conversionRequiredCount();
         const pct =
             (count / total) * 100;
         const pText = $(
@@ -186,7 +181,7 @@ export async function init(
                 `${pct}%`;
         }
         const isReady =
-            presenter.isReady();
+            conversionIsReady(fields);
         const remaining =
             total - count;
         const section = $(
@@ -346,7 +341,7 @@ export async function init(
             async () => {
                 syncFormFields();
                 if (
-                    !presenter.isReady()
+                    !conversionIsReady(fields)
                 ) return;
                 const btn = $(
                     '#convert-submit-btn',
@@ -372,8 +367,7 @@ export async function init(
                     await performConversion(
                         ideaId,
                         projectId,
-                        presenter
-                            .projectDetails(),
+                        fields,
                     );
                 } catch (err) {
                     log.error(
@@ -407,10 +401,7 @@ export async function init(
                     return;
                 }
                 const projectName =
-                    presenter
-                        .projectDetails()[
-                            'project-name'
-                        ] ?? '';
+                    fields['project-name'];
                 await postActivity({
                     type: 'idea_converted',
                     action:
@@ -469,37 +460,33 @@ export async function init(
 async function performConversion(
     ideaId: string,
     projectId: string,
-    pd: Record<string, string>,
+    fields: ConversionFields,
 ): Promise<void> {
     const leadUserId =
-        pd['project-lead']!;
+        fields['project-lead'];
     await putProject(
         projectId,
         {
             title:
-                pd['project-name']!,
+                fields['project-name'],
             description:
-                pd[
-                    'success-criteria'
-                ]!,
+                fields['success-criteria'],
             status: 'submitted',
             progress: 0,
             start_date:
-                pd['start-date']!,
+                fields['start-date'],
             target_end_date:
-                pd[
-                    'target-end-date'
-                ]!,
+                fields['target-end-date'],
             estimated_duration: 0,
             actual_duration: 0,
             estimated_cost:
                 Number(
-                    pd['budget']!,
+                    fields['budget'],
                 ) || 0,
             actual_cost: 0,
             estimated_impact:
                 Number(
-                    pd['impact']!,
+                    fields['impact'],
                 ) || 0,
             actual_impact: 0,
             position: 0,
@@ -507,7 +494,7 @@ async function performConversion(
                 jsonObjectField({}),
             timeline_label: '',
             budget_label:
-                pd['budget']!,
+                fields['budget'],
         },
     );
     await putProjectTeamMember({

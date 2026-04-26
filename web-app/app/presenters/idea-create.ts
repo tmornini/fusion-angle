@@ -6,7 +6,7 @@ import {
     iconLightbulb, iconCheck,
 } from '../icons';
 
-interface FormData {
+export interface IdeaCreateDraft {
     title: string;
     problemStatement: string;
     targetUsers: string;
@@ -15,52 +15,37 @@ interface FormData {
     successMetrics: string;
 }
 
-const EMPTY_FORM: FormData = {
-    title: '',
-    problemStatement: '',
-    targetUsers: '',
-    proposedSolution: '',
-    expectedOutcome: '',
-    successMetrics: '',
-};
+export const EMPTY_IDEA_CREATE_DRAFT:
+    IdeaCreateDraft = {
+        title: '',
+        problemStatement: '',
+        targetUsers: '',
+        proposedSolution: '',
+        expectedOutcome: '',
+        successMetrics: '',
+    };
+
+export function ideaCreateDraftIsComplete(
+    draft: IdeaCreateDraft,
+): boolean {
+    return draft.title !== ''
+        && draft.problemStatement !== ''
+        && draft.proposedSolution !== ''
+        && draft.expectedOutcome !== '';
+}
 
 export class IdeaCreatePresenter {
-    #form: FormData = { ...EMPTY_FORM };
+    readonly #draft: IdeaCreateDraft;
 
-    syncFields(
-        fields: Partial<FormData>,
-    ): void {
-        for (
-            const [k, v] of
-            Object.entries(fields)
-        ) {
-            if (v !== undefined) {
-                this.#form[
-                    k as keyof FormData
-                ] = v.trim();
-            }
-        }
-    }
-
-    formData(): FormData {
-        return { ...this.#form };
-    }
-
-    isFormComplete(): boolean {
-        return this.#form
-            .title !== ''
-            && this.#form
-                .problemStatement
-                !== ''
-            && this.#form
-                .proposedSolution
-                !== ''
-            && this.#form
-                .expectedOutcome
-                !== '';
+    constructor(draft: IdeaCreateDraft) {
+        this.#draft = draft;
     }
 
     render(): SafeHtml {
+        const isComplete =
+            ideaCreateDraftIsComplete(
+                this.#draft,
+            );
         return html`
     <div class="idea-detail-wrap">
     <div class="${
@@ -149,7 +134,7 @@ export class IdeaCreatePresenter {
                 id=${'idea-create'
                     + '-step-next'}
                 ${trusted(
-                    this.isFormComplete()
+                    isComplete
                         ? ''
                         : 'disabled',
                 )}>
@@ -162,6 +147,7 @@ export class IdeaCreatePresenter {
     }
 
     #buildFormFields(): SafeHtml {
+        const d = this.#draft;
         return html`
     <div class="flex flex-col gap-6">
         <div>
@@ -178,9 +164,7 @@ export class IdeaCreatePresenter {
                     + ' AI-Powered'
                     + ' Customer'
                     + ' Segmentation'}"
-                value="${
-                    this.#form.title
-                }"
+                value="${d.title}"
             />
             <p class="text-xs text-muted
                 mt-1">
@@ -211,8 +195,7 @@ export class IdeaCreatePresenter {
                     + ' not solving it?'
                 }"
                 rows="5">${
-                    this.#form
-                        .problemStatement
+                    d.problemStatement
             }</textarea>
             <p class="text-xs text-muted
                 mt-1">
@@ -237,9 +220,7 @@ export class IdeaCreatePresenter {
                     + ' operations'
                     + ' managers'
                 }"
-                value="${
-                    this.#form.targetUsers
-                }"
+                value="${d.targetUsers}"
             />
             <p class="text-xs text-muted
                 mt-1">
@@ -269,8 +250,7 @@ export class IdeaCreatePresenter {
                     + ' you use?'
                 }"
                 rows="5">${
-                    this.#form
-                        .proposedSolution
+                    d.proposedSolution
             }</textarea>
             <p class="text-xs text-muted
                 mt-1">
@@ -301,8 +281,7 @@ export class IdeaCreatePresenter {
                     + ' improved...'
                 }"
                 rows="5">${
-                    this.#form
-                        .expectedOutcome
+                    d.expectedOutcome
             }</textarea>
             <p class="text-xs text-muted
                 mt-1">
@@ -334,8 +313,7 @@ export class IdeaCreatePresenter {
                     + ' of 10 points'
                 }"
                 rows="4">${
-                    this.#form
-                        .successMetrics
+                    d.successMetrics
             }</textarea>
             <p class="text-xs text-muted
                 mt-1">

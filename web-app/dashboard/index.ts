@@ -29,11 +29,9 @@ export async function init(
         );
     if (!gauges) return;
 
-    const rendered = gauges.map(g => {
-        const p = new GaugePresenter();
-        g.presentGaugeInto(p);
-        return p.render();
-    });
+    const rendered = gauges.map(
+        g => new GaugePresenter(g).render(),
+    );
     setHtml(
         container,
         html`${rendered}`,

@@ -18,7 +18,6 @@ import { allStrengths } from '../adapters';
 import {
     WorkingStylesPresenter,
 } from './working-styles';
-import type { EditMode } from './edit-mode';
 
 const DEPARTMENTS = [
     'Product',
@@ -32,155 +31,32 @@ export type ProfileFieldKey =
     | 'phone' | 'role' | 'department'
     | 'bio';
 
-export class ProfilePresenter {
-    #profile: Profile;
-    #mode: EditMode<Profile>
-        = { kind: 'reading' };
-
-    constructor(profile: Profile) {
-        this.#profile = profile;
-    }
-
-    update(profile: Profile): void {
-        this.#profile = profile;
-        this.#mode = { kind: 'reading' };
-    }
-
-    beginEdit(): void {
-        this.#mode = {
-            kind: 'editing',
-            draft: {
-                ...this.#profile,
-                strengths: [
-                    ...this.#profile.strengths,
-                ],
-            },
-        };
-    }
-
-    cancelEdit(): void {
-        this.#mode = { kind: 'reading' };
-    }
-
-    isEditing(): boolean {
-        return this.#mode.kind === 'editing';
-    }
-
-    setDraftField(
-        field: ProfileFieldKey,
-        value: string,
-    ): void {
-        if (this.#mode.kind !== 'editing') {
-            throw new Error(
-                'setDraftField requires'
-                + ' editing mode',
-            );
-        }
-        this.#mode.draft[field] = value;
-    }
-
-    toggleStrength(name: string): void {
-        if (this.#mode.kind !== 'editing') {
-            throw new Error(
-                'toggleStrength requires'
-                + ' editing mode',
-            );
-        }
-        const strengths
-            = this.#mode.draft.strengths;
-        const i = strengths.indexOf(name);
-        if (i >= 0) {
-            strengths.splice(i, 1);
-        } else {
-            strengths.push(name);
-        }
-    }
-
-    draft(): Profile {
-        return this.#mode.kind === 'editing'
-            ? this.#mode.draft
-            : this.#profile;
-    }
-
-    renderShell(
-        container: HTMLElement,
-    ): void {
-        setHtml(container, html`
+function buildShell(
+    container: HTMLElement,
+): void {
+    setHtml(container, html`
 <div class="idea-detail-wrap">
     <div class="profile-header-slot"></div>
     <div class="profile-info-slot"></div>
     <div class="profile-styles-slot"></div>
     <div class="profile-strengths-slot"></div>
 </div>`);
-        this.renderUpdate(container);
-    }
+}
 
-    renderUpdate(
-        container: HTMLElement,
-    ): void {
-        this.#updateHeader(container);
-        this.#updateInfo(container);
-        this.#updateStyles(container);
-        this.#updateStrengths(container);
-    }
+function setSlot(
+    container: HTMLElement,
+    cls: string,
+    markup: SafeHtml,
+): void {
+    const slot = $(cls, container);
+    if (!slot) return;
+    setHtml(slot, markup);
+}
 
-    #updateHeader(
-        container: HTMLElement,
-    ): void {
-        const slot = $(
-            '.profile-header-slot', container,
-        );
-        if (!slot) return;
-        setHtml(slot, this.#buildHeader());
-    }
-
-    #updateInfo(
-        container: HTMLElement,
-    ): void {
-        const slot = $(
-            '.profile-info-slot', container,
-        );
-        if (!slot) return;
-        setHtml(
-            slot,
-            this.#buildPersonalInfoCard(),
-        );
-    }
-
-    #updateStyles(
-        container: HTMLElement,
-    ): void {
-        const slot = $(
-            '.profile-styles-slot', container,
-        );
-        if (!slot) return;
-        setHtml(
-            slot,
-            this.#buildWorkingStylesCard(),
-        );
-    }
-
-    #updateStrengths(
-        container: HTMLElement,
-    ): void {
-        const slot = $(
-            '.profile-strengths-slot',
-            container,
-        );
-        if (!slot) return;
-        setHtml(
-            slot, this.#buildStrengthsCard(),
-        );
-    }
-
-    #avatarInitials(): string {
-        const p = this.draft();
-        return p.firstName.charAt(0)
-            + p.lastName.charAt(0);
-    }
-
-    #buildHeader(): SafeHtml {
-        return html`
+function buildHeader(
+    buttons: SafeHtml,
+): SafeHtml {
+    return html`
         <div class="page-header">
             <div>
                 <h1 class="page-title">
@@ -194,40 +70,47 @@ export class ProfilePresenter {
                     preferences
                 </p>
             </div>
-            ${this.#buildHeaderButtons()}
+            ${buttons}
         </div>`;
-    }
+}
 
-    #buildHeaderButtons(): SafeHtml {
-        if (this.isEditing()) {
-            return html`
-            <div class="flex gap-2">
-                <button class="${
-                    'btn btn-outline gap-2'
-                }" id="profile-cancel-btn"
-                    data-profile-action="cancel">
-                    ${iconX(16, '')} Cancel
-                </button>
-                <button class="${
-                    'btn btn-primary gap-2'
-                }" id="profile-save-btn"
-                    data-profile-action="save">
-                    ${iconSave(16, '')} Save
-                </button>
-            </div>`;
-        }
-        return html`
-            <button class="${
-                'btn btn-outline gap-2'
-            }" id="profile-edit-btn"
-                data-profile-action="edit">
-                ${iconEdit(16, '')} Edit
-            </button>`;
-    }
+function buildAvatar(
+    profile: Profile,
+    showCameraButton: boolean,
+): SafeHtml {
+    const initials =
+        profile.firstName.charAt(0)
+        + profile.lastName.charAt(0);
+    return html`
+        <div class="profile-avatar-wrap">
+            <div class="profile-avatar">
+                <span class="${
+                    'text-3xl font-bold'
+                    + ' text-primary'
+                }">${initials}</span>
+            </div>
+            ${showCameraButton
+                ? html`<button class="${
+                    'profile-avatar-btn'
+                }"
+                    id="profile-avatar-btn"
+                    aria-label="${
+                        'Change avatar'
+                    }">${
+                        iconCamera(14, '')
+                    }</button>`
+                : html``}
+        </div>`;
+}
 
-    #buildPersonalInfoCard(): SafeHtml {
-        const p = this.draft();
-        return html`
+function buildInfoCard(
+    nameFields: SafeHtml,
+    avatar: SafeHtml,
+    secondRow: SafeHtml,
+    thirdRow: SafeHtml,
+    bio: SafeHtml,
+): SafeHtml {
+    return html`
         <div class="${
             'card card-hover p-6 mb-6'
         }">
@@ -238,184 +121,123 @@ export class ProfilePresenter {
             <div class="${
                 'flex items-start gap-6 mb-6'
             }">
-                ${this.#buildAvatar()}
-                ${this.#buildNameFields()}
+                ${avatar}
+                ${nameFields}
             </div>
             <div class="${
                 'grid grid-cols-2 gap-4 mb-4'
-            }">
-                ${this.#buildField(
-                    'profile-email',
-                    'email',
-                    html`${
-                        iconMail(16, '')
-                    } Email`,
-                    p.email,
-                    'email',
-                )}
-                ${this.#buildField(
-                    'profile-phone',
-                    'phone',
-                    html`${
-                        iconPhone(16, '')
-                    } Phone`,
-                    p.phone,
-                    'text',
-                )}
-            </div>
+            }">${secondRow}</div>
             <div class="${
                 'grid grid-cols-2 gap-4 mb-4'
-            }">
-                ${this.#buildField(
-                    'profile-role',
-                    'role',
-                    html`${
-                        iconBriefcase(16, '')
-                    } Role`,
-                    p.role,
-                    'text',
-                )}
-                ${this.#buildDepartmentField()}
-            </div>
-            ${this.#buildBioField()}
+            }">${thirdRow}</div>
+            ${bio}
         </div>`;
-    }
+}
 
-    #buildAvatar(): SafeHtml {
-        return html`
-            <div class="profile-avatar-wrap">
-                <div class="profile-avatar">
-                    <span class="${
-                        'text-3xl font-bold'
-                        + ' text-primary'
-                    }">${
-                        this.#avatarInitials()
-                    }</span>
-                </div>
-                ${this.isEditing()
-                    ? html`<button class="${
-                        'profile-avatar-btn'
-                    }"
-                        id="profile-avatar-btn"
-                        aria-label="${
-                            'Change avatar'
-                        }">${
-                            iconCamera(14, '')
-                        }</button>`
-                    : html``}
-            </div>`;
-    }
+function buildReadonlyField(
+    id: string,
+    label: SafeHtml,
+    value: string,
+): SafeHtml {
+    return html`
+        <div>
+            <label class="${
+                'label mb-2 flex'
+                + ' items-center gap-2'
+            }" for="${id}">${label}</label>
+            <p class="text-sm">${value}</p>
+        </div>`;
+}
 
-    #buildNameFields(): SafeHtml {
-        const p = this.draft();
-        return html`
-            <div class="${
-                'grid grid-cols-2 gap-4 flex-1'
-            }">
-                ${this.#buildField(
-                    'profile-first-name',
-                    'firstName',
-                    html`First Name`,
-                    p.firstName,
-                    'text',
-                )}
-                ${this.#buildField(
-                    'profile-last-name',
-                    'lastName',
-                    html`Last Name`,
-                    p.lastName,
-                    'text',
-                )}
-            </div>`;
-    }
+function buildEditableField(
+    id: string,
+    field: ProfileFieldKey,
+    label: SafeHtml,
+    value: string,
+    inputType: string,
+): SafeHtml {
+    return html`
+        <div>
+            <label class="${
+                'label mb-2 flex'
+                + ' items-center gap-2'
+            }" for="${id}">${label}</label>
+            <input class="input"
+                id="${id}"
+                type="${inputType}"
+                data-profile-field="${field}"
+                value="${value}" />
+        </div>`;
+}
 
-    #buildField(
-        id: string,
-        field: ProfileFieldKey,
-        label: SafeHtml,
-        value: string,
-        inputType: string,
-    ): SafeHtml {
-        return html`
-            <div>
-                <label class="${
-                    'label mb-2 flex'
-                    + ' items-center gap-2'
-                }" for="${id}">${label}</label>
-                ${this.isEditing()
-                    ? html`<input
-                        class="input"
-                        id="${id}"
-                        type="${inputType}"
-                        data-profile-field="${
-                            field
-                        }"
-                        value="${value}" />`
-                    : html`<p class="${
-                        'text-sm'
-                    }">${value}</p>`}
-            </div>`;
-    }
+function buildReadonlyDepartment(
+    value: string,
+): SafeHtml {
+    return html`
+        <div>
+            <label class="${
+                'label mb-2 block'
+            }" for="profile-department"
+            >Department</label>
+            <p class="text-sm">${value}</p>
+        </div>`;
+}
 
-    #buildDepartmentField(): SafeHtml {
-        const p = this.draft();
-        return html`
-            <div>
-                <label class="${
-                    'label mb-2 block'
-                }" for="profile-department"
-                >Department</label>
-                ${this.isEditing()
-                    ? html`<select
-                        class="input"
-                        id="profile-department"
-                        data-profile-field="${
-                            'department'
-                        }"
-                    >${DEPARTMENTS.map(d =>
-                        html`<option
-                            value="${d}"
-                            ${p.department === d
-                                ? 'selected'
-                                : ''}
-                        >${d}</option>`)
-                    }</select>`
-                    : html`<p class="${
-                        'text-sm'
-                    }">${p.department}</p>`}
-            </div>`;
-    }
+function buildEditableDepartment(
+    value: string,
+): SafeHtml {
+    return html`
+        <div>
+            <label class="${
+                'label mb-2 block'
+            }" for="profile-department"
+            >Department</label>
+            <select class="input"
+                id="profile-department"
+                data-profile-field="department"
+            >${DEPARTMENTS.map(d =>
+                html`<option
+                    value="${d}"
+                    ${value === d
+                        ? 'selected'
+                        : ''}
+                >${d}</option>`)
+            }</select>
+        </div>`;
+}
 
-    #buildBioField(): SafeHtml {
-        const p = this.draft();
-        return html`
-            <div>
-                <label class="${
-                    'label mb-2 block'
-                }" for="profile-bio">Bio</label>
-                ${this.isEditing()
-                    ? html`<textarea
-                        class="textarea"
-                        rows="3"
-                        id="profile-bio"
-                        data-profile-field="${
-                            'bio'
-                        }"
-                    >${p.bio}</textarea>`
-                    : html`<p class="${
-                        'text-sm'
-                    }">${p.bio}</p>`}
-            </div>`;
-    }
+function buildReadonlyBio(
+    value: string,
+): SafeHtml {
+    return html`
+        <div>
+            <label class="${
+                'label mb-2 block'
+            }" for="profile-bio">Bio</label>
+            <p class="text-sm">${value}</p>
+        </div>`;
+}
 
-    #buildWorkingStylesCard(): SafeHtml {
-        return new WorkingStylesPresenter(
-            this.#profile.teamDimensions,
-        ).buildCard();
-    }
+function buildEditableBio(
+    value: string,
+): SafeHtml {
+    return html`
+        <div>
+            <label class="${
+                'label mb-2 block'
+            }" for="profile-bio">Bio</label>
+            <textarea class="textarea"
+                rows="3"
+                id="profile-bio"
+                data-profile-field="bio"
+            >${value}</textarea>
+        </div>`;
+}
 
-    #buildStrengthsCard(): SafeHtml {
-        return html`
+function buildStrengthsCard(
+    chips: SafeHtml,
+): SafeHtml {
+    return html`
         <div class="${
             'card card-hover p-6 mb-6'
         }">
@@ -428,37 +250,33 @@ export class ProfilePresenter {
             <div class="${
                 'flex flex-wrap gap-2'
             }" id="profile-strengths">
-                ${this.#buildStrengthChips()}
+                ${chips}
             </div>
         </div>`;
-    }
+}
 
-    #buildStrengthChips(): SafeHtml {
-        const p = this.draft();
-        const draftSet = new Set(p.strengths);
-        if (!this.isEditing()) {
-            const selected = allStrengths
-                .filter(s => draftSet.has(s));
-            return html`${selected.map(
-                name => html`<span class="${
-                    'pill-tag'
-                    + ' pill-tag-strength'
-                }">${
-                    iconStar(10, '')
-                } ${name}</span>`,
-            )}`;
-        }
-        return html`${allStrengths.map(
-            name => this.#buildEditableChip(
-                name, draftSet.has(name),
-            ),
-        )}`;
-    }
+function buildSelectedStrengthChips(
+    strengths: readonly string[],
+): SafeHtml {
+    const draftSet = new Set(strengths);
+    const selected = allStrengths
+        .filter(s => draftSet.has(s));
+    return html`${selected.map(
+        name => html`<span class="${
+            'pill-tag'
+            + ' pill-tag-strength'
+        }">${
+            iconStar(10, '')
+        } ${name}</span>`,
+    )}`;
+}
 
-    #buildEditableChip(
-        name: string,
-        isActive: boolean,
-    ): SafeHtml {
+function buildEditableStrengthChips(
+    strengths: readonly string[],
+): SafeHtml {
+    const draftSet = new Set(strengths);
+    return html`${allStrengths.map(name => {
+        const isActive = draftSet.has(name);
         const variant = isActive
             ? 'btn-primary'
             : 'btn-secondary';
@@ -473,5 +291,256 @@ export class ProfilePresenter {
                 } `
                 : html``
         }${name}</button>`;
+    })}`;
+}
+
+export class ProfilePresenter {
+    readonly #profile: Profile;
+
+    constructor(profile: Profile) {
+        this.#profile = profile;
+    }
+
+    renderShell(
+        container: HTMLElement,
+    ): void {
+        buildShell(container);
+        this.renderUpdate(container);
+    }
+
+    renderUpdate(
+        container: HTMLElement,
+    ): void {
+        setSlot(
+            container,
+            '.profile-header-slot',
+            this.#buildHeader(),
+        );
+        setSlot(
+            container,
+            '.profile-info-slot',
+            this.#buildPersonalInfoCard(),
+        );
+        setSlot(
+            container,
+            '.profile-styles-slot',
+            this.#buildWorkingStylesCard(),
+        );
+        setSlot(
+            container,
+            '.profile-strengths-slot',
+            this.#buildStrengthsCard(),
+        );
+    }
+
+    #buildHeader(): SafeHtml {
+        return buildHeader(html`
+            <button class="${
+                'btn btn-outline gap-2'
+            }" id="profile-edit-btn"
+                data-profile-action="edit">
+                ${iconEdit(16, '')} Edit
+            </button>`);
+    }
+
+    #buildPersonalInfoCard(): SafeHtml {
+        const p = this.#profile;
+        const nameFields = html`
+            <div class="${
+                'grid grid-cols-2 gap-4 flex-1'
+            }">
+                ${buildReadonlyField(
+                    'profile-first-name',
+                    html`First Name`,
+                    p.firstName,
+                )}
+                ${buildReadonlyField(
+                    'profile-last-name',
+                    html`Last Name`,
+                    p.lastName,
+                )}
+            </div>`;
+        return buildInfoCard(
+            nameFields,
+            buildAvatar(p, false),
+            html`
+                ${buildReadonlyField(
+                    'profile-email',
+                    html`${
+                        iconMail(16, '')
+                    } Email`,
+                    p.email,
+                )}
+                ${buildReadonlyField(
+                    'profile-phone',
+                    html`${
+                        iconPhone(16, '')
+                    } Phone`,
+                    p.phone,
+                )}`,
+            html`
+                ${buildReadonlyField(
+                    'profile-role',
+                    html`${
+                        iconBriefcase(16, '')
+                    } Role`,
+                    p.role,
+                )}
+                ${buildReadonlyDepartment(
+                    p.department,
+                )}`,
+            buildReadonlyBio(p.bio),
+        );
+    }
+
+    #buildWorkingStylesCard(): SafeHtml {
+        return new WorkingStylesPresenter(
+            this.#profile.teamDimensions,
+        ).buildCard();
+    }
+
+    #buildStrengthsCard(): SafeHtml {
+        return buildStrengthsCard(
+            buildSelectedStrengthChips(
+                this.#profile.strengths,
+            ),
+        );
+    }
+}
+
+export class ProfileEditPresenter {
+    readonly #profile: Profile;
+    readonly #draft: Profile;
+
+    constructor(
+        profile: Profile,
+        draft: Profile,
+    ) {
+        this.#profile = profile;
+        this.#draft = draft;
+    }
+
+    renderShell(
+        container: HTMLElement,
+    ): void {
+        buildShell(container);
+        this.renderUpdate(container);
+    }
+
+    renderUpdate(
+        container: HTMLElement,
+    ): void {
+        setSlot(
+            container,
+            '.profile-header-slot',
+            this.#buildHeader(),
+        );
+        setSlot(
+            container,
+            '.profile-info-slot',
+            this.#buildPersonalInfoCard(),
+        );
+        setSlot(
+            container,
+            '.profile-styles-slot',
+            this.#buildWorkingStylesCard(),
+        );
+        setSlot(
+            container,
+            '.profile-strengths-slot',
+            this.#buildStrengthsCard(),
+        );
+    }
+
+    #buildHeader(): SafeHtml {
+        return buildHeader(html`
+            <div class="flex gap-2">
+                <button class="${
+                    'btn btn-outline gap-2'
+                }" id="profile-cancel-btn"
+                    data-profile-action="cancel">
+                    ${iconX(16, '')} Cancel
+                </button>
+                <button class="${
+                    'btn btn-primary gap-2'
+                }" id="profile-save-btn"
+                    data-profile-action="save">
+                    ${iconSave(16, '')} Save
+                </button>
+            </div>`);
+    }
+
+    #buildPersonalInfoCard(): SafeHtml {
+        const d = this.#draft;
+        const nameFields = html`
+            <div class="${
+                'grid grid-cols-2 gap-4 flex-1'
+            }">
+                ${buildEditableField(
+                    'profile-first-name',
+                    'firstName',
+                    html`First Name`,
+                    d.firstName,
+                    'text',
+                )}
+                ${buildEditableField(
+                    'profile-last-name',
+                    'lastName',
+                    html`Last Name`,
+                    d.lastName,
+                    'text',
+                )}
+            </div>`;
+        return buildInfoCard(
+            nameFields,
+            buildAvatar(d, true),
+            html`
+                ${buildEditableField(
+                    'profile-email',
+                    'email',
+                    html`${
+                        iconMail(16, '')
+                    } Email`,
+                    d.email,
+                    'email',
+                )}
+                ${buildEditableField(
+                    'profile-phone',
+                    'phone',
+                    html`${
+                        iconPhone(16, '')
+                    } Phone`,
+                    d.phone,
+                    'text',
+                )}`,
+            html`
+                ${buildEditableField(
+                    'profile-role',
+                    'role',
+                    html`${
+                        iconBriefcase(16, '')
+                    } Role`,
+                    d.role,
+                    'text',
+                )}
+                ${buildEditableDepartment(
+                    d.department,
+                )}`,
+            buildEditableBio(d.bio),
+        );
+    }
+
+    #buildWorkingStylesCard(): SafeHtml {
+        return new WorkingStylesPresenter(
+            this.#profile.teamDimensions,
+        ).buildCard();
+    }
+
+    #buildStrengthsCard(): SafeHtml {
+        return buildStrengthsCard(
+            buildEditableStrengthChips(
+                this.#draft.strengths,
+            ),
+        );
     }
 }

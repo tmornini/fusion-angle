@@ -1,5 +1,5 @@
 import {
-    $, $select, attr,
+    $, $select, attr, createElement,
 } from '../app/dom';
 import {
     html,
@@ -22,7 +22,7 @@ import {
     getProjects,
     postFlowFromMermaid,
     postFlowFromZip,
-    readZipBackup,
+    getBackupFromZip,
     computeFlowBackupResolution,
     putFlowFromBackup,
     postFlowFromBackup,
@@ -100,11 +100,10 @@ export async function init(
         },
     );
     if (!result) return;
-    const rendered = result.map(flow => {
-        const p = new FlowPresenter();
-        flow.presentCardInto(p);
-        return p.render();
-    });
+    const rendered = result.map(
+        flow =>
+            new FlowPresenter(flow).render(),
+    );
 
     setHtml(
         listEl,
@@ -237,10 +236,7 @@ async function openImportDialog(
 
     select.replaceChildren();
     for (const p of projects) {
-        const opt =
-            document.createElement(
-                'option',
-            );
+        const opt = createElement('option');
         opt.value = p.idForLink();
         opt.textContent =
             p.titleText();
@@ -266,7 +262,7 @@ async function handleFileSelect(
         );
         try {
             const backup =
-                await readZipBackup(bytes);
+                await getBackupFromZip(bytes);
             await handleV2Zip(
                 backup, input,
             );

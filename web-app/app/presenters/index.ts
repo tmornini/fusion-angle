@@ -1,14 +1,29 @@
 export {
     IdeaPresenter,
+    IdeaEditPresenter,
     IdeaListPresenter,
+    ideaDraftFromIdea,
+    ideaPatchFromDraft,
     type IdeaFieldKey,
+    type IdeaDraftFields,
     type IdeaEntityPatch,
 } from './idea';
 export {
     IdeaConversionPresenter,
+    initialConversionFields,
+    conversionRequiredCount,
+    conversionCompletedCount,
+    conversionIsReady,
+    conversionFieldIsReady,
+    ALL_CONVERSION_FIELDS,
+    type ConversionField,
+    type ConversionFields,
 } from './idea-conversion';
 export {
     IdeaCreatePresenter,
+    EMPTY_IDEA_CREATE_DRAFT,
+    ideaCreateDraftIsComplete,
+    type IdeaCreateDraft,
 } from './idea-create';
 export {
     ProjectPresenter,
@@ -30,7 +45,11 @@ export {
 } from './flow';
 export {
     ProjectDetailPresenter,
+    ProjectDetailEditPresenter,
+    projectDraftFromView,
+    projectPatchFromDraft,
     type ProjectFieldKey,
+    type ProjectDraftFields,
     type ProjectEntityPatch,
 } from './project-detail';
 export {
@@ -38,10 +57,12 @@ export {
 } from './organization';
 export {
     ProfilePresenter,
+    ProfileEditPresenter,
     type ProfileFieldKey,
 } from './profile';
 export {
     CompanyPresenter,
+    CompanyEditPresenter,
     type CompanyFieldKey,
 } from './company';
 export {

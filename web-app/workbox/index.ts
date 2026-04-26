@@ -1,4 +1,6 @@
-import { $, populateIcons } from '../app/dom';
+import {
+    $, populateIcons, attr,
+} from '../app/dom';
 import {
     html, setHtml,
 } from '../app/safe-html';
@@ -187,9 +189,9 @@ function onRowClick(e: MouseEvent): void {
         '[data-work-order-card]',
     );
     if (!card) return;
-    const id = card.getAttribute(
-        'data-work-order-card',
-    ) ?? '';
+    const id = attr(
+        card, 'data-work-order-card',
+    );
     navigateTo('workbox-detail', { id });
 }
 

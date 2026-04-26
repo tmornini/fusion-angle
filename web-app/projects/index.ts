@@ -59,7 +59,7 @@ export async function init(): Promise<void> {
         badgesEl.addEventListener(
             'click',
             e => onBadgeClick(
-                e, badgesEl, presenter,
+                e, badgesEl, listEl, presenter,
             ),
             { signal },
         );
@@ -94,6 +94,7 @@ export async function init(): Promise<void> {
 function onBadgeClick(
     e: MouseEvent,
     badgesEl: HTMLElement,
+    listEl: HTMLElement,
     p: ProjectListPresenter,
 ): void {
     if (
@@ -105,12 +106,7 @@ function onBadgeClick(
     if (!badge) return;
     const s = attr(badge, 'data-status');
     if (!isProjectStatus(s)) return;
-    p.toggleFilter(s as ProjectStatus);
-    p.renderBadges(badgesEl);
-    const listEl = $(
-        '#projects-list', document,
-    );
-    if (listEl) p.renderList(listEl);
+    p.applyFilterToggle(s, badgesEl, listEl);
 }
 
 function onCardClick(e: MouseEvent): void {

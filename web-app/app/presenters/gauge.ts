@@ -8,7 +8,7 @@ import {
     iconZap,
 } from '../icons';
 import type {
-    GaugeReceiver,
+    GaugeData,
     GaugeIcon,
     GaugeTheme,
 } from '../adapters/dashboard';
@@ -40,91 +40,37 @@ const ICON_FNS: Record<
 const ARC_OUTER_R = 65;
 const ARC_INNER_R = 45;
 
-export class GaugePresenter
-    implements GaugeReceiver
-{
-    #title = '';
-    #tone: GaugeTone = 'primary';
-    #iconFn: (
-        size: number,
-        cls: string,
-    ) => SafeHtml = iconClock;
-    #iconCss = '';
-    #outerValue = 0;
-    #outerMax = 0;
-    #outerLabel = '';
-    #outerDisplay = '';
-    #innerValue = 0;
-    #innerMax = 0;
-    #innerLabel = '';
-    #innerDisplay = '';
-    #hasOverrun = false;
+export class GaugePresenter {
+    readonly #data: GaugeData;
 
-    title(text: string): void {
-        this.#title = text;
-    }
-
-    theme(name: GaugeTheme): void {
-        this.#tone = THEME_TONE[name];
-    }
-
-    icon(
-        name: GaugeIcon,
-        cssClass: string,
-    ): void {
-        this.#iconFn = ICON_FNS[name];
-        this.#iconCss = cssClass;
-    }
-
-    outerArc(
-        value: number,
-        max: number,
-        label: string,
-        display: string,
-    ): void {
-        this.#outerValue = value;
-        this.#outerMax = max;
-        this.#outerLabel = label;
-        this.#outerDisplay = display;
-    }
-
-    innerArc(
-        value: number,
-        max: number,
-        label: string,
-        display: string,
-    ): void {
-        this.#innerValue = value;
-        this.#innerMax = max;
-        this.#innerLabel = label;
-        this.#innerDisplay = display;
-    }
-
-    overrunWarning(
-        enabled: boolean,
-    ): void {
-        this.#hasOverrun = enabled;
+    constructor(data: GaugeData) {
+        this.#data = data;
     }
 
     render(): SafeHtml {
-        const elementId = this.#title
+        const elementId = this.#data.title
             .replace(/\s+/g, '-')
             .toLowerCase();
+        const tone =
+            THEME_TONE[this.#data.theme];
+        const iconFn =
+            ICON_FNS[this.#data.icon];
         return html`
     <div class="card gauge-card"
-        data-tone="${this.#tone}">
+        data-tone="${tone}">
         <div class="${
             'flex items-center gap-3 mb-5'
         }">
             <div class="icon-box"
-                data-tone="${this.#tone}">
-                ${this.#iconFn(
-                    20, this.#iconCss,
+                data-tone="${tone}">
+                ${iconFn(
+                    20,
+                    this.#data.iconCssClass,
                 )}
             </div>
             <h3 class="${
                 'text-sm font-semibold'
-            }">${this.#title}</h3>
+            }">${this.#data.title}</h3>
         </div>
         <div class="gauge-arc-container">
             ${this.#renderSvgArcs(elementId)}
@@ -136,20 +82,24 @@ export class GaugePresenter
     #renderSvgArcs(
         elementId: string,
     ): SafeHtml {
+        const outer = this.#data.outer;
+        const inner = this.#data.inner;
+        const hasOverrun =
+            this.#data.hasOverrunWarning;
         const outerPct =
-            this.#outerMax > 0
+            outer.max > 0
                 ? Math.min(
-                    (this.#outerValue
-                        / this.#outerMax)
+                    (outer.value
+                        / outer.max)
                         * 100,
                     100,
                 )
                 : 0;
         const innerPct =
-            this.#innerMax > 0
+            inner.max > 0
                 ? Math.min(
-                    (this.#innerValue
-                        / this.#innerMax)
+                    (inner.value
+                        / inner.max)
                         * 100,
                     100,
                 )
@@ -159,9 +109,8 @@ export class GaugePresenter
         const innerArc =
             Math.PI * ARC_INNER_R;
         const isOverrun =
-            this.#hasOverrun
-            && this.#innerValue
-                > this.#innerMax;
+            hasOverrun
+            && inner.value > inner.max;
         const stop0 =
             'hsl(var(--success))';
         const stop1 = isOverrun
@@ -172,12 +121,11 @@ export class GaugePresenter
         let innerStyle =
             '--dash-full:' + innerArc;
         if (
-            this.#hasOverrun
-            && this.#innerMax > 0
+            hasOverrun
+            && inner.max > 0
         ) {
             const ratio =
-                this.#innerValue
-                / this.#innerMax;
+                inner.value / inner.max;
             if (ratio > 1.5) {
                 const dur = Math.max(
                     0.333,
@@ -315,6 +263,8 @@ export class GaugePresenter
     }
 
     #renderLegend(): SafeHtml {
+        const inner = this.#data.inner;
+        const outer = this.#data.outer;
         return html`
         <div class="${
             'grid grid-cols-2 gap-4'
@@ -329,10 +279,10 @@ export class GaugePresenter
                     </div>
                     <span
                         class="legend-cell-label"
-                    >${this.#innerLabel}</span>
+                    >${inner.label}</span>
                 </div>
                 <p class="legend-cell-value">${
-                    this.#innerDisplay
+                    inner.display
                 }</p>
             </div>
             <div class="legend-cell">
@@ -345,10 +295,10 @@ export class GaugePresenter
                     </div>
                     <span
                         class="legend-cell-label"
-                    >${this.#outerLabel}</span>
+                    >${outer.label}</span>
                 </div>
                 <p class="legend-cell-value">${
-                    this.#outerDisplay
+                    outer.display
                 }</p>
             </div>
         </div>`;

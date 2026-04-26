@@ -4,10 +4,13 @@ import {
     iconTarget,
     iconMessageSquare,
     iconHeart,
-    iconStar,
 } from '../icons';
+import {
+    isDimensionKey,
+    type DimensionKey,
+} from '../adapters';
 
-const LABELS: Record<string, string> = {
+const LABELS: Record<DimensionKey, string> = {
     driver: 'Mover',
     analytical: 'Shaker',
     expressive: 'Prover',
@@ -15,7 +18,7 @@ const LABELS: Record<string, string> = {
 };
 
 const ICONS: Record<
-    string,
+    DimensionKey,
     (
         size: number,
         cssClass: string,
@@ -27,7 +30,7 @@ const ICONS: Record<
     amiable: iconHeart,
 };
 
-const ORDER = [
+const ORDER: readonly DimensionKey[] = [
     'driver',
     'analytical',
     'expressive',
@@ -36,12 +39,30 @@ const ORDER = [
 
 export class WorkingStylesPresenter {
     readonly #dimensions:
-        Record<string, number>;
+        Record<DimensionKey, number>;
 
     constructor(
         dimensions: Record<string, number>,
     ) {
-        this.#dimensions = dimensions;
+        const validated:
+            Partial<Record<
+                DimensionKey, number
+            >> = {};
+        for (
+            const [key, value]
+            of Object.entries(dimensions)
+        ) {
+            if (!isDimensionKey(key)) {
+                throw new Error(
+                    'Unknown dimension key: '
+                    + key,
+                );
+            }
+            validated[key] = value;
+        }
+        this.#dimensions = validated as Record<
+            DimensionKey, number
+        >;
     }
 
     buildCard(): SafeHtml {
@@ -63,7 +84,7 @@ export class WorkingStylesPresenter {
             .map(key => [
                 key,
                 this.#dimensions[key]!,
-            ] as [string, number]);
+            ] as [DimensionKey, number]);
         return html`${entries.map(
             ([key, value]) => this.#buildRow(
                 key, value,
@@ -72,11 +93,11 @@ export class WorkingStylesPresenter {
     }
 
     #buildRow(
-        key: string,
+        key: DimensionKey,
         value: number,
     ): SafeHtml {
-        const label = LABELS[key] ?? key;
-        const icon = ICONS[key] ?? iconStar;
+        const label = LABELS[key]!;
+        const icon = ICONS[key]!;
         return html`
             <div class="user-dim-row">
                 <div class="${

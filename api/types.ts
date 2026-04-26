@@ -46,6 +46,50 @@ export type IdeaStatus =
     | 'archived'
     | 'deleted';
 
+export type ActivityType =
+    | 'idea_created'
+    | 'project_created'
+    | 'user_joined'
+    | 'status_changed'
+    | 'idea_converted';
+
+const ACTIVITY_TYPES:
+    readonly ActivityType[] = [
+    'idea_created',
+    'project_created',
+    'user_joined',
+    'status_changed',
+    'idea_converted',
+];
+
+export function isActivityType(
+    v: string,
+): v is ActivityType {
+    return (ACTIVITY_TYPES as readonly string[])
+        .includes(v);
+}
+
+export type DimensionKey =
+    | 'driver'
+    | 'analytical'
+    | 'expressive'
+    | 'amiable';
+
+const DIMENSION_KEYS:
+    readonly DimensionKey[] = [
+    'driver',
+    'analytical',
+    'expressive',
+    'amiable',
+];
+
+export function isDimensionKey(
+    v: string,
+): v is DimensionKey {
+    return (DIMENSION_KEYS as readonly string[])
+        .includes(v);
+}
+
 export type ProjectStatus =
     | 'submitted'
     | 'under-review'
@@ -228,6 +272,11 @@ export function msSinceUtc(
         - new Date(iso).getTime();
 }
 
+export interface Deleted {
+    id: Id;
+    deleted_at: string;
+}
+
 export interface UserEntity {
     id: Id;
     first_name: string;
@@ -247,42 +296,6 @@ export interface UserEntity {
     last_active: string;
 }
 
-export interface UserCardReceiver {
-    identity(
-        id: string,
-        fullName: string,
-        initials: string,
-    ): void;
-    role(text: string): void;
-    department(text: string): void;
-    email(text: string): void;
-    status(
-        label: string,
-        className: string,
-        isActive: boolean,
-        isPending: boolean,
-        isDeactivated: boolean,
-    ): void;
-    availability(value: number): void;
-    performance(
-        score: number,
-        projectsCompleted: number,
-        currentProjects: number,
-    ): void;
-    strengths(items: string[]): void;
-    teamDimensions(
-        dims: Record<string, number>,
-    ): void;
-    lastActive(isoDate: string): void;
-}
-
-export interface UserProfileReceiver {
-    populateField(
-        field: string,
-        value: string,
-    ): void;
-}
-
 export class User {
     readonly #id: string;
     readonly #firstName: string;
@@ -297,8 +310,6 @@ export class User {
     readonly #currentProjects: number;
     readonly #strengths: string;
     readonly #teamDimensions: string;
-    readonly #phone: string;
-    readonly #bio: string;
     readonly #lastActive: string;
 
     constructor(entity: UserEntity) {
@@ -324,8 +335,6 @@ export class User {
             entity.strengths;
         this.#teamDimensions =
             entity.team_dimensions;
-        this.#phone = entity.phone;
-        this.#bio = entity.bio;
         this.#lastActive =
             entity.last_active;
     }
@@ -452,71 +461,6 @@ export class User {
         );
     }
 
-    presentCardInto(
-        r: UserCardReceiver,
-    ): void {
-        const fn = this.fullName();
-        const parts = fn.split(/\s+/);
-        const ini = parts.length >= 2
-            ? (parts[0]![0] ?? '')
-                + (parts[parts.length - 1]
-                    ?.[0] ?? '')
-            : fn.slice(0, 2);
-        r.identity(
-            this.#id,
-            fn,
-            ini.toUpperCase(),
-        );
-        r.role(this.#role);
-        r.department(this.#department);
-        r.email(this.#email);
-        r.status(
-            this.statusLabel(),
-            this.statusClassName(),
-            this.isActive(),
-            this.isPending(),
-            this.isDeactivated(),
-        );
-        r.availability(this.#availability);
-        r.performance(
-            this.#performanceScore,
-            this.#projectsCompleted,
-            this.#currentProjects,
-        );
-        r.strengths(
-            this.parsedStrengths(),
-        );
-        r.teamDimensions(
-            this.parsedTeamDimensions(),
-        );
-        r.lastActive(this.#lastActive);
-    }
-
-    presentProfileInto(
-        r: UserProfileReceiver,
-    ): void {
-        r.populateField(
-            'firstName', this.#firstName,
-        );
-        r.populateField(
-            'lastName', this.#lastName,
-        );
-        r.populateField(
-            'email', this.#email,
-        );
-        r.populateField(
-            'phone', this.#phone,
-        );
-        r.populateField(
-            'role', this.#role,
-        );
-        r.populateField(
-            'department', this.#department,
-        );
-        r.populateField(
-            'bio', this.#bio,
-        );
-    }
 }
 
 export interface IdeaEntity {
@@ -1233,7 +1177,7 @@ export class Project {
 
 export class Activity {
     readonly #id: string;
-    readonly #type: string;
+    readonly #type: ActivityType;
     readonly #action: string;
     readonly #target: string;
     readonly #timestamp: string;
@@ -1245,6 +1189,12 @@ export class Activity {
         entity: ActivityEntity,
         actor: string,
     ) {
+        if (!isActivityType(entity.type)) {
+            throw new Error(
+                'Unknown activity type: '
+                + entity.type,
+            );
+        }
         this.#id = entity.id;
         this.#type = entity.type;
         this.#action = entity.action;
@@ -1266,7 +1216,7 @@ export class Activity {
             + ` ${this.#target}`;
     }
 
-    typeValue(): string {
+    typeValue(): ActivityType {
         return this.#type;
     }
 

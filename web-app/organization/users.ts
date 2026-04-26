@@ -1,5 +1,5 @@
 import {
-    $, $input, $select,
+    $, $input, $select, $textarea,
 } from '../app/dom';
 import {
     html, setHtml,
@@ -580,10 +580,9 @@ async function handleInvite(): Promise<void> {
             '#invite-perf', document,
         )!.value,
     );
-    const bio = document.querySelector
-        <HTMLTextAreaElement>(
-            '#invite-bio',
-        )!.value;
+    const bio = $textarea(
+        '#invite-bio', document,
+    )!.value;
     const id = crypto.randomUUID();
     try {
         await putUser(

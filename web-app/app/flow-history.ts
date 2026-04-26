@@ -1,35 +1,74 @@
 import type { FlowVersion } from './adapters';
 
-export class FlowHistory {
-    #hasUndoHistory: boolean;
-    #redoStack: FlowVersion[] = [];
+export interface FlowHistorySnapshot {
+    readonly hasUndoHistory: boolean;
+    readonly redoStack: readonly FlowVersion[];
+}
 
-    constructor(hasUndoHistory: boolean) {
-        this.#hasUndoHistory = hasUndoHistory;
-    }
+export function buildFlowHistorySnapshot(
+    hasUndoHistory: boolean,
+): FlowHistorySnapshot {
+    return {
+        hasUndoHistory,
+        redoStack: [],
+    };
+}
 
-    canUndo(): boolean {
-        return this.#hasUndoHistory;
-    }
+export function canUndo(
+    s: FlowHistorySnapshot,
+): boolean {
+    return s.hasUndoHistory;
+}
 
-    canRedo(): boolean {
-        return this.#redoStack.length > 0;
-    }
+export function canRedo(
+    s: FlowHistorySnapshot,
+): boolean {
+    return s.redoStack.length > 0;
+}
 
-    noteMutation(): void {
-        this.#hasUndoHistory = true;
-        this.#redoStack = [];
-    }
+export function noteMutation(
+    s: FlowHistorySnapshot,
+): FlowHistorySnapshot {
+    return {
+        hasUndoHistory: true,
+        redoStack: [],
+    };
+}
 
-    setHasUndoHistory(value: boolean): void {
-        this.#hasUndoHistory = value;
-    }
+export function setHasUndoHistory(
+    s: FlowHistorySnapshot,
+    value: boolean,
+): FlowHistorySnapshot {
+    return { ...s, hasUndoHistory: value };
+}
 
-    pushRedo(version: FlowVersion): void {
-        this.#redoStack.push(version);
-    }
+export function pushRedo(
+    s: FlowHistorySnapshot,
+    version: FlowVersion,
+): FlowHistorySnapshot {
+    return {
+        ...s,
+        redoStack: [...s.redoStack, version],
+    };
+}
 
-    popRedo(): FlowVersion | undefined {
-        return this.#redoStack.pop();
+export interface PoppedRedo {
+    readonly snapshot: FlowHistorySnapshot;
+    readonly version: FlowVersion | undefined;
+}
+
+export function popRedo(
+    s: FlowHistorySnapshot,
+): PoppedRedo {
+    if (s.redoStack.length === 0) {
+        return { snapshot: s, version: undefined };
     }
+    const last = s.redoStack.length - 1;
+    return {
+        snapshot: {
+            ...s,
+            redoStack: s.redoStack.slice(0, last),
+        },
+        version: s.redoStack[last],
+    };
 }

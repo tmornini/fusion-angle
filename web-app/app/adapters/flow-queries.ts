@@ -19,19 +19,6 @@ export type {
     FlowFieldType,
 };
 
-export interface FlowCardReceiver {
-    flowId(id: string): void;
-    name(text: string): void;
-    description(text: string): void;
-    stats(
-        nodeCount: number,
-        edgeCount: number,
-    ): void;
-    projectName(
-        name: string | undefined,
-    ): void;
-}
-
 export interface FlowGraph {
     id: string;
     name: string;
@@ -53,46 +40,14 @@ function parseGraph(
     );
 }
 
-export class FlowSummary {
-    readonly #id: string;
-    readonly #name: string;
-    readonly #description: string;
-    readonly #nodeCount: number;
-    readonly #edgeCount: number;
-    readonly #projectName:
+export interface FlowSummary {
+    readonly id: string;
+    readonly name: string;
+    readonly description: string;
+    readonly nodeCount: number;
+    readonly edgeCount: number;
+    readonly projectName:
         string | undefined;
-
-    constructor(init: {
-        readonly id: string;
-        readonly name: string;
-        readonly description: string;
-        readonly nodeCount: number;
-        readonly edgeCount: number;
-        readonly projectName:
-            string | undefined;
-    }) {
-        this.#id = init.id;
-        this.#name = init.name;
-        this.#description =
-            init.description;
-        this.#nodeCount = init.nodeCount;
-        this.#edgeCount = init.edgeCount;
-        this.#projectName =
-            init.projectName;
-    }
-
-    presentCardInto(
-        r: FlowCardReceiver,
-    ): void {
-        r.flowId(this.#id);
-        r.name(this.#name);
-        r.description(this.#description);
-        r.stats(
-            this.#nodeCount,
-            this.#edgeCount,
-        );
-        r.projectName(this.#projectName);
-    }
 }
 
 export interface FlowListItem {
@@ -135,7 +90,7 @@ export async function getFlows(
 
     return flows.map(f => {
         const g = parseGraph(f.graph);
-        return new FlowSummary({
+        return {
             id: f.id,
             name: f.name,
             description: f.description,
@@ -143,7 +98,7 @@ export async function getFlows(
                 projectByFlow.get(f.id),
             nodeCount: g.nodes.length,
             edgeCount: g.edges.length,
-        });
+        };
     });
 }
 

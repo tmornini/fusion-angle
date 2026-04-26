@@ -329,6 +329,16 @@ export class ProjectListPresenter {
         setHtml(container, this.#buildList());
     }
 
+    applyFilterToggle(
+        status: ProjectStatus,
+        badgesEl: HTMLElement,
+        listEl: HTMLElement,
+    ): void {
+        this.toggleFilter(status);
+        this.renderBadges(badgesEl);
+        this.renderList(listEl);
+    }
+
     #buildBadges(): SafeHtml {
         const active = this.activeFilter();
         const groups = Object.groupBy(

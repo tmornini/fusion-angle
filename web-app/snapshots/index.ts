@@ -3,12 +3,14 @@ import {
     postSchemaCreation,
     postBootstrap,
     postMockDataLoad,
-    putSnapshot,
+    putSnapshotFromFile,
     getSnapshot,
     getDataPresent,
     nowUtc,
 } from '../app/adapters';
-import { $ } from '../app/dom';
+import {
+    $, $input, $button, createElement,
+} from '../app/dom';
 import { log } from '../app/logger';
 import {
     html,
@@ -270,10 +272,9 @@ export async function init(
 
     await mutateEmptyBanner(root);
 
-    const wipeBtn =
-        document.querySelector<
-            HTMLButtonElement
-        >('#wipe-btn');
+    const wipeBtn = $button(
+        '#wipe-btn', document,
+    );
     if (wipeBtn) {
         wipeBtn.addEventListener(
             'click',
@@ -298,10 +299,9 @@ export async function init(
         );
     }
 
-    const reloadBtn =
-        document.querySelector<
-            HTMLButtonElement
-        >('#reload-btn');
+    const reloadBtn = $button(
+        '#reload-btn', document,
+    );
     if (reloadBtn) {
         reloadBtn.addEventListener(
             'click',
@@ -317,10 +317,9 @@ export async function init(
         );
     }
 
-    const importInput =
-        document.querySelector<
-            HTMLInputElement
-        >('#upload-input');
+    const importInput = $input(
+        '#upload-input', document,
+    );
     importInput?.addEventListener(
         'change',
         async () => {
@@ -328,14 +327,10 @@ export async function init(
                 importInput.files?.[0];
             if (!file) return;
             try {
-                const text =
-                    await file.text();
-                await putSnapshot(
-                    text,
-                );
+                await putSnapshotFromFile(file);
             } catch (err) {
                 log.error(
-                    'putSnapshot failed',
+                    'putSnapshotFromFile failed',
                     'snapshots',
                     err,
                 );
@@ -385,9 +380,7 @@ export async function init(
             const url =
                 URL.createObjectURL(blob);
             const downloadLink =
-                document.createElement(
-                    'a',
-                );
+                createElement('a');
             downloadLink.href = url;
             const date = nowUtc()
                 .split('T')[0];
@@ -443,16 +436,12 @@ async function mutateEmptyBanner(
 ): Promise<void> {
     const hasExistingData =
         await getDataPresent();
-    const existing =
-        document.getElementById(
-            BANNER_ID,
-        );
+    const existing = $(
+        '#' + BANNER_ID, document,
+    );
     if (!hasExistingData) {
         if (!existing) {
-            const banner =
-                document.createElement(
-                    'div',
-                );
+            const banner = createElement('div');
             banner.id = BANNER_ID;
             banner.className =
                 'card empty-banner';

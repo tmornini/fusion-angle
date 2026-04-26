@@ -18,13 +18,13 @@ import {
     deleteFlowVersion,
     putFlowFromVersion,
 } from '../adapters';
-import type { FlowEntity } from '../../../api/types';
 import type {
     GraphNode,
     GraphEdge,
     GraphField,
     FlowGraph,
     FlowVersion,
+    FlowSaveShape,
 } from '../adapters/flows';
 import type { FlowFieldType }
     from '../adapters/flows';
@@ -39,6 +39,7 @@ import {
     whichEdge,
     controlOffset,
     buildEdgePreviewPath,
+    BLUE,
 } from '../flow-graph';
 import {
     computeLayout,
@@ -60,7 +61,21 @@ import {
 import type {
     InteractionState,
 } from '../flow-interactions';
-import { FlowHistory } from '../flow-history';
+import {
+    buildFlowHistorySnapshot,
+    canUndo as historyCanUndo,
+    canRedo as historyCanRedo,
+    noteMutation as historyNoteMutation,
+    setHasUndoHistory,
+    pushRedo,
+    popRedo,
+} from '../flow-history';
+import type {
+    FlowHistorySnapshot,
+} from '../flow-history';
+import {
+    applyMoveNodes,
+} from '../flow-designer-actions';
 import { iconArrowLeft } from '../icons';
 import {
     buildToolbar,
@@ -69,6 +84,9 @@ import {
     buildEdgePanel,
     buildFlowNameHeader,
 } from './flow-designer-view';
+
+const NEW_NODE_OFFSET_X = 120;
+const NEW_NODE_OFFSET_Y = 100;
 
 function serializeGraph(
     nodes: GraphNode[],
@@ -104,6 +122,7 @@ interface DesignerState {
     nodes: GraphNode[];
     edges: GraphEdge[];
     edgeWaypoints: Map<string, Waypoint[]>;
+    isPanelOpen: boolean;
     interaction: InteractionState;
     savedViewBox: SavedViewBox;
 }
@@ -142,7 +161,7 @@ export class FlowDesignerPresenter {
     #canvasW: number;
     #canvasH: number;
     #needsFit: boolean;
-    #history: FlowHistory;
+    #history: FlowHistorySnapshot;
 
     constructor(
         graph: FlowGraph,
@@ -153,7 +172,7 @@ export class FlowDesignerPresenter {
         this.#canvasW = canvasW;
         this.#canvasH = canvasH;
         this.#needsFit = true;
-        this.#history = new FlowHistory(
+        this.#history = buildFlowHistorySnapshot(
             hasUndoHistory,
         );
         const interaction =
@@ -174,6 +193,7 @@ export class FlowDesignerPresenter {
             nodes: graph.nodes,
             edges: graph.edges,
             edgeWaypoints: emptyWaypoints(),
+            isPanelOpen: false,
             interaction,
             savedViewBox:
                 { kind: 'none' },
@@ -182,7 +202,9 @@ export class FlowDesignerPresenter {
     }
 
     #noteMutation(): void {
-        this.#history.noteMutation();
+        this.#history = historyNoteMutation(
+            this.#history,
+        );
     }
 
     async #reloadGraphFromStore(
@@ -203,30 +225,22 @@ export class FlowDesignerPresenter {
             .selection = { kind: 'none' };
     }
 
-    #buildFlowEntity(
-    ): Omit<FlowEntity, 'id'> {
+    #buildSaveShape(): FlowSaveShape {
         return {
             name: this.#state.flowName,
             description:
                 this.#state.flowDescription,
-            is_locked: this.#state.isLocked,
-            is_auto_layout:
+            isLocked: this.#state.isLocked,
+            isAutoLayout:
                 this.#state.isAutoLayout,
-            is_auto_fit:
+            isAutoFit:
                 this.#state.isAutoFit,
-            lock_timeout:
+            lockTimeout:
                 this.#state.lockTimeout,
-            graph: jsonObjectField({
-                nodes: this.#state
-                    .nodes as unknown as
-                    Record<string, unknown>[],
-                edges: this.#state
-                    .edges as unknown as
-                    Record<string, unknown>[],
-            }),
-            created_at:
+            nodes: this.#state.nodes,
+            edges: this.#state.edges,
+            createdAt:
                 this.#state.createdAt,
-            updated_at: nowUtc(),
         };
     }
 
@@ -240,7 +254,7 @@ export class FlowDesignerPresenter {
         }
         await putFlow(
             this.#state.flowId,
-            this.#buildFlowEntity(),
+            this.#buildSaveShape(),
         );
     }
 
@@ -339,11 +353,11 @@ export class FlowDesignerPresenter {
     }
 
     canUndo(): boolean {
-        return this.#history.canUndo();
+        return historyCanUndo(this.#history);
     }
 
     canRedo(): boolean {
-        return this.#history.canRedo();
+        return historyCanRedo(this.#history);
     }
 
     async performUndo(): Promise<boolean> {
@@ -353,11 +367,12 @@ export class FlowDesignerPresenter {
         );
         const version = versions[0];
         if (!version) {
-            this.#history
-                .setHasUndoHistory(false);
+            this.#history = setHasUndoHistory(
+                this.#history, false,
+            );
             return false;
         }
-        this.#history.pushRedo({
+        this.#history = pushRedo(this.#history, {
             id: crypto.randomUUID(),
             flowId: this.#state.flowId,
             name: this.#state.flowName,
@@ -382,7 +397,8 @@ export class FlowDesignerPresenter {
         const remaining = await getFlowVersions(
             this.#state.flowId,
         );
-        this.#history.setHasUndoHistory(
+        this.#history = setHasUndoHistory(
+            this.#history,
             remaining.length > 0,
         );
         this.reconcileLayout();
@@ -391,15 +407,18 @@ export class FlowDesignerPresenter {
 
     async performRedo(): Promise<boolean> {
         if (this.#guardLocked()) return false;
-        const snapshot =
-            this.#history.popRedo();
-        if (!snapshot) return false;
+        const popped = popRedo(this.#history);
+        this.#history = popped.snapshot;
+        if (!popped.version) return false;
         await postFlowVersion(
             this.#state.flowId,
         );
-        this.#history
-            .setHasUndoHistory(true);
-        await putFlowFromVersion(snapshot);
+        this.#history = setHasUndoHistory(
+            this.#history, true,
+        );
+        await putFlowFromVersion(
+            popped.version,
+        );
         await this.#refreshState();
         this.reconcileLayout();
         return true;
@@ -425,8 +444,7 @@ export class FlowDesignerPresenter {
         this.#state.edges = graph.edges;
         this.#state.interaction
             .selection = { kind: 'none' };
-        this.#state.interaction
-            .isPanelOpen = false;
+        this.#state.isPanelOpen = false;
     }
 
     #migrateToCenter(): void {
@@ -501,6 +519,10 @@ export class FlowDesignerPresenter {
 
     interactionState(): InteractionState {
         return this.#state.interaction;
+    }
+
+    setPanelOpen(open: boolean): void {
+        this.#state.isPanelOpen = open;
     }
 
     getNodePosition(id: string): {
@@ -612,8 +634,7 @@ export class FlowDesignerPresenter {
         const saved =
             this.#state.savedViewBox;
         const isOpen =
-            this.#state.interaction
-                .isPanelOpen;
+            this.#state.isPanelOpen;
         const wasOpen =
             saved.kind === 'saved';
         if (isOpen && !wasOpen) {
@@ -809,23 +830,9 @@ Auto Fit</label>
     ): void {
         if (this.#guardLocked()) return;
         if (updates.length === 0) return;
-        const fId = this.#state.flowId;
-        const updateMap = new Map(
-            updates.map(
-                u => [u.nodeId, u],
-            ),
+        this.#state.nodes = applyMoveNodes(
+            this.#state.nodes, updates,
         );
-        this.#state.nodes =
-            this.#state.nodes.map(n => {
-                const u =
-                    updateMap.get(n.id);
-                if (!u) return n;
-                return {
-                    ...n,
-                    positionX: u.x,
-                    positionY: u.y,
-                };
-            });
         void this.#saveFlow(true);
         this.#noteMutation();
         this.reconcileLayout();
@@ -834,8 +841,8 @@ Auto Fit</label>
     async addNode(): Promise<boolean> {
         const x = START_X
             + (this.#state.nodes.length - 1)
-            * (NODE_WIDTH + 120);
-        const y = START_Y + 100;
+            * (NODE_WIDTH + NEW_NODE_OFFSET_X);
+        const y = START_Y + NEW_NODE_OFFSET_Y;
         const nodeId = crypto.randomUUID();
         const fId = this.#state.flowId;
         try {
@@ -1132,8 +1139,8 @@ Auto Fit</label>
                         ),
                 };
             });
-        const panelOpen = this.#state
-            .interaction.isPanelOpen;
+        const panelOpen =
+            this.#state.isPanelOpen;
         const effectiveW = panelOpen
             ? Math.max(
                 0,
@@ -1469,8 +1476,7 @@ Auto Fit</label>
                 kind: 'nodes',
                 nodeIds: new Set([nodeId]),
             };
-        this.#state.interaction
-            .isPanelOpen = false;
+        this.#state.isPanelOpen = false;
         this.reconcileLayout();
         return true;
     }
@@ -1751,12 +1757,11 @@ Auto Fit</label>
     }
 
     #buildPropsPanel(): SafeHtml {
-        const interaction =
-            this.#state.interaction;
-        if (!interaction.isPanelOpen) {
+        if (!this.#state.isPanelOpen) {
             return html``;
         }
-        const sel = interaction.selection;
+        const sel =
+            this.#state.interaction.selection;
 
         const singleNodeId = this
             .#singleSelectedNodeId();
@@ -1941,7 +1946,7 @@ Auto Fit</label>
         return '<path'
             + ' d="' + pathD + '"'
             + ' fill="none"'
-            + ' stroke="#4B6CA1"'
+            + ` stroke="${BLUE}"`
             + ' stroke-width="2"'
             + ' opacity="0.3"'
             + ' marker-end='
@@ -1959,7 +1964,7 @@ Auto Fit</label>
             + ' rx="10"'
             + ' fill="var('
             + '--color-card-bg)"'
-            + ' stroke="#4B6CA1"'
+            + ` stroke="${BLUE}"`
             + ' stroke-width="2"/>'
             + '<text'
             + ` x="${halfW}"`

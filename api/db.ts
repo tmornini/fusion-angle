@@ -1,4 +1,5 @@
 import type {
+    Id,
     UserEntity,
     IdeaEntity,
     ProjectEntity,
@@ -47,6 +48,12 @@ export interface SingletonStore<
 > {
     get(): Promise<T>;
     put(fields: Omit<T, 'id'>): Promise<T>;
+}
+
+export interface DeletedStore {
+    isDeleted(id: Id): Promise<boolean>;
+    record(id: Id): Promise<void>;
+    allDeletedIds(): Promise<Set<Id>>;
 }
 
 export interface DbAdapter {
@@ -118,4 +125,5 @@ export interface DbAdapter {
         EntityStore<
             ActivityActorEntity
         >;
+    deleted: DeletedStore;
 }

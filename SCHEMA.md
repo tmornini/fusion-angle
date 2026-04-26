@@ -1,12 +1,14 @@
 # Database Schema
 
-18 tables stored in localStorage as JSON arrays. Each table is keyed as `fusion-ai:tableName`. All rows have a text `id` primary key. Column types: TEXT (string), INTEGER (number), REAL (float), BOOLEAN (see below). JSON columns store stringified arrays or objects. All columns are NOT NULL — entity validation on creation ensures every field is present.
+19 tables stored in localStorage as JSON arrays. Each table is keyed as `fusion-ai:tableName`. All rows have a text `id` primary key. Column types: TEXT (string), INTEGER (number), REAL (float), BOOLEAN (see below). JSON columns store stringified arrays or objects. All columns are NOT NULL — entity validation on creation ensures every field is present.
 
 **Boolean storage:** BOOLEAN columns are typed as `boolean` in TypeScript (`api/types.ts`) but persisted as INTEGER `0`|`1` by `db-localstorage.ts::serializeValue` on write and deserialized back on read. The in-memory and API-boundary shape is always a real boolean; the `0`|`1` form never escapes the storage layer.
 
 **Duration convention:** All numeric duration fields are persisted in seconds. UI displays days via `durationInDays(seconds)` from `format.ts`.
 
 **Timestamp convention:** TEXT columns storing timestamps use RFC-3339 Zulu format (e.g., `2024-01-15T09:30:00.000000Z`). Temporal facts (completedAt, deletedAt, etc.) belong in event tables — the absence of a row is the absence of the event.
+
+**Deletion:** Entity rows themselves never carry a `deleted_at` column. Deletion is recorded as a tombstone row in the single `deleted` table — the row's *presence* is the deletion fact. `EntityStore.getAll()` and `getById()` filter by `deleted.allDeletedIds()`; `delete(id)` writes a tombstone. History tables (`flow_versions`) are exempt and hard-delete via row removal.
 
 ## Core
 
@@ -294,3 +296,14 @@ work order state and history.
 | team_id | TEXT (FK → teams) |
 | user_id | TEXT (FK → users) |
 | created_at | TEXT |
+
+## Deletion
+
+### deleted
+
+Tombstone table — the *presence* of a row marks an entity (in any other table) as deleted. UUIDs are globally unique across all entity tables, so the single tombstone table works without an entity-type discriminator.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | TEXT | PRIMARY KEY — id of any entity in any other table |
+| deleted_at | TEXT | RFC-3339 Zulu — moment of deletion |

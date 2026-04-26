@@ -66,7 +66,7 @@ protocol locally, but testing is HTTP-only.
 - **Auth**: Mock auth returning `demo@example.com`.
 - **Data**: REST-style API layer (`api/`) backed by localStorage. The `web-app/app/adapters/` directory contains adapter functions across 16 modules (with barrel re-export) that call `GET()`/`PUT()`/`POST()` and convert normalized DB rows into the denormalized shapes pages expect.
 - **Presentation**: The `web-app/app/presenters/` directory contains 15 presenter classes across 13 files (with barrel re-export) that wrap adapter-returned shapes and emit `SafeHtml`. Page modules instantiate presenters and call `build*` methods on them to produce markup — keeping rendering logic out of page modules and out of adapters.
-- **Database**: localStorage with JSON serialization, persisted across page navigations. Each table is stored as a `fusion-ai:tableName` key containing a JSON array of row objects. When no schema exists (no `fusion-ai:*` keys in localStorage), non-entry pages redirect to snapshots so users can initialize the environment. A snapshots page provides create pristine environment, wipe and load mock data, upload snapshot, and download snapshot operations.
+- **Database**: localStorage with JSON serialization, persisted across page navigations. Each table is stored as a `fusion-ai:tableName` key containing a JSON array of row objects. Deletion is recorded in a single `fusion-ai:deleted` tombstone table whose rows are `{id, deleted_at}` — entity rows themselves never carry a `deleted_at` column. `EntityStore.getAll()`/`getById()` filter against `deleted.allDeletedIds()`; `EntityStore.delete(id)` writes a tombstone row. History stores (`flow_versions`) hard-delete via splice. When no schema exists (no `fusion-ai:*` keys in localStorage), non-entry pages redirect to snapshots so users can initialize the environment. A snapshots page provides create pristine environment, wipe and load mock data, upload snapshot, and download snapshot operations.
 - **State**: Simple module-level variables + pub-sub pattern for theme (persisted to localStorage), mobile detection (matchMedia), auth, and sidebar state.
 - **Durations**: All numeric durations are persisted in seconds. UI displays days via `durationInDays(seconds)` from `format.ts`.
 
@@ -114,22 +114,42 @@ modules fetch data via adapters, instantiate the
 relevant presenter, and call `build*` methods on it to
 generate the markup the page injects into the DOM.
 
-- **Construction**: each presenter takes the
-  adapter-returned shape in its constructor. Example:
-  `new IdeaPresenter(idea)` wraps an `Idea` and exposes
-  `buildStatusBadge()`, `idForLink()`,
-  `positionSortKey()`, etc.
-- **Receiver variant**: a few presenters implement a
-  `*Receiver` interface (e.g.,
-  `GaugePresenter implements GaugeReceiver`) so the
-  adapter can tell the presenter its values via method
-  calls rather than returning a data shape — a
-  tell-don't-ask flavor for simpler components.
+- **Construction**: every presenter takes its full
+  data shape in the constructor and is immutable.
+  Example: `new IdeaPresenter(idea)` wraps an `Idea`
+  and exposes `buildStatusBadge()`, `idForLink()`,
+  `positionSortKey()`, etc. State transitions
+  construct a *new* presenter — never mutate an
+  existing one.
+- **Edit mode is a separate presenter**: entities
+  with editable detail views split into two
+  classes — `IdeaPresenter` (read view, takes the
+  entity) and `IdeaEditPresenter` (edit view, takes
+  the entity plus a draft shape). The page module
+  owns a `PageState` discriminated union
+  (`{kind: 'reading'} | {kind: 'editing', draft}`)
+  and constructs the appropriate presenter on each
+  render. The same pattern applies to `Profile`,
+  `Company`, and `ProjectDetail`.
 - **No state beyond construction args**: presenters
   are pure view objects. They never fetch data, never
   mutate, and never touch the DOM directly. Page
   modules are responsible for the DOM; presenters are
   responsible for the HTML they hand over.
+  *Exception:* `FlowDesignerPresenter` retains
+  internal mutable state. Partial extraction
+  completed: panel state is hoisted out of
+  `InteractionState` (the gesture FSM uses an
+  `onPanelRequest` callback rather than mutating
+  panel directly); `FlowHistory` is now an
+  immutable value with free transition functions;
+  `flow-designer-actions.ts` seeds pure transitions
+  (`applyMoveNodes`). Full migration to a
+  `FlowSnapshot` constructor argument and a
+  fully-pure presenter remains pending — it needs
+  manual regression coverage (F1–F46) that
+  includes drag/connect/marquee gestures that
+  synthetic PointerEvents cannot reliably drive.
 - **Barrel**: `presenters/index.ts` re-exports every
   presenter class. Page modules import via
   `from '../app/presenters'`.
@@ -137,17 +157,22 @@ generate the markup the page injects into the DOM.
   an internal helper used by several presenters; it is
   not itself a presenter and is not re-exported from
   the barrel.
-- **File list** (15 classes across 13 presenter
-  files, 16 files total including helpers):
-  `account`, `activity`, `flow`, `flow-designer`,
-  `gauge`, `idea` (exports `IdeaPresenter` plus
+- **File list** (presenter classes across the
+  presenter files): `account`, `activity`, `flow`,
+  `flow-designer`, `gauge`, `idea` (exports
+  `IdeaPresenter` + `IdeaEditPresenter` +
   `IdeaListPresenter`), `idea-conversion`,
-  `idea-create`, `profile`, `project` (exports
-  `ProjectPresenter` plus `ProjectListPresenter`),
-  `project-detail`, `company`, `user`, plus
-  `index` (barrel), `ordered-keys` (helper), and
-  `flow-designer-view` (helper for the flow
-  designer page, exporting `build*` functions).
+  `idea-create`, `profile` (exports `ProfilePresenter`
+  + `ProfileEditPresenter`), `project` (exports
+  `ProjectPresenter` + `ProjectListPresenter`),
+  `project-detail` (exports
+  `ProjectDetailPresenter` + `ProjectDetailEditPresenter`),
+  `company` (exports `CompanyPresenter` +
+  `CompanyEditPresenter`), `user`, `working-styles`,
+  `workbox-inbox`, plus `index` (barrel),
+  `ordered-keys` (helper), and `flow-designer-view`
+  (helper for the flow designer page, exporting
+  `build*` functions).
 
 ### Import Conventions
 
@@ -182,7 +207,7 @@ import { navigateTo, openDialog, closeDialog } from '../app/core';
 
 ### Adapter Conventions
 
-- **User-name resolution**: `userName(userMap, userId)` returns `''` only when `userId` itself is absent (legitimately unassigned). When `userId` is present but the user is not in the map, the function **throws** — a dangling reference is a data-integrity bug, not a formatting case. UI renders `'\u2014'` (em dash) for the legitimate-absence empty string. Never use magical fallback strings like `'Unknown'`.
+- **User-name resolution**: `userName(userMap, userId: Id)` throws on both missing and unknown userId. Parameter type is `Id`, not `Id | undefined` — a missing required reference is a bug, not a presentation case. Optional user references (a project with no lead yet, a work order with no transitions) must be modeled at the call site by branching on the upstream absence (`leadRow ? userName(...) : ''`), not by overloading `userName` with two policies. UI renders `'\u2014'` (em dash) via `DISPLAY_ABSENT` for legitimately absent values that the type system admits. Never use magical fallback strings like `'Unknown'`.
 - **Absent values**: Use `null` for semantically absent values in adapter return types (e.g., `confidence: ConfidenceLevel | null`). Persisted noun entities never use `null`.
 - **No adapter caching**: Each adapter function fetches its own data directly via `getUserMap()`. No `cachedUserMap` or `prefetched*` parameters — simplicity over micro-optimization of localStorage reads.
 - **Shared helpers**: `adapters/shared.ts` exports cross-module utilities (`getUserMap`, `userName`, `getCurrentUser`, `AuthContext`).
@@ -369,7 +394,7 @@ web-app/
   auth/                     # Login/signup (standalone)
   not-found/                # 404 page (standalone)
 
-SCHEMA.md                     # Database schema (18 tables, columns, types, defaults)
+SCHEMA.md                     # Database schema (19 tables, columns, types, defaults)
 DESIGN-SYSTEM.md              # Design system specification
 TEST-PLAN.md                  # Human-executable test plan (254 cases)
 ```
@@ -393,6 +418,15 @@ CLI options: `./build [--no-zip] [path/]`. The trailing `/` on the path argument
 No build artifacts are created in the repo — build output goes to `/tmp/` by default.
 
 ## Testing
+
+The codebase honors the Office of Verification through
+a manual browser regression protocol rather than an
+executable test runner — a deliberate trade-off between
+toolchain minimalism (zero runtime *and* test
+dependencies) and verification automation. A future
+scroll may introduce Node's built-in test runner for
+the `api/` and `adapters/` layers (highest leverage;
+validates the boundary doctrine).
 
 No unit test framework is configured. Testing is a manual browser
 regression pass against `TEST-PLAN.md` (254 cases), driven either

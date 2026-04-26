@@ -284,10 +284,14 @@ export async function getAllWorkOrders(
         const fg = validateWorkOrderFlowGraph(
             wo.flow_graph,
         );
-        const woTransitions = (
-            transitionsByWo
-                .get(wo.id) ?? []
-        ).sort(
+        const rawTransitions =
+            transitionsByWo.get(wo.id);
+        if (!rawTransitions) {
+            throw new Error(
+                `Work order ${wo.id} has no transitions`,
+            );
+        }
+        const woTransitions = rawTransitions.sort(
             (a, b) =>
                 a.transitioned_at
                     .localeCompare(
@@ -325,10 +329,11 @@ export async function getAllWorkOrders(
             flowName: fg.name,
             stateName: curNode.name,
             transitionerName:
-                userName(
-                    userMap,
-                    last?.user_id,
-                ),
+                last
+                    ? userName(
+                        userMap, last.user_id,
+                    )
+                    : '',
             lastTransitionedAt:
                 last?.transitioned_at
                     ?? wo.created_at,

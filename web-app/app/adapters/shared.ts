@@ -40,9 +40,8 @@ export async function getUserMap(
 
 export function userName(
     userMap: Map<Id, User>,
-    userId: string | undefined,
+    userId: Id,
 ): string {
-    if (!userId) return '';
     const user = userMap.get(userId);
     if (!user) {
         throw new Error(

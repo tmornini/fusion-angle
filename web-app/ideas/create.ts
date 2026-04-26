@@ -14,65 +14,76 @@ import {
 } from '../app/adapters';
 import {
     IdeaCreatePresenter,
+    EMPTY_IDEA_CREATE_DRAFT,
+    ideaCreateDraftIsComplete,
+} from '../app/presenters';
+import type {
+    IdeaCreateDraft,
 } from '../app/presenters';
 
 export async function init():
     Promise<void> {
-    const presenter =
-        new IdeaCreatePresenter();
+    let formState: IdeaCreateDraft = {
+        ...EMPTY_IDEA_CREATE_DRAFT,
+    };
 
     function renderPage(): void {
         const root =
             $('#create-content', document);
         if (!root) return;
-        setHtml(root, presenter.render());
+        setHtml(
+            root,
+            new IdeaCreatePresenter(formState)
+                .render(),
+        );
         bindEvents();
     }
 
-    function syncFormFields(): void {
-        presenter.syncFields({
+    function readFormFromDom(
+    ): IdeaCreateDraft {
+        return {
             title:
                 $input(
                     '#idea-create'
                     + '-field-title',
                     document,
-                )!.value,
+                )!.value.trim(),
             problemStatement:
                 $textarea(
                     '#idea-create'
                     + '-field'
                     + '-problem',
                     document,
-                )!.value,
+                )!.value.trim(),
             targetUsers:
                 $input(
                     '#idea-create'
                     + '-field'
                     + '-target',
                     document,
-                )!.value,
+                )!.value.trim(),
             proposedSolution:
                 $textarea(
                     '#idea-create'
                     + '-field'
                     + '-solution',
                     document,
-                )!.value,
+                )!.value.trim(),
             expectedOutcome:
                 $textarea(
                     '#idea-create'
                     + '-field'
                     + '-outcome',
                     document,
-                )!.value,
+                )!.value.trim(),
             successMetrics:
                 $textarea(
                     '#idea-create'
                     + '-field'
                     + '-metrics',
                     document,
-                )!.value,
-        });
+                )!.value.trim(),
+        };
     }
 
     function mutateSubmitButton(): void {
@@ -85,8 +96,9 @@ export async function init():
             HTMLButtonElement
         ) {
             btn.disabled =
-                !presenter
-                    .isFormComplete();
+                !ideaCreateDraftIsComplete(
+                    formState,
+                );
         }
     }
 
@@ -114,30 +126,28 @@ export async function init():
         )?.addEventListener(
             'click',
             async () => {
-                syncFormFields();
+                formState = readFormFromDom();
                 const ideaId =
                     crypto.randomUUID();
-                const fd =
-                    presenter.formData();
                 await putIdea(
                     ideaId,
                     {
                         title:
-                            fd.title,
+                            formState.title,
                         problem_statement:
-                            fd
+                            formState
                             .problemStatement,
                         target_users:
-                            fd
+                            formState
                             .targetUsers,
                         proposed_solution:
-                            fd
+                            formState
                             .proposedSolution,
                         expected_outcome:
-                            fd
+                            formState
                             .expectedOutcome,
                         success_metrics:
-                            fd
+                            formState
                             .successMetrics,
                         status:
                             'active',
@@ -168,7 +178,7 @@ export async function init():
                     type: 'idea_created',
                     action:
                         'submitted new idea',
-                    target: fd.title,
+                    target: formState.title,
                     status: '',
                     feedback: '',
                 });
@@ -192,7 +202,8 @@ export async function init():
                 field.addEventListener(
                     'input',
                     () => {
-                        syncFormFields();
+                        formState =
+                            readFormFromDom();
                         mutateSubmitButton();
                     },
                 );

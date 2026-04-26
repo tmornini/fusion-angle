@@ -201,9 +201,37 @@ export async function postFieldAddition(
     );
 }
 
+export interface FlowSaveShape {
+    name: string;
+    description: string;
+    isLocked: boolean;
+    isAutoLayout: boolean;
+    isAutoFit: boolean;
+    lockTimeout: number;
+    nodes: GraphNode[];
+    edges: GraphEdge[];
+    createdAt: string;
+}
+
 export async function putFlow(
     id: string,
-    entity: Omit<FlowEntity, 'id'>,
+    save: FlowSaveShape,
 ): Promise<void> {
+    const entity: Omit<FlowEntity, 'id'> = {
+        name: save.name,
+        description: save.description,
+        is_locked: save.isLocked,
+        is_auto_layout: save.isAutoLayout,
+        is_auto_fit: save.isAutoFit,
+        lock_timeout: save.lockTimeout,
+        graph: jsonObjectField({
+            nodes: save.nodes as unknown as
+                Record<string, unknown>[],
+            edges: save.edges as unknown as
+                Record<string, unknown>[],
+        }),
+        created_at: save.createdAt,
+        updated_at: nowUtc(),
+    };
     await PUT(`flows/${id}`, entity);
 }

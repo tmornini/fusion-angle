@@ -51,6 +51,7 @@ function detectDiagramType(
 const HEADER_RE =
     /^flowchart\s+(LR|TD|TB|BT|RL)\s*$/;
 
+// Mermaid styling/layout directives we ignore — not graph semantics.
 const SKIP_KEYWORDS = [
     'classDef', 'class\\s', 'click\\s',
     'style\\s', 'subgraph', 'end\\s*$',
@@ -71,6 +72,7 @@ const RECT_RE =
 
 /* edges */
 
+// Match: from -[.|=]-> to, optionally |label|, with node-shape suffix.
 const EDGE_RE = new RegExp(
     '^'
     + '(\\S+(?:\\([^)]*\\)'

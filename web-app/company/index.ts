@@ -1,6 +1,7 @@
 import { $ } from '../app/dom';
 import {
     CompanyPresenter,
+    CompanyEditPresenter,
     type CompanyFieldKey,
 } from '../app/presenters';
 import { setHtml } from '../app/safe-html';
@@ -19,7 +20,18 @@ import {
 const pageAbort = new AbortController();
 const signal = pageAbort.signal;
 
-let presenter: CompanyPresenter | null = null;
+type PageState =
+    | {
+        kind: 'reading';
+        company: Company;
+    }
+    | {
+        kind: 'editing';
+        company: Company;
+        draft: Company;
+    };
+
+let state: PageState | null = null;
 let pageContainer: HTMLElement | null = null;
 
 const FIELDS: ReadonlySet<CompanyFieldKey> =
@@ -30,6 +42,25 @@ function isFieldKey(
 ): s is CompanyFieldKey {
     return s !== null
         && FIELDS.has(s as CompanyFieldKey);
+}
+
+function buildPresenter():
+    CompanyPresenter | CompanyEditPresenter
+{
+    if (state === null) {
+        throw new Error(
+            'state not initialized',
+        );
+    }
+    return state.kind === 'reading'
+        ? new CompanyPresenter(state.company)
+        : new CompanyEditPresenter(state.draft);
+}
+
+function rerender(): void {
+    if (!pageContainer) return;
+    buildPresenter()
+        .renderUpdate(pageContainer);
 }
 
 export async function init(): Promise<void> {
@@ -65,21 +96,20 @@ export async function init(): Promise<void> {
         return;
     }
 
-    presenter = new CompanyPresenter(company);
-    presenter.renderShell(container);
-    bindStableListeners(container, presenter);
+    state = { kind: 'reading', company };
+    buildPresenter().renderShell(container);
+    bindStableListeners(container);
 }
 
 function bindStableListeners(
     container: HTMLElement,
-    p: CompanyPresenter,
 ): void {
     container.addEventListener(
-        'click', e => onClick(e, container, p),
+        'click', e => onClick(e),
         { signal },
     );
     container.addEventListener(
-        'input', e => onInput(e, p),
+        'input', e => onInput(e),
         { signal },
     );
     container.addEventListener(
@@ -89,17 +119,13 @@ function bindStableListeners(
     );
     document.addEventListener(
         'keydown',
-        e => onDocumentKeydown(
-            e, container, p,
-        ),
+        e => onDocumentKeydown(e),
         { signal },
     );
 }
 
 function onClick(
     e: MouseEvent,
-    container: HTMLElement,
-    p: CompanyPresenter,
 ): void {
     const target = e.target as Element | null;
     if (!target) return;
@@ -109,13 +135,28 @@ function onClick(
             'data-company-action',
         );
     if (action === 'edit') {
-        p.beginEdit();
-        p.renderUpdate(container);
+        if (
+            !state
+            || state.kind !== 'reading'
+        ) return;
+        state = {
+            kind: 'editing',
+            company: state.company,
+            draft: { ...state.company },
+        };
+        rerender();
         return;
     }
     if (action === 'cancel') {
-        p.cancelEdit();
-        p.renderUpdate(container);
+        if (
+            !state
+            || state.kind !== 'editing'
+        ) return;
+        state = {
+            kind: 'reading',
+            company: state.company,
+        };
+        rerender();
         return;
     }
     if (action === 'save') {
@@ -125,8 +166,10 @@ function onClick(
 
 function onInput(
     e: Event,
-    p: CompanyPresenter,
 ): void {
+    if (!state || state.kind !== 'editing') {
+        return;
+    }
     const target = e.target as
         | HTMLInputElement | null;
     if (!target) return;
@@ -134,7 +177,13 @@ function onInput(
         'data-company-field',
     );
     if (!isFieldKey(field)) return;
-    p.setDraftField(field, target.value);
+    state = {
+        ...state,
+        draft: {
+            ...state.draft,
+            [field]: target.value,
+        },
+    };
 }
 
 function onContainerKeydown(
@@ -150,22 +199,24 @@ function onContainerKeydown(
 
 function onDocumentKeydown(
     e: KeyboardEvent,
-    container: HTMLElement,
-    p: CompanyPresenter,
 ): void {
     if (e.key !== 'Escape') return;
-    if (!p.isEditing()) return;
+    if (!state || state.kind !== 'editing') {
+        return;
+    }
     e.preventDefault();
-    p.cancelEdit();
-    p.renderUpdate(container);
+    state = {
+        kind: 'reading',
+        company: state.company,
+    };
+    rerender();
 }
 
 async function handleSave(): Promise<void> {
-    if (!presenter || !pageContainer) return;
-    if (!presenter.isEditing()) return;
-    const updated = trimStrings(
-        presenter.draft(),
-    );
+    if (!state || state.kind !== 'editing') {
+        return;
+    }
+    const updated = trimStrings(state.draft);
     try {
         await putCompany(updated);
     } catch (err) {
@@ -181,6 +232,9 @@ async function handleSave(): Promise<void> {
         return;
     }
     showToast('Company saved', 'success');
-    presenter.update(updated);
-    presenter.renderUpdate(pageContainer);
+    state = {
+        kind: 'reading',
+        company: updated,
+    };
+    rerender();
 }

@@ -31,7 +31,6 @@ import type {
 import {
     IDEA_STATUS_CONFIG,
 } from '../adapters';
-import type { EditMode } from './edit-mode';
 
 const STATUS_ICONS: Record<
     IdeaStatus,
@@ -49,7 +48,7 @@ const STATUS_ICONS: Record<
     'deleted': iconXCircle,
 };
 
-interface IdeaDraftFields {
+export interface IdeaDraftFields {
     title: string;
     problemStatement: string;
     targetUsers: string;
@@ -70,81 +69,505 @@ export type IdeaEntityPatch =
         | 'expected_outcome'
         | 'success_metrics'>;
 
+export function ideaDraftFromIdea(
+    idea: Idea,
+): IdeaDraftFields {
+    return {
+        title: idea.titleText(),
+        problemStatement:
+            idea.problemStatementText(),
+        targetUsers:
+            idea.targetUsersText(),
+        proposedSolution:
+            idea.proposedSolutionText(),
+        expectedOutcome:
+            idea.expectedOutcomeText(),
+        successMetrics:
+            idea.successMetricsText(),
+    };
+}
+
+export function ideaPatchFromDraft(
+    draft: IdeaDraftFields,
+): IdeaEntityPatch {
+    return {
+        title: draft.title,
+        problem_statement:
+            draft.problemStatement,
+        target_users:
+            draft.targetUsers,
+        proposed_solution:
+            draft.proposedSolution,
+        expected_outcome:
+            draft.expectedOutcome,
+        success_metrics:
+            draft.successMetrics,
+    };
+}
+
+function buildShell(
+    container: HTMLElement,
+): void {
+    setHtml(container, html`
+<div class="idea-detail-host">
+    <div class="idea-detail-wrap">
+        <div class="${
+            'flex items-center gap-2'
+            + ' text-sm text-muted mb-4'
+            + ' idea-breadcrumb-slot'
+        }"></div>
+        <div class="${
+            'flex items-start'
+            + ' justify-between gap-4 mb-6'
+        }">
+            <div class="${
+                'flex items-center gap-4'
+            }">
+                <button
+                    class="${
+                        'btn btn-ghost'
+                        + ' btn-icon'
+                    }"
+                    id="idea-back-btn"
+                    data-idea-action="back"
+                    aria-label="Back">
+                    ${iconArrowLeft(20, '')}
+                </button>
+                <div class="idea-title-slot">
+                </div>
+            </div>
+            <div class="${
+                'flex items-center gap-2'
+                + ' idea-actions-slot'
+            }"></div>
+        </div>
+        <div class="${
+            'stack-lg idea-cards-slot'
+        }"></div>
+    </div>
+    <div class="idea-footer-slot"></div>
+    <div class="idea-dialogs-slot"></div>
+</div>`);
+}
+
+function setSlot(
+    container: HTMLElement,
+    cls: string,
+    markup: SafeHtml,
+): void {
+    const slot = $(cls, container);
+    if (!slot) return;
+    setHtml(slot, markup);
+}
+
+function updateWrapClass(
+    container: HTMLElement,
+    isReviewable: boolean,
+): void {
+    const wrap = $(
+        '.idea-detail-wrap', container,
+    );
+    if (!wrap) return;
+    wrap.classList.toggle(
+        'has-footer-actions',
+        isReviewable,
+    );
+}
+
+function buildBreadcrumb(
+    titleText: string,
+): SafeHtml {
+    return html`
+        <a href="../ideas/index.html"
+            class="hover-link">
+            Ideas
+        </a>
+        <span>/</span>
+        <span>${titleText}</span>`;
+}
+
+function buildSubmittedByLine(
+    idea: Idea,
+): SafeHtml {
+    return html`
+        <p class="${
+            'text-sm text-muted'
+        }">
+            Submitted by
+            ${displayText(
+                idea.submittedByName(),
+            )}
+            @ ${formatDateTime(
+                idea.submittedAtDate(),
+            )}
+        </p>`;
+}
+
+function buildReadonlyTitleSection(
+    idea: Idea,
+): SafeHtml {
+    return html`
+        <div class="${
+            'flex flex-wrap items-center'
+            + ' gap-3 mb-2'
+        }">
+            <h1 class="${
+                'text-xl'
+                + ' font-display'
+                + ' font-bold'
+            }">
+                ${idea.titleText()}
+            </h1>
+            <span class="${
+                'badge '
+                + idea.statusClassName()
+                + ' text-xs'
+            }">
+                ${idea.statusLabel()}
+            </span>
+        </div>
+        ${buildSubmittedByLine(idea)}`;
+}
+
+function buildEditableTitleSection(
+    idea: Idea,
+    draft: IdeaDraftFields,
+): SafeHtml {
+    return html`
+        <div class="${
+            'flex flex-wrap items-center'
+            + ' gap-3 mb-2'
+        }">
+            <input
+                class="${
+                    'input idea-edit-title'
+                }"
+                id="idea-edit-title"
+                data-idea-field="title"
+                value="${draft.title}" />
+            <span class="${
+                'badge '
+                + idea.statusClassName()
+                + ' text-xs'
+            }">
+                ${idea.statusLabel()}
+            </span>
+        </div>
+        ${buildSubmittedByLine(idea)}`;
+}
+
+function buildReadonlyInput(
+    label: string,
+    savedValue: string,
+): SafeHtml {
+    return html`
+        <div>
+            <p class="${
+                'text-xs text-muted mb-1'
+            }">${label}</p>
+            <p class="text-sm">
+                ${displayText(savedValue)}
+            </p>
+        </div>`;
+}
+
+function buildEditableInput(
+    id: string,
+    field: IdeaFieldKey,
+    label: string,
+    value: string,
+): SafeHtml {
+    return html`
+        <div>
+            <p class="${
+                'text-xs text-muted mb-1'
+            }">${label}</p>
+            <input class="input"
+                id="${id}"
+                data-idea-field="${field}"
+                value="${value}" />
+        </div>`;
+}
+
+function buildReadonlyTextarea(
+    label: string,
+    savedValue: string,
+): SafeHtml {
+    return html`
+        <div>
+            <p class="${
+                'text-xs text-muted mb-1'
+            }">${label}</p>
+            <p class="text-sm">
+                ${displayText(savedValue)}
+            </p>
+        </div>`;
+}
+
+function buildEditableTextarea(
+    id: string,
+    field: IdeaFieldKey,
+    label: string,
+    value: string,
+): SafeHtml {
+    return html`
+        <div>
+            <p class="${
+                'text-xs text-muted mb-1'
+            }">${label}</p>
+            <textarea
+                class="${
+                    'textarea resize-none'
+                }"
+                id="${id}"
+                data-idea-field="${field}"
+                rows="3"
+                >${value}</textarea>
+        </div>`;
+}
+
+function buildSubmitConvertButtons(
+    idea: Idea,
+): SafeHtml {
+    const canSubmit =
+        idea.statusValue() === 'active'
+        || idea.statusValue() === 'sent-back';
+    return html`
+        ${canSubmit
+            ? html`<button
+                class="${
+                    'btn btn-primary'
+                    + ' btn-sm gap-2'
+                }"
+                id="idea-submit-review-btn"
+                data-idea-action="${
+                    'submit-review'
+                }">
+                ${iconClipboardCheck(16, '')}
+                Submit for Review
+            </button>` : html``}
+        ${idea.isConvertible()
+            ? html`<button
+                class="${
+                    'btn btn-primary'
+                    + ' btn-sm gap-2'
+                }"
+                id="idea-convert-btn"
+                data-idea-action="convert">
+                ${iconArrowRight(16, '')}
+                Convert
+            </button>` : html``}`;
+}
+
+function buildApprovalFooter(): SafeHtml {
+    return html`
+    <div class="action-footer">
+        <div class="action-footer-inner">
+            <div class="${
+                'flex items-center'
+                + ' justify-end gap-4'
+            }">
+                <div class="flex gap-3">
+                    <button
+                        class="${
+                            'btn'
+                            + ' btn-outline-error'
+                            + ' gap-2'
+                        }"
+                        id="approval-send-back-btn"
+                        data-dialog-open="${
+                            'approval-send-back'
+                        }">
+                        ${iconXCircle(16, '')}
+                        <span class="${
+                            'hidden-mobile'
+                        }">Send Back</span>
+                        <span class="${
+                            'visible-mobile'
+                        }">Send Back</span>
+                    </button>
+                    <button
+                        class="${
+                            'btn btn-success'
+                            + ' gap-2'
+                        }"
+                        id="approval-approve-btn"
+                        data-idea-action="${
+                            'approve'
+                        }">
+                        ${iconCheckCircle(16, '')}
+                        Approve
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>`;
+}
+
+function buildApprovalDialogs(): SafeHtml {
+    return html`
+    <div
+        id="approval-send-back-backdrop"
+        class="${
+            'dialog-backdrop hidden'
+        }"
+        data-dialog-id="${
+            'approval-send-back'
+        }">
+    </div>
+    <div
+        id="approval-send-back-dialog"
+        class="${
+            'dialog dialog-narrow hidden'
+        }"
+        role="dialog"
+        aria-modal="true">
+        <div class="dialog-header">
+            <h3 class="dialog-title">
+                Send Back for Revision
+            </h3>
+            <p class="${
+                'dialog-description'
+            }">
+                Provide feedback to help
+                the submitter improve their
+                idea.
+            </p>
+        </div>
+        <div class="py-4">
+            <textarea
+                class="${
+                    'textarea resize-none'
+                }"
+                id="${
+                    'approval-send-back'
+                    + '-feedback'
+                }"
+                placeholder="${
+                    'Explain what changes'
+                    + ' or additional'
+                    + ' information is'
+                    + ' needed...'
+                }"
+                rows="4">
+            </textarea>
+        </div>
+        <div class="dialog-footer">
+            <button
+                class="btn btn-outline"
+                id="${
+                    'approval-send-back'
+                    + '-cancel'
+                }"
+                data-dialog-cancel="${
+                    'approval-send-back'
+                }">
+                Cancel
+            </button>
+            <button
+                class="${
+                    'btn btn-destructive'
+                }"
+                id="${
+                    'approval-send-back'
+                    + '-confirm'
+                }"
+                data-idea-action="${
+                    'send-back-confirm'
+                }">
+                Send Back
+            </button>
+        </div>
+    </div>`;
+}
+
+function buildProblemSolutionReadonlyCard(
+    idea: Idea,
+): SafeHtml {
+    return html`
+<div class="card p-6">
+    <h2 class="${
+        'text-lg font-display'
+        + ' font-semibold mb-4'
+    }">
+        Problem &amp; Solution
+    </h2>
+    <div class="flex flex-col gap-5">
+        ${buildReadonlyTextarea(
+            'Problem Statement',
+            idea.problemStatementText(),
+        )}
+        ${buildReadonlyInput(
+            'Target Users',
+            idea.targetUsersText(),
+        )}
+        ${buildReadonlyTextarea(
+            'Proposed Solution',
+            idea.proposedSolutionText(),
+        )}
+        ${buildReadonlyTextarea(
+            'Expected Outcome',
+            idea.expectedOutcomeText(),
+        )}
+        ${buildReadonlyTextarea(
+            'Success Metrics',
+            idea.successMetricsText(),
+        )}
+    </div>
+</div>`;
+}
+
+function buildProblemSolutionEditableCard(
+    draft: IdeaDraftFields,
+): SafeHtml {
+    return html`
+<div class="card p-6">
+    <h2 class="${
+        'text-lg font-display'
+        + ' font-semibold mb-4'
+    }">
+        Problem &amp; Solution
+    </h2>
+    <div class="flex flex-col gap-5">
+        ${buildEditableTextarea(
+            'idea-edit-problem',
+            'problemStatement',
+            'Problem Statement',
+            draft.problemStatement,
+        )}
+        ${buildEditableInput(
+            'idea-edit-target',
+            'targetUsers',
+            'Target Users',
+            draft.targetUsers,
+        )}
+        ${buildEditableTextarea(
+            'idea-edit-solution',
+            'proposedSolution',
+            'Proposed Solution',
+            draft.proposedSolution,
+        )}
+        ${buildEditableTextarea(
+            'idea-edit-outcome',
+            'expectedOutcome',
+            'Expected Outcome',
+            draft.expectedOutcome,
+        )}
+        ${buildEditableTextarea(
+            'idea-edit-metrics',
+            'successMetrics',
+            'Success Metrics',
+            draft.successMetrics,
+        )}
+    </div>
+</div>`;
+}
+
 export class IdeaPresenter {
-    #idea: Idea;
-    #mode: EditMode<IdeaDraftFields>
-        = { kind: 'reading' };
+    readonly #idea: Idea;
 
     constructor(idea: Idea) {
         this.#idea = idea;
-    }
-
-    update(idea: Idea): void {
-        this.#idea = idea;
-        this.#mode = { kind: 'reading' };
-    }
-
-    beginEdit(): void {
-        this.#mode = {
-            kind: 'editing',
-            draft: {
-                title:
-                    this.#idea.titleText(),
-                problemStatement: this.#idea
-                    .problemStatementText(),
-                targetUsers: this.#idea
-                    .targetUsersText(),
-                proposedSolution: this.#idea
-                    .proposedSolutionText(),
-                expectedOutcome: this.#idea
-                    .expectedOutcomeText(),
-                successMetrics: this.#idea
-                    .successMetricsText(),
-            },
-        };
-    }
-
-    cancelEdit(): void {
-        this.#mode = { kind: 'reading' };
-    }
-
-    isEditing(): boolean {
-        return this.#mode.kind === 'editing';
-    }
-
-    setDraftField(
-        field: IdeaFieldKey,
-        value: string,
-    ): void {
-        if (this.#mode.kind !== 'editing') {
-            throw new Error(
-                'setDraftField requires'
-                + ' editing mode',
-            );
-        }
-        this.#mode.draft[field] = value;
-    }
-
-    buildEntityPatch(): IdeaEntityPatch {
-        if (this.#mode.kind !== 'editing') {
-            throw new Error(
-                'buildEntityPatch requires'
-                + ' editing mode',
-            );
-        }
-        const d = this.#mode.draft;
-        return {
-            title: d.title,
-            problem_statement:
-                d.problemStatement,
-            target_users: d.targetUsers,
-            proposed_solution:
-                d.proposedSolution,
-            expected_outcome:
-                d.expectedOutcome,
-            success_metrics:
-                d.successMetrics,
-        };
     }
 
     idForLink(): string {
@@ -281,493 +704,174 @@ export class IdeaPresenter {
     renderShell(
         container: HTMLElement,
     ): void {
-        setHtml(container, html`
-<div class="idea-detail-host">
-    <div class="idea-detail-wrap">
-        <div class="${
-            'flex items-center gap-2'
-            + ' text-sm text-muted mb-4'
-            + ' idea-breadcrumb-slot'
-        }"></div>
-        <div class="${
-            'flex items-start'
-            + ' justify-between gap-4 mb-6'
-        }">
-            <div class="${
-                'flex items-center gap-4'
-            }">
-                <button
-                    class="${
-                        'btn btn-ghost'
-                        + ' btn-icon'
-                    }"
-                    id="idea-back-btn"
-                    data-idea-action="back"
-                    aria-label="Back">
-                    ${iconArrowLeft(20, '')}
-                </button>
-                <div class="idea-title-slot">
-                </div>
-            </div>
-            <div class="${
-                'flex items-center gap-2'
-                + ' idea-actions-slot'
-            }"></div>
-        </div>
-        <div class="${
-            'stack-lg idea-cards-slot'
-        }"></div>
-    </div>
-    <div class="idea-footer-slot"></div>
-    <div class="idea-dialogs-slot"></div>
-</div>`);
+        buildShell(container);
         this.renderUpdate(container);
     }
 
     renderUpdate(
         container: HTMLElement,
     ): void {
-        this.#updateWrapClass(container);
-        this.#updateBreadcrumb(container);
-        this.#updateTitle(container);
-        this.#updateActions(container);
-        this.#updateCards(container);
-        this.#updateFooter(container);
-        this.#updateDialogs(container);
-    }
-
-    #updateWrapClass(
-        container: HTMLElement,
-    ): void {
-        const wrap = $(
-            '.idea-detail-wrap', container,
-        );
-        if (!wrap) return;
-        wrap.classList.toggle(
-            'has-footer-actions',
+        updateWrapClass(
+            container,
             this.#idea.isReviewable(),
         );
-    }
-
-    #updateBreadcrumb(
-        container: HTMLElement,
-    ): void {
-        const slot = $(
-            '.idea-breadcrumb-slot', container,
+        setSlot(
+            container,
+            '.idea-breadcrumb-slot',
+            buildBreadcrumb(
+                this.#idea.titleText(),
+            ),
         );
-        if (!slot) return;
-        setHtml(slot, html`
-            <a href="../ideas/index.html"
-                class="hover-link">
-                Ideas
-            </a>
-            <span>/</span>
-            <span>${this.#titleForDisplay()}</span>`);
-    }
-
-    #titleForDisplay(): string {
-        return this.#mode.kind === 'editing'
-            ? this.#mode.draft.title
-            : this.#idea.titleText();
-    }
-
-    #updateTitle(
-        container: HTMLElement,
-    ): void {
-        const slot = $(
-            '.idea-title-slot', container,
+        setSlot(
+            container,
+            '.idea-title-slot',
+            buildReadonlyTitleSection(
+                this.#idea,
+            ),
         );
-        if (!slot) return;
-        setHtml(slot, this.#buildTitleSection());
-    }
-
-    #buildTitleSection(): SafeHtml {
-        return html`
-            <div class="${
-                'flex flex-wrap items-center'
-                + ' gap-3 mb-2'
-            }">
-                ${this.isEditing()
-                    ? html`<input
-                        class="${
-                            'input idea-edit-title'
-                        }"
-                        id="idea-edit-title"
-                        data-idea-field="title"
-                        value="${
-                            this.#titleForDisplay()
-                        }" />`
-                    : html`<h1
-                        class="${
-                            'text-xl'
-                            + ' font-display'
-                            + ' font-bold'
-                        }">
-                        ${this.#idea.titleText()}
-                    </h1>`}
-                <span class="${
-                    'badge '
-                    + this.#idea.statusClassName()
-                    + ' text-xs'
-                }">
-                    ${this.#idea.statusLabel()}
-                </span>
-            </div>
-            <p class="${
-                'text-sm text-muted'
-            }">
-                Submitted by
-                ${displayText(
-                    this.#idea.submittedByName(),
-                )}
-                @ ${formatDateTime(
-                    this.#idea.submittedAtDate(),
-                )}
-            </p>`;
-    }
-
-    #updateActions(
-        container: HTMLElement,
-    ): void {
-        const slot = $(
-            '.idea-actions-slot', container,
+        setSlot(
+            container,
+            '.idea-actions-slot',
+            this.#buildActionButtons(),
         );
-        if (!slot) return;
-        setHtml(slot, this.#buildActionButtons());
+        setSlot(
+            container,
+            '.idea-cards-slot',
+            buildProblemSolutionReadonlyCard(
+                this.#idea,
+            ),
+        );
+        setSlot(
+            container,
+            '.idea-footer-slot',
+            this.#idea.isReviewable()
+                ? buildApprovalFooter()
+                : html``,
+        );
+        setSlot(
+            container,
+            '.idea-dialogs-slot',
+            this.#idea.isReviewable()
+                ? buildApprovalDialogs()
+                : html``,
+        );
     }
 
     #buildActionButtons(): SafeHtml {
         return html`
-            ${this.canSubmit()
-                ? html`<button
-                    class="${
-                        'btn btn-primary'
-                        + ' btn-sm gap-2'
-                    }"
-                    id="idea-submit-review-btn"
-                    data-idea-action="${
-                        'submit-review'
-                    }">
-                    ${iconClipboardCheck(16, '')}
-                    Submit for Review
-                </button>` : html``}
-            ${this.#idea.isConvertible()
-                ? html`<button
-                    class="${
-                        'btn btn-primary'
-                        + ' btn-sm gap-2'
-                    }"
-                    id="idea-convert-btn"
-                    data-idea-action="convert">
-                    ${iconArrowRight(16, '')}
-                    Convert
-                </button>` : html``}
-            ${this.isEditing()
-                ? html`<div class="flex gap-2">
-                    <button
-                        class="${
-                            'btn btn-outline gap-2'
-                        }"
-                        id="idea-cancel-btn"
-                        data-idea-action="cancel">
-                        ${iconX(16, '')} Cancel
-                    </button>
-                    <button
-                        class="${
-                            'btn btn-primary gap-2'
-                        }"
-                        id="idea-save-btn"
-                        data-idea-action="save">
-                        ${iconSave(16, '')} Save
-                    </button>
-                </div>`
-                : html`<button
+            ${buildSubmitConvertButtons(
+                this.#idea,
+            )}
+            <button
+                class="${
+                    'btn btn-outline gap-2'
+                }"
+                id="idea-edit-btn"
+                data-idea-action="edit">
+                ${iconEdit(16, '')} Edit
+            </button>`;
+    }
+}
+
+export class IdeaEditPresenter {
+    readonly #idea: Idea;
+    readonly #draft: IdeaDraftFields;
+
+    constructor(
+        idea: Idea,
+        draft: IdeaDraftFields,
+    ) {
+        this.#idea = idea;
+        this.#draft = draft;
+    }
+
+    idForLink(): string {
+        return this.#idea.idForLink();
+    }
+
+    draft(): IdeaDraftFields {
+        return this.#draft;
+    }
+
+    renderShell(
+        container: HTMLElement,
+    ): void {
+        buildShell(container);
+        this.renderUpdate(container);
+    }
+
+    renderUpdate(
+        container: HTMLElement,
+    ): void {
+        updateWrapClass(
+            container,
+            this.#idea.isReviewable(),
+        );
+        setSlot(
+            container,
+            '.idea-breadcrumb-slot',
+            buildBreadcrumb(
+                this.#draft.title,
+            ),
+        );
+        setSlot(
+            container,
+            '.idea-title-slot',
+            buildEditableTitleSection(
+                this.#idea, this.#draft,
+            ),
+        );
+        setSlot(
+            container,
+            '.idea-actions-slot',
+            this.#buildActionButtons(),
+        );
+        setSlot(
+            container,
+            '.idea-cards-slot',
+            buildProblemSolutionEditableCard(
+                this.#draft,
+            ),
+        );
+        setSlot(
+            container,
+            '.idea-footer-slot',
+            this.#idea.isReviewable()
+                ? buildApprovalFooter()
+                : html``,
+        );
+        setSlot(
+            container,
+            '.idea-dialogs-slot',
+            this.#idea.isReviewable()
+                ? buildApprovalDialogs()
+                : html``,
+        );
+    }
+
+    #buildActionButtons(): SafeHtml {
+        return html`
+            ${buildSubmitConvertButtons(
+                this.#idea,
+            )}
+            <div class="flex gap-2">
+                <button
                     class="${
                         'btn btn-outline gap-2'
                     }"
-                    id="idea-edit-btn"
-                    data-idea-action="edit">
-                    ${iconEdit(16, '')} Edit
-                </button>`}`;
-    }
-
-    #updateCards(
-        container: HTMLElement,
-    ): void {
-        const slot = $(
-            '.idea-cards-slot', container,
-        );
-        if (!slot) return;
-        setHtml(
-            slot,
-            this.#buildProblemSolutionCard(),
-        );
-    }
-
-    #buildProblemSolutionCard(): SafeHtml {
-        return html`
-    <div class="card p-6">
-        <h2 class="${
-            'text-lg font-display'
-            + ' font-semibold mb-4'
-        }">
-            Problem &amp; Solution
-        </h2>
-        <div class="flex flex-col gap-5">
-            ${this.#buildTextareaField(
-                'idea-edit-problem',
-                'problemStatement',
-                'Problem Statement',
-                this.#idea
-                    .problemStatementText(),
-            )}
-            ${this.#buildInputField(
-                'idea-edit-target',
-                'targetUsers',
-                'Target Users',
-                this.#idea.targetUsersText(),
-            )}
-            ${this.#buildTextareaField(
-                'idea-edit-solution',
-                'proposedSolution',
-                'Proposed Solution',
-                this.#idea
-                    .proposedSolutionText(),
-            )}
-            ${this.#buildTextareaField(
-                'idea-edit-outcome',
-                'expectedOutcome',
-                'Expected Outcome',
-                this.#idea
-                    .expectedOutcomeText(),
-            )}
-            ${this.#buildTextareaField(
-                'idea-edit-metrics',
-                'successMetrics',
-                'Success Metrics',
-                this.#idea
-                    .successMetricsText(),
-            )}
-        </div>
-    </div>`;
-    }
-
-    #fieldDraftValue(
-        field: IdeaFieldKey,
-        savedValue: string,
-    ): string {
-        return this.#mode.kind === 'editing'
-            ? this.#mode.draft[field]
-            : savedValue;
-    }
-
-    #buildInputField(
-        id: string,
-        field: IdeaFieldKey,
-        label: string,
-        savedValue: string,
-    ): SafeHtml {
-        const value = this.#fieldDraftValue(
-            field, savedValue,
-        );
-        return html`
-            <div>
-                <p class="${
-                    'text-xs text-muted mb-1'
-                }">${label}</p>
-                ${this.isEditing()
-                    ? html`<input
-                        class="input"
-                        id="${id}"
-                        data-idea-field="${
-                            field
-                        }"
-                        value="${value}" />`
-                    : html`<p class="text-sm">
-                        ${displayText(
-                            savedValue,
-                        )}
-                    </p>`}
-            </div>`;
-    }
-
-    #buildTextareaField(
-        id: string,
-        field: IdeaFieldKey,
-        label: string,
-        savedValue: string,
-    ): SafeHtml {
-        const value = this.#fieldDraftValue(
-            field, savedValue,
-        );
-        return html`
-            <div>
-                <p class="${
-                    'text-xs text-muted mb-1'
-                }">${label}</p>
-                ${this.isEditing()
-                    ? html`<textarea
-                        class="${
-                            'textarea resize-none'
-                        }"
-                        id="${id}"
-                        data-idea-field="${
-                            field
-                        }"
-                        rows="3"
-                        >${value}</textarea>`
-                    : html`<p class="text-sm">
-                        ${displayText(
-                            savedValue,
-                        )}
-                    </p>`}
-            </div>`;
-    }
-
-    #updateFooter(
-        container: HTMLElement,
-    ): void {
-        const slot = $(
-            '.idea-footer-slot', container,
-        );
-        if (!slot) return;
-        setHtml(slot, this.#idea.isReviewable()
-            ? this.#buildApprovalFooter()
-            : html``);
-    }
-
-    #buildApprovalFooter(): SafeHtml {
-        return html`
-        <div class="action-footer">
-            <div class="action-footer-inner">
-                <div class="${
-                    'flex items-center'
-                    + ' justify-end gap-4'
-                }">
-                    <div class="flex gap-3">
-                        <button
-                            class="${
-                                'btn'
-                                + ' btn-outline-error'
-                                + ' gap-2'
-                            }"
-                            id="approval-send-back-btn"
-                            data-dialog-open="${
-                                'approval-send-back'
-                            }">
-                            ${iconXCircle(16, '')}
-                            <span class="${
-                                'hidden-mobile'
-                            }">Send Back</span>
-                            <span class="${
-                                'visible-mobile'
-                            }">Send Back</span>
-                        </button>
-                        <button
-                            class="${
-                                'btn btn-success'
-                                + ' gap-2'
-                            }"
-                            id="approval-approve-btn"
-                            data-idea-action="${
-                                'approve'
-                            }">
-                            ${iconCheckCircle(16, '')}
-                            Approve
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>`;
-    }
-
-    #updateDialogs(
-        container: HTMLElement,
-    ): void {
-        const slot = $(
-            '.idea-dialogs-slot', container,
-        );
-        if (!slot) return;
-        setHtml(slot, this.#idea.isReviewable()
-            ? this.#buildApprovalDialogs()
-            : html``);
-    }
-
-    #buildApprovalDialogs(): SafeHtml {
-        return html`
-        <div
-            id="approval-send-back-backdrop"
-            class="${
-                'dialog-backdrop hidden'
-            }"
-            data-dialog-id="${
-                'approval-send-back'
-            }">
-        </div>
-        <div
-            id="approval-send-back-dialog"
-            class="${
-                'dialog dialog-narrow hidden'
-            }"
-            role="dialog"
-            aria-modal="true">
-            <div class="dialog-header">
-                <h3 class="dialog-title">
-                    Send Back for Revision
-                </h3>
-                <p class="${
-                    'dialog-description'
-                }">
-                    Provide feedback to help
-                    the submitter improve their
-                    idea.
-                </p>
-            </div>
-            <div class="py-4">
-                <textarea
-                    class="${
-                        'textarea resize-none'
-                    }"
-                    id="${
-                        'approval-send-back'
-                        + '-feedback'
-                    }"
-                    placeholder="${
-                        'Explain what changes'
-                        + ' or additional'
-                        + ' information is'
-                        + ' needed...'
-                    }"
-                    rows="4">
-                </textarea>
-            </div>
-            <div class="dialog-footer">
-                <button
-                    class="btn btn-outline"
-                    id="${
-                        'approval-send-back'
-                        + '-cancel'
-                    }"
-                    data-dialog-cancel="${
-                        'approval-send-back'
-                    }">
-                    Cancel
+                    id="idea-cancel-btn"
+                    data-idea-action="cancel">
+                    ${iconX(16, '')} Cancel
                 </button>
                 <button
                     class="${
-                        'btn btn-destructive'
+                        'btn btn-primary gap-2'
                     }"
-                    id="${
-                        'approval-send-back'
-                        + '-confirm'
-                    }"
-                    data-idea-action="${
-                        'send-back-confirm'
-                    }">
-                    Send Back
+                    id="idea-save-btn"
+                    data-idea-action="save">
+                    ${iconSave(16, '')} Save
                 </button>
-            </div>
-        </div>`;
+            </div>`;
     }
 }
 
@@ -827,6 +931,16 @@ export class IdeaListPresenter {
         container: HTMLElement,
     ): void {
         setHtml(container, this.#buildList());
+    }
+
+    applyFilterToggle(
+        status: IdeaStatus,
+        badgesEl: HTMLElement,
+        listEl: HTMLElement,
+    ): void {
+        this.toggleFilter(status);
+        this.renderBadges(badgesEl);
+        this.renderList(listEl);
     }
 
     #buildBadges(): SafeHtml {

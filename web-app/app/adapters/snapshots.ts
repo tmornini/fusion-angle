@@ -28,6 +28,13 @@ export async function putSnapshot(json: string): Promise<void> {
     await PUT('snapshots/import', { json });
 }
 
+export async function putSnapshotFromFile(
+    file: File,
+): Promise<void> {
+    const json = await file.text();
+    await putSnapshot(json);
+}
+
 export async function getSnapshot(): Promise<string> {
     return GET<string>('snapshots/schema');
 }

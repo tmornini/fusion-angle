@@ -7,17 +7,21 @@ const AUTOFIT_TOAST_MSG =
     'Disable Auto-Fit to change the view';
 const WHEEL_TOAST_COOLDOWN_MS = 2000;
 const ZOOM_TO_FIT_PADDING_PX = 70;
-let lastWheelToastAt = 0;
 
-function toastAutoFitWheel(): void {
-    const now = Date.now();
-    if (
-        now - lastWheelToastAt
-        < WHEEL_TOAST_COOLDOWN_MS
-    ) return;
-    lastWheelToastAt = now;
-    showToast(AUTOFIT_TOAST_MSG, 'error');
-}
+const toastAutoFitWheel = (() => {
+    let lastWheelToastAt = 0;
+    return (): void => {
+        const now = Date.now();
+        if (
+            now - lastWheelToastAt
+            < WHEEL_TOAST_COOLDOWN_MS
+        ) return;
+        lastWheelToastAt = now;
+        showToast(
+            AUTOFIT_TOAST_MSG, 'error',
+        );
+    };
+})();
 
 export interface ViewBox {
     x: number;
@@ -92,7 +96,6 @@ export type LastClick =
 
 export interface InteractionState {
     selection: Selection;
-    isPanelOpen: boolean;
     lastClick: LastClick;
     drag: DragMode;
     connect: ConnectMode;
@@ -102,6 +105,9 @@ export interface InteractionState {
     zoom: number;
     isSpaceDown: boolean;
 }
+
+export type PanelRequestCallback =
+    (open: boolean) => void;
 
 export type NodePositionLookup = (
     id: string,
@@ -132,7 +138,6 @@ export function buildInteractionState(
 ): InteractionState {
     return {
         selection: { kind: 'none' },
-        isPanelOpen: false,
         lastClick: { kind: 'none' },
         drag: { kind: 'idle' },
         connect: { kind: 'idle' },
@@ -185,6 +190,7 @@ function handlePointerDown(
     svg: SVGSVGElement,
     state: InteractionState,
     onUpdate: InteractionCallback,
+    onPanelRequest: PanelRequestCallback,
     getNodePosition: NodePositionLookup,
     isLocked: () => boolean,
 ): void {
@@ -235,7 +241,7 @@ function handlePointerDown(
                 kind: 'nodes',
                 nodeIds: new Set([nodeId]),
             };
-            state.isPanelOpen = isDbl;
+            onPanelRequest(isDbl);
             state.connect = {
                 kind: 'connecting',
                 fromNodeId: nodeId,
@@ -253,7 +259,7 @@ function handlePointerDown(
         applyNodeClickSelection(
             state, nodeId, e,
         );
-        state.isPanelOpen = isDbl;
+        onPanelRequest(isDbl);
         if (isLocked()) {
             onUpdate();
             return;
@@ -269,9 +275,9 @@ function handlePointerDown(
                 { x: number; y: number }
             >();
         for (const id of ids) {
-            const p = getNodePosition(id);
+            const pos = getNodePosition(id);
             initialPositions.set(
-                id, { x: p.x, y: p.y },
+                id, { x: pos.x, y: pos.y },
             );
         }
         state.drag = {
@@ -310,14 +316,14 @@ function handlePointerDown(
             id: edgeId,
             time: now,
         };
-        state.isPanelOpen = isDbl;
+        onPanelRequest(isDbl);
         onUpdate();
         return;
     }
 
     state.lastClick = { kind: 'none' };
     startBackgroundDrag(
-        e, wrap, svg, state,
+        e, wrap, svg, state, onPanelRequest,
     );
     onUpdate();
 }
@@ -327,8 +333,9 @@ function startBackgroundDrag(
     wrap: HTMLElement,
     svg: SVGSVGElement,
     state: InteractionState,
+    onPanelRequest: PanelRequestCallback,
 ): void {
-    state.isPanelOpen = false;
+    onPanelRequest(false);
     const svgPt = screenToSvg(
         svg, e.clientX, e.clientY,
     );
@@ -706,6 +713,7 @@ export function bindInteractions(
     wrap: HTMLElement,
     state: InteractionState,
     onUpdate: InteractionCallback,
+    onPanelRequest: PanelRequestCallback,
     onNodesDragEnd: (
         updates: Array<{
             nodeId: string;
@@ -737,11 +745,11 @@ export function bindInteractions(
 
     const liveSvg = (
     ): SVGSVGElement | null => {
-        const s = wrap.querySelector(
+        const el = wrap.querySelector(
             'svg.flow-canvas',
         );
-        return s instanceof SVGSVGElement
-            ? s : null;
+        return el instanceof SVGSVGElement
+            ? el : null;
     };
 
     wrap.addEventListener(
@@ -751,7 +759,7 @@ export function bindInteractions(
             if (!svg) return;
             handlePointerDown(
                 e, wrap, svg, state,
-                onUpdate,
+                onUpdate, onPanelRequest,
                 getNodePosition, isLocked,
             );
         },
@@ -820,9 +828,11 @@ export function bindInteractions(
     );
 
     const isFormFocused = (): boolean => {
-        const a = document.activeElement;
-        if (!a) return false;
-        const tag = a.tagName.toLowerCase();
+        const activeEl
+            = document.activeElement;
+        if (!activeEl) return false;
+        const tag = activeEl.tagName
+            .toLowerCase();
         if (
             tag === 'input'
             || tag === 'textarea'
@@ -831,7 +841,7 @@ export function bindInteractions(
             || tag === 'a'
         ) return true;
         return (
-            a as HTMLElement
+            activeEl as HTMLElement
         ).isContentEditable;
     };
 
@@ -880,6 +890,7 @@ export function bindInteractions(
         'keydown',
         (e) => handleCanvasNavigation(
             e, wrap, state, onUpdate,
+            onPanelRequest,
         ),
         { signal },
     );
@@ -890,6 +901,7 @@ function handleCanvasNavigation(
     wrap: HTMLElement,
     state: InteractionState,
     onUpdate: InteractionCallback,
+    onPanelRequest: PanelRequestCallback,
 ): void {
     if (e.key !== 'Enter' && e.key !== ' ') {
         return;
@@ -915,7 +927,7 @@ function handleCanvasNavigation(
             kind: 'edge', edgeId,
         };
     }
-    state.isPanelOpen = true;
+    onPanelRequest(true);
     onUpdate();
 }
 

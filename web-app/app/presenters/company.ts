@@ -9,99 +9,46 @@ import {
 import type {
     Company,
 } from '../adapters';
-import type { EditMode } from './edit-mode';
 
 export type CompanyFieldKey =
     | 'name' | 'domain';
 
-export class CompanyPresenter {
-    #company: Company;
-    #mode: EditMode<Company>
-        = { kind: 'reading' };
-
-    constructor(company: Company) {
-        this.#company = company;
-    }
-
-    update(company: Company): void {
-        this.#company = company;
-        this.#mode = { kind: 'reading' };
-    }
-
-    beginEdit(): void {
-        this.#mode = {
-            kind: 'editing',
-            draft: { ...this.#company },
-        };
-    }
-
-    cancelEdit(): void {
-        this.#mode = { kind: 'reading' };
-    }
-
-    isEditing(): boolean {
-        return this.#mode.kind === 'editing';
-    }
-
-    setDraftField(
-        field: CompanyFieldKey,
-        value: string,
-    ): void {
-        if (this.#mode.kind !== 'editing') {
-            throw new Error(
-                'setDraftField requires'
-                + ' editing mode',
-            );
-        }
-        this.#mode.draft[field] = value;
-    }
-
-    draft(): Company {
-        return this.#mode.kind === 'editing'
-            ? this.#mode.draft
-            : this.#company;
-    }
-
-    renderShell(
-        container: HTMLElement,
-    ): void {
-        setHtml(container, html`
+function buildShell(
+    container: HTMLElement,
+): void {
+    setHtml(container, html`
 <div class="content-wrap">
     <div class="company-header-slot"></div>
     <div class="company-body-slot"></div>
 </div>`);
-        this.renderUpdate(container);
-    }
+}
 
-    renderUpdate(
-        container: HTMLElement,
-    ): void {
-        this.#updateHeader(container);
-        this.#updateBody(container);
-    }
+function setHeader(
+    container: HTMLElement,
+    markup: SafeHtml,
+): void {
+    const slot = $(
+        '.company-header-slot', container,
+    );
+    if (!slot) return;
+    setHtml(slot, markup);
+}
 
-    #updateHeader(
-        container: HTMLElement,
-    ): void {
-        const slot = $(
-            '.company-header-slot', container,
-        );
-        if (!slot) return;
-        setHtml(slot, this.#buildHeader());
-    }
+function setBody(
+    container: HTMLElement,
+    markup: SafeHtml,
+): void {
+    const slot = $(
+        '.company-body-slot', container,
+    );
+    if (!slot) return;
+    setHtml(slot, markup);
+}
 
-    #updateBody(
-        container: HTMLElement,
-    ): void {
-        const slot = $(
-            '.company-body-slot', container,
-        );
-        if (!slot) return;
-        setHtml(slot, this.#buildCard());
-    }
-
-    #buildHeader(): SafeHtml {
-        return html`
+function buildHeader(
+    buttons: SafeHtml,
+): SafeHtml {
+    return html`
         <div class="page-header">
             <div>
                 <h1 class="${
@@ -113,40 +60,50 @@ export class CompanyPresenter {
                     + ' configuration'
                 }</p>
             </div>
-            ${this.#buildHeaderButtons()}
+            ${buttons}
         </div>`;
-    }
+}
 
-    #buildHeaderButtons(): SafeHtml {
-        if (this.isEditing()) {
-            return html`
-            <div class="flex gap-2">
-                <button class="${
-                    'btn btn-outline gap-2'
-                }" id="company-cancel-btn"
-                    data-company-action="cancel">
-                    ${iconX(16, '')} Cancel
-                </button>
-                <button class="${
-                    'btn btn-primary gap-2'
-                }" id="company-save-btn"
-                    data-company-action="save">
-                    ${iconSave(16, '')} Save
-                </button>
-            </div>`;
-        }
-        return html`
-            <button class="${
-                'btn btn-outline gap-2'
-            }" id="company-edit-btn"
-                data-company-action="edit">
-                ${iconEdit(16, '')} Edit
-            </button>`;
-    }
+function buildReadonlyField(
+    id: string,
+    label: string,
+    value: string,
+): SafeHtml {
+    return html`
+        <div>
+            <label class="${
+                'label mb-2 block'
+            }" for="${id}">${
+                label
+            }</label>
+            <p class="text-sm">${value}</p>
+        </div>`;
+}
 
-    #buildCard(): SafeHtml {
-        const c = this.draft();
-        return html`
+function buildEditableField(
+    id: string,
+    field: CompanyFieldKey,
+    label: string,
+    value: string,
+): SafeHtml {
+    return html`
+        <div>
+            <label class="${
+                'label mb-2 block'
+            }" for="${id}">${
+                label
+            }</label>
+            <input class="input"
+                id="${id}"
+                data-company-field="${field}"
+                value="${value}" />
+        </div>`;
+}
+
+function buildCard(
+    body: SafeHtml,
+): SafeHtml {
+    return html`
         <div class="${
             'card card-hover p-6 mb-6'
         }">
@@ -160,46 +117,119 @@ export class CompanyPresenter {
             <div class="${
                 'grid grid-cols-2 gap-4'
             }">
-                ${this.#buildField(
-                    'company-name',
-                    'name',
-                    'Company Name',
-                    c.name,
-                )}
-                ${this.#buildField(
-                    'company-domain',
-                    'domain',
-                    'Domain',
-                    c.domain,
-                )}
+                ${body}
             </div>
         </div>`;
+}
+
+export class CompanyPresenter {
+    readonly #company: Company;
+
+    constructor(company: Company) {
+        this.#company = company;
     }
 
-    #buildField(
-        id: string,
-        field: CompanyFieldKey,
-        label: string,
-        value: string,
-    ): SafeHtml {
-        return html`
-                <div>
-                    <label class="${
-                        'label mb-2 block'
-                    }" for="${id}">${
-                        label
-                    }</label>
-                    ${this.isEditing()
-                        ? html`<input
-                            class="input"
-                            id="${id}"
-                            data-company-field="${
-                                field
-                            }"
-                            value="${value}" />`
-                        : html`<p class="${
-                            'text-sm'
-                        }">${value}</p>`}
-                </div>`;
+    renderShell(
+        container: HTMLElement,
+    ): void {
+        buildShell(container);
+        this.renderUpdate(container);
+    }
+
+    renderUpdate(
+        container: HTMLElement,
+    ): void {
+        setHeader(
+            container, this.#buildHeader(),
+        );
+        setBody(
+            container, this.#buildCard(),
+        );
+    }
+
+    #buildHeader(): SafeHtml {
+        return buildHeader(html`
+            <button class="${
+                'btn btn-outline gap-2'
+            }" id="company-edit-btn"
+                data-company-action="edit">
+                ${iconEdit(16, '')} Edit
+            </button>`);
+    }
+
+    #buildCard(): SafeHtml {
+        const c = this.#company;
+        return buildCard(html`
+            ${buildReadonlyField(
+                'company-name',
+                'Company Name',
+                c.name,
+            )}
+            ${buildReadonlyField(
+                'company-domain',
+                'Domain',
+                c.domain,
+            )}`);
+    }
+}
+
+export class CompanyEditPresenter {
+    readonly #draft: Company;
+
+    constructor(draft: Company) {
+        this.#draft = draft;
+    }
+
+    renderShell(
+        container: HTMLElement,
+    ): void {
+        buildShell(container);
+        this.renderUpdate(container);
+    }
+
+    renderUpdate(
+        container: HTMLElement,
+    ): void {
+        setHeader(
+            container, this.#buildHeader(),
+        );
+        setBody(
+            container, this.#buildCard(),
+        );
+    }
+
+    #buildHeader(): SafeHtml {
+        return buildHeader(html`
+            <div class="flex gap-2">
+                <button class="${
+                    'btn btn-outline gap-2'
+                }" id="company-cancel-btn"
+                    data-company-action="cancel">
+                    ${iconX(16, '')} Cancel
+                </button>
+                <button class="${
+                    'btn btn-primary gap-2'
+                }" id="company-save-btn"
+                    data-company-action="save">
+                    ${iconSave(16, '')} Save
+                </button>
+            </div>`);
+    }
+
+    #buildCard(): SafeHtml {
+        const d = this.#draft;
+        return buildCard(html`
+            ${buildEditableField(
+                'company-name',
+                'name',
+                'Company Name',
+                d.name,
+            )}
+            ${buildEditableField(
+                'company-domain',
+                'domain',
+                'Domain',
+                d.domain,
+            )}`);
     }
 }

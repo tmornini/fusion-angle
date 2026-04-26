@@ -202,9 +202,11 @@ export async function getProject(
 
     return new ProjectView(
         project,
-        userName(
-            userMap, leadRow?.user_id,
-        ),
+        leadRow
+            ? userName(
+                userMap, leadRow.user_id,
+            )
+            : '',
         teamRows.map(member => ({
             id: member.user_id,
             name: userName(
@@ -230,6 +232,14 @@ export async function putProject(
 ): Promise<void> {
     await PUT(`projects/${id}`, entity);
     projectChanged.send();
+}
+
+export async function putProjectPatch(
+    id: string,
+    patch: Partial<Omit<ProjectEntity, 'id'>>,
+): Promise<void> {
+    const entity = await getProjectEntity(id);
+    await putProject(id, { ...entity, ...patch });
 }
 
 export interface TeamMemberAssignment {

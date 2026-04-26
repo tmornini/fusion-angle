@@ -1,5 +1,6 @@
 import {
-    $, $input, $select,
+    $, $input, $inputRequired, $select,
+    $textarea, createElement,
 } from '../app/dom';
 import { log } from '../app/logger';
 import { setHtml } from '../app/safe-html';
@@ -74,6 +75,8 @@ class Debouncer {
 const saveDebouncer =
     new Debouncer(SAVE_DELAY_MS);
 
+type PanelStateRef = { open: boolean };
+
 class PageState {
     #projectId: string | undefined;
     readonly #interaction =
@@ -144,10 +147,10 @@ function bindFlowNameEdit(
                 btn.id
                     === 'flow-name-save-btn'
             ) {
-                const name = $input(
+                const name = $inputRequired(
                     '#flow-name-input',
                     container,
-                )?.value.trim() ?? '';
+                ).value.trim();
                 if (name.length === 0) {
                     showToast(
                         'Flow name is'
@@ -273,10 +276,11 @@ function bindBackButton(
 function bindCanvasInteractions(
     container: HTMLElement,
     presenter: FlowDesignerPresenter,
+    panelStateRef: PanelStateRef,
     signal: AbortSignal,
 ): void {
-    const wrap = container.querySelector(
-        '.flow-canvas-wrap',
+    const wrap = $(
+        '.flow-canvas-wrap', container,
     );
     if (!(wrap instanceof HTMLElement)) {
         return;
@@ -287,6 +291,10 @@ function bindCanvasInteractions(
         wrap,
         state,
         () => update(container, presenter),
+        (open) => {
+            panelStateRef.open = open;
+            presenter.setPanelOpen(open);
+        },
         (updates) => {
             presenter.moveNodes(updates);
             update(container, presenter);
@@ -461,8 +469,7 @@ async function handleExportZip(
     );
     const url =
         URL.createObjectURL(blob);
-    const a =
-        document.createElement('a');
+    const a = createElement('a');
     a.href = url;
     a.download = result.name;
     a.click();
@@ -476,6 +483,7 @@ async function handleExportZip(
 function bindPanelActions(
     container: HTMLElement,
     presenter: FlowDesignerPresenter,
+    panelStateRef: PanelStateRef,
     signal: AbortSignal,
 ): void {
     const slot = $(
@@ -497,9 +505,8 @@ function bindPanelActions(
                 'data-action',
             );
             if (action === 'close-panel') {
-                presenter
-                    .interactionState()
-                    .isPanelOpen = false;
+                panelStateRef.open = false;
+                presenter.setPanelOpen(false);
                 update(
                     container, presenter,
                 );
@@ -643,20 +650,28 @@ async function handleSaveField(
     if (
         presenter.selectedNodeId() === null
     ) return;
-    const nameEl = $input(
+    const nameEl = $inputRequired(
         '#new-field-name', container,
     );
     const typeEl = $select(
         '#new-field-type', container,
     );
-    const reqEl = $input(
+    if (!typeEl) {
+        throw new Error(
+            'Required: #new-field-type',
+        );
+    }
+    const reqEl = $inputRequired(
         '#new-field-required', container,
     );
-    const optEl = container
-        .querySelector<HTMLTextAreaElement>(
-            '#new-field-options',
+    const optEl = $textarea(
+        '#new-field-options', container,
+    );
+    if (!optEl) {
+        throw new Error(
+            'Required: #new-field-options',
         );
-    if (!nameEl || !typeEl) return;
+    }
     const fieldName = nameEl.value.trim();
     if (fieldName.length === 0) {
         showToast(
@@ -666,10 +681,8 @@ async function handleSaveField(
         return;
     }
     const fieldType = typeEl.value;
-    const isRequired =
-        reqEl?.checked ?? false;
-    const optionsText =
-        optEl?.value.trim() ?? '';
+    const isRequired = reqEl.checked;
+    const optionsText = optEl.value.trim();
     const options =
         optionsText.length > 0
             ? optionsText
@@ -724,17 +737,21 @@ export async function init(
             FALLBACK_H,
             loaded.versions.length > 0,
         );
+    const panelStateRef: PanelStateRef =
+        { open: false };
     const signal = pageState.signal();
     presenter.renderShell(container);
     bindBackButton(container, signal);
     bindCanvasInteractions(
-        container, presenter, signal,
+        container, presenter,
+        panelStateRef, signal,
     );
     bindToolbarActions(
         container, presenter, signal,
     );
     bindPanelActions(
-        container, presenter, signal,
+        container, presenter,
+        panelStateRef, signal,
     );
     bindFlowNameEdit(
         container, presenter, signal,
@@ -743,7 +760,8 @@ export async function init(
         container, presenter, signal,
     );
     bindKeyboardShortcuts(
-        container, presenter, signal,
+        container, presenter,
+        panelStateRef, signal,
     );
     const initialWrap = container.querySelector(
         '.flow-canvas-wrap',
@@ -777,6 +795,7 @@ export async function init(
 function bindKeyboardShortcuts(
     container: HTMLElement,
     presenter: FlowDesignerPresenter,
+    panelStateRef: PanelStateRef,
     signal: AbortSignal,
 ): void {
     document.addEventListener(
@@ -784,14 +803,11 @@ function bindKeyboardShortcuts(
         (e: KeyboardEvent) => {
             if (
                 e.key === 'Escape'
-                && presenter
-                    .interactionState()
-                    .isPanelOpen
+                && panelStateRef.open
             ) {
                 e.preventDefault();
-                presenter
-                    .interactionState()
-                    .isPanelOpen = false;
+                panelStateRef.open = false;
+                presenter.setPanelOpen(false);
                 update(
                     container, presenter,
                 );

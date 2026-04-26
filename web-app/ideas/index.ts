@@ -130,9 +130,9 @@ function onBadgeClick(e: MouseEvent): void {
     if (!badge) return;
     const s = attr(badge, 'data-status');
     if (!isIdeaStatus(s)) return;
-    presenter.toggleFilter(s);
-    presenter.renderBadges(badgesEl);
-    presenter.renderList(listEl);
+    presenter.applyFilterToggle(
+        s, badgesEl, listEl,
+    );
 }
 
 function onCardClick(e: MouseEvent): void {

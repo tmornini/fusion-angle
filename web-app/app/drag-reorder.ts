@@ -1,3 +1,5 @@
+import { createElement } from './dom';
+
 const INDICATOR_HEIGHT = 3;
 const INDICATOR_COLOR =
     'hsl(var(--primary))';
@@ -40,8 +42,7 @@ export function initDragReorder(
 
     function buildIndicator():
         HTMLElement {
-        const el =
-            document.createElement('div');
+        const el = createElement('div');
         el.style.height =
             INDICATOR_HEIGHT + 'px';
         el.style.background =

@@ -24,38 +24,14 @@ export type GaugeTheme =
     | 'green'
     | 'amber';
 
-export interface GaugeReceiver {
-    title(text: string): void;
-    theme(name: GaugeTheme): void;
-    icon(
-        name: GaugeIcon,
-        cssClass: string,
-    ): void;
-    outerArc(
-        value: number,
-        max: number,
-        label: string,
-        display: string,
-    ): void;
-    innerArc(
-        value: number,
-        max: number,
-        label: string,
-        display: string,
-    ): void;
-    overrunWarning(
-        enabled: boolean,
-    ): void;
-}
-
-interface ArcData {
+export interface ArcData {
     readonly value: number;
     readonly max: number;
     readonly label: string;
     readonly display: string;
 }
 
-interface GaugeCardInit {
+export interface GaugeData {
     readonly title: string;
     readonly icon: GaugeIcon;
     readonly iconCssClass: string;
@@ -65,56 +41,8 @@ interface GaugeCardInit {
     readonly hasOverrunWarning: boolean;
 }
 
-export class GaugeCard {
-    readonly #title: string;
-    readonly #icon: GaugeIcon;
-    readonly #iconCssClass: string;
-    readonly #theme: GaugeTheme;
-    readonly #outer: ArcData;
-    readonly #inner: ArcData;
-    readonly #hasOverrunWarning: boolean;
-
-    constructor(init: GaugeCardInit) {
-        this.#title = init.title;
-        this.#icon = init.icon;
-        this.#iconCssClass =
-            init.iconCssClass;
-        this.#theme = init.theme;
-        this.#outer = init.outer;
-        this.#inner = init.inner;
-        this.#hasOverrunWarning =
-            init.hasOverrunWarning;
-    }
-
-    presentGaugeInto(
-        r: GaugeReceiver,
-    ): void {
-        r.title(this.#title);
-        r.theme(this.#theme);
-        r.icon(
-            this.#icon,
-            this.#iconCssClass,
-        );
-        r.outerArc(
-            this.#outer.value,
-            this.#outer.max,
-            this.#outer.label,
-            this.#outer.display,
-        );
-        r.innerArc(
-            this.#inner.value,
-            this.#inner.max,
-            this.#inner.label,
-            this.#inner.display,
-        );
-        r.overrunWarning(
-            this.#hasOverrunWarning,
-        );
-    }
-}
-
 export async function getDashboardGauges(
-): Promise<GaugeCard[]> {
+): Promise<GaugeData[]> {
     const allProjects =
         await GET<ProjectEntity[]>(
             'projects',
@@ -186,7 +114,7 @@ export async function getDashboardGauges(
     );
 
     return [
-        new GaugeCard({
+        {
             title: 'Time',
             icon: 'clock',
             iconCssClass: 'text-success',
@@ -206,8 +134,8 @@ export async function getDashboardGauges(
                     `${sumCurrentDays}d`,
             },
             hasOverrunWarning: true,
-        }),
-        new GaugeCard({
+        },
+        {
             title: 'Cost',
             icon: 'dollarSign',
             iconCssClass: 'text-primary',
@@ -231,8 +159,8 @@ export async function getDashboardGauges(
                     ),
             },
             hasOverrunWarning: true,
-        }),
-        new GaugeCard({
+        },
+        {
             title: 'Impact',
             icon: 'zap',
             iconCssClass: 'text-warning',
@@ -254,7 +182,7 @@ export async function getDashboardGauges(
                     + ` pts`,
             },
             hasOverrunWarning: false,
-        }),
+        },
     ];
 }
 

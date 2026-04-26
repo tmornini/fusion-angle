@@ -24,11 +24,9 @@ import {
 function buildColorSwatch(
     name: string,
     variable: string,
-    bgClass?: string,
 ): SafeHtml {
     const cls =
-        bgClass
-        ?? 'bg' + variable.replace('--', '-');
+        'bg' + variable.replace('--', '-');
     return html`<div class="color-swatch">
     <div class="${
         'color-swatch-block ' + cls

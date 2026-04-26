@@ -7,14 +7,10 @@ import {
     iconEdit,
     iconArrowRight,
 } from '../icons';
-import type { Activity } from '../adapters';
-
-type ActivityType =
-    | 'idea_created'
-    | 'project_created'
-    | 'user_joined'
-    | 'status_changed'
-    | 'idea_converted';
+import type {
+    Activity,
+    ActivityType,
+} from '../adapters';
 
 type IconTone =
     'primary' | 'success' | 'warning' | 'info';
@@ -148,11 +144,9 @@ export class ActivityPresenter {
     }
 
     #buildIcon(): SafeHtml {
-        const actType = this.#activity
-            .typeValue() as ActivityType;
-        const entry =
-            ICON_MAP[actType]
-            ?? ICON_MAP.idea_created;
+        const entry = ICON_MAP[
+            this.#activity.typeValue()
+        ];
         return html`<div class="icon-box"
             data-tone="${entry.tone}">${
             entry.icon(20, '')

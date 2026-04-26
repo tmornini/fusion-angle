@@ -1,4 +1,6 @@
-import { $, $required } from '../app/dom';
+import {
+    $, $required, attr,
+} from '../app/dom';
 import {
     html, setHtml, trusted,
 } from '../app/safe-html';
@@ -56,10 +58,9 @@ function collectFieldValues(
             | HTMLTextAreaElement
         >('[data-field-id]');
     for (const input of inputs) {
-        const fieldId =
-            input.getAttribute(
-                'data-field-id',
-            ) ?? '';
+        const fieldId = attr(
+            input, 'data-field-id',
+        );
         if (input.type === 'checkbox') {
             values[fieldId] = (
                 input as HTMLInputElement
@@ -169,8 +170,9 @@ function buildFieldInput(
             data-field-id="${id}"
             ${req} />`;
     }
-    const extra =
-        trusted(spec.extra ?? '');
+    const extra = spec.extra
+        ? trusted(spec.extra)
+        : html``;
     return html`<input
         type="${spec.type}"
         class="input"
@@ -359,10 +361,9 @@ function initTransitionButtons(
         btn.addEventListener(
             'click',
             async () => {
-                const edgeId =
-                    btn.getAttribute(
-                        'data-edge-id',
-                    ) ?? '';
+                const edgeId = attr(
+                    btn, 'data-edge-id',
+                );
                 const values =
                     collectFieldValues(
                         container,
@@ -373,11 +374,12 @@ function initTransitionButtons(
                         .filter(
                             f => f.isRequired,
                         )
-                        .some(
-                            f =>
-                                (values[f.id]
-                                    ?? '') === '',
-                        );
+                        .some(f => {
+                            const v
+                                = values[f.id];
+                            return v === undefined
+                                || v === '';
+                        });
                 if (hasEmpty) {
                     showToast(
                         'Please fill'

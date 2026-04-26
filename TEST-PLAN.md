@@ -68,7 +68,7 @@ on. Run these in order.
 ### AA1. Create Pristine Environment
 
 - [ ] **AA1** Navigate to `snapshots/`. Click "Create Pristine Environment" and confirm the wipe dialog. PASS: redirects to dashboard. Dashboard shows empty/minimal state.
-- [ ] **AA2** Open DevTools, verify localStorage has `fusion-ai:*` keys (18 tables as empty arrays plus bootstrap data).
+- [ ] **AA2** Open DevTools, verify localStorage has `fusion-ai:*` keys (19 tables as empty arrays plus bootstrap data, including the `deleted` tombstone table).
 - [ ] **AA3** Verify bootstrap data exists: user "Tony Stark" (id: `current`), company "Stark Industries" with "Business" plan.
 
 ### AA2. Create Users
