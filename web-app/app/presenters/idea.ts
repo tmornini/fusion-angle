@@ -27,6 +27,7 @@ import type {
     Idea,
     IdeaStatus,
     IdeaEntity,
+    IdeaWithSubmitter,
 } from '../adapters/index.ts';
 import {
     IDEA_STATUS_CONFIG,
@@ -185,24 +186,23 @@ function buildBreadcrumb(
 }
 
 function buildSubmittedByLine(
-    idea: Idea,
+    submitterName: string,
+    submittedAt: string,
 ): SafeHtml {
     return html`
         <p class="${
             'text-sm text-muted'
         }">
             Submitted by
-            ${displayText(
-                idea.submittedByName(),
-            )}
-            @ ${formatDateTime(
-                idea.submittedAtDate(),
-            )}
+            ${displayText(submitterName)}
+            @ ${formatDateTime(submittedAt)}
         </p>`;
 }
 
 function buildReadonlyTitleSection(
     idea: Idea,
+    submitterName: string,
+    submittedAt: string,
 ): SafeHtml {
     return html`
         <div class="${
@@ -224,12 +224,16 @@ function buildReadonlyTitleSection(
                 ${idea.statusLabel()}
             </span>
         </div>
-        ${buildSubmittedByLine(idea)}`;
+        ${buildSubmittedByLine(
+            submitterName, submittedAt,
+        )}`;
 }
 
 function buildEditableTitleSection(
     idea: Idea,
     draft: IdeaDraftFields,
+    submitterName: string,
+    submittedAt: string,
 ): SafeHtml {
     return html`
         <div class="${
@@ -251,7 +255,9 @@ function buildEditableTitleSection(
                 ${idea.statusLabel()}
             </span>
         </div>
-        ${buildSubmittedByLine(idea)}`;
+        ${buildSubmittedByLine(
+            submitterName, submittedAt,
+        )}`;
 }
 
 function buildReadonlyInput(
@@ -563,9 +569,25 @@ function buildProblemSolutionEditableCard(
 
 export class IdeaPresenter {
     readonly #idea: Idea;
+    readonly #submitterName: string;
+    readonly #submittedAt: string;
 
-    constructor(idea: Idea) {
+    constructor(
+        idea: Idea,
+        submitterName: string,
+        submittedAt: string,
+    ) {
         this.#idea = idea;
+        this.#submitterName = submitterName;
+        this.#submittedAt = submittedAt;
+    }
+
+    submitterName(): string {
+        return this.#submitterName;
+    }
+
+    submittedAt(): string {
+        return this.#submittedAt;
     }
 
     idForLink(): string {
@@ -731,6 +753,8 @@ export class IdeaPresenter {
             '.idea-title-slot',
             buildReadonlyTitleSection(
                 this.#idea,
+                this.#submitterName,
+                this.#submittedAt,
             ),
         );
         mutateSlot(
@@ -780,13 +804,19 @@ export class IdeaPresenter {
 export class IdeaEditPresenter {
     readonly #idea: Idea;
     readonly #draft: IdeaDraftFields;
+    readonly #submitterName: string;
+    readonly #submittedAt: string;
 
     constructor(
         idea: Idea,
         draft: IdeaDraftFields,
+        submitterName: string,
+        submittedAt: string,
     ) {
         this.#idea = idea;
         this.#draft = draft;
+        this.#submitterName = submitterName;
+        this.#submittedAt = submittedAt;
     }
 
     idForLink(): string {
@@ -823,6 +853,8 @@ export class IdeaEditPresenter {
             '.idea-title-slot',
             buildEditableTitleSection(
                 this.#idea, this.#draft,
+                this.#submitterName,
+                this.#submittedAt,
             ),
         );
         mutateSlot(
@@ -884,19 +916,19 @@ export type IdeaListFilter =
     | { kind: 'filtered'; status: IdeaStatus };
 
 export type IdeaListState = {
-    ideas: Idea[];
+    ideas: IdeaWithSubmitter[];
     filter: IdeaListFilter;
 };
 
 export function buildInitialIdeaListState(
-    ideas: Idea[],
+    ideas: IdeaWithSubmitter[],
 ): IdeaListState {
     return { ideas, filter: { kind: 'all' } };
 }
 
 export function applyIdeaListUpdate(
     state: IdeaListState,
-    ideas: Idea[],
+    ideas: IdeaWithSubmitter[],
 ): IdeaListState {
     return { ...state, ideas };
 }
@@ -919,7 +951,11 @@ export class IdeaListPresenter {
 
     constructor(state: IdeaListState) {
         this.#ideas = state.ideas.map(
-            i => new IdeaPresenter(i),
+            t => new IdeaPresenter(
+                t.idea,
+                t.submitterName,
+                t.submittedAt,
+            ),
         );
         this.#filter = state.filter;
     }

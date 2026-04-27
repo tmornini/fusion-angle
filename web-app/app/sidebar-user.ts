@@ -15,13 +15,19 @@ async function getSidebarUser(
     name: string;
     company: string;
 }> {
-    const { getCurrentUser } =
-        await import('./adapters');
-    const { user, company } =
-        await getCurrentUser();
+    const {
+        getCurrentUserRow,
+        getCompanyRow,
+        User,
+    } = await import('./adapters');
+    const [userRow, company] =
+        await Promise.all([
+            getCurrentUserRow(),
+            getCompanyRow(),
+        ]);
     return {
-        name: user.fullName(),
-        company,
+        name: new User(userRow).fullName(),
+        company: company.name,
     };
 }
 

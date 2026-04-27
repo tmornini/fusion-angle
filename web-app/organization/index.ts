@@ -8,7 +8,15 @@ import {
     navigateTo,
 } from '../app/core.ts';
 import {
-    getOrganization,
+    getOrganizationRow,
+    getCompany,
+    getActivityRows,
+    getActivityActorRows,
+    getUserMap,
+    userName,
+    createFetchContext,
+    RECENT_ACTIVITY_COUNT,
+    type RecentActivityItem,
 } from '../app/adapters/index.ts';
 import {
     OrganizationPresenter,
@@ -24,14 +32,60 @@ export async function init(): Promise<void> {
         buildSkeleton('detail', 4),
     );
 
-    let organization: Awaited<
-        ReturnType<typeof getOrganization>
-    >;
+    const ctx = createFetchContext();
+    let presenter: OrganizationPresenter;
     try {
-        organization = await getOrganization();
+        const [
+            entity, company,
+            activities, actors, userMap,
+        ] = await Promise.all([
+            getOrganizationRow(),
+            getCompany(),
+            getActivityRows(),
+            getActivityActorRows(),
+            getUserMap(ctx),
+        ]);
+        const actorMap = new Map(
+            actors.map(a => [
+                a.activity_id, a.user_id,
+            ]),
+        );
+        const recent: RecentActivityItem[] =
+            activities
+                .slice(
+                    0, RECENT_ACTIVITY_COUNT,
+                )
+                .map(a => {
+                    const actorId =
+                        actorMap.get(a.id);
+                    if (!actorId) {
+                        throw new Error(
+                            'Activity has'
+                            + ' no actor: '
+                            + a.id,
+                        );
+                    }
+                    const actor = userName(
+                        userMap, actorId,
+                    );
+                    return {
+                        type: a.type,
+                        description:
+                            actor + ' '
+                            + a.action + ' '
+                            + a.target,
+                        time: a.timestamp,
+                    };
+                });
+        presenter =
+            new OrganizationPresenter(
+                entity,
+                company.name,
+                recent,
+            );
     } catch (err) {
         log.error(
-            'getOrganization failed',
+            'getOrganizationRow failed',
             'organization',
             err,
         );
@@ -52,9 +106,6 @@ export async function init(): Promise<void> {
             );
         return;
     }
-
-    const presenter =
-        new OrganizationPresenter(organization);
     mutateHtml(
         container,
         presenter.buildPage(),

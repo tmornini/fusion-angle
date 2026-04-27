@@ -12,7 +12,11 @@ import {
     withLoadingState,
 } from '../app/loading-states.ts';
 import {
-    getActivityFeed,
+    getActivityRows,
+    getActivityActorRows,
+    getUserMap,
+    userName,
+    createFetchContext,
 } from '../app/adapters/index.ts';
 import {
     ActivityPresenter,
@@ -25,11 +29,43 @@ export async function init(
     );
     if (!container) return;
 
-    const activities =
+    const ctx = createFetchContext();
+    const items =
         await withLoadingState(
             container,
             buildSkeleton('card-list', 6),
-            getActivityFeed,
+            async () => {
+                const [
+                    rows, actors, userMap,
+                ] = await Promise.all([
+                    getActivityRows(),
+                    getActivityActorRows(),
+                    getUserMap(ctx),
+                ]);
+                const actorMap = new Map(
+                    actors.map(a => [
+                        a.activity_id,
+                        a.user_id,
+                    ]),
+                );
+                return rows.map(row => {
+                    const actorId =
+                        actorMap.get(row.id);
+                    if (!actorId) {
+                        throw new Error(
+                            'Activity has'
+                            + ' no actor: '
+                            + row.id,
+                        );
+                    }
+                    return new ActivityPresenter(
+                        row,
+                        userName(
+                            userMap, actorId,
+                        ),
+                    );
+                });
+            },
             () => init(),
             {
                 icon: iconActivity(24, ''),
@@ -42,10 +78,8 @@ export async function init(
                     + ' projects.',
             },
         );
-    if (!activities) return;
-    const items = activities.map(
-        a => new ActivityPresenter(a),
-    );
+    if (!items) return;
+    const presenters = items;
 
     mutateHtml(container, html`
     <div class="content-wrap">
@@ -75,7 +109,7 @@ export async function init(
         </div>
 
         <div id="activity-list">
-            ${items.map(
+            ${presenters.map(
                 a => a.buildActivity(),
             )}
         </div>
@@ -119,7 +153,7 @@ export async function init(
         const types = typeVal !== 'all'
             ? typeMap[typeVal]
             : undefined;
-        const filtered = items.filter(
+        const filtered = presenters.filter(
             a => a.matchesFilter(
                 query, types,
             ),

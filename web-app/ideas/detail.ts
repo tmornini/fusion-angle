@@ -26,7 +26,7 @@ import {
     putIdea,
     subscribeToIdeaChanges,
     createFetchContext,
-    type Idea,
+    type IdeaWithSubmitter,
 } from '../app/adapters/index.ts';
 
 const pageAbort = new AbortController();
@@ -37,11 +37,11 @@ const NO_FEEDBACK = '';
 type PageState =
     | {
         kind: 'reading';
-        idea: Idea;
+        view: IdeaWithSubmitter;
     }
     | {
         kind: 'editing';
-        idea: Idea;
+        view: IdeaWithSubmitter;
         draft: IdeaDraftFields;
     };
 
@@ -145,10 +145,17 @@ function buildPresenter():
             'state not initialized',
         );
     }
+    const v = state.view;
     return state.kind === 'reading'
-        ? new IdeaPresenter(state.idea)
+        ? new IdeaPresenter(
+            v.idea,
+            v.submitterName,
+            v.submittedAt,
+        )
         : new IdeaEditPresenter(
-            state.idea, state.draft,
+            v.idea, state.draft,
+            v.submitterName,
+            v.submittedAt,
         );
 }
 
@@ -174,15 +181,15 @@ export async function init(
     pageContainer = container;
 
     const ctx = createFetchContext();
-    const idea = await withLoadingState(
+    const view = await withLoadingState(
         container,
         buildSkeleton('detail', 4),
         () => getIdea(ideaId, ctx),
         () => init(params),
     );
-    if (!idea) return;
+    if (!view) return;
 
-    state = { kind: 'reading', idea };
+    state = { kind: 'reading', view };
     buildPresenter().renderShell(container);
     bindStableListeners(container);
 
@@ -191,7 +198,9 @@ export async function init(
         const fresh = await getIdea(
             ideaId, createFetchContext(),
         );
-        state = { kind: 'reading', idea: fresh };
+        state = {
+            kind: 'reading', view: fresh,
+        };
         rerender();
     });
 }
@@ -277,7 +286,7 @@ function handleIdeaActions(
         'data-idea-action',
     );
     if (!action) return false;
-    const ideaId = state.idea.idForLink();
+    const ideaId = state.view.idea.idForLink();
     switch (action) {
         case 'back':
             navigateTo('ideas');
@@ -288,9 +297,9 @@ function handleIdeaActions(
             }
             state = {
                 kind: 'editing',
-                idea: state.idea,
+                view: state.view,
                 draft: ideaDraftFromIdea(
-                    state.idea,
+                    state.view.idea,
                 ),
             };
             rerender();
@@ -301,7 +310,7 @@ function handleIdeaActions(
             }
             state = {
                 kind: 'reading',
-                idea: state.idea,
+                view: state.view,
             };
             rerender();
             return true;
@@ -398,7 +407,7 @@ function onDocumentKeydown(
     e.preventDefault();
     state = {
         kind: 'reading',
-        idea: state.idea,
+        view: state.view,
     };
     rerender();
 }
@@ -410,7 +419,7 @@ async function handleSave(): Promise<void> {
     const patch = ideaPatchFromDraft(
         state.draft,
     );
-    const ideaId = state.idea.idForLink();
+    const ideaId = state.view.idea.idForLink();
     try {
         const entity = await getIdeaRow(
             ideaId,

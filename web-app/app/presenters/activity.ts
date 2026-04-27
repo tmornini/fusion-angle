@@ -7,8 +7,9 @@ import {
     iconEdit,
     iconArrowRight,
 } from '../icons.ts';
+import { isActivityType } from '../adapters/index.ts';
 import type {
-    Activity,
+    ActivityEntity,
     ActivityType,
 } from '../adapters/index.ts';
 
@@ -50,10 +51,23 @@ const ICON_MAP: Record<
 };
 
 export class ActivityPresenter {
-    readonly #activity: Activity;
+    readonly #entity: ActivityEntity;
+    readonly #type: ActivityType;
+    readonly #actor: string;
 
-    constructor(activity: Activity) {
-        this.#activity = activity;
+    constructor(
+        entity: ActivityEntity,
+        actor: string,
+    ) {
+        if (!isActivityType(entity.type)) {
+            throw new Error(
+                'Unknown activity type: '
+                + entity.type,
+            );
+        }
+        this.#entity = entity;
+        this.#type = entity.type;
+        this.#actor = actor;
     }
 
     matchesFilter(
@@ -62,35 +76,43 @@ export class ActivityPresenter {
             readonly string[]
             | undefined,
     ): boolean {
-        if (query
-            && !this.#activity
-                .matchesActor(query)
-            && !this.#activity
-                .matchesTarget(query))
-            return false;
+        if (query) {
+            const q = query.toLowerCase();
+            const hitsActor =
+                this.#actor
+                    .toLowerCase()
+                    .includes(q);
+            const hitsTarget =
+                this.#entity.target
+                    .toLowerCase()
+                    .includes(q);
+            if (!hitsActor && !hitsTarget) {
+                return false;
+            }
+        }
         if (types
-            && !types.some(
-                t => this.#activity
-                    .hasType(t),
-            ))
+            && !types.includes(this.#type))
             return false;
         return true;
     }
 
     buildActivity(): SafeHtml {
+        const hasStatus =
+            this.#entity.status !== '';
+        const hasFeedback =
+            this.#entity.feedback !== '';
         const meta = html`${
-            this.#activity.hasStatus()
+            hasStatus
                 ? html`<div
                     class="${
                         'badge badge-default'
                         + ' text-xs mt-1'
                     }">${
-                    this.#activity
-                        .statusText()
+                    this.#entity.status
                 }</div>`
                 : html``
         }${
-            this.#activity.hasFeedback()
+            hasFeedback
                 ? html`<p
                     class="${
                         'text-sm'
@@ -98,8 +120,7 @@ export class ActivityPresenter {
                         + ' mt-1 italic'
                     }"
                     >"${
-                    this.#activity
-                        .feedbackText()
+                    this.#entity.feedback
                 }"</p>`
                 : html``
         }`;
@@ -112,22 +133,17 @@ export class ActivityPresenter {
                 <span class="${
                     'font-medium'
                 }">${
-                    displayText(
-                        this.#activity
-                            .actorName(),
-                    )
+                    displayText(this.#actor)
                 }</span>
                 <span class="${
                     'text-muted'
                 }"> ${
-                    this.#activity
-                        .actionText()
+                    this.#entity.action
                 } </span>
                 <span class="${
                     'font-medium'
                 }">${
-                    this.#activity
-                        .targetText()
+                    this.#entity.target
                 }</span>
             </p>
             ${meta}
@@ -135,8 +151,7 @@ export class ActivityPresenter {
                 'text-xs text-muted mt-1'
             }">${
                 formatDate(
-                    this.#activity
-                        .timestampValue(),
+                    this.#entity.timestamp,
                 )
             }</p>
         </div>
@@ -144,9 +159,7 @@ export class ActivityPresenter {
     }
 
     #buildIcon(): SafeHtml {
-        const entry = ICON_MAP[
-            this.#activity.typeValue()
-        ];
+        const entry = ICON_MAP[this.#type];
         return html`<div class="icon-box"
             data-tone="${entry.tone}">${
             entry.icon(20, '')

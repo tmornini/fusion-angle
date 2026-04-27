@@ -14,19 +14,22 @@ interface HeaderData {
 async function getHeaderData(
 ): Promise<HeaderData> {
     const {
-        getCurrentUser,
+        getCurrentUserRow,
+        getCompanyRow,
         getDashboardStats,
+        User,
     } = await import('./adapters');
     const { getTimeOfDay } =
         await import('./format');
-    const [auth, stats] =
+    const [userRow, company, stats] =
         await Promise.all([
-            getCurrentUser(),
+            getCurrentUserRow(),
+            getCompanyRow(),
             getDashboardStats(),
         ]);
     return {
-        userName: auth.user.fullName(),
-        company: auth.company,
+        userName: new User(userRow).fullName(),
+        company: company.name,
         greeting: getTimeOfDay(),
         stats,
     };

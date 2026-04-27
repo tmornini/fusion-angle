@@ -14,14 +14,20 @@ import {
     closeDialog,
 } from '../app/core.ts';
 import {
-    getProject,
+    getProjectRow,
+    getProjectTeamRows,
+    getUserMap,
+    userName,
+    isTeamLead,
+    Project,
+    ProjectView,
     putProjectPatch,
     getFlowsByProject,
     postFlowCreation,
     subscribeToProjectChanges,
     generateId,
     createFetchContext,
-    type ProjectView,
+    type FetchContext,
 } from '../app/adapters/index.ts';
 import type {
     FlowListItem,
@@ -67,6 +73,36 @@ function isFieldKey(
 ): s is ProjectFieldKey {
     return s !== null
         && FIELDS.has(s as ProjectFieldKey);
+}
+
+async function loadProjectView(
+    projectId: string,
+    ctx: FetchContext,
+): Promise<ProjectView> {
+    const [
+        entity, teamRows, userMap,
+    ] = await Promise.all([
+        getProjectRow(projectId),
+        getProjectTeamRows(projectId),
+        getUserMap(ctx),
+    ]);
+    const project = new Project(entity);
+    const leadRow = teamRows.find(isTeamLead);
+    return new ProjectView(
+        project,
+        leadRow
+            ? userName(
+                userMap, leadRow.user_id,
+            )
+            : '',
+        teamRows.map(member => ({
+            id: member.user_id,
+            name: userName(
+                userMap, member.user_id,
+            ),
+            role: member.role,
+        })),
+    );
 }
 
 function buildPresenter():
@@ -116,7 +152,7 @@ export async function init(
     try {
         const ctx = createFetchContext();
         [project, flows] = await Promise.all([
-            getProject(projectId, ctx),
+            loadProjectView(projectId, ctx),
             getFlowsByProject(projectId),
         ]);
     } catch (err) {
@@ -158,7 +194,7 @@ export async function init(
         const ctx = createFetchContext();
         const [upd, updFlows] =
             await Promise.all([
-                getProject(projectId, ctx),
+                loadProjectView(projectId, ctx),
                 getFlowsByProject(projectId),
             ]);
         state = {

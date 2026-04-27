@@ -6,7 +6,7 @@ import {
 import type {
     ActivityType,
 } from '../../../api/types.ts';
-import { getCurrentUser } from './shared.ts';
+import { getCurrentUserRow } from './shared.ts';
 import { generateId } from './uuid.ts';
 
 export {
@@ -29,7 +29,7 @@ export interface ActivityInput {
 export async function postActivity(
     input: ActivityInput,
 ): Promise<void> {
-    const auth = await getCurrentUser();
+    const userRow = await getCurrentUserRow();
     const activityId = generateId();
     const actorId = generateId();
     const timestamp = nowUtc();
@@ -48,7 +48,7 @@ export async function postActivity(
         `activity-actors/${actorId}`,
         {
             activity_id: activityId,
-            user_id: auth.user.idForLink(),
+            user_id: userRow.id,
             created_at: timestamp,
         },
     );

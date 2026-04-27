@@ -46,8 +46,6 @@ export interface FlowSummary {
     readonly description: string;
     readonly nodeCount: number;
     readonly edgeCount: number;
-    readonly projectName:
-        string | undefined;
 }
 
 export interface FlowListItem {
@@ -60,47 +58,30 @@ export interface FlowListItem {
 
 export async function getFlows(
 ): Promise<FlowSummary[]> {
-    const [
-        flows, projectFlows, projects,
-    ] = await Promise.all([
-        GET<FlowEntity[]>('flows'),
-        GET<ProjectFlowEntity[]>(
-            'project-flows',
-        ),
-        GET<ProjectEntity[]>('projects'),
-    ]);
-
-    const projectMap = new Map(
-        projects.map(p => [p.id, p.title]),
-    );
-
-    const projectByFlow = new Map<
-        string, string
-    >();
-    for (const pw of projectFlows) {
-        const name = projectMap.get(
-            pw.project_id,
-        );
-        if (name !== undefined) {
-            projectByFlow.set(
-                pw.flow_id, name,
-            );
-        }
-    }
-
+    const flows =
+        await GET<FlowEntity[]>('flows');
     return flows.map(f => {
         const g = parseGraph(f.graph);
         return {
             id: f.id,
             name: f.name,
             description: f.description,
-            projectName:
-                projectByFlow.get(f.id),
             nodeCount: g.nodes.length,
             edgeCount: g.edges.length,
         };
     });
 }
+
+export async function getProjectFlowRows(
+): Promise<ProjectFlowEntity[]> {
+    return GET<ProjectFlowEntity[]>(
+        'project-flows',
+    );
+}
+
+export type {
+    ProjectFlowEntity,
+} from '../../../api/types.ts';
 
 export async function getFlowsByProject(
     projectId: string,

@@ -37,14 +37,14 @@ export {
     COST_DIVISOR,
 } from '../../../api/types.ts';
 
-interface TeamMemberRow {
+export interface TeamMemberRow {
     id: string;
     user_id: string;
     role: string;
     type: string;
 }
 
-function isTeamLead(
+export function isTeamLead(
     m: { role: string },
 ): boolean {
     return m.role === 'lead';
@@ -187,42 +187,11 @@ export class ProjectView {
     }
 }
 
-export async function getProject(
+export async function getProjectTeamRows(
     projectId: string,
-    ctx?: FetchContext,
-): Promise<ProjectView> {
-    const [
-        entity, teamRows, userMap,
-    ] = await Promise.all([
-        GET<ProjectEntity>(
-            `projects/${projectId}`,
-        ),
-        GET<TeamMemberRow[]>(
-            `projects/${projectId}/team`,
-        ),
-        getUserMap(ctx),
-    ]);
-
-    const project = new Project(entity);
-    const leadRow = teamRows.find(
-        isTeamLead,
-    );
-
-    return new ProjectView(
-        project,
-        leadRow
-            ? userName(
-                userMap, leadRow.user_id,
-            )
-            : '',
-        teamRows.map(member => ({
-            id: member.user_id,
-            name: userName(
-                userMap,
-                member.user_id,
-            ),
-            role: member.role,
-        })),
+): Promise<TeamMemberRow[]> {
+    return GET<TeamMemberRow[]>(
+        `projects/${projectId}/team`,
     );
 }
 

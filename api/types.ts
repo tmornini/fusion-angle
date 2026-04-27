@@ -818,18 +818,11 @@ export class Idea {
     readonly #expectedOutcome: string;
     readonly #successMetrics: string;
     readonly #readiness: ReadinessLevel;
-    readonly #waitingDays: number;
-    readonly #submittedAt: string;
     readonly #risks: string;
     readonly #assumptions: string;
     readonly #alignments: string;
-    readonly #submittedBy: string;
 
-    constructor(
-        entity: IdeaEntity,
-        submittedBy: string,
-        submittedAt: string,
-    ) {
+    constructor(entity: IdeaEntity) {
         this.#id = entity.id;
         this.#title = entity.title;
         this.#position = entity.position;
@@ -845,20 +838,9 @@ export class Idea {
         this.#successMetrics =
             entity.success_metrics;
         this.#readiness = entity.readiness;
-        this.#submittedAt = submittedAt;
-        this.#waitingDays = this.#submittedAt
-            ? Math.max(0, Math.ceil(
-                msSinceUtc(
-                    this.#submittedAt,
-                )
-                / MS_PER_SECOND
-                / SECONDS_PER_DAY,
-            ))
-            : 0;
         this.#risks = entity.risks;
         this.#assumptions = entity.assumptions;
         this.#alignments = entity.alignments;
-        this.#submittedBy = submittedBy;
     }
 
     isDeleted(): boolean {
@@ -926,15 +908,9 @@ export class Idea {
     }
 
     matchesSearch(term: string): boolean {
-        const t = term.toLowerCase();
-        return (
-            this.#title
-                .toLowerCase()
-                .includes(t)
-            || this.#submittedBy
-                .toLowerCase()
-                .includes(t)
-        );
+        return this.#title
+            .toLowerCase()
+            .includes(term.toLowerCase());
     }
 
     idForLink(): string {
@@ -975,18 +951,6 @@ export class Idea {
 
     readinessValue(): ReadinessLevel {
         return this.#readiness;
-    }
-
-    waitingDaysCount(): number {
-        return this.#waitingDays;
-    }
-
-    submittedAtDate(): string {
-        return this.#submittedAt;
-    }
-
-    submittedByName(): string {
-        return this.#submittedBy;
     }
 }
 
@@ -1175,292 +1139,10 @@ export class Project {
     }
 }
 
-export class Activity {
-    readonly #id: string;
-    readonly #type: ActivityType;
-    readonly #action: string;
-    readonly #target: string;
-    readonly #timestamp: string;
-    readonly #status: string;
-    readonly #feedback: string;
-    readonly #actor: string;
-
-    constructor(
-        entity: ActivityEntity,
-        actor: string,
-    ) {
-        if (!isActivityType(entity.type)) {
-            throw new Error(
-                'Unknown activity type: '
-                + entity.type,
-            );
-        }
-        this.#id = entity.id;
-        this.#type = entity.type;
-        this.#action = entity.action;
-        this.#target = entity.target;
-        this.#timestamp =
-            entity.timestamp;
-        this.#status = entity.status;
-        this.#feedback = entity.feedback;
-        this.#actor = actor;
-    }
-
-    formattedDescription(): string {
-        return `${this.#actor} `
-            + `${this.#action}`
-            + ` ${this.#target}`;
-    }
-
-    typeValue(): ActivityType {
-        return this.#type;
-    }
-
-    actionText(): string {
-        return this.#action;
-    }
-
-    targetText(): string {
-        return this.#target;
-    }
-
-    timestampValue(): string {
-        return this.#timestamp;
-    }
-
-    statusText(): string {
-        return this.#status;
-    }
-
-    hasStatus(): boolean {
-        return this.#status !== '';
-    }
-
-    feedbackText(): string {
-        return this.#feedback;
-    }
-
-    hasFeedback(): boolean {
-        return this.#feedback !== '';
-    }
-
-    actorName(): string {
-        return this.#actor;
-    }
-
-    matchesActor(term: string): boolean {
-        return this.#actor
-            .toLowerCase()
-            .includes(term);
-    }
-
-    matchesTarget(term: string): boolean {
-        return this.#target
-            .toLowerCase()
-            .includes(term);
-    }
-
-    hasType(type: string): boolean {
-        return this.#type === type;
-    }
-}
-
 export interface RecentActivityItem {
     type: string;
     description: string;
     time: string;
-}
-
-export class Organization {
-    readonly #companyName: string;
-    readonly #plan: string;
-    readonly #planStatus: string;
-    readonly #nextBilling: string;
-    readonly #seats: number;
-    readonly #usedSeats: number;
-    readonly #projectsCurrent: number;
-    readonly #projectsLimit: number;
-    readonly #ideasCurrent: number;
-    readonly #ideasLimit: number;
-    readonly #storageCurrent: number;
-    readonly #storageLimit: number;
-    readonly #aiCreditsCurrent: number;
-    readonly #aiCreditsLimit: number;
-    readonly #healthScore: number;
-    readonly #healthStatus: string;
-    readonly #lastActivity: string;
-    readonly #activeUsers: number;
-    readonly #recentActivity:
-        RecentActivityItem[];
-
-    constructor(
-        entity: OrganizationEntity,
-        companyName: string,
-        recentActivity:
-            RecentActivityItem[],
-    ) {
-        this.#companyName = companyName;
-        this.#plan = entity.plan;
-        this.#planStatus =
-            entity.plan_status;
-        this.#nextBilling =
-            entity.next_billing;
-        this.#seats = entity.seats;
-        this.#usedSeats =
-            entity.used_seats;
-        this.#projectsCurrent =
-            entity.projects_current;
-        this.#projectsLimit =
-            entity.projects_limit;
-        this.#ideasCurrent =
-            entity.ideas_current;
-        this.#ideasLimit =
-            entity.ideas_limit;
-        this.#storageCurrent =
-            entity.storage_current;
-        this.#storageLimit =
-            entity.storage_limit;
-        this.#aiCreditsCurrent =
-            entity.ai_credits_current;
-        this.#aiCreditsLimit =
-            entity.ai_credits_limit;
-        this.#healthScore =
-            entity.health_score;
-        this.#healthStatus =
-            entity.health_status;
-        this.#lastActivity =
-            entity.last_activity;
-        this.#activeUsers =
-            entity.active_users;
-        this.#recentActivity =
-            recentActivity;
-    }
-
-    companyNameText(): string {
-        return this.#companyName;
-    }
-
-    planName(): string {
-        return this.#plan;
-    }
-
-    planStatusText(): string {
-        return this.#planStatus;
-    }
-
-    nextBillingDate(): string {
-        return this.#nextBilling;
-    }
-
-    seatCount(): number {
-        return this.#seats;
-    }
-
-    usedSeatCount(): number {
-        return this.#usedSeats;
-    }
-
-    projectsCurrentCount(): number {
-        return this.#projectsCurrent;
-    }
-
-    projectsLimitCount(): number {
-        return this.#projectsLimit;
-    }
-
-    ideasCurrentCount(): number {
-        return this.#ideasCurrent;
-    }
-
-    ideasLimitCount(): number {
-        return this.#ideasLimit;
-    }
-
-    storageCurrentValue(): number {
-        return this.#storageCurrent;
-    }
-
-    storageLimitValue(): number {
-        return this.#storageLimit;
-    }
-
-    aiCreditsCurrentValue(): number {
-        return this.#aiCreditsCurrent;
-    }
-
-    aiCreditsLimitValue(): number {
-        return this.#aiCreditsLimit;
-    }
-
-    healthScoreValue(): number {
-        return this.#healthScore;
-    }
-
-    healthStatusText(): string {
-        return this.#healthStatus;
-    }
-
-    lastActivityDate(): string {
-        return this.#lastActivity;
-    }
-
-    activeUserCount(): number {
-        return this.#activeUsers;
-    }
-
-    seatUsagePercent(): number {
-        return this.#seats > 0
-            ? Math.min(
-                (this.#usedSeats
-                    / this.#seats) * 100,
-                100,
-            )
-            : 0;
-    }
-
-    projectUsagePercent(): number {
-        return this.#projectsLimit > 0
-            ? Math.min(
-                (this.#projectsCurrent
-                    / this.#projectsLimit)
-                    * 100,
-                100,
-            )
-            : 0;
-    }
-
-    ideaUsagePercent(): number {
-        return this.#ideasLimit > 0
-            ? Math.min(
-                (this.#ideasCurrent
-                    / this.#ideasLimit)
-                    * 100,
-                100,
-            )
-            : 0;
-    }
-
-    aiCreditUsagePercent(): number {
-        return this.#aiCreditsLimit > 0
-            ? Math.min(
-                (this.#aiCreditsCurrent
-                    / this.#aiCreditsLimit)
-                    * 100,
-                100,
-            )
-            : 0;
-    }
-
-    storageUsagePercent(): number {
-        return this.#storageLimit > 0
-            ? Math.min(
-                (this.#storageCurrent
-                    / this.#storageLimit)
-                    * 100,
-                100,
-            )
-            : 0;
-    }
 }
 
 export function ideaIsVisible(

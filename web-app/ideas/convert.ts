@@ -60,16 +60,18 @@ export async function init(
         IdeaConversionPresenter;
     try {
         const ctx = createFetchContext();
-        const [idea, users] =
+        const [tuple, users] =
             await Promise.all([
                 getIdea(ideaId, ctx),
                 getManagedUsers(ctx),
             ]);
         fields =
-            buildInitialConversionFields(idea);
+            buildInitialConversionFields(
+                tuple.idea,
+            );
         presenter =
             new IdeaConversionPresenter(
-                idea,
+                tuple.idea,
                 users,
                 fields,
             );

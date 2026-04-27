@@ -95,7 +95,9 @@ export {
 } from './working-styles.ts';
 export {
     WorkboxInboxPresenter,
+    type InboxMode,
 } from './workbox-inbox.ts';
 export {
     buildFieldInputHtml,
+    WorkboxDetailPresenter,
 } from './workbox-detail.ts';

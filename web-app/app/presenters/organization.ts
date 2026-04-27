@@ -10,13 +10,26 @@ import {
     iconExternalLink,
 } from '../icons.ts';
 import { formatDate } from '../core.ts';
-import type { Organization } from '../adapters/index.ts';
+import type {
+    OrganizationEntity,
+    RecentActivityItem,
+} from '../adapters/index.ts';
 
 export class OrganizationPresenter {
-    readonly #organization: Organization;
+    readonly #entity: OrganizationEntity;
+    readonly #companyName: string;
+    readonly #recentActivity:
+        readonly RecentActivityItem[];
 
-    constructor(organization: Organization) {
-        this.#organization = organization;
+    constructor(
+        entity: OrganizationEntity,
+        companyName: string,
+        recentActivity:
+            readonly RecentActivityItem[],
+    ) {
+        this.#entity = entity;
+        this.#companyName = companyName;
+        this.#recentActivity = recentActivity;
     }
 
     buildPage(): SafeHtml {
@@ -55,10 +68,7 @@ export class OrganizationPresenter {
                             class="text-xl
                                    font-display
                                    font-semibold"
-                        >${
-                            this.#organization
-                                .companyNameText()
-                        }</h2>
+                        >${this.#companyName}</h2>
                         <div
                             class="flex
                                    items-center
@@ -72,8 +82,7 @@ export class OrganizationPresenter {
                                 ${iconCrown(
                                     12, '',
                                 )}
-                                ${this.#organization
-                                    .planName()
+                                ${this.#entity.plan
                                 } Plan
                             </span>
                             <span class="${
@@ -102,14 +111,14 @@ export class OrganizationPresenter {
                         <span class="${
                             'text-sm font-medium'
                         }">
-                            ${this.#organization
-                                .healthStatusText()}
+                            ${this.#entity
+                                .health_status}
                         </span>
                     </div>
                     <p class="text-xs mt-1">
                         ${'Health Score: '
-                            + this.#organization
-                                .healthScoreValue()
+                            + this.#entity
+                                .health_score
                             + '%'}
                     </p>
                 </div>
@@ -133,15 +142,14 @@ export class OrganizationPresenter {
                     <p class="${
                         'text-2xl font-bold'
                     }">
-                        ${this.#organization
-                            .usedSeatCount()
+                        ${this.#entity
+                            .used_seats
                         }<span
                             class="text-sm
                                    font-normal
                                    text-muted"
-                        >/${this.#organization
-                            .seatCount()
-                        }</span>
+                        >/${this.#entity
+                            .seats}</span>
                     </p>
                 </div>
                 <div class="stat-cell">
@@ -160,9 +168,8 @@ export class OrganizationPresenter {
                     <p class="${
                         'text-2xl font-bold'
                     }">
-                        ${this.#organization
-                            .projectsCurrentCount()
-                        }
+                        ${this.#entity
+                            .projects_current}
                     </p>
                 </div>
                 <div class="stat-cell">
@@ -179,9 +186,8 @@ export class OrganizationPresenter {
                     <p class="${
                         'text-2xl font-bold'
                     }">
-                        ${this.#organization
-                            .ideasCurrentCount()
-                        }
+                        ${this.#entity
+                            .ideas_current}
                     </p>
                 </div>
                 <div class="stat-cell">
@@ -199,8 +205,8 @@ export class OrganizationPresenter {
                         'text-lg font-bold'
                     }">
                         ${formatDate(
-                            this.#organization
-                                .nextBillingDate(),
+                            this.#entity
+                                .next_billing,
                         )}
                     </p>
                 </div>
@@ -220,38 +226,34 @@ export class OrganizationPresenter {
             <div class="flex flex-col gap-4">
                 ${this.#buildUsageBar(
                     'User Seats',
-                    this.#organization
-                        .usedSeatCount(),
-                    this.#organization
-                        .seatCount(),
+                    this.#entity.used_seats,
+                    this.#entity.seats,
                 )}
                 ${this.#buildUsageBar(
                     'Projects',
-                    this.#organization
-                        .projectsCurrentCount(),
-                    this.#organization
-                        .projectsLimitCount(),
+                    this.#entity
+                        .projects_current,
+                    this.#entity
+                        .projects_limit,
                 )}
                 ${this.#buildUsageBar(
                     'Ideas',
-                    this.#organization
-                        .ideasCurrentCount(),
-                    this.#organization
-                        .ideasLimitCount(),
+                    this.#entity.ideas_current,
+                    this.#entity.ideas_limit,
                 )}
                 ${this.#buildUsageBar(
                     'AI Credits',
-                    this.#organization
-                        .aiCreditsCurrentValue(),
-                    this.#organization
-                        .aiCreditsLimitValue(),
+                    this.#entity
+                        .ai_credits_current,
+                    this.#entity
+                        .ai_credits_limit,
                 )}
                 ${this.#buildUsageBar(
                     'Storage (GB)',
-                    this.#organization
-                        .storageCurrentValue(),
-                    this.#organization
-                        .storageLimitValue(),
+                    this.#entity
+                        .storage_current,
+                    this.#entity
+                        .storage_limit,
                 )}
             </div>
         </div>

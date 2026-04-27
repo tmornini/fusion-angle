@@ -38,81 +38,104 @@ export {
     IDEA_STATUS_CONFIG,
 } from '../../../api/types.ts';
 
-export async function getIdeas(
-    ctx?: FetchContext,
-): Promise<Idea[]> {
-    const [
-        ideas, userMap, submissions,
-    ] = await Promise.all([
-        GET<IdeaEntity[]>('ideas'),
-        getUserMap(ctx),
-        GET<IdeaSubmissionEntity[]>(
-            'idea-submissions',
-        ),
-    ]);
-    const submissionMap = new Map(
-        submissions.map(s => [s.idea_id, s]),
-    );
-    return ideas
-        .filter(ideaIsVisible)
-        .map(idea => {
-            const submission =
-                submissionMap.get(idea.id);
-            if (!submission) {
-                throw new Error(
-                    'Idea has no submission: '
-                    + idea.id,
-                );
-            }
-            return new Idea(
-                idea,
-                userName(
-                    userMap,
-                    submission.user_id,
-                ),
-                submission.created_at,
-            );
-        });
-}
-
-export async function getIdea(
-    ideaId: string,
-    ctx?: FetchContext,
-): Promise<Idea> {
-    const [
-        idea, userMap, submissions,
-    ] = await Promise.all([
-        GET<IdeaEntity>(
-            `ideas/${ideaId}`,
-        ),
-        getUserMap(ctx),
-        GET<IdeaSubmissionEntity[]>(
-            'idea-submissions',
-        ),
-    ]);
-    const submission = submissions.find(
-        s => s.idea_id === ideaId,
-    );
-    if (!submission) {
-        throw new Error(
-            'Idea submission not found'
-                + ' for idea ' + ideaId,
-        );
-    }
-    return new Idea(
-        idea,
-        userName(
-            userMap,
-            submission.user_id,
-        ),
-        submission.created_at,
-    );
+export async function getIdeaRows(
+): Promise<IdeaEntity[]> {
+    const all =
+        await GET<IdeaEntity[]>('ideas');
+    return all.filter(ideaIsVisible);
 }
 
 export async function getIdeaRow(
     id: string,
 ): Promise<IdeaEntity> {
     return GET<IdeaEntity>(`ideas/${id}`);
+}
+
+export async function getIdeaSubmissionRows(
+): Promise<IdeaSubmissionEntity[]> {
+    return GET<
+        IdeaSubmissionEntity[]
+    >('idea-submissions');
+}
+
+export async function getIdeaSubmissionRow(
+    ideaId: string,
+): Promise<IdeaSubmissionEntity> {
+    const all = await getIdeaSubmissionRows();
+    const found = all.find(
+        s => s.idea_id === ideaId,
+    );
+    if (!found) {
+        throw new Error(
+            'Idea submission not found'
+                + ' for idea ' + ideaId,
+        );
+    }
+    return found;
+}
+
+export type {
+    IdeaSubmissionEntity,
+} from '../../../api/types.ts';
+
+export interface IdeaWithSubmitter {
+    readonly idea: Idea;
+    readonly submitterName: string;
+    readonly submittedAt: string;
+}
+
+export async function getIdeas(
+    ctx?: FetchContext,
+): Promise<IdeaWithSubmitter[]> {
+    const [
+        ideas, userMap, submissions,
+    ] = await Promise.all([
+        getIdeaRows(),
+        getUserMap(ctx),
+        getIdeaSubmissionRows(),
+    ]);
+    const submissionMap = new Map(
+        submissions.map(s => [s.idea_id, s]),
+    );
+    return ideas.map(row => {
+        const submission =
+            submissionMap.get(row.id);
+        if (!submission) {
+            throw new Error(
+                'Idea has no submission: '
+                + row.id,
+            );
+        }
+        return {
+            idea: new Idea(row),
+            submitterName: userName(
+                userMap,
+                submission.user_id,
+            ),
+            submittedAt:
+                submission.created_at,
+        };
+    });
+}
+
+export async function getIdea(
+    ideaId: string,
+    ctx?: FetchContext,
+): Promise<IdeaWithSubmitter> {
+    const [
+        row, submission, userMap,
+    ] = await Promise.all([
+        getIdeaRow(ideaId),
+        getIdeaSubmissionRow(ideaId),
+        getUserMap(ctx),
+    ]);
+    return {
+        idea: new Idea(row),
+        submitterName: userName(
+            userMap, submission.user_id,
+        ),
+        submittedAt: submission.created_at,
+    };
 }
 
 export async function putIdea(

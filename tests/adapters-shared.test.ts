@@ -9,7 +9,8 @@ import {
     createFetchContext,
     getUserMap,
     userName,
-    getCurrentUser,
+    getCurrentUserRow,
+    getCompanyRow,
 } from '../web-app/app/adapters/shared.ts';
 import { User } from '../api/types.ts';
 
@@ -106,23 +107,25 @@ test('Without ctx, getUserMap re-fetches each call', async () => {
     assert.equal(m2.size, 2);
 });
 
-test('getCurrentUser returns User and company', async () => {
+test('getCurrentUserRow returns UserEntity', async () => {
     const db = setupMemDb();
-    // current-user route looks up users/current
-    // (see api.ts route('current-user'))
     await db.users.put('current', {
         ...buildUserRow(
             'current', 'Alice', 'Adams',
         ),
     });
+    const row = await getCurrentUserRow();
+    assert.equal(row.first_name, 'Alice');
+    assert.equal(row.last_name, 'Adams');
+});
+
+test('getCompanyRow returns CompanyEntity', async () => {
+    const db = setupMemDb();
     await db.company.put({
         name: 'Acme Corp',
         domain: 'acme.example',
     });
-    const ctx = await getCurrentUser();
-    assert.equal(
-        ctx.user.fullName(),
-        'Alice Adams',
-    );
-    assert.equal(ctx.company, 'Acme Corp');
+    const row = await getCompanyRow();
+    assert.equal(row.name, 'Acme Corp');
+    assert.equal(row.domain, 'acme.example');
 });

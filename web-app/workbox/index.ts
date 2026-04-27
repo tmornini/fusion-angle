@@ -19,18 +19,21 @@ import {
     initDropdown,
 } from '../app/core.ts';
 import {
-    getActiveWorkOrders,
-    getArchivedWorkOrders,
+    getWorkOrderRows,
+    getAllWorkOrderTransitionRows,
+    getAllWorkOrderClaimRows,
+    getUserMap,
     getWorkOrder,
     getFlowsForCreation,
     postWorkOrderCreation,
     putWorkOrder,
-    getCurrentUser,
+    getCurrentUserRow,
     createFetchContext,
     type FetchContext,
 } from '../app/adapters/index.ts';
 import {
     WorkboxInboxPresenter,
+    type InboxMode,
 } from '../app/presenters/index.ts';
 import {
     initDragReorder,
@@ -86,14 +89,36 @@ function renderTabs(): void {
         } Archive</span>`);
 }
 
+async function loadInboxPresenter(
+    mode: InboxMode,
+    showGrip: boolean,
+    ctx?: FetchContext,
+): Promise<WorkboxInboxPresenter> {
+    const [
+        workOrders, transitions,
+        claims, userMap,
+    ] = await Promise.all([
+        getWorkOrderRows(),
+        getAllWorkOrderTransitionRows(),
+        getAllWorkOrderClaimRows(),
+        getUserMap(ctx),
+    ]);
+    return new WorkboxInboxPresenter(
+        workOrders, transitions, claims,
+        userMap, mode, showGrip,
+    );
+}
+
 async function initActiveList(
     activeEl: HTMLElement,
     ctx: FetchContext,
 ): Promise<void> {
-    const items = await withLoadingState(
+    const presenter = await withLoadingState(
         activeEl,
         buildSkeleton('card-list', 4),
-        () => getActiveWorkOrders(ctx),
+        () => loadInboxPresenter(
+            'active', true, ctx,
+        ),
         init,
         {
             icon: iconMail(24, ''),
@@ -104,12 +129,9 @@ async function initActiveList(
                 + ' started.',
         },
     );
-    if (!items) return;
+    if (!presenter) return;
 
-    activePresenter =
-        new WorkboxInboxPresenter(
-            items, true,
-        );
+    activePresenter = presenter;
     activePresenter.renderList(activeEl);
     bindRowNavigation(activeEl);
 
@@ -136,11 +158,9 @@ async function initActiveList(
                 );
                 return;
             }
-            const updated =
-                await getActiveWorkOrders();
             activePresenter =
-                new WorkboxInboxPresenter(
-                    updated, true,
+                await loadInboxPresenter(
+                    'active', true,
                 );
             activePresenter.renderList(
                 activeEl,
@@ -153,10 +173,12 @@ async function initArchiveList(
     archiveEl: HTMLElement,
     ctx: FetchContext,
 ): Promise<void> {
-    const items = await withLoadingState(
+    const presenter = await withLoadingState(
         archiveEl,
         buildSkeleton('card-list', 4),
-        () => getArchivedWorkOrders(ctx),
+        () => loadInboxPresenter(
+            'archived', false, ctx,
+        ),
         init,
         {
             icon: iconMail(24, ''),
@@ -167,11 +189,8 @@ async function initArchiveList(
                 + ' appear here.',
         },
     );
-    if (!items) return;
+    if (!presenter) return;
 
-    const presenter = new WorkboxInboxPresenter(
-        items, false,
-    );
     presenter.renderList(archiveEl);
     bindRowNavigation(archiveEl);
 }
@@ -202,14 +221,13 @@ function onRowClick(e: MouseEvent): void {
 async function createWorkOrderForFlow(
     flowId: string,
 ): Promise<void> {
-    let auth: Awaited<
-        ReturnType<typeof getCurrentUser>
-    >;
+    let userId: string;
     try {
-        auth = await getCurrentUser();
+        const row = await getCurrentUserRow();
+        userId = row.id;
     } catch (err) {
         log.error(
-            'getCurrentUser failed',
+            'getCurrentUserRow failed',
             'workbox', err,
         );
         showToast(
@@ -221,7 +239,7 @@ async function createWorkOrderForFlow(
         const woId =
             await postWorkOrderCreation(
                 flowId,
-                auth.user.idForLink(),
+                userId,
             );
         showToast(
             'Work order created', 'success',

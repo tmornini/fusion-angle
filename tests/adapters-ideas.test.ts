@@ -72,11 +72,15 @@ test('getIdeas returns ideas with submitter', async () => {
         user_id: 'u1',
         created_at: '2026-04-01T00:00:00Z',
     });
-    const ideas = await getIdeas();
-    assert.equal(ideas.length, 1);
+    const result = await getIdeas();
+    assert.equal(result.length, 1);
     assert.equal(
-        ideas[0]?.titleText(),
+        result[0]?.idea.titleText(),
         'First idea',
+    );
+    assert.equal(
+        result[0]?.submitterName,
+        'Alice Test',
     );
 });
 
@@ -108,8 +112,11 @@ test('getIdea finds submission for one idea', async () => {
         user_id: 'u1',
         created_at: '2026-04-01T00:00:00Z',
     });
-    const idea = await getIdea('i1');
-    assert.equal(idea.titleText(), 'A');
+    const result = await getIdea('i1');
+    assert.equal(result.idea.titleText(), 'A');
+    assert.equal(
+        result.submitterName, 'Alice Test',
+    );
 });
 
 test('getIdea throws on missing submission', async () => {
@@ -161,9 +168,9 @@ test('deleted ideas are filtered from getIdeas', async () => {
         created_at: '2026-04-01T00:00:00Z',
     });
     await db.ideas.delete('i2');
-    const ideas = await getIdeas();
-    assert.equal(ideas.length, 1);
+    const result = await getIdeas();
+    assert.equal(result.length, 1);
     assert.equal(
-        ideas[0]?.titleText(), 'Keep',
+        result[0]?.idea.titleText(), 'Keep',
     );
 });

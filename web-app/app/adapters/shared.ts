@@ -6,22 +6,17 @@ import type {
 } from '../../../api/types.ts';
 import { User } from '../../../api/types.ts';
 
-export interface AuthContext {
-    user: User;
-    company: string;
+export type { Id } from '../../../api/types.ts';
+export { User } from '../../../api/types.ts';
+
+export async function getCurrentUserRow(
+): Promise<UserEntity> {
+    return GET<UserEntity>('current-user');
 }
 
-export async function getCurrentUser(
-): Promise<AuthContext> {
-    const [row, company] =
-        await Promise.all([
-            GET<UserEntity>('current-user'),
-            GET<CompanyEntity>('company'),
-        ]);
-    return {
-        user: new User(row),
-        company: company.name,
-    };
+export async function getCompanyRow(
+): Promise<CompanyEntity> {
+    return GET<CompanyEntity>('company');
 }
 
 async function fetchUserMap(

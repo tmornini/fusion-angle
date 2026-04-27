@@ -20,6 +20,7 @@ import {
 import {
     getFlows,
     getProjects,
+    getProjectFlowRows,
     postFlowFromMermaid,
     postFlowFromZip,
     getBackupFromZip,
@@ -83,7 +84,43 @@ export async function init(
     const result = await withLoadingState(
         listEl,
         buildSkeleton('card-list', 4),
-        getFlows,
+        async () => {
+            const [
+                flows, projectFlows, projects,
+            ] = await Promise.all([
+                getFlows(),
+                getProjectFlowRows(),
+                getProjects(),
+            ]);
+            const projectNameById = new Map(
+                projects.map(
+                    p => [
+                        p.idForLink(),
+                        p.titleText(),
+                    ],
+                ),
+            );
+            const projectNameByFlow = new Map<
+                string, string
+            >();
+            for (const pf of projectFlows) {
+                const name =
+                    projectNameById.get(
+                        pf.project_id,
+                    );
+                if (name !== undefined) {
+                    projectNameByFlow.set(
+                        pf.flow_id, name,
+                    );
+                }
+            }
+            return flows.map(flow => ({
+                flow,
+                projectName:
+                    projectNameByFlow
+                        .get(flow.id),
+            }));
+        },
         init,
         {
             icon: iconGitBranch(24, ''),
@@ -102,8 +139,10 @@ export async function init(
     );
     if (!result) return;
     const rendered = result.map(
-        flow =>
-            new FlowPresenter(flow).render(),
+        ({ flow, projectName }) =>
+            new FlowPresenter(
+                flow, projectName,
+            ).render(),
     );
 
     mutateHtml(

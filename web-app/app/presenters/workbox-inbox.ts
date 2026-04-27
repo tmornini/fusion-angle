@@ -3,9 +3,16 @@ import {
 } from '../safe-html.ts';
 import { iconGripVertical } from '../icons.ts';
 import { DISPLAY_ABSENT } from '../core.ts';
-import type {
-    WorkOrderInboxRow,
+import {
+    userName,
+    validateWorkOrderFlowGraph,
+    isExpiredClaim,
+    type WorkOrderEntity,
+    type WorkOrderTransitionEntity,
+    type WorkOrderClaimEntity,
+    type Id,
 } from '../adapters/index.ts';
+import type { User } from '../adapters/index.ts';
 
 const DAY_MS = 1000 * 60 * 60 * 24;
 
@@ -22,16 +29,39 @@ function relativeTime(iso: string): string {
     return 'just now';
 }
 
+interface InboxItem {
+    id: string;
+    displayId: string;
+    flowName: string;
+    stateName: string;
+    transitionerName: string | null;
+    lastTransitionedAt: string | null;
+    completed: boolean;
+    position: number;
+}
+
+export type InboxMode = 'active' | 'archived';
+
 export class WorkboxInboxPresenter {
-    readonly #items: readonly WorkOrderInboxRow[];
+    readonly #items: readonly InboxItem[];
     readonly #showGrip: boolean;
 
     constructor(
-        items: readonly WorkOrderInboxRow[],
+        workOrders:
+            readonly WorkOrderEntity[],
+        transitions:
+            readonly WorkOrderTransitionEntity[],
+        claims:
+            readonly WorkOrderClaimEntity[],
+        userMap: Map<Id, User>,
+        mode: InboxMode,
         showGrip: boolean,
     ) {
-        this.#items = items;
         this.#showGrip = showGrip;
+        this.#items = buildInboxItems(
+            workOrders, transitions,
+            claims, userMap, mode,
+        );
     }
 
     renderList(
@@ -45,20 +75,17 @@ export class WorkboxInboxPresenter {
     }
 
     #buildRow(
-        item: WorkOrderInboxRow,
+        item: InboxItem,
     ): SafeHtml {
-        const badge = item.isCompleted()
+        const badge = item.completed
             ? html`<span
                 class="badge badge-success"
                 >Complete</span>`
             : html`<span
                 class="badge badge-info"
-                >${
-                item.currentStateName()
-            }</span>`;
-        const name =
-            item.lastTransitionerName();
-        const from = name ? name : DISPLAY_ABSENT;
+                >${item.stateName}</span>`;
+        const from = item.transitionerName
+            ?? DISPLAY_ABSENT;
         const grip = this.#showGrip
             ? html`<div class="${
                 'hidden-mobile text-muted'
@@ -70,12 +97,8 @@ export class WorkboxInboxPresenter {
         return html`
         <div
             class="card p-4 cursor-pointer"
-            data-work-order-card="${
-                item.idForLink()
-            }"
-            data-position="${
-                item.positionSortKey()
-            }">
+            data-work-order-card="${item.id}"
+            data-position="${item.position}">
             <div class="${
                 'flex items-center gap-4'
             }">
@@ -88,12 +111,12 @@ export class WorkboxInboxPresenter {
                         <span class="${
                             'font-semibold'
                         }">${
-                            item.flowNameText()
+                            item.flowName
                         }</span>
                         <span class="${
                             'text-xs text-muted'
                         }">#${
-                            item.displayIdText()
+                            item.displayId
                         }</span>
                     </div>
                     <div class="${
@@ -107,9 +130,9 @@ export class WorkboxInboxPresenter {
                         }</span>
                         <span class="ml-auto"
                             >${
-                                item.lastTransitionedAtDate()
+                                item.lastTransitionedAt
                                     ? relativeTime(
-                                        item.lastTransitionedAtDate()!,
+                                        item.lastTransitionedAt,
                                     )
                                     : DISPLAY_ABSENT
                             }</span>
@@ -118,4 +141,95 @@ export class WorkboxInboxPresenter {
             </div>
         </div>`;
     }
+}
+
+function buildInboxItems(
+    workOrders:
+        readonly WorkOrderEntity[],
+    transitions:
+        readonly WorkOrderTransitionEntity[],
+    claims:
+        readonly WorkOrderClaimEntity[],
+    userMap: Map<Id, User>,
+    mode: InboxMode,
+): InboxItem[] {
+    const transitionsByWo = Map.groupBy(
+        transitions,
+        t => t.work_order_id,
+    );
+    const claimByWo = new Map<
+        string, WorkOrderClaimEntity
+    >();
+    for (const c of claims) {
+        claimByWo.set(
+            c.work_order_id, c,
+        );
+    }
+
+    const items: InboxItem[] = [];
+    for (const wo of workOrders) {
+        const fg =
+            validateWorkOrderFlowGraph(
+                wo.flow_graph,
+            );
+        const woTransitions =
+            transitionsByWo.get(wo.id);
+        if (!woTransitions) {
+            throw new Error(
+                `Work order ${wo.id}`
+                + ' has no transitions',
+            );
+        }
+        const sorted = woTransitions
+            .toSorted(
+                (a, b) =>
+                    a.transitioned_at
+                        .localeCompare(
+                            b.transitioned_at,
+                        ),
+            );
+        const lastToId = sorted.at(-1)
+            ?.to_node_id;
+        const curNode = fg.nodes.find(
+            n => n.id === lastToId,
+        )!;
+        const completed = curNode.isComplete;
+
+        const claim =
+            claimByWo.get(wo.id);
+        const isClaimed = claim !== undefined
+            && !isExpiredClaim(
+                claim, fg.lockTimeout,
+            );
+        if (isClaimed && !completed)
+            continue;
+
+        if (mode === 'active' && completed)
+            continue;
+        if (mode === 'archived' && !completed)
+            continue;
+
+        const last = sorted.at(-1);
+
+        items.push({
+            id: wo.id,
+            displayId: wo.display_id,
+            flowName: fg.name,
+            stateName: curNode.name,
+            transitionerName: last
+                ? userName(
+                    userMap, last.user_id,
+                )
+                : null,
+            lastTransitionedAt: last
+                ? last.transitioned_at
+                : null,
+            completed,
+            position: wo.position,
+        });
+    }
+
+    return items.toSorted(
+        (a, b) => a.position - b.position,
+    );
 }

@@ -14,13 +14,19 @@ import type {
 
 export class FlowPresenter {
     readonly #flow: FlowSummary;
+    readonly #projectName: string | undefined;
 
-    constructor(flow: FlowSummary) {
+    constructor(
+        flow: FlowSummary,
+        projectName: string | undefined,
+    ) {
         this.#flow = flow;
+        this.#projectName = projectName;
     }
 
     render(): SafeHtml {
         const f = this.#flow;
+        const projectName = this.#projectName;
         return html`
     <div class="${
         'card card-hover p-4 cursor-pointer'
@@ -36,7 +42,7 @@ export class FlowPresenter {
                     + 'items-center'
                     + ' gap-2 mb-2'
                 }">
-                    ${f.projectName
+                    ${projectName
                         ? html`<span
                             class="${
                                 'badge'
@@ -47,7 +53,7 @@ export class FlowPresenter {
                                 12, '',
                             )
                         } ${
-                            f.projectName
+                            projectName
                         }</span>`
                         : html``}
                 </div>
