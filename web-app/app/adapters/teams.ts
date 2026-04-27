@@ -45,7 +45,7 @@ export async function getManagedUsers(
     return Array.from(userMap.values());
 }
 
-export async function getUserEntity(
+export async function getUserRow(
     id: string,
 ): Promise<UserEntity> {
     return GET<UserEntity>(`users/${id}`);

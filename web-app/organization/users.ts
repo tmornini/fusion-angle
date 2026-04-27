@@ -18,7 +18,7 @@ import {
     navigateTo, trimStrings,
 } from '../app/core.ts';
 import {
-    getManagedUsers, getUserEntity, putUser,
+    getManagedUsers, getUserRow, putUser,
     postActivity,
     jsonArrayField,
     jsonObjectField,
@@ -515,31 +515,46 @@ async function updateUserActivationStatus(
     userId: string,
     next: 'active' | 'deactivated',
 ): Promise<void> {
+    let entity: Awaited<
+        ReturnType<typeof getUserRow>
+    >;
     try {
-        const entity =
-            await getUserEntity(userId);
-        const { id: _id, ...rest } = entity;
-        await putUser(userId, {
-            ...rest,
-            status: next,
-        });
-        showToast(
-            next === 'deactivated'
-                ? 'User deactivated'
-                : 'User reactivated',
-            'success',
-        );
-        navigateTo('users');
+        entity = await getUserRow(userId);
     } catch (err) {
         log.error(
-            'updateUserActivationStatus failed',
+            'getUserRow failed',
             'organization', err,
         );
         showToast(
             'Failed to update user status',
             'error',
         );
+        return;
     }
+    const { id: _id, ...rest } = entity;
+    try {
+        await putUser(userId, {
+            ...rest,
+            status: next,
+        });
+    } catch (err) {
+        log.error(
+            'putUser failed',
+            'organization', err,
+        );
+        showToast(
+            'Failed to update user status',
+            'error',
+        );
+        return;
+    }
+    showToast(
+        next === 'deactivated'
+            ? 'User deactivated'
+            : 'User reactivated',
+        'success',
+    );
+    navigateTo('users');
 }
 
 function bindInviteDialog(): void {
@@ -638,16 +653,6 @@ async function handleInvite(): Promise<void> {
                 last_active: nowUtc(),
             }),
         );
-        await postActivity({
-            type: 'user_joined',
-            action: 'joined the team',
-            target: first + ' ' + last,
-            status: '',
-            feedback: '',
-        });
-        showToast('User created', 'success');
-        closeDialog('invite');
-        navigateTo('users');
     } catch (err) {
         log.error(
             'putUser failed',
@@ -656,5 +661,27 @@ async function handleInvite(): Promise<void> {
         showToast(
             'Failed to create user', 'error',
         );
+        return;
     }
+    try {
+        await postActivity({
+            type: 'user_joined',
+            action: 'joined the team',
+            target: first + ' ' + last,
+            status: '',
+            feedback: '',
+        });
+    } catch (err) {
+        log.error(
+            'postActivity failed',
+            'organization', err,
+        );
+        showToast(
+            'Failed to create user', 'error',
+        );
+        return;
+    }
+    showToast('User created', 'success');
+    closeDialog('invite');
+    navigateTo('users');
 }

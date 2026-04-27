@@ -56,8 +56,7 @@ function singleSelectedNodeId(
     const sel = snap.interaction.selection;
     if (sel.kind !== 'nodes') return null;
     if (sel.nodeIds.size !== 1) return null;
-    return sel.nodeIds.values().next().value
-        ?? null;
+    return sel.nodeIds.values().next().value!;
 }
 
 export type ToastVariant =

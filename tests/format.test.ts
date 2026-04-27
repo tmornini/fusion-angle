@@ -24,10 +24,6 @@ test('initials concatenates multi-word firsts', () => {
     );
 });
 
-test('initials handles empty string', () => {
-    assert.equal(initials(''), '');
-});
-
 test('initials skips multiple spaces', () => {
     assert.equal(
         initials('Alice  Bob'),

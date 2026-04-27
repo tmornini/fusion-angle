@@ -21,7 +21,7 @@ import {
 } from '../app/core.ts';
 import {
     getIdea,
-    getIdeaEntity,
+    getIdeaRow,
     postActivity,
     putIdea,
     subscribeToIdeaChanges,
@@ -110,7 +110,7 @@ async function transitionIdea(
     let title = '';
     try {
         const entity =
-            await getIdeaEntity(ideaId);
+            await getIdeaRow(ideaId);
         title = entity.title;
         await putIdea(
             ideaId,
@@ -412,7 +412,7 @@ async function handleSave(): Promise<void> {
     );
     const ideaId = state.idea.idForLink();
     try {
-        const entity = await getIdeaEntity(
+        const entity = await getIdeaRow(
             ideaId,
         );
         await putIdea(ideaId, {

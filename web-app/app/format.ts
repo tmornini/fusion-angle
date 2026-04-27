@@ -7,7 +7,6 @@ import {
 const DISPLAY_ABSENT = '—';
 
 function initials(name: string): string {
-    if (!name) return '';
     return name
         .split(' ')
         .filter(Boolean)

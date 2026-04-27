@@ -41,6 +41,16 @@ export interface GaugeData {
     readonly hasOverrunWarning: boolean;
 }
 
+function sumBy<T>(
+    items: readonly T[],
+    pick: (item: T) => number,
+): number {
+    return items.reduce(
+        (acc, item) => acc + pick(item),
+        0,
+    );
+}
+
 export async function getDashboardGauges(
 ): Promise<GaugeData[]> {
     const allProjects =
@@ -80,29 +90,13 @@ export async function getDashboardGauges(
         );
     }
     const sumEstimatedCost =
-        projects.reduce(
-            (sum, p) =>
-                sum + p.estimated_cost,
-            0,
-        );
+        sumBy(projects, p => p.estimated_cost);
     const sumActualCost =
-        projects.reduce(
-            (sum, p) =>
-                sum + p.actual_cost,
-            0,
-        );
+        sumBy(projects, p => p.actual_cost);
     const sumEstimatedImpact =
-        projects.reduce(
-            (sum, p) =>
-                sum + p.estimated_impact,
-            0,
-        );
+        sumBy(projects, p => p.estimated_impact);
     const sumActualImpact =
-        projects.reduce(
-            (sum, p) =>
-                sum + p.actual_impact,
-            0,
-        );
+        sumBy(projects, p => p.actual_impact);
 
     const estCost =
         Math.ceil(sumEstimatedCost);

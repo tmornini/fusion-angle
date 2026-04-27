@@ -226,7 +226,7 @@ export async function getProject(
     );
 }
 
-export async function getProjectEntity(
+export async function getProjectRow(
     id: string,
 ): Promise<ProjectEntity> {
     return GET<ProjectEntity>(
@@ -246,7 +246,7 @@ export async function putProjectPatch(
     id: string,
     patch: Partial<Omit<ProjectEntity, 'id'>>,
 ): Promise<void> {
-    const entity = await getProjectEntity(id);
+    const entity = await getProjectRow(id);
     await putProject(id, { ...entity, ...patch });
 }
 

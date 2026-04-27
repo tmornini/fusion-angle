@@ -109,7 +109,7 @@ export async function getIdea(
     );
 }
 
-export async function getIdeaEntity(
+export async function getIdeaRow(
     id: string,
 ): Promise<IdeaEntity> {
     return GET<IdeaEntity>(`ideas/${id}`);
@@ -153,7 +153,7 @@ export async function postIdeaConversion(
         role: 'lead',
         type: 'internal',
     });
-    const existing = await getIdeaEntity(ideaId);
+    const existing = await getIdeaRow(ideaId);
     await putIdea(ideaId, {
         ...existing,
         status: 'promoted',
