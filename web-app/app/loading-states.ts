@@ -1,10 +1,10 @@
-import { iconAlertTriangle } from './icons';
+import { iconAlertTriangle } from './icons.ts';
 import {
     SafeHtml,
     html,
     mutateHtml,
     trusted,
-} from './safe-html';
+} from './safe-html.ts';
 
 export type SkeletonType =
     | 'card-grid'

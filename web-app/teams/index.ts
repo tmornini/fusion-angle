@@ -1,25 +1,25 @@
 import {
     $, $input, populateIcons,
-} from '../app/dom';
-import { showToast } from '../app/toast';
+} from '../app/dom.ts';
+import { showToast } from '../app/toast.ts';
 import {
     buildSkeleton, withLoadingState,
-} from '../app/loading-states';
+} from '../app/loading-states.ts';
 import {
     iconUsers, iconSearch,
     iconActivity, iconPlus,
-} from '../app/icons';
+} from '../app/icons.ts';
 import {
     initTabs, initDialog, closeDialog,
-} from '../app/core';
-import { getTeamMembers } from '../app/adapters';
+} from '../app/core.ts';
+import { getTeamMembers } from '../app/adapters/index.ts';
 import {
     TeamListPresenter,
     buildInitialTeamListState,
     applyTeamSearch,
     applyTeamSelection,
     type TeamListState,
-} from '../app/presenters';
+} from '../app/presenters/index.ts';
 
 const pageAbort = new AbortController();
 const signal = pageAbort.signal;

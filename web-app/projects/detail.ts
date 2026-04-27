@@ -1,18 +1,18 @@
 import {
     $, $inputRequired,
-} from '../app/dom';
-import { showToast } from '../app/toast';
+} from '../app/dom.ts';
+import { showToast } from '../app/toast.ts';
 import {
     buildSkeleton, buildErrorState,
-} from '../app/loading-states';
-import { mutateHtml } from '../app/safe-html';
-import { log } from '../app/logger';
+} from '../app/loading-states.ts';
+import { mutateHtml } from '../app/safe-html.ts';
+import { log } from '../app/logger.ts';
 import {
     navigateTo,
     trimStrings,
     openDialog,
     closeDialog,
-} from '../app/core';
+} from '../app/core.ts';
 import {
     getProject,
     putProjectPatch,
@@ -22,10 +22,10 @@ import {
     generateId,
     createFetchContext,
     type ProjectView,
-} from '../app/adapters';
+} from '../app/adapters/index.ts';
 import type {
     FlowListItem,
-} from '../app/adapters';
+} from '../app/adapters/index.ts';
 import {
     ProjectDetailPresenter,
     ProjectDetailEditPresenter,
@@ -33,7 +33,7 @@ import {
     projectPatchFromDraft,
     type ProjectFieldKey,
     type ProjectDraftFields,
-} from '../app/presenters';
+} from '../app/presenters/index.ts';
 
 const pageAbort = new AbortController();
 const signal = pageAbort.signal;

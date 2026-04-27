@@ -1,15 +1,15 @@
-import type { SafeHtml } from './safe-html';
-import { trusted, html, escapeForHtml } from './safe-html';
+import type { SafeHtml } from './safe-html.ts';
+import { trusted, html, escapeForHtml } from './safe-html.ts';
 import type {
     GraphNode, GraphEdge,
-} from './adapters/flows';
+} from './adapters/flows.ts';
 import type {
     Selection,
-} from './flow-interactions';
+} from './flow-interactions.ts';
 import {
     NODE_WIDTH, NODE_HEIGHT,
-} from './flow-layout';
-import { pluralize } from './format';
+} from './flow-layout.ts';
+import { pluralize } from './format.ts';
 
 export const BLUE = '#4B6CA1';
 const WARN = '#d97706';

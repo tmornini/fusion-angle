@@ -1,10 +1,10 @@
 import {
     html, SafeHtml, trusted,
-} from '../safe-html';
+} from '../safe-html.ts';
 import {
     iconSparkles, iconArrowLeft,
     iconLightbulb, iconCheck,
-} from '../icons';
+} from '../icons.ts';
 
 export interface IdeaCreateDraft {
     title: string;

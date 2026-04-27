@@ -1,23 +1,23 @@
-import { GET, PUT } from '../../../api/api';
+import { GET, PUT } from '../../../api/api.ts';
 import type {
     ProjectEntity,
     ProjectStatus,
-} from '../../../api/types';
+} from '../../../api/types.ts';
 import {
     Project,
     projectIsNotDeleted,
     msSinceUtc,
     COST_DIVISOR,
     MS_PER_DAY,
-} from '../../../api/types';
+} from '../../../api/types.ts';
 import {
     getUserMap,
     userName,
-} from './shared';
-import type { FetchContext } from './shared';
+} from './shared.ts';
+import type { FetchContext } from './shared.ts';
 import {
     createChannel,
-} from '../channels';
+} from '../channels.ts';
 
 const projectChangedChannel =
     createChannel<void>();
@@ -35,7 +35,7 @@ export {
     isProjectStatus,
     PROJECT_STATUS_CONFIG,
     COST_DIVISOR,
-} from '../../../api/types';
+} from '../../../api/types.ts';
 
 interface TeamMemberRow {
     id: string;

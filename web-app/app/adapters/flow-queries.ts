@@ -1,4 +1,4 @@
-import { GET } from '../../../api/api';
+import { GET } from '../../../api/api.ts';
 import type {
     FlowEntity,
     ProjectEntity,
@@ -8,11 +8,11 @@ import type {
     GraphField,
     StoredGraph,
     FlowFieldType,
-} from '../../../api/types';
-import { toBool } from '../../../api/types';
+} from '../../../api/types.ts';
+import { toBool } from '../../../api/types.ts';
 import {
     validateStoredGraphJson,
-} from '../../../api/validators';
+} from '../../../api/validators.ts';
 
 export type {
     GraphNode, GraphEdge, GraphField,

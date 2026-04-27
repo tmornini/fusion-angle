@@ -1,4 +1,4 @@
-import { createElement } from '../dom';
+import { createElement } from '../dom.ts';
 
 export function downloadBlob(
     blob: Blob,

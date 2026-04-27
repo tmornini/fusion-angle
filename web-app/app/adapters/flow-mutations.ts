@@ -1,6 +1,6 @@
 import {
     GET, PUT,
-} from '../../../api/api';
+} from '../../../api/api.ts';
 import type {
     FlowEntity,
     GraphNode,
@@ -8,20 +8,20 @@ import type {
     GraphField,
     StoredGraph,
     FlowFieldType,
-} from '../../../api/types';
+} from '../../../api/types.ts';
 import {
     nowUtc,
     jsonObjectField,
     DEFAULT_LOCK_TIMEOUT,
-} from '../../../api/types';
+} from '../../../api/types.ts';
 import {
     validateStoredGraphJson,
-} from '../../../api/validators';
-import { postFlowVersion } from './flow-versions';
+} from '../../../api/validators.ts';
+import { postFlowVersion } from './flow-versions.ts';
 import {
     buildStartAndCompleteNodes,
-} from './flow-defaults';
-import { generateId } from './uuid';
+} from './flow-defaults.ts';
+import { generateId } from './uuid.ts';
 
 function parseGraph(
     raw: string,

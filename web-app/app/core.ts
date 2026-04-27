@@ -1,26 +1,26 @@
 import {
     applyTheme,
     initListeners,
-} from './state';
+} from './state.ts';
 import {
     getPageName,
-} from './navigation';
+} from './navigation.ts';
 import {
     initSidebarLayout,
-} from './layout';
+} from './layout.ts';
 import {
     initDatabase,
     handleDatabaseError,
-} from './database-init';
+} from './database-init.ts';
 import {
     initPageModule,
     handlePageLoadError,
-} from './page-loader';
-import { log } from './logger';
-import { MissingTableError } from '../../api/db';
-import { navigateTo } from './navigation';
+} from './page-loader.ts';
+import { log } from './logger.ts';
+import { MissingTableError } from '../../api/db.ts';
+import { navigateTo } from './navigation.ts';
 
-export { navigateTo } from './navigation';
+export { navigateTo } from './navigation.ts';
 export {
     DISPLAY_ABSENT,
     displayText,
@@ -34,14 +34,14 @@ export {
     durationInDays,
     formatCompactCurrency,
     SECONDS_PER_DAY,
-} from './format';
+} from './format.ts';
 export {
     openDialog,
     closeDialog,
     initDialog,
     initTabs,
-} from './dialog';
-export { initDropdown } from './theme-toggle';
+} from './dialog.ts';
+export { initDropdown } from './theme-toggle.ts';
 
 async function loadAndInitCommandPalette(): Promise<void> {
     const cp = await import('./command-palette');

@@ -1,18 +1,18 @@
 import {
     $, $required, getRequiredAttribute,
-} from '../app/dom';
+} from '../app/dom.ts';
 import {
     html, mutateHtml,
-} from '../app/safe-html';
-import type { SafeHtml } from '../app/safe-html';
-import { buildFieldInputHtml } from '../app/presenters';
-import { log } from '../app/logger';
-import { showToast } from '../app/toast';
+} from '../app/safe-html.ts';
+import type { SafeHtml } from '../app/safe-html.ts';
+import { buildFieldInputHtml } from '../app/presenters/index.ts';
+import { log } from '../app/logger.ts';
+import { showToast } from '../app/toast.ts';
 import {
     buildSkeleton,
     withLoadingState,
-} from '../app/loading-states';
-import { navigateTo } from '../app/core';
+} from '../app/loading-states.ts';
+import { navigateTo } from '../app/core.ts';
 import {
     getWorkOrderDetail,
     postActivity,
@@ -20,17 +20,17 @@ import {
     postWorkOrderClaim,
     deleteWorkOrderClaim,
     getCurrentUser,
-} from '../app/adapters';
+} from '../app/adapters/index.ts';
 import type {
     WorkOrderDetail,
     HistoryEntry,
     HistoryFieldValue,
     GraphField,
-} from '../app/adapters';
+} from '../app/adapters/index.ts';
 import {
     iconArrowLeft,
     iconClock,
-} from '../app/icons';
+} from '../app/icons.ts';
 
 /* ── Helpers ─────────────── */
 

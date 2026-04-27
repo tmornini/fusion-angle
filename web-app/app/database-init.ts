@@ -1,10 +1,10 @@
-import { log } from './logger';
+import { log } from './logger.ts';
 import {
     html, mutateHtml,
-} from './safe-html';
+} from './safe-html.ts';
 import {
     formatErrorMessage,
-} from './loading-states';
+} from './loading-states.ts';
 
 export async function initDatabase(
 ): Promise<boolean> {

@@ -1,14 +1,14 @@
 import {
     html, mutateHtml, SafeHtml,
-} from '../safe-html';
-import { $required } from '../dom';
+} from '../safe-html.ts';
+import { $required } from '../dom.ts';
 import {
     iconBuilding, iconSave,
     iconEdit, iconX,
-} from '../icons';
+} from '../icons.ts';
 import type {
     Company,
-} from '../adapters';
+} from '../adapters/index.ts';
 
 export type CompanyFieldKey =
     | 'name' | 'domain';

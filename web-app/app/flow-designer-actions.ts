@@ -2,20 +2,20 @@ import type {
     GraphNode,
     GraphEdge,
     GraphField,
-} from './adapters/flows';
+} from './adapters/flows.ts';
 import {
     computeLayout,
     edgeWaypointKey,
     NODE_WIDTH,
     NODE_HEIGHT,
-} from './flow-layout';
+} from './flow-layout.ts';
 import {
     computeEdgeLabelWidth,
-} from './flow-graph';
+} from './flow-graph.ts';
 import type {
     ViewBox,
     DragMode,
-} from './flow-interactions';
+} from './flow-interactions.ts';
 
 export type Waypoint = {
     readonly x: number;

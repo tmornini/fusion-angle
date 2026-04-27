@@ -1,13 +1,13 @@
 import {
     $,
-} from './dom';
+} from './dom.ts';
 import {
     html,
     mutateHtml,
     SafeHtml,
     trusted,
     escapeForHtml,
-} from './safe-html';
+} from './safe-html.ts';
 import {
     icons,
     iconSearch,
@@ -15,19 +15,19 @@ import {
     iconFolderKanban,
     iconUser,
     iconX,
-} from './icons';
+} from './icons.ts';
 import {
     getIdeas,
     getProjects,
     getTeamMembers,
     createFetchContext,
     setLocation,
-} from './adapters';
+} from './adapters/index.ts';
 import {
     PAGE_REGISTRY,
-} from './page-registry';
-import { buildPageUrl } from './navigation';
-import { pluralize } from './format';
+} from './page-registry.ts';
+import { buildPageUrl } from './navigation.ts';
+import { pluralize } from './format.ts';
 
 interface SearchItem {
     id: string;

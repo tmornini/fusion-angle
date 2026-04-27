@@ -8,32 +8,32 @@ import {
     getDataPresent,
     nowUtc,
     getUrlParam,
-} from '../app/adapters';
+} from '../app/adapters/index.ts';
 import {
     $, $input, $button, createElement,
-} from '../app/dom';
+} from '../app/dom.ts';
 import {
     downloadBlob,
-} from '../app/adapters/blob-download';
-import { log } from '../app/logger';
+} from '../app/adapters/blob-download.ts';
+import { log } from '../app/logger.ts';
 import {
     html,
     mutateHtml,
     SafeHtml,
-} from '../app/safe-html';
-import { showToast } from '../app/toast';
+} from '../app/safe-html.ts';
+import { showToast } from '../app/toast.ts';
 import {
     navigateTo,
     openDialog,
     closeDialog,
-} from '../app/core';
+} from '../app/core.ts';
 import {
     iconTrash,
     iconDownload,
     iconUpload,
     iconDatabase,
     iconInfo,
-} from '../app/icons';
+} from '../app/icons.ts';
 
 const BANNER_ID = 'empty-banner';
 

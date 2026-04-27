@@ -1,4 +1,4 @@
-import { DELETE } from '../../../api/api';
+import { DELETE } from '../../../api/api.ts';
 
 export async function deleteWorkOrderClaim(
     claimId: string,

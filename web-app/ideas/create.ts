@@ -1,26 +1,26 @@
 import {
     $, $input, $textarea,
     bindEnterToClick,
-} from '../app/dom';
+} from '../app/dom.ts';
 import {
     mutateHtml,
-} from '../app/safe-html';
-import { navigateTo } from '../app/core';
+} from '../app/safe-html.ts';
+import { navigateTo } from '../app/core.ts';
 import {
     postActivity,
     putIdea,
     putIdeaSubmission,
     jsonArrayField,
     generateId,
-} from '../app/adapters';
+} from '../app/adapters/index.ts';
 import {
     IdeaCreatePresenter,
     EMPTY_IDEA_CREATE_DRAFT,
     ideaCreateDraftIsComplete,
-} from '../app/presenters';
+} from '../app/presenters/index.ts';
 import type {
     IdeaCreateDraft,
-} from '../app/presenters';
+} from '../app/presenters/index.ts';
 
 export async function init():
     Promise<void> {

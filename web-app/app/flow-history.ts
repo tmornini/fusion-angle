@@ -1,4 +1,4 @@
-import type { FlowVersion } from './adapters';
+import type { FlowVersion } from './adapters/index.ts';
 
 export interface FlowHistorySnapshot {
     readonly hasUndoHistory: boolean;

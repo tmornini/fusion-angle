@@ -1,23 +1,23 @@
 import {
     $, populateIcons, getRequiredAttribute,
-} from '../app/dom';
+} from '../app/dom.ts';
 import {
     html, mutateHtml,
-} from '../app/safe-html';
-import { log } from '../app/logger';
-import { showToast } from '../app/toast';
+} from '../app/safe-html.ts';
+import { log } from '../app/logger.ts';
+import { showToast } from '../app/toast.ts';
 import {
     buildSkeleton,
     withLoadingState,
-} from '../app/loading-states';
+} from '../app/loading-states.ts';
 import {
     iconMail, iconArchive, iconPlus,
-} from '../app/icons';
+} from '../app/icons.ts';
 import {
     navigateTo,
     initTabs,
     initDropdown,
-} from '../app/core';
+} from '../app/core.ts';
 import {
     getActiveWorkOrders,
     getArchivedWorkOrders,
@@ -28,13 +28,13 @@ import {
     getCurrentUser,
     createFetchContext,
     type FetchContext,
-} from '../app/adapters';
+} from '../app/adapters/index.ts';
 import {
     WorkboxInboxPresenter,
-} from '../app/presenters';
+} from '../app/presenters/index.ts';
 import {
     initDragReorder,
-} from '../app/drag-reorder';
+} from '../app/drag-reorder.ts';
 
 const pageAbort = new AbortController();
 const signal = pageAbort.signal;

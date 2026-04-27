@@ -1,27 +1,27 @@
-import { $, getRequiredAttribute } from '../app/dom';
+import { $, getRequiredAttribute } from '../app/dom.ts';
 import {
     buildSkeleton,
     withLoadingState,
-} from '../app/loading-states';
-import { iconFolderKanban } from '../app/icons';
-import { navigateTo } from '../app/core';
+} from '../app/loading-states.ts';
+import { iconFolderKanban } from '../app/icons.ts';
+import { navigateTo } from '../app/core.ts';
 import {
     getProjects,
     getProjectEntity,
     putProject,
     isProjectStatus,
     type ProjectStatus,
-} from '../app/adapters';
+} from '../app/adapters/index.ts';
 import {
     ProjectListPresenter,
     buildInitialProjectListState,
     applyProjectListUpdate,
     applyProjectFilterToggle,
     type ProjectListState,
-} from '../app/presenters';
+} from '../app/presenters/index.ts';
 import {
     initDragReorder,
-} from '../app/drag-reorder';
+} from '../app/drag-reorder.ts';
 
 const pageAbort = new AbortController();
 const signal = pageAbort.signal;

@@ -1,13 +1,13 @@
-import { log } from './logger';
-import { mutateHtml } from './safe-html';
+import { log } from './logger.ts';
+import { mutateHtml } from './safe-html.ts';
 import {
     buildErrorState,
     formatErrorMessage,
-} from './loading-states';
+} from './loading-states.ts';
 import {
     navigateTo,
     getParams,
-} from './navigation';
+} from './navigation.ts';
 
 const pageModules: Record<
     string,

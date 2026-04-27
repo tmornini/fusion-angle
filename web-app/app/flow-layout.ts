@@ -122,6 +122,7 @@ export function wouldBeCycle(
     toId: string,
     edges: readonly EdgePair[],
 ): boolean {
+    if (fromId === toId) return true;
     const adj = buildAdjacency(edges);
     return isReachable(toId, fromId, adj);
 }

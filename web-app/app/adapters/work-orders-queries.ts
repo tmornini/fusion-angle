@@ -1,4 +1,4 @@
-import { GET } from '../../../api/api';
+import { GET } from '../../../api/api.ts';
 import type {
     FlowEntity,
     WorkOrderEntity,
@@ -8,20 +8,20 @@ import type {
     GraphNode,
     GraphEdge,
     GraphField,
-} from '../../../api/types';
+} from '../../../api/types.ts';
 import {
     msSinceUtc,
     MS_PER_SECOND,
-} from '../../../api/types';
+} from '../../../api/types.ts';
 import {
     validateWorkOrderFlowGraphJson,
     validateTransitionValuesJson,
-} from '../../../api/validators';
+} from '../../../api/validators.ts';
 import {
     getUserMap,
     userName,
-} from './shared';
-import type { FetchContext } from './shared';
+} from './shared.ts';
+import type { FetchContext } from './shared.ts';
 
 /* ── Types ───────────────── */
 

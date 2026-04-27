@@ -1,22 +1,22 @@
-import { PUT } from '../../../api/api';
-import { nowUtc } from '../../../api/types';
+import { PUT } from '../../../api/api.ts';
+import { nowUtc } from '../../../api/types.ts';
 import {
     isActivityType,
-} from '../../../api/types';
+} from '../../../api/types.ts';
 import type {
     ActivityType,
-} from '../../../api/types';
-import { getCurrentUser } from './shared';
-import { generateId } from './uuid';
+} from '../../../api/types.ts';
+import { getCurrentUser } from './shared.ts';
+import { generateId } from './uuid.ts';
 
 export {
     isActivityType,
     isDimensionKey,
-} from '../../../api/types';
+} from '../../../api/types.ts';
 export type {
     ActivityType,
     DimensionKey,
-} from '../../../api/types';
+} from '../../../api/types.ts';
 
 export interface ActivityInput {
     type: ActivityType;

@@ -1,7 +1,7 @@
 import type {
     FlowGraph,
     GraphNode,
-} from './adapters/flows';
+} from './adapters/flows.ts';
 
 const MERMAID_SPECIAL = /[\[\](){}|>]/;
 

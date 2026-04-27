@@ -1,7 +1,7 @@
 import {
     html, mutateHtml, SafeHtml,
-} from '../safe-html';
-import { initials, formatDate } from '../core';
+} from '../safe-html.ts';
+import { initials, formatDate } from '../core.ts';
 import {
     iconUsers,
     iconStar,
@@ -16,15 +16,15 @@ import {
     iconUserX,
     iconUserCheck,
     iconShield,
-} from '../icons';
+} from '../icons.ts';
 import {
     AVAILABILITY_HIGH,
     AVAILABILITY_LOW,
     type User,
-} from '../adapters';
+} from '../adapters/index.ts';
 import {
     WorkingStylesPresenter,
-} from './working-styles';
+} from './working-styles.ts';
 
 type AvailabilityTone =
     'success' | 'warning' | 'error';

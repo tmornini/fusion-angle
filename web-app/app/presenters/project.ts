@@ -1,6 +1,6 @@
 import {
     html, mutateHtml, SafeHtml,
-} from '../safe-html';
+} from '../safe-html.ts';
 import {
     iconClock,
     iconDollarSign,
@@ -11,17 +11,17 @@ import {
     iconLightbulb,
     iconClipboardCheck,
     iconArrowLeft,
-} from '../icons';
+} from '../icons.ts';
 import {
     type Project,
     type ProjectStatus,
     PROJECT_STATUS_CONFIG,
     COST_DIVISOR,
     MS_PER_DAY,
-} from '../adapters';
+} from '../adapters/index.ts';
 import {
     orderedKeys,
-} from './ordered-keys';
+} from './ordered-keys.ts';
 
 const STATUS_ICONS: Record<
     ProjectStatus,

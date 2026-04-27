@@ -1,5 +1,5 @@
-import { $ } from './dom';
-import { navigateTo } from './navigation';
+import { $ } from './dom.ts';
+import { navigateTo } from './navigation.ts';
 
 interface HeaderData {
     userName: string;

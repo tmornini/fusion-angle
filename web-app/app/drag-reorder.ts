@@ -1,4 +1,4 @@
-import { createElement } from './dom';
+import { createElement } from './dom.ts';
 
 const INDICATOR_HEIGHT = 3;
 const INDICATOR_COLOR =

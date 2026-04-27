@@ -1,24 +1,24 @@
 import {
     GET, PUT, DELETE,
-} from '../../../api/api';
+} from '../../../api/api.ts';
 import type {
     FlowEntity,
     WorkOrderEntity,
     WorkOrderClaimEntity,
     WorkOrderFlowGraph,
     StoredGraph,
-} from '../../../api/types';
+} from '../../../api/types.ts';
 import {
     nowUtc,
     jsonObjectField,
-} from '../../../api/types';
+} from '../../../api/types.ts';
 import {
     validateStoredGraphJson,
-} from '../../../api/validators';
+} from '../../../api/validators.ts';
 import {
     validateWorkOrderFlowGraph,
-} from './work-orders-queries';
-import { generateId } from './uuid';
+} from './work-orders-queries.ts';
+import { generateId } from './uuid.ts';
 
 const FIRST_POSITION = 1;
 const POSITION_STEP = 1;

@@ -1,18 +1,18 @@
-import { GET } from '../../../api/api';
+import { GET } from '../../../api/api.ts';
 import type {
     IdeaEntity,
     ProjectEntity,
     FlowEntity,
-} from '../../../api/types';
+} from '../../../api/types.ts';
 import {
     ideaIsVisible,
     projectIsApproved,
     projectIsNotDeleted,
     MS_PER_DAY,
-} from '../../../api/types';
+} from '../../../api/types.ts';
 import {
     formatCompactCurrency,
-} from '../format';
+} from '../format.ts';
 
 export type GaugeIcon =
     | 'clock'

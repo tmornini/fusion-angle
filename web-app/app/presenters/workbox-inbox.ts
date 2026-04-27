@@ -1,11 +1,11 @@
 import {
     html, mutateHtml, SafeHtml,
-} from '../safe-html';
-import { iconGripVertical } from '../icons';
-import { DISPLAY_ABSENT } from '../core';
+} from '../safe-html.ts';
+import { iconGripVertical } from '../icons.ts';
+import { DISPLAY_ABSENT } from '../core.ts';
 import type {
     WorkOrderInboxRow,
-} from '../adapters';
+} from '../adapters/index.ts';
 
 const DAY_MS = 1000 * 60 * 60 * 24;
 

@@ -2,8 +2,8 @@ import {
     validateStringArrayJson,
     validateStringNumberRecordJson,
     validateRisksJson,
-} from './validators';
-import type { Risk } from './validators';
+} from './validators.ts';
+import type { Risk } from './validators.ts';
 
 export type { Risk };
 

@@ -1,7 +1,7 @@
-import { $ } from '../app/dom';
-import { html, mutateHtml } from '../app/safe-html';
-import { iconSparkles, iconArrowRight } from '../app/icons';
-import { navigateTo } from '../app/core';
+import { $ } from '../app/dom.ts';
+import { html, mutateHtml } from '../app/safe-html.ts';
+import { iconSparkles, iconArrowRight } from '../app/icons.ts';
+import { navigateTo } from '../app/core.ts';
 
 export async function init(): Promise<void> {
     const root = $('#page-root', document);

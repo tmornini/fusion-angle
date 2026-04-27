@@ -1,10 +1,10 @@
-import { $ } from '../app/dom';
+import { $ } from '../app/dom.ts';
 import {
     html,
     mutateHtml,
     trusted,
     type SafeHtml,
-} from '../app/safe-html';
+} from '../app/safe-html.ts';
 import {
     iconCheck,
     iconX,
@@ -19,7 +19,7 @@ import {
     iconTarget,
     iconUpload,
     iconAlertCircle,
-} from '../app/icons';
+} from '../app/icons.ts';
 
 function buildColorSwatch(
     name: string,

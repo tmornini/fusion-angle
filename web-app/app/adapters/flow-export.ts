@@ -1,13 +1,13 @@
 import {
     GET, POST, PUT,
-} from '../../../api/api';
+} from '../../../api/api.ts';
 import {
     nowUtc,
     jsonObjectField,
     DEFAULT_LOCK_TIMEOUT,
     toBool,
     projectIsNotDeleted,
-} from '../../../api/types';
+} from '../../../api/types.ts';
 import type {
     FlowEntity,
     ProjectFlowEntity,
@@ -17,8 +17,8 @@ import type {
     GraphField,
     StoredGraph,
     FlowFieldType,
-} from '../../../api/types';
-import { generateId } from './uuid';
+} from '../../../api/types.ts';
+import { generateId } from './uuid.ts';
 import {
     validateStoredGraphJson,
     parseOrThrow,
@@ -29,34 +29,34 @@ import {
     asBoolean,
     asStoredGraph,
     asFlowFieldType,
-} from '../../../api/validators';
+} from '../../../api/validators.ts';
 import {
     getFlowGraph,
-} from './flow-queries';
-import type { FlowGraph } from './flow-queries';
+} from './flow-queries.ts';
+import type { FlowGraph } from './flow-queries.ts';
 import {
     generateMermaid,
-} from '../mermaid-generate';
-import { parseMermaid } from '../mermaid-parse';
+} from '../mermaid-generate.ts';
+import { parseMermaid } from '../mermaid-parse.ts';
 import type {
     ParsedNode,
     ParsedEdge,
-} from '../mermaid-parse';
+} from '../mermaid-parse.ts';
 import {
     buildZip, getZipEntries,
-} from '../zip';
+} from '../zip.ts';
 import {
     buildStartAndCompleteNodes,
-} from './flow-defaults';
+} from './flow-defaults.ts';
 import {
     computeLayout,
-} from '../flow-layout';
+} from '../flow-layout.ts';
 import type {
     LayoutInput, LayoutEdge,
-} from '../flow-layout';
+} from '../flow-layout.ts';
 import {
     computeEdgeLabelWidth,
-} from '../flow-graph';
+} from '../flow-graph.ts';
 
 /* ── Mermaid export ──────────────── */
 

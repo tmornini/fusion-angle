@@ -1,21 +1,21 @@
-import { $ } from '../app/dom';
+import { $ } from '../app/dom.ts';
 import {
     CompanyPresenter,
     CompanyEditPresenter,
     type CompanyFieldKey,
-} from '../app/presenters';
-import { mutateHtml } from '../app/safe-html';
-import { showToast } from '../app/toast';
+} from '../app/presenters/index.ts';
+import { mutateHtml } from '../app/safe-html.ts';
+import { showToast } from '../app/toast.ts';
 import {
     buildErrorState,
-} from '../app/loading-states';
-import { log } from '../app/logger';
-import { trimStrings } from '../app/core';
+} from '../app/loading-states.ts';
+import { log } from '../app/logger.ts';
+import { trimStrings } from '../app/core.ts';
 import {
     getCompany,
     putCompany,
     type Company,
-} from '../app/adapters';
+} from '../app/adapters/index.ts';
 
 const pageAbort = new AbortController();
 const signal = pageAbort.signal;

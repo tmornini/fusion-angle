@@ -1,5 +1,5 @@
-import type { GraphNode } from '../../../api/types';
-import { generateId } from './uuid';
+import type { GraphNode } from '../../../api/types.ts';
+import { generateId } from './uuid.ts';
 
 const DEFAULT_START_NAME = 'Start';
 const DEFAULT_COMPLETE_NAME = 'End';

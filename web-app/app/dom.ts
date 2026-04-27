@@ -1,5 +1,5 @@
-import type { SafeHtml } from './safe-html';
-import { mutateHtml } from './safe-html';
+import type { SafeHtml } from './safe-html.ts';
+import { mutateHtml } from './safe-html.ts';
 
 export function $(
     selector: string,

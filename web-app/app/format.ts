@@ -2,7 +2,7 @@ import {
     SECONDS_PER_DAY,
     durationInDays,
     formatCompactCurrency,
-} from './adapters';
+} from './adapters/index.ts';
 
 const DISPLAY_ABSENT = '—';
 

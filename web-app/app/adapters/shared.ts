@@ -1,10 +1,10 @@
-import { GET } from '../../../api/api';
+import { GET } from '../../../api/api.ts';
 import type {
     Id,
     UserEntity,
     CompanyEntity,
-} from '../../../api/types';
-import { User } from '../../../api/types';
+} from '../../../api/types.ts';
+import { User } from '../../../api/types.ts';
 
 export interface AuthContext {
     user: User;

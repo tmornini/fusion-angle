@@ -1,22 +1,22 @@
 import {
     $, $select, getRequiredAttribute, createElement,
-} from '../app/dom';
+} from '../app/dom.ts';
 import {
     html,
     mutateHtml,
-} from '../app/safe-html';
+} from '../app/safe-html.ts';
 import {
     buildSkeleton,
     withLoadingState,
-} from '../app/loading-states';
+} from '../app/loading-states.ts';
 import {
     iconGitBranch,
-} from '../app/icons';
+} from '../app/icons.ts';
 import {
     navigateTo,
     openDialog,
     closeDialog,
-} from '../app/core';
+} from '../app/core.ts';
 import {
     getFlows,
     getProjects,
@@ -27,16 +27,16 @@ import {
     putFlowFromBackup,
     postFlowFromBackup,
     generateId,
-} from '../app/adapters';
+} from '../app/adapters/index.ts';
 import type {
     BackupV2,
     ImportResolution,
-} from '../app/adapters';
+} from '../app/adapters/index.ts';
 import {
     FlowPresenter,
-} from '../app/presenters';
-import { log } from '../app/logger';
-import { showToast } from '../app/toast';
+} from '../app/presenters/index.ts';
+import { log } from '../app/logger.ts';
+import { showToast } from '../app/toast.ts';
 
 type ImportState =
     | { kind: 'idle' }

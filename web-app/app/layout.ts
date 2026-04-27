@@ -1,26 +1,26 @@
 import {
     setSidebarCollapsed
         as persistSidebarCollapsed,
-} from './state';
-import { $required } from './dom';
-import { log } from './logger';
-import { showToast } from './toast';
+} from './state.ts';
+import { $required } from './dom.ts';
+import { log } from './logger.ts';
+import { showToast } from './toast.ts';
 import {
     initActiveNavItem,
-} from './nav-highlight';
+} from './nav-highlight.ts';
 import {
     mutateThemeToggleIcon,
     initThemeAndDropdowns,
-} from './theme-toggle';
+} from './theme-toggle.ts';
 import {
     mutateSidebarUser,
-} from './sidebar-user';
+} from './sidebar-user.ts';
 import {
     initMobileDrawer,
-} from './mobile-drawer';
+} from './mobile-drawer.ts';
 import {
     mutateHeaderInfo,
-} from './header-info';
+} from './header-info.ts';
 
 function initSidebar(): void {
     function toggleSidebar(): void {

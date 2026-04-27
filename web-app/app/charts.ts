@@ -2,7 +2,7 @@ import {
     SafeHtml,
     trusted,
     escapeForHtml,
-} from './safe-html';
+} from './safe-html.ts';
 
 const BASELINE_OPACITY = 0.15;
 const BAR_FILL_OPACITY = 0.85;

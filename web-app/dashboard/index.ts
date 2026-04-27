@@ -1,18 +1,18 @@
-import { $ } from '../app/dom';
+import { $ } from '../app/dom.ts';
 import {
     html,
     mutateHtml,
-} from '../app/safe-html';
+} from '../app/safe-html.ts';
 import {
     buildSkeleton,
     withLoadingState,
-} from '../app/loading-states';
+} from '../app/loading-states.ts';
 import {
     getDashboardGauges,
-} from '../app/adapters';
+} from '../app/adapters/index.ts';
 import {
     GaugePresenter,
-} from '../app/presenters';
+} from '../app/presenters/index.ts';
 
 export async function init(
 ): Promise<void> {

@@ -1,7 +1,7 @@
 import {
     html, mutateHtml, SafeHtml,
-} from '../safe-html';
-import { $required } from '../dom';
+} from '../safe-html.ts';
+import { $required } from '../dom.ts';
 import {
     iconMail,
     iconPhone,
@@ -12,12 +12,12 @@ import {
     iconCamera,
     iconEdit,
     iconX,
-} from '../icons';
-import type { Profile } from '../adapters';
-import { allStrengths } from '../adapters';
+} from '../icons.ts';
+import type { Profile } from '../adapters/index.ts';
+import { allStrengths } from '../adapters/index.ts';
 import {
     WorkingStylesPresenter,
-} from './working-styles';
+} from './working-styles.ts';
 
 const DEPARTMENTS = [
     'Product',

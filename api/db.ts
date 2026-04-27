@@ -18,7 +18,7 @@ import type {
     FlowWorkOrderEntity,
     WorkOrderTransitionEntity,
     WorkOrderClaimEntity,
-} from './types';
+} from './types.ts';
 
 export class EntityNotFound {
     readonly message: string;

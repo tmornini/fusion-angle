@@ -1,9 +1,9 @@
 import {
     html, SafeHtml, trusted,
-} from '../safe-html';
+} from '../safe-html.ts';
 import {
     displayText,
-} from '../core';
+} from '../core.ts';
 import {
     iconDollarSign,
     iconArrowRight,
@@ -14,11 +14,11 @@ import {
     iconUsers,
     iconTrendingUp,
     iconCheckCircle2,
-} from '../icons';
+} from '../icons.ts';
 import {
     type Idea,
     User,
-} from '../adapters';
+} from '../adapters/index.ts';
 
 export type ConversionField =
     | 'project-name'

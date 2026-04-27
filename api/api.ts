@@ -1,9 +1,9 @@
-import type { DbAdapter } from './db';
+import type { DbAdapter } from './db.ts';
 import {
     EntityNotFound,
     MissingTableError,
-} from './db';
-import { nowUtc } from './types';
+} from './db.ts';
+import { nowUtc } from './types.ts';
 import type {
     UserEntity,
     IdeaEntity,
@@ -23,7 +23,7 @@ import type {
     WorkOrderClaimEntity,
     CompanyEntity,
     OrganizationEntity,
-} from './types';
+} from './types.ts';
 
 export class ApiError {
     constructor(

@@ -1,16 +1,16 @@
-import { html, SafeHtml } from '../safe-html';
-import { formatDate, displayText } from '../core';
+import { html, SafeHtml } from '../safe-html.ts';
+import { formatDate, displayText } from '../core.ts';
 import {
     iconLightbulb,
     iconFolderKanban,
     iconUserPlus,
     iconEdit,
     iconArrowRight,
-} from '../icons';
+} from '../icons.ts';
 import type {
     Activity,
     ActivityType,
-} from '../adapters';
+} from '../adapters/index.ts';
 
 type IconTone =
     'primary' | 'success' | 'warning' | 'info';

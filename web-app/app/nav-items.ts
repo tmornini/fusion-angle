@@ -1,4 +1,4 @@
-import type { SafeHtml } from './safe-html';
+import type { SafeHtml } from './safe-html.ts';
 import {
     iconHome,
     iconLightbulb,
@@ -12,7 +12,7 @@ import {
     iconCreditCard,
     iconDatabase,
     iconPalette,
-} from './icons';
+} from './icons.ts';
 
 interface SidebarNavItem {
     href: string;

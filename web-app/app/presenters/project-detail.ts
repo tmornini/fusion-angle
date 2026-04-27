@@ -1,7 +1,7 @@
 import {
     html, mutateHtml, SafeHtml, trusted,
-} from '../safe-html';
-import { $required } from '../dom';
+} from '../safe-html.ts';
+import { $required } from '../dom.ts';
 import {
     iconTrendingUp, iconClock,
     iconDollarSign,
@@ -12,24 +12,24 @@ import {
     iconMinus,
     iconGitBranch, iconInfo,
     iconEdit, iconSave, iconX,
-} from '../icons';
+} from '../icons.ts';
 import {
     initials, formatDate,
     toDateInputValue,
     DISPLAY_ABSENT,
-} from '../core';
+} from '../core.ts';
 import type {
     ProjectView,
     ProjectEntity,
-} from '../adapters';
+} from '../adapters/index.ts';
 import {
     PROJECT_STATUS_CONFIG,
     COST_DIVISOR,
     isProjectStatus,
-} from '../adapters';
+} from '../adapters/index.ts';
 import type {
     FlowListItem,
-} from '../adapters/flows';
+} from '../adapters/flows.ts';
 
 export interface ProjectDraftFields {
     title: string;

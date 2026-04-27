@@ -1,16 +1,16 @@
-import { $, $input } from '../app/dom';
+import { $, $input } from '../app/dom.ts';
 import {
     html,
     mutateHtml,
-} from '../app/safe-html';
-import { showToast } from '../app/toast';
+} from '../app/safe-html.ts';
+import { showToast } from '../app/toast.ts';
 import {
     iconSparkles,
     iconArrowRight,
     iconLoader,
-} from '../app/icons';
-import { navigateTo } from '../app/core';
-import { getViewportWidth } from '../app/adapters';
+} from '../app/icons.ts';
+import { navigateTo } from '../app/core.ts';
+import { getViewportWidth } from '../app/adapters/index.ts';
 
 function validateEmail(
     email: string,

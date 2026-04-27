@@ -1,13 +1,13 @@
 import {
     html, mutateHtml, SafeHtml,
-} from '../safe-html';
-import { $required } from '../dom';
+} from '../safe-html.ts';
+import { $required } from '../dom.ts';
 import {
     orderedKeys,
-} from './ordered-keys';
+} from './ordered-keys.ts';
 import {
     displayText, formatDateTime,
-} from '../core';
+} from '../core.ts';
 import {
     iconGripVertical,
     iconClock,
@@ -22,15 +22,15 @@ import {
     iconEdit,
     iconSave,
     iconX,
-} from '../icons';
+} from '../icons.ts';
 import type {
     Idea,
     IdeaStatus,
     IdeaEntity,
-} from '../adapters';
+} from '../adapters/index.ts';
 import {
     IDEA_STATUS_CONFIG,
-} from '../adapters';
+} from '../adapters/index.ts';
 
 const STATUS_ICONS: Record<
     IdeaStatus,

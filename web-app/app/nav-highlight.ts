@@ -1,5 +1,5 @@
-import { $$, getRequiredAttribute } from './dom';
-import { getPageName } from './navigation';
+import { $$, getRequiredAttribute } from './dom.ts';
+import { getPageName } from './navigation.ts';
 
 const NAV_GROUP_CHILDREN:
     Record<string, string[]> = {

@@ -1,7 +1,7 @@
 import {
     html, trusted,
-} from '../safe-html';
-import type { SafeHtml } from '../safe-html';
+} from '../safe-html.ts';
+import type { SafeHtml } from '../safe-html.ts';
 import {
     iconUndo,
     iconRedo,
@@ -13,12 +13,12 @@ import {
     iconPlus,
     iconCopy,
     iconDownload,
-} from '../icons';
+} from '../icons.ts';
 import type {
     GraphField,
     GraphNode,
     GraphEdge,
-} from '../adapters';
+} from '../adapters/index.ts';
 
 export function buildFieldBadge(
     fieldType: string,

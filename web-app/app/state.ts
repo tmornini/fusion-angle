@@ -1,17 +1,17 @@
 import {
     getPreference,
     writePreference,
-} from './adapters/preferences';
+} from './adapters/preferences.ts';
 import {
     mediaQueryMatches,
     subscribeMediaQuery,
-} from './adapters/media-query';
+} from './adapters/media-query.ts';
 import {
     iconSun,
     iconMoon,
     iconMonitor,
-} from './icons';
-import type { SafeHtml } from './safe-html';
+} from './icons.ts';
+import type { SafeHtml } from './safe-html.ts';
 
 const STORAGE_KEY_THEME = 'fusion-theme';
 const STORAGE_KEY_SIDEBAR =

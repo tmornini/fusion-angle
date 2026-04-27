@@ -5,7 +5,7 @@ import type {
     StoredGraph,
     WorkOrderFlowGraph,
     FlowFieldType,
-} from './types';
+} from './types.ts';
 
 export interface Risk {
     title: string;

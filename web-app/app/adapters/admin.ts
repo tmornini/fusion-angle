@@ -1,25 +1,25 @@
 import {
     GET, PUT,
-} from '../../../api/api';
+} from '../../../api/api.ts';
 import type {
     UserEntity,
     OrganizationEntity,
     CompanyEntity,
     ActivityEntity,
     ActivityActorEntity,
-} from '../../../api/types';
+} from '../../../api/types.ts';
 import {
     Activity,
     Organization,
     User,
     jsonArrayField,
-} from '../../../api/types';
+} from '../../../api/types.ts';
 export type { Organization };
 import {
     getUserMap,
     userName,
-} from './shared';
-import type { FetchContext } from './shared';
+} from './shared.ts';
+import type { FetchContext } from './shared.ts';
 
 const RECENT_ACTIVITY_COUNT = 3;
 
@@ -178,7 +178,7 @@ export async function putCompany(
     await PUT('company', { ...company });
 }
 
-export { Activity } from '../../../api/types';
+export { Activity } from '../../../api/types.ts';
 
 export async function getActivityFeed(
     ctx?: FetchContext,

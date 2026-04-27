@@ -1,7 +1,7 @@
 import {
     NODE_WIDTH, NODE_HEIGHT,
-} from './flow-layout';
-import { showToast } from './toast';
+} from './flow-layout.ts';
+import { showToast } from './toast.ts';
 
 const AUTOFIT_TOAST_MSG =
     'Disable Auto-Fit to change the view';

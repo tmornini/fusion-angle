@@ -1,6 +1,6 @@
-import { $ } from '../app/dom';
-import { html, mutateHtml } from '../app/safe-html';
-import { iconSparkles } from '../app/icons';
+import { $ } from '../app/dom.ts';
+import { html, mutateHtml } from '../app/safe-html.ts';
+import { iconSparkles } from '../app/icons.ts';
 
 export async function init(): Promise<void> {
     const root = $('#page-root', document);

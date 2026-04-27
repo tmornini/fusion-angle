@@ -1,22 +1,22 @@
 import {
     $, $input, $select, $textarea,
-} from '../app/dom';
+} from '../app/dom.ts';
 import {
     html, mutateHtml,
-} from '../app/safe-html';
-import { showToast } from '../app/toast';
+} from '../app/safe-html.ts';
+import { showToast } from '../app/toast.ts';
 import {
     buildSkeleton, withLoadingState,
-} from '../app/loading-states';
-import { log } from '../app/logger';
+} from '../app/loading-states.ts';
+import { log } from '../app/logger.ts';
 import {
     iconUsers, iconUserPlus, iconSearch,
     iconChevronRight, iconSend,
-} from '../app/icons';
+} from '../app/icons.ts';
 import {
     initDialog, closeDialog,
     navigateTo, trimStrings,
-} from '../app/core';
+} from '../app/core.ts';
 import {
     getManagedUsers, getUserEntity, putUser,
     postActivity,
@@ -24,7 +24,7 @@ import {
     jsonObjectField,
     nowUtc,
     generateId,
-} from '../app/adapters';
+} from '../app/adapters/index.ts';
 import {
     ManagedUsersPresenter,
     buildInitialManagedUsersState,
@@ -32,7 +32,7 @@ import {
     applyManagedUsersRole,
     applyManagedUsersStatus,
     type ManagedUsersState,
-} from '../app/presenters';
+} from '../app/presenters/index.ts';
 
 const DEFAULT_DIM = 50;
 

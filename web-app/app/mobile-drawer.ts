@@ -1,6 +1,6 @@
 import {
     $, $required, FOCUSABLE_SELECTOR,
-} from './dom';
+} from './dom.ts';
 
 export function initMobileDrawer(
 ): void {

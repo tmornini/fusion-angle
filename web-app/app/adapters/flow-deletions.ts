@@ -1,16 +1,16 @@
-import { GET, PUT } from '../../../api/api';
+import { GET, PUT } from '../../../api/api.ts';
 import type {
     FlowEntity,
     StoredGraph,
-} from '../../../api/types';
+} from '../../../api/types.ts';
 import {
     nowUtc,
     jsonObjectField,
-} from '../../../api/types';
+} from '../../../api/types.ts';
 import {
     validateStoredGraphJson,
-} from '../../../api/validators';
-import { postFlowVersion } from './flow-versions';
+} from '../../../api/validators.ts';
+import { postFlowVersion } from './flow-versions.ts';
 
 function parseGraph(
     raw: string,

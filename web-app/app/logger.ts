@@ -1,6 +1,6 @@
 import {
     getPreference,
-} from './adapters/preferences';
+} from './adapters/preferences.ts';
 
 const STORAGE_KEY_LOG_LEVEL =
     'fusion-ai:log-level';

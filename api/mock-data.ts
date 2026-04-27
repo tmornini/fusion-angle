@@ -1,4 +1,4 @@
-import type { DbAdapter } from './db';
+import type { DbAdapter } from './db.ts';
 import type {
     UserEntity,
     UserStatus,
@@ -13,12 +13,12 @@ import type {
     WorkOrderEntity,
     FlowWorkOrderEntity,
     WorkOrderTransitionEntity,
-} from './types';
+} from './types.ts';
 import {
     jsonArrayField,
     jsonObjectField,
     DEFAULT_LOCK_TIMEOUT,
-} from './types';
+} from './types.ts';
 
 const now = new Date();
 

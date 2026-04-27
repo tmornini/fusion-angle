@@ -1,6 +1,6 @@
 import {
     $required, FOCUSABLE_SELECTOR,
-} from './dom';
+} from './dom.ts';
 
 const BACKDROP_SUFFIX = '-backdrop';
 const DIALOG_SUFFIX = '-dialog';

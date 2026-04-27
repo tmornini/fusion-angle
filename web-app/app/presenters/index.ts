@@ -11,7 +11,7 @@ export {
     type IdeaFieldKey,
     type IdeaDraftFields,
     type IdeaEntityPatch,
-} from './idea';
+} from './idea.ts';
 export {
     IdeaConversionPresenter,
     buildInitialConversionFields,
@@ -22,13 +22,13 @@ export {
     ALL_CONVERSION_FIELDS,
     type ConversionField,
     type ConversionFields,
-} from './idea-conversion';
+} from './idea-conversion.ts';
 export {
     IdeaCreatePresenter,
     EMPTY_IDEA_CREATE_DRAFT,
     ideaCreateDraftIsComplete,
     type IdeaCreateDraft,
-} from './idea-create';
+} from './idea-create.ts';
 export {
     ProjectPresenter,
     ProjectListPresenter,
@@ -37,13 +37,13 @@ export {
     applyProjectFilterToggle,
     type ProjectListState,
     type ProjectListFilter,
-} from './project';
+} from './project.ts';
 export {
     GaugePresenter,
-} from './gauge';
+} from './gauge.ts';
 export {
     ActivityPresenter,
-} from './activity';
+} from './activity.ts';
 export {
     UserPresenter,
     TeamListPresenter,
@@ -59,10 +59,10 @@ export {
     applyManagedUsersStatus,
     type TeamListState,
     type ManagedUsersState,
-} from './user';
+} from './user.ts';
 export {
     FlowPresenter,
-} from './flow';
+} from './flow.ts';
 export {
     ProjectDetailPresenter,
     ProjectDetailEditPresenter,
@@ -71,29 +71,29 @@ export {
     type ProjectFieldKey,
     type ProjectDraftFields,
     type ProjectEntityPatch,
-} from './project-detail';
+} from './project-detail.ts';
 export {
     OrganizationPresenter,
-} from './organization';
+} from './organization.ts';
 export {
     ProfilePresenter,
     ProfileEditPresenter,
     type ProfileFieldKey,
-} from './profile';
+} from './profile.ts';
 export {
     CompanyPresenter,
     CompanyEditPresenter,
     type CompanyFieldKey,
-} from './company';
+} from './company.ts';
 export {
     FlowDesignerPresenter,
-} from './flow-designer';
+} from './flow-designer.ts';
 export {
     WorkingStylesPresenter,
-} from './working-styles';
+} from './working-styles.ts';
 export {
     WorkboxInboxPresenter,
-} from './workbox-inbox';
+} from './workbox-inbox.ts';
 export {
     buildFieldInputHtml,
-} from './workbox-detail';
+} from './workbox-detail.ts';

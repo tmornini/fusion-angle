@@ -1,22 +1,22 @@
-import { $ } from '../app/dom';
+import { $ } from '../app/dom.ts';
 import {
     html,
     mutateHtml,
-} from '../app/safe-html';
+} from '../app/safe-html.ts';
 import {
     iconActivity,
     iconSearch,
-} from '../app/icons';
+} from '../app/icons.ts';
 import {
     buildSkeleton,
     withLoadingState,
-} from '../app/loading-states';
+} from '../app/loading-states.ts';
 import {
     getActivityFeed,
-} from '../app/adapters';
+} from '../app/adapters/index.ts';
 import {
     ActivityPresenter,
-} from '../app/presenters';
+} from '../app/presenters/index.ts';
 
 export async function init(
 ): Promise<void> {

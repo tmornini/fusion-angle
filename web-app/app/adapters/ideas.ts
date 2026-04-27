@@ -1,20 +1,20 @@
-import { GET, PUT } from '../../../api/api';
+import { GET, PUT } from '../../../api/api.ts';
 import type {
     IdeaEntity,
     IdeaSubmissionEntity,
-} from '../../../api/types';
+} from '../../../api/types.ts';
 import {
     Idea, nowUtc,
     ideaIsVisible,
-} from '../../../api/types';
+} from '../../../api/types.ts';
 import {
     getUserMap,
     userName,
-} from './shared';
-import type { FetchContext } from './shared';
+} from './shared.ts';
+import type { FetchContext } from './shared.ts';
 import {
     createChannel,
-} from '../channels';
+} from '../channels.ts';
 
 const ideaChangedChannel =
     createChannel<void>();
@@ -31,7 +31,7 @@ export {
     type IdeaEntity,
     isIdeaStatus,
     IDEA_STATUS_CONFIG,
-} from '../../../api/types';
+} from '../../../api/types.ts';
 
 export async function getIdeas(
     ctx?: FetchContext,

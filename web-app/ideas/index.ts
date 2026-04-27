@@ -1,13 +1,13 @@
-import { $, getRequiredAttribute, populateIcons } from '../app/dom';
-import { html } from '../app/safe-html';
+import { $, getRequiredAttribute, populateIcons } from '../app/dom.ts';
+import { html } from '../app/safe-html.ts';
 import {
     buildSkeleton,
     withLoadingState,
-} from '../app/loading-states';
+} from '../app/loading-states.ts';
 import {
     iconPlus, iconLightbulb,
-} from '../app/icons';
-import { navigateTo } from '../app/core';
+} from '../app/icons.ts';
+import { navigateTo } from '../app/core.ts';
 import {
     getIdeas,
     getIdeaEntity,
@@ -15,17 +15,17 @@ import {
     subscribeToIdeaChanges,
     isIdeaStatus,
     createFetchContext,
-} from '../app/adapters';
+} from '../app/adapters/index.ts';
 import {
     IdeaListPresenter,
     buildInitialIdeaListState,
     applyIdeaListUpdate,
     applyIdeaFilterToggle,
     type IdeaListState,
-} from '../app/presenters';
+} from '../app/presenters/index.ts';
 import {
     initDragReorder,
-} from '../app/drag-reorder';
+} from '../app/drag-reorder.ts';
 
 const pageAbort = new AbortController();
 const signal = pageAbort.signal;

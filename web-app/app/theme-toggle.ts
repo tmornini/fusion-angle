@@ -2,11 +2,11 @@ import {
     getThemeIcon,
     isValidTheme,
     persistThemePreference,
-} from './state';
-import { $, $$ } from './dom';
-import { mutateHtml } from './safe-html';
-import { showToast } from './toast';
-import { log } from './logger';
+} from './state.ts';
+import { $, $$ } from './dom.ts';
+import { mutateHtml } from './safe-html.ts';
+import { showToast } from './toast.ts';
+import { log } from './logger.ts';
 
 const THEME_TOGGLE_IDS = [
     'theme-toggle',

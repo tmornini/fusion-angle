@@ -1,8 +1,8 @@
-import { PAGE_REGISTRY } from './page-registry';
+import { PAGE_REGISTRY } from './page-registry.ts';
 import {
     getQueryString,
     setLocation,
-} from './adapters/location';
+} from './adapters/location.ts';
 
 function getPageName(): string {
     const name = document

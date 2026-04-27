@@ -1,16 +1,16 @@
 import {
     GET, PUT, DELETE,
-} from '../../../api/api';
+} from '../../../api/api.ts';
 import type {
     FlowEntity,
     FlowVersionEntity,
     JsonObjectField,
-} from '../../../api/types';
+} from '../../../api/types.ts';
 import {
     nowUtc,
     toBool,
-} from '../../../api/types';
-import { generateId } from './uuid';
+} from '../../../api/types.ts';
+import { generateId } from './uuid.ts';
 
 export interface FlowVersion {
     id: string;

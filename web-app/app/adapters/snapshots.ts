@@ -1,6 +1,6 @@
-import { GET, POST, PUT, DELETE } from '../../../api/api';
-import { MissingTableError } from '../../../api/db';
-import type { UserEntity } from '../../../api/types';
+import { GET, POST, PUT, DELETE } from '../../../api/api.ts';
+import { MissingTableError } from '../../../api/db.ts';
+import type { UserEntity } from '../../../api/types.ts';
 
 export async function deleteSchema(): Promise<void> {
     await DELETE('snapshots/schema');

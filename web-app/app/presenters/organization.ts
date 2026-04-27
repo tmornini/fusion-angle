@@ -1,6 +1,6 @@
 import {
     html, SafeHtml,
-} from '../safe-html';
+} from '../safe-html.ts';
 import {
     iconCreditCard, iconBuilding,
     iconCrown, iconCheckCircle2,
@@ -8,9 +8,9 @@ import {
     iconFolderKanban, iconLightbulb,
     iconCalendar, iconTrendingUp,
     iconExternalLink,
-} from '../icons';
-import { formatDate } from '../core';
-import type { Organization } from '../adapters';
+} from '../icons.ts';
+import { formatDate } from '../core.ts';
+import type { Organization } from '../adapters/index.ts';
 
 export class OrganizationPresenter {
     readonly #organization: Organization;

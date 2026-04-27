@@ -1,4 +1,4 @@
-import { $ } from './dom';
+import { $ } from './dom.ts';
 
 const SIDEBAR_USER_NAME_IDS = [
     'sidebar-user-name',

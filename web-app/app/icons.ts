@@ -1,4 +1,4 @@
-import { SafeHtml } from './safe-html';
+import { SafeHtml } from './safe-html.ts';
 
 function icon(
     paths: string,

@@ -1,9 +1,9 @@
-import { $ } from '../app/dom';
+import { $ } from '../app/dom.ts';
 import {
     html,
     mutateHtml,
     type SafeHtml,
-} from '../app/safe-html';
+} from '../app/safe-html.ts';
 import {
     iconSparkles,
     iconArrowRight,
@@ -16,8 +16,8 @@ import {
     iconShield,
     iconLineChart,
     iconMessageSquare,
-} from '../app/icons';
-import { setLocation } from '../app/adapters';
+} from '../app/icons.ts';
+import { setLocation } from '../app/adapters/index.ts';
 
 const features = [
     {

@@ -1,18 +1,18 @@
-import { $, $$, getRequiredAttribute } from '../app/dom';
-import { mutateHtml } from '../app/safe-html';
+import { $, $$, getRequiredAttribute } from '../app/dom.ts';
+import { mutateHtml } from '../app/safe-html.ts';
 import {
     buildSkeleton, buildErrorState,
-} from '../app/loading-states';
-import { log } from '../app/logger';
+} from '../app/loading-states.ts';
+import { log } from '../app/logger.ts';
 import {
     navigateTo,
-} from '../app/core';
+} from '../app/core.ts';
 import {
     getOrganization,
-} from '../app/adapters';
+} from '../app/adapters/index.ts';
 import {
     OrganizationPresenter,
-} from '../app/presenters';
+} from '../app/presenters/index.ts';
 
 export async function init(): Promise<void> {
     const container =

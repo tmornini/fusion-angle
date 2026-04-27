@@ -1,14 +1,14 @@
-import { html, SafeHtml } from '../safe-html';
+import { html, SafeHtml } from '../safe-html.ts';
 import {
     iconZap,
     iconTarget,
     iconMessageSquare,
     iconHeart,
-} from '../icons';
+} from '../icons.ts';
 import {
     isDimensionKey,
     type DimensionKey,
-} from '../adapters';
+} from '../adapters/index.ts';
 
 const LABELS: Record<DimensionKey, string> = {
     driver: 'Mover',

@@ -1,18 +1,18 @@
 import {
     $, bindEnterToClick,
-} from '../app/dom';
+} from '../app/dom.ts';
 import {
     html, mutateHtml,
-} from '../app/safe-html';
-import { showToast } from '../app/toast';
-import { log } from '../app/logger';
+} from '../app/safe-html.ts';
+import { showToast } from '../app/toast.ts';
+import { log } from '../app/logger.ts';
 import {
     buildSkeleton, buildErrorState,
-} from '../app/loading-states';
+} from '../app/loading-states.ts';
 import {
     iconArrowRight, iconLoader,
-} from '../app/icons';
-import { navigateTo } from '../app/core';
+} from '../app/icons.ts';
+import { navigateTo } from '../app/core.ts';
 import {
     getIdea,
     getManagedUsers,
@@ -24,7 +24,7 @@ import {
     jsonObjectField,
     createFetchContext,
     generateId,
-} from '../app/adapters';
+} from '../app/adapters/index.ts';
 import {
     IdeaConversionPresenter,
     buildInitialConversionFields,
@@ -33,11 +33,11 @@ import {
     conversionIsReady,
     conversionFieldIsReady,
     ALL_CONVERSION_FIELDS,
-} from '../app/presenters';
+} from '../app/presenters/index.ts';
 import type {
     ConversionField,
     ConversionFields,
-} from '../app/presenters';
+} from '../app/presenters/index.ts';
 
 export async function init(
     params?: Record<string, string>,

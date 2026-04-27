@@ -1,17 +1,17 @@
 import {
     GET, PUT,
-} from '../../../api/api';
+} from '../../../api/api.ts';
 import type {
     UserEntity,
-} from '../../../api/types';
-import { User } from '../../../api/types';
-import { getUserMap } from './shared';
-import type { FetchContext } from './shared';
+} from '../../../api/types.ts';
+import { User } from '../../../api/types.ts';
+import { getUserMap } from './shared.ts';
+import type { FetchContext } from './shared.ts';
 export {
     User,
     AVAILABILITY_HIGH,
     AVAILABILITY_LOW,
-} from '../../../api/types';
+} from '../../../api/types.ts';
 
 const TOP_MEMBERS_COUNT = 6;
 

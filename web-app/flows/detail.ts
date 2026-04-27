@@ -1,17 +1,17 @@
 import {
     $, $input, $inputRequired, $select,
     $textarea,
-} from '../app/dom';
-import { log } from '../app/logger';
-import { mutateHtml } from '../app/safe-html';
-import { showToast } from '../app/toast';
+} from '../app/dom.ts';
+import { log } from '../app/logger.ts';
+import { mutateHtml } from '../app/safe-html.ts';
+import { showToast } from '../app/toast.ts';
 import {
     buildSkeleton,
     withLoadingState,
-} from '../app/loading-states';
+} from '../app/loading-states.ts';
 import {
     navigateTo,
-} from '../app/core';
+} from '../app/core.ts';
 import {
     getFlowGraph,
     getFlowMermaid,
@@ -19,17 +19,17 @@ import {
     getFlowVersions,
     postClipboardCopy,
     subscribeResize,
-} from '../app/adapters';
+} from '../app/adapters/index.ts';
 import {
     downloadBlob,
-} from '../app/adapters/blob-download';
+} from '../app/adapters/blob-download.ts';
 import {
     bindInteractions,
     type FlowGestureContext,
-} from '../app/flow-interactions';
+} from '../app/flow-interactions.ts';
 import {
     FlowDesignerPresenter,
-} from '../app/presenters';
+} from '../app/presenters/index.ts';
 
 const FALLBACK_W = 800;
 const FALLBACK_H = 600;

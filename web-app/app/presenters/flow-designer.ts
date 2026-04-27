@@ -1,10 +1,10 @@
 import {
     html, mutateHtml, trusted,
-} from '../safe-html';
-import type { SafeHtml } from '../safe-html';
-import { $, $required } from '../dom';
-import { log } from '../logger';
-import { showToast } from '../toast';
+} from '../safe-html.ts';
+import type { SafeHtml } from '../safe-html.ts';
+import { $, $required } from '../dom.ts';
+import { log } from '../logger.ts';
+import { showToast } from '../toast.ts';
 import {
     putFlow,
     postNodeAddition,
@@ -17,7 +17,7 @@ import {
     getFlowVersions,
     deleteFlowVersion,
     putFlowFromVersion,
-} from '../adapters';
+} from '../adapters/index.ts';
 import type {
     GraphNode,
     GraphEdge,
@@ -25,14 +25,14 @@ import type {
     FlowGraph,
     FlowVersion,
     FlowSaveShape,
-} from '../adapters/flows';
+} from '../adapters/flows.ts';
 import type { FlowFieldType }
-    from '../adapters/flows';
+    from '../adapters/flows.ts';
 import {
     jsonObjectField,
     nowUtc,
     generateId,
-} from '../adapters';
+} from '../adapters/index.ts';
 import {
     buildGraphSvg,
     perimeterPoint,
@@ -40,7 +40,7 @@ import {
     controlOffset,
     buildEdgePreviewPath,
     BLUE,
-} from '../flow-graph';
+} from '../flow-graph.ts';
 import {
     wouldBeCycle,
     NODE_WIDTH,
@@ -49,16 +49,16 @@ import {
     VERTICAL_GAP,
     START_X,
     START_Y,
-} from '../flow-layout';
+} from '../flow-layout.ts';
 import {
     buildInteractionState,
     zoomIn as zoomInState,
     zoomOut as zoomOutState,
     zoomToFit as zoomToFitState,
-} from '../flow-interactions';
+} from '../flow-interactions.ts';
 import type {
     InteractionState,
-} from '../flow-interactions';
+} from '../flow-interactions.ts';
 import {
     buildFlowHistorySnapshot,
     canUndoFlowEdits,
@@ -67,10 +67,10 @@ import {
     setHasUndoHistory,
     appendToRedoStack,
     removeFromRedoStack,
-} from '../flow-history';
+} from '../flow-history.ts';
 import type {
     FlowHistorySnapshot,
-} from '../flow-history';
+} from '../flow-history.ts';
 import {
     applyMoveNodes,
     applyDragPreview,
@@ -87,19 +87,19 @@ import {
     applyAutoLayout,
     applyPanToRevealSelected,
     applyPanelTransition,
-} from '../flow-designer-actions';
+} from '../flow-designer-actions.ts';
 import type {
     Waypoint,
     SavedViewBox,
-} from '../flow-designer-actions';
-import { iconArrowLeft } from '../icons';
+} from '../flow-designer-actions.ts';
+import { iconArrowLeft } from '../icons.ts';
 import {
     buildToolbar,
     buildFieldEditor,
     buildNodePanel,
     buildEdgePanel,
     buildFlowNameHeader,
-} from './flow-designer-view';
+} from './flow-designer-view.ts';
 
 const NEW_NODE_OFFSET_X = 120;
 const NEW_NODE_OFFSET_Y = 100;

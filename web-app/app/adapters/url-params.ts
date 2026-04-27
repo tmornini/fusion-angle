@@ -1,4 +1,4 @@
-import { getQueryString } from './location';
+import { getQueryString } from './location.ts';
 
 export function getUrlParam(
     name: string,

@@ -1,8 +1,8 @@
 import {
     html, trusted,
-} from '../safe-html';
-import type { SafeHtml } from '../safe-html';
-import type { GraphField } from '../adapters';
+} from '../safe-html.ts';
+import type { SafeHtml } from '../safe-html.ts';
+import type { GraphField } from '../adapters/index.ts';
 
 const FIELD_HTML_TYPE: Record<
     string,

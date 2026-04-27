@@ -1,4 +1,4 @@
-import { $, $textarea } from '../app/dom';
+import { $, $textarea } from '../app/dom.ts';
 import {
     IdeaPresenter,
     IdeaEditPresenter,
@@ -6,19 +6,19 @@ import {
     ideaPatchFromDraft,
     type IdeaFieldKey,
     type IdeaDraftFields,
-} from '../app/presenters';
-import { showToast } from '../app/toast';
-import { log } from '../app/logger';
+} from '../app/presenters/index.ts';
+import { showToast } from '../app/toast.ts';
+import { log } from '../app/logger.ts';
 import {
     buildSkeleton,
     withLoadingState,
-} from '../app/loading-states';
+} from '../app/loading-states.ts';
 import {
     navigateTo,
     trimStrings,
     openDialog,
     closeDialog,
-} from '../app/core';
+} from '../app/core.ts';
 import {
     getIdea,
     getIdeaEntity,
@@ -27,7 +27,7 @@ import {
     subscribeToIdeaChanges,
     createFetchContext,
     type Idea,
-} from '../app/adapters';
+} from '../app/adapters/index.ts';
 
 const pageAbort = new AbortController();
 const signal = pageAbort.signal;

@@ -1,16 +1,16 @@
 import {
     html,
     SafeHtml,
-} from '../safe-html';
+} from '../safe-html.ts';
 import {
     iconCircle,
     iconShare,
     iconChevronRight,
     iconFolderKanban,
-} from '../icons';
+} from '../icons.ts';
 import type {
     FlowSummary,
-} from '../adapters/flows';
+} from '../adapters/flows.ts';
 
 export class FlowPresenter {
     readonly #flow: FlowSummary;

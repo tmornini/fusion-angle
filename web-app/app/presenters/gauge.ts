@@ -1,17 +1,17 @@
 import {
     html,
     SafeHtml,
-} from '../safe-html';
+} from '../safe-html.ts';
 import {
     iconDollarSign,
     iconClock,
     iconZap,
-} from '../icons';
+} from '../icons.ts';
 import type {
     GaugeData,
     GaugeIcon,
     GaugeTheme,
-} from '../adapters/dashboard';
+} from '../adapters/dashboard.ts';
 
 type GaugeTone =
     'primary' | 'success' | 'warning';

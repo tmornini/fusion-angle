@@ -1,13 +1,13 @@
 import {
     EntityNotFound,
     MissingTableError,
-} from './db';
+} from './db.ts';
 import type {
     DbAdapter,
     DeletedStore,
     EntityStore,
     SingletonStore,
-} from './db';
+} from './db.ts';
 import type {
     Deleted,
     UserEntity,
@@ -28,11 +28,11 @@ import type {
     FlowWorkOrderEntity,
     WorkOrderTransitionEntity,
     WorkOrderClaimEntity,
-} from './types';
-import { nowUtc } from './types';
+} from './types.ts';
+import { nowUtc } from './types.ts';
 import {
     withSimulatedLatency,
-} from './latency';
+} from './latency.ts';
 
 const KEY_PREFIX = 'fusion-ai:';
 
