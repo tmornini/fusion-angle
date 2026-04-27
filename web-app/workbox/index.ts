@@ -33,7 +33,9 @@ import {
 } from '../app/adapters/index.ts';
 import {
     WorkboxInboxPresenter,
+    buildInboxItems,
     type InboxMode,
+    type InboxItem,
 } from '../app/presenters/index.ts';
 import {
     initDragReorder,
@@ -89,11 +91,10 @@ function renderTabs(): void {
         } Archive</span>`);
 }
 
-async function loadInboxPresenter(
+async function loadInboxItems(
     mode: InboxMode,
-    showGrip: boolean,
     ctx?: FetchContext,
-): Promise<WorkboxInboxPresenter> {
+): Promise<InboxItem[]> {
     const [
         workOrders, transitions,
         claims, userMap,
@@ -103,9 +104,9 @@ async function loadInboxPresenter(
         getAllWorkOrderClaimRows(),
         getUserMap(ctx),
     ]);
-    return new WorkboxInboxPresenter(
+    return buildInboxItems(
         workOrders, transitions, claims,
-        userMap, mode, showGrip,
+        userMap, mode,
     );
 }
 
@@ -113,12 +114,10 @@ async function initActiveList(
     activeEl: HTMLElement,
     ctx: FetchContext,
 ): Promise<void> {
-    const presenter = await withLoadingState(
+    const items = await withLoadingState(
         activeEl,
         buildSkeleton('card-list', 4),
-        () => loadInboxPresenter(
-            'active', true, ctx,
-        ),
+        () => loadInboxItems('active', ctx),
         init,
         {
             icon: iconMail(24, ''),
@@ -129,9 +128,11 @@ async function initActiveList(
                 + ' started.',
         },
     );
-    if (!presenter) return;
+    if (!items) return;
 
-    activePresenter = presenter;
+    activePresenter = new WorkboxInboxPresenter(
+        items, true,
+    );
     activePresenter.renderList(activeEl);
     bindRowNavigation(activeEl);
 
@@ -158,9 +159,11 @@ async function initActiveList(
                 );
                 return;
             }
+            const refreshed =
+                await loadInboxItems('active');
             activePresenter =
-                await loadInboxPresenter(
-                    'active', true,
+                new WorkboxInboxPresenter(
+                    refreshed, true,
                 );
             activePresenter.renderList(
                 activeEl,
@@ -173,12 +176,10 @@ async function initArchiveList(
     archiveEl: HTMLElement,
     ctx: FetchContext,
 ): Promise<void> {
-    const presenter = await withLoadingState(
+    const items = await withLoadingState(
         archiveEl,
         buildSkeleton('card-list', 4),
-        () => loadInboxPresenter(
-            'archived', false, ctx,
-        ),
+        () => loadInboxItems('archived', ctx),
         init,
         {
             icon: iconMail(24, ''),
@@ -189,8 +190,11 @@ async function initArchiveList(
                 + ' appear here.',
         },
     );
-    if (!presenter) return;
+    if (!items) return;
 
+    const presenter = new WorkboxInboxPresenter(
+        items, false,
+    );
     presenter.renderList(archiveEl);
     bindRowNavigation(archiveEl);
 }

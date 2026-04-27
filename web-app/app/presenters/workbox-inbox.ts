@@ -2,7 +2,7 @@ import {
     html, mutateHtml, SafeHtml,
 } from '../safe-html.ts';
 import { iconGripVertical } from '../icons.ts';
-import { DISPLAY_ABSENT } from '../core.ts';
+import { DISPLAY_ABSENT } from '../format.ts';
 import {
     userName,
     validateWorkOrderFlowGraph,
@@ -29,7 +29,7 @@ function relativeTime(iso: string): string {
     return 'just now';
 }
 
-interface InboxItem {
+export interface InboxItem {
     id: string;
     displayId: string;
     flowName: string;
@@ -47,21 +47,11 @@ export class WorkboxInboxPresenter {
     readonly #showGrip: boolean;
 
     constructor(
-        workOrders:
-            readonly WorkOrderEntity[],
-        transitions:
-            readonly WorkOrderTransitionEntity[],
-        claims:
-            readonly WorkOrderClaimEntity[],
-        userMap: Map<Id, User>,
-        mode: InboxMode,
+        items: readonly InboxItem[],
         showGrip: boolean,
     ) {
+        this.#items = items;
         this.#showGrip = showGrip;
-        this.#items = buildInboxItems(
-            workOrders, transitions,
-            claims, userMap, mode,
-        );
     }
 
     renderList(
@@ -143,7 +133,7 @@ export class WorkboxInboxPresenter {
     }
 }
 
-function buildInboxItems(
+export function buildInboxItems(
     workOrders:
         readonly WorkOrderEntity[],
     transitions:
