@@ -21,6 +21,7 @@ import {
     getUserMap,
     userName,
 } from './shared';
+import type { FetchContext } from './shared';
 
 /* ── Types ───────────────── */
 
@@ -28,9 +29,9 @@ export class WorkOrderInboxRow {
     readonly #id: string;
     readonly #displayId: string;
     readonly #flowName: string;
-    readonly #lastTransitionedAt: string;
+    readonly #lastTransitionedAt: string | null;
     readonly #stateName: string;
-    readonly #transitionerName: string;
+    readonly #transitionerName: string | null;
     readonly #completed: boolean;
     readonly #position: number;
 
@@ -39,8 +40,8 @@ export class WorkOrderInboxRow {
         displayId: string;
         flowName: string;
         stateName: string;
-        transitionerName: string;
-        lastTransitionedAt: string;
+        transitionerName: string | null;
+        lastTransitionedAt: string | null;
         completed: boolean;
         position: number;
     }) {
@@ -68,7 +69,7 @@ export class WorkOrderInboxRow {
         return this.#flowName;
     }
 
-    lastTransitionedAtDate(): string {
+    lastTransitionedAtDate(): string | null {
         return this.#lastTransitionedAt;
     }
 
@@ -80,7 +81,7 @@ export class WorkOrderInboxRow {
         return this.#stateName;
     }
 
-    lastTransitionerName(): string {
+    lastTransitionerName(): string | null {
         return this.#transitionerName;
     }
 
@@ -247,6 +248,7 @@ export function isExpiredClaim(
 /* ── Reads ───────────────── */
 
 export async function getAllWorkOrders(
+    ctx?: FetchContext,
 ): Promise<WorkOrderInboxRow[]> {
     const [
         workOrders, transitions,
@@ -261,7 +263,7 @@ export async function getAllWorkOrders(
         GET<WorkOrderClaimEntity[]>(
             'work-order-claims',
         ),
-        getUserMap(),
+        getUserMap(ctx),
     ]);
 
     const transitionsByWo = Map.groupBy(
@@ -291,7 +293,7 @@ export async function getAllWorkOrders(
                 `Work order ${wo.id} has no transitions`,
             );
         }
-        const woTransitions = rawTransitions.sort(
+        const woTransitions = rawTransitions.toSorted(
             (a, b) =>
                 a.transitioned_at
                     .localeCompare(
@@ -333,35 +335,36 @@ export async function getAllWorkOrders(
                     ? userName(
                         userMap, last.user_id,
                     )
-                    : '',
+                    : null,
             lastTransitionedAt:
-                last?.transitioned_at
-                    ?? wo.created_at,
+                last
+                    ? last.transitioned_at
+                    : null,
             completed: isCompleted,
             position: wo.position,
         }));
     }
 
-    items.sort(
+    return items.toSorted(
         (a, b) =>
             a.positionSortKey()
             - b.positionSortKey(),
     );
-
-    return items;
 }
 
 export async function getArchivedWorkOrders(
+    ctx?: FetchContext,
 ): Promise<WorkOrderInboxRow[]> {
-    const items = await getAllWorkOrders();
+    const items = await getAllWorkOrders(ctx);
     return items.filter(
         i => i.isCompleted(),
     );
 }
 
 export async function getActiveWorkOrders(
+    ctx?: FetchContext,
 ): Promise<WorkOrderInboxRow[]> {
-    const items = await getAllWorkOrders();
+    const items = await getAllWorkOrders(ctx);
     return items.filter(
         i => !i.isCompleted(),
     );
@@ -378,6 +381,7 @@ export async function getWorkOrder(
 export async function getWorkOrderDetail(
     workOrderId: string,
     currentUserId: string,
+    ctx?: FetchContext,
 ): Promise<WorkOrderDetail> {
     const [
         wo, transitions,
@@ -392,7 +396,7 @@ export async function getWorkOrderDetail(
         GET<WorkOrderClaimEntity[]>(
             'work-order-claims',
         ),
-        getUserMap(),
+        getUserMap(ctx),
     ]);
 
     const fg = validateWorkOrderFlowGraph(
@@ -404,7 +408,7 @@ export async function getWorkOrderDetail(
             t => t.work_order_id
                 === workOrderId,
         )
-        .sort(
+        .toSorted(
             (a, b) =>
                 a.transitioned_at
                     .localeCompare(

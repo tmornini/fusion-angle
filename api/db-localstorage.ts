@@ -1,5 +1,6 @@
 import {
     EntityNotFound,
+    MissingTableError,
 } from './db';
 import type {
     DbAdapter,
@@ -35,6 +36,20 @@ import {
 
 const KEY_PREFIX = 'fusion-ai:';
 
+const SIMULATE_LATENCY_PARAM =
+    'simulate-latency';
+
+function simulateLatencyRequested(): boolean {
+    if (typeof window === 'undefined') {
+        return false;
+    }
+    const params = new URLSearchParams(
+        window.location.search,
+    );
+    return params.get(SIMULATE_LATENCY_PARAM)
+        === 'on';
+}
+
 function isRowShaped(
     row: unknown,
 ): row is { id: string } {
@@ -52,7 +67,9 @@ function readTable<T>(
     const raw = localStorage.getItem(
         KEY_PREFIX + tableName,
     );
-    if (!raw) return [];
+    if (raw === null) {
+        throw new MissingTableError(tableName);
+    }
     try {
         const parsed = JSON.parse(raw);
         if (!Array.isArray(parsed)) {
@@ -655,5 +672,7 @@ export async function createLocalStorageAdapter(
         deleted: deletedStore,
     };
 
-    return withSimulatedLatency(adapter);
+    return simulateLatencyRequested()
+        ? withSimulatedLatency(adapter)
+        : adapter;
 }

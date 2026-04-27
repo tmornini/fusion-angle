@@ -54,7 +54,7 @@ export type ConversionFields = Record<
     ConversionField, string
 >;
 
-export function initialConversionFields(
+export function buildInitialConversionFields(
     idea: Idea,
 ): ConversionFields {
     return {

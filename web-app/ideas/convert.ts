@@ -2,7 +2,7 @@ import {
     $, bindEnterToClick,
 } from '../app/dom';
 import {
-    html, setHtml,
+    html, mutateHtml,
 } from '../app/safe-html';
 import { showToast } from '../app/toast';
 import { log } from '../app/logger';
@@ -22,10 +22,12 @@ import {
     putProject,
     putProjectTeamMember,
     jsonObjectField,
+    createFetchContext,
+    generateId,
 } from '../app/adapters';
 import {
     IdeaConversionPresenter,
-    initialConversionFields,
+    buildInitialConversionFields,
     conversionRequiredCount,
     conversionCompletedCount,
     conversionIsReady,
@@ -51,7 +53,7 @@ export async function init(
         '#convert-content', document,
     );
     if (!root) return;
-    setHtml(
+    mutateHtml(
         root,
         buildSkeleton('detail', 4),
     );
@@ -60,15 +62,14 @@ export async function init(
     let presenter:
         IdeaConversionPresenter;
     try {
+        const ctx = createFetchContext();
         const [idea, users] =
             await Promise.all([
-                getIdea(
-                    ideaId,
-                ),
-                getManagedUsers(),
+                getIdea(ideaId, ctx),
+                getManagedUsers(ctx),
             ]);
         fields =
-            initialConversionFields(idea);
+            buildInitialConversionFields(idea);
         presenter =
             new IdeaConversionPresenter(
                 idea,
@@ -82,7 +83,7 @@ export async function init(
             'ideas',
             err,
         );
-        setHtml(
+        mutateHtml(
             root,
             buildErrorState(
                 'Failed to load idea'
@@ -131,7 +132,7 @@ export async function init(
             document,
         );
         if (!container) return;
-        setHtml(
+        mutateHtml(
             container,
             presenter.render(),
         );
@@ -348,7 +349,7 @@ export async function init(
                     document,
                 );
                 if (!btn) return;
-                setHtml(
+                mutateHtml(
                     btn,
                     html`${
                         iconLoader(16, '')
@@ -362,7 +363,7 @@ export async function init(
                 }
 
                 const projectId =
-                    crypto.randomUUID();
+                    generateId();
                 try {
                     await performConversion(
                         ideaId,
@@ -383,7 +384,7 @@ export async function init(
                         + ' try again.',
                         'error',
                     );
-                    setHtml(
+                    mutateHtml(
                         btn,
                         html`${'Create'
                             + ' Project'}
@@ -457,6 +458,20 @@ export async function init(
     renderPage();
 }
 
+function parseFiniteNumber(
+    field: string,
+    value: string,
+): number {
+    const n = Number(value);
+    if (!Number.isFinite(n)) {
+        throw new Error(
+            `${field} must be a finite number,`
+            + ` got ${JSON.stringify(value)}`,
+        );
+    }
+    return n;
+}
+
 async function performConversion(
     ideaId: string,
     projectId: string,
@@ -479,15 +494,15 @@ async function performConversion(
                 fields['target-end-date'],
             estimated_duration: 0,
             actual_duration: 0,
-            estimated_cost:
-                Number(
-                    fields['budget'],
-                ) || 0,
+            estimated_cost: parseFiniteNumber(
+                'budget',
+                fields['budget'],
+            ),
             actual_cost: 0,
-            estimated_impact:
-                Number(
-                    fields['impact'],
-                ) || 0,
+            estimated_impact: parseFiniteNumber(
+                'impact',
+                fields['impact'],
+            ),
             actual_impact: 0,
             position: 0,
             business_context:

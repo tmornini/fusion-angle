@@ -4,7 +4,7 @@ import {
     CompanyEditPresenter,
     type CompanyFieldKey,
 } from '../app/presenters';
-import { setHtml } from '../app/safe-html';
+import { mutateHtml } from '../app/safe-html';
 import { showToast } from '../app/toast';
 import {
     buildErrorState,
@@ -79,7 +79,7 @@ export async function init(): Promise<void> {
             'company',
             err,
         );
-        setHtml(
+        mutateHtml(
             container,
             buildErrorState(
                 'Failed to load company.',

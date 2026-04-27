@@ -1,7 +1,17 @@
 import {
     getPreference,
     writePreference,
-} from './preferences-store';
+} from './adapters/preferences';
+import {
+    mediaQueryMatches,
+    subscribeMediaQuery,
+} from './adapters/media-query';
+import {
+    iconSun,
+    iconMoon,
+    iconMonitor,
+} from './icons';
+import type { SafeHtml } from './safe-html';
 
 const STORAGE_KEY_THEME = 'fusion-theme';
 const STORAGE_KEY_SIDEBAR =
@@ -53,13 +63,15 @@ function loadStoredSidebarCollapsed(
     );
 }
 
+const MOBILE_QUERY = '(max-width: '
+    + MOBILE_BREAKPOINT_PX
+    + 'px)';
+const DARK_QUERY =
+    '(prefers-color-scheme: dark)';
+
 let state: Readonly<AppState> = {
     theme: loadStoredTheme(),
-    isMobile: window.matchMedia(
-        '(max-width: '
-        + MOBILE_BREAKPOINT_PX
-        + 'px)',
-    ).matches,
+    isMobile: mediaQueryMatches(MOBILE_QUERY),
     isSidebarCollapsed:
         loadStoredSidebarCollapsed(),
     isSidebarOpen: false,
@@ -69,11 +81,16 @@ let state: Readonly<AppState> = {
 
 const subs = new Set<StateListener>();
 
+function getState(): Readonly<AppState> {
+    return state;
+}
+
 function setState(
     partial: Partial<AppState>,
 ): void {
     state = { ...state, ...partial };
-    subs.forEach(fn => fn());
+    const snapshot = [...subs];
+    snapshot.forEach(fn => fn());
 }
 
 function subscribe(
@@ -87,15 +104,24 @@ function subscribe(
 
 function computeTheme(): 'light' | 'dark' {
     if (state.theme === 'system') {
-        const darkMediaQuery
-            = '(prefers-color-scheme: dark)';
-        return window
-            .matchMedia(darkMediaQuery)
-            .matches
+        return mediaQueryMatches(DARK_QUERY)
             ? 'dark'
             : 'light';
     }
     return state.theme;
+}
+
+function getThemeIcon(
+    size: number,
+    cssClass: string,
+): SafeHtml {
+    if (state.theme === 'dark') {
+        return iconMoon(size, cssClass);
+    }
+    if (state.theme === 'light') {
+        return iconSun(size, cssClass);
+    }
+    return iconMonitor(size, cssClass);
 }
 
 function applyTheme(): void {
@@ -112,7 +138,7 @@ function applyTheme(): void {
         );
 }
 
-function setTheme(
+function persistThemePreference(
     theme: AppState['theme'],
 ): void {
     writePreference(
@@ -136,38 +162,27 @@ function setSidebarCollapsed(
 }
 
 function initListeners(): void {
-    const darkQ =
-        '(prefers-color-scheme: dark)';
-    window.matchMedia(darkQ)
-        .addEventListener(
-            'change',
-            () => {
-                if (
-                    state.theme === 'system'
-                ) {
-                    applyTheme();
-                }
-            },
-        );
+    subscribeMediaQuery(
+        DARK_QUERY,
+        () => {
+            if (state.theme === 'system') {
+                applyTheme();
+            }
+        },
+    );
 
-    const mobileQ = '(max-width: '
-        + MOBILE_BREAKPOINT_PX
-        + 'px)';
-    window.matchMedia(mobileQ)
-        .addEventListener(
-            'change',
-            (e) => {
+    subscribeMediaQuery(
+        MOBILE_QUERY,
+        (matches) => {
+            setState({ isMobile: matches });
+            if (!matches) {
                 setState({
-                    isMobile: e.matches,
+                    isSidebarOpen: false,
+                    isSearchOpen: false,
                 });
-                if (!e.matches) {
-                    setState({
-                        isSidebarOpen: false,
-                        isSearchOpen: false,
-                    });
-                }
-            },
-        );
+            }
+        },
+    );
 
     window.addEventListener(
         'storage',
@@ -204,17 +219,17 @@ function initListeners(): void {
     );
 }
 
-initListeners();
-
 export type { AppState };
 export {
     STORAGE_KEY_THEME,
-    state,
+    getState,
     setState,
     subscribe,
     computeTheme,
+    getThemeIcon,
     applyTheme,
-    setTheme,
+    persistThemePreference,
     setSidebarCollapsed,
     isValidTheme,
+    initListeners,
 };

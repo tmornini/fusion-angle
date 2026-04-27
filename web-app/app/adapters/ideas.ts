@@ -11,12 +11,19 @@ import {
     getUserMap,
     userName,
 } from './shared';
+import type { FetchContext } from './shared';
 import {
     createChannel,
 } from '../channels';
 
-export const ideaChanged =
+const ideaChangedChannel =
     createChannel<void>();
+
+export function subscribeToIdeaChanges(
+    fn: () => void,
+): () => void {
+    return ideaChangedChannel.subscribe(fn);
+}
 
 export {
     Idea,
@@ -27,43 +34,45 @@ export {
 } from '../../../api/types';
 
 export async function getIdeas(
+    ctx?: FetchContext,
 ): Promise<Idea[]> {
     const [
         ideas, userMap, submissions,
     ] = await Promise.all([
         GET<IdeaEntity[]>('ideas'),
-        getUserMap(),
+        getUserMap(ctx),
         GET<IdeaSubmissionEntity[]>(
             'idea-submissions',
         ),
     ]);
-    const submitterMap = new Map(
-        submissions.map(
-            s => [s.idea_id, s.user_id],
-        ),
-    );
-    const submittedAtMap = new Map(
-        submissions.map(
-            s => [
-                s.idea_id,
-                s.created_at,
-            ],
-        ),
+    const submissionMap = new Map(
+        submissions.map(s => [s.idea_id, s]),
     );
     return ideas
         .filter(ideaIsVisible)
-        .map(idea => new Idea(
-            idea,
-            userName(
-                userMap,
-                submitterMap.get(idea.id)!,
-            ),
-            submittedAtMap.get(idea.id)!,
-        ));
+        .map(idea => {
+            const submission =
+                submissionMap.get(idea.id);
+            if (!submission) {
+                throw new Error(
+                    'Idea has no submission: '
+                    + idea.id,
+                );
+            }
+            return new Idea(
+                idea,
+                userName(
+                    userMap,
+                    submission.user_id,
+                ),
+                submission.created_at,
+            );
+        });
 }
 
 export async function getIdea(
     ideaId: string,
+    ctx?: FetchContext,
 ): Promise<Idea> {
     const [
         idea, userMap, submissions,
@@ -71,7 +80,7 @@ export async function getIdea(
         GET<IdeaEntity>(
             `ideas/${ideaId}`,
         ),
-        getUserMap(),
+        getUserMap(ctx),
         GET<IdeaSubmissionEntity[]>(
             'idea-submissions',
         ),
@@ -106,7 +115,7 @@ export async function putIdea(
     entity: Omit<IdeaEntity, 'id'>,
 ): Promise<void> {
     await PUT(`ideas/${id}`, entity);
-    ideaChanged.send();
+    ideaChangedChannel.send();
 }
 
 export async function putIdeaSubmission(

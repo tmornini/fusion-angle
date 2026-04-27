@@ -804,7 +804,8 @@
 .skeleton {
   background-color: hsl(var(--muted));
   border-radius: var(--radius);
-  animation: pulse-subtle 2s ease-in-out infinite;
+  animation: pulse-subtle var(--duration-pulse)
+    ease-in-out infinite;
 }
 
 /* Shimmer skeleton loading */
@@ -819,7 +820,9 @@
     hsl(var(--muted-foreground) / 0.08) 50%,
     hsl(var(--muted)) 75%);
   background-size: 200% 100%;
-  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+  animation: skeleton-shimmer
+    var(--duration-shimmer)
+    ease-in-out infinite;
   border-radius: var(--radius);
 }
 

@@ -31,6 +31,16 @@ export class EntityNotFound {
     }
 }
 
+export class MissingTableError extends Error {
+    constructor(readonly table: string) {
+        super(
+            `Schema is missing table "${table}".`
+            + ' Recreate the schema from snapshots.',
+        );
+        this.name = 'MissingTableError';
+    }
+}
+
 export interface EntityStore<
     T extends { id: string },
 > {

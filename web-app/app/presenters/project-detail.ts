@@ -1,7 +1,7 @@
 import {
-    html, setHtml, SafeHtml, trusted,
+    html, mutateHtml, SafeHtml, trusted,
 } from '../safe-html';
-import { $ } from '../dom';
+import { $required } from '../dom';
 import {
     iconTrendingUp, iconClock,
     iconDollarSign,
@@ -16,6 +16,7 @@ import {
 import {
     initials, formatDate,
     toDateInputValue,
+    DISPLAY_ABSENT,
 } from '../core';
 import type {
     ProjectView,
@@ -76,9 +77,10 @@ export function projectDraftFromView(
 }
 
 export function projectPatchFromDraft(
+    view: ProjectView,
     draft: ProjectDraftFields,
-    fallbackStatus: string,
 ): ProjectEntityPatch {
+    const fallbackStatus = view.statusValue();
     const status = isProjectStatus(draft.status)
         ? draft.status
         : (isProjectStatus(fallbackStatus)
@@ -101,7 +103,7 @@ export function projectPatchFromDraft(
 function buildShell(
     container: HTMLElement,
 ): void {
-    setHtml(container, html`
+    mutateHtml(container, html`
 <div class="project-detail-host">
     <div class="project-detail-wrap">
         <div class="${
@@ -154,14 +156,12 @@ function buildShell(
 </div>`);
 }
 
-function setSlot(
+function mutateSlot(
     container: HTMLElement,
     cls: string,
     markup: SafeHtml,
 ): void {
-    const slot = $(cls, container);
-    if (!slot) return;
-    setHtml(slot, markup);
+    mutateHtml($required(cls, container), markup);
 }
 
 function buildBreadcrumb(
@@ -523,7 +523,7 @@ function buildMetricCell(
                             ? m.prefix
                                 + m.current
                                 + m.unit
-                            : '—'
+                            : DISPLAY_ABSENT
                     }</span>
                 </div>
                 <div class="${
@@ -564,7 +564,7 @@ function buildReadonlyBaselineCell(
     }">${
         m.baseline
             ? m.prefix + m.baseline + m.unit
-            : '—'
+            : DISPLAY_ABSENT
     }</span>`;
 }
 
@@ -1002,38 +1002,38 @@ export class ProjectDetailPresenter {
     renderUpdate(
         container: HTMLElement,
     ): void {
-        setSlot(
+        mutateSlot(
             container,
             '.project-breadcrumb-slot',
             buildBreadcrumb(
                 this.#view.titleText(),
             ),
         );
-        setSlot(
+        mutateSlot(
             container,
             '.project-title-slot',
             buildReadonlyTitleSection(
                 this.#view,
             ),
         );
-        setSlot(
+        mutateSlot(
             container,
             '.project-actions-slot',
             buildReadonlyActionButtons(),
         );
-        setSlot(
+        mutateSlot(
             container,
             '.project-summary-slot',
             buildReadonlyProjectSummary(
                 this.#view,
             ),
         );
-        setSlot(
+        mutateSlot(
             container,
             '.project-metrics-slot',
             buildReadonlyMetrics(this.#view),
         );
-        setSlot(
+        mutateSlot(
             container,
             '.project-sidebar-slot',
             buildSidebar(
@@ -1083,38 +1083,38 @@ export class ProjectDetailEditPresenter {
     renderUpdate(
         container: HTMLElement,
     ): void {
-        setSlot(
+        mutateSlot(
             container,
             '.project-breadcrumb-slot',
             buildBreadcrumb(this.#draft.title),
         );
-        setSlot(
+        mutateSlot(
             container,
             '.project-title-slot',
             buildEditableTitleSection(
                 this.#view, this.#draft,
             ),
         );
-        setSlot(
+        mutateSlot(
             container,
             '.project-actions-slot',
             buildEditableActionButtons(),
         );
-        setSlot(
+        mutateSlot(
             container,
             '.project-summary-slot',
             buildEditableProjectSummary(
                 this.#view, this.#draft,
             ),
         );
-        setSlot(
+        mutateSlot(
             container,
             '.project-metrics-slot',
             buildEditableMetrics(
                 this.#view, this.#draft,
             ),
         );
-        setSlot(
+        mutateSlot(
             container,
             '.project-sidebar-slot',
             buildSidebar(

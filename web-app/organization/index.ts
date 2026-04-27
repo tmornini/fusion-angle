@@ -1,5 +1,5 @@
-import { $, $$, attr } from '../app/dom';
-import { setHtml } from '../app/safe-html';
+import { $, $$, getRequiredAttribute } from '../app/dom';
+import { mutateHtml } from '../app/safe-html';
 import {
     buildSkeleton, buildErrorState,
 } from '../app/loading-states';
@@ -19,7 +19,7 @@ export async function init(): Promise<void> {
         $('#organization-content', document);
     if (!container) return;
 
-    setHtml(
+    mutateHtml(
         container,
         buildSkeleton('detail', 4),
     );
@@ -35,7 +35,7 @@ export async function init(): Promise<void> {
             'organization',
             err,
         );
-        setHtml(
+        mutateHtml(
             container,
             buildErrorState(
                 'Failed to load'
@@ -55,7 +55,7 @@ export async function init(): Promise<void> {
 
     const presenter =
         new OrganizationPresenter(organization);
-    setHtml(
+    mutateHtml(
         container,
         presenter.buildPage(),
     );
@@ -65,7 +65,7 @@ export async function init(): Promise<void> {
             navButton.addEventListener(
                 'click',
                 () => navigateTo(
-                    attr(
+                    getRequiredAttribute(
                         navButton,
                         'data-nav-to',
                     ),

@@ -1,4 +1,4 @@
-import { $, attr, populateIcons } from '../app/dom';
+import { $, getRequiredAttribute, populateIcons } from '../app/dom';
 import { html } from '../app/safe-html';
 import {
     buildSkeleton,
@@ -12,11 +12,16 @@ import {
     getIdeas,
     getIdeaEntity,
     putIdea,
-    ideaChanged,
+    subscribeToIdeaChanges,
     isIdeaStatus,
+    createFetchContext,
 } from '../app/adapters';
 import {
     IdeaListPresenter,
+    buildInitialIdeaListState,
+    applyIdeaListUpdate,
+    applyIdeaFilterToggle,
+    type IdeaListState,
 } from '../app/presenters';
 import {
     initDragReorder,
@@ -25,7 +30,7 @@ import {
 const pageAbort = new AbortController();
 const signal = pageAbort.signal;
 
-let presenter: IdeaListPresenter | null = null;
+let ideaState: IdeaListState | null = null;
 let listEl: HTMLElement | null = null;
 let badgesEl: HTMLElement | null = null;
 
@@ -35,10 +40,11 @@ export async function init(): Promise<void> {
     );
     if (!teamListEl) return;
 
+    const ctx = createFetchContext();
     const ideas = await withLoadingState(
         teamListEl,
         buildSkeleton('card-list', 4),
-        getIdeas,
+        () => getIdeas(ctx),
         init,
         {
             icon: iconLightbulb(24, ''),
@@ -72,34 +78,31 @@ export async function init(): Promise<void> {
 
     if (!ideas) return;
 
-    presenter = new IdeaListPresenter(ideas);
+    ideaState = buildInitialIdeaListState(ideas);
     listEl = teamListEl;
     badgesEl = $(
         '#status-badges', document,
     );
 
+    rerenderIdeas();
     if (badgesEl) {
-        presenter.renderBadges(badgesEl);
         badgesEl.addEventListener(
             'click', onBadgeClick,
             { signal },
         );
     }
-
-    presenter.renderList(listEl);
     listEl.addEventListener(
         'click', onCardClick,
         { signal },
     );
 
-    ideaChanged.subscribe(async () => {
-        if (!presenter || !listEl) return;
+    subscribeToIdeaChanges(async () => {
+        if (!ideaState || !listEl) return;
         const updated = await getIdeas();
-        presenter.update(updated);
-        if (badgesEl) {
-            presenter.renderBadges(badgesEl);
-        }
-        presenter.renderList(listEl);
+        ideaState = applyIdeaListUpdate(
+            ideaState, updated,
+        );
+        rerenderIdeas();
     });
 
     initDragReorder(
@@ -117,9 +120,19 @@ export async function init(): Promise<void> {
     );
 }
 
+function rerenderIdeas(): void {
+    if (!ideaState || !listEl) return;
+    const presenter =
+        new IdeaListPresenter(ideaState);
+    if (badgesEl) {
+        presenter.renderBadges(badgesEl);
+    }
+    presenter.renderList(listEl);
+}
+
 function onBadgeClick(e: MouseEvent): void {
     if (
-        !presenter || !badgesEl || !listEl
+        !ideaState || !badgesEl || !listEl
     ) return;
     if (
         !(e.target instanceof HTMLElement)
@@ -128,11 +141,12 @@ function onBadgeClick(e: MouseEvent): void {
         '[data-status]',
     );
     if (!badge) return;
-    const s = attr(badge, 'data-status');
+    const s = getRequiredAttribute(badge, 'data-status');
     if (!isIdeaStatus(s)) return;
-    presenter.applyFilterToggle(
-        s, badgesEl, listEl,
+    ideaState = applyIdeaFilterToggle(
+        ideaState, s,
     );
+    rerenderIdeas();
 }
 
 function onCardClick(e: MouseEvent): void {
@@ -145,7 +159,7 @@ function onCardClick(e: MouseEvent): void {
         );
     if (convertBtn) {
         navigateTo('idea-convert', {
-            ideaId: attr(
+            ideaId: getRequiredAttribute(
                 convertBtn,
                 'data-idea-convert',
             ),
@@ -158,7 +172,7 @@ function onCardClick(e: MouseEvent): void {
     );
     if (card) {
         navigateTo('idea-detail', {
-            ideaId: attr(
+            ideaId: getRequiredAttribute(
                 card, 'data-idea-card',
             ),
         });

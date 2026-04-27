@@ -22,6 +22,11 @@ import {
 
 const now = new Date();
 
+const TIER_PROJECTS_LIMIT = 50;
+const TIER_IDEAS_LIMIT = 200;
+const TIER_STORAGE_GB = 10;
+const TIER_AI_CREDITS = 1000;
+
 function pad(n: number): string {
     return String(n).padStart(2, '0');
 }
@@ -877,13 +882,13 @@ export async function populateMockData(
             next_billing: dt(-300, 0, 0),
             seats: 25,
             used_seats: 18,
-            projects_limit: 50,
+            projects_limit: TIER_PROJECTS_LIMIT,
             projects_current: 12,
-            ideas_limit: 200,
+            ideas_limit: TIER_IDEAS_LIMIT,
             ideas_current: 47,
-            storage_limit: 10,
+            storage_limit: TIER_STORAGE_GB,
             storage_current: 2.4,
-            ai_credits_limit: 1000,
+            ai_credits_limit: TIER_AI_CREDITS,
             ai_credits_current: 850,
             health_score: 92,
             health_status: 'excellent',
@@ -2881,13 +2886,13 @@ export async function populateBootstrapData(
             next_billing: dt(-300, 0, 0),
             seats: 25,
             used_seats: 18,
-            projects_limit: 50,
+            projects_limit: TIER_PROJECTS_LIMIT,
             projects_current: 12,
-            ideas_limit: 200,
+            ideas_limit: TIER_IDEAS_LIMIT,
             ideas_current: 47,
-            storage_limit: 10,
+            storage_limit: TIER_STORAGE_GB,
             storage_current: 2.4,
-            ai_credits_limit: 1000,
+            ai_credits_limit: TIER_AI_CREDITS,
             ai_credits_current: 850,
             health_score: 92,
             health_status: 'excellent',

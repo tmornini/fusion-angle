@@ -1,7 +1,7 @@
 import { $ } from '../app/dom';
 import {
     html,
-    setHtml,
+    mutateHtml,
 } from '../app/safe-html';
 import {
     iconActivity,
@@ -47,7 +47,7 @@ export async function init(
         a => new ActivityPresenter(a),
     );
 
-    setHtml(container, html`
+    mutateHtml(container, html`
     <div class="content-wrap">
         <div class="flex items-center
             gap-4 mb-6">
@@ -124,7 +124,7 @@ export async function init(
                 query, types,
             ),
         );
-        setHtml(
+        mutateHtml(
             activityList,
             html`${filtered.map(
                 a => a.buildActivity(),

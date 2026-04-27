@@ -7,14 +7,18 @@ import {
     getSnapshot,
     getDataPresent,
     nowUtc,
+    getUrlParam,
 } from '../app/adapters';
 import {
     $, $input, $button, createElement,
 } from '../app/dom';
+import {
+    downloadBlob,
+} from '../app/adapters/blob-download';
 import { log } from '../app/logger';
 import {
     html,
-    setHtml,
+    mutateHtml,
     SafeHtml,
 } from '../app/safe-html';
 import { showToast } from '../app/toast';
@@ -145,7 +149,7 @@ export async function init(
         }
     }
 
-    setHtml(root, html`
+    mutateHtml(root, html`
     <div class="card snapshot-card">
         <div class="${
             'flex items-center gap-3'
@@ -270,6 +274,7 @@ export async function init(
     </div>
     `);
 
+    mutateMissingTableBanner(root);
     await mutateEmptyBanner(root);
 
     const wipeBtn = $button(
@@ -377,19 +382,14 @@ export async function init(
                         'application/json',
                 },
             );
-            const url =
-                URL.createObjectURL(blob);
-            const downloadLink =
-                createElement('a');
-            downloadLink.href = url;
             const date = nowUtc()
                 .split('T')[0];
-            downloadLink.download =
+            downloadBlob(
+                blob,
                 'fusion-ai-snapshot-'
                 + date
-                + '.json';
-            downloadLink.click();
-            URL.revokeObjectURL(url);
+                + '.json',
+            );
             showToast(
                 'Snapshot downloaded'
                 + ' successfully.',
@@ -431,6 +431,40 @@ export async function init(
     );
 }
 
+const MISSING_TABLE_BANNER_ID =
+    'missing-table-banner';
+
+function mutateMissingTableBanner(
+    root: HTMLElement,
+): void {
+    const missing = getUrlParam('missing-table');
+    if (!missing) return;
+    if (
+        $(
+            '#' + MISSING_TABLE_BANNER_ID,
+            document,
+        )
+    ) return;
+    const banner = createElement('div');
+    banner.id = MISSING_TABLE_BANNER_ID;
+    banner.className =
+        'card empty-banner';
+    banner.dataset['tone'] = 'warning';
+    mutateHtml(
+        banner,
+        html`<span
+            class="empty-banner-icon"
+            >${iconInfo(20, '')}</span>
+        <p class="text-sm m-0">${
+            'The schema is missing the "'
+            + missing
+            + '" table. Recreate the schema'
+            + ' below to continue.'
+        }</p>`,
+    );
+    root.prepend(banner);
+}
+
 async function mutateEmptyBanner(
     root: HTMLElement,
 ): Promise<void> {
@@ -445,7 +479,7 @@ async function mutateEmptyBanner(
             banner.id = BANNER_ID;
             banner.className =
                 'card empty-banner';
-            setHtml(
+            mutateHtml(
                 banner,
                 html`<span
                     class="empty-banner-icon"

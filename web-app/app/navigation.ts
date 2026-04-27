@@ -1,4 +1,8 @@
 import { PAGE_REGISTRY } from './page-registry';
+import {
+    getQueryString,
+    setLocation,
+} from './adapters/location';
 
 function getPageName(): string {
     const name = document
@@ -16,7 +20,7 @@ function getPageName(): string {
 function getParams(): Record<string, string> {
     const params: Record<string, string> = {};
     new URLSearchParams(
-        window.location.search,
+        getQueryString(),
     ).forEach((value, key) => {
         params[key] = value;
     });
@@ -45,31 +49,7 @@ function navigateTo(
     page: string,
     params?: Record<string, string>,
 ): void {
-    window.location.href =
-        buildPageUrl(page, params);
+    setLocation(buildPageUrl(page, params));
 }
 
-function initPrefetch(): void {
-    if (location.protocol === 'file:') return;
-    const prefetched = new Set<string>();
-    document.addEventListener('pointerenter', (e) => {
-        if (!(e.target instanceof Element)) return;
-        const anchor = e.target.closest<HTMLAnchorElement>('a[href]');
-        if (!anchor) return;
-        const href = anchor.getAttribute('href');
-        if (
-            href
-            && href.endsWith('.html')
-            && !href.startsWith('http')
-            && !prefetched.has(href)
-        ) {
-            prefetched.add(href);
-            const link = document.createElement('link');
-            link.rel = 'prefetch';
-            link.href = href;
-            document.head.appendChild(link);
-        }
-    }, { capture: true });
-}
-
-export { buildPageUrl, navigateTo, getPageName, getParams, initPrefetch };
+export { buildPageUrl, navigateTo, getPageName, getParams };

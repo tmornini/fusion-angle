@@ -24,7 +24,7 @@ export async function getCurrentUser(
     };
 }
 
-export async function getUserMap(
+async function fetchUserMap(
 ): Promise<Map<Id, User>> {
     const users =
         await GET<UserEntity[]>('users');
@@ -36,6 +36,31 @@ export async function getUserMap(
             ],
         ),
     );
+}
+
+export interface FetchContext {
+    getUserMap(): Promise<Map<Id, User>>;
+}
+
+export function createFetchContext(
+): FetchContext {
+    let userMapPromise:
+        Promise<Map<Id, User>> | null = null;
+    return {
+        getUserMap() {
+            if (userMapPromise === null) {
+                userMapPromise = fetchUserMap();
+            }
+            return userMapPromise;
+        },
+    };
+}
+
+export async function getUserMap(
+    ctx?: FetchContext,
+): Promise<Map<Id, User>> {
+    if (ctx) return ctx.getUserMap();
+    return fetchUserMap();
 }
 
 export function userName(

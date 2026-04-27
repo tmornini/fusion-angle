@@ -1,5 +1,5 @@
 import {
-    html, setHtml, SafeHtml,
+    html, mutateHtml, SafeHtml,
 } from '../safe-html';
 import { initials, formatDate } from '../core';
 import {
@@ -567,37 +567,68 @@ export class UserPresenter {
     }
 }
 
+export type ManagedUsersState = {
+    users: User[];
+    search: string;
+    role: string;
+    status: string;
+};
+
+export function buildInitialManagedUsersState(
+    users: User[],
+): ManagedUsersState {
+    return {
+        users,
+        search: '',
+        role: 'all',
+        status: 'all',
+    };
+}
+
+export function applyManagedUsersUpdate(
+    state: ManagedUsersState,
+    users: User[],
+): ManagedUsersState {
+    return { ...state, users };
+}
+
+export function applyManagedUsersSearch(
+    state: ManagedUsersState,
+    query: string,
+): ManagedUsersState {
+    return {
+        ...state,
+        search: query.toLowerCase(),
+    };
+}
+
+export function applyManagedUsersRole(
+    state: ManagedUsersState,
+    role: string,
+): ManagedUsersState {
+    return { ...state, role };
+}
+
+export function applyManagedUsersStatus(
+    state: ManagedUsersState,
+    status: string,
+): ManagedUsersState {
+    return { ...state, status };
+}
+
 export class ManagedUsersPresenter {
     #presenters: UserPresenter[];
     #search: string;
     #role: string;
     #status: string;
 
-    constructor(users: User[]) {
-        this.#presenters = users.map(
+    constructor(state: ManagedUsersState) {
+        this.#presenters = state.users.map(
             u => new UserPresenter(u),
         );
-        this.#search = '';
-        this.#role = 'all';
-        this.#status = 'all';
-    }
-
-    update(users: User[]): void {
-        this.#presenters = users.map(
-            u => new UserPresenter(u),
-        );
-    }
-
-    setSearch(query: string): void {
-        this.#search = query.toLowerCase();
-    }
-
-    setRole(role: string): void {
-        this.#role = role;
-    }
-
-    setStatus(status: string): void {
-        this.#status = status;
+        this.#search = state.search;
+        this.#role = state.role;
+        this.#status = state.status;
     }
 
     activeCount(): number {
@@ -632,10 +663,50 @@ export class ManagedUsersPresenter {
                     this.#status,
                 ),
             );
-        setHtml(container, html`${filtered.map(
+        mutateHtml(container, html`${filtered.map(
             p => p.buildUserRow(),
         )}`);
     }
+}
+
+export type TeamListState = {
+    users: User[];
+    search: string;
+    selectedId: string | null;
+};
+
+export function buildInitialTeamListState(
+    users: User[],
+): TeamListState {
+    return {
+        users,
+        search: '',
+        selectedId: null,
+    };
+}
+
+export function applyTeamListUpdate(
+    state: TeamListState,
+    users: User[],
+): TeamListState {
+    return { ...state, users };
+}
+
+export function applyTeamSearch(
+    state: TeamListState,
+    query: string,
+): TeamListState {
+    return {
+        ...state,
+        search: query.toLowerCase(),
+    };
+}
+
+export function applyTeamSelection(
+    state: TeamListState,
+    id: string | null,
+): TeamListState {
+    return { ...state, selectedId: id };
 }
 
 export class TeamListPresenter {
@@ -643,26 +714,12 @@ export class TeamListPresenter {
     #selectedId: string | null;
     #search: string;
 
-    constructor(users: User[]) {
-        this.#presenters = users.map(
+    constructor(state: TeamListState) {
+        this.#presenters = state.users.map(
             u => new UserPresenter(u),
         );
-        this.#selectedId = null;
-        this.#search = '';
-    }
-
-    update(users: User[]): void {
-        this.#presenters = users.map(
-            u => new UserPresenter(u),
-        );
-    }
-
-    setSearch(query: string): void {
-        this.#search = query.toLowerCase();
-    }
-
-    select(id: string | null): void {
-        this.#selectedId = id;
+        this.#selectedId = state.selectedId;
+        this.#search = state.search;
     }
 
     selectedId(): string | null {
@@ -686,7 +743,7 @@ export class TeamListPresenter {
             .filter(p => p.matchesSearch(
                 this.#search,
             ));
-        setHtml(container, html`${filtered.map(
+        mutateHtml(container, html`${filtered.map(
             p => p.buildMemberCard(
                 this.#selectedId,
             ),
@@ -702,7 +759,7 @@ export class TeamListPresenter {
                     === this.#selectedId,
             )
             : undefined;
-        setHtml(container, member
+        mutateHtml(container, member
             ? member.buildMemberDetail()
             : this.#buildPlaceholder());
     }

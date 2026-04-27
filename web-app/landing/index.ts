@@ -1,7 +1,7 @@
 import { $ } from '../app/dom';
 import {
     html,
-    setHtml,
+    mutateHtml,
     type SafeHtml,
 } from '../app/safe-html';
 import {
@@ -17,6 +17,7 @@ import {
     iconLineChart,
     iconMessageSquare,
 } from '../app/icons';
+import { setLocation } from '../app/adapters';
 
 const features = [
     {
@@ -568,7 +569,7 @@ export async function init(): Promise<void> {
     const root = $('#page-root', document);
     if (!root) return;
 
-    setHtml(root, html`
+    mutateHtml(root, html`
     <div class="${
         'min-h-screen bg-background'
     }">
@@ -597,7 +598,7 @@ export async function init(): Promise<void> {
                     'hidden',
                     !isHidden,
                 );
-                setHtml(
+                mutateHtml(
                     toggle,
                     isHidden
                         ? iconX(24, '')
@@ -615,15 +616,13 @@ export async function init(): Promise<void> {
             el.addEventListener(
                 'click',
                 () => {
-                    window.location.href =
-                        '../auth/index.html';
+                    setLocation('../auth/index.html');
                 },
             );
         });
 
     const AUTO_REDIRECT_MS = 2000;
     setTimeout(() => {
-        window.location.href =
-            '../dashboard/index.html';
+        setLocation('../dashboard/index.html');
     }, AUTO_REDIRECT_MS);
 }

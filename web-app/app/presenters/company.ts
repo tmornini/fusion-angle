@@ -1,7 +1,7 @@
 import {
-    html, setHtml, SafeHtml,
+    html, mutateHtml, SafeHtml,
 } from '../safe-html';
-import { $ } from '../dom';
+import { $required } from '../dom';
 import {
     iconBuilding, iconSave,
     iconEdit, iconX,
@@ -16,33 +16,35 @@ export type CompanyFieldKey =
 function buildShell(
     container: HTMLElement,
 ): void {
-    setHtml(container, html`
+    mutateHtml(container, html`
 <div class="content-wrap">
     <div class="company-header-slot"></div>
     <div class="company-body-slot"></div>
 </div>`);
 }
 
-function setHeader(
+function mutateHeader(
     container: HTMLElement,
     markup: SafeHtml,
 ): void {
-    const slot = $(
-        '.company-header-slot', container,
+    mutateHtml(
+        $required(
+            '.company-header-slot', container,
+        ),
+        markup,
     );
-    if (!slot) return;
-    setHtml(slot, markup);
 }
 
-function setBody(
+function mutateBody(
     container: HTMLElement,
     markup: SafeHtml,
 ): void {
-    const slot = $(
-        '.company-body-slot', container,
+    mutateHtml(
+        $required(
+            '.company-body-slot', container,
+        ),
+        markup,
     );
-    if (!slot) return;
-    setHtml(slot, markup);
 }
 
 function buildHeader(
@@ -139,10 +141,10 @@ export class CompanyPresenter {
     renderUpdate(
         container: HTMLElement,
     ): void {
-        setHeader(
+        mutateHeader(
             container, this.#buildHeader(),
         );
-        setBody(
+        mutateBody(
             container, this.#buildCard(),
         );
     }
@@ -190,10 +192,10 @@ export class CompanyEditPresenter {
     renderUpdate(
         container: HTMLElement,
     ): void {
-        setHeader(
+        mutateHeader(
             container, this.#buildHeader(),
         );
-        setBody(
+        mutateBody(
             container, this.#buildCard(),
         );
     }

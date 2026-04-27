@@ -200,6 +200,10 @@
   --duration-fast: 150ms;
   --duration-normal: 200ms;
   --duration-slow: 300ms;
+  --duration-progress: 300ms;
+  --duration-shimmer: 1.5s;
+  --duration-pulse: 2s;
+  --duration-spin-slow: 3s;
 
   --ease-default: cubic-bezier(0.4, 0, 0.2, 1);
   --ease-in: cubic-bezier(0.4, 0, 1, 1);

@@ -1,9 +1,9 @@
 import {
     $, $input, $inputRequired, $select,
-    $textarea, createElement,
+    $textarea,
 } from '../app/dom';
 import { log } from '../app/logger';
-import { setHtml } from '../app/safe-html';
+import { mutateHtml } from '../app/safe-html';
 import { showToast } from '../app/toast';
 import {
     buildSkeleton,
@@ -17,9 +17,15 @@ import {
     getFlowMermaid,
     getFlowZip,
     getFlowVersions,
+    postClipboardCopy,
+    subscribeResize,
 } from '../app/adapters';
 import {
+    downloadBlob,
+} from '../app/adapters/blob-download';
+import {
     bindInteractions,
+    type FlowGestureContext,
 } from '../app/flow-interactions';
 import {
     FlowDesignerPresenter,
@@ -75,6 +81,10 @@ class Debouncer {
 const saveDebouncer =
     new Debouncer(SAVE_DELAY_MS);
 
+let pushGestureContext:
+    | ((next: FlowGestureContext) => void)
+    | null = null;
+
 type PanelStateRef = { open: boolean };
 
 class PageState {
@@ -103,6 +113,12 @@ function update(
 ): void {
     saveDebouncer.flush();
     presenter.renderUpdate(container);
+    if (pushGestureContext) {
+        pushGestureContext({
+            isAutoFit: presenter.isAutoFit(),
+            isLocked: presenter.isLocked(),
+        });
+    }
 }
 
 function bindFlowNameEdit(
@@ -287,7 +303,7 @@ function bindCanvasInteractions(
     }
     const state =
         presenter.interactionState();
-    bindInteractions(
+    pushGestureContext = bindInteractions(
         wrap,
         state,
         () => update(container, presenter),
@@ -318,8 +334,10 @@ function bindCanvasInteractions(
         (id) =>
             presenter.getNodePosition(id),
         () => presenter.getAllNodes(),
-        () => presenter.isAutoFit(),
-        () => presenter.isLocked(),
+        {
+            isAutoFit: presenter.isAutoFit(),
+            isLocked: presenter.isLocked(),
+        },
         signal,
     );
 }
@@ -327,6 +345,7 @@ function bindCanvasInteractions(
 function bindToolbarActions(
     container: HTMLElement,
     presenter: FlowDesignerPresenter,
+    flowId: string,
     signal: AbortSignal,
 ): void {
     const slot = $(
@@ -375,15 +394,11 @@ function bindToolbarActions(
             } else if (
                 action === 'copy-mermaid'
             ) {
-                void handleCopyMermaid(
-                    presenter,
-                );
+                void handleCopyMermaid(flowId);
             } else if (
                 action === 'export-zip'
             ) {
-                void handleExportZip(
-                    presenter,
-                );
+                void handleExportZip(flowId);
             } else if (
                 action === 'delete-selected'
             ) {
@@ -399,9 +414,8 @@ function bindToolbarActions(
 }
 
 async function handleCopyMermaid(
-    presenter: FlowDesignerPresenter,
+    flowId: string,
 ): Promise<void> {
-    const flowId = presenter.flowId();
     let text: string;
     try {
         text =
@@ -419,8 +433,7 @@ async function handleCopyMermaid(
         return;
     }
     try {
-        await navigator.clipboard
-            .writeText(text);
+        await postClipboardCopy(text);
     } catch (err) {
         log.error(
             'clipboard write failed',
@@ -440,9 +453,8 @@ async function handleCopyMermaid(
 }
 
 async function handleExportZip(
-    presenter: FlowDesignerPresenter,
+    flowId: string,
 ): Promise<void> {
-    const flowId = presenter.flowId();
     let result: {
         data: Uint8Array;
         name: string;
@@ -467,13 +479,7 @@ async function handleExportZip(
             unknown as ArrayBuffer],
         { type: 'application/zip' },
     );
-    const url =
-        URL.createObjectURL(blob);
-    const a = createElement('a');
-    a.href = url;
-    a.download = result.name;
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadBlob(blob, result.name);
     showToast(
         'Flow exported',
         'success',
@@ -624,32 +630,17 @@ function showFieldEditor(
     container: HTMLElement,
     presenter: FlowDesignerPresenter,
 ): void {
-    if (
-        presenter.selectedNodeId() === null
-    ) return;
-    if (presenter.isLocked()) {
-        showToast(
-            'Flow is locked', 'error',
-        );
-        return;
+    const result =
+        presenter.tryShowFieldEditor(container);
+    if (result === 'locked') {
+        showToast('Flow is locked', 'error');
     }
-    const slot = $(
-        '#field-editor-slot', container,
-    );
-    if (!slot) return;
-    setHtml(
-        slot,
-        presenter.buildFieldEditor(),
-    );
 }
 
 async function handleSaveField(
     container: HTMLElement,
     presenter: FlowDesignerPresenter,
 ): Promise<void> {
-    if (
-        presenter.selectedNodeId() === null
-    ) return;
     const nameEl = $inputRequired(
         '#new-field-name', container,
     );
@@ -747,7 +738,7 @@ export async function init(
         panelStateRef, signal,
     );
     bindToolbarActions(
-        container, presenter, signal,
+        container, presenter, flowId, signal,
     );
     bindPanelActions(
         container, presenter,
@@ -775,7 +766,7 @@ export async function init(
             update(container, presenter);
         }
     }
-    const ro = new ResizeObserver(() => {
+    subscribeResize(container, () => {
         const liveWrap = container.querySelector(
             '.flow-canvas-wrap',
         );
@@ -789,7 +780,6 @@ export async function init(
             update(container, presenter);
         }
     });
-    ro.observe(container);
 }
 
 function bindKeyboardShortcuts(

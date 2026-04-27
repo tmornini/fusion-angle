@@ -1,7 +1,7 @@
 import { $, $input } from '../app/dom';
 import {
     html,
-    setHtml,
+    mutateHtml,
 } from '../app/safe-html';
 import { showToast } from '../app/toast';
 import {
@@ -10,6 +10,7 @@ import {
     iconLoader,
 } from '../app/icons';
 import { navigateTo } from '../app/core';
+import { getViewportWidth } from '../app/adapters';
 
 function validateEmail(
     email: string,
@@ -45,7 +46,7 @@ export async function init(): Promise<void> {
     const root = $('#page-root', document);
     if (!root) return;
 
-    setHtml(root, html`
+    mutateHtml(root, html`
     <div class="${
         'min-h-screen flex bg-background'
     }">
@@ -356,7 +357,7 @@ export async function init(): Promise<void> {
     const branding = $('#auth-branding', document);
     if (
         branding
-        && window.innerWidth >= 1024
+        && getViewportWidth() >= 1024
     ) {
         branding.classList.remove('hidden');
         branding.style.display = '';
@@ -364,7 +365,7 @@ export async function init(): Promise<void> {
     const mobileLogo = $('#mobile-logo', document);
     if (
         mobileLogo
-        && window.innerWidth >= 1024
+        && getViewportWidth() >= 1024
     ) {
         mobileLogo.classList.add('hidden');
     }
@@ -404,7 +405,7 @@ export async function init(): Promise<void> {
         toggleMode.textContent = isLogin
             ? 'Sign up'
             : 'Sign in';
-        setHtml(
+        mutateHtml(
             submitBtn,
             html`${
                 isLogin
@@ -495,7 +496,7 @@ export async function init(): Promise<void> {
 
         if (emailErr || passErr) return;
 
-        setHtml(
+        mutateHtml(
             submitBtn,
             iconLoader(
                 20,

@@ -1,4 +1,4 @@
-import { $, attr } from '../app/dom';
+import { $, getRequiredAttribute } from '../app/dom';
 import {
     buildSkeleton,
     withLoadingState,
@@ -14,6 +14,10 @@ import {
 } from '../app/adapters';
 import {
     ProjectListPresenter,
+    buildInitialProjectListState,
+    applyProjectListUpdate,
+    applyProjectFilterToggle,
+    type ProjectListState,
 } from '../app/presenters';
 import {
     initDragReorder,
@@ -21,6 +25,10 @@ import {
 
 const pageAbort = new AbortController();
 const signal = pageAbort.signal;
+
+let projectState: ProjectListState | null = null;
+let projectListEl: HTMLElement | null = null;
+let projectBadgesEl: HTMLElement | null = null;
 
 export async function init(): Promise<void> {
     const listEl = $(
@@ -48,24 +56,20 @@ export async function init(): Promise<void> {
     );
     if (!projects) return;
 
-    const presenter =
-        new ProjectListPresenter(projects);
-
-    const badgesEl = $(
+    projectState =
+        buildInitialProjectListState(projects);
+    projectListEl = listEl;
+    projectBadgesEl = $(
         '#status-badges', document,
     );
-    if (badgesEl) {
-        presenter.renderBadges(badgesEl);
-        badgesEl.addEventListener(
-            'click',
-            e => onBadgeClick(
-                e, badgesEl, listEl, presenter,
-            ),
+
+    rerenderProjects();
+    if (projectBadgesEl) {
+        projectBadgesEl.addEventListener(
+            'click', onBadgeClick,
             { signal },
         );
     }
-
-    presenter.renderList(listEl);
     listEl.addEventListener(
         'click',
         e => onCardClick(e),
@@ -85,18 +89,30 @@ export async function init(): Promise<void> {
             });
             const updated =
                 await getProjects();
-            presenter.update(updated);
-            presenter.renderList(listEl);
+            if (!projectState) return;
+            projectState = applyProjectListUpdate(
+                projectState, updated,
+            );
+            rerenderProjects();
         },
     );
 }
 
-function onBadgeClick(
-    e: MouseEvent,
-    badgesEl: HTMLElement,
-    listEl: HTMLElement,
-    p: ProjectListPresenter,
-): void {
+function rerenderProjects(): void {
+    if (!projectState || !projectListEl) return;
+    const presenter =
+        new ProjectListPresenter(projectState);
+    if (projectBadgesEl) {
+        presenter.renderBadges(projectBadgesEl);
+    }
+    presenter.renderList(projectListEl);
+}
+
+function onBadgeClick(e: MouseEvent): void {
+    if (
+        !projectState || !projectBadgesEl
+        || !projectListEl
+    ) return;
     if (
         !(e.target instanceof HTMLElement)
     ) return;
@@ -104,9 +120,12 @@ function onBadgeClick(
         '[data-status]',
     );
     if (!badge) return;
-    const s = attr(badge, 'data-status');
+    const s = getRequiredAttribute(badge, 'data-status');
     if (!isProjectStatus(s)) return;
-    p.applyFilterToggle(s, badgesEl, listEl);
+    projectState = applyProjectFilterToggle(
+        projectState, s,
+    );
+    rerenderProjects();
 }
 
 function onCardClick(e: MouseEvent): void {
@@ -119,7 +138,7 @@ function onCardClick(e: MouseEvent): void {
         );
     if (!card) return;
     navigateTo('project-detail', {
-        projectId: attr(
+        projectId: getRequiredAttribute(
             card, 'data-project-card',
         ),
     });

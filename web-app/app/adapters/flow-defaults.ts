@@ -1,4 +1,5 @@
 import type { GraphNode } from '../../../api/types';
+import { generateId } from './uuid';
 
 const DEFAULT_START_NAME = 'Start';
 const DEFAULT_COMPLETE_NAME = 'End';
@@ -13,7 +14,7 @@ export function buildStartAndCompleteNodes(): {
 } {
     return {
         start: {
-            id: crypto.randomUUID(),
+            id: generateId(),
             name: DEFAULT_START_NAME,
             description: '',
             positionX: DEFAULT_START_X,
@@ -23,7 +24,7 @@ export function buildStartAndCompleteNodes(): {
             fields: [],
         },
         complete: {
-            id: crypto.randomUUID(),
+            id: generateId(),
             name: DEFAULT_COMPLETE_NAME,
             description: '',
             positionX: DEFAULT_COMPLETE_X,

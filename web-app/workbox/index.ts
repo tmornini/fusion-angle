@@ -1,8 +1,8 @@
 import {
-    $, populateIcons, attr,
+    $, populateIcons, getRequiredAttribute,
 } from '../app/dom';
 import {
-    html, setHtml,
+    html, mutateHtml,
 } from '../app/safe-html';
 import { log } from '../app/logger';
 import { showToast } from '../app/toast';
@@ -26,6 +26,8 @@ import {
     postWorkOrderCreation,
     putWorkOrder,
     getCurrentUser,
+    createFetchContext,
+    type FetchContext,
 } from '../app/adapters';
 import {
     WorkboxInboxPresenter,
@@ -53,11 +55,12 @@ export async function init(
     const archiveEl =
         $('#archive-list', document);
 
+    const ctx = createFetchContext();
     if (activeEl) {
-        await initActiveList(activeEl);
+        await initActiveList(activeEl, ctx);
     }
     if (archiveEl) {
-        await initArchiveList(archiveEl);
+        await initArchiveList(archiveEl, ctx);
     }
 
     await initCreateDropdown();
@@ -68,7 +71,7 @@ function renderTabs(): void {
         '#workbox-tabs', document,
     );
     if (!tabsEl) return;
-    setHtml(tabsEl, html`
+    mutateHtml(tabsEl, html`
         <span class="${
             'badge badge-success'
             + ' text-xs cursor-pointer active'
@@ -85,11 +88,12 @@ function renderTabs(): void {
 
 async function initActiveList(
     activeEl: HTMLElement,
+    ctx: FetchContext,
 ): Promise<void> {
     const items = await withLoadingState(
         activeEl,
         buildSkeleton('card-list', 4),
-        getActiveWorkOrders,
+        () => getActiveWorkOrders(ctx),
         init,
         {
             icon: iconMail(24, ''),
@@ -134,25 +138,25 @@ async function initActiveList(
             }
             const updated =
                 await getActiveWorkOrders();
-            if (activePresenter) {
-                activePresenter.update(
-                    updated,
+            activePresenter =
+                new WorkboxInboxPresenter(
+                    updated, true,
                 );
-                activePresenter.renderList(
-                    activeEl,
-                );
-            }
+            activePresenter.renderList(
+                activeEl,
+            );
         },
     );
 }
 
 async function initArchiveList(
     archiveEl: HTMLElement,
+    ctx: FetchContext,
 ): Promise<void> {
     const items = await withLoadingState(
         archiveEl,
         buildSkeleton('card-list', 4),
-        getArchivedWorkOrders,
+        () => getArchivedWorkOrders(ctx),
         init,
         {
             icon: iconMail(24, ''),
@@ -189,7 +193,7 @@ function onRowClick(e: MouseEvent): void {
         '[data-work-order-card]',
     );
     if (!card) return;
-    const id = attr(
+    const id = getRequiredAttribute(
         card, 'data-work-order-card',
     );
     navigateTo('workbox-detail', { id });
@@ -254,7 +258,7 @@ async function initCreateDropdown(
 
     const flows = await getFlowsForCreation();
 
-    setHtml(dropdownEl, html`${flows.map(
+    mutateHtml(dropdownEl, html`${flows.map(
         f => html`<button
             class="dropdown-item"
             data-flow-id="${f.id}"

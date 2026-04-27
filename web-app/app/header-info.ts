@@ -34,18 +34,18 @@ async function getHeaderData(
 
 export async function mutateHeaderInfo(
 ): Promise<void> {
-    const data = await getHeaderData();
-    const { html, setHtml } =
+    const headerInfo = await getHeaderData();
+    const { html, mutateHtml } =
         await import('./safe-html');
     const greetingEl =
         $('#header-greeting', document);
     if (greetingEl) {
-        setHtml(
+        mutateHtml(
             greetingEl,
             html`<span
 class="font-normal">Good ${
-data.greeting},</span> ${
-data.userName}`,
+headerInfo.greeting},</span> ${
+headerInfo.userName}`,
         );
         greetingEl.addEventListener(
             'click',
@@ -56,12 +56,12 @@ data.userName}`,
     const statsEl =
         $('#header-stats', document);
     if (statsEl) {
-        setHtml(
+        mutateHtml(
             statsEl,
             html`<span
 class="header-stat-label">${
-data.company}</span>${
-data.stats.map(
+headerInfo.company}</span>${
+headerInfo.stats.map(
     (stat) =>
         html`<div
 class="header-stat-divider"></div>

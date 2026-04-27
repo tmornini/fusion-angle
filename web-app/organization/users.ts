@@ -2,7 +2,7 @@ import {
     $, $input, $select, $textarea,
 } from '../app/dom';
 import {
-    html, setHtml,
+    html, mutateHtml,
 } from '../app/safe-html';
 import { showToast } from '../app/toast';
 import {
@@ -23,9 +23,15 @@ import {
     jsonArrayField,
     jsonObjectField,
     nowUtc,
+    generateId,
 } from '../app/adapters';
 import {
     ManagedUsersPresenter,
+    buildInitialManagedUsersState,
+    applyManagedUsersSearch,
+    applyManagedUsersRole,
+    applyManagedUsersStatus,
+    type ManagedUsersState,
 } from '../app/presenters';
 
 const DEFAULT_DIM = 50;
@@ -33,8 +39,8 @@ const DEFAULT_DIM = 50;
 const pageAbort = new AbortController();
 const signal = pageAbort.signal;
 
-let presenter:
-    ManagedUsersPresenter | null = null;
+let usersState:
+    ManagedUsersState | null = null;
 let userListEl: HTMLElement | null = null;
 
 export async function init(): Promise<void> {
@@ -59,23 +65,32 @@ export async function init(): Promise<void> {
     );
     if (!users) return;
 
-    presenter = new ManagedUsersPresenter(users);
-    setHtml(container, buildShellHtml(
-        presenter.activeCount(),
-        presenter.pendingCount(),
+    usersState =
+        buildInitialManagedUsersState(users);
+    const initialPresenter =
+        new ManagedUsersPresenter(usersState);
+    mutateHtml(container, buildShellHtml(
+        initialPresenter.activeCount(),
+        initialPresenter.pendingCount(),
     ));
 
     userListEl = $('#user-list', document);
     if (userListEl) {
-        presenter.renderList(userListEl);
+        rerenderUsers();
         userListEl.addEventListener(
             'click', onUserListClick,
             { signal },
         );
     }
 
-    bindFilters();
+    initUserListFilters();
     bindInviteDialog();
+}
+
+function rerenderUsers(): void {
+    if (!usersState || !userListEl) return;
+    new ManagedUsersPresenter(usersState)
+        .renderList(userListEl);
 }
 
 function buildShellHtml(
@@ -416,7 +431,7 @@ function buildInviteDialog(
         </div>`;
 }
 
-function bindFilters(): void {
+function initUserListFilters(): void {
     $input('#user-search', document)
         ?.addEventListener(
             'input', onSearchInput,
@@ -435,27 +450,33 @@ function bindFilters(): void {
 }
 
 function onSearchInput(e: Event): void {
-    if (!presenter || !userListEl) return;
+    if (!usersState || !userListEl) return;
     const target =
         e.target as HTMLInputElement;
-    presenter.setSearch(target.value);
-    presenter.renderList(userListEl);
+    usersState = applyManagedUsersSearch(
+        usersState, target.value,
+    );
+    rerenderUsers();
 }
 
 function onRoleChange(e: Event): void {
-    if (!presenter || !userListEl) return;
+    if (!usersState || !userListEl) return;
     const target =
         e.target as HTMLSelectElement;
-    presenter.setRole(target.value);
-    presenter.renderList(userListEl);
+    usersState = applyManagedUsersRole(
+        usersState, target.value,
+    );
+    rerenderUsers();
 }
 
 function onStatusChange(e: Event): void {
-    if (!presenter || !userListEl) return;
+    if (!usersState || !userListEl) return;
     const target =
         e.target as HTMLSelectElement;
-    presenter.setStatus(target.value);
-    presenter.renderList(userListEl);
+    usersState = applyManagedUsersStatus(
+        usersState, target.value,
+    );
+    rerenderUsers();
 }
 
 function onUserListClick(e: MouseEvent): void {
@@ -469,7 +490,7 @@ function onUserListClick(e: MouseEvent): void {
             'data-deactivate-user',
         );
         if (id) {
-            void changeUserStatus(
+            void updateUserActivationStatus(
                 id, 'deactivated',
             );
         }
@@ -483,14 +504,14 @@ function onUserListClick(e: MouseEvent): void {
             'data-reactivate-user',
         );
         if (id) {
-            void changeUserStatus(
+            void updateUserActivationStatus(
                 id, 'active',
             );
         }
     }
 }
 
-async function changeUserStatus(
+async function updateUserActivationStatus(
     userId: string,
     next: 'active' | 'deactivated',
 ): Promise<void> {
@@ -511,7 +532,7 @@ async function changeUserStatus(
         navigateTo('users');
     } catch (err) {
         log.error(
-            'changeUserStatus failed',
+            'updateUserActivationStatus failed',
             'organization', err,
         );
         showToast(
@@ -583,7 +604,7 @@ async function handleInvite(): Promise<void> {
     const bio = $textarea(
         '#invite-bio', document,
     )!.value;
-    const id = crypto.randomUUID();
+    const id = generateId();
     try {
         await putUser(
             id,

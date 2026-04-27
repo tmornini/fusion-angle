@@ -1,8 +1,9 @@
 const MAX_TOASTS = 5;
 const TOAST_DURATION_MS = 3000;
 const TOAST_TRANSITION_MS = 300;
+const TOAST_CONTAINER_ID = 'toast-container';
 
-function dismissToast(
+function closeActiveToast(
     toast: HTMLElement,
 ): void {
     toast.style.opacity = '0';
@@ -22,7 +23,9 @@ export function showToast(
         | 'warning'
         | 'info' = 'info',
 ): void {
-    const container = document.getElementById('toast-container');
+    const container = document.getElementById(
+        TOAST_CONTAINER_ID,
+    );
     if (!container) return;
 
     while (container.children.length >= MAX_TOASTS) {
@@ -42,12 +45,12 @@ export function showToast(
     closeBtn.className = 'toast-close';
     closeBtn.setAttribute('aria-label', 'Dismiss');
     closeBtn.textContent = '\u00D7';
-    closeBtn.addEventListener('click', () => dismissToast(toast));
+    closeBtn.addEventListener('click', () => closeActiveToast(toast));
     toast.appendChild(closeBtn);
 
     container.appendChild(toast);
     setTimeout(
-            () => dismissToast(toast),
+            () => closeActiveToast(toast),
             TOAST_DURATION_MS,
     );
 }

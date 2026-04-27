@@ -1,7 +1,8 @@
 import {
-    html, setHtml, SafeHtml,
+    html, mutateHtml, SafeHtml,
 } from '../safe-html';
 import { iconGripVertical } from '../icons';
+import { DISPLAY_ABSENT } from '../core';
 import type {
     WorkOrderInboxRow,
 } from '../adapters';
@@ -22,27 +23,21 @@ function relativeTime(iso: string): string {
 }
 
 export class WorkboxInboxPresenter {
-    #items: WorkOrderInboxRow[];
+    readonly #items: readonly WorkOrderInboxRow[];
     readonly #showGrip: boolean;
 
     constructor(
-        items: WorkOrderInboxRow[],
+        items: readonly WorkOrderInboxRow[],
         showGrip: boolean,
     ) {
         this.#items = items;
         this.#showGrip = showGrip;
     }
 
-    update(
-        items: WorkOrderInboxRow[],
-    ): void {
-        this.#items = items;
-    }
-
     renderList(
         container: HTMLElement,
     ): void {
-        setHtml(container, html`${
+        mutateHtml(container, html`${
             this.#items.map(
                 i => this.#buildRow(i),
             )
@@ -63,7 +58,7 @@ export class WorkboxInboxPresenter {
             }</span>`;
         const name =
             item.lastTransitionerName();
-        const from = name ? name : '—';
+        const from = name ? name : DISPLAY_ABSENT;
         const grip = this.#showGrip
             ? html`<div class="${
                 'hidden-mobile text-muted'
@@ -111,10 +106,13 @@ export class WorkboxInboxPresenter {
                             from
                         }</span>
                         <span class="ml-auto"
-                            >${relativeTime(
-                                item
-                                    .lastTransitionedAtDate(),
-                            )}</span>
+                            >${
+                                item.lastTransitionedAtDate()
+                                    ? relativeTime(
+                                        item.lastTransitionedAtDate()!,
+                                    )
+                                    : DISPLAY_ABSENT
+                            }</span>
                     </div>
                 </div>
             </div>

@@ -1,5 +1,5 @@
 import { $ } from '../app/dom';
-import { html, setHtml } from '../app/safe-html';
+import { html, mutateHtml } from '../app/safe-html';
 import { iconSparkles, iconArrowRight } from '../app/icons';
 import { navigateTo } from '../app/core';
 
@@ -7,7 +7,7 @@ export async function init(): Promise<void> {
     const root = $('#page-root', document);
     if (!root) return;
 
-    setHtml(root, html`
+    mutateHtml(root, html`
         <div class="${
             'min-h-screen bg-background'
             + ' flex flex-col'

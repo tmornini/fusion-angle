@@ -1207,11 +1207,7 @@ export class Activity {
     }
 
     formattedDescription(): string {
-        const prefix =
-            this.#actor !== null
-                ? `${this.#actor} `
-                : '';
-        return prefix
+        return `${this.#actor} `
             + `${this.#action}`
             + ` ${this.#target}`;
     }

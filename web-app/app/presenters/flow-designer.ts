@@ -1,8 +1,8 @@
 import {
-    html, setHtml, trusted,
+    html, mutateHtml, trusted,
 } from '../safe-html';
 import type { SafeHtml } from '../safe-html';
-import { $ } from '../dom';
+import { $, $required } from '../dom';
 import { log } from '../logger';
 import { showToast } from '../toast';
 import {
@@ -31,10 +31,10 @@ import type { FlowFieldType }
 import {
     jsonObjectField,
     nowUtc,
+    generateId,
 } from '../adapters';
 import {
     buildGraphSvg,
-    computeEdgeLabelWidth,
     perimeterPoint,
     whichEdge,
     controlOffset,
@@ -42,8 +42,6 @@ import {
     BLUE,
 } from '../flow-graph';
 import {
-    computeLayout,
-    edgeWaypointKey,
     wouldBeCycle,
     NODE_WIDTH,
     NODE_HEIGHT,
@@ -63,18 +61,36 @@ import type {
 } from '../flow-interactions';
 import {
     buildFlowHistorySnapshot,
-    canUndo as historyCanUndo,
-    canRedo as historyCanRedo,
-    noteMutation as historyNoteMutation,
+    canUndoFlowEdits,
+    canRedoFlowEdits,
+    recordFlowMutation,
     setHasUndoHistory,
-    pushRedo,
-    popRedo,
+    appendToRedoStack,
+    removeFromRedoStack,
 } from '../flow-history';
 import type {
     FlowHistorySnapshot,
 } from '../flow-history';
 import {
     applyMoveNodes,
+    applyDragPreview,
+    applyToggleLock,
+    applyUpdateFlowName,
+    applyAddNode,
+    applyAddEdge,
+    applyDeleteNodes,
+    applyDeleteEdge,
+    applyUpdateNode,
+    applyUpdateEdge,
+    applyAddField,
+    applyDeleteField,
+    applyAutoLayout,
+    applyPanToRevealSelected,
+    applyPanelTransition,
+} from '../flow-designer-actions';
+import type {
+    Waypoint,
+    SavedViewBox,
 } from '../flow-designer-actions';
 import { iconArrowLeft } from '../icons';
 import {
@@ -99,16 +115,6 @@ function serializeGraph(
     );
 }
 
-type SavedViewBox =
-    | { kind: 'none' }
-    | {
-        kind: 'saved';
-        x: number;
-        y: number;
-        w: number;
-        h: number;
-    };
-
 interface DesignerState {
     flowId: string;
     flowName: string;
@@ -125,26 +131,6 @@ interface DesignerState {
     isPanelOpen: boolean;
     interaction: InteractionState;
     savedViewBox: SavedViewBox;
-}
-
-type Waypoint = { x: number; y: number };
-
-function mapWaypointsByEdgeId(
-    edges: readonly GraphEdge[],
-    byPair: Map<string, Waypoint[]>,
-): Map<string, Waypoint[]> {
-    const result =
-        new Map<string, Waypoint[]>();
-    for (const e of edges) {
-        const key = edgeWaypointKey(
-            e.fromNodeId, e.toNodeId,
-        );
-        const wp = byPair.get(key);
-        if (wp && wp.length > 0) {
-            result.set(e.id, wp);
-        }
-    }
-    return result;
 }
 
 function emptyWaypoints(
@@ -202,7 +188,7 @@ export class FlowDesignerPresenter {
     }
 
     #noteMutation(): void {
-        this.#history = historyNoteMutation(
+        this.#history = recordFlowMutation(
             this.#history,
         );
     }
@@ -287,11 +273,13 @@ export class FlowDesignerPresenter {
     }
 
     toggleLocked(): void {
-        const next = !this.#state.isLocked;
-        this.#state.isLocked = next;
-        if (next && this.#state.isEditingName) {
-            this.#state.isEditingName = false;
-        }
+        const result = applyToggleLock(
+            this.#state.isLocked,
+            this.#state.isEditingName,
+        );
+        this.#state.isLocked = result.isLocked;
+        this.#state.isEditingName =
+            result.isEditingName;
         void this.#saveFlow(false);
     }
 
@@ -345,19 +333,20 @@ export class FlowDesignerPresenter {
 
     updateFlowName(name: string): void {
         if (this.#guardLocked()) return;
-        name = name.trim();
-        this.#state.flowName = name;
-        this.#state.isEditingName = false;
+        const result = applyUpdateFlowName(name);
+        this.#state.flowName = result.flowName;
+        this.#state.isEditingName =
+            result.isEditingName;
         void this.#saveFlow(true);
         this.#noteMutation();
     }
 
     canUndo(): boolean {
-        return historyCanUndo(this.#history);
+        return canUndoFlowEdits(this.#history);
     }
 
     canRedo(): boolean {
-        return historyCanRedo(this.#history);
+        return canRedoFlowEdits(this.#history);
     }
 
     async performUndo(): Promise<boolean> {
@@ -372,8 +361,8 @@ export class FlowDesignerPresenter {
             );
             return false;
         }
-        this.#history = pushRedo(this.#history, {
-            id: crypto.randomUUID(),
+        this.#history = appendToRedoStack(this.#history, {
+            id: generateId(),
             flowId: this.#state.flowId,
             name: this.#state.flowName,
             description:
@@ -407,7 +396,7 @@ export class FlowDesignerPresenter {
 
     async performRedo(): Promise<boolean> {
         if (this.#guardLocked()) return false;
-        const popped = popRedo(this.#history);
+        const popped = removeFromRedoStack(this.#history);
         this.#history = popped.snapshot;
         if (!popped.version) return false;
         await postFlowVersion(
@@ -456,19 +445,19 @@ export class FlowDesignerPresenter {
             sumX += n.positionX;
             sumY += n.positionY;
         }
-        const cx = sumX / nodes.length;
-        const cy = sumY / nodes.length;
+        const centerX = sumX / nodes.length;
+        const centerY = sumY / nodes.length;
         if (
-            Math.abs(cx) <= 1
-            && Math.abs(cy) <= 1
+            Math.abs(centerX) <= 1
+            && Math.abs(centerY) <= 1
         ) return;
         this.#state.nodes = nodes.map(
             n => ({
                 ...n,
                 positionX:
-                    n.positionX - cx,
+                    n.positionX - centerX,
                 positionY:
-                    n.positionY - cy,
+                    n.positionY - centerY,
             }),
         );
         void this.#saveFlow(false);
@@ -513,10 +502,6 @@ export class FlowDesignerPresenter {
             : new Set<string>();
     }
 
-    flowId(): string {
-        return this.#state.flowId;
-    }
-
     interactionState(): InteractionState {
         return this.#state.interaction;
     }
@@ -556,112 +541,44 @@ export class FlowDesignerPresenter {
     }
 
     #panToRevealSelected(): void {
-        // Center the selection in the visible canvas
-        // region (the area not covered by the panel).
-        // The panel is anchored at the left edge of
-        // .flow-canvas-area with width PANEL_WIDTH_PX,
-        // so visible X spans [PANEL_WIDTH_PX, canvasW].
-        // Solving for vb.x such that selX lands at the
-        // visible center yields:
-        //   vb.x = selX - (vb.w + panelW_svg) / 2
         const sel =
             this.#state.interaction.selection;
-        let selX: number | undefined;
-        let selY: number | undefined;
-        const singleId = this
-            .#singleSelectedNodeId();
-        if (singleId) {
-            const n =
-                this.#state.nodes.find(
-                    nd => nd.id === singleId,
-                );
-            if (n) {
-                selX = n.positionX
-                    + NODE_WIDTH / 2;
-                selY = n.positionY
-                    + NODE_HEIGHT / 2;
-            }
-        }
-        if (sel.kind === 'edge') {
-            const e =
-                this.#state.edges.find(
-                    ed => ed.id
-                        === sel.edgeId,
-                );
-            if (e) {
-                const fn =
-                    this.#state.nodes
-                        .find(
-                            nd => nd.id
-                                === e
-                                .fromNodeId,
-                        );
-                const tn =
-                    this.#state.nodes
-                        .find(
-                            nd => nd.id
-                                === e
-                                .toNodeId,
-                        );
-                if (fn && tn) {
-                    const fx = fn.positionX
-                        + NODE_WIDTH / 2;
-                    const fy = fn.positionY
-                        + NODE_HEIGHT / 2;
-                    const tx = tn.positionX
-                        + NODE_WIDTH / 2;
-                    const ty = tn.positionY
-                        + NODE_HEIGHT / 2;
-                    selX = (fx + tx) / 2;
-                    selY = (fy + ty) / 2;
-                }
-            }
-        }
-        if (selX === undefined) return;
-        if (selY === undefined) return;
+        const edgeId =
+            sel.kind === 'edge'
+                ? sel.edgeId : null;
+        const origin = applyPanToRevealSelected(
+            this.#singleSelectedNodeId(),
+            edgeId,
+            this.#state.nodes,
+            this.#state.edges,
+            this.#state.interaction.viewBox,
+            this.#canvasW,
+            PANEL_WIDTH_PX,
+        );
+        if (!origin) return;
         const vb =
             this.#state.interaction.viewBox;
-        const panelW_svg =
-            PANEL_WIDTH_PX
-            * vb.w / this.#canvasW;
-        vb.x = selX
-            - (vb.w + panelW_svg) / 2;
-        vb.y = selY - vb.h / 2;
+        vb.x = origin.x;
+        vb.y = origin.y;
     }
 
     #handlePanelTransition(): void {
-        if (this.#state.isAutoFit) return;
-        const saved =
-            this.#state.savedViewBox;
-        const isOpen =
-            this.#state.isPanelOpen;
-        const wasOpen =
-            saved.kind === 'saved';
-        if (isOpen && !wasOpen) {
-            const vb =
-                this.#state.interaction
-                    .viewBox;
-            this.#state.savedViewBox = {
-                kind: 'saved',
-                x: vb.x,
-                y: vb.y,
-                w: vb.w,
-                h: vb.h,
-            };
-            this.#panToRevealSelected();
-        }
-        if (!isOpen && wasOpen) {
-            const vb =
-                this.#state.interaction
-                    .viewBox;
-            vb.x = saved.x;
-            vb.y = saved.y;
-            vb.w = saved.w;
-            vb.h = saved.h;
-            this.#state.savedViewBox =
-                { kind: 'none' };
-        }
-        if (isOpen && wasOpen) {
+        const result = applyPanelTransition(
+            this.#state.isAutoFit,
+            this.#state.isPanelOpen,
+            this.#state.savedViewBox,
+            this.#state.interaction.viewBox,
+        );
+        if (!result) return;
+        this.#state.savedViewBox =
+            result.savedViewBox;
+        const vb =
+            this.#state.interaction.viewBox;
+        vb.x = result.viewBox.x;
+        vb.y = result.viewBox.y;
+        vb.w = result.viewBox.w;
+        vb.h = result.viewBox.h;
+        if (result.shouldPanToReveal) {
             this.#panToRevealSelected();
         }
     }
@@ -727,7 +644,7 @@ Auto Fit</label>
 </div>
 </div>
 </div>`;
-        setHtml(container, shell);
+        mutateHtml(container, shell);
         this.renderUpdate(container);
     }
 
@@ -773,52 +690,56 @@ Auto Fit</label>
     #updateNameHeader(
         container: HTMLElement,
     ): void {
-        const slot = $(
-            '.flow-name-header-slot',
-            container,
-        );
-        if (!slot) return;
         const nameHtml =
             buildFlowNameHeader(
                 this.#state.flowName,
                 this.#state.isEditingName,
             );
-        setHtml(slot, html`${nameHtml}
+        mutateHtml(
+            $required(
+                '.flow-name-header-slot',
+                container,
+            ),
+            html`${nameHtml}
 <p class="text-sm text-muted"
-    >${this.#state.flowDescription}</p>`);
+    >${this.#state.flowDescription}</p>`,
+        );
     }
 
     #updateToolbar(
         container: HTMLElement,
     ): void {
-        const slot = $(
-            '.flow-toolbar-slot',
-            container,
+        mutateHtml(
+            $required(
+                '.flow-toolbar-slot',
+                container,
+            ),
+            this.#buildToolbar(),
         );
-        if (!slot) return;
-        setHtml(slot, this.#buildToolbar());
     }
 
     #updatePanel(
         container: HTMLElement,
     ): void {
-        const slot = $(
-            '.flow-props-slot',
-            container,
+        mutateHtml(
+            $required(
+                '.flow-props-slot',
+                container,
+            ),
+            this.#buildPropsPanel(),
         );
-        if (!slot) return;
-        setHtml(slot, this.#buildPropsPanel());
     }
 
     #updateCanvas(
         container: HTMLElement,
     ): void {
-        const slot = $(
-            '.flow-canvas-host',
-            container,
+        mutateHtml(
+            $required(
+                '.flow-canvas-host',
+                container,
+            ),
+            this.#buildCanvas(),
         );
-        if (!slot) return;
-        setHtml(slot, this.#buildCanvas());
     }
 
     moveNodes(
@@ -843,7 +764,7 @@ Auto Fit</label>
             + (this.#state.nodes.length - 1)
             * (NODE_WIDTH + NEW_NODE_OFFSET_X);
         const y = START_Y + NEW_NODE_OFFSET_Y;
-        const nodeId = crypto.randomUUID();
+        const nodeId = generateId();
         const fId = this.#state.flowId;
         try {
             await postNodeAddition({
@@ -862,19 +783,10 @@ Auto Fit</label>
                 );
             return false;
         }
-        this.#state.nodes = [
-            ...this.#state.nodes,
-            {
-                id: nodeId,
-                name: 'New State',
-                description: '',
-                positionX: x,
-                positionY: y,
-                isStart: false,
-                isComplete: false,
-                fields: [],
-            },
-        ];
+        this.#state.nodes = applyAddNode(
+            this.#state.nodes,
+            nodeId, 'New State', x, y,
+        );
         this.#noteMutation();
         this.reconcileLayout();
         return true;
@@ -895,7 +807,19 @@ Auto Fit</label>
             this.#state.nodes.find(
                 n => n.id === toId,
             );
-        if (from?.isComplete) {
+        if (!from) {
+            throw new Error(
+                'addEdge: unknown fromId '
+                    + fromId,
+            );
+        }
+        if (!to) {
+            throw new Error(
+                'addEdge: unknown toId '
+                    + toId,
+            );
+        }
+        if (from.isComplete) {
             showToast(
                 'Cannot create transition'
                 + ' from end state',
@@ -903,7 +827,7 @@ Auto Fit</label>
             );
             return false;
         }
-        if (to?.isStart) {
+        if (to.isStart) {
             showToast(
                 'Cannot create transition'
                 + ' to start state',
@@ -923,7 +847,7 @@ Auto Fit</label>
             );
             return false;
         }
-        if (from?.isStart) {
+        if (from.isStart) {
             const hasOutgoing =
                 this.#state.edges.some(
                     e => e.fromNodeId
@@ -939,7 +863,7 @@ Auto Fit</label>
                 return false;
             }
         }
-        const edgeId = crypto.randomUUID();
+        const edgeId = generateId();
         const fId = this.#state.flowId;
         try {
             await postEdgeConnection({
@@ -959,16 +883,11 @@ Auto Fit</label>
                 );
             return false;
         }
-        this.#state.edges = [
-            ...this.#state.edges,
-            {
-                id: edgeId,
-                name: 'Transition',
-                description: '',
-                fromNodeId: fromId,
-                toNodeId: toId,
-            },
-        ];
+        this.#state.edges = applyAddEdge(
+            this.#state.edges,
+            edgeId, 'Transition',
+            fromId, toId,
+        );
         this.#noteMutation();
         this.reconcileLayout();
         return true;
@@ -983,24 +902,15 @@ Auto Fit</label>
             .#deletableNodeIds();
         if (ids.length === 0) return false;
         const idSet = new Set(ids);
-        const nextNodes =
-            this.#state.nodes.filter(
-                n => !idSet.has(n.id),
-            );
-        const nextEdges =
-            this.#state.edges.filter(
-                e =>
-                    !idSet.has(
-                        e.fromNodeId,
-                    )
-                    && !idSet.has(
-                        e.toNodeId,
-                    ),
-            );
+        const result = applyDeleteNodes(
+            this.#state.nodes,
+            this.#state.edges,
+            idSet,
+        );
         const prevNodes = this.#state.nodes;
         const prevEdges = this.#state.edges;
-        this.#state.nodes = nextNodes;
-        this.#state.edges = nextEdges;
+        this.#state.nodes = result.nodes;
+        this.#state.edges = result.edges;
         try {
             await this.#saveFlow(true);
         } catch (err) {
@@ -1070,10 +980,9 @@ Auto Fit</label>
                 );
             return false;
         }
-        this.#state.edges =
-            this.#state.edges.filter(
-                e => e.id !== edgeId,
-            );
+        this.#state.edges = applyDeleteEdge(
+            this.#state.edges, edgeId,
+        );
         this.#noteMutation();
         this.#state.interaction
             .selection = { kind: 'none' };
@@ -1110,64 +1019,17 @@ Auto Fit</label>
     }
 
     #runAutoLayout(): void {
-        const nodeById = new Map(
-            this.#state.nodes.map(
-                n => [n.id, n],
-            ),
+        const result = applyAutoLayout(
+            this.#state.nodes,
+            this.#state.edges,
+            this.#canvasW,
+            this.#canvasH,
+            this.#state.isPanelOpen,
+            PANEL_WIDTH_PX,
         );
-        const layoutInputs =
-            this.#state.nodes.map(
-                n => ({
-                    id: n.id,
-                    isStart: n.isStart,
-                    isComplete: n.isComplete,
-                }),
-            );
-        const layoutEdges =
-            this.#state.edges.map(e => {
-                const from =
-                    nodeById.get(e.fromNodeId);
-                const isStart =
-                    from?.isStart === true;
-                return {
-                    fromId: e.fromNodeId,
-                    toId: e.toNodeId,
-                    labelWidth: isStart
-                        ? 0
-                        : computeEdgeLabelWidth(
-                            e.name,
-                        ),
-                };
-            });
-        const panelOpen =
-            this.#state.isPanelOpen;
-        const effectiveW = panelOpen
-            ? Math.max(
-                0,
-                this.#canvasW - PANEL_WIDTH_PX,
-            )
-            : this.#canvasW;
-        const result = computeLayout({
-            nodes: layoutInputs,
-            edges: layoutEdges,
-            canvasWidth: effectiveW,
-            canvasHeight: this.#canvasH,
-        });
-        this.#state.nodes =
-            this.#state.nodes.map(n => {
-                const pos =
-                    result.positions.get(n.id)!;
-                return {
-                    ...n,
-                    positionX: pos.x,
-                    positionY: pos.y,
-                };
-            });
+        this.#state.nodes = result.nodes;
         this.#state.edgeWaypoints =
-            mapWaypointsByEdgeId(
-                this.#state.edges,
-                result.waypoints,
-            );
+            result.edgeWaypoints;
         void this.#saveFlow(false);
     }
 
@@ -1175,16 +1037,14 @@ Auto Fit</label>
         name: string,
     ): void {
         if (this.#guardLocked()) return;
-        name = name.trim();
         const nodeId = this
             .#singleSelectedNodeId();
         if (!nodeId) return;
-        this.#state.nodes =
-            this.#state.nodes.map(
-                n => n.id === nodeId
-                    ? { ...n, name }
-                    : n,
-            );
+        this.#state.nodes = applyUpdateNode(
+            this.#state.nodes,
+            nodeId,
+            { name: name.trim() },
+        );
         void this.#saveFlow(true);
         this.#noteMutation();
     }
@@ -1193,19 +1053,14 @@ Auto Fit</label>
         desc: string,
     ): void {
         if (this.#guardLocked()) return;
-        desc = desc.trim();
         const nodeId = this
             .#singleSelectedNodeId();
         if (!nodeId) return;
-        this.#state.nodes =
-            this.#state.nodes.map(
-                n => n.id === nodeId
-                    ? {
-                        ...n,
-                        description: desc,
-                    }
-                    : n,
-            );
+        this.#state.nodes = applyUpdateNode(
+            this.#state.nodes,
+            nodeId,
+            { description: desc.trim() },
+        );
         void this.#saveFlow(true);
         this.#noteMutation();
     }
@@ -1214,18 +1069,15 @@ Auto Fit</label>
         name: string,
     ): void {
         if (this.#guardLocked()) return;
-        name = name.trim();
         const sel =
             this.#state.interaction
                 .selection;
         if (sel.kind !== 'edge') return;
-        const edgeId = sel.edgeId;
-        this.#state.edges =
-            this.#state.edges.map(
-                e => e.id === edgeId
-                    ? { ...e, name }
-                    : e,
-            );
+        this.#state.edges = applyUpdateEdge(
+            this.#state.edges,
+            sel.edgeId,
+            { name: name.trim() },
+        );
         void this.#saveFlow(true);
         this.#noteMutation();
     }
@@ -1234,21 +1086,15 @@ Auto Fit</label>
         desc: string,
     ): void {
         if (this.#guardLocked()) return;
-        desc = desc.trim();
         const sel =
             this.#state.interaction
                 .selection;
         if (sel.kind !== 'edge') return;
-        const edgeId = sel.edgeId;
-        this.#state.edges =
-            this.#state.edges.map(
-                e => e.id === edgeId
-                    ? {
-                        ...e,
-                        description: desc,
-                    }
-                    : e,
-            );
+        this.#state.edges = applyUpdateEdge(
+            this.#state.edges,
+            sel.edgeId,
+            { description: desc.trim() },
+        );
         void this.#saveFlow(true);
         this.#noteMutation();
     }
@@ -1270,7 +1116,7 @@ Auto Fit</label>
             this.#state.nodes.find(
                 n => n.id === nodeId,
             )!.fields.length;
-        const fieldId = crypto.randomUUID();
+        const fieldId = generateId();
         const fId = this.#state.flowId;
         try {
             await postFieldAddition({
@@ -1302,18 +1148,10 @@ Auto Fit</label>
             isRequired,
             options,
         };
-        this.#state.nodes =
-            this.#state.nodes.map(
-                n => n.id === nodeId
-                    ? {
-                        ...n,
-                        fields: [
-                            ...n.fields,
-                            newField,
-                        ],
-                    }
-                    : n,
-            );
+        this.#state.nodes = applyAddField(
+            this.#state.nodes,
+            nodeId, newField,
+        );
         this.#noteMutation();
         return true;
     }
@@ -1342,19 +1180,10 @@ Auto Fit</label>
                 );
             return false;
         }
-        this.#state.nodes =
-            this.#state.nodes.map(
-                n => n.id === nodeId
-                    ? {
-                        ...n,
-                        fields:
-                            n.fields.filter(
-                                f => f.id
-                                    !== fieldId,
-                            ),
-                    }
-                    : n,
-            );
+        this.#state.nodes = applyDeleteField(
+            this.#state.nodes,
+            nodeId, fieldId,
+        );
         this.#noteMutation();
         return true;
     }
@@ -1405,8 +1234,8 @@ Auto Fit</label>
                 return false;
             }
         }
-        const nodeId = crypto.randomUUID();
-        const edgeId = crypto.randomUUID();
+        const nodeId = generateId();
+        const edgeId = generateId();
         const fId = this.#state.flowId;
         const posX =
             x - NODE_WIDTH / 2;
@@ -1447,29 +1276,15 @@ Auto Fit</label>
                 );
             return false;
         }
-        this.#state.nodes = [
-            ...this.#state.nodes,
-            {
-                id: nodeId,
-                name: 'New State',
-                description: '',
-                positionX: posX,
-                positionY: posY,
-                isStart: false,
-                isComplete: false,
-                fields: [],
-            },
-        ];
-        this.#state.edges = [
-            ...this.#state.edges,
-            {
-                id: edgeId,
-                name: 'Transition',
-                description: '',
-                fromNodeId,
-                toNodeId: nodeId,
-            },
-        ];
+        this.#state.nodes = applyAddNode(
+            this.#state.nodes,
+            nodeId, 'New State', posX, posY,
+        );
+        this.#state.edges = applyAddEdge(
+            this.#state.edges,
+            edgeId, 'Transition',
+            fromNodeId, nodeId,
+        );
         this.#noteMutation();
         this.#state.interaction
             .selection = {
@@ -1502,8 +1317,8 @@ Auto Fit</label>
             this.#computeDirectionPos(
                 fromNode, direction,
             );
-        const nodeId = crypto.randomUUID();
-        const edgeId = crypto.randomUUID();
+        const nodeId = generateId();
+        const edgeId = generateId();
         const fId = this.#state.flowId;
 
         try {
@@ -1541,29 +1356,15 @@ Auto Fit</label>
                 );
             return false;
         }
-        this.#state.nodes = [
-            ...this.#state.nodes,
-            {
-                id: nodeId,
-                name,
-                description: '',
-                positionX: pos.x,
-                positionY: pos.y,
-                isStart: false,
-                isComplete: false,
-                fields: [],
-            },
-        ];
-        this.#state.edges = [
-            ...this.#state.edges,
-            {
-                id: edgeId,
-                name: transitionName,
-                description: '',
-                fromNodeId,
-                toNodeId: nodeId,
-            },
-        ];
+        this.#state.nodes = applyAddNode(
+            this.#state.nodes,
+            nodeId, name, pos.x, pos.y,
+        );
+        this.#state.edges = applyAddEdge(
+            this.#state.edges,
+            edgeId, transitionName,
+            fromNodeId, nodeId,
+        );
         this.#noteMutation();
         this.reconcileLayout();
         return true;
@@ -1703,14 +1504,14 @@ Auto Fit</label>
         const vb =
             this.#state.interaction
                 .viewBox;
-        const cx = vb.x + vb.w / 2;
-        const cy = vb.y + vb.h / 2;
+        const centerX = vb.x + vb.w / 2;
+        const centerY = vb.y + vb.h / 2;
         const z =
             this.#state.interaction.zoom;
         vb.w = w / z;
         vb.h = h / z;
-        vb.x = cx - vb.w / 2;
-        vb.y = cy - vb.h / 2;
+        vb.x = centerX - vb.w / 2;
+        vb.y = centerY - vb.h / 2;
     }
 
     #applyZoomToFit(): void {
@@ -1721,12 +1522,16 @@ Auto Fit</label>
                     y: n.positionY,
                 }),
             );
-        zoomToFitState(
-            this.#state.interaction,
+        const result = zoomToFitState(
             positions,
             this.#canvasW,
             this.#canvasH,
         );
+        if (!result) return;
+        this.#state.interaction.zoom =
+            result.zoom;
+        this.#state.interaction.viewBox =
+            { ...result.viewBox };
     }
 
     #canDelete(): boolean {
@@ -1754,6 +1559,31 @@ Auto Fit</label>
         return buildFieldEditor(
             this.#singleSelectedNodeId(),
         );
+    }
+
+    tryShowFieldEditor(
+        container: HTMLElement,
+    ):
+        | 'opened'
+        | 'no-selection'
+        | 'locked'
+    {
+        if (this.selectedNodeId() === null) {
+            return 'no-selection';
+        }
+        if (this.isLocked()) {
+            return 'locked';
+        }
+        const slot = $(
+            '#field-editor-slot', container,
+        );
+        if (slot) {
+            mutateHtml(
+                slot,
+                this.buildFieldEditor(),
+            );
+        }
+        return 'opened';
     }
 
     #buildPropsPanel(): SafeHtml {
@@ -1980,28 +1810,10 @@ Auto Fit</label>
     }
 
     #nodesForRender(): GraphNode[] {
-        const drag =
-            this.#state.interaction.drag;
-        if (drag.kind !== 'dragging') {
-            return this.#state.nodes;
-        }
-        const dx =
-            drag.currentPointerX
-            - drag.startPointerX;
-        const dy =
-            drag.currentPointerY
-            - drag.startPointerY;
-        return this.#state.nodes.map(n => {
-            const init =
-                drag.initialPositions
-                    .get(n.id);
-            if (!init) return n;
-            return {
-                ...n,
-                positionX: init.x + dx,
-                positionY: init.y + dy,
-            };
-        });
+        return applyDragPreview(
+            this.#state.nodes,
+            this.#state.interaction.drag,
+        );
     }
 
     #buildCanvas(): SafeHtml {

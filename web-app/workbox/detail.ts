@@ -1,10 +1,11 @@
 import {
-    $, $required, attr,
+    $, $required, getRequiredAttribute,
 } from '../app/dom';
 import {
-    html, setHtml, trusted,
+    html, mutateHtml,
 } from '../app/safe-html';
 import type { SafeHtml } from '../app/safe-html';
+import { buildFieldInputHtml } from '../app/presenters';
 import { log } from '../app/logger';
 import { showToast } from '../app/toast';
 import {
@@ -58,7 +59,7 @@ function collectFieldValues(
             | HTMLTextAreaElement
         >('[data-field-id]');
     for (const input of inputs) {
-        const fieldId = attr(
+        const fieldId = getRequiredAttribute(
             input, 'data-field-id',
         );
         if (input.type === 'checkbox') {
@@ -77,110 +78,6 @@ function collectFieldValues(
 
 /* ── Build functions ─────── */
 
-const FIELD_HTML_TYPE: Record<
-    string,
-    { type: string; extra?: string }
-> = {
-    text: { type: 'text' },
-    number: { type: 'number' },
-    date: { type: 'date' },
-    email: { type: 'email' },
-    url: { type: 'url' },
-    phone: { type: 'tel' },
-    currency: {
-        type: 'number',
-        extra: 'step="0.01"',
-    },
-    checkbox: { type: 'checkbox' },
-    file: { type: 'file' },
-    image: {
-        type: 'file',
-        extra: 'accept="image/*"',
-    },
-};
-
-function buildFieldInput(
-    field: GraphField,
-): SafeHtml {
-    const id = field.id;
-    const req = field.isRequired
-        ? 'required'
-        : '';
-    if (field.fieldType === 'textarea') {
-        return html`<textarea
-            class="input"
-            rows="3"
-            data-field-id="${id}"
-            ${req}></textarea>`;
-    }
-    if (field.fieldType === 'select') {
-        return html`<select
-            class="input"
-            data-field-id="${id}"
-            ${req}>
-            <option value="">
-                Select...
-            </option>
-            ${field.options.map(
-                o => html`<option
-                    value="${o}"
-                    >${o}</option>`,
-            )}
-        </select>`;
-    }
-    if (
-        field.fieldType === 'radio'
-        || field.fieldType
-            === 'multi_select'
-    ) {
-        const inputType =
-            field.fieldType === 'radio'
-                ? 'radio' : 'checkbox';
-        return html`<div
-            class="flex flex-col
-                gap-2">
-            ${field.options.map(
-                o => html`<label
-                    class="flex
-                        items-center
-                        gap-2">
-                    <input
-                        type="${inputType}"
-                        name="${id}"
-                        value="${o}"
-                        data-field-id
-                            ="${id}" />
-                    ${o}
-                </label>`,
-            )}
-        </div>`;
-    }
-    const spec =
-        FIELD_HTML_TYPE[field.fieldType];
-    if (!spec) {
-        return html`<input
-            type="text"
-            class="input"
-            data-field-id="${id}"
-            ${req} />`;
-    }
-    if (spec.type === 'checkbox') {
-        return html`<input
-            type="checkbox"
-            data-field-id="${id}"
-            ${req} />`;
-    }
-    const extra = spec.extra
-        ? trusted(spec.extra)
-        : html``;
-    return html`<input
-        type="${spec.type}"
-        class="input"
-        data-field-id="${id}"
-        ${extra}
-        ${req} />`;
-}
-
 function buildFieldRow(
     field: GraphField,
 ): SafeHtml {
@@ -188,7 +85,7 @@ function buildFieldRow(
         + (field.isRequired ? ' *' : '');
     return html`<div class="mb-4">
         <label class="label">${label}</label>
-        ${buildFieldInput(field)}
+        ${buildFieldInputHtml(field)}
     </div>`;
 }
 
@@ -227,8 +124,7 @@ function buildHistoryEntry(
             <span
                 class="text-muted
                     ml-auto"
-            >${entry.userName
-                || '\u2014'}</span>
+            >${entry.userName}</span>
             <span
                 class="text-muted
                     text-sm"
@@ -361,7 +257,7 @@ function initTransitionButtons(
         btn.addEventListener(
             'click',
             async () => {
-                const edgeId = attr(
+                const edgeId = getRequiredAttribute(
                     btn, 'data-edge-id',
                 );
                 const values =
@@ -401,26 +297,6 @@ function initTransitionButtons(
                                 detail
                                     .currentNodeId(),
                         });
-                    await postActivity({
-                        type: 'status_changed',
-                        action:
-                            'transitioned'
-                            + ' work order',
-                        target:
-                            detail
-                                .flowNameText()
-                            + ' #'
-                            + detail
-                                .displayIdText(),
-                        status: '',
-                        feedback: '',
-                    });
-                    showToast(
-                        'Transition'
-                        + ' complete',
-                        'success',
-                    );
-                    navigateTo('workbox');
                 } catch (err) {
                     log.error(
                         'work order'
@@ -434,7 +310,27 @@ function initTransitionButtons(
                         + ' failed',
                         'error',
                     );
+                    return;
                 }
+                await postActivity({
+                    type: 'status_changed',
+                    action:
+                        'transitioned'
+                        + ' work order',
+                    target:
+                        detail
+                            .flowNameText()
+                        + ' #'
+                        + detail
+                            .displayIdText(),
+                    status: '',
+                    feedback: '',
+                });
+                showToast(
+                    'Transition complete',
+                    'success',
+                );
+                navigateTo('workbox');
             },
         );
     }
@@ -458,11 +354,6 @@ function initUnclaimButton(
                 await deleteWorkOrderClaim(
                     claimId,
                 );
-                showToast(
-                    'Work order released',
-                    'success',
-                );
-                navigateTo('workbox');
             } catch (err) {
                 log.error(
                     'work order release'
@@ -475,7 +366,13 @@ function initUnclaimButton(
                     + ' work order',
                     'error',
                 );
+                return;
             }
+            showToast(
+                'Work order released',
+                'success',
+            );
+            navigateTo('workbox');
         },
     );
 }
@@ -526,7 +423,7 @@ export async function init(
     );
     if (!detail) return;
 
-    setHtml(
+    mutateHtml(
         container,
         buildDetailView(detail),
     );

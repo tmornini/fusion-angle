@@ -1,4 +1,5 @@
 import { GET, POST, PUT, DELETE } from '../../../api/api';
+import { MissingTableError } from '../../../api/db';
 import type { UserEntity } from '../../../api/types';
 
 export async function deleteSchema(): Promise<void> {
@@ -40,6 +41,14 @@ export async function getSnapshot(): Promise<string> {
 }
 
 export async function getDataPresent(): Promise<boolean> {
-    const users = await GET<UserEntity[]>('users');
-    return users.length > 0;
+    try {
+        const users =
+            await GET<UserEntity[]>('users');
+        return users.length > 0;
+    } catch (err) {
+        if (err instanceof MissingTableError) {
+            return false;
+        }
+        throw err;
+    }
 }

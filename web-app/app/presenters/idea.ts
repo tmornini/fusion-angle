@@ -1,7 +1,7 @@
 import {
-    html, setHtml, SafeHtml,
+    html, mutateHtml, SafeHtml,
 } from '../safe-html';
-import { $ } from '../dom';
+import { $required } from '../dom';
 import {
     orderedKeys,
 } from './ordered-keys';
@@ -108,7 +108,7 @@ export function ideaPatchFromDraft(
 function buildShell(
     container: HTMLElement,
 ): void {
-    setHtml(container, html`
+    mutateHtml(container, html`
 <div class="idea-detail-host">
     <div class="idea-detail-wrap">
         <div class="${
@@ -150,24 +150,22 @@ function buildShell(
 </div>`);
 }
 
-function setSlot(
+function mutateSlot(
     container: HTMLElement,
     cls: string,
     markup: SafeHtml,
 ): void {
-    const slot = $(cls, container);
-    if (!slot) return;
-    setHtml(slot, markup);
+    const slot = $required(cls, container);
+    mutateHtml(slot, markup);
 }
 
 function updateWrapClass(
     container: HTMLElement,
     isReviewable: boolean,
 ): void {
-    const wrap = $(
+    const wrap = $required(
         '.idea-detail-wrap', container,
     );
-    if (!wrap) return;
     wrap.classList.toggle(
         'has-footer-actions',
         isReviewable,
@@ -596,6 +594,12 @@ export class IdeaPresenter {
         return this.#idea.statusValue();
     }
 
+    matchesStatus(
+        status: IdeaStatus,
+    ): boolean {
+        return this.statusGroup() === status;
+    }
+
     buildStatusBadge(
         isActive: boolean | null,
     ): SafeHtml {
@@ -715,40 +719,40 @@ export class IdeaPresenter {
             container,
             this.#idea.isReviewable(),
         );
-        setSlot(
+        mutateSlot(
             container,
             '.idea-breadcrumb-slot',
             buildBreadcrumb(
                 this.#idea.titleText(),
             ),
         );
-        setSlot(
+        mutateSlot(
             container,
             '.idea-title-slot',
             buildReadonlyTitleSection(
                 this.#idea,
             ),
         );
-        setSlot(
+        mutateSlot(
             container,
             '.idea-actions-slot',
             this.#buildActionButtons(),
         );
-        setSlot(
+        mutateSlot(
             container,
             '.idea-cards-slot',
             buildProblemSolutionReadonlyCard(
                 this.#idea,
             ),
         );
-        setSlot(
+        mutateSlot(
             container,
             '.idea-footer-slot',
             this.#idea.isReviewable()
                 ? buildApprovalFooter()
                 : html``,
         );
-        setSlot(
+        mutateSlot(
             container,
             '.idea-dialogs-slot',
             this.#idea.isReviewable()
@@ -807,40 +811,40 @@ export class IdeaEditPresenter {
             container,
             this.#idea.isReviewable(),
         );
-        setSlot(
+        mutateSlot(
             container,
             '.idea-breadcrumb-slot',
             buildBreadcrumb(
                 this.#draft.title,
             ),
         );
-        setSlot(
+        mutateSlot(
             container,
             '.idea-title-slot',
             buildEditableTitleSection(
                 this.#idea, this.#draft,
             ),
         );
-        setSlot(
+        mutateSlot(
             container,
             '.idea-actions-slot',
             this.#buildActionButtons(),
         );
-        setSlot(
+        mutateSlot(
             container,
             '.idea-cards-slot',
             buildProblemSolutionEditableCard(
                 this.#draft,
             ),
         );
-        setSlot(
+        mutateSlot(
             container,
             '.idea-footer-slot',
             this.#idea.isReviewable()
                 ? buildApprovalFooter()
                 : html``,
         );
-        setSlot(
+        mutateSlot(
             container,
             '.idea-dialogs-slot',
             this.#idea.isReviewable()
@@ -875,40 +879,49 @@ export class IdeaEditPresenter {
     }
 }
 
+export type IdeaListFilter =
+    | { kind: 'all' }
+    | { kind: 'filtered'; status: IdeaStatus };
+
+export type IdeaListState = {
+    ideas: Idea[];
+    filter: IdeaListFilter;
+};
+
+export function buildInitialIdeaListState(
+    ideas: Idea[],
+): IdeaListState {
+    return { ideas, filter: { kind: 'all' } };
+}
+
+export function applyIdeaListUpdate(
+    state: IdeaListState,
+    ideas: Idea[],
+): IdeaListState {
+    return { ...state, ideas };
+}
+
+export function applyIdeaFilterToggle(
+    state: IdeaListState,
+    status: IdeaStatus,
+): IdeaListState {
+    const next: IdeaListFilter =
+        state.filter.kind === 'filtered'
+        && state.filter.status === status
+            ? { kind: 'all' }
+            : { kind: 'filtered', status };
+    return { ...state, filter: next };
+}
+
 export class IdeaListPresenter {
     #ideas: IdeaPresenter[];
-    #filter:
-        | { kind: 'all' }
-        | {
-            kind: 'filtered';
-            status: IdeaStatus;
-        } = { kind: 'all' };
+    #filter: IdeaListFilter;
 
-    constructor(ideas: Idea[]) {
-        this.#ideas = ideas.map(
+    constructor(state: IdeaListState) {
+        this.#ideas = state.ideas.map(
             i => new IdeaPresenter(i),
         );
-    }
-
-    update(ideas: Idea[]): void {
-        this.#ideas = ideas.map(
-            i => new IdeaPresenter(i),
-        );
-    }
-
-    toggleFilter(
-        status: IdeaStatus,
-    ): void {
-        this.#filter =
-            this.#filter.kind
-                === 'filtered'
-            && this.#filter.status
-                === status
-                ? { kind: 'all' }
-                : {
-                    kind: 'filtered',
-                    status,
-                };
+        this.#filter = state.filter;
     }
 
     activeFilter():
@@ -922,7 +935,7 @@ export class IdeaListPresenter {
     renderBadges(
         container: HTMLElement,
     ): void {
-        setHtml(
+        mutateHtml(
             container, this.#buildBadges(),
         );
     }
@@ -930,17 +943,7 @@ export class IdeaListPresenter {
     renderList(
         container: HTMLElement,
     ): void {
-        setHtml(container, this.#buildList());
-    }
-
-    applyFilterToggle(
-        status: IdeaStatus,
-        badgesEl: HTMLElement,
-        listEl: HTMLElement,
-    ): void {
-        this.toggleFilter(status);
-        this.renderBadges(badgesEl);
-        this.renderList(listEl);
+        mutateHtml(container, this.#buildList());
     }
 
     #buildBadges(): SafeHtml {
@@ -978,8 +981,9 @@ export class IdeaListPresenter {
         const filtered =
             f.kind === 'filtered'
                 ? this.#ideas.filter(
-                    i => i.statusGroup()
-                        === f.status,
+                    i => i.matchesStatus(
+                        f.status,
+                    ),
                 )
                 : this.#ideas;
         const sorted =

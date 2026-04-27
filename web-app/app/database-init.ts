@@ -1,9 +1,9 @@
 import { log } from './logger';
 import {
-    html, setHtml,
+    html, mutateHtml,
 } from './safe-html';
 import {
-    errorMessage,
+    formatErrorMessage,
 } from './loading-states';
 
 export async function initDatabase(
@@ -39,7 +39,7 @@ export function handleDatabaseError(
         'core',
         err,
     );
-    setHtml(document.body, html`<div
+    mutateHtml(document.body, html`<div
         style="padding:2rem;
             font-family:sans-serif;
             max-width:40rem">
@@ -51,7 +51,7 @@ export function handleDatabaseError(
             border-radius:0.5rem;
             overflow:auto;
             white-space:pre-wrap"
->${errorMessage(
+>${formatErrorMessage(
     err, 'Unknown database error',
 )}</pre>
       <p>Try clearing site data

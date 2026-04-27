@@ -38,12 +38,10 @@ const VERSION = 20;
 const STORE = 0;
 const DEFLATE = 8;
 
-const encoder = new TextEncoder();
-const decoder = new TextDecoder();
-
 export function buildZip(
     files: ZipEntry[],
 ): Uint8Array {
+    const encoder = new TextEncoder();
     let totalSize = END_RECORD;
     for (const f of files) {
         const nameBytes =
@@ -286,6 +284,7 @@ function getLocalData(
 export async function getZipEntries(
     data: Uint8Array,
 ): Promise<ZipEntry[]> {
+    const decoder = new TextDecoder();
     const view = new DataView(
         data.buffer,
         data.byteOffset,

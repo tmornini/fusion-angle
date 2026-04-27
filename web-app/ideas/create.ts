@@ -3,7 +3,7 @@ import {
     bindEnterToClick,
 } from '../app/dom';
 import {
-    setHtml,
+    mutateHtml,
 } from '../app/safe-html';
 import { navigateTo } from '../app/core';
 import {
@@ -11,6 +11,7 @@ import {
     putIdea,
     putIdeaSubmission,
     jsonArrayField,
+    generateId,
 } from '../app/adapters';
 import {
     IdeaCreatePresenter,
@@ -31,7 +32,7 @@ export async function init():
         const root =
             $('#create-content', document);
         if (!root) return;
-        setHtml(
+        mutateHtml(
             root,
             new IdeaCreatePresenter(formState)
                 .render(),
@@ -128,7 +129,7 @@ export async function init():
             async () => {
                 formState = readFormFromDom();
                 const ideaId =
-                    crypto.randomUUID();
+                    generateId();
                 await putIdea(
                     ideaId,
                     {
@@ -170,7 +171,7 @@ export async function init():
                     },
                 );
                 await putIdeaSubmission(
-                    crypto.randomUUID(),
+                    generateId(),
                     ideaId,
                     'current',
                 );

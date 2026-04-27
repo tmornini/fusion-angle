@@ -1,7 +1,7 @@
 import {
-    html, setHtml, SafeHtml,
+    html, mutateHtml, SafeHtml,
 } from '../safe-html';
-import { $ } from '../dom';
+import { $required } from '../dom';
 import {
     iconMail,
     iconPhone,
@@ -34,7 +34,7 @@ export type ProfileFieldKey =
 function buildShell(
     container: HTMLElement,
 ): void {
-    setHtml(container, html`
+    mutateHtml(container, html`
 <div class="idea-detail-wrap">
     <div class="profile-header-slot"></div>
     <div class="profile-info-slot"></div>
@@ -43,14 +43,12 @@ function buildShell(
 </div>`);
 }
 
-function setSlot(
+function mutateSlot(
     container: HTMLElement,
     cls: string,
     markup: SafeHtml,
 ): void {
-    const slot = $(cls, container);
-    if (!slot) return;
-    setHtml(slot, markup);
+    mutateHtml($required(cls, container), markup);
 }
 
 function buildHeader(
@@ -311,22 +309,22 @@ export class ProfilePresenter {
     renderUpdate(
         container: HTMLElement,
     ): void {
-        setSlot(
+        mutateSlot(
             container,
             '.profile-header-slot',
             this.#buildHeader(),
         );
-        setSlot(
+        mutateSlot(
             container,
             '.profile-info-slot',
             this.#buildPersonalInfoCard(),
         );
-        setSlot(
+        mutateSlot(
             container,
             '.profile-styles-slot',
             this.#buildWorkingStylesCard(),
         );
-        setSlot(
+        mutateSlot(
             container,
             '.profile-strengths-slot',
             this.#buildStrengthsCard(),
@@ -430,22 +428,22 @@ export class ProfileEditPresenter {
     renderUpdate(
         container: HTMLElement,
     ): void {
-        setSlot(
+        mutateSlot(
             container,
             '.profile-header-slot',
             this.#buildHeader(),
         );
-        setSlot(
+        mutateSlot(
             container,
             '.profile-info-slot',
             this.#buildPersonalInfoCard(),
         );
-        setSlot(
+        mutateSlot(
             container,
             '.profile-styles-slot',
             this.#buildWorkingStylesCard(),
         );
-        setSlot(
+        mutateSlot(
             container,
             '.profile-strengths-slot',
             this.#buildStrengthsCard(),

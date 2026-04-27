@@ -10,6 +10,7 @@ import {
     nowUtc,
     toBool,
 } from '../../../api/types';
+import { generateId } from './uuid';
 
 export interface FlowVersion {
     id: string;
@@ -63,7 +64,7 @@ export async function postFlowVersion(
         'flows/' + flowId,
     );
     await PUT<void>('flow-versions', {
-        id: crypto.randomUUID(),
+        id: generateId(),
         flow_id: flowId,
         name: flow.name,
         description: flow.description,

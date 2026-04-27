@@ -7,6 +7,7 @@ import type {
     ActivityType,
 } from '../../../api/types';
 import { getCurrentUser } from './shared';
+import { generateId } from './uuid';
 
 export {
     isActivityType,
@@ -29,8 +30,8 @@ export async function postActivity(
     input: ActivityInput,
 ): Promise<void> {
     const auth = await getCurrentUser();
-    const activityId = crypto.randomUUID();
-    const actorId = crypto.randomUUID();
+    const activityId = generateId();
+    const actorId = generateId();
     const timestamp = nowUtc();
     await PUT(
         `activities/${activityId}`,

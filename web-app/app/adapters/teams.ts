@@ -5,6 +5,8 @@ import type {
     UserEntity,
 } from '../../../api/types';
 import { User } from '../../../api/types';
+import { getUserMap } from './shared';
+import type { FetchContext } from './shared';
 export {
     User,
     AVAILABILITY_HIGH,
@@ -14,11 +16,10 @@ export {
 const TOP_MEMBERS_COUNT = 6;
 
 export async function getTeamMembers(
+    ctx?: FetchContext,
 ): Promise<User[]> {
-    const rows =
-        await GET<UserEntity[]>('users');
-    return rows
-        .map(entity => new User(entity))
+    const userMap = await getUserMap(ctx);
+    return Array.from(userMap.values())
         .filter(user =>
             user.hasDepartment()
             && user.hasPerformanceScore(),
@@ -38,11 +39,10 @@ export type UserAccountStatus =
     | 'deactivated';
 
 export async function getManagedUsers(
+    ctx?: FetchContext,
 ): Promise<User[]> {
-    const rows =
-        await GET<UserEntity[]>('users');
-    return rows
-        .map(entity => new User(entity));
+    const userMap = await getUserMap(ctx);
+    return Array.from(userMap.values());
 }
 
 export async function getUserEntity(

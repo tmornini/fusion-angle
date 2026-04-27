@@ -4,7 +4,7 @@ import {
     ProfileEditPresenter,
     type ProfileFieldKey,
 } from '../app/presenters';
-import { setHtml } from '../app/safe-html';
+import { mutateHtml } from '../app/safe-html';
 import { showToast } from '../app/toast';
 import {
     buildErrorState,
@@ -84,7 +84,7 @@ export async function init(): Promise<void> {
             'profile',
             err,
         );
-        setHtml(
+        mutateHtml(
             container,
             buildErrorState(
                 'Failed to load profile.',

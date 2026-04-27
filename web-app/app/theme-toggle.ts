@@ -1,17 +1,12 @@
 import {
-    state,
+    getThemeIcon,
     isValidTheme,
-    setTheme,
+    persistThemePreference,
 } from './state';
 import { $, $$ } from './dom';
-import { setHtml } from './safe-html';
+import { mutateHtml } from './safe-html';
 import { showToast } from './toast';
 import { log } from './logger';
-import {
-    iconSun,
-    iconMoon,
-    iconMonitor,
-} from './icons';
 
 const THEME_TOGGLE_IDS = [
     'theme-toggle',
@@ -20,18 +15,13 @@ const THEME_TOGGLE_IDS = [
 
 export function mutateThemeToggleIcon(
 ): void {
-    const themeIcon =
-        state.theme === 'dark'
-            ? iconMoon(20, '')
-            : state.theme === 'light'
-                ? iconSun(20, '')
-                : iconMonitor(20, '');
+    const themeIcon = getThemeIcon(20, '');
     const themeLabel = 'Toggle theme';
     THEME_TOGGLE_IDS.forEach(id => {
         const button =
             $(`#${id}`, document);
         if (button) {
-            setHtml(button, themeIcon);
+            mutateHtml(button, themeIcon);
             button.setAttribute(
                 'aria-label',
                 themeLabel,
@@ -121,11 +111,13 @@ export function initThemeAndDropdowns(
                         isValidTheme(theme)
                     ) {
                         try {
-                            setTheme(theme);
+                            persistThemePreference(
+                                theme,
+                            );
                         } catch (e) {
                             log.warn(
-                                'setTheme'
-                                + ' failed',
+                                'persistThemePreference'
+                                    + ' failed',
                                 'theme-toggle',
                                 e,
                             );

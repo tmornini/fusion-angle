@@ -3,10 +3,13 @@ import { createElement } from './dom';
 const INDICATOR_HEIGHT = 3;
 const INDICATOR_COLOR =
     'hsl(var(--primary))';
+const INDICATOR_BORDER_RADIUS = '2px';
+const INDICATOR_MARGIN = '2px 0';
 const DRAGGING_OPACITY = '0.4';
 const FIRST_POSITION = 1;
 const POSITION_GAP = 1;
 const HYSTERESIS_PX = 8;
+const DRAG_HANDLE_SELECTOR = '.cursor-grab';
 
 type DragState =
     | { kind: 'idle' }
@@ -47,8 +50,9 @@ export function initDragReorder(
             INDICATOR_HEIGHT + 'px';
         el.style.background =
             INDICATOR_COLOR;
-        el.style.borderRadius = '2px';
-        el.style.margin = '2px 0';
+        el.style.borderRadius =
+            INDICATOR_BORDER_RADIUS;
+        el.style.margin = INDICATOR_MARGIN;
         el.style.pointerEvents = 'none';
         return el;
     }
@@ -109,7 +113,7 @@ export function initDragReorder(
             if (!card) return;
             const handle =
                 pointerTarget?.closest(
-                    '.cursor-grab',
+                    DRAG_HANDLE_SELECTOR,
                 );
             if (!handle) {
                 e.preventDefault();

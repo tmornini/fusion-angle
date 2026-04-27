@@ -332,5 +332,9 @@
     animation: scale-in var(--duration-normal)
         var(--ease-out) forwards;
 }
-.animate-spin-slow { animation: spin-slow 3s linear infinite; }
+.animate-spin-slow {
+    animation: spin-slow
+        var(--duration-spin-slow)
+        linear infinite;
+}
 

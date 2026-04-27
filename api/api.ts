@@ -1,5 +1,8 @@
 import type { DbAdapter } from './db';
-import { EntityNotFound } from './db';
+import {
+    EntityNotFound,
+    MissingTableError,
+} from './db';
 import { nowUtc } from './types';
 import type {
     UserEntity,
@@ -28,6 +31,10 @@ export class ApiError {
         readonly status: number,
     ) {}
 }
+
+const HTTP_BAD_REQUEST = 400;
+const HTTP_NOT_FOUND = 404;
+const HTTP_INTERNAL_ERROR = 500;
 
 let adapter: DbAdapter | undefined;
 
@@ -459,7 +466,7 @@ const routes: Route[] = [
                     throw new ApiError(
                         'Missing or invalid'
                         + ' "role" field.',
-                        400,
+                        HTTP_BAD_REQUEST,
                     );
                 }
                 if (
@@ -470,7 +477,7 @@ const routes: Route[] = [
                     throw new ApiError(
                         'Missing or invalid'
                         + ' "type" field.',
-                        400,
+                        HTTP_BAD_REQUEST,
                     );
                 }
                 const tmId =
@@ -545,7 +552,7 @@ const routes: Route[] = [
                     'Missing or invalid'
                     + ' "json" field:'
                     + ' expected a string.',
-                    400,
+                    HTTP_BAD_REQUEST,
                 );
             }
             return db.importSnapshot(
@@ -619,7 +626,7 @@ export async function handleRequest(
                 error:
                     'Not found: ' + pathname,
             },
-            { status: 404 },
+            { status: HTTP_NOT_FOUND },
         );
     }
 
@@ -746,6 +753,11 @@ export async function handleRequest(
                 );
         }
     } catch (error) {
+        if (
+            error instanceof MissingTableError
+        ) {
+            throw error;
+        }
         if (error instanceof ApiError) {
             return Response.json(
                 { error: error.message },
@@ -757,7 +769,7 @@ export async function handleRequest(
         ) {
             return Response.json(
                 { error: error.message },
-                { status: 404 },
+                { status: HTTP_NOT_FOUND },
             );
         }
         return Response.json(
@@ -767,7 +779,7 @@ export async function handleRequest(
                         ? error.message
                         : String(error),
             },
-            { status: 500 },
+            { status: HTTP_INTERNAL_ERROR },
         );
     }
 }

@@ -15,12 +15,12 @@ export function trusted(rawHtml: string): SafeHtml {
 }
 
 export function escapeForHtml(str: string): string {
-    return str
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
+    let escaped = str.replace(/&/g, '&amp;');
+    escaped = escaped.replace(/</g, '&lt;');
+    escaped = escaped.replace(/>/g, '&gt;');
+    escaped = escaped.replace(/"/g, '&quot;');
+    escaped = escaped.replace(/'/g, '&#39;');
+    return escaped;
 }
 
 function interpolate(value: unknown): string {
@@ -41,6 +41,6 @@ export function html(
     return new SafeHtml(result);
 }
 
-export function setHtml(element: HTMLElement, content: SafeHtml): void {
+export function mutateHtml(element: HTMLElement, content: SafeHtml): void {
     element.innerHTML = content.toString();
 }

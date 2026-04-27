@@ -1,4 +1,4 @@
-import { $$, attr } from './dom';
+import { $$, getRequiredAttribute } from './dom';
 import { getPageName } from './navigation';
 
 const NAV_GROUP_CHILDREN:
@@ -24,7 +24,7 @@ export function initActiveNavItem(
         '[data-page-link]', document,
     ).forEach(
         navLink => {
-            const linkPage = attr(
+            const linkPage = getRequiredAttribute(
                 navLink,
                 'data-page-link',
             );

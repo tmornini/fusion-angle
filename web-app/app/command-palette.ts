@@ -3,7 +3,7 @@ import {
 } from './dom';
 import {
     html,
-    setHtml,
+    mutateHtml,
     SafeHtml,
     trusted,
     escapeForHtml,
@@ -20,11 +20,14 @@ import {
     getIdeas,
     getProjects,
     getTeamMembers,
+    createFetchContext,
+    setLocation,
 } from './adapters';
 import {
     PAGE_REGISTRY,
 } from './page-registry';
 import { buildPageUrl } from './navigation';
+import { pluralize } from './format';
 
 interface SearchItem {
     id: string;
@@ -167,11 +170,12 @@ export function initCommandPalette(
             }),
         );
 
+        const ctx = createFetchContext();
         const [ideas, projects, members] =
             await Promise.all([
-                getIdeas(),
+                getIdeas(ctx),
                 getProjects(),
-                getTeamMembers(),
+                getTeamMembers(ctx),
             ]);
 
         const ideaItems:
@@ -325,7 +329,7 @@ export function initCommandPalette(
             state.filteredItems.length
             === 0
         ) {
-            setHtml(
+            mutateHtml(
                 state.list,
                 html`<div
 class="command-palette-empty"
@@ -416,16 +420,19 @@ ${posIndex === 0
             }
         }
 
-        setHtml(
+        mutateHtml(
             state.list,
             html`${markup}`,
         );
-        if (state.liveRegion)
+        if (state.liveRegion) {
+            const count =
+                state.filteredItems.length;
             state.liveRegion
                 .textContent =
-                `${state.filteredItems.length}`
-                + ` result${state.filteredItems.length !== 1 ? 's' : ''}`
+                `${count} `
+                + `${pluralize(count, 'result')}`
                 + ` found`;
+        }
     }
 
     function mutateActiveItem(): void {
@@ -465,6 +472,18 @@ ${posIndex === 0
         }
     }
 
+    function moveActiveIndex(
+        delta: number,
+    ): void {
+        const len =
+            state.filteredItems.length;
+        if (len === 0) return;
+        state.activeIndex =
+            (state.activeIndex + delta + len)
+            % len;
+        mutateActiveItem();
+    }
+
     function navigateToItem(
         index: number,
     ): void {
@@ -472,7 +491,7 @@ ${posIndex === 0
             state.filteredItems[index];
         if (!item) return;
         close();
-        window.location.href = item.href;
+        setLocation(item.href);
     }
 
     function open(): void {
@@ -547,7 +566,7 @@ ${posIndex === 0
             'Search',
         );
 
-        setHtml(state.dialog, html`
+        mutateHtml(state.dialog, html`
     <div class="${
         'command-palette-input-wrapper'
     }">
@@ -667,49 +686,14 @@ ${posIndex === 0
                     close();
                     return;
                 }
-                if (
-                    e.key === 'ArrowDown'
-                ) {
+                if (e.key === 'ArrowDown') {
                     e.preventDefault();
-                    if (
-                        state
-                            .filteredItems
-                            .length > 0
-                    ) {
-                        state
-                            .activeIndex =
-                            (state
-                                .activeIndex
-                                + 1)
-                            % state
-                                .filteredItems
-                                .length;
-                        mutateActiveItem();
-                    }
+                    moveActiveIndex(1);
                     return;
                 }
-                if (
-                    e.key === 'ArrowUp'
-                ) {
+                if (e.key === 'ArrowUp') {
                     e.preventDefault();
-                    if (
-                        state
-                            .filteredItems
-                            .length > 0
-                    ) {
-                        state
-                            .activeIndex =
-                            (state
-                                .activeIndex
-                                - 1
-                                + state
-                                    .filteredItems
-                                    .length)
-                            % state
-                                .filteredItems
-                                .length;
-                        mutateActiveItem();
-                    }
+                    moveActiveIndex(-1);
                     return;
                 }
                 if (

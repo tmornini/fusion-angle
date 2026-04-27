@@ -1,7 +1,7 @@
 import { $ } from '../app/dom';
 import {
     html,
-    setHtml,
+    mutateHtml,
     trusted,
     type SafeHtml,
 } from '../app/safe-html';
@@ -427,7 +427,7 @@ export async function init(): Promise<void> {
     const succBorderStyle =
         'border-color:hsl(var(--success))';
 
-    setHtml(root, html`
+    mutateHtml(root, html`
     <div class="ds-page">
         <div>
             <h1 class="${''

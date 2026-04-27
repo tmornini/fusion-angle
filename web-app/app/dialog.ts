@@ -2,6 +2,13 @@ import {
     $required, FOCUSABLE_SELECTOR,
 } from './dom';
 
+const BACKDROP_SUFFIX = '-backdrop';
+const DIALOG_SUFFIX = '-dialog';
+const CANCEL_SUFFIX = '-cancel';
+const SUBMIT_SUFFIX = '-submit';
+const TAB_PANEL_PREFIX = 'tab-';
+const TAB_BUTTON_PREFIX = 'tab-btn-';
+
 class DialogStack {
     readonly #focus: HTMLElement[] = [];
     readonly #ids: string[] = [];
@@ -49,7 +56,7 @@ function handleEscape(
     e.stopPropagation();
     const cancelBtn =
         document.getElementById(
-            `${topId}-cancel`,
+            topId + CANCEL_SUFFIX,
         );
     if (cancelBtn) {
         cancelBtn.click();
@@ -70,11 +77,11 @@ function openDialog(
         );
     }
     $required(
-        `#${dialogId}-backdrop`,
+        '#' + dialogId + BACKDROP_SUFFIX,
         document,
     ).classList.remove('hidden');
     const dialog = $required(
-        `#${dialogId}-dialog`,
+        '#' + dialogId + DIALOG_SUFFIX,
         document,
     );
     dialog.classList.remove('hidden');
@@ -100,11 +107,11 @@ function closeDialog(
     dialogId: string,
 ): void {
     $required(
-        `#${dialogId}-backdrop`,
+        '#' + dialogId + BACKDROP_SUFFIX,
         document,
     ).classList.add('hidden');
     const dialog = $required(
-        `#${dialogId}-dialog`,
+        '#' + dialogId + DIALOG_SUFFIX,
         document,
     );
     dialog.classList.add('hidden');
@@ -141,9 +148,13 @@ function initTabs(
     tabs.forEach(tab => {
         const tabId = tab.dataset.tab;
         if (!tabId) return;
-        const panel = document.getElementById(`tab-${tabId}`);
-        const tabButtonId = `tab-btn-${tabId}`;
-        const panelId = `tab-${tabId}`;
+        const panel = document.getElementById(
+            TAB_PANEL_PREFIX + tabId,
+        );
+        const tabButtonId =
+            TAB_BUTTON_PREFIX + tabId;
+        const panelId =
+            TAB_PANEL_PREFIX + tabId;
 
         tab.setAttribute('role', 'tab');
         tab.id = tabButtonId;
@@ -174,7 +185,9 @@ function initTabs(
         tab.setAttribute('tabindex', '0');
         tab.focus();
         panels.forEach(panel => { panel.style.display = 'none'; });
-        const panel = document.getElementById(`tab-${tabId}`);
+        const panel = document.getElementById(
+            TAB_PANEL_PREFIX + tabId,
+        );
         if (panel) panel.style.display = '';
     }
 
@@ -206,22 +219,22 @@ function initDialog(
     onSubmit?: () => void,
 ): void {
     const cancelId =
-        `${dialogId}-cancel`;
+        dialogId + CANCEL_SUFFIX;
 
     $required(
-        `#${openBtnId}`, document,
+        '#' + openBtnId, document,
     ).addEventListener(
         'click',
         () => openDialog(dialogId),
     );
     $required(
-        `#${cancelId}`, document,
+        '#' + cancelId, document,
     ).addEventListener(
         'click',
         () => closeDialog(dialogId),
     );
     $required(
-        `#${dialogId}-backdrop`,
+        '#' + dialogId + BACKDROP_SUFFIX,
         document,
     ).addEventListener(
         'click',
@@ -236,7 +249,7 @@ function initDialog(
     );
     if (onSubmit) {
         $required(
-            `#${dialogId}-submit`,
+            '#' + dialogId + SUBMIT_SUFFIX,
             document,
         ).addEventListener(
             'click',

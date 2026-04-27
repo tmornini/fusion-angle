@@ -21,6 +21,7 @@ import { postFlowVersion } from './flow-versions';
 import {
     buildStartAndCompleteNodes,
 } from './flow-defaults';
+import { generateId } from './uuid';
 
 function parseGraph(
     raw: string,
@@ -121,7 +122,7 @@ export async function postFlowCreation(
     });
 
     await PUT<void>('project-flows', {
-        id: crypto.randomUUID(),
+        id: generateId(),
         project_id: ctx.projectId,
         flow_id: ctx.flowId,
         created_at: now,

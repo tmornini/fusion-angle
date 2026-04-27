@@ -14,19 +14,19 @@ export function buildFlowHistorySnapshot(
     };
 }
 
-export function canUndo(
+export function canUndoFlowEdits(
     s: FlowHistorySnapshot,
 ): boolean {
     return s.hasUndoHistory;
 }
 
-export function canRedo(
+export function canRedoFlowEdits(
     s: FlowHistorySnapshot,
 ): boolean {
     return s.redoStack.length > 0;
 }
 
-export function noteMutation(
+export function recordFlowMutation(
     s: FlowHistorySnapshot,
 ): FlowHistorySnapshot {
     return {
@@ -42,7 +42,7 @@ export function setHasUndoHistory(
     return { ...s, hasUndoHistory: value };
 }
 
-export function pushRedo(
+export function appendToRedoStack(
     s: FlowHistorySnapshot,
     version: FlowVersion,
 ): FlowHistorySnapshot {
@@ -57,7 +57,7 @@ export interface PoppedRedo {
     readonly version: FlowVersion | undefined;
 }
 
-export function popRedo(
+export function removeFromRedoStack(
     s: FlowHistorySnapshot,
 ): PoppedRedo {
     if (s.redoStack.length === 0) {

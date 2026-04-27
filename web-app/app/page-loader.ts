@@ -1,8 +1,8 @@
 import { log } from './logger';
-import { setHtml } from './safe-html';
+import { mutateHtml } from './safe-html';
 import {
     buildErrorState,
-    errorMessage,
+    formatErrorMessage,
 } from './loading-states';
 import {
     navigateTo,
@@ -113,10 +113,10 @@ export function handlePageLoadError(
             'page-root',
         );
     if (container) {
-        setHtml(
+        mutateHtml(
             container,
             buildErrorState(
-                errorMessage(
+                formatErrorMessage(
                     err,
                     'This page'
                     + ' failed to'

@@ -4,6 +4,8 @@ import {
     formatCompactCurrency,
 } from './adapters';
 
+const DISPLAY_ABSENT = '—';
+
 function initials(name: string): string {
     if (!name) return '';
     return name
@@ -24,9 +26,9 @@ function getTimeOfDay(): string {
 }
 
 function formatDate(iso: string): string {
-    const d = new Date(iso);
-    if (isNaN(d.getTime())) return '—';
-    return d.toLocaleDateString('en-US', {
+    const parsedDate = new Date(iso);
+    if (isNaN(parsedDate.getTime())) return DISPLAY_ABSENT;
+    return parsedDate.toLocaleDateString('en-US', {
         month: 'short',
         day: 'numeric',
         year: 'numeric',
@@ -37,9 +39,9 @@ function formatDate(iso: string): string {
 function formatDateTime(
     iso: string,
 ): string {
-    const d = new Date(iso);
-    if (isNaN(d.getTime())) return '\u2014';
-    return d.toLocaleString('en-US', {
+    const parsedDate = new Date(iso);
+    if (isNaN(parsedDate.getTime())) return DISPLAY_ABSENT;
+    return parsedDate.toLocaleString('en-US', {
         month: 'short',
         day: 'numeric',
         year: 'numeric',
@@ -55,14 +57,21 @@ function toDateInputValue(
     return iso.slice(0, 10);
 }
 
-const DISPLAY_ABSENT = '\u2014';
-
 function displayText(
     value: string,
 ): string {
     return value !== ''
         ? value
         : DISPLAY_ABSENT;
+}
+
+function pluralize(
+    count: number,
+    word: string,
+): string {
+    return count === 1
+        ? word
+        : word + 's';
 }
 
 function trimStrings<
@@ -87,6 +96,7 @@ export {
     formatDateTime,
     getTimeOfDay,
     initials,
+    pluralize,
     toDateInputValue,
     trimStrings,
     durationInDays,

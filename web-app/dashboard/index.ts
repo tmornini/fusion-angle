@@ -1,7 +1,7 @@
 import { $ } from '../app/dom';
 import {
     html,
-    setHtml,
+    mutateHtml,
 } from '../app/safe-html';
 import {
     buildSkeleton,
@@ -32,7 +32,7 @@ export async function init(
     const rendered = gauges.map(
         g => new GaugePresenter(g).render(),
     );
-    setHtml(
+    mutateHtml(
         container,
         html`${rendered}`,
     );

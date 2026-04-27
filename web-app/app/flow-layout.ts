@@ -42,6 +42,27 @@ function isDummy(id: string): boolean {
     return id.startsWith(DUMMY_PREFIX);
 }
 
+function countPairInversions(
+    pairs: readonly (readonly [number, number])[],
+): number {
+    let total = 0;
+    for (let i = 0; i < pairs.length; i++) {
+        for (
+            let j = i + 1;
+            j < pairs.length;
+            j++
+        ) {
+            const [t1, b1] = pairs[i]!;
+            const [t2, b2] = pairs[j]!;
+            const isInversion =
+                (t1 < t2 && b1 > b2)
+                || (t1 > t2 && b1 < b2);
+            if (isInversion) total++;
+        }
+    }
+    return total;
+}
+
 export function edgeWaypointKey(
     fromId: string, toId: string,
 ): string {
@@ -160,11 +181,17 @@ export function computeLayout(
             );
             const canvasAspect =
                 canvasWidth / canvasHeight;
-            const mis = (a: number): number =>
-                Math.max(a, canvasAspect)
-                / Math.min(a, canvasAspect);
-            if (mis(computeBboxAspect(snakePos))
-                < mis(computeBboxAspect(sugiPos))) {
+            const snakeMismatch =
+                computeAspectMismatch(
+                    computeBboxAspect(snakePos),
+                    canvasAspect,
+                );
+            const sugiMismatch =
+                computeAspectMismatch(
+                    computeBboxAspect(sugiPos),
+                    canvasAspect,
+                );
+            if (snakeMismatch < sugiMismatch) {
                 return {
                     positions: fitToCanvas(
                         snakePos,
@@ -516,8 +543,9 @@ function reduceCrossings(
             }
             return { id, bary: sum / ns.length };
         });
-        withBary.sort((a, b) => a.bary - b.bary);
-        return withBary.map(b => b.id);
+        return withBary
+            .toSorted((a, b) => a.bary - b.bary)
+            .map(b => b.id);
     };
 
     const sweepDown = (
@@ -583,24 +611,7 @@ function reduceCrossings(
                     }
                 }
             });
-            for (let i = 0; i < pairs.length; i++) {
-                for (
-                    let j = i + 1;
-                    j < pairs.length;
-                    j++
-                ) {
-                    const p1 = pairs[i]!;
-                    const p2 = pairs[j]!;
-                    const t1 = p1[0];
-                    const b1 = p1[1];
-                    const t2 = p2[0];
-                    const b2 = p2[1];
-                    const crosses =
-                        (t1 < t2 && b1 > b2)
-                        || (t1 > t2 && b1 < b2);
-                    if (crosses) total++;
-                }
-            }
+            total += countPairInversions(pairs);
         }
         return total;
     };
@@ -753,9 +764,10 @@ function medianY(
     ids: readonly string[],
     ys: Map<string, number>,
 ): number {
+    if (ids.length === 0) return 0;
     const vals = ids
         .map(id => ys.get(id)!)
-        .sort((a, b) => a - b);
+        .toSorted((a, b) => a - b);
     const mid = Math.floor(vals.length / 2);
     if (vals.length % 2 === 1) {
         return vals[mid]!;
@@ -931,16 +943,17 @@ function fitToCanvas(
         if (isFinite(sX) && isFinite(sY)) {
             const sSmall = Math.min(sX, sY);
             const sBig = Math.max(sX, sY);
-            const capped = Math.min(
+            const cappedBig = Math.min(
                 sBig,
                 sSmall * MAX_ASPECT_STRETCH,
             );
-            scaleX = sX >= sY
-                ? capped
+            const isXBigger = sX >= sY;
+            scaleX = isXBigger
+                ? cappedBig
                 : sSmall;
-            scaleY = sY > sX
-                ? capped
-                : sSmall;
+            scaleY = isXBigger
+                ? sSmall
+                : cappedBig;
             scaleX = Math.max(scaleX, 1);
             scaleY = Math.max(scaleY, 0.4);
         }
@@ -1068,10 +1081,19 @@ function snakeColRow(
 ): { col: number; row: number } {
     const row = Math.floor(i / k);
     const rowEven = row % 2 === 0;
+    const colInRow = i % k;
     const col = rowEven
-        ? (i % k)
-        : (k - 1 - (i % k));
+        ? colInRow
+        : (k - 1 - colInRow);
     return { col, row };
+}
+
+function computeAspectMismatch(
+    aspect: number,
+    canvasAspect: number,
+): number {
+    return Math.max(aspect, canvasAspect)
+        / Math.min(aspect, canvasAspect);
 }
 
 function computeTopoSnake(

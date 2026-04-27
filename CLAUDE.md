@@ -136,20 +136,34 @@ generate the markup the page injects into the DOM.
   mutate, and never touch the DOM directly. Page
   modules are responsible for the DOM; presenters are
   responsible for the HTML they hand over.
-  *Exception:* `FlowDesignerPresenter` retains
-  internal mutable state. Partial extraction
-  completed: panel state is hoisted out of
-  `InteractionState` (the gesture FSM uses an
-  `onPanelRequest` callback rather than mutating
-  panel directly); `FlowHistory` is now an
+  *Exception:* `FlowDesignerPresenter` retains an
+  internal `#state: DesignerState` field. The
+  state's mutation surface has been narrowed
+  significantly: every named transition lives in
+  `flow-designer-actions.ts` as a pure `apply*`
+  function (`applyMoveNodes`, `applyDragPreview`,
+  `applyToggleLock`, `applyUpdateFlowName`,
+  `applyAddNode`, `applyAddEdge`, `applyDeleteNodes`,
+  `applyDeleteEdge`, `applyUpdateNode`,
+  `applyUpdateEdge`, `applyAddField`,
+  `applyDeleteField`, `applyAutoLayout`,
+  `applyPanToRevealSelected`,
+  `applyPanelTransition`); `FlowHistory` is an
   immutable value with free transition functions;
-  `flow-designer-actions.ts` seeds pure transitions
-  (`applyMoveNodes`). Full migration to a
-  `FlowSnapshot` constructor argument and a
-  fully-pure presenter remains pending — it needs
-  manual regression coverage (F1–F46) that
-  includes drag/connect/marquee gestures that
-  synthetic PointerEvents cannot reliably drive.
+  `zoomToFit` in `flow-interactions.ts` returns a
+  fresh `{ zoom, viewBox }` rather than mutating in
+  place; the gesture FSM uses an `onPanelRequest`
+  callback rather than mutating panel state. The
+  remaining presenter methods are short adapters
+  that call a pure transition and copy the result
+  back into `#state`. Full type-level immutability
+  (a `FlowSnapshot` constructor argument with the
+  presenter reconstructed per render) remains
+  pending — it would be a structural rewrite rather
+  than a behavioral one, and needs manual
+  regression coverage (F1–F46) that includes
+  drag/connect/marquee gestures that synthetic
+  PointerEvents cannot reliably drive.
 - **Barrel**: `presenters/index.ts` re-exports every
   presenter class. Page modules import via
   `from '../app/presenters'`.
@@ -209,8 +223,9 @@ import { navigateTo, openDialog, closeDialog } from '../app/core';
 
 - **User-name resolution**: `userName(userMap, userId: Id)` throws on both missing and unknown userId. Parameter type is `Id`, not `Id | undefined` — a missing required reference is a bug, not a presentation case. Optional user references (a project with no lead yet, a work order with no transitions) must be modeled at the call site by branching on the upstream absence (`leadRow ? userName(...) : ''`), not by overloading `userName` with two policies. UI renders `'\u2014'` (em dash) via `DISPLAY_ABSENT` for legitimately absent values that the type system admits. Never use magical fallback strings like `'Unknown'`.
 - **Absent values**: Use `null` for semantically absent values in adapter return types (e.g., `confidence: ConfidenceLevel | null`). Persisted noun entities never use `null`.
-- **No adapter caching**: Each adapter function fetches its own data directly via `getUserMap()`. No `cachedUserMap` or `prefetched*` parameters — simplicity over micro-optimization of localStorage reads.
-- **Shared helpers**: `adapters/shared.ts` exports cross-module utilities (`getUserMap`, `userName`, `getCurrentUser`, `AuthContext`).
+- **No module-level adapter caching**: Adapters never hold long-lived caches (`cachedUserMap` etc.). Module-level state introduces cross-request leakage and contradicts the "share memory by communicating" article of faith.
+- **Request-scoped immutability via `FetchContext`**: A page-module `init()` may construct a `FetchContext` and thread it through multiple adapter calls so the *whole process executes against an immutable snapshot* of the underlying data. Motivation is idempotency and atomicity (Commandments VII and X), not performance: a process that reads `'users'` twice could see different data if another tab writes between the reads, breaking process atomicity. `ctx.getUserMap()` snapshots once and reuses; the ctx is constructed per request and discarded — never module-level. Adapters that need user data accept an optional `ctx?: FetchContext`; when omitted, they fetch fresh (backward-compatible default). When the backend migrates from localStorage to Postgres, this also avoids redundant database round-trips for free.
+- **Shared helpers**: `adapters/shared.ts` exports cross-module utilities (`getUserMap`, `userName`, `getCurrentUser`, `AuthContext`, `FetchContext`, `createFetchContext`).
 
 ### Dark Mode
 

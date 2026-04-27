@@ -15,12 +15,16 @@ import {
 import { getTeamMembers } from '../app/adapters';
 import {
     TeamListPresenter,
+    buildInitialTeamListState,
+    applyTeamSearch,
+    applyTeamSelection,
+    type TeamListState,
 } from '../app/presenters';
 
 const pageAbort = new AbortController();
 const signal = pageAbort.signal;
 
-let presenter: TeamListPresenter | null = null;
+let teamState: TeamListState | null = null;
 let listEl: HTMLElement | null = null;
 let panelEl: HTMLElement | null = null;
 
@@ -63,7 +67,7 @@ export async function init(): Promise<void> {
 
     if (!result) return;
 
-    presenter = new TeamListPresenter(result);
+    teamState = buildInitialTeamListState(result);
     listEl = teamListEl;
     panelEl = $(
         '#team-detail-panel', document,
@@ -74,14 +78,23 @@ export async function init(): Promise<void> {
     );
     if (summaryEl) {
         summaryEl.textContent =
-            presenter.summary();
+            new TeamListPresenter(
+                teamState,
+            ).summary();
     }
 
+    rerenderTeam();
+    bindStableListeners(listEl);
+}
+
+function rerenderTeam(): void {
+    if (!teamState || !listEl) return;
+    const presenter =
+        new TeamListPresenter(teamState);
     presenter.renderList(listEl);
     if (panelEl) {
         presenter.renderDetail(panelEl);
     }
-    bindStableListeners(listEl);
 }
 
 function bindAddMemberDialog(): void {
@@ -138,7 +151,7 @@ function bindStableListeners(
 function onCardClick(e: MouseEvent): void {
     if (
         !(e.target instanceof Element)
-        || !presenter
+        || !teamState
     ) return;
     const card = e.target.closest(
         '[data-member-card]',
@@ -147,12 +160,11 @@ function onCardClick(e: MouseEvent): void {
     const id = card.getAttribute(
         'data-member-card',
     );
-    presenter.select(id);
-    if (listEl) {
-        presenter.renderList(listEl);
-    }
+    teamState = applyTeamSelection(
+        teamState, id,
+    );
+    rerenderTeam();
     if (panelEl) {
-        presenter.renderDetail(panelEl);
         initTabs(
             '[data-tab]',
             '.tab-panel',
@@ -162,8 +174,10 @@ function onCardClick(e: MouseEvent): void {
 }
 
 function onSearchInput(e: Event): void {
-    if (!presenter || !listEl) return;
+    if (!teamState || !listEl) return;
     const target = e.target as HTMLInputElement;
-    presenter.setSearch(target.value);
-    presenter.renderList(listEl);
+    teamState = applyTeamSearch(
+        teamState, target.value,
+    );
+    rerenderTeam();
 }

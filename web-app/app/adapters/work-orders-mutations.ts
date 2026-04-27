@@ -18,6 +18,7 @@ import {
 import {
     validateWorkOrderFlowGraph,
 } from './work-orders-queries';
+import { generateId } from './uuid';
 
 const FIRST_POSITION = 1;
 const POSITION_STEP = 1;
@@ -90,7 +91,7 @@ export async function postWorkOrderCreation(
     const postStartNodeId =
         postStartEdges[0]!.toNodeId;
 
-    const woId = crypto.randomUUID();
+    const woId = generateId();
     const displayId =
         await generateDisplayId(woId);
     const position =
@@ -122,7 +123,7 @@ export async function postWorkOrderCreation(
     await PUT<void>(
         'flow-work-orders',
         {
-            id: crypto.randomUUID(),
+            id: generateId(),
             flow_id: flowId,
             work_order_id: woId,
             created_at: now,
@@ -136,7 +137,7 @@ export async function postWorkOrderCreation(
     await PUT<void>(
         'work-order-transitions',
         {
-            id: crypto.randomUUID(),
+            id: generateId(),
             work_order_id: woId,
             from_node_id: '',
             to_node_id: startNode.id,
@@ -149,7 +150,7 @@ export async function postWorkOrderCreation(
     await PUT<void>(
         'work-order-transitions',
         {
-            id: crypto.randomUUID(),
+            id: generateId(),
             work_order_id: woId,
             from_node_id: startNode.id,
             to_node_id: postStartNodeId,
@@ -162,7 +163,7 @@ export async function postWorkOrderCreation(
     await PUT<void>(
         'work-order-claims',
         {
-            id: crypto.randomUUID(),
+            id: generateId(),
             work_order_id: woId,
             user_id: userId,
             claimed_at: now,
@@ -208,7 +209,7 @@ export async function postWorkOrderTransition(
     await PUT<void>(
         'work-order-transitions',
         {
-            id: crypto.randomUUID(),
+            id: generateId(),
             work_order_id: workOrderId,
             from_node_id: currentNodeId,
             to_node_id: edge.toNodeId,
@@ -249,7 +250,7 @@ export async function postWorkOrderClaim(
     userId: string,
 ): Promise<string> {
     const now = nowUtc();
-    const claimId = crypto.randomUUID();
+    const claimId = generateId();
 
     await PUT<void>(
         'work-order-claims',

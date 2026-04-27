@@ -1259,12 +1259,13 @@ svg.flow-canvas [data-edge-id] {
 
 .gauge-arc-outer,
 .gauge-arc-inner {
-  animation: gauge-draw 2s ease-out;
+  animation: gauge-draw var(--duration-pulse)
+    ease-out;
 }
 
 .gauge-arc-inner.overrun {
   animation:
-    gauge-draw 2s ease-out,
+    gauge-draw var(--duration-pulse) ease-out,
     gauge-flash var(--flash-speed, 0.5s)
       infinite;
 }
@@ -1532,7 +1533,7 @@ svg.flow-canvas [data-edge-id] {
 .convert-progress-fill {
   height: 100%;
   background: hsl(var(--success));
-  transition: width 0.3s;
+  transition: width var(--duration-progress);
   width: var(--convert-progress, 0%);
 }
 

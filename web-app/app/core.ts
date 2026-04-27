@@ -1,7 +1,9 @@
-import { applyTheme } from './state';
+import {
+    applyTheme,
+    initListeners,
+} from './state';
 import {
     getPageName,
-    initPrefetch,
 } from './navigation';
 import {
     initSidebarLayout,
@@ -14,6 +16,9 @@ import {
     initPageModule,
     handlePageLoadError,
 } from './page-loader';
+import { log } from './logger';
+import { MissingTableError } from '../../api/db';
+import { navigateTo } from './navigation';
 
 export { navigateTo } from './navigation';
 export {
@@ -23,6 +28,7 @@ export {
     formatDateTime,
     getTimeOfDay,
     initials,
+    pluralize,
     toDateInputValue,
     trimStrings,
     durationInDays,
@@ -37,11 +43,41 @@ export {
 } from './dialog';
 export { initDropdown } from './theme-toggle';
 
+async function loadAndInitCommandPalette(): Promise<void> {
+    const cp = await import('./command-palette');
+    cp.initCommandPalette();
+}
+
+function redirectIfMissingTable(
+    err: unknown,
+): boolean {
+    if (!(err instanceof MissingTableError)) {
+        return false;
+    }
+    if (getPageName() === 'snapshots') {
+        log.warn(
+            'missing table on snapshots page',
+            'core',
+            err,
+        );
+        return false;
+    }
+    log.warn(
+        'missing table; redirecting to snapshots',
+        'core',
+        err,
+    );
+    navigateTo('snapshots', {
+        'missing-table': err.table,
+    });
+    return true;
+}
+
 document.addEventListener(
     'DOMContentLoaded',
     async () => {
+        initListeners();
         applyTheme();
-        initPrefetch();
 
         let hasSchema: boolean;
         try {
@@ -67,10 +103,6 @@ document.addEventListener(
                     page,
                 )
             ) {
-                const { navigateTo } =
-                    await import(
-                        './navigation'
-                    );
                 navigateTo('snapshots');
                 return;
             }
@@ -78,22 +110,46 @@ document.addEventListener(
 
         const pageName = getPageName();
 
-        try {
-            if (
-                document.querySelector(
-                    '.sidebar-layout',
-                )
-            ) {
+        if (
+            document.querySelector(
+                '.sidebar-layout',
+            )
+        ) {
+            try {
                 await initSidebarLayout(
                     hasSchema,
                 );
+            } catch (err) {
+                if (
+                    redirectIfMissingTable(err)
+                ) return;
+                log.warn(
+                    'sidebar layout init failed',
+                    'core',
+                    err,
+                );
             }
-            const cp = await import(
-                './command-palette'
+        }
+
+        try {
+            await loadAndInitCommandPalette();
+        } catch (err) {
+            if (
+                redirectIfMissingTable(err)
+            ) return;
+            log.warn(
+                'command palette init failed',
+                'core',
+                err,
             );
-            cp.initCommandPalette();
+        }
+
+        try {
             await initPageModule(pageName);
         } catch (err) {
+            if (
+                redirectIfMissingTable(err)
+            ) return;
             handlePageLoadError(
                 pageName, err,
             );

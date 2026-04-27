@@ -5,7 +5,7 @@ import { showToast } from '../app/toast';
 import {
     buildSkeleton, buildErrorState,
 } from '../app/loading-states';
-import { setHtml } from '../app/safe-html';
+import { mutateHtml } from '../app/safe-html';
 import { log } from '../app/logger';
 import {
     navigateTo,
@@ -18,7 +18,9 @@ import {
     putProjectPatch,
     getFlowsByProject,
     postFlowCreation,
-    projectChanged,
+    subscribeToProjectChanges,
+    generateId,
+    createFetchContext,
     type ProjectView,
 } from '../app/adapters';
 import type {
@@ -105,15 +107,16 @@ export async function init(
     );
     if (!container) return;
     pageContainer = container;
-    setHtml(
+    mutateHtml(
         container, buildSkeleton('detail', 4),
     );
 
     let project: ProjectView;
     let flows: FlowListItem[];
     try {
+        const ctx = createFetchContext();
         [project, flows] = await Promise.all([
-            getProject(projectId),
+            getProject(projectId, ctx),
             getFlowsByProject(projectId),
         ]);
     } catch (err) {
@@ -121,7 +124,7 @@ export async function init(
             'getProject failed',
             'projects', err,
         );
-        setHtml(
+        mutateHtml(
             container,
             buildErrorState(
                 'Failed to load project'
@@ -148,13 +151,14 @@ export async function init(
     buildPresenter().renderShell(container);
     bindStableListeners(container);
 
-    projectChanged.subscribe(async () => {
+    subscribeToProjectChanges(async () => {
         if (!state || !pageContainer) {
             return;
         }
+        const ctx = createFetchContext();
         const [upd, updFlows] =
             await Promise.all([
-                getProject(projectId),
+                getProject(projectId, ctx),
                 getFlowsByProject(projectId),
             ]);
         state = {
@@ -378,8 +382,8 @@ async function handleSave(): Promise<void> {
     }
     const projectId = state.view.idForLink();
     const patch = projectPatchFromDraft(
+        state.view,
         state.draft,
-        state.view.statusValue(),
     );
     try {
         await putProjectPatch(
@@ -410,7 +414,7 @@ async function handleNewFlowSubmit(
         );
         return;
     }
-    const flowId = crypto.randomUUID();
+    const flowId = generateId();
     try {
         await postFlowCreation({
             flowId,

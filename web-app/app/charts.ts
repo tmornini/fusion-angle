@@ -4,6 +4,21 @@ import {
     escapeForHtml,
 } from './safe-html';
 
+const BASELINE_OPACITY = 0.15;
+const BAR_FILL_OPACITY = 0.85;
+const BAR_LABEL_OPACITY = 0.6;
+const BAR_LABEL_FONT_SIZE = 10;
+const BAR_LABEL_Y_OFFSET = 16;
+const BAR_MAX_WIDTH = 40;
+const BAR_GAP = 8;
+const BAR_CORNER_RADIUS = 4;
+const LINE_DOT_RADIUS = 3;
+const LINE_STROKE_WIDTH = 2;
+const DONUT_RADIUS_INSET = 10;
+const DONUT_STROKE_WIDTH = 20;
+const AREA_GRADIENT_TOP_OPACITY = 0.3;
+const AREA_GRADIENT_BOTTOM_OPACITY = 0.02;
+
 export interface ChartDatum {
     label: string;
     value: number;
@@ -74,7 +89,7 @@ function buildBaseline(
         + ` x2="${width - padding}"`
         + ` y2="${height - padding}"`
         + ' stroke="currentColor"'
-        + ' stroke-opacity="0.15"/>';
+        + ` stroke-opacity="${BASELINE_OPACITY}"/>`;
 }
 
 export function buildBarChart(
@@ -94,10 +109,10 @@ export function buildBarChart(
         showLabels, accessibleLabel,
     } = config;
     const barWidth = Math.min(
-        40,
+        BAR_MAX_WIDTH,
         (width - padding * 2)
             / data.length
-            - 8,
+            - BAR_GAP,
     );
 
     let bars = '';
@@ -120,18 +135,21 @@ export function buildBarChart(
             + ` y="${y}"`
             + ` width="${barWidth}"`
             + ` height="${barHeight}"`
-            + ' rx="4"'
+            + ` rx="${BAR_CORNER_RADIUS}"`
             + ` fill="${datum.color}"`
-            + ' opacity="0.85"/>';
+            + ` opacity="${BAR_FILL_OPACITY}"/>`;
         if (showLabels) {
             bars +=
                 '<text'
                 + ` x="${x + barWidth / 2}"`
-                + ` y="${height - padding + 16}"`
+                + ` y="${
+                    height - padding
+                    + BAR_LABEL_Y_OFFSET
+                }"`
                 + ' text-anchor="middle"'
                 + ' fill="currentColor"'
-                + ' font-size="10"'
-                + ' opacity="0.6">'
+                + ` font-size="${BAR_LABEL_FONT_SIZE}"`
+                + ` opacity="${BAR_LABEL_OPACITY}">`
                 + escapeForHtml(datum.label)
                 + '</text>';
         }
@@ -198,7 +216,7 @@ export function buildLineChart(
             '<circle'
             + ` cx="${point.x}"`
             + ` cy="${point.y}"`
-            + ' r="3"'
+            + ` r="${LINE_DOT_RADIUS}"`
             + ` fill="${color}"/>`;
     });
 
@@ -223,7 +241,7 @@ export function buildLineChart(
         + `<path d="${pathData}"`
         + ' fill="none"'
         + ` stroke="${color}"`
-        + ' stroke-width="2"'
+        + ` stroke-width="${LINE_STROKE_WIDTH}"`
         + ' stroke-linecap="round"'
         + ' stroke-linejoin="round"/>'
         + dotMarkup
@@ -243,8 +261,8 @@ export function buildDonutChart(
 
     const cx = size / 2;
     const cy = size / 2;
-    const radius = size / 2 - 10;
-    const strokeWidth = 20;
+    const radius = size / 2 - DONUT_RADIUS_INSET;
+    const strokeWidth = DONUT_STROKE_WIDTH;
     const total = data.reduce(
         (sum, datum) => sum + datum.value,
         0,
@@ -255,8 +273,9 @@ export function buildDonutChart(
     let offset = 0;
     let arcs = '';
     data.forEach((datum, index) => {
-        const percentage =
-            datum.value / total;
+        const percentage = total > 0
+            ? datum.value / total
+            : 0;
         const dash =
             percentage * circumference;
         arcs +=
@@ -360,10 +379,10 @@ export function buildAreaChart(
         + ' x2="0" y2="1">'
         + '<stop offset="0%"'
         + ` stop-color="${color}"`
-        + ' stop-opacity="0.3"/>'
+        + ` stop-opacity="${AREA_GRADIENT_TOP_OPACITY}"/>`
         + '<stop offset="100%"'
         + ` stop-color="${color}"`
-        + ' stop-opacity="0.02"/>'
+        + ` stop-opacity="${AREA_GRADIENT_BOTTOM_OPACITY}"/>`
         + '</linearGradient></defs>'
         + buildBaseline(
             padding,
@@ -375,7 +394,7 @@ export function buildAreaChart(
         + `<path d="${linePath}"`
         + ' fill="none"'
         + ` stroke="${color}"`
-        + ' stroke-width="2"'
+        + ` stroke-width="${LINE_STROKE_WIDTH}"`
         + ' stroke-linecap="round"'
         + ' stroke-linejoin="round"/>'
         + '</svg>',

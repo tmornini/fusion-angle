@@ -27,14 +27,14 @@ async function getSidebarUser(
 
 export async function mutateSidebarUser(
 ): Promise<void> {
-    const data = await getSidebarUser();
+    const sidebarUser = await getSidebarUser();
     for (const id of
         SIDEBAR_USER_NAME_IDS
     ) {
         const el =
             $(`#${id}`, document);
         if (el)
-            el.textContent = data.name;
+            el.textContent = sidebarUser.name;
     }
     for (const id of
         SIDEBAR_USER_COMPANY_IDS
@@ -43,6 +43,6 @@ export async function mutateSidebarUser(
             $(`#${id}`, document);
         if (el)
             el.textContent =
-                data.company;
+                sidebarUser.company;
     }
 }
