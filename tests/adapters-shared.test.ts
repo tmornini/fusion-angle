@@ -1,0 +1,128 @@
+import { test } from 'node:test';
+import { strict as assert } from 'node:assert';
+import {
+    initApi,
+    resetApi,
+} from '../api/api.ts';
+import { MemoryDbAdapter } from '../api/db-memory.ts';
+import {
+    createFetchContext,
+    getUserMap,
+    userName,
+    getCurrentUser,
+} from '../web-app/app/adapters/shared.ts';
+import { User } from '../api/types.ts';
+
+function buildUserRow(
+    id: string,
+    first: string,
+    last: string,
+) {
+    return {
+        id,
+        first_name: first,
+        last_name: last,
+        email: `${first}@example.com`.toLowerCase(),
+        phone: '',
+        role: 'product_manager',
+        availability: 80,
+        is_active: 1 as 0 | 1,
+        bio: '',
+        department: 'Product',
+        created_at: '2026-01-01T00:00:00Z',
+        updated_at: '2026-01-01T00:00:00Z',
+    };
+}
+
+function setupMemDb(): MemoryDbAdapter {
+    const db = new MemoryDbAdapter();
+    resetApi();
+    initApi(db);
+    return db;
+}
+
+test('userName returns fullName for known id', () => {
+    const map = new Map<string, User>([
+        ['u1', new User(
+            buildUserRow('u1', 'Alice', 'Adams'),
+        )],
+    ]);
+    assert.equal(
+        userName(map, 'u1'),
+        'Alice Adams',
+    );
+});
+
+test('userName throws for unknown id', () => {
+    const map = new Map<string, User>();
+    assert.throws(
+        () => userName(map, 'missing'),
+        /unknown user/,
+    );
+});
+
+test('getUserMap fetches users via adapter', async () => {
+    const db = setupMemDb();
+    await db.users.put('u1', buildUserRow(
+        'u1', 'Alice', 'Adams',
+    ));
+    const map = await getUserMap();
+    assert.equal(map.size, 1);
+    assert.equal(
+        map.get('u1')?.fullName(),
+        'Alice Adams',
+    );
+});
+
+test('FetchContext memoizes user map across calls', async () => {
+    const db = setupMemDb();
+    await db.users.put('u1', buildUserRow(
+        'u1', 'Alice', 'Adams',
+    ));
+    const ctx = createFetchContext();
+    const m1 = await ctx.getUserMap();
+    // Mutate underlying data after first fetch
+    await db.users.put('u2', buildUserRow(
+        'u2', 'Bob', 'Brown',
+    ));
+    const m2 = await ctx.getUserMap();
+    // Same Promise → same Map → m2 reflects ONLY first fetch
+    assert.equal(m1, m2);
+    assert.equal(m1.size, 1);
+});
+
+test('Without ctx, getUserMap re-fetches each call', async () => {
+    const db = setupMemDb();
+    await db.users.put('u1', buildUserRow(
+        'u1', 'Alice', 'Adams',
+    ));
+    const m1 = await getUserMap();
+    await db.users.put('u2', buildUserRow(
+        'u2', 'Bob', 'Brown',
+    ));
+    const m2 = await getUserMap();
+    assert.notEqual(m1, m2);
+    assert.equal(m1.size, 1);
+    assert.equal(m2.size, 2);
+});
+
+test('getCurrentUser returns User and company', async () => {
+    const db = setupMemDb();
+    // current-user route looks up users/current
+    // (see api.ts route('current-user'))
+    await db.users.put('current', {
+        ...buildUserRow(
+            'current', 'Alice', 'Adams',
+        ),
+    });
+    await db.company.put({
+        name: 'Acme Corp',
+        domain: 'acme.example',
+    });
+    const ctx = await getCurrentUser();
+    assert.equal(
+        ctx.user.fullName(),
+        'Alice Adams',
+    );
+    assert.equal(ctx.company, 'Acme Corp');
+});

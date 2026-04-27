@@ -32,9 +32,9 @@ cd ~/Desktop/fusion-test/ && python3 -m http.server 8080
 
 `~/Desktop/` is in the sandbox write allowlist; `TMPDIR=/tmp/claude` redirects tsx's IPC socket into the allowed path. `localhost` is reachable from the sandbox, so the Chrome MCP tools can drive the page normally.
 
-`./validate` runs `tsc --noEmit` (type checking) then enforces 78-character maximum line length on all `.ts`, `.html`, and `.css` files (excluding `compose.ts`).
+`./validate` runs `tsc --noEmit` (type checking), then `node --test --strip-types tests/*.test.ts` (automated tests against pure modules and the `api/`/`adapters/` layer), then enforces 78-character maximum line length on all `.ts`, `.html`, and `.css` files (excluding `compose.ts`).
 
-No unit test framework is configured; see `## Testing` below for the manual browser regression protocol.
+Automated tests cover pure modules and adapter behavior; UI behavior is still covered by the manual browser regression protocol — see `## Testing` below.
 
 ## TypeScript
 
@@ -434,19 +434,39 @@ No build artifacts are created in the repo — build output goes to `/tmp/` by d
 
 ## Testing
 
-The codebase honors the Office of Verification through
-a manual browser regression protocol rather than an
-executable test runner — a deliberate trade-off between
-toolchain minimalism (zero runtime *and* test
-dependencies) and verification automation. A future
-scroll may introduce Node's built-in test runner for
-the `api/` and `adapters/` layers (highest leverage;
-validates the boundary doctrine).
+Two layers, both zero-dependency:
 
-No unit test framework is configured. Testing is a manual browser
-regression pass against `TEST-PLAN.md` (254 cases), driven either
-by a single human tester serially or by Claude Code agents in
-parallel via the `claude-in-chrome` MCP.
+**Automated tests** (Node's built-in `node:test` runner with
+`--strip-types`, no devDependencies). Files under `tests/` cover:
+
+- `safe-html.test.ts` — escape semantics + tagged template
+- `mermaid.test.ts` — generate/parse + full round-trip
+- `flow-layout.test.ts` — graph algorithms (reachability,
+  cycle detection)
+- `channels.test.ts` — pub/sub channel semantics
+- `format.test.ts` — pure formatters and helpers
+- `flow-designer-actions.test.ts` — pure flow-designer
+  state transitions (the `apply*` functions)
+- `adapters-shared.test.ts` — `FetchContext`, `userName`,
+  `getCurrentUser` against `MemoryDbAdapter`
+- `adapters-ideas.test.ts` — full adapter end-to-end including
+  the submission-existence invariant
+- `api.test.ts` — HTTP-style routing through GET/PUT/DELETE
+
+`api/db-memory.ts` provides an in-memory `DbAdapter` so
+adapter and api-layer tests run without `localStorage`. Tests
+call `resetApi()` then `initApi(new MemoryDbAdapter())` per
+test to isolate state.
+
+Run via `./validate` (which also type-checks and lints) or
+directly: `node --test --strip-types tests/*.test.ts`.
+
+**Manual browser regression** for UI behavior: a pass against
+`TEST-PLAN.md` (254 cases), driven either by a single human
+tester serially or by Claude Code agents in parallel via the
+`claude-in-chrome` MCP. Anything DOM-driven (gestures, layout,
+visual rendering) lives here. Pure transitions, adapters, and
+API routing live in the automated suite.
 
 ### Six-phase parallel protocol
 

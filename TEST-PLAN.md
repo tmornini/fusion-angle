@@ -2,6 +2,20 @@
 
 > **Encoding:** `- [ ]` = pending, `- [ ]` = PASS, `- [FAIL]` = failure (add note)
 
+### Scope
+
+This plan covers **UI behavior** — anything that requires a browser
+DOM, CSS, gestures, or visual rendering. Pure transitions,
+adapter behavior, and HTTP-style API routing are now covered by
+the **automated test suite** (`./validate` runs them; the suite
+also runs standalone via `node --test --strip-types tests/*.test.ts`).
+See `CLAUDE.md` section `## Testing` for the inventory of
+automated test files and what each covers.
+
+This UI plan therefore focuses on what automated tests cannot
+verify: layout, gestures, navigation, drag-and-drop, dialog
+behavior, and end-to-end user flows through the rendered DOM.
+
 ### Protocol
 
 All sections are executed over HTTP. Two execution modes:

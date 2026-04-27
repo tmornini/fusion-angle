@@ -52,6 +52,22 @@ cd /tmp/fusion-test/ && python3 -m http.server 8080
 # open http://localhost:8080/landing/index.html
 ```
 
+## Testing
+
+Two layers, both zero-dependency:
+
+- **Automated** (`./validate` runs them, or
+  `node --test --strip-types tests/*.test.ts` directly): pure
+  modules, adapter behavior, and HTTP-style API routing. Uses
+  Node 25's built-in `node:test` runner with `--strip-types`
+  (no Jest, no Vitest, no devDependencies). An in-memory
+  `DbAdapter` (`api/db-memory.ts`) backs adapter tests so they
+  run without `localStorage`.
+- **Manual** (`TEST-PLAN.md`, 254 cases): UI behavior — gestures,
+  layout, drag-and-drop, dialogs, end-to-end flows. Run serially
+  by a human or in parallel by Claude Code agents via the
+  `claude-in-chrome` MCP. See `CLAUDE.md` section `## Testing`.
+
 ## Tech Stack
 
 - TypeScript (vanilla, no framework)

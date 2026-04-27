@@ -22,21 +22,27 @@ import type {
 
 export class EntityNotFound {
     readonly message: string;
+    readonly table: string;
+    readonly id: string;
     constructor(
-        readonly table: string,
-        readonly id: string,
+        table: string,
+        id: string,
     ) {
+        this.table = table;
+        this.id = id;
         this.message =
             `Not found: ${table}/${id}`;
     }
 }
 
 export class MissingTableError extends Error {
-    constructor(readonly table: string) {
+    readonly table: string;
+    constructor(table: string) {
         super(
             `Schema is missing table "${table}".`
             + ' Recreate the schema from snapshots.',
         );
+        this.table = table;
         this.name = 'MissingTableError';
     }
 }

@@ -26,10 +26,16 @@ import type {
 } from './types.ts';
 
 export class ApiError {
+    readonly message: string;
+    readonly status: number;
+
     constructor(
-        readonly message: string,
-        readonly status: number,
-    ) {}
+        message: string,
+        status: number,
+    ) {
+        this.message = message;
+        this.status = status;
+    }
 }
 
 const HTTP_BAD_REQUEST = 400;
@@ -47,6 +53,10 @@ export function initApi(
         );
     }
     adapter = dbAdapter;
+}
+
+export function resetApi(): void {
+    adapter = undefined;
 }
 
 function getDbAdapter(): DbAdapter {
@@ -110,7 +120,7 @@ function param(
     index: number,
 ): string {
     const value = params[index];
-    if (value === undefined) {
+    if (value === undefined || value === '') {
         throw new Error(
             'Missing route param at index '
             + index,
