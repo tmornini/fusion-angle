@@ -45,10 +45,6 @@ import {
     wouldBeCycle,
     NODE_WIDTH,
     NODE_HEIGHT,
-    HORIZONTAL_GAP,
-    VERTICAL_GAP,
-    START_X,
-    START_Y,
 } from '../flow-layout.ts';
 import {
     buildInteractionState,
@@ -101,9 +97,6 @@ import {
     buildFlowNameHeader,
 } from './flow-designer-view.ts';
 
-const NEW_NODE_OFFSET_X = 120;
-const NEW_NODE_OFFSET_Y = 100;
-
 function serializeGraph(
     nodes: GraphNode[],
     edges: GraphEdge[],
@@ -133,9 +126,38 @@ interface DesignerState {
     savedViewBox: SavedViewBox;
 }
 
+export type FlowSnapshot = Readonly<DesignerState>;
+
 function emptyWaypoints(
 ): Map<string, Waypoint[]> {
     return new Map<string, Waypoint[]>();
+}
+
+export function buildInitialFlowSnapshot(
+    graph: FlowGraph,
+    canvasW: number,
+    canvasH: number,
+): FlowSnapshot {
+    const interaction = buildInteractionState(
+        canvasW, canvasH,
+    );
+    return {
+        flowId: graph.id,
+        flowName: graph.name,
+        flowDescription: graph.description,
+        isLocked: graph.isLocked,
+        isAutoLayout: graph.isAutoLayout,
+        isAutoFit: graph.isAutoFit,
+        lockTimeout: graph.lockTimeout,
+        createdAt: graph.createdAt,
+        isEditingName: false,
+        nodes: graph.nodes,
+        edges: graph.edges,
+        edgeWaypoints: emptyWaypoints(),
+        isPanelOpen: false,
+        interaction,
+        savedViewBox: { kind: 'none' },
+    };
 }
 
 // Must match .flow-props-panel width in pages.css
@@ -143,14 +165,14 @@ function emptyWaypoints(
 const PANEL_WIDTH_PX = 288;
 
 export class FlowDesignerPresenter {
-    #state: DesignerState;
+    #snapshot: FlowSnapshot;
     #canvasW: number;
     #canvasH: number;
     #needsFit: boolean;
     #history: FlowHistorySnapshot;
 
     constructor(
-        graph: FlowGraph,
+        snap: FlowSnapshot,
         canvasW: number,
         canvasH: number,
         hasUndoHistory: boolean,
@@ -161,29 +183,7 @@ export class FlowDesignerPresenter {
         this.#history = buildFlowHistorySnapshot(
             hasUndoHistory,
         );
-        const interaction =
-            buildInteractionState(
-                canvasW, canvasH,
-            );
-        this.#state = {
-            flowId: graph.id,
-            flowName: graph.name,
-            flowDescription:
-                graph.description,
-            isLocked: graph.isLocked,
-            isAutoLayout: graph.isAutoLayout,
-            isAutoFit: graph.isAutoFit,
-            lockTimeout: graph.lockTimeout,
-            createdAt: graph.createdAt,
-            isEditingName: false,
-            nodes: graph.nodes,
-            edges: graph.edges,
-            edgeWaypoints: emptyWaypoints(),
-            isPanelOpen: false,
-            interaction,
-            savedViewBox:
-                { kind: 'none' },
-        };
+        this.#snapshot = snap;
         this.#migrateToCenter();
     }
 
@@ -196,37 +196,38 @@ export class FlowDesignerPresenter {
     async #reloadGraphFromStore(
     ): Promise<void> {
         const g = await getFlowGraph(
-            this.#state.flowId,
+            this.#snapshot.flowId,
         );
-        this.#state.flowName = g.name;
-        this.#state.flowDescription =
-            g.description;
-        this.#state.isLocked = g.isLocked;
-        this.#state.lockTimeout =
-            g.lockTimeout;
-        this.#state.createdAt = g.createdAt;
-        this.#state.nodes = g.nodes;
-        this.#state.edges = g.edges;
-        this.#state.interaction
+        this.#snapshot = {
+            ...this.#snapshot,
+            flowName: g.name,
+            flowDescription: g.description,
+            isLocked: g.isLocked,
+            lockTimeout: g.lockTimeout,
+            createdAt: g.createdAt,
+            nodes: g.nodes,
+            edges: g.edges,
+        };
+        this.#snapshot.interaction
             .selection = { kind: 'none' };
     }
 
     #buildSaveShape(): FlowSaveShape {
         return {
-            name: this.#state.flowName,
+            name: this.#snapshot.flowName,
             description:
-                this.#state.flowDescription,
-            isLocked: this.#state.isLocked,
+                this.#snapshot.flowDescription,
+            isLocked: this.#snapshot.isLocked,
             isAutoLayout:
-                this.#state.isAutoLayout,
+                this.#snapshot.isAutoLayout,
             isAutoFit:
-                this.#state.isAutoFit,
+                this.#snapshot.isAutoFit,
             lockTimeout:
-                this.#state.lockTimeout,
-            nodes: this.#state.nodes,
-            edges: this.#state.edges,
+                this.#snapshot.lockTimeout,
+            nodes: this.#snapshot.nodes,
+            edges: this.#snapshot.edges,
             createdAt:
-                this.#state.createdAt,
+                this.#snapshot.createdAt,
         };
     }
 
@@ -235,11 +236,11 @@ export class FlowDesignerPresenter {
     ): Promise<void> {
         if (versioned) {
             await postFlowVersion(
-                this.#state.flowId,
+                this.#snapshot.flowId,
             );
         }
         await putFlow(
-            this.#state.flowId,
+            this.#snapshot.flowId,
             this.#buildSaveShape(),
         );
     }
@@ -259,59 +260,74 @@ export class FlowDesignerPresenter {
             .#reloadGraphFromStore();
     }
 
-    startEditingName(): void {
-        if (this.#guardLocked()) return;
-        this.#state.isEditingName = true;
-    }
-
-    cancelEditingName(): void {
-        this.#state.isEditingName = false;
+    withNameEditing(
+        editing: boolean,
+    ): FlowSnapshot {
+        if (editing && this.#guardLocked()) {
+            return this.#snapshot;
+        }
+        this.#snapshot = {
+            ...this.#snapshot,
+            isEditingName: editing,
+        };
+        return this.#snapshot;
     }
 
     isLocked(): boolean {
-        return this.#state.isLocked;
+        return this.#snapshot.isLocked;
     }
 
-    toggleLocked(): void {
+    withLockToggled(): FlowSnapshot {
         const result = applyToggleLock(
-            this.#state.isLocked,
-            this.#state.isEditingName,
+            this.#snapshot.isLocked,
+            this.#snapshot.isEditingName,
         );
-        this.#state.isLocked = result.isLocked;
-        this.#state.isEditingName =
-            result.isEditingName;
+        this.#snapshot = {
+            ...this.#snapshot,
+            isLocked: result.isLocked,
+            isEditingName: result.isEditingName,
+        };
         void this.#saveFlow(false);
+        return this.#snapshot;
     }
 
     isAutoLayout(): boolean {
-        return this.#state.isAutoLayout;
+        return this.#snapshot.isAutoLayout;
     }
 
-    toggleAutoLayout(): void {
+    withAutoLayoutToggled(): FlowSnapshot {
         const next =
-            !this.#state.isAutoLayout;
-        this.#state.isAutoLayout = next;
+            !this.#snapshot.isAutoLayout;
+        this.#snapshot = {
+            ...this.#snapshot,
+            isAutoLayout: next,
+        };
         void this.#saveFlow(false);
         if (next) {
-            this.reconcileLayout();
+            this.withLayoutReconciled();
         }
+        return this.#snapshot;
     }
 
     isAutoFit(): boolean {
-        return this.#state.isAutoFit;
+        return this.#snapshot.isAutoFit;
     }
 
-    toggleAutoFit(): void {
-        const next = !this.#state.isAutoFit;
-        this.#state.isAutoFit = next;
+    withAutoFitToggled(): FlowSnapshot {
+        const next = !this.#snapshot.isAutoFit;
+        this.#snapshot = {
+            ...this.#snapshot,
+            isAutoFit: next,
+        };
         void this.#saveFlow(false);
         if (next) {
             this.#applyZoomToFit();
         }
+        return this.#snapshot;
     }
 
     #guardLocked(): boolean {
-        if (!this.#state.isLocked) {
+        if (!this.#snapshot.isLocked) {
             return false;
         }
         showToast(
@@ -321,7 +337,7 @@ export class FlowDesignerPresenter {
     }
 
     #guardAutoFit(): boolean {
-        if (!this.#state.isAutoFit) {
+        if (!this.#snapshot.isAutoFit) {
             return false;
         }
         showToast(
@@ -331,14 +347,19 @@ export class FlowDesignerPresenter {
         return true;
     }
 
-    updateFlowName(name: string): void {
-        if (this.#guardLocked()) return;
+    withFlowName(name: string): FlowSnapshot {
+        if (this.#guardLocked()) {
+            return this.#snapshot;
+        }
         const result = applyUpdateFlowName(name);
-        this.#state.flowName = result.flowName;
-        this.#state.isEditingName =
-            result.isEditingName;
+        this.#snapshot = {
+            ...this.#snapshot,
+            flowName: result.flowName,
+            isEditingName: result.isEditingName,
+        };
         void this.#saveFlow(true);
         this.#noteMutation();
+        return this.#snapshot;
     }
 
     canUndo(): boolean {
@@ -349,34 +370,36 @@ export class FlowDesignerPresenter {
         return canRedoFlowEdits(this.#history);
     }
 
-    async performUndo(): Promise<boolean> {
-        if (this.#guardLocked()) return false;
+    async performUndo(): Promise<FlowSnapshot> {
+        if (this.#guardLocked()) {
+            return this.#snapshot;
+        }
         const versions = await getFlowVersions(
-            this.#state.flowId,
+            this.#snapshot.flowId,
         );
         const version = versions[0];
         if (!version) {
             this.#history = setHasUndoHistory(
                 this.#history, false,
             );
-            return false;
+            return this.#snapshot;
         }
         this.#history = appendToRedoStack(this.#history, {
             id: generateId(),
-            flowId: this.#state.flowId,
-            name: this.#state.flowName,
+            flowId: this.#snapshot.flowId,
+            name: this.#snapshot.flowName,
             description:
-                this.#state.flowDescription,
-            isLocked: this.#state.isLocked,
+                this.#snapshot.flowDescription,
+            isLocked: this.#snapshot.isLocked,
             isAutoLayout:
-                this.#state.isAutoLayout,
+                this.#snapshot.isAutoLayout,
             isAutoFit:
-                this.#state.isAutoFit,
+                this.#snapshot.isAutoFit,
             lockTimeout:
-                this.#state.lockTimeout,
+                this.#snapshot.lockTimeout,
             graph: serializeGraph(
-                this.#state.nodes,
-                this.#state.edges,
+                this.#snapshot.nodes,
+                this.#snapshot.edges,
             ),
             createdAt: nowUtc(),
         });
@@ -384,23 +407,25 @@ export class FlowDesignerPresenter {
         await deleteFlowVersion(version.id);
         await this.#refreshState();
         const remaining = await getFlowVersions(
-            this.#state.flowId,
+            this.#snapshot.flowId,
         );
         this.#history = setHasUndoHistory(
             this.#history,
             remaining.length > 0,
         );
-        this.reconcileLayout();
-        return true;
+        this.withLayoutReconciled();
+        return this.#snapshot;
     }
 
-    async performRedo(): Promise<boolean> {
-        if (this.#guardLocked()) return false;
+    async performRedo(): Promise<FlowSnapshot> {
+        if (this.#guardLocked()) {
+            return this.#snapshot;
+        }
         const popped = removeFromRedoStack(this.#history);
         this.#history = popped.snapshot;
-        if (!popped.version) return false;
+        if (!popped.version) return this.#snapshot;
         await postFlowVersion(
-            this.#state.flowId,
+            this.#snapshot.flowId,
         );
         this.#history = setHasUndoHistory(
             this.#history, true,
@@ -409,35 +434,33 @@ export class FlowDesignerPresenter {
             popped.version,
         );
         await this.#refreshState();
-        this.reconcileLayout();
-        return true;
+        this.withLayoutReconciled();
+        return this.#snapshot;
     }
 
     async #refreshState(): Promise<void> {
         const graph = await getFlowGraph(
-            this.#state.flowId,
+            this.#snapshot.flowId,
         );
-        this.#state.flowName = graph.name;
-        this.#state.flowDescription =
-            graph.description;
-        this.#state.isLocked = graph.isLocked;
-        this.#state.isAutoLayout =
-            graph.isAutoLayout;
-        this.#state.isAutoFit =
-            graph.isAutoFit;
-        this.#state.lockTimeout =
-            graph.lockTimeout;
-        this.#state.createdAt =
-            graph.createdAt;
-        this.#state.nodes = graph.nodes;
-        this.#state.edges = graph.edges;
-        this.#state.interaction
+        this.#snapshot = {
+            ...this.#snapshot,
+            flowName: graph.name,
+            flowDescription: graph.description,
+            isLocked: graph.isLocked,
+            isAutoLayout: graph.isAutoLayout,
+            isAutoFit: graph.isAutoFit,
+            lockTimeout: graph.lockTimeout,
+            createdAt: graph.createdAt,
+            nodes: graph.nodes,
+            edges: graph.edges,
+            isPanelOpen: false,
+        };
+        this.#snapshot.interaction
             .selection = { kind: 'none' };
-        this.#state.isPanelOpen = false;
     }
 
     #migrateToCenter(): void {
-        const nodes = this.#state.nodes;
+        const nodes = this.#snapshot.nodes;
         if (nodes.length === 0) return;
         let sumX = 0;
         let sumY = 0;
@@ -451,15 +474,14 @@ export class FlowDesignerPresenter {
             Math.abs(centerX) <= 1
             && Math.abs(centerY) <= 1
         ) return;
-        this.#state.nodes = nodes.map(
-            n => ({
+        this.#snapshot = {
+            ...this.#snapshot,
+            nodes: nodes.map(n => ({
                 ...n,
-                positionX:
-                    n.positionX - centerX,
-                positionY:
-                    n.positionY - centerY,
-            }),
-        );
+                positionX: n.positionX - centerX,
+                positionY: n.positionY - centerY,
+            })),
+        };
         void this.#saveFlow(false);
     }
 
@@ -470,7 +492,7 @@ export class FlowDesignerPresenter {
 
     selectedEdgeId(): string | null {
         const sel =
-            this.#state.interaction
+            this.#snapshot.interaction
                 .selection;
         return sel.kind === 'edge'
             ? sel.edgeId
@@ -480,7 +502,7 @@ export class FlowDesignerPresenter {
     #singleSelectedNodeId(
     ): string | null {
         const sel =
-            this.#state.interaction
+            this.#snapshot.interaction
                 .selection;
         if (sel.kind !== 'nodes') {
             return null;
@@ -495,7 +517,7 @@ export class FlowDesignerPresenter {
 
     #selectedNodeIds(): Set<string> {
         const sel =
-            this.#state.interaction
+            this.#snapshot.interaction
                 .selection;
         return sel.kind === 'nodes'
             ? sel.nodeIds
@@ -503,11 +525,19 @@ export class FlowDesignerPresenter {
     }
 
     interactionState(): InteractionState {
-        return this.#state.interaction;
+        return this.#snapshot.interaction;
     }
 
-    setPanelOpen(open: boolean): void {
-        this.#state.isPanelOpen = open;
+    snapshot(): FlowSnapshot {
+        return this.#snapshot;
+    }
+
+    withPanelOpen(open: boolean): FlowSnapshot {
+        this.#snapshot = {
+            ...this.#snapshot,
+            isPanelOpen: open,
+        };
+        return this.#snapshot;
     }
 
     getNodePosition(id: string): {
@@ -516,7 +546,7 @@ export class FlowDesignerPresenter {
         isDraggable: boolean;
     } {
         const node =
-            this.#state.nodes.find(
+            this.#snapshot.nodes.find(
                 n => n.id === id,
             )!;
         return {
@@ -531,7 +561,7 @@ export class FlowDesignerPresenter {
         x: number;
         y: number;
     }> {
-        return this.#state.nodes.map(
+        return this.#snapshot.nodes.map(
             n => ({
                 id: n.id,
                 x: n.positionX,
@@ -542,38 +572,40 @@ export class FlowDesignerPresenter {
 
     #panToRevealSelected(): void {
         const sel =
-            this.#state.interaction.selection;
+            this.#snapshot.interaction.selection;
         const edgeId =
             sel.kind === 'edge'
                 ? sel.edgeId : null;
         const origin = applyPanToRevealSelected(
             this.#singleSelectedNodeId(),
             edgeId,
-            this.#state.nodes,
-            this.#state.edges,
-            this.#state.interaction.viewBox,
+            this.#snapshot.nodes,
+            this.#snapshot.edges,
+            this.#snapshot.interaction.viewBox,
             this.#canvasW,
             PANEL_WIDTH_PX,
         );
         if (!origin) return;
         const vb =
-            this.#state.interaction.viewBox;
+            this.#snapshot.interaction.viewBox;
         vb.x = origin.x;
         vb.y = origin.y;
     }
 
     #handlePanelTransition(): void {
         const result = applyPanelTransition(
-            this.#state.isAutoFit,
-            this.#state.isPanelOpen,
-            this.#state.savedViewBox,
-            this.#state.interaction.viewBox,
+            this.#snapshot.isAutoFit,
+            this.#snapshot.isPanelOpen,
+            this.#snapshot.savedViewBox,
+            this.#snapshot.interaction.viewBox,
         );
         if (!result) return;
-        this.#state.savedViewBox =
-            result.savedViewBox;
+        this.#snapshot = {
+            ...this.#snapshot,
+            savedViewBox: result.savedViewBox,
+        };
         const vb =
-            this.#state.interaction.viewBox;
+            this.#snapshot.interaction.viewBox;
         vb.x = result.viewBox.x;
         vb.y = result.viewBox.y;
         vb.w = result.viewBox.w;
@@ -675,15 +707,15 @@ Auto Fit</label>
         };
         set(
             '#flow-lock-switch',
-            this.#state.isLocked,
+            this.#snapshot.isLocked,
         );
         set(
             '#flow-auto-layout-switch',
-            this.#state.isAutoLayout,
+            this.#snapshot.isAutoLayout,
         );
         set(
             '#flow-auto-fit-switch',
-            this.#state.isAutoFit,
+            this.#snapshot.isAutoFit,
         );
     }
 
@@ -692,8 +724,8 @@ Auto Fit</label>
     ): void {
         const nameHtml =
             buildFlowNameHeader(
-                this.#state.flowName,
-                this.#state.isEditingName,
+                this.#snapshot.flowName,
+                this.#snapshot.isEditingName,
             );
         mutateHtml(
             $required(
@@ -702,7 +734,7 @@ Auto Fit</label>
             ),
             html`${nameHtml}
 <p class="text-sm text-muted"
-    >${this.#state.flowDescription}</p>`,
+    >${this.#snapshot.flowDescription}</p>`,
         );
     }
 
@@ -742,69 +774,44 @@ Auto Fit</label>
         );
     }
 
-    moveNodes(
+    withNodesMoved(
         updates: Array<{
             nodeId: string;
             x: number;
             y: number;
         }>,
-    ): void {
-        if (this.#guardLocked()) return;
-        if (updates.length === 0) return;
-        this.#state.nodes = applyMoveNodes(
-            this.#state.nodes, updates,
-        );
+    ): FlowSnapshot {
+        if (this.#guardLocked()) {
+            return this.#snapshot;
+        }
+        if (updates.length === 0) {
+            return this.#snapshot;
+        }
+        this.#snapshot = {
+            ...this.#snapshot,
+            nodes: applyMoveNodes(
+                this.#snapshot.nodes, updates,
+            ),
+        };
         void this.#saveFlow(true);
         this.#noteMutation();
-        this.reconcileLayout();
-    }
-
-    async addNode(): Promise<boolean> {
-        const x = START_X
-            + (this.#state.nodes.length - 1)
-            * (NODE_WIDTH + NEW_NODE_OFFSET_X);
-        const y = START_Y + NEW_NODE_OFFSET_Y;
-        const nodeId = generateId();
-        const fId = this.#state.flowId;
-        try {
-            await postNodeAddition({
-                nodeId,
-                flowId: fId,
-                name: 'New State',
-                positionX: x,
-                positionY: y,
-            });
-        } catch (err) {
-            await this
-                .#handleMutationError(
-                    err,
-                    'addNode',
-                    'Failed to add state',
-                );
-            return false;
-        }
-        this.#state.nodes = applyAddNode(
-            this.#state.nodes,
-            nodeId, 'New State', x, y,
-        );
-        this.#noteMutation();
-        this.reconcileLayout();
-        return true;
+        this.withLayoutReconciled();
+        return this.#snapshot;
     }
 
     async addEdge(
         fromId: string,
         toId: string,
-    ): Promise<boolean> {
+    ): Promise<FlowSnapshot> {
         if (this.#guardLocked()) {
-            return false;
+            return this.#snapshot;
         }
         const from =
-            this.#state.nodes.find(
+            this.#snapshot.nodes.find(
                 n => n.id === fromId,
             );
         const to =
-            this.#state.nodes.find(
+            this.#snapshot.nodes.find(
                 n => n.id === toId,
             );
         if (!from) {
@@ -825,7 +832,7 @@ Auto Fit</label>
                 + ' from end state',
                 'error',
             );
-            return false;
+            return this.#snapshot;
         }
         if (to.isStart) {
             showToast(
@@ -833,10 +840,10 @@ Auto Fit</label>
                 + ' to start state',
                 'error',
             );
-            return false;
+            return this.#snapshot;
         }
         const hasDuplicate =
-            this.#state.edges.some(
+            this.#snapshot.edges.some(
                 e => e.fromNodeId === fromId
                     && e.toNodeId === toId,
             );
@@ -845,11 +852,11 @@ Auto Fit</label>
                 'Transition already exists',
                 'error',
             );
-            return false;
+            return this.#snapshot;
         }
         if (from.isStart) {
             const hasOutgoing =
-                this.#state.edges.some(
+                this.#snapshot.edges.some(
                     e => e.fromNodeId
                         === fromId,
                 );
@@ -860,11 +867,11 @@ Auto Fit</label>
                     + ' transition',
                     'error',
                 );
-                return false;
+                return this.#snapshot;
             }
         }
         const edgeId = generateId();
-        const fId = this.#state.flowId;
+        const fId = this.#snapshot.flowId;
         try {
             await postEdgeConnection({
                 edgeId,
@@ -881,65 +888,71 @@ Auto Fit</label>
                     'Failed to create'
                     + ' transition',
                 );
-            return false;
+            return this.#snapshot;
         }
-        this.#state.edges = applyAddEdge(
-            this.#state.edges,
-            edgeId, 'Transition',
-            fromId, toId,
-        );
+        this.#snapshot = {
+            ...this.#snapshot,
+            edges: applyAddEdge(
+                this.#snapshot.edges,
+                edgeId, 'Transition',
+                fromId, toId,
+            ),
+        };
         this.#noteMutation();
-        this.reconcileLayout();
-        return true;
+        this.withLayoutReconciled();
+        return this.#snapshot;
     }
 
     async deleteSelectedNodes(
-    ): Promise<boolean> {
+    ): Promise<FlowSnapshot> {
         if (this.#guardLocked()) {
-            return false;
+            return this.#snapshot;
         }
         const ids = this
             .#deletableNodeIds();
-        if (ids.length === 0) return false;
+        if (ids.length === 0) {
+            return this.#snapshot;
+        }
         const idSet = new Set(ids);
         const result = applyDeleteNodes(
-            this.#state.nodes,
-            this.#state.edges,
+            this.#snapshot.nodes,
+            this.#snapshot.edges,
             idSet,
         );
-        const prevNodes = this.#state.nodes;
-        const prevEdges = this.#state.edges;
-        this.#state.nodes = result.nodes;
-        this.#state.edges = result.edges;
+        const prev = this.#snapshot;
+        this.#snapshot = {
+            ...this.#snapshot,
+            nodes: result.nodes,
+            edges: result.edges,
+        };
         try {
             await this.#saveFlow(true);
         } catch (err) {
-            this.#state.nodes = prevNodes;
-            this.#state.edges = prevEdges;
+            this.#snapshot = prev;
             await this
                 .#handleMutationError(
                     err,
                     'deleteSelectedNodes',
                     'Failed to delete state',
                 );
-            return false;
+            return this.#snapshot;
         }
         this.#noteMutation();
-        this.#state.interaction
+        this.#snapshot.interaction
             .selection = { kind: 'none' };
-        this.reconcileLayout();
-        return true;
+        this.withLayoutReconciled();
+        return this.#snapshot;
     }
 
     #deletableNodeIds(): string[] {
         const sel =
-            this.#state.interaction
+            this.#snapshot.interaction
                 .selection;
         if (sel.kind !== 'nodes') return [];
         const result: string[] = [];
         for (const id of sel.nodeIds) {
             const n =
-                this.#state.nodes.find(
+                this.#snapshot.nodes.find(
                     nd => nd.id === id,
                 );
             if (
@@ -954,21 +967,21 @@ Auto Fit</label>
     }
 
     async deleteSelectedEdge(
-    ): Promise<boolean> {
+    ): Promise<FlowSnapshot> {
         if (this.#guardLocked()) {
-            return false;
+            return this.#snapshot;
         }
         const sel =
-            this.#state.interaction
+            this.#snapshot.interaction
                 .selection;
         if (sel.kind !== 'edge') {
-            return false;
+            return this.#snapshot;
         }
         const edgeId = sel.edgeId;
         try {
             await deleteEdge(
                 edgeId,
-                this.#state.flowId,
+                this.#snapshot.flowId,
             );
         } catch (err) {
             await this
@@ -978,22 +991,25 @@ Auto Fit</label>
                     'Failed to delete'
                     + ' transition',
                 );
-            return false;
+            return this.#snapshot;
         }
-        this.#state.edges = applyDeleteEdge(
-            this.#state.edges, edgeId,
-        );
+        this.#snapshot = {
+            ...this.#snapshot,
+            edges: applyDeleteEdge(
+                this.#snapshot.edges, edgeId,
+            ),
+        };
         this.#noteMutation();
-        this.#state.interaction
+        this.#snapshot.interaction
             .selection = { kind: 'none' };
-        this.reconcileLayout();
-        return true;
+        this.withLayoutReconciled();
+        return this.#snapshot;
     }
 
     async deleteSelected(
-    ): Promise<boolean> {
+    ): Promise<FlowSnapshot> {
         const sel =
-            this.#state.interaction
+            this.#snapshot.interaction
                 .selection;
         if (sel.kind === 'nodes') {
             return this
@@ -1003,100 +1019,131 @@ Auto Fit</label>
             return this
                 .deleteSelectedEdge();
         }
-        return false;
+        return this.#snapshot;
     }
 
-    reconcileLayout(): void {
+    withLayoutReconciled(): FlowSnapshot {
         if (
-            this.#state.isAutoLayout
-            && !this.#state.isLocked
+            this.#snapshot.isAutoLayout
+            && !this.#snapshot.isLocked
         ) {
             this.#runAutoLayout();
         }
-        if (this.#state.isAutoFit) {
+        if (this.#snapshot.isAutoFit) {
             this.#applyZoomToFit();
         }
+        return this.#snapshot;
     }
 
     #runAutoLayout(): void {
         const result = applyAutoLayout(
-            this.#state.nodes,
-            this.#state.edges,
+            this.#snapshot.nodes,
+            this.#snapshot.edges,
             this.#canvasW,
             this.#canvasH,
-            this.#state.isPanelOpen,
+            this.#snapshot.isPanelOpen,
             PANEL_WIDTH_PX,
         );
-        this.#state.nodes = result.nodes;
-        this.#state.edgeWaypoints =
-            result.edgeWaypoints;
+        this.#snapshot = {
+            ...this.#snapshot,
+            nodes: result.nodes,
+            edgeWaypoints: result.edgeWaypoints,
+        };
         void this.#saveFlow(false);
     }
 
-    updateNodeName(
+    withNodeNamed(
         name: string,
-    ): void {
-        if (this.#guardLocked()) return;
+    ): FlowSnapshot {
+        if (this.#guardLocked()) {
+            return this.#snapshot;
+        }
         const nodeId = this
             .#singleSelectedNodeId();
-        if (!nodeId) return;
-        this.#state.nodes = applyUpdateNode(
-            this.#state.nodes,
-            nodeId,
-            { name: name.trim() },
-        );
+        if (!nodeId) return this.#snapshot;
+        this.#snapshot = {
+            ...this.#snapshot,
+            nodes: applyUpdateNode(
+                this.#snapshot.nodes,
+                nodeId,
+                { name: name.trim() },
+            ),
+        };
         void this.#saveFlow(true);
         this.#noteMutation();
+        return this.#snapshot;
     }
 
-    updateNodeDescription(
+    withNodeDescribed(
         desc: string,
-    ): void {
-        if (this.#guardLocked()) return;
+    ): FlowSnapshot {
+        if (this.#guardLocked()) {
+            return this.#snapshot;
+        }
         const nodeId = this
             .#singleSelectedNodeId();
-        if (!nodeId) return;
-        this.#state.nodes = applyUpdateNode(
-            this.#state.nodes,
-            nodeId,
-            { description: desc.trim() },
-        );
+        if (!nodeId) return this.#snapshot;
+        this.#snapshot = {
+            ...this.#snapshot,
+            nodes: applyUpdateNode(
+                this.#snapshot.nodes,
+                nodeId,
+                { description: desc.trim() },
+            ),
+        };
         void this.#saveFlow(true);
         this.#noteMutation();
+        return this.#snapshot;
     }
 
-    updateEdgeName(
+    withEdgeNamed(
         name: string,
-    ): void {
-        if (this.#guardLocked()) return;
+    ): FlowSnapshot {
+        if (this.#guardLocked()) {
+            return this.#snapshot;
+        }
         const sel =
-            this.#state.interaction
+            this.#snapshot.interaction
                 .selection;
-        if (sel.kind !== 'edge') return;
-        this.#state.edges = applyUpdateEdge(
-            this.#state.edges,
-            sel.edgeId,
-            { name: name.trim() },
-        );
+        if (sel.kind !== 'edge') {
+            return this.#snapshot;
+        }
+        this.#snapshot = {
+            ...this.#snapshot,
+            edges: applyUpdateEdge(
+                this.#snapshot.edges,
+                sel.edgeId,
+                { name: name.trim() },
+            ),
+        };
         void this.#saveFlow(true);
         this.#noteMutation();
+        return this.#snapshot;
     }
 
-    updateEdgeDescription(
+    withEdgeDescribed(
         desc: string,
-    ): void {
-        if (this.#guardLocked()) return;
+    ): FlowSnapshot {
+        if (this.#guardLocked()) {
+            return this.#snapshot;
+        }
         const sel =
-            this.#state.interaction
+            this.#snapshot.interaction
                 .selection;
-        if (sel.kind !== 'edge') return;
-        this.#state.edges = applyUpdateEdge(
-            this.#state.edges,
-            sel.edgeId,
-            { description: desc.trim() },
-        );
+        if (sel.kind !== 'edge') {
+            return this.#snapshot;
+        }
+        this.#snapshot = {
+            ...this.#snapshot,
+            edges: applyUpdateEdge(
+                this.#snapshot.edges,
+                sel.edgeId,
+                { description: desc.trim() },
+            ),
+        };
         void this.#saveFlow(true);
         this.#noteMutation();
+        return this.#snapshot;
     }
 
     async addField(
@@ -1104,20 +1151,20 @@ Auto Fit</label>
         fieldType: string,
         isRequired: boolean,
         options: string[],
-    ): Promise<boolean> {
+    ): Promise<FlowSnapshot> {
         if (this.#guardLocked()) {
-            return false;
+            return this.#snapshot;
         }
         name = name.trim();
         const nodeId = this
             .#singleSelectedNodeId();
-        if (!nodeId) return false;
+        if (!nodeId) return this.#snapshot;
         const sortOrder =
-            this.#state.nodes.find(
+            this.#snapshot.nodes.find(
                 n => n.id === nodeId,
             )!.fields.length;
         const fieldId = generateId();
-        const fId = this.#state.flowId;
+        const fId = this.#snapshot.flowId;
         try {
             await postFieldAddition({
                 fieldId,
@@ -1136,7 +1183,7 @@ Auto Fit</label>
                     'addField',
                     'Failed to add field',
                 );
-            return false;
+            return this.#snapshot;
         }
         const typed =
             fieldType as FlowFieldType;
@@ -1148,28 +1195,31 @@ Auto Fit</label>
             isRequired,
             options,
         };
-        this.#state.nodes = applyAddField(
-            this.#state.nodes,
-            nodeId, newField,
-        );
+        this.#snapshot = {
+            ...this.#snapshot,
+            nodes: applyAddField(
+                this.#snapshot.nodes,
+                nodeId, newField,
+            ),
+        };
         this.#noteMutation();
-        return true;
+        return this.#snapshot;
     }
 
     async deleteField(
         fieldId: string,
-    ): Promise<boolean> {
+    ): Promise<FlowSnapshot> {
         if (this.#guardLocked()) {
-            return false;
+            return this.#snapshot;
         }
         const nodeId = this
             .#singleSelectedNodeId();
-        if (!nodeId) return false;
+        if (!nodeId) return this.#snapshot;
         try {
             await deleteField(
                 fieldId,
                 nodeId,
-                this.#state.flowId,
+                this.#snapshot.flowId,
             );
         } catch (err) {
             await this
@@ -1178,21 +1228,24 @@ Auto Fit</label>
                     'deleteField',
                     'Failed to delete field',
                 );
-            return false;
+            return this.#snapshot;
         }
-        this.#state.nodes = applyDeleteField(
-            this.#state.nodes,
-            nodeId, fieldId,
-        );
+        this.#snapshot = {
+            ...this.#snapshot,
+            nodes: applyDeleteField(
+                this.#snapshot.nodes,
+                nodeId, fieldId,
+            ),
+        };
         this.#noteMutation();
-        return true;
+        return this.#snapshot;
     }
 
     selectedNodeName(): string {
         const nodeId = this
             .#singleSelectedNodeId();
         if (!nodeId) return '';
-        return this.#state.nodes.find(
+        return this.#snapshot.nodes.find(
             n => n.id === nodeId,
         )!.name;
     }
@@ -1201,26 +1254,26 @@ Auto Fit</label>
         fromNodeId: string,
         x: number,
         y: number,
-    ): Promise<boolean> {
+    ): Promise<FlowSnapshot> {
         if (this.#guardLocked()) {
-            return false;
+            return this.#snapshot;
         }
         const fromNode =
-            this.#state.nodes.find(
+            this.#snapshot.nodes.find(
                 n => n.id === fromNodeId,
             );
-        if (!fromNode) return false;
+        if (!fromNode) return this.#snapshot;
         if (fromNode.isComplete) {
             showToast(
                 'Cannot create from'
                 + ' end state',
                 'error',
             );
-            return false;
+            return this.#snapshot;
         }
         if (fromNode.isStart) {
             const hasOut =
-                this.#state.edges.some(
+                this.#snapshot.edges.some(
                     e => e.fromNodeId
                         === fromNodeId,
                 );
@@ -1231,12 +1284,12 @@ Auto Fit</label>
                     + ' transition',
                     'error',
                 );
-                return false;
+                return this.#snapshot;
             }
         }
         const nodeId = generateId();
         const edgeId = generateId();
-        const fId = this.#state.flowId;
+        const fId = this.#snapshot.flowId;
         const posX =
             x - NODE_WIDTH / 2;
         const posY =
@@ -1256,7 +1309,7 @@ Auto Fit</label>
                     'addNodeAtPosition',
                     'Failed to add state',
                 );
-            return false;
+            return this.#snapshot;
         }
         try {
             await postEdgeConnection({
@@ -1274,152 +1327,51 @@ Auto Fit</label>
                     'Failed to connect'
                     + ' transition',
                 );
-            return false;
+            return this.#snapshot;
         }
-        this.#state.nodes = applyAddNode(
-            this.#state.nodes,
-            nodeId, 'New State', posX, posY,
-        );
-        this.#state.edges = applyAddEdge(
-            this.#state.edges,
-            edgeId, 'Transition',
-            fromNodeId, nodeId,
-        );
+        this.#snapshot = {
+            ...this.#snapshot,
+            nodes: applyAddNode(
+                this.#snapshot.nodes,
+                nodeId, 'New State', posX, posY,
+            ),
+            edges: applyAddEdge(
+                this.#snapshot.edges,
+                edgeId, 'Transition',
+                fromNodeId, nodeId,
+            ),
+            isPanelOpen: false,
+        };
         this.#noteMutation();
-        this.#state.interaction
+        this.#snapshot.interaction
             .selection = {
                 kind: 'nodes',
                 nodeIds: new Set([nodeId]),
             };
-        this.#state.isPanelOpen = false;
-        this.reconcileLayout();
-        return true;
+        this.withLayoutReconciled();
+        return this.#snapshot;
     }
 
-    async addNodeWithEdge(
-        name: string,
-        transitionName: string,
-        direction: string,
-    ): Promise<boolean> {
-        if (this.#guardLocked()) {
-            return false;
+    withZoomedIn(): FlowSnapshot {
+        if (this.#guardAutoFit()) {
+            return this.#snapshot;
         }
-        const fromNodeId = this
-            .#singleSelectedNodeId();
-        if (!fromNodeId) return false;
-        const fromNode =
-            this.#state.nodes.find(
-                n => n.id === fromNodeId,
-            );
-        if (!fromNode) return false;
-
-        const pos =
-            this.#computeDirectionPos(
-                fromNode, direction,
-            );
-        const nodeId = generateId();
-        const edgeId = generateId();
-        const fId = this.#state.flowId;
-
-        try {
-            await postNodeAddition({
-                nodeId,
-                flowId: fId,
-                name,
-                positionX: pos.x,
-                positionY: pos.y,
-            });
-        } catch (err) {
-            await this
-                .#handleMutationError(
-                    err,
-                    'addNodeWithEdge',
-                    'Failed to add state',
-                );
-            return false;
-        }
-        try {
-            await postEdgeConnection({
-                edgeId,
-                flowId: fId,
-                name: transitionName,
-                fromNodeId,
-                toNodeId: nodeId,
-            });
-        } catch (err) {
-            await this
-                .#handleMutationError(
-                    err,
-                    'addNodeWithEdge',
-                    'Failed to connect'
-                    + ' transition',
-                );
-            return false;
-        }
-        this.#state.nodes = applyAddNode(
-            this.#state.nodes,
-            nodeId, name, pos.x, pos.y,
-        );
-        this.#state.edges = applyAddEdge(
-            this.#state.edges,
-            edgeId, transitionName,
-            fromNodeId, nodeId,
-        );
-        this.#noteMutation();
-        this.reconcileLayout();
-        return true;
-    }
-
-    #computeDirectionPos(
-        fromNode: GraphNode,
-        direction: string,
-    ): { x: number; y: number } {
-        switch (direction) {
-            case 'left':
-                return {
-                    x: fromNode.positionX
-                        - NODE_WIDTH
-                        - HORIZONTAL_GAP,
-                    y: fromNode.positionY,
-                };
-            case 'above':
-                return {
-                    x: fromNode.positionX,
-                    y: fromNode.positionY
-                        - NODE_HEIGHT
-                        - VERTICAL_GAP,
-                };
-            case 'below':
-                return {
-                    x: fromNode.positionX,
-                    y: fromNode.positionY
-                        + NODE_HEIGHT
-                        + VERTICAL_GAP,
-                };
-            default:
-                return {
-                    x: fromNode.positionX
-                        + NODE_WIDTH
-                        + HORIZONTAL_GAP,
-                    y: fromNode.positionY,
-                };
-        }
-    }
-
-    zoomIn(): void {
-        if (this.#guardAutoFit()) return;
         zoomInState(
-            this.#state.interaction,
+            this.#snapshot.interaction,
             this.#selectedFocalPt(),
         );
+        return this.#snapshot;
     }
 
-    zoomOut(): void {
-        if (this.#guardAutoFit()) return;
+    withZoomedOut(): FlowSnapshot {
+        if (this.#guardAutoFit()) {
+            return this.#snapshot;
+        }
         zoomOutState(
-            this.#state.interaction,
+            this.#snapshot.interaction,
             this.#selectedFocalPt(),
         );
+        return this.#snapshot;
     }
 
     #selectedFocalPt(): {
@@ -1427,11 +1379,11 @@ Auto Fit</label>
         y: number;
     } | null {
         const sel =
-            this.#state.interaction
+            this.#snapshot.interaction
                 .selection;
         if (sel.kind === 'nodes') {
             const selectedNodes =
-                this.#state.nodes.filter(
+                this.#snapshot.nodes.filter(
                     n => sel.nodeIds
                         .has(n.id),
                 );
@@ -1465,17 +1417,17 @@ Auto Fit</label>
         }
         if (sel.kind === 'edge') {
             const edge =
-                this.#state.edges.find(
+                this.#snapshot.edges.find(
                     e => e.id
                         === sel.edgeId,
                 )!;
             const from =
-                this.#state.nodes.find(
+                this.#snapshot.nodes.find(
                     n => n.id
                         === edge.fromNodeId,
                 )!;
             const to =
-                this.#state.nodes.find(
+                this.#snapshot.nodes.find(
                     n => n.id
                         === edge.toNodeId,
                 )!;
@@ -1491,32 +1443,33 @@ Auto Fit</label>
         return null;
     }
 
-    updateCanvasSize(
+    withCanvasSize(
         w: number, h: number,
-    ): void {
+    ): FlowSnapshot {
         this.#canvasW = w;
         this.#canvasH = h;
         if (this.#needsFit) {
             this.#needsFit = false;
             this.#applyZoomToFit();
-            return;
+            return this.#snapshot;
         }
         const vb =
-            this.#state.interaction
+            this.#snapshot.interaction
                 .viewBox;
         const centerX = vb.x + vb.w / 2;
         const centerY = vb.y + vb.h / 2;
         const z =
-            this.#state.interaction.zoom;
+            this.#snapshot.interaction.zoom;
         vb.w = w / z;
         vb.h = h / z;
         vb.x = centerX - vb.w / 2;
         vb.y = centerY - vb.h / 2;
+        return this.#snapshot;
     }
 
     #applyZoomToFit(): void {
         const positions =
-            this.#state.nodes.map(
+            this.#snapshot.nodes.map(
                 n => ({
                     x: n.positionX,
                     y: n.positionY,
@@ -1528,15 +1481,15 @@ Auto Fit</label>
             this.#canvasH,
         );
         if (!result) return;
-        this.#state.interaction.zoom =
+        this.#snapshot.interaction.zoom =
             result.zoom;
-        this.#state.interaction.viewBox =
+        this.#snapshot.interaction.viewBox =
             { ...result.viewBox };
     }
 
     #canDelete(): boolean {
         const sel =
-            this.#state.interaction
+            this.#snapshot.interaction
                 .selection;
         if (sel.kind === 'nodes') {
             return this
@@ -1587,50 +1540,50 @@ Auto Fit</label>
     }
 
     #buildPropsPanel(): SafeHtml {
-        if (!this.#state.isPanelOpen) {
+        if (!this.#snapshot.isPanelOpen) {
             return html``;
         }
         const sel =
-            this.#state.interaction.selection;
+            this.#snapshot.interaction.selection;
 
         const singleNodeId = this
             .#singleSelectedNodeId();
         if (singleNodeId) {
             const node =
-                this.#state.nodes.find(
+                this.#snapshot.nodes.find(
                     n => n.id
                         === singleNodeId,
                 )!;
             const outgoing =
-                this.#state.edges.filter(
+                this.#snapshot.edges.filter(
                     e => e.fromNodeId
                         === singleNodeId,
                 );
             return buildNodePanel(
                 node, outgoing,
-                this.#state.isLocked,
+                this.#snapshot.isLocked,
             );
         }
 
         if (sel.kind === 'edge') {
             const edge =
-                this.#state.edges.find(
+                this.#snapshot.edges.find(
                     e => e.id
                         === sel.edgeId,
                 )!;
             const fromNode =
-                this.#state.nodes.find(
+                this.#snapshot.nodes.find(
                     n => n.id
                         === edge.fromNodeId,
                 )!;
             const toNode =
-                this.#state.nodes.find(
+                this.#snapshot.nodes.find(
                     n => n.id
                         === edge.toNodeId,
                 )!;
             return buildEdgePanel(
                 edge, fromNode, toNode,
-                this.#state.isLocked,
+                this.#snapshot.isLocked,
             );
         }
 
@@ -1642,12 +1595,12 @@ Auto Fit</label>
         y: number;
     } | null {
         const conn =
-            this.#state.interaction.connect;
+            this.#snapshot.interaction.connect;
         if (conn.kind !== 'connecting') {
             return null;
         }
         const fromNode =
-            this.#state.nodes.find(
+            this.#snapshot.nodes.find(
                 n => n.id
                     === conn.fromNodeId,
             );
@@ -1662,7 +1615,7 @@ Auto Fit</label>
 
     #buildConnectPreview(): string {
         const conn =
-            this.#state.interaction
+            this.#snapshot.interaction
                 .connect;
         if (conn.kind !== 'connecting') {
             return '';
@@ -1671,7 +1624,7 @@ Auto Fit</label>
             this.#connectSourcePoint();
         if (!src) return '';
         const fromNode =
-            this.#state.nodes.find(
+            this.#snapshot.nodes.find(
                 n => n.id
                     === conn.fromNodeId,
             );
@@ -1683,7 +1636,7 @@ Auto Fit</label>
                 const targetId =
                     conn.target.id;
                 const toNode =
-                    this.#state.nodes.find(
+                    this.#snapshot.nodes.find(
                         n => n.id
                             === targetId,
                     );
@@ -1692,7 +1645,7 @@ Auto Fit</label>
                         wouldBeCycle(
                             conn.fromNodeId,
                             targetId,
-                            this.#state
+                            this.#snapshot
                                 .edges
                                 .map(e => ({
                                     fromId:
@@ -1811,21 +1764,21 @@ Auto Fit</label>
 
     #nodesForRender(): GraphNode[] {
         return applyDragPreview(
-            this.#state.nodes,
-            this.#state.interaction.drag,
+            this.#snapshot.nodes,
+            this.#snapshot.interaction.drag,
         );
     }
 
     #buildCanvas(): SafeHtml {
         const nodes = this.#nodesForRender();
         const vb =
-            this.#state.interaction.viewBox;
+            this.#snapshot.interaction.viewBox;
         const isConn =
-            this.#state.interaction
+            this.#snapshot.interaction
                 .connect.kind
                 === 'connecting';
         const m =
-            this.#state.interaction.marquee;
+            this.#snapshot.interaction.marquee;
         const marqueeRect = m.kind
             === 'selecting'
             ? {
@@ -1845,17 +1798,17 @@ Auto Fit</label>
             : null;
         const svgHtml = buildGraphSvg(
             nodes,
-            this.#state.edges,
+            this.#snapshot.edges,
             vb.x,
             vb.y,
             vb.w,
             vb.h,
-            this.#state.interaction
+            this.#snapshot.interaction
                 .selection,
-            this.#state.isLocked,
+            this.#snapshot.isLocked,
             isConn,
             marqueeRect,
-            this.#state.edgeWaypoints,
+            this.#snapshot.edgeWaypoints,
         );
         const preview =
             this.#buildConnectPreview();

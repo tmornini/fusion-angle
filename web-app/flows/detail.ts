@@ -29,6 +29,7 @@ import {
 } from '../app/flow-interactions.ts';
 import {
     FlowDesignerPresenter,
+    buildInitialFlowSnapshot,
 } from '../app/presenters/index.ts';
 
 const FALLBACK_W = 800;
@@ -90,6 +91,7 @@ class PageState {
     #pushGestureContext:
         | ((next: FlowGestureContext) => void)
         | null = null;
+    #presenter: FlowDesignerPresenter | null = null;
 
     projectId(): string | undefined {
         return this.#projectId;
@@ -116,6 +118,22 @@ class PageState {
             this.#pushGestureContext(next);
         }
     }
+
+    presenter(): FlowDesignerPresenter {
+        if (!this.#presenter) {
+            throw new Error(
+                'pageState.presenter() called'
+                + ' before setPresenter()',
+            );
+        }
+        return this.#presenter;
+    }
+
+    setPresenter(
+        p: FlowDesignerPresenter,
+    ): void {
+        this.#presenter = p;
+    }
 }
 
 const pageState = new PageState();
@@ -134,7 +152,6 @@ function update(
 
 function bindFlowNameEdit(
     container: HTMLElement,
-    presenter: FlowDesignerPresenter,
     signal: AbortSignal,
 ): void {
     const slot = $(
@@ -157,10 +174,11 @@ function bindFlowNameEdit(
                 btn.id
                     === 'flow-name-edit-btn'
             ) {
-                presenter
-                    .startEditingName();
+                pageState.presenter()
+                    .withNameEditing(true);
                 update(
-                    container, presenter,
+                    container,
+                    pageState.presenter(),
                 );
                 const input = $input(
                     '#flow-name-input',
@@ -186,19 +204,21 @@ function bindFlowNameEdit(
                     );
                     return;
                 }
-                presenter
-                    .updateFlowName(name);
+                pageState.presenter()
+                    .withFlowName(name);
                 update(
-                    container, presenter,
+                    container,
+                    pageState.presenter(),
                 );
             } else if (
                 btn.id
                     === 'flow-name-cancel-btn'
             ) {
-                presenter
-                    .cancelEditingName();
+                pageState.presenter()
+                    .withNameEditing(false);
                 update(
-                    container, presenter,
+                    container,
+                    pageState.presenter(),
                 );
             }
         },
@@ -240,7 +260,6 @@ function bindFlowNameEdit(
 
 function bindSwitches(
     container: HTMLElement,
-    presenter: FlowDesignerPresenter,
     signal: AbortSignal,
 ): void {
     $(
@@ -248,8 +267,11 @@ function bindSwitches(
     )?.addEventListener(
         'click',
         () => {
-            presenter.toggleLocked();
-            update(container, presenter);
+            pageState.presenter()
+                .withLockToggled();
+            update(
+                container, pageState.presenter(),
+            );
         },
         { signal },
     );
@@ -259,8 +281,11 @@ function bindSwitches(
     )?.addEventListener(
         'click',
         () => {
-            presenter.toggleAutoLayout();
-            update(container, presenter);
+            pageState.presenter()
+                .withAutoLayoutToggled();
+            update(
+                container, pageState.presenter(),
+            );
         },
         { signal },
     );
@@ -270,8 +295,11 @@ function bindSwitches(
     )?.addEventListener(
         'click',
         () => {
-            presenter.toggleAutoFit();
-            update(container, presenter);
+            pageState.presenter()
+                .withAutoFitToggled();
+            update(
+                container, pageState.presenter(),
+            );
         },
         { signal },
     );
@@ -317,34 +345,43 @@ function bindCanvasInteractions(
     const push = bindInteractions(
         wrap,
         state,
-        () => update(container, presenter),
+        () => update(
+            container, pageState.presenter(),
+        ),
         (open) => {
             panelStateRef.open = open;
-            presenter.setPanelOpen(open);
+            pageState.presenter()
+                .withPanelOpen(open);
         },
         (updates) => {
-            presenter.moveNodes(updates);
-            update(container, presenter);
+            pageState.presenter()
+                .withNodesMoved(updates);
+            update(
+                container, pageState.presenter(),
+            );
         },
         (fromId, toId) => {
-            void presenter
+            void pageState.presenter()
                 .addEdge(fromId, toId)
                 .then(() => update(
-                    container, presenter,
+                    container,
+                    pageState.presenter(),
                 ));
         },
         (fromId, x, y) => {
-            void presenter
+            void pageState.presenter()
                 .addNodeAtPosition(
                     fromId, x, y,
                 )
                 .then(() => update(
-                    container, presenter,
+                    container,
+                    pageState.presenter(),
                 ));
         },
-        (id) =>
-            presenter.getNodePosition(id),
-        () => presenter.getAllNodes(),
+        (id) => pageState.presenter()
+            .getNodePosition(id),
+        () => pageState.presenter()
+            .getAllNodes(),
         {
             isAutoFit: presenter.isAutoFit(),
             isLocked: presenter.isLocked(),
@@ -381,28 +418,38 @@ function bindToolbarActions(
             if (!action) return;
             if (action === 'undo') {
                 void (async () => {
-                    await presenter
+                    await pageState.presenter()
                         .performUndo();
                     update(
-                        container, presenter,
+                        container,
+                        pageState.presenter(),
                     );
                 })();
             } else if (action === 'redo') {
                 void (async () => {
-                    await presenter
+                    await pageState.presenter()
                         .performRedo();
                     update(
-                        container, presenter,
+                        container,
+                        pageState.presenter(),
                     );
                 })();
             } else if (action === 'zoom-in') {
-                presenter.zoomIn();
-                update(container, presenter);
+                pageState.presenter()
+                    .withZoomedIn();
+                update(
+                    container,
+                    pageState.presenter(),
+                );
             } else if (
                 action === 'zoom-out'
             ) {
-                presenter.zoomOut();
-                update(container, presenter);
+                pageState.presenter()
+                    .withZoomedOut();
+                update(
+                    container,
+                    pageState.presenter(),
+                );
             } else if (
                 action === 'copy-mermaid'
             ) {
@@ -414,10 +461,11 @@ function bindToolbarActions(
             } else if (
                 action === 'delete-selected'
             ) {
-                void presenter
+                void pageState.presenter()
                     .deleteSelected()
                     .then(() => update(
-                        container, presenter,
+                        container,
+                        pageState.presenter(),
                     ));
             }
         },
@@ -524,9 +572,11 @@ function bindPanelActions(
             );
             if (action === 'close-panel') {
                 panelStateRef.open = false;
-                presenter.setPanelOpen(false);
+                pageState.presenter()
+                    .withPanelOpen(false);
                 update(
-                    container, presenter,
+                    container,
+                    pageState.presenter(),
                 );
             } else if (
                 action === 'add-field'
@@ -542,10 +592,11 @@ function bindPanelActions(
                         'data-field-id',
                     );
                 if (!fieldId) return;
-                void presenter
+                void pageState.presenter()
                     .deleteField(fieldId)
                     .then(() => update(
-                        container, presenter,
+                        container,
+                        pageState.presenter(),
                     ));
             } else if (
                 action === 'save-field'
@@ -575,8 +626,9 @@ function bindPanelActions(
             const value = target.value;
             if (id === 'prop-node-name') {
                 saveDebouncer.schedule(
-                    () => presenter
-                        .updateNodeName(
+                    () => pageState
+                        .presenter()
+                        .withNodeNamed(
                             value,
                         ),
                 );
@@ -584,8 +636,9 @@ function bindPanelActions(
                 id === 'prop-node-desc'
             ) {
                 saveDebouncer.schedule(
-                    () => presenter
-                        .updateNodeDescription(
+                    () => pageState
+                        .presenter()
+                        .withNodeDescribed(
                             value,
                         ),
                 );
@@ -593,8 +646,9 @@ function bindPanelActions(
                 id === 'prop-edge-name'
             ) {
                 saveDebouncer.schedule(
-                    () => presenter
-                        .updateEdgeName(
+                    () => pageState
+                        .presenter()
+                        .withEdgeNamed(
                             value,
                         ),
                 );
@@ -602,8 +656,9 @@ function bindPanelActions(
                 id === 'prop-edge-desc'
             ) {
                 saveDebouncer.schedule(
-                    () => presenter
-                        .updateEdgeDescription(
+                    () => pageState
+                        .presenter()
+                        .withEdgeDescribed(
                             value,
                         ),
                 );
@@ -693,11 +748,11 @@ async function handleSaveField(
                 .map(s => s.trim())
                 .filter(s => s.length > 0)
             : [];
-    await presenter.addField(
+    await pageState.presenter().addField(
         fieldName, fieldType,
         isRequired, options,
     );
-    update(container, presenter);
+    update(container, pageState.presenter());
 }
 
 export async function init(
@@ -733,13 +788,20 @@ export async function init(
     );
     if (!loaded) return;
 
+    const initialSnap =
+        buildInitialFlowSnapshot(
+            loaded.graph,
+            FALLBACK_W,
+            FALLBACK_H,
+        );
     const presenter =
         new FlowDesignerPresenter(
-            loaded.graph,
+            initialSnap,
             FALLBACK_W,
             FALLBACK_H,
             loaded.versions.length > 0,
         );
+    pageState.setPresenter(presenter);
     const panelStateRef: PanelStateRef =
         { open: false };
     const signal = pageState.signal();
@@ -757,10 +819,10 @@ export async function init(
         panelStateRef, signal,
     );
     bindFlowNameEdit(
-        container, presenter, signal,
+        container, signal,
     );
     bindSwitches(
-        container, presenter, signal,
+        container, signal,
     );
     bindKeyboardShortcuts(
         container, presenter,
@@ -773,9 +835,13 @@ export async function init(
         const w = initialWrap.clientWidth;
         const h = initialWrap.clientHeight;
         if (w > 0 && h > 0) {
-            presenter.updateCanvasSize(w, h);
-            presenter.reconcileLayout();
-            update(container, presenter);
+            pageState.presenter()
+                .withCanvasSize(w, h);
+            pageState.presenter()
+                .withLayoutReconciled();
+            update(
+                container, pageState.presenter(),
+            );
         }
     }
     subscribeResize(container, () => {
@@ -788,8 +854,11 @@ export async function init(
         const w = liveWrap.clientWidth;
         const h = liveWrap.clientHeight;
         if (w > 0 && h > 0) {
-            presenter.updateCanvasSize(w, h);
-            update(container, presenter);
+            pageState.presenter()
+                .withCanvasSize(w, h);
+            update(
+                container, pageState.presenter(),
+            );
         }
     });
 }
@@ -809,9 +878,11 @@ function bindKeyboardShortcuts(
             ) {
                 e.preventDefault();
                 panelStateRef.open = false;
-                presenter.setPanelOpen(false);
+                pageState.presenter()
+                    .withPanelOpen(false);
                 update(
-                    container, presenter,
+                    container,
+                    pageState.presenter(),
                 );
                 return;
             }
@@ -831,10 +902,11 @@ function bindKeyboardShortcuts(
                 )
             ) {
                 e.preventDefault();
-                void presenter
+                void pageState.presenter()
                     .deleteSelected()
                     .then(() => update(
-                        container, presenter,
+                        container,
+                        pageState.presenter(),
                     ));
             }
             const mod =
@@ -846,10 +918,11 @@ function bindKeyboardShortcuts(
             ) {
                 e.preventDefault();
                 void (async () => {
-                    await presenter
+                    await pageState.presenter()
                         .performUndo();
                     update(
-                        container, presenter,
+                        container,
+                        pageState.presenter(),
                     );
                 })();
             }
@@ -859,10 +932,11 @@ function bindKeyboardShortcuts(
             ) {
                 e.preventDefault();
                 void (async () => {
-                    await presenter
+                    await pageState.presenter()
                         .performRedo();
                     update(
-                        container, presenter,
+                        container,
+                        pageState.presenter(),
                     );
                 })();
             }
