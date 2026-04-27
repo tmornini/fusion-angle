@@ -528,6 +528,7 @@ function reduceCrossings(
         upN.get(e.toId)!.push(e.fromId);
     }
 
+    // Sugiyama barycenter heuristic for crossing reduction.
     const barycenter = (
         ids: readonly string[],
         neighborPos: Map<string, number>,

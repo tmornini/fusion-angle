@@ -4,10 +4,10 @@ import {
     buildErrorState,
     formatErrorMessage,
 } from './loading-states.ts';
+import { navigateTo } from './navigation.ts';
 import {
-    navigateTo,
-    getParams,
-} from './navigation.ts';
+    getUrlParams,
+} from './adapters/url-params.ts';
 
 const pageModules: Record<
     string,
@@ -91,7 +91,7 @@ export async function initPageModule(
         return;
     }
     const mod = await loader();
-    await mod.init(getParams());
+    await mod.init(getUrlParams());
 }
 
 export function handlePageLoadError(

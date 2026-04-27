@@ -2,6 +2,7 @@ import { GET, PUT } from '../../../api/api.ts';
 import type {
     IdeaEntity,
     IdeaSubmissionEntity,
+    ProjectEntity,
 } from '../../../api/types.ts';
 import {
     Idea, nowUtc,
@@ -12,6 +13,10 @@ import {
     userName,
 } from './shared.ts';
 import type { FetchContext } from './shared.ts';
+import {
+    putProject,
+    putProjectTeamMember,
+} from './projects.ts';
 import {
     createChannel,
 } from '../channels.ts';
@@ -132,4 +137,25 @@ export async function putIdeaSubmission(
             created_at: nowUtc(),
         },
     );
+}
+
+// Idempotent: retry recovers from partial failure.
+export async function postIdeaConversion(
+    ideaId: string,
+    projectId: string,
+    project: Omit<ProjectEntity, 'id'>,
+    leadUserId: string,
+): Promise<void> {
+    await putProject(projectId, project);
+    await putProjectTeamMember({
+        projectId,
+        userId: leadUserId,
+        role: 'lead',
+        type: 'internal',
+    });
+    const existing = await getIdeaEntity(ideaId);
+    await putIdea(ideaId, {
+        ...existing,
+        status: 'promoted',
+    });
 }

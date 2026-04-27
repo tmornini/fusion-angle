@@ -455,12 +455,9 @@ function mutateMissingTableBanner(
         html`<span
             class="empty-banner-icon"
             >${iconInfo(20, '')}</span>
-        <p class="text-sm m-0">${
-            'The schema is missing the "'
-            + missing
-            + '" table. Recreate the schema'
-            + ' below to continue.'
-        }</p>`,
+        <p class="text-sm m-0">The schema is missing the "${
+            missing
+        }" table. Recreate the schema below to continue.</p>`,
     );
     root.prepend(banner);
 }

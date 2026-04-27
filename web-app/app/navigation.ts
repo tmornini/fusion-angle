@@ -1,8 +1,6 @@
 import { PAGE_REGISTRY } from './page-registry.ts';
-import {
-    getQueryString,
-    setLocation,
-} from './adapters/location.ts';
+import { setLocation } from './adapters/location.ts';
+import { buildQueryString } from './adapters/url-params.ts';
 
 function getPageName(): string {
     const name = document
@@ -15,16 +13,6 @@ function getPageName(): string {
         );
     }
     return name;
-}
-
-function getParams(): Record<string, string> {
-    const params: Record<string, string> = {};
-    new URLSearchParams(
-        getQueryString(),
-    ).forEach((value, key) => {
-        params[key] = value;
-    });
-    return params;
 }
 
 function buildPageUrl(
@@ -40,7 +28,7 @@ function buildPageUrl(
     let url = `../${entry.sourceDir}`
         + `/${entry.sourceFile}.html`;
     if (params && Object.keys(params).length > 0) {
-        url += '?' + new URLSearchParams(params).toString();
+        url += '?' + buildQueryString(params);
     }
     return url;
 }
@@ -52,4 +40,4 @@ function navigateTo(
     setLocation(buildPageUrl(page, params));
 }
 
-export { buildPageUrl, navigateTo, getPageName, getParams };
+export { buildPageUrl, navigateTo, getPageName };

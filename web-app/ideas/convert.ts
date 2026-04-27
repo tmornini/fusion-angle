@@ -16,11 +16,8 @@ import { navigateTo } from '../app/core.ts';
 import {
     getIdea,
     getManagedUsers,
-    getIdeaEntity,
     postActivity,
-    putIdea,
-    putProject,
-    putProjectTeamMember,
+    postIdeaConversion,
     jsonObjectField,
     createFetchContext,
     generateId,
@@ -477,9 +474,8 @@ async function performConversion(
     projectId: string,
     fields: ConversionFields,
 ): Promise<void> {
-    const leadUserId =
-        fields['project-lead'];
-    await putProject(
+    await postIdeaConversion(
+        ideaId,
         projectId,
         {
             title:
@@ -511,17 +507,6 @@ async function performConversion(
             budget_label:
                 fields['budget'],
         },
+        fields['project-lead'],
     );
-    await putProjectTeamMember({
-        projectId,
-        userId: leadUserId,
-        role: 'lead',
-        type: 'internal',
-    });
-    const existingIdea =
-        await getIdeaEntity(ideaId);
-    await putIdea(ideaId, {
-        ...existingIdea,
-        status: 'promoted',
-    });
 }

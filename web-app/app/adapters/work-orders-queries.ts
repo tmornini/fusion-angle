@@ -476,11 +476,16 @@ export async function getWorkOrderDetail(
                 const [fId, val]
                 of Object.entries(vals)
             ) {
+                const fieldName =
+                    fieldNameMap.get(fId);
+                if (!fieldName) {
+                    throw new Error(
+                        'Field not found: '
+                            + fId,
+                    );
+                }
                 fieldValues.push({
-                    fieldName:
-                        fieldNameMap
-                            .get(fId)
-                            ?? fId,
+                    fieldName,
                     value: val,
                 });
             }

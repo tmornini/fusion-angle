@@ -3,14 +3,14 @@ export interface ZipEntry {
     data: Uint8Array;
 }
 
-/* CRC-32 lookup table */
+const PKZIP_CRC32_REVERSED = 0xEDB88320;
 
 const CRC_TABLE = new Uint32Array(256);
 for (let i = 0; i < 256; i++) {
     let c = i;
     for (let j = 0; j < 8; j++) {
         c = (c & 1)
-            ? (0xEDB88320 ^ (c >>> 1))
+            ? (PKZIP_CRC32_REVERSED ^ (c >>> 1))
             : (c >>> 1);
     }
     CRC_TABLE[i] = c;

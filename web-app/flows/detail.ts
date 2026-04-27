@@ -81,16 +81,15 @@ class Debouncer {
 const saveDebouncer =
     new Debouncer(SAVE_DELAY_MS);
 
-let pushGestureContext:
-    | ((next: FlowGestureContext) => void)
-    | null = null;
-
 type PanelStateRef = { open: boolean };
 
 class PageState {
     #projectId: string | undefined;
     readonly #interaction =
         new AbortController();
+    #pushGestureContext:
+        | ((next: FlowGestureContext) => void)
+        | null = null;
 
     projectId(): string | undefined {
         return this.#projectId;
@@ -103,6 +102,20 @@ class PageState {
     signal(): AbortSignal {
         return this.#interaction.signal;
     }
+
+    setPushGestureContext(
+        fn: (next: FlowGestureContext) => void,
+    ): void {
+        this.#pushGestureContext = fn;
+    }
+
+    pushGestureContext(
+        next: FlowGestureContext,
+    ): void {
+        if (this.#pushGestureContext) {
+            this.#pushGestureContext(next);
+        }
+    }
 }
 
 const pageState = new PageState();
@@ -113,12 +126,10 @@ function update(
 ): void {
     saveDebouncer.flush();
     presenter.renderUpdate(container);
-    if (pushGestureContext) {
-        pushGestureContext({
-            isAutoFit: presenter.isAutoFit(),
-            isLocked: presenter.isLocked(),
-        });
-    }
+    pageState.pushGestureContext({
+        isAutoFit: presenter.isAutoFit(),
+        isLocked: presenter.isLocked(),
+    });
 }
 
 function bindFlowNameEdit(
@@ -303,7 +314,7 @@ function bindCanvasInteractions(
     }
     const state =
         presenter.interactionState();
-    pushGestureContext = bindInteractions(
+    const push = bindInteractions(
         wrap,
         state,
         () => update(container, presenter),
@@ -340,6 +351,7 @@ function bindCanvasInteractions(
         },
         signal,
     );
+    pageState.setPushGestureContext(push);
 }
 
 function bindToolbarActions(

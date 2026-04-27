@@ -66,7 +66,7 @@ protocol locally, but testing is HTTP-only.
 - **Auth**: Mock auth returning `demo@example.com`.
 - **Data**: REST-style API layer (`api/`) backed by localStorage. The `web-app/app/adapters/` directory contains adapter functions across 16 modules (with barrel re-export) that call `GET()`/`PUT()`/`POST()` and convert normalized DB rows into the denormalized shapes pages expect.
 - **Presentation**: The `web-app/app/presenters/` directory contains 15 presenter classes across 13 files (with barrel re-export) that wrap adapter-returned shapes and emit `SafeHtml`. Page modules instantiate presenters and call `build*` methods on them to produce markup — keeping rendering logic out of page modules and out of adapters.
-- **Database**: localStorage with JSON serialization, persisted across page navigations. Each table is stored as a `fusion-ai:tableName` key containing a JSON array of row objects. Deletion is recorded in a single `fusion-ai:deleted` tombstone table whose rows are `{id, deleted_at}` — entity rows themselves never carry a `deleted_at` column. `EntityStore.getAll()`/`getById()` filter against `deleted.allDeletedIds()`; `EntityStore.delete(id)` writes a tombstone row. History stores (`flow_versions`) hard-delete via splice. When no schema exists (no `fusion-ai:*` keys in localStorage), non-entry pages redirect to snapshots so users can initialize the environment. A snapshots page provides create pristine environment, wipe and load mock data, upload snapshot, and download snapshot operations.
+- **Database**: localStorage with JSON serialization, persisted across page navigations. Each table is stored as a `fusion-ai:tableName` key containing a JSON array of row objects. Deletion is recorded in a single `fusion-ai:deleted` tombstone table whose rows are `{id, deleted_at}` — entity rows themselves never carry a `deleted_at` column. `EntityStore.getAll()`/`getById()` filter against `deleted.allDeletedIds()`; `EntityStore.delete(id)` writes a tombstone row. History stores (`flow_versions`) hard-delete via splice. When no schema exists (no `fusion-ai:*` keys in localStorage), non-entry pages redirect to snapshots so users can initialize the environment. A snapshots page provides create pristine environment, wipe and load mock data, upload snapshot, and download snapshot operations. Extracting `created_at` and `updated_at` from entity rows (`FlowEntity`, `WorkOrderEntity`) into `flow_events` and `work_order_events` tables — the natural extension of the tombstone pattern — is **deferred until immediately before the Postgres backend migration**, when transactional guarantees make the multi-table writes natural and a single regression pass covers both changes.
 - **State**: Simple module-level variables + pub-sub pattern for theme (persisted to localStorage), mobile detection (matchMedia), auth, and sidebar state.
 - **Durations**: All numeric durations are persisted in seconds. UI displays days via `durationInDays(seconds)` from `format.ts`.
 
@@ -136,34 +136,6 @@ generate the markup the page injects into the DOM.
   mutate, and never touch the DOM directly. Page
   modules are responsible for the DOM; presenters are
   responsible for the HTML they hand over.
-  *Exception:* `FlowDesignerPresenter` retains an
-  internal `#state: DesignerState` field. The
-  state's mutation surface has been narrowed
-  significantly: every named transition lives in
-  `flow-designer-actions.ts` as a pure `apply*`
-  function (`applyMoveNodes`, `applyDragPreview`,
-  `applyToggleLock`, `applyUpdateFlowName`,
-  `applyAddNode`, `applyAddEdge`, `applyDeleteNodes`,
-  `applyDeleteEdge`, `applyUpdateNode`,
-  `applyUpdateEdge`, `applyAddField`,
-  `applyDeleteField`, `applyAutoLayout`,
-  `applyPanToRevealSelected`,
-  `applyPanelTransition`); `FlowHistory` is an
-  immutable value with free transition functions;
-  `zoomToFit` in `flow-interactions.ts` returns a
-  fresh `{ zoom, viewBox }` rather than mutating in
-  place; the gesture FSM uses an `onPanelRequest`
-  callback rather than mutating panel state. The
-  remaining presenter methods are short adapters
-  that call a pure transition and copy the result
-  back into `#state`. Full type-level immutability
-  (a `FlowSnapshot` constructor argument with the
-  presenter reconstructed per render) remains
-  pending — it would be a structural rewrite rather
-  than a behavioral one, and needs manual
-  regression coverage (F1–F46) that includes
-  drag/connect/marquee gestures that synthetic
-  PointerEvents cannot reliably drive.
 - **Barrel**: `presenters/index.ts` re-exports every
   presenter class. Page modules import via
   `from '../app/presenters'`.
