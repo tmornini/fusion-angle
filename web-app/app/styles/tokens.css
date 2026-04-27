@@ -1,5 +1,5 @@
 /* ==========================================
-   1. DESIGN TOKENS (Light Mode)
+   1. DESIGN TOKENS (Theme-Neutral)
    ========================================== */
 
 :root {
@@ -40,81 +40,15 @@
   --gray-800: 217 16% 22%;
   --gray-900: 217 20% 15%;
 
-  /* Semantic: Background */
-  --background: var(--gray-50);
-  --foreground: var(--blue-900);
-
-  /* Semantic: Surfaces */
-  --card: 0 0% 100%;
-  --color-card-bg: hsl(var(--card));
-  --color-surface: hsl(var(--background));
-  --color-foreground: hsl(var(--foreground));
-  --color-muted-foreground:
-      hsl(var(--muted-foreground));
-  --card-foreground: var(--blue-900);
-  --popover: 0 0% 100%;
-  --popover-foreground: var(--blue-900);
-
-  /* Semantic: Primary */
-  --primary: var(--blue-500);
-  --primary-foreground: 0 0% 100%;
-  --primary-hover: var(--blue-600);
-  --primary-active: var(--blue-700);
-
-  /* Semantic: Secondary */
-  --secondary: var(--blue-100);
-  --secondary-foreground: var(--blue-800);
-  --secondary-hover: var(--blue-200);
-
-  /* Semantic: Muted */
-  --muted: var(--gray-200);
-  --muted-foreground: var(--gray-600);
-
-  /* Semantic: Accent (Yellow) */
+  /* Accent base (yellow theming, theme-neutral) */
   --accent: var(--yellow-400);
   --accent-foreground: var(--blue-900);
-  --accent-soft: 48 80% 95%;
-  --accent-text: 48 85% 30%;
 
-  /* Semantic: Destructive */
-  --destructive: 0 72% 51%;
-  --destructive-hover: 0 72% 45%;
+  /* Destructive foreground (white in both themes) */
   --destructive-foreground: 0 0% 100%;
 
-  /* Semantic: Interactive */
-  --border: var(--gray-200);
-  --border-strong: var(--gray-300);
-  --input: var(--gray-200);
+  /* Focus ring color */
   --ring: var(--blue-500);
-
-  /* Status: Success */
-  --success: 152 60% 40%;
-  --success-hover: 152 60% 35%;
-  --success-foreground: 0 0% 100%;
-  --success-soft: 152 50% 95%;
-  --success-border: 152 45% 75%;
-  --success-text: 152 60% 30%;
-
-  /* Status: Warning */
-  --warning: 38 92% 45%;
-  --warning-foreground: 0 0% 100%;
-  --warning-soft: 38 80% 95%;
-  --warning-border: 38 70% 75%;
-  --warning-text: 38 80% 30%;
-
-  /* Status: Error */
-  --error: 0 72% 51%;
-  --error-foreground: 0 0% 100%;
-  --error-soft: 0 70% 96%;
-  --error-border: 0 60% 80%;
-  --error-text: 0 70% 40%;
-
-  /* Status: Info */
-  --info: var(--blue-500);
-  --info-foreground: 0 0% 100%;
-  --info-soft: var(--blue-50);
-  --info-border: var(--blue-200);
-  --info-text: var(--blue-700);
 
   /* Radii */
   --radius: 0.5rem;
@@ -123,12 +57,12 @@
   --radius-xl: 1rem;
   --radius-full: 9999px;
 
-  /* Focus */
+  /* Focus geometry */
   --focus-ring-width: 2px;
   --focus-ring-offset: 2px;
   --focus-ring-color: var(--blue-500);
 
-  /* Shadows */
+  /* Shadows (base — theme-neutral) */
   --shadow-xs: 0 1px 2px 0 hsl(var(--blue-900) / 0.04);
   --shadow-sm:
       0 1px 3px 0 hsl(var(--blue-900) / 0.06),
@@ -143,12 +77,6 @@
       0 20px 25px -5px hsl(var(--blue-900) / 0.08),
       0 8px 10px -6px hsl(var(--blue-900) / 0.06);
   --shadow-inner: inset 0 2px 4px 0 hsl(var(--blue-900) / 0.04);
-  --shadow-card:
-      0 1px 3px 0 hsl(var(--blue-500) / 0.04),
-      0 1px 2px -1px hsl(var(--blue-500) / 0.04);
-  --shadow-card-hover:
-      0 8px 16px -4px hsl(var(--blue-500) / 0.08),
-      0 4px 6px -2px hsl(var(--blue-500) / 0.04);
 
   /* Spacing (8-pt grid) */
   --space-1: 0.25rem;
@@ -214,7 +142,7 @@
       background-color var(--duration-fast)
           var(--ease-default);
 
-  /* Gradients */
+  /* Theme-neutral gradients */
   --gradient-primary:
       linear-gradient(135deg,
           hsl(var(--blue-500)) 0%,
@@ -223,18 +151,10 @@
       linear-gradient(135deg,
           hsl(var(--yellow-400)) 0%,
           hsl(var(--yellow-500)) 100%);
-  --gradient-subtle:
-      linear-gradient(180deg,
-          hsl(var(--gray-50)) 0%,
-          hsl(var(--gray-100)) 100%);
   --gradient-hero:
       linear-gradient(135deg,
           hsl(var(--blue-500)) 0%,
           hsl(var(--blue-700)) 100%);
-
-  /* Chart Colors (extended palette) */
-  --chart-5: 217 71% 53%;
-  --chart-6: 280 65% 60%;
 
   /* Backdrop */
   --backdrop: 0 0% 0%;
@@ -249,4 +169,3 @@
   --z-tooltip: 600;
   --z-toast: 700;
 }
-

@@ -1,0 +1,95 @@
+/* ==========================================
+   2. LIGHT MODE TOKENS
+   ========================================== */
+
+:root {
+  /* Semantic: Background */
+  --background: var(--gray-50);
+  --foreground: var(--blue-900);
+
+  /* Semantic: Surfaces */
+  --card: 0 0% 100%;
+  --color-card-bg: hsl(var(--card));
+  --color-surface: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-muted-foreground:
+      hsl(var(--muted-foreground));
+  --card-foreground: var(--blue-900);
+  --popover: 0 0% 100%;
+  --popover-foreground: var(--blue-900);
+
+  /* Semantic: Primary */
+  --primary: var(--blue-500);
+  --primary-foreground: 0 0% 100%;
+  --primary-hover: var(--blue-600);
+  --primary-active: var(--blue-700);
+
+  /* Semantic: Secondary */
+  --secondary: var(--blue-100);
+  --secondary-foreground: var(--blue-800);
+  --secondary-hover: var(--blue-200);
+
+  /* Semantic: Muted */
+  --muted: var(--gray-200);
+  --muted-foreground: var(--gray-600);
+
+  /* Accent variants (tinted backgrounds and text) */
+  --accent-soft: 48 80% 95%;
+  --accent-text: 48 85% 30%;
+
+  /* Semantic: Destructive */
+  --destructive: 0 72% 51%;
+  --destructive-hover: 0 72% 45%;
+
+  /* Semantic: Interactive */
+  --border: var(--gray-200);
+  --border-strong: var(--gray-300);
+  --input: var(--gray-200);
+
+  /* Status: Success */
+  --success: 152 60% 40%;
+  --success-hover: 152 60% 35%;
+  --success-foreground: 0 0% 100%;
+  --success-soft: 152 50% 95%;
+  --success-border: 152 45% 75%;
+  --success-text: 152 60% 30%;
+
+  /* Status: Warning */
+  --warning: 38 92% 45%;
+  --warning-foreground: 0 0% 100%;
+  --warning-soft: 38 80% 95%;
+  --warning-border: 38 70% 75%;
+  --warning-text: 38 80% 30%;
+
+  /* Status: Error */
+  --error: 0 72% 51%;
+  --error-foreground: 0 0% 100%;
+  --error-soft: 0 70% 96%;
+  --error-border: 0 60% 80%;
+  --error-text: 0 70% 40%;
+
+  /* Status: Info */
+  --info: var(--blue-500);
+  --info-foreground: 0 0% 100%;
+  --info-soft: var(--blue-50);
+  --info-border: var(--blue-200);
+  --info-text: var(--blue-700);
+
+  /* Card shadows */
+  --shadow-card:
+      0 1px 3px 0 hsl(var(--blue-500) / 0.04),
+      0 1px 2px -1px hsl(var(--blue-500) / 0.04);
+  --shadow-card-hover:
+      0 8px 16px -4px hsl(var(--blue-500) / 0.08),
+      0 4px 6px -2px hsl(var(--blue-500) / 0.04);
+
+  /* Subtle gradient */
+  --gradient-subtle:
+      linear-gradient(180deg,
+          hsl(var(--gray-50)) 0%,
+          hsl(var(--gray-100)) 100%);
+
+  /* Chart Colors (extended palette) */
+  --chart-5: 217 71% 53%;
+  --chart-6: 280 65% 60%;
+}

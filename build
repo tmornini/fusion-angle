@@ -71,6 +71,7 @@ echo "Bundle created: assets/app.js ($(wc -c < "$BUILD_DIR/assets/app.js" | xarg
 
 cat web-app/app/styles/fonts.css \
     web-app/app/styles/tokens.css \
+    web-app/app/styles/light-mode.css \
     web-app/app/styles/dark-mode.css \
     web-app/app/styles/base.css \
     web-app/app/styles/components.css \
