@@ -30,7 +30,29 @@ import {
 import {
     FlowDesignerPresenter,
     buildInitialFlowSnapshot,
+    type FlowSnapshot,
 } from '../app/presenters/index.ts';
+import {
+    buildFlowHistorySnapshot,
+    recordFlowMutation,
+} from '../app/flow-history.ts';
+import type {
+    FlowHistorySnapshot,
+} from '../app/flow-history.ts';
+import {
+    performAddEdge,
+    performAddNodeAtPosition,
+    performDeleteSelectedNodes,
+    performDeleteSelectedEdge,
+    performAddField,
+    performDeleteField,
+    performUndo,
+    performRedo,
+} from '../app/flow-operations.ts';
+import {
+    applyAddField,
+    applyDeleteField,
+} from '../app/flow-designer-actions.ts';
 
 const FALLBACK_W = 800;
 const FALLBACK_H = 600;
@@ -134,9 +156,322 @@ class PageState {
     ): void {
         this.#presenter = p;
     }
+
+    #container: HTMLElement | null = null;
+    #canvasW: number = FALLBACK_W;
+    #canvasH: number = FALLBACK_H;
+    #needsFit: boolean = true;
+    #history: FlowHistorySnapshot =
+        buildFlowHistorySnapshot(false);
+
+    container(): HTMLElement {
+        if (!this.#container) {
+            throw new Error(
+                'pageState.container() called'
+                + ' before setContainer()',
+            );
+        }
+        return this.#container;
+    }
+
+    setContainer(c: HTMLElement): void {
+        this.#container = c;
+    }
+
+    canvasW(): number {
+        return this.#canvasW;
+    }
+
+    canvasH(): number {
+        return this.#canvasH;
+    }
+
+    setCanvasSize(w: number, h: number): void {
+        this.#canvasW = w;
+        this.#canvasH = h;
+    }
+
+    needsFit(): boolean {
+        return this.#needsFit;
+    }
+
+    setNeedsFit(value: boolean): void {
+        this.#needsFit = value;
+    }
+
+    history(): FlowHistorySnapshot {
+        return this.#history;
+    }
+
+    setHistory(h: FlowHistorySnapshot): void {
+        this.#history = h;
+    }
 }
 
 const pageState = new PageState();
+
+function commit(
+    next: FlowSnapshot,
+    opts?: { advanceHistory?: boolean },
+): void {
+    if (opts?.advanceHistory) {
+        pageState.setHistory(
+            recordFlowMutation(pageState.history()),
+        );
+    }
+    const presenter = new FlowDesignerPresenter(
+        next,
+        pageState.canvasW(),
+        pageState.canvasH(),
+        pageState.history(),
+    );
+    pageState.setPresenter(presenter);
+    update(pageState.container(), presenter);
+}
+
+async function handleAddEdge(
+    fromId: string,
+    toId: string,
+): Promise<void> {
+    const snap = pageState.presenter().snapshot();
+    const op = await performAddEdge(
+        snap, fromId, toId,
+    );
+    if (op.kind === 'fail') {
+        await reportOpFailure(
+            op.toast, op.toastVariant, snap.flowId,
+        );
+        return;
+    }
+    const current =
+        pageState.presenter().snapshot();
+    const next: FlowSnapshot = {
+        ...current,
+        edges: [...current.edges, op.edge],
+    };
+    commit(next, {
+        advanceHistory: op.advanceHistory,
+    });
+    commit(
+        pageState.presenter().withLayoutReconciled(),
+    );
+}
+
+async function reportOpFailure(
+    toast: string,
+    toastVariant:
+        | 'success' | 'error' | 'warning' | 'info',
+    flowId: string,
+): Promise<void> {
+    showToast(toast, toastVariant);
+    const g = await getFlowGraph(flowId);
+    const current = pageState.presenter().snapshot();
+    commit({
+        ...current,
+        flowName: g.name,
+        flowDescription: g.description,
+        isLocked: g.isLocked,
+        lockTimeout: g.lockTimeout,
+        createdAt: g.createdAt,
+        nodes: g.nodes,
+        edges: g.edges,
+    });
+}
+
+async function handleUndo(): Promise<void> {
+    const snap = pageState.presenter().snapshot();
+    const op = await performUndo(
+        snap, pageState.history(),
+    );
+    if (op.kind === 'fail') {
+        showToast(op.toast, op.toastVariant);
+        return;
+    }
+    pageState.setHistory(op.newHistory);
+    commit(op.freshSnap);
+    commit(
+        pageState.presenter().withLayoutReconciled(),
+    );
+}
+
+async function handleRedo(): Promise<void> {
+    const snap = pageState.presenter().snapshot();
+    const op = await performRedo(
+        snap, pageState.history(),
+    );
+    if (op.kind === 'fail') {
+        showToast(op.toast, op.toastVariant);
+        return;
+    }
+    pageState.setHistory(op.newHistory);
+    commit(op.freshSnap);
+    commit(
+        pageState.presenter().withLayoutReconciled(),
+    );
+}
+
+async function handleDeleteSelected(): Promise<void> {
+    const sel = pageState.presenter()
+        .snapshot().interaction.selection;
+    if (sel.kind === 'nodes') {
+        await handleDeleteSelectedNodes();
+    } else if (sel.kind === 'edge') {
+        await handleDeleteSelectedEdge();
+    }
+}
+
+async function handleDeleteSelectedNodes(
+): Promise<void> {
+    const snap = pageState.presenter().snapshot();
+    const op = await performDeleteSelectedNodes(snap);
+    if (op.kind === 'noop') return;
+    if (op.kind === 'fail') {
+        await reportOpFailure(
+            op.toast, op.toastVariant, snap.flowId,
+        );
+        return;
+    }
+    const current = pageState.presenter().snapshot();
+    const next: FlowSnapshot = {
+        ...current,
+        nodes: op.nodes,
+        edges: op.edges,
+        interaction: {
+            ...current.interaction,
+            selection: { kind: 'none' },
+        },
+    };
+    commit(next, {
+        advanceHistory: op.advanceHistory,
+    });
+    commit(
+        pageState.presenter().withLayoutReconciled(),
+    );
+}
+
+async function handleDeleteSelectedEdge(
+): Promise<void> {
+    const snap = pageState.presenter().snapshot();
+    const op = await performDeleteSelectedEdge(snap);
+    if (op.kind === 'noop') return;
+    if (op.kind === 'fail') {
+        await reportOpFailure(
+            op.toast, op.toastVariant, snap.flowId,
+        );
+        return;
+    }
+    const current = pageState.presenter().snapshot();
+    const next: FlowSnapshot = {
+        ...current,
+        edges: current.edges.filter(
+            e => e.id !== op.edgeId,
+        ),
+        interaction: {
+            ...current.interaction,
+            selection: { kind: 'none' },
+        },
+    };
+    commit(next, {
+        advanceHistory: op.advanceHistory,
+    });
+    commit(
+        pageState.presenter().withLayoutReconciled(),
+    );
+}
+
+async function handleAddField(
+    name: string,
+    fieldType: string,
+    isRequired: boolean,
+    options: string[],
+): Promise<void> {
+    const snap = pageState.presenter().snapshot();
+    const op = await performAddField(
+        snap, name, fieldType,
+        isRequired, options,
+    );
+    if (op.kind === 'noop') return;
+    if (op.kind === 'fail') {
+        await reportOpFailure(
+            op.toast, op.toastVariant, snap.flowId,
+        );
+        return;
+    }
+    const current = pageState.presenter().snapshot();
+    const next: FlowSnapshot = {
+        ...current,
+        nodes: applyAddField(
+            current.nodes, op.nodeId, op.field,
+        ),
+    };
+    commit(next, {
+        advanceHistory: op.advanceHistory,
+    });
+}
+
+async function handleDeleteField(
+    fieldId: string,
+): Promise<void> {
+    const snap = pageState.presenter().snapshot();
+    const op = await performDeleteField(
+        snap, fieldId,
+    );
+    if (op.kind === 'noop') return;
+    if (op.kind === 'fail') {
+        await reportOpFailure(
+            op.toast, op.toastVariant, snap.flowId,
+        );
+        return;
+    }
+    const current = pageState.presenter().snapshot();
+    const next: FlowSnapshot = {
+        ...current,
+        nodes: applyDeleteField(
+            current.nodes, op.nodeId, op.fieldId,
+        ),
+    };
+    commit(next, {
+        advanceHistory: op.advanceHistory,
+    });
+}
+
+async function handleAddNodeAtPosition(
+    fromId: string,
+    x: number,
+    y: number,
+): Promise<void> {
+    const snap = pageState.presenter().snapshot();
+    const op = await performAddNodeAtPosition(
+        snap, fromId, x, y,
+    );
+    if (op.kind === 'fail') {
+        await reportOpFailure(
+            op.toast, op.toastVariant, snap.flowId,
+        );
+        return;
+    }
+    const current =
+        pageState.presenter().snapshot();
+    const next: FlowSnapshot = {
+        ...current,
+        nodes: [...current.nodes, op.node],
+        edges: [...current.edges, op.edge],
+        isPanelOpen: false,
+        interaction: {
+            ...current.interaction,
+            selection: {
+                kind: 'nodes',
+                nodeIds: new Set([op.selectId]),
+            },
+        },
+    };
+    commit(next, {
+        advanceHistory: op.advanceHistory,
+    });
+    commit(
+        pageState.presenter().withLayoutReconciled(),
+    );
+}
 
 function update(
     container: HTMLElement,
@@ -148,6 +483,7 @@ function update(
         isAutoFit: presenter.isAutoFit(),
         isLocked: presenter.isLocked(),
     });
+    pageState.setHistory(presenter.history());
 }
 
 function bindFlowNameEdit(
@@ -174,11 +510,9 @@ function bindFlowNameEdit(
                 btn.id
                     === 'flow-name-edit-btn'
             ) {
-                pageState.presenter()
-                    .withNameEditing(true);
-                update(
-                    container,
-                    pageState.presenter(),
+                commit(
+                    pageState.presenter()
+                        .withNameEditing(true),
                 );
                 const input = $input(
                     '#flow-name-input',
@@ -204,21 +538,18 @@ function bindFlowNameEdit(
                     );
                     return;
                 }
-                pageState.presenter()
-                    .withFlowName(name);
-                update(
-                    container,
-                    pageState.presenter(),
+                commit(
+                    pageState.presenter()
+                        .withFlowName(name),
+                    { advanceHistory: true },
                 );
             } else if (
                 btn.id
                     === 'flow-name-cancel-btn'
             ) {
-                pageState.presenter()
-                    .withNameEditing(false);
-                update(
-                    container,
-                    pageState.presenter(),
+                commit(
+                    pageState.presenter()
+                        .withNameEditing(false),
                 );
             }
         },
@@ -267,10 +598,9 @@ function bindSwitches(
     )?.addEventListener(
         'click',
         () => {
-            pageState.presenter()
-                .withLockToggled();
-            update(
-                container, pageState.presenter(),
+            commit(
+                pageState.presenter()
+                    .withLockToggled(),
             );
         },
         { signal },
@@ -281,10 +611,9 @@ function bindSwitches(
     )?.addEventListener(
         'click',
         () => {
-            pageState.presenter()
-                .withAutoLayoutToggled();
-            update(
-                container, pageState.presenter(),
+            commit(
+                pageState.presenter()
+                    .withAutoLayoutToggled(),
             );
         },
         { signal },
@@ -295,10 +624,9 @@ function bindSwitches(
     )?.addEventListener(
         'click',
         () => {
-            pageState.presenter()
-                .withAutoFitToggled();
-            update(
-                container, pageState.presenter(),
+            commit(
+                pageState.presenter()
+                    .withAutoFitToggled(),
             );
         },
         { signal },
@@ -350,33 +678,25 @@ function bindCanvasInteractions(
         ),
         (open) => {
             panelStateRef.open = open;
-            pageState.presenter()
-                .withPanelOpen(open);
+            commit(
+                pageState.presenter()
+                    .withPanelOpen(open),
+            );
         },
         (updates) => {
-            pageState.presenter()
-                .withNodesMoved(updates);
-            update(
-                container, pageState.presenter(),
+            commit(
+                pageState.presenter()
+                    .withNodesMoved(updates),
+                { advanceHistory: true },
             );
         },
         (fromId, toId) => {
-            void pageState.presenter()
-                .addEdge(fromId, toId)
-                .then(() => update(
-                    container,
-                    pageState.presenter(),
-                ));
+            void handleAddEdge(fromId, toId);
         },
         (fromId, x, y) => {
-            void pageState.presenter()
-                .addNodeAtPosition(
-                    fromId, x, y,
-                )
-                .then(() => update(
-                    container,
-                    pageState.presenter(),
-                ));
+            void handleAddNodeAtPosition(
+                fromId, x, y,
+            );
         },
         (id) => pageState.presenter()
             .getNodePosition(id),
@@ -417,23 +737,9 @@ function bindToolbarActions(
             );
             if (!action) return;
             if (action === 'undo') {
-                void (async () => {
-                    await pageState.presenter()
-                        .performUndo();
-                    update(
-                        container,
-                        pageState.presenter(),
-                    );
-                })();
+                void handleUndo();
             } else if (action === 'redo') {
-                void (async () => {
-                    await pageState.presenter()
-                        .performRedo();
-                    update(
-                        container,
-                        pageState.presenter(),
-                    );
-                })();
+                void handleRedo();
             } else if (action === 'zoom-in') {
                 pageState.presenter()
                     .withZoomedIn();
@@ -461,12 +767,7 @@ function bindToolbarActions(
             } else if (
                 action === 'delete-selected'
             ) {
-                void pageState.presenter()
-                    .deleteSelected()
-                    .then(() => update(
-                        container,
-                        pageState.presenter(),
-                    ));
+                void handleDeleteSelected();
             }
         },
         { signal },
@@ -572,11 +873,9 @@ function bindPanelActions(
             );
             if (action === 'close-panel') {
                 panelStateRef.open = false;
-                pageState.presenter()
-                    .withPanelOpen(false);
-                update(
-                    container,
-                    pageState.presenter(),
+                commit(
+                    pageState.presenter()
+                        .withPanelOpen(false),
                 );
             } else if (
                 action === 'add-field'
@@ -592,18 +891,11 @@ function bindPanelActions(
                         'data-field-id',
                     );
                 if (!fieldId) return;
-                void pageState.presenter()
-                    .deleteField(fieldId)
-                    .then(() => update(
-                        container,
-                        pageState.presenter(),
-                    ));
+                void handleDeleteField(fieldId);
             } else if (
                 action === 'save-field'
             ) {
-                void handleSaveField(
-                    container, presenter,
-                );
+                void handleSaveField(container);
             }
         },
         { signal },
@@ -626,41 +918,45 @@ function bindPanelActions(
             const value = target.value;
             if (id === 'prop-node-name') {
                 saveDebouncer.schedule(
-                    () => pageState
-                        .presenter()
-                        .withNodeNamed(
-                            value,
-                        ),
+                    () => commit(
+                        pageState.presenter()
+                            .withNodeNamed(value),
+                        { advanceHistory: true },
+                    ),
                 );
             } else if (
                 id === 'prop-node-desc'
             ) {
                 saveDebouncer.schedule(
-                    () => pageState
-                        .presenter()
-                        .withNodeDescribed(
-                            value,
-                        ),
+                    () => commit(
+                        pageState.presenter()
+                            .withNodeDescribed(
+                                value,
+                            ),
+                        { advanceHistory: true },
+                    ),
                 );
             } else if (
                 id === 'prop-edge-name'
             ) {
                 saveDebouncer.schedule(
-                    () => pageState
-                        .presenter()
-                        .withEdgeNamed(
-                            value,
-                        ),
+                    () => commit(
+                        pageState.presenter()
+                            .withEdgeNamed(value),
+                        { advanceHistory: true },
+                    ),
                 );
             } else if (
                 id === 'prop-edge-desc'
             ) {
                 saveDebouncer.schedule(
-                    () => pageState
-                        .presenter()
-                        .withEdgeDescribed(
-                            value,
-                        ),
+                    () => commit(
+                        pageState.presenter()
+                            .withEdgeDescribed(
+                                value,
+                            ),
+                        { advanceHistory: true },
+                    ),
                 );
             }
         },
@@ -706,7 +1002,6 @@ function showFieldEditor(
 
 async function handleSaveField(
     container: HTMLElement,
-    presenter: FlowDesignerPresenter,
 ): Promise<void> {
     const nameEl = $inputRequired(
         '#new-field-name', container,
@@ -748,11 +1043,10 @@ async function handleSaveField(
                 .map(s => s.trim())
                 .filter(s => s.length > 0)
             : [];
-    await pageState.presenter().addField(
+    await handleAddField(
         fieldName, fieldType,
         isRequired, options,
     );
-    update(container, pageState.presenter());
 }
 
 export async function init(
@@ -773,6 +1067,7 @@ export async function init(
         '#flow-designer', document,
     );
     if (!container) return;
+    pageState.setContainer(container);
 
     const loaded = await withLoadingState(
         container,
@@ -788,6 +1083,14 @@ export async function init(
     );
     if (!loaded) return;
 
+    pageState.setCanvasSize(FALLBACK_W, FALLBACK_H);
+    pageState.setNeedsFit(true);
+    pageState.setHistory(
+        buildFlowHistorySnapshot(
+            loaded.versions.length > 0,
+        ),
+    );
+
     const initialSnap =
         buildInitialFlowSnapshot(
             loaded.graph,
@@ -799,7 +1102,7 @@ export async function init(
             initialSnap,
             FALLBACK_W,
             FALLBACK_H,
-            loaded.versions.length > 0,
+            pageState.history(),
         );
     pageState.setPresenter(presenter);
     const panelStateRef: PanelStateRef =
@@ -835,12 +1138,13 @@ export async function init(
         const w = initialWrap.clientWidth;
         const h = initialWrap.clientHeight;
         if (w > 0 && h > 0) {
+            pageState.setCanvasSize(w, h);
+            pageState.setNeedsFit(false);
             pageState.presenter()
                 .withCanvasSize(w, h);
-            pageState.presenter()
-                .withLayoutReconciled();
-            update(
-                container, pageState.presenter(),
+            commit(
+                pageState.presenter()
+                    .withLayoutReconciled(),
             );
         }
     }
@@ -854,6 +1158,8 @@ export async function init(
         const w = liveWrap.clientWidth;
         const h = liveWrap.clientHeight;
         if (w > 0 && h > 0) {
+            pageState.setCanvasSize(w, h);
+            pageState.setNeedsFit(true);
             pageState.presenter()
                 .withCanvasSize(w, h);
             update(
@@ -878,11 +1184,9 @@ function bindKeyboardShortcuts(
             ) {
                 e.preventDefault();
                 panelStateRef.open = false;
-                pageState.presenter()
-                    .withPanelOpen(false);
-                update(
-                    container,
-                    pageState.presenter(),
+                commit(
+                    pageState.presenter()
+                        .withPanelOpen(false),
                 );
                 return;
             }
@@ -902,12 +1206,7 @@ function bindKeyboardShortcuts(
                 )
             ) {
                 e.preventDefault();
-                void pageState.presenter()
-                    .deleteSelected()
-                    .then(() => update(
-                        container,
-                        pageState.presenter(),
-                    ));
+                void handleDeleteSelected();
             }
             const mod =
                 e.metaKey || e.ctrlKey;
@@ -917,28 +1216,14 @@ function bindKeyboardShortcuts(
                 && !e.shiftKey
             ) {
                 e.preventDefault();
-                void (async () => {
-                    await pageState.presenter()
-                        .performUndo();
-                    update(
-                        container,
-                        pageState.presenter(),
-                    );
-                })();
+                void handleUndo();
             }
             if (
                 e.key === 'z'
                 && e.shiftKey
             ) {
                 e.preventDefault();
-                void (async () => {
-                    await pageState.presenter()
-                        .performRedo();
-                    update(
-                        container,
-                        pageState.presenter(),
-                    );
-                })();
+                void handleRedo();
             }
         },
         { signal },
