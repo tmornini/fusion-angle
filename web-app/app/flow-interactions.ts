@@ -2,24 +2,34 @@ import {
     NODE_WIDTH, NODE_HEIGHT,
 } from './flow-layout.ts';
 import { showToast } from './toast.ts';
+import { reduceFsm }
+    from './flow-fsm-reduce.ts';
+import type {
+    FsmInput,
+    Action,
+} from './flow-fsm-types.ts';
 
 const AUTOFIT_TOAST_MSG =
     'Disable Auto-Fit to change the view';
 const WHEEL_TOAST_COOLDOWN_MS = 2000;
 const ZOOM_TO_FIT_PADDING_PX = 70;
+const MIN_ZOOM = 0.25;
+const MAX_ZOOM = 2.0;
+const ZOOM_STEP = 0.1;
 
-const toastAutoFitWheel = (() => {
-    let lastWheelToastAt = 0;
-    return (): void => {
+const toastWithCooldown = (() => {
+    let lastAt = 0;
+    return (
+        msg: string,
+        tone: 'error' | 'success',
+    ): void => {
         const now = Date.now();
         if (
-            now - lastWheelToastAt
+            now - lastAt
             < WHEEL_TOAST_COOLDOWN_MS
         ) return;
-        lastWheelToastAt = now;
-        showToast(
-            AUTOFIT_TOAST_MSG, 'error',
-        );
+        lastAt = now;
+        showToast(msg, tone);
     };
 })();
 
@@ -131,12 +141,6 @@ export type NodeListLookup = (
 
 export type InteractionCallback = () => void;
 
-const MIN_ZOOM = 0.25;
-const MAX_ZOOM = 2.0;
-const ZOOM_STEP = 0.1;
-const DBLCLICK_MS = 400;
-const MIN_DRAG_DISTANCE = 20;
-
 export function buildInteractionState(
     viewBoxW: number,
     viewBoxH: number,
@@ -189,529 +193,48 @@ function ancestorAttr(
     return null;
 }
 
-function handlePointerDown(
-    e: PointerEvent,
-    wrap: HTMLElement,
-    svg: SVGSVGElement,
+function buildSelectedPositions(
     state: InteractionState,
-    onUpdate: InteractionCallback,
-    onPanelRequest: PanelRequestCallback,
+    clickedId: string,
     getNodePosition: NodePositionLookup,
-    isLocked: boolean,
-): void {
-    const target = e.target;
-    if (!(target instanceof Element)) return;
-
-    if (state.isSpaceDown) {
-        state.pan = {
-            kind: 'panning',
-            startX: e.clientX,
-            startY: e.clientY,
-        };
-        wrap.setPointerCapture(
-            e.pointerId,
-        );
-        onUpdate();
-        return;
-    }
-
-    const svgPt = screenToSvg(
-        svg, e.clientX, e.clientY,
-    );
-
-    const nodeId = ancestorAttr(
-        target, 'data-node-id',
-    );
-    if (nodeId) {
-        const now = Date.now();
-        const isDbl =
-            state.lastClick.kind
-                === 'clicked'
-            && nodeId
-                === state.lastClick.id
-            && now - state.lastClick.time
-                < DBLCLICK_MS;
-        state.lastClick = {
-            kind: 'clicked',
-            id: nodeId,
-            time: now,
-        };
-        const isPort = ancestorAttr(
-            target, 'data-connect-port',
-        ) !== null;
-        const pos =
-            getNodePosition(nodeId);
-        if (isPort || !pos.isDraggable) {
-            state.selection = {
-                kind: 'nodes',
-                nodeIds: new Set([nodeId]),
-            };
-            onPanelRequest(isDbl);
-            state.connect = {
-                kind: 'connecting',
-                fromNodeId: nodeId,
-                toX: svgPt.x,
-                toY: svgPt.y,
-                isShift: e.shiftKey,
-                target: { kind: 'none' },
-            };
-            wrap.setPointerCapture(
-                e.pointerId,
-            );
-            onUpdate();
-            return;
-        }
-        applyNodeClickSelection(
-            state, nodeId, e,
-        );
-        onPanelRequest(isDbl);
-        if (isLocked) {
-            onUpdate();
-            return;
-        }
-        const sel = state.selection;
-        const ids =
-            sel.kind === 'nodes'
-                ? sel.nodeIds
-                : new Set<string>();
-        const initialPositions =
-            new Map<
-                string,
-                { x: number; y: number }
-            >();
-        for (const id of ids) {
+): Map<string, { x: number; y: number }> {
+    const m = new Map<
+        string,
+        { x: number; y: number }
+    >();
+    if (state.selection.kind === 'nodes') {
+        for (
+            const id of state.selection.nodeIds
+        ) {
             const pos = getNodePosition(id);
-            initialPositions.set(
-                id, { x: pos.x, y: pos.y },
-            );
-        }
-        state.drag = {
-            kind: 'dragging',
-            anchorNodeId: nodeId,
-            startPointerX: svgPt.x,
-            startPointerY: svgPt.y,
-            currentPointerX: svgPt.x,
-            currentPointerY: svgPt.y,
-            initialPositions,
-        };
-        wrap.setPointerCapture(
-            e.pointerId,
-        );
-        onUpdate();
-        return;
-    }
-
-    const edgeId = ancestorAttr(
-        target, 'data-edge-id',
-    );
-    if (edgeId) {
-        const now = Date.now();
-        const isDbl =
-            state.lastClick.kind
-                === 'clicked'
-            && edgeId
-                === state.lastClick.id
-            && now - state.lastClick.time
-                < DBLCLICK_MS;
-        state.selection = {
-            kind: 'edge', edgeId,
-        };
-        state.lastClick = {
-            kind: 'clicked',
-            id: edgeId,
-            time: now,
-        };
-        onPanelRequest(isDbl);
-        onUpdate();
-        return;
-    }
-
-    state.lastClick = { kind: 'none' };
-    startBackgroundDrag(
-        e, wrap, svg, state, onPanelRequest,
-    );
-    onUpdate();
-}
-
-function startBackgroundDrag(
-    e: PointerEvent,
-    wrap: HTMLElement,
-    svg: SVGSVGElement,
-    state: InteractionState,
-    onPanelRequest: PanelRequestCallback,
-): void {
-    onPanelRequest(false);
-    const svgPt = screenToSvg(
-        svg, e.clientX, e.clientY,
-    );
-    state.selection = { kind: 'none' };
-    state.marquee = {
-        kind: 'selecting',
-        startX: svgPt.x,
-        startY: svgPt.y,
-        currentX: svgPt.x,
-        currentY: svgPt.y,
-    };
-    wrap.setPointerCapture(e.pointerId);
-}
-
-function applyNodeClickSelection(
-    state: InteractionState,
-    nodeId: string,
-    e: PointerEvent,
-): void {
-    const sel = state.selection;
-    const current =
-        sel.kind === 'nodes'
-            ? sel.nodeIds
-            : new Set<string>();
-    if (e.shiftKey) {
-        const next = new Set(current);
-        next.add(nodeId);
-        state.selection = {
-            kind: 'nodes', nodeIds: next,
-        };
-        return;
-    }
-    if (e.metaKey || e.ctrlKey) {
-        const next = new Set(current);
-        if (next.has(nodeId)) {
-            next.delete(nodeId);
-        } else {
-            next.add(nodeId);
-        }
-        state.selection = next.size === 0
-            ? { kind: 'none' }
-            : {
-                kind: 'nodes',
-                nodeIds: next,
-            };
-        return;
-    }
-    if (current.has(nodeId)) {
-        return;
-    }
-    state.selection = {
-        kind: 'nodes',
-        nodeIds: new Set([nodeId]),
-    };
-}
-
-function handlePointerMove(
-    e: PointerEvent,
-    svg: SVGSVGElement,
-    state: InteractionState,
-    onUpdate: InteractionCallback,
-): void {
-    if (state.drag.kind === 'dragging') {
-        const svgPt = screenToSvg(
-            svg, e.clientX, e.clientY,
-        );
-        state.drag = {
-            ...state.drag,
-            currentPointerX: svgPt.x,
-            currentPointerY: svgPt.y,
-        };
-        onUpdate();
-        return;
-    }
-
-    if (
-        state.connect.kind
-            === 'connecting'
-    ) {
-        const svgPt = screenToSvg(
-            svg, e.clientX, e.clientY,
-        );
-        let target: ConnectTarget =
-            { kind: 'none' };
-        const hit =
-            document.elementFromPoint(
-                e.clientX, e.clientY,
-            );
-        if (hit instanceof Element) {
-            const nid = ancestorAttr(
-                hit, 'data-node-id',
-            );
-            if (
-                nid
-                && nid
-                    !== state.connect
-                        .fromNodeId
-            ) {
-                target = {
-                    kind: 'node',
-                    id: nid,
-                };
-            }
-        }
-        state.connect = {
-            ...state.connect,
-            toX: svgPt.x,
-            toY: svgPt.y,
-            isShift: e.shiftKey,
-            target,
-        };
-        onUpdate();
-        return;
-    }
-
-    if (state.pan.kind === 'panning') {
-        const dx =
-            e.clientX
-            - state.pan.startX;
-        const dy =
-            e.clientY
-            - state.pan.startY;
-        const rect =
-            svg.getBoundingClientRect();
-        const scaleX =
-            state.viewBox.w / rect.width;
-        const scaleY =
-            state.viewBox.h
-            / rect.height;
-        state.viewBox.x -= dx * scaleX;
-        state.viewBox.y -= dy * scaleY;
-        state.pan = {
-            kind: 'panning',
-            startX: e.clientX,
-            startY: e.clientY,
-        };
-        onUpdate();
-        return;
-    }
-
-    if (
-        state.marquee.kind === 'selecting'
-    ) {
-        const svgPt = screenToSvg(
-            svg, e.clientX, e.clientY,
-        );
-        state.marquee = {
-            ...state.marquee,
-            currentX: svgPt.x,
-            currentY: svgPt.y,
-        };
-        onUpdate();
-    }
-}
-
-function handlePointerUp(
-    e: PointerEvent,
-    wrap: HTMLElement,
-    state: InteractionState,
-    onUpdate: InteractionCallback,
-    onNodesDragEnd: (
-        updates: Array<{
-            nodeId: string;
-            x: number;
-            y: number;
-        }>,
-    ) => void,
-    onEdgeCreated: (
-        fromNodeId: string,
-        toNodeId: string,
-    ) => void,
-    onNodeCreated: (
-        fromNodeId: string,
-        x: number,
-        y: number,
-    ) => void,
-    getNodePosition: NodePositionLookup,
-    getAllNodes: NodeListLookup,
-): void {
-    if (state.pan.kind === 'panning') {
-        state.pan = { kind: 'idle' };
-        wrap.releasePointerCapture(
-            e.pointerId,
-        );
-        onUpdate();
-        return;
-    }
-
-    if (state.drag.kind === 'dragging') {
-        const dx =
-            state.drag.currentPointerX
-            - state.drag.startPointerX;
-        const dy =
-            state.drag.currentPointerY
-            - state.drag.startPointerY;
-        const updates: Array<{
-            nodeId: string;
-            x: number;
-            y: number;
-        }> = [];
-        for (const [
-            id, init,
-        ] of state.drag.initialPositions) {
-            updates.push({
-                nodeId: id,
-                x: init.x + dx,
-                y: init.y + dy,
+            m.set(id, {
+                x: pos.x, y: pos.y,
             });
         }
-        onNodesDragEnd(updates);
-        state.drag = { kind: 'idle' };
-        wrap.releasePointerCapture(
-            e.pointerId,
-        );
-        onUpdate();
-        return;
     }
-
-    if (
-        state.connect.kind
-            === 'connecting'
-    ) {
-        const fromId =
-            state.connect.fromNodeId;
-        const toX = state.connect.toX;
-        const toY = state.connect.toY;
-        if (e.shiftKey) {
-            const target =
-                document.elementFromPoint(
-                    e.clientX, e.clientY,
-                );
-            if (
-                target instanceof Element
-            ) {
-                const toNodeId =
-                    ancestorAttr(
-                        target,
-                        'data-node-id',
-                    );
-                if (
-                    toNodeId
-                    && toNodeId !== fromId
-                ) {
-                    onEdgeCreated(
-                        fromId, toNodeId,
-                    );
-                }
-            }
-        } else {
-            const pos =
-                getNodePosition(fromId);
-            const portX =
-                pos.x + NODE_WIDTH;
-            const portY =
-                pos.y
-                + NODE_HEIGHT / 2;
-            const dx = toX - portX;
-            const dy = toY - portY;
-            const dist = Math.hypot(
-                dx, dy,
-            );
-            const dropHit =
-                document
-                    .elementFromPoint(
-                        e.clientX,
-                        e.clientY,
-                    );
-            const overNode =
-                dropHit
-                    instanceof Element
-                && ancestorAttr(
-                    dropHit,
-                    'data-node-id',
-                ) !== null;
-            if (
-                dist > MIN_DRAG_DISTANCE
-                && !overNode
-            ) {
-                onNodeCreated(
-                    fromId, toX, toY,
-                );
-            }
-        }
-        state.connect = { kind: 'idle' };
-        wrap.releasePointerCapture(
-            e.pointerId,
-        );
-        onUpdate();
-        return;
-    }
-
-    if (
-        state.marquee.kind === 'selecting'
-    ) {
-        const m = state.marquee;
-        const minX = Math.min(
-            m.startX, m.currentX,
-        );
-        const minY = Math.min(
-            m.startY, m.currentY,
-        );
-        const maxX = Math.max(
-            m.startX, m.currentX,
-        );
-        const maxY = Math.max(
-            m.startY, m.currentY,
-        );
-        const hits = new Set<string>();
-        for (const n of getAllNodes()) {
-            const nr = n.x + NODE_WIDTH;
-            const nb = n.y + NODE_HEIGHT;
-            const overlaps =
-                n.x < maxX
-                && nr > minX
-                && n.y < maxY
-                && nb > minY;
-            if (overlaps) {
-                hits.add(n.id);
-            }
-        }
-        state.selection = hits.size === 0
-            ? { kind: 'none' }
-            : {
-                kind: 'nodes',
-                nodeIds: hits,
-            };
-        state.marquee = { kind: 'idle' };
-        wrap.releasePointerCapture(
-            e.pointerId,
-        );
-        onUpdate();
-    }
+    const clickedPos =
+        getNodePosition(clickedId);
+    m.set(clickedId, {
+        x: clickedPos.x, y: clickedPos.y,
+    });
+    return m;
 }
 
-function handleWheel(
-    e: WheelEvent,
-    svg: SVGSVGElement,
-    state: InteractionState,
-    onUpdate: InteractionCallback,
-    isAutoFit: boolean,
-): void {
-    e.preventDefault();
-    if (isAutoFit) {
-        toastAutoFitWheel();
-        return;
-    }
-
-    const svgPt = screenToSvg(
-        svg, e.clientX, e.clientY,
-    );
-
-    const prevZoom = state.zoom;
-    const delta = e.deltaY > 0
-        ? -ZOOM_STEP
-        : ZOOM_STEP;
-    state.zoom = Math.max(
-        MIN_ZOOM,
-        Math.min(MAX_ZOOM, prevZoom + delta),
-    );
-
-    const ratio = prevZoom / state.zoom;
-    state.viewBox.w *= ratio;
-    state.viewBox.h *= ratio;
-    state.viewBox.x =
-        svgPt.x
-        - (svgPt.x - state.viewBox.x) * ratio;
-    state.viewBox.y =
-        svgPt.y
-        - (svgPt.y - state.viewBox.y) * ratio;
-
-    onUpdate();
+function isFormFocused(): boolean {
+    const activeEl = document.activeElement;
+    if (!activeEl) return false;
+    const tag = activeEl.tagName
+        .toLowerCase();
+    if (
+        tag === 'input'
+        || tag === 'textarea'
+        || tag === 'select'
+        || tag === 'button'
+        || tag === 'a'
+    ) return true;
+    return (
+        activeEl as HTMLElement
+    ).isContentEditable;
 }
 
 export function bindInteractions(
@@ -741,9 +264,9 @@ export function bindInteractions(
     signal: AbortSignal,
 ): (next: FlowGestureContext) => void {
     let context = initialContext;
-    const cursorHost = wrap;
+    let activePointerId: number | null = null;
     if (state.isSpaceDown) {
-        cursorHost.classList.add(
+        wrap.classList.add(
             'flow-pan-cursor',
         );
     }
@@ -757,17 +280,179 @@ export function bindInteractions(
             ? el : null;
     };
 
+    const applyAction = (
+        action: Action,
+    ): void => {
+        switch (action.kind) {
+            case 'move-nodes':
+                onNodesDragEnd(action.updates);
+                return;
+            case 'add-edge':
+                onEdgeCreated(
+                    action.fromId,
+                    action.toId,
+                );
+                return;
+            case 'add-node':
+                onNodeCreated(
+                    action.fromId,
+                    action.svgX,
+                    action.svgY,
+                );
+                return;
+            case 'open-panel':
+                onPanelRequest(action.open);
+                return;
+            case 'request-update':
+                onUpdate();
+                return;
+            case 'capture-pointer':
+                if (
+                    activePointerId !== null
+                ) {
+                    wrap.setPointerCapture(
+                        activePointerId,
+                    );
+                }
+                return;
+            case 'release-pointer':
+                if (
+                    activePointerId !== null
+                ) {
+                    wrap.releasePointerCapture(
+                        activePointerId,
+                    );
+                    activePointerId = null;
+                }
+                return;
+            case 'set-pan-cursor':
+                if (action.on) {
+                    wrap.classList.add(
+                        'flow-pan-cursor',
+                    );
+                } else {
+                    wrap.classList.remove(
+                        'flow-pan-cursor',
+                    );
+                }
+                return;
+            case 'show-toast':
+                if (
+                    action.message
+                        === AUTOFIT_TOAST_MSG
+                ) {
+                    toastWithCooldown(
+                        action.message,
+                        action.tone,
+                    );
+                } else {
+                    showToast(
+                        action.message,
+                        action.tone,
+                    );
+                }
+                return;
+        }
+    };
+
+    const dispatch = (
+        input: FsmInput,
+    ): void => {
+        const result = reduceFsm(
+            state, input,
+        );
+        Object.assign(state, result.state);
+        for (const action of result.actions) {
+            applyAction(action);
+        }
+    };
+
     wrap.addEventListener(
         'pointerdown',
         (e) => {
+            activePointerId = e.pointerId;
             const svg = liveSvg();
             if (!svg) return;
-            handlePointerDown(
-                e, wrap, svg, state,
-                onUpdate, onPanelRequest,
-                getNodePosition,
-                context.isLocked,
+            const target = e.target;
+            if (
+                !(target instanceof Element)
+            ) return;
+            const svgPt = screenToSvg(
+                svg, e.clientX, e.clientY,
             );
+
+            if (state.isSpaceDown) {
+                dispatch({
+                    kind:
+                        'pointer-down-on-canvas',
+                    svgX: svgPt.x,
+                    svgY: svgPt.y,
+                    clientX: e.clientX,
+                    clientY: e.clientY,
+                });
+                return;
+            }
+
+            const nodeId = ancestorAttr(
+                target, 'data-node-id',
+            );
+            if (nodeId) {
+                const isPort =
+                    ancestorAttr(
+                        target,
+                        'data-connect-port',
+                    ) !== null;
+                const pos =
+                    getNodePosition(nodeId);
+                const positions =
+                    buildSelectedPositions(
+                        state,
+                        nodeId,
+                        getNodePosition,
+                    );
+                dispatch({
+                    kind:
+                        'pointer-down-on-node',
+                    nodeId,
+                    isPort,
+                    isDraggable:
+                        pos.isDraggable,
+                    isShift: e.shiftKey,
+                    isMeta:
+                        e.metaKey
+                        || e.ctrlKey,
+                    isLocked:
+                        context.isLocked,
+                    svgX: svgPt.x,
+                    svgY: svgPt.y,
+                    now: Date.now(),
+                    selectedPositions:
+                        positions,
+                });
+                return;
+            }
+
+            const edgeId = ancestorAttr(
+                target, 'data-edge-id',
+            );
+            if (edgeId) {
+                dispatch({
+                    kind:
+                        'pointer-down-on-edge',
+                    edgeId,
+                    now: Date.now(),
+                });
+                return;
+            }
+
+            dispatch({
+                kind:
+                    'pointer-down-on-canvas',
+                svgX: svgPt.x,
+                svgY: svgPt.y,
+                clientX: e.clientX,
+                clientY: e.clientY,
+            });
         },
         { signal },
     );
@@ -777,35 +462,109 @@ export function bindInteractions(
         (e) => {
             const svg = liveSvg();
             if (!svg) return;
-            handlePointerMove(
-                e, svg, state, onUpdate,
+            const svgPt = screenToSvg(
+                svg, e.clientX, e.clientY,
             );
+            let hoverNodeId: string | null
+                = null;
+            const hit =
+                document.elementFromPoint(
+                    e.clientX, e.clientY,
+                );
+            if (hit instanceof Element) {
+                hoverNodeId = ancestorAttr(
+                    hit, 'data-node-id',
+                );
+            }
+            const rect =
+                svg.getBoundingClientRect();
+            dispatch({
+                kind: 'pointer-move',
+                svgX: svgPt.x,
+                svgY: svgPt.y,
+                clientX: e.clientX,
+                clientY: e.clientY,
+                isShift: e.shiftKey,
+                hoverNodeId,
+                svgRectW: rect.width,
+                svgRectH: rect.height,
+            });
         },
         { signal },
     );
 
     wrap.addEventListener(
         'pointerup',
-        (e) => handlePointerUp(
-            e, wrap, state, onUpdate,
-            onNodesDragEnd,
-            onEdgeCreated,
-            onNodeCreated,
-            getNodePosition,
-            getAllNodes,
-        ),
+        (e) => {
+            const svg = liveSvg();
+            if (!svg) return;
+            const svgPt = screenToSvg(
+                svg, e.clientX, e.clientY,
+            );
+            let hoverNodeId: string | null
+                = null;
+            const hit =
+                document.elementFromPoint(
+                    e.clientX, e.clientY,
+                );
+            if (hit instanceof Element) {
+                hoverNodeId = ancestorAttr(
+                    hit, 'data-node-id',
+                );
+            }
+            let fromNodePosition: {
+                x: number;
+                y: number;
+            } | null = null;
+            if (
+                state.connect.kind
+                    === 'connecting'
+            ) {
+                const pos = getNodePosition(
+                    state.connect.fromNodeId,
+                );
+                fromNodePosition = {
+                    x: pos.x, y: pos.y,
+                };
+            }
+            const allNodes =
+                state.marquee.kind
+                    === 'selecting'
+                    ? Array.from(
+                        getAllNodes(),
+                    )
+                    : [];
+            dispatch({
+                kind: 'pointer-up',
+                svgX: svgPt.x,
+                svgY: svgPt.y,
+                clientX: e.clientX,
+                clientY: e.clientY,
+                isShift: e.shiftKey,
+                hoverNodeId,
+                fromNodePosition,
+                allNodes,
+            });
+        },
         { signal },
     );
 
     wrap.addEventListener(
         'wheel',
         (e) => {
+            e.preventDefault();
             const svg = liveSvg();
             if (!svg) return;
-            handleWheel(
-                e, svg, state, onUpdate,
-                context.isAutoFit,
+            const svgPt = screenToSvg(
+                svg, e.clientX, e.clientY,
             );
+            dispatch({
+                kind: 'wheel',
+                deltaY: e.deltaY,
+                svgX: svgPt.x,
+                svgY: svgPt.y,
+                isAutoFit: context.isAutoFit,
+            });
         },
         { passive: false, signal },
     );
@@ -814,15 +573,10 @@ export function bindInteractions(
         ke: KeyboardEvent,
     ): void => {
         if (ke.key !== 'Shift') return;
-        if (
-            state.connect.kind
-                !== 'connecting'
-        ) return;
-        state.connect = {
-            ...state.connect,
+        dispatch({
+            kind: 'shift-key',
             isShift: ke.shiftKey,
-        };
-        onUpdate();
+        });
     };
     window.addEventListener(
         'keydown', handleShift,
@@ -833,54 +587,20 @@ export function bindInteractions(
         { signal },
     );
 
-    const isFormFocused = (): boolean => {
-        const activeEl
-            = document.activeElement;
-        if (!activeEl) return false;
-        const tag = activeEl.tagName
-            .toLowerCase();
-        if (
-            tag === 'input'
-            || tag === 'textarea'
-            || tag === 'select'
-            || tag === 'button'
-            || tag === 'a'
-        ) return true;
-        return (
-            activeEl as HTMLElement
-        ).isContentEditable;
-    };
-
     const handleSpace = (
         ke: KeyboardEvent,
     ): void => {
         if (ke.key !== ' ') return;
         if (isFormFocused()) return;
         ke.preventDefault();
-        const next = ke.type === 'keydown';
-        if (state.isSpaceDown === next) {
-            return;
-        }
-        if (next && context.isAutoFit) {
-            showToast(
-                AUTOFIT_TOAST_MSG, 'error',
-            );
-            return;
-        }
-        state.isSpaceDown = next;
-        if (next) {
-            cursorHost.classList.add(
-                'flow-pan-cursor',
-            );
+        if (ke.type === 'keydown') {
+            dispatch({
+                kind: 'space-down',
+                isAutoFit: context.isAutoFit,
+                isFormFocused: false,
+            });
         } else {
-            cursorHost.classList.remove(
-                'flow-pan-cursor',
-            );
-            if (
-                state.pan.kind === 'panning'
-            ) {
-                state.pan = { kind: 'idle' };
-            }
+            dispatch({ kind: 'space-up' });
         }
     };
     window.addEventListener(
@@ -894,51 +614,40 @@ export function bindInteractions(
 
     document.addEventListener(
         'keydown',
-        (e) => handleCanvasNavigation(
-            e, wrap, state, onUpdate,
-            onPanelRequest,
-        ),
+        (e) => {
+            if (
+                e.key !== 'Enter'
+                && e.key !== ' '
+            ) return;
+            const active =
+                document.activeElement;
+            if (
+                !(active instanceof Element)
+            ) return;
+            if (
+                !wrap.contains(active)
+            ) return;
+            const nodeId = ancestorAttr(
+                active, 'data-node-id',
+            );
+            const edgeId = ancestorAttr(
+                active, 'data-edge-id',
+            );
+            if (!nodeId && !edgeId) return;
+            e.preventDefault();
+            dispatch({
+                kind:
+                    'canvas-key-activate',
+                nodeId,
+                edgeId,
+            });
+        },
         { signal },
     );
 
     return (next) => {
         context = next;
     };
-}
-
-function handleCanvasNavigation(
-    e: KeyboardEvent,
-    wrap: HTMLElement,
-    state: InteractionState,
-    onUpdate: InteractionCallback,
-    onPanelRequest: PanelRequestCallback,
-): void {
-    if (e.key !== 'Enter' && e.key !== ' ') {
-        return;
-    }
-    const active = document.activeElement;
-    if (!(active instanceof Element)) return;
-    if (!wrap.contains(active)) return;
-    const nodeId = ancestorAttr(
-        active, 'data-node-id',
-    );
-    const edgeId = ancestorAttr(
-        active, 'data-edge-id',
-    );
-    if (!nodeId && !edgeId) return;
-    e.preventDefault();
-    if (nodeId) {
-        state.selection = {
-            kind: 'nodes',
-            nodeIds: new Set([nodeId]),
-        };
-    } else if (edgeId) {
-        state.selection = {
-            kind: 'edge', edgeId,
-        };
-    }
-    onPanelRequest(true);
-    onUpdate();
 }
 
 export function zoomIn(
@@ -1027,9 +736,11 @@ export function zoomToFit(
     }
 
     const contentW =
-        maxX - minX + ZOOM_TO_FIT_PADDING_PX * 2;
+        maxX - minX
+        + ZOOM_TO_FIT_PADDING_PX * 2;
     const contentH =
-        maxY - minY + ZOOM_TO_FIT_PADDING_PX * 2;
+        maxY - minY
+        + ZOOM_TO_FIT_PADDING_PX * 2;
     const cx = (minX + maxX) / 2;
     const cy = (minY + maxY) / 2;
 
