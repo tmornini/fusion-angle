@@ -785,7 +785,7 @@ on. Run these in order.
 - [ ] **G5** Type a name in the search input. PASS: team member cards filter in real-time by name, role, or department.
 - [ ] **G6** Click "Add Member" button. PASS: add-member dialog opens with an email field and send button.
 - [ ] **G7** Enter an email address and click send. PASS: toast confirms invitation, dialog closes.
-- [ ] **G8** Member status dots render with distinct colors (green for available, yellow for busy, red for limited). PASS: at least 2 different statuses visible.
+- [ ] **G8** In DevTools console run: `const u = JSON.parse(localStorage.getItem('fusion-ai:users')); u[0].availability = 90; u[1].availability = 50; u[2].availability = 20; localStorage.setItem('fusion-ai:users', JSON.stringify(u)); location.reload();` PASS: rendered `.status-dot[data-tone]` elements include `success`, `warning`, and `error` (one each, mapped from `>=70`, `>=40`, `<40` respectively in `toneForAvailability`). Pinned to known data so the test does not depend on seed-data variety surviving prior data mutations.
 
 ### Account (`organization/index.html`)
 
