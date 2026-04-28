@@ -3,7 +3,7 @@ import {
     bindEnterToClick,
 } from '../app/dom.ts';
 import {
-    mutateHtml,
+    setHtml,
 } from '../app/safe-html.ts';
 import { navigateTo } from '../app/core.ts';
 import {
@@ -32,7 +32,7 @@ export async function init():
         const root =
             $('#create-content', document);
         if (!root) return;
-        mutateHtml(
+        setHtml(
             root,
             new IdeaCreatePresenter(formState)
                 .render(),

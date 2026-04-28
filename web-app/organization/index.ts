@@ -1,5 +1,5 @@
 import { $, $$, getRequiredAttribute } from '../app/dom.ts';
-import { mutateHtml } from '../app/safe-html.ts';
+import { setHtml } from '../app/safe-html.ts';
 import {
     buildSkeleton, buildErrorState,
 } from '../app/loading-states.ts';
@@ -27,7 +27,7 @@ export async function init(): Promise<void> {
         $('#organization-content', document);
     if (!container) return;
 
-    mutateHtml(
+    setHtml(
         container,
         buildSkeleton('detail', 4),
     );
@@ -89,7 +89,7 @@ export async function init(): Promise<void> {
             'organization',
             err,
         );
-        mutateHtml(
+        setHtml(
             container,
             buildErrorState(
                 'Failed to load'
@@ -106,7 +106,7 @@ export async function init(): Promise<void> {
             );
         return;
     }
-    mutateHtml(
+    setHtml(
         container,
         presenter.buildPage(),
     );

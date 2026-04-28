@@ -1,5 +1,5 @@
 import { log } from './logger.ts';
-import { mutateHtml } from './safe-html.ts';
+import { setHtml } from './safe-html.ts';
 import {
     buildErrorState,
     formatErrorMessage,
@@ -113,7 +113,7 @@ export function handlePageLoadError(
             'page-root',
         );
     if (container) {
-        mutateHtml(
+        setHtml(
             container,
             buildErrorState(
                 formatErrorMessage(

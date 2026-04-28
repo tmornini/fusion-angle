@@ -41,6 +41,6 @@ export function html(
     return new SafeHtml(result);
 }
 
-export function mutateHtml(element: HTMLElement, content: SafeHtml): void {
+export function setHtml(element: HTMLElement, content: SafeHtml): void {
     element.innerHTML = content.toString();
 }

@@ -1,5 +1,5 @@
 import {
-    html, mutateHtml, SafeHtml,
+    html, setHtml, SafeHtml,
 } from '../safe-html.ts';
 import { $required } from '../dom.ts';
 import {
@@ -16,7 +16,7 @@ export type CompanyFieldKey =
 function buildShell(
     container: HTMLElement,
 ): void {
-    mutateHtml(container, html`
+    setHtml(container, html`
 <div class="content-wrap">
     <div class="company-header-slot"></div>
     <div class="company-body-slot"></div>
@@ -27,7 +27,7 @@ function mutateHeader(
     container: HTMLElement,
     markup: SafeHtml,
 ): void {
-    mutateHtml(
+    setHtml(
         $required(
             '.company-header-slot', container,
         ),
@@ -39,7 +39,7 @@ function mutateBody(
     container: HTMLElement,
     markup: SafeHtml,
 ): void {
-    mutateHtml(
+    setHtml(
         $required(
             '.company-body-slot', container,
         ),

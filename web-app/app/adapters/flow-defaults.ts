@@ -1,4 +1,8 @@
 import type { GraphNode } from '../../../api/types.ts';
+import {
+    DEFAULT_NODE_DESCRIPTION,
+    DEFAULT_NODE_FIELDS,
+} from '../../../api/types.ts';
 import { generateId } from './uuid.ts';
 
 const DEFAULT_START_NAME = 'Start';
@@ -16,22 +20,24 @@ export function buildStartAndCompleteNodes(): {
         start: {
             id: generateId(),
             name: DEFAULT_START_NAME,
-            description: '',
+            description:
+                DEFAULT_NODE_DESCRIPTION,
             positionX: DEFAULT_START_X,
             positionY: DEFAULT_START_Y,
             isStart: true,
             isComplete: false,
-            fields: [],
+            fields: [...DEFAULT_NODE_FIELDS],
         },
         complete: {
             id: generateId(),
             name: DEFAULT_COMPLETE_NAME,
-            description: '',
+            description:
+                DEFAULT_NODE_DESCRIPTION,
             positionX: DEFAULT_COMPLETE_X,
             positionY: DEFAULT_COMPLETE_Y,
             isStart: false,
             isComplete: true,
-            fields: [],
+            fields: [...DEFAULT_NODE_FIELDS],
         },
     };
 }

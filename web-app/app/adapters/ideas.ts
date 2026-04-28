@@ -38,7 +38,7 @@ export {
     IDEA_STATUS_CONFIG,
 } from '../../../api/types.ts';
 
-export async function getIdeaRows(
+async function getIdeaRows(
 ): Promise<IdeaEntity[]> {
     const all =
         await GET<IdeaEntity[]>('ideas');
@@ -51,14 +51,14 @@ export async function getIdeaRow(
     return GET<IdeaEntity>(`ideas/${id}`);
 }
 
-export async function getIdeaSubmissionRows(
+async function getIdeaSubmissionRows(
 ): Promise<IdeaSubmissionEntity[]> {
     return GET<
         IdeaSubmissionEntity[]
     >('idea-submissions');
 }
 
-export async function getIdeaSubmissionRow(
+async function getIdeaSubmissionRow(
     ideaId: string,
 ): Promise<IdeaSubmissionEntity> {
     const all = await getIdeaSubmissionRows();

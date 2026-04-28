@@ -1,12 +1,12 @@
 import { $ } from '../app/dom.ts';
-import { html, mutateHtml } from '../app/safe-html.ts';
+import { html, setHtml } from '../app/safe-html.ts';
 import { iconSparkles } from '../app/icons.ts';
 
 export async function init(): Promise<void> {
     const root = $('#page-root', document);
     if (!root) return;
 
-    mutateHtml(root, html`
+    setHtml(root, html`
     <div class="${
         'flex min-h-screen '
         + 'items-center justify-center'

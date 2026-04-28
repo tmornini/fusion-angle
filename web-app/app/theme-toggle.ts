@@ -4,7 +4,7 @@ import {
     persistThemePreference,
 } from './state.ts';
 import { $, $$ } from './dom.ts';
-import { mutateHtml } from './safe-html.ts';
+import { setHtml } from './safe-html.ts';
 import { showToast } from './toast.ts';
 import { log } from './logger.ts';
 
@@ -21,7 +21,7 @@ export function mutateThemeToggleIcon(
         const button =
             $(`#${id}`, document);
         if (button) {
-            mutateHtml(button, themeIcon);
+            setHtml(button, themeIcon);
             button.setAttribute(
                 'aria-label',
                 themeLabel,

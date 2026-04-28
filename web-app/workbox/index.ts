@@ -2,7 +2,7 @@ import {
     $, populateIcons, getRequiredAttribute,
 } from '../app/dom.ts';
 import {
-    html, mutateHtml,
+    html, setHtml,
 } from '../app/safe-html.ts';
 import { log } from '../app/logger.ts';
 import { showToast } from '../app/toast.ts';
@@ -76,7 +76,7 @@ function renderTabs(): void {
         '#workbox-tabs', document,
     );
     if (!tabsEl) return;
-    mutateHtml(tabsEl, html`
+    setHtml(tabsEl, html`
         <span class="${
             'badge badge-success'
             + ' text-xs cursor-pointer active'
@@ -280,7 +280,7 @@ async function initCreateDropdown(
 
     const flows = await getFlowsForCreation();
 
-    mutateHtml(dropdownEl, html`${flows.map(
+    setHtml(dropdownEl, html`${flows.map(
         f => html`<button
             class="dropdown-item"
             data-flow-id="${f.id}"

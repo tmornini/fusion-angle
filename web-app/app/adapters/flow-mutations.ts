@@ -13,6 +13,9 @@ import {
     nowUtc,
     jsonObjectField,
     DEFAULT_LOCK_TIMEOUT,
+    DEFAULT_NODE_DESCRIPTION,
+    DEFAULT_EDGE_DESCRIPTION,
+    DEFAULT_NODE_FIELDS,
 } from '../../../api/types.ts';
 import {
     validateStoredGraphJson,
@@ -135,12 +138,13 @@ export async function postNodeAddition(
     const node: GraphNode = {
         id: ctx.nodeId,
         name: ctx.name,
-        description: '',
+        description:
+            DEFAULT_NODE_DESCRIPTION,
         positionX: ctx.positionX,
         positionY: ctx.positionY,
         isStart: false,
         isComplete: false,
-        fields: [],
+        fields: [...DEFAULT_NODE_FIELDS],
     };
     await putGraphMutation(
         ctx.flowId,
@@ -157,7 +161,8 @@ export async function postEdgeConnection(
     const edge: GraphEdge = {
         id: ctx.edgeId,
         name: ctx.name,
-        description: '',
+        description:
+            DEFAULT_EDGE_DESCRIPTION,
         fromNodeId: ctx.fromNodeId,
         toNodeId: ctx.toNodeId,
     };

@@ -11,6 +11,26 @@ import {
 } from './flow-layout.ts';
 import { pluralize } from './format.ts';
 
+function nodeHasConnections(
+    nodeId: string,
+    edges: readonly GraphEdge[],
+): boolean {
+    return edges.some(
+        e =>
+            e.fromNodeId === nodeId
+            || e.toNodeId === nodeId,
+    );
+}
+
+function canShowPort(
+    isLocked: boolean,
+    isSpecial: boolean,
+    hasConnections: boolean,
+): boolean {
+    return !isLocked
+        && (!isSpecial || !hasConnections);
+}
+
 export const BLUE = '#4B6CA1';
 const WARN = '#d97706';
 const GREEN = '#16a34a';
@@ -18,6 +38,18 @@ const RED = '#b91c1c';
 
 const GRID_CELL = 24;
 const GRID_DOT_RADIUS = 0.7;
+
+// Glow filter on highlighted edges. Filter
+// region overflows the source by 30% on
+// each side (160% total) so the blur
+// doesn't clip. stdDeviation animates
+// between min (resting) and peak (pulse)
+// to give the glow a breathing motion.
+const GLOW_FILTER_OVERFLOW_PCT = 30;
+const GLOW_FILTER_SCALE_PCT = 160;
+const GLOW_BLUR_MIN = 4;
+const GLOW_BLUR_PEAK = 12;
+const GLOW_ANIMATION_DURATION = '1.5s';
 
 const ARROW_VIEWBOX = 10;
 const ARROW_MIDPOINT = 5;
@@ -33,6 +65,15 @@ const NODE_RADIUS = 10;
 const PORT_RADIUS = 5;
 const PORT_STROKE = 2;
 
+// Node text geometry. Coordinates are
+// SVG units relative to a 64-px-tall
+// node rectangle. NODE_LABEL_Y is the
+// baseline for two-line labels;
+// NODE_LABEL_Y_CENTERED is the baseline
+// for single-line labels (offset down
+// for vertical centering). NODE_META_Y
+// is the optional second line (status
+// text) below the label.
 const NODE_LABEL_Y = 26;
 const NODE_LABEL_Y_CENTERED = 38;
 const NODE_LABEL_FONT = 13;
@@ -290,18 +331,21 @@ function buildDefs(): string {
         + ` fill="${WARN}"/>`
         + '</marker>'
         + '<filter id="flow-glow"'
-        + ' x="-30%" y="-30%"'
-        + ' width="160%"'
-        + ' height="160%">'
+        + ` x="-${GLOW_FILTER_OVERFLOW_PCT}%"`
+        + ` y="-${GLOW_FILTER_OVERFLOW_PCT}%"`
+        + ` width="${GLOW_FILTER_SCALE_PCT}%"`
+        + ` height="${GLOW_FILTER_SCALE_PCT}%">`
         + '<feGaussianBlur'
         + ' in="SourceGraphic"'
-        + ' stdDeviation="4"'
+        + ` stdDeviation="${GLOW_BLUR_MIN}"`
         + ' result="blur">'
         + '<animate'
         + ' attributeName='
         + '"stdDeviation"'
-        + ' values="4;12;4"'
-        + ' dur="1.5s"'
+        + ` values="${GLOW_BLUR_MIN};`
+        + `${GLOW_BLUR_PEAK};`
+        + `${GLOW_BLUR_MIN}"`
+        + ` dur="${GLOW_ANIMATION_DURATION}"`
         + ' repeatCount='
         + '"indefinite"/>'
         + '</feGaussianBlur>'
@@ -995,15 +1039,12 @@ export function buildGraphSvg(
             node.isStart
             || node.isComplete;
         const hasEdges = isSpecial
-            && edges.some(
-                e =>
-                    e.fromNodeId
-                        === node.id
-                    || e.toNodeId
-                        === node.id,
+            && nodeHasConnections(
+                node.id, edges,
             );
-        const showPort = !isLocked
-            && (!isSpecial || !hasEdges);
+        const showPort = canShowPort(
+            isLocked, isSpecial, hasEdges,
+        );
         const portPos = showPort
             ? computePortPos(
                 node, edges, nodeMap,

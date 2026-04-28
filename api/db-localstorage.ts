@@ -191,11 +191,14 @@ function createDeletedStore(): DeletedStore {
             if (
                 rows.some(r => r.id === id)
             ) return;
-            rows.push({
-                id,
-                deleted_at: nowUtc(),
-            });
-            writeTable(TABLE, rows);
+            const next: Deleted[] = [
+                ...rows,
+                {
+                    id,
+                    deleted_at: nowUtc(),
+                },
+            ];
+            writeTable(TABLE, next);
         },
         async allDeletedIds(
         ): Promise<Set<string>> {
@@ -257,30 +260,14 @@ function createEntityStore<
                 fields as Record<string, unknown>,
                 tableName,
             );
-
-            if (index >= 0) {
-                rows[index] = {
-                    ...serialized,
-                    id,
-                } as T;
-            } else {
-                rows.push({
-                    ...serialized,
-                    id,
-                } as T);
-            }
-
-            writeTable(tableName, rows);
-            const pos = index >= 0
-                ? index
-                : rows.length - 1;
-            const written = rows[pos];
-            if (!written) {
-                throw new Error(
-                    'Internal error: entity'
-                    + ' not found after write',
-                );
-            }
+            const written = {
+                ...serialized,
+                id,
+            } as T;
+            const next = index >= 0
+                ? rows.with(index, written)
+                : [...rows, written];
+            writeTable(tableName, next);
             return written;
         },
         async delete(id: string): Promise<void> {
@@ -325,30 +312,14 @@ function createHistoryEntityStore<
                 fields as Record<string, unknown>,
                 tableName,
             );
-
-            if (index >= 0) {
-                rows[index] = {
-                    ...serialized,
-                    id,
-                } as T;
-            } else {
-                rows.push({
-                    ...serialized,
-                    id,
-                } as T);
-            }
-
-            writeTable(tableName, rows);
-            const pos = index >= 0
-                ? index
-                : rows.length - 1;
-            const written = rows[pos];
-            if (!written) {
-                throw new Error(
-                    'Internal error: entity'
-                    + ' not found after write',
-                );
-            }
+            const written = {
+                ...serialized,
+                id,
+            } as T;
+            const next = index >= 0
+                ? rows.with(index, written)
+                : [...rows, written];
+            writeTable(tableName, next);
             return written;
         },
         async delete(id: string): Promise<void> {
@@ -357,8 +328,10 @@ function createHistoryEntityStore<
                 e => e.id === id,
             );
             if (idx >= 0) {
-                rows.splice(idx, 1);
-                writeTable(tableName, rows);
+                writeTable(
+                    tableName,
+                    rows.toSpliced(idx, 1),
+                );
             }
         },
     };
@@ -562,6 +535,26 @@ export async function createLocalStorageAdapter(
                 );
             }
 
+            // Backup existing tables before
+            // any write. If a setItem fails
+            // mid-loop (e.g. quota exceeded
+            // on the 6th of 19 writes), we
+            // restore the old state so the
+            // database is never half-imported.
+            const backup = new Map<
+                string,
+                string | null
+            >();
+            for (
+                const table of TABLE_NAMES
+            ) {
+                backup.set(
+                    table,
+                    localStorage.getItem(
+                        KEY_PREFIX + table,
+                    ),
+                );
+            }
             for (
                 const table of TABLE_NAMES
             ) {
@@ -569,14 +562,35 @@ export async function createLocalStorageAdapter(
                     KEY_PREFIX + table,
                 );
             }
-            for (
-                const [table, json]
-                    of serialized
-            ) {
-                localStorage.setItem(
-                    KEY_PREFIX + table,
-                    json,
-                );
+            try {
+                for (
+                    const [table, json]
+                        of serialized
+                ) {
+                    localStorage.setItem(
+                        KEY_PREFIX + table,
+                        json,
+                    );
+                }
+            } catch (err) {
+                for (
+                    const [table, prev]
+                        of backup
+                ) {
+                    if (prev !== null) {
+                        localStorage.setItem(
+                            KEY_PREFIX + table,
+                            prev,
+                        );
+                    } else {
+                        localStorage
+                            .removeItem(
+                                KEY_PREFIX
+                                + table,
+                            );
+                    }
+                }
+                throw err;
             }
         },
 

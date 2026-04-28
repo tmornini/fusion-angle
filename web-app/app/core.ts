@@ -1,5 +1,5 @@
 import {
-    applyTheme,
+    applyResolvedTheme,
     initListeners,
 } from './state.ts';
 import {
@@ -17,7 +17,7 @@ import {
     handlePageLoadError,
 } from './page-loader.ts';
 import { log } from './logger.ts';
-import { MissingTableError } from '../../api/db.ts';
+import { MissingTableError } from './adapters/index.ts';
 import { navigateTo } from './navigation.ts';
 
 export { navigateTo } from './navigation.ts';
@@ -77,7 +77,7 @@ document.addEventListener(
     'DOMContentLoaded',
     async () => {
         initListeners();
-        applyTheme();
+        applyResolvedTheme();
 
         let hasSchema: boolean;
         try {

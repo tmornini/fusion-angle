@@ -27,7 +27,7 @@ export interface FlowVersion {
 
 export const FLOW_VERSION_CAP = 10;
 
-function toFlowVersion(
+function computeFlowVersion(
     row: FlowVersionEntity,
 ): FlowVersion {
     return {
@@ -98,7 +98,7 @@ export async function getFlowVersions(
     return all
         .filter(v => v.flow_id === flowId)
         .sort((a, b) => -compareRows(a, b))
-        .map(toFlowVersion);
+        .map(computeFlowVersion);
 }
 
 export async function deleteFlowVersion(

@@ -1,10 +1,13 @@
 import {
-    html, mutateHtml, SafeHtml,
+    html, setHtml, SafeHtml,
 } from '../safe-html.ts';
 import { $required } from '../dom.ts';
 import {
     orderedKeys,
 } from './ordered-keys.ts';
+import {
+    toggleStatusFilter,
+} from './list-filter.ts';
 import {
     displayText, formatDateTime,
 } from '../core.ts';
@@ -109,7 +112,7 @@ export function ideaPatchFromDraft(
 function buildShell(
     container: HTMLElement,
 ): void {
-    mutateHtml(container, html`
+    setHtml(container, html`
 <div class="idea-detail-host">
     <div class="idea-detail-wrap">
         <div class="${
@@ -157,7 +160,7 @@ function mutateSlot(
     markup: SafeHtml,
 ): void {
     const slot = $required(cls, container);
-    mutateHtml(slot, markup);
+    setHtml(slot, markup);
 }
 
 function updateWrapClass(
@@ -334,8 +337,7 @@ function buildSubmitConvertButtons(
     idea: Idea,
 ): SafeHtml {
     const canSubmit =
-        idea.statusValue() === 'active'
-        || idea.statusValue() === 'sent-back';
+        idea.canBeSubmittedForReview();
     return html`
         ${canSubmit
             ? html`<button
@@ -603,9 +605,8 @@ export class IdeaPresenter {
     }
 
     canSubmit(): boolean {
-        const s = this.#idea.statusValue();
-        return s === 'active'
-            || s === 'sent-back';
+        return this.#idea
+            .canBeSubmittedForReview();
     }
 
     positionSortKey(): number {
@@ -938,10 +939,9 @@ export function applyIdeaFilterToggle(
     status: IdeaStatus,
 ): IdeaListState {
     const next: IdeaListFilter =
-        state.filter.kind === 'filtered'
-        && state.filter.status === status
-            ? { kind: 'all' }
-            : { kind: 'filtered', status };
+        toggleStatusFilter(
+            state.filter, status,
+        );
     return { ...state, filter: next };
 }
 
@@ -971,7 +971,7 @@ export class IdeaListPresenter {
     renderBadges(
         container: HTMLElement,
     ): void {
-        mutateHtml(
+        setHtml(
             container, this.#buildBadges(),
         );
     }
@@ -979,7 +979,7 @@ export class IdeaListPresenter {
     renderList(
         container: HTMLElement,
     ): void {
-        mutateHtml(container, this.#buildList());
+        setHtml(container, this.#buildList());
     }
 
     #buildBadges(): SafeHtml {

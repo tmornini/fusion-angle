@@ -38,7 +38,7 @@ export interface GaugeData {
     readonly theme: GaugeTheme;
     readonly outer: ArcData;
     readonly inner: ArcData;
-    readonly hasOverrunWarning: boolean;
+    readonly isOverrunning: boolean;
 }
 
 function sumBy<T>(
@@ -127,7 +127,7 @@ export async function getDashboardGauges(
                 display:
                     `${sumCurrentDays}d`,
             },
-            hasOverrunWarning: true,
+            isOverrunning: true,
         },
         {
             title: 'Cost',
@@ -152,7 +152,7 @@ export async function getDashboardGauges(
                         actCost,
                     ),
             },
-            hasOverrunWarning: true,
+            isOverrunning: true,
         },
         {
             title: 'Impact',
@@ -175,7 +175,7 @@ export async function getDashboardGauges(
                     `${sumActualImpact}`
                     + ` pts`,
             },
-            hasOverrunWarning: false,
+            isOverrunning: false,
         },
     ];
 }

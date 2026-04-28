@@ -1,5 +1,5 @@
 import { $ } from '../app/dom.ts';
-import { html, mutateHtml } from '../app/safe-html.ts';
+import { html, setHtml } from '../app/safe-html.ts';
 import { iconSparkles, iconArrowRight } from '../app/icons.ts';
 import { navigateTo } from '../app/core.ts';
 
@@ -7,7 +7,7 @@ export async function init(): Promise<void> {
     const root = $('#page-root', document);
     if (!root) return;
 
-    mutateHtml(root, html`
+    setHtml(root, html`
         <div class="${
             'min-h-screen bg-background'
             + ' flex flex-col'

@@ -18,7 +18,7 @@ import {
 import { log } from '../app/logger.ts';
 import {
     html,
-    mutateHtml,
+    setHtml,
     SafeHtml,
 } from '../app/safe-html.ts';
 import { showToast } from '../app/toast.ts';
@@ -101,18 +101,32 @@ export async function init(
                 originalText;
             return;
         }
+        // Schema is now wiped. If the
+        // load step fails, the database
+        // is left empty — the user must
+        // run another snapshot operation
+        // to restore a usable state. The
+        // error toast names this
+        // explicitly so the half-state
+        // isn't a silent surprise.
         try {
             await action();
         } catch (err) {
             log.error(
-                label + ' failed',
+                label
+                + ' failed after schema'
+                + ' deletion (database'
+                + ' is now empty)',
                 'snapshots',
                 err,
             );
             showToast(
                 'Failed to '
                 + label.toLowerCase()
-                + '.',
+                + '. Database is empty —'
+                + ' load mock data or'
+                + ' a snapshot to'
+                + ' continue.',
                 'error',
             );
             button.disabled = false;
@@ -149,7 +163,7 @@ export async function init(
         }
     }
 
-    mutateHtml(root, html`
+    setHtml(root, html`
     <div class="card snapshot-card">
         <div class="${
             'flex items-center gap-3'
@@ -450,7 +464,7 @@ function mutateMissingTableBanner(
     banner.className =
         'card empty-banner';
     banner.dataset['tone'] = 'warning';
-    mutateHtml(
+    setHtml(
         banner,
         html`<span
             class="empty-banner-icon"
@@ -476,7 +490,7 @@ async function mutateEmptyBanner(
             banner.id = BANNER_ID;
             banner.className =
                 'card empty-banner';
-            mutateHtml(
+            setHtml(
                 banner,
                 html`<span
                     class="empty-banner-icon"

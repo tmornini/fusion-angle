@@ -1,5 +1,5 @@
 import type { SafeHtml } from './safe-html.ts';
-import { mutateHtml } from './safe-html.ts';
+import { setHtml } from './safe-html.ts';
 
 export function $(
     selector: string,
@@ -110,7 +110,7 @@ export function getRequiredAttribute(
 export function populateIcons(entries: Array<[string, SafeHtml]>): void {
     for (const [selector, icon] of entries) {
         const el = $(selector, document);
-        if (el) mutateHtml(el, icon);
+        if (el) setHtml(el, icon);
     }
 }
 

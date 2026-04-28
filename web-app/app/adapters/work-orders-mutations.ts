@@ -81,7 +81,11 @@ export async function postWorkOrderCreation(
             e => e.fromNodeId
                 === startNode.id,
         );
-    if (postStartEdges.length !== 1) {
+    const [postStartEdge] = postStartEdges;
+    if (
+        postStartEdges.length !== 1
+        || !postStartEdge
+    ) {
         throw new Error(
             'Start node must have'
             + ' exactly one outgoing'
@@ -89,7 +93,7 @@ export async function postWorkOrderCreation(
         );
     }
     const postStartNodeId =
-        postStartEdges[0]!.toNodeId;
+        postStartEdge.toNodeId;
 
     const woId = generateId();
     const displayId =
@@ -245,6 +249,18 @@ export async function putWorkOrder(
     await PUT(`work-orders/${id}`, entity);
 }
 
+// Two tabs can both read an empty
+// claims table, both write a claim,
+// both succeed — duplicate claim rows
+// for one work order. localStorage has
+// no compare-and-swap, so any
+// read-check-write inside this function
+// would still have a TOCTOU window.
+// Structural fix lives in the Postgres
+// migration: UNIQUE (work_order_id)
+// WHERE active. Until then, the UI
+// disables the claim button while a
+// request is pending.
 export async function postWorkOrderClaim(
     workOrderId: string,
     userId: string,

@@ -248,15 +248,23 @@ function findCurrentNode(
     sortedTransitions:
         readonly WorkOrderTransitionEntity[],
 ): GraphNode {
-    const lastToId = sortedTransitions
-        .at(-1)?.to_node_id;
+    const lastTransition =
+        sortedTransitions.at(-1);
+    if (!lastTransition) {
+        throw new Error(
+            'invariant violated: work'
+            + ' order has no transitions',
+        );
+    }
+    const lastToId = lastTransition.to_node_id;
     const node = nodes.find(
         n => n.id === lastToId,
     );
     if (!node) {
         throw new Error(
-            'Current node not found'
-            + ` in flow graph: ${lastToId}`,
+            'invariant violated:'
+            + ' transition references'
+            + ' unknown node ' + lastToId,
         );
     }
     return node;

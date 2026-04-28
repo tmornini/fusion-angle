@@ -102,6 +102,20 @@ interface LeadOption {
     readonly role: string;
 }
 
+function buildLeadOption(
+    option: LeadOption,
+    selectedId: string,
+): SafeHtml {
+    const sel = option.id === selectedId
+        ? 'selected'
+        : '';
+    return html`<option
+        value="${option.id}"
+        ${trusted(sel)}>
+        ${option.fullName} - ${option.role}
+    </option>`;
+}
+
 export class IdeaConversionPresenter {
     readonly #title: string;
     readonly #problemStatement: string;
@@ -461,20 +475,13 @@ export class IdeaConversionPresenter {
                                     + ' project?'}
                             </option>
                             ${lo.map(
-                                o => html`
-                            <option
-                                value="${o.id}"
-                                ${trusted(
-                                    o.id ===
+                                o => buildLeadOption(
+                                    o,
                                     fields[
-                                    'project-lead'
-                                    ]
-                                        ? 'selected'
-                                        : '',
-                                )}>
-                                ${o.fullName}
-                                - ${o.role}
-                            </option>`)}
+                                        'project-lead'
+                                    ],
+                                ),
+                            )}
                         </select>
                     </div>
                     <div class="${

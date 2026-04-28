@@ -564,6 +564,20 @@ export interface StoredGraph {
 
 export const DEFAULT_LOCK_TIMEOUT = 28800;
 
+// Named defaults for flow-graph entities.
+// Pass explicitly at call sites: the
+// constant tells the next reader the
+// empty value is deliberate, not
+// coincidental.
+export const DEFAULT_NODE_DESCRIPTION = '';
+export const DEFAULT_EDGE_DESCRIPTION = '';
+export const DEFAULT_NODE_FIELDS:
+    readonly GraphField[] = [];
+export const DEFAULT_NEW_STATE_NAME =
+    'New State';
+export const DEFAULT_TRANSITION_NAME =
+    'Transition';
+
 export interface FlowEntity {
     id: Id;
     name: string;
@@ -857,6 +871,11 @@ export class Idea {
 
     isConvertible(): boolean {
         return this.#status === 'approved';
+    }
+
+    canBeSubmittedForReview(): boolean {
+        return this.#status === 'active'
+            || this.#status === 'sent-back';
     }
 
     isReady(): boolean {

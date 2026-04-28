@@ -17,18 +17,30 @@ const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 2.0;
 const ZOOM_STEP = 0.1;
 
+// Cooldown state: 'never' before the
+// first toast, 'last' with the firing
+// timestamp afterward. The discriminated
+// union makes "have we ever fired?"
+// explicit, instead of encoding it as
+// a magic 0 in a number.
+type CooldownState =
+    | { kind: 'never' }
+    | { kind: 'last'; at: number };
+
 const toastWithCooldown = (() => {
-    let lastAt = 0;
+    let cooldown: CooldownState =
+        { kind: 'never' };
     return (
         msg: string,
         tone: 'error' | 'success',
     ): void => {
         const now = Date.now();
         if (
-            now - lastAt
-            < WHEEL_TOAST_COOLDOWN_MS
+            cooldown.kind === 'last'
+            && now - cooldown.at
+                < WHEEL_TOAST_COOLDOWN_MS
         ) return;
-        lastAt = now;
+        cooldown = { kind: 'last', at: now };
         showToast(msg, tone);
     };
 })();
@@ -656,8 +668,8 @@ export function zoomIn(
         x: number;
         y: number;
     } | null,
-): void {
-    applyButtonZoom(
+): InteractionState {
+    return applyButtonZoom(
         state, ZOOM_STEP, focalPt,
     );
 }
@@ -668,8 +680,8 @@ export function zoomOut(
         x: number;
         y: number;
     } | null,
-): void {
-    applyButtonZoom(
+): InteractionState {
+    return applyButtonZoom(
         state, -ZOOM_STEP, focalPt,
     );
 }
@@ -681,27 +693,33 @@ function applyButtonZoom(
         x: number;
         y: number;
     } | null | undefined,
-): void {
+): InteractionState {
     const prevCx = state.viewBox.x
         + state.viewBox.w / 2;
     const prevCy = state.viewBox.y
         + state.viewBox.h / 2;
     const prevZoom = state.zoom;
-    state.zoom = Math.max(
+    const nextZoom = Math.max(
         MIN_ZOOM,
         Math.min(
             MAX_ZOOM, prevZoom + delta,
         ),
     );
-    const ratio = prevZoom / state.zoom;
-    state.viewBox.w *= ratio;
-    state.viewBox.h *= ratio;
+    const ratio = prevZoom / nextZoom;
+    const nextW = state.viewBox.w * ratio;
+    const nextH = state.viewBox.h * ratio;
     const cx = focalPt?.x ?? prevCx;
     const cy = focalPt?.y ?? prevCy;
-    state.viewBox.x =
-        cx - state.viewBox.w / 2;
-    state.viewBox.y =
-        cy - state.viewBox.h / 2;
+    return {
+        ...state,
+        zoom: nextZoom,
+        viewBox: {
+            x: cx - nextW / 2,
+            y: cy - nextH / 2,
+            w: nextW,
+            h: nextH,
+        },
+    };
 }
 
 export interface ZoomToFitResult {

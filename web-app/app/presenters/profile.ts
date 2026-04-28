@@ -1,5 +1,5 @@
 import {
-    html, mutateHtml, SafeHtml,
+    html, setHtml, SafeHtml,
 } from '../safe-html.ts';
 import { $required } from '../dom.ts';
 import {
@@ -34,7 +34,7 @@ export type ProfileFieldKey =
 function buildShell(
     container: HTMLElement,
 ): void {
-    mutateHtml(container, html`
+    setHtml(container, html`
 <div class="idea-detail-wrap">
     <div class="profile-header-slot"></div>
     <div class="profile-info-slot"></div>
@@ -48,7 +48,7 @@ function mutateSlot(
     cls: string,
     markup: SafeHtml,
 ): void {
-    mutateHtml($required(cls, container), markup);
+    setHtml($required(cls, container), markup);
 }
 
 function buildHeader(

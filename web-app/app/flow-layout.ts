@@ -42,6 +42,16 @@ function isDummy(id: string): boolean {
     return id.startsWith(DUMMY_PREFIX);
 }
 
+function arePairsInverted(
+    a: readonly [number, number],
+    b: readonly [number, number],
+): boolean {
+    const [t1, b1] = a;
+    const [t2, b2] = b;
+    return (t1 < t2 && b1 > b2)
+        || (t1 > t2 && b1 < b2);
+}
+
 function countPairInversions(
     pairs: readonly (readonly [number, number])[],
 ): number {
@@ -52,12 +62,9 @@ function countPairInversions(
             j < pairs.length;
             j++
         ) {
-            const [t1, b1] = pairs[i]!;
-            const [t2, b2] = pairs[j]!;
-            const isInversion =
-                (t1 < t2 && b1 > b2)
-                || (t1 > t2 && b1 < b2);
-            if (isInversion) total++;
+            if (arePairsInverted(
+                pairs[i]!, pairs[j]!,
+            )) total++;
         }
     }
     return total;
@@ -718,9 +725,6 @@ function assignCoordinates(
     for (const e of forwardEdges) {
         const fl = layerOf.get(e.fromId);
         if (fl === undefined) continue;
-        if (fl >= orderedLayers.length) {
-            continue;
-        }
         const w = maxLabelByLayer[fl]!;
         if (e.labelWidth > w) {
             maxLabelByLayer[fl] =

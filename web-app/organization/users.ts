@@ -2,7 +2,7 @@ import {
     $, $input, $select, $textarea,
 } from '../app/dom.ts';
 import {
-    html, mutateHtml,
+    html, setHtml,
 } from '../app/safe-html.ts';
 import { showToast } from '../app/toast.ts';
 import {
@@ -69,7 +69,7 @@ export async function init(): Promise<void> {
         buildInitialManagedUsersState(users);
     const initialPresenter =
         new ManagedUsersPresenter(usersState);
-    mutateHtml(container, buildShellHtml(
+    setHtml(container, buildShellHtml(
         initialPresenter.activeCount(),
         initialPresenter.pendingCount(),
     ));
@@ -85,6 +85,14 @@ export async function init(): Promise<void> {
 
     initUserListFilters();
     bindInviteDialog();
+}
+
+function isMissingInviteRequiredFields(
+    first: string,
+    last: string,
+    email: string,
+): boolean {
+    return !first || !last || !email;
 }
 
 function rerenderUsers(): void {
@@ -587,7 +595,11 @@ async function handleInvite(): Promise<void> {
     const email = $input(
         '#invite-email', document,
     )!.value;
-    if (!first || !last || !email) {
+    if (
+        isMissingInviteRequiredFields(
+            first, last, email,
+        )
+    ) {
         showToast(
             'Name and email are required',
             'error',

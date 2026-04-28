@@ -102,29 +102,33 @@ function unquote(s: string): string {
 function extractNodeDecl(
     token: string,
 ): ParsedNode | null {
-    let m = DOUBLE_CIRCLE_RE.exec(token);
-    if (m) {
+    const doubleCircleMatch =
+        DOUBLE_CIRCLE_RE.exec(token);
+    if (doubleCircleMatch) {
         return {
-            mermaidId: m[1]!,
-            name: unquote(m[2]!),
+            mermaidId: doubleCircleMatch[1]!,
+            name: unquote(
+                doubleCircleMatch[2]!,
+            ),
             isStart: false,
             isComplete: true,
         };
     }
-    m = STADIUM_RE.exec(token);
-    if (m) {
+    const stadiumMatch =
+        STADIUM_RE.exec(token);
+    if (stadiumMatch) {
         return {
-            mermaidId: m[1]!,
-            name: unquote(m[2]!),
+            mermaidId: stadiumMatch[1]!,
+            name: unquote(stadiumMatch[2]!),
             isStart: true,
             isComplete: false,
         };
     }
-    m = RECT_RE.exec(token);
-    if (m) {
+    const rectMatch = RECT_RE.exec(token);
+    if (rectMatch) {
         return {
-            mermaidId: m[1]!,
-            name: unquote(m[2]!),
+            mermaidId: rectMatch[1]!,
+            name: unquote(rectMatch[2]!),
             isStart: false,
             isComplete: false,
         };

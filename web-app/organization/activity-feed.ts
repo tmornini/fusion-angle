@@ -1,7 +1,7 @@
 import { $ } from '../app/dom.ts';
 import {
     html,
-    mutateHtml,
+    setHtml,
 } from '../app/safe-html.ts';
 import {
     iconActivity,
@@ -81,7 +81,7 @@ export async function init(
     if (!items) return;
     const presenters = items;
 
-    mutateHtml(container, html`
+    setHtml(container, html`
     <div class="content-wrap">
         <div class="flex items-center
             gap-4 mb-6">
@@ -158,7 +158,7 @@ export async function init(
                 query, types,
             ),
         );
-        mutateHtml(
+        setHtml(
             activityList,
             html`${filtered.map(
                 a => a.buildActivity(),

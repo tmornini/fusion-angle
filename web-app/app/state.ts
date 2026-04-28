@@ -17,6 +17,8 @@ const STORAGE_KEY_THEME = 'fusion-theme';
 const STORAGE_KEY_SIDEBAR =
     'fusion-sidebar-collapsed';
 const MOBILE_BREAKPOINT_PX = 768;
+const BOOL_STRING_TRUE = 'true';
+const BOOL_STRING_FALSE = 'false';
 
 interface AppState {
     theme: 'light' | 'dark' | 'system';
@@ -55,8 +57,8 @@ function loadStoredSidebarCollapsed(
         STORAGE_KEY_SIDEBAR,
     );
     if (raw === null) return false;
-    if (raw === 'true') return true;
-    if (raw === 'false') return false;
+    if (raw === BOOL_STRING_TRUE) return true;
+    if (raw === BOOL_STRING_FALSE) return false;
     throw new Error(
         'corrupt stored sidebar state: '
             + raw,
@@ -124,7 +126,7 @@ function getThemeIcon(
     return iconMonitor(size, cssClass);
 }
 
-function applyTheme(): void {
+function applyResolvedTheme(): void {
     const resolved = computeTheme();
     document.documentElement
         .setAttribute(
@@ -146,15 +148,17 @@ function persistThemePreference(
         theme,
     );
     setState({ theme });
-    applyTheme();
+    applyResolvedTheme();
 }
 
-function setSidebarCollapsed(
+function collapseSidebar(
     collapsed: boolean,
 ): void {
     writePreference(
         STORAGE_KEY_SIDEBAR,
-        String(collapsed),
+        collapsed
+            ? BOOL_STRING_TRUE
+            : BOOL_STRING_FALSE,
     );
     setState({
         isSidebarCollapsed: collapsed,
@@ -166,7 +170,7 @@ function initListeners(): void {
         DARK_QUERY,
         () => {
             if (state.theme === 'system') {
-                applyTheme();
+                applyResolvedTheme();
             }
         },
     );
@@ -194,17 +198,20 @@ function initListeners(): void {
                 setState({
                     theme: e.newValue,
                 });
-                applyTheme();
+                applyResolvedTheme();
             }
             if (
                 e.key === STORAGE_KEY_SIDEBAR
                 && (
-                    e.newValue === 'true'
-                    || e.newValue === 'false'
+                    e.newValue
+                        === BOOL_STRING_TRUE
+                    || e.newValue
+                        === BOOL_STRING_FALSE
                 )
             ) {
                 const collapsed =
-                    e.newValue === 'true';
+                    e.newValue
+                        === BOOL_STRING_TRUE;
                 setState({
                     isSidebarCollapsed:
                         collapsed,
@@ -227,9 +234,9 @@ export {
     subscribe,
     computeTheme,
     getThemeIcon,
-    applyTheme,
+    applyResolvedTheme,
     persistThemePreference,
-    setSidebarCollapsed,
+    collapseSidebar,
     isValidTheme,
     initListeners,
 };

@@ -35,7 +35,7 @@ export function recordFlowMutation(
     };
 }
 
-export function setHasUndoHistory(
+export function recordUndoHistoryMark(
     s: FlowHistorySnapshot,
     value: boolean,
 ): FlowHistorySnapshot {

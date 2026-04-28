@@ -1,5 +1,5 @@
 import {
-    html, mutateHtml, SafeHtml,
+    html, setHtml, SafeHtml,
 } from '../safe-html.ts';
 import { iconGripVertical } from '../icons.ts';
 import { DISPLAY_ABSENT } from '../format.ts';
@@ -15,6 +15,32 @@ import {
 import type { User } from '../adapters/index.ts';
 
 const DAY_MS = 1000 * 60 * 60 * 24;
+
+function isClaimActive(
+    claim: WorkOrderClaimEntity | undefined,
+    lockTimeout: number,
+): boolean {
+    return claim !== undefined
+        && !isExpiredClaim(
+            claim, lockTimeout,
+        );
+}
+
+function isClaimedAndUnfinished(
+    isClaimed: boolean,
+    completed: boolean,
+): boolean {
+    return isClaimed && !completed;
+}
+
+function itemMatchesMode(
+    mode: InboxMode,
+    completed: boolean,
+): boolean {
+    return mode === 'active'
+        ? !completed
+        : completed;
+}
 
 function relativeTime(iso: string): string {
     const ms = Date.now()
@@ -57,7 +83,7 @@ export class WorkboxInboxPresenter {
     renderList(
         container: HTMLElement,
     ): void {
-        mutateHtml(container, html`${
+        setHtml(container, html`${
             this.#items.map(
                 i => this.#buildRow(i),
             )
@@ -178,25 +204,40 @@ export function buildInboxItems(
                             b.transitioned_at,
                         ),
             );
-        const lastToId = sorted.at(-1)
-            ?.to_node_id;
+        const lastTransition = sorted.at(-1);
+        if (!lastTransition) {
+            throw new Error(
+                'invariant violated: work'
+                + ' order ' + wo.id
+                + ' has empty transitions'
+                + ' array',
+            );
+        }
+        const lastToId =
+            lastTransition.to_node_id;
         const curNode = fg.nodes.find(
             n => n.id === lastToId,
-        )!;
+        );
+        if (!curNode) {
+            throw new Error(
+                'invariant violated:'
+                + ' transition for work'
+                + ' order ' + wo.id
+                + ' references unknown'
+                + ' node ' + lastToId,
+            );
+        }
         const completed = curNode.isComplete;
 
         const claim =
             claimByWo.get(wo.id);
-        const isClaimed = claim !== undefined
-            && !isExpiredClaim(
-                claim, fg.lockTimeout,
-            );
-        if (isClaimed && !completed)
-            continue;
-
-        if (mode === 'active' && completed)
-            continue;
-        if (mode === 'archived' && !completed)
+        const isClaimed = isClaimActive(
+            claim, fg.lockTimeout,
+        );
+        if (isClaimedAndUnfinished(
+            isClaimed, completed,
+        )) continue;
+        if (!itemMatchesMode(mode, completed))
             continue;
 
         const last = sorted.at(-1);

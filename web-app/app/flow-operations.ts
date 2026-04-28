@@ -7,6 +7,13 @@ import type {
     FlowFieldType,
 } from './adapters/flows.ts';
 import {
+    DEFAULT_NODE_DESCRIPTION,
+    DEFAULT_EDGE_DESCRIPTION,
+    DEFAULT_NODE_FIELDS,
+    DEFAULT_NEW_STATE_NAME,
+    DEFAULT_TRANSITION_NAME,
+} from '../../api/types.ts';
+import {
     postEdgeConnection,
     postNodeAddition,
     postFieldAddition,
@@ -30,7 +37,7 @@ import {
     applyDeleteNodes,
 } from './flow-designer-actions.ts';
 import {
-    setHasUndoHistory,
+    recordUndoHistoryMark,
     appendToRedoStack,
     removeFromRedoStack,
 } from './flow-history.ts';
@@ -38,6 +45,14 @@ import type {
     FlowHistorySnapshot,
 } from './flow-history.ts';
 import { log } from './logger.ts';
+
+function isIntermediateNode(
+    node: GraphNode | undefined,
+): node is GraphNode {
+    return node !== undefined
+        && !node.isStart
+        && !node.isComplete;
+}
 
 function serializeGraph(
     nodes: readonly GraphNode[],
@@ -265,18 +280,20 @@ export async function performAddNodeAtPosition(
         kind: 'ok',
         node: {
             id: nodeId,
-            name: 'New State',
-            description: '',
+            name: DEFAULT_NEW_STATE_NAME,
+            description:
+                DEFAULT_NODE_DESCRIPTION,
             isStart: false,
             isComplete: false,
             positionX: posX,
             positionY: posY,
-            fields: [],
+            fields: [...DEFAULT_NODE_FIELDS],
         },
         edge: {
             id: edgeId,
-            name: 'Transition',
-            description: '',
+            name: DEFAULT_TRANSITION_NAME,
+            description:
+                DEFAULT_EDGE_DESCRIPTION,
             fromNodeId,
             toNodeId: nodeId,
         },
@@ -306,7 +323,7 @@ export async function performDeleteSelectedNodes(
         const n = snap.nodes.find(
             nd => nd.id === id,
         );
-        if (n && !n.isStart && !n.isComplete) {
+        if (isIntermediateNode(n)) {
             deletableIds.push(id);
         }
     }
@@ -531,7 +548,7 @@ export async function performUndo(
             return {
                 kind: 'ok',
                 freshSnap: snap,
-                newHistory: setHasUndoHistory(
+                newHistory: recordUndoHistoryMark(
                     history, false,
                 ),
             };
@@ -561,7 +578,7 @@ export async function performUndo(
         const remaining = await getFlowVersions(
             snap.flowId,
         );
-        const newHistory = setHasUndoHistory(
+        const newHistory = recordUndoHistoryMark(
             stagedHistory,
             remaining.length > 0,
         );
@@ -600,7 +617,7 @@ export async function performRedo(
         const graph = await getFlowGraph(
             snap.flowId,
         );
-        const newHistory = setHasUndoHistory(
+        const newHistory = recordUndoHistoryMark(
             popped.snapshot, true,
         );
         return {

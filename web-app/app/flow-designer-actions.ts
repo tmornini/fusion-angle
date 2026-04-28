@@ -4,6 +4,11 @@ import type {
     GraphField,
 } from './adapters/flows.ts';
 import {
+    DEFAULT_NODE_DESCRIPTION,
+    DEFAULT_EDGE_DESCRIPTION,
+    DEFAULT_NODE_FIELDS,
+} from '../../api/types.ts';
+import {
     computeLayout,
     edgeWaypointKey,
     NODE_WIDTH,
@@ -33,15 +38,17 @@ export function applyMoveNodes(
     updates: readonly NodeMove[],
 ): GraphNode[] {
     const updateMap = new Map(
-        updates.map(u => [u.nodeId, u]),
+        updates.map(
+            update => [update.nodeId, update],
+        ),
     );
-    return nodes.map(n => {
-        const u = updateMap.get(n.id);
-        if (!u) return n;
+    return nodes.map(node => {
+        const update = updateMap.get(node.id);
+        if (!update) return node;
         return {
-            ...n,
-            positionX: u.x,
-            positionY: u.y,
+            ...node,
+            positionX: update.x,
+            positionY: update.y,
         };
     });
 }
@@ -114,12 +121,13 @@ export function applyAddNode(
         {
             id: nodeId,
             name,
-            description: '',
+            description:
+                DEFAULT_NODE_DESCRIPTION,
             positionX,
             positionY,
             isStart: false,
             isComplete: false,
-            fields: [],
+            fields: [...DEFAULT_NODE_FIELDS],
         },
     ];
 }
@@ -136,7 +144,8 @@ export function applyAddEdge(
         {
             id: edgeId,
             name,
-            description: '',
+            description:
+                DEFAULT_EDGE_DESCRIPTION,
             fromNodeId,
             toNodeId,
         },
@@ -254,8 +263,7 @@ export function applyAutoLayout(
     const layoutEdges = edges.map(e => {
         const from =
             nodeById.get(e.fromNodeId);
-        const isStart =
-            from?.isStart === true;
+        const isStart = from?.isStart ?? false;
         return {
             fromId: e.fromNodeId,
             toId: e.toNodeId,
@@ -280,7 +288,15 @@ export function applyAutoLayout(
     });
     const newNodes = nodes.map(n => {
         const pos =
-            result.positions.get(n.id)!;
+            result.positions.get(n.id);
+        if (!pos) {
+            throw new Error(
+                'invariant violated:'
+                + ' computeLayout did not'
+                + ' produce a position for'
+                + ' node ' + n.id,
+            );
+        }
         return {
             ...n,
             positionX: pos.x,

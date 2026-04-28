@@ -3,7 +3,7 @@ import {
 } from '../app/dom.ts';
 import {
     html,
-    mutateHtml,
+    setHtml,
 } from '../app/safe-html.ts';
 import {
     buildSkeleton,
@@ -145,7 +145,7 @@ export async function init(
             ).render(),
     );
 
-    mutateHtml(
+    setHtml(
         listEl,
         html`${rendered}`,
     );

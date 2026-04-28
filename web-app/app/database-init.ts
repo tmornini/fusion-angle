@@ -1,28 +1,15 @@
 import { log } from './logger.ts';
 import {
-    html, mutateHtml,
+    html, setHtml,
 } from './safe-html.ts';
 import {
     formatErrorMessage,
 } from './loading-states.ts';
+import { initAdapter } from './adapters/init.ts';
 
 export async function initDatabase(
 ): Promise<boolean> {
-    const { createLocalStorageAdapter } =
-        await import(
-            '../../api/db-localstorage'
-        );
-    const { initApi, GET } =
-        await import('../../api/api');
-    const adapter =
-        await createLocalStorageAdapter();
-    await adapter.initialize();
-    initApi(adapter);
-    const schema =
-        await GET<string | null>(
-            'snapshots/schema',
-        );
-    return schema !== null;
+    return initAdapter();
 }
 
 // Inline styles here are intentional: this error is shown
@@ -39,7 +26,7 @@ export function handleDatabaseError(
         'core',
         err,
     );
-    mutateHtml(document.body, html`<div
+    setHtml(document.body, html`<div
         style="padding:2rem;
             font-family:sans-serif;
             max-width:40rem">

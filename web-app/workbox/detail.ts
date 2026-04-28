@@ -2,7 +2,7 @@ import {
     $, $required, getRequiredAttribute,
 } from '../app/dom.ts';
 import {
-    html, mutateHtml,
+    html, setHtml,
 } from '../app/safe-html.ts';
 import type { SafeHtml } from '../app/safe-html.ts';
 import {
@@ -318,20 +318,39 @@ function initTransitionButtons(
                     );
                     return;
                 }
-                await postActivity({
-                    type: 'status_changed',
-                    action:
-                        'transitioned'
-                        + ' work order',
-                    target:
-                        detail
-                            .flowNameText()
-                        + ' #'
-                        + detail
-                            .displayIdText(),
-                    status: '',
-                    feedback: '',
-                });
+                // Activity logging is
+                // best-effort: the user-
+                // visible operation
+                // (transition) already
+                // succeeded, so a logging
+                // failure shouldn't
+                // overwrite the success
+                // toast — but it must not
+                // be silent either.
+                try {
+                    await postActivity({
+                        type: 'status_changed',
+                        action:
+                            'transitioned'
+                            + ' work order',
+                        target:
+                            detail
+                                .flowNameText()
+                            + ' #'
+                            + detail
+                                .displayIdText(),
+                        status: '',
+                        feedback: '',
+                    });
+                } catch (err) {
+                    log.warn(
+                        'activity logging'
+                        + ' failed after'
+                        + ' transition',
+                        'workbox',
+                        err,
+                    );
+                }
                 showToast(
                     'Transition complete',
                     'success',
@@ -461,7 +480,7 @@ export async function init(
     );
     if (!detail) return;
 
-    mutateHtml(
+    setHtml(
         container,
         buildDetailView(detail),
     );

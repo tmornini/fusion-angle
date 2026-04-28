@@ -2,7 +2,7 @@ import {
     $, bindEnterToClick,
 } from '../app/dom.ts';
 import {
-    html, mutateHtml,
+    html, setHtml,
 } from '../app/safe-html.ts';
 import { showToast } from '../app/toast.ts';
 import { log } from '../app/logger.ts';
@@ -50,39 +50,31 @@ export async function init(
         '#convert-content', document,
     );
     if (!root) return;
-    mutateHtml(
+    setHtml(
         root,
         buildSkeleton('detail', 4),
     );
 
-    let fields: ConversionFields;
-    let presenter:
-        IdeaConversionPresenter;
+    const ctx = createFetchContext();
+    let tuple: Awaited<
+        ReturnType<typeof getIdea>
+    >;
+    let users: Awaited<
+        ReturnType<typeof getManagedUsers>
+    >;
     try {
-        const ctx = createFetchContext();
-        const [tuple, users] =
-            await Promise.all([
-                getIdea(ideaId, ctx),
-                getManagedUsers(ctx),
-            ]);
-        fields =
-            buildInitialConversionFields(
-                tuple.idea,
-            );
-        presenter =
-            new IdeaConversionPresenter(
-                tuple.idea,
-                users,
-                fields,
-            );
+        [tuple, users] = await Promise.all([
+            getIdea(ideaId, ctx),
+            getManagedUsers(ctx),
+        ]);
     } catch (err) {
         log.error(
-            'getIdea'
+            'getIdea or getManagedUsers'
             + ' failed',
             'ideas',
             err,
         );
-        mutateHtml(
+        setHtml(
             root,
             buildErrorState(
                 'Failed to load idea'
@@ -98,6 +90,17 @@ export async function init(
         );
         return;
     }
+    let fields: ConversionFields =
+        buildInitialConversionFields(
+            tuple.idea,
+        );
+    const presenter:
+        IdeaConversionPresenter =
+        new IdeaConversionPresenter(
+            tuple.idea,
+            users,
+            fields,
+        );
 
     function syncFormFields(): void {
         const next = {
@@ -131,7 +134,7 @@ export async function init(
             document,
         );
         if (!container) return;
-        mutateHtml(
+        setHtml(
             container,
             presenter.render(),
         );
@@ -348,7 +351,7 @@ export async function init(
                     document,
                 );
                 if (!btn) return;
-                mutateHtml(
+                setHtml(
                     btn,
                     html`${
                         iconLoader(16, '')
@@ -383,7 +386,7 @@ export async function init(
                         + ' try again.',
                         'error',
                     );
-                    mutateHtml(
+                    setHtml(
                         btn,
                         html`${'Create'
                             + ' Project'}

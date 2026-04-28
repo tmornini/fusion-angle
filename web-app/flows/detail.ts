@@ -3,7 +3,7 @@ import {
     $textarea,
 } from '../app/dom.ts';
 import { log } from '../app/logger.ts';
-import { mutateHtml } from '../app/safe-html.ts';
+import { setHtml } from '../app/safe-html.ts';
 import { showToast } from '../app/toast.ts';
 import {
     buildSkeleton,
@@ -101,19 +101,22 @@ class Debouncer {
     }
 }
 
-const saveDebouncer =
-    new Debouncer(SAVE_DELAY_MS);
-
 type PanelStateRef = { open: boolean };
 
 class PageState {
     #projectId: string | undefined;
     readonly #interaction =
         new AbortController();
+    readonly #saveDebouncer =
+        new Debouncer(SAVE_DELAY_MS);
     #pushGestureContext:
         | ((next: FlowGestureContext) => void)
         | null = null;
     #presenter: FlowDesignerPresenter | null = null;
+
+    saveDebouncer(): Debouncer {
+        return this.#saveDebouncer;
+    }
 
     projectId(): string | undefined {
         return this.#projectId;
@@ -477,12 +480,11 @@ function update(
     container: HTMLElement,
     presenter: FlowDesignerPresenter,
 ): void {
-    saveDebouncer.flush();
+    pageState.saveDebouncer().flush();
     presenter.renderUpdate(container);
-    pageState.pushGestureContext({
-        isAutoFit: presenter.isAutoFit(),
-        isLocked: presenter.isLocked(),
-    });
+    pageState.pushGestureContext(
+        presenter.buildGestureContext(),
+    );
     pageState.setHistory(presenter.history());
 }
 
@@ -702,10 +704,7 @@ function bindCanvasInteractions(
             .getNodePosition(id),
         () => pageState.presenter()
             .getAllNodes(),
-        {
-            isAutoFit: presenter.isAutoFit(),
-            isLocked: presenter.isLocked(),
-        },
+        presenter.buildGestureContext(),
         signal,
     );
     pageState.setPushGestureContext(push);
@@ -917,7 +916,7 @@ function bindPanelActions(
             const id = target.id;
             const value = target.value;
             if (id === 'prop-node-name') {
-                saveDebouncer.schedule(
+                pageState.saveDebouncer().schedule(
                     () => commit(
                         pageState.presenter()
                             .withNodeNamed(value),
@@ -927,7 +926,7 @@ function bindPanelActions(
             } else if (
                 id === 'prop-node-desc'
             ) {
-                saveDebouncer.schedule(
+                pageState.saveDebouncer().schedule(
                     () => commit(
                         pageState.presenter()
                             .withNodeDescribed(
@@ -939,7 +938,7 @@ function bindPanelActions(
             } else if (
                 id === 'prop-edge-name'
             ) {
-                saveDebouncer.schedule(
+                pageState.saveDebouncer().schedule(
                     () => commit(
                         pageState.presenter()
                             .withEdgeNamed(value),
@@ -949,7 +948,7 @@ function bindPanelActions(
             } else if (
                 id === 'prop-edge-desc'
             ) {
-                saveDebouncer.schedule(
+                pageState.saveDebouncer().schedule(
                     () => commit(
                         pageState.presenter()
                             .withEdgeDescribed(

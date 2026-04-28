@@ -214,13 +214,20 @@ function asGraphField(
         obj['options'],
         label + '.options',
     );
+    const name = asString(
+        obj['name'], label + '.name',
+    );
+    if (name.length === 0) {
+        throw new Error(
+            'expected non-empty string'
+            + ' for ' + label + '.name',
+        );
+    }
     return {
         id: asString(
             obj['id'], label + '.id',
         ),
-        name: asString(
-            obj['name'], label + '.name',
-        ),
+        name,
         fieldType: asFlowFieldType(
             obj['fieldType'],
             label + '.fieldType',

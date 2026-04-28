@@ -1,7 +1,7 @@
 import { $ } from '../app/dom.ts';
 import {
     html,
-    mutateHtml,
+    setHtml,
     type SafeHtml,
 } from '../app/safe-html.ts';
 import {
@@ -229,6 +229,15 @@ function buildNavbar(): SafeHtml {
     </nav>`;
 }
 
+function buildCompanyLogos(
+    companies: readonly string[],
+): SafeHtml {
+    return html`${companies.map(
+        company =>
+            html`<span>${company}</span>`,
+    )}`;
+}
+
 function buildHero(): SafeHtml {
     return html`
     <section class="hero">
@@ -301,11 +310,8 @@ function buildHero(): SafeHtml {
                     <div class="${
                         'hero-trust-logos'
                     }">
-                        ${companies.map(
-                            company =>
-                                html`<span>${
-                                    company
-                                }</span>`,
+                        ${buildCompanyLogos(
+                            companies,
                         )}
                     </div>
                 </div>
@@ -569,7 +575,7 @@ export async function init(): Promise<void> {
     const root = $('#page-root', document);
     if (!root) return;
 
-    mutateHtml(root, html`
+    setHtml(root, html`
     <div class="${
         'min-h-screen bg-background'
     }">
@@ -598,7 +604,7 @@ export async function init(): Promise<void> {
                     'hidden',
                     !isHidden,
                 );
-                mutateHtml(
+                setHtml(
                     toggle,
                     isHidden
                         ? iconX(24, '')

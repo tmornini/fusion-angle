@@ -15,6 +15,32 @@ import type {
     RecentActivityItem,
 } from '../adapters/index.ts';
 
+const STAT_VALUE_2XL = 'text-2xl font-bold';
+const STAT_VALUE_LG = 'text-lg font-bold';
+
+function buildStatCell(
+    icon: SafeHtml,
+    label: string,
+    value: SafeHtml,
+    valueClass: string,
+): SafeHtml {
+    return html`
+        <div class="stat-cell">
+            <div class="${
+                'flex items-center gap-2'
+                + ' text-muted mb-1'
+            }">
+                ${icon}
+                <span class="text-xs">
+                    ${label}
+                </span>
+            </div>
+            <p class="${valueClass}">
+                ${value}
+            </p>
+        </div>`;
+}
+
 export class OrganizationPresenter {
     readonly #entity: OrganizationEntity;
     readonly #companyName: string;
@@ -128,88 +154,40 @@ export class OrganizationPresenter {
                 class="grid grid-cols-2
                        lg:grid-cols-4 gap-4"
             >
-                <div class="stat-cell">
-                    <div
-                        class="flex items-center
-                               gap-2 text-muted
-                               mb-1"
-                    >
-                        ${iconUsers(16, '')}
-                        <span class="text-xs">
-                            Active Users
-                        </span>
-                    </div>
-                    <p class="${
-                        'text-2xl font-bold'
-                    }">
-                        ${this.#entity
-                            .used_seats
-                        }<span
-                            class="text-sm
-                                   font-normal
-                                   text-muted"
-                        >/${this.#entity
-                            .seats}</span>
-                    </p>
-                </div>
-                <div class="stat-cell">
-                    <div
-                        class="flex items-center
-                               gap-2 text-muted
-                               mb-1"
-                    >
-                        ${iconFolderKanban(
-                            16, '',
-                        )}
-                        <span class="text-xs">
-                            Projects
-                        </span>
-                    </div>
-                    <p class="${
-                        'text-2xl font-bold'
-                    }">
-                        ${this.#entity
-                            .projects_current}
-                    </p>
-                </div>
-                <div class="stat-cell">
-                    <div
-                        class="flex items-center
-                               gap-2 text-muted
-                               mb-1"
-                    >
-                        ${iconLightbulb(16, '')}
-                        <span class="text-xs">
-                            Ideas
-                        </span>
-                    </div>
-                    <p class="${
-                        'text-2xl font-bold'
-                    }">
-                        ${this.#entity
-                            .ideas_current}
-                    </p>
-                </div>
-                <div class="stat-cell">
-                    <div
-                        class="flex items-center
-                               gap-2 text-muted
-                               mb-1"
-                    >
-                        ${iconCalendar(16, '')}
-                        <span class="text-xs">
-                            Next Billing
-                        </span>
-                    </div>
-                    <p class="${
-                        'text-lg font-bold'
-                    }">
-                        ${formatDate(
-                            this.#entity
-                                .next_billing,
-                        )}
-                    </p>
-                </div>
+                ${buildStatCell(
+                    iconUsers(16, ''),
+                    'Active Users',
+                    html`${this.#entity
+                        .used_seats}<span class="${
+                        'text-sm font-normal'
+                        + ' text-muted'
+                    }">/${this.#entity
+                        .seats}</span>`,
+                    STAT_VALUE_2XL,
+                )}
+                ${buildStatCell(
+                    iconFolderKanban(16, ''),
+                    'Projects',
+                    html`${this.#entity
+                        .projects_current}`,
+                    STAT_VALUE_2XL,
+                )}
+                ${buildStatCell(
+                    iconLightbulb(16, ''),
+                    'Ideas',
+                    html`${this.#entity
+                        .ideas_current}`,
+                    STAT_VALUE_2XL,
+                )}
+                ${buildStatCell(
+                    iconCalendar(16, ''),
+                    'Next Billing',
+                    html`${formatDate(
+                        this.#entity
+                            .next_billing,
+                    )}`,
+                    STAT_VALUE_LG,
+                )}
             </div>
         </div>
 

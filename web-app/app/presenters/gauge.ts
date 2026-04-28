@@ -85,7 +85,7 @@ export class GaugePresenter {
         const outer = this.#data.outer;
         const inner = this.#data.inner;
         const hasOverrun =
-            this.#data.hasOverrunWarning;
+            this.#data.isOverrunning;
         const outerPct =
             outer.max > 0
                 ? Math.min(

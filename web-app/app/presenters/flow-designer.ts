@@ -1,5 +1,5 @@
 import {
-    html, mutateHtml, trusted,
+    html, setHtml, trusted,
 } from '../safe-html.ts';
 import type { SafeHtml } from '../safe-html.ts';
 import { $, $required } from '../dom.ts';
@@ -40,6 +40,7 @@ import {
 } from '../flow-interactions.ts';
 import type {
     InteractionState,
+    FlowGestureContext,
 } from '../flow-interactions.ts';
 import {
     canUndoFlowEdits,
@@ -239,6 +240,16 @@ export class FlowDesignerPresenter {
 
     isAutoFit(): boolean {
         return this.#snapshot.isAutoFit;
+    }
+
+    buildGestureContext(
+    ): FlowGestureContext {
+        return {
+            isAutoFit:
+                this.#snapshot.isAutoFit,
+            isLocked:
+                this.#snapshot.isLocked,
+        };
     }
 
     withAutoFitToggled(): FlowSnapshot {
@@ -526,7 +537,7 @@ Auto Fit</label>
 </div>
 </div>
 </div>`;
-        mutateHtml(container, shell);
+        setHtml(container, shell);
         this.renderUpdate(container);
     }
 
@@ -576,7 +587,7 @@ Auto Fit</label>
                 this.#snapshot.flowName,
                 this.#snapshot.isEditingName,
             );
-        mutateHtml(
+        setHtml(
             $required(
                 '.flow-name-header-slot',
                 container,
@@ -590,7 +601,7 @@ Auto Fit</label>
     #updateToolbar(
         container: HTMLElement,
     ): void {
-        mutateHtml(
+        setHtml(
             $required(
                 '.flow-toolbar-slot',
                 container,
@@ -602,7 +613,7 @@ Auto Fit</label>
     #updatePanel(
         container: HTMLElement,
     ): void {
-        mutateHtml(
+        setHtml(
             $required(
                 '.flow-props-slot',
                 container,
@@ -614,7 +625,7 @@ Auto Fit</label>
     #updateCanvas(
         container: HTMLElement,
     ): void {
-        mutateHtml(
+        setHtml(
             $required(
                 '.flow-canvas-host',
                 container,
@@ -796,22 +807,28 @@ Auto Fit</label>
         if (this.#guardAutoFit()) {
             return this.#snapshot;
         }
-        zoomInState(
+        const interaction = zoomInState(
             this.#snapshot.interaction,
             this.#selectedFocalPt(),
         );
-        return this.#snapshot;
+        return {
+            ...this.#snapshot,
+            interaction,
+        };
     }
 
     withZoomedOut(): FlowSnapshot {
         if (this.#guardAutoFit()) {
             return this.#snapshot;
         }
-        zoomOutState(
+        const interaction = zoomOutState(
             this.#snapshot.interaction,
             this.#selectedFocalPt(),
         );
-        return this.#snapshot;
+        return {
+            ...this.#snapshot,
+            interaction,
+        };
     }
 
     #selectedFocalPt(): {
@@ -980,7 +997,7 @@ Auto Fit</label>
             '#field-editor-slot', container,
         );
         if (slot) {
-            mutateHtml(
+            setHtml(
                 slot,
                 this.buildFieldEditor(),
             );

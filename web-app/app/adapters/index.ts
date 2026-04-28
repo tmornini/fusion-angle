@@ -7,6 +7,9 @@ export {
     durationInDays,
     formatCompactCurrency,
 } from '../../../api/types.ts';
+export {
+    MissingTableError,
+} from '../../../api/db.ts';
 export * from './shared.ts';
 export * from './dashboard.ts';
 export * from './ideas.ts';

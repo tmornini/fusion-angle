@@ -1,5 +1,5 @@
 import {
-    setSidebarCollapsed
+    collapseSidebar
         as persistSidebarCollapsed,
 } from './state.ts';
 import { $required } from './dom.ts';

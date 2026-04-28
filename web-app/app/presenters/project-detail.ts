@@ -1,5 +1,5 @@
 import {
-    html, mutateHtml, SafeHtml, trusted,
+    html, setHtml, SafeHtml, trusted,
 } from '../safe-html.ts';
 import { $required } from '../dom.ts';
 import {
@@ -103,7 +103,7 @@ export function projectPatchFromDraft(
 function buildShell(
     container: HTMLElement,
 ): void {
-    mutateHtml(container, html`
+    setHtml(container, html`
 <div class="project-detail-host">
     <div class="project-detail-wrap">
         <div class="${
@@ -161,7 +161,7 @@ function mutateSlot(
     cls: string,
     markup: SafeHtml,
 ): void {
-    mutateHtml($required(cls, container), markup);
+    setHtml($required(cls, container), markup);
 }
 
 function buildBreadcrumb(

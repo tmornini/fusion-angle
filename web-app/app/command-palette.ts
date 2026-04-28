@@ -3,7 +3,7 @@ import {
 } from './dom.ts';
 import {
     html,
-    mutateHtml,
+    setHtml,
     SafeHtml,
     trusted,
     escapeForHtml,
@@ -51,6 +51,9 @@ interface PalettePageEntry {
 }
 
 const DEBOUNCE_MS = 100;
+const PALETTE_ICON_SIZE_SM = 16;
+const PALETTE_ICON_SIZE_LG = 20;
+const PALETTE_DEFAULT_RESULT_COUNT = 12;
 
 function buildPageList(
 ): PalettePageEntry[] {
@@ -68,8 +71,12 @@ function buildPageList(
         result.push({
             title: entry.title,
             icon: iconFn
-                ? iconFn(16, '')
-                : iconSearch(16, ''),
+                ? iconFn(
+                    PALETTE_ICON_SIZE_SM, '',
+                )
+                : iconSearch(
+                    PALETTE_ICON_SIZE_SM, '',
+                ),
             href: buildPageUrl(name),
             keywords: entry.keywords,
         });
@@ -107,9 +114,11 @@ function buildHighlightedMatch(
     const escaped = escapeForHtml(text);
     const escapedQuery =
         escapeForHtml(query);
-    // Escape regex metachars so user input matches literally.
+    const safePattern = escapeRegexMetachars(
+        escapedQuery,
+    );
     const highlightPattern = new RegExp(
-        `(${escapedQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`,
+        '(' + safePattern + ')',
         'gi',
     );
     return trusted(
@@ -117,6 +126,18 @@ function buildHighlightedMatch(
             highlightPattern,
             '<mark>$1</mark>',
         ),
+    );
+}
+
+// Escape regex metacharacters so the
+// user's literal query becomes a regex
+// that matches itself, not a regex
+// that interprets the query.
+function escapeRegexMetachars(
+    s: string,
+): string {
+    return s.replace(
+        /[.*+?^${}()|[\]\\]/g, '\\$&',
     );
 }
 
@@ -134,6 +155,13 @@ const categoryLabels:
         people: 'People',
         pages: 'Pages',
     };
+
+function isCommandPaletteHotkey(
+    e: KeyboardEvent,
+): boolean {
+    return (e.metaKey || e.ctrlKey)
+        && e.key === 'k';
+}
 
 export function initCommandPalette(
 ): void {
@@ -232,7 +260,8 @@ export function initCommandPalette(
                         'projects',
                     icon:
                         iconFolderKanban(
-                            16, '',
+                            PALETTE_ICON_SIZE_SM,
+                            '',
                         ),
                     href:
                         buildPageUrl(
@@ -295,7 +324,10 @@ export function initCommandPalette(
     ): SearchItem[] {
         if (!query.trim())
             return state.allItems
-                .slice(0, 12);
+                .slice(
+                    0,
+                    PALETTE_DEFAULT_RESULT_COUNT,
+                );
         const normalizedQuery =
             query.toLowerCase();
         return state.allItems.filter(
@@ -331,7 +363,7 @@ export function initCommandPalette(
             state.filteredItems.length
             === 0
         ) {
-            mutateHtml(
+            setHtml(
                 state.list,
                 html`<div
 class="command-palette-empty"
@@ -352,13 +384,11 @@ class="command-palette-empty"
         > = {};
         state.filteredItems.forEach(
             item => {
-                const group =
-                    grouped[
-                        item.category
-                    ] ?? [];
-                grouped[item.category] =
-                    group;
-                group.push(item);
+                if (!grouped[item.category]) {
+                    grouped[item.category] = [];
+                }
+                grouped[item.category]!
+                    .push(item);
             },
         );
 
@@ -390,11 +420,10 @@ data-href="${item.href}"
 aria-posinset="${posIndex + 1}"
 aria-setsize="${
 state.filteredItems.length}"
-${posIndex === 0
-    ? trusted(
-        'aria-selected="true"',
-    )
-    : trusted('')}>
+aria-selected="${
+posIndex === state.activeIndex
+    ? 'true'
+    : 'false'}">
     <div class="${
         'command-palette-item-icon'
     }">${item.icon}</div>
@@ -422,7 +451,7 @@ ${posIndex === 0
             }
         }
 
-        mutateHtml(
+        setHtml(
             state.list,
             html`${markup}`,
         );
@@ -480,9 +509,10 @@ ${posIndex === 0
         const len =
             state.filteredItems.length;
         if (len === 0) return;
-        state.activeIndex =
-            (state.activeIndex + delta + len)
-            % len;
+        let next = state.activeIndex + delta;
+        if (next < 0) next += len;
+        if (next >= len) next -= len;
+        state.activeIndex = next;
         mutateActiveItem();
     }
 
@@ -568,11 +598,13 @@ ${posIndex === 0
             'Search',
         );
 
-        mutateHtml(state.dialog, html`
+        setHtml(state.dialog, html`
     <div class="${
         'command-palette-input-wrapper'
     }">
-        ${iconSearch(20, '')}
+        ${iconSearch(
+            PALETTE_ICON_SIZE_LG, '',
+        )}
         <input
             class="command-palette-input"
             placeholder="${
@@ -805,10 +837,7 @@ ${posIndex === 0
     document.addEventListener(
         'keydown',
         (e: KeyboardEvent) => {
-            if (
-                (e.metaKey || e.ctrlKey)
-                && e.key === 'k'
-            ) {
+            if (isCommandPaletteHotkey(e)) {
                 e.preventDefault();
                 if (state.isOpen)
                     close();
@@ -851,4 +880,10 @@ ${posIndex === 0
             },
         );
     }
+
+    // Eager-load the search index so the
+    // first Cmd+K opens instantly. Without
+    // this, the user pays a 100-300 ms
+    // adapter-fetch latency on first open.
+    void getSearchIndex();
 }

@@ -1,5 +1,5 @@
 import {
-    html, mutateHtml, SafeHtml,
+    html, setHtml, SafeHtml,
 } from '../safe-html.ts';
 import {
     iconClock,
@@ -12,6 +12,9 @@ import {
     iconClipboardCheck,
     iconArrowLeft,
 } from '../icons.ts';
+import {
+    toggleStatusFilter,
+} from './list-filter.ts';
 import {
     type Project,
     type ProjectStatus,
@@ -298,10 +301,9 @@ export function applyProjectFilterToggle(
     status: ProjectStatus,
 ): ProjectListState {
     const next: ProjectListFilter =
-        state.filter.kind === 'filtered'
-        && state.filter.status === status
-            ? { kind: 'all' }
-            : { kind: 'filtered', status };
+        toggleStatusFilter(
+            state.filter, status,
+        );
     return { ...state, filter: next };
 }
 
@@ -327,7 +329,7 @@ export class ProjectListPresenter {
     renderBadges(
         container: HTMLElement,
     ): void {
-        mutateHtml(
+        setHtml(
             container, this.#buildBadges(),
         );
     }
@@ -335,7 +337,7 @@ export class ProjectListPresenter {
     renderList(
         container: HTMLElement,
     ): void {
-        mutateHtml(container, this.#buildList());
+        setHtml(container, this.#buildList());
     }
 
     #buildBadges(): SafeHtml {

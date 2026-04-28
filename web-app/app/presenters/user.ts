@@ -1,5 +1,5 @@
 import {
-    html, mutateHtml, SafeHtml,
+    html, setHtml, SafeHtml,
 } from '../safe-html.ts';
 import { initials, formatDate } from '../core.ts';
 import {
@@ -663,7 +663,7 @@ export class ManagedUsersPresenter {
                     this.#status,
                 ),
             );
-        mutateHtml(container, html`${filtered.map(
+        setHtml(container, html`${filtered.map(
             p => p.buildUserRow(),
         )}`);
     }
@@ -743,7 +743,7 @@ export class TeamListPresenter {
             .filter(p => p.matchesSearch(
                 this.#search,
             ));
-        mutateHtml(container, html`${filtered.map(
+        setHtml(container, html`${filtered.map(
             p => p.buildMemberCard(
                 this.#selectedId,
             ),
@@ -759,7 +759,7 @@ export class TeamListPresenter {
                     === this.#selectedId,
             )
             : undefined;
-        mutateHtml(container, member
+        setHtml(container, member
             ? member.buildMemberDetail()
             : this.#buildPlaceholder());
     }

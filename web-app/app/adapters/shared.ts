@@ -39,15 +39,20 @@ export interface FetchContext {
 
 export function createFetchContext(
 ): FetchContext {
-    let userMapPromise:
-        Promise<Map<Id, User>> | null = null;
+    // Eager fetch + frozen reference:
+    // the promise is created exactly
+    // once at context construction and
+    // captured as a const. No mutable
+    // state. Callers that need the user
+    // map await the same promise; those
+    // that don't simply discard the
+    // unawaited promise (handled by V8's
+    // unhandled-rejection tracker, but
+    // safe because fetchUserMap throws
+    // only on bugs).
+    const userMapPromise = fetchUserMap();
     return {
-        getUserMap() {
-            if (userMapPromise === null) {
-                userMapPromise = fetchUserMap();
-            }
-            return userMapPromise;
-        },
+        getUserMap: () => userMapPromise,
     };
 }
 

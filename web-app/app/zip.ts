@@ -3,8 +3,19 @@ export interface ZipEntry {
     data: Uint8Array;
 }
 
+// PKZIP CRC-32 polynomial in reflected form
+// (RFC 1952 §2.3, Appendix B). The standard
+// CRC-32 generator polynomial 0x04C11DB7
+// reversed bit-for-bit gives 0xEDB88320 —
+// the form used when shifting LSB-first
+// across the input stream.
 const PKZIP_CRC32_REVERSED = 0xEDB88320;
 
+// Precomputed lookup table: for each byte
+// value 0-255, store the CRC of that byte
+// passed through 8 polynomial divisions.
+// Table-driven CRC turns the inner loop
+// into one xor + one shift per input byte.
 const CRC_TABLE = new Uint32Array(256);
 for (let i = 0; i < 256; i++) {
     let c = i;
