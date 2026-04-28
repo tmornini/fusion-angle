@@ -21,7 +21,7 @@ import {
     isTeamLead,
     Project,
     ProjectView,
-    putProjectPatch,
+    putProject,
     getFlowsByProject,
     postFlowCreation,
     subscribeProjectChanges,
@@ -417,17 +417,21 @@ async function handleSave(): Promise<void> {
         return;
     }
     const projectId = state.view.idForLink();
-    const patch = projectPatchFromDraft(
-        state.view,
-        state.draft,
+    const patch = trimStrings(
+        projectPatchFromDraft(
+            state.view,
+            state.draft,
+        ),
     );
     try {
-        await putProjectPatch(
-            projectId, trimStrings(patch),
-        );
+        const entity =
+            await getProjectRow(projectId);
+        await putProject(projectId, {
+            ...entity, ...patch,
+        });
     } catch (err) {
         log.error(
-            'putProjectPatch failed',
+            'putProject failed',
             'projects', err,
         );
         showToast(

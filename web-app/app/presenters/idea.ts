@@ -1023,7 +1023,7 @@ export class IdeaListPresenter {
                 )
                 : this.#ideas;
         const sorted =
-            [...filtered].sort(
+            filtered.toSorted(
                 (a, b) =>
                     a.positionSortKey()
                     - b.positionSortKey(),

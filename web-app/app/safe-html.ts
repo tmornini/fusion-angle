@@ -14,13 +14,20 @@ export function trusted(rawHtml: string): SafeHtml {
     return new SafeHtml(rawHtml);
 }
 
+const HTML_ESCAPES: Readonly<Record<string, string>> =
+    Object.freeze({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;',
+    });
+
 export function escapeForHtml(str: string): string {
-    let escaped = str.replace(/&/g, '&amp;');
-    escaped = escaped.replace(/</g, '&lt;');
-    escaped = escaped.replace(/>/g, '&gt;');
-    escaped = escaped.replace(/"/g, '&quot;');
-    escaped = escaped.replace(/'/g, '&#39;');
-    return escaped;
+    return str.replace(
+        /[&<>"']/g,
+        (ch) => HTML_ESCAPES[ch]!,
+    );
 }
 
 function interpolate(value: unknown): string {

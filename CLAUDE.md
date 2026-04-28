@@ -254,7 +254,7 @@ Full spec in `DESIGN-SYSTEM.md`. Key constraints:
 - **Spacing**: 8px grid system.
 - **Icons**: ~100 inline SVG functions in `web-app/app/icons.ts`. Each returns a `SafeHtml` value: `iconSparkles(size, cssClass)`. Pages import icons directly from `icons.ts`.
 - **Toasts**: `showToast(message, variant)` function with auto-dismiss.
-- **Charts**: SVG rendering functions in `web-app/app/charts.ts` (bar, line, donut, area).
+- **Charts**: Dashboard gauges are rendered by `presenters/gauge.ts`. There is no separate chart library.
 - **Dark mode**: CSS custom properties with `data-theme` attribute.
 
 ### Mobile Responsiveness
@@ -300,7 +300,6 @@ web-app/
     state.ts                  # AppState, theme, mobile detection, pub-sub
     adapters/preferences.ts   # localStorage adapter for user preferences (theme, sidebar, log-level)
     channels.ts               # createChannel<T>() pub/sub for cross-page change notifications
-    charts.ts                 # SVG chart rendering (bar, line, donut, area)
     command-palette.ts        # Cmd+K search overlay with keyboard navigation
     dom.ts                    # querySelector wrappers ($, $$, $required, $input, $select, $textarea), attr(), populateIcons(), initToggleGroup(), bindEnterToClick()
     drag-reorder.ts           # initDragReorder() pointer-driven list reordering with hysteresis indicator

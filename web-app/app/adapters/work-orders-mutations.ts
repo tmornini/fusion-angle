@@ -283,19 +283,6 @@ export async function putWorkOrder(
     workOrderChangedChannel.send();
 }
 
-export async function putWorkOrderPosition(
-    id: string,
-    position: number,
-): Promise<void> {
-    const entity =
-        await GET<WorkOrderEntity>(
-            `work-orders/${id}`,
-        );
-    await putWorkOrder(id, {
-        ...entity, position,
-    });
-}
-
 // Two tabs can both read an empty
 // claims table, both write a claim,
 // both succeed — duplicate claim rows

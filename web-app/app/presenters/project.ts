@@ -178,33 +178,37 @@ export class ProjectPresenter {
     }
 
     #buildMetrics(): SafeHtml {
-        const p = this.#project;
-        const s = new Date(
-            p.startDateValue(),
+        const project = this.#project;
+        const startDateMs = new Date(
+            project.startDateValue(),
         ).getTime();
-        const e = new Date(
-            p.targetEndDateValue(),
+        const endDateMs = new Date(
+            project.targetEndDateValue(),
         ).getTime();
-        const tb = isNaN(s) || isNaN(e)
-            ? 0
-            : Math.max(0, Math.ceil(
-                (e - s) / MS_PER_DAY,
-            ));
-        const tc = isNaN(s)
+        const timeBudget =
+            isNaN(startDateMs) || isNaN(endDateMs)
+                ? 0
+                : Math.max(0, Math.ceil(
+                    (endDateMs - startDateMs)
+                    / MS_PER_DAY,
+                ));
+        const timeElapsed = isNaN(startDateMs)
             ? 0
             : Math.max(0, Math.floor(
-                (Date.now() - s)
+                (Date.now() - startDateMs)
                 / MS_PER_DAY,
             ));
-        const cb = p.estimatedCostAmount()
+        const costBudget =
+            project.estimatedCostAmount()
             / COST_DIVISOR;
-        const cc = p.actualCostAmount()
+        const costActual =
+            project.actualCostAmount()
             / COST_DIVISOR;
-        const ib =
-            p.estimatedImpactScore();
-        const ic =
-            p.actualImpactScore();
-        const m = 'text-xs text-muted';
+        const impactBudget =
+            project.estimatedImpactScore();
+        const impactActual =
+            project.actualImpactScore();
+        const metricLabelClasses = 'text-xs text-muted';
         return html`
     <div class="${
         'hidden-mobile project-metric-grid'
@@ -218,13 +222,15 @@ export class ProjectPresenter {
                 )
             }</div>
             <div>
-                <p class="${m}">Time</p>
+                <p class="${
+                    metricLabelClasses
+                }">Time</p>
                 <p class="${
                     'text-sm font-medium'
-                }">${tb
-                    ? html`${tc}d <span
-                        class="${m}"
-                        >/ ${tb}d</span>`
+                }">${timeBudget
+                    ? html`${timeElapsed}d <span
+                        class="${metricLabelClasses}"
+                        >/ ${timeBudget}d</span>`
                     : html`&mdash;`
                 }</p>
             </div>
@@ -238,14 +244,17 @@ export class ProjectPresenter {
                 )
             }</div>
             <div>
-                <p class="${m}">Cost</p>
+                <p class="${
+                    metricLabelClasses
+                }">Cost</p>
                 <p class="${
                     'text-sm font-medium'
-                }">${cb
-                    ? html`${'$' + cc}k
-                        <span class="${m}"
-                        >/ ${'$'
-                        + cb}k</span>`
+                }">${costBudget
+                    ? html`${'$' + costActual}k
+                        <span class="${
+                            metricLabelClasses
+                        }">/ ${'$'
+                        + costBudget}k</span>`
                     : html`&mdash;`
                 }</p>
             </div>
@@ -259,13 +268,15 @@ export class ProjectPresenter {
                 )
             }</div>
             <div>
-                <p class="${m}">Impact</p>
+                <p class="${
+                    metricLabelClasses
+                }">Impact</p>
                 <p class="${
                     'text-sm font-medium'
-                }">${ib
-                    ? html`${ic} <span
-                        class="${m}"
-                        >/ ${ib}</span>`
+                }">${impactBudget
+                    ? html`${impactActual} <span
+                        class="${metricLabelClasses}"
+                        >/ ${impactBudget}</span>`
                     : html`&mdash;`
                 }</p>
             </div>

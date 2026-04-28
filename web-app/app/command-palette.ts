@@ -862,16 +862,7 @@ posIndex === state.activeIndex
         '#mobile-search-toggle', document,
     );
     if (mobileSearchToggle) {
-        const newToggle =
-            mobileSearchToggle
-                .cloneNode(true) as
-                HTMLElement;
-        mobileSearchToggle.parentNode
-            ?.replaceChild(
-                newToggle,
-                mobileSearchToggle,
-            );
-        newToggle.addEventListener(
+        mobileSearchToggle.addEventListener(
             'click',
             (e) => {
                 e.preventDefault();

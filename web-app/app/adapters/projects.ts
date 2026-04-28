@@ -218,21 +218,6 @@ export async function putProject(
     projectChangedChannel.send();
 }
 
-export async function putProjectPatch(
-    id: string,
-    patch: Partial<Omit<ProjectEntity, 'id'>>,
-): Promise<void> {
-    const entity = await getProjectRow(id);
-    await putProject(id, { ...entity, ...patch });
-}
-
-export async function putProjectPosition(
-    id: string,
-    position: number,
-): Promise<void> {
-    await putProjectPatch(id, { position });
-}
-
 export interface TeamMemberAssignment {
     projectId: string;
     userId: string;

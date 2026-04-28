@@ -1,5 +1,4 @@
 import {
-    applyResolvedTheme,
     initListeners,
 } from './state.ts';
 import {
@@ -77,7 +76,6 @@ document.addEventListener(
     'DOMContentLoaded',
     async () => {
         initListeners();
-        applyResolvedTheme();
 
         let hasSchema: boolean;
         try {

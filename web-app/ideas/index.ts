@@ -10,7 +10,8 @@ import {
 import { navigateTo } from '../app/core.ts';
 import {
     getIdeas,
-    putIdeaPosition,
+    getIdeaRow,
+    putIdea,
     subscribeIdeaChanges,
     isIdeaStatus,
     createFetchContext,
@@ -109,9 +110,11 @@ export async function init(): Promise<void> {
         '[data-idea-card]',
         'data-idea-card',
         async (id, newPosition) => {
-            await putIdeaPosition(
-                id, newPosition,
-            );
+            const entity = await getIdeaRow(id);
+            await putIdea(id, {
+                ...entity,
+                position: newPosition,
+            });
         },
     );
 }

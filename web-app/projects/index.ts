@@ -7,7 +7,8 @@ import { iconFolderKanban } from '../app/icons.ts';
 import { navigateTo } from '../app/core.ts';
 import {
     getProjects,
-    putProjectPosition,
+    getProjectRow,
+    putProject,
     isProjectStatus,
     subscribeProjectChanges,
     type ProjectStatus,
@@ -92,9 +93,12 @@ export async function init(): Promise<void> {
         '[data-project-card]',
         'data-project-card',
         async (id, newPosition) => {
-            await putProjectPosition(
-                id, newPosition,
-            );
+            const entity =
+                await getProjectRow(id);
+            await putProject(id, {
+                ...entity,
+                position: newPosition,
+            });
             const updated =
                 await getProjects();
             if (!projectState) return;

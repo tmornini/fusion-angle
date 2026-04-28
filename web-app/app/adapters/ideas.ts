@@ -2,7 +2,6 @@ import { GET, PUT } from '../../../api/api.ts';
 import type {
     IdeaEntity,
     IdeaSubmissionEntity,
-    IdeaStatus,
     ProjectEntity,
 } from '../../../api/types.ts';
 import {
@@ -152,28 +151,6 @@ export async function putIdea(
 ): Promise<void> {
     await PUT(`ideas/${id}`, entity);
     ideaChangedChannel.send();
-}
-
-async function putIdeaPatch(
-    id: string,
-    patch: Partial<Omit<IdeaEntity, 'id'>>,
-): Promise<void> {
-    const entity = await getIdeaRow(id);
-    await putIdea(id, { ...entity, ...patch });
-}
-
-export async function putIdeaPosition(
-    id: string,
-    position: number,
-): Promise<void> {
-    await putIdeaPatch(id, { position });
-}
-
-export async function putIdeaStatus(
-    id: string,
-    status: IdeaStatus,
-): Promise<void> {
-    await putIdeaPatch(id, { status });
 }
 
 export async function putIdeaSubmission(

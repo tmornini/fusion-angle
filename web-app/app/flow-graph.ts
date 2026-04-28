@@ -656,13 +656,13 @@ function buildEdge(
         endPt.x - startPt.x,
         endPt.y - startPt.y,
     );
-    const se = whichEdge(
+    const startEdge = whichEdge(
         startPt.x, startPt.y,
         fromNode.positionX,
         fromNode.positionY,
         NODE_WIDTH, NODE_HEIGHT,
     );
-    const ee = whichEdge(
+    const endEdge = whichEdge(
         endPt.x, endPt.y,
         toNode.positionX,
         toNode.positionY,
@@ -673,14 +673,18 @@ function buildEdge(
             startPt, endPt, waypoints,
         );
     } else {
-        const cp1 =
-            controlOffset(se, dist);
-        const cp2 =
-            controlOffset(ee, dist);
-        const cp1X = startPt.x + cp1.dx;
-        const cp1Y = startPt.y + cp1.dy;
-        const cp2X = endPt.x + cp2.dx;
-        const cp2Y = endPt.y + cp2.dy;
+        const startControl =
+            controlOffset(startEdge, dist);
+        const endControl =
+            controlOffset(endEdge, dist);
+        const cp1X =
+            startPt.x + startControl.dx;
+        const cp1Y =
+            startPt.y + startControl.dy;
+        const cp2X =
+            endPt.x + endControl.dx;
+        const cp2Y =
+            endPt.y + endControl.dy;
         pathD = 'M '
             + String(startPt.x) + ' '
             + String(startPt.y)
@@ -707,7 +711,7 @@ function buildEdge(
         dashAttr = '';
     }
 
-    const sw = EDGE_STROKE;
+    const strokeWidth = EDGE_STROKE;
 
     if (fromNode.isStart) {
         return trusted(
@@ -716,7 +720,7 @@ function buildEdge(
             + ` d="${pathD}"`
             + ' fill="none"'
             + ` stroke="${color}"`
-            + ` stroke-width="${sw}"`
+            + ` stroke-width="${strokeWidth}"`
             + dashAttr
             + ` marker-end="${markerUrl}"/>`
             + '</g>',
@@ -734,7 +738,7 @@ function buildEdge(
         + ` d="${pathD}"`
         + ' fill="none"'
         + ` stroke="${color}"`
-        + ` stroke-width="${sw}"`
+        + ` stroke-width="${strokeWidth}"`
         + dashAttr
         + ` marker-end="${markerUrl}"`;
     const visClose = '/>';
