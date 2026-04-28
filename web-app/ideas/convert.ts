@@ -20,7 +20,7 @@ import {
     postIdeaConversion,
     jsonObjectField,
     createFetchContext,
-    generateId,
+    generateCryptoSafeBase62,
 } from '../app/adapters/index.ts';
 import {
     IdeaConversionPresenter,
@@ -365,7 +365,7 @@ export async function init(
                 }
 
                 const projectId =
-                    generateId();
+                    generateCryptoSafeBase62();
                 try {
                     await performConversion(
                         ideaId,

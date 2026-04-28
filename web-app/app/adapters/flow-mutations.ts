@@ -24,7 +24,9 @@ import { postFlowVersion } from './flow-versions.ts';
 import {
     buildStartAndCompleteNodes,
 } from './flow-defaults.ts';
-import { generateId } from './uuid.ts';
+import {
+    generateCryptoSafeBase62,
+} from './crypto-safe-base62.ts';
 
 function parseGraph(
     raw: string,
@@ -125,7 +127,7 @@ export async function postFlowCreation(
     });
 
     await PUT<void>('project-flows', {
-        id: generateId(),
+        id: generateCryptoSafeBase62(),
         project_id: ctx.projectId,
         flow_id: ctx.flowId,
         created_at: now,

@@ -11,7 +11,7 @@ import {
     putIdea,
     putIdeaSubmission,
     jsonArrayField,
-    generateId,
+    generateCryptoSafeBase62,
 } from '../app/adapters/index.ts';
 import {
     IdeaCreatePresenter,
@@ -129,7 +129,7 @@ export async function init():
             async () => {
                 formState = readFormFromDom();
                 const ideaId =
-                    generateId();
+                    generateCryptoSafeBase62();
                 await putIdea(
                     ideaId,
                     {
@@ -171,7 +171,7 @@ export async function init():
                     },
                 );
                 await putIdeaSubmission(
-                    generateId(),
+                    generateCryptoSafeBase62(),
                     ideaId,
                     'current',
                 );

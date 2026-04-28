@@ -1,0 +1,243 @@
+import { test } from 'node:test';
+import { strict as assert } from 'node:assert';
+import {
+    createLocalStorageAdapter,
+} from '../api/db-localstorage.ts';
+import {
+    jsonObjectField,
+} from '../api/types.ts';
+
+const KEY_PREFIX = 'fusion-ai:';
+
+function installShim(): Map<string, string> {
+    const map = new Map<string, string>();
+    (globalThis as unknown as {
+        localStorage: {
+            getItem(key: string): string | null;
+            setItem(key: string, value: string): void;
+            removeItem(key: string): void;
+        };
+    }).localStorage = {
+        getItem(key) { return map.get(key) ?? null; },
+        setItem(key, value) { map.set(key, value); },
+        removeItem(key) { map.delete(key); },
+    };
+    return map;
+}
+
+const baseVersion = {
+    flow_id: 'flow-aaaaaaaaaaaaaaaaaaaa',
+    name: 'Test Flow',
+    description: 'A test',
+    is_locked: false,
+    is_auto_layout: true,
+    is_auto_fit: true,
+    lock_timeout: 60,
+    graph: jsonObjectField({
+        nodes: [
+            {
+                id: 'n1',
+                name: 'Start',
+                isStart: true,
+                isComplete: false,
+                fields: [],
+                positionX: 0,
+                positionY: 0,
+                description: '',
+            },
+        ],
+        edges: [],
+    }),
+    created_at: '2026-01-01T00:00:00.000Z',
+};
+
+test(
+    'flow_versions write produces gz1: prefix in storage',
+    async () => {
+        const map = installShim();
+        const adapter = await createLocalStorageAdapter();
+        await adapter.createSchema();
+        await adapter.flowVersions.put(
+            'fv-prefix-test', baseVersion,
+        );
+        const stored = map.get(
+            KEY_PREFIX + 'flow_versions',
+        );
+        assert.ok(stored, 'expected stored value');
+        assert.ok(
+            stored.startsWith('gz1:'),
+            'expected gz1: prefix, got '
+            + stored.slice(0, 20),
+        );
+    },
+);
+
+test(
+    'flow_versions round-trips through put → getById',
+    async () => {
+        installShim();
+        const adapter = await createLocalStorageAdapter();
+        await adapter.createSchema();
+        await adapter.flowVersions.put(
+            'fv-rt', baseVersion,
+        );
+        const got = await adapter.flowVersions.getById(
+            'fv-rt',
+        );
+        assert.equal(got.id, 'fv-rt');
+        assert.equal(got.name, 'Test Flow');
+        assert.equal(got.flow_id, baseVersion.flow_id);
+    },
+);
+
+test(
+    'legacy uncompressed flow_versions JSON reads correctly',
+    async () => {
+        const map = installShim();
+        const legacyRow = {
+            id: 'fv-legacy',
+            ...baseVersion,
+            is_locked: 0,
+            is_auto_layout: 1,
+            is_auto_fit: 1,
+        };
+        map.set(
+            KEY_PREFIX + 'flow_versions',
+            JSON.stringify([legacyRow]),
+        );
+        const adapter = await createLocalStorageAdapter();
+        const got = await adapter.flowVersions.getById(
+            'fv-legacy',
+        );
+        assert.equal(got.id, 'fv-legacy');
+        assert.equal(got.name, 'Test Flow');
+    },
+);
+
+test(
+    'work_order_transitions write produces gz1: prefix',
+    async () => {
+        const map = installShim();
+        const adapter = await createLocalStorageAdapter();
+        await adapter.createSchema();
+        await adapter.workOrderTransitions.put(
+            'wot-prefix-test',
+            {
+                work_order_id: 'wo-1',
+                from_node_id: 'n-from',
+                to_node_id: 'n-to',
+                user_id: 'u-1',
+                values: jsonObjectField({}),
+                transitioned_at:
+                    '2026-01-01T00:00:00.000Z',
+            },
+        );
+        const stored = map.get(
+            KEY_PREFIX + 'work_order_transitions',
+        );
+        assert.ok(stored, 'expected stored value');
+        assert.ok(
+            stored.startsWith('gz1:'),
+            'expected gz1: prefix, got '
+            + stored.slice(0, 20),
+        );
+    },
+);
+
+test(
+    'users table is not compressed (raw JSON in storage)',
+    async () => {
+        const map = installShim();
+        const adapter = await createLocalStorageAdapter();
+        await adapter.createSchema();
+        await adapter.users.put('u1', {
+            first_name: 'Alice',
+            last_name: 'Adams',
+            email: 'alice@example.com',
+            phone: '',
+            role: 'product_manager',
+            availability: 80,
+            is_active: true,
+            bio: '',
+            department: 'Product',
+            created_at: '2026-01-01T00:00:00Z',
+            updated_at: '2026-01-01T00:00:00Z',
+        });
+        const stored = map.get(KEY_PREFIX + 'users');
+        assert.ok(stored, 'expected stored users value');
+        assert.ok(
+            stored.startsWith('['),
+            'expected raw JSON array, got '
+            + stored.slice(0, 20),
+        );
+    },
+);
+
+test(
+    'compression actually shrinks flow_versions storage',
+    async () => {
+        const map = installShim();
+        const adapter = await createLocalStorageAdapter();
+        await adapter.createSchema();
+        for (let i = 0; i < 10; i++) {
+            await adapter.flowVersions.put(
+                `fv-${i}`, baseVersion,
+            );
+        }
+        const stored = map.get(
+            KEY_PREFIX + 'flow_versions',
+        )!;
+        // Raw JSON for 10 versions of this entity:
+        // ~5,000+ bytes. Compressed: should be < 1,500.
+        assert.ok(
+            stored.length < 2000,
+            'expected compressed length < 2000, got '
+            + String(stored.length),
+        );
+    },
+);
+
+test(
+    'snapshot export emits parsed objects, not gz1: blob',
+    async () => {
+        installShim();
+        const adapter = await createLocalStorageAdapter();
+        await adapter.createSchema();
+        await adapter.flowVersions.put(
+            'fv-export', baseVersion,
+        );
+        const json = await adapter.exportSnapshot();
+        const parsed = JSON.parse(json);
+        assert.ok(
+            Array.isArray(parsed.flow_versions),
+            'flow_versions should be an array in snapshot',
+        );
+        assert.equal(parsed.flow_versions.length, 1);
+        assert.equal(
+            parsed.flow_versions[0].id, 'fv-export',
+        );
+    },
+);
+
+test(
+    'snapshot import stores flow_versions compressed',
+    async () => {
+        const map = installShim();
+        const adapter = await createLocalStorageAdapter();
+        const snapshot = JSON.stringify({
+            flow_versions: [
+                { id: 'fv-imp', ...baseVersion },
+            ],
+        });
+        await adapter.importSnapshot(snapshot);
+        const stored = map.get(
+            KEY_PREFIX + 'flow_versions',
+        );
+        assert.ok(stored, 'expected stored value');
+        assert.ok(
+            stored.startsWith('gz1:'),
+            'expected gz1: prefix after import, got '
+            + (stored?.slice(0, 20) ?? ''),
+        );
+    },
+);

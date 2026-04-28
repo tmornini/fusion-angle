@@ -18,7 +18,9 @@ import {
 import {
     validateWorkOrderFlowGraph,
 } from './work-orders-queries.ts';
-import { generateId } from './uuid.ts';
+import {
+    generateCryptoSafeBase62,
+} from './crypto-safe-base62.ts';
 
 const FIRST_POSITION = 1;
 const POSITION_STEP = 1;
@@ -95,7 +97,7 @@ export async function postWorkOrderCreation(
     const postStartNodeId =
         postStartEdge.toNodeId;
 
-    const woId = generateId();
+    const woId = generateCryptoSafeBase62();
     const displayId =
         await generateDisplayId(woId);
     const position =
@@ -127,7 +129,7 @@ export async function postWorkOrderCreation(
     await PUT<void>(
         'flow-work-orders',
         {
-            id: generateId(),
+            id: generateCryptoSafeBase62(),
             flow_id: flowId,
             work_order_id: woId,
             created_at: now,
@@ -141,7 +143,7 @@ export async function postWorkOrderCreation(
     await PUT<void>(
         'work-order-transitions',
         {
-            id: generateId(),
+            id: generateCryptoSafeBase62(),
             work_order_id: woId,
             from_node_id: '',
             to_node_id: startNode.id,
@@ -154,7 +156,7 @@ export async function postWorkOrderCreation(
     await PUT<void>(
         'work-order-transitions',
         {
-            id: generateId(),
+            id: generateCryptoSafeBase62(),
             work_order_id: woId,
             from_node_id: startNode.id,
             to_node_id: postStartNodeId,
@@ -167,7 +169,7 @@ export async function postWorkOrderCreation(
     await PUT<void>(
         'work-order-claims',
         {
-            id: generateId(),
+            id: generateCryptoSafeBase62(),
             work_order_id: woId,
             user_id: userId,
             claimed_at: now,
@@ -213,7 +215,7 @@ export async function postWorkOrderTransition(
     await PUT<void>(
         'work-order-transitions',
         {
-            id: generateId(),
+            id: generateCryptoSafeBase62(),
             work_order_id: workOrderId,
             from_node_id: currentNodeId,
             to_node_id: edge.toNodeId,
@@ -266,7 +268,7 @@ export async function postWorkOrderClaim(
     userId: string,
 ): Promise<string> {
     const now = nowUtc();
-    const claimId = generateId();
+    const claimId = generateCryptoSafeBase62();
 
     await PUT<void>(
         'work-order-claims',

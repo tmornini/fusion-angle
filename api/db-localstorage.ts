@@ -36,6 +36,13 @@ import {
 
 const KEY_PREFIX = 'fusion-ai:';
 
+const COMPRESSED_TABLES: ReadonlySet<string> = new Set([
+    'work_order_transitions',
+    'flow_versions',
+]);
+
+const COMPRESSION_PREFIX = 'gz1:';
+
 const SIMULATE_LATENCY_PARAM =
     'simulate-latency';
 
@@ -61,9 +68,43 @@ function isRowShaped(
         ).id === 'string';
 }
 
-function readTable<T>(
+async function compressJson(
+    json: string,
+): Promise<string> {
+    const stream = new Blob([json]).stream().pipeThrough(
+        new CompressionStream('gzip'),
+    );
+    const buffer =
+        await new Response(stream).arrayBuffer();
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    for (const b of bytes) {
+        binary += String.fromCharCode(b);
+    }
+    return COMPRESSION_PREFIX + btoa(binary);
+}
+
+async function decompressJson(
+    stored: string,
+): Promise<string> {
+    if (!stored.startsWith(COMPRESSION_PREFIX)) {
+        return stored;
+    }
+    const b64 = stored.slice(COMPRESSION_PREFIX.length);
+    const binary = atob(b64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+    }
+    const stream = new Blob([bytes]).stream().pipeThrough(
+        new DecompressionStream('gzip'),
+    );
+    return new Response(stream).text();
+}
+
+async function readTable<T>(
     tableName: string,
-): T[] {
+): Promise<T[]> {
     const raw = localStorage.getItem(
         KEY_PREFIX + tableName,
     );
@@ -71,7 +112,10 @@ function readTable<T>(
         throw new MissingTableError(tableName);
     }
     try {
-        const parsed = JSON.parse(raw);
+        const json = COMPRESSED_TABLES.has(tableName)
+            ? await decompressJson(raw)
+            : raw;
+        const parsed = JSON.parse(json);
         if (!Array.isArray(parsed)) {
             throw new Error(
                 'Table "' + tableName
@@ -107,14 +151,18 @@ function readTable<T>(
     }
 }
 
-function writeTable<T>(
+async function writeTable<T>(
     tableName: string,
     rows: T[],
-): void {
+): Promise<void> {
+    const json = JSON.stringify(rows);
+    const payload = COMPRESSED_TABLES.has(tableName)
+        ? await compressJson(json)
+        : json;
     try {
         localStorage.setItem(
             KEY_PREFIX + tableName,
-            JSON.stringify(rows),
+            payload,
         );
     } catch (e) {
         if (
@@ -179,13 +227,13 @@ function createDeletedStore(): DeletedStore {
         async isDeleted(
             id: string,
         ): Promise<boolean> {
-            const rows = readTable<Deleted>(
+            const rows = await readTable<Deleted>(
                 TABLE,
             );
             return rows.some(r => r.id === id);
         },
         async record(id: string): Promise<void> {
-            const rows = readTable<Deleted>(
+            const rows = await readTable<Deleted>(
                 TABLE,
             );
             if (
@@ -198,11 +246,11 @@ function createDeletedStore(): DeletedStore {
                     deleted_at: nowUtc(),
                 },
             ];
-            writeTable(TABLE, next);
+            await writeTable(TABLE, next);
         },
         async allDeletedIds(
         ): Promise<Set<string>> {
-            const rows = readTable<Deleted>(
+            const rows = await readTable<Deleted>(
                 TABLE,
             );
             return new Set(
@@ -220,7 +268,7 @@ function createEntityStore<
 ): EntityStore<T> {
     return {
         async getAll(): Promise<T[]> {
-            const rows = readTable<T>(tableName);
+            const rows = await readTable<T>(tableName);
             const deletedIds =
                 await deletedStore.allDeletedIds();
             return rows.filter(
@@ -237,7 +285,7 @@ function createEntityStore<
                     tableName, id,
                 );
             }
-            const rows = readTable<T>(tableName);
+            const rows = await readTable<T>(tableName);
             const row = rows.find(
                 entity => entity.id === id,
             );
@@ -252,7 +300,7 @@ function createEntityStore<
             id: string,
             fields: Omit<T, 'id'>,
         ): Promise<T> {
-            const rows = readTable<T>(tableName);
+            const rows = await readTable<T>(tableName);
             const index = rows.findIndex(
                 entity => entity.id === id,
             );
@@ -267,7 +315,7 @@ function createEntityStore<
             const next = index >= 0
                 ? rows.with(index, written)
                 : [...rows, written];
-            writeTable(tableName, next);
+            await writeTable(tableName, next);
             return written;
         },
         async delete(id: string): Promise<void> {
@@ -284,12 +332,12 @@ function createHistoryEntityStore<
 >(tableName: string): EntityStore<T> {
     return {
         async getAll(): Promise<T[]> {
-            return readTable<T>(tableName);
+            return await readTable<T>(tableName);
         },
         async getById(
             id: string,
         ): Promise<T> {
-            const rows = readTable<T>(tableName);
+            const rows = await readTable<T>(tableName);
             const row = rows.find(
                 entity => entity.id === id,
             );
@@ -304,7 +352,7 @@ function createHistoryEntityStore<
             id: string,
             fields: Omit<T, 'id'>,
         ): Promise<T> {
-            const rows = readTable<T>(tableName);
+            const rows = await readTable<T>(tableName);
             const index = rows.findIndex(
                 entity => entity.id === id,
             );
@@ -319,16 +367,16 @@ function createHistoryEntityStore<
             const next = index >= 0
                 ? rows.with(index, written)
                 : [...rows, written];
-            writeTable(tableName, next);
+            await writeTable(tableName, next);
             return written;
         },
         async delete(id: string): Promise<void> {
-            const rows = readTable<T>(tableName);
+            const rows = await readTable<T>(tableName);
             const idx = rows.findIndex(
                 e => e.id === id,
             );
             if (idx >= 0) {
-                writeTable(
+                await writeTable(
                     tableName,
                     rows.toSpliced(idx, 1),
                 );
@@ -342,7 +390,7 @@ function createSingletonStore<
 >(tableName: string): SingletonStore<T> {
     return {
         async get(): Promise<T> {
-            const rows = readTable<T>(tableName);
+            const rows = await readTable<T>(tableName);
             const row = rows.find(
                 entity => entity.id === '1',
             );
@@ -356,7 +404,7 @@ function createSingletonStore<
         async put(
             fields: Omit<T, 'id'>,
         ): Promise<T> {
-            const rows = readTable<T>(tableName);
+            const rows = await readTable<T>(tableName);
             const serialized = serializeRecord(
                 fields as Record<string, unknown>,
                 tableName,
@@ -377,7 +425,7 @@ function createSingletonStore<
                 } as T);
             }
 
-            writeTable(tableName, rows);
+            await writeTable(tableName, rows);
             const pos = index >= 0
                 ? index
                 : rows.length - 1;
@@ -454,7 +502,7 @@ export async function createLocalStorageAdapter(
                         KEY_PREFIX + table,
                     ) === null
                 ) {
-                    writeTable(table, []);
+                    await writeTable(table, []);
                 }
             }
         },
@@ -468,7 +516,7 @@ export async function createLocalStorageAdapter(
             for (
                 const table of TABLE_NAMES
             ) {
-                snapshot[table] = readTable(
+                snapshot[table] = await readTable(
                     table,
                 );
             }
@@ -567,9 +615,13 @@ export async function createLocalStorageAdapter(
                     const [table, json]
                         of serialized
                 ) {
+                    const payload =
+                        COMPRESSED_TABLES.has(table)
+                            ? await compressJson(json)
+                            : json;
                     localStorage.setItem(
                         KEY_PREFIX + table,
-                        json,
+                        payload,
                     );
                 }
             } catch (err) {

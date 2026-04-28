@@ -25,7 +25,7 @@ import {
     getFlowGraph,
     getFlowVersions,
     putFlowFromVersion,
-    generateId,
+    generateCryptoSafeBase62,
     nowUtc,
     jsonObjectField,
 } from './adapters/index.ts';
@@ -163,7 +163,7 @@ export async function performAddEdge(
             );
         }
     }
-    const edgeId = generateId();
+    const edgeId = generateCryptoSafeBase62();
     const name = 'Transition';
     try {
         await postEdgeConnection({
@@ -238,8 +238,8 @@ export async function performAddNodeAtPosition(
             );
         }
     }
-    const nodeId = generateId();
-    const edgeId = generateId();
+    const nodeId = generateCryptoSafeBase62();
+    const edgeId = generateCryptoSafeBase62();
     const posX = x - NODE_WIDTH / 2;
     const posY = y - NODE_HEIGHT / 2;
     try {
@@ -424,7 +424,7 @@ export async function performAddField(
         return { kind: 'noop' };
     }
     const sortOrder = node.fields.length;
-    const fieldId = generateId();
+    const fieldId = generateCryptoSafeBase62();
     try {
         await postFieldAddition({
             fieldId,
@@ -556,7 +556,7 @@ export async function performUndo(
         const stagedHistory = appendToRedoStack(
             history,
             {
-                id: generateId(),
+                id: generateCryptoSafeBase62(),
                 flowId: snap.flowId,
                 name: snap.flowName,
                 description: snap.flowDescription,

@@ -10,7 +10,9 @@ import {
     nowUtc,
     toBool,
 } from '../../../api/types.ts';
-import { generateId } from './uuid.ts';
+import {
+    generateCryptoSafeBase62,
+} from './crypto-safe-base62.ts';
 
 export interface FlowVersion {
     id: string;
@@ -64,7 +66,7 @@ export async function postFlowVersion(
         'flows/' + flowId,
     );
     await PUT<void>('flow-versions', {
-        id: generateId(),
+        id: generateCryptoSafeBase62(),
         flow_id: flowId,
         name: flow.name,
         description: flow.description,

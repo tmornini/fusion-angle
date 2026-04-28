@@ -27,7 +27,7 @@ export * from './work-orders-queries.ts';
 export * from './work-orders-mutations.ts';
 export * from './work-orders-deletions.ts';
 export * from './flow-defaults.ts';
-export * from './uuid.ts';
+export * from './crypto-safe-base62.ts';
 export * from './clipboard.ts';
 export * from './viewport.ts';
 export * from './location.ts';

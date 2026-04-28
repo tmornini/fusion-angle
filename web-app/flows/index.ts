@@ -27,7 +27,7 @@ import {
     computeFlowBackupResolution,
     putFlowFromBackup,
     postFlowFromBackup,
-    generateId,
+    generateCryptoSafeBase62,
 } from '../app/adapters/index.ts';
 import type {
     BackupV2,
@@ -335,7 +335,7 @@ async function handleFileSelect(
         flowId: string;
         warnings: string[];
     };
-    const uuid = generateId();
+    const uuid = generateCryptoSafeBase62();
     if (ext === 'zip') {
         const bytes = new Uint8Array(
             await file.arrayBuffer(),
@@ -558,7 +558,7 @@ async function handleCreateNew(
     let flowId: string;
     try {
         flowId = await postFlowFromBackup(
-            generateId(),
+            generateCryptoSafeBase62(),
             stRe.backup, projectId,
         );
     } catch (err) {
@@ -596,7 +596,7 @@ async function handleCreate(
     let flowId: string;
     try {
         flowId = await postFlowFromBackup(
-            generateId(),
+            generateCryptoSafeBase62(),
             stNw.backup, projectId,
         );
     } catch (err) {

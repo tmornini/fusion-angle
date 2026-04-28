@@ -23,7 +23,7 @@ import {
     jsonArrayField,
     jsonObjectField,
     nowUtc,
-    generateId,
+    generateCryptoSafeBase62,
 } from '../app/adapters/index.ts';
 import {
     ManagedUsersPresenter,
@@ -631,7 +631,7 @@ async function handleInvite(): Promise<void> {
     const bio = $textarea(
         '#invite-bio', document,
     )!.value;
-    const id = generateId();
+    const id = generateCryptoSafeBase62();
     try {
         await putUser(
             id,

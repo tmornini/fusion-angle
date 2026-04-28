@@ -7,7 +7,9 @@ import type {
     ActivityType,
 } from '../../../api/types.ts';
 import { getCurrentUserRow } from './shared.ts';
-import { generateId } from './uuid.ts';
+import {
+    generateCryptoSafeBase62,
+} from './crypto-safe-base62.ts';
 
 export {
     isActivityType,
@@ -30,8 +32,8 @@ export async function postActivity(
     input: ActivityInput,
 ): Promise<void> {
     const userRow = await getCurrentUserRow();
-    const activityId = generateId();
-    const actorId = generateId();
+    const activityId = generateCryptoSafeBase62();
+    const actorId = generateCryptoSafeBase62();
     const timestamp = nowUtc();
     await PUT(
         `activities/${activityId}`,

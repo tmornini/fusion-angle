@@ -17,7 +17,7 @@ import type {
     FlowSaveShape,
 } from '../adapters/flows.ts';
 import {
-    generateId,
+    generateCryptoSafeBase62,
 } from '../adapters/index.ts';
 import {
     buildGraphSvg,

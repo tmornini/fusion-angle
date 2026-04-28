@@ -25,7 +25,7 @@ import {
     getFlowsByProject,
     postFlowCreation,
     subscribeToProjectChanges,
-    generateId,
+    generateCryptoSafeBase62,
     createFetchContext,
     type FetchContext,
 } from '../app/adapters/index.ts';
@@ -450,7 +450,7 @@ async function handleNewFlowSubmit(
         );
         return;
     }
-    const flowId = generateId();
+    const flowId = generateCryptoSafeBase62();
     try {
         await postFlowCreation({
             flowId,
