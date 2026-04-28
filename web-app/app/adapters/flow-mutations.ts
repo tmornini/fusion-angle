@@ -1,39 +1,38 @@
-import {
-    GET, PUT,
-} from '../../../api/api.ts';
+import { PUT } from '../../../api/api.ts';
 import type {
     FlowEntity,
     GraphNode,
     GraphEdge,
-    GraphField,
     StoredGraph,
-    FlowFieldType,
 } from '../../../api/types.ts';
 import {
     nowUtc,
     jsonObjectField,
     DEFAULT_LOCK_TIMEOUT,
-    DEFAULT_NODE_DESCRIPTION,
-    DEFAULT_EDGE_DESCRIPTION,
-    DEFAULT_NODE_FIELDS,
 } from '../../../api/types.ts';
-import {
-    validateStoredGraphJson,
-} from '../../../api/validators.ts';
-import { postFlowVersion } from './flow-versions.ts';
 import {
     buildStartAndCompleteNodes,
 } from './flow-defaults.ts';
 import {
-    generateCryptoSafeBase62,
-} from './crypto-safe-base62.ts';
+    createChannel,
+    bridgeStorageToChannel,
+} from '../channels.ts';
 
-function parseGraph(
-    raw: string,
-): StoredGraph {
-    return validateStoredGraphJson(
-        raw, 'flow.graph',
-    );
+const flowChangedChannel =
+    createChannel<void>();
+bridgeStorageToChannel(
+    ['flows', 'flow-versions', 'project-flows'],
+    flowChangedChannel,
+);
+
+export function subscribeFlowChanges(
+    fn: () => void,
+): () => void {
+    return flowChangedChannel.subscribe(fn);
+}
+
+export function notifyFlowChange(): void {
+    flowChangedChannel.send();
 }
 
 function putFlowGraph(
@@ -46,64 +45,16 @@ function putFlowGraph(
     );
 }
 
-async function putGraphMutation(
-    flowId: string,
-    transform: (
-        g: StoredGraph,
-    ) => StoredGraph,
-): Promise<void> {
-    await postFlowVersion(flowId);
-    const entity =
-        await GET<FlowEntity>(
-            `flows/${flowId}`,
-        );
-    const graph = parseGraph(
-        entity.graph,
-    );
-    const updated = transform(graph);
-    await PUT(`flows/${flowId}`, {
-        ...entity,
-        graph: putFlowGraph(updated),
-        updated_at: nowUtc(),
-    });
-}
-
-export interface FlowCreationContext {
+export interface FlowCreationInput {
     flowId: string;
+    linkId: string;
     projectId: string;
     name: string;
     description: string;
 }
 
-export interface NodeAdditionContext {
-    nodeId: string;
-    flowId: string;
-    name: string;
-    positionX: number;
-    positionY: number;
-}
-
-export interface EdgeConnectionContext {
-    edgeId: string;
-    flowId: string;
-    name: string;
-    fromNodeId: string;
-    toNodeId: string;
-}
-
-export interface FieldAdditionContext {
-    fieldId: string;
-    flowId: string;
-    nodeId: string;
-    name: string;
-    fieldType: string;
-    sortOrder: number;
-    isRequired: boolean;
-    options: string[];
-}
-
 export async function postFlowCreation(
-    ctx: FlowCreationContext,
+    ctx: FlowCreationInput,
 ): Promise<void> {
     const now = nowUtc();
     const { start, complete } =
@@ -127,86 +78,13 @@ export async function postFlowCreation(
     });
 
     await PUT<void>('project-flows', {
-        id: generateCryptoSafeBase62(),
+        id: ctx.linkId,
         project_id: ctx.projectId,
         flow_id: ctx.flowId,
         created_at: now,
     });
-}
 
-export async function postNodeAddition(
-    ctx: NodeAdditionContext,
-): Promise<void> {
-    const node: GraphNode = {
-        id: ctx.nodeId,
-        name: ctx.name,
-        description:
-            DEFAULT_NODE_DESCRIPTION,
-        positionX: ctx.positionX,
-        positionY: ctx.positionY,
-        isStart: false,
-        isComplete: false,
-        fields: [...DEFAULT_NODE_FIELDS],
-    };
-    await putGraphMutation(
-        ctx.flowId,
-        g => ({
-            ...g,
-            nodes: [...g.nodes, node],
-        }),
-    );
-}
-
-export async function postEdgeConnection(
-    ctx: EdgeConnectionContext,
-): Promise<void> {
-    const edge: GraphEdge = {
-        id: ctx.edgeId,
-        name: ctx.name,
-        description:
-            DEFAULT_EDGE_DESCRIPTION,
-        fromNodeId: ctx.fromNodeId,
-        toNodeId: ctx.toNodeId,
-    };
-    await putGraphMutation(
-        ctx.flowId,
-        g => ({
-            ...g,
-            edges: [...g.edges, edge],
-        }),
-    );
-}
-
-export async function postFieldAddition(
-    ctx: FieldAdditionContext,
-): Promise<void> {
-    const ft =
-        ctx.fieldType as FlowFieldType;
-    const field: GraphField = {
-        id: ctx.fieldId,
-        name: ctx.name,
-        fieldType: ft,
-        sortOrder: ctx.sortOrder,
-        isRequired: ctx.isRequired,
-        options: ctx.options,
-    };
-    await putGraphMutation(
-        ctx.flowId,
-        g => ({
-            ...g,
-            nodes: g.nodes.map(
-                n => n.id === ctx.nodeId
-                    ? {
-                        ...n,
-                        fields: [
-                            ...n.fields,
-                            field,
-                        ],
-                    }
-                    : n,
-            ),
-        }),
-    );
+    flowChangedChannel.send();
 }
 
 export interface FlowSaveShape {
@@ -242,4 +120,5 @@ export async function putFlow(
         updated_at: nowUtc(),
     };
     await PUT(`flows/${id}`, entity);
+    flowChangedChannel.send();
 }

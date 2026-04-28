@@ -19,8 +19,28 @@ import {
     validateWorkOrderFlowGraph,
 } from './work-orders-queries.ts';
 import {
-    generateCryptoSafeBase62,
-} from './crypto-safe-base62.ts';
+    createChannel,
+    bridgeStorageToChannel,
+} from '../channels.ts';
+
+const workOrderChangedChannel =
+    createChannel<void>();
+bridgeStorageToChannel(
+    [
+        'work-orders',
+        'work-order-transitions',
+        'work-order-claims',
+        'flow-work-orders',
+    ],
+    workOrderChangedChannel,
+);
+
+export function subscribeWorkOrderChanges(
+    fn: () => void,
+): () => void {
+    return workOrderChangedChannel
+        .subscribe(fn);
+}
 
 const FIRST_POSITION = 1;
 const POSITION_STEP = 1;
@@ -57,12 +77,21 @@ async function nextWorkOrderPosition(
     return maxPosition + POSITION_STEP;
 }
 
+export interface WorkOrderCreationInput {
+    workOrderId: string;
+    flowLinkId: string;
+    initTransitionId: string;
+    postStartTransitionId: string;
+    claimId: string;
+    flowId: string;
+    userId: string;
+}
+
 export async function postWorkOrderCreation(
-    flowId: string,
-    userId: string,
-): Promise<string> {
+    ctx: WorkOrderCreationInput,
+): Promise<void> {
     const flow = await GET<FlowEntity>(
-        `flows/${flowId}`,
+        `flows/${ctx.flowId}`,
     );
     const graph: StoredGraph =
         validateStoredGraphJson(
@@ -97,9 +126,8 @@ export async function postWorkOrderCreation(
     const postStartNodeId =
         postStartEdge.toNodeId;
 
-    const woId = generateCryptoSafeBase62();
     const displayId =
-        await generateDisplayId(woId);
+        await generateDisplayId(ctx.workOrderId);
     const position =
         await nextWorkOrderPosition();
     const now = nowUtc();
@@ -115,7 +143,7 @@ export async function postWorkOrderCreation(
         };
 
     await PUT<void>('work-orders', {
-        id: woId,
+        id: ctx.workOrderId,
         display_id: displayId,
         flow_graph: jsonObjectField(
             flowGraph as unknown as Record<
@@ -129,9 +157,9 @@ export async function postWorkOrderCreation(
     await PUT<void>(
         'flow-work-orders',
         {
-            id: generateCryptoSafeBase62(),
-            flow_id: flowId,
-            work_order_id: woId,
+            id: ctx.flowLinkId,
+            flow_id: ctx.flowId,
+            work_order_id: ctx.workOrderId,
             created_at: now,
         },
     );
@@ -143,11 +171,11 @@ export async function postWorkOrderCreation(
     await PUT<void>(
         'work-order-transitions',
         {
-            id: generateCryptoSafeBase62(),
-            work_order_id: woId,
+            id: ctx.initTransitionId,
+            work_order_id: ctx.workOrderId,
             from_node_id: '',
             to_node_id: startNode.id,
-            user_id: userId,
+            user_id: ctx.userId,
             values: emptyValues,
             transitioned_at: now,
         },
@@ -156,11 +184,11 @@ export async function postWorkOrderCreation(
     await PUT<void>(
         'work-order-transitions',
         {
-            id: generateCryptoSafeBase62(),
-            work_order_id: woId,
+            id: ctx.postStartTransitionId,
+            work_order_id: ctx.workOrderId,
             from_node_id: startNode.id,
             to_node_id: postStartNodeId,
-            user_id: userId,
+            user_id: ctx.userId,
             values: emptyValues,
             transitioned_at: now,
         },
@@ -169,17 +197,18 @@ export async function postWorkOrderCreation(
     await PUT<void>(
         'work-order-claims',
         {
-            id: generateCryptoSafeBase62(),
-            work_order_id: woId,
-            user_id: userId,
+            id: ctx.claimId,
+            work_order_id: ctx.workOrderId,
+            user_id: ctx.userId,
             claimed_at: now,
         },
     );
 
-    return woId;
+    workOrderChangedChannel.send();
 }
 
-export interface TransitionContext {
+export interface WorkOrderTransitionInput {
+    transitionId: string;
     workOrderId: string;
     edgeId: string;
     values: Record<string, string>;
@@ -188,11 +217,11 @@ export interface TransitionContext {
 }
 
 export async function postWorkOrderTransition(
-    ctx: TransitionContext,
+    ctx: WorkOrderTransitionInput,
 ): Promise<void> {
     const {
-        workOrderId, edgeId, values,
-        userId, currentNodeId,
+        transitionId, workOrderId, edgeId,
+        values, userId, currentNodeId,
     } = ctx;
     const wo = await GET<WorkOrderEntity>(
         `work-orders/${workOrderId}`,
@@ -215,7 +244,7 @@ export async function postWorkOrderTransition(
     await PUT<void>(
         'work-order-transitions',
         {
-            id: generateCryptoSafeBase62(),
+            id: transitionId,
             work_order_id: workOrderId,
             from_node_id: currentNodeId,
             to_node_id: edge.toNodeId,
@@ -242,6 +271,8 @@ export async function postWorkOrderTransition(
             `work-order-claims/${claim.id}`,
         );
     }
+
+    workOrderChangedChannel.send();
 }
 
 export async function putWorkOrder(
@@ -249,6 +280,20 @@ export async function putWorkOrder(
     entity: Omit<WorkOrderEntity, 'id'>,
 ): Promise<void> {
     await PUT(`work-orders/${id}`, entity);
+    workOrderChangedChannel.send();
+}
+
+export async function putWorkOrderPosition(
+    id: string,
+    position: number,
+): Promise<void> {
+    const entity =
+        await GET<WorkOrderEntity>(
+            `work-orders/${id}`,
+        );
+    await putWorkOrder(id, {
+        ...entity, position,
+    });
 }
 
 // Two tabs can both read an empty
@@ -264,11 +309,11 @@ export async function putWorkOrder(
 // disables the claim button while a
 // request is pending.
 export async function postWorkOrderClaim(
+    claimId: string,
     workOrderId: string,
     userId: string,
-): Promise<string> {
+): Promise<void> {
     const now = nowUtc();
-    const claimId = generateCryptoSafeBase62();
 
     await PUT<void>(
         'work-order-claims',
@@ -280,5 +325,5 @@ export async function postWorkOrderClaim(
         },
     );
 
-    return claimId;
+    workOrderChangedChannel.send();
 }

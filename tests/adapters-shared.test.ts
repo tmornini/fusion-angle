@@ -129,3 +129,68 @@ test('getCompanyRow returns CompanyEntity', async () => {
     assert.equal(row.name, 'Acme Corp');
     assert.equal(row.domain, 'acme.example');
 });
+
+test(
+    'FetchContext memoizes currentUser'
+    + ' across calls',
+    async () => {
+        const db = setupMemDb();
+        await db.users.put('current', {
+            ...buildUserRow(
+                'current', 'Alice', 'Adams',
+            ),
+        });
+        const ctx = createFetchContext();
+        const u1 = await ctx.getCurrentUser();
+        await db.users.put('current', {
+            ...buildUserRow(
+                'current', 'Renamed', 'Adams',
+            ),
+        });
+        const u2 = await ctx.getCurrentUser();
+        // Same Promise → first snapshot stays
+        assert.equal(u1, u2);
+        assert.equal(u1.first_name, 'Alice');
+    },
+);
+
+test(
+    'FetchContext requestId is stable'
+    + ' and unique',
+    () => {
+        const a = createFetchContext();
+        const b = createFetchContext();
+        assert.equal(
+            a.requestId, a.requestId,
+        );
+        assert.notEqual(
+            a.requestId, b.requestId,
+        );
+        assert.ok(a.requestId.length > 0);
+    },
+);
+
+test(
+    'FetchContext memoizes idea, project,'
+    + ' and flow row fetches',
+    async () => {
+        const db = setupMemDb();
+        await db.users.put('u1', buildUserRow(
+            'u1', 'Alice', 'Adams',
+        ));
+        const ctx = createFetchContext();
+        const ideas1 = await ctx.getIdeaRows();
+        const ideas2 = await ctx.getIdeaRows();
+        assert.equal(ideas1, ideas2);
+
+        const projects1 =
+            await ctx.getProjectRows();
+        const projects2 =
+            await ctx.getProjectRows();
+        assert.equal(projects1, projects2);
+
+        const flows1 = await ctx.getFlowRows();
+        const flows2 = await ctx.getFlowRows();
+        assert.equal(flows1, flows2);
+    },
+);

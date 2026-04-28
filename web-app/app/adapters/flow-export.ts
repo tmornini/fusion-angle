@@ -22,6 +22,9 @@ import {
     generateCryptoSafeBase62,
 } from './crypto-safe-base62.ts';
 import {
+    notifyFlowChange,
+} from './flow-mutations.ts';
+import {
     validateStoredGraphJson,
     parseOrThrow,
     asObject,
@@ -530,6 +533,7 @@ export async function putFlowFromBackup(
             updated_at: nowUtc(),
         },
     );
+    notifyFlowChange();
     return backup.flow.id;
 }
 
@@ -623,6 +627,7 @@ export async function postFlowFromBackup(
         },
     );
 
+    notifyFlowChange();
     return flowId;
 }
 
@@ -947,6 +952,7 @@ export async function postFlowFromMermaid(
         created_at: now,
     });
 
+    notifyFlowChange();
     return {
         flowId,
         warnings: parsed.warnings,
@@ -1374,6 +1380,7 @@ export async function postFlowFromZip(
         created_at: now,
     });
 
+    notifyFlowChange();
     return {
         flowId,
         warnings: parsed.warnings,

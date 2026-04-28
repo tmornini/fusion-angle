@@ -23,12 +23,13 @@ import {
     getAllWorkOrderTransitionRows,
     getAllWorkOrderClaimRows,
     getUserMap,
-    getWorkOrder,
     getFlowsForCreation,
     postWorkOrderCreation,
-    putWorkOrder,
+    putWorkOrderPosition,
     getCurrentUserRow,
     createFetchContext,
+    generateCryptoSafeBase62,
+    subscribeWorkOrderChanges,
     type FetchContext,
 } from '../app/adapters/index.ts';
 import {
@@ -68,7 +69,34 @@ export async function init(
         await initArchiveList(archiveEl, ctx);
     }
 
+    subscribeWorkOrderChanges(() => {
+        if (activeEl) {
+            void rerenderInbox(
+                activeEl, 'active',
+            );
+        }
+        if (archiveEl) {
+            void rerenderInbox(
+                archiveEl, 'archived',
+            );
+        }
+    });
+
     await initCreateDropdown();
+}
+
+async function rerenderInbox(
+    listEl: HTMLElement,
+    mode: InboxMode,
+): Promise<void> {
+    const items = await loadInboxItems(mode);
+    const presenter = new WorkboxInboxPresenter(
+        items, mode === 'active',
+    );
+    presenter.renderList(listEl);
+    if (mode === 'active') {
+        activePresenter = presenter;
+    }
 }
 
 function renderTabs(): void {
@@ -142,12 +170,9 @@ async function initActiveList(
         'data-work-order-card',
         async (id, newPosition) => {
             try {
-                const entity =
-                    await getWorkOrder(id);
-                await putWorkOrder(id, {
-                    ...entity,
-                    position: newPosition,
-                });
+                await putWorkOrderPosition(
+                    id, newPosition,
+                );
             } catch (err) {
                 log.error(
                     'reorder failed',
@@ -239,17 +264,32 @@ async function createWorkOrderForFlow(
         );
         return;
     }
+    const workOrderId =
+        generateCryptoSafeBase62();
+    const flowLinkId =
+        generateCryptoSafeBase62();
+    const initTransitionId =
+        generateCryptoSafeBase62();
+    const postStartTransitionId =
+        generateCryptoSafeBase62();
+    const claimId =
+        generateCryptoSafeBase62();
     try {
-        const woId =
-            await postWorkOrderCreation(
-                flowId,
-                userId,
-            );
+        await postWorkOrderCreation({
+            workOrderId,
+            flowLinkId,
+            initTransitionId,
+            postStartTransitionId,
+            claimId,
+            flowId,
+            userId,
+        });
         showToast(
             'Work order created', 'success',
         );
         navigateTo(
-            'workbox-detail', { id: woId },
+            'workbox-detail',
+            { id: workOrderId },
         );
     } catch (err) {
         log.error(

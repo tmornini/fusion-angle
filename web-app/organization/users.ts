@@ -24,6 +24,7 @@ import {
     jsonObjectField,
     nowUtc,
     generateCryptoSafeBase62,
+    subscribeUserChanges,
 } from '../app/adapters/index.ts';
 import {
     ManagedUsersPresenter,
@@ -82,6 +83,16 @@ export async function init(): Promise<void> {
             { signal },
         );
     }
+
+    subscribeUserChanges(async () => {
+        if (!usersState || !userListEl) return;
+        const fresh = await getManagedUsers();
+        usersState =
+            buildInitialManagedUsersState(
+                fresh,
+            );
+        rerenderUsers();
+    });
 
     initUserListFilters();
     bindInviteDialog();

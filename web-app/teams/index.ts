@@ -12,7 +12,10 @@ import {
 import {
     initTabs, initDialog, closeDialog,
 } from '../app/core.ts';
-import { getTeamMembers } from '../app/adapters/index.ts';
+import {
+    getTeamMembers,
+    subscribeUserChanges,
+} from '../app/adapters/index.ts';
 import {
     TeamListPresenter,
     buildInitialTeamListState,
@@ -85,6 +88,15 @@ export async function init(): Promise<void> {
 
     rerenderTeam();
     bindStableListeners(listEl);
+
+    subscribeUserChanges(async () => {
+        if (!teamState || !listEl) return;
+        const fresh = await getTeamMembers();
+        teamState = buildInitialTeamListState(
+            fresh,
+        );
+        rerenderTeam();
+    });
 }
 
 function rerenderTeam(): void {

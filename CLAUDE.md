@@ -298,21 +298,21 @@ web-app/
     dialog.ts                 # openDialog(), closeDialog(), initTabs() dialog/tab helpers
     icons.ts                  # ~100 SVG icon functions and lookup map
     state.ts                  # AppState, theme, mobile detection, pub-sub
-    preferences-store.ts      # localStorage adapter for user preferences (theme, sidebar, log-level)
+    adapters/preferences.ts   # localStorage adapter for user preferences (theme, sidebar, log-level)
     channels.ts               # createChannel<T>() pub/sub for cross-page change notifications
     charts.ts                 # SVG chart rendering (bar, line, donut, area)
     command-palette.ts        # Cmd+K search overlay with keyboard navigation
     dom.ts                    # querySelector wrappers ($, $$, $required, $input, $select, $textarea), attr(), populateIcons(), initToggleGroup(), bindEnterToClick()
     drag-reorder.ts           # initDragReorder() pointer-driven list reordering with hysteresis indicator
     flow-graph.ts             # SVG renderer for flow canvas (nodes, ports, bezier edges, label boxes)
-    flow-history.ts           # FlowHistory class: tracks undo/redo stack for the flow designer page
+    flow-history.ts           # pure helpers (recordUndoHistoryMark, appendToRedoStack, removeFromRedoStack) for the flow designer page
     flow-interactions.ts      # Pointer/keyboard state machines: selection, drag, connect, pan, marquee
     flow-layout.ts            # Sugiyama-style layered graph layout (computeLayout, NODE_WIDTH, reachability)
     mermaid-generate.ts       # generateMermaid(graph): serialize FlowGraph to Mermaid flowchart text
     mermaid-parse.ts          # parseMermaid(text): parse Mermaid flowchart/stateDiagram into ParsedFlowchart
     zip.ts                    # In-browser ZIP build/read (DEFLATE + CRC-32) for flow export/import
     toast.ts                  # showToast() auto-dismiss notifications
-    logger.ts                 # Lightweight logger using preferences-store for log-level
+    logger.ts                 # Lightweight logger using adapters/preferences for log-level
     safe-html.ts              # SafeHtml class, html tagged template, trusted(), setHtml()
     loading-states.ts         # Loading skeletons, error states, empty states, withLoadingState()
     adapters/                 # adapter functions across 16 modules (API → frontend shapes)
@@ -324,8 +324,7 @@ web-app/
       teams.ts                # getTeamMembers, getManagedUsers
       flows.ts                # Barrel re-export from flow-* modules
       flow-queries.ts         # getFlows, getFlowsByProject, getFlowGraph + graph types
-      flow-mutations.ts       # postFlowCreation, postNodeAddition, postEdgeConnection, postFieldAddition, putFlow, putGraph, putGraphSilent, putNode, putWfEdge, putField
-      flow-deletions.ts       # deleteNode, deleteEdge, deleteField
+      flow-mutations.ts       # postFlowCreation, putFlow (caller declares full state; node/edge/field changes flow through putFlow + applyAdd*/applyDelete* helpers)
       flow-versions.ts        # postFlowVersion, getFlowVersions, getLatestFlowVersion, deleteFlowVersion, putFlowFromVersion (persistent undo history)
       flow-export.ts          # getFlowMermaid, getFlowZip, postFlowFromMermaid, postFlowFromZip
       workbox-queries.ts      # getWorkboxItems, getWorkboxActive, getWorkboxArchive, getWorkboxItem, getFlowsForCreation

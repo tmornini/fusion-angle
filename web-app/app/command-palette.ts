@@ -202,7 +202,7 @@ export function initCommandPalette(
         const [ideas, projects, members] =
             await Promise.all([
                 getIdeas(ctx),
-                getProjects(),
+                getProjects(ctx),
                 getTeamMembers(ctx),
             ]);
 

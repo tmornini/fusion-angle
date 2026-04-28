@@ -13,9 +13,44 @@ import {
 } from
 '../web-app/app/adapters/work-orders-mutations.ts';
 import {
+    generateCryptoSafeBase62,
+} from
+'../web-app/app/adapters/crypto-safe-base62.ts';
+import {
     jsonObjectField,
     DEFAULT_LOCK_TIMEOUT,
 } from '../api/types.ts';
+
+interface CreateIds {
+    workOrderId: string;
+    flowLinkId: string;
+    initTransitionId: string;
+    postStartTransitionId: string;
+    claimId: string;
+}
+
+function mintCreateIds(): CreateIds {
+    return {
+        workOrderId: generateCryptoSafeBase62(),
+        flowLinkId: generateCryptoSafeBase62(),
+        initTransitionId:
+            generateCryptoSafeBase62(),
+        postStartTransitionId:
+            generateCryptoSafeBase62(),
+        claimId: generateCryptoSafeBase62(),
+    };
+}
+
+async function createWorkOrder(
+    flowId: string,
+    userId: string,
+): Promise<string> {
+    const ids = mintCreateIds();
+    await postWorkOrderCreation({
+        ...ids, flowId, userId,
+    });
+    return ids.workOrderId;
+}
 import type {
     UserEntity,
     FlowEntity,
@@ -157,7 +192,7 @@ test(
         );
 
         const woId =
-            await postWorkOrderCreation(
+            await createWorkOrder(
                 'f1', 'u1',
             );
 
@@ -243,7 +278,7 @@ test(
         );
         await assert.rejects(
             () =>
-                postWorkOrderCreation(
+                createWorkOrder(
                     'f1', 'u1',
                 ),
             /no start node/,
@@ -279,7 +314,7 @@ test(
         );
         await assert.rejects(
             () =>
-                postWorkOrderCreation(
+                createWorkOrder(
                     'f1', 'u1',
                 ),
             /exactly one outgoing edge/,
@@ -299,10 +334,10 @@ test(
             'f1',
             buildFlow(buildLinearGraph()),
         );
-        await postWorkOrderCreation(
+        await createWorkOrder(
             'f1', 'u1',
         );
-        await postWorkOrderCreation(
+        await createWorkOrder(
             'f1', 'u1',
         );
         const wos = await db.workOrders
@@ -331,7 +366,7 @@ test(
             buildFlow(buildLinearGraph()),
         );
         const woId =
-            await postWorkOrderCreation(
+            await createWorkOrder(
                 'f1', 'u1',
             );
 
@@ -347,6 +382,8 @@ test(
         );
 
         await postWorkOrderTransition({
+            transitionId:
+                generateCryptoSafeBase62(),
             workOrderId: woId,
             edgeId: 'e2',
             values: {},
@@ -390,7 +427,7 @@ test(
             buildFlow(buildLinearGraph()),
         );
         const woId =
-            await postWorkOrderCreation(
+            await createWorkOrder(
                 'f1', 'u1',
             );
         // Manually clear any claim to
@@ -405,6 +442,8 @@ test(
         }
 
         await postWorkOrderTransition({
+            transitionId:
+                generateCryptoSafeBase62(),
             workOrderId: woId,
             edgeId: 'e2',
             values: {},
@@ -434,12 +473,14 @@ test(
             buildFlow(buildLinearGraph()),
         );
         const woId =
-            await postWorkOrderCreation(
+            await createWorkOrder(
                 'f1', 'u1',
             );
         await assert.rejects(
             () =>
                 postWorkOrderTransition({
+                    transitionId:
+                        generateCryptoSafeBase62(),
                     workOrderId: woId,
                     edgeId: 'no-such-edge',
                     values: {},
@@ -465,9 +506,10 @@ test(
         assert.equal(before.length, 0);
 
         const claimId =
-            await postWorkOrderClaim(
-                'w1', 'u1',
-            );
+            generateCryptoSafeBase62();
+        await postWorkOrderClaim(
+            claimId, 'w1', 'u1',
+        );
 
         const after =
             await db.workOrderClaims
@@ -499,9 +541,11 @@ test(
     async () => {
         const db = setupDb();
         await postWorkOrderClaim(
+            generateCryptoSafeBase62(),
             'w1', 'u1',
         );
         await postWorkOrderClaim(
+            generateCryptoSafeBase62(),
             'w1', 'u1',
         );
         const claims =

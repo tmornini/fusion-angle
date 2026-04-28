@@ -36,6 +36,30 @@ import {
 
 const KEY_PREFIX = 'fusion-ai:';
 
+const IMPORTING_SENTINEL_KEY =
+    KEY_PREFIX + '_importing';
+
+export class SnapshotRollbackFailed
+    extends Error {
+    readonly originalError: unknown;
+    readonly rollbackError: unknown;
+    constructor(
+        originalError: unknown,
+        rollbackError: unknown,
+    ) {
+        super(
+            'Snapshot import failed AND'
+            + ' rollback failed; database is'
+            + ' in indeterminate state.'
+            + ' Wipe and reload from'
+            + ' snapshots.',
+        );
+        this.originalError = originalError;
+        this.rollbackError = rollbackError;
+        this.name = 'SnapshotRollbackFailed';
+    }
+}
+
 const COMPRESSED_TABLES: ReadonlySet<string> = new Set([
     'work_order_transitions',
     'flow_versions',
@@ -603,6 +627,17 @@ export async function createLocalStorageAdapter(
                     ),
                 );
             }
+            // Sentinel marks the database as
+            // in indeterminate state for the
+            // duration of the write loop. If
+            // we crash or both the write AND
+            // the rollback fail, the next
+            // bootstrap surfaces the
+            // snapshots page so the user
+            // can recover.
+            localStorage.setItem(
+                IMPORTING_SENTINEL_KEY, '1',
+            );
             for (
                 const table of TABLE_NAMES
             ) {
@@ -625,25 +660,43 @@ export async function createLocalStorageAdapter(
                     );
                 }
             } catch (err) {
-                for (
-                    const [table, prev]
-                        of backup
-                ) {
-                    if (prev !== null) {
-                        localStorage.setItem(
-                            KEY_PREFIX + table,
-                            prev,
-                        );
-                    } else {
-                        localStorage
-                            .removeItem(
-                                KEY_PREFIX
-                                + table,
-                            );
+                try {
+                    for (
+                        const [table, prev]
+                            of backup
+                    ) {
+                        if (prev !== null) {
+                            localStorage
+                                .setItem(
+                                    KEY_PREFIX
+                                    + table,
+                                    prev,
+                                );
+                        } else {
+                            localStorage
+                                .removeItem(
+                                    KEY_PREFIX
+                                    + table,
+                                );
+                        }
                     }
+                } catch (rollbackErr) {
+                    // Sentinel stays set —
+                    // database is wedged.
+                    throw new
+                        SnapshotRollbackFailed(
+                            err,
+                            rollbackErr,
+                        );
                 }
+                localStorage.removeItem(
+                    IMPORTING_SENTINEL_KEY,
+                );
                 throw err;
             }
+            localStorage.removeItem(
+                IMPORTING_SENTINEL_KEY,
+            );
         },
 
         users:

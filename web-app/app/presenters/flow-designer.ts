@@ -182,7 +182,10 @@ export class FlowDesignerPresenter {
         snap: FlowSnapshot,
     ): Promise<void> {
         if (versioned) {
-            await postFlowVersion(snap.flowId);
+            await postFlowVersion(
+                generateCryptoSafeBase62(),
+                snap.flowId,
+            );
         }
         await putFlow(
             snap.flowId,

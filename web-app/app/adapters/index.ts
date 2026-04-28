@@ -20,7 +20,6 @@ export * from './activities.ts';
 export * from './snapshots.ts';
 export * from './flow-queries.ts';
 export * from './flow-mutations.ts';
-export * from './flow-deletions.ts';
 export * from './flow-versions.ts';
 export * from './flow-export.ts';
 export * from './work-orders-queries.ts';

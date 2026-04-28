@@ -17,12 +17,17 @@ import {
 import type { FetchContext } from './shared.ts';
 import {
     createChannel,
+    bridgeStorageToChannel,
 } from '../channels.ts';
 
 const projectChangedChannel =
     createChannel<void>();
+bridgeStorageToChannel(
+    ['projects', 'project-team-members'],
+    projectChangedChannel,
+);
 
-export function subscribeToProjectChanges(
+export function subscribeProjectChanges(
     fn: () => void,
 ): () => void {
     return projectChangedChannel.subscribe(fn);
@@ -37,7 +42,7 @@ export {
     COST_DIVISOR,
 } from '../../../api/types.ts';
 
-export interface TeamMemberRow {
+export interface TeamMemberEntity {
     id: string;
     user_id: string;
     role: string;
@@ -51,9 +56,11 @@ export function isTeamLead(
 }
 
 export async function getProjects(
+    ctx?: FetchContext,
 ): Promise<Project[]> {
-    const rows =
-        await GET<ProjectEntity[]>(
+    const rows = ctx
+        ? await ctx.getProjectRows()
+        : await GET<ProjectEntity[]>(
             'projects',
         );
     return rows
@@ -189,8 +196,8 @@ export class ProjectView {
 
 export async function getProjectTeamRows(
     projectId: string,
-): Promise<TeamMemberRow[]> {
-    return GET<TeamMemberRow[]>(
+): Promise<TeamMemberEntity[]> {
+    return GET<TeamMemberEntity[]>(
         `projects/${projectId}/team`,
     );
 }
@@ -217,6 +224,13 @@ export async function putProjectPatch(
 ): Promise<void> {
     const entity = await getProjectRow(id);
     await putProject(id, { ...entity, ...patch });
+}
+
+export async function putProjectPosition(
+    id: string,
+    position: number,
+): Promise<void> {
+    await putProjectPatch(id, { position });
 }
 
 export interface TeamMemberAssignment {

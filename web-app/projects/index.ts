@@ -7,9 +7,9 @@ import { iconFolderKanban } from '../app/icons.ts';
 import { navigateTo } from '../app/core.ts';
 import {
     getProjects,
-    getProjectRow,
-    putProject,
+    putProjectPosition,
     isProjectStatus,
+    subscribeProjectChanges,
     type ProjectStatus,
 } from '../app/adapters/index.ts';
 import {
@@ -76,17 +76,25 @@ export async function init(): Promise<void> {
         { signal },
     );
 
+    subscribeProjectChanges(async () => {
+        if (!projectState || !projectListEl) {
+            return;
+        }
+        const updated = await getProjects();
+        projectState = applyProjectListUpdate(
+            projectState, updated,
+        );
+        rerenderProjects();
+    });
+
     initDragReorder(
         listEl,
         '[data-project-card]',
         'data-project-card',
         async (id, newPosition) => {
-            const entity =
-                await getProjectRow(id);
-            await putProject(id, {
-                ...entity,
-                position: newPosition,
-            });
+            await putProjectPosition(
+                id, newPosition,
+            );
             const updated =
                 await getProjects();
             if (!projectState) return;

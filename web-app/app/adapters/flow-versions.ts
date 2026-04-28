@@ -11,8 +11,8 @@ import {
     toBool,
 } from '../../../api/types.ts';
 import {
-    generateCryptoSafeBase62,
-} from './crypto-safe-base62.ts';
+    notifyFlowChange,
+} from './flow-mutations.ts';
 
 export interface FlowVersion {
     id: string;
@@ -60,13 +60,14 @@ function compareRows(
 }
 
 export async function postFlowVersion(
+    versionId: string,
     flowId: string,
 ): Promise<void> {
     const flow = await GET<FlowEntity>(
         'flows/' + flowId,
     );
     await PUT<void>('flow-versions', {
-        id: generateCryptoSafeBase62(),
+        id: versionId,
         flow_id: flowId,
         name: flow.name,
         description: flow.description,
@@ -89,6 +90,7 @@ export async function postFlowVersion(
             'flow-versions/' + mine[i]!.id,
         );
     }
+    notifyFlowChange();
 }
 
 export async function getFlowVersions(
@@ -107,6 +109,7 @@ export async function deleteFlowVersion(
     versionId: string,
 ): Promise<void> {
     await DELETE('flow-versions/' + versionId);
+    notifyFlowChange();
 }
 
 export async function putFlowFromVersion(
@@ -126,4 +129,5 @@ export async function putFlowFromVersion(
         created_at: current.created_at,
         updated_at: nowUtc(),
     });
+    notifyFlowChange();
 }

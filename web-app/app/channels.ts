@@ -26,3 +26,31 @@ export function createChannel<T>(
         },
     };
 }
+
+const STORAGE_KEY_PREFIX = 'fusion-ai:';
+const TOMBSTONE_KEY =
+    STORAGE_KEY_PREFIX + 'deleted';
+
+export function bridgeStorageToChannel(
+    tableNames: readonly string[],
+    channel: Channel<void>,
+): void {
+    if (typeof window === 'undefined') return;
+    const watchedKeys = new Set(
+        tableNames.map(
+            t => STORAGE_KEY_PREFIX + t,
+        ),
+    );
+    window.addEventListener(
+        'storage',
+        (e) => {
+            if (e.key === null) return;
+            if (
+                watchedKeys.has(e.key)
+                || e.key === TOMBSTONE_KEY
+            ) {
+                channel.send();
+            }
+        },
+    );
+}

@@ -13,6 +13,7 @@ import { toBool } from '../../../api/types.ts';
 import {
     validateStoredGraphJson,
 } from '../../../api/validators.ts';
+import type { FetchContext } from './shared.ts';
 
 export type {
     GraphNode, GraphEdge, GraphField,
@@ -57,9 +58,11 @@ export interface FlowListItem {
 }
 
 export async function getFlows(
+    ctx?: FetchContext,
 ): Promise<FlowSummary[]> {
-    const flows =
-        await GET<FlowEntity[]>('flows');
+    const flows = ctx
+        ? await ctx.getFlowRows()
+        : await GET<FlowEntity[]>('flows');
     return flows.map(f => {
         const g = parseGraph(f.graph);
         return {
@@ -77,6 +80,55 @@ export async function getProjectFlowRows(
     return GET<ProjectFlowEntity[]>(
         'project-flows',
     );
+}
+
+export interface FlowWithProjectName {
+    readonly summary: FlowSummary;
+    readonly projectName: string | undefined;
+}
+
+export async function
+getFlowsWithProjectNames(
+): Promise<FlowWithProjectName[]> {
+    const [
+        flows, projectFlows, allProjects,
+    ] = await Promise.all([
+        GET<FlowEntity[]>('flows'),
+        getProjectFlowRows(),
+        GET<ProjectEntity[]>('projects'),
+    ]);
+    const projectNameById = new Map(
+        allProjects.map(
+            p => [p.id, p.title],
+        ),
+    );
+    const projectNameByFlow = new Map<
+        string, string
+    >();
+    for (const pf of projectFlows) {
+        const name = projectNameById.get(
+            pf.project_id,
+        );
+        if (name !== undefined) {
+            projectNameByFlow.set(
+                pf.flow_id, name,
+            );
+        }
+    }
+    return flows.map(f => {
+        const g = parseGraph(f.graph);
+        return {
+            summary: {
+                id: f.id,
+                name: f.name,
+                description: f.description,
+                nodeCount: g.nodes.length,
+                edgeCount: g.edges.length,
+            },
+            projectName:
+                projectNameByFlow.get(f.id),
+        };
+    });
 }
 
 export type {

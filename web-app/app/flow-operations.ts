@@ -7,20 +7,12 @@ import type {
     FlowFieldType,
 } from './adapters/flows.ts';
 import {
-    DEFAULT_NODE_DESCRIPTION,
-    DEFAULT_EDGE_DESCRIPTION,
-    DEFAULT_NODE_FIELDS,
     DEFAULT_NEW_STATE_NAME,
     DEFAULT_TRANSITION_NAME,
 } from '../../api/types.ts';
 import {
-    postEdgeConnection,
-    postNodeAddition,
-    postFieldAddition,
     postFlowVersion,
     putFlow,
-    deleteEdge,
-    deleteField,
     deleteFlowVersion,
     getFlowGraph,
     getFlowVersions,
@@ -29,12 +21,20 @@ import {
     nowUtc,
     jsonObjectField,
 } from './adapters/index.ts';
+import type {
+    FlowSaveShape,
+} from './adapters/flow-mutations.ts';
 import {
     NODE_WIDTH,
     NODE_HEIGHT,
 } from './flow-layout.ts';
 import {
+    applyAddNode,
+    applyAddEdge,
+    applyAddField,
     applyDeleteNodes,
+    applyDeleteEdge,
+    applyDeleteField,
 } from './flow-designer-actions.ts';
 import {
     recordUndoHistoryMark,
@@ -72,6 +72,24 @@ function singleSelectedNodeId(
     if (sel.kind !== 'nodes') return null;
     if (sel.nodeIds.size !== 1) return null;
     return sel.nodeIds.values().next().value!;
+}
+
+function snapToSave(
+    snap: FlowSnapshot,
+    nodes: GraphNode[],
+    edges: GraphEdge[],
+): FlowSaveShape {
+    return {
+        name: snap.flowName,
+        description: snap.flowDescription,
+        isLocked: snap.isLocked,
+        isAutoLayout: snap.isAutoLayout,
+        isAutoFit: snap.isAutoFit,
+        lockTimeout: snap.lockTimeout,
+        nodes,
+        edges,
+        createdAt: snap.createdAt,
+    };
 }
 
 export type ToastVariant =
@@ -164,15 +182,22 @@ export async function performAddEdge(
         }
     }
     const edgeId = generateCryptoSafeBase62();
-    const name = 'Transition';
+    const newEdges = applyAddEdge(
+        snap.edges,
+        edgeId,
+        DEFAULT_TRANSITION_NAME,
+        fromId,
+        toId,
+    );
     try {
-        await postEdgeConnection({
-            edgeId,
-            flowId: snap.flowId,
-            name,
-            fromNodeId: fromId,
-            toNodeId: toId,
-        });
+        await postFlowVersion(
+            generateCryptoSafeBase62(),
+            snap.flowId,
+        );
+        await putFlow(
+            snap.flowId,
+            snapToSave(snap, snap.nodes, newEdges),
+        );
     } catch (err) {
         log.error(
             'performAddEdge failed',
@@ -184,13 +209,7 @@ export async function performAddEdge(
     }
     return {
         kind: 'ok',
-        edge: {
-            id: edgeId,
-            name,
-            description: '',
-            fromNodeId: fromId,
-            toNodeId: toId,
-        },
+        edge: newEdges[newEdges.length - 1]!,
         advanceHistory: true,
     };
 }
@@ -242,61 +261,40 @@ export async function performAddNodeAtPosition(
     const edgeId = generateCryptoSafeBase62();
     const posX = x - NODE_WIDTH / 2;
     const posY = y - NODE_HEIGHT / 2;
+    const newNodes = applyAddNode(
+        snap.nodes,
+        nodeId,
+        DEFAULT_NEW_STATE_NAME,
+        posX,
+        posY,
+    );
+    const newEdges = applyAddEdge(
+        snap.edges,
+        edgeId,
+        DEFAULT_TRANSITION_NAME,
+        fromNodeId,
+        nodeId,
+    );
     try {
-        await postNodeAddition({
-            nodeId,
-            flowId: snap.flowId,
-            name: 'New State',
-            positionX: posX,
-            positionY: posY,
-        });
+        await postFlowVersion(
+            generateCryptoSafeBase62(),
+            snap.flowId,
+        );
+        await putFlow(
+            snap.flowId,
+            snapToSave(snap, newNodes, newEdges),
+        );
     } catch (err) {
         log.error(
-            'performAddNodeAtPosition'
-            + ' postNodeAddition failed',
+            'performAddNodeAtPosition failed',
             'flow-operations', err,
         );
         return failOp('Failed to add state');
     }
-    try {
-        await postEdgeConnection({
-            edgeId,
-            flowId: snap.flowId,
-            name: 'Transition',
-            fromNodeId,
-            toNodeId: nodeId,
-        });
-    } catch (err) {
-        log.error(
-            'performAddNodeAtPosition'
-            + ' postEdgeConnection failed',
-            'flow-operations', err,
-        );
-        return failOp(
-            'Failed to connect transition',
-        );
-    }
     return {
         kind: 'ok',
-        node: {
-            id: nodeId,
-            name: DEFAULT_NEW_STATE_NAME,
-            description:
-                DEFAULT_NODE_DESCRIPTION,
-            isStart: false,
-            isComplete: false,
-            positionX: posX,
-            positionY: posY,
-            fields: [...DEFAULT_NODE_FIELDS],
-        },
-        edge: {
-            id: edgeId,
-            name: DEFAULT_TRANSITION_NAME,
-            description:
-                DEFAULT_EDGE_DESCRIPTION,
-            fromNodeId,
-            toNodeId: nodeId,
-        },
+        node: newNodes[newNodes.length - 1]!,
+        edge: newEdges[newEdges.length - 1]!,
         selectId: nodeId,
         advanceHistory: true,
     };
@@ -335,18 +333,16 @@ export async function performDeleteSelectedNodes(
         new Set(deletableIds),
     );
     try {
-        await postFlowVersion(snap.flowId);
-        await putFlow(snap.flowId, {
-            name: snap.flowName,
-            description: snap.flowDescription,
-            isLocked: snap.isLocked,
-            isAutoLayout: snap.isAutoLayout,
-            isAutoFit: snap.isAutoFit,
-            lockTimeout: snap.lockTimeout,
-            nodes: result.nodes,
-            edges: result.edges,
-            createdAt: snap.createdAt,
-        });
+        await postFlowVersion(
+            generateCryptoSafeBase62(),
+            snap.flowId,
+        );
+        await putFlow(
+            snap.flowId,
+            snapToSave(
+                snap, result.nodes, result.edges,
+            ),
+        );
     } catch (err) {
         log.error(
             'performDeleteSelectedNodes failed',
@@ -378,8 +374,18 @@ export async function performDeleteSelectedEdge(
         return { kind: 'noop' };
     }
     const edgeId = sel.edgeId;
+    const newEdges = applyDeleteEdge(
+        snap.edges, edgeId,
+    );
     try {
-        await deleteEdge(edgeId, snap.flowId);
+        await postFlowVersion(
+            generateCryptoSafeBase62(),
+            snap.flowId,
+        );
+        await putFlow(
+            snap.flowId,
+            snapToSave(snap, snap.nodes, newEdges),
+        );
     } catch (err) {
         log.error(
             'performDeleteSelectedEdge failed',
@@ -425,17 +431,26 @@ export async function performAddField(
     }
     const sortOrder = node.fields.length;
     const fieldId = generateCryptoSafeBase62();
+    const field: GraphField = {
+        id: fieldId,
+        name: trimmed,
+        fieldType: fieldType as FlowFieldType,
+        sortOrder,
+        isRequired,
+        options,
+    };
+    const newNodes = applyAddField(
+        snap.nodes, nodeId, field,
+    );
     try {
-        await postFieldAddition({
-            fieldId,
-            flowId: snap.flowId,
-            nodeId,
-            name: trimmed,
-            fieldType,
-            sortOrder,
-            isRequired,
-            options,
-        });
+        await postFlowVersion(
+            generateCryptoSafeBase62(),
+            snap.flowId,
+        );
+        await putFlow(
+            snap.flowId,
+            snapToSave(snap, newNodes, snap.edges),
+        );
     } catch (err) {
         log.error(
             'performAddField failed',
@@ -446,14 +461,7 @@ export async function performAddField(
     return {
         kind: 'ok',
         nodeId,
-        field: {
-            id: fieldId,
-            name: trimmed,
-            fieldType: fieldType as FlowFieldType,
-            sortOrder,
-            isRequired,
-            options,
-        },
+        field,
         advanceHistory: true,
     };
 }
@@ -475,9 +483,17 @@ export async function performDeleteField(
     if (!nodeId) {
         return { kind: 'noop' };
     }
+    const newNodes = applyDeleteField(
+        snap.nodes, nodeId, fieldId,
+    );
     try {
-        await deleteField(
-            fieldId, nodeId, snap.flowId,
+        await postFlowVersion(
+            generateCryptoSafeBase62(),
+            snap.flowId,
+        );
+        await putFlow(
+            snap.flowId,
+            snapToSave(snap, newNodes, snap.edges),
         );
     } catch (err) {
         log.error(
@@ -612,7 +628,10 @@ export async function performRedo(
         };
     }
     try {
-        await postFlowVersion(snap.flowId);
+        await postFlowVersion(
+            generateCryptoSafeBase62(),
+            snap.flowId,
+        );
         await putFlowFromVersion(popped.version);
         const graph = await getFlowGraph(
             snap.flowId,

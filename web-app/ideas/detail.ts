@@ -24,7 +24,7 @@ import {
     getIdeaRow,
     postActivity,
     putIdea,
-    subscribeToIdeaChanges,
+    subscribeIdeaChanges,
     createFetchContext,
     type IdeaWithSubmitter,
 } from '../app/adapters/index.ts';
@@ -193,7 +193,7 @@ export async function init(
     buildPresenter().renderShell(container);
     bindStableListeners(container);
 
-    subscribeToIdeaChanges(async () => {
+    subscribeIdeaChanges(async () => {
         if (!pageContainer || !state) return;
         const fresh = await getIdea(
             ideaId, createFetchContext(),

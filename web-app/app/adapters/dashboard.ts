@@ -13,6 +13,7 @@ import {
 import {
     formatCompactCurrency,
 } from '../format.ts';
+import type { FetchContext } from './shared.ts';
 
 export type GaugeIcon =
     | 'clock'
@@ -52,9 +53,11 @@ function sumBy<T>(
 }
 
 export async function getDashboardGauges(
+    ctx?: FetchContext,
 ): Promise<GaugeData[]> {
-    const allProjects =
-        await GET<ProjectEntity[]>(
+    const allProjects = ctx
+        ? await ctx.getProjectRows()
+        : await GET<ProjectEntity[]>(
             'projects',
         );
     const projects = allProjects.filter(
@@ -181,16 +184,23 @@ export async function getDashboardGauges(
 }
 
 export async function getDashboardStats(
+    ctx?: FetchContext,
 ): Promise<
     { label: string; value: number }[]
 > {
     const [ideas, projects, flows] =
         await Promise.all([
-            GET<IdeaEntity[]>('ideas'),
-            GET<ProjectEntity[]>('projects'),
-            GET<FlowEntity[]>(
-                'flows',
-            ),
+            ctx
+                ? ctx.getIdeaRows()
+                : GET<IdeaEntity[]>('ideas'),
+            ctx
+                ? ctx.getProjectRows()
+                : GET<ProjectEntity[]>(
+                    'projects',
+                ),
+            ctx
+                ? ctx.getFlowRows()
+                : GET<FlowEntity[]>('flows'),
         ]);
 
     return [

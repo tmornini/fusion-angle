@@ -9,6 +9,7 @@ import {
 } from '../app/loading-states.ts';
 import {
     getDashboardGauges,
+    createFetchContext,
 } from '../app/adapters/index.ts';
 import {
     GaugePresenter,
@@ -20,11 +21,12 @@ export async function init(
         $('#gauge-container', document);
     if (!container) return;
 
+    const ctx = createFetchContext();
     const gauges =
         await withLoadingState(
             container,
             buildSkeleton('card-grid', 3),
-            () => getDashboardGauges(),
+            () => getDashboardGauges(ctx),
             () => init(),
         );
     if (!gauges) return;

@@ -2,6 +2,7 @@ import { GET, PUT } from '../../../api/api.ts';
 import type {
     IdeaEntity,
     IdeaSubmissionEntity,
+    IdeaStatus,
     ProjectEntity,
 } from '../../../api/types.ts';
 import {
@@ -19,12 +20,17 @@ import {
 } from './projects.ts';
 import {
     createChannel,
+    bridgeStorageToChannel,
 } from '../channels.ts';
 
 const ideaChangedChannel =
     createChannel<void>();
+bridgeStorageToChannel(
+    ['ideas', 'idea-submissions'],
+    ideaChangedChannel,
+);
 
-export function subscribeToIdeaChanges(
+export function subscribeIdeaChanges(
     fn: () => void,
 ): () => void {
     return ideaChangedChannel.subscribe(fn);
@@ -39,9 +45,11 @@ export {
 } from '../../../api/types.ts';
 
 async function getIdeaRows(
+    ctx?: FetchContext,
 ): Promise<IdeaEntity[]> {
-    const all =
-        await GET<IdeaEntity[]>('ideas');
+    const all = ctx
+        ? await ctx.getIdeaRows()
+        : await GET<IdeaEntity[]>('ideas');
     return all.filter(ideaIsVisible);
 }
 
@@ -90,7 +98,7 @@ export async function getIdeas(
     const [
         ideas, userMap, submissions,
     ] = await Promise.all([
-        getIdeaRows(),
+        getIdeaRows(ctx),
         getUserMap(ctx),
         getIdeaSubmissionRows(),
     ]);
@@ -144,6 +152,28 @@ export async function putIdea(
 ): Promise<void> {
     await PUT(`ideas/${id}`, entity);
     ideaChangedChannel.send();
+}
+
+async function putIdeaPatch(
+    id: string,
+    patch: Partial<Omit<IdeaEntity, 'id'>>,
+): Promise<void> {
+    const entity = await getIdeaRow(id);
+    await putIdea(id, { ...entity, ...patch });
+}
+
+export async function putIdeaPosition(
+    id: string,
+    position: number,
+): Promise<void> {
+    await putIdeaPatch(id, { position });
+}
+
+export async function putIdeaStatus(
+    id: string,
+    status: IdeaStatus,
+): Promise<void> {
+    await putIdeaPatch(id, { status });
 }
 
 export async function putIdeaSubmission(
