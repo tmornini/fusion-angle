@@ -14,7 +14,8 @@ import { trimStrings } from '../app/core.ts';
 import {
     getProfile,
     putProfile,
-    type Profile,
+    Profile,
+    type ProfileDraft,
 } from '../app/adapters/index.ts';
 
 const pageAbort = new AbortController();
@@ -28,7 +29,7 @@ type PageState =
     | {
         kind: 'editing';
         profile: Profile;
-        draft: Profile;
+        draft: ProfileDraft;
     };
 
 let state: PageState | null = null;
@@ -153,12 +154,7 @@ function onClick(
         state = {
             kind: 'editing',
             profile: state.profile,
-            draft: {
-                ...state.profile,
-                strengths: [
-                    ...state.profile.strengths,
-                ],
-            },
+            draft: state.profile.toDraft(),
         };
         rerender();
         return;
@@ -192,7 +188,8 @@ function onClick(
             'data-strength',
         );
         if (name) {
-            const cur = state.draft.strengths;
+            const cur =
+                state.draft.strengths;
             const i = cur.indexOf(name);
             const next = i >= 0
                 ? cur.filter(
@@ -266,9 +263,9 @@ async function handleSave(): Promise<void> {
     if (!state || state.kind !== 'editing') {
         return;
     }
-    const updated = trimStrings(state.draft);
+    const trimmed = trimStrings(state.draft);
     try {
-        await putProfile(updated);
+        await putProfile(trimmed);
     } catch (err) {
         log.error(
             'putProfile failed',
@@ -284,7 +281,7 @@ async function handleSave(): Promise<void> {
     showToast('Profile saved', 'success');
     state = {
         kind: 'reading',
-        profile: updated,
+        profile: new Profile(trimmed),
     };
     rerender();
 }

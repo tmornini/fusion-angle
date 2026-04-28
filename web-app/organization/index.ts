@@ -8,7 +8,7 @@ import {
     navigateTo,
 } from '../app/core.ts';
 import {
-    getOrganizationRow,
+    getOrganization,
     getCompany,
     getActivityRows,
     getActivityActorRows,
@@ -36,10 +36,10 @@ export async function init(): Promise<void> {
     let presenter: OrganizationPresenter;
     try {
         const [
-            entity, company,
+            org, company,
             activities, actors, userMap,
         ] = await Promise.all([
-            getOrganizationRow(),
+            getOrganization(),
             getCompany(),
             getActivityRows(),
             getActivityActorRows(),
@@ -79,13 +79,13 @@ export async function init(): Promise<void> {
                 });
         presenter =
             new OrganizationPresenter(
-                entity,
-                company.name,
+                org,
+                company.nameText(),
                 recent,
             );
     } catch (err) {
         log.error(
-            'getOrganizationRow failed',
+            'getOrganization failed',
             'organization',
             err,
         );

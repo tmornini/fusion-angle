@@ -20,6 +20,10 @@ import {
     type Id,
 } from '../adapters/index.ts';
 import type { User } from '../adapters/index.ts';
+import {
+    iconArrowLeft,
+    iconClock,
+} from '../icons.ts';
 
 const FIELD_HTML_TYPE: Record<
     string,
@@ -199,34 +203,16 @@ export class WorkboxDetailPresenter {
         return this.#workOrder.id;
     }
 
-    displayIdText(): string {
-        return this.#workOrder.display_id;
-    }
-
     flowNameText(): string {
         return this.#flowGraph.name;
     }
 
-    outgoingEdgeList():
-        readonly GraphEdge[] {
-        return this.#outgoingEdges;
-    }
-
-    historyEntries():
-        readonly HistoryEntry[] {
-        return this.#history;
-    }
-
-    hasHistory(): boolean {
-        return this.#history.length > 0;
+    displayIdText(): string {
+        return this.#workOrder.display_id;
     }
 
     isComplete(): boolean {
         return this.#currentNode.isComplete;
-    }
-
-    currentNodeName(): string {
-        return this.#currentNode.name;
     }
 
     currentNodeId(): string {
@@ -240,6 +226,216 @@ export class WorkboxDetailPresenter {
 
     claimStatus(): ClaimStatus {
         return this.#claim;
+    }
+
+    buildPage(): SafeHtml {
+        const complete = this.isComplete();
+
+        const fields = complete
+            ? html``
+            : this.#buildFieldsCard();
+
+        const transitions = complete
+            ? html``
+            : this.#buildTransitionButtons();
+
+        const unclaimBtn = complete
+            ? html``
+            : html`<button
+                id="unclaim-btn"
+                class="btn btn-outline">
+                Release Work Order
+            </button>`;
+
+        return html`<div
+            class="content-wrap">
+            <div id="work-order-header"
+                class="flex items-center
+                    gap-4 mb-6">
+                <button
+                    id="work-order-back-btn"
+                    class="btn btn-ghost
+                        btn-icon">
+                    ${iconArrowLeft(20, '')}
+                </button>
+                <div>
+                    <h1 class="text-2xl
+                        font-bold mb-1">
+                        ${this.flowNameText()}
+                    </h1>
+                    <div class="flex
+                        items-center gap-3">
+                        <span
+                            class="badge
+                                badge-neutral">
+                            #${this
+                                .displayIdText()}
+                        </span>
+                        <span
+                            class="badge
+                                badge-info">
+                            ${this
+                                .#currentNodeName()}
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            ${fields}
+            ${transitions}
+
+            <div class="flex gap-3 mb-6">
+                ${unclaimBtn}
+            </div>
+
+            <details
+                id="work-order-history"
+                open>
+                <summary
+                    class="text-lg
+                        font-semibold mb-3
+                        cursor-pointer">
+                    History
+                </summary>
+                <div class="card p-4">
+                    ${!this.#hasHistory()
+                        ? html`<p
+                            class="text-muted">
+                            No history yet.
+                        </p>`
+                        : this.#historyEntries()
+                            .toReversed()
+                            .map(
+                                e =>
+                                    this
+                                    .#buildHistoryEntry(
+                                        e,
+                                    ),
+                            )}
+                </div>
+            </details>
+        </div>`;
+    }
+
+    #buildFieldsCard(): SafeHtml {
+        return html`<div
+            id="work-order-fields"
+            class="card mb-6 p-6">
+            <h3 class="text-lg
+                font-semibold mb-4">
+                Fields
+            </h3>
+            ${this.renderableFields()
+                .toSorted(
+                    (a, b) =>
+                        a.sortOrder
+                        - b.sortOrder,
+                )
+                .map(
+                    f =>
+                        this.#buildFieldRow(f),
+                )}
+        </div>`;
+    }
+
+    #buildTransitionButtons(): SafeHtml {
+        return html`<div
+            id="work-order-transitions"
+            class="flex gap-3 mb-6
+                flex-wrap">
+            ${this.#outgoingEdges.map(
+                e => html`<button
+                    class="btn btn-primary"
+                    data-edge-id="${e.id}">
+                    ${e.name}
+                </button>`,
+            )}
+        </div>`;
+    }
+
+    #buildHistoryEntry(
+        entry: HistoryEntry,
+    ): SafeHtml {
+        const hasValues =
+            entry.fieldValues.length > 0;
+        const valuesHtml = hasValues
+            ? html`<div
+                class="mt-2 ml-6
+                    work-order-history-fields">
+                ${entry.fieldValues.map(
+                    fv => html`
+                    <span
+                        class="text-muted"
+                    >${fv.fieldName}</span>
+                    <span>${fv.value}</span>`,
+                )}
+            </div>`
+            : html``;
+        return html`<div
+            class="py-3 border-b">
+            <div
+                class="flex items-center
+                    gap-3"
+            >
+                <span class="text-muted">
+                    ${iconClock(14, '')}
+                </span>
+                <span
+                    class="font-semibold"
+                >${entry.fromNodeName}
+                    &rarr;
+                    ${entry.toNodeName}</span>
+                <span
+                    class="text-muted
+                        ml-auto"
+                >${entry.userName}</span>
+                <span
+                    class="text-muted
+                        text-sm"
+                >${this.#relativeTime(
+                    entry.transitionedAt,
+                )}</span>
+            </div>
+            ${valuesHtml}
+        </div>`;
+    }
+
+    #buildFieldRow(
+        field: GraphField,
+    ): SafeHtml {
+        const label = field.name
+            + (field.isRequired ? ' *' : '');
+        return html`<div class="mb-4">
+            <label
+                class="label">${label}</label>
+            ${buildFieldInputHtml(field)}
+        </div>`;
+    }
+
+    #relativeTime(iso: string): string {
+        const ms = Date.now()
+            - new Date(iso).getTime();
+        const sec = Math.floor(ms / 1000);
+        const min = Math.floor(sec / 60);
+        const hr = Math.floor(min / 60);
+        const d = Math.floor(hr / 24);
+        if (d > 0) return `${d}d ago`;
+        if (hr > 0) return `${hr}h ago`;
+        if (min > 0) return `${min}m ago`;
+        return 'just now';
+    }
+
+    #currentNodeName(): string {
+        return this.#currentNode.name;
+    }
+
+    #hasHistory(): boolean {
+        return this.#history.length > 0;
+    }
+
+    #historyEntries():
+        readonly HistoryEntry[] {
+        return this.#history;
     }
 }
 

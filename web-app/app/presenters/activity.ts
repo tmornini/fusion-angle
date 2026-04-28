@@ -7,9 +7,8 @@ import {
     iconEdit,
     iconArrowRight,
 } from '../icons.ts';
-import { isActivityType } from '../adapters/index.ts';
 import type {
-    ActivityEntity,
+    Activity,
     ActivityType,
 } from '../adapters/index.ts';
 
@@ -51,23 +50,10 @@ const ICON_MAP: Record<
 };
 
 export class ActivityPresenter {
-    readonly #entity: ActivityEntity;
-    readonly #type: ActivityType;
-    readonly #actor: string;
+    readonly #activity: Activity;
 
-    constructor(
-        entity: ActivityEntity,
-        actor: string,
-    ) {
-        if (!isActivityType(entity.type)) {
-            throw new Error(
-                'Unknown activity type: '
-                + entity.type,
-            );
-        }
-        this.#entity = entity;
-        this.#type = entity.type;
-        this.#actor = actor;
+    constructor(activity: Activity) {
+        this.#activity = activity;
     }
 
     matchesFilter(
@@ -77,42 +63,36 @@ export class ActivityPresenter {
             | undefined,
     ): boolean {
         if (query) {
-            const q = query.toLowerCase();
-            const hitsActor =
-                this.#actor
-                    .toLowerCase()
-                    .includes(q);
-            const hitsTarget =
-                this.#entity.target
-                    .toLowerCase()
-                    .includes(q);
-            if (!hitsActor && !hitsTarget) {
+            if (
+                !this.#activity.matchesQuery(
+                    query,
+                )
+            ) {
                 return false;
             }
         }
         if (types
-            && !types.includes(this.#type))
-            return false;
+            && !this.#activity.matchesTypes(
+                types,
+            )
+        ) return false;
         return true;
     }
 
     buildActivity(): SafeHtml {
-        const hasStatus =
-            this.#entity.status !== '';
-        const hasFeedback =
-            this.#entity.feedback !== '';
+        const a = this.#activity;
         const meta = html`${
-            hasStatus
+            a.hasStatus()
                 ? html`<div
                     class="${
                         'badge badge-default'
                         + ' text-xs mt-1'
                     }">${
-                    this.#entity.status
+                    a.statusText()
                 }</div>`
                 : html``
         }${
-            hasFeedback
+            a.hasFeedback()
                 ? html`<p
                     class="${
                         'text-sm'
@@ -120,7 +100,7 @@ export class ActivityPresenter {
                         + ' mt-1 italic'
                     }"
                     >"${
-                    this.#entity.feedback
+                    a.feedbackText()
                 }"</p>`
                 : html``
         }`;
@@ -133,17 +113,17 @@ export class ActivityPresenter {
                 <span class="${
                     'font-medium'
                 }">${
-                    displayText(this.#actor)
+                    displayText(a.actorText())
                 }</span>
                 <span class="${
                     'text-muted'
                 }"> ${
-                    this.#entity.action
+                    a.actionText()
                 } </span>
                 <span class="${
                     'font-medium'
                 }">${
-                    this.#entity.target
+                    a.targetText()
                 }</span>
             </p>
             ${meta}
@@ -151,7 +131,7 @@ export class ActivityPresenter {
                 'text-xs text-muted mt-1'
             }">${
                 formatDate(
-                    this.#entity.timestamp,
+                    a.timestampText(),
                 )
             }</p>
         </div>
@@ -159,7 +139,8 @@ export class ActivityPresenter {
     }
 
     #buildIcon(): SafeHtml {
-        const entry = ICON_MAP[this.#type];
+        const entry =
+            ICON_MAP[this.#activity.typeValue()];
         return html`<div class="icon-box"
             data-tone="${entry.tone}">${
             entry.icon(20, '')

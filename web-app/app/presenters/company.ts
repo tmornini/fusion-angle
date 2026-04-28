@@ -8,6 +8,7 @@ import {
 } from '../icons.ts';
 import type {
     Company,
+    CompanyDraft,
 } from '../adapters/index.ts';
 
 export type CompanyFieldKey =
@@ -165,20 +166,20 @@ export class CompanyPresenter {
             ${buildReadonlyField(
                 'company-name',
                 'Company Name',
-                c.name,
+                c.nameText(),
             )}
             ${buildReadonlyField(
                 'company-domain',
                 'Domain',
-                c.domain,
+                c.domainText(),
             )}`);
     }
 }
 
 export class CompanyEditPresenter {
-    readonly #draft: Company;
+    readonly #draft: CompanyDraft;
 
-    constructor(draft: Company) {
+    constructor(draft: CompanyDraft) {
         this.#draft = draft;
     }
 

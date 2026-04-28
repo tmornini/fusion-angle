@@ -9,9 +9,8 @@ import {
     iconCalendar, iconTrendingUp,
     iconExternalLink,
 } from '../icons.ts';
-import { formatDate } from '../core.ts';
 import type {
-    OrganizationEntity,
+    Organization,
     RecentActivityItem,
 } from '../adapters/index.ts';
 
@@ -42,23 +41,25 @@ function buildStatCell(
 }
 
 export class OrganizationPresenter {
-    readonly #entity: OrganizationEntity;
+    readonly #org: Organization;
     readonly #companyName: string;
     readonly #recentActivity:
         readonly RecentActivityItem[];
 
     constructor(
-        entity: OrganizationEntity,
+        org: Organization,
         companyName: string,
         recentActivity:
             readonly RecentActivityItem[],
     ) {
-        this.#entity = entity;
+        this.#org = org;
         this.#companyName = companyName;
         this.#recentActivity = recentActivity;
     }
 
     buildPage(): SafeHtml {
+        const org = this.#org;
+        const seats = org.seatsUsage();
         return html`
     <div class="content-wrap-xl">
         <div class="mb-8">
@@ -108,8 +109,7 @@ export class OrganizationPresenter {
                                 ${iconCrown(
                                     12, '',
                                 )}
-                                ${this.#entity.plan
-                                } Plan
+                                ${org.planLabel()}
                             </span>
                             <span class="${
                                 'status-badge'
@@ -137,14 +137,14 @@ export class OrganizationPresenter {
                         <span class="${
                             'text-sm font-medium'
                         }">
-                            ${this.#entity
-                                .health_status}
+                            ${org
+                                .healthStatusText()}
                         </span>
                     </div>
                     <p class="text-xs mt-1">
                         ${'Health Score: '
-                            + this.#entity
-                                .health_score
+                            + org
+                                .healthScorePercent()
                             + '%'}
                     </p>
                 </div>
@@ -157,35 +157,30 @@ export class OrganizationPresenter {
                 ${buildStatCell(
                     iconUsers(16, ''),
                     'Active Users',
-                    html`${this.#entity
-                        .used_seats}<span class="${
+                    html`${seats.used}<span class="${
                         'text-sm font-normal'
                         + ' text-muted'
-                    }">/${this.#entity
-                        .seats}</span>`,
+                    }">/${seats.total}</span>`,
                     STAT_VALUE_2XL,
                 )}
                 ${buildStatCell(
                     iconFolderKanban(16, ''),
                     'Projects',
-                    html`${this.#entity
-                        .projects_current}`,
+                    html`${org
+                        .projectsCurrent()}`,
                     STAT_VALUE_2XL,
                 )}
                 ${buildStatCell(
                     iconLightbulb(16, ''),
                     'Ideas',
-                    html`${this.#entity
-                        .ideas_current}`,
+                    html`${org.ideasCurrent()}`,
                     STAT_VALUE_2XL,
                 )}
                 ${buildStatCell(
                     iconCalendar(16, ''),
                     'Next Billing',
-                    html`${formatDate(
-                        this.#entity
-                            .next_billing,
-                    )}`,
+                    html`${org
+                        .nextBillingDate()}`,
                     STAT_VALUE_LG,
                 )}
             </div>
@@ -204,34 +199,28 @@ export class OrganizationPresenter {
             <div class="flex flex-col gap-4">
                 ${this.#buildUsageBar(
                     'User Seats',
-                    this.#entity.used_seats,
-                    this.#entity.seats,
+                    org.usedSeats(),
+                    org.totalSeats(),
                 )}
                 ${this.#buildUsageBar(
                     'Projects',
-                    this.#entity
-                        .projects_current,
-                    this.#entity
-                        .projects_limit,
+                    org.projectsCurrent(),
+                    org.projectsLimit(),
                 )}
                 ${this.#buildUsageBar(
                     'Ideas',
-                    this.#entity.ideas_current,
-                    this.#entity.ideas_limit,
+                    org.ideasCurrent(),
+                    org.ideasLimit(),
                 )}
                 ${this.#buildUsageBar(
                     'AI Credits',
-                    this.#entity
-                        .ai_credits_current,
-                    this.#entity
-                        .ai_credits_limit,
+                    org.aiCreditsCurrent(),
+                    org.aiCreditsLimit(),
                 )}
                 ${this.#buildUsageBar(
                     'Storage (GB)',
-                    this.#entity
-                        .storage_current,
-                    this.#entity
-                        .storage_limit,
+                    org.storageCurrent(),
+                    org.storageLimit(),
                 )}
             </div>
         </div>

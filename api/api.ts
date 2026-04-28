@@ -4,26 +4,26 @@ import {
     MissingTableError,
 } from './db.ts';
 import { nowUtc } from './types.ts';
-import type {
-    UserEntity,
-    IdeaEntity,
-    ProjectEntity,
-    ActivityEntity,
-    IdeaSubmissionEntity,
-    ActivityActorEntity,
-    TeamEntity,
-    TeamProjectEntity,
-    TeamUserEntity,
-    FlowEntity,
-    FlowVersionEntity,
-    ProjectFlowEntity,
-    WorkOrderEntity,
-    FlowWorkOrderEntity,
-    WorkOrderTransitionEntity,
-    WorkOrderClaimEntity,
-    CompanyEntity,
-    OrganizationEntity,
-} from './types.ts';
+import {
+    validateUserEntity,
+    validateIdeaEntity,
+    validateProjectEntity,
+    validateTeamEntity,
+    validateTeamProjectEntity,
+    validateTeamUserEntity,
+    validateActivityEntity,
+    validateFlowEntity,
+    validateFlowVersionEntity,
+    validateProjectFlowEntity,
+    validateWorkOrderEntity,
+    validateFlowWorkOrderEntity,
+    validateWorkOrderTransitionEntity,
+    validateWorkOrderClaimEntity,
+    validateCompanyEntity,
+    validateOrganizationEntity,
+    validateIdeaSubmissionEntity,
+    validateActivityActorEntity,
+} from './validators.ts';
 
 export class ApiError {
     readonly message: string;
@@ -129,12 +129,17 @@ function param(
     return value;
 }
 
-function fields<T extends { id: string }>(
+// Strip `id` from the request body before
+// passing to entity validators. `id` is a
+// routing/storage key, not a body field;
+// validators enforce the exact body key set.
+function withoutId(
     body: Record<string, unknown>,
-): Omit<T, 'id'> {
+): Record<string, unknown> {
     const { id: _id, ...rest } = body;
-    return rest as Omit<T, 'id'>;
+    return rest;
 }
+
 
 const routes: Route[] = [
     route('users', {
@@ -178,7 +183,9 @@ const routes: Route[] = [
         put: (db, _params, body) =>
             db.flows.put(
                 body.id as string,
-                fields<FlowEntity>(body),
+                validateFlowEntity(
+                    withoutId(body),
+                ),
             ),
     }),
     route('flows/:id', {
@@ -189,7 +196,9 @@ const routes: Route[] = [
         put: (db, params, body) =>
             db.flows.put(
                 param(params, 0),
-                fields<FlowEntity>(body),
+                validateFlowEntity(
+                    withoutId(body),
+                ),
             ),
         delete: (db, params) =>
             db.flows.delete(
@@ -202,7 +211,9 @@ const routes: Route[] = [
         put: (db, _params, body) =>
             db.flowVersions.put(
                 body.id as string,
-                fields<FlowVersionEntity>(body),
+                validateFlowVersionEntity(
+                    withoutId(body),
+                ),
             ),
     }),
     route('flow-versions/:id', {
@@ -222,7 +233,9 @@ const routes: Route[] = [
         put: (db, _params, body) =>
             db.projectFlows.put(
                 body.id as string,
-                fields<ProjectFlowEntity>(body),
+                validateProjectFlowEntity(
+                    withoutId(body),
+                ),
             ),
     }),
     route('project-flows/:id', {
@@ -237,7 +250,9 @@ const routes: Route[] = [
         put: (db, _params, body) =>
             db.workOrders.put(
                 body.id as string,
-                fields<WorkOrderEntity>(body),
+                validateWorkOrderEntity(
+                    withoutId(body),
+                ),
             ),
     }),
     route('work-orders/:id', {
@@ -248,7 +263,9 @@ const routes: Route[] = [
         put: (db, params, body) =>
             db.workOrders.put(
                 param(params, 0),
-                fields<WorkOrderEntity>(body),
+                validateWorkOrderEntity(
+                    withoutId(body),
+                ),
             ),
     }),
     route('flow-work-orders', {
@@ -257,8 +274,8 @@ const routes: Route[] = [
         put: (db, _params, body) =>
             db.flowWorkOrders.put(
                 body.id as string,
-                fields<FlowWorkOrderEntity>(
-                    body,
+                validateFlowWorkOrderEntity(
+                    withoutId(body),
                 ),
             ),
     }),
@@ -269,9 +286,9 @@ const routes: Route[] = [
         put: (db, _params, body) =>
             db.workOrderTransitions.put(
                 body.id as string,
-                fields<
-                    WorkOrderTransitionEntity
-                >(body),
+                validateWorkOrderTransitionEntity(
+                    withoutId(body),
+                ),
             ),
     }),
     route('work-order-claims', {
@@ -281,9 +298,9 @@ const routes: Route[] = [
         put: (db, _params, body) =>
             db.workOrderClaims.put(
                 body.id as string,
-                fields<
-                    WorkOrderClaimEntity
-                >(body),
+                validateWorkOrderClaimEntity(
+                    withoutId(body),
+                ),
             ),
     }),
     route('work-order-claims/:id', {
@@ -298,15 +315,17 @@ const routes: Route[] = [
             db.company.get(),
         put: (db, _, payload) =>
             db.company.put(
-                fields<CompanyEntity>(payload),
+                validateCompanyEntity(
+                    withoutId(payload),
+                ),
             ),
     }),
     route('organization', {
         get: (db) => db.organization.get(),
         put: (db, _, payload) =>
             db.organization.put(
-                fields<OrganizationEntity>(
-                    payload,
+                validateOrganizationEntity(
+                    withoutId(payload),
                 ),
             ),
     }),
@@ -321,7 +340,9 @@ const routes: Route[] = [
         put: (db, p, payload) =>
             db.users.put(
                 param(p, 0),
-                fields<UserEntity>(payload),
+                validateUserEntity(
+                    withoutId(payload),
+                ),
             ),
     }),
     route('ideas/:id', {
@@ -330,7 +351,9 @@ const routes: Route[] = [
         put: (db, p, payload) =>
             db.ideas.put(
                 param(p, 0),
-                fields<IdeaEntity>(payload),
+                validateIdeaEntity(
+                    withoutId(payload),
+                ),
             ),
         delete: (db, p) =>
             db.ideas.delete(param(p, 0)),
@@ -343,7 +366,9 @@ const routes: Route[] = [
         put: (db, p, payload) =>
             db.projects.put(
                 param(p, 0),
-                fields<ProjectEntity>(payload),
+                validateProjectEntity(
+                    withoutId(payload),
+                ),
             ),
         delete: (db, p) =>
             db.projects.delete(param(p, 0)),
@@ -352,8 +377,8 @@ const routes: Route[] = [
         put: (db, p, payload) =>
             db.activities.put(
                 param(p, 0),
-                fields<ActivityEntity>(
-                    payload,
+                validateActivityEntity(
+                    withoutId(payload),
                 ),
             ),
     }),
@@ -361,27 +386,27 @@ const routes: Route[] = [
         put: (db, p, payload) =>
             db.ideaSubmissions.put(
                 param(p, 0),
-                fields<
-                    IdeaSubmissionEntity
-                >(payload),
+                validateIdeaSubmissionEntity(
+                    withoutId(payload),
+                ),
             ),
     }),
     route('activity-actors/:id', {
         put: (db, p, payload) =>
             db.activityActors.put(
                 param(p, 0),
-                fields<
-                    ActivityActorEntity
-                >(payload),
+                validateActivityActorEntity(
+                    withoutId(payload),
+                ),
             ),
     }),
     route('teams/:id', {
         put: (db, p, payload) =>
             db.teams.put(
                 param(p, 0),
-                fields<
-                    TeamEntity
-                >(payload),
+                validateTeamEntity(
+                    withoutId(payload),
+                ),
             ),
     }),
     route(
@@ -391,9 +416,9 @@ const routes: Route[] = [
                 db.teamProjects
                     .put(
                         param(p, 0),
-                        fields<
-                            TeamProjectEntity
-                        >(payload),
+                        validateTeamProjectEntity(
+                            withoutId(payload),
+                        ),
                     ),
         },
     ),
@@ -404,9 +429,9 @@ const routes: Route[] = [
                 db.teamUsers
                     .put(
                         param(p, 0),
-                        fields<
-                            TeamUserEntity
-                        >(payload),
+                        validateTeamUserEntity(
+                            withoutId(payload),
+                        ),
                     ),
         },
     ),

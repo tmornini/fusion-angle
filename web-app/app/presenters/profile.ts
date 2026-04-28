@@ -14,6 +14,7 @@ import {
     iconX,
 } from '../icons.ts';
 import type { Profile } from '../adapters/index.ts';
+import type { ProfileDraft } from '../adapters/index.ts';
 import { allStrengths } from '../adapters/index.ts';
 import {
     WorkingStylesPresenter,
@@ -73,19 +74,16 @@ function buildHeader(
 }
 
 function buildAvatar(
-    profile: Profile,
+    initialsStr: string,
     showCameraButton: boolean,
 ): SafeHtml {
-    const initials =
-        profile.firstName.charAt(0)
-        + profile.lastName.charAt(0);
     return html`
         <div class="profile-avatar-wrap">
             <div class="profile-avatar">
                 <span class="${
                     'text-3xl font-bold'
                     + ' text-primary'
-                }">${initials}</span>
+                }">${initialsStr}</span>
             </div>
             ${showCameraButton
                 ? html`<button class="${
@@ -350,31 +348,33 @@ export class ProfilePresenter {
                 ${buildReadonlyField(
                     'profile-first-name',
                     html`First Name`,
-                    p.firstName,
+                    p.firstNameText(),
                 )}
                 ${buildReadonlyField(
                     'profile-last-name',
                     html`Last Name`,
-                    p.lastName,
+                    p.lastNameText(),
                 )}
             </div>`;
         return buildInfoCard(
             nameFields,
-            buildAvatar(p, false),
+            buildAvatar(
+                p.initialsText(), false,
+            ),
             html`
                 ${buildReadonlyField(
                     'profile-email',
                     html`${
                         iconMail(16, '')
                     } Email`,
-                    p.email,
+                    p.emailText(),
                 )}
                 ${buildReadonlyField(
                     'profile-phone',
                     html`${
                         iconPhone(16, '')
                     } Phone`,
-                    p.phone,
+                    p.phoneText(),
                 )}`,
             html`
                 ${buildReadonlyField(
@@ -382,25 +382,25 @@ export class ProfilePresenter {
                     html`${
                         iconBriefcase(16, '')
                     } Role`,
-                    p.role,
+                    p.roleText(),
                 )}
                 ${buildReadonlyDepartment(
-                    p.department,
+                    p.departmentText(),
                 )}`,
-            buildReadonlyBio(p.bio),
+            buildReadonlyBio(p.bioText()),
         );
     }
 
     #buildWorkingStylesCard(): SafeHtml {
         return new WorkingStylesPresenter(
-            this.#profile.teamDimensions,
+            this.#profile.teamDimensionsMap(),
         ).buildCard();
     }
 
     #buildStrengthsCard(): SafeHtml {
         return buildStrengthsCard(
             buildSelectedStrengthChips(
-                this.#profile.strengths,
+                this.#profile.strengthsList(),
             ),
         );
     }
@@ -408,11 +408,11 @@ export class ProfilePresenter {
 
 export class ProfileEditPresenter {
     readonly #profile: Profile;
-    readonly #draft: Profile;
+    readonly #draft: ProfileDraft;
 
     constructor(
         profile: Profile,
-        draft: Profile,
+        draft: ProfileDraft,
     ) {
         this.#profile = profile;
         this.#draft = draft;
@@ -491,7 +491,10 @@ export class ProfileEditPresenter {
             </div>`;
         return buildInfoCard(
             nameFields,
-            buildAvatar(d, true),
+            buildAvatar(
+                this.#profile.initialsText(),
+                true,
+            ),
             html`
                 ${buildEditableField(
                     'profile-email',
@@ -530,7 +533,7 @@ export class ProfileEditPresenter {
 
     #buildWorkingStylesCard(): SafeHtml {
         return new WorkingStylesPresenter(
-            this.#profile.teamDimensions,
+            this.#profile.teamDimensionsMap(),
         ).buildCard();
     }
 

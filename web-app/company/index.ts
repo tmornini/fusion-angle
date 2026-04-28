@@ -14,7 +14,8 @@ import { trimStrings } from '../app/core.ts';
 import {
     getCompany,
     putCompany,
-    type Company,
+    Company,
+    type CompanyDraft,
 } from '../app/adapters/index.ts';
 
 const pageAbort = new AbortController();
@@ -28,7 +29,7 @@ type PageState =
     | {
         kind: 'editing';
         company: Company;
-        draft: Company;
+        draft: CompanyDraft;
     };
 
 let state: PageState | null = null;
@@ -142,7 +143,7 @@ function onClick(
         state = {
             kind: 'editing',
             company: state.company,
-            draft: { ...state.company },
+            draft: state.company.toDraft(),
         };
         rerender();
         return;
@@ -216,9 +217,9 @@ async function handleSave(): Promise<void> {
     if (!state || state.kind !== 'editing') {
         return;
     }
-    const updated = trimStrings(state.draft);
+    const trimmed = trimStrings(state.draft);
     try {
-        await putCompany(updated);
+        await putCompany(trimmed);
     } catch (err) {
         log.error(
             'putCompany failed',
@@ -234,7 +235,7 @@ async function handleSave(): Promise<void> {
     showToast('Company saved', 'success');
     state = {
         kind: 'reading',
-        company: updated,
+        company: new Company(trimmed),
     };
     rerender();
 }

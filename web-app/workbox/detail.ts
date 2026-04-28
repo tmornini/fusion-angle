@@ -2,11 +2,9 @@ import {
     $, $required, getRequiredAttribute,
 } from '../app/dom.ts';
 import {
-    html, setHtml,
+    setHtml,
 } from '../app/safe-html.ts';
-import type { SafeHtml } from '../app/safe-html.ts';
 import {
-    buildFieldInputHtml,
     WorkboxDetailPresenter,
 } from '../app/presenters/index.ts';
 import { log } from '../app/logger.ts';
@@ -29,30 +27,8 @@ import {
     createFetchContext,
     generateCryptoSafeBase62,
 } from '../app/adapters/index.ts';
-import type {
-    HistoryEntry,
-    HistoryFieldValue,
-    GraphField,
-} from '../app/adapters/index.ts';
-import {
-    iconArrowLeft,
-    iconClock,
-} from '../app/icons.ts';
 
 /* ── Helpers ─────────────── */
-
-function relativeTime(iso: string): string {
-    const ms = Date.now()
-        - new Date(iso).getTime();
-    const sec = Math.floor(ms / 1000);
-    const min = Math.floor(sec / 60);
-    const hr = Math.floor(min / 60);
-    const d = Math.floor(hr / 24);
-    if (d > 0) return `${d}d ago`;
-    if (hr > 0) return `${hr}h ago`;
-    if (min > 0) return `${min}m ago`;
-    return 'just now';
-}
 
 function collectFieldValues(
     container: HTMLElement,
@@ -81,172 +57,6 @@ function collectFieldValues(
         }
     }
     return values;
-}
-
-/* ── Build functions ─────── */
-
-function buildFieldRow(
-    field: GraphField,
-): SafeHtml {
-    const label = field.name
-        + (field.isRequired ? ' *' : '');
-    return html`<div class="mb-4">
-        <label class="label">${label}</label>
-        ${buildFieldInputHtml(field)}
-    </div>`;
-}
-
-function buildHistoryEntry(
-    entry: HistoryEntry,
-): SafeHtml {
-    const hasValues =
-        entry.fieldValues.length > 0;
-    const valuesHtml = hasValues
-        ? html`<div
-            class="mt-2 ml-6
-                work-order-history-fields">
-            ${entry.fieldValues.map(
-                fv => html`
-                <span
-                    class="text-muted"
-                >${fv.fieldName}</span>
-                <span>${fv.value}</span>`,
-            )}
-        </div>`
-        : html``;
-    return html`<div
-        class="py-3 border-b">
-        <div
-            class="flex items-center
-                gap-3"
-        >
-            <span class="text-muted">
-                ${iconClock(14, '')}
-            </span>
-            <span
-                class="font-semibold"
-            >${entry.fromNodeName}
-                &rarr;
-                ${entry.toNodeName}</span>
-            <span
-                class="text-muted
-                    ml-auto"
-            >${entry.userName}</span>
-            <span
-                class="text-muted
-                    text-sm"
-            >${relativeTime(
-                entry.transitionedAt,
-            )}</span>
-        </div>
-        ${valuesHtml}
-    </div>`;
-}
-
-function buildDetailView(
-    detail: WorkboxDetailPresenter,
-): SafeHtml {
-    const complete = detail.isComplete();
-
-    const fields = complete
-        ? html``
-        : html`<div id="work-order-fields"
-            class="card mb-6 p-6">
-            <h3 class="text-lg
-                font-semibold mb-4">
-                Fields
-            </h3>
-            ${detail.renderableFields()
-                .toSorted(
-                    (a, b) =>
-                        a.sortOrder
-                        - b.sortOrder,
-                )
-                .map(buildFieldRow)}
-        </div>`;
-
-    const transitions = complete
-        ? html``
-        : html`<div id="work-order-transitions"
-            class="flex gap-3 mb-6
-                flex-wrap">
-            ${detail.outgoingEdgeList().map(
-                e => html`<button
-                    class="btn btn-primary"
-                    data-edge-id="${e.id}">
-                    ${e.name}
-                </button>`,
-            )}
-        </div>`;
-
-    const unclaimBtn = complete
-        ? html``
-        : html`<button
-            id="unclaim-btn"
-            class="btn btn-outline">
-            Release Work Order
-        </button>`;
-
-    return html`<div class="content-wrap">
-        <div id="work-order-header"
-            class="flex items-center
-                gap-4 mb-6">
-            <button id="work-order-back-btn"
-                class="btn btn-ghost
-                    btn-icon">
-                ${iconArrowLeft(20, '')}
-            </button>
-            <div>
-                <h1 class="text-2xl
-                    font-bold mb-1">
-                    ${detail.flowNameText()}
-                </h1>
-                <div class="flex items-center
-                    gap-3">
-                    <span
-                        class="badge
-                            badge-neutral">
-                        #${detail
-                            .displayIdText()}
-                    </span>
-                    <span
-                        class="badge
-                            badge-info">
-                        ${detail
-                            .currentNodeName()}
-                    </span>
-                </div>
-            </div>
-        </div>
-
-        ${fields}
-        ${transitions}
-
-        <div class="flex gap-3 mb-6">
-            ${unclaimBtn}
-        </div>
-
-        <details id="work-order-history" open>
-            <summary
-                class="text-lg
-                    font-semibold mb-3
-                    cursor-pointer">
-                History
-            </summary>
-            <div class="card p-4">
-                ${!detail.hasHistory()
-                    ? html`<p
-                        class="text-muted">
-                        No history yet.
-                    </p>`
-                    : detail.historyEntries()
-                        .toReversed()
-                        .map(
-                            buildHistoryEntry,
-                        )}
-            </div>
-        </details>
-    </div>`;
 }
 
 /* ── Event wiring ────────── */
@@ -487,7 +297,7 @@ export async function init(
 
     setHtml(
         container,
-        buildDetailView(detail),
+        detail.buildPage(),
     );
 
     const backBtn = $(

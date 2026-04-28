@@ -69,6 +69,19 @@ export function isActivityType(
         .includes(v);
 }
 
+export function assertActivityType(
+    v: string,
+    label: string,
+): ActivityType {
+    if (!isActivityType(v)) {
+        throw new Error(
+            'expected ActivityType for '
+                + label + ', got ' + v,
+        );
+    }
+    return v;
+}
+
 export type DimensionKey =
     | 'driver'
     | 'analytical'
@@ -191,6 +204,19 @@ export function isProjectStatus(
     );
 }
 
+export function assertProjectStatus(
+    v: string,
+    label: string,
+): ProjectStatus {
+    if (!includes(PROJECT_STATUSES, v)) {
+        throw new Error(
+            'expected ProjectStatus for '
+                + label + ', got ' + v,
+        );
+    }
+    return v;
+}
+
 const IDEA_STATUSES:
     readonly IdeaStatus[]
     = [
@@ -208,6 +234,19 @@ export function isIdeaStatus(
     );
 }
 
+export function assertIdeaStatus(
+    v: string,
+    label: string,
+): IdeaStatus {
+    if (!includes(IDEA_STATUSES, v)) {
+        throw new Error(
+            'expected IdeaStatus for '
+                + label + ', got ' + v,
+        );
+    }
+    return v;
+}
+
 const USER_STATUSES: readonly UserStatus[] =
     ['active', 'pending', 'deactivated'];
 
@@ -217,6 +256,19 @@ export function isUserStatus(
     return includes(
         USER_STATUSES, v,
     );
+}
+
+export function assertUserStatus(
+    v: string,
+    label: string,
+): UserStatus {
+    if (!includes(USER_STATUSES, v)) {
+        throw new Error(
+            'expected UserStatus for '
+                + label + ', got ' + v,
+        );
+    }
+    return v;
 }
 
 const READINESS_LEVELS:
@@ -229,6 +281,19 @@ export function isReadinessLevel(
     return includes(
         READINESS_LEVELS, v,
     );
+}
+
+export function assertReadinessLevel(
+    v: string,
+    label: string,
+): ReadinessLevel {
+    if (!includes(READINESS_LEVELS, v)) {
+        throw new Error(
+            'expected ReadinessLevel for '
+                + label + ', got ' + v,
+        );
+    }
+    return v;
 }
 
 export const MS_PER_SECOND = 1000;

@@ -17,6 +17,7 @@ import {
     getUserMap,
     userName,
     createFetchContext,
+    Activity,
 } from '../app/adapters/index.ts';
 import {
     ActivityPresenter,
@@ -59,9 +60,12 @@ export async function init(
                         );
                     }
                     return new ActivityPresenter(
-                        row,
-                        userName(
-                            userMap, actorId,
+                        new Activity(
+                            row,
+                            userName(
+                                userMap,
+                                actorId,
+                            ),
                         ),
                     );
                 });

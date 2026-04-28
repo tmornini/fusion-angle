@@ -1,3 +1,9 @@
+import {
+    assertUserStatus,
+    assertIdeaStatus,
+    assertProjectStatus,
+    assertReadinessLevel,
+} from './types.ts';
 import type {
     GraphNode,
     GraphEdge,
@@ -5,6 +11,30 @@ import type {
     StoredGraph,
     WorkOrderFlowGraph,
     FlowFieldType,
+    UserStatus,
+    IdeaStatus,
+    ProjectStatus,
+    ReadinessLevel,
+    JsonArrayField,
+    JsonObjectField,
+    UserEntity,
+    IdeaEntity,
+    ProjectEntity,
+    TeamEntity,
+    TeamProjectEntity,
+    TeamUserEntity,
+    ActivityEntity,
+    FlowEntity,
+    FlowVersionEntity,
+    WorkOrderEntity,
+    FlowWorkOrderEntity,
+    WorkOrderTransitionEntity,
+    WorkOrderClaimEntity,
+    CompanyEntity,
+    OrganizationEntity,
+    IdeaSubmissionEntity,
+    ActivityActorEntity,
+    ProjectFlowEntity,
 } from './types.ts';
 
 export interface Risk {
@@ -426,4 +456,846 @@ validateTransitionValuesJson(
         );
     }
     return out;
+}
+
+// ── JSON field helpers ────────────────
+
+function asJsonArrayField(
+    value: unknown,
+    label: string,
+): JsonArrayField {
+    const raw = asString(value, label);
+    const parsed = parseOrThrow(raw, label);
+    asArray(parsed, label);
+    return raw as JsonArrayField;
+}
+
+function asJsonObjectField(
+    value: unknown,
+    label: string,
+): JsonObjectField {
+    const raw = asString(value, label);
+    const parsed = parseOrThrow(raw, label);
+    asObject(parsed, label);
+    return raw as JsonObjectField;
+}
+
+// ── Enum validators ─────────────────
+
+export function asUserStatus(
+    value: unknown,
+    label: string,
+): UserStatus {
+    return assertUserStatus(
+        asString(value, label), label,
+    );
+}
+
+export function asIdeaStatus(
+    value: unknown,
+    label: string,
+): IdeaStatus {
+    return assertIdeaStatus(
+        asString(value, label), label,
+    );
+}
+
+export function asProjectStatus(
+    value: unknown,
+    label: string,
+): ProjectStatus {
+    return assertProjectStatus(
+        asString(value, label), label,
+    );
+}
+
+export function asReadinessLevel(
+    value: unknown,
+    label: string,
+): ReadinessLevel {
+    return assertReadinessLevel(
+        asString(value, label), label,
+    );
+}
+
+// ── Key-set enforcement ──────────────
+//
+// assertOnlyKeys checks exact key-set
+// membership: no extra keys, no missing
+// keys. Rejects key-injection attacks
+// ("trust within the walls" doctrine).
+//
+// Follow-on: extend this same discipline
+// into JSON-encoded fields (graph,
+// flow_graph, business_context, values,
+// strengths, team_dimensions, etc.) — each
+// JSON column's inner schema needs its own
+// enumerated key list. That is the
+// "recursive check" that closes the
+// remaining edges. Intentionally deferred
+// here because each column's shape must be
+// enumerated case-by-case (e.g.
+// business_context has its own keys; risks
+// is an array of {title, severity,
+// mitigation} objects — validateRisksJson
+// does deep field validation but not
+// key-count rejection). Bringing those
+// columns under key-count discipline is
+// the next iteration.
+
+export function assertOnlyKeys(
+    body: Record<string, unknown>,
+    expected: readonly string[],
+    label: string,
+): void {
+    const expectedSet = new Set(expected);
+    for (const key of Object.keys(body)) {
+        if (!expectedSet.has(key)) {
+            throw new Error(
+                'unexpected key "'
+                    + key + '"'
+                    + ' for ' + label,
+            );
+        }
+    }
+    for (const key of expected) {
+        if (!(key in body)) {
+            throw new Error(
+                'missing required key "'
+                    + key + '"'
+                    + ' for ' + label,
+            );
+        }
+    }
+}
+
+// ── Entity validators ────────────────
+
+const USER_BODY_KEYS: readonly string[] = [
+    'first_name', 'last_name', 'email',
+    'role', 'department', 'status',
+    'availability', 'performance_score',
+    'projects_completed', 'current_projects',
+    'strengths', 'team_dimensions',
+    'phone', 'bio', 'last_active',
+];
+
+export function validateUserEntity(
+    body: Record<string, unknown>,
+): Omit<UserEntity, 'id'> {
+    assertOnlyKeys(
+        body, USER_BODY_KEYS, 'UserEntity',
+    );
+    return {
+        first_name: asString(
+            body['first_name'], 'first_name',
+        ),
+        last_name: asString(
+            body['last_name'], 'last_name',
+        ),
+        email: asString(
+            body['email'], 'email',
+        ),
+        role: asString(
+            body['role'], 'role',
+        ),
+        department: asString(
+            body['department'], 'department',
+        ),
+        status: asUserStatus(
+            body['status'], 'status',
+        ),
+        availability: asNumber(
+            body['availability'],
+            'availability',
+        ),
+        performance_score: asNumber(
+            body['performance_score'],
+            'performance_score',
+        ),
+        projects_completed: asNumber(
+            body['projects_completed'],
+            'projects_completed',
+        ),
+        current_projects: asNumber(
+            body['current_projects'],
+            'current_projects',
+        ),
+        strengths: asJsonArrayField(
+            body['strengths'], 'strengths',
+        ),
+        team_dimensions: asJsonObjectField(
+            body['team_dimensions'],
+            'team_dimensions',
+        ),
+        phone: asString(
+            body['phone'], 'phone',
+        ),
+        bio: asString(
+            body['bio'], 'bio',
+        ),
+        last_active: asString(
+            body['last_active'], 'last_active',
+        ),
+    };
+}
+
+const IDEA_BODY_KEYS: readonly string[] = [
+    'title', 'position', 'status',
+    'problem_statement', 'target_users',
+    'proposed_solution', 'expected_outcome',
+    'success_metrics', 'readiness',
+    'risks', 'assumptions', 'alignments',
+];
+
+export function validateIdeaEntity(
+    body: Record<string, unknown>,
+): Omit<IdeaEntity, 'id'> {
+    assertOnlyKeys(
+        body, IDEA_BODY_KEYS, 'IdeaEntity',
+    );
+    return {
+        title: asString(
+            body['title'], 'title',
+        ),
+        position: asNumber(
+            body['position'], 'position',
+        ),
+        status: asIdeaStatus(
+            body['status'], 'status',
+        ),
+        problem_statement: asString(
+            body['problem_statement'],
+            'problem_statement',
+        ),
+        target_users: asString(
+            body['target_users'],
+            'target_users',
+        ),
+        proposed_solution: asString(
+            body['proposed_solution'],
+            'proposed_solution',
+        ),
+        expected_outcome: asString(
+            body['expected_outcome'],
+            'expected_outcome',
+        ),
+        success_metrics: asString(
+            body['success_metrics'],
+            'success_metrics',
+        ),
+        readiness: asReadinessLevel(
+            body['readiness'], 'readiness',
+        ),
+        risks: asJsonArrayField(
+            body['risks'], 'risks',
+        ),
+        assumptions: asJsonArrayField(
+            body['assumptions'],
+            'assumptions',
+        ),
+        alignments: asJsonArrayField(
+            body['alignments'], 'alignments',
+        ),
+    };
+}
+
+const PROJECT_BODY_KEYS: readonly string[] = [
+    'title', 'description', 'status',
+    'progress', 'start_date',
+    'target_end_date', 'estimated_duration',
+    'actual_duration', 'estimated_cost',
+    'actual_cost', 'estimated_impact',
+    'actual_impact', 'position',
+    'business_context', 'timeline_label',
+    'budget_label',
+];
+
+export function validateProjectEntity(
+    body: Record<string, unknown>,
+): Omit<ProjectEntity, 'id'> {
+    assertOnlyKeys(
+        body,
+        PROJECT_BODY_KEYS,
+        'ProjectEntity',
+    );
+    return {
+        title: asString(
+            body['title'], 'title',
+        ),
+        description: asString(
+            body['description'],
+            'description',
+        ),
+        status: asProjectStatus(
+            body['status'], 'status',
+        ),
+        progress: asNumber(
+            body['progress'], 'progress',
+        ),
+        start_date: asString(
+            body['start_date'], 'start_date',
+        ),
+        target_end_date: asString(
+            body['target_end_date'],
+            'target_end_date',
+        ),
+        estimated_duration: asNumber(
+            body['estimated_duration'],
+            'estimated_duration',
+        ),
+        actual_duration: asNumber(
+            body['actual_duration'],
+            'actual_duration',
+        ),
+        estimated_cost: asNumber(
+            body['estimated_cost'],
+            'estimated_cost',
+        ),
+        actual_cost: asNumber(
+            body['actual_cost'],
+            'actual_cost',
+        ),
+        estimated_impact: asNumber(
+            body['estimated_impact'],
+            'estimated_impact',
+        ),
+        actual_impact: asNumber(
+            body['actual_impact'],
+            'actual_impact',
+        ),
+        position: asNumber(
+            body['position'], 'position',
+        ),
+        business_context: asJsonObjectField(
+            body['business_context'],
+            'business_context',
+        ),
+        timeline_label: asString(
+            body['timeline_label'],
+            'timeline_label',
+        ),
+        budget_label: asString(
+            body['budget_label'],
+            'budget_label',
+        ),
+    };
+}
+
+const TEAM_BODY_KEYS: readonly string[] = [
+    'role', 'type',
+];
+
+export function validateTeamEntity(
+    body: Record<string, unknown>,
+): Omit<TeamEntity, 'id'> {
+    assertOnlyKeys(
+        body, TEAM_BODY_KEYS, 'TeamEntity',
+    );
+    return {
+        role: asString(
+            body['role'], 'role',
+        ),
+        type: asString(
+            body['type'], 'type',
+        ),
+    };
+}
+
+const TEAM_PROJECT_BODY_KEYS:
+    readonly string[] = [
+    'team_id', 'project_id', 'created_at',
+];
+
+export function validateTeamProjectEntity(
+    body: Record<string, unknown>,
+): Omit<TeamProjectEntity, 'id'> {
+    assertOnlyKeys(
+        body,
+        TEAM_PROJECT_BODY_KEYS,
+        'TeamProjectEntity',
+    );
+    return {
+        team_id: asString(
+            body['team_id'], 'team_id',
+        ),
+        project_id: asString(
+            body['project_id'], 'project_id',
+        ),
+        created_at: asString(
+            body['created_at'], 'created_at',
+        ),
+    };
+}
+
+const TEAM_USER_BODY_KEYS:
+    readonly string[] = [
+    'team_id', 'user_id', 'created_at',
+];
+
+export function validateTeamUserEntity(
+    body: Record<string, unknown>,
+): Omit<TeamUserEntity, 'id'> {
+    assertOnlyKeys(
+        body,
+        TEAM_USER_BODY_KEYS,
+        'TeamUserEntity',
+    );
+    return {
+        team_id: asString(
+            body['team_id'], 'team_id',
+        ),
+        user_id: asString(
+            body['user_id'], 'user_id',
+        ),
+        created_at: asString(
+            body['created_at'], 'created_at',
+        ),
+    };
+}
+
+const ACTIVITY_BODY_KEYS: readonly string[] = [
+    'type', 'action', 'target',
+    'timestamp', 'status', 'feedback',
+];
+
+export function validateActivityEntity(
+    body: Record<string, unknown>,
+): Omit<ActivityEntity, 'id'> {
+    assertOnlyKeys(
+        body,
+        ACTIVITY_BODY_KEYS,
+        'ActivityEntity',
+    );
+    return {
+        type: asString(
+            body['type'], 'type',
+        ),
+        action: asString(
+            body['action'], 'action',
+        ),
+        target: asString(
+            body['target'], 'target',
+        ),
+        timestamp: asString(
+            body['timestamp'], 'timestamp',
+        ),
+        status: asString(
+            body['status'], 'status',
+        ),
+        feedback: asString(
+            body['feedback'], 'feedback',
+        ),
+    };
+}
+
+const FLOW_BODY_KEYS: readonly string[] = [
+    'name', 'description', 'is_locked',
+    'is_auto_layout', 'is_auto_fit',
+    'lock_timeout', 'graph',
+    'created_at', 'updated_at',
+];
+
+export function validateFlowEntity(
+    body: Record<string, unknown>,
+): Omit<FlowEntity, 'id'> {
+    assertOnlyKeys(
+        body, FLOW_BODY_KEYS, 'FlowEntity',
+    );
+    return {
+        name: asString(
+            body['name'], 'name',
+        ),
+        description: asString(
+            body['description'],
+            'description',
+        ),
+        is_locked: asBoolean(
+            body['is_locked'], 'is_locked',
+        ),
+        is_auto_layout: asBoolean(
+            body['is_auto_layout'],
+            'is_auto_layout',
+        ),
+        is_auto_fit: asBoolean(
+            body['is_auto_fit'],
+            'is_auto_fit',
+        ),
+        lock_timeout: asNumber(
+            body['lock_timeout'],
+            'lock_timeout',
+        ),
+        graph: asJsonObjectField(
+            body['graph'], 'graph',
+        ),
+        created_at: asString(
+            body['created_at'], 'created_at',
+        ),
+        updated_at: asString(
+            body['updated_at'], 'updated_at',
+        ),
+    };
+}
+
+const FLOW_VERSION_BODY_KEYS:
+    readonly string[] = [
+    'flow_id', 'name', 'description',
+    'is_locked', 'is_auto_layout',
+    'is_auto_fit', 'lock_timeout',
+    'graph', 'created_at',
+];
+
+export function validateFlowVersionEntity(
+    body: Record<string, unknown>,
+): Omit<FlowVersionEntity, 'id'> {
+    assertOnlyKeys(
+        body,
+        FLOW_VERSION_BODY_KEYS,
+        'FlowVersionEntity',
+    );
+    return {
+        flow_id: asString(
+            body['flow_id'], 'flow_id',
+        ),
+        name: asString(
+            body['name'], 'name',
+        ),
+        description: asString(
+            body['description'],
+            'description',
+        ),
+        is_locked: asBoolean(
+            body['is_locked'], 'is_locked',
+        ),
+        is_auto_layout: asBoolean(
+            body['is_auto_layout'],
+            'is_auto_layout',
+        ),
+        is_auto_fit: asBoolean(
+            body['is_auto_fit'],
+            'is_auto_fit',
+        ),
+        lock_timeout: asNumber(
+            body['lock_timeout'],
+            'lock_timeout',
+        ),
+        graph: asJsonObjectField(
+            body['graph'], 'graph',
+        ),
+        created_at: asString(
+            body['created_at'], 'created_at',
+        ),
+    };
+}
+
+const WORK_ORDER_BODY_KEYS:
+    readonly string[] = [
+    'display_id', 'flow_graph',
+    'position', 'created_at',
+];
+
+export function validateWorkOrderEntity(
+    body: Record<string, unknown>,
+): Omit<WorkOrderEntity, 'id'> {
+    assertOnlyKeys(
+        body,
+        WORK_ORDER_BODY_KEYS,
+        'WorkOrderEntity',
+    );
+    return {
+        display_id: asString(
+            body['display_id'], 'display_id',
+        ),
+        flow_graph: asJsonObjectField(
+            body['flow_graph'], 'flow_graph',
+        ),
+        position: asNumber(
+            body['position'], 'position',
+        ),
+        created_at: asString(
+            body['created_at'], 'created_at',
+        ),
+    };
+}
+
+const FLOW_WORK_ORDER_BODY_KEYS:
+    readonly string[] = [
+    'flow_id', 'work_order_id', 'created_at',
+];
+
+export function validateFlowWorkOrderEntity(
+    body: Record<string, unknown>,
+): Omit<FlowWorkOrderEntity, 'id'> {
+    assertOnlyKeys(
+        body,
+        FLOW_WORK_ORDER_BODY_KEYS,
+        'FlowWorkOrderEntity',
+    );
+    return {
+        flow_id: asString(
+            body['flow_id'], 'flow_id',
+        ),
+        work_order_id: asString(
+            body['work_order_id'],
+            'work_order_id',
+        ),
+        created_at: asString(
+            body['created_at'], 'created_at',
+        ),
+    };
+}
+
+const WORK_ORDER_TRANSITION_BODY_KEYS:
+    readonly string[] = [
+    'work_order_id', 'from_node_id',
+    'to_node_id', 'user_id',
+    'values', 'transitioned_at',
+];
+
+export function
+validateWorkOrderTransitionEntity(
+    body: Record<string, unknown>,
+): Omit<WorkOrderTransitionEntity, 'id'> {
+    assertOnlyKeys(
+        body,
+        WORK_ORDER_TRANSITION_BODY_KEYS,
+        'WorkOrderTransitionEntity',
+    );
+    return {
+        work_order_id: asString(
+            body['work_order_id'],
+            'work_order_id',
+        ),
+        from_node_id: asString(
+            body['from_node_id'],
+            'from_node_id',
+        ),
+        to_node_id: asString(
+            body['to_node_id'], 'to_node_id',
+        ),
+        user_id: asString(
+            body['user_id'], 'user_id',
+        ),
+        values: asJsonObjectField(
+            body['values'], 'values',
+        ),
+        transitioned_at: asString(
+            body['transitioned_at'],
+            'transitioned_at',
+        ),
+    };
+}
+
+const WORK_ORDER_CLAIM_BODY_KEYS:
+    readonly string[] = [
+    'work_order_id', 'user_id', 'claimed_at',
+];
+
+export function validateWorkOrderClaimEntity(
+    body: Record<string, unknown>,
+): Omit<WorkOrderClaimEntity, 'id'> {
+    assertOnlyKeys(
+        body,
+        WORK_ORDER_CLAIM_BODY_KEYS,
+        'WorkOrderClaimEntity',
+    );
+    return {
+        work_order_id: asString(
+            body['work_order_id'],
+            'work_order_id',
+        ),
+        user_id: asString(
+            body['user_id'], 'user_id',
+        ),
+        claimed_at: asString(
+            body['claimed_at'], 'claimed_at',
+        ),
+    };
+}
+
+const COMPANY_BODY_KEYS: readonly string[] = [
+    'name', 'domain',
+];
+
+export function validateCompanyEntity(
+    body: Record<string, unknown>,
+): Omit<CompanyEntity, 'id'> {
+    assertOnlyKeys(
+        body,
+        COMPANY_BODY_KEYS,
+        'CompanyEntity',
+    );
+    return {
+        name: asString(
+            body['name'], 'name',
+        ),
+        domain: asString(
+            body['domain'], 'domain',
+        ),
+    };
+}
+
+const ORGANIZATION_BODY_KEYS:
+    readonly string[] = [
+    'plan', 'plan_status', 'next_billing',
+    'seats', 'used_seats', 'projects_limit',
+    'projects_current', 'ideas_limit',
+    'ideas_current', 'storage_limit',
+    'storage_current', 'ai_credits_limit',
+    'ai_credits_current', 'health_score',
+    'health_status', 'last_activity',
+    'active_users',
+];
+
+export function validateOrganizationEntity(
+    body: Record<string, unknown>,
+): Omit<OrganizationEntity, 'id'> {
+    assertOnlyKeys(
+        body,
+        ORGANIZATION_BODY_KEYS,
+        'OrganizationEntity',
+    );
+    return {
+        plan: asString(
+            body['plan'], 'plan',
+        ),
+        plan_status: asString(
+            body['plan_status'], 'plan_status',
+        ),
+        next_billing: asString(
+            body['next_billing'],
+            'next_billing',
+        ),
+        seats: asNumber(
+            body['seats'], 'seats',
+        ),
+        used_seats: asNumber(
+            body['used_seats'], 'used_seats',
+        ),
+        projects_limit: asNumber(
+            body['projects_limit'],
+            'projects_limit',
+        ),
+        projects_current: asNumber(
+            body['projects_current'],
+            'projects_current',
+        ),
+        ideas_limit: asNumber(
+            body['ideas_limit'], 'ideas_limit',
+        ),
+        ideas_current: asNumber(
+            body['ideas_current'],
+            'ideas_current',
+        ),
+        storage_limit: asNumber(
+            body['storage_limit'],
+            'storage_limit',
+        ),
+        storage_current: asNumber(
+            body['storage_current'],
+            'storage_current',
+        ),
+        ai_credits_limit: asNumber(
+            body['ai_credits_limit'],
+            'ai_credits_limit',
+        ),
+        ai_credits_current: asNumber(
+            body['ai_credits_current'],
+            'ai_credits_current',
+        ),
+        health_score: asNumber(
+            body['health_score'],
+            'health_score',
+        ),
+        health_status: asString(
+            body['health_status'],
+            'health_status',
+        ),
+        last_activity: asString(
+            body['last_activity'],
+            'last_activity',
+        ),
+        active_users: asNumber(
+            body['active_users'],
+            'active_users',
+        ),
+    };
+}
+
+const IDEA_SUBMISSION_BODY_KEYS:
+    readonly string[] = [
+    'idea_id', 'user_id', 'created_at',
+];
+
+export function validateIdeaSubmissionEntity(
+    body: Record<string, unknown>,
+): Omit<IdeaSubmissionEntity, 'id'> {
+    assertOnlyKeys(
+        body,
+        IDEA_SUBMISSION_BODY_KEYS,
+        'IdeaSubmissionEntity',
+    );
+    return {
+        idea_id: asString(
+            body['idea_id'], 'idea_id',
+        ),
+        user_id: asString(
+            body['user_id'], 'user_id',
+        ),
+        created_at: asString(
+            body['created_at'], 'created_at',
+        ),
+    };
+}
+
+const ACTIVITY_ACTOR_BODY_KEYS:
+    readonly string[] = [
+    'activity_id', 'user_id', 'created_at',
+];
+
+export function validateActivityActorEntity(
+    body: Record<string, unknown>,
+): Omit<ActivityActorEntity, 'id'> {
+    assertOnlyKeys(
+        body,
+        ACTIVITY_ACTOR_BODY_KEYS,
+        'ActivityActorEntity',
+    );
+    return {
+        activity_id: asString(
+            body['activity_id'], 'activity_id',
+        ),
+        user_id: asString(
+            body['user_id'], 'user_id',
+        ),
+        created_at: asString(
+            body['created_at'], 'created_at',
+        ),
+    };
+}
+
+const PROJECT_FLOW_BODY_KEYS:
+    readonly string[] = [
+    'project_id', 'flow_id', 'created_at',
+];
+
+export function validateProjectFlowEntity(
+    body: Record<string, unknown>,
+): Omit<ProjectFlowEntity, 'id'> {
+    assertOnlyKeys(
+        body,
+        PROJECT_FLOW_BODY_KEYS,
+        'ProjectFlowEntity',
+    );
+    return {
+        project_id: asString(
+            body['project_id'], 'project_id',
+        ),
+        flow_id: asString(
+            body['flow_id'], 'flow_id',
+        ),
+        created_at: asString(
+            body['created_at'], 'created_at',
+        ),
+    };
 }
