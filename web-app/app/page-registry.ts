@@ -1,11 +1,25 @@
-import type { IconName } from './icons.ts';
+import type { IconFn } from './icons.ts';
+import {
+    iconHome,
+    iconMail,
+    iconLightbulb,
+    iconFolderKanban,
+    iconGitBranch,
+    iconUsers,
+    iconSettings,
+    iconUser,
+    iconCreditCard,
+    iconActivity,
+    iconDatabase,
+    iconPalette,
+} from './icons.ts';
 
 export interface PageEntry {
     title: string;
     layout: 'sidebar' | 'standalone';
     sourceDir: string;
     sourceFile: string;
-    icon?: IconName;
+    icon?: IconFn;
     keywords?: string;
     searchable?: boolean;
 }
@@ -19,7 +33,7 @@ export const PAGE_REGISTRY: Record<
         layout: 'sidebar',
         sourceDir: 'dashboard',
         sourceFile: 'index',
-        icon: 'home',
+        icon: iconHome,
         keywords: 'home overview',
     },
     workbox: {
@@ -27,7 +41,7 @@ export const PAGE_REGISTRY: Record<
         layout: 'sidebar',
         sourceDir: 'workbox',
         sourceFile: 'index',
-        icon: 'mail',
+        icon: iconMail,
         keywords:
             'workbox inbox work order',
     },
@@ -36,7 +50,7 @@ export const PAGE_REGISTRY: Record<
         layout: 'sidebar',
         sourceDir: 'workbox',
         sourceFile: 'detail',
-        icon: 'mail',
+        icon: iconMail,
         searchable: false,
     },
     ideas: {
@@ -44,7 +58,7 @@ export const PAGE_REGISTRY: Record<
         layout: 'sidebar',
         sourceDir: 'ideas',
         sourceFile: 'index',
-        icon: 'lightbulb',
+        icon: iconLightbulb,
         keywords: 'ideas list innovation',
     },
     'idea-detail': {
@@ -52,7 +66,7 @@ export const PAGE_REGISTRY: Record<
         layout: 'sidebar',
         sourceDir: 'ideas',
         sourceFile: 'detail',
-        icon: 'lightbulb',
+        icon: iconLightbulb,
         searchable: false,
     },
     projects: {
@@ -60,7 +74,7 @@ export const PAGE_REGISTRY: Record<
         layout: 'sidebar',
         sourceDir: 'projects',
         sourceFile: 'index',
-        icon: 'folderKanban',
+        icon: iconFolderKanban,
         keywords:
             'projects list kanban',
     },
@@ -69,7 +83,7 @@ export const PAGE_REGISTRY: Record<
         layout: 'sidebar',
         sourceDir: 'projects',
         sourceFile: 'detail',
-        icon: 'folderKanban',
+        icon: iconFolderKanban,
         searchable: false,
     },
     flows: {
@@ -77,7 +91,7 @@ export const PAGE_REGISTRY: Record<
         layout: 'sidebar',
         sourceDir: 'flows',
         sourceFile: 'index',
-        icon: 'gitBranch',
+        icon: iconGitBranch,
         keywords:
             'flow, process,'
             + ' state machine',
@@ -87,7 +101,7 @@ export const PAGE_REGISTRY: Record<
         layout: 'standalone',
         sourceDir: 'flows',
         sourceFile: 'detail',
-        icon: 'gitBranch',
+        icon: iconGitBranch,
         searchable: false,
     },
     teams: {
@@ -95,7 +109,7 @@ export const PAGE_REGISTRY: Record<
         layout: 'sidebar',
         sourceDir: 'teams',
         sourceFile: 'index',
-        icon: 'users',
+        icon: iconUsers,
         keywords: 'team members roster',
     },
     organization: {
@@ -103,7 +117,7 @@ export const PAGE_REGISTRY: Record<
         layout: 'sidebar',
         sourceDir: 'organization',
         sourceFile: 'index',
-        icon: 'settings',
+        icon: iconSettings,
         keywords:
             'organization billing plan',
     },
@@ -112,7 +126,7 @@ export const PAGE_REGISTRY: Record<
         layout: 'sidebar',
         sourceDir: 'profile',
         sourceFile: 'index',
-        icon: 'user',
+        icon: iconUser,
         keywords:
             'profile settings personal',
     },
@@ -121,7 +135,7 @@ export const PAGE_REGISTRY: Record<
         layout: 'sidebar',
         sourceDir: 'company',
         sourceFile: 'index',
-        icon: 'settings',
+        icon: iconSettings,
         keywords: 'company organization',
     },
     billing: {
@@ -129,7 +143,7 @@ export const PAGE_REGISTRY: Record<
         layout: 'sidebar',
         sourceDir: 'billing',
         sourceFile: 'index',
-        icon: 'creditCard',
+        icon: iconCreditCard,
         keywords:
             'billing plan invoices'
             + ' payment',
@@ -139,7 +153,7 @@ export const PAGE_REGISTRY: Record<
         layout: 'sidebar',
         sourceDir: 'organization',
         sourceFile: 'users',
-        icon: 'users',
+        icon: iconUsers,
         keywords: 'users invite manage admin',
     },
     'activity-feed': {
@@ -147,7 +161,7 @@ export const PAGE_REGISTRY: Record<
         layout: 'sidebar',
         sourceDir: 'organization',
         sourceFile: 'activity-feed',
-        icon: 'activity',
+        icon: iconActivity,
         keywords: 'activity feed log',
     },
     snapshots: {
@@ -155,7 +169,7 @@ export const PAGE_REGISTRY: Record<
         layout: 'sidebar',
         sourceDir: 'snapshots',
         sourceFile: 'index',
-        icon: 'database',
+        icon: iconDatabase,
         keywords:
             'data export import wipe',
     },
@@ -164,7 +178,7 @@ export const PAGE_REGISTRY: Record<
         layout: 'sidebar',
         sourceDir: 'design-system',
         sourceFile: 'index',
-        icon: 'palette',
+        icon: iconPalette,
         keywords:
             'components ui reference',
     },
@@ -173,7 +187,7 @@ export const PAGE_REGISTRY: Record<
         layout: 'sidebar',
         sourceDir: 'ideas',
         sourceFile: 'create',
-        icon: 'lightbulb',
+        icon: iconLightbulb,
         keywords: 'new idea submit',
     },
     'idea-convert': {
@@ -181,7 +195,7 @@ export const PAGE_REGISTRY: Record<
         layout: 'sidebar',
         sourceDir: 'ideas',
         sourceFile: 'convert',
-        icon: 'lightbulb',
+        icon: iconLightbulb,
         searchable: false,
     },
     auth: {

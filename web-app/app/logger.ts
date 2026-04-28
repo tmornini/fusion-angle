@@ -21,61 +21,96 @@ function getConfiguredLevel(): Level {
 }
 
 function shouldLog(level: Level): boolean {
-    return LEVELS[level] >= LEVELS[getConfiguredLevel()];
+    return (
+        LEVELS[level]
+        >= LEVELS[getConfiguredLevel()]
+    );
 }
 
-function formatPrefix(level: Level, context?: string): string {
-    const tag = context ? `[fusion-ai:${context}]` : '[fusion-ai]';
-    return `${tag} ${level.toUpperCase()}`;
+function formatPrefix(
+    level: Level,
+    context?: string,
+    requestId?: string,
+): string {
+    const tag = context
+        ? `[fusion-ai:${context}]`
+        : '[fusion-ai]';
+    const reqTag = requestId
+        ? ` [req:${requestId.slice(0, 8)}]`
+        : '';
+    return `${tag}${reqTag} ${
+        level.toUpperCase()
+    }`;
+}
+
+type LogMethod = (
+    message: string,
+    context?: string,
+    ...data: unknown[]
+) => void;
+
+interface BoundLogger {
+    debug: LogMethod;
+    info: LogMethod;
+    warn: LogMethod;
+    error: LogMethod;
+}
+
+function makeLogMethod(
+    level: Level,
+    requestId?: string,
+): LogMethod {
+    return function (
+        message: string,
+        context?: string,
+        ...data: unknown[]
+    ): void {
+        if (!shouldLog(level)) return;
+        const prefix = formatPrefix(
+            level, context, requestId,
+        );
+        // eslint-disable-next-line no-console
+        switch (level) {
+            case 'debug':
+                console.debug(
+                    prefix, message, ...data,
+                );
+                break;
+            case 'info':
+                console.info(
+                    prefix, message, ...data,
+                );
+                break;
+            case 'warn':
+                console.warn(
+                    prefix, message, ...data,
+                );
+                break;
+            case 'error':
+                console.error(
+                    prefix, message, ...data,
+                );
+                break;
+        }
+    };
+}
+
+function makeLogger(
+    requestId?: string,
+): BoundLogger {
+    return {
+        debug: makeLogMethod('debug', requestId),
+        info: makeLogMethod('info', requestId),
+        warn: makeLogMethod('warn', requestId),
+        error: makeLogMethod(
+            'error', requestId,
+        ),
+    };
 }
 
 export const log = {
-    debug(
-        message: string,
-        context?: string,
-        ...data: unknown[]
-    ): void {
-        if (shouldLog('debug'))
-            console.debug(
-                formatPrefix('debug', context),
-                message,
-                ...data,
-            );
-    },
-    info(
-        message: string,
-        context?: string,
-        ...data: unknown[]
-    ): void {
-        if (shouldLog('info'))
-            console.info(
-                formatPrefix('info', context),
-                message,
-                ...data,
-            );
-    },
-    warn(
-        message: string,
-        context?: string,
-        ...data: unknown[]
-    ): void {
-        if (shouldLog('warn'))
-            console.warn(
-                formatPrefix('warn', context),
-                message,
-                ...data,
-            );
-    },
-    error(
-        message: string,
-        context?: string,
-        ...data: unknown[]
-    ): void {
-        if (shouldLog('error'))
-            console.error(
-                formatPrefix('error', context),
-                message,
-                ...data,
-            );
+    ...makeLogger(),
+    with(requestId: string): BoundLogger {
+        return makeLogger(requestId);
     },
 };

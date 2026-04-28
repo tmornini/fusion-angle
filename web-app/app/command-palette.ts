@@ -9,7 +9,6 @@ import {
     escapeForHtml,
 } from './safe-html.ts';
 import {
-    icons,
     iconSearch,
     iconLightbulb,
     iconFolderKanban,
@@ -65,9 +64,7 @@ function buildPageList(
         if (entry.searchable === false)
             continue;
         if (!entry.keywords) continue;
-        const iconFn = entry.icon
-            ? icons[entry.icon]
-            : undefined;
+        const iconFn = entry.icon;
         result.push({
             title: entry.title,
             icon: iconFn
