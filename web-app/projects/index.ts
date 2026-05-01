@@ -6,12 +6,13 @@ import {
 import { iconFolderKanban } from '../app/icons.ts';
 import { navigateTo } from '../app/core.ts';
 import {
+    createFetchContext,
     getProjects,
-    getProjectRow,
     putProject,
     isProjectStatus,
     subscribeProjectChanges,
     type ProjectStatus,
+    type ProjectEntity,
 } from '../app/adapters/index.ts';
 import {
     ProjectListPresenter,
@@ -28,8 +29,28 @@ const pageAbort = new AbortController();
 const signal = pageAbort.signal;
 
 let projectState: ProjectListState | null = null;
+let projectEntities:
+    Map<string, ProjectEntity> = new Map();
 let projectListEl: HTMLElement | null = null;
 let projectBadgesEl: HTMLElement | null = null;
+
+async function loadProjectsAndEntities(
+    ctx: ReturnType<typeof createFetchContext>,
+): Promise<{
+    projects: Awaited<ReturnType<typeof getProjects>>;
+    entities: Map<string, ProjectEntity>;
+}> {
+    const [rows, projects] = await Promise.all([
+        ctx.getProjectRows(),
+        getProjects(ctx),
+    ]);
+    return {
+        projects,
+        entities: new Map(
+            rows.map(r => [r.id, r]),
+        ),
+    };
+}
 
 export async function init(): Promise<void> {
     const listEl = $(
@@ -37,10 +58,11 @@ export async function init(): Promise<void> {
     );
     if (!listEl) return;
 
-    const projects = await withLoadingState(
+    const ctx = createFetchContext();
+    const loaded = await withLoadingState(
         listEl,
         buildSkeleton('card-list', 4),
-        getProjects,
+        () => loadProjectsAndEntities(ctx),
         init,
         {
             icon: iconFolderKanban(24, ''),
@@ -55,10 +77,13 @@ export async function init(): Promise<void> {
             },
         },
     );
-    if (!projects) return;
+    if (!loaded) return;
 
     projectState =
-        buildInitialProjectListState(projects);
+        buildInitialProjectListState(
+            loaded.projects,
+        );
+    projectEntities = loaded.entities;
     projectListEl = listEl;
     projectBadgesEl = $(
         '#status-badges', document,
@@ -81,10 +106,14 @@ export async function init(): Promise<void> {
         if (!projectState || !projectListEl) {
             return;
         }
-        const updated = await getProjects();
+        const refreshed =
+            await loadProjectsAndEntities(
+                createFetchContext(),
+            );
         projectState = applyProjectListUpdate(
-            projectState, updated,
+            projectState, refreshed.projects,
         );
+        projectEntities = refreshed.entities;
         rerenderProjects();
     });
 
@@ -94,18 +123,15 @@ export async function init(): Promise<void> {
         'data-project-card',
         async (id, newPosition) => {
             const entity =
-                await getProjectRow(id);
-            await putProject(id, {
-                ...entity,
-                position: newPosition,
-            });
-            const updated =
-                await getProjects();
-            if (!projectState) return;
-            projectState = applyProjectListUpdate(
-                projectState, updated,
+                projectEntities.get(id);
+            if (!entity) return;
+            await putProject(
+                createFetchContext(), id,
+                {
+                    ...entity,
+                    position: newPosition,
+                },
             );
-            rerenderProjects();
         },
     );
 }

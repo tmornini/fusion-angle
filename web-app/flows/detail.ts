@@ -13,6 +13,7 @@ import {
     navigateTo,
 } from '../app/core.ts';
 import {
+    createFetchContext,
     getFlowGraph,
     getFlowMermaid,
     getFlowZip,
@@ -58,6 +59,9 @@ const FALLBACK_W = 800;
 const FALLBACK_H = 600;
 const SAVE_DELAY_MS = 800;
 
+// Unit 6a instrumentation: capture per-burst stats so
+// the debouncer can be measured against frame budget and
+// removed/lowered if it isn't earning its keep.
 class Debouncer {
     #timer: ReturnType<
         typeof setTimeout
@@ -66,6 +70,8 @@ class Debouncer {
         | (() => void)
         | undefined = undefined;
     readonly #delayMs: number;
+    #scheduleCount: number = 0;
+    #burstStart: number = 0;
 
     constructor(delayMs: number) {
         this.#delayMs = delayMs;
@@ -74,14 +80,48 @@ class Debouncer {
     schedule(fn: () => void): void {
         if (this.#timer !== undefined) {
             clearTimeout(this.#timer);
+        } else {
+            this.#scheduleCount = 0;
+            this.#burstStart =
+                performance.now();
         }
+        this.#scheduleCount += 1;
         this.#pending = fn;
+        const startedAt = this.#burstStart;
+        const count = this.#scheduleCount;
         this.#timer = setTimeout(
             () => {
+                const burstDurMs =
+                    performance.now() - startedAt;
+                const ratePerSec =
+                    burstDurMs > 0
+                        ? count / (burstDurMs / 1000)
+                        : 0;
+                const callStart =
+                    performance.now();
                 fn();
+                const callDurMs =
+                    performance.now() - callStart;
+                log.info(
+                    'flow save debouncer fire',
+                    'debouncer',
+                    {
+                        delayMs: this.#delayMs,
+                        burstSchedules: count,
+                        burstDurMs:
+                            Math.round(burstDurMs),
+                        keystrokesPerSec:
+                            Math.round(
+                                ratePerSec * 10,
+                            ) / 10,
+                        callDurMs:
+                            Math.round(
+                                callDurMs * 100,
+                            ) / 100,
+                    },
+                );
                 this.#timer = undefined;
-                this.#pending =
-                    undefined;
+                this.#pending = undefined;
             },
             this.#delayMs,
         );
@@ -95,7 +135,21 @@ class Debouncer {
         if (
             this.#pending !== undefined
         ) {
+            const callStart =
+                performance.now();
             this.#pending();
+            const callDurMs =
+                performance.now() - callStart;
+            log.info(
+                'flow save debouncer flush',
+                'debouncer',
+                {
+                    callDurMs:
+                        Math.round(
+                            callDurMs * 100,
+                        ) / 100,
+                },
+            );
             this.#pending = undefined;
         }
     }
@@ -267,7 +321,9 @@ async function reportOpFailure(
     flowId: string,
 ): Promise<void> {
     showToast(toast, toastVariant);
-    const g = await getFlowGraph(flowId);
+    const g = await getFlowGraph(
+        createFetchContext(), flowId,
+    );
     const current = pageState.presenter().snapshot();
     commit({
         ...current,
@@ -740,20 +796,16 @@ function bindToolbarActions(
             } else if (action === 'redo') {
                 void handleRedo();
             } else if (action === 'zoom-in') {
-                pageState.presenter()
-                    .withZoomedIn();
-                update(
-                    container,
-                    pageState.presenter(),
+                commit(
+                    pageState.presenter()
+                        .withZoomedIn(),
                 );
             } else if (
                 action === 'zoom-out'
             ) {
-                pageState.presenter()
-                    .withZoomedOut();
-                update(
-                    container,
-                    pageState.presenter(),
+                commit(
+                    pageState.presenter()
+                        .withZoomedOut(),
                 );
             } else if (
                 action === 'copy-mermaid'
@@ -779,7 +831,9 @@ async function handleCopyMermaid(
     let text: string;
     try {
         text =
-            await getFlowMermaid(flowId);
+            await getFlowMermaid(
+                createFetchContext(), flowId,
+            );
     } catch (err) {
         log.error(
             'getFlowMermaid failed',
@@ -821,7 +875,9 @@ async function handleExportZip(
     };
     try {
         result =
-            await getFlowZip(flowId);
+            await getFlowZip(
+                createFetchContext(), flowId,
+            );
     } catch (err) {
         log.error(
             'getFlowZip failed',
@@ -1072,10 +1128,11 @@ export async function init(
         container,
         buildSkeleton('detail', 1),
         async () => {
+            const ctx = createFetchContext();
             const [graph, versions] =
                 await Promise.all([
-                    getFlowGraph(flowId),
-                    getFlowVersions(flowId),
+                    getFlowGraph(ctx, flowId),
+                    getFlowVersions(ctx, flowId),
                 ]);
             return { graph, versions };
         },

@@ -207,7 +207,7 @@ function computePortPos(
     const w = NODE_WIDTH;
     const h = NODE_HEIGHT;
     const perim = 2 * (w + h);
-    const params = edges.flatMap(e => {
+    const perimeterDistances = edges.flatMap(e => {
         const otherId =
             getOtherNodeId(e, node.id);
         if (!otherId) return [];
@@ -226,19 +226,19 @@ function computePortPos(
             pt.y - node.positionY,
         )];
     }).toSorted((a, b) => a - b);
-    if (params.length === 0) {
+    if (perimeterDistances.length === 0) {
         return { x: w, y: h / 2 };
     }
     let bestGap = 0;
     let bestMid = w + h / 2;
     for (let i = 0;
-        i < params.length; i++
+        i < perimeterDistances.length; i++
     ) {
         const next =
-            params[(i + 1)
-                % params.length]!;
-        const cur = params[i]!;
-        const gap = i < params.length - 1
+            perimeterDistances[(i + 1)
+                % perimeterDistances.length]!;
+        const cur = perimeterDistances[i]!;
+        const gap = i < perimeterDistances.length - 1
             ? next - cur
             : perim - cur + next;
         if (gap > bestGap) {
@@ -896,6 +896,11 @@ export function buildEdgePreviewPath(
 
 // Cubic Bézier B(t) = u³P0 + 3u²t P1 + 3ut² P2 + t³P3
 // where u = 1-t, P0..P3 are the control points.
+// Used to place an edge's label at parameter t along the
+// curve we drew. The SVG path mini-language separates
+// numbers with either commas or whitespace, so we split on
+// /[,\s]+/. We don't validate path syntax because we only
+// call this on paths constructed by this same file.
 function bezierAt(
     pathD: string,
     t: number,

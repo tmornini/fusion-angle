@@ -1,11 +1,7 @@
 import {
-    GET, POST, PUT,
-} from '../../../api/api.ts';
-import {
     nowUtc,
     jsonObjectField,
     DEFAULT_LOCK_TIMEOUT,
-    toBool,
     projectIsNotDeleted,
 } from '../../../api/types.ts';
 import type {
@@ -39,6 +35,7 @@ import {
     getFlowGraph,
 } from './flow-queries.ts';
 import type { FlowGraph } from './flow-queries.ts';
+import type { FetchContext } from './shared.ts';
 import {
     generateMermaid,
 } from '../mermaid-generate.ts';
@@ -66,10 +63,11 @@ import {
 /* ── Mermaid export ──────────────── */
 
 export async function getFlowMermaid(
+    ctx: FetchContext,
     flowId: string,
 ): Promise<string> {
     const graph =
-        await getFlowGraph(flowId);
+        await getFlowGraph(ctx, flowId);
     return generateMermaid(graph);
 }
 
@@ -257,6 +255,7 @@ function buildDialogConfig(
 }
 
 async function getFlowBackupData(
+    ctx: FetchContext,
     flowId: string,
 ): Promise<{
     flow: FlowEntity;
@@ -264,10 +263,10 @@ async function getFlowBackupData(
 }> {
     const [flow, projectFlows] =
         await Promise.all([
-            GET<FlowEntity>(
+            ctx.GET<FlowEntity>(
                 'flows/' + flowId,
             ),
-            GET<ProjectFlowEntity[]>(
+            ctx.GET<ProjectFlowEntity[]>(
                 'project-flows',
             ),
         ]);
@@ -296,14 +295,17 @@ function buildBackupJson(
             name: flow.name,
             description:
                 flow.description,
-            isLocked: toBool(
+            isLocked: asBoolean(
                 flow.is_locked,
+                'is_locked',
             ),
-            isAutoLayout: toBool(
+            isAutoLayout: asBoolean(
                 flow.is_auto_layout,
+                'is_auto_layout',
             ),
-            isAutoFit: toBool(
+            isAutoFit: asBoolean(
                 flow.is_auto_fit,
+                'is_auto_fit',
             ),
             lockTimeout:
                 flow.lock_timeout,
@@ -316,13 +318,14 @@ function buildBackupJson(
 }
 
 export async function getFlowZip(
+    ctx: FetchContext,
     flowId: string,
 ): Promise<{
     data: Uint8Array;
     name: string;
 }> {
     const { flow, projectId } =
-        await getFlowBackupData(flowId);
+        await getFlowBackupData(ctx, flowId);
 
     const graph = validateStoredGraphJson(
         flow.graph, 'flow.graph',
@@ -332,14 +335,17 @@ export async function getFlowZip(
         id: flow.id,
         name: flow.name,
         description: flow.description,
-        isLocked: toBool(
+        isLocked: asBoolean(
             flow.is_locked,
+            'is_locked',
         ),
-        isAutoLayout: toBool(
+        isAutoLayout: asBoolean(
             flow.is_auto_layout,
+            'is_auto_layout',
         ),
-        isAutoFit: toBool(
+        isAutoFit: asBoolean(
             flow.is_auto_fit,
+            'is_auto_fit',
         ),
         lockTimeout: flow.lock_timeout,
         createdAt: flow.created_at,
@@ -474,12 +480,13 @@ export async function getBackupFromZip(
 }
 
 export async function computeFlowBackupResolution(
+    ctx: FetchContext,
     backup: BackupV2,
 ): Promise<ImportResolution> {
     const [flows, projects] =
         await Promise.all([
-            GET<FlowEntity[]>('flows'),
-            GET<ProjectEntity[]>(
+            ctx.GET<FlowEntity[]>('flows'),
+            ctx.GET<ProjectEntity[]>(
                 'projects',
             ),
         ]);
@@ -505,39 +512,8 @@ export async function computeFlowBackupResolution(
     };
 }
 
-export async function putFlowFromBackup(
-    backup: BackupV2,
-): Promise<string> {
-    const current = await GET<FlowEntity>(
-        'flows/' + backup.flow.id,
-    );
-    await PUT(
-        'flows/' + backup.flow.id,
-        {
-            name: backup.flow.name,
-            description:
-                backup.flow.description,
-            is_locked:
-                backup.flow.isLocked,
-            is_auto_layout:
-                backup.flow.isAutoLayout,
-            is_auto_fit:
-                backup.flow.isAutoFit,
-            lock_timeout:
-                backup.flow.lockTimeout,
-            graph: putFlowGraph(
-                backup.flow.graph,
-            ),
-            created_at:
-                current.created_at,
-            updated_at: nowUtc(),
-        },
-    );
-    notifyFlowChange();
-    return backup.flow.id;
-}
-
 export async function postFlowFromBackup(
+    ctx: FetchContext,
     flowId: string,
     backup: BackupV2,
     projectId: string,
@@ -598,7 +574,7 @@ export async function postFlowFromBackup(
             };
         });
 
-    await PUT<void>('flows', {
+    await ctx.PUT<void>('flows', {
         id: flowId,
         name: backup.flow.name,
         description:
@@ -617,7 +593,7 @@ export async function postFlowFromBackup(
         updated_at: now,
     });
 
-    await PUT<void>(
+    await ctx.PUT<void>(
         'project-flows',
         {
             id: generateCryptoSafeBase62(),
@@ -817,6 +793,7 @@ function putFlowGraph(
 }
 
 export async function postFlowFromMermaid(
+    ctx: FetchContext,
     flowId: string,
     text: string,
     projectId: string,
@@ -934,18 +911,21 @@ export async function postFlowFromMermaid(
                 + ' intermediate state',
         );
     }
-    await PUT<void>('flows', {
+    await ctx.PUT<void>('flows', {
         id: flowId,
         name:
             firstNode.name + ' (import)',
         description: '',
+        is_locked: false,
+        is_auto_layout: true,
+        is_auto_fit: true,
         lock_timeout: DEFAULT_LOCK_TIMEOUT,
         graph: putFlowGraph(graph),
         created_at: now,
         updated_at: now,
     });
 
-    await PUT<void>('project-flows', {
+    await ctx.PUT<void>('project-flows', {
         id: generateCryptoSafeBase62(),
         project_id: projectId,
         flow_id: flowId,
@@ -1139,6 +1119,7 @@ function applySidecarToDefault(
 }
 
 export async function postFlowFromZip(
+    ctx: FetchContext,
     flowId: string,
     data: Uint8Array,
     projectId: string,
@@ -1363,17 +1344,20 @@ export async function postFlowFromZip(
         ? sidecar.description
         : firstNode!.name;
 
-    await PUT<void>('flows', {
+    await ctx.PUT<void>('flows', {
         id: flowId,
         name: flowName,
         description: flowDesc,
+        is_locked: false,
+        is_auto_layout: true,
+        is_auto_fit: true,
         lock_timeout: DEFAULT_LOCK_TIMEOUT,
         graph: putFlowGraph(graph),
         created_at: now,
         updated_at: now,
     });
 
-    await PUT<void>('project-flows', {
+    await ctx.PUT<void>('project-flows', {
         id: generateCryptoSafeBase62(),
         project_id: projectId,
         flow_id: flowId,

@@ -41,7 +41,7 @@ async function simulateNetworkLatency(
 
 function withSimulatedLatency<T extends object>(
     target: T,
-    config: LatencyConfig = DEFAULT_LATENCY_CONFIG,
+    config: LatencyConfig,
 ): T {
     return new Proxy(target, {
         get(obj, prop, receiver) {

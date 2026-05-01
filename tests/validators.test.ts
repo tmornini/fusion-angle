@@ -446,7 +446,6 @@ const validTransition = {
     from_node_id: 'n-1',
     to_node_id: 'n-2',
     user_id: 'u-1',
-    values: '{}',
     transitioned_at: '2024-01-01T00:00:00Z',
 };
 
@@ -474,6 +473,22 @@ test(
             body,
         ),
         /missing required key "transitioned_at"/,
+    );
+});
+
+test(
+    'validateWorkOrderTransitionEntity rejects'
+    + ' lingering values key',
+    () => {
+    const body = {
+        ...validTransition,
+        values: '{}',
+    };
+    assert.throws(
+        () => validateWorkOrderTransitionEntity(
+            body,
+        ),
+        /unexpected key "values"/,
     );
 });
 

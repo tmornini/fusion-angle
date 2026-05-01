@@ -151,6 +151,16 @@ function persistThemePreference(
     applyResolvedTheme();
 }
 
+function applySidebarCollapsed(
+    collapsed: boolean,
+): void {
+    document.documentElement
+        .classList.toggle(
+            'sidebar-collapsed',
+            collapsed,
+        );
+}
+
 function collapseSidebar(
     collapsed: boolean,
 ): void {
@@ -163,6 +173,7 @@ function collapseSidebar(
     setState({
         isSidebarCollapsed: collapsed,
     });
+    applySidebarCollapsed(collapsed);
 }
 
 function initListeners(): void {
@@ -216,11 +227,9 @@ function initListeners(): void {
                     isSidebarCollapsed:
                         collapsed,
                 });
-                document.documentElement
-                    .classList.toggle(
-                        'sidebar-collapsed',
-                        collapsed,
-                    );
+                applySidebarCollapsed(
+                    collapsed,
+                );
             }
         },
     );

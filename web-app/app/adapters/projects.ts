@@ -1,4 +1,3 @@
-import { GET, PUT } from '../../../api/api.ts';
 import type {
     ProjectEntity,
     ProjectStatus,
@@ -16,21 +15,18 @@ import {
 } from './shared.ts';
 import type { FetchContext } from './shared.ts';
 import {
-    createChannel,
-    bridgeStorageToChannel,
+    createSubscriptionChannel,
 } from '../channels.ts';
 
-const projectChangedChannel =
-    createChannel<void>();
-bridgeStorageToChannel(
-    ['projects', 'project-team-members'],
-    projectChangedChannel,
-);
+const projectChanges =
+    createSubscriptionChannel(
+        ['projects', 'project-team-members'],
+    );
 
 export function subscribeProjectChanges(
     fn: () => void,
 ): () => void {
-    return projectChangedChannel.subscribe(fn);
+    return projectChanges.subscribe(fn);
 }
 
 export {
@@ -56,13 +52,9 @@ export function isTeamLead(
 }
 
 export async function getProjects(
-    ctx?: FetchContext,
+    ctx: FetchContext,
 ): Promise<Project[]> {
-    const rows = ctx
-        ? await ctx.getProjectRows()
-        : await GET<ProjectEntity[]>(
-            'projects',
-        );
+    const rows = await ctx.getProjectRows();
     return rows
         .filter(projectIsNotDeleted)
         .map(row => new Project(row));
@@ -195,27 +187,30 @@ export class ProjectView {
 }
 
 export async function getProjectTeamRows(
+    ctx: FetchContext,
     projectId: string,
 ): Promise<TeamMemberEntity[]> {
-    return GET<TeamMemberEntity[]>(
+    return ctx.GET<TeamMemberEntity[]>(
         `projects/${projectId}/team`,
     );
 }
 
 export async function getProjectRow(
+    ctx: FetchContext,
     id: string,
 ): Promise<ProjectEntity> {
-    return GET<ProjectEntity>(
+    return ctx.GET<ProjectEntity>(
         `projects/${id}`,
     );
 }
 
 export async function putProject(
+    ctx: FetchContext,
     id: string,
     entity: Omit<ProjectEntity, 'id'>,
 ): Promise<void> {
-    await PUT(`projects/${id}`, entity);
-    projectChangedChannel.send();
+    await ctx.PUT(`projects/${id}`, entity);
+    projectChanges.notify();
 }
 
 export interface TeamMemberAssignment {
@@ -227,14 +222,15 @@ export interface TeamMemberAssignment {
 
 export async function
 putProjectTeamMember(
-    ctx: TeamMemberAssignment,
+    ctx: FetchContext,
+    assignment: TeamMemberAssignment,
 ): Promise<void> {
-    await PUT(
-        `projects/${ctx.projectId}`
-            + `/team/${ctx.userId}`,
+    await ctx.PUT(
+        `projects/${assignment.projectId}`
+            + `/team/${assignment.userId}`,
         {
-            role: ctx.role,
-            type: ctx.type,
+            role: assignment.role,
+            type: assignment.type,
         },
     );
 }

@@ -28,10 +28,12 @@ import type {
     FlowWorkOrderEntity,
     WorkOrderTransitionEntity,
     WorkOrderClaimEntity,
+    TransitionFieldValueEntity,
 } from './types.ts';
 import { nowUtc } from './types.ts';
 import {
     withSimulatedLatency,
+    DEFAULT_LATENCY_CONFIG,
 } from './latency.ts';
 import {
     asString,
@@ -48,6 +50,7 @@ import {
     validateWorkOrderEntity,
     validateFlowWorkOrderEntity,
     validateWorkOrderTransitionEntity,
+    validateTransitionFieldValueEntity,
     validateWorkOrderClaimEntity,
     validateCompanyEntity,
     validateOrganizationEntity,
@@ -56,30 +59,6 @@ import {
 } from './validators.ts';
 
 const KEY_PREFIX = 'fusion-ai:';
-
-const IMPORTING_SENTINEL_KEY =
-    KEY_PREFIX + '_importing';
-
-export class SnapshotRollbackFailed
-    extends Error {
-    readonly originalError: unknown;
-    readonly rollbackError: unknown;
-    constructor(
-        originalError: unknown,
-        rollbackError: unknown,
-    ) {
-        super(
-            'Snapshot import failed AND'
-            + ' rollback failed; database is'
-            + ' in indeterminate state.'
-            + ' Wipe and reload from'
-            + ' snapshots.',
-        );
-        this.originalError = originalError;
-        this.rollbackError = rollbackError;
-        this.name = 'SnapshotRollbackFailed';
-    }
-}
 
 // Map table name → entity validator.
 // 'deleted' rows have shape {id, deleted_at}
@@ -137,6 +116,11 @@ function validateSnapshotRow(
                 break;
             case 'work_order_transitions':
                 validateWorkOrderTransitionEntity(
+                    body,
+                );
+                break;
+            case 'transition_field_values':
+                validateTransitionFieldValueEntity(
                     body,
                 );
                 break;
@@ -251,44 +235,51 @@ async function readTable<T>(
     if (raw === null) {
         throw new MissingTableError(tableName);
     }
+    let json: string;
+    if (COMPRESSED_TABLES.has(tableName)) {
+        try {
+            json = await decompressJson(raw);
+        } catch (e) {
+            throw new Error(
+                'Decompressing table "'
+                + tableName + '" failed: '
+                + (e instanceof Error
+                    ? e.message
+                    : String(e)),
+            );
+        }
+    } else {
+        json = raw;
+    }
+    let parsed: unknown;
     try {
-        const json = COMPRESSED_TABLES.has(tableName)
-            ? await decompressJson(raw)
-            : raw;
-        const parsed = JSON.parse(json);
-        if (!Array.isArray(parsed)) {
-            throw new Error(
-                'Table "' + tableName
-                + '" is not an array.'
-                + ' Clear data or import'
-                + ' a valid snapshot.',
-            );
-        }
-        if (!parsed.every(isRowShaped)) {
-            throw new Error(
-                'Table "' + tableName
-                + '" has malformed row(s).'
-                + ' Clear data or import'
-                + ' a valid snapshot.',
-            );
-        }
-        return parsed as T[];
+        parsed = JSON.parse(json);
     } catch (e) {
-        if (e instanceof Error) {
-            throw new Error(
-                'Reading table "'
-                + tableName
-                + '" failed: '
-                + e.message,
-            );
-        }
+        throw new Error(
+            'Parsing table "'
+            + tableName + '" failed: '
+            + (e instanceof Error
+                ? e.message
+                : String(e)),
+        );
+    }
+    if (!Array.isArray(parsed)) {
         throw new Error(
             'Table "' + tableName
-            + '" has corrupt JSON.'
+            + '" is not an array.'
             + ' Clear data or import'
             + ' a valid snapshot.',
         );
     }
+    if (!parsed.every(isRowShaped)) {
+        throw new Error(
+            'Table "' + tableName
+            + '" has malformed row(s).'
+            + ' Clear data or import'
+            + ' a valid snapshot.',
+        );
+    }
+    return parsed as T[];
 }
 
 async function writeTable<T>(
@@ -332,9 +323,6 @@ function serializeValue(
             + ` ${String(value)}.`,
         );
     }
-    if (typeof value === 'boolean') {
-        return value ? 1 : 0;
-    }
     return value;
 }
 
@@ -361,8 +349,29 @@ function generateCompositeId(
     return `${prefix}-${parts.join('-')}`;
 }
 
+// Serializes async writes per store. Without this, two
+// Promise.all'd puts both await readTable, both see the
+// pre-write array, and both write back a 1-row result
+// (last writer wins). The chain forces each write to
+// observe the prior write's effect.
+function createSerializer():
+    <R>(fn: () => Promise<R>) => Promise<R> {
+    let tail: Promise<unknown> = Promise.resolve();
+    return function run<R>(
+        fn: () => Promise<R>,
+    ): Promise<R> {
+        const next = tail.then(fn, fn);
+        tail = next.then(
+            () => undefined,
+            () => undefined,
+        );
+        return next as Promise<R>;
+    };
+}
+
 function createDeletedStore(): DeletedStore {
     const TABLE = 'deleted';
+    const serialize = createSerializer();
     return {
         async isDeleted(
             id: string,
@@ -373,20 +382,22 @@ function createDeletedStore(): DeletedStore {
             return rows.some(r => r.id === id);
         },
         async record(id: string): Promise<void> {
-            const rows = await readTable<Deleted>(
-                TABLE,
-            );
-            if (
-                rows.some(r => r.id === id)
-            ) return;
-            const next: Deleted[] = [
-                ...rows,
-                {
-                    id,
-                    deleted_at: nowUtc(),
-                },
-            ];
-            await writeTable(TABLE, next);
+            return serialize(async () => {
+                const rows = await readTable<Deleted>(
+                    TABLE,
+                );
+                if (
+                    rows.some(r => r.id === id)
+                ) return;
+                const next: Deleted[] = [
+                    ...rows,
+                    {
+                        id,
+                        deleted_at: nowUtc(),
+                    },
+                ];
+                await writeTable(TABLE, next);
+            });
         },
         async allDeletedIds(
         ): Promise<Set<string>> {
@@ -406,6 +417,7 @@ function createEntityStore<
     tableName: string,
     deletedStore: DeletedStore,
 ): EntityStore<T> {
+    const serialize = createSerializer();
     return {
         async getAll(): Promise<T[]> {
             const rows = await readTable<T>(tableName);
@@ -440,23 +452,27 @@ function createEntityStore<
             id: string,
             fields: Omit<T, 'id'>,
         ): Promise<T> {
-            const rows = await readTable<T>(tableName);
-            const index = rows.findIndex(
-                entity => entity.id === id,
-            );
-            const serialized = serializeRecord(
-                fields as Record<string, unknown>,
-                tableName,
-            );
-            const written = {
-                ...serialized,
-                id,
-            } as T;
-            const next = index >= 0
-                ? rows.with(index, written)
-                : [...rows, written];
-            await writeTable(tableName, next);
-            return written;
+            return serialize(async () => {
+                const rows = await readTable<T>(
+                    tableName,
+                );
+                const index = rows.findIndex(
+                    entity => entity.id === id,
+                );
+                const serialized = serializeRecord(
+                    fields as Record<string, unknown>,
+                    tableName,
+                );
+                const written = {
+                    ...serialized,
+                    id,
+                } as T;
+                const next = index >= 0
+                    ? rows.with(index, written)
+                    : [...rows, written];
+                await writeTable(tableName, next);
+                return written;
+            });
         },
         async delete(id: string): Promise<void> {
             await deletedStore.record(id);
@@ -470,6 +486,7 @@ function createEntityStore<
 function createHistoryEntityStore<
     T extends { id: string },
 >(tableName: string): EntityStore<T> {
+    const serialize = createSerializer();
     return {
         async getAll(): Promise<T[]> {
             return await readTable<T>(tableName);
@@ -492,35 +509,43 @@ function createHistoryEntityStore<
             id: string,
             fields: Omit<T, 'id'>,
         ): Promise<T> {
-            const rows = await readTable<T>(tableName);
-            const index = rows.findIndex(
-                entity => entity.id === id,
-            );
-            const serialized = serializeRecord(
-                fields as Record<string, unknown>,
-                tableName,
-            );
-            const written = {
-                ...serialized,
-                id,
-            } as T;
-            const next = index >= 0
-                ? rows.with(index, written)
-                : [...rows, written];
-            await writeTable(tableName, next);
-            return written;
+            return serialize(async () => {
+                const rows = await readTable<T>(
+                    tableName,
+                );
+                const index = rows.findIndex(
+                    entity => entity.id === id,
+                );
+                const serialized = serializeRecord(
+                    fields as Record<string, unknown>,
+                    tableName,
+                );
+                const written = {
+                    ...serialized,
+                    id,
+                } as T;
+                const next = index >= 0
+                    ? rows.with(index, written)
+                    : [...rows, written];
+                await writeTable(tableName, next);
+                return written;
+            });
         },
         async delete(id: string): Promise<void> {
-            const rows = await readTable<T>(tableName);
-            const idx = rows.findIndex(
-                e => e.id === id,
-            );
-            if (idx >= 0) {
-                await writeTable(
+            return serialize(async () => {
+                const rows = await readTable<T>(
                     tableName,
-                    rows.toSpliced(idx, 1),
                 );
-            }
+                const idx = rows.findIndex(
+                    e => e.id === id,
+                );
+                if (idx >= 0) {
+                    await writeTable(
+                        tableName,
+                        rows.toSpliced(idx, 1),
+                    );
+                }
+            });
         },
     };
 }
@@ -528,6 +553,7 @@ function createHistoryEntityStore<
 function createSingletonStore<
     T extends { id: string },
 >(tableName: string): SingletonStore<T> {
+    const serialize = createSerializer();
     return {
         async get(): Promise<T> {
             const rows = await readTable<T>(tableName);
@@ -544,41 +570,191 @@ function createSingletonStore<
         async put(
             fields: Omit<T, 'id'>,
         ): Promise<T> {
-            const rows = await readTable<T>(tableName);
-            const serialized = serializeRecord(
-                fields as Record<string, unknown>,
-                tableName,
-            );
-            const index = rows.findIndex(
-                entity => entity.id === '1',
-            );
-
-            if (index >= 0) {
-                rows[index] = {
-                    ...serialized,
-                    id: '1',
-                } as T;
-            } else {
-                rows.push({
-                    ...serialized,
-                    id: '1',
-                } as T);
-            }
-
-            await writeTable(tableName, rows);
-            const pos = index >= 0
-                ? index
-                : rows.length - 1;
-            const written = rows[pos];
-            if (!written) {
-                throw new Error(
-                    'Internal error: entity'
-                    + ' not found after write',
+            return serialize(async () => {
+                const rows = await readTable<T>(
+                    tableName,
                 );
-            }
-            return written;
+                const serialized = serializeRecord(
+                    fields as Record<string, unknown>,
+                    tableName,
+                );
+                const index = rows.findIndex(
+                    entity => entity.id === '1',
+                );
+
+                if (index >= 0) {
+                    rows[index] = {
+                        ...serialized,
+                        id: '1',
+                    } as T;
+                } else {
+                    rows.push({
+                        ...serialized,
+                        id: '1',
+                    } as T);
+                }
+
+                await writeTable(tableName, rows);
+                const pos = index >= 0
+                    ? index
+                    : rows.length - 1;
+                const written = rows[pos];
+                if (!written) {
+                    throw new Error(
+                        'Internal error: entity'
+                        + ' not found after write',
+                    );
+                }
+                return written;
+            });
         },
     };
+}
+
+async function clearAllTables(): Promise<void> {
+    for (const table of TABLE_NAMES) {
+        localStorage.removeItem(
+            KEY_PREFIX + table,
+        );
+    }
+}
+
+async function hasAnyTable(): Promise<boolean> {
+    return TABLE_NAMES.some(
+        table =>
+            localStorage.getItem(
+                KEY_PREFIX + table,
+            ) !== null,
+    );
+}
+
+async function seedEmptyTables(): Promise<void> {
+    for (const table of TABLE_NAMES) {
+        if (
+            localStorage.getItem(
+                KEY_PREFIX + table,
+            ) === null
+        ) {
+            await writeTable(table, []);
+        }
+    }
+}
+
+async function serializeAllTables(
+): Promise<string> {
+    const snapshot: Record<
+        string,
+        unknown[]
+    > = {};
+    for (const table of TABLE_NAMES) {
+        snapshot[table] = await readTable(
+            table,
+        );
+    }
+    return JSON.stringify(snapshot, null, 2);
+}
+
+// Parses + validates the snapshot JSON, returning
+// per-table serialized payloads ready for storage.
+// Throws with a precise message identifying which
+// table or row failed validation. Pure (no I/O).
+async function parseAndValidateSnapshot(
+    json: string,
+): Promise<Map<string, string>> {
+    let parsed: unknown;
+    try {
+        parsed = JSON.parse(json);
+    } catch {
+        throw new Error(
+            'Invalid snapshot:'
+            + ' not valid JSON.',
+        );
+    }
+    if (
+        typeof parsed !== 'object'
+        || parsed === null
+        || Array.isArray(parsed)
+    ) {
+        throw new Error(
+            'Invalid snapshot: expected'
+            + ' an object with table'
+            + ' keys.',
+        );
+    }
+    const record = parsed as Record<
+        string, unknown
+    >;
+    const serialized = new Map<string, string>();
+    for (const table of TABLE_NAMES) {
+        const rows = record[table];
+        if (
+            rows !== undefined
+            && !Array.isArray(rows)
+        ) {
+            throw new Error(
+                'Invalid snapshot:'
+                + ' table "'
+                + table
+                + '" is not an array.',
+            );
+        }
+        const rowArr =
+            Array.isArray(rows) ? rows : [];
+        for (let i = 0; i < rowArr.length; i++) {
+            const row = rowArr[i];
+            if (
+                typeof row !== 'object'
+                || row === null
+                || Array.isArray(row)
+            ) {
+                throw new Error(
+                    'Invalid snapshot:'
+                    + ' row '
+                    + i
+                    + ' in table "'
+                    + table
+                    + '" is not an'
+                    + ' object.',
+                );
+            }
+            const r = row as Record<
+                string, unknown
+            >;
+            validateSnapshotRow(table, r, i);
+        }
+        serialized.set(
+            table, JSON.stringify(rowArr),
+        );
+    }
+    return serialized;
+}
+
+// Wipes existing tables, then writes serialized
+// payloads. On mid-write failure (e.g. quota
+// exceeded), wipes everything so the next
+// bootstrap detects no schema and routes the
+// user to re-import. Real atomicity arrives
+// with Postgres.
+async function applyValidatedSnapshot(
+    serialized: Map<string, string>,
+): Promise<void> {
+    await clearAllTables();
+    try {
+        for (
+            const [table, json] of serialized
+        ) {
+            const payload =
+                COMPRESSED_TABLES.has(table)
+                    ? await compressJson(json)
+                    : json;
+            localStorage.setItem(
+                KEY_PREFIX + table, payload,
+            );
+        }
+    } catch (err) {
+        await clearAllTables();
+        throw err;
+    }
 }
 
 export const TABLE_NAMES = [
@@ -595,6 +771,7 @@ export const TABLE_NAMES = [
     'work_orders',
     'flow_work_orders',
     'work_order_transitions',
+    'transition_field_values',
     'work_order_claims',
     'company',
     'organization',
@@ -618,228 +795,20 @@ export async function createLocalStorageAdapter(
         async flush(): Promise<void> {
         },
 
-        async deleteSchema(): Promise<void> {
-            for (const table of TABLE_NAMES) {
-                localStorage.removeItem(
-                    KEY_PREFIX + table,
-                );
-            }
-        },
-
-        async hasSchema(): Promise<boolean> {
-            return TABLE_NAMES.some(
-                table =>
-                    localStorage.getItem(
-                        KEY_PREFIX + table,
-                    ) !== null,
-            );
-        },
-
-        async createSchema(): Promise<void> {
-            for (const table of TABLE_NAMES) {
-                if (
-                    localStorage.getItem(
-                        KEY_PREFIX + table,
-                    ) === null
-                ) {
-                    await writeTable(table, []);
-                }
-            }
-        },
-
-        async exportSnapshot(
-        ): Promise<string> {
-            const snapshot: Record<
-                string,
-                unknown[]
-            > = {};
-            for (
-                const table of TABLE_NAMES
-            ) {
-                snapshot[table] = await readTable(
-                    table,
-                );
-            }
-            return JSON.stringify(
-                snapshot,
-                null,
-                2,
-            );
-        },
+        deleteSchema: clearAllTables,
+        hasSchema: hasAnyTable,
+        createSchema: seedEmptyTables,
+        exportSnapshot: serializeAllTables,
 
         async importSnapshot(
             json: string,
         ): Promise<void> {
-            let snapshot: unknown;
-            try {
-                snapshot = JSON.parse(json);
-            } catch {
-                throw new Error(
-                    'Invalid snapshot:'
-                    + ' not valid JSON.',
+            const serialized =
+                await parseAndValidateSnapshot(
+                    json,
                 );
-            }
-            if (
-                typeof snapshot !== 'object'
-                || snapshot === null
-                || Array.isArray(snapshot)
-            ) {
-                throw new Error(
-                    'Invalid snapshot: expected'
-                    + ' an object with table'
-                    + ' keys.',
-                );
-            }
-            const record = snapshot as Record<
-                string,
-                unknown
-            >;
-            const serialized = new Map<
-                string,
-                string
-            >();
-            for (
-                const table of TABLE_NAMES
-            ) {
-                const rows = record[table];
-                if (
-                    rows !== undefined
-                    && !Array.isArray(rows)
-                ) {
-                    throw new Error(
-                        'Invalid snapshot:'
-                        + ' table "'
-                        + table
-                        + '" is not an array.',
-                    );
-                }
-                const rowArr =
-                    Array.isArray(rows)
-                        ? rows
-                        : [];
-                for (
-                    let i = 0;
-                    i < rowArr.length;
-                    i++
-                ) {
-                    const row = rowArr[i];
-                    if (
-                        typeof row !== 'object'
-                        || row === null
-                        || Array.isArray(row)
-                    ) {
-                        throw new Error(
-                            'Invalid snapshot:'
-                            + ' row '
-                            + i
-                            + ' in table "'
-                            + table
-                            + '" is not an'
-                            + ' object.',
-                        );
-                    }
-                    const r = row as Record<
-                        string, unknown
-                    >;
-                    validateSnapshotRow(
-                        table, r, i,
-                    );
-                }
-                serialized.set(
-                    table,
-                    JSON.stringify(rowArr),
-                );
-            }
-
-            // Backup existing tables before
-            // any write. If a setItem fails
-            // mid-loop (e.g. quota exceeded
-            // on the 6th of 19 writes), we
-            // restore the old state so the
-            // database is never half-imported.
-            const backup = new Map<
-                string,
-                string | null
-            >();
-            for (
-                const table of TABLE_NAMES
-            ) {
-                backup.set(
-                    table,
-                    localStorage.getItem(
-                        KEY_PREFIX + table,
-                    ),
-                );
-            }
-            // Sentinel marks the database as
-            // in indeterminate state for the
-            // duration of the write loop. If
-            // we crash or both the write AND
-            // the rollback fail, the next
-            // bootstrap surfaces the
-            // snapshots page so the user
-            // can recover.
-            localStorage.setItem(
-                IMPORTING_SENTINEL_KEY, '1',
-            );
-            for (
-                const table of TABLE_NAMES
-            ) {
-                localStorage.removeItem(
-                    KEY_PREFIX + table,
-                );
-            }
-            try {
-                for (
-                    const [table, json]
-                        of serialized
-                ) {
-                    const payload =
-                        COMPRESSED_TABLES.has(table)
-                            ? await compressJson(json)
-                            : json;
-                    localStorage.setItem(
-                        KEY_PREFIX + table,
-                        payload,
-                    );
-                }
-            } catch (err) {
-                try {
-                    for (
-                        const [table, prev]
-                            of backup
-                    ) {
-                        if (prev !== null) {
-                            localStorage
-                                .setItem(
-                                    KEY_PREFIX
-                                    + table,
-                                    prev,
-                                );
-                        } else {
-                            localStorage
-                                .removeItem(
-                                    KEY_PREFIX
-                                    + table,
-                                );
-                        }
-                    }
-                } catch (rollbackErr) {
-                    // Sentinel stays set —
-                    // database is wedged.
-                    throw new
-                        SnapshotRollbackFailed(
-                            err,
-                            rollbackErr,
-                        );
-                }
-                localStorage.removeItem(
-                    IMPORTING_SENTINEL_KEY,
-                );
-                throw err;
-            }
-            localStorage.removeItem(
-                IMPORTING_SENTINEL_KEY,
+            await applyValidatedSnapshot(
+                serialized,
             );
         },
 
@@ -906,6 +875,13 @@ export async function createLocalStorageAdapter(
                 'work_order_transitions',
                 deletedStore,
             ),
+        transitionFieldValues:
+            createEntityStore<
+                TransitionFieldValueEntity
+            >(
+                'transition_field_values',
+                deletedStore,
+            ),
         workOrderClaims:
             createEntityStore<
                 WorkOrderClaimEntity
@@ -936,6 +912,9 @@ export async function createLocalStorageAdapter(
     };
 
     return simulateLatencyRequested()
-        ? withSimulatedLatency(adapter)
+        ? withSimulatedLatency(
+            adapter,
+            DEFAULT_LATENCY_CONFIG,
+        )
         : adapter;
 }

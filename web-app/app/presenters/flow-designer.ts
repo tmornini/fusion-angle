@@ -6,6 +6,7 @@ import { $, $required } from '../dom.ts';
 import { log } from '../logger.ts';
 import { showToast } from '../toast.ts';
 import {
+    createFetchContext,
     putFlow,
     postFlowVersion,
 } from '../adapters/index.ts';
@@ -181,13 +182,16 @@ export class FlowDesignerPresenter {
         versioned: boolean,
         snap: FlowSnapshot,
     ): Promise<void> {
+        const ctx = createFetchContext();
         if (versioned) {
             await postFlowVersion(
+                ctx,
                 generateCryptoSafeBase62(),
                 snap.flowId,
             );
         }
         await putFlow(
+            ctx,
             snap.flowId,
             this.#buildSaveShape(snap),
         );

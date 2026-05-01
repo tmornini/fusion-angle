@@ -5,10 +5,10 @@ import type { SafeHtml } from '../safe-html.ts';
 import {
     userName,
     validateWorkOrderFlowGraph,
-    parseTransitionValues,
     isExpiredClaim,
     type WorkOrderEntity,
     type WorkOrderTransitionEntity,
+    type TransitionFieldValueEntity,
     type WorkOrderClaimEntity,
     type WorkOrderFlowGraph,
     type GraphNode,
@@ -143,6 +143,11 @@ export class WorkboxDetailPresenter {
         workOrder: WorkOrderEntity,
         transitions:
             readonly WorkOrderTransitionEntity[],
+        fieldValuesByTransition:
+            ReadonlyMap<
+                Id,
+                readonly TransitionFieldValueEntity[]
+            >,
         claims:
             readonly WorkOrderClaimEntity[],
         userMap: Map<Id, User>,
@@ -174,6 +179,7 @@ export class WorkboxDetailPresenter {
             );
         this.#history = buildHistory(
             sorted,
+            fieldValuesByTransition,
             this.#flowGraph.nodes,
             userMap,
         );
@@ -484,6 +490,11 @@ function nodeNameById(
 function buildHistory(
     sortedTransitions:
         readonly WorkOrderTransitionEntity[],
+    fieldValuesByTransition:
+        ReadonlyMap<
+            Id,
+            readonly TransitionFieldValueEntity[]
+        >,
     nodes: readonly GraphNode[],
     userMap: Map<Id, User>,
 ): HistoryEntry[] {
@@ -497,24 +508,23 @@ function buildHistory(
     }
 
     return sortedTransitions.map(t => {
-        const vals =
-            parseTransitionValues(t.values);
+        const rows =
+            fieldValuesByTransition.get(t.id)
+            ?? [];
         const fieldValues:
             HistoryFieldValue[] = [];
-        for (
-            const [fId, val]
-            of Object.entries(vals)
-        ) {
+        for (const row of rows) {
             const fieldName =
-                fieldNameMap.get(fId);
+                fieldNameMap.get(row.field_id);
             if (!fieldName) {
                 throw new Error(
                     'Field not found: '
-                        + fId,
+                        + row.field_id,
                 );
             }
             fieldValues.push({
-                fieldName, value: val,
+                fieldName,
+                value: row.value,
             });
         }
         return {

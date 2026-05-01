@@ -3,6 +3,34 @@ export interface ZipEntry {
     data: Uint8Array;
 }
 
+// Defence against ZIP bombs and oversize uploads.
+// All four limits enforced by getZipEntries; inflate
+// receives a per-call byte cap and throws on overflow.
+export interface ZipLimits {
+    maxEntries: number;
+    maxCompressedTotal: number;
+    maxDecompressedTotal: number;
+    maxPerEntry: number;
+}
+
+// Calibrated to our two real consumers:
+// - flow ZIP: exactly 3 entries (.txt + .mmd + .json)
+// - snapshot ZIP: 1 entry (a single JSON file)
+// Both fit comfortably under these defaults.
+export const DEFAULT_ZIP_LIMITS: ZipLimits = {
+    maxEntries: 64,
+    maxCompressedTotal: 5_000_000,
+    maxDecompressedTotal: 50_000_000,
+    maxPerEntry: 25_000_000,
+};
+
+export class ZipLimitExceeded extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = 'ZipLimitExceeded';
+    }
+}
+
 // PKZIP CRC-32 polynomial in reflected form
 // (RFC 1952 §2.3, Appendix B). The standard
 // CRC-32 generator polynomial 0x04C11DB7
@@ -252,6 +280,7 @@ function locateEocd(
 
 async function inflate(
     raw: Uint8Array,
+    maxBytes: number,
 ): Promise<Uint8Array> {
     const ds = new DecompressionStream(
         'deflate-raw',
@@ -262,9 +291,33 @@ async function inflate(
         )
             .stream()
             .pipeThrough(ds);
-    const buf = await new Response(stream)
-        .arrayBuffer();
-    return new Uint8Array(buf);
+    // Read chunk-by-chunk so a malicious ZIP that
+    // expands a few KB into gigabytes hits the cap
+    // before we allocate the rest. DecompressionStream
+    // has no built-in bound; the bound lives here.
+    const reader = stream.getReader();
+    const chunks: Uint8Array[] = [];
+    let total = 0;
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        total += value.byteLength;
+        if (total > maxBytes) {
+            await reader.cancel();
+            throw new ZipLimitExceeded(
+                'Decompressed entry exceeds limit: '
+                + total + ' > ' + maxBytes,
+            );
+        }
+        chunks.push(value);
+    }
+    const out = new Uint8Array(total);
+    let off = 0;
+    for (const c of chunks) {
+        out.set(c, off);
+        off += c.byteLength;
+    }
+    return out;
 }
 
 function getLocalData(
@@ -294,6 +347,7 @@ function getLocalData(
 
 export async function getZipEntries(
     data: Uint8Array,
+    limits: ZipLimits = DEFAULT_ZIP_LIMITS,
 ): Promise<ZipEntry[]> {
     const decoder = new TextDecoder();
     const view = new DataView(
@@ -310,12 +364,20 @@ export async function getZipEntries(
     const count = view.getUint16(
         eocd + 10, true,
     );
+    if (count > limits.maxEntries) {
+        throw new ZipLimitExceeded(
+            'ZIP entry count exceeds limit: '
+            + count + ' > ' + limits.maxEntries,
+        );
+    }
     const cdStart = view.getUint32(
         eocd + 16, true,
     );
 
     const entries: ZipEntry[] = [];
     let off = cdStart;
+    let totalCompressed = 0;
+    let totalDecompressed = 0;
 
     for (let i = 0; i < count; i++) {
         if (
@@ -348,6 +410,19 @@ export async function getZipEntries(
 
         off += CENTRAL_HEADER;
 
+        totalCompressed += compSz;
+        if (
+            totalCompressed
+                > limits.maxCompressedTotal
+        ) {
+            throw new ZipLimitExceeded(
+                'ZIP total compressed size '
+                + 'exceeds limit: '
+                + totalCompressed + ' > '
+                + limits.maxCompressedTotal,
+            );
+        }
+
         const name = decoder.decode(
             data.slice(
                 off, off + nameLen,
@@ -362,11 +437,45 @@ export async function getZipEntries(
         if (!raw) continue;
 
         if (method === DEFLATE) {
+            const room =
+                limits.maxDecompressedTotal
+                - totalDecompressed;
+            const cap = Math.min(
+                limits.maxPerEntry, room,
+            );
+            const entryData =
+                await inflate(raw, cap);
+            totalDecompressed +=
+                entryData.byteLength;
             entries.push({
                 name,
-                data: await inflate(raw),
+                data: entryData,
             });
         } else if (method === STORE) {
+            if (
+                raw.byteLength
+                    > limits.maxPerEntry
+            ) {
+                throw new ZipLimitExceeded(
+                    'ZIP entry exceeds '
+                    + 'maxPerEntry: '
+                    + raw.byteLength + ' > '
+                    + limits.maxPerEntry,
+                );
+            }
+            totalDecompressed +=
+                raw.byteLength;
+            if (
+                totalDecompressed
+                    > limits.maxDecompressedTotal
+            ) {
+                throw new ZipLimitExceeded(
+                    'ZIP total decompressed '
+                    + 'size exceeds limit: '
+                    + totalDecompressed + ' > '
+                    + limits.maxDecompressedTotal,
+                );
+            }
             entries.push({
                 name,
                 data: raw,

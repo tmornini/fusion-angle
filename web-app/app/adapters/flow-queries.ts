@@ -1,4 +1,3 @@
-import { GET } from '../../../api/api.ts';
 import type {
     FlowEntity,
     ProjectEntity,
@@ -9,8 +8,8 @@ import type {
     StoredGraph,
     FlowFieldType,
 } from '../../../api/types.ts';
-import { toBool } from '../../../api/types.ts';
 import {
+    asBoolean,
     validateStoredGraphJson,
 } from '../../../api/validators.ts';
 import type { FetchContext } from './shared.ts';
@@ -58,11 +57,9 @@ export interface FlowListItem {
 }
 
 export async function getFlows(
-    ctx?: FetchContext,
+    ctx: FetchContext,
 ): Promise<FlowSummary[]> {
-    const flows = ctx
-        ? await ctx.getFlowRows()
-        : await GET<FlowEntity[]>('flows');
+    const flows = await ctx.getFlowRows();
     return flows.map(f => {
         const g = parseGraph(f.graph);
         return {
@@ -76,8 +73,9 @@ export async function getFlows(
 }
 
 export async function getProjectFlowRows(
+    ctx: FetchContext,
 ): Promise<ProjectFlowEntity[]> {
-    return GET<ProjectFlowEntity[]>(
+    return ctx.GET<ProjectFlowEntity[]>(
         'project-flows',
     );
 }
@@ -89,13 +87,14 @@ export interface FlowWithProjectName {
 
 export async function
 getFlowsWithProjectNames(
+    ctx: FetchContext,
 ): Promise<FlowWithProjectName[]> {
     const [
         flows, projectFlows, allProjects,
     ] = await Promise.all([
-        GET<FlowEntity[]>('flows'),
-        getProjectFlowRows(),
-        GET<ProjectEntity[]>('projects'),
+        ctx.GET<FlowEntity[]>('flows'),
+        getProjectFlowRows(ctx),
+        ctx.GET<ProjectEntity[]>('projects'),
     ]);
     const projectNameById = new Map(
         allProjects.map(
@@ -136,14 +135,15 @@ export type {
 } from '../../../api/types.ts';
 
 export async function getFlowsByProject(
+    ctx: FetchContext,
     projectId: string,
 ): Promise<FlowListItem[]> {
     const [projectFlows, flows] =
         await Promise.all([
-            GET<ProjectFlowEntity[]>(
+            ctx.GET<ProjectFlowEntity[]>(
                 'project-flows',
             ),
-            GET<FlowEntity[]>('flows'),
+            ctx.GET<FlowEntity[]>('flows'),
         ]);
 
     const flowIds = new Set(
@@ -177,10 +177,11 @@ export async function getFlowsByProject(
 }
 
 export async function getFlowGraph(
+    ctx: FetchContext,
     flowId: string,
 ): Promise<FlowGraph> {
     const flow =
-        await GET<FlowEntity>(
+        await ctx.GET<FlowEntity>(
             `flows/${flowId}`,
         );
     const g = parseGraph(flow.graph);
@@ -188,14 +189,17 @@ export async function getFlowGraph(
         id: flow.id,
         name: flow.name,
         description: flow.description,
-        isLocked: toBool(
+        isLocked: asBoolean(
             flow.is_locked,
+            'is_locked',
         ),
-        isAutoLayout: toBool(
+        isAutoLayout: asBoolean(
             flow.is_auto_layout,
+            'is_auto_layout',
         ),
-        isAutoFit: toBool(
+        isAutoFit: asBoolean(
             flow.is_auto_fit,
+            'is_auto_fit',
         ),
         lockTimeout: flow.lock_timeout,
         createdAt: flow.created_at,

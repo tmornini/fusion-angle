@@ -39,10 +39,10 @@ export async function init(): Promise<void> {
             org, company,
             activities, actors, userMap,
         ] = await Promise.all([
-            getOrganization(),
-            getCompany(),
-            getActivityRows(),
-            getActivityActorRows(),
+            getOrganization(ctx),
+            getCompany(ctx),
+            getActivityRows(ctx),
+            getActivityActorRows(ctx),
             getUserMap(ctx),
         ]);
         const actorMap = new Map(

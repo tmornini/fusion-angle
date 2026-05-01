@@ -141,13 +141,6 @@ export function jsonObjectField(
     ) as JsonObjectField;
 }
 
-export function toBool(
-    value: unknown,
-): boolean {
-    return value === 1
-        || value === true;
-}
-
 function includes<T extends string>(
     values: readonly T[],
     v: string,
@@ -297,7 +290,8 @@ export function assertReadinessLevel(
 }
 
 export const MS_PER_SECOND = 1000;
-export const SECONDS_PER_DAY = 86400;
+export const SECONDS_PER_HOUR = 3600;
+export const SECONDS_PER_DAY = 24 * SECONDS_PER_HOUR;
 export const MS_PER_DAY =
     SECONDS_PER_DAY * MS_PER_SECOND;
 export const COST_DIVISOR = 1000;
@@ -699,8 +693,18 @@ export interface WorkOrderTransitionEntity {
     from_node_id: Id;
     to_node_id: Id;
     user_id: Id;
-    values: JsonObjectField;
     transitioned_at: string;
+}
+
+// Per-field values written when a transition fires.
+// Replaces the former JSON `values` blob on
+// work_order_transitions — a relation belongs in a
+// table, not a column. (Codd 1NF.)
+export interface TransitionFieldValueEntity {
+    id: Id;
+    transition_id: Id;
+    field_id: Id;
+    value: string;
 }
 
 export interface WorkOrderClaimEntity {

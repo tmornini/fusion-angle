@@ -15,6 +15,19 @@ function closeActiveToast(
     );
 }
 
+function ensureContainer(): HTMLElement {
+    const existing = document.getElementById(
+        TOAST_CONTAINER_ID,
+    );
+    if (existing) return existing;
+    const container = document.createElement('div');
+    container.id = TOAST_CONTAINER_ID;
+    container.setAttribute('aria-live', 'polite');
+    container.setAttribute('aria-atomic', 'true');
+    document.body.appendChild(container);
+    return container;
+}
+
 export function showToast(
     message: string,
     variant:
@@ -23,10 +36,7 @@ export function showToast(
         | 'warning'
         | 'info' = 'info',
 ): void {
-    const container = document.getElementById(
-        TOAST_CONTAINER_ID,
-    );
-    if (!container) return;
+    const container = ensureContainer();
 
     while (container.children.length >= MAX_TOASTS) {
         container.firstElementChild?.remove();

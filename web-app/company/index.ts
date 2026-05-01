@@ -12,6 +12,7 @@ import {
 import { log } from '../app/logger.ts';
 import { trimStrings } from '../app/core.ts';
 import {
+    createFetchContext,
     getCompany,
     putCompany,
     Company,
@@ -73,7 +74,9 @@ export async function init(): Promise<void> {
 
     let company: Company;
     try {
-        company = await getCompany();
+        company = await getCompany(
+            createFetchContext(),
+        );
     } catch (err) {
         log.error(
             'getCompany failed',
@@ -219,7 +222,9 @@ async function handleSave(): Promise<void> {
     }
     const trimmed = trimStrings(state.draft);
     try {
-        await putCompany(trimmed);
+        await putCompany(
+            createFetchContext(), trimmed,
+        );
     } catch (err) {
         log.error(
             'putCompany failed',

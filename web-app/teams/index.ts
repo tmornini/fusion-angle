@@ -13,6 +13,7 @@ import {
     initTabs, initDialog, closeDialog,
 } from '../app/core.ts';
 import {
+    createFetchContext,
     getTeamMembers,
     subscribeUserChanges,
 } from '../app/adapters/index.ts';
@@ -40,7 +41,9 @@ export async function init(): Promise<void> {
     const result = await withLoadingState(
         teamListEl,
         buildSkeleton('card-list', 4),
-        getTeamMembers,
+        () => getTeamMembers(
+            createFetchContext(),
+        ),
         init,
         {
             icon: iconUsers(24, ''),
@@ -91,7 +94,9 @@ export async function init(): Promise<void> {
 
     subscribeUserChanges(async () => {
         if (!teamState || !listEl) return;
-        const fresh = await getTeamMembers();
+        const fresh = await getTeamMembers(
+            createFetchContext(),
+        );
         teamState = buildInitialTeamListState(
             fresh,
         );

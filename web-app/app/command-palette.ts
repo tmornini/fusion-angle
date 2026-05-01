@@ -21,14 +21,18 @@ import {
     getTeamMembers,
     createFetchContext,
     setLocation,
+    type IdeaWithSubmitter,
+    Project,
+    User,
 } from './adapters/index.ts';
 import {
     PAGE_REGISTRY,
 } from './page-registry.ts';
 import { buildPageUrl } from './navigation.ts';
 import { pluralize } from './format.ts';
+import { log } from './logger.ts';
 
-interface SearchItem {
+export interface SearchItem {
     id: string;
     title: string;
     meta: string;
@@ -160,6 +164,108 @@ function isCommandPaletteHotkey(
         && e.key === 'k';
 }
 
+export function ideaToSearchItem(
+    tuple: IdeaWithSubmitter,
+): SearchItem {
+    return {
+        id: 'idea-' + tuple.idea.idForLink(),
+        title: tuple.idea.titleText(),
+        meta: tuple.idea.statusValue()
+            .replace(/-/g, ' '),
+        category: 'ideas',
+        icon: iconLightbulb(
+            PALETTE_ICON_SIZE_SM, '',
+        ),
+        href: buildPageUrl('idea-convert', {
+            ideaId: tuple.idea.idForLink(),
+        }),
+        keywords: tuple.submitterName + ' '
+            + tuple.idea.statusValue(),
+    };
+}
+
+export function projectToSearchItem(
+    project: Project,
+): SearchItem {
+    return {
+        id: 'project-' + project.idForLink(),
+        title: project.titleText(),
+        meta: 'Progress: '
+            + project.progressPercent()
+            + '% · '
+            + project.statusValue()
+                .replace(/-/g, ' '),
+        category: 'projects',
+        icon: iconFolderKanban(
+            PALETTE_ICON_SIZE_SM, '',
+        ),
+        href: buildPageUrl('project-detail', {
+            projectId: project.idForLink(),
+        }),
+        keywords: project.statusValue(),
+    };
+}
+
+export function memberToSearchItem(
+    member: User,
+): SearchItem {
+    return {
+        id: 'person-' + member.idForLink(),
+        title: member.fullName(),
+        meta: member.roleLabel()
+            + ' · '
+            + member.departmentLabel(),
+        category: 'people',
+        icon: iconUser(
+            PALETTE_ICON_SIZE_SM, '',
+        ),
+        href: buildPageUrl('teams'),
+        keywords: member.roleLabel()
+            + ' ' + member.departmentLabel()
+            + ' ' + member.emailAddress(),
+    };
+}
+
+function pageToSearchItem(
+    page: PalettePageEntry,
+    index: number,
+): SearchItem {
+    return {
+        id: 'page-' + index,
+        title: page.title,
+        meta: 'Page',
+        category: 'pages',
+        icon: page.icon,
+        href: page.href,
+        keywords: page.keywords,
+    };
+}
+
+// Case-insensitive substring match across
+// title/meta/keywords. When query is empty,
+// returns the first PALETTE_DEFAULT_RESULT_COUNT
+// items so the panel always shows something.
+export function searchItems(
+    items: readonly SearchItem[],
+    query: string,
+): SearchItem[] {
+    if (!query.trim()) {
+        return items.slice(
+            0, PALETTE_DEFAULT_RESULT_COUNT,
+        );
+    }
+    const needle = query.toLowerCase();
+    return items.filter(
+        item =>
+            item.title.toLowerCase()
+                .includes(needle)
+            || item.meta.toLowerCase()
+                .includes(needle)
+            || item.keywords.toLowerCase()
+                .includes(needle),
+    );
+}
+
 export function initCommandPalette(
 ): void {
     const state: CommandPaletteState = {
@@ -182,19 +288,6 @@ export function initCommandPalette(
         if (state.isDataLoaded) return;
         state.isDataLoaded = true;
 
-        state.allItems = pages.map(
-            (page, i) => ({
-                id: `page-${i}`,
-                title: page.title,
-                meta: 'Page',
-                category:
-                    'pages' as const,
-                icon: page.icon,
-                href: page.href,
-                keywords: page.keywords,
-            }),
-        );
-
         const ctx = createFetchContext();
         const [ideas, projects, members] =
             await Promise.all([
@@ -203,148 +296,14 @@ export function initCommandPalette(
                 getTeamMembers(ctx),
             ]);
 
-        const ideaItems:
-            SearchItem[] =
-            ideas.map(t => ({
-                id: `idea-${
-                    t.idea.idForLink()}`,
-                title: t.idea.titleText(),
-                meta:
-                    t.idea.statusValue()
-                        .replace(
-                            /-/g,
-                            ' ',
-                        ),
-                category: 'ideas',
-                icon:
-                    iconLightbulb(16, ''),
-                href: buildPageUrl(
-                    'idea-convert',
-                    {
-                        ideaId:
-                            t.idea.idForLink(),
-                    },
-                ),
-                keywords:
-                    `${t.submitterName}`
-                    + ` ${
-                        t.idea.statusValue()
-                    }`,
-            }));
-
-        const projectItems:
-            SearchItem[] =
-            projects.map(
-                project => ({
-                    id: 'project-'
-                        + project
-                            .idForLink(),
-                    title:
-                        project
-                            .titleText(),
-                    meta:
-                        'Progress: '
-                        + project
-                            .progressPercent()
-                        + '% \u00B7 '
-                        + project
-                            .statusValue()
-                            .replace(
-                                /-/g,
-                                ' ',
-                            ),
-                    category:
-                        'projects',
-                    icon:
-                        iconFolderKanban(
-                            PALETTE_ICON_SIZE_SM,
-                            '',
-                        ),
-                    href:
-                        buildPageUrl(
-                            'project-detail',
-                            {
-                                projectId:
-                                    project
-                                        .idForLink(),
-                            },
-                        ),
-                    keywords:
-                        project
-                            .statusValue(),
-                }),
-            );
-
-        const peopleItems:
-            SearchItem[] =
-            members.map(
-                member => ({
-                    id: `person-`
-                        + member
-                            .idForLink(),
-                    title:
-                        member.fullName(),
-                    meta:
-                        member.roleLabel()
-                        + ' \u00B7 '
-                        + member
-                            .departmentLabel(),
-                    category:
-                        'people',
-                    icon:
-                        iconUser(16, ''),
-                    href:
-                        buildPageUrl(
-                            'teams',
-                        ),
-                    keywords:
-                        member.roleLabel()
-                        + ' '
-                        + member
-                            .departmentLabel()
-                        + ' '
-                        + member
-                            .emailAddress(),
-                }),
-            );
-
         state.allItems = [
-            ...ideaItems,
-            ...projectItems,
-            ...peopleItems,
-            ...state.allItems,
+            ...ideas.map(ideaToSearchItem),
+            ...projects.map(
+                projectToSearchItem,
+            ),
+            ...members.map(memberToSearchItem),
+            ...pages.map(pageToSearchItem),
         ];
-    }
-
-    function search(
-        query: string,
-    ): SearchItem[] {
-        if (!query.trim())
-            return state.allItems
-                .slice(
-                    0,
-                    PALETTE_DEFAULT_RESULT_COUNT,
-                );
-        const normalizedQuery =
-            query.toLowerCase();
-        return state.allItems.filter(
-            item =>
-                item.title
-                    .toLowerCase()
-                    .includes(
-                        normalizedQuery,
-                    )
-                || item.meta
-                    .toLowerCase()
-                    .includes(
-                        normalizedQuery,
-                    )
-                || item.keywords
-                    .toLowerCase()
-                    .includes(
-                        normalizedQuery,
-                    ),
-        );
     }
 
     function mutateResults(
@@ -352,8 +311,9 @@ export function initCommandPalette(
     ): void {
         if (!state.list) return;
 
-        state.filteredItems =
-            search(query);
+        state.filteredItems = searchItems(
+            state.allItems, query,
+        );
         state.activeIndex = 0;
 
         if (
@@ -691,11 +651,55 @@ posIndex === state.activeIndex
             mutateResults(state.input.value);
         }
 
+        // Unit 6a instrumentation: same shape as the
+        // flow-save debouncer so both sites can be
+        // measured together.
+        let scheduleCount = 0;
+        let burstStart = 0;
         state.input?.addEventListener('input', () => {
-            if (state.debounceTimeoutId)
-                clearTimeout(state.debounceTimeoutId);
+            if (state.debounceTimeoutId) {
+                clearTimeout(
+                    state.debounceTimeoutId,
+                );
+            } else {
+                scheduleCount = 0;
+                burstStart = performance.now();
+            }
+            scheduleCount += 1;
+            const startedAt = burstStart;
+            const count = scheduleCount;
             state.debounceTimeoutId = setTimeout(
-                applyDebouncedQuery,
+                () => {
+                    const burstDurMs =
+                        performance.now() - startedAt;
+                    const ratePerSec =
+                        burstDurMs > 0
+                            ? count / (burstDurMs / 1000)
+                            : 0;
+                    const callStart =
+                        performance.now();
+                    applyDebouncedQuery();
+                    const callDurMs =
+                        performance.now() - callStart;
+                    log.info(
+                        'palette debouncer fire',
+                        'debouncer',
+                        {
+                            delayMs: DEBOUNCE_MS,
+                            burstSchedules: count,
+                            burstDurMs:
+                                Math.round(burstDurMs),
+                            keystrokesPerSec:
+                                Math.round(
+                                    ratePerSec * 10,
+                                ) / 10,
+                            callDurMs:
+                                Math.round(
+                                    callDurMs * 100,
+                                ) / 100,
+                        },
+                    );
+                },
                 DEBOUNCE_MS,
             );
         });

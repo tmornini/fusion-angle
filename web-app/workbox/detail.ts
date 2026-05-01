@@ -16,8 +16,9 @@ import {
 import { navigateTo } from '../app/core.ts';
 import {
     getWorkOrder,
-    getWorkOrderTransitionRows,
-    getWorkOrderClaimRows,
+    getWorkOrderTransitionRowsByOrder,
+    getTransitionFieldValuesByTransition,
+    getWorkOrderClaimRowsByOrder,
     getUserMap,
     postActivity,
     postWorkOrderTransition,
@@ -64,7 +65,7 @@ function collectFieldValues(
 function initTransitionButtons(
     container: HTMLElement,
     detail: WorkboxDetailPresenter,
-    userId: string,
+    ctx: ReturnType<typeof createFetchContext>,
 ): void {
     const buttons =
         container.querySelectorAll<
@@ -102,20 +103,28 @@ function initTransitionButtons(
                     );
                     return;
                 }
+                const fieldValueIds:
+                    Record<string, string> = {};
+                for (const fid of Object.keys(values)) {
+                    fieldValueIds[fid] =
+                        generateCryptoSafeBase62();
+                }
                 try {
-                    await
-                        postWorkOrderTransition({
+                    await postWorkOrderTransition(
+                        ctx,
+                        {
                             transitionId:
                                 generateCryptoSafeBase62(),
                             workOrderId:
                                 detail.idValue(),
                             edgeId,
                             values,
-                            userId,
+                            fieldValueIds,
                             currentNodeId:
                                 detail
                                     .currentNodeId(),
-                        });
+                        },
+                    );
                 } catch (err) {
                     log.error(
                         'work order'
@@ -141,7 +150,7 @@ function initTransitionButtons(
                 // toast — but it must not
                 // be silent either.
                 try {
-                    await postActivity({
+                    await postActivity(ctx, {
                         type: 'status_changed',
                         action:
                             'transitioned'
@@ -177,6 +186,7 @@ function initTransitionButtons(
 function initUnclaimButton(
     container: HTMLElement,
     detail: WorkboxDetailPresenter,
+    ctx: ReturnType<typeof createFetchContext>,
 ): void {
     const btn = $(
         '#unclaim-btn', container,
@@ -190,7 +200,7 @@ function initUnclaimButton(
         async () => {
             try {
                 await deleteWorkOrderClaim(
-                    claimId,
+                    ctx, claimId,
                 );
             } catch (err) {
                 log.error(
@@ -222,18 +232,21 @@ async function loadPresenter(
 ): Promise<WorkboxDetailPresenter> {
     const [
         workOrder, transitions,
+        fieldValuesByTransition,
         claims, userMap,
     ] = await Promise.all([
-        getWorkOrder(workOrderId),
-        getWorkOrderTransitionRows(
-            workOrderId,
+        getWorkOrder(ctx, workOrderId),
+        getWorkOrderTransitionRowsByOrder(
+            ctx, workOrderId,
         ),
-        getWorkOrderClaimRows(workOrderId),
+        getTransitionFieldValuesByTransition(ctx),
+        getWorkOrderClaimRowsByOrder(ctx, workOrderId),
         getUserMap(ctx),
     ]);
     return new WorkboxDetailPresenter(
         workOrder,
         transitions,
+        fieldValuesByTransition,
         claims,
         userMap,
         currentUserId,
@@ -279,8 +292,9 @@ export async function init(
                 && !presenter.isComplete()
             ) {
                 await postWorkOrderClaim(
+                    ctx,
                     generateCryptoSafeBase62(),
-                    id, userId,
+                    id,
                 );
                 presenter =
                     await loadPresenter(
@@ -314,11 +328,10 @@ export async function init(
         !detail.isComplete()
     ) {
         initTransitionButtons(
-            container, detail,
-            userId,
+            container, detail, ctx,
         );
         initUnclaimButton(
-            container, detail,
+            container, detail, ctx,
         );
     }
 }

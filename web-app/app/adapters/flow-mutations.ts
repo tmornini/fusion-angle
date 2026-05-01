@@ -1,4 +1,3 @@
-import { PUT } from '../../../api/api.ts';
 import type {
     FlowEntity,
     GraphNode,
@@ -14,25 +13,27 @@ import {
     buildStartAndCompleteNodes,
 } from './flow-defaults.ts';
 import {
-    createChannel,
-    bridgeStorageToChannel,
+    createSubscriptionChannel,
 } from '../channels.ts';
+import type { FetchContext } from './shared.ts';
 
-const flowChangedChannel =
-    createChannel<void>();
-bridgeStorageToChannel(
-    ['flows', 'flow-versions', 'project-flows'],
-    flowChangedChannel,
-);
+const flowChanges =
+    createSubscriptionChannel(
+        [
+            'flows',
+            'flow-versions',
+            'project-flows',
+        ],
+    );
 
 export function subscribeFlowChanges(
     fn: () => void,
 ): () => void {
-    return flowChangedChannel.subscribe(fn);
+    return flowChanges.subscribe(fn);
 }
 
 export function notifyFlowChange(): void {
-    flowChangedChannel.send();
+    flowChanges.notify();
 }
 
 function putFlowGraph(
@@ -54,7 +55,8 @@ export interface FlowCreationInput {
 }
 
 export async function postFlowCreation(
-    ctx: FlowCreationInput,
+    ctx: FetchContext,
+    input: FlowCreationInput,
 ): Promise<void> {
     const now = nowUtc();
     const { start, complete } =
@@ -64,10 +66,10 @@ export async function postFlowCreation(
         edges: [],
     };
 
-    await PUT<void>('flows', {
-        id: ctx.flowId,
-        name: ctx.name,
-        description: ctx.description,
+    await ctx.PUT<void>('flows', {
+        id: input.flowId,
+        name: input.name,
+        description: input.description,
         is_locked: false,
         is_auto_layout: false,
         is_auto_fit: false,
@@ -77,14 +79,14 @@ export async function postFlowCreation(
         updated_at: now,
     });
 
-    await PUT<void>('project-flows', {
-        id: ctx.linkId,
-        project_id: ctx.projectId,
-        flow_id: ctx.flowId,
+    await ctx.PUT<void>('project-flows', {
+        id: input.linkId,
+        project_id: input.projectId,
+        flow_id: input.flowId,
         created_at: now,
     });
 
-    flowChangedChannel.send();
+    flowChanges.notify();
 }
 
 export interface FlowSaveShape {
@@ -100,6 +102,7 @@ export interface FlowSaveShape {
 }
 
 export async function putFlow(
+    ctx: FetchContext,
     id: string,
     save: FlowSaveShape,
 ): Promise<void> {
@@ -119,6 +122,6 @@ export async function putFlow(
         created_at: save.createdAt,
         updated_at: nowUtc(),
     };
-    await PUT(`flows/${id}`, entity);
-    flowChangedChannel.send();
+    await ctx.PUT(`flows/${id}`, entity);
+    flowChanges.notify();
 }

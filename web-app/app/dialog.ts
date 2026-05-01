@@ -11,7 +11,7 @@ const TAB_BUTTON_PREFIX = 'tab-btn-';
 
 class DialogStack {
     readonly #focus: HTMLElement[] = [];
-    readonly #ids: string[] = [];
+    #ids: string[] = [];
 
     topId(): string | undefined {
         return this.#ids.at(-1);
@@ -34,13 +34,13 @@ class DialogStack {
     }
 
     pushId(id: string): void {
-        this.#ids.push(id);
+        this.#ids = [...this.#ids, id];
     }
 
     removeId(id: string): void {
-        const idx =
-            this.#ids.indexOf(id);
-        this.#ids.splice(idx, 1);
+        this.#ids = this.#ids.filter(
+            existing => existing !== id,
+        );
     }
 }
 

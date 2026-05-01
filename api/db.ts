@@ -18,6 +18,7 @@ import type {
     FlowWorkOrderEntity,
     WorkOrderTransitionEntity,
     WorkOrderClaimEntity,
+    TransitionFieldValueEntity,
 } from './types.ts';
 
 export class EntityNotFound {
@@ -124,6 +125,10 @@ export interface DbAdapter {
     workOrderTransitions:
         EntityStore<
             WorkOrderTransitionEntity
+        >;
+    transitionFieldValues:
+        EntityStore<
+            TransitionFieldValueEntity
         >;
     workOrderClaims:
         EntityStore<

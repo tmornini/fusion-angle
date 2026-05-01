@@ -18,13 +18,16 @@ import {
     navigateTo, trimStrings,
 } from '../app/core.ts';
 import {
-    getManagedUsers, getUserRow, putUser,
+    createFetchContext,
+    getManagedUsers, putUser,
     postActivity,
     jsonArrayField,
     jsonObjectField,
     nowUtc,
     generateCryptoSafeBase62,
     subscribeUserChanges,
+    type FetchContext,
+    type UserEntity,
 } from '../app/adapters/index.ts';
 import {
     ManagedUsersPresenter,
@@ -42,7 +45,27 @@ const signal = pageAbort.signal;
 
 let usersState:
     ManagedUsersState | null = null;
+let userEntities:
+    Map<string, UserEntity> = new Map();
 let userListEl: HTMLElement | null = null;
+
+async function loadUsersAndEntities(
+    ctx: FetchContext,
+): Promise<{
+    users: Awaited<ReturnType<typeof getManagedUsers>>;
+    entities: Map<string, UserEntity>;
+}> {
+    const [users, rows] = await Promise.all([
+        getManagedUsers(ctx),
+        ctx.GET<UserEntity[]>('users'),
+    ]);
+    return {
+        users,
+        entities: new Map(
+            rows.map(r => [r.id, r]),
+        ),
+    };
+}
 
 export async function init(): Promise<void> {
     const container = $(
@@ -50,10 +73,12 @@ export async function init(): Promise<void> {
     );
     if (!container) return;
 
-    const users = await withLoadingState(
+    const loaded = await withLoadingState(
         container,
         buildSkeleton('table', 5),
-        getManagedUsers,
+        () => loadUsersAndEntities(
+            createFetchContext(),
+        ),
         init,
         {
             icon: iconUsers(24, ''),
@@ -64,10 +89,13 @@ export async function init(): Promise<void> {
                 + ' collaborating.',
         },
     );
-    if (!users) return;
+    if (!loaded) return;
 
     usersState =
-        buildInitialManagedUsersState(users);
+        buildInitialManagedUsersState(
+            loaded.users,
+        );
+    userEntities = loaded.entities;
     const initialPresenter =
         new ManagedUsersPresenter(usersState);
     setHtml(container, buildShellHtml(
@@ -86,11 +114,15 @@ export async function init(): Promise<void> {
 
     subscribeUserChanges(async () => {
         if (!usersState || !userListEl) return;
-        const fresh = await getManagedUsers();
+        const fresh =
+            await loadUsersAndEntities(
+                createFetchContext(),
+            );
         usersState =
             buildInitialManagedUsersState(
-                fresh,
+                fresh.users,
             );
+        userEntities = fresh.entities;
         rerenderUsers();
     });
 
@@ -534,25 +566,12 @@ async function updateUserActivationStatus(
     userId: string,
     next: 'active' | 'deactivated',
 ): Promise<void> {
-    let entity: Awaited<
-        ReturnType<typeof getUserRow>
-    >;
-    try {
-        entity = await getUserRow(userId);
-    } catch (err) {
-        log.error(
-            'getUserRow failed',
-            'organization', err,
-        );
-        showToast(
-            'Failed to update user status',
-            'error',
-        );
-        return;
-    }
+    const entity = userEntities.get(userId);
+    if (!entity) return;
     const { id: _id, ...rest } = entity;
+    const ctx = createFetchContext();
     try {
-        await putUser(userId, {
+        await putUser(ctx, userId, {
             ...rest,
             status: next,
         });
@@ -645,6 +664,7 @@ async function handleInvite(): Promise<void> {
     const id = generateCryptoSafeBase62();
     try {
         await putUser(
+            createFetchContext(),
             id,
             trimStrings({
                 first_name: first,
@@ -687,13 +707,16 @@ async function handleInvite(): Promise<void> {
         return;
     }
     try {
-        await postActivity({
-            type: 'user_joined',
-            action: 'joined the team',
-            target: first + ' ' + last,
-            status: '',
-            feedback: '',
-        });
+        await postActivity(
+            createFetchContext(),
+            {
+                type: 'user_joined',
+                action: 'joined the team',
+                target: first + ' ' + last,
+                status: '',
+                feedback: '',
+            },
+        );
     } catch (err) {
         log.error(
             'postActivity failed',

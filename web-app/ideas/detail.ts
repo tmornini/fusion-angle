@@ -21,7 +21,6 @@ import {
 } from '../app/core.ts';
 import {
     getIdea,
-    getIdeaRow,
     postActivity,
     putIdea,
     subscribeIdeaChanges,
@@ -106,14 +105,14 @@ async function transitionIdea(
     toStatus: IdeaTransition,
     feedback: string,
 ): Promise<void> {
+    if (!state) return;
+    const ctx = createFetchContext();
     const cfg = TRANSITION_CONFIG[toStatus]!;
-    let title = '';
+    const entity = state.view.entity;
+    const title = entity.title;
     try {
-        const entity =
-            await getIdeaRow(ideaId);
-        title = entity.title;
         await putIdea(
-            ideaId,
+            ctx, ideaId,
             { ...entity, status: toStatus },
         );
     } catch (err) {
@@ -123,7 +122,7 @@ async function transitionIdea(
         showToast(cfg.failureToast, 'error');
         return;
     }
-    await postActivity({
+    await postActivity(ctx, {
         type: 'status_changed',
         action: cfg.activityAction,
         target: title,
@@ -184,7 +183,7 @@ export async function init(
     const view = await withLoadingState(
         container,
         buildSkeleton('detail', 4),
-        () => getIdea(ideaId, ctx),
+        () => getIdea(ctx, ideaId),
         () => init(params),
     );
     if (!view) return;
@@ -196,7 +195,7 @@ export async function init(
     subscribeIdeaChanges(async () => {
         if (!pageContainer || !state) return;
         const fresh = await getIdea(
-            ideaId, createFetchContext(),
+            createFetchContext(), ideaId,
         );
         state = {
             kind: 'reading', view: fresh,
@@ -420,11 +419,10 @@ async function handleSave(): Promise<void> {
         state.draft,
     );
     const ideaId = state.view.idea.idForLink();
+    const entity = state.view.entity;
+    const ctx = createFetchContext();
     try {
-        const entity = await getIdeaRow(
-            ideaId,
-        );
-        await putIdea(ideaId, {
+        await putIdea(ctx, ideaId, {
             ...entity,
             ...trimStrings(patch),
         });

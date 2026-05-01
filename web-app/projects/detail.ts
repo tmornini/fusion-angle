@@ -28,6 +28,7 @@ import {
     generateCryptoSafeBase62,
     createFetchContext,
     type FetchContext,
+    type ProjectEntity,
 } from '../app/adapters/index.ts';
 import type {
     FlowListItem,
@@ -48,11 +49,13 @@ type PageState =
     | {
         kind: 'reading';
         view: ProjectView;
+        entity: ProjectEntity;
         flows: FlowListItem[];
     }
     | {
         kind: 'editing';
         view: ProjectView;
+        entity: ProjectEntity;
         flows: FlowListItem[];
         draft: ProjectDraftFields;
     };
@@ -78,17 +81,20 @@ function isFieldKey(
 async function loadProjectView(
     projectId: string,
     ctx: FetchContext,
-): Promise<ProjectView> {
+): Promise<{
+    view: ProjectView;
+    entity: ProjectEntity;
+}> {
     const [
         entity, teamRows, userMap,
     ] = await Promise.all([
-        getProjectRow(projectId),
-        getProjectTeamRows(projectId),
+        getProjectRow(ctx, projectId),
+        getProjectTeamRows(ctx, projectId),
         getUserMap(ctx),
     ]);
     const project = new Project(entity);
     const leadRow = teamRows.find(isTeamLead);
-    return new ProjectView(
+    const view = new ProjectView(
         project,
         leadRow
             ? userName(
@@ -103,6 +109,7 @@ async function loadProjectView(
             role: member.role,
         })),
     );
+    return { view, entity };
 }
 
 function buildPresenter():
@@ -147,13 +154,16 @@ export async function init(
         container, buildSkeleton('detail', 4),
     );
 
-    let project: ProjectView;
+    let project: {
+        view: ProjectView;
+        entity: ProjectEntity;
+    };
     let flows: FlowListItem[];
     try {
         const ctx = createFetchContext();
         [project, flows] = await Promise.all([
             loadProjectView(projectId, ctx),
-            getFlowsByProject(projectId),
+            getFlowsByProject(ctx, projectId),
         ]);
     } catch (err) {
         log.error(
@@ -181,7 +191,8 @@ export async function init(
 
     state = {
         kind: 'reading',
-        view: project,
+        view: project.view,
+        entity: project.entity,
         flows,
     };
     buildPresenter().renderShell(container);
@@ -195,11 +206,12 @@ export async function init(
         const [upd, updFlows] =
             await Promise.all([
                 loadProjectView(projectId, ctx),
-                getFlowsByProject(projectId),
+                getFlowsByProject(ctx, projectId),
             ]);
         state = {
             kind: 'reading',
-            view: upd,
+            view: upd.view,
+            entity: upd.entity,
             flows: updFlows,
         };
         rerender();
@@ -324,6 +336,7 @@ function handleProjectActions(
             state = {
                 kind: 'editing',
                 view: state.view,
+                entity: state.entity,
                 flows: state.flows,
                 draft: projectDraftFromView(
                     state.view,
@@ -338,6 +351,7 @@ function handleProjectActions(
             state = {
                 kind: 'reading',
                 view: state.view,
+                entity: state.entity,
                 flows: state.flows,
             };
             rerender();
@@ -407,6 +421,7 @@ function onDocumentKeydown(
     state = {
         kind: 'reading',
         view: state.view,
+        entity: state.entity,
         flows: state.flows,
     };
     rerender();
@@ -417,16 +432,16 @@ async function handleSave(): Promise<void> {
         return;
     }
     const projectId = state.view.idForLink();
+    const entity = state.entity;
     const patch = trimStrings(
         projectPatchFromDraft(
             state.view,
             state.draft,
         ),
     );
+    const ctx = createFetchContext();
     try {
-        const entity =
-            await getProjectRow(projectId);
-        await putProject(projectId, {
+        await putProject(ctx, projectId, {
             ...entity, ...patch,
         });
     } catch (err) {
@@ -457,13 +472,16 @@ async function handleNewFlowSubmit(
     const flowId = generateCryptoSafeBase62();
     const linkId = generateCryptoSafeBase62();
     try {
-        await postFlowCreation({
-            flowId,
-            linkId,
-            projectId,
-            name,
-            description: '',
-        });
+        await postFlowCreation(
+            createFetchContext(),
+            {
+                flowId,
+                linkId,
+                projectId,
+                name,
+                description: '',
+            },
+        );
     } catch (err) {
         log.error(
             'postFlowCreation failed',

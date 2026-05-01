@@ -1,9 +1,5 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import {
-    initApi,
-    resetApi,
-} from '../api/api.ts';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import {
     createFetchContext,
@@ -35,13 +31,6 @@ function buildUserRow(
     };
 }
 
-function setupMemDb(): MemoryDbAdapter {
-    const db = new MemoryDbAdapter();
-    resetApi();
-    initApi(db);
-    return db;
-}
-
 test('userName returns fullName for known id', () => {
     const map = new Map<string, User>([
         ['u1', new User(
@@ -63,11 +52,12 @@ test('userName throws for unknown id', () => {
 });
 
 test('getUserMap fetches users via adapter', async () => {
-    const db = setupMemDb();
+    const db = new MemoryDbAdapter();
     await db.users.put('u1', buildUserRow(
         'u1', 'Alice', 'Adams',
     ));
-    const map = await getUserMap();
+    const ctx = createFetchContext(db);
+    const map = await getUserMap(ctx);
     assert.equal(map.size, 1);
     assert.equal(
         map.get('u1')?.fullName(),
@@ -76,11 +66,11 @@ test('getUserMap fetches users via adapter', async () => {
 });
 
 test('FetchContext memoizes user map across calls', async () => {
-    const db = setupMemDb();
+    const db = new MemoryDbAdapter();
     await db.users.put('u1', buildUserRow(
         'u1', 'Alice', 'Adams',
     ));
-    const ctx = createFetchContext();
+    const ctx = createFetchContext(db);
     const m1 = await ctx.getUserMap();
     // Mutate underlying data after first fetch
     await db.users.put('u2', buildUserRow(
@@ -92,40 +82,46 @@ test('FetchContext memoizes user map across calls', async () => {
     assert.equal(m1.size, 1);
 });
 
-test('Without ctx, getUserMap re-fetches each call', async () => {
-    const db = setupMemDb();
+test('Fresh ctx re-fetches each call', async () => {
+    const db = new MemoryDbAdapter();
     await db.users.put('u1', buildUserRow(
         'u1', 'Alice', 'Adams',
     ));
-    const m1 = await getUserMap();
+    const m1 = await createFetchContext(db)
+        .getUserMap();
     await db.users.put('u2', buildUserRow(
         'u2', 'Bob', 'Brown',
     ));
-    const m2 = await getUserMap();
+    const m2 = await createFetchContext(db)
+        .getUserMap();
     assert.notEqual(m1, m2);
     assert.equal(m1.size, 1);
     assert.equal(m2.size, 2);
 });
 
 test('getCurrentUserRow returns UserEntity', async () => {
-    const db = setupMemDb();
+    const db = new MemoryDbAdapter();
     await db.users.put('current', {
         ...buildUserRow(
             'current', 'Alice', 'Adams',
         ),
     });
-    const row = await getCurrentUserRow();
+    const row = await getCurrentUserRow(
+        createFetchContext(db),
+    );
     assert.equal(row.first_name, 'Alice');
     assert.equal(row.last_name, 'Adams');
 });
 
 test('getCompanyRow returns CompanyEntity', async () => {
-    const db = setupMemDb();
+    const db = new MemoryDbAdapter();
     await db.company.put({
         name: 'Acme Corp',
         domain: 'acme.example',
     });
-    const row = await getCompanyRow();
+    const row = await getCompanyRow(
+        createFetchContext(db),
+    );
     assert.equal(row.name, 'Acme Corp');
     assert.equal(row.domain, 'acme.example');
 });
@@ -134,13 +130,13 @@ test(
     'FetchContext memoizes currentUser'
     + ' across calls',
     async () => {
-        const db = setupMemDb();
+        const db = new MemoryDbAdapter();
         await db.users.put('current', {
             ...buildUserRow(
                 'current', 'Alice', 'Adams',
             ),
         });
-        const ctx = createFetchContext();
+        const ctx = createFetchContext(db);
         const u1 = await ctx.getCurrentUser();
         await db.users.put('current', {
             ...buildUserRow(
@@ -158,8 +154,9 @@ test(
     'FetchContext requestId is stable'
     + ' and unique',
     () => {
-        const a = createFetchContext();
-        const b = createFetchContext();
+        const db = new MemoryDbAdapter();
+        const a = createFetchContext(db);
+        const b = createFetchContext(db);
         assert.equal(
             a.requestId, a.requestId,
         );
@@ -174,11 +171,11 @@ test(
     'FetchContext memoizes idea, project,'
     + ' and flow row fetches',
     async () => {
-        const db = setupMemDb();
+        const db = new MemoryDbAdapter();
         await db.users.put('u1', buildUserRow(
             'u1', 'Alice', 'Adams',
         ));
-        const ctx = createFetchContext();
+        const ctx = createFetchContext(db);
         const ideas1 = await ctx.getIdeaRows();
         const ideas2 = await ctx.getIdeaRows();
         assert.equal(ideas1, ideas2);

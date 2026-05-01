@@ -7,6 +7,7 @@ import {
 } from '../app/safe-html.ts';
 import { navigateTo } from '../app/core.ts';
 import {
+    createFetchContext,
     postActivity,
     putIdea,
     putIdeaSubmission,
@@ -128,9 +129,11 @@ export async function init():
             'click',
             async () => {
                 formState = readFormFromDom();
+                const ctx = createFetchContext();
                 const ideaId =
                     generateCryptoSafeBase62();
                 await putIdea(
+                    ctx,
                     ideaId,
                     {
                         title:
@@ -171,11 +174,11 @@ export async function init():
                     },
                 );
                 await putIdeaSubmission(
+                    ctx,
                     generateCryptoSafeBase62(),
                     ideaId,
-                    'current',
                 );
-                await postActivity({
+                await postActivity(ctx, {
                     type: 'idea_created',
                     action:
                         'submitted new idea',

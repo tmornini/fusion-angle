@@ -1,11 +1,12 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import {
-    initApi, resetApi,
-} from '../api/api.ts';
-import {
     MemoryDbAdapter,
 } from '../api/db-memory.ts';
+import {
+    createFetchContext,
+    type FetchContext,
+} from '../web-app/app/adapters/shared.ts';
 import {
     getIdeas,
     getIdea,
@@ -52,15 +53,17 @@ function buildIdea(
     };
 }
 
-function setupDb(): MemoryDbAdapter {
+function setupDb(): {
+    db: MemoryDbAdapter;
+    ctx: FetchContext;
+} {
     const db = new MemoryDbAdapter();
-    resetApi();
-    initApi(db);
-    return db;
+    const ctx = createFetchContext(db);
+    return { db, ctx };
 }
 
 test('getIdeas returns ideas with submitter', async () => {
-    const db = setupDb();
+    const { db, ctx } = setupDb();
     await db.users.put(
         'u1', buildUser('u1', 'Alice'),
     );
@@ -72,7 +75,7 @@ test('getIdeas returns ideas with submitter', async () => {
         user_id: 'u1',
         created_at: '2026-04-01T00:00:00Z',
     });
-    const result = await getIdeas();
+    const result = await getIdeas(ctx);
     assert.equal(result.length, 1);
     assert.equal(
         result[0]?.idea.titleText(),
@@ -85,7 +88,7 @@ test('getIdeas returns ideas with submitter', async () => {
 });
 
 test('getIdeas throws when idea has no submission', async () => {
-    const db = setupDb();
+    const { db, ctx } = setupDb();
     await db.users.put(
         'u1', buildUser('u1', 'Alice'),
     );
@@ -94,13 +97,13 @@ test('getIdeas throws when idea has no submission', async () => {
     ));
     // No submission for i1
     await assert.rejects(
-        () => getIdeas(),
+        () => getIdeas(ctx),
         /no submission/,
     );
 });
 
 test('getIdea finds submission for one idea', async () => {
-    const db = setupDb();
+    const { db, ctx } = setupDb();
     await db.users.put(
         'u1', buildUser('u1', 'Alice'),
     );
@@ -112,7 +115,7 @@ test('getIdea finds submission for one idea', async () => {
         user_id: 'u1',
         created_at: '2026-04-01T00:00:00Z',
     });
-    const result = await getIdea('i1');
+    const result = await getIdea(ctx, 'i1');
     assert.equal(result.idea.titleText(), 'A');
     assert.equal(
         result.submitterName, 'Alice Test',
@@ -120,7 +123,7 @@ test('getIdea finds submission for one idea', async () => {
 });
 
 test('getIdea throws on missing submission', async () => {
-    const db = setupDb();
+    const { db, ctx } = setupDb();
     await db.users.put(
         'u1', buildUser('u1', 'Alice'),
     );
@@ -128,17 +131,17 @@ test('getIdea throws on missing submission', async () => {
         'i1', buildIdea('i1', 'A'),
     );
     await assert.rejects(
-        () => getIdea('i1'),
+        () => getIdea(ctx, 'i1'),
         /submission not found/,
     );
 });
 
 test('putIdea persists changes', async () => {
-    const db = setupDb();
+    const { db, ctx } = setupDb();
     await db.ideas.put(
         'i1', buildIdea('i1', 'Original'),
     );
-    await putIdea('i1', {
+    await putIdea(ctx, 'i1', {
         ...buildIdea('i1', 'Updated'),
     });
     const stored =
@@ -147,7 +150,7 @@ test('putIdea persists changes', async () => {
 });
 
 test('deleted ideas are filtered from getIdeas', async () => {
-    const db = setupDb();
+    const { db, ctx } = setupDb();
     await db.users.put(
         'u1', buildUser('u1', 'Alice'),
     );
@@ -168,7 +171,7 @@ test('deleted ideas are filtered from getIdeas', async () => {
         created_at: '2026-04-01T00:00:00Z',
     });
     await db.ideas.delete('i2');
-    const result = await getIdeas();
+    const result = await getIdeas(ctx);
     assert.equal(result.length, 1);
     assert.equal(
         result[0]?.idea.titleText(), 'Keep',

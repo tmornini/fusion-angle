@@ -1,9 +1,10 @@
-import { DELETE } from '../../../api/api.ts';
+import type { FetchContext } from './shared.ts';
 
 export async function deleteWorkOrderClaim(
+    ctx: FetchContext,
     claimId: string,
 ): Promise<void> {
-    await DELETE(
+    await ctx.DELETE(
         `work-order-claims/${claimId}`,
     );
 }

@@ -1,9 +1,11 @@
 import {
+    createFetchContext,
     deleteSchema,
     postSchemaCreation,
     postBootstrap,
     postMockDataLoad,
     putSnapshotFromFile,
+    SnapshotTooLargeError,
     getSnapshot,
     getDataPresent,
     nowUtc,
@@ -68,6 +70,7 @@ export async function init(
     );
     if (!root) return;
 
+    const ctx = createFetchContext();
     let pending: PendingState =
         { kind: 'idle' };
 
@@ -85,7 +88,7 @@ export async function init(
         button.disabled = true;
         button.textContent = 'Working...';
         try {
-            await deleteSchema();
+            await deleteSchema(ctx);
         } catch (err) {
             log.error(
                 'schema deletion failed',
@@ -289,7 +292,7 @@ export async function init(
     `);
 
     mutateMissingTableBanner(root);
-    await mutateEmptyBanner(root);
+    await mutateEmptyBanner(root, ctx);
 
     const wipeBtn = $button(
         '#wipe-btn', document,
@@ -303,8 +306,8 @@ export async function init(
                     'Create pristine'
                     + ' environment',
                     async () => {
-                        await postSchemaCreation();
-                        await postBootstrap();
+                        await postSchemaCreation(ctx);
+                        await postBootstrap(ctx);
                     },
                     'Are you sure you'
                     + ' want to create a'
@@ -329,8 +332,8 @@ export async function init(
                     reloadBtn,
                     'Load mock data',
                     async () => {
-                        await postSchemaCreation();
-                        await postMockDataLoad();
+                        await postSchemaCreation(ctx);
+                        await postMockDataLoad(ctx);
                     },
                 ),
         );
@@ -346,19 +349,31 @@ export async function init(
                 importInput.files?.[0];
             if (!file) return;
             try {
-                await putSnapshotFromFile(file);
+                await putSnapshotFromFile(ctx, file);
             } catch (err) {
                 log.error(
                     'putSnapshotFromFile failed',
                     'snapshots',
                     err,
                 );
-                showToast(
-                    'Failed to upload'
-                    + ' snapshot. Check'
-                    + ' file format.',
-                    'error',
-                );
+                if (
+                    err
+                    instanceof SnapshotTooLargeError
+                ) {
+                    showToast(
+                        'Snapshot too large'
+                        + ' for available storage.'
+                        + ' Free space and retry.',
+                        'error',
+                    );
+                } else {
+                    showToast(
+                        'Failed to upload'
+                        + ' snapshot. Check'
+                        + ' file format.',
+                        'error',
+                    );
+                }
                 importInput.value = '';
                 return;
             }
@@ -375,7 +390,7 @@ export async function init(
             let json: string;
             try {
                 json =
-                    await getSnapshot();
+                    await getSnapshot(ctx);
             } catch (err) {
                 log.error(
                     'getSnapshot failed',
@@ -478,9 +493,10 @@ function mutateMissingTableBanner(
 
 async function mutateEmptyBanner(
     root: HTMLElement,
+    ctx: ReturnType<typeof createFetchContext>,
 ): Promise<void> {
     const hasExistingData =
-        await getDataPresent();
+        await getDataPresent(ctx);
     const existing = $(
         '#' + BANNER_ID, document,
     );

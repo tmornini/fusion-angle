@@ -69,6 +69,29 @@ npx esbuild web-app/app/core.ts \
 [ -s "$BUILD_DIR/assets/app.js" ] || { echo "ERROR: app.js is empty or missing" >&2; exit 1; }
 echo "Bundle created: assets/app.js ($(wc -c < "$BUILD_DIR/assets/app.js" | xargs) bytes)"
 
+# Pre-app bootstrap scripts: extracted from former inline
+# <script> blocks so the page can run with a strict
+# Content-Security-Policy (script-src 'self').
+npx esbuild web-app/app/theme-init.ts \
+  --bundle \
+  --minify \
+  --target=es2024 \
+  --format=iife \
+  --outfile="$BUILD_DIR/assets/theme-init.js"
+
+[ -s "$BUILD_DIR/assets/theme-init.js" ] || { echo "ERROR: theme-init.js is empty or missing" >&2; exit 1; }
+echo "Bundle created: assets/theme-init.js ($(wc -c < "$BUILD_DIR/assets/theme-init.js" | xargs) bytes)"
+
+npx esbuild web-app/app/root-redirect.ts \
+  --bundle \
+  --minify \
+  --target=es2024 \
+  --format=iife \
+  --outfile="$BUILD_DIR/assets/root-redirect.js"
+
+[ -s "$BUILD_DIR/assets/root-redirect.js" ] || { echo "ERROR: root-redirect.js is empty or missing" >&2; exit 1; }
+echo "Bundle created: assets/root-redirect.js ($(wc -c < "$BUILD_DIR/assets/root-redirect.js" | xargs) bytes)"
+
 cat web-app/app/styles/fonts.css \
     web-app/app/styles/tokens.css \
     web-app/app/styles/light-mode.css \

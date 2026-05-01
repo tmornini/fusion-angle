@@ -13,8 +13,12 @@ import {
     type Id,
 } from '../adapters/index.ts';
 import type { User } from '../adapters/index.ts';
+import {
+    SECONDS_PER_DAY,
+    MS_PER_SECOND,
+} from '../../../api/types.ts';
 
-const DAY_MS = 1000 * 60 * 60 * 24;
+const DAY_MS = SECONDS_PER_DAY * MS_PER_SECOND;
 
 function isClaimActive(
     claim: WorkOrderClaimEntity | undefined,

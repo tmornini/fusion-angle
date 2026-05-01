@@ -29,6 +29,7 @@ import type {
     WorkOrderEntity,
     FlowWorkOrderEntity,
     WorkOrderTransitionEntity,
+    TransitionFieldValueEntity,
     WorkOrderClaimEntity,
     CompanyEntity,
     OrganizationEntity,
@@ -440,23 +441,6 @@ validateWorkOrderFlowGraphJson(
     };
 }
 
-export function
-validateTransitionValuesJson(
-    raw: string,
-    label: string,
-): Record<string, string> {
-    const parsed = parseOrThrow(raw, label);
-    const obj = asObject(parsed, label);
-    const out: Record<string, string> = {};
-    for (
-        const [k, v] of Object.entries(obj)
-    ) {
-        out[k] = asString(
-            v, label + '.' + k,
-        );
-    }
-    return out;
-}
 
 // ── JSON field helpers ────────────────
 
@@ -1049,7 +1033,7 @@ const WORK_ORDER_TRANSITION_BODY_KEYS:
     readonly string[] = [
     'work_order_id', 'from_node_id',
     'to_node_id', 'user_id',
-    'values', 'transitioned_at',
+    'transitioned_at',
 ];
 
 export function
@@ -1076,12 +1060,37 @@ validateWorkOrderTransitionEntity(
         user_id: asString(
             body['user_id'], 'user_id',
         ),
-        values: asJsonObjectField(
-            body['values'], 'values',
-        ),
         transitioned_at: asString(
             body['transitioned_at'],
             'transitioned_at',
+        ),
+    };
+}
+
+const TRANSITION_FIELD_VALUE_BODY_KEYS:
+    readonly string[] = [
+    'transition_id', 'field_id', 'value',
+];
+
+export function
+validateTransitionFieldValueEntity(
+    body: Record<string, unknown>,
+): Omit<TransitionFieldValueEntity, 'id'> {
+    assertOnlyKeys(
+        body,
+        TRANSITION_FIELD_VALUE_BODY_KEYS,
+        'TransitionFieldValueEntity',
+    );
+    return {
+        transition_id: asString(
+            body['transition_id'],
+            'transition_id',
+        ),
+        field_id: asString(
+            body['field_id'], 'field_id',
+        ),
+        value: asString(
+            body['value'], 'value',
         ),
     };
 }

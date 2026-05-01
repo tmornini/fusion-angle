@@ -3,19 +3,18 @@
     <head>
         <meta charset="UTF-8" />
         <title>Fusion AI</title>
+        <meta
+            http-equiv="Content-Security-Policy"
+            content="
+                default-src 'self';
+                script-src 'self';
+                frame-ancestors 'none';
+                base-uri 'self';
+                form-action 'self'
+            "
+        />
     </head>
     <body>
-        <script>
-            var hasSchema =
-                Object.keys(localStorage)
-                .some(function(k) {
-                    return k.indexOf(
-                        'fusion-ai:'
-                    ) === 0;
-                });
-            window.location.href = hasSchema
-                ? 'landing/index.html'
-                : 'snapshots/index.html';
-        </script>
+        <script src="assets/root-redirect.js"></script>
     </body>
 </html>

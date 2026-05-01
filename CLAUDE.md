@@ -2,6 +2,13 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Alignment
+
+**Match the codebase's voice, or change the codebase.** A better
+pattern earns its place by replacing every site of the old one —
+never by living beside it. One codebase, one voice. The snowflake
+is a sin against Uniformity (Commandment III).
+
 ## Build & Dev Commands
 
 ```bash
@@ -42,61 +49,62 @@ Target: **ES2024** · Strict mode with `noUncheckedIndexedAccess`. Config at `we
 
 ## Architecture
 
-**Vanilla TypeScript** with zero runtime dependencies.
-This is an enterprise innovation management platform
-with modules for ideas, projects, teams, flows,
-workbox, and analytics. Every page is a standalone HTML file
-served via HTTP. The code also supports `file:///`
-protocol locally, but testing is HTTP-only.
+**Vanilla TypeScript** with zero runtime dependencies. Enterprise innovation management platform with modules for ideas, projects, teams, flows, workbox, and analytics. Every page is a standalone HTML file served via HTTP. The code also supports `file:///` protocol locally, but testing is HTTP-only.
 
 ### Key Layers
 
-- **HTML Composition**: A build step
-  (`web-app/app/compose.ts`) assembles
-  `web-app/app/components-layout.html` (layout
-  skeleton) with `component-*.html` files and each
-  page's `index.html` to produce standalone composed
-  `index.html` files in a temp build directory.
-  5 standalone pages have hand-written HTML
-  that is copied directly to the build output.
-- **Navigation**: Standard `<a href>` links between pages. Parameterized pages use query strings (`?ideaId=1`). `navigateTo(page, params?)` helper constructs relative URLs for programmatic navigation.
-- **Layout**: Sidebar-layout pages share a layout template with sidebar, header, search, and theme toggle. Mobile layout uses CSS media queries (not JS) to swap between desktop sidebar and mobile drawer.
-- **Page Detection**: `page-registry.ts` defines `PAGE_REGISTRY` mapping page names to `'sidebar'` or `'standalone'` layout type. `<html data-page="dashboard">` attribute is read by JS on `DOMContentLoaded` to dispatch to the correct page module's `init()`. Pages with `sourceDir` in `PAGE_REGISTRY` have source files at a different path than their page name.
-- **Source = Output Alignment**: Build output paths always use the registry's `sourceDir` and `sourceFile` (both are required fields on `PageEntry`). Both `compose.ts` and `navigateTo()` resolve output as `{sourceDir}/{sourceFile}.html`. So a page registered as `flow-detail` with `sourceDir: 'flows'` and `sourceFile: 'detail'` produces output at `flows/detail.html`, and `navigateTo('idea-detail')` generates `../ideas/detail.html` because `idea-detail` has `sourceDir: 'ideas'`, `sourceFile: 'detail'`. This keeps the developer's mental model simple: the file you edit is the file the browser loads.
-- **Auth**: Mock auth returning `demo@example.com`.
-- **Data**: REST-style API layer (`api/`) backed by localStorage. The `web-app/app/adapters/` directory contains adapter functions across 16 modules (with barrel re-export) that call `GET()`/`PUT()`/`POST()` and convert normalized DB rows into the denormalized shapes pages expect.
-- **Presentation**: The `web-app/app/presenters/` directory contains 15 presenter classes across 13 files (with barrel re-export) that wrap adapter-returned shapes and emit `SafeHtml`. Page modules instantiate presenters and call `build*` methods on them to produce markup — keeping rendering logic out of page modules and out of adapters.
-- **Database**: localStorage with JSON serialization, persisted across page navigations. Each table is stored as a `fusion-ai:tableName` key containing a JSON array of row objects. Deletion is recorded in a single `fusion-ai:deleted` tombstone table whose rows are `{id, deleted_at}` — entity rows themselves never carry a `deleted_at` column. `EntityStore.getAll()`/`getById()` filter against `deleted.allDeletedIds()`; `EntityStore.delete(id)` writes a tombstone row. History stores (`flow_versions`) hard-delete via splice. When no schema exists (no `fusion-ai:*` keys in localStorage), non-entry pages redirect to snapshots so users can initialize the environment. A snapshots page provides create pristine environment, wipe and load mock data, upload snapshot, and download snapshot operations. Extracting `created_at` and `updated_at` from entity rows (`FlowEntity`, `WorkOrderEntity`) into `flow_events` and `work_order_events` tables — the natural extension of the tombstone pattern — is **deferred until immediately before the Postgres backend migration**, when transactional guarantees make the multi-table writes natural and a single regression pass covers both changes.
-- **State**: Simple module-level variables + pub-sub pattern for theme (persisted to localStorage), mobile detection (matchMedia), auth, and sidebar state.
-- **Durations**: All numeric durations are persisted in seconds. UI displays days via `durationInDays(seconds)` from `format.ts`.
+- **HTML Composition**: `web-app/app/compose.ts` assembles
+  `components-layout.html` + `component-*.html` + each page's
+  `index.html` into composed standalones in a temp build dir.
+  Standalone pages are copied directly.
+- **Navigation**: `<a href>` between pages. `navigateTo(page,
+  params?)` builds relative URLs.
+- **Page Detection**: `<html data-page="dashboard">` →
+  `PAGE_REGISTRY` lookup → page module's `init()`.
+- **Source = Output Alignment**: `PAGE_REGISTRY` declares
+  `sourceDir` and `sourceFile`. Both `compose.ts` and
+  `navigateTo()` resolve output as
+  `{sourceDir}/{sourceFile}.html` — the file you edit is the
+  file the browser loads.
+- **Auth**: Mock, returns `demo@example.com`.
+- **Data**: REST-style API (`api/`) over localStorage. Adapters
+  in `web-app/app/adapters/` shape rows for pages.
+- **Presentation**: Presenters in `web-app/app/presenters/` emit
+  `SafeHtml`.
+- **Database**: localStorage with JSON serialization. Each table
+  is a `fusion-ai:tableName` key. Deletion uses a single
+  `fusion-ai:deleted` tombstone table; entity rows never carry
+  `deleted_at`. History stores hard-delete via splice. When no
+  schema exists, non-entry pages redirect to snapshots.
+- **State**: Module-level vars + pub-sub for theme, mobile, auth,
+  sidebar.
+- **Durations**: Persisted in seconds; UI displays days via
+  `durationInDays(seconds)`.
 
 ### Flow Canvas
 
-The "Flow Designer" page (`flows/detail.html`) renders an SVG canvas of a flow graph with pan, marquee selection, drag, and edge connection. Layers:
-
-- **`flow-layout.ts`** — Sugiyama-style layered layout (`computeLayout()`), aspect-aware scaling, reachability and adjacency helpers. Exports node-size constants used by the renderer.
-- **`flow-graph.ts`** — Pure SVG renderer that consumes a laid-out graph and emits nodes (ports, label boxes, start/complete decorations) and bezier edges (with bidirectional spread and dashed cycles).
-- **`flow-interactions.ts`** — Discriminated-union state machines (`Selection`, `DragMode`, `ConnectMode`, `PanMode`, `MarqueeMode`) that the page module wires to pointer and keyboard events. Pan requires Space + mousedown.
-- **`mermaid-generate.ts` / `mermaid-parse.ts`** — Round-trip between `FlowGraph` and Mermaid flowchart / stateDiagram text. Used by `adapters/flow-export.ts`.
-- **`zip.ts`** — Minimal in-browser ZIP (DEFLATE + CRC-32) used to package a flow as a downloadable bundle.
-
-`adapters/flow-export.ts` is the integration point: it calls `generateMermaid`, `parseMermaid`, `buildZip`, `getZipEntries`, `computeLayout`, and `computeEdgeLabelWidth` to produce `getFlowMermaid`, `getFlowZip`, `postFlowFromMermaid`, and `postFlowFromZip`.
+The Flow Designer (`flows/detail.html`) renders an SVG canvas
+with pan, marquee, drag, and edge connection. Layers:
+`flow-layout.ts` (Sugiyama layout), `flow-graph.ts` (SVG render),
+`flow-interactions.ts` (pointer/keyboard state machines —
+discriminated unions, pan needs Space+mousedown),
+`mermaid-{generate,parse}.ts` (round-trip text format),
+`zip.ts` (in-browser ZIP). Integration point:
+`adapters/flow-export.ts`.
 
 ### API Layer (`/api`)
 
-The API layer is a set of TypeScript modules that provide a REST-style interface to the database:
+`api/types.ts` (row types + shared aliases), `api/db.ts`
+(`DbAdapter` interface), `api/db-localstorage.ts` (production
+impl), `api/db-memory.ts` (test impl), `api/api.ts` (pure HTTP
+routing — `GET/PUT/DELETE/POST` helpers, **no module-level
+adapter; threaded explicitly**), `api/mock-data.ts`,
+`api/validators.ts`. The `DbAdapter` interface is the migration
+seam to Postgres.
 
-- **`api/types.ts`** — Row types (snake_case) matching
-  schema, shared type aliases (`Id`,
-  `ConfidenceLevel`, `IdeaStatus`),
-  `User` class wrapping `UserEntity`, and `toBool`
-  utility
-- **`api/db.ts`** — `DbAdapter` interface with `EntityStore<T>` and `SingletonStore<T>` patterns, plus `hasSchema()`/`createSchema()` lifecycle methods
-- **`api/db-localstorage.ts`** — localStorage implementation with JSON serialization
-- **`api/api.ts`** — `GET(resource)` / `PUT(resource, body)` / `DELETE(resource)` / `POST(resource, body)` URL routing
-- **`api/mock-data.ts`** — Mock data seed payload + apply helper
-
-The `DbAdapter` interface is designed for easy migration to Postgres or other backends — implement the same interface and swap the import.
+The composition root is `web-app/app/adapters/init.ts`.
+`createFetchContext()` defaults to the LocalStorage adapter;
+tests pass `createFetchContext(db)` with a `MemoryDbAdapter`.
 
 ### Page Module Pattern
 
@@ -107,58 +115,23 @@ Sidebar-layout pages have `index.html` containing page content that gets compose
 
 ### Presenter Pattern
 
-Presenters live in `web-app/app/presenters/` and wrap
-adapter-returned shapes to produce `SafeHtml`. They are
-the single place where rendering logic lives: page
-modules fetch data via adapters, instantiate the
-relevant presenter, and call `build*` methods on it to
-generate the markup the page injects into the DOM.
+Presenters in `web-app/app/presenters/` are immutable view
+objects: constructor takes the full data shape, methods return
+`SafeHtml`. Page modules instantiate them and inject the result
+into the DOM — presenters never touch the DOM, never fetch,
+never mutate.
 
-- **Construction**: every presenter takes its full
-  data shape in the constructor and is immutable.
-  Example: `new IdeaPresenter(idea)` wraps an `Idea`
-  and exposes `buildStatusBadge()`, `idForLink()`,
-  `positionSortKey()`, etc. State transitions
-  construct a *new* presenter — never mutate an
-  existing one.
-- **Edit mode is a separate presenter**: entities
-  with editable detail views split into two
-  classes — `IdeaPresenter` (read view, takes the
-  entity) and `IdeaEditPresenter` (edit view, takes
-  the entity plus a draft shape). The page module
-  owns a `PageState` discriminated union
-  (`{kind: 'reading'} | {kind: 'editing', draft}`)
-  and constructs the appropriate presenter on each
-  render. The same pattern applies to `Profile`,
-  `Company`, and `ProjectDetail`.
-- **No state beyond construction args**: presenters
-  are pure view objects. They never fetch data, never
-  mutate, and never touch the DOM directly. Page
-  modules are responsible for the DOM; presenters are
-  responsible for the HTML they hand over.
-- **Barrel**: `presenters/index.ts` re-exports every
-  presenter class. Page modules import via
-  `from '../app/presenters'`.
-- **Shared helpers**: `presenters/ordered-keys.ts` is
-  an internal helper used by several presenters; it is
-  not itself a presenter and is not re-exported from
-  the barrel.
-- **File list** (presenter classes across the
-  presenter files): `account`, `activity`, `flow`,
-  `flow-designer`, `gauge`, `idea` (exports
-  `IdeaPresenter` + `IdeaEditPresenter` +
-  `IdeaListPresenter`), `idea-conversion`,
-  `idea-create`, `profile` (exports `ProfilePresenter`
-  + `ProfileEditPresenter`), `project` (exports
-  `ProjectPresenter` + `ProjectListPresenter`),
-  `project-detail` (exports
-  `ProjectDetailPresenter` + `ProjectDetailEditPresenter`),
-  `company` (exports `CompanyPresenter` +
-  `CompanyEditPresenter`), `user`, `working-styles`,
-  `workbox-inbox`, plus `index` (barrel),
-  `ordered-keys` (helper), and `flow-designer-view`
-  (helper for the flow designer page, exporting
-  `build*` functions).
+Editable detail views split into two presenters: a read presenter
+(takes the entity) and an `*Edit` presenter (takes entity + draft
+shape). The page module owns a `PageState` discriminated union
+(`{kind: 'reading'} | {kind: 'editing', draft}`) and constructs
+the appropriate one per render. This pattern applies to `Idea`,
+`Profile`, `Company`, and `ProjectDetail`.
+
+`presenters/index.ts` is the barrel; page modules import from
+`'../app/presenters'`. `WorkboxDetailPresenter` uses a public
+`buildPage()` orchestrating private `#build*` helpers; the rest
+expose `build*` directly.
 
 ### Import Conventions
 
@@ -179,26 +152,41 @@ import { navigateTo, openDialog, closeDialog } from '../app/core';
 
 ### Naming Conventions
 
-- `build*` — construct and return a value (data structure, HTML, chart)
-- `mutate*` — find existing DOM element(s) and update their content (side-effecting)
-- `init*` — set up event listeners and initial behavior
-- `toneFor*` / `levelFor*` — map a status/value to a string enum (`'success' | 'warning' | 'error'` etc.) used as a `data-tone` or `data-level` attribute value. Replaces the older `styleFor*` pattern that returned inline-style strings.
-- `compute*` — pure calculation returning a derived value
-- `get*` — adapter functions that fetch and transform data (reads)
-- `put*` — adapter functions that write entity data (writes)
-- Adapter function names use **domain nouns** (`getIdea`, `putProject`), never internal type names like `Entity` — the return type already communicates the shape
-- `deleteSchema`, `postSchemaCreation`, `postMockDataLoad`, `postBootstrap`, `putSnapshot`, `getSnapshot`, `getDataPresent` — snapshot lifecycle operations in `adapters/snapshots.ts`
-- Boolean variables: `is*`, `has*`, `needs*` (use the prefix that reads naturally in English)
-- Config objects: `Record<StatusType, { label, className }>` in `api/types.ts`
+- `mutate*` — finds existing DOM and updates it (side-effecting,
+  distinct from `build*` which constructs and returns)
+- `toneFor*` / `levelFor*` — return string enums consumed as
+  `data-tone` / `data-level` attribute values (replaces older
+  `styleFor*` inline-style pattern)
+- `assert*` — Telling-shape validators in `api/types.ts` and
+  `api/validators.ts` that take a raw value and return a typed
+  value or throw. The `is*` type-guards remain for legitimate
+  type-narrowing call sites.
+- Adapter functions use **domain nouns** (`getIdea`, not
+  `getIdeaEntity`) — return type already communicates shape.
 
 ### Adapter Conventions
 
-- **User-name resolution**: `userName(userMap, userId: Id)` throws on both missing and unknown userId. Parameter type is `Id`, not `Id | undefined` — a missing required reference is a bug, not a presentation case. Optional user references (a project with no lead yet, a work order with no transitions) must be modeled at the call site by branching on the upstream absence (`leadRow ? userName(...) : ''`), not by overloading `userName` with two policies. UI renders `'\u2014'` (em dash) via `DISPLAY_ABSENT` for legitimately absent values that the type system admits. Never use magical fallback strings like `'Unknown'`.
-- **Absent values**: Use `null` for semantically absent values in adapter return types (e.g., `confidence: ConfidenceLevel | null`). Persisted noun entities never use `null`.
-- **No module-level adapter caching**: Adapters never hold long-lived caches (`cachedUserMap` etc.). Module-level state introduces cross-request leakage and contradicts the "share memory by communicating" article of faith.
-- **Request-scoped immutability via `FetchContext`**: A page-module `init()` may construct a `FetchContext` and thread it through multiple adapter calls so the *whole process executes against an immutable snapshot* of the underlying data. Motivation is idempotency and atomicity (Commandments VII and X), not performance: a process that reads `'users'` twice could see different data if another tab writes between the reads, breaking process atomicity. `ctx.getUserMap()` snapshots once and reuses; the ctx is constructed per request and discarded — never module-level. Adapters that need user data accept an optional `ctx?: FetchContext`; when omitted, they fetch fresh (backward-compatible default). When the backend migrates from localStorage to Postgres, this also avoids redundant database round-trips for free.
-- **Shared helpers**: `adapters/shared.ts` exports cross-module utilities (`getUserMap`, `userName`, `getCurrentUser`, `AuthContext`, `FetchContext`, `createFetchContext`).
-- **Platform-shim adapters vs data-access adapters**: the `adapters/` directory holds two categories. *Data-access* adapters (`ideas.ts`, `projects.ts`, `flow-queries.ts`, `dashboard.ts`, etc.) fetch and shape entity data through the API layer. *Platform-shim* adapters (`blob-download.ts`, `clipboard.ts`, `viewport.ts`, `location.ts`, `media-query.ts`, `resize-observer.ts`, `preferences.ts`, `url-params.ts`, `crypto-safe-base62.ts`) wrap browser primitives so the codebase speaks one voice — `setLocation(url)` instead of `window.location.href = url`, `postClipboardCopy(text)` instead of `navigator.clipboard.writeText(text)`. A one-line shim is not a code smell; it is the divorce point. When a platform feature evolves (clipboard permission flows, `visualViewport` semantics, ResizeObserver options, base62 vs UUID identity), the change happens in one place. Don't fold platform shims into call sites for LOC savings — the Article on Insulation through Adapters earns the file. Distinct from data-access adapters: platform shims are typically tiny (1–15 lines), don't take `ctx?: FetchContext`, don't return entity shapes, and don't go through the `api/` layer.
+- **`userName(userMap, userId: Id)`** throws on both missing and
+  unknown userId. Optional user references must branch at the
+  call site (`leadRow ? userName(...) : ''`) — never overload
+  `userName` with a fallback. UI renders `'—'` via
+  `DISPLAY_ABSENT` for legitimately absent values. Never use
+  magic strings like `'Unknown'`.
+- **`FetchContext` is the only I/O surface.** Every data-access
+  adapter takes `ctx: FetchContext` first and uses
+  `ctx.GET/PUT/DELETE/POST/commit`. The standalone `GET/PUT/...`
+  exports in `api/api.ts` are the transport `ctx` delegates to —
+  adapters never import them directly. A ctx executes against an
+  immutable snapshot: `ctx.getUserMap()`, `ctx.getIdeaRows()`,
+  etc. are memoized for its lifetime so multiple adapter calls
+  see the same view.
+- **Platform-shim vs data-access adapters share `adapters/`.**
+  Data-access adapters (`ideas.ts`, `flow-queries.ts`, etc.)
+  fetch entity data through `ctx`. Platform shims
+  (`clipboard.ts`, `viewport.ts`, `location.ts`,
+  `crypto-safe-base62.ts`, etc.) wrap browser primitives so the
+  app speaks one voice. Tiny shims are not a smell — they are
+  the divorce point.
 
 ### Dark Mode
 
@@ -206,37 +194,28 @@ CSS custom properties on `:root` (light) and `[data-theme="dark"]` (dark). Toggl
 
 ## UI & Styling
 
-### CSS-first styling (no inline `style=""` strings)
+### CSS-first styling
 
-All visual styling lives in CSS files under `web-app/app/styles/`. TypeScript presenters and page modules emit semantic class names plus `data-*` attributes for variants. Inline `style="..."` strings are forbidden except for two narrow cases:
+All styling lives in `web-app/app/styles/`. Inline `style="..."`
+strings are forbidden except:
 
-1. **Dynamic per-element values** — values computed at render time from entity data (progress bar widths, animation durations, fill percentages). These pass via CSS custom properties: `style="--progress-fill:${value}%"` consumed by a CSS rule that reads `var(--progress-fill, 0%)`. The value is **data**, not styling.
-2. **Bootstrap fallbacks** — `database-init.ts` shows an error UI when the app fails to bootstrap and CSS may not have loaded. Inline styles are intentional there. A file-header comment marks the exception.
+1. **Dynamic per-element values** (progress widths, fill
+   percentages) — passed via CSS custom properties:
+   `style="--progress-fill:${value}%"` consumed by a CSS rule
+   reading `var(--progress-fill, 0%)`. The value is **data**,
+   not styling.
+2. **Bootstrap fallbacks** in `database-init.ts` — error UI
+   before CSS may have loaded, marked with a file-header
+   comment.
 
-The **theme/variant pattern** is `data-tone` or `data-level` attributes on a base class:
+The variant pattern is `data-tone` / `data-level` attributes on
+a base class. The TS enum and the CSS attribute selector share
+one source of truth.
 
-```typescript
-// presenter
-return html`<div class="icon-box" data-tone="${tone}">...</div>`;
-```
-
-```css
-/* components.css */
-.icon-box[data-tone="primary"] { background: ...; }
-.icon-box[data-tone="success"] { background: ...; }
-```
-
-`tone` comes from a `toneFor*` / `levelFor*` helper that returns a string enum. The TS type system and the CSS attribute selectors share a single source of truth: the enum values.
-
-When migrating or extending visual code:
-
-- **Look for an existing utility first** (`.flex`, `.gap-4`, `.mb-5`, `.text-sm`, `.bg-primary`, `.shadow-lg`).
-- **Look for an existing component class** (`.card`, `.icon-box`, `.avatar`, `.status-dot`, `.legend-cell`, `.action-card`, `.stat-cell`, `.pill[data-tone]`).
-- **Add to `components.css`** when a pattern appears in 3+ files. Group with sibling classes and modifiers.
-- **Add to `pages.css`** in a numbered section when the pattern is page-scoped (only used by one feature).
-- **Add to `utilities.css`** for new single-property primitives.
-- **Never use raw hex colors** in new CSS rules — always `hsl(var(--token))`. The token system is the single source of truth for color.
-- **Demonstrating the design system**: `design-system/index.ts` consumes the **same** `.bg-*`, `.shadow-*`, `.text-*` classes that production code uses. There is no parallel demonstration-only style universe — if `--primary` changes, every `.bg-primary` instance updates including the swatch on the design-system page.
+When extending CSS: components.css for patterns appearing in 3+
+files; pages.css for page-scoped patterns; utilities.css for
+single-property primitives. Never use raw hex colors — always
+`hsl(var(--token))`.
 
 ### Component Library
 
@@ -248,15 +227,9 @@ All UI components are vanilla HTML/CSS with ARIA attributes, defined as CSS clas
 
 ### Design System
 
-Full spec in `DESIGN-SYSTEM.md`. Key constraints:
-
-- **Colors**: Primary Blue `#4B6CA1`, Primary Yellow `#FDD31D`. Never use pure black `#000` — all grays are blue-tinted. All colors defined as CSS custom properties.
-- **Typography**: Display = IBM Plex Sans, Body = Inter, Mono = IBM Plex Mono. Self-hosted woff2 files at `web-app/assets/*.woff2`.
-- **Spacing**: 8px grid system.
-- **Icons**: ~100 inline SVG functions in `web-app/app/icons.ts`. Each returns a `SafeHtml` value: `iconSparkles(size, cssClass)`. Pages import icons directly from `icons.ts`.
-- **Toasts**: `showToast(message, variant)` function with auto-dismiss.
-- **Charts**: Dashboard gauges are rendered by `presenters/gauge.ts`. There is no separate chart library.
-- **Dark mode**: CSS custom properties with `data-theme` attribute.
+See `DESIGN-SYSTEM.md`. Key invariant: never use raw hex colors
+in CSS — always `hsl(var(--token))`. Icons are ~100 inline SVG
+functions in `web-app/app/icons.ts`.
 
 ### Mobile Responsiveness
 
@@ -264,170 +237,35 @@ CSS media queries in `web-app/app/styles/responsive.css` show/hide desktop vs mo
 
 ## Project Structure
 
-```
-package.json                  # Project config (zero runtime dependencies)
-build                         # Executable build script
+`api/` — REST routing, DB adapter interface, mock data,
+validators. `web-app/app/` — all source (TypeScript + CSS), with
+subdirectories `adapters/` (data-access + platform shims, both
+kinds share the folder), `presenters/` (presenter classes
+producing `SafeHtml`), and `styles/` (cascade-ordered CSS
+modules). `web-app/{dashboard,workbox,ideas,projects,flows,...}/`
+— page directories registered in `PAGE_REGISTRY` (sidebar-layout
++ standalone). `billing/` is a stub.
 
-api/
-  types.ts                    # Row types (snake_case), shared type aliases (Id, ConfidenceLevel, IdeaStatus), User class, toBool
-  db.ts                       # DbAdapter interface (EntityStore, SingletonStore, hasSchema, createSchema), EntityNotFound
-  db-localstorage.ts          # localStorage implementation with JSON serialization
-  api.ts                      # GET/PUT/DELETE/POST URL routing
-  mock-data.ts                # Mock data seed payload
-  validators.ts               # JSON validators for Risk[], StoredGraph, WorkOrderFlowGraph, transition values
-
-web-app/
-  index.html                  # Redirects to landing/index.html
-  app/                        # All source code (TypeScript + CSS)
-    tsconfig.json             # TypeScript config
-    components-layout.html     # Layout skeleton with component placeholders
-    component-*.html          # UI components (sidebar, top-bar, mobile-header, mobile-sidebar)
-    compose.ts                # Build-time script: layout + page → composed index.html
-    core.ts                   # DOMContentLoaded bootstrap + re-exports from format.ts, navigation.ts, dialog.ts
-    database-init.ts          # initDatabase(), handleDatabaseError()
-    page-loader.ts            # Page module registry, loadAndInitPage(), handlePageLoadError()
-    page-registry.ts          # PAGE_REGISTRY: maps page names → sidebar/standalone classification + sourceDir/sourceFile overrides
-    format.ts                 # initials(), durationInDays(), formatCompactCurrency(), formatDateTime(), SECONDS_PER_DAY, DISPLAY_ABSENT
-    layout.ts                 # Sidebar collapse/expand + initSidebarLayout() orchestrator
-    theme-toggle.ts           # Theme toggle icon, dropdown init
-    sidebar-user.ts           # Sidebar user info fetch and display
-    nav-highlight.ts          # Active nav item highlighting
-    nav-items.ts              # SIDEBAR_NAV_ITEMS + buildSidebarNavItemsHtml(), single source of truth for sidebar links
-    mobile-drawer.ts          # Mobile sidebar drawer behavior
-    header-info.ts            # Header greeting and stats
-    navigation.ts             # navigateTo(), getPageName(), URL construction, link prefetch
-    dialog.ts                 # openDialog(), closeDialog(), initTabs() dialog/tab helpers
-    icons.ts                  # ~100 SVG icon functions and lookup map
-    state.ts                  # AppState, theme, mobile detection, pub-sub
-    adapters/preferences.ts   # localStorage adapter for user preferences (theme, sidebar, log-level)
-    channels.ts               # createChannel<T>() pub/sub for cross-page change notifications
-    command-palette.ts        # Cmd+K search overlay with keyboard navigation
-    dom.ts                    # querySelector wrappers ($, $$, $required, $input, $select, $textarea), attr(), populateIcons(), initToggleGroup(), bindEnterToClick()
-    drag-reorder.ts           # initDragReorder() pointer-driven list reordering with hysteresis indicator
-    flow-graph.ts             # SVG renderer for flow canvas (nodes, ports, bezier edges, label boxes)
-    flow-history.ts           # pure helpers (recordUndoHistoryMark, appendToRedoStack, removeFromRedoStack) for the flow designer page
-    flow-interactions.ts      # Pointer/keyboard state machines: selection, drag, connect, pan, marquee
-    flow-layout.ts            # Sugiyama-style layered graph layout (computeLayout, NODE_WIDTH, reachability)
-    mermaid-generate.ts       # generateMermaid(graph): serialize FlowGraph to Mermaid flowchart text
-    mermaid-parse.ts          # parseMermaid(text): parse Mermaid flowchart/stateDiagram into ParsedFlowchart
-    zip.ts                    # In-browser ZIP build/read (DEFLATE + CRC-32) for flow export/import
-    toast.ts                  # showToast() auto-dismiss notifications
-    logger.ts                 # Lightweight logger using adapters/preferences for log-level
-    safe-html.ts              # SafeHtml class, html tagged template, trusted(), setHtml()
-    loading-states.ts         # Loading skeletons, error states, empty states, withLoadingState()
-    adapters/                 # adapter functions across 16 modules (API → frontend shapes)
-      index.ts                # Barrel re-export
-      shared.ts               # getUserMap, userName, getCurrentUser, AuthContext
-      dashboard.ts            # getDashboardGauges, getDashboardStats, etc.
-      ideas.ts                # getIdeas, getIdeaDetail, getIdeaForConversion, getIdea, putIdea, putIdeaSubmission
-      projects.ts             # getProjects, getProjectById, putProject, putProjectTeamMember
-      teams.ts                # getTeamMembers, getManagedUsers
-      flows.ts                # Barrel re-export from flow-* modules
-      flow-queries.ts         # getFlows, getFlowsByProject, getFlowGraph + graph types
-      flow-mutations.ts       # postFlowCreation, putFlow (caller declares full state; node/edge/field changes flow through putFlow + applyAdd*/applyDelete* helpers)
-      flow-versions.ts        # postFlowVersion, getFlowVersions, getLatestFlowVersion, deleteFlowVersion, putFlowFromVersion (persistent undo history)
-      flow-export.ts          # getFlowMermaid, getFlowZip, postFlowFromMermaid, postFlowFromZip
-      workbox-queries.ts      # getWorkboxItems, getWorkboxActive, getWorkboxArchive, getWorkboxItem, getFlowsForCreation
-      workbox-mutations.ts    # postWorkOrderCreation, postWorkOrderTransition, postWorkOrderClaim, putWorkOrder
-      workbox-deletions.ts    # deleteWorkOrderClaim
-      admin.ts                # getAccount, getProfile, getCompany, getActivityFeed
-      snapshots.ts            # deleteSchema, postSchemaCreation, postMockDataLoad, postBootstrap, putSnapshot, getSnapshot, getDataPresent
-    presenters/               # 15 presenter classes across 13 files (adapter shapes → SafeHtml)
-      index.ts                # Barrel re-export
-      ordered-keys.ts         # Internal helper (not a presenter)
-      account.ts              # AccountPresenter
-      activity.ts             # ActivityPresenter
-      flow.ts                 # FlowPresenter
-      flow-designer.ts        # FlowDesignerPresenter (flow canvas page)
-      gauge.ts                # GaugePresenter (dashboard gauges, receiver-style)
-      idea.ts                 # IdeaPresenter, IdeaListPresenter
-      idea-conversion.ts      # IdeaConversionPresenter (idea → project flow)
-      idea-create.ts          # IdeaCreatePresenter
-      profile.ts              # ProfilePresenter
-      project.ts              # ProjectPresenter, ProjectListPresenter
-      project-detail.ts       # ProjectDetailPresenter
-      company.ts              # CompanyPresenter
-      user.ts                 # UserPresenter
-    styles/                   # CSS modules (cascade-ordered) — build inputs
-      fonts.css               # @font-face declarations
-      tokens.css              # :root custom properties (light mode)
-      dark-mode.css           # [data-theme="dark"] overrides
-      base.css                # Reset, typography, focus/selection
-      components.css          # Buttons, inputs, cards, badges, tables, etc.
-      layout.css              # Sidebar layout, header, named grid classes
-      utilities.css           # Utility classes and animations
-      responsive.css          # Media queries and reduced motion
-      pages.css               # Page-specific styles
-      command-palette.css     # Command palette styles
-  assets/                     # Static files — copied as-is to build output
-    favicon.ico               # Application favicon
-    *.woff2                   # 9 self-hosted font files (IBM Plex Sans, Inter, IBM Plex Mono)
-
-  # Pages — 24 entries in PAGE_REGISTRY (19 sidebar-layout + 5 standalone). Most page directories hold multiple pages (e.g., flows/index + flows/detail).
-  dashboard/                # Dashboard with gauge cards
-  workbox/                  # Work order inbox + detail
-  ideas/                    # Ideas list + detail, create, convert (named files)
-  projects/                 # Projects list + detail (named files)
-  flows/                    # Flow list + detail (detail.ts/detail.html)
-  organization/             # Account overview, users, activity-feed, onboarding (named files)
-  teams/                    # Team roster and member management
-  profile/                  # Profile settings
-  company/                  # Company name and domain
-  billing/                  # Billing page — STUB (init() is empty; page renders a placeholder)
-  snapshots/                # Snapshots (wipe, reload, upload/download snapshots)
-  design-system/            # Component gallery
-  landing/                  # Landing page (standalone)
-  auth/                     # Login/signup (standalone)
-  not-found/                # 404 page (standalone)
-
-SCHEMA.md                     # Database schema (19 tables, columns, types, defaults)
-DESIGN-SYSTEM.md              # Design system specification
-TEST-PLAN.md                  # Human-executable test plan (254 cases)
-```
-
-Most pages use `index.ts` + `index.html`. Pages with
-`sourceFile` in `PAGE_REGISTRY` use named files (e.g.,
-`detail.ts` + `detail.html`). Build output goes to a
-temp directory -- no build artifacts in the repo.
+The composition root is `web-app/app/adapters/init.ts`. Run `ls`
+or read file headers — both are more current than this document
+will ever be.
 
 ## Build
 
-Build steps (requires clean git working directory):
-1. Composes HTML pages: runs `web-app/app/compose.ts` to assemble `components-layout.html` with `component-*.html` files and each sidebar-layout page's HTML file, producing 18 composed files in the build directory. Respects `sourceDir` and `sourceFile` for both input resolution and output placement. Exits with error if any page is missing.
-2. Copies 5 standalone pages (`auth`, `landing`, `onboarding`, `not-found`, `flow-detail`) — also handled by `compose.ts`, which uses `copyFileSync` for standalone entries instead of templating
-3. Bundles TypeScript into a single IIFE (`assets/app.js`) via esbuild into the build directory
-4. Concatenates CSS modules in cascade order and minifies via esbuild into `assets/styles.css`, copies `*.woff2` and `favicon.ico` to the build directory
-5. Creates a distribution ZIP (`fusion-ai-<sha>.zip`) at the output path (default `~/Desktop/`), or skips zipping with `--no-zip`
-
-CLI options: `./build [--no-zip] [path/]`. The trailing `/` on the path argument is required. Default output is `~/Desktop/`. With `--no-zip`, the bundle directory is kept for direct serving via HTTP.
-
-No build artifacts are created in the repo — build output goes to `/tmp/` by default.
+`./build` requires a clean working directory. Output is a ZIP at
+`~/Desktop/`. Use `./build --help` for options. The build script
+itself is the source of truth for what gets composed, bundled,
+and copied — read it, don't read this section.
 
 ## Testing
 
 Two layers, both zero-dependency:
 
 **Automated tests** (Node's built-in `node:test` runner with
-`--strip-types`, no devDependencies). Files under `tests/` cover:
-
-- `safe-html.test.ts` — escape semantics + tagged template
-- `mermaid.test.ts` — generate/parse + full round-trip
-- `flow-layout.test.ts` — graph algorithms (reachability,
-  cycle detection)
-- `channels.test.ts` — pub/sub channel semantics
-- `format.test.ts` — pure formatters and helpers
-- `flow-designer-actions.test.ts` — pure flow-designer
-  state transitions (the `apply*` functions)
-- `adapters-shared.test.ts` — `FetchContext`, `userName`,
-  `getCurrentUser` against `MemoryDbAdapter`
-- `adapters-ideas.test.ts` — full adapter end-to-end including
-  the submission-existence invariant
-- `api.test.ts` — HTTP-style routing through GET/PUT/DELETE
-
-`api/db-memory.ts` provides an in-memory `DbAdapter` so
-adapter and api-layer tests run without `localStorage`. Tests
-call `resetApi()` then `initApi(new MemoryDbAdapter())` per
-test to isolate state.
+`--strip-types`, no devDependencies). Tests cover pure modules,
+adapters, and api routing — see `tests/` for the current set.
+`api/db-memory.ts` provides an in-memory `DbAdapter` so adapter
+and api-layer tests run without `localStorage`.
 
 Run via `./validate` (which also type-checks and lints) or
 directly: `node --test --strip-types tests/*.test.ts`.
@@ -449,7 +287,8 @@ time budgets while keeping per-entity mutation domains disjoint:
    server, start HTTP server, open tab 0. Covers A1–A5.
 2. **Phase 1 — Data setup** (one agent, serial): AA1–AA43 in
    tab 0. Creates pristine environment, users, ideas, projects,
-   one flow. Populates the shared database that Phase 2 verifies.
+   one flow. Populates the shared database that Phase 2
+   verifies.
 3. **Phase 2 — Parallel verification** (7 agents concurrent,
    each in its own tab, no shared tabs):
    - Agent-B — Entry pages (B1–B16)
@@ -526,6 +365,8 @@ patterns apply only to the parallel run.
 - **Cross-tab theme sync**: `state.ts` listens to `StorageEvent` and syncs theme changes across browser tabs automatically.
 - **Non-critical writes logged at warn**: localStorage writes for theme and sidebar state are wrapped in try/catch that log at `warn` level — quota errors don't break the app but are observable via the logger.
 - **Snapshots wipe-first**: All snapshot operations (pristine, mock data, import) call `DELETE('snapshots/schema')` before writing — there is no merge, only replace.
+- **Snapshot quota pre-flight**: `putSnapshotFromFile` consults `navigator.storage.estimate()` and rejects with `SnapshotTooLargeError` if `file.size` exceeds half of `quota - usage` (the import doubles peak memory while parsing). Falls back to a 5 MB hard cap when `navigator.storage.estimate()` is unavailable.
+- **Snapshot wipe-on-fail**: With pre-flight quota checks + per-row validation + column-level compression, mid-write failure is rare; when it does happen, `importSnapshot` wipes every `fusion-ai:<table>` key so the next bootstrap detects no schema and routes the user to the snapshots page to re-import. No backup, no sentinel, no rollback — real atomicity arrives with Postgres.
 - **Availability thresholds**: `AVAILABILITY_HIGH = 70`, `AVAILABILITY_LOW = 40`.
 - **`file:///` protocol**: Navigation detects file protocol and skips link prefetching. Page URLs use relative paths. Code supports `file:///` locally but testing is HTTP-only.
 

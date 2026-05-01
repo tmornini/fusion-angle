@@ -1,9 +1,3 @@
-import { GET } from '../../../api/api.ts';
-import type {
-    IdeaEntity,
-    ProjectEntity,
-    FlowEntity,
-} from '../../../api/types.ts';
 import {
     ideaIsVisible,
     projectIsApproved,
@@ -43,13 +37,10 @@ export interface GaugeData {
 }
 
 export async function getDashboardGauges(
-    ctx?: FetchContext,
+    ctx: FetchContext,
 ): Promise<GaugeData[]> {
-    const allProjects = ctx
-        ? await ctx.getProjectRows()
-        : await GET<ProjectEntity[]>(
-            'projects',
-        );
+    const allProjects =
+        await ctx.getProjectRows();
     const projects = allProjects.filter(
         projectIsApproved,
     );
@@ -175,23 +166,15 @@ export async function getDashboardGauges(
 }
 
 export async function getDashboardStats(
-    ctx?: FetchContext,
+    ctx: FetchContext,
 ): Promise<
     { label: string; value: number }[]
 > {
     const [ideas, projects, flows] =
         await Promise.all([
-            ctx
-                ? ctx.getIdeaRows()
-                : GET<IdeaEntity[]>('ideas'),
-            ctx
-                ? ctx.getProjectRows()
-                : GET<ProjectEntity[]>(
-                    'projects',
-                ),
-            ctx
-                ? ctx.getFlowRows()
-                : GET<FlowEntity[]>('flows'),
+            ctx.getIdeaRows(),
+            ctx.getProjectRows(),
+            ctx.getFlowRows(),
         ]);
 
     return [

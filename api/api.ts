@@ -18,6 +18,7 @@ import {
     validateWorkOrderEntity,
     validateFlowWorkOrderEntity,
     validateWorkOrderTransitionEntity,
+    validateTransitionFieldValueEntity,
     validateWorkOrderClaimEntity,
     validateCompanyEntity,
     validateOrganizationEntity,
@@ -41,34 +42,6 @@ export class ApiError {
 const HTTP_BAD_REQUEST = 400;
 const HTTP_NOT_FOUND = 404;
 const HTTP_INTERNAL_ERROR = 500;
-
-let adapter: DbAdapter | undefined;
-
-export function initApi(
-    dbAdapter: DbAdapter,
-): void {
-    if (adapter) {
-        throw new Error(
-            'initApi() already called.',
-        );
-    }
-    adapter = dbAdapter;
-}
-
-export function resetApi(): void {
-    adapter = undefined;
-}
-
-function getDbAdapter(): DbAdapter {
-    if (!adapter) {
-        throw new Error(
-            'API not initialized.'
-            + ' Call initApi()'
-            + ' first.',
-        );
-    }
-    return adapter;
-}
 
 type GetHandler = (
     adapter: DbAdapter,
@@ -289,6 +262,24 @@ const routes: Route[] = [
                 validateWorkOrderTransitionEntity(
                     withoutId(body),
                 ),
+            ),
+    }),
+    route('transition-field-values', {
+        get: (db) =>
+            db.transitionFieldValues
+                .getAll(),
+        put: (db, _params, body) =>
+            db.transitionFieldValues.put(
+                body.id as string,
+                validateTransitionFieldValueEntity(
+                    withoutId(body),
+                ),
+            ),
+    }),
+    route('transition-field-values/:id', {
+        delete: (db, params) =>
+            db.transitionFieldValues.delete(
+                param(params, 0),
             ),
     }),
     route('work-order-claims', {
@@ -647,6 +638,7 @@ function matchRoute(
 const BASE_URL = 'http://localhost';
 
 export async function handleRequest(
+    adapter: DbAdapter,
     request: Request,
 ): Promise<Response> {
     const { pathname } = new URL(request.url);
@@ -667,7 +659,6 @@ export async function handleRequest(
 
     const { route: matched, params } = match;
     const method = request.method;
-    const db = getDbAdapter();
 
     // HTTP boundary handler: each case
     // calls a single route handler; the
@@ -689,7 +680,7 @@ export async function handleRequest(
                 }
                 return Response.json(
                     await matched.get(
-                        db,
+                        adapter,
                         params,
                     ),
                 );
@@ -713,7 +704,7 @@ export async function handleRequest(
                     >;
                 const result =
                     await matched.put(
-                        db,
+                        adapter,
                         params,
                         payload,
                     );
@@ -738,7 +729,7 @@ export async function handleRequest(
                     );
                 }
                 await matched.delete(
-                    db,
+                    adapter,
                     params,
                 );
                 return new Response(null, {
@@ -765,7 +756,7 @@ export async function handleRequest(
                     >;
                 const result =
                     await matched.post(
-                        db,
+                        adapter,
                         params,
                         payload,
                     );
@@ -837,10 +828,12 @@ async function unwrapResponse<T>(
 }
 
 export async function GET<T>(
+    adapter: DbAdapter,
     resource: string,
 ): Promise<T> {
     return unwrapResponse<T>(
         await handleRequest(
+            adapter,
             new Request(
                 `${BASE_URL}/${resource}`,
             ),
@@ -849,11 +842,13 @@ export async function GET<T>(
 }
 
 export async function PUT<T>(
+    adapter: DbAdapter,
     resource: string,
     payload: Record<string, unknown>,
 ): Promise<T> {
     return unwrapResponse<T>(
         await handleRequest(
+            adapter,
             new Request(
                 `${BASE_URL}/${resource}`,
                 {
@@ -872,10 +867,12 @@ export async function PUT<T>(
 }
 
 export async function DELETE(
+    adapter: DbAdapter,
     resource: string,
 ): Promise<void> {
     await unwrapResponse(
         await handleRequest(
+            adapter,
             new Request(
                 `${BASE_URL}/${resource}`,
                 { method: 'DELETE' },
@@ -885,11 +882,13 @@ export async function DELETE(
 }
 
 export async function POST<T>(
+    adapter: DbAdapter,
     resource: string,
     payload: Record<string, unknown>,
 ): Promise<T> {
     return unwrapResponse<T>(
         await handleRequest(
+            adapter,
             new Request(
                 `${BASE_URL}/${resource}`,
                 {

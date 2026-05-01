@@ -27,6 +27,7 @@ import type {
     WorkOrderEntity,
     FlowWorkOrderEntity,
     WorkOrderTransitionEntity,
+    TransitionFieldValueEntity,
     WorkOrderClaimEntity,
 } from './types.ts';
 import { nowUtc, type Id } from './types.ts';
@@ -181,6 +182,9 @@ interface Tables {
     workOrderTransitions: Map<
         string, WorkOrderTransitionEntity
     >;
+    transitionFieldValues: Map<
+        string, TransitionFieldValueEntity
+    >;
     workOrderClaims: Map<
         string, WorkOrderClaimEntity
     >;
@@ -219,6 +223,10 @@ export class MemoryDbAdapter
     readonly workOrderTransitions:
         EntityStore<
             WorkOrderTransitionEntity
+        >;
+    readonly transitionFieldValues:
+        EntityStore<
+            TransitionFieldValueEntity
         >;
     readonly workOrderClaims:
         EntityStore<WorkOrderClaimEntity>;
@@ -300,6 +308,11 @@ export class MemoryDbAdapter
             new MemEntityStore(
                 'work_order_transitions',
                 t.workOrderTransitions, ds,
+            );
+        this.transitionFieldValues =
+            new MemEntityStore(
+                'transition_field_values',
+                t.transitionFieldValues, ds,
             );
         this.workOrderClaims =
             new MemEntityStore(
@@ -415,6 +428,7 @@ function buildTables(): Tables {
         workOrders: new Map(),
         flowWorkOrders: new Map(),
         workOrderTransitions: new Map(),
+        transitionFieldValues: new Map(),
         workOrderClaims: new Map(),
         deleted: new Map(),
     };

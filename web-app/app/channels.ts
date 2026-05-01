@@ -54,3 +54,22 @@ export function bridgeStorageToChannel(
         },
     );
 }
+
+export interface SubscriptionChannel {
+    notify(): void;
+    subscribe(
+        fn: () => void,
+    ): () => void;
+}
+
+export function createSubscriptionChannel(
+    tableNames: readonly string[],
+): SubscriptionChannel {
+    const channel = createChannel<void>();
+    bridgeStorageToChannel(tableNames, channel);
+    return {
+        notify: () => channel.send(),
+        subscribe: (fn) =>
+            channel.subscribe(fn),
+    };
+}

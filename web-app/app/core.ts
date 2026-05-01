@@ -47,6 +47,15 @@ async function loadAndInitCommandPalette(): Promise<void> {
     cp.initCommandPalette();
 }
 
+const PAGES_WITHOUT_SCHEMA: ReadonlySet<string> = new Set([
+    'snapshots',
+    'auth',
+    'onboarding',
+    'not-found',
+    'design-system',
+    'landing',
+]);
+
 function redirectIfMissingTable(
     err: unknown,
 ): boolean {
@@ -86,27 +95,15 @@ document.addEventListener(
             return;
         }
 
-        if (!hasSchema) {
-            const page = getPageName();
-            const skipRedirect = [
-                'snapshots',
-                'auth',
-                'onboarding',
-                'not-found',
-                'design-system',
-                'landing',
-            ];
-            if (
-                !skipRedirect.includes(
-                    page,
-                )
-            ) {
-                navigateTo('snapshots');
-                return;
-            }
-        }
-
         const pageName = getPageName();
+
+        if (
+            !hasSchema
+            && !PAGES_WITHOUT_SCHEMA.has(pageName)
+        ) {
+            navigateTo('snapshots');
+            return;
+        }
 
         if (
             document.querySelector(

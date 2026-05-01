@@ -16,26 +16,21 @@
             href="../assets/favicon.ico"
             sizes="any"
         />
-        <script>
-            (function() {
-                var t = localStorage
-                    .getItem('fusion-theme');
-                var dark = t === 'dark'
-                    || (t !== 'light'
-                        && matchMedia(
-                            '(prefers-color-scheme'
-                            + ': dark)'
-                        ).matches);
-                if (dark) {
-                    var d = document
-                        .documentElement;
-                    d.setAttribute(
-                        'data-theme', 'dark'
-                    );
-                    d.classList.add('dark');
-                }
-            })();
-        </script>
+        <meta
+            http-equiv="Content-Security-Policy"
+            content="
+                default-src 'self';
+                script-src 'self';
+                style-src 'self';
+                style-src-attr 'unsafe-inline';
+                font-src 'self';
+                img-src 'self' data:;
+                frame-ancestors 'none';
+                base-uri 'self';
+                form-action 'self'
+            "
+        />
+        <script src="../assets/theme-init.js"></script>
     </head>
     <body>
         <div id="page-root">

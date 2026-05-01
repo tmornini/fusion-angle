@@ -44,12 +44,7 @@ function initSidebar(): void {
                 + ' sidebar state.',
                 'error',
             );
-            return;
         }
-        root.classList.toggle(
-            'sidebar-collapsed',
-            isCollapsed,
-        );
     }
 
     $required(

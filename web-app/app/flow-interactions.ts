@@ -276,8 +276,9 @@ export function bindInteractions(
     signal: AbortSignal,
 ): (next: FlowGestureContext) => void {
     let context = initialContext;
+    let currentState: InteractionState = state;
     let activePointerId: number | null = null;
-    if (state.isSpaceDown) {
+    if (currentState.isSpaceDown) {
         wrap.classList.add(
             'flow-pan-cursor',
         );
@@ -371,9 +372,9 @@ export function bindInteractions(
         input: FsmInput,
     ): void => {
         const result = reduceFsm(
-            state, input,
+            currentState, input,
         );
-        Object.assign(state, result.state);
+        currentState = result.state;
         for (const action of result.actions) {
             applyAction(action);
         }
@@ -393,7 +394,7 @@ export function bindInteractions(
                 svg, e.clientX, e.clientY,
             );
 
-            if (state.isSpaceDown) {
+            if (currentState.isSpaceDown) {
                 dispatch({
                     kind:
                         'pointer-down-on-canvas',
@@ -529,18 +530,19 @@ export function bindInteractions(
                 y: number;
             } | null = null;
             if (
-                state.connect.kind
+                currentState.connect.kind
                     === 'connecting'
             ) {
                 const pos = getNodePosition(
-                    state.connect.fromNodeId,
+                    currentState.connect
+                        .fromNodeId,
                 );
                 fromNodePosition = {
                     x: pos.x, y: pos.y,
                 };
             }
             const allNodes =
-                state.marquee.kind
+                currentState.marquee.kind
                     === 'selecting'
                     ? Array.from(
                         getAllNodes(),

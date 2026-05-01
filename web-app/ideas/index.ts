@@ -10,7 +10,6 @@ import {
 import { navigateTo } from '../app/core.ts';
 import {
     getIdeas,
-    getIdeaRow,
     putIdea,
     subscribeIdeaChanges,
     isIdeaStatus,
@@ -98,7 +97,9 @@ export async function init(): Promise<void> {
 
     subscribeIdeaChanges(async () => {
         if (!ideaState || !listEl) return;
-        const updated = await getIdeas();
+        const updated = await getIdeas(
+            createFetchContext(),
+        );
         ideaState = applyIdeaListUpdate(
             ideaState, updated,
         );
@@ -110,11 +111,17 @@ export async function init(): Promise<void> {
         '[data-idea-card]',
         'data-idea-card',
         async (id, newPosition) => {
-            const entity = await getIdeaRow(id);
-            await putIdea(id, {
-                ...entity,
-                position: newPosition,
-            });
+            if (!ideaState) return;
+            const tuple = ideaState.ideas
+                .find(t => t.entity.id === id);
+            if (!tuple) return;
+            await putIdea(
+                createFetchContext(), id,
+                {
+                    ...tuple.entity,
+                    position: newPosition,
+                },
+            );
         },
     );
 }

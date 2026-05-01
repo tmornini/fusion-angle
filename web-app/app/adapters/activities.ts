@@ -1,4 +1,3 @@
-import { PUT } from '../../../api/api.ts';
 import { nowUtc } from '../../../api/types.ts';
 import {
     isActivityType,
@@ -30,15 +29,16 @@ export interface ActivityInput {
 }
 
 export async function postActivity(
+    ctx: FetchContext,
     input: ActivityInput,
-    ctx?: FetchContext,
 ): Promise<void> {
     const userRow =
         await getCurrentUserRow(ctx);
-    const activityId = generateCryptoSafeBase62();
+    const activityId =
+        generateCryptoSafeBase62();
     const actorId = generateCryptoSafeBase62();
     const timestamp = nowUtc();
-    await PUT(
+    await ctx.PUT(
         `activities/${activityId}`,
         {
             type: input.type,
@@ -49,7 +49,7 @@ export async function postActivity(
             feedback: input.feedback,
         },
     );
-    await PUT(
+    await ctx.PUT(
         `activity-actors/${actorId}`,
         {
             activity_id: activityId,

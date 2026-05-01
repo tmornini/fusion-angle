@@ -39,8 +39,8 @@ export async function init(
                 const [
                     rows, actors, userMap,
                 ] = await Promise.all([
-                    getActivityRows(),
-                    getActivityActorRows(),
+                    getActivityRows(ctx),
+                    getActivityActorRows(ctx),
                     getUserMap(ctx),
                 ]);
                 const actorMap = new Map(

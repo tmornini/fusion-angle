@@ -1,6 +1,3 @@
-import {
-    GET, PUT,
-} from '../../../api/api.ts';
 import type {
     UserEntity,
     OrganizationEntity,
@@ -11,15 +8,14 @@ import type {
 } from '../../../api/types.ts';
 import {
     User,
-    jsonArrayField,
     assertActivityType,
 } from '../../../api/types.ts';
 import {
     initials,
     formatDate,
 } from '../format.ts';
-import { notifyUserChange } from './teams.ts';
 import { getCurrentUserRow } from './shared.ts';
+import type { FetchContext } from './shared.ts';
 
 export type {
     OrganizationEntity,
@@ -28,15 +24,11 @@ export type { RecentActivityItem } from '../../../api/types.ts';
 export const RECENT_ACTIVITY_COUNT = 3;
 
 async function getOrganizationRow(
+    ctx: FetchContext,
 ): Promise<OrganizationEntity> {
-    const entity = await GET<
-        OrganizationEntity
-    >('organization');
-    if (!entity.plan)
-        throw new Error(
-            'Organization not configured',
-        );
-    return entity;
+    return ctx.GET<OrganizationEntity>(
+        'organization',
+    );
 }
 
 export class Organization {
@@ -136,8 +128,10 @@ export class Organization {
 }
 
 export async function getOrganization(
+    ctx: FetchContext,
 ): Promise<Organization> {
-    const entity = await getOrganizationRow();
+    const entity =
+        await getOrganizationRow(ctx);
     return new Organization(entity);
 }
 
@@ -257,13 +251,17 @@ export const allStrengths = [
 ];
 
 export async function getProfile(
-): Promise<Profile> {
+    ctx: FetchContext,
+): Promise<{
+    profile: Profile;
+    entity: UserEntity;
+}> {
     const user =
-        await GET<UserEntity>(
+        await ctx.GET<UserEntity>(
             'current-user',
         );
     const userObj = new User(user);
-    return new Profile({
+    const profile = new Profile({
         firstName: user.first_name,
         lastName: user.last_name,
         email: user.email,
@@ -276,28 +274,7 @@ export async function getProfile(
         teamDimensions:
             userObj.parsedTeamDimensions(),
     });
-}
-
-export async function putProfile(
-    draft: ProfileDraft,
-): Promise<void> {
-    const current = await getCurrentUserRow();
-    const updated:
-        Omit<UserEntity, 'id'> = {
-            ...current,
-            first_name: draft.firstName,
-            last_name: draft.lastName,
-            email: draft.email,
-            phone: draft.phone,
-            role: draft.role,
-            department: draft.department,
-            bio: draft.bio,
-            strengths: jsonArrayField(
-                draft.strengths,
-            ),
-        };
-    await PUT('users/current', updated);
-    notifyUserChange();
+    return { profile, entity: user };
 }
 
 export interface CompanyDraft {
@@ -331,9 +308,10 @@ export class Company {
 }
 
 export async function getCompany(
+    ctx: FetchContext,
 ): Promise<Company> {
     const row =
-        await GET<CompanyEntity>('company');
+        await ctx.GET<CompanyEntity>('company');
     return new Company({
         name: row.name,
         domain: row.domain,
@@ -341,21 +319,24 @@ export async function getCompany(
 }
 
 export async function putCompany(
+    ctx: FetchContext,
     draft: CompanyDraft,
 ): Promise<void> {
-    await PUT('company', { ...draft });
+    await ctx.PUT('company', { ...draft });
 }
 
 export async function getActivityRows(
+    ctx: FetchContext,
 ): Promise<ActivityEntity[]> {
-    return GET<ActivityEntity[]>(
+    return ctx.GET<ActivityEntity[]>(
         'activities',
     );
 }
 
 export async function getActivityActorRows(
+    ctx: FetchContext,
 ): Promise<ActivityActorEntity[]> {
-    return GET<ActivityActorEntity[]>(
+    return ctx.GET<ActivityActorEntity[]>(
         'activity-actors',
     );
 }

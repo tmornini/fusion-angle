@@ -20,18 +20,17 @@ import {
 } from '../app/core.ts';
 import {
     getWorkOrderRows,
-    getAllWorkOrderTransitionRows,
-    getAllWorkOrderClaimRows,
+    getWorkOrderTransitionRows,
+    getWorkOrderClaimRows,
     getUserMap,
-    getWorkOrder,
     getFlowsForCreation,
     postWorkOrderCreation,
     putWorkOrder,
-    getCurrentUserRow,
     createFetchContext,
     generateCryptoSafeBase62,
     subscribeWorkOrderChanges,
     type FetchContext,
+    type WorkOrderEntity,
 } from '../app/adapters/index.ts';
 import {
     WorkboxInboxPresenter,
@@ -48,6 +47,8 @@ const signal = pageAbort.signal;
 
 let activePresenter:
     WorkboxInboxPresenter | null = null;
+let workOrderEntities:
+    Map<string, WorkOrderEntity> = new Map();
 
 export async function init(
     _params?: Record<string, string>,
@@ -73,24 +74,25 @@ export async function init(
     subscribeWorkOrderChanges(() => {
         if (activeEl) {
             void rerenderInbox(
-                activeEl, 'active',
+                activeEl, 'active', ctx,
             );
         }
         if (archiveEl) {
             void rerenderInbox(
-                archiveEl, 'archived',
+                archiveEl, 'archived', ctx,
             );
         }
     });
 
-    await initCreateDropdown();
+    await initCreateDropdown(ctx);
 }
 
 async function rerenderInbox(
     listEl: HTMLElement,
     mode: InboxMode,
+    ctx: FetchContext,
 ): Promise<void> {
-    const items = await loadInboxItems(mode);
+    const items = await loadInboxItems(mode, ctx);
     const presenter = new WorkboxInboxPresenter(
         items, mode === 'active',
     );
@@ -122,17 +124,20 @@ function renderTabs(): void {
 
 async function loadInboxItems(
     mode: InboxMode,
-    ctx?: FetchContext,
+    ctx: FetchContext,
 ): Promise<InboxItem[]> {
     const [
         workOrders, transitions,
         claims, userMap,
     ] = await Promise.all([
-        getWorkOrderRows(),
-        getAllWorkOrderTransitionRows(),
-        getAllWorkOrderClaimRows(),
+        getWorkOrderRows(ctx),
+        getWorkOrderTransitionRows(ctx),
+        getWorkOrderClaimRows(ctx),
         getUserMap(ctx),
     ]);
+    workOrderEntities = new Map(
+        workOrders.map(w => [w.id, w]),
+    );
     return buildInboxItems(
         workOrders, transitions, claims,
         userMap, mode,
@@ -170,10 +175,11 @@ async function initActiveList(
         '[data-work-order-card]',
         'data-work-order-card',
         async (id, newPosition) => {
+            const entity =
+                workOrderEntities.get(id);
+            if (!entity) return;
             try {
-                const entity =
-                    await getWorkOrder(id);
-                await putWorkOrder(id, {
+                await putWorkOrder(ctx, id, {
                     ...entity,
                     position: newPosition,
                 });
@@ -189,7 +195,7 @@ async function initActiveList(
                 return;
             }
             const refreshed =
-                await loadInboxItems('active');
+                await loadInboxItems('active', ctx);
             activePresenter =
                 new WorkboxInboxPresenter(
                     refreshed, true,
@@ -253,21 +259,8 @@ function onRowClick(e: MouseEvent): void {
 
 async function createWorkOrderForFlow(
     flowId: string,
+    ctx: FetchContext,
 ): Promise<void> {
-    let userId: string;
-    try {
-        const row = await getCurrentUserRow();
-        userId = row.id;
-    } catch (err) {
-        log.error(
-            'getCurrentUserRow failed',
-            'workbox', err,
-        );
-        showToast(
-            'Failed to load user', 'error',
-        );
-        return;
-    }
     const workOrderId =
         generateCryptoSafeBase62();
     const flowLinkId =
@@ -279,14 +272,13 @@ async function createWorkOrderForFlow(
     const claimId =
         generateCryptoSafeBase62();
     try {
-        await postWorkOrderCreation({
+        await postWorkOrderCreation(ctx, {
             workOrderId,
             flowLinkId,
             initTransitionId,
             postStartTransitionId,
             claimId,
             flowId,
-            userId,
         });
         showToast(
             'Work order created', 'success',
@@ -308,6 +300,7 @@ async function createWorkOrderForFlow(
 }
 
 async function initCreateDropdown(
+    ctx: FetchContext,
 ): Promise<void> {
     populateIcons([
         [
@@ -322,7 +315,7 @@ async function initCreateDropdown(
     );
     if (!dropdownEl) return;
 
-    const flows = await getFlowsForCreation();
+    const flows = await getFlowsForCreation(ctx);
 
     setHtml(dropdownEl, html`${flows.map(
         f => html`<button
@@ -338,7 +331,7 @@ async function initCreateDropdown(
 
     dropdownEl.addEventListener(
         'click',
-        e => onDropdownClick(e, dropdownEl),
+        e => onDropdownClick(e, dropdownEl, ctx),
         { signal },
     );
 }
@@ -346,6 +339,7 @@ async function initCreateDropdown(
 function onDropdownClick(
     e: MouseEvent,
     dropdownEl: HTMLElement,
+    ctx: FetchContext,
 ): void {
     if (
         !(e.target instanceof Element)
@@ -359,5 +353,5 @@ function onDropdownClick(
     );
     if (!flowId) return;
     dropdownEl.classList.add('hidden');
-    void createWorkOrderForFlow(flowId);
+    void createWorkOrderForFlow(flowId, ctx);
 }

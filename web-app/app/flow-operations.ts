@@ -11,15 +11,14 @@ import {
     DEFAULT_TRANSITION_NAME,
 } from '../../api/types.ts';
 import {
+    createFetchContext,
     postFlowVersion,
     putFlow,
     deleteFlowVersion,
     getFlowGraph,
     getFlowVersions,
-    putFlowFromVersion,
     generateCryptoSafeBase62,
     nowUtc,
-    jsonObjectField,
 } from './adapters/index.ts';
 import type {
     FlowSaveShape,
@@ -54,17 +53,6 @@ function isIntermediateNode(
         && !node.isComplete;
 }
 
-function serializeGraph(
-    nodes: readonly GraphNode[],
-    edges: readonly GraphEdge[],
-) {
-    return jsonObjectField(
-        { nodes, edges } as unknown as Record<
-            string, unknown
-        >,
-    );
-}
-
 function singleSelectedNodeId(
     snap: FlowSnapshot,
 ): string | null {
@@ -90,6 +78,24 @@ function snapToSave(
         edges,
         createdAt: snap.createdAt,
     };
+}
+
+async function commitFlowMutation(
+    snap: FlowSnapshot,
+    nodes: GraphNode[],
+    edges: GraphEdge[],
+): Promise<void> {
+    const ctx = createFetchContext();
+    await postFlowVersion(
+        ctx,
+        generateCryptoSafeBase62(),
+        snap.flowId,
+    );
+    await putFlow(
+        ctx,
+        snap.flowId,
+        snapToSave(snap, nodes, edges),
+    );
 }
 
 export type ToastVariant =
@@ -190,13 +196,8 @@ export async function performAddEdge(
         toId,
     );
     try {
-        await postFlowVersion(
-            generateCryptoSafeBase62(),
-            snap.flowId,
-        );
-        await putFlow(
-            snap.flowId,
-            snapToSave(snap, snap.nodes, newEdges),
+        await commitFlowMutation(
+            snap, snap.nodes, newEdges,
         );
     } catch (err) {
         log.error(
@@ -276,13 +277,8 @@ export async function performAddNodeAtPosition(
         nodeId,
     );
     try {
-        await postFlowVersion(
-            generateCryptoSafeBase62(),
-            snap.flowId,
-        );
-        await putFlow(
-            snap.flowId,
-            snapToSave(snap, newNodes, newEdges),
+        await commitFlowMutation(
+            snap, newNodes, newEdges,
         );
     } catch (err) {
         log.error(
@@ -333,15 +329,8 @@ export async function performDeleteSelectedNodes(
         new Set(deletableIds),
     );
     try {
-        await postFlowVersion(
-            generateCryptoSafeBase62(),
-            snap.flowId,
-        );
-        await putFlow(
-            snap.flowId,
-            snapToSave(
-                snap, result.nodes, result.edges,
-            ),
+        await commitFlowMutation(
+            snap, result.nodes, result.edges,
         );
     } catch (err) {
         log.error(
@@ -378,13 +367,8 @@ export async function performDeleteSelectedEdge(
         snap.edges, edgeId,
     );
     try {
-        await postFlowVersion(
-            generateCryptoSafeBase62(),
-            snap.flowId,
-        );
-        await putFlow(
-            snap.flowId,
-            snapToSave(snap, snap.nodes, newEdges),
+        await commitFlowMutation(
+            snap, snap.nodes, newEdges,
         );
     } catch (err) {
         log.error(
@@ -443,13 +427,8 @@ export async function performAddField(
         snap.nodes, nodeId, field,
     );
     try {
-        await postFlowVersion(
-            generateCryptoSafeBase62(),
-            snap.flowId,
-        );
-        await putFlow(
-            snap.flowId,
-            snapToSave(snap, newNodes, snap.edges),
+        await commitFlowMutation(
+            snap, newNodes, snap.edges,
         );
     } catch (err) {
         log.error(
@@ -487,13 +466,8 @@ export async function performDeleteField(
         snap.nodes, nodeId, fieldId,
     );
     try {
-        await postFlowVersion(
-            generateCryptoSafeBase62(),
-            snap.flowId,
-        );
-        await putFlow(
-            snap.flowId,
-            snapToSave(snap, newNodes, snap.edges),
+        await commitFlowMutation(
+            snap, newNodes, snap.edges,
         );
     } catch (err) {
         log.error(
@@ -556,8 +530,9 @@ export async function performUndo(
         return failOp('Flow is locked');
     }
     try {
+        const ctx = createFetchContext();
         const versions = await getFlowVersions(
-            snap.flowId,
+            ctx, snap.flowId,
         );
         const version = versions[0];
         if (!version) {
@@ -580,19 +555,28 @@ export async function performUndo(
                 isAutoLayout: snap.isAutoLayout,
                 isAutoFit: snap.isAutoFit,
                 lockTimeout: snap.lockTimeout,
-                graph: serializeGraph(
-                    snap.nodes, snap.edges,
-                ),
+                nodes: snap.nodes,
+                edges: snap.edges,
                 createdAt: nowUtc(),
             },
         );
-        await putFlowFromVersion(version);
-        await deleteFlowVersion(version.id);
+        await putFlow(ctx, snap.flowId, {
+            name: version.name,
+            description: version.description,
+            isLocked: version.isLocked,
+            isAutoLayout: version.isAutoLayout,
+            isAutoFit: version.isAutoFit,
+            lockTimeout: version.lockTimeout,
+            nodes: version.nodes,
+            edges: version.edges,
+            createdAt: snap.createdAt,
+        });
+        await deleteFlowVersion(ctx, version.id);
         const graph = await getFlowGraph(
-            snap.flowId,
+            ctx, snap.flowId,
         );
         const remaining = await getFlowVersions(
-            snap.flowId,
+            ctx, snap.flowId,
         );
         const newHistory = recordUndoHistoryMark(
             stagedHistory,
@@ -628,13 +612,26 @@ export async function performRedo(
         };
     }
     try {
+        const ctx = createFetchContext();
         await postFlowVersion(
+            ctx,
             generateCryptoSafeBase62(),
             snap.flowId,
         );
-        await putFlowFromVersion(popped.version);
+        const v = popped.version;
+        await putFlow(ctx, snap.flowId, {
+            name: v.name,
+            description: v.description,
+            isLocked: v.isLocked,
+            isAutoLayout: v.isAutoLayout,
+            isAutoFit: v.isAutoFit,
+            lockTimeout: v.lockTimeout,
+            nodes: v.nodes,
+            edges: v.edges,
+            createdAt: snap.createdAt,
+        });
         const graph = await getFlowGraph(
-            snap.flowId,
+            ctx, snap.flowId,
         );
         const newHistory = recordUndoHistoryMark(
             popped.snapshot, true,

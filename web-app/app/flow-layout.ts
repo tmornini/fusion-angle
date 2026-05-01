@@ -176,15 +176,15 @@ export function computeLayout(
         !hasWideFan
         && topo.length >= MIN_SNAKE_NODES
     ) {
-        const k = computeSnakeWrap(
+        const columnsPerRow = computeSnakeWrap(
             topo.length, canvasWidth, canvasHeight,
         );
-        if (k > 0) {
+        if (columnsPerRow > 0) {
             const sugiPos = assignCoordinates(
                 ordered, aug.edges,
             );
             const snakePos = computeTopoSnake(
-                topo, k, forwardEdges,
+                topo, columnsPerRow, forwardEdges,
                 canvasWidth, canvasHeight,
             );
             const canvasAspect =
@@ -348,6 +348,11 @@ function extractWaypoints(
     return result;
 }
 
+// Sugiyama layered layout requires a DAG. DFS from the start
+// node identifies back edges (edges that re-enter the
+// recursion stack); we reverse them in the layout structure
+// so layering can proceed. The renderer later draws reversed
+// edges dashed, signalling the original direction.
 function removeCycles(
     nodes: readonly LayoutInput[],
     edges: readonly LayoutEdge[],
@@ -422,6 +427,10 @@ function removeCycles(
     return { forwardEdges, reversedIds };
 }
 
+// Kahn's topological sort: in-degree zero means "all
+// predecessors already placed." Layer = max(parent layers)
+// + 1 so every edge goes from a lower layer to a higher
+// one — the foundation of the Sugiyama framework.
 function assignLayers(
     nodes: readonly LayoutInput[],
     forwardEdges: readonly LayoutEdge[],
@@ -502,6 +511,12 @@ function assignLayers(
     return layers;
 }
 
+// Sugiyama barycenter heuristic: each node's preferred
+// position in its layer is the mean of its neighbours'
+// positions in the adjacent layer. Sweeping up then down
+// reduces edge crossings; CROSSING_SWEEP_COUNT = 24 is
+// empirically sufficient for our typical 5–30 node graphs
+// (more sweeps do not converge faster on this scale).
 function reduceCrossings(
     layers: Layers,
     forwardEdges: readonly LayoutEdge[],
@@ -649,6 +664,12 @@ function reduceCrossings(
     return best;
 }
 
+// Y coordinates: forward pass places each node at the median
+// Y of its parents; backward pass refines using median Y of
+// children. Median resists outliers — a single stray child
+// far above does not pull the parent up; mean would. Nodes
+// already placed by fanout grouping are skipped so the
+// backward pass does not undo deliberate forward placement.
 function assignCoordinates(
     orderedLayers: Layers,
     forwardEdges: readonly LayoutEdge[],
@@ -698,7 +719,7 @@ function assignCoordinates(
         );
     }
 
-    const fanOwned = computeFanOwned(
+    const parentHasFanout = computeParentHasFanout(
         orderedLayers, upN,
     );
 
@@ -709,7 +730,7 @@ function assignCoordinates(
             l--
         ) {
             backwardPassLayer(
-                orderedLayers[l]!, downN, ys, fanOwned,
+                orderedLayers[l]!, downN, ys, parentHasFanout,
             );
         }
         for (let l = 1; l < orderedLayers.length; l++) {
@@ -835,10 +856,10 @@ function backwardPassLayer(
     layer: readonly string[],
     downN: Map<string, string[]>,
     ys: Map<string, number>,
-    fanOwned: ReadonlySet<string>,
+    parentHasFanout: ReadonlySet<string>,
 ): void {
     for (const id of layer) {
-        if (fanOwned.has(id)) continue;
+        if (parentHasFanout.has(id)) continue;
         const succs = downN.get(id)!;
         if (succs.length === 0) continue;
         ys.set(id, medianY(succs, ys));
@@ -846,16 +867,16 @@ function backwardPassLayer(
     enforceSpacing(layer, ys);
 }
 
-function computeFanOwned(
+function computeParentHasFanout(
     orderedLayers: Layers,
     upN: Map<string, string[]>,
 ): ReadonlySet<string> {
-    const fanOwned = new Set<string>();
+    const parentHasFanout = new Set<string>();
     for (const layer of orderedLayers) {
         for (const id of layer) {
             const ps = upN.get(id)!;
-            if (ps.length === 1 && fanOwned.has(ps[0]!)) {
-                fanOwned.add(id);
+            if (ps.length === 1 && parentHasFanout.has(ps[0]!)) {
+                parentHasFanout.add(id);
             }
         }
         let i = 0;
@@ -880,13 +901,13 @@ function computeFanOwned(
             }
             if (j - i >= 2) {
                 for (let k = i; k < j; k++) {
-                    fanOwned.add(layer[k]!);
+                    parentHasFanout.add(layer[k]!);
                 }
             }
             i = j;
         }
     }
-    return fanOwned;
+    return parentHasFanout;
 }
 
 function enforceSpacing(
@@ -980,6 +1001,10 @@ function fitToCanvas(
         });
     }
 
+    // Workflow charts read left-to-right top-to-bottom, like
+    // text. If the layout algorithm placed the start node
+    // right of (or below) the complete node, mirror the whole
+    // graph so the user reads it in the natural direction.
     const startId = nodes.find(
         n => n.isStart,
     )?.id;
@@ -1038,6 +1063,13 @@ function fitToCanvas(
     return result;
 }
 
+// When the topology is mostly linear (no node with 3+
+// children), Sugiyama produces a tall narrow column. Snake
+// layout instead wraps the topo order into a grid of
+// columns × rows that fills the canvas more evenly. We
+// compute both and pick whichever has the smaller aspect
+// mismatch with the canvas. columnsPerRow is derived from
+// available canvas height divided by per-row vertical span.
 function computeSnakeWrap(
     nodeCount: number,
     _canvasW: number,
@@ -1052,14 +1084,14 @@ function computeSnakeWrap(
     const numRows = Math.max(
         2, Math.floor(targetH / cellH),
     );
-    const k = Math.max(
+    const columnsPerRow = Math.max(
         2,
         Math.min(
             Math.ceil(nodeCount / numRows),
             nodeCount - 1,
         ),
     );
-    return k;
+    return columnsPerRow;
 }
 
 function computeBboxAspect(
@@ -1083,14 +1115,14 @@ function computeBboxAspect(
 
 function snakeColRow(
     i: number,
-    k: number,
+    columnsPerRow: number,
 ): { col: number; row: number } {
-    const row = Math.floor(i / k);
+    const row = Math.floor(i / columnsPerRow);
     const rowEven = row % 2 === 0;
-    const colInRow = i % k;
+    const colInRow = i % columnsPerRow;
     const col = rowEven
         ? colInRow
-        : (k - 1 - colInRow);
+        : (columnsPerRow - 1 - colInRow);
     return { col, row };
 }
 
@@ -1104,12 +1136,12 @@ function computeAspectMismatch(
 
 function computeTopoSnake(
     topo: readonly string[],
-    k: number,
+    columnsPerRow: number,
     forwardEdges: readonly LayoutEdge[],
     canvasW: number,
     canvasH: number,
 ): Map<string, Position> {
-    const numRows = Math.ceil(topo.length / k);
+    const numRows = Math.ceil(topo.length / columnsPerRow);
 
     const edgeLabel = new Map<string, number>();
     for (const e of forwardEdges) {
@@ -1121,11 +1153,11 @@ function computeTopoSnake(
     }
 
     const colGap = new Array<number>(
-        Math.max(0, k - 1),
+        Math.max(0, columnsPerRow - 1),
     ).fill(HORIZONTAL_GAP);
     for (let i = 0; i < topo.length - 1; i++) {
-        const a = snakeColRow(i, k);
-        const b = snakeColRow(i + 1, k);
+        const a = snakeColRow(i, columnsPerRow);
+        const b = snakeColRow(i + 1, columnsPerRow);
         if (a.row !== b.row) continue;
         const g = Math.min(a.col, b.col);
         const fwd =
@@ -1140,9 +1172,9 @@ function computeTopoSnake(
         if (need > colGap[g]!) colGap[g] = need;
     }
 
-    const colX = new Array<number>(k);
+    const colX = new Array<number>(columnsPerRow);
     colX[0] = 0;
-    for (let c = 1; c < k; c++) {
+    for (let c = 1; c < columnsPerRow; c++) {
         const step = Math.max(
             MIN_LAYER_STEP,
             NODE_WIDTH + colGap[c - 1]!,
@@ -1150,15 +1182,15 @@ function computeTopoSnake(
         colX[c] = colX[c - 1]! + step;
     }
 
-    const lastCol = colX[k - 1]!;
+    const lastCol = colX[columnsPerRow - 1]!;
     const targetW = canvasW - NODE_WIDTH;
     if (
-        k > 1
+        columnsPerRow > 1
         && lastCol > 0
         && targetW > lastCol
     ) {
         const scale = targetW / lastCol;
-        for (let c = 1; c < k; c++) {
+        for (let c = 1; c < columnsPerRow; c++) {
             colX[c] = colX[c]! * scale;
         }
     }
@@ -1175,7 +1207,7 @@ function computeTopoSnake(
 
     const positions = new Map<string, Position>();
     for (let i = 0; i < topo.length; i++) {
-        const { col, row } = snakeColRow(i, k);
+        const { col, row } = snakeColRow(i, columnsPerRow);
         positions.set(topo[i]!, {
             x: colX[col]!,
             y: rowY[row]!,

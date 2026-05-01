@@ -21,6 +21,7 @@ import {
     jsonObjectField,
     createFetchContext,
     generateCryptoSafeBase62,
+    type IdeaEntity,
 } from '../app/adapters/index.ts';
 import {
     IdeaConversionPresenter,
@@ -64,7 +65,7 @@ export async function init(
     >;
     try {
         [tuple, users] = await Promise.all([
-            getIdea(ideaId, ctx),
+            getIdea(ctx, ideaId),
             getManagedUsers(ctx),
         ]);
     } catch (err) {
@@ -368,9 +369,11 @@ export async function init(
                     generateCryptoSafeBase62();
                 try {
                     await performConversion(
+                        ctx,
                         ideaId,
                         projectId,
                         fields,
+                        tuple.entity,
                     );
                 } catch (err) {
                     log.error(
@@ -405,7 +408,7 @@ export async function init(
                 }
                 const projectName =
                     fields['project-name'];
-                await postActivity({
+                await postActivity(ctx, {
                     type: 'idea_converted',
                     action:
                         'converted idea to'
@@ -414,7 +417,7 @@ export async function init(
                     status: '',
                     feedback: '',
                 });
-                await postActivity({
+                await postActivity(ctx, {
                     type: 'project_created',
                     action:
                         'created new project',
@@ -475,11 +478,14 @@ function parseFiniteNumber(
 }
 
 async function performConversion(
+    ctx: ReturnType<typeof createFetchContext>,
     ideaId: string,
     projectId: string,
     fields: ConversionFields,
+    ideaEntity: IdeaEntity,
 ): Promise<void> {
     await postIdeaConversion(
+        ctx,
         ideaId,
         projectId,
         {
@@ -513,5 +519,6 @@ async function performConversion(
                 fields['budget'],
         },
         fields['project-lead'],
+        { ...ideaEntity, status: 'promoted' },
     );
 }

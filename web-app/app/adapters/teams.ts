@@ -1,6 +1,3 @@
-import {
-    GET, PUT,
-} from '../../../api/api.ts';
 import type {
     UserEntity,
 } from '../../../api/types.ts';
@@ -8,35 +5,32 @@ import { User } from '../../../api/types.ts';
 import { getUserMap } from './shared.ts';
 import type { FetchContext } from './shared.ts';
 import {
-    createChannel,
-    bridgeStorageToChannel,
+    createSubscriptionChannel,
 } from '../channels.ts';
 export {
     User,
     AVAILABILITY_HIGH,
     AVAILABILITY_LOW,
 } from '../../../api/types.ts';
+export type { UserEntity } from '../../../api/types.ts';
 
-const userChangedChannel =
-    createChannel<void>();
-bridgeStorageToChannel(
-    ['users'], userChangedChannel,
-);
+const userChanges =
+    createSubscriptionChannel(['users']);
 
 export function subscribeUserChanges(
     fn: () => void,
 ): () => void {
-    return userChangedChannel.subscribe(fn);
+    return userChanges.subscribe(fn);
 }
 
 export function notifyUserChange(): void {
-    userChangedChannel.send();
+    userChanges.notify();
 }
 
 const TOP_MEMBERS_COUNT = 6;
 
 export async function getTeamMembers(
-    ctx?: FetchContext,
+    ctx: FetchContext,
 ): Promise<User[]> {
     const userMap = await getUserMap(ctx);
     return Array.from(userMap.values())
@@ -59,22 +53,26 @@ export type UserAccountStatus =
     | 'deactivated';
 
 export async function getManagedUsers(
-    ctx?: FetchContext,
+    ctx: FetchContext,
 ): Promise<User[]> {
     const userMap = await getUserMap(ctx);
     return Array.from(userMap.values());
 }
 
 export async function getUserRow(
+    ctx: FetchContext,
     id: string,
 ): Promise<UserEntity> {
-    return GET<UserEntity>(`users/${id}`);
+    return ctx.GET<UserEntity>(
+        `users/${id}`,
+    );
 }
 
 export async function putUser(
+    ctx: FetchContext,
     id: string,
     entity: Omit<UserEntity, 'id'>,
 ): Promise<void> {
-    await PUT(`users/${id}`, entity);
-    userChangedChannel.send();
+    await ctx.PUT(`users/${id}`, entity);
+    userChanges.notify();
 }

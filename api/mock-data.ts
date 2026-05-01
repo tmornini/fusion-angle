@@ -13,11 +13,13 @@ import type {
     WorkOrderEntity,
     FlowWorkOrderEntity,
     WorkOrderTransitionEntity,
+    TransitionFieldValueEntity,
 } from './types.ts';
 import {
     jsonArrayField,
     jsonObjectField,
     DEFAULT_LOCK_TIMEOUT,
+    SECONDS_PER_HOUR,
 } from './types.ts';
 
 const now = new Date();
@@ -913,8 +915,8 @@ export async function populateMockData(
             progress: 72,
             start_date: dt(60, 0, 0),
             target_end_date: dt(-30, 0, 0),
-            estimated_duration: 432000,
-            actual_duration: 306000,
+            estimated_duration: 120 * SECONDS_PER_HOUR,
+            actual_duration: 85 * SECONDS_PER_HOUR,
             estimated_cost: 45000,
             actual_cost: 38000,
             estimated_impact: 85,
@@ -978,8 +980,8 @@ export async function populateMockData(
             progress: 100,
             start_date: dt(90, 9, 0),
             target_end_date: dt(57, 9, 0),
-            estimated_duration: 288000,
-            actual_duration: 216000,
+            estimated_duration: 80 * SECONDS_PER_HOUR,
+            actual_duration: 60 * SECONDS_PER_HOUR,
             estimated_cost: 32000,
             actual_cost: 28000,
             estimated_impact: 78,
@@ -1004,8 +1006,8 @@ export async function populateMockData(
             progress: 22,
             start_date: dt(45, 9, 0),
             target_end_date: dt(-28, 9, 0),
-            estimated_duration: 720000,
-            actual_duration: 162000,
+            estimated_duration: 200 * SECONDS_PER_HOUR,
+            actual_duration: 45 * SECONDS_PER_HOUR,
             estimated_cost: 75000,
             actual_cost: 18000,
             estimated_impact: 90,
@@ -1029,8 +1031,8 @@ export async function populateMockData(
             progress: 100,
             start_date: dt(75, 9, 0),
             target_end_date: dt(47, 9, 0),
-            estimated_duration: 216000,
-            actual_duration: 198000,
+            estimated_duration: 60 * SECONDS_PER_HOUR,
+            actual_duration: 55 * SECONDS_PER_HOUR,
             estimated_cost: 28000,
             actual_cost: 26000,
             estimated_impact: 72,
@@ -1055,8 +1057,8 @@ export async function populateMockData(
             progress: 15,
             start_date: dt(50, 9, 0),
             target_end_date: dt(7, 9, 0),
-            estimated_duration: 360000,
-            actual_duration: 108000,
+            estimated_duration: 100 * SECONDS_PER_HOUR,
+            actual_duration: 30 * SECONDS_PER_HOUR,
             estimated_cost: 38000,
             actual_cost: 12000,
             estimated_impact: 68,
@@ -1081,8 +1083,8 @@ export async function populateMockData(
             progress: 18,
             start_date: dt(14, 9, 0),
             target_end_date: dt(-28, 9, 0),
-            estimated_duration: 324000,
-            actual_duration: 72000,
+            estimated_duration: 90 * SECONDS_PER_HOUR,
+            actual_duration: 20 * SECONDS_PER_HOUR,
             estimated_cost: 35000,
             actual_cost: 8000,
             estimated_impact: 65,
@@ -2235,7 +2237,6 @@ export async function populateMockData(
             from_node_id: '',
             to_node_id: woNodeNew,
             user_id: woUserSarah,
-            values: jsonObjectField({}),
             transitioned_at:
                 woCreated,
         },
@@ -2245,7 +2246,6 @@ export async function populateMockData(
             from_node_id: woNodeNew,
             to_node_id: woNodeCapture,
             user_id: woUserSarah,
-            values: jsonObjectField({}),
             transitioned_at:
                 woCreated,
         },
@@ -2256,18 +2256,6 @@ export async function populateMockData(
                 woNodeCapture,
             to_node_id: woNodeReview,
             user_id: woUserMike,
-            values: jsonObjectField({
-                [fCompanyName]:
-                    'Acme Corp',
-                [fEmail]:
-                    'onboard@acme.com',
-                [fPhone]:
-                    '+1-555-0100',
-                [fIndustry]:
-                    'Technology',
-                [fRevenue]: '5000000',
-                [fEmployees]: '250',
-            }),
             transitioned_at:
                 dt(13, 14, 30),
         },
@@ -2279,13 +2267,54 @@ export async function populateMockData(
             to_node_id:
                 woNodeComplete,
             user_id: woUserSarah,
-            values: jsonObjectField({
-                [fReviewerNotes]:
-                    'Approved.'
-                    + ' Strong fit.',
-            }),
             transitioned_at:
                 dt(12, 9, 15),
+        },
+    ];
+
+    const mockTransitionFieldValues:
+        TransitionFieldValueEntity[] = [
+        {
+            id: 'tfv-03-name-' + woId,
+            transition_id: 'wot-03-' + woId,
+            field_id: fCompanyName,
+            value: 'Acme Corp',
+        },
+        {
+            id: 'tfv-03-email-' + woId,
+            transition_id: 'wot-03-' + woId,
+            field_id: fEmail,
+            value: 'onboard@acme.com',
+        },
+        {
+            id: 'tfv-03-phone-' + woId,
+            transition_id: 'wot-03-' + woId,
+            field_id: fPhone,
+            value: '+1-555-0100',
+        },
+        {
+            id: 'tfv-03-ind-' + woId,
+            transition_id: 'wot-03-' + woId,
+            field_id: fIndustry,
+            value: 'Technology',
+        },
+        {
+            id: 'tfv-03-rev-' + woId,
+            transition_id: 'wot-03-' + woId,
+            field_id: fRevenue,
+            value: '5000000',
+        },
+        {
+            id: 'tfv-03-emp-' + woId,
+            transition_id: 'wot-03-' + woId,
+            field_id: fEmployees,
+            value: '250',
+        },
+        {
+            id: 'tfv-04-notes-' + woId,
+            transition_id: 'wot-04-' + woId,
+            field_id: fReviewerNotes,
+            value: 'Approved. Strong fit.',
         },
     ];
 
@@ -2595,6 +2624,10 @@ export async function populateMockData(
         ),
         ...mockWoTransitions.map(r =>
             adapter.workOrderTransitions
+                .put(r.id, r),
+        ),
+        ...mockTransitionFieldValues.map(r =>
+            adapter.transitionFieldValues
                 .put(r.id, r),
         ),
     ]);

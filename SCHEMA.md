@@ -267,8 +267,23 @@ work order state and history.
 | from_node_id | TEXT | '' for creation |
 | to_node_id | TEXT | Node in flow_graph |
 | user_id | TEXT | References users |
-| values | TEXT | JSON {field_id: value} |
 | transitioned_at | TEXT | RFC-3339 Zulu |
+
+Per-field values written during the transition
+live in `transition_field_values`, not on this row.
+
+### transition_field_values
+
+Per-field values captured by a transition. One row
+per (transition × field). Replaces the former JSON
+`values` blob on `work_order_transitions` (Codd 1NF).
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | TEXT | PRIMARY KEY |
+| transition_id | TEXT | References work_order_transitions |
+| field_id | TEXT | Node-field id from flow_graph |
+| value | TEXT | Value as a string |
 
 ### work_order_claims
 

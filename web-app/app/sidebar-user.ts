@@ -16,14 +16,16 @@ async function getSidebarUser(
     company: string;
 }> {
     const {
+        createFetchContext,
         getCurrentUserRow,
         getCompanyRow,
         User,
     } = await import('./adapters');
+    const ctx = createFetchContext();
     const [userRow, company] =
         await Promise.all([
-            getCurrentUserRow(),
-            getCompanyRow(),
+            getCurrentUserRow(ctx),
+            getCompanyRow(ctx),
         ]);
     return {
         name: new User(userRow).fullName(),
