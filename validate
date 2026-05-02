@@ -3,7 +3,7 @@ set -euo pipefail
 
 npx tsc --noEmit -p web-app/app/tsconfig.json
 
-node --test --strip-types tests/*.test.ts
+./test
 
 LONG_LINES=$(find api web-app tests -type f \
   \( -name '*.ts' -o -name '*.html' -o -name '*.css' \) \

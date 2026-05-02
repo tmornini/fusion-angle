@@ -1,0 +1,17 @@
+#!/bin/bash
+set -euo pipefail
+
+if [ $# -ne 1 ]; then
+  echo "Usage: ./serve <port>" >&2
+  exit 1
+fi
+
+PORT="$1"
+BUILD_DIR=$(mktemp -d "${TMPDIR:-/tmp}/fusion-serve.XXXXXX")
+trap 'rm -rf "$BUILD_DIR"' EXIT
+
+./build --no-zip "$BUILD_DIR/"
+
+echo
+echo "Serving on http://localhost:$PORT/"
+cd "$BUILD_DIR" && python3 -m http.server "$PORT"

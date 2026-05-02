@@ -12,11 +12,13 @@ is a sin against Uniformity (Commandment III).
 ## Build & Dev Commands
 
 ```bash
-./validate             # Type-check + lint (works on dirty tree)
+./test                 # Run automated tests
+./validate             # Type-check + tests + lint (works on dirty tree)
 ./build                # Compile, bundle, minify, ZIP to ~/Desktop/
 ./build --no-zip dir/  # Bundle to dir/ without zipping (for testing)
 ./build dir/           # ZIP to dir/ instead of ~/Desktop/
 ./build --help         # Show usage
+./serve <port>         # Build + start local HTTP server on <port>
 ```
 
 **Always commit before building.** `./build` requires a clean working directory. Use `./validate` to catch type errors and lint issues before committing, then commit, then build.
@@ -24,22 +26,20 @@ is a sin against Uniformity (Commandment III).
 **Build and test locally:**
 
 ```bash
-./build --no-zip /tmp/fusion-test/
-cd /tmp/fusion-test/ && python3 -m http.server 8080
+./serve 8080
 # open http://localhost:8080/landing/index.html
 ```
 
 **When running under the Claude Code sandbox**, the defaults above fail two ways: `/tmp/` is not writable, and the tsx IPC pipe used by the `npx tsx` step inside `./build` lands in `$TMPDIR/tsx-501/…` which is outside the sandbox's allowed Unix-socket path (`/tmp/claude/tsx-501`). Use this invocation instead:
 
 ```bash
-TMPDIR=/tmp/claude ./build --no-zip ~/Desktop/fusion-test/
-cd ~/Desktop/fusion-test/ && python3 -m http.server 8080
+TMPDIR=/tmp/claude ./serve 8080
 # open http://localhost:8080/landing/index.html
 ```
 
-`~/Desktop/` is in the sandbox write allowlist; `TMPDIR=/tmp/claude` redirects tsx's IPC socket into the allowed path. `localhost` is reachable from the sandbox, so the Chrome MCP tools can drive the page normally.
+`TMPDIR=/tmp/claude` redirects both tsx's IPC socket and `./serve`'s temp build dir into the sandbox-allowed path. `localhost` is reachable from the sandbox, so the Chrome MCP tools can drive the page normally.
 
-`./validate` runs `tsc --noEmit` (type checking), then `node --test --strip-types tests/*.test.ts` (automated tests against pure modules and the `api/`/`adapters/` layer), then enforces 78-character maximum line length on all `.ts`, `.html`, and `.css` files (excluding `compose.ts`).
+`./validate` runs `tsc --noEmit` (type checking), then `./test` (automated tests against pure modules and the `api/`/`adapters/` layer, via `node --test --strip-types tests/*.test.ts`), then enforces 78-character maximum line length on all `.ts`, `.html`, and `.css` files (excluding `compose.ts`).
 
 Automated tests cover pure modules and adapter behavior; UI behavior is still covered by the manual browser regression protocol — see `## Testing` below.
 
@@ -319,9 +319,14 @@ subset of tables:
 | Agent-D | `ideas` |
 | Agent-E | `projects` (plus one flow via E7) |
 | Agent-F | `flows`, `flow_versions` |
-| Agent-F2 | `work_orders`, `work_order_transitions`, `work_order_claims` |
+| Agent-F2 | `work_orders`, `work_order_transitions`, `work_order_claims`, plus its own private flow in `flows`/`flow_versions` |
 | Agent-G | `users`, `teams`, `profile`, `company` |
 | Agent-CH | none (read-only) |
+
+Agent-F2 owns its source flow because `postWorkOrderCreation`
+freezes `flow_graph` at creation time. If Agent-F edits the
+shared flow concurrently, the captured snapshot reflects
+mid-edit state, not a clean baseline.
 
 Because `StorageEvent` propagation makes sibling changes visible
 to every tab, cross-boundary assertions use `≥ N` or
@@ -369,6 +374,7 @@ patterns apply only to the parallel run.
 - **Snapshot wipe-on-fail**: With pre-flight quota checks + per-row validation + column-level compression, mid-write failure is rare; when it does happen, `importSnapshot` wipes every `fusion-ai:<table>` key so the next bootstrap detects no schema and routes the user to the snapshots page to re-import. No backup, no sentinel, no rollback — real atomicity arrives with Postgres.
 - **Availability thresholds**: `AVAILABILITY_HIGH = 70`, `AVAILABILITY_LOW = 40`.
 - **`file:///` protocol**: Navigation detects file protocol and skips link prefetching. Page URLs use relative paths. Code supports `file:///` locally but testing is HTTP-only.
+- **View Transition aborts**: rapid programmatic navigation surfaces `InvalidStateError` lines in console. Browser-internal (no app code calls `startViewTransition`); no app impact.
 
 ## Worktrees
 

@@ -91,22 +91,22 @@ export async function init(
         );
         return;
     }
-    let fields: ConversionFields =
-        buildInitialConversionFields(
-            tuple.idea,
-        );
     const presenter:
         IdeaConversionPresenter =
         new IdeaConversionPresenter(
             tuple.idea,
             users,
-            fields,
+            buildInitialConversionFields(
+                tuple.idea,
+            ),
         );
 
-    function syncFormFields(): void {
-        const next = {
-            ...fields,
-        } as ConversionFields;
+    function readFieldsFromDom(
+    ): ConversionFields {
+        const next =
+            buildInitialConversionFields(
+                tuple.idea,
+            );
         for (
             const field of ALL_CONVERSION_FIELDS
         ) {
@@ -126,7 +126,7 @@ export async function init(
                     el.value.trim();
             }
         }
-        fields = next;
+        return next;
     }
 
     function renderPage(): void {
@@ -142,7 +142,9 @@ export async function init(
         bindEvents();
     }
 
-    function mutateValidation(): void {
+    function mutateValidation(
+        fields: ConversionFields,
+    ): void {
         for (
             const field of ALL_CONVERSION_FIELDS
         ) {
@@ -305,8 +307,9 @@ export async function init(
             )
             .forEach(el => {
                 const handler = () => {
-                    syncFormFields();
-                    mutateValidation();
+                    mutateValidation(
+                        readFieldsFromDom(),
+                    );
                 };
                 el.addEventListener(
                     'input', handler,
@@ -343,9 +346,12 @@ export async function init(
         )?.addEventListener(
             'click',
             async () => {
-                syncFormFields();
+                const submitted =
+                    readFieldsFromDom();
                 if (
-                    !conversionIsReady(fields)
+                    !conversionIsReady(
+                        submitted,
+                    )
                 ) return;
                 const btn = $(
                     '#convert-submit-btn',
@@ -372,7 +378,7 @@ export async function init(
                         ctx,
                         ideaId,
                         projectId,
-                        fields,
+                        submitted,
                         tuple.entity,
                     );
                 } catch (err) {
@@ -407,7 +413,7 @@ export async function init(
                     return;
                 }
                 const projectName =
-                    fields['project-name'];
+                    submitted['project-name'];
                 await postActivity(ctx, {
                     type: 'idea_converted',
                     action:

@@ -168,6 +168,20 @@ test('applyDeleteNodes removes nodes and orphan edges', () => {
     assert.equal(result.edges[0]?.id, 'e3');
 });
 
+test('applyDeleteNodes empty id set leaves both arrays unchanged', () => {
+    const nodes = [node('a'), node('b')];
+    const edges = [edge('e1', 'a', 'b')];
+    const result = applyDeleteNodes(
+        nodes, edges, new Set(),
+    );
+    assert.deepEqual(
+        result.nodes.map(n => n.id), ['a', 'b'],
+    );
+    assert.deepEqual(
+        result.edges.map(e => e.id), ['e1'],
+    );
+});
+
 test('applyDeleteEdge removes single edge by id', () => {
     const edges = [
         edge('e1', 'a', 'b'),
@@ -178,6 +192,20 @@ test('applyDeleteEdge removes single edge by id', () => {
     );
     assert.equal(result.length, 1);
     assert.equal(result[0]?.id, 'e2');
+});
+
+test('applyDeleteEdge with non-matching id is a no-op', () => {
+    const edges = [
+        edge('e1', 'a', 'b'),
+        edge('e2', 'b', 'c'),
+    ];
+    const result = applyDeleteEdge(
+        edges, 'missing',
+    );
+    assert.equal(result.length, 2);
+    assert.deepEqual(
+        result.map(e => e.id), ['e1', 'e2'],
+    );
 });
 
 test('applyUpdateNode patches matching id', () => {

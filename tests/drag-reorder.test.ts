@@ -1,0 +1,122 @@
+import { test } from 'node:test';
+import { strict as assert } from 'node:assert';
+import {
+    computeNewPosition,
+    dropIndex,
+    type CardRect,
+} from '../web-app/app/drag-reorder-positions.ts';
+
+function rects(
+    ...specs: readonly [number, number][]
+): readonly CardRect[] {
+    return specs.map(
+        ([top, height]) => ({ top, height }),
+    );
+}
+
+test(
+    'dropIndex returns slot when cursor below'
+    + ' midpoint without hysteresis',
+    () => {
+        const items = rects(
+            [0, 100],
+            [100, 100],
+            [200, 100],
+        );
+        // cursor at 60 is past midpoint (50) of
+        // first item, so the next slot (1) wins.
+        assert.equal(
+            dropIndex(60, null, items), 1,
+        );
+    },
+);
+
+test(
+    'dropIndex respects hysteresis when'
+    + ' lastIdx === current slot',
+    () => {
+        const items = rects(
+            [0, 100],
+            [100, 100],
+        );
+        // midpoint of slot 0 is 50; without
+        // hysteresis cursor at 55 would advance
+        // to slot 1. With lastIdx=0 the boundary
+        // shifts to 50 + 8 = 58, so slot 0 sticks.
+        assert.equal(
+            dropIndex(55, 0, items), 0,
+        );
+    },
+);
+
+test(
+    'dropIndex respects hysteresis when'
+    + ' lastIdx === next slot',
+    () => {
+        const items = rects(
+            [0, 100],
+            [100, 100],
+        );
+        // midpoint of slot 0 is 50; without
+        // hysteresis cursor at 45 stays on slot 0.
+        // With lastIdx=1 the boundary shifts to
+        // 50 - 8 = 42, so slot 1 holds.
+        assert.equal(
+            dropIndex(45, 1, items), 1,
+        );
+    },
+);
+
+test(
+    'computeNewPosition returns FIRST_POSITION'
+    + ' on empty list',
+    () => {
+        assert.equal(
+            computeNewPosition([], 0), 1,
+        );
+    },
+);
+
+test(
+    'computeNewPosition prepends with negative'
+    + ' gap when idx is 0',
+    () => {
+        assert.equal(
+            computeNewPosition([5, 10, 15], 0),
+            4,
+        );
+    },
+);
+
+test(
+    'computeNewPosition appends with positive'
+    + ' gap when idx >= length',
+    () => {
+        assert.equal(
+            computeNewPosition([5, 10, 15], 3),
+            16,
+        );
+    },
+);
+
+test(
+    'computeNewPosition inserts midway between'
+    + ' neighbors',
+    () => {
+        assert.equal(
+            computeNewPosition([5, 10, 15], 1),
+            7.5,
+        );
+    },
+);
+
+test(
+    'computeNewPosition inserts midway between'
+    + ' neighbors at end',
+    () => {
+        assert.equal(
+            computeNewPosition([5, 10, 15], 2),
+            12.5,
+        );
+    },
+);

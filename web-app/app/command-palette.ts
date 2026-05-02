@@ -21,10 +21,14 @@ import {
     getTeamMembers,
     createFetchContext,
     setLocation,
+    subscribeSchemaChanges,
     type IdeaWithSubmitter,
     Project,
     User,
 } from './adapters/index.ts';
+import {
+    getDbAdapter,
+} from './adapters/init.ts';
 import {
     PAGE_REGISTRY,
 } from './page-registry.ts';
@@ -877,5 +881,17 @@ posIndex === state.activeIndex
     // first Cmd+K opens instantly. Without
     // this, the user pays a 100-300 ms
     // adapter-fetch latency on first open.
-    void getSearchIndex();
+    void (async () => {
+        const adapter = getDbAdapter();
+        if (await adapter.hasSchema()) {
+            void getSearchIndex();
+            return;
+        }
+        const unsub = subscribeSchemaChanges(
+            () => {
+                unsub();
+                void getSearchIndex();
+            },
+        );
+    })();
 }

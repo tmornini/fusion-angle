@@ -66,7 +66,7 @@ See `CLAUDE.md` section `## Testing`.
 ## A. Build & Setup
 
 - [ ] **A1** Run `./build` from a clean working directory. PASS: exits 0, prints no errors, creates `~/Desktop/fusion-ai-<sha>.zip`.
-- [ ] **A2** Run `./build --no-zip /tmp/fusion-test/`. PASS: `/tmp/fusion-test/` contains `assets/app.js`, `assets/styles.css`, `assets/` (*.woff2 fonts), `index.html`, and 14 page directories containing 24 HTML page files, plus root `index.html`.
+- [ ] **A2** Run `./build --no-zip /tmp/fusion-test/`. PASS: `/tmp/fusion-test/` contains `assets/app.js`, `assets/styles.css`, `assets/` (*.woff2 fonts), `index.html`, and 15 page directories containing 24 HTML page files, plus root `index.html`.
 - [ ] **A3** Start an HTTP server from the build directory (`cd /tmp/fusion-test/ && python3 -m http.server 8080`). PASS: server starts without errors.
 - [ ] **A4** Open `http://localhost:8080/` in the test browser. PASS: redirects to `snapshots/index.html` when no data exists, or `landing/index.html` (which auto-redirects to `dashboard/index.html` after ~2 seconds) when data has been loaded.
 - [ ] **A5** Open DevTools Console and confirm no JavaScript errors on initial load. PASS: console is clean (warnings from browser extensions are acceptable).
@@ -96,7 +96,7 @@ on. Run these in order.
 
 - [ ] **AA8** Navigate to Profile. Edit fields (phone, bio, strengths). Click "Save Changes". PASS: toast "Profile saved" appears.
 - [ ] **AA9** Navigate away, return to Profile. PASS: edited fields persist with saved values.
-- [ ] **AA10** Navigate to Company. Edit a field (e.g. timezone). Click save. PASS: success toast appears.
+- [ ] **AA10** Navigate to Company. Edit a field (e.g. Domain). Click save. PASS: success toast appears.
 - [ ] **AA11** Navigate away, return to Settings. PASS: edited field persists with saved value.
 
 ### AA4. Create Ideas
@@ -116,7 +116,7 @@ on. Run these in order.
 - [ ] **AA18** On Ideas list, filter by "In Review". Click idea #1. PASS: navigates to idea detail with approval footer.
 - [ ] **AA19** Click "Approve". PASS: idea status changes to approved, confirmation shown.
 - [ ] **AA20** Approve idea #4 as well (it was submitted for review in AA16). Leave others in their current status. PASS: statuses match mock data (2 approved, rest in-review/active).
-- [ ] **AA21** Navigate to approved idea #1. Click "Convert". PASS: conversion form loads with 5 required fields (Project Name, Lead, Start Date, End Date, Cost).
+- [ ] **AA21** Navigate to approved idea #1. Click "Convert". PASS: conversion form loads with 6 required fields (Project Name, Lead, Start Date, End Date, Cost, Impact).
 - [ ] **AA22** Fill all required fields: Project Name, select "Sarah Chen" as project lead, Start Date, Target End Date, Cost. Click "Create Project". PASS: navigates to project detail for the new project.
 - [ ] **AA23** On project detail, click "Edit". Set fields (title, description, status, start date, end date, cost baseline, impact baseline) to match mock data. Save. PASS: project data persists.
 - [ ] **AA24** Approve remaining ideas (7, 8, 9, 10) from Ideas list (filter by "In Review"), then convert all 6 approved ideas to projects. PASS: Projects list shows all 6 with correct status and progress.
@@ -220,8 +220,8 @@ on. Run these in order.
   Save, navigate away, return. PASS: changed phone
   persists.
 - [ ] **AA42** Edit company: change
-  timezone. Save, navigate away, return. PASS:
-  changed timezone persists.
+  Domain. Save, navigate away, return. PASS:
+  changed Domain persists.
 
 ### AA12. Snapshot Round-Trip
 
@@ -451,18 +451,18 @@ on. Run these in order.
 
 - [ ] **F7** Navigate to a flow designer page.
   PASS: toolbar runs vertically along the left
-  edge of the canvas with Back at the top, Delete
-  (trash icon) at the bottom, and Undo/Redo, Auto
-  Layout, Zoom −/Auto Fit/+, Copy Mermaid, Export
-  distributed between them. Locked checkbox in
-  header controls edit lock. SVG canvas to the
-  right of the toolbar with dot grid background
-  showing the flow graph. When Auto Fit is on,
-  conflicting interactions (drag, pan, zoom
-  buttons, panel pan) are gated with a fire-and-
-  toast "blocked" message rather than being
-  silently absorbed; the user either turns Auto
-  Fit off or accepts the constraint. Changes
+  edge of the canvas with Undo/Redo, Zoom −/+,
+  Copy Mermaid, Export, and Delete (trash icon)
+  arranged top-to-bottom. The header above the
+  canvas hosts the Back button and three header
+  switches (Locked, Auto Layout, Auto Fit). SVG
+  canvas to the right of the toolbar with dot
+  grid background showing the flow graph. When
+  Auto Fit is on, conflicting interactions (drag,
+  pan, zoom buttons, panel pan) are gated with a
+  fire-and-toast "blocked" message rather than
+  being silently absorbed; the user either turns
+  Auto Fit off or accepts the constraint. Changes
   auto-save (no explicit Save button).
 - [ ] **F8** Nodes display correctly: start node
   has green border with its name centered in the
@@ -480,9 +480,14 @@ on. Run these in order.
   path render as solid blue even when they share
   a level.
 - [ ] **F10** Connection ports (small circles) are
-  visible on middle nodes (not on start or
-  complete, and not on any node when the flow is
-  locked). Each port sits on the longest open
+  visible on every middle node when the flow is
+  unlocked. Start and complete nodes show a port
+  only when they have no connected edges yet —
+  per `canShowPort` in `web-app/app/flow-graph.ts`,
+  ports render when not locked AND (not a
+  start/complete node OR that special node has no
+  connections). When the flow is locked, no node
+  shows a port. Each port sits on the longest open
   perimeter gap of its node, not always the right
   side. Hover over a port. PASS: cursor changes
   to crosshair and a browser tooltip reads "Click
@@ -527,8 +532,8 @@ on. Run these in order.
   respectively when invoked). Clicking the start
   node's port still initiates a drag-from-start
   to create a new state.
-- [ ] **F18** Click "Auto Layout" in the vertical
-  toolbar on the left. PASS:
+- [ ] **F18** Toggle the Auto Layout header
+  switch. PASS:
   all nodes reposition based on their rank from
   start. Start is placed top-left, complete
   bottom-right, others arranged by graph depth.
@@ -588,8 +593,8 @@ on. Run these in order.
   removed from the canvas.
 - [ ] **F29** Click "Zoom +" and "Zoom -" in
   toolbar. PASS: canvas zooms in and out smoothly.
-  Click "Show All". PASS: canvas adjusts to
-  show all nodes.
+  Toggle the Auto Fit header switch on. PASS:
+  canvas adjusts to show all nodes.
 - [ ] **F30** Edit a node name via the properties
   panel, wait 1 second for auto-save. Navigate
   away and return to the designer. PASS: all
@@ -671,6 +676,10 @@ on. Run these in order.
 
 ## F2. Workbox
 
+### AA13. Workbox Source Flow
+
+- [ ] **AA-WB-SETUP** Create one Workbox-only flow named `WB Test Flow` with three nodes: Start → Capture (text + select fields) → Done (`is_complete: true`). This flow is mutated only by Agent-F2. Agent-F2's WO creation reads from this flow, not from any Agent-F flow.
+
 ### Workbox Inbox (`workbox/`)
 
 - [ ] **WB1** Navigate to `workbox/`. PASS:
@@ -688,19 +697,20 @@ on. Run these in order.
 
 - [ ] **WB4** Click "+ Create Work Order". PASS:
   a dropdown menu opens listing available flows
-  by name. (No separate dialog or Cancel button;
-  the flow listing itself is the selector.)
-- [ ] **WB5** Select a flow (e.g. "Customer
-  Onboarding") and click Create. PASS: work
-  order is created, browser navigates to the
-  action screen at the first post-start state
-  (e.g. "Data Capture"). Display ID (8-char
-  hex) is visible in the header.
+  by name (including `WB Test Flow` from
+  AA-WB-SETUP). (No separate dialog or Cancel
+  button; the flow listing itself is the
+  selector.)
+- [ ] **WB5** Select `WB Test Flow` and click
+  Create. PASS: work order is created, browser
+  navigates to the action screen at the first
+  post-start state ("Capture"). Display ID
+  (8-char hex) is visible in the header.
 
 ### Workbox — Action Screen (`workbox/detail.html`)
 
-- [ ] **WB6** The action screen shows: back link
-  ("Workbox"), flow name, display ID, current
+- [ ] **WB6** The action screen shows: back button
+  (icon-only), flow name, display ID, current
   state badge, and dynamically rendered fields
   matching the current node's field definitions
   from the flow graph.
@@ -780,10 +790,10 @@ on. Run these in order.
 
 - [ ] **G1** Navigate to `teams/index.html`. PASS: shows roster of seeded team members with initials avatars, names, roles, departments, availability percentage badges, strength chips, performance stats (percentage, active count, completed count), and status dots (green=available, yellow=busy, red=limited). Search input and "Activity Feed" / "Add Member" buttons visible.
 - [ ] **G2** Click a team member card. PASS: right-side detail panel populates with member name, role, email, and large avatar with initials.
-- [ ] **G3** Detail panel shows two tabs (Dimensions, Performance). Click between tabs. PASS: tab content switches — Dimensions shows Driver/Analytical/Expressive/Amiable scores with progress bars.
+- [ ] **G3** Detail panel shows two tabs (Dimensions, Performance). Click between tabs. PASS: tab content switches — Dimensions shows Mover/Shaker/Prover/Maker scores with progress bars.
 - [ ] **G4** Click a different team member card. PASS: detail panel updates to show the newly selected member's information.
 - [ ] **G5** Type a name in the search input. PASS: team member cards filter in real-time by name, role, or department.
-- [ ] **G6** Click "Add Member" button. PASS: add-member dialog opens with an email field and send button.
+- [ ] **G6** Click "Add Member" button. PASS: add-member dialog opens with Full Name + Email + Role + Department fields and send button.
 - [ ] **G7** Enter an email address and click send. PASS: toast confirms invitation, dialog closes.
 - [ ] **G8** In DevTools console run: `const u = JSON.parse(localStorage.getItem('fusion-ai:users')); u[0].availability = 90; u[1].availability = 50; u[2].availability = 20; localStorage.setItem('fusion-ai:users', JSON.stringify(u)); location.reload();` PASS: rendered `.status-dot[data-tone]` elements include `success`, `warning`, and `error` (one each, mapped from `>=70`, `>=40`, `<40` respectively in `toneForAvailability`). Pinned to known data so the test does not depend on seed-data variety surviving prior data mutations.
 
@@ -826,7 +836,7 @@ on. Run these in order.
 
 - [ ] **G30** Navigate to `snapshots/`. PASS: shows 4 operation cards: Create Pristine Environment, Wipe and Load Mock Data, Upload Snapshot, Download Snapshot.
 - [ ] **G31** Click "Download Snapshot". PASS: browser downloads `fusion-ai-snapshot-YYYY-MM-DD.json`. File contains valid JSON with entity data.
-- [ ] **G32** Click "Create Pristine Environment", confirm the dialog. PASS: redirects to `dashboard/index.html`. Dashboard renders with zeroed-out metrics (empty database). All 18 `fusion-ai:*` keys exist in localStorage as empty arrays.
+- [ ] **G32** Click "Create Pristine Environment", confirm the dialog. PASS: redirects to `dashboard/index.html`. Dashboard renders with zeroed-out metrics (empty database). All 20 `fusion-ai:*` keys exist in localStorage as empty arrays.
 - [ ] **G33** Click "Wipe and Load Mock Data". PASS: redirects to `dashboard/index.html`. Navigate to `ideas/` — 11 ideas are back.
 - [ ] **G34** Return to `snapshots/`, wipe data, then use "Upload Snapshot" file input and select the previously downloaded JSON file. PASS: redirects to `dashboard/index.html`. Data matches the snapshot.
 
@@ -894,7 +904,7 @@ feature is implemented.
 
 ### Mobile Responsive
 
-- [ ] **I10** Resize browser to ≤768px width (or use DevTools device emulation). PASS: desktop sidebar disappears, mobile header with hamburger menu appears.
+- [ ] **I10 — Mobile breakpoint** (NOT MCP-driven — `resize_window` does not change the CSS viewport). Verify by source: read `web-app/app/styles/responsive.css` and confirm `@media (max-width: 767px)` rules toggle the desktop sidebar (`.sidebar` → `display: none`) and reveal the mobile drawer. PASS = rules present and well-formed.
 - [ ] **I11** Tap/click the hamburger menu. PASS: mobile sidebar sheet slides in from the left with navigation links.
 - [ ] **I12** Tap/click the backdrop or a nav link. PASS: mobile sidebar closes.
 - [ ] **I13** Tap a navigation link in the mobile sidebar. PASS: navigates to the target page and mobile sidebar closes.

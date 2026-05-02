@@ -150,6 +150,7 @@ export async function init(
     );
     if (!container) return;
     pageContainer = container;
+    bindStableListeners(container);
     setHtml(
         container, buildSkeleton('detail', 4),
     );
@@ -196,7 +197,6 @@ export async function init(
         flows,
     };
     buildPresenter().renderShell(container);
-    bindStableListeners(container);
 
     subscribeProjectChanges(async () => {
         if (!state || !pageContainer) {

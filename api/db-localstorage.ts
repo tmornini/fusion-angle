@@ -1,6 +1,7 @@
 import {
     EntityNotFound,
     MissingTableError,
+    TABLE_NAMES,
 } from './db.ts';
 import type {
     DbAdapter,
@@ -756,30 +757,6 @@ async function applyValidatedSnapshot(
         throw err;
     }
 }
-
-export const TABLE_NAMES = [
-    'users',
-    'ideas',
-    'projects',
-    'teams',
-    'team_projects',
-    'team_users',
-    'activities',
-    'flows',
-    'flow_versions',
-    'project_flows',
-    'work_orders',
-    'flow_work_orders',
-    'work_order_transitions',
-    'transition_field_values',
-    'work_order_claims',
-    'company',
-    'organization',
-    'idea_submissions',
-    'activity_actors',
-    'deleted',
-];
-
 
 export async function createLocalStorageAdapter(
 ): Promise<DbAdapter> {

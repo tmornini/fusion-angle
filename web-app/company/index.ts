@@ -71,6 +71,7 @@ export async function init(): Promise<void> {
     );
     if (!container) return;
     pageContainer = container;
+    bindStableListeners(container);
 
     let company: Company;
     try {
@@ -102,7 +103,6 @@ export async function init(): Promise<void> {
 
     state = { kind: 'reading', company };
     buildPresenter().renderShell(container);
-    bindStableListeners(container);
 }
 
 function bindStableListeners(

@@ -80,6 +80,7 @@ export async function init(): Promise<void> {
     );
     if (!container) return;
     pageContainer = container;
+    bindStableListeners(container);
 
     let loaded: {
         profile: Profile;
@@ -118,7 +119,6 @@ export async function init(): Promise<void> {
         entity: loaded.entity,
     };
     buildPresenter().renderShell(container);
-    bindStableListeners(container);
 }
 
 function bindStableListeners(

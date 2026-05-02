@@ -1,4 +1,8 @@
 import { createElement } from './dom.ts';
+import {
+    computeNewPosition,
+    dropIndex as computeDropIndex,
+} from './drag-reorder-positions.ts';
 
 const INDICATOR_HEIGHT = 3;
 const INDICATOR_COLOR =
@@ -6,9 +10,6 @@ const INDICATOR_COLOR =
 const INDICATOR_BORDER_RADIUS = '2px';
 const INDICATOR_MARGIN = '2px 0';
 const DRAGGING_OPACITY = '0.4';
-const FIRST_POSITION = 1;
-const POSITION_GAP = 1;
-const HYSTERESIS_PX = 8;
 const DRAG_HANDLE_SELECTOR = '.cursor-grab';
 
 type DragState =
@@ -72,26 +73,17 @@ export function initDragReorder(
         y: number,
         lastIdx: number | null,
     ): number {
-        const items = cards();
-        for (
-            let i = 0; i < items.length; i++
-        ) {
-            const rect =
-                items[i]!
-                    .getBoundingClientRect();
-            const mid =
-                rect.top + rect.height / 2;
-            let boundary = mid;
-            if (lastIdx === i) {
-                boundary =
-                    mid + HYSTERESIS_PX;
-            } else if (lastIdx === i + 1) {
-                boundary =
-                    mid - HYSTERESIS_PX;
-            }
-            if (y < boundary) return i;
-        }
-        return items.length;
+        const rects = cards().map((c) => {
+            const r =
+                c.getBoundingClientRect();
+            return {
+                top: r.top,
+                height: r.height,
+            };
+        });
+        return computeDropIndex(
+            y, lastIdx, rects,
+        );
     }
 
     container.addEventListener(
@@ -211,7 +203,6 @@ export function initDragReorder(
             clearIndicator();
             drag = { kind: 'idle' };
             const items = cards();
-            const idx = committedIdx;
             const positions = items.map(
                 c => {
                     const raw =
@@ -228,25 +219,9 @@ export function initDragReorder(
                     return parseFloat(raw);
                 },
             );
-            let newPos: number;
-            if (items.length === 0) {
-                newPos = FIRST_POSITION;
-            } else if (idx === 0) {
-                newPos = positions[0]!
-                    - POSITION_GAP;
-            } else if (
-                idx >= items.length
-            ) {
-                newPos =
-                    positions[
-                        positions.length - 1
-                    ]! + POSITION_GAP;
-            } else {
-                newPos = (
-                    positions[idx - 1]!
-                    + positions[idx]!
-                ) / 2;
-            }
+            const newPos = computeNewPosition(
+                positions, committedIdx,
+            );
             for (const c of items) {
                 c.style.opacity = '';
             }

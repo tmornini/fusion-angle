@@ -341,6 +341,42 @@ test(
     },
 );
 
+test(
+    'postWorkOrderCreation freezes '
+    + 'flow_graph against subsequent '
+    + 'flow edits',
+    async () => {
+        const { db, ctx } = await setupDb();
+        await db.flows.put(
+            'f1',
+            buildFlow(buildLinearGraph()),
+        );
+        await createWorkOrder(ctx, 'f1');
+
+        // Mutate source flow AFTER the
+        // work order captured its
+        // snapshot.
+        const mutated = buildLinearGraph();
+        mutated.nodes[1]!.name = 'EDITED';
+        await db.flows.put(
+            'f1', buildFlow(mutated),
+        );
+
+        const wo = (
+            await db.workOrders.getAll()
+        )[0]!;
+        const fg = JSON.parse(
+            wo.flow_graph,
+        );
+        assert.equal(
+            fg.nodes[1].name, 'Doing work',
+        );
+        assert.notEqual(
+            fg.nodes[1].name, 'EDITED',
+        );
+    },
+);
+
 // ── postWorkOrderTransition ───────
 
 test(

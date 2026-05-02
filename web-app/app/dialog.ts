@@ -184,11 +184,11 @@ function initTabs(
         tab.setAttribute('aria-selected', 'true');
         tab.setAttribute('tabindex', '0');
         tab.focus();
-        panels.forEach(panel => { panel.style.display = 'none'; });
+        panels.forEach(p => p.classList.add('hidden'));
         const panel = document.getElementById(
             TAB_PANEL_PREFIX + tabId,
         );
-        if (panel) panel.style.display = '';
+        if (panel) panel.classList.remove('hidden');
     }
 
     tabs.forEach(tab => {
