@@ -21,7 +21,7 @@ function buildState(
         marquee: { kind: 'idle' },
         viewBox: { x: 0, y: 0, w: 800, h: 600 },
         zoom: 1.0,
-        isSpaceDown: false,
+        isPanMode: false,
         ...overrides,
     };
 }
@@ -304,17 +304,18 @@ test('marquee selects overlapping nodes', () => {
 });
 
 test(
-    'space-down enables pan cursor',
+    'space-toggle from off enables pan mode'
+    + ' and emits cursor-on action',
     () => {
         const state = buildState();
         const input: FsmInput = {
-            kind: 'space-down',
+            kind: 'space-toggle',
             isAutoFit: false,
             isFormFocused: false,
         };
         const r = reduceFsm(state, input);
         assert.equal(
-            r.state.isSpaceDown, true,
+            r.state.isPanMode, true,
         );
         const cursor = findAction(
             r.actions, 'set-pan-cursor',
@@ -324,24 +325,180 @@ test(
 );
 
 test(
-    'space-down with autofit shows toast'
-    + ' and does not enable',
+    'space-toggle from on disables pan mode'
+    + ' and emits cursor-off action',
+    () => {
+        const state = buildState({
+            isPanMode: true,
+        });
+        const input: FsmInput = {
+            kind: 'space-toggle',
+            isAutoFit: false,
+            isFormFocused: false,
+        };
+        const r = reduceFsm(state, input);
+        assert.equal(
+            r.state.isPanMode, false,
+        );
+        const cursor = findAction(
+            r.actions, 'set-pan-cursor',
+        );
+        assert.equal(cursor?.on, false);
+    },
+);
+
+test(
+    'space-toggle from off with autofit'
+    + ' shows toast and stays off',
     () => {
         const state = buildState();
         const input: FsmInput = {
-            kind: 'space-down',
+            kind: 'space-toggle',
             isAutoFit: true,
             isFormFocused: false,
         };
         const r = reduceFsm(state, input);
         assert.equal(
-            r.state.isSpaceDown, false,
+            r.state.isPanMode, false,
         );
         const toast = findAction(
             r.actions, 'show-toast',
         );
         assert.ok(toast);
         assert.equal(toast.tone, 'error');
+    },
+);
+
+test(
+    'space-toggle from on with autofit'
+    + ' still toggles off',
+    () => {
+        const state = buildState({
+            isPanMode: true,
+        });
+        const input: FsmInput = {
+            kind: 'space-toggle',
+            isAutoFit: true,
+            isFormFocused: false,
+        };
+        const r = reduceFsm(state, input);
+        assert.equal(
+            r.state.isPanMode, false,
+        );
+        const cursor = findAction(
+            r.actions, 'set-pan-cursor',
+        );
+        assert.equal(cursor?.on, false);
+    },
+);
+
+test(
+    'space-toggle while dragging is ignored',
+    () => {
+        const state = buildState({
+            drag: {
+                kind: 'dragging',
+                anchorNodeId: 'n1',
+                startPointerX: 0,
+                startPointerY: 0,
+                currentPointerX: 0,
+                currentPointerY: 0,
+                initialPositions: new Map(),
+            },
+        });
+        const input: FsmInput = {
+            kind: 'space-toggle',
+            isAutoFit: false,
+            isFormFocused: false,
+        };
+        const r = reduceFsm(state, input);
+        assert.equal(r.state, state);
+        assert.equal(r.actions.length, 0);
+    },
+);
+
+test(
+    'space-toggle while connecting is ignored',
+    () => {
+        const state = buildState({
+            connect: {
+                kind: 'connecting',
+                fromNodeId: 'n1',
+                toX: 0,
+                toY: 0,
+                isShift: false,
+                target: { kind: 'none' },
+            },
+        });
+        const input: FsmInput = {
+            kind: 'space-toggle',
+            isAutoFit: false,
+            isFormFocused: false,
+        };
+        const r = reduceFsm(state, input);
+        assert.equal(r.state, state);
+        assert.equal(r.actions.length, 0);
+    },
+);
+
+test(
+    'space-toggle while marquee selecting'
+    + ' is ignored',
+    () => {
+        const state = buildState({
+            marquee: {
+                kind: 'selecting',
+                startX: 0,
+                startY: 0,
+                currentX: 0,
+                currentY: 0,
+            },
+        });
+        const input: FsmInput = {
+            kind: 'space-toggle',
+            isAutoFit: false,
+            isFormFocused: false,
+        };
+        const r = reduceFsm(state, input);
+        assert.equal(r.state, state);
+        assert.equal(r.actions.length, 0);
+    },
+);
+
+test(
+    'space-toggle while panning is ignored',
+    () => {
+        const state = buildState({
+            isPanMode: true,
+            pan: {
+                kind: 'panning',
+                startX: 0,
+                startY: 0,
+            },
+        });
+        const input: FsmInput = {
+            kind: 'space-toggle',
+            isAutoFit: false,
+            isFormFocused: false,
+        };
+        const r = reduceFsm(state, input);
+        assert.equal(r.state, state);
+        assert.equal(r.actions.length, 0);
+    },
+);
+
+test(
+    'space-toggle while form-focused is ignored',
+    () => {
+        const state = buildState();
+        const input: FsmInput = {
+            kind: 'space-toggle',
+            isAutoFit: false,
+            isFormFocused: true,
+        };
+        const r = reduceFsm(state, input);
+        assert.equal(r.state, state);
+        assert.equal(r.actions.length, 0);
     },
 );
 
@@ -373,5 +530,84 @@ test(
         };
         const r = reduceFsm(state, input);
         assert.notEqual(r.state.zoom, 1.0);
+    },
+);
+
+test(
+    'request-update carries the new state'
+    + ' (FSM-to-presenter sync contract)',
+    () => {
+        const state = buildState();
+        const input: FsmInput = {
+            kind: 'pointer-down-on-node',
+            nodeId: 'n1',
+            isPort: false,
+            isDraggable: true,
+            isShift: false,
+            isMeta: false,
+            isLocked: false,
+            svgX: 0, svgY: 0,
+            now: 1000,
+            selectedPositions: new Map([
+                ['n1', { x: 0, y: 0 }],
+            ]),
+        };
+        const r = reduceFsm(state, input);
+        const update = findAction(
+            r.actions, 'request-update',
+        );
+        assert.ok(update);
+        assert.equal(update.state, r.state);
+        assert.equal(
+            update.state.selection.kind, 'nodes',
+        );
+    },
+);
+
+test(
+    'second click within DBLCLICK window emits'
+    + ' open-panel:true and request-update with'
+    + ' selection set (double-click integration)',
+    () => {
+        const state0 = buildState();
+        const downInput = (now: number): FsmInput => ({
+            kind: 'pointer-down-on-node',
+            nodeId: 'n1',
+            isPort: false,
+            isDraggable: true,
+            isShift: false,
+            isMeta: false,
+            isLocked: false,
+            svgX: 0, svgY: 0,
+            now,
+            selectedPositions: new Map([
+                ['n1', { x: 0, y: 0 }],
+            ]),
+        });
+        const r1 = reduceFsm(
+            state0, downInput(1000),
+        );
+        const r2 = reduceFsm(
+            r1.state, downInput(1200),
+        );
+        const open = findAction(
+            r2.actions, 'open-panel',
+        );
+        assert.equal(open?.open, true);
+        const update = findAction(
+            r2.actions, 'request-update',
+        );
+        assert.ok(update);
+        assert.equal(
+            update.state.selection.kind, 'nodes',
+        );
+        if (
+            update.state.selection.kind === 'nodes'
+        ) {
+            assert.ok(
+                update.state.selection
+                    .nodeIds.has('n1'),
+            );
+        }
     },
 );

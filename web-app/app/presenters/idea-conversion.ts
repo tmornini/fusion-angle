@@ -11,18 +11,14 @@ import {
     iconTarget,
     iconRocket,
     iconCalendar,
-    iconUsers,
+    iconPeople,
     iconTrendingUp,
     iconCheckCircle2,
 } from '../icons.ts';
-import {
-    type Idea,
-    User,
-} from '../adapters/index.ts';
+import { type Idea } from '../adapters/index.ts';
 
 export type ConversionField =
     | 'project-name'
-    | 'project-lead'
     | 'start-date'
     | 'target-end-date'
     | 'budget'
@@ -32,7 +28,6 @@ export type ConversionField =
 const REQUIRED_FIELDS:
     readonly ConversionField[] = [
     'project-name',
-    'project-lead',
     'start-date',
     'target-end-date',
     'budget',
@@ -42,7 +37,6 @@ const REQUIRED_FIELDS:
 export const ALL_CONVERSION_FIELDS:
     readonly ConversionField[] = [
     'project-name',
-    'project-lead',
     'start-date',
     'target-end-date',
     'budget',
@@ -59,7 +53,6 @@ export function buildInitialConversionFields(
 ): ConversionFields {
     return {
         'project-name': idea.titleText(),
-        'project-lead': '',
         'start-date': '',
         'target-end-date': '',
         'budget': '',
@@ -96,26 +89,6 @@ export function conversionFieldIsReady(
     return fields[field] !== '';
 }
 
-interface LeadOption {
-    readonly id: string;
-    readonly fullName: string;
-    readonly role: string;
-}
-
-function buildLeadOption(
-    option: LeadOption,
-    selectedId: string,
-): SafeHtml {
-    const sel = option.id === selectedId
-        ? 'selected'
-        : '';
-    return html`<option
-        value="${option.id}"
-        ${trusted(sel)}>
-        ${option.fullName} - ${option.role}
-    </option>`;
-}
-
 export class IdeaConversionPresenter {
     readonly #title: string;
     readonly #problemStatement: string;
@@ -123,12 +96,10 @@ export class IdeaConversionPresenter {
     readonly #proposedSolution: string;
     readonly #expectedOutcome: string;
     readonly #successMetrics: string;
-    readonly #leadOptions: LeadOption[];
     readonly #fields: ConversionFields;
 
     constructor(
         idea: Idea,
-        users: User[],
         fields: ConversionFields,
     ) {
         this.#title = idea.titleText();
@@ -142,13 +113,6 @@ export class IdeaConversionPresenter {
             idea.expectedOutcomeText();
         this.#successMetrics =
             idea.successMetricsText();
-        this.#leadOptions = users
-            .filter(u => u.isActive())
-            .map(u => ({
-                id: u.idForLink(),
-                fullName: u.fullName(),
-                role: u.roleLabel(),
-            }));
         this.#fields = fields;
     }
 
@@ -401,7 +365,6 @@ export class IdeaConversionPresenter {
 
     #buildRequired(): SafeHtml {
         const fields = this.#fields;
-        const lo = this.#leadOptions;
         return html`
             <div class="card p-6">
                 <div class="flex
@@ -448,41 +411,6 @@ export class IdeaConversionPresenter {
                                 + ' name'
                             }"
                         />
-                    </div>
-                    <div>
-                        <label class="${
-                            'label mb-2'
-                            + ' font-medium'
-                            + ' flex'
-                            + ' items-center'
-                            + ' gap-2'
-                        }">
-                            Project Lead
-                            ${this.#fieldCheck(
-                                'project-lead',
-                            )}
-                        </label>
-                        <select
-                            class="input"
-                            id=${'convert'
-                                + '-project'
-                                + '-lead'}>
-                            <option
-                                value="">
-                                ${'Who will'
-                                    + ' own'
-                                    + ' this'
-                                    + ' project?'}
-                            </option>
-                            ${lo.map(
-                                o => buildLeadOption(
-                                    o,
-                                    fields[
-                                        'project-lead'
-                                    ],
-                                ),
-                            )}
-                        </select>
                     </div>
                     <div class="${
                         'grid grid-cols-2 gap-4'
@@ -655,7 +583,7 @@ export class IdeaConversionPresenter {
                 <div class="flex
                     items-center
                     gap-2 mb-6">
-                    ${iconUsers(
+                    ${iconPeople(
                         20,
                         'text-primary',
                     )}

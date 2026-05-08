@@ -81,8 +81,7 @@ export async function postFlowVersion(
     const flow = await ctx.GET<FlowEntity>(
         'flows/' + flowId,
     );
-    await ctx.PUT<void>('flow-versions', {
-        id: versionId,
+    await ctx.PUT<void>(`flow-versions/${versionId}`, {
         flow_id: flowId,
         name: flow.name,
         description: flow.description,

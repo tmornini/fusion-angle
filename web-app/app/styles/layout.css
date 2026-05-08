@@ -122,10 +122,10 @@ html.sidebar-collapsed .sidebar {
 }
 
 .sidebar-collapsed .sidebar-footer { padding: var(--space-2); }
-.sidebar-collapsed .sidebar-user { justify-content: center; gap: 0; }
-.sidebar-collapsed .sidebar-user .flex-fill { display: none; }
+.sidebar-collapsed .sidebar-person { justify-content: center; gap: 0; }
+.sidebar-collapsed .sidebar-person .flex-fill { display: none; }
 
-.sidebar-user {
+.sidebar-person {
   display: flex;
   align-items: center;
   gap: var(--space-3);

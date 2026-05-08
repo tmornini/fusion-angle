@@ -4,13 +4,13 @@ import {
     searchItems,
     ideaToSearchItem,
     projectToSearchItem,
-    memberToSearchItem,
+    personToSearchItem,
 } from '../web-app/app/command-palette.ts';
 import type {
     SearchItem,
 } from '../web-app/app/command-palette.ts';
 import {
-    Idea, Project, User,
+    Idea, Project, Person,
     jsonArrayField,
     jsonObjectField,
 } from '../api/types.ts';
@@ -62,31 +62,25 @@ function buildProject(
     });
 }
 
-function buildUser(
+function buildPerson(
     id: string,
     first: string, last: string,
-    role = 'engineer',
+    title = 'engineer',
     department = 'Eng',
-): User {
-    return new User({
+): Person {
+    return new Person({
         id,
         first_name: first,
         last_name: last,
         email: first.toLowerCase()
             + '@example.com',
-        role,
+        title,
         department,
         status: 'active',
-        availability: 100,
-        performance_score: 80,
-        projects_completed: 0,
-        current_projects: 0,
         strengths: jsonArrayField([]),
         team_dimensions: jsonObjectField({}),
         phone: '',
         bio: '',
-        last_active:
-            '2026-01-01T00:00:00.000Z',
     });
 }
 
@@ -261,10 +255,10 @@ test(
 );
 
 test(
-    'memberToSearchItem builds correct shape',
+    'personToSearchItem builds correct shape',
     () => {
-        const out = memberToSearchItem(
-            buildUser(
+        const out = personToSearchItem(
+            buildPerson(
                 'u1', 'Carol', 'Smith',
                 'pm', 'Product',
             ),
@@ -274,7 +268,7 @@ test(
         assert.equal(out.category, 'people');
         assert.ok(
             out.keywords.includes('pm'),
-            'role in keywords',
+            'title in keywords',
         );
         assert.ok(
             out.keywords.includes('Product'),
@@ -292,8 +286,8 @@ test(
 test(
     'searchItems search by member email works',
     () => {
-        const memberItem = memberToSearchItem(
-            buildUser(
+        const memberItem = personToSearchItem(
+            buildPerson(
                 'u1', 'Carol', 'Smith',
             ),
         );

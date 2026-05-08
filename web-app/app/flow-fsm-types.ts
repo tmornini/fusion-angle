@@ -84,11 +84,10 @@ export type FsmInput =
         isAutoFit: boolean;
     }
     | {
-        kind: 'space-down';
+        kind: 'space-toggle';
         isAutoFit: boolean;
         isFormFocused: boolean;
     }
-    | { kind: 'space-up' }
     | {
         kind: 'shift-key';
         isShift: boolean;
@@ -119,7 +118,7 @@ export type Action =
         kind: 'open-panel';
         open: boolean;
     }
-    | { kind: 'request-update' }
+    | { kind: 'request-update'; state: FsmState }
     | { kind: 'capture-pointer' }
     | { kind: 'release-pointer' }
     | {

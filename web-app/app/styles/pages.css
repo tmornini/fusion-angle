@@ -1080,12 +1080,14 @@ svg.flow-canvas {
   user-select: none;
 }
 
-svg.flow-canvas.flow-canvas-locked .flow-grid-bg {
-  fill: hsl(var(--yellow-300));
+#flow-glow feFlood {
+  flood-color: hsl(var(--accent));
 }
 
-svg.flow-canvas.flow-canvas-locked #flow-grid circle {
-  fill: hsl(var(--blue-900));
+svg.flow-canvas.flow-canvas-locked .flow-node rect,
+svg.flow-canvas.flow-canvas-locked .flow-edge path[marker-end],
+svg.flow-canvas.flow-canvas-locked .flow-edge rect {
+  stroke: hsl(var(--accent-text));
 }
 
 .flow-node:focus,
@@ -1168,6 +1170,10 @@ svg.flow-canvas [data-node-id] {
       opacity var(--duration-fast)
       var(--ease-default);
   cursor: pointer;
+}
+
+.flow-node-hazard {
+  color: hsl(var(--warning));
 }
 
 svg.flow-canvas [data-node-id]:hover {
@@ -1453,22 +1459,8 @@ svg.flow-canvas [data-edge-id] {
 }
 
 /* ==========================================
-   45. USER / TEAM MEMBER PRESENTER
+   45. PEOPLE LIST + DETAIL
    ========================================== */
-
-.user-detail-wrap {
-  padding: var(--space-6);
-}
-
-.user-detail-header {
-  text-align: center;
-  margin-bottom: var(--space-6);
-}
-
-.user-row-divider {
-  border-bottom: 1px solid
-    hsl(var(--border));
-}
 
 .user-dim-row {
   margin-bottom: var(--space-4);
@@ -1478,33 +1470,55 @@ svg.flow-canvas [data-edge-id] {
   height: 0.5rem;
 }
 
-.text-capitalize {
-  text-transform: capitalize;
+.person-detail-wrap {
+  max-width: 48rem;
+  margin: 0 auto;
 }
 
-.perf-hero {
-  padding: var(--space-4);
+.person-avatar {
+  width: 6rem;
+  height: 6rem;
   border-radius: var(--radius-lg);
   background: linear-gradient(135deg,
-    hsl(var(--primary) / 0.1),
+    hsl(var(--primary) / 0.2),
     hsl(var(--primary) / 0.05));
-  text-align: center;
-  margin-bottom: var(--space-4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
-.perf-hero-value {
-  margin: var(--space-2) 0;
+.person-row {
+  cursor: pointer;
+  transition: background var(--duration-fast);
 }
 
-.perf-stat-cell {
-  padding: var(--space-3);
-  border-radius: var(--radius);
-  background: hsl(var(--muted) / 0.3);
-  text-align: center;
+.person-row:hover {
+  background: hsl(var(--muted) / 0.5);
 }
 
-.perf-stat-value {
-  margin: var(--space-1) 0;
+.person-row-divider {
+  border-bottom: 1px solid
+    hsl(var(--border));
+}
+
+.person-row[data-self="true"] {
+  position: relative;
+  background: hsl(var(--primary) / 0.05);
+  border-left: 3px solid hsl(var(--primary));
+}
+
+.person-row[data-self="true"]:hover {
+  background: hsl(var(--primary) / 0.1);
+}
+
+.sidebar-person {
+  cursor: pointer;
+  transition: background var(--duration-fast);
+}
+
+.sidebar-person:hover {
+  background: hsl(var(--muted) / 0.5);
 }
 
 /* ==========================================
@@ -1818,42 +1832,5 @@ svg.flow-canvas [data-edge-id] {
 .ds-soft-btn[data-tone="error"] {
   background: hsl(var(--error-soft));
   color: hsl(var(--error-text));
-}
-
-/* ==========================================
-   PROFILE
-   ========================================== */
-
-.profile-avatar-wrap {
-  position: relative;
-}
-
-.profile-avatar {
-  width: 6rem;
-  height: 6rem;
-  border-radius: var(--radius-lg);
-  background: linear-gradient(135deg,
-    hsl(var(--primary) / 0.2),
-    hsl(var(--primary) / 0.05));
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.profile-avatar-btn {
-  position: absolute;
-  bottom: -0.5rem;
-  right: -0.5rem;
-  width: 2rem;
-  height: 2rem;
-  border-radius: var(--radius-full);
-  background: hsl(var(--primary));
-  color: hsl(var(--primary-foreground));
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  cursor: pointer;
-  box-shadow: var(--shadow-lg);
 }
 

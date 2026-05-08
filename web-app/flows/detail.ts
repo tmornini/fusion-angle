@@ -18,9 +18,15 @@ import {
     getFlowMermaid,
     getFlowZip,
     getFlowVersions,
+    getPersonMap,
+    getMembersOfCrew,
     postClipboardCopy,
     subscribeResize,
 } from '../app/adapters/index.ts';
+import type {
+    FetchContext,
+} from '../app/adapters/index.ts';
+import type { NodeAssignment } from '../../api/types.ts';
 import {
     downloadBlob,
 } from '../app/adapters/blob-download.ts';
@@ -272,9 +278,7 @@ function commit(
     opts?: { advanceHistory?: boolean },
 ): void {
     if (opts?.advanceHistory) {
-        pageState.setHistory(
-            recordFlowMutation(pageState.history()),
-        );
+        pageState.setHistory(recordFlowMutation());
     }
     const presenter = new FlowDesignerPresenter(
         next,
@@ -731,14 +735,42 @@ function bindCanvasInteractions(
     const push = bindInteractions(
         wrap,
         state,
-        () => update(
-            container, pageState.presenter(),
-        ),
+        (next) => {
+            const prevSelected = pageState
+                .presenter().selectedNodeId();
+            commit(
+                pageState.presenter()
+                    .withInteractionState(next),
+            );
+            commit(
+                pageState.presenter()
+                    .withFitReconciled(),
+            );
+            const nowSelected = pageState
+                .presenter().selectedNodeId();
+            const isPanelOpen = pageState
+                .presenter().snapshot()
+                .isPanelOpen;
+            if (
+                prevSelected !== nowSelected
+                && nowSelected !== null
+                && isPanelOpen
+            ) {
+                commit(
+                    pageState.presenter()
+                        .withSelectionCentered(),
+                );
+            }
+        },
         (open) => {
             panelStateRef.open = open;
             commit(
                 pageState.presenter()
                     .withPanelOpen(open),
+            );
+            commit(
+                pageState.presenter()
+                    .withFitReconciled(),
             );
         },
         (updates) => {
@@ -768,7 +800,6 @@ function bindCanvasInteractions(
 
 function bindToolbarActions(
     container: HTMLElement,
-    presenter: FlowDesignerPresenter,
     flowId: string,
     signal: AbortSignal,
 ): void {
@@ -902,9 +933,66 @@ async function handleExportZip(
     );
 }
 
+async function buildRoleMemberCounts(
+    ctx: FetchContext,
+): Promise<Map<string, number>> {
+    const rows =
+        await ctx.getRoleMembershipRows();
+    const counts = new Map<string, number>();
+    for (const row of rows) {
+        counts.set(
+            row.role_id,
+            (counts.get(row.role_id) ?? 0) + 1,
+        );
+    }
+    return counts;
+}
+
+async function buildCrewMemberCounts(
+    ctx: FetchContext,
+): Promise<Map<string, number>> {
+    const crewMap = await ctx.getCrewMap();
+    const counts = new Map<string, number>();
+    for (const crewId of crewMap.keys()) {
+        const members = await getMembersOfCrew(
+            ctx, crewId,
+        );
+        counts.set(crewId, members.size);
+    }
+    return counts;
+}
+
+function parseNodeAssignmentSelectValue(
+    raw: string,
+): NodeAssignment {
+    if (raw === 'unassigned') {
+        return { kind: 'unassigned' };
+    }
+    if (raw.startsWith('role:')) {
+        return {
+            kind: 'role',
+            roleId: raw.slice(5),
+        };
+    }
+    if (raw.startsWith('crew:')) {
+        return {
+            kind: 'crew',
+            crewId: raw.slice(5),
+        };
+    }
+    if (raw.startsWith('model:')) {
+        return {
+            kind: 'model',
+            modelId: raw.slice(6),
+        };
+    }
+    throw new Error(
+        'invalid assignment value: ' + raw,
+    );
+}
+
 function bindPanelActions(
     container: HTMLElement,
-    presenter: FlowDesignerPresenter,
     panelStateRef: PanelStateRef,
     signal: AbortSignal,
 ): void {
@@ -912,6 +1000,28 @@ function bindPanelActions(
         '.flow-props-slot', container,
     );
     if (!slot) return;
+    slot.addEventListener(
+        'change',
+        (e) => {
+            const target = e.target;
+            if (
+                !(target instanceof
+                    HTMLSelectElement)
+            ) return;
+            if (
+                target.id !== 'prop-node-assignment'
+            ) return;
+            const assignment = parseNodeAssignmentSelectValue(
+                target.value,
+            );
+            commit(
+                pageState.presenter()
+                    .withNodeAssignment(assignment),
+                { advanceHistory: true },
+            );
+        },
+        { signal },
+    );
     slot.addEventListener(
         'click',
         (e) => {
@@ -932,11 +1042,16 @@ function bindPanelActions(
                     pageState.presenter()
                         .withPanelOpen(false),
                 );
+                commit(
+                    pageState.presenter()
+                        .withFitReconciled(),
+                );
             } else if (
                 action === 'add-field'
             ) {
                 showFieldEditor(
-                    container, presenter,
+                    container,
+                    pageState.presenter(),
                 );
             } else if (
                 action === 'delete-field'
@@ -1129,12 +1244,29 @@ export async function init(
         buildSkeleton('detail', 1),
         async () => {
             const ctx = createFetchContext();
-            const [graph, versions] =
-                await Promise.all([
-                    getFlowGraph(ctx, flowId),
-                    getFlowVersions(ctx, flowId),
-                ]);
-            return { graph, versions };
+            const [
+                graph, versions,
+                personMap, roleMap,
+                roleMemberCounts,
+                crewMap, crewMemberCounts,
+                modelMap,
+            ] = await Promise.all([
+                getFlowGraph(ctx, flowId),
+                getFlowVersions(ctx, flowId),
+                getPersonMap(ctx),
+                ctx.getRoleMap(),
+                buildRoleMemberCounts(ctx),
+                ctx.getCrewMap(),
+                buildCrewMemberCounts(ctx),
+                ctx.getModelMap(),
+            ]);
+            return {
+                graph, versions,
+                personMap, roleMap,
+                roleMemberCounts,
+                crewMap, crewMemberCounts,
+                modelMap,
+            };
         },
     );
     if (!loaded) return;
@@ -1152,6 +1284,12 @@ export async function init(
             loaded.graph,
             FALLBACK_W,
             FALLBACK_H,
+            loaded.personMap,
+            loaded.roleMap,
+            loaded.roleMemberCounts,
+            loaded.crewMap,
+            loaded.crewMemberCounts,
+            loaded.modelMap,
         );
     const presenter =
         new FlowDesignerPresenter(
@@ -1171,11 +1309,10 @@ export async function init(
         panelStateRef, signal,
     );
     bindToolbarActions(
-        container, presenter, flowId, signal,
+        container, flowId, signal,
     );
     bindPanelActions(
-        container, presenter,
-        panelStateRef, signal,
+        container, panelStateRef, signal,
     );
     bindFlowNameEdit(
         container, signal,
@@ -1184,8 +1321,7 @@ export async function init(
         container, signal,
     );
     bindKeyboardShortcuts(
-        container, presenter,
-        panelStateRef, signal,
+        container, panelStateRef, signal,
     );
     const initialWrap = container.querySelector(
         '.flow-canvas-wrap',
@@ -1227,7 +1363,6 @@ export async function init(
 
 function bindKeyboardShortcuts(
     container: HTMLElement,
-    presenter: FlowDesignerPresenter,
     panelStateRef: PanelStateRef,
     signal: AbortSignal,
 ): void {
@@ -1243,6 +1378,10 @@ function bindKeyboardShortcuts(
                 commit(
                     pageState.presenter()
                         .withPanelOpen(false),
+                );
+                commit(
+                    pageState.presenter()
+                        .withFitReconciled(),
                 );
                 return;
             }

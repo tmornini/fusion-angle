@@ -3,14 +3,10 @@ import {
     EntityNotFound,
     MissingTableError,
 } from './db.ts';
-import { nowUtc } from './types.ts';
 import {
-    validateUserEntity,
+    validatePersonEntity,
     validateIdeaEntity,
     validateProjectEntity,
-    validateTeamEntity,
-    validateTeamProjectEntity,
-    validateTeamUserEntity,
     validateActivityEntity,
     validateFlowEntity,
     validateFlowVersionEntity,
@@ -20,10 +16,15 @@ import {
     validateWorkOrderTransitionEntity,
     validateTransitionFieldValueEntity,
     validateWorkOrderClaimEntity,
-    validateCompanyEntity,
     validateOrganizationEntity,
     validateIdeaSubmissionEntity,
     validateActivityActorEntity,
+    validateRoleEntity,
+    validateRoleMembershipEntity,
+    validateCrewEntity,
+    validateCrewRoleMembershipEntity,
+    validateModelEntity,
+    validateRoleModelMembershipEntity,
 } from './validators.ts';
 
 export class ApiError {
@@ -115,8 +116,8 @@ function withoutId(
 
 
 const routes: Route[] = [
-    route('users', {
-        get: (db) => db.users.getAll(),
+    route('people', {
+        get: (db) => db.people.getAll(),
     }),
     route('ideas', {
         get: (db) => db.ideas.getAll(),
@@ -135,31 +136,120 @@ const routes: Route[] = [
         get: (db) =>
             db.activityActors.getAll(),
     }),
-    route('teams', {
-        get: (db) =>
-            db.teams.getAll(),
+    route('roles', {
+        get: (db) => db.roles.getAll(),
     }),
-    route('team-projects', {
-        get: (db) =>
-            db.teamProjects
-                .getAll(),
-    }),
-    route('team-users', {
-        get: (db) =>
-            db.teamUsers
-                .getAll(),
-    }),
-
-    route('flows', {
-        get: (db) =>
-            db.flows.getAll(),
-        put: (db, _params, body) =>
-            db.flows.put(
-                body.id as string,
-                validateFlowEntity(
+    route('roles/:id', {
+        get: (db, params) =>
+            db.roles.getById(
+                param(params, 0),
+            ),
+        put: (db, params, body) =>
+            db.roles.put(
+                param(params, 0),
+                validateRoleEntity(
                     withoutId(body),
                 ),
             ),
+        delete: (db, params) =>
+            db.roles.delete(
+                param(params, 0),
+            ),
+    }),
+    route('role-memberships', {
+        get: (db) =>
+            db.roleMemberships.getAll(),
+    }),
+    route('role-memberships/:id', {
+        put: (db, params, body) =>
+            db.roleMemberships.put(
+                param(params, 0),
+                validateRoleMembershipEntity(
+                    withoutId(body),
+                ),
+            ),
+        delete: (db, params) =>
+            db.roleMemberships.delete(
+                param(params, 0),
+            ),
+    }),
+    route('crews', {
+        get: (db) => db.crews.getAll(),
+    }),
+    route('crews/:id', {
+        get: (db, params) =>
+            db.crews.getById(
+                param(params, 0),
+            ),
+        put: (db, params, body) =>
+            db.crews.put(
+                param(params, 0),
+                validateCrewEntity(
+                    withoutId(body),
+                ),
+            ),
+        delete: (db, params) =>
+            db.crews.delete(
+                param(params, 0),
+            ),
+    }),
+    route('crew-role-memberships', {
+        get: (db) =>
+            db.crewRoleMemberships.getAll(),
+    }),
+    route('crew-role-memberships/:id', {
+        put: (db, params, body) =>
+            db.crewRoleMemberships.put(
+                param(params, 0),
+                validateCrewRoleMembershipEntity(
+                    withoutId(body),
+                ),
+            ),
+        delete: (db, params) =>
+            db.crewRoleMemberships.delete(
+                param(params, 0),
+            ),
+    }),
+    route('models', {
+        get: (db) => db.models.getAll(),
+    }),
+    route('models/:id', {
+        get: (db, params) =>
+            db.models.getById(
+                param(params, 0),
+            ),
+        put: (db, params, body) =>
+            db.models.put(
+                param(params, 0),
+                validateModelEntity(
+                    withoutId(body),
+                ),
+            ),
+        delete: (db, params) =>
+            db.models.delete(
+                param(params, 0),
+            ),
+    }),
+    route('role-model-memberships', {
+        get: (db) =>
+            db.roleModelMemberships.getAll(),
+    }),
+    route('role-model-memberships/:id', {
+        put: (db, params, body) =>
+            db.roleModelMemberships.put(
+                param(params, 0),
+                validateRoleModelMembershipEntity(
+                    withoutId(body),
+                ),
+            ),
+        delete: (db, params) =>
+            db.roleModelMemberships.delete(
+                param(params, 0),
+            ),
+    }),
+    route('flows', {
+        get: (db) =>
+            db.flows.getAll(),
     }),
     route('flows/:id', {
         get: (db, params) =>
@@ -181,18 +271,18 @@ const routes: Route[] = [
     route('flow-versions', {
         get: (db) =>
             db.flowVersions.getAll(),
-        put: (db, _params, body) =>
-            db.flowVersions.put(
-                body.id as string,
-                validateFlowVersionEntity(
-                    withoutId(body),
-                ),
-            ),
     }),
     route('flow-versions/:id', {
         get: (db, params) =>
             db.flowVersions.getById(
                 param(params, 0),
+            ),
+        put: (db, params, body) =>
+            db.flowVersions.put(
+                param(params, 0),
+                validateFlowVersionEntity(
+                    withoutId(body),
+                ),
             ),
         delete: (db, params) =>
             db.flowVersions.delete(
@@ -203,15 +293,15 @@ const routes: Route[] = [
         get: (db) =>
             db.projectFlows
                 .getAll(),
-        put: (db, _params, body) =>
+    }),
+    route('project-flows/:id', {
+        put: (db, params, body) =>
             db.projectFlows.put(
-                body.id as string,
+                param(params, 0),
                 validateProjectFlowEntity(
                     withoutId(body),
                 ),
             ),
-    }),
-    route('project-flows/:id', {
         delete: (db, params) =>
             db.projectFlows.delete(
                 param(params, 0),
@@ -220,13 +310,6 @@ const routes: Route[] = [
     route('work-orders', {
         get: (db) =>
             db.workOrders.getAll(),
-        put: (db, _params, body) =>
-            db.workOrders.put(
-                body.id as string,
-                validateWorkOrderEntity(
-                    withoutId(body),
-                ),
-            ),
     }),
     route('work-orders/:id', {
         get: (db, params) =>
@@ -244,9 +327,11 @@ const routes: Route[] = [
     route('flow-work-orders', {
         get: (db) =>
             db.flowWorkOrders.getAll(),
-        put: (db, _params, body) =>
+    }),
+    route('flow-work-orders/:id', {
+        put: (db, params, body) =>
             db.flowWorkOrders.put(
-                body.id as string,
+                param(params, 0),
                 validateFlowWorkOrderEntity(
                     withoutId(body),
                 ),
@@ -256,9 +341,11 @@ const routes: Route[] = [
         get: (db) =>
             db.workOrderTransitions
                 .getAll(),
-        put: (db, _params, body) =>
+    }),
+    route('work-order-transitions/:id', {
+        put: (db, params, body) =>
             db.workOrderTransitions.put(
-                body.id as string,
+                param(params, 0),
                 validateWorkOrderTransitionEntity(
                     withoutId(body),
                 ),
@@ -268,15 +355,15 @@ const routes: Route[] = [
         get: (db) =>
             db.transitionFieldValues
                 .getAll(),
-        put: (db, _params, body) =>
+    }),
+    route('transition-field-values/:id', {
+        put: (db, params, body) =>
             db.transitionFieldValues.put(
-                body.id as string,
+                param(params, 0),
                 validateTransitionFieldValueEntity(
                     withoutId(body),
                 ),
             ),
-    }),
-    route('transition-field-values/:id', {
         delete: (db, params) =>
             db.transitionFieldValues.delete(
                 param(params, 0),
@@ -286,31 +373,21 @@ const routes: Route[] = [
         get: (db) =>
             db.workOrderClaims
                 .getAll(),
-        put: (db, _params, body) =>
+    }),
+    route('work-order-claims/:id', {
+        put: (db, params, body) =>
             db.workOrderClaims.put(
-                body.id as string,
+                param(params, 0),
                 validateWorkOrderClaimEntity(
                     withoutId(body),
                 ),
             ),
-    }),
-    route('work-order-claims/:id', {
         delete: (db, params) =>
             db.workOrderClaims.delete(
                 param(params, 0),
             ),
     }),
 
-    route('company', {
-        get: (db) =>
-            db.company.get(),
-        put: (db, _, payload) =>
-            db.company.put(
-                validateCompanyEntity(
-                    withoutId(payload),
-                ),
-            ),
-    }),
     route('organization', {
         get: (db) => db.organization.get(),
         put: (db, _, payload) =>
@@ -320,18 +397,18 @@ const routes: Route[] = [
                 ),
             ),
     }),
-    route('current-user', {
+    route('current-person', {
         get: (db) =>
-            db.users.getById('current'),
+            db.people.getById('current'),
     }),
 
-    route('users/:id', {
+    route('people/:id', {
         get: (db, p) =>
-            db.users.getById(param(p, 0)),
+            db.people.getById(param(p, 0)),
         put: (db, p, payload) =>
-            db.users.put(
+            db.people.put(
                 param(p, 0),
-                validateUserEntity(
+                validatePersonEntity(
                     withoutId(payload),
                 ),
             ),
@@ -391,160 +468,6 @@ const routes: Route[] = [
                 ),
             ),
     }),
-    route('teams/:id', {
-        put: (db, p, payload) =>
-            db.teams.put(
-                param(p, 0),
-                validateTeamEntity(
-                    withoutId(payload),
-                ),
-            ),
-    }),
-    route(
-        'team-projects/:id',
-        {
-            put: (db, p, payload) =>
-                db.teamProjects
-                    .put(
-                        param(p, 0),
-                        validateTeamProjectEntity(
-                            withoutId(payload),
-                        ),
-                    ),
-        },
-    ),
-    route(
-        'team-users/:id',
-        {
-            put: (db, p, payload) =>
-                db.teamUsers
-                    .put(
-                        param(p, 0),
-                        validateTeamUserEntity(
-                            withoutId(payload),
-                        ),
-                    ),
-        },
-    ),
-    route('projects/:projectId/team', {
-        get: async (db, p) => {
-            const pid = param(p, 0);
-            const [
-                tmProjects,
-                memberships,
-                tmUsers,
-            ] = await Promise.all([
-                db.teamProjects
-                    .getAll(),
-                db.teams
-                    .getAll(),
-                db.teamUsers
-                    .getAll(),
-            ]);
-            const membershipIds = new Set(
-                tmProjects
-                    .filter(
-                        l => l.project_id
-                            === pid,
-                    )
-                    .map(
-                        l =>
-                            l.team_id,
-                    ),
-            );
-            const userByMembership = new Map(
-                tmUsers.map(
-                    u => [
-                        u.team_id,
-                        u.user_id,
-                    ],
-                ),
-            );
-            return memberships
-                .filter(
-                    m =>
-                        membershipIds.has(
-                            m.id,
-                        ),
-                )
-                .map(m => ({
-                    id: m.id,
-                    user_id:
-                        userByMembership
-                            .get(m.id)!,
-                    role: m.role,
-                    type: m.type,
-                }));
-        },
-    }),
-
-    route(
-        'projects/:projectId/team/:userId',
-        {
-            put: async (db, p, payload) => {
-                const pid = param(p, 0);
-                const uid = param(p, 1);
-                if (
-                    typeof payload.role
-                        !== 'string'
-                    || payload.role === ''
-                ) {
-                    throw new ApiError(
-                        'Missing or invalid'
-                        + ' "role" field.',
-                        HTTP_BAD_REQUEST,
-                    );
-                }
-                if (
-                    typeof payload.type
-                        !== 'string'
-                    || payload.type === ''
-                ) {
-                    throw new ApiError(
-                        'Missing or invalid'
-                        + ' "type" field.',
-                        HTTP_BAD_REQUEST,
-                    );
-                }
-                const tmId =
-                    `tm-${pid}-${uid}`;
-                const membership =
-                    await db.teams
-                        .put(tmId, {
-                            role:
-                                payload.role as
-                                    string,
-                            type:
-                                payload.type as
-                                    string,
-                        });
-                const projLinkId =
-                    `tmp-${tmId}`;
-                const userLinkId =
-                    `tmu-${tmId}`;
-                await Promise.all([
-                    db.teamProjects
-                        .put(projLinkId, {
-                            team_id:
-                                tmId,
-                            project_id: pid,
-                            created_at:
-                                nowUtc(),
-                        }),
-                    db.teamUsers
-                        .put(userLinkId, {
-                            team_id:
-                                tmId,
-                            user_id: uid,
-                            created_at:
-                                nowUtc(),
-                        }),
-                ]);
-                return membership;
-            },
-        },
-    ),
-
     route('snapshots/schema', {
         get: async (db) =>
             (await db.hasSchema())

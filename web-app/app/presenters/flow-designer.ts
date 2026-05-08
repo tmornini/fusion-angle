@@ -9,6 +9,13 @@ import {
     createFetchContext,
     putFlow,
     postFlowVersion,
+    Person,
+    Role,
+    Crew,
+    Model,
+} from '../adapters/index.ts';
+import type {
+    Id,
 } from '../adapters/index.ts';
 import type {
     GraphNode,
@@ -17,6 +24,7 @@ import type {
     FlowVersion,
     FlowSaveShape,
 } from '../adapters/flows.ts';
+import type { NodeAssignment } from '../../../api/types.ts';
 import {
     generateCryptoSafeBase62,
 } from '../adapters/index.ts';
@@ -91,6 +99,12 @@ interface DesignerState {
     isPanelOpen: boolean;
     interaction: InteractionState;
     savedViewBox: SavedViewBox;
+    personMap: Map<Id, Person>;
+    roleMap: Map<Id, Role>;
+    roleMemberCounts: Map<Id, number>;
+    crewMap: Map<Id, Crew>;
+    crewMemberCounts: Map<Id, number>;
+    modelMap: Map<Id, Model>;
 }
 
 export type FlowSnapshot = Readonly<DesignerState>;
@@ -104,6 +118,14 @@ export function buildInitialFlowSnapshot(
     graph: FlowGraph,
     canvasW: number,
     canvasH: number,
+    personMap: Map<Id, Person>,
+    roleMap: Map<Id, Role> = new Map(),
+    roleMemberCounts: Map<Id, number>
+        = new Map(),
+    crewMap: Map<Id, Crew> = new Map(),
+    crewMemberCounts: Map<Id, number>
+        = new Map(),
+    modelMap: Map<Id, Model> = new Map(),
 ): FlowSnapshot {
     const interaction = buildInteractionState(
         canvasW, canvasH,
@@ -124,6 +146,12 @@ export function buildInitialFlowSnapshot(
         isPanelOpen: false,
         interaction,
         savedViewBox: { kind: 'none' },
+        personMap,
+        roleMap,
+        roleMemberCounts,
+        crewMap,
+        crewMemberCounts,
+        modelMap,
     };
 }
 
@@ -157,9 +185,7 @@ export class FlowDesignerPresenter {
     }
 
     #noteMutation(): void {
-        this.#history = recordFlowMutation(
-            this.#history,
-        );
+        this.#history = recordFlowMutation();
     }
 
     #buildSaveShape(
@@ -398,6 +424,15 @@ export class FlowDesignerPresenter {
             isPanelOpen: open,
         };
         return this.#handlePanelTransition(next);
+    }
+
+    withInteractionState(
+        state: InteractionState,
+    ): FlowSnapshot {
+        return {
+            ...this.#snapshot,
+            interaction: state,
+        };
     }
 
     getNodePosition(id: string): {
@@ -671,6 +706,22 @@ Auto Fit</label>
         );
     }
 
+    withFitReconciled(): FlowSnapshot {
+        if (!this.#snapshot.isAutoFit) {
+            return this.#snapshot;
+        }
+        this.#applyZoomToFit(this.#snapshot);
+        return this.#snapshot;
+    }
+
+    withSelectionCentered(): FlowSnapshot {
+        if (!this.#snapshot.isPanelOpen) {
+            return this.#snapshot;
+        }
+        this.#panToRevealSelected(this.#snapshot);
+        return this.#snapshot;
+    }
+
     #applyLayoutReconcile(
         snap: FlowSnapshot,
     ): FlowSnapshot {
@@ -744,6 +795,28 @@ Auto Fit</label>
                 this.#snapshot.nodes,
                 nodeId,
                 { description: desc.trim() },
+            ),
+        };
+        void this.#saveFlow(true, next);
+        this.#noteMutation();
+        return next;
+    }
+
+    withNodeAssignment(
+        assignment: NodeAssignment,
+    ): FlowSnapshot {
+        if (this.#guardLocked()) {
+            return this.#snapshot;
+        }
+        const nodeId = this
+            .#singleSelectedNodeId();
+        if (!nodeId) return this.#snapshot;
+        const next: FlowSnapshot = {
+            ...this.#snapshot,
+            nodes: applyUpdateNode(
+                this.#snapshot.nodes,
+                nodeId,
+                { crew: assignment },
             ),
         };
         void this.#saveFlow(true, next);
@@ -938,10 +1011,13 @@ Auto Fit</label>
                 y: n.positionY,
             }),
         );
+        const panelOffset = snap.isPanelOpen
+            ? PANEL_WIDTH_PX : 0;
         const result = zoomToFitState(
             positions,
             this.#canvasW,
             this.#canvasH,
+            panelOffset,
         );
         if (!result) return;
         snap.interaction.zoom = result.zoom;
@@ -989,14 +1065,7 @@ Auto Fit</label>
 
     tryShowFieldEditor(
         container: HTMLElement,
-    ):
-        | 'opened'
-        | 'no-selection'
-        | 'locked'
-    {
-        if (this.selectedNodeId() === null) {
-            return 'no-selection';
-        }
+    ): 'opened' | 'locked' {
         if (this.isLocked()) {
             return 'locked';
         }
@@ -1035,6 +1104,10 @@ Auto Fit</label>
             return buildNodePanel(
                 node, outgoing,
                 this.#snapshot.isLocked,
+                this.#snapshot.personMap,
+                this.#snapshot.roleMap,
+                this.#snapshot.crewMap,
+                this.#snapshot.modelMap,
             );
         }
 
@@ -1282,6 +1355,8 @@ Auto Fit</label>
             isConn,
             marqueeRect,
             this.#snapshot.edgeWaypoints,
+            this.#snapshot.roleMemberCounts,
+            this.#snapshot.crewMemberCounts,
         );
         const preview =
             this.#buildConnectPreview();

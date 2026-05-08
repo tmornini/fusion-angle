@@ -83,7 +83,7 @@ export function iconFolderKanban(
     );
 }
 
-export function iconUsers(size: number, cssClass: string) {
+export function iconPeople(size: number, cssClass: string) {
     return icon(
         '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4'
         + ' 4 0 0 0-4 4v2"/>'
@@ -97,7 +97,7 @@ export function iconUsers(size: number, cssClass: string) {
     );
 }
 
-export function iconUser(size: number, cssClass: string) {
+export function iconPerson(size: number, cssClass: string) {
     return icon(
         '<path d="M19 21v-2a4 4 0 0 0-4-4H9a4'
         + ' 4 0 0 0-4 4v2"/>'
@@ -1134,7 +1134,7 @@ export function iconMessageSquare(
     );
 }
 
-export function iconUserPlus(
+export function iconPersonPlus(
     size: number,
     cssClass: string,
 ) {
@@ -1151,7 +1151,7 @@ export function iconUserPlus(
     );
 }
 
-export function iconUserCheck(
+export function iconPersonCheck(
     size: number,
     cssClass: string,
 ) {
@@ -1166,7 +1166,7 @@ export function iconUserCheck(
     );
 }
 
-export function iconUserX(size: number, cssClass: string) {
+export function iconPersonX(size: number, cssClass: string) {
     return icon(
         '<path d="M16 21v-2a4 4 0 0 0-4-4H6a'
         + '4 4 0 0 0-4 4v2"/>'

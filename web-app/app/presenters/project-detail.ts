@@ -14,7 +14,7 @@ import {
     iconEdit, iconSave, iconX,
 } from '../icons.ts';
 import {
-    initials, formatDate,
+    formatDate,
     toDateInputValue,
     DISPLAY_ABSENT,
 } from '../core.ts';
@@ -183,10 +183,8 @@ function buildSubtitle(
 ): SafeHtml {
     return html`
         <p class="text-sm text-muted">
-            Led by ${view.projectLeadName()}
-            &#x2022; ${
-                view.progressPercent()
-            }% of schedule elapsed
+            ${view.progressPercent()}%
+            of schedule elapsed
         </p>`;
 }
 
@@ -729,33 +727,6 @@ function buildEditableMetrics(
         </div>`;
 }
 
-function buildTeamMember(
-    m: { name: string; role: string },
-): SafeHtml {
-    return html`
-        <div class="${
-            'flex items-center gap-3'
-        }">
-            <div class="${
-                'team-member-avatar'
-            }">
-                <span class="${
-                    'text-xs font-bold'
-                    + ' text-primary'
-                }">${initials(m.name)}</span>
-            </div>
-            <div class="flex-fill">
-                <p class="${
-                    'text-sm font-medium'
-                    + ' truncate'
-                }">${m.name}</p>
-                <p class="${
-                    'text-xs text-muted'
-                }">${m.role}</p>
-            </div>
-        </div>`;
-}
-
 function buildFlowCard(
     flow: FlowListItem,
 ): SafeHtml {
@@ -878,39 +849,11 @@ function buildFlowsSection(
 }
 
 function buildSidebar(
-    view: ProjectView,
     flows: FlowListItem[],
     isApproved: boolean,
 ): SafeHtml {
     return html`
         <div class="stack-lg">
-            <div class="card p-6">
-                <div class="${
-                    'flex items-center'
-                    + ' justify-between mb-4'
-                }">
-                    <h3 class="${
-                        'font-display'
-                        + ' font-semibold'
-                    }">
-                        Team
-                    </h3>
-                    <button class="${
-                        'btn btn-ghost'
-                        + ' btn-sm gap-1'
-                    }">
-                        ${iconPlus(14, '')}
-                        Add
-                    </button>
-                </div>
-                <div class="${
-                    'flex flex-col gap-3'
-                }">
-                    ${view.teamMembers()
-                        .map(m =>
-                            buildTeamMember(m))}
-                </div>
-            </div>
             ${buildFlowsSection(
                 isApproved, flows,
             )}
@@ -1037,7 +980,6 @@ export class ProjectDetailPresenter {
             container,
             '.project-sidebar-slot',
             buildSidebar(
-                this.#view,
                 this.#flows,
                 this.isApproved(),
             ),
@@ -1118,7 +1060,6 @@ export class ProjectDetailEditPresenter {
             container,
             '.project-sidebar-slot',
             buildSidebar(
-                this.#view,
                 this.#flows,
                 this.isApproved(),
             ),

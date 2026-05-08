@@ -1,3 +1,8 @@
+import {
+    START_NODE_DEFAULT_NAME,
+    END_NODE_DEFAULT_NAME,
+} from '../../api/types.ts';
+
 export interface ParsedNode {
     mermaidId: string;
     name: string;
@@ -290,8 +295,6 @@ const COMPOSITE_CLOSE_RE =
     /^\}\s*$/;
 
 const STATE_PSEUDO = '[*]';
-const STATE_START_NAME = 'Start';
-const STATE_COMPLETE_NAME = 'End';
 
 function parseStateDiagram(
     text: string,
@@ -316,8 +319,8 @@ function parseStateDiagram(
         nodes.set(id, {
             mermaidId: id,
             name: kind === 'start'
-                ? STATE_START_NAME
-                : STATE_COMPLETE_NAME,
+                ? START_NODE_DEFAULT_NAME
+                : END_NODE_DEFAULT_NAME,
             isStart: kind === 'start',
             isComplete: kind === 'complete',
         });

@@ -20,6 +20,7 @@ const node = (id: string, x = 0, y = 0) => ({
     positionY: y,
     isStart: false,
     isComplete: false,
+    crew: { kind: 'unassigned' as const },
     fields: [],
 });
 
@@ -221,6 +222,62 @@ test('applyUpdateNode patches matching id', () => {
     assert.equal(result[0]?.isStart, true);
     assert.equal(result[1]?.name, 'B');
 });
+
+test('applyUpdateNode patches crew variant', () => {
+    const nodes = [
+        node('a', 0, 0),
+        node('b', 0, 0),
+    ];
+    const result = applyUpdateNode(
+        nodes, 'a',
+        {
+            crew: {
+                kind: 'model',
+                modelId: 'm-1',
+            },
+        },
+    );
+    assert.equal(result[0]?.crew.kind, 'model');
+    if (result[0]?.crew.kind === 'model') {
+        assert.equal(
+            result[0].crew.modelId, 'm-1',
+        );
+    }
+    assert.equal(
+        result[1]?.crew.kind, 'unassigned',
+    );
+});
+
+test(
+    'applyUpdateNode patches a crew assignment'
+    + ' variant',
+    () => {
+        const nodes = [
+            node('a', 0, 0),
+            node('b', 0, 0),
+        ];
+        const result = applyUpdateNode(
+            nodes, 'a',
+            {
+                crew: {
+                    kind: 'crew',
+                    crewId: 'c-1',
+                },
+            },
+        );
+        assert.equal(
+            result[0]?.crew.kind, 'crew',
+        );
+        if (result[0]?.crew.kind === 'crew') {
+            assert.equal(
+                result[0].crew.crewId, 'c-1',
+            );
+        }
+        assert.equal(
+            result[1]?.crew.kind, 'unassigned',
+        );
+    },
+);
 
 test('applyUpdateEdge patches matching id', () => {
     const edges = [

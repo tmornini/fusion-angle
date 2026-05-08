@@ -41,27 +41,16 @@ const pageModules: Record<
         import('../flows/index'),
     'flow-detail': () =>
         import('../flows/detail'),
-    teams: () =>
-        import('../teams/index'),
     organization: () =>
         import(
             '../organization/index'
         ),
-    profile: () =>
-        import('../profile/index'),
-    company: () =>
-        import('../company/index'),
     billing: () =>
         import('../billing/index'),
-    users: () =>
-        import(
-            '../organization/users'
-        ),
-    'activity-feed': () =>
-        import(
-            '../organization/'
-            + 'activity-feed'
-        ),
+    people: () =>
+        import('../people/index'),
+    'people-detail': () =>
+        import('../people/detail'),
     snapshots: () =>
         import('../snapshots/index'),
     'design-system': () =>
@@ -72,11 +61,6 @@ const pageModules: Record<
         import('../landing/index'),
     auth: () =>
         import('../auth/index'),
-    onboarding: () =>
-        import(
-            '../organization/'
-            + 'onboarding'
-        ),
     'not-found': () =>
         import('../not-found/index'),
 };

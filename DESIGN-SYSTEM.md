@@ -219,8 +219,16 @@ Labels render at the bezier midpoint in a pill with
 `--color-card-bg` background. Bidirectional pairs
 are separated with a perpendicular offset.
 
-**Selection**: Blue glow filter on selected node,
-thicker stroke (3px) on selected edge.
+**Selection**: `--accent` gold glow filter on
+selected node, thicker stroke (3 px) on selected edge.
+
+**Locked**: When a flow is locked, all node rectangles,
+edge paths, and edge-label backgrounds re-stroke in
+`--accent-text` (theme-adapted gold). The dot grid
+renders in its default unlocked colors. Per-type
+border colors (Start green, Complete red, Regular
+blue, Cycle amber-dashed) are visually overridden by
+the locked-state stroke and restored when unlocked.
 
 **Constraints**:
 - No duplicate edges (same direction between a pair)
@@ -229,6 +237,34 @@ thicker stroke (3px) on selected edge.
   allowed from different nodes
 - Bidirectional pairs separated with perpendicular
   offset
+
+**Properties panel header**: Regular nodes display
+the panel with a Crew `<select>` centered in the
+header (no "State Properties" title) and the close
+button on the right, via the
+`.flow-props-header-with-crew` modifier on
+`.flow-props-header`. Start/End/Edge panels keep
+the original 2-column flex layout with their title
+on the left. The Crew `<select>` uses
+`<optgroup label="Users">` and
+`<optgroup label="Models">` to group its options.
+
+### Form Controls
+
+`<select class="input">` with flat `<option>`
+children is the standard pattern for dropdowns
+across the app (project status, profile
+department, filter selectors, etc.).
+
+When a select has semantically distinct option
+groups, use native `<optgroup label="...">` rather
+than disabled-option separators or custom dropdown
+components. The Crew dropdown on flow node panels
+is the introducing case — `<optgroup>` is the
+codebase's standard for grouped selects from this
+point forward (Commandment III: one codebase, one
+voice). Browser default styling (bold-italic group
+labels) is fine; no override needed.
 
 ### Dark Mode
 

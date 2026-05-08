@@ -32,7 +32,7 @@ import {
     subscribeFlowChanges,
 } from '../app/adapters/index.ts';
 import type {
-    BackupV2,
+    Backup,
     ImportResolution,
 } from '../app/adapters/index.ts';
 import {
@@ -45,7 +45,7 @@ type ImportState =
     | { kind: 'idle' }
     | {
         kind: 'pending';
-        backup: BackupV2;
+        backup: Backup;
         resolution: ImportResolution;
     };
 
@@ -59,7 +59,7 @@ class ImportStore {
     }
 
     setPending(
-        backup: BackupV2,
+        backup: Backup,
         resolution: ImportResolution,
     ): void {
         this.#state = {
@@ -290,19 +290,19 @@ async function handleFileSelect(
         const bytes = new Uint8Array(
             await file.arrayBuffer(),
         );
-        let backup: BackupV2 | undefined;
+        let backup: Backup | undefined;
         try {
             backup =
                 await getBackupFromZip(bytes);
         } catch (err) {
             log.info(
-                'not a v2 backup',
+                'not a backup',
                 'flows',
                 err,
             );
         }
         if (backup) {
-            await handleV2Zip(backup, input);
+            await handleBackupZip(backup, input);
             return;
         }
     }
@@ -384,8 +384,8 @@ async function handleFileSelect(
     );
 }
 
-async function handleV2Zip(
-    backup: BackupV2,
+async function handleBackupZip(
+    backup: Backup,
     input: HTMLInputElement,
 ): Promise<void> {
     let resolution: ImportResolution;

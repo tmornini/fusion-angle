@@ -22,15 +22,18 @@ import {
     getWorkOrderRows,
     getWorkOrderTransitionRows,
     getWorkOrderClaimRows,
-    getUserMap,
+    getPersonMap,
+    getCurrentPersonRow,
     getFlowsForCreation,
     postWorkOrderCreation,
     putWorkOrder,
+    getMembersOfCrew,
     createFetchContext,
     generateCryptoSafeBase62,
     subscribeWorkOrderChanges,
     type FetchContext,
     type WorkOrderEntity,
+    type Id,
 } from '../app/adapters/index.ts';
 import {
     WorkboxInboxPresenter,
@@ -128,20 +131,71 @@ async function loadInboxItems(
 ): Promise<InboxItem[]> {
     const [
         workOrders, transitions,
-        claims, userMap,
+        claims, personMap,
+        currentPerson,
+        scope,
     ] = await Promise.all([
         getWorkOrderRows(ctx),
         getWorkOrderTransitionRows(ctx),
         getWorkOrderClaimRows(ctx),
-        getUserMap(ctx),
+        getPersonMap(ctx),
+        getCurrentPersonRow(ctx),
+        buildVisibilityScope(ctx),
     ]);
     workOrderEntities = new Map(
         workOrders.map(w => [w.id, w]),
     );
     return buildInboxItems(
         workOrders, transitions, claims,
-        userMap, mode,
+        personMap, mode,
+        {
+            currentPersonId: currentPerson.id,
+            roleMemberSetByRoleId:
+                scope.roleMemberSetByRoleId,
+            crewMemberSetByCrewId:
+                scope.crewMemberSetByCrewId,
+        },
     );
+}
+
+async function buildVisibilityScope(
+    ctx: FetchContext,
+): Promise<{
+    roleMemberSetByRoleId:
+        ReadonlyMap<Id, ReadonlySet<Id>>;
+    crewMemberSetByCrewId:
+        ReadonlyMap<Id, ReadonlySet<Id>>;
+}> {
+    const [memberships, crewMap] =
+        await Promise.all([
+            ctx.getRoleMembershipRows(),
+            ctx.getCrewMap(),
+        ]);
+    const roleMemberSetByRoleId =
+        new Map<Id, Set<Id>>();
+    for (const m of memberships) {
+        const set =
+            roleMemberSetByRoleId
+                .get(m.role_id) ?? new Set();
+        set.add(m.person_id);
+        roleMemberSetByRoleId.set(
+            m.role_id, set,
+        );
+    }
+    const crewMemberSetByCrewId =
+        new Map<Id, ReadonlySet<Id>>();
+    for (const crewId of crewMap.keys()) {
+        const members = await getMembersOfCrew(
+            ctx, crewId,
+        );
+        crewMemberSetByCrewId.set(
+            crewId, members,
+        );
+    }
+    return {
+        roleMemberSetByRoleId,
+        crewMemberSetByCrewId,
+    };
 }
 
 async function initActiveList(

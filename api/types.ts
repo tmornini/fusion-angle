@@ -27,7 +27,7 @@ export type FlowFieldType =
     | 'radio'
     | 'image';
 
-export type UserStatus =
+export type PersonStatus =
     | 'active'
     | 'pending'
     | 'deactivated';
@@ -49,7 +49,7 @@ export type IdeaStatus =
 export type ActivityType =
     | 'idea_created'
     | 'project_created'
-    | 'user_joined'
+    | 'person_joined'
     | 'status_changed'
     | 'idea_converted';
 
@@ -57,7 +57,7 @@ const ACTIVITY_TYPES:
     readonly ActivityType[] = [
     'idea_created',
     'project_created',
-    'user_joined',
+    'person_joined',
     'status_changed',
     'idea_converted',
 ];
@@ -111,9 +111,6 @@ export type ProjectStatus =
     | 'declined'
     | 'completed'
     | 'deleted';
-
-export const AVAILABILITY_HIGH = 70;
-export const AVAILABILITY_LOW = 40;
 
 export type StoredBoolean = 0 | 1;
 
@@ -240,24 +237,24 @@ export function assertIdeaStatus(
     return v;
 }
 
-const USER_STATUSES: readonly UserStatus[] =
+const PERSON_STATUSES: readonly PersonStatus[] =
     ['active', 'pending', 'deactivated'];
 
-export function isUserStatus(
+export function isPersonStatus(
     v: string,
-): v is UserStatus {
+): v is PersonStatus {
     return includes(
-        USER_STATUSES, v,
+        PERSON_STATUSES, v,
     );
 }
 
-export function assertUserStatus(
+export function assertPersonStatus(
     v: string,
     label: string,
-): UserStatus {
-    if (!includes(USER_STATUSES, v)) {
+): PersonStatus {
+    if (!includes(PERSON_STATUSES, v)) {
         throw new Error(
-            'expected UserStatus for '
+            'expected PersonStatus for '
                 + label + ', got ' + v,
         );
     }
@@ -336,70 +333,62 @@ export interface Deleted {
     deleted_at: string;
 }
 
-export interface UserEntity {
+export interface PersonEntity {
     id: Id;
     first_name: string;
     last_name: string;
     email: string;
-    role: string;
+    title: string;
     department: string;
-    status: UserStatus;
-    availability: number;
-    performance_score: number;
-    projects_completed: number;
-    current_projects: number;
+    status: PersonStatus;
     strengths: JsonArrayField;
     team_dimensions: JsonObjectField;
     phone: string;
     bio: string;
-    last_active: string;
 }
 
-export class User {
+export class Person {
     readonly #id: string;
     readonly #firstName: string;
     readonly #lastName: string;
     readonly #email: string;
-    readonly #role: string;
+    readonly #title: string;
     readonly #department: string;
-    readonly #status: UserStatus;
-    readonly #availability: number;
-    readonly #performanceScore: number;
-    readonly #projectsCompleted: number;
-    readonly #currentProjects: number;
+    readonly #status: PersonStatus;
     readonly #strengths: string;
     readonly #teamDimensions: string;
-    readonly #lastActive: string;
+    readonly #phone: string;
+    readonly #bio: string;
 
-    constructor(entity: UserEntity) {
+    constructor(entity: PersonEntity) {
         this.#id = entity.id;
         this.#firstName =
             entity.first_name;
         this.#lastName =
             entity.last_name;
         this.#email = entity.email;
-        this.#role = entity.role;
+        this.#title = entity.title;
         this.#department =
             entity.department;
         this.#status = entity.status;
-        this.#availability =
-            entity.availability;
-        this.#performanceScore =
-            entity.performance_score;
-        this.#projectsCompleted =
-            entity.projects_completed;
-        this.#currentProjects =
-            entity.current_projects;
         this.#strengths =
             entity.strengths;
         this.#teamDimensions =
             entity.team_dimensions;
-        this.#lastActive =
-            entity.last_active;
+        this.#phone = entity.phone;
+        this.#bio = entity.bio;
     }
 
     idForLink(): string {
         return this.#id;
+    }
+
+    firstNameText(): string {
+        return this.#firstName;
+    }
+
+    lastNameText(): string {
+        return this.#lastName;
     }
 
     fullName(): string {
@@ -409,8 +398,8 @@ export class User {
         ).trim();
     }
 
-    roleLabel(): string {
-        return this.#role;
+    titleLabel(): string {
+        return this.#title;
     }
 
     departmentLabel(): string {
@@ -419,6 +408,14 @@ export class User {
 
     emailAddress(): string {
         return this.#email;
+    }
+
+    phoneNumber(): string {
+        return this.#phone;
+    }
+
+    bioText(): string {
+        return this.#bio;
     }
 
     isActive(): boolean {
@@ -457,31 +454,7 @@ export class User {
         return this.#department !== '';
     }
 
-    hasPerformanceScore(): boolean {
-        return this.#performanceScore > 0;
-    }
-
-    availabilityScore(): number {
-        return this.#availability;
-    }
-
-    performanceScoreValue(): number {
-        return this.#performanceScore;
-    }
-
-    projectsCompletedCount(): number {
-        return this.#projectsCompleted;
-    }
-
-    currentProjectsCount(): number {
-        return this.#currentProjects;
-    }
-
-    lastActiveDate(): string {
-        return this.#lastActive;
-    }
-
-    statusValue(): UserStatus {
+    statusValue(): PersonStatus {
         return this.#status;
     }
 
@@ -511,7 +484,7 @@ export class User {
             || this.#email
                 .toLowerCase()
                 .includes(t)
-            || this.#role
+            || this.#title
                 .toLowerCase()
                 .includes(t)
             || this.#department
@@ -558,26 +531,6 @@ export interface ProjectEntity {
     budget_label: string;
 }
 
-export interface TeamEntity {
-    id: Id;
-    role: string;
-    type: string;
-}
-
-export interface TeamProjectEntity {
-    id: Id;
-    team_id: Id;
-    project_id: Id;
-    created_at: string;
-}
-
-export interface TeamUserEntity {
-    id: Id;
-    team_id: Id;
-    user_id: Id;
-    created_at: string;
-}
-
 export interface ActivityEntity {
     id: Id;
     type: string;
@@ -597,6 +550,15 @@ export interface GraphField {
     options: string[];
 }
 
+export const START_NODE_DEFAULT_NAME = 'Create';
+export const END_NODE_DEFAULT_NAME = 'Archive';
+
+export type NodeAssignment =
+    | { kind: 'unassigned' }
+    | { kind: 'role'; roleId: Id }
+    | { kind: 'crew'; crewId: Id }
+    | { kind: 'model'; modelId: Id };
+
 export interface GraphNode {
     id: string;
     name: string;
@@ -605,6 +567,7 @@ export interface GraphNode {
     positionY: number;
     isStart: boolean;
     isComplete: boolean;
+    crew: NodeAssignment;
     fields: GraphField[];
 }
 
@@ -636,6 +599,8 @@ export const DEFAULT_NEW_STATE_NAME =
     'New State';
 export const DEFAULT_TRANSITION_NAME =
     'Transition';
+export const DEFAULT_NODE_ASSIGNMENT: NodeAssignment =
+    { kind: 'unassigned' };
 
 export interface FlowEntity {
     id: Id;
@@ -692,7 +657,7 @@ export interface WorkOrderTransitionEntity {
     work_order_id: Id;
     from_node_id: Id;
     to_node_id: Id;
-    user_id: Id;
+    person_id: Id;
     transitioned_at: string;
 }
 
@@ -710,18 +675,14 @@ export interface TransitionFieldValueEntity {
 export interface WorkOrderClaimEntity {
     id: Id;
     work_order_id: Id;
-    user_id: Id;
+    person_id: Id;
     claimed_at: string;
-}
-
-export interface CompanyEntity {
-    id: Id;
-    name: string;
-    domain: string;
 }
 
 export interface OrganizationEntity {
     id: Id;
+    name: string;
+    domain: string;
     plan: string;
     plan_status: string;
     next_billing: string;
@@ -738,20 +699,20 @@ export interface OrganizationEntity {
     health_score: number;
     health_status: string;
     last_activity: string;
-    active_users: number;
+    active_people: number;
 }
 
 export interface IdeaSubmissionEntity {
     id: Id;
     idea_id: Id;
-    user_id: Id;
+    person_id: Id;
     created_at: string;
 }
 
 export interface ActivityActorEntity {
     id: Id;
     activity_id: Id;
-    user_id: Id;
+    person_id: Id;
     created_at: string;
 }
 
@@ -762,6 +723,49 @@ export interface ProjectFlowEntity {
     created_at: string;
 }
 
+export interface RoleEntity {
+    id: Id;
+    name: string;
+    description: string;
+    created_at: string;
+}
+
+export interface RoleMembershipEntity {
+    id: Id;
+    role_id: Id;
+    person_id: Id;
+    created_at: string;
+}
+
+export interface CrewEntity {
+    id: Id;
+    name: string;
+    description: string;
+    created_at: string;
+}
+
+export interface CrewRoleMembershipEntity {
+    id: Id;
+    crew_id: Id;
+    role_id: Id;
+    created_at: string;
+}
+
+export interface ModelEntity {
+    id: Id;
+    name: string;
+    provider: string;
+    description: string;
+    created_at: string;
+}
+
+export interface RoleModelMembershipEntity {
+    id: Id;
+    role_id: Id;
+    model_id: Id;
+    created_at: string;
+}
+
 
 export interface StatusDisplay {
     label: string;
@@ -769,7 +773,7 @@ export interface StatusDisplay {
 }
 
 export const USER_STATUS_CONFIG: Record<
-    UserStatus,
+    PersonStatus,
     StatusDisplay
 > = {
     active: {
@@ -1224,6 +1228,105 @@ export class Project {
         return this.#title
             .toLowerCase()
             .includes(t);
+    }
+}
+
+export class Role {
+    readonly #id: Id;
+    readonly #name: string;
+    readonly #description: string;
+    readonly #createdAt: string;
+
+    constructor(entity: RoleEntity) {
+        this.#id = entity.id;
+        this.#name = entity.name;
+        this.#description =
+            entity.description;
+        this.#createdAt = entity.created_at;
+    }
+
+    idForLink(): string {
+        return this.#id;
+    }
+
+    nameText(): string {
+        return this.#name;
+    }
+
+    descriptionText(): string {
+        return this.#description;
+    }
+
+    createdAtValue(): string {
+        return this.#createdAt;
+    }
+}
+
+export class Crew {
+    readonly #id: Id;
+    readonly #name: string;
+    readonly #description: string;
+    readonly #createdAt: string;
+
+    constructor(entity: CrewEntity) {
+        this.#id = entity.id;
+        this.#name = entity.name;
+        this.#description =
+            entity.description;
+        this.#createdAt = entity.created_at;
+    }
+
+    idForLink(): string {
+        return this.#id;
+    }
+
+    nameText(): string {
+        return this.#name;
+    }
+
+    descriptionText(): string {
+        return this.#description;
+    }
+
+    createdAtValue(): string {
+        return this.#createdAt;
+    }
+}
+
+export class Model {
+    readonly #id: Id;
+    readonly #name: string;
+    readonly #provider: string;
+    readonly #description: string;
+    readonly #createdAt: string;
+
+    constructor(entity: ModelEntity) {
+        this.#id = entity.id;
+        this.#name = entity.name;
+        this.#provider = entity.provider;
+        this.#description =
+            entity.description;
+        this.#createdAt = entity.created_at;
+    }
+
+    idForLink(): string {
+        return this.#id;
+    }
+
+    nameText(): string {
+        return this.#name;
+    }
+
+    providerText(): string {
+        return this.#provider;
+    }
+
+    descriptionText(): string {
+        return this.#description;
+    }
+
+    createdAtValue(): string {
+        return this.#createdAt;
     }
 }
 

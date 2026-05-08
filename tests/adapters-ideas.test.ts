@@ -16,7 +16,7 @@ import type {
     IdeaEntity,
 } from '../api/types.ts';
 
-function buildUser(id: string, name: string) {
+function buildPerson(id: string, name: string) {
     return {
         id,
         first_name: name,
@@ -24,13 +24,12 @@ function buildUser(id: string, name: string) {
         email: `${name}@example.com`
             .toLowerCase(),
         phone: '',
-        role: 'product_manager' as const,
-        availability: 80,
-        is_active: 1 as 0 | 1,
+        title: 'product_manager' as const,
+        status: 'active' as const,
+        strengths: '[]' as const,
+        team_dimensions: '{}' as const,
         bio: '',
         department: 'Product',
-        created_at: '2026-01-01T00:00:00Z',
-        updated_at: '2026-01-01T00:00:00Z',
     };
 }
 
@@ -64,15 +63,15 @@ function setupDb(): {
 
 test('getIdeas returns ideas with submitter', async () => {
     const { db, ctx } = setupDb();
-    await db.users.put(
-        'u1', buildUser('u1', 'Alice'),
+    await db.people.put(
+        'u1', buildPerson('u1', 'Alice'),
     );
     await db.ideas.put('i1', buildIdea(
         'i1', 'First idea',
     ));
     await db.ideaSubmissions.put('s1', {
         idea_id: 'i1',
-        user_id: 'u1',
+        person_id: 'u1',
         created_at: '2026-04-01T00:00:00Z',
     });
     const result = await getIdeas(ctx);
@@ -89,8 +88,8 @@ test('getIdeas returns ideas with submitter', async () => {
 
 test('getIdeas throws when idea has no submission', async () => {
     const { db, ctx } = setupDb();
-    await db.users.put(
-        'u1', buildUser('u1', 'Alice'),
+    await db.people.put(
+        'u1', buildPerson('u1', 'Alice'),
     );
     await db.ideas.put('i1', buildIdea(
         'i1', 'Orphan',
@@ -104,15 +103,15 @@ test('getIdeas throws when idea has no submission', async () => {
 
 test('getIdea finds submission for one idea', async () => {
     const { db, ctx } = setupDb();
-    await db.users.put(
-        'u1', buildUser('u1', 'Alice'),
+    await db.people.put(
+        'u1', buildPerson('u1', 'Alice'),
     );
     await db.ideas.put('i1', buildIdea(
         'i1', 'A',
     ));
     await db.ideaSubmissions.put('s1', {
         idea_id: 'i1',
-        user_id: 'u1',
+        person_id: 'u1',
         created_at: '2026-04-01T00:00:00Z',
     });
     const result = await getIdea(ctx, 'i1');
@@ -124,8 +123,8 @@ test('getIdea finds submission for one idea', async () => {
 
 test('getIdea throws on missing submission', async () => {
     const { db, ctx } = setupDb();
-    await db.users.put(
-        'u1', buildUser('u1', 'Alice'),
+    await db.people.put(
+        'u1', buildPerson('u1', 'Alice'),
     );
     await db.ideas.put(
         'i1', buildIdea('i1', 'A'),
@@ -151,15 +150,15 @@ test('putIdea persists changes', async () => {
 
 test('deleted ideas are filtered from getIdeas', async () => {
     const { db, ctx } = setupDb();
-    await db.users.put(
-        'u1', buildUser('u1', 'Alice'),
+    await db.people.put(
+        'u1', buildPerson('u1', 'Alice'),
     );
     await db.ideas.put(
         'i1', buildIdea('i1', 'Keep'),
     );
     await db.ideaSubmissions.put('s1', {
         idea_id: 'i1',
-        user_id: 'u1',
+        person_id: 'u1',
         created_at: '2026-04-01T00:00:00Z',
     });
     await db.ideas.put(
@@ -167,7 +166,7 @@ test('deleted ideas are filtered from getIdeas', async () => {
     );
     await db.ideaSubmissions.put('s2', {
         idea_id: 'i2',
-        user_id: 'u1',
+        person_id: 'u1',
         created_at: '2026-04-01T00:00:00Z',
     });
     await db.ideas.delete('i2');

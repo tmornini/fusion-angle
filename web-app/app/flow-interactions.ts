@@ -130,7 +130,7 @@ export interface InteractionState {
     marquee: MarqueeMode;
     viewBox: ViewBox;
     zoom: number;
-    isSpaceDown: boolean;
+    isPanMode: boolean;
 }
 
 export type PanelRequestCallback =
@@ -151,7 +151,9 @@ export type NodeListLookup = (
     y: number;
 }>;
 
-export type InteractionCallback = () => void;
+export type InteractionCallback = (
+    state: InteractionState,
+) => void;
 
 export function buildInteractionState(
     viewBoxW: number,
@@ -171,7 +173,7 @@ export function buildInteractionState(
             h: viewBoxH,
         },
         zoom: 1.0,
-        isSpaceDown: false,
+        isPanMode: false,
     };
 }
 
@@ -278,7 +280,7 @@ export function bindInteractions(
     let context = initialContext;
     let currentState: InteractionState = state;
     let activePointerId: number | null = null;
-    if (currentState.isSpaceDown) {
+    if (currentState.isPanMode) {
         wrap.classList.add(
             'flow-pan-cursor',
         );
@@ -317,7 +319,7 @@ export function bindInteractions(
                 onPanelRequest(action.open);
                 return;
             case 'request-update':
-                onUpdate();
+                onUpdate(action.state);
                 return;
             case 'capture-pointer':
                 if (
@@ -394,7 +396,7 @@ export function bindInteractions(
                 svg, e.clientX, e.clientY,
             );
 
-            if (currentState.isSpaceDown) {
+            if (currentState.isPanMode) {
                 dispatch({
                     kind:
                         'pointer-down-on-canvas',
@@ -419,7 +421,7 @@ export function bindInteractions(
                     getNodePosition(nodeId);
                 const positions =
                     buildSelectedPositions(
-                        state,
+                        currentState,
                         nodeId,
                         getNodePosition,
                     );
@@ -605,24 +607,18 @@ export function bindInteractions(
         ke: KeyboardEvent,
     ): void => {
         if (ke.key !== ' ') return;
+        // auto-repeat would chatter the toggle
+        if (ke.repeat) return;
         if (isFormFocused()) return;
         ke.preventDefault();
-        if (ke.type === 'keydown') {
-            dispatch({
-                kind: 'space-down',
-                isAutoFit: context.isAutoFit,
-                isFormFocused: false,
-            });
-        } else {
-            dispatch({ kind: 'space-up' });
-        }
+        dispatch({
+            kind: 'space-toggle',
+            isAutoFit: context.isAutoFit,
+            isFormFocused: false,
+        });
     };
     window.addEventListener(
         'keydown', handleSpace,
-        { signal },
-    );
-    window.addEventListener(
-        'keyup', handleSpace,
         { signal },
     );
 
@@ -736,6 +732,7 @@ export function zoomToFit(
     }[],
     canvasW: number,
     canvasH: number,
+    panelOffsetPx: number,
 ): ZoomToFitResult | null {
     if (nodePositions.length === 0) return null;
 
@@ -764,18 +761,19 @@ export function zoomToFit(
     const cx = (minX + maxX) / 2;
     const cy = (minY + maxY) / 2;
 
-    const containerAR = canvasW / canvasH;
-    const contentAR =
-        contentW / contentH;
+    const effectiveW = canvasW - panelOffsetPx;
+    const canvasAR = canvasW / canvasH;
+    const visibleAR = effectiveW / canvasH;
+    const contentAR = contentW / contentH;
 
     let vbW: number;
     let vbH: number;
-    if (contentAR > containerAR) {
-        vbW = contentW;
-        vbH = contentW / containerAR;
+    if (contentAR > visibleAR) {
+        vbW = contentW * canvasW / effectiveW;
+        vbH = vbW / canvasAR;
     } else {
         vbH = contentH;
-        vbW = contentH * containerAR;
+        vbW = vbH * canvasAR;
     }
 
     let zoom = canvasW / vbW;
@@ -787,7 +785,9 @@ export function zoomToFit(
     return {
         zoom,
         viewBox: {
-            x: cx - vbW / 2,
+            x: cx
+                - vbW * (canvasW + panelOffsetPx)
+                    / (2 * canvasW),
             y: cy - vbH / 2,
             w: vbW,
             h: vbH,

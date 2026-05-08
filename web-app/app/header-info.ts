@@ -2,8 +2,9 @@ import { $ } from './dom.ts';
 import { navigateTo } from './navigation.ts';
 
 interface HeaderData {
-    userName: string;
-    company: string;
+    personId: string;
+    personName: string;
+    organization: string;
     greeting: string;
     stats: ReadonlyArray<{
         value: string | number;
@@ -15,23 +16,25 @@ async function getHeaderData(
 ): Promise<HeaderData> {
     const {
         createFetchContext,
-        getCurrentUserRow,
-        getCompanyRow,
+        getCurrentPersonRow,
+        getOrganization,
         getDashboardStats,
-        User,
+        Person,
     } = await import('./adapters');
     const { getTimeOfDay } =
         await import('./format');
     const ctx = createFetchContext();
-    const [userRow, company, stats] =
+    const [personRow, org, stats] =
         await Promise.all([
-            getCurrentUserRow(ctx),
-            getCompanyRow(ctx),
+            getCurrentPersonRow(ctx),
+            getOrganization(ctx),
             getDashboardStats(ctx),
         ]);
     return {
-        userName: new User(userRow).fullName(),
-        company: company.name,
+        personId: personRow.id,
+        personName:
+            new Person(personRow).fullName(),
+        organization: org.nameText(),
         greeting: getTimeOfDay(),
         stats,
     };
@@ -50,12 +53,14 @@ export async function mutateHeaderInfo(
             html`<span
 class="font-normal">Good ${
 headerInfo.greeting},</span> ${
-headerInfo.userName}`,
+headerInfo.personName}`,
         );
         greetingEl.addEventListener(
             'click',
-            () =>
-                navigateTo('profile'),
+            () => navigateTo(
+                'people-detail',
+                { personId: headerInfo.personId },
+            ),
         );
     }
     const statsEl =
@@ -65,7 +70,7 @@ headerInfo.userName}`,
             statsEl,
             html`<span
 class="header-stat-label">${
-headerInfo.company}</span>${
+headerInfo.organization}</span>${
 headerInfo.stats.map(
     (stat) =>
         html`<div

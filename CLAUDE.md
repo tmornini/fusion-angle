@@ -49,7 +49,7 @@ Target: **ES2024** · Strict mode with `noUncheckedIndexedAccess`. Config at `we
 
 ## Architecture
 
-**Vanilla TypeScript** with zero runtime dependencies. Enterprise innovation management platform with modules for ideas, projects, teams, flows, workbox, and analytics. Every page is a standalone HTML file served via HTTP. The code also supports `file:///` protocol locally, but testing is HTTP-only.
+**Vanilla TypeScript** with zero runtime dependencies. Enterprise innovation management platform with modules for ideas, projects, people, flows, workbox, and analytics. Every page is a standalone HTML file served via HTTP. The code also supports `file:///` protocol locally, but testing is HTTP-only.
 
 ### Key Layers
 
@@ -87,10 +87,54 @@ The Flow Designer (`flows/detail.html`) renders an SVG canvas
 with pan, marquee, drag, and edge connection. Layers:
 `flow-layout.ts` (Sugiyama layout), `flow-graph.ts` (SVG render),
 `flow-interactions.ts` (pointer/keyboard state machines —
-discriminated unions, pan needs Space+mousedown),
+discriminated unions, pan toggles via Space: one tap on,
+one tap off; toggle is ignored mid-gesture),
 `mermaid-{generate,parse}.ts` (round-trip text format),
 `zip.ts` (in-browser ZIP). Integration point:
-`adapters/flow-export.ts`.
+`adapters/flow-export.ts`. The FSM (`flow-fsm-reduce.ts`)
+propagates its new state to the presenter via the
+`request-update` action payload, consumed by detail.ts through
+`presenter.withInteractionState(state)` — the single sanctioned
+seam, no shared mutable state. The properties
+panel is positioned on the LEFT (`pages.css` `.flow-props-panel`
+uses `left: 0`); the visible canvas occupies pixels
+`[PANEL_WIDTH_PX, canvasW]`. When the panel is open, both Auto
+Layout (`applyAutoLayout`) and Auto Fit (`zoomToFit`) account
+for the panel-occupied left portion via `PANEL_WIDTH_PX`. The
+presenter's `withFitReconciled` runs Auto Fit only when
+`isAutoFit` is true (no-op otherwise), so panel toggles and
+selection updates re-fit the visible canvas symmetrically
+without re-laying out nodes. Viewport scale/translate
+operations (zoom, pan, Auto Fit, panel toggle, selection
+centering) MUST NOT invoke Auto Layout. Explicit auto-layout
+fires only via `withAutoLayoutToggled`, `withLayoutReconciled`,
+and the `withNodesMoved` chain — never via `withFitReconciled`
+or `withSelectionCentered`. The detail-page `request-update`
+callback runs `withFitReconciled` after `withInteractionState`
+so the auto-fit viewBox is the final state, not stomped by the
+FSM's frozen viewBox; on selection change while the panel is
+open, it then runs `withSelectionCentered` to pan the newly
+selected node to the visible canvas center (zoom unchanged).
+The two special nodes (`isStart` / `isComplete`) display as
+"Create" and "Archive" — names live in `START_NODE_DEFAULT_NAME`
+and `END_NODE_DEFAULT_NAME` constants in `api/types.ts` and
+override `node.name` at SVG-render and panel-render time, so
+existing flows whose persisted name is "Start"/"End" still
+display the new labels without a data migration. Regular
+nodes (not start/end) carry a `crew: Crew` field — a
+3-variant discriminated union (`unassigned`/`user`/`model`)
+persisted on the node and rendered in the panel body as a
+labeled `<select>` with `<optgroup>` sections, matching the
+Name/Description label pattern. Crew respects `isLocked`
+(disabled when locked) but is otherwise cosmetic — not
+consumed by execution, layout, mermaid, or export. Regular
+nodes whose crew is `unassigned` render a hazard triangle
+(`iconAlertTriangle` colored via `.flow-node-hazard`) in the
+bottom-left corner of the node SVG. Model names live in
+`CREW_MODELS` in `api/types.ts`. The `<select>` value crosses
+the DOM seam as `'user:<id>'` / `'model:<name>'` /
+`'unassigned'` and is parsed back to the typed union via
+`parseCrewSelectValue` in `flows/detail.ts`.
 
 ### API Layer (`/api`)
 
@@ -108,7 +152,7 @@ tests pass `createFetchContext(db)` with a `MemoryDbAdapter`.
 
 ### Page Module Pattern
 
-Every entry in `PAGE_REGISTRY` declares both `sourceDir` and `sourceFile` explicitly (e.g., `flow-detail` → `web-app/flows/detail.ts` + `web-app/flows/detail.html`). The most common values are `index`, `detail`, `create`, `convert`, and the named `organization/` files (`users`, `activity-feed`, `onboarding`). Each page module exports:
+Every entry in `PAGE_REGISTRY` declares both `sourceDir` and `sourceFile` explicitly (e.g., `flow-detail` → `web-app/flows/detail.ts` + `web-app/flows/detail.html`). The most common values are `index`, `detail`, `create`, and `convert`. Each page module exports:
 - `init(): Promise<void>` — fetches data, populates DOM placeholders, binds event listeners
 
 Sidebar-layout pages have `index.html` containing page content that gets composed with the layout template. Standalone pages have a complete hand-written `index.html` with a `<div id="page-root">` that `init()` renders into.
@@ -126,7 +170,9 @@ Editable detail views split into two presenters: a read presenter
 shape). The page module owns a `PageState` discriminated union
 (`{kind: 'reading'} | {kind: 'editing', draft}`) and constructs
 the appropriate one per render. This pattern applies to `Idea`,
-`Profile`, `Company`, and `ProjectDetail`.
+`Person`, and `ProjectDetail`. The word "Member" is reserved for a
+future `(user, role)` join — do not name a member-rendering
+construct until that scroll opens.
 
 `presenters/index.ts` is the barrel; page modules import from
 `'../app/presenters'`. `WorkboxDetailPresenter` uses a public
@@ -166,10 +212,10 @@ import { navigateTo, openDialog, closeDialog } from '../app/core';
 
 ### Adapter Conventions
 
-- **`userName(userMap, userId: Id)`** throws on both missing and
-  unknown userId. Optional user references must branch at the
-  call site (`leadRow ? userName(...) : ''`) — never overload
-  `userName` with a fallback. UI renders `'—'` via
+- **`personName(personMap, personId: Id)`** throws on both missing
+  and unknown personId. Optional person references must branch at
+  the call site (`leadRow ? personName(...) : ''`) — never overload
+  `personName` with a fallback. UI renders `'—'` via
   `DISPLAY_ABSENT` for legitimately absent values. Never use
   magic strings like `'Unknown'`.
 - **`FetchContext` is the only I/O surface.** Every data-access
@@ -177,7 +223,7 @@ import { navigateTo, openDialog, closeDialog } from '../app/core';
   `ctx.GET/PUT/DELETE/POST/commit`. The standalone `GET/PUT/...`
   exports in `api/api.ts` are the transport `ctx` delegates to —
   adapters never import them directly. A ctx executes against an
-  immutable snapshot: `ctx.getUserMap()`, `ctx.getIdeaRows()`,
+  immutable snapshot: `ctx.getPersonMap()`, `ctx.getIdeaRows()`,
   etc. are memoized for its lifetime so multiple adapter calls
   see the same view.
 - **Platform-shim vs data-access adapters share `adapters/`.**
@@ -271,7 +317,7 @@ Run via `./validate` (which also type-checks and lints) or
 directly: `node --test --strip-types tests/*.test.ts`.
 
 **Manual browser regression** for UI behavior: a pass against
-`TEST-PLAN.md` (254 cases), driven either by a single human
+`TEST-PLAN.md` (269 cases), driven either by a single human
 tester serially or by Claude Code agents in parallel via the
 `claude-in-chrome` MCP. Anything DOM-driven (gestures, layout,
 visual rendering) lives here. Pure transitions, adapters, and
@@ -286,7 +332,7 @@ time budgets while keeping per-entity mutation domains disjoint:
    produce the distribution ZIP, `./build --no-zip` for the test
    server, start HTTP server, open tab 0. Covers A1–A5.
 2. **Phase 1 — Data setup** (one agent, serial): AA1–AA43 in
-   tab 0. Creates pristine environment, users, ideas, projects,
+   tab 0. Creates pristine environment, people, ideas, projects,
    one flow. Populates the shared database that Phase 2
    verifies.
 3. **Phase 2 — Parallel verification** (7 agents concurrent,
@@ -295,9 +341,9 @@ time budgets while keeping per-entity mutation domains disjoint:
    - Agent-CH — Dashboard + Reference (C1–C7, H1–H2), read-only
    - Agent-D — Ideas (D1–D37)
    - Agent-E — Projects (E1–E11)
-   - Agent-F — Flows (F1–F46)
+   - Agent-F — Flows (F1–F74)
    - Agent-F2 — Workbox (WB1–WB19)
-   - Agent-G — Admin (G1–G29, G36–G37; skip G30–G35)
+   - Agent-G — Admin (G9–G14, G19–G24, G36–G40; skip G30–G35; G1–G8/G15–G18/G25–G29 retired)
 4. **Phase 3 — Cross-cutting** (one agent, alone): I1–I28.
    Mutates global UI state (theme, sidebar, command palette) —
    no concurrent agents.
@@ -320,7 +366,7 @@ subset of tables:
 | Agent-E | `projects` (plus one flow via E7) |
 | Agent-F | `flows`, `flow_versions` |
 | Agent-F2 | `work_orders`, `work_order_transitions`, `work_order_claims`, plus its own private flow in `flows`/`flow_versions` |
-| Agent-G | `users`, `teams`, `profile`, `company` |
+| Agent-G | `people`, `organization` |
 | Agent-CH | none (read-only) |
 
 Agent-F2 owns its source flow because `postWorkOrderCreation`
@@ -372,7 +418,6 @@ patterns apply only to the parallel run.
 - **Snapshots wipe-first**: All snapshot operations (pristine, mock data, import) call `DELETE('snapshots/schema')` before writing — there is no merge, only replace.
 - **Snapshot quota pre-flight**: `putSnapshotFromFile` consults `navigator.storage.estimate()` and rejects with `SnapshotTooLargeError` if `file.size` exceeds half of `quota - usage` (the import doubles peak memory while parsing). Falls back to a 5 MB hard cap when `navigator.storage.estimate()` is unavailable.
 - **Snapshot wipe-on-fail**: With pre-flight quota checks + per-row validation + column-level compression, mid-write failure is rare; when it does happen, `importSnapshot` wipes every `fusion-ai:<table>` key so the next bootstrap detects no schema and routes the user to the snapshots page to re-import. No backup, no sentinel, no rollback — real atomicity arrives with Postgres.
-- **Availability thresholds**: `AVAILABILITY_HIGH = 70`, `AVAILABILITY_LOW = 40`.
 - **`file:///` protocol**: Navigation detects file protocol and skips link prefetching. Page URLs use relative paths. Code supports `file:///` locally but testing is HTTP-only.
 - **View Transition aborts**: rapid programmatic navigation surfaces `InvalidStateError` lines in console. Browser-internal (no app code calls `startViewTransition`); no app impact.
 

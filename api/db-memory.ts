@@ -10,20 +10,22 @@ import type {
 } from './db.ts';
 import type {
     Deleted,
-    UserEntity,
+    PersonEntity,
     IdeaEntity,
     ProjectEntity,
-    TeamEntity,
-    TeamProjectEntity,
-    TeamUserEntity,
     ActivityEntity,
     FlowEntity,
     FlowVersionEntity,
-    CompanyEntity,
     OrganizationEntity,
     IdeaSubmissionEntity,
     ActivityActorEntity,
     ProjectFlowEntity,
+    RoleEntity,
+    RoleMembershipEntity,
+    CrewEntity,
+    CrewRoleMembershipEntity,
+    ModelEntity,
+    RoleModelMembershipEntity,
     WorkOrderEntity,
     FlowWorkOrderEntity,
     WorkOrderTransitionEntity,
@@ -149,20 +151,14 @@ class MemDeletedStore implements DeletedStore {
 }
 
 interface Tables {
-    users: Map<string, UserEntity>;
+    people: Map<string, PersonEntity>;
     ideas: Map<string, IdeaEntity>;
     projects: Map<string, ProjectEntity>;
-    teams: Map<string, TeamEntity>;
-    teamProjects: Map<
-        string, TeamProjectEntity
-    >;
-    teamUsers: Map<string, TeamUserEntity>;
     activities: Map<string, ActivityEntity>;
     flows: Map<string, FlowEntity>;
     flowVersions: Map<
         string, FlowVersionEntity
     >;
-    company: Map<string, CompanyEntity>;
     organization: Map<
         string, OrganizationEntity
     >;
@@ -174,6 +170,18 @@ interface Tables {
     >;
     projectFlows: Map<
         string, ProjectFlowEntity
+    >;
+    roles: Map<string, RoleEntity>;
+    roleMemberships: Map<
+        string, RoleMembershipEntity
+    >;
+    crews: Map<string, CrewEntity>;
+    crewRoleMemberships: Map<
+        string, CrewRoleMembershipEntity
+    >;
+    models: Map<string, ModelEntity>;
+    roleModelMemberships: Map<
+        string, RoleModelMembershipEntity
     >;
     workOrders: Map<string, WorkOrderEntity>;
     flowWorkOrders: Map<
@@ -196,18 +204,12 @@ export class MemoryDbAdapter
 {
     #tables: Tables | null = null;
     readonly #deletedStore: MemDeletedStore;
-    readonly users:
-        EntityStore<UserEntity>;
+    readonly people:
+        EntityStore<PersonEntity>;
     readonly ideas:
         EntityStore<IdeaEntity>;
     readonly projects:
         EntityStore<ProjectEntity>;
-    readonly teams:
-        EntityStore<TeamEntity>;
-    readonly teamProjects:
-        EntityStore<TeamProjectEntity>;
-    readonly teamUsers:
-        EntityStore<TeamUserEntity>;
     readonly activities:
         EntityStore<ActivityEntity>;
     readonly flows:
@@ -230,14 +232,26 @@ export class MemoryDbAdapter
         >;
     readonly workOrderClaims:
         EntityStore<WorkOrderClaimEntity>;
-    readonly company:
-        SingletonStore<CompanyEntity>;
     readonly organization:
         SingletonStore<OrganizationEntity>;
     readonly ideaSubmissions:
         EntityStore<IdeaSubmissionEntity>;
     readonly activityActors:
         EntityStore<ActivityActorEntity>;
+    readonly roles:
+        EntityStore<RoleEntity>;
+    readonly roleMemberships:
+        EntityStore<RoleMembershipEntity>;
+    readonly crews:
+        EntityStore<CrewEntity>;
+    readonly crewRoleMemberships:
+        EntityStore<CrewRoleMembershipEntity>;
+    readonly models:
+        EntityStore<ModelEntity>;
+    readonly roleModelMemberships:
+        EntityStore<
+            RoleModelMembershipEntity
+        >;
     readonly deleted: DeletedStore;
 
     constructor() {
@@ -249,9 +263,9 @@ export class MemoryDbAdapter
         this.deleted = this.#deletedStore;
         const t = this.#tables;
         const ds = this.#deletedStore;
-        this.users =
+        this.people =
             new MemEntityStore(
-                'users', t.users, ds,
+                'people', t.people, ds,
             );
         this.ideas =
             new MemEntityStore(
@@ -260,20 +274,6 @@ export class MemoryDbAdapter
         this.projects =
             new MemEntityStore(
                 'projects', t.projects, ds,
-            );
-        this.teams =
-            new MemEntityStore(
-                'teams', t.teams, ds,
-            );
-        this.teamProjects =
-            new MemEntityStore(
-                'team_projects',
-                t.teamProjects, ds,
-            );
-        this.teamUsers =
-            new MemEntityStore(
-                'team_users',
-                t.teamUsers, ds,
             );
         this.activities =
             new MemEntityStore(
@@ -319,10 +319,6 @@ export class MemoryDbAdapter
                 'work_order_claims',
                 t.workOrderClaims, ds,
             );
-        this.company =
-            new MemSingletonStore(
-                'company', t.company,
-            );
         this.organization =
             new MemSingletonStore(
                 'organization',
@@ -337,6 +333,33 @@ export class MemoryDbAdapter
             new MemEntityStore(
                 'activity_actors',
                 t.activityActors, ds,
+            );
+        this.roles =
+            new MemEntityStore(
+                'roles', t.roles, ds,
+            );
+        this.roleMemberships =
+            new MemEntityStore(
+                'role_memberships',
+                t.roleMemberships, ds,
+            );
+        this.crews =
+            new MemEntityStore(
+                'crews', t.crews, ds,
+            );
+        this.crewRoleMemberships =
+            new MemEntityStore(
+                'crew_role_memberships',
+                t.crewRoleMemberships, ds,
+            );
+        this.models =
+            new MemEntityStore(
+                'models', t.models, ds,
+            );
+        this.roleModelMemberships =
+            new MemEntityStore(
+                'role_model_memberships',
+                t.roleModelMemberships, ds,
             );
     }
 
@@ -411,20 +434,22 @@ export class MemoryDbAdapter
 
 function buildTables(): Tables {
     return {
-        users: new Map(),
+        people: new Map(),
         ideas: new Map(),
         projects: new Map(),
-        teams: new Map(),
-        teamProjects: new Map(),
-        teamUsers: new Map(),
         activities: new Map(),
         flows: new Map(),
         flowVersions: new Map(),
-        company: new Map(),
         organization: new Map(),
         ideaSubmissions: new Map(),
         activityActors: new Map(),
         projectFlows: new Map(),
+        roles: new Map(),
+        roleMemberships: new Map(),
+        crews: new Map(),
+        crewRoleMemberships: new Map(),
+        models: new Map(),
+        roleModelMemberships: new Map(),
         workOrders: new Map(),
         flowWorkOrders: new Map(),
         workOrderTransitions: new Map(),

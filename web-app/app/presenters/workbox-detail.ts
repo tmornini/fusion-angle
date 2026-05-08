@@ -3,7 +3,7 @@ import {
 } from '../safe-html.ts';
 import type { SafeHtml } from '../safe-html.ts';
 import {
-    userName,
+    personName,
     validateWorkOrderFlowGraph,
     isExpiredClaim,
     type WorkOrderEntity,
@@ -19,7 +19,7 @@ import {
     type ClaimStatus,
     type Id,
 } from '../adapters/index.ts';
-import type { User } from '../adapters/index.ts';
+import type { Person } from '../adapters/index.ts';
 import {
     iconArrowLeft,
     iconClock,
@@ -150,8 +150,8 @@ export class WorkboxDetailPresenter {
             >,
         claims:
             readonly WorkOrderClaimEntity[],
-        userMap: Map<Id, User>,
-        currentUserId: string,
+        personMap: Map<Id, Person>,
+        currentPersonId: string,
     ) {
         this.#workOrder = workOrder;
         this.#flowGraph =
@@ -181,7 +181,7 @@ export class WorkboxDetailPresenter {
             sorted,
             fieldValuesByTransition,
             this.#flowGraph.nodes,
-            userMap,
+            personMap,
         );
 
         const active = claims.find(
@@ -198,9 +198,9 @@ export class WorkboxDetailPresenter {
             ? {
                 kind: 'claimed',
                 claimId: active.id,
-                byCurrentUser:
-                    active.user_id
-                        === currentUserId,
+                byCurrentPerson:
+                    active.person_id
+                        === currentPersonId,
             }
             : { kind: 'unclaimed' };
     }
@@ -394,7 +394,7 @@ export class WorkboxDetailPresenter {
                 <span
                     class="text-muted
                         ml-auto"
-                >${entry.userName}</span>
+                >${entry.personName}</span>
                 <span
                     class="text-muted
                         text-sm"
@@ -496,7 +496,7 @@ function buildHistory(
             readonly TransitionFieldValueEntity[]
         >,
     nodes: readonly GraphNode[],
-    userMap: Map<Id, User>,
+    personMap: Map<Id, Person>,
 ): HistoryEntry[] {
     const fieldNameMap = new Map<
         string, string
@@ -538,8 +538,8 @@ function buildHistory(
             toNodeName: nodeNameById(
                 nodes, t.to_node_id,
             ),
-            userName: userName(
-                userMap, t.user_id,
+            personName: personName(
+                personMap, t.person_id,
             ),
             transitionedAt:
                 t.transitioned_at,

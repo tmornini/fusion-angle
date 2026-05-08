@@ -19,12 +19,12 @@ import {
     getWorkOrderTransitionRowsByOrder,
     getTransitionFieldValuesByTransition,
     getWorkOrderClaimRowsByOrder,
-    getUserMap,
+    getPersonMap,
     postActivity,
     postWorkOrderTransition,
     postWorkOrderClaim,
     deleteWorkOrderClaim,
-    getCurrentUserRow,
+    getCurrentPersonRow,
     createFetchContext,
     generateCryptoSafeBase62,
 } from '../app/adapters/index.ts';
@@ -227,13 +227,13 @@ function initUnclaimButton(
 
 async function loadPresenter(
     workOrderId: string,
-    currentUserId: string,
+    currentPersonId: string,
     ctx: ReturnType<typeof createFetchContext>,
 ): Promise<WorkboxDetailPresenter> {
     const [
         workOrder, transitions,
         fieldValuesByTransition,
-        claims, userMap,
+        claims, personMap,
     ] = await Promise.all([
         getWorkOrder(ctx, workOrderId),
         getWorkOrderTransitionRowsByOrder(
@@ -241,15 +241,15 @@ async function loadPresenter(
         ),
         getTransitionFieldValuesByTransition(ctx),
         getWorkOrderClaimRowsByOrder(ctx, workOrderId),
-        getUserMap(ctx),
+        getPersonMap(ctx),
     ]);
     return new WorkboxDetailPresenter(
         workOrder,
         transitions,
         fieldValuesByTransition,
         claims,
-        userMap,
-        currentUserId,
+        personMap,
+        currentPersonId,
     );
 }
 
@@ -270,9 +270,9 @@ export async function init(
     if (!container) return;
 
     const ctx = createFetchContext();
-    const userRow =
-        await getCurrentUserRow(ctx);
-    const userId = userRow.id;
+    const personRow =
+        await getCurrentPersonRow(ctx);
+    const personId = personRow.id;
 
     const detail = await withLoadingState(
         container,
@@ -281,14 +281,14 @@ export async function init(
             let presenter =
                 await loadPresenter(
                     id,
-                    userId,
+                    personId,
                     ctx,
                 );
             const claim =
                 presenter.claimStatus();
             if (
                 (claim.kind !== 'claimed'
-                    || !claim.byCurrentUser)
+                    || !claim.byCurrentPerson)
                 && !presenter.isComplete()
             ) {
                 await postWorkOrderClaim(
@@ -299,7 +299,7 @@ export async function init(
                 presenter =
                     await loadPresenter(
                         id,
-                        userId,
+                        personId,
                         ctx,
                     );
             }

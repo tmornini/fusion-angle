@@ -18,7 +18,18 @@ import type {
     GraphField,
     GraphNode,
     GraphEdge,
+    Id,
 } from '../adapters/index.ts';
+import {
+    Person,
+    Role,
+    Crew,
+    Model,
+} from '../adapters/index.ts';
+import {
+    START_NODE_DEFAULT_NAME,
+    END_NODE_DEFAULT_NAME,
+} from '../../../api/types.ts';
 
 export function buildFieldBadge(
     fieldType: string,
@@ -153,17 +164,22 @@ export function buildNodePanel(
     node: GraphNode,
     outgoing: GraphEdge[],
     isLocked: boolean,
+    personMap: Map<Id, Person>,
+    roleMap: Map<Id, Role>,
+    crewMap: Map<Id, Crew> = new Map(),
+    modelMap: Map<Id, Model> = new Map(),
 ): SafeHtml {
     const isSpecial =
         node.isStart || node.isComplete;
     if (isSpecial) {
-        const kind = node.isStart
-            ? 'Start' : 'End';
+        const label = node.isStart
+            ? START_NODE_DEFAULT_NAME
+            : END_NODE_DEFAULT_NAME;
         return html`<div
 class="flow-props-panel">
 <div class="flow-props-header"
 ><h3 class="text-sm font-semibold"
-    >${kind} State</h3>
+    >${label}</h3>
 <button
     class="btn btn-ghost btn-icon btn-xs"
     data-action="close-panel"
@@ -173,7 +189,7 @@ class="flow-props-panel">
 <div class="mb-2">
 <label class="text-xs text-muted"
     >Name</label>
-<div class="text-sm">${node.name}</div>
+<div class="text-sm">${label}</div>
 </div>
 <div class="mb-3">
 <label class="text-xs text-muted"
@@ -191,6 +207,42 @@ class="text-sm text-muted"
         .map(f => buildFieldRow(f));
     const lockAttr =
         trusted(isLocked ? ' disabled' : '');
+    const sortedPeople = Array.from(
+        personMap.values(),
+    ).sort((a, b) =>
+        a.fullName().localeCompare(
+            b.fullName(),
+        ),
+    );
+    const sortedRoles = Array.from(
+        roleMap.values(),
+    ).sort((a, b) =>
+        a.nameText().localeCompare(
+            b.nameText(),
+        ),
+    );
+    const sortedCrews = Array.from(
+        crewMap.values(),
+    ).sort((a, b) =>
+        a.nameText().localeCompare(
+            b.nameText(),
+        ),
+    );
+    const sortedModels = Array.from(
+        modelMap.values(),
+    ).sort((a, b) =>
+        a.nameText().localeCompare(
+            b.nameText(),
+        ),
+    );
+    const isUnassigned =
+        node.crew.kind === 'unassigned';
+    const selRoleId = node.crew.kind === 'role'
+        ? node.crew.roleId : '';
+    const selCrewId = node.crew.kind === 'crew'
+        ? node.crew.crewId : '';
+    const selModelId = node.crew.kind === 'model'
+        ? node.crew.modelId : '';
     return html`<div
 class="flow-props-panel">
 <div class="flow-props-header"
@@ -201,6 +253,49 @@ class="flow-props-panel">
     data-action="close-panel"
     aria-label="Close"
     >${iconX(14, '')}</button>
+</div>
+<div class="mb-2">
+<label class="text-xs text-muted"
+    >Assignment</label>
+<select class="input input-sm"
+    id="prop-node-assignment"${lockAttr}>
+<option value="unassigned"${
+    trusted(isUnassigned ? ' selected' : '')
+    }>Unassigned</option>
+<optgroup label="Roles">
+${sortedRoles.map(r => html`<option
+    value="role:${r.idForLink()}"${
+    trusted(selRoleId === r.idForLink()
+        ? ' selected' : '')
+    }>${r.nameText()}</option>`)}
+</optgroup>
+<optgroup label="People (private)">
+${sortedPeople.map(p => {
+    const privateRoleId =
+        'user-private:' + p.idForLink();
+    return html`<option
+    value="role:${privateRoleId}"
+    data-role-private="user"${
+    trusted(selRoleId === privateRoleId
+        ? ' selected' : '')
+    }>${p.fullName()}</option>`;
+})}
+</optgroup>
+<optgroup label="Crews">
+${sortedCrews.map(c => html`<option
+    value="crew:${c.idForLink()}"${
+    trusted(selCrewId === c.idForLink()
+        ? ' selected' : '')
+    }>${c.nameText()}</option>`)}
+</optgroup>
+<optgroup label="Models">
+${sortedModels.map(m => html`<option
+    value="model:${m.idForLink()}"${
+    trusted(selModelId === m.idForLink()
+        ? ' selected' : '')
+    }>${m.nameText()}</option>`)}
+</optgroup>
+</select>
 </div>
 <div class="mb-2">
 <label class="text-xs text-muted"

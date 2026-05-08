@@ -113,6 +113,7 @@ definition as a JSON document:
     "positionY": 0,
     "isStart": false,
     "isComplete": false,
+    "crew": { "kind": "unassigned" },
     "fields": [{
       "id": "...",
       "name": "...",
@@ -131,6 +132,22 @@ definition as a JSON document:
   }]
 }
 ```
+
+The `crew` field is a discriminated union with
+three variants:
+
+- `{ "kind": "unassigned" }` — no Crew assigned
+- `{ "kind": "user", "userId": "..." }` — assigned
+  to a system user
+- `{ "kind": "model", "model": "..." }` — assigned
+  to an AI model from the `CREW_MODELS` constant
+  (`api/types.ts`)
+
+Crew is currently cosmetic — persisted on the node
+but not consumed by execution, layout, mermaid, or
+export. Validator default: nodes without `crew`
+are read as `{ "kind": "unassigned" }` (lazy
+migration at the gate).
 
 ## Workbox
 

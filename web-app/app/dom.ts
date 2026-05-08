@@ -85,6 +85,16 @@ export function $inputRequired(
     return el;
 }
 
+export function isFormField(
+    el: unknown,
+): el is HTMLInputElement
+    | HTMLSelectElement
+    | HTMLTextAreaElement {
+    return el instanceof HTMLInputElement
+        || el instanceof HTMLSelectElement
+        || el instanceof HTMLTextAreaElement;
+}
+
 export function createElement<
     K extends keyof HTMLElementTagNameMap
 >(

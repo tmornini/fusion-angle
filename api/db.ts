@@ -1,19 +1,21 @@
 import type {
     Id,
-    UserEntity,
+    PersonEntity,
     IdeaEntity,
     ProjectEntity,
-    TeamEntity,
-    TeamProjectEntity,
-    TeamUserEntity,
     ActivityEntity,
     FlowEntity,
     FlowVersionEntity,
-    CompanyEntity,
     OrganizationEntity,
     IdeaSubmissionEntity,
     ActivityActorEntity,
     ProjectFlowEntity,
+    RoleEntity,
+    RoleMembershipEntity,
+    CrewEntity,
+    CrewRoleMembershipEntity,
+    ModelEntity,
+    RoleModelMembershipEntity,
     WorkOrderEntity,
     FlowWorkOrderEntity,
     WorkOrderTransitionEntity,
@@ -86,24 +88,12 @@ export interface DbAdapter {
         json: string,
     ): Promise<void>;
 
-    users:
-        EntityStore<UserEntity>;
+    people:
+        EntityStore<PersonEntity>;
     ideas:
         EntityStore<IdeaEntity>;
     projects:
         EntityStore<ProjectEntity>;
-    teams:
-        EntityStore<
-            TeamEntity
-        >;
-    teamProjects:
-        EntityStore<
-            TeamProjectEntity
-        >;
-    teamUsers:
-        EntityStore<
-            TeamUserEntity
-        >;
     activities:
         EntityStore<ActivityEntity>;
     flows:
@@ -134,8 +124,6 @@ export interface DbAdapter {
         EntityStore<
             WorkOrderClaimEntity
         >;
-    company:
-        SingletonStore<CompanyEntity>;
     organization:
         SingletonStore<OrganizationEntity>;
     ideaSubmissions:
@@ -146,16 +134,31 @@ export interface DbAdapter {
         EntityStore<
             ActivityActorEntity
         >;
+    roles:
+        EntityStore<RoleEntity>;
+    roleMemberships:
+        EntityStore<
+            RoleMembershipEntity
+        >;
+    crews:
+        EntityStore<CrewEntity>;
+    crewRoleMemberships:
+        EntityStore<
+            CrewRoleMembershipEntity
+        >;
+    models:
+        EntityStore<ModelEntity>;
+    roleModelMemberships:
+        EntityStore<
+            RoleModelMembershipEntity
+        >;
     deleted: DeletedStore;
 }
 
 export const TABLE_NAMES = [
-    'users',
+    'people',
     'ideas',
     'projects',
-    'teams',
-    'team_projects',
-    'team_users',
     'activities',
     'flows',
     'flow_versions',
@@ -165,9 +168,14 @@ export const TABLE_NAMES = [
     'work_order_transitions',
     'transition_field_values',
     'work_order_claims',
-    'company',
     'organization',
     'idea_submissions',
     'activity_actors',
+    'roles',
+    'role_memberships',
+    'crews',
+    'crew_role_memberships',
+    'models',
+    'role_model_memberships',
     'deleted',
 ];

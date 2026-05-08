@@ -27,7 +27,6 @@ export function canRedoFlowEdits(
 }
 
 export function recordFlowMutation(
-    s: FlowHistorySnapshot,
 ): FlowHistorySnapshot {
     return {
         hasUndoHistory: true,

@@ -50,7 +50,6 @@ async function loadAndInitCommandPalette(): Promise<void> {
 const PAGES_WITHOUT_SCHEMA: ReadonlySet<string> = new Set([
     'snapshots',
     'auth',
-    'onboarding',
     'not-found',
     'design-system',
     'landing',

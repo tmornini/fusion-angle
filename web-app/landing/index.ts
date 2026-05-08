@@ -11,7 +11,7 @@ import {
     iconX,
     iconCheck,
     iconBrain,
-    iconUsers,
+    iconPeople,
     iconZap,
     iconShield,
     iconLineChart,
@@ -31,7 +31,7 @@ const features = [
             + ' replacing human judgment.',
     },
     {
-        icon: iconUsers,
+        icon: iconPeople,
         title: 'Collaborative Flows',
         description:
             'Seamlessly integrate AI'

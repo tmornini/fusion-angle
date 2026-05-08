@@ -10,7 +10,7 @@ import {
 } from '../app/loading-states.ts';
 import { log } from '../app/logger.ts';
 import {
-    iconUsers, iconUserPlus, iconSearch,
+    iconPersonPlus, iconSearch,
     iconChevronRight, iconSend,
 } from '../app/icons.ts';
 import {
@@ -19,23 +19,21 @@ import {
 } from '../app/core.ts';
 import {
     createFetchContext,
-    getManagedUsers, putUser,
+    getPeople, putPerson,
+    getCurrentPersonRow,
     postActivity,
     jsonArrayField,
     jsonObjectField,
-    nowUtc,
     generateCryptoSafeBase62,
-    subscribeUserChanges,
-    type FetchContext,
-    type UserEntity,
+    subscribePersonChanges,
 } from '../app/adapters/index.ts';
 import {
-    ManagedUsersPresenter,
-    buildInitialManagedUsersState,
-    applyManagedUsersSearch,
-    applyManagedUsersRole,
-    applyManagedUsersStatus,
-    type ManagedUsersState,
+    ManagedPeoplePresenter,
+    buildInitialManagedPeopleState,
+    applyManagedPeopleSearch,
+    applyManagedPeopleTitle,
+    applyManagedPeopleStatus,
+    type ManagedPeopleState,
 } from '../app/presenters/index.ts';
 
 const DEFAULT_DIM = 50;
@@ -43,90 +41,66 @@ const DEFAULT_DIM = 50;
 const pageAbort = new AbortController();
 const signal = pageAbort.signal;
 
-let usersState:
-    ManagedUsersState | null = null;
-let userEntities:
-    Map<string, UserEntity> = new Map();
-let userListEl: HTMLElement | null = null;
-
-async function loadUsersAndEntities(
-    ctx: FetchContext,
-): Promise<{
-    users: Awaited<ReturnType<typeof getManagedUsers>>;
-    entities: Map<string, UserEntity>;
-}> {
-    const [users, rows] = await Promise.all([
-        getManagedUsers(ctx),
-        ctx.GET<UserEntity[]>('users'),
-    ]);
-    return {
-        users,
-        entities: new Map(
-            rows.map(r => [r.id, r]),
-        ),
-    };
-}
+let peopleState:
+    ManagedPeopleState | null = null;
+let personListEl: HTMLElement | null = null;
 
 export async function init(): Promise<void> {
     const container = $(
-        '#manage-users-content', document,
+        '#manage-people-content', document,
     );
     if (!container) return;
 
+    const ctx = createFetchContext();
     const loaded = await withLoadingState(
         container,
         buildSkeleton('table', 5),
-        () => loadUsersAndEntities(
-            createFetchContext(),
-        ),
-        init,
-        {
-            icon: iconUsers(24, ''),
-            title: 'No Users Yet',
-            description:
-                'Invite users to your'
-                + ' organization to start'
-                + ' collaborating.',
+        async () => {
+            const [people, currentRow] =
+                await Promise.all([
+                    getPeople(ctx),
+                    getCurrentPersonRow(ctx),
+                ]);
+            return { people, currentRow };
         },
+        init,
     );
     if (!loaded) return;
 
-    usersState =
-        buildInitialManagedUsersState(
-            loaded.users,
+    peopleState =
+        buildInitialManagedPeopleState(
+            loaded.people, loaded.currentRow.id,
         );
-    userEntities = loaded.entities;
     const initialPresenter =
-        new ManagedUsersPresenter(usersState);
+        new ManagedPeoplePresenter(peopleState);
     setHtml(container, buildShellHtml(
         initialPresenter.activeCount(),
         initialPresenter.pendingCount(),
     ));
 
-    userListEl = $('#user-list', document);
-    if (userListEl) {
-        rerenderUsers();
-        userListEl.addEventListener(
-            'click', onUserListClick,
+    personListEl = $('#person-list', document);
+    if (personListEl) {
+        rerenderPeople();
+        personListEl.addEventListener(
+            'click', onPersonListClick,
             { signal },
         );
     }
 
-    subscribeUserChanges(async () => {
-        if (!usersState || !userListEl) return;
-        const fresh =
-            await loadUsersAndEntities(
-                createFetchContext(),
+    subscribePersonChanges(async () => {
+        if (!peopleState || !personListEl) return;
+        const fresh = await getPeople(
+            createFetchContext(),
+        );
+        peopleState =
+            buildInitialManagedPeopleState(
+                fresh,
+                peopleState.currentPersonId,
             );
-        usersState =
-            buildInitialManagedUsersState(
-                fresh.users,
-            );
-        userEntities = fresh.entities;
-        rerenderUsers();
+        rerenderPeople();
     });
 
-    initUserListFilters();
+    initPersonListFilters();
     bindInviteDialog();
 }
 
@@ -138,10 +112,10 @@ function isMissingInviteRequiredFields(
     return !first || !last || !email;
 }
 
-function rerenderUsers(): void {
-    if (!usersState || !userListEl) return;
-    new ManagedUsersPresenter(usersState)
-        .renderList(userListEl);
+function rerenderPeople(): void {
+    if (!peopleState || !personListEl) return;
+    new ManagedPeoplePresenter(peopleState)
+        .renderList(personListEl);
 }
 
 function buildShellHtml(
@@ -155,12 +129,12 @@ function buildShellHtml(
                 + ' gap-2 text-sm'
                 + ' text-muted mb-6'
             }">
-                <a href="index.html"
+                <a href="../organization/index.html"
                     class="text-primary">
                     Organization
                 </a>
                 ${iconChevronRight(14, '')}
-                <span>Manage Users</span>
+                <span>Manage People</span>
             </nav>
 
             <div class="${
@@ -171,10 +145,10 @@ function buildShellHtml(
                     <h1 class="${
                         'text-3xl font-display'
                         + ' font-bold mb-2'
-                    }">Manage Users</h1>
+                    }">Manage People</h1>
                     <p class="text-muted">
                         ${activeCount}
-                        active users,
+                        active people,
                         ${pendingCount}
                         pending invitations
                     </p>
@@ -182,8 +156,8 @@ function buildShellHtml(
                 <button class="${
                     'btn btn-primary gap-2'
                 }" id="invite-btn">
-                    ${iconUserPlus(16, '')}
-                    Invite User
+                    ${iconPersonPlus(16, '')}
+                    Invite Person
                 </button>
             </div>
 
@@ -205,7 +179,7 @@ function buildShellHtml(
                             'Search by name'
                             + ' or email...'
                         }"
-                        id="user-search"
+                        id="person-search"
                         aria-label="${
                             'Search by name'
                             + ' or email'
@@ -213,24 +187,12 @@ function buildShellHtml(
                 </div>
                 <select class="${
                     'input input-narrow'
-                }" id="role-filter"
+                }" id="title-filter"
                     aria-label="${
-                        'Filter by role'
+                        'Filter by title'
                     }">
                     <option value="all">
-                        All Roles
-                    </option>
-                    <option value="admin">
-                        Admin
-                    </option>
-                    <option value="manager">
-                        Manager
-                    </option>
-                    <option value="member">
-                        Member
-                    </option>
-                    <option value="viewer">
-                        Viewer
+                        All Titles
                     </option>
                 </select>
                 <select class="${
@@ -266,7 +228,7 @@ function buildShellHtml(
                         'flex-2 text-xs'
                         + ' font-medium'
                         + ' text-muted'
-                    }">User</div>
+                    }">Person</div>
                     <div class="${
                         'flex-1 text-xs'
                         + ' font-medium'
@@ -286,7 +248,7 @@ function buildShellHtml(
                         'table-action-cell'
                     }"></div>
                 </div>
-                <div id="user-list"></div>
+                <div id="person-list"></div>
             </div>
 
             ${buildInviteDialog()}
@@ -312,8 +274,8 @@ function buildInviteDialog(
                     + ' flex items-center'
                     + ' gap-2'
                 }">
-                    ${iconUserPlus(20, '')}
-                    Add User
+                    ${iconPersonPlus(20, '')}
+                    Add Person
                 </h3>
             </div>
             <div class="${
@@ -349,7 +311,7 @@ function buildInviteDialog(
                     <input class="input"
                         type="email"
                         placeholder="${
-                            'user@company.com'
+                            'person@company.com'
                         }"
                         id="invite-email" />
                 </div>
@@ -357,22 +319,13 @@ function buildInviteDialog(
                     <div class="flex-1">
                         <label class="${
                             'label mb-1 block'
-                        }">Role</label>
-                        <select class="input"
-                            id="invite-role">
-                            <option value="${
-                                'member'
-                            }">Member</option>
-                            <option value="${
-                                'admin'
-                            }">Admin</option>
-                            <option value="${
-                                'manager'
-                            }">Manager</option>
-                            <option value="${
-                                'viewer'
-                            }">Viewer</option>
-                        </select>
+                        }">Title</label>
+                        <input class="input"
+                            type="text"
+                            placeholder="${
+                                'e.g. Engineer'
+                            }"
+                            id="invite-title" />
                     </div>
                     <div class="flex-1">
                         <label class="${
@@ -432,28 +385,6 @@ function buildInviteDialog(
                             }" />
                     </div>
                 </div>
-                <div class="flex gap-3">
-                    <div class="flex-1">
-                        <label class="${
-                            'label mb-1 block'
-                        }">Availability %</label>
-                        <input class="input"
-                            type="number"
-                            min="0" max="100"
-                            id="invite-avail"
-                            placeholder="0-100" />
-                    </div>
-                    <div class="flex-1">
-                        <label class="${
-                            'label mb-1 block'
-                        }">Performance</label>
-                        <input class="input"
-                            type="number"
-                            min="0" max="100"
-                            id="invite-perf"
-                            placeholder="0-100" />
-                    </div>
-                </div>
                 <div>
                     <label class="${
                         'label mb-1 block'
@@ -476,21 +407,21 @@ function buildInviteDialog(
                     'btn btn-primary gap-2'
                 }" id="invite-submit">
                     ${iconSend(16, '')}
-                    Add User
+                    Add Person
                 </button>
             </div>
         </div>`;
 }
 
-function initUserListFilters(): void {
-    $input('#user-search', document)
+function initPersonListFilters(): void {
+    $input('#person-search', document)
         ?.addEventListener(
             'input', onSearchInput,
             { signal },
         );
-    $select('#role-filter', document)
+    $select('#title-filter', document)
         ?.addEventListener(
-            'change', onRoleChange,
+            'change', onTitleChange,
             { signal },
         );
     $select('#status-filter', document)
@@ -501,98 +432,50 @@ function initUserListFilters(): void {
 }
 
 function onSearchInput(e: Event): void {
-    if (!usersState || !userListEl) return;
+    if (!peopleState || !personListEl) return;
     const target =
         e.target as HTMLInputElement;
-    usersState = applyManagedUsersSearch(
-        usersState, target.value,
+    peopleState = applyManagedPeopleSearch(
+        peopleState, target.value,
     );
-    rerenderUsers();
+    rerenderPeople();
 }
 
-function onRoleChange(e: Event): void {
-    if (!usersState || !userListEl) return;
+function onTitleChange(e: Event): void {
+    if (!peopleState || !personListEl) return;
     const target =
         e.target as HTMLSelectElement;
-    usersState = applyManagedUsersRole(
-        usersState, target.value,
+    peopleState = applyManagedPeopleTitle(
+        peopleState, target.value,
     );
-    rerenderUsers();
+    rerenderPeople();
 }
 
 function onStatusChange(e: Event): void {
-    if (!usersState || !userListEl) return;
+    if (!peopleState || !personListEl) return;
     const target =
         e.target as HTMLSelectElement;
-    usersState = applyManagedUsersStatus(
-        usersState, target.value,
+    peopleState = applyManagedPeopleStatus(
+        peopleState, target.value,
     );
-    rerenderUsers();
+    rerenderPeople();
 }
 
-function onUserListClick(e: MouseEvent): void {
+function onPersonListClick(e: MouseEvent): void {
     const target = e.target;
     if (!(target instanceof Element)) return;
-    const deactivate = target.closest(
-        '[data-deactivate-user]',
+    const row = target.closest(
+        '[data-person-id]',
     );
-    if (deactivate) {
-        const id = deactivate.getAttribute(
-            'data-deactivate-user',
-        );
-        if (id) {
-            void updateUserActivationStatus(
-                id, 'deactivated',
-            );
-        }
-        return;
-    }
-    const reactivate = target.closest(
-        '[data-reactivate-user]',
+    if (!row) return;
+    const personId = row.getAttribute(
+        'data-person-id',
     );
-    if (reactivate) {
-        const id = reactivate.getAttribute(
-            'data-reactivate-user',
+    if (personId) {
+        navigateTo(
+            'people-detail', { personId },
         );
-        if (id) {
-            void updateUserActivationStatus(
-                id, 'active',
-            );
-        }
     }
-}
-
-async function updateUserActivationStatus(
-    userId: string,
-    next: 'active' | 'deactivated',
-): Promise<void> {
-    const entity = userEntities.get(userId);
-    if (!entity) return;
-    const { id: _id, ...rest } = entity;
-    const ctx = createFetchContext();
-    try {
-        await putUser(ctx, userId, {
-            ...rest,
-            status: next,
-        });
-    } catch (err) {
-        log.error(
-            'putUser failed',
-            'organization', err,
-        );
-        showToast(
-            'Failed to update user status',
-            'error',
-        );
-        return;
-    }
-    showToast(
-        next === 'deactivated'
-            ? 'User deactivated'
-            : 'User reactivated',
-        'success',
-    );
-    navigateTo('users');
 }
 
 function bindInviteDialog(): void {
@@ -636,8 +519,8 @@ async function handleInvite(): Promise<void> {
         );
         return;
     }
-    const role = $select(
-        '#invite-role', document,
+    const title = $input(
+        '#invite-title', document,
     )!.value;
     const dept = $select(
         '#invite-department', document,
@@ -648,38 +531,24 @@ async function handleInvite(): Promise<void> {
     const phone = $input(
         '#invite-phone', document,
     )!.value;
-    const avail = Number(
-        $input(
-            '#invite-avail', document,
-        )!.value,
-    );
-    const perf = Number(
-        $input(
-            '#invite-perf', document,
-        )!.value,
-    );
     const bio = $textarea(
         '#invite-bio', document,
     )!.value;
     const id = generateCryptoSafeBase62();
     try {
-        await putUser(
+        await putPerson(
             createFetchContext(),
             id,
             trimStrings({
                 first_name: first,
                 last_name: last,
                 email,
-                role,
+                title,
                 department: dept,
                 status: status as
                     'active'
                     | 'pending'
                     | 'deactivated',
-                availability: avail,
-                performance_score: perf,
-                projects_completed: 0,
-                current_projects: 0,
                 strengths:
                     jsonArrayField([]),
                 team_dimensions:
@@ -693,16 +562,15 @@ async function handleInvite(): Promise<void> {
                     }),
                 phone,
                 bio,
-                last_active: nowUtc(),
             }),
         );
     } catch (err) {
         log.error(
-            'putUser failed',
+            'putPerson failed',
             'organization', err,
         );
         showToast(
-            'Failed to create user', 'error',
+            'Failed to add person', 'error',
         );
         return;
     }
@@ -710,7 +578,7 @@ async function handleInvite(): Promise<void> {
         await postActivity(
             createFetchContext(),
             {
-                type: 'user_joined',
+                type: 'person_joined',
                 action: 'joined the team',
                 target: first + ' ' + last,
                 status: '',
@@ -723,11 +591,11 @@ async function handleInvite(): Promise<void> {
             'organization', err,
         );
         showToast(
-            'Failed to create user', 'error',
+            'Failed to add person', 'error',
         );
         return;
     }
-    showToast('User created', 'success');
+    showToast('Person added', 'success');
     closeDialog('invite');
-    navigateTo('users');
+    navigateTo('people');
 }

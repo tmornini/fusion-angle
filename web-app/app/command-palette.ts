@@ -12,20 +12,23 @@ import {
     iconSearch,
     iconLightbulb,
     iconFolderKanban,
-    iconUser,
+    iconPerson,
     iconX,
 } from './icons.ts';
 import {
     getIdeas,
     getProjects,
-    getTeamMembers,
+    getPeople,
+    featuredPeople,
     createFetchContext,
     setLocation,
     subscribeSchemaChanges,
     type IdeaWithSubmitter,
     Project,
-    User,
+    Person,
 } from './adapters/index.ts';
+// init.ts is the composition root —
+// intentionally outside the adapter barrel.
 import {
     getDbAdapter,
 } from './adapters/init.ts';
@@ -210,23 +213,23 @@ export function projectToSearchItem(
     };
 }
 
-export function memberToSearchItem(
-    member: User,
+export function personToSearchItem(
+    person: Person,
 ): SearchItem {
     return {
-        id: 'person-' + member.idForLink(),
-        title: member.fullName(),
-        meta: member.roleLabel()
+        id: 'person-' + person.idForLink(),
+        title: person.fullName(),
+        meta: person.titleLabel()
             + ' · '
-            + member.departmentLabel(),
+            + person.departmentLabel(),
         category: 'people',
-        icon: iconUser(
+        icon: iconPerson(
             PALETTE_ICON_SIZE_SM, '',
         ),
-        href: buildPageUrl('teams'),
-        keywords: member.roleLabel()
-            + ' ' + member.departmentLabel()
-            + ' ' + member.emailAddress(),
+        href: buildPageUrl('people'),
+        keywords: person.titleLabel()
+            + ' ' + person.departmentLabel()
+            + ' ' + person.emailAddress(),
     };
 }
 
@@ -293,19 +296,21 @@ export function initCommandPalette(
         state.isDataLoaded = true;
 
         const ctx = createFetchContext();
-        const [ideas, projects, members] =
+        const [ideas, projects, people] =
             await Promise.all([
                 getIdeas(ctx),
                 getProjects(ctx),
-                getTeamMembers(ctx),
+                getPeople(ctx),
             ]);
+        const members =
+            featuredPeople(people);
 
         state.allItems = [
             ...ideas.map(ideaToSearchItem),
             ...projects.map(
                 projectToSearchItem,
             ),
-            ...members.map(memberToSearchItem),
+            ...members.map(personToSearchItem),
             ...pages.map(pageToSearchItem),
         ];
     }
@@ -884,13 +889,25 @@ posIndex === state.activeIndex
     void (async () => {
         const adapter = getDbAdapter();
         if (await adapter.hasSchema()) {
-            void getSearchIndex();
+            getSearchIndex().catch(
+                err => log.warn(
+                    'eager search index load failed',
+                    'palette',
+                    err,
+                ),
+            );
             return;
         }
         const unsub = subscribeSchemaChanges(
             () => {
                 unsub();
-                void getSearchIndex();
+                getSearchIndex().catch(
+                    err => log.warn(
+                        'eager search index load failed',
+                        'palette',
+                        err,
+                    ),
+                );
             },
         );
     })();

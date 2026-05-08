@@ -85,7 +85,7 @@ export async function postWorkOrderCreation(
     ctx: FetchContext,
     input: WorkOrderCreationInput,
 ): Promise<void> {
-    const user = await ctx.getCurrentUser();
+    const person = await ctx.getCurrentPerson();
     const flow = await ctx.GET<FlowEntity>(
         `flows/${input.flowId}`,
     );
@@ -138,22 +138,23 @@ export async function postWorkOrderCreation(
             edges: graph.edges,
         };
 
-    await ctx.PUT<void>('work-orders', {
-        id: input.workOrderId,
-        display_id: displayId,
-        flow_graph: jsonObjectField(
-            flowGraph as unknown as Record<
-                string, unknown
-            >,
-        ),
-        position,
-        created_at: now,
-    });
+    await ctx.PUT<void>(
+        `work-orders/${input.workOrderId}`,
+        {
+            display_id: displayId,
+            flow_graph: jsonObjectField(
+                flowGraph as unknown as Record<
+                    string, unknown
+                >,
+            ),
+            position,
+            created_at: now,
+        },
+    );
 
     await ctx.PUT<void>(
-        'flow-work-orders',
+        `flow-work-orders/${input.flowLinkId}`,
         {
-            id: input.flowLinkId,
             flow_id: input.flowId,
             work_order_id: input.workOrderId,
             created_at: now,
@@ -161,35 +162,32 @@ export async function postWorkOrderCreation(
     );
 
     await ctx.PUT<void>(
-        'work-order-transitions',
+        `work-order-transitions/${input.initTransitionId}`,
         {
-            id: input.initTransitionId,
             work_order_id: input.workOrderId,
             from_node_id: '',
             to_node_id: startNode.id,
-            user_id: user.id,
+            person_id: person.id,
             transitioned_at: now,
         },
     );
 
     await ctx.PUT<void>(
-        'work-order-transitions',
+        `work-order-transitions/${input.postStartTransitionId}`,
         {
-            id: input.postStartTransitionId,
             work_order_id: input.workOrderId,
             from_node_id: startNode.id,
             to_node_id: postStartNodeId,
-            user_id: user.id,
+            person_id: person.id,
             transitioned_at: now,
         },
     );
 
     await ctx.PUT<void>(
-        'work-order-claims',
+        `work-order-claims/${input.claimId}`,
         {
-            id: input.claimId,
             work_order_id: input.workOrderId,
-            user_id: user.id,
+            person_id: person.id,
             claimed_at: now,
         },
     );
@@ -215,7 +213,7 @@ export async function postWorkOrderTransition(
         values, fieldValueIds,
         currentNodeId,
     } = input;
-    const user = await ctx.getCurrentUser();
+    const person = await ctx.getCurrentPerson();
     const wo = await ctx.GET<WorkOrderEntity>(
         `work-orders/${workOrderId}`,
     );
@@ -235,13 +233,12 @@ export async function postWorkOrderTransition(
     const now = nowUtc();
 
     await ctx.PUT<void>(
-        'work-order-transitions',
+        `work-order-transitions/${transitionId}`,
         {
-            id: transitionId,
             work_order_id: workOrderId,
             from_node_id: currentNodeId,
             to_node_id: edge.toNodeId,
-            user_id: user.id,
+            person_id: person.id,
             transitioned_at: now,
         },
     );
@@ -262,9 +259,8 @@ export async function postWorkOrderTransition(
             );
         }
         await ctx.PUT<void>(
-            'transition-field-values',
+            `transition-field-values/${id}`,
             {
-                id,
                 transition_id: transitionId,
                 field_id: fieldId,
                 value,
@@ -315,15 +311,14 @@ export async function postWorkOrderClaim(
     claimId: string,
     workOrderId: string,
 ): Promise<void> {
-    const user = await ctx.getCurrentUser();
+    const person = await ctx.getCurrentPerson();
     const now = nowUtc();
 
     await ctx.PUT<void>(
-        'work-order-claims',
+        `work-order-claims/${claimId}`,
         {
-            id: claimId,
             work_order_id: workOrderId,
-            user_id: user.id,
+            person_id: person.id,
             claimed_at: now,
         },
     );

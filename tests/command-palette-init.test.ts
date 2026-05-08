@@ -60,12 +60,18 @@ test(
             );
             try {
                 initCommandPalette();
-                await new Promise(
-                    r => setImmediate(r),
-                );
-                await new Promise(
-                    r => setImmediate(r),
-                );
+                // Drain microtask boundaries inside
+                // getSearchIndex (await hasSchema,
+                // await getIdeas, etc.) so the
+                // unhandledRejection handler can fire.
+                // Two setImmediates flush today's
+                // pipeline; the loop guards against
+                // future microtask growth.
+                for (let i = 0; i < 10; i++) {
+                    await new Promise(
+                        r => setImmediate(r),
+                    );
+                }
             } finally {
                 process.off(
                     'unhandledRejection',
@@ -125,6 +131,15 @@ function installGlobals(
         hadDocument: 'document' in g,
         hadLocalStorage: 'localStorage' in g,
     };
+    // Minimal document stub. initCommandPalette uses
+    // only addEventListener (global keydown bind) and
+    // querySelector (lookup) at init time. Methods
+    // like document.body and createElement appear in
+    // dialog-build paths that fire on first open.
+    // A future init-time touch of those would fail
+    // with "undefined is not a function" — signal
+    // worth keeping, but unrelated to the schema-gate
+    // behavior under test.
     g.document = {
         addEventListener: () => {},
         querySelector: () => null,

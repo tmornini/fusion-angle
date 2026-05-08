@@ -1,4 +1,6 @@
-import { $, $textarea } from '../app/dom.ts';
+import {
+    $, $textarea, isFormField,
+} from '../app/dom.ts';
 import {
     IdeaPresenter,
     IdeaEditPresenter,
@@ -367,11 +369,8 @@ function onInput(
     if (!state || state.kind !== 'editing') {
         return;
     }
-    const target = e.target as
-        | HTMLInputElement
-        | HTMLTextAreaElement
-        | null;
-    if (!target) return;
+    const target = e.target;
+    if (!isFormField(target)) return;
     const field = target.getAttribute(
         'data-idea-field',
     );

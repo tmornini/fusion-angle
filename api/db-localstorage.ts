@@ -11,20 +11,22 @@ import type {
 } from './db.ts';
 import type {
     Deleted,
-    UserEntity,
+    PersonEntity,
     IdeaEntity,
     ProjectEntity,
-    TeamEntity,
-    TeamProjectEntity,
-    TeamUserEntity,
     ActivityEntity,
     FlowEntity,
     FlowVersionEntity,
-    CompanyEntity,
     OrganizationEntity,
     IdeaSubmissionEntity,
     ActivityActorEntity,
     ProjectFlowEntity,
+    RoleEntity,
+    RoleMembershipEntity,
+    CrewEntity,
+    CrewRoleMembershipEntity,
+    ModelEntity,
+    RoleModelMembershipEntity,
     WorkOrderEntity,
     FlowWorkOrderEntity,
     WorkOrderTransitionEntity,
@@ -38,12 +40,9 @@ import {
 } from './latency.ts';
 import {
     asString,
-    validateUserEntity,
+    validatePersonEntity,
     validateIdeaEntity,
     validateProjectEntity,
-    validateTeamEntity,
-    validateTeamProjectEntity,
-    validateTeamUserEntity,
     validateActivityEntity,
     validateFlowEntity,
     validateFlowVersionEntity,
@@ -53,10 +52,15 @@ import {
     validateWorkOrderTransitionEntity,
     validateTransitionFieldValueEntity,
     validateWorkOrderClaimEntity,
-    validateCompanyEntity,
     validateOrganizationEntity,
     validateIdeaSubmissionEntity,
     validateActivityActorEntity,
+    validateRoleEntity,
+    validateRoleMembershipEntity,
+    validateCrewEntity,
+    validateCrewRoleMembershipEntity,
+    validateModelEntity,
+    validateRoleModelMembershipEntity,
 } from './validators.ts';
 
 const KEY_PREFIX = 'fusion-ai:';
@@ -79,23 +83,14 @@ function validateSnapshotRow(
     const { id: _id, ...body } = row;
     try {
         switch (table) {
-            case 'users':
-                validateUserEntity(body);
+            case 'people':
+                validatePersonEntity(body);
                 break;
             case 'ideas':
                 validateIdeaEntity(body);
                 break;
             case 'projects':
                 validateProjectEntity(body);
-                break;
-            case 'teams':
-                validateTeamEntity(body);
-                break;
-            case 'team_projects':
-                validateTeamProjectEntity(body);
-                break;
-            case 'team_users':
-                validateTeamUserEntity(body);
                 break;
             case 'activities':
                 validateActivityEntity(body);
@@ -128,9 +123,6 @@ function validateSnapshotRow(
             case 'work_order_claims':
                 validateWorkOrderClaimEntity(body);
                 break;
-            case 'company':
-                validateCompanyEntity(body);
-                break;
             case 'organization':
                 validateOrganizationEntity(body);
                 break;
@@ -139,6 +131,28 @@ function validateSnapshotRow(
                 break;
             case 'activity_actors':
                 validateActivityActorEntity(body);
+                break;
+            case 'roles':
+                validateRoleEntity(body);
+                break;
+            case 'role_memberships':
+                validateRoleMembershipEntity(body);
+                break;
+            case 'crews':
+                validateCrewEntity(body);
+                break;
+            case 'crew_role_memberships':
+                validateCrewRoleMembershipEntity(
+                    body,
+                );
+                break;
+            case 'models':
+                validateModelEntity(body);
+                break;
+            case 'role_model_memberships':
+                validateRoleModelMembershipEntity(
+                    body,
+                );
                 break;
             case 'deleted':
                 // Shape: {id, deleted_at}
@@ -789,9 +803,9 @@ export async function createLocalStorageAdapter(
             );
         },
 
-        users:
-            createEntityStore<UserEntity>(
-                'users',
+        people:
+            createEntityStore<PersonEntity>(
+                'people',
                 deletedStore,
             ),
         ideas:
@@ -805,19 +819,6 @@ export async function createLocalStorageAdapter(
                 'projects',
                 deletedStore,
             ),
-
-        teams:
-            createEntityStore<
-                TeamEntity
-            >('teams', deletedStore),
-        teamProjects:
-            createEntityStore<
-                TeamProjectEntity
-            >('team_projects', deletedStore),
-        teamUsers:
-            createEntityStore<
-                TeamUserEntity
-            >('team_users', deletedStore),
 
         activities:
             createEntityStore<ActivityEntity>(
@@ -867,11 +868,6 @@ export async function createLocalStorageAdapter(
                 deletedStore,
             ),
 
-        company:
-            createSingletonStore<CompanyEntity>(
-                'company',
-            ),
-
         organization:
             createSingletonStore<OrganizationEntity>(
                 'organization',
@@ -885,6 +881,39 @@ export async function createLocalStorageAdapter(
             createEntityStore<
                 ActivityActorEntity
             >('activity_actors', deletedStore),
+        roles:
+            createEntityStore<
+                RoleEntity
+            >('roles', deletedStore),
+        roleMemberships:
+            createEntityStore<
+                RoleMembershipEntity
+            >(
+                'role_memberships',
+                deletedStore,
+            ),
+        crews:
+            createEntityStore<
+                CrewEntity
+            >('crews', deletedStore),
+        crewRoleMemberships:
+            createEntityStore<
+                CrewRoleMembershipEntity
+            >(
+                'crew_role_memberships',
+                deletedStore,
+            ),
+        models:
+            createEntityStore<
+                ModelEntity
+            >('models', deletedStore),
+        roleModelMemberships:
+            createEntityStore<
+                RoleModelMembershipEntity
+            >(
+                'role_model_memberships',
+                deletedStore,
+            ),
         deleted: deletedStore,
     };
 

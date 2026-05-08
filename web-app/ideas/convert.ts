@@ -1,5 +1,5 @@
 import {
-    $, bindEnterToClick,
+    $, bindEnterToClick, isFormField,
 } from '../app/dom.ts';
 import {
     html, setHtml,
@@ -15,7 +15,6 @@ import {
 import { navigateTo } from '../app/core.ts';
 import {
     getIdea,
-    getManagedUsers,
     postActivity,
     postIdeaConversion,
     jsonObjectField,
@@ -60,18 +59,11 @@ export async function init(
     let tuple: Awaited<
         ReturnType<typeof getIdea>
     >;
-    let users: Awaited<
-        ReturnType<typeof getManagedUsers>
-    >;
     try {
-        [tuple, users] = await Promise.all([
-            getIdea(ctx, ideaId),
-            getManagedUsers(ctx),
-        ]);
+        tuple = await getIdea(ctx, ideaId);
     } catch (err) {
         log.error(
-            'getIdea or getManagedUsers'
-            + ' failed',
+            'getIdea failed',
             'ideas',
             err,
         );
@@ -95,7 +87,6 @@ export async function init(
         IdeaConversionPresenter =
         new IdeaConversionPresenter(
             tuple.idea,
-            users,
             buildInitialConversionFields(
                 tuple.idea,
             ),
@@ -114,14 +105,7 @@ export async function init(
                 `#convert-${field}`,
                 document,
             );
-            if (
-                el instanceof
-                    HTMLInputElement
-                || el instanceof
-                    HTMLSelectElement
-                || el instanceof
-                    HTMLTextAreaElement
-            ) {
+            if (isFormField(el)) {
                 next[field] =
                     el.value.trim();
             }
@@ -524,7 +508,6 @@ async function performConversion(
             budget_label:
                 fields['budget'],
         },
-        fields['project-lead'],
         { ...ideaEntity, status: 'promoted' },
     );
 }

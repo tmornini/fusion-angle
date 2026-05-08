@@ -37,7 +37,7 @@ export interface HistoryFieldValue {
 export interface HistoryEntry {
     fromNodeName: string;
     toNodeName: string;
-    userName: string;
+    personName: string;
     transitionedAt: string;
     fieldValues: HistoryFieldValue[];
 }
@@ -47,7 +47,7 @@ export type ClaimStatus =
     | {
         kind: 'claimed';
         claimId: string;
-        byCurrentUser: boolean;
+        byCurrentPerson: boolean;
     };
 
 /* ── Helpers ─────────────── */

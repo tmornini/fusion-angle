@@ -10,6 +10,11 @@ import {
     NODE_WIDTH, NODE_HEIGHT,
 } from './flow-layout.ts';
 import { pluralize } from './format.ts';
+import { iconAlertTriangle } from './icons.ts';
+import {
+    START_NODE_DEFAULT_NAME,
+    END_NODE_DEFAULT_NAME,
+} from '../../api/types.ts';
 
 function nodeHasConnections(
     nodeId: string,
@@ -350,7 +355,6 @@ function buildDefs(): string {
         + '"indefinite"/>'
         + '</feGaussianBlur>'
         + '<feFlood'
-        + ` flood-color="${BLUE}"`
         + ' flood-opacity="0.8"'
         + ' result="color"/>'
         + '<feComposite'
@@ -422,6 +426,41 @@ export function computeEdgeLabelWidth(
     );
 }
 
+// User-private role ids share their own
+// prefix; mirrored here so flow-graph.ts is
+// not coupled to the roles adapter.
+const USER_PRIVATE_ROLE_PREFIX_FOR_GRAPH =
+    'user-private:';
+
+export function shouldShowHazard(
+    node: GraphNode,
+    roleMemberCounts:
+        ReadonlyMap<string, number>,
+    crewMemberCounts:
+        ReadonlyMap<string, number> = new Map(),
+): boolean {
+    const a = node.crew;
+    if (a.kind === 'unassigned') return true;
+    if (a.kind === 'role') {
+        // User-private roles always have
+        // cardinality 1 by construction.
+        if (a.roleId.startsWith(
+            USER_PRIVATE_ROLE_PREFIX_FOR_GRAPH,
+        )) {
+            return false;
+        }
+        const count = roleMemberCounts
+            .get(a.roleId) ?? 0;
+        return count === 0;
+    }
+    if (a.kind === 'crew') {
+        const count = crewMemberCounts
+            .get(a.crewId) ?? 0;
+        return count === 0;
+    }
+    return false;
+}
+
 function buildNode(
     node: GraphNode,
     isSelected: boolean,
@@ -429,6 +468,10 @@ function buildNode(
     portPos: {
         x: number; y: number;
     } | null,
+    roleMemberCounts:
+        ReadonlyMap<string, number>,
+    crewMemberCounts:
+        ReadonlyMap<string, number>,
 ): SafeHtml {
     const { positionX, positionY } = node;
     const halfH = NODE_HEIGHT / 2;
@@ -465,9 +508,14 @@ function buildNode(
         ? NODE_LABEL_Y_CENTERED
         : NODE_LABEL_Y;
 
+    const displayName = node.isStart
+        ? START_NODE_DEFAULT_NAME
+        : node.isComplete
+        ? END_NODE_DEFAULT_NAME
+        : node.name;
     const nameEsc = escapeForHtml(
         truncateLabel(
-            node.name, NODE_MAX_CHARS,
+            displayName, NODE_MAX_CHARS,
         ),
     );
     inner += '<text'
@@ -519,7 +567,25 @@ function buildNode(
             + '</circle>';
     }
 
-    const labelEsc = escapeForHtml(node.name);
+    if (
+        !isSpecial
+        && shouldShowHazard(
+            node, roleMemberCounts,
+            crewMemberCounts,
+        )
+    ) {
+        inner += '<g'
+            + ' class="flow-node-hazard"'
+            + ' transform="translate(6, 42)">'
+            + '<title>'
+            + 'No assignment for this node.'
+            + '</title>'
+            + iconAlertTriangle(16, '')
+                .toString()
+            + '</g>';
+    }
+
+    const labelEsc = escapeForHtml(displayName);
     const ariaCurrent = isSelected
         ? ' aria-current="true"' : '';
     return trusted(
@@ -952,6 +1018,10 @@ export function buildGraphSvg(
         string,
         readonly { x: number; y: number }[]
     >,
+    roleMemberCounts:
+        ReadonlyMap<string, number> = new Map(),
+    crewMemberCounts:
+        ReadonlyMap<string, number> = new Map(),
 ): SafeHtml {
     const nodeMap = new Map(
         nodes.map(n => [n.id, n]),
@@ -1063,6 +1133,8 @@ export function buildGraphSvg(
             buildNode(
                 node, isSelected,
                 isLocked, portPos,
+                roleMemberCounts,
+                crewMemberCounts,
             ).toString();
     }
 

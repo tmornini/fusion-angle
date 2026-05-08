@@ -666,20 +666,22 @@
 
 #toast-container {
   position: fixed;
-  bottom: var(--space-4);
-  right: var(--space-4);
+  top: var(--space-4);
+  left: 50%;
+  transform: translateX(-50%);
   z-index: var(--z-toast);
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  max-width: 24rem;
+  width: 28rem;
+  max-width: calc(100vw - 2rem);
 }
 
 .toast {
   display: flex;
   align-items: flex-start;
   gap: var(--space-3);
-  padding: var(--space-4);
+  padding: var(--space-5);
   background-color: hsl(var(--card));
   border: 1px solid hsl(var(--border));
   border-radius: var(--radius-lg);
@@ -693,11 +695,11 @@
 .toast-info { border-left: 3px solid hsl(var(--info)); }
 
 .toast-title {
-    font-size: var(--text-sm);
+    font-size: var(--text-base);
     font-weight: var(--font-weight-medium);
 }
 .toast-message {
-    font-size: var(--text-sm);
+    font-size: var(--text-base);
     color: hsl(var(--muted-foreground));
     flex: 1;
 }
@@ -1337,5 +1339,26 @@
   justify-content: center;
   font-size: 0.625rem;
   font-weight: var(--font-weight-bold);
+}
+
+/* ==========================================
+   32. ROLE MEMBERSHIP ROWS
+   ========================================== */
+
+.role-membership-row {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius);
+  background-color: hsl(var(--muted));
+}
+
+/* User-private row: a row of person, masquerading as
+   a role. Visually distinct so the workaround feels
+   like a workaround — Article on Validation
+   ("degrade visibly rather than corrupt silently"). */
+.role-membership-row[data-role-private="user"] {
+  background-color: transparent;
+  border: 1px dashed hsl(var(--border));
+  color: hsl(var(--muted-foreground));
+  font-style: italic;
 }
 

@@ -3,6 +3,7 @@ import { strict as assert } from 'node:assert';
 import {
     computeNewPosition,
     dropIndex,
+    FIRST_POSITION,
     type CardRect,
 } from '../web-app/app/drag-reorder-positions.ts';
 
@@ -72,7 +73,7 @@ test(
     + ' on empty list',
     () => {
         assert.equal(
-            computeNewPosition([], 0), 1,
+            computeNewPosition([], 0), FIRST_POSITION,
         );
     },
 );

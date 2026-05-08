@@ -4,6 +4,7 @@ import {
     createLocalStorageAdapter,
 } from '../api/db-localstorage.ts';
 import {
+    jsonArrayField,
     jsonObjectField,
 } from '../api/types.ts';
 
@@ -40,6 +41,7 @@ const baseVersion = {
                 name: 'Start',
                 isStart: true,
                 isComplete: false,
+                crew: { kind: 'unassigned' },
                 fields: [],
                 positionX: 0,
                 positionY: 0,
@@ -122,23 +124,21 @@ test(
             (_, i) => `u-${i}`,
         );
         await Promise.all(
-            ids.map(id => adapter.users.put(id, {
+            ids.map(id => adapter.people.put(id, {
                 first_name: 'F' + id,
                 last_name: 'L' + id,
                 email: id + '@example.com',
-                role: 'member',
+                title: 'member',
                 department: 'eng',
                 status: 'active',
+                strengths: jsonArrayField([]),
+                team_dimensions:
+                    jsonObjectField({}),
                 phone: '',
-                avatar_color: '#000',
-                availability: 100,
-                performance_score: 50,
                 bio: '',
-                created_at: '2026-01-01T00:00:00.000Z',
-                updated_at: '2026-01-01T00:00:00.000Z',
             })),
         );
-        const all = await adapter.users.getAll();
+        const all = await adapter.people.getAll();
         assert.equal(
             all.length, 11,
             'all 11 concurrent puts must persist',
@@ -154,30 +154,6 @@ test(
 );
 
 test(
-    'legacy uncompressed flow_versions JSON reads correctly',
-    async () => {
-        const map = installShim();
-        const legacyRow = {
-            id: 'fv-legacy',
-            ...baseVersion,
-            is_locked: 0,
-            is_auto_layout: 1,
-            is_auto_fit: 1,
-        };
-        map.set(
-            KEY_PREFIX + 'flow_versions',
-            JSON.stringify([legacyRow]),
-        );
-        const adapter = await createLocalStorageAdapter();
-        const got = await adapter.flowVersions.getById(
-            'fv-legacy',
-        );
-        assert.equal(got.id, 'fv-legacy');
-        assert.equal(got.name, 'Test Flow');
-    },
-);
-
-test(
     'work_order_transitions write produces gz1: prefix',
     async () => {
         const map = installShim();
@@ -189,7 +165,7 @@ test(
                 work_order_id: 'wo-1',
                 from_node_id: 'n-from',
                 to_node_id: 'n-to',
-                user_id: 'u-1',
+                person_id: 'u-1',
                 values: jsonObjectField({}),
                 transitioned_at:
                     '2026-01-01T00:00:00.000Z',
@@ -208,26 +184,25 @@ test(
 );
 
 test(
-    'users table is not compressed (raw JSON in storage)',
+    'people table is not compressed (raw JSON in storage)',
     async () => {
         const map = installShim();
         const adapter = await createLocalStorageAdapter();
         await adapter.createSchema();
-        await adapter.users.put('u1', {
+        await adapter.people.put('u1', {
             first_name: 'Alice',
             last_name: 'Adams',
             email: 'alice@example.com',
             phone: '',
-            role: 'product_manager',
-            availability: 80,
-            is_active: true,
+            title: 'product_manager',
+            status: 'active',
+            strengths: jsonArrayField([]),
+            team_dimensions: jsonObjectField({}),
             bio: '',
             department: 'Product',
-            created_at: '2026-01-01T00:00:00Z',
-            updated_at: '2026-01-01T00:00:00Z',
         });
-        const stored = map.get(KEY_PREFIX + 'users');
-        assert.ok(stored, 'expected stored users value');
+        const stored = map.get(KEY_PREFIX + 'people');
+        assert.ok(stored, 'expected stored people value');
         assert.ok(
             stored.startsWith('['),
             'expected raw JSON array, got '

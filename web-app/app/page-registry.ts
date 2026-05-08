@@ -5,13 +5,14 @@ import {
     iconLightbulb,
     iconFolderKanban,
     iconGitBranch,
-    iconUsers,
+    iconPeople,
     iconSettings,
-    iconUser,
+    iconPerson,
     iconCreditCard,
-    iconActivity,
     iconDatabase,
     iconPalette,
+    iconShield,
+    iconBriefcase,
 } from './icons.ts';
 
 export interface PageEntry {
@@ -98,19 +99,11 @@ export const PAGE_REGISTRY: Record<
     },
     'flow-detail': {
         title: 'Flow Designer',
-        layout: 'standalone',
+        layout: 'sidebar',
         sourceDir: 'flows',
         sourceFile: 'detail',
         icon: iconGitBranch,
         searchable: false,
-    },
-    teams: {
-        title: 'Teams',
-        layout: 'sidebar',
-        sourceDir: 'teams',
-        sourceFile: 'index',
-        icon: iconUsers,
-        keywords: 'team members roster',
     },
     organization: {
         title: 'Organization',
@@ -121,22 +114,13 @@ export const PAGE_REGISTRY: Record<
         keywords:
             'organization billing plan',
     },
-    profile: {
-        title: 'Profile',
+    'people-detail': {
+        title: 'Person',
         layout: 'sidebar',
-        sourceDir: 'profile',
-        sourceFile: 'index',
-        icon: iconUser,
-        keywords:
-            'profile settings personal',
-    },
-    company: {
-        title: 'Company',
-        layout: 'sidebar',
-        sourceDir: 'company',
-        sourceFile: 'index',
-        icon: iconSettings,
-        keywords: 'company organization',
+        sourceDir: 'people',
+        sourceFile: 'detail',
+        icon: iconPerson,
+        searchable: false,
     },
     billing: {
         title: 'Billing',
@@ -148,21 +132,29 @@ export const PAGE_REGISTRY: Record<
             'billing plan invoices'
             + ' payment',
     },
-    users: {
-        title: 'Users',
+    people: {
+        title: 'People',
         layout: 'sidebar',
-        sourceDir: 'organization',
-        sourceFile: 'users',
-        icon: iconUsers,
-        keywords: 'users invite manage admin',
+        sourceDir: 'people',
+        sourceFile: 'index',
+        icon: iconPeople,
+        keywords: 'people invite manage admin',
     },
-    'activity-feed': {
-        title: 'Activity Feed',
+    roles: {
+        title: 'Roles',
         layout: 'sidebar',
-        sourceDir: 'organization',
-        sourceFile: 'activity-feed',
-        icon: iconActivity,
-        keywords: 'activity feed log',
+        sourceDir: 'roles',
+        sourceFile: 'index',
+        icon: iconShield,
+        keywords: 'roles teams membership',
+    },
+    crews: {
+        title: 'Crews',
+        layout: 'sidebar',
+        sourceDir: 'crews',
+        sourceFile: 'index',
+        icon: iconBriefcase,
+        keywords: 'crews collaborate team',
     },
     snapshots: {
         title: 'Snapshots',
@@ -210,13 +202,6 @@ export const PAGE_REGISTRY: Record<
         layout: 'standalone',
         sourceDir: 'landing',
         sourceFile: 'index',
-        searchable: false,
-    },
-    onboarding: {
-        title: 'Onboarding',
-        layout: 'standalone',
-        sourceDir: 'organization',
-        sourceFile: 'onboarding',
         searchable: false,
     },
     'not-found': {

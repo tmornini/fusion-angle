@@ -5,7 +5,7 @@ import {
 import type {
     ActivityType,
 } from '../../../api/types.ts';
-import { getCurrentUserRow } from './shared.ts';
+import { getCurrentPersonRow } from './shared.ts';
 import type { FetchContext } from './shared.ts';
 import {
     generateCryptoSafeBase62,
@@ -32,8 +32,8 @@ export async function postActivity(
     ctx: FetchContext,
     input: ActivityInput,
 ): Promise<void> {
-    const userRow =
-        await getCurrentUserRow(ctx);
+    const personRow =
+        await getCurrentPersonRow(ctx);
     const activityId =
         generateCryptoSafeBase62();
     const actorId = generateCryptoSafeBase62();
@@ -53,7 +53,7 @@ export async function postActivity(
         `activity-actors/${actorId}`,
         {
             activity_id: activityId,
-            user_id: userRow.id,
+            person_id: personRow.id,
             created_at: timestamp,
         },
     );

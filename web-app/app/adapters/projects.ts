@@ -10,8 +10,8 @@ import {
     MS_PER_DAY,
 } from '../../../api/types.ts';
 import {
-    getUserMap,
-    userName,
+    getPersonMap,
+    personName,
 } from './shared.ts';
 import type { FetchContext } from './shared.ts';
 import {
@@ -19,9 +19,7 @@ import {
 } from '../channels.ts';
 
 const projectChanges =
-    createSubscriptionChannel(
-        ['projects', 'project-team-members'],
-    );
+    createSubscriptionChannel(['projects']);
 
 export function subscribeProjectChanges(
     fn: () => void,
@@ -38,19 +36,6 @@ export {
     COST_DIVISOR,
 } from '../../../api/types.ts';
 
-export interface TeamMemberEntity {
-    id: string;
-    user_id: string;
-    role: string;
-    type: string;
-}
-
-export function isTeamLead(
-    m: { role: string },
-): boolean {
-    return m.role === 'lead';
-}
-
 export async function getProjects(
     ctx: FetchContext,
 ): Promise<Project[]> {
@@ -60,27 +45,11 @@ export async function getProjects(
         .map(row => new Project(row));
 }
 
-export interface DetailTeamMember {
-    readonly id: string;
-    readonly name: string;
-    readonly role: string;
-}
-
 export class ProjectView {
     readonly #project: Project;
-    readonly #projectLead: string;
-    readonly #team:
-        readonly DetailTeamMember[];
 
-    constructor(
-        project: Project,
-        projectLead: string,
-        team:
-            readonly DetailTeamMember[],
-    ) {
+    constructor(project: Project) {
         this.#project = project;
-        this.#projectLead = projectLead;
-        this.#team = team;
     }
 
     idForLink(): string {
@@ -114,15 +83,6 @@ export class ProjectView {
     targetEndDateValue(): string {
         return this.#project
             .targetEndDateValue();
-    }
-
-    projectLeadName(): string {
-        return this.#projectLead;
-    }
-
-    teamMembers():
-        readonly DetailTeamMember[] {
-        return this.#team;
     }
 
     statusLabel(): string {
@@ -186,15 +146,6 @@ export class ProjectView {
     }
 }
 
-export async function getProjectTeamRows(
-    ctx: FetchContext,
-    projectId: string,
-): Promise<TeamMemberEntity[]> {
-    return ctx.GET<TeamMemberEntity[]>(
-        `projects/${projectId}/team`,
-    );
-}
-
 export async function getProjectRow(
     ctx: FetchContext,
     id: string,
@@ -213,24 +164,3 @@ export async function putProject(
     projectChanges.notify();
 }
 
-export interface TeamMemberAssignment {
-    projectId: string;
-    userId: string;
-    role: string;
-    type: string;
-}
-
-export async function
-putProjectTeamMember(
-    ctx: FetchContext,
-    assignment: TeamMemberAssignment,
-): Promise<void> {
-    await ctx.PUT(
-        `projects/${assignment.projectId}`
-            + `/team/${assignment.userId}`,
-        {
-            role: assignment.role,
-            type: assignment.type,
-        },
-    );
-}

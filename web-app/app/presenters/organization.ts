@@ -4,15 +4,19 @@ import {
 import {
     iconCreditCard, iconBuilding,
     iconCrown, iconCheckCircle2,
-    iconActivity, iconUsers,
+    iconActivity, iconPeople,
     iconFolderKanban, iconLightbulb,
     iconCalendar, iconTrendingUp,
     iconExternalLink,
+    iconEdit, iconSave, iconX,
 } from '../icons.ts';
 import type {
     Organization,
-    RecentActivityItem,
+    GeneralInfoDraft,
 } from '../adapters/index.ts';
+
+export type GeneralInfoFieldKey =
+    | 'name' | 'domain';
 
 const STAT_VALUE_2XL = 'text-2xl font-bold';
 const STAT_VALUE_LG = 'text-lg font-bold';
@@ -40,39 +44,87 @@ function buildStatCell(
         </div>`;
 }
 
-export class OrganizationPresenter {
-    readonly #org: Organization;
-    readonly #companyName: string;
-    readonly #recentActivity:
-        readonly RecentActivityItem[];
+function buildPageHeader(
+    actions: SafeHtml,
+): SafeHtml {
+    return html`
+        <div class="${
+            'flex items-center'
+            + ' justify-between gap-4'
+            + ' mb-8 flex-wrap'
+        }">
+            <div>
+                <h1
+                    class="text-3xl font-display
+                           font-bold mb-2"
+                >Organization</h1>
+                <p class="text-muted">
+                    Manage your organization
+                </p>
+            </div>
+            ${actions}
+        </div>`;
+}
 
-    constructor(
-        org: Organization,
-        companyName: string,
-        recentActivity:
-            readonly RecentActivityItem[],
-    ) {
-        this.#org = org;
-        this.#companyName = companyName;
-        this.#recentActivity = recentActivity;
-    }
+function buildReadField(
+    label: string,
+    value: string,
+): SafeHtml {
+    return html`
+        <div>
+            <label class="${
+                'label mb-2 block'
+            }">${label}</label>
+            <p class="text-sm">${value}</p>
+        </div>`;
+}
 
-    buildPage(): SafeHtml {
-        const org = this.#org;
-        const seats = org.seatsUsage();
-        return html`
-    <div class="content-wrap-xl">
-        <div class="mb-8">
-            <h1
-                class="text-3xl font-display
-                       font-bold mb-2"
-            >Organization</h1>
-            <p class="text-muted">
-                Manage your organization
-            </p>
-        </div>
+function buildEditField(
+    field: GeneralInfoFieldKey,
+    label: string,
+    value: string,
+): SafeHtml {
+    return html`
+        <div>
+            <label class="${
+                'label mb-2 block'
+            }" for="org-${field}">${
+                label
+            }</label>
+            <input class="input"
+                id="org-${field}"
+                data-org-field="${field}"
+                value="${value}" />
+        </div>`;
+}
 
-        <!-- Company Overview -->
+function buildGeneralInfoCard(
+    body: SafeHtml,
+): SafeHtml {
+    return html`
+        <div class="${
+            'card card-hover p-6 mb-6'
+        }">
+            <h3 class="${
+                'font-display font-semibold'
+                + ' mb-4 flex items-center'
+                + ' gap-2'
+            }">${
+                iconBuilding(20, '')
+            } General Information</h3>
+            <div class="${
+                'grid grid-cols-2 gap-4'
+            }">
+                ${body}
+            </div>
+        </div>`;
+}
+
+function buildOverviewCard(
+    org: Organization,
+): SafeHtml {
+    const seats = org.seatsUsage();
+    return html`
         <div class="card card-hover p-6 mb-6">
             <div
                 class="${
@@ -95,7 +147,7 @@ export class OrganizationPresenter {
                             class="text-xl
                                    font-display
                                    font-semibold"
-                        >${this.#companyName}</h2>
+                        >${org.nameText()}</h2>
                         <div
                             class="flex
                                    items-center
@@ -155,8 +207,8 @@ export class OrganizationPresenter {
                        lg:grid-cols-4 gap-4"
             >
                 ${buildStatCell(
-                    iconUsers(16, ''),
-                    'Active Users',
+                    iconPeople(16, ''),
+                    'Active People',
                     html`${seats.used}<span class="${
                         'text-sm font-normal'
                         + ' text-muted'
@@ -184,9 +236,67 @@ export class OrganizationPresenter {
                     STAT_VALUE_LG,
                 )}
             </div>
-        </div>
+        </div>`;
+}
 
-        <!-- Usage Overview -->
+const USAGE_DANGER = 90;
+const USAGE_WARNING = 70;
+
+function levelForUsage(
+    current: number,
+    limit: number,
+): 'danger' | 'warning' | 'normal' {
+    const percentage =
+        (current / limit) * 100;
+    if (percentage >= USAGE_DANGER) {
+        return 'danger';
+    }
+    if (percentage >= USAGE_WARNING) {
+        return 'warning';
+    }
+    return 'normal';
+}
+
+function buildUsageBar(
+    label: string,
+    current: number,
+    limit: number,
+): SafeHtml {
+    const percentage = Math.min(
+        100, (current / limit) * 100,
+    );
+    const level = levelForUsage(current, limit);
+    return html`
+    <div>
+        <div
+            class="flex items-center
+                   justify-between
+                   text-sm mb-1"
+        >
+            <span class="text-muted">
+                ${label}
+            </span>
+            <span class="font-medium">
+                ${current} / ${limit}
+            </span>
+        </div>
+        <div class="progress">
+            <div
+                class="progress-bar"
+                data-level="${level}"
+                style="${
+                    '--progress-fill:'
+                    + percentage + '%'
+                }"
+            ></div>
+        </div>
+    </div>`;
+}
+
+function buildUsageCard(
+    org: Organization,
+): SafeHtml {
+    return html`
         <div class="card card-hover p-6">
             <h3
                 class="font-display
@@ -197,35 +307,37 @@ export class OrganizationPresenter {
                 Usage Overview
             </h3>
             <div class="flex flex-col gap-4">
-                ${this.#buildUsageBar(
-                    'User Seats',
+                ${buildUsageBar(
+                    'Seats',
                     org.usedSeats(),
                     org.totalSeats(),
                 )}
-                ${this.#buildUsageBar(
+                ${buildUsageBar(
                     'Projects',
                     org.projectsCurrent(),
                     org.projectsLimit(),
                 )}
-                ${this.#buildUsageBar(
+                ${buildUsageBar(
                     'Ideas',
                     org.ideasCurrent(),
                     org.ideasLimit(),
                 )}
-                ${this.#buildUsageBar(
+                ${buildUsageBar(
                     'AI Credits',
                     org.aiCreditsCurrent(),
                     org.aiCreditsLimit(),
                 )}
-                ${this.#buildUsageBar(
+                ${buildUsageBar(
                     'Storage (GB)',
                     org.storageCurrent(),
                     org.storageLimit(),
                 )}
             </div>
-        </div>
+        </div>`;
+}
 
-        <!-- Admin Links -->
+function buildAdminCard(): SafeHtml {
+    return html`
         <div class="card card-hover p-6 mt-6">
             <h3
                 class="font-display
@@ -240,13 +352,13 @@ export class OrganizationPresenter {
                     data-nav-to="users"
                 >
                     <span class="text-muted"
-                    >${iconUsers(20, '')}</span>
+                    >${iconPeople(20, '')}</span>
                     <div class="flex-fill"
                     >
                         <p class="${
                             'font-medium text-sm'
                         }">
-                            Users
+                            People
                         </p>
                         <p
                             class="text-xs
@@ -255,7 +367,7 @@ export class OrganizationPresenter {
                         >
                             ${'Add, edit,'
                                 + ' or remove'
-                                + ' team members'}
+                                + ' members'}
                         </p>
                     </div>
                     ${iconExternalLink(16, '')}
@@ -286,70 +398,94 @@ export class OrganizationPresenter {
                     ${iconExternalLink(16, '')}
                 </button>
             </div>
-        </div>
+        </div>`;
+}
+
+function buildPage(
+    org: Organization,
+    headerActions: SafeHtml,
+    generalInfoBody: SafeHtml,
+): SafeHtml {
+    return html`
+    <div class="content-wrap-xl">
+        ${buildPageHeader(headerActions)}
+        ${buildGeneralInfoCard(generalInfoBody)}
+        ${buildOverviewCard(org)}
+        ${buildUsageCard(org)}
+        ${buildAdminCard()}
     </div>`;
+}
+
+export class OrganizationPresenter {
+    readonly #org: Organization;
+
+    constructor(org: Organization) {
+        this.#org = org;
     }
 
-    static readonly USAGE_DANGER = 90;
-    static readonly USAGE_WARNING = 70;
+    buildPage(): SafeHtml {
+        const org = this.#org;
+        const actions = html`
+            <button class="${
+                'btn btn-outline gap-2'
+            }" id="org-edit-btn"
+                data-org-action="edit">
+                ${iconEdit(16, '')} Edit
+            </button>`;
+        const body = html`
+            ${buildReadField(
+                'Organization Name',
+                org.nameText(),
+            )}
+            ${buildReadField(
+                'Domain',
+                org.domainText(),
+            )}`;
+        return buildPage(org, actions, body);
+    }
+}
 
-    #levelForUsage(
-        current: number,
-        limit: number,
-    ): 'danger' | 'warning' | 'normal' {
-        const percentage =
-            (current / limit) * 100;
-        if (percentage
-            >= OrganizationPresenter
-                .USAGE_DANGER
-        ) {
-            return 'danger';
-        }
-        if (percentage
-            >= OrganizationPresenter
-                .USAGE_WARNING
-        ) {
-            return 'warning';
-        }
-        return 'normal';
+export class OrganizationEditPresenter {
+    readonly #org: Organization;
+    readonly #draft: GeneralInfoDraft;
+
+    constructor(
+        org: Organization,
+        draft: GeneralInfoDraft,
+    ) {
+        this.#org = org;
+        this.#draft = draft;
     }
 
-    #buildUsageBar(
-        label: string,
-        current: number,
-        limit: number,
-    ): SafeHtml {
-        const percentage = Math.min(
-            100, (current / limit) * 100,
+    buildPage(): SafeHtml {
+        const actions = html`
+            <div class="flex gap-2">
+                <button class="${
+                    'btn btn-outline gap-2'
+                }" id="org-cancel-btn"
+                    data-org-action="cancel">
+                    ${iconX(16, '')} Cancel
+                </button>
+                <button class="${
+                    'btn btn-primary gap-2'
+                }" id="org-save-btn"
+                    data-org-action="save">
+                    ${iconSave(16, '')} Save
+                </button>
+            </div>`;
+        const body = html`
+            ${buildEditField(
+                'name',
+                'Organization Name',
+                this.#draft.name,
+            )}
+            ${buildEditField(
+                'domain',
+                'Domain',
+                this.#draft.domain,
+            )}`;
+        return buildPage(
+            this.#org, actions, body,
         );
-        const level =
-            this.#levelForUsage(
-                current, limit,
-            );
-        return html`
-    <div>
-        <div
-            class="flex items-center
-                   justify-between
-                   text-sm mb-1"
-        >
-            <span class="text-muted">
-                ${label}
-            </span>
-            <span class="font-medium">
-                ${current} / ${limit}
-            </span>
-        </div>
-        <div class="progress">
-            <div
-                class="progress-bar"
-                data-level="${level}"
-                style="${
-                    '--progress-fill:'
-                    + percentage + '%'
-                }"
-            ></div>
-        </div>
-    </div>`;
     }
 }

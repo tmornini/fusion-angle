@@ -98,11 +98,11 @@ test(
         const adapter =
             await createLocalStorageAdapter();
         const json = JSON.stringify({
-            users: { not: 'an array' },
+            people: { not: 'an array' },
         });
         await assert.rejects(
             () => adapter.importSnapshot(json),
-            /table "users" is not an array/,
+            /table "people" is not an array/,
         );
     },
 );
@@ -114,11 +114,11 @@ test(
         const adapter =
             await createLocalStorageAdapter();
         const json = JSON.stringify({
-            users: ['not an object'],
+            people: ['not an object'],
         });
         await assert.rejects(
             () => adapter.importSnapshot(json),
-            /row 0 in table "users" is not an object/,
+            /row 0 in table "people" is not an object/,
         );
     },
 );
@@ -130,11 +130,11 @@ test(
         const adapter =
             await createLocalStorageAdapter();
         const json = JSON.stringify({
-            users: [null],
+            people: [null],
         });
         await assert.rejects(
             () => adapter.importSnapshot(json),
-            /row 0 in table "users" is not an object/,
+            /row 0 in table "people" is not an object/,
         );
     },
 );
@@ -146,11 +146,11 @@ test(
         const adapter =
             await createLocalStorageAdapter();
         const json = JSON.stringify({
-            users: [['not', 'an', 'object']],
+            people: [['not', 'an', 'object']],
         });
         await assert.rejects(
             () => adapter.importSnapshot(json),
-            /row 0 in table "users" is not an object/,
+            /row 0 in table "people" is not an object/,
         );
     },
 );
@@ -162,32 +162,26 @@ test(
         const adapter =
             await createLocalStorageAdapter();
         const json = JSON.stringify({
-            users: [
+            people: [
                 {
                     id: 'u1',
                     first_name: 'Alice',
                     last_name: 'Adams',
                     email: 'a@example.com',
                     phone: '',
-                    role: 'product_manager',
+                    title: 'product_manager',
                     status: 'active',
-                    availability: 80,
-                    performance_score: 50,
-                    projects_completed: 0,
-                    current_projects: 0,
                     strengths: '[]',
                     team_dimensions: '{}',
                     bio: '',
                     department: 'Product',
-                    last_active:
-                        '2026-01-01T00:00:00Z',
                     rogue_field: 'invalid',
                 },
             ],
         });
         await assert.rejects(
             () => adapter.importSnapshot(json),
-            /snapshot\.users\[0\]/,
+            /snapshot\.people\[0\]/,
         );
     },
 );
@@ -199,31 +193,25 @@ test(
         const adapter =
             await createLocalStorageAdapter();
         const json = JSON.stringify({
-            users: [
+            people: [
                 {
                     id: 'u1',
                     first_name: 'Alice',
                     last_name: 'Adams',
                     email: 'a@example.com',
                     phone: '',
-                    role: 'product_manager',
+                    title: 'product_manager',
                     status: 'active',
-                    availability: 80,
-                    performance_score: 50,
-                    projects_completed: 0,
-                    current_projects: 0,
                     strengths: '[]',
                     team_dimensions: '{}',
                     bio: '',
                     department: 'Product',
-                    last_active:
-                        '2026-01-01T00:00:00Z',
                 },
             ],
         });
         await adapter.importSnapshot(json);
         const stored = map.get(
-            KEY_PREFIX + 'users',
+            KEY_PREFIX + 'people',
         );
         assert.ok(stored, 'users should persist');
     },
@@ -237,7 +225,7 @@ test(
             await createLocalStorageAdapter();
         await adapter.importSnapshot('{}');
         const usersBlob = map.get(
-            KEY_PREFIX + 'users',
+            KEY_PREFIX + 'people',
         );
         assert.equal(
             usersBlob,
@@ -277,29 +265,26 @@ test(
         const adapter =
             await createLocalStorageAdapter();
         await adapter.createSchema();
-        await adapter.users.put('u1', {
+        await adapter.people.put('u1', {
             first_name: 'Alice',
             last_name: 'Adams',
             email: 'a@example.com',
             phone: '',
-            role: 'product_manager',
-            availability: 80,
-            is_active: true,
+            title: 'product_manager',
+            status: 'active',
+            strengths: '[]' as never,
+            team_dimensions: '{}' as never,
             bio: '',
             department: 'Product',
-            created_at:
-                '2026-01-01T00:00:00Z',
-            updated_at:
-                '2026-01-01T00:00:00Z',
         });
         await adapter.createSchema();
-        const users = await adapter.users.getAll();
+        const people = await adapter.people.getAll();
         assert.equal(
-            users.length, 1,
+            people.length, 1,
             'second createSchema preserves data',
         );
         assert.ok(
-            map.get(KEY_PREFIX + 'users'),
+            map.get(KEY_PREFIX + 'people'),
         );
     },
 );
@@ -329,16 +314,15 @@ test(
             await adapter.exportSnapshot();
         const parsed = JSON.parse(json);
         const expected = [
-            'users', 'ideas', 'projects',
-            'teams', 'team_projects',
-            'team_users', 'activities',
+            'people', 'ideas', 'projects',
+            'activities',
             'flows', 'flow_versions',
             'project_flows', 'work_orders',
             'flow_work_orders',
             'work_order_transitions',
             'transition_field_values',
             'work_order_claims',
-            'company', 'organization',
+            'organization',
             'idea_submissions',
             'activity_actors', 'deleted',
         ];

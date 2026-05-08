@@ -1,5 +1,5 @@
 const MAX_TOASTS = 5;
-const TOAST_DURATION_MS = 3000;
+const TOAST_DURATION_MS = 6000;
 const TOAST_TRANSITION_MS = 300;
 const TOAST_CONTAINER_ID = 'toast-container';
 
@@ -39,7 +39,7 @@ export function showToast(
     const container = ensureContainer();
 
     while (container.children.length >= MAX_TOASTS) {
-        container.firstElementChild?.remove();
+        container.lastElementChild?.remove();
     }
 
     const toast = document.createElement('div');
@@ -58,7 +58,7 @@ export function showToast(
     closeBtn.addEventListener('click', () => closeActiveToast(toast));
     toast.appendChild(closeBtn);
 
-    container.appendChild(toast);
+    container.prepend(toast);
     setTimeout(
             () => closeActiveToast(toast),
             TOAST_DURATION_MS,

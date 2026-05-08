@@ -519,7 +519,7 @@ export async function init(): Promise<void> {
                     'success',
                 );
                 setTimeout(() => {
-                    navigateTo('onboarding');
+                    navigateTo('dashboard');
                 }, 1500);
             }
         }, 800);

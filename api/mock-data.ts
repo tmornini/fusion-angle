@@ -1,7 +1,7 @@
 import type { DbAdapter } from './db.ts';
 import type {
-    UserEntity,
-    UserStatus,
+    PersonEntity,
+    PersonStatus,
     ReadinessLevel,
     IdeaEntity,
     ProjectEntity,
@@ -10,6 +10,12 @@ import type {
     ActivityActorEntity,
     FlowEntity,
     ProjectFlowEntity,
+    RoleEntity,
+    RoleMembershipEntity,
+    CrewEntity,
+    CrewRoleMembershipEntity,
+    ModelEntity,
+    RoleModelMembershipEntity,
     WorkOrderEntity,
     FlowWorkOrderEntity,
     WorkOrderTransitionEntity,
@@ -20,6 +26,8 @@ import {
     jsonObjectField,
     DEFAULT_LOCK_TIMEOUT,
     SECONDS_PER_HOUR,
+    START_NODE_DEFAULT_NAME,
+    END_NODE_DEFAULT_NAME,
 } from './types.ts';
 
 const now = new Date();
@@ -54,8 +62,8 @@ function dt(
         + `T${h}:${mi}:00.000000Z`;
 }
 
-type SeedUser = Omit<
-    UserEntity,
+type SeedPerson = Omit<
+    PersonEntity,
     'strengths' | 'team_dimensions'
 > & {
     strengths: string[];
@@ -67,19 +75,15 @@ type SeedUser = Omit<
 export async function populateMockData(
     adapter: DbAdapter,
 ): Promise<void> {
-    const users: SeedUser[] = [
+    const people: SeedPerson[] = [
         {
             id: 'LhfaUUf4IumVsCSGB4xjdK',
             first_name: 'Sarah',
             last_name: 'Chen',
             email: 'sarah.chen@company.com',
-            role: 'Project Lead',
+            title: 'Project Lead',
             department: 'Operations',
             status: 'active',
-            availability: 85,
-            performance_score: 94,
-            projects_completed: 12,
-            current_projects: 3,
             strengths: [
                 'Strategic Planning',
                 'Team Leadership',
@@ -96,20 +100,15 @@ export async function populateMockData(
                 + ' thrives on aligning'
                 + ' cross-functional teams'
                 + ' around strategic goals.',
-            last_active: dt(0, 16, 0),
         },
         {
             id: 'bLP3X1hb1mSz8gY9neogU3',
             first_name: 'Mike',
             last_name: 'Thompson',
             email: 'mike.thompson@company.com',
-            role: 'ML Engineer',
+            title: 'ML Engineer',
             department: 'Engineering',
             status: 'active',
-            availability: 60,
-            performance_score: 91,
-            projects_completed: 8,
-            current_projects: 2,
             strengths: [
                 'Machine Learning',
                 'Python',
@@ -126,20 +125,15 @@ export async function populateMockData(
                 + ' scalable data pipelines'
                 + ' and production-grade'
                 + ' model deployment.',
-            last_active: dt(1, 15, 30),
         },
         {
             id: 'zyTbfbjcGEfbpCsNTP0XjX',
             first_name: 'Jessica',
             last_name: 'Park',
             email: 'jessica.park@company.com',
-            role: 'Data Scientist',
+            title: 'Data Scientist',
             department: 'Analytics',
             status: 'active',
-            availability: 70,
-            performance_score: 88,
-            projects_completed: 6,
-            current_projects: 2,
             strengths: [
                 'Statistical Analysis',
                 'Visualization',
@@ -156,20 +150,15 @@ export async function populateMockData(
                 + ' about turning complex'
                 + ' datasets into actionable'
                 + ' business insights.',
-            last_active: dt(0, 17, 0),
         },
         {
             id: '6xBfK5If82JKfThXb1wlzS',
             first_name: 'David',
             last_name: 'Martinez',
             email: 'david.martinez@company.com',
-            role: 'Backend Developer',
+            title: 'Backend Developer',
             department: 'Engineering',
             status: 'active',
-            availability: 40,
-            performance_score: 86,
-            projects_completed: 10,
-            current_projects: 4,
             strengths: [
                 'API Development',
                 'Database Design',
@@ -186,20 +175,15 @@ export async function populateMockData(
                 + ' builds reliable APIs'
                 + ' and loves optimizing'
                 + ' database performance.',
-            last_active: dt(0, 14, 0),
         },
         {
             id: '53J8h9dr76XFqCjYcNVwIR',
             first_name: 'Emily',
             last_name: 'Rodriguez',
             email: 'emily.rodriguez@company.com',
-            role: 'UX Designer',
+            title: 'UX Designer',
             department: 'Design',
             status: 'pending',
-            availability: 90,
-            performance_score: 92,
-            projects_completed: 15,
-            current_projects: 1,
             strengths: [
                 'User Research',
                 'Prototyping',
@@ -216,20 +200,15 @@ export async function populateMockData(
                 + ' crafting intuitive'
                 + ' experiences grounded in'
                 + ' user research.',
-            last_active: dt(0, 9, 15),
         },
         {
             id: 'I5ntELi16X3N3JYCCnxMjZ',
             first_name: 'Alex',
             last_name: 'Kim',
             email: 'alex.kim@company.com',
-            role: 'Product Manager',
+            title: 'Product Manager',
             department: 'Product',
             status: 'active',
-            availability: 55,
-            performance_score: 89,
-            projects_completed: 7,
-            current_projects: 3,
             strengths: [
                 'Roadmap Planning',
                 'Stakeholder Management',
@@ -246,20 +225,15 @@ export async function populateMockData(
                 + ' translating customer'
                 + ' needs into clear'
                 + ' roadmaps.',
-            last_active: dt(0, 11, 45),
         },
         {
             id: 'WxQn4LVWb76YkmqK5B0EPp',
             first_name: 'Marcus',
             last_name: 'Johnson',
             email: 'marcus@acmecorp.com',
-            role: 'manager',
+            title: 'manager',
             department: 'Product',
             status: 'active',
-            availability: 80,
-            performance_score: 85,
-            projects_completed: 5,
-            current_projects: 2,
             strengths: [
                 'Product Strategy',
                 'Team Management',
@@ -275,20 +249,15 @@ export async function populateMockData(
                 + ' with a knack for'
                 + ' spotting market gaps'
                 + ' and coaching teams.',
-            last_active: dt(0, 17, 30),
         },
         {
             id: 'jBoWiyWxj7pp4sG3JgX5l2',
             first_name: 'David',
             last_name: 'Kim',
             email: 'david.kim@company.com',
-            role: 'member',
+            title: 'member',
             department: 'Engineering',
             status: 'active',
-            availability: 75,
-            performance_score: 83,
-            projects_completed: 4,
-            current_projects: 2,
             strengths: [
                 'Frontend Development',
                 'React',
@@ -305,20 +274,15 @@ export async function populateMockData(
                 + ' cares deeply about'
                 + ' performance and'
                 + ' accessible UI patterns.',
-            last_active: dt(2, 14, 0),
         },
         {
             id: 'Trf1Up2jMsPhEnjbW4Ji1n',
             first_name: 'Lisa',
             last_name: 'Wang',
             email: 'lisa@acmecorp.com',
-            role: 'viewer',
+            title: 'viewer',
             department: 'Sales',
             status: 'active',
-            availability: 70,
-            performance_score: 80,
-            projects_completed: 3,
-            current_projects: 1,
             strengths: [
                 'Sales Strategy',
                 'Client Relations',
@@ -334,20 +298,15 @@ export async function populateMockData(
                 + ' builds lasting client'
                 + ' relationships through'
                 + ' consultative selling.',
-            last_active: dt(1, 18, 0),
         },
         {
             id: 'oU0bIe0eUC33mTbZrxdogC',
             first_name: 'James',
             last_name: 'Miller',
             email: 'james@acmecorp.com',
-            role: 'member',
+            title: 'member',
             department: 'Engineering',
             status: 'deactivated',
-            availability: 0,
-            performance_score: 78,
-            projects_completed: 6,
-            current_projects: 0,
             strengths: [
                 'Backend Development',
                 'Python',
@@ -363,20 +322,15 @@ export async function populateMockData(
                 + ' strong Python skills'
                 + ' and a focus on clean'
                 + ' architecture.',
-            last_active: dt(7, 18, 0),
         },
         {
             id: 'current',
             first_name: 'Tony',
             last_name: 'Stark',
             email: 'demo@example.com',
-            role: 'Admin',
+            title: 'Admin',
             department: 'Product',
             status: 'active',
-            availability: 100,
-            performance_score: 95,
-            projects_completed: 20,
-            current_projects: 5,
             strengths: [
                 'Strategic Planning',
                 'Data Analysis',
@@ -392,18 +346,17 @@ export async function populateMockData(
             bio: 'Passionate about building'
                 + ' products that solve'
                 + ' real problems.',
-            last_active: dt(0, 18, 0),
         },
     ];
 
-    await Promise.all(users.map(user =>
-        adapter.users.put(user.id, {
-            ...user,
+    await Promise.all(people.map(person =>
+        adapter.people.put(person.id, {
+            ...person,
             strengths:
-                jsonArrayField(user.strengths),
+                jsonArrayField(person.strengths),
             team_dimensions:
                 jsonObjectField(
-                    user.team_dimensions,
+                    person.team_dimensions,
                 ),
         }),
     ));
@@ -874,11 +827,9 @@ export async function populateMockData(
         ...ideas.map(idea =>
             adapter.ideas.put(idea.id, idea),
         ),
-        adapter.company.put({
+        adapter.organization.put({
             name: 'Stark Industries',
             domain: 'acmecorp.com',
-        }),
-        adapter.organization.put({
             plan: 'Business',
             plan_status: 'active',
             next_billing: dt(-300, 0, 0),
@@ -895,7 +846,7 @@ export async function populateMockData(
             health_score: 92,
             health_status: 'excellent',
             last_activity: dt(0, 16, 0),
-            active_users: 14,
+            active_people: 14,
         }),
     ]);
 
@@ -1189,12 +1140,13 @@ export async function populateMockData(
                 nodes: [
                     {
                         id: 'lzkYvFNCEHARBQmZ4YHAn4',
-                        name: 'Start',
+                        name: START_NODE_DEFAULT_NAME,
                         description: '',
                         positionX: 40,
                         positionY: 30,
                         isStart: true,
                         isComplete: false,
+                        crew: { kind: 'unassigned' },
                         fields: [],
                     },
                     {
@@ -1206,6 +1158,11 @@ export async function populateMockData(
                         positionY: 140,
                         isStart: false,
                         isComplete: false,
+                        crew: {
+                            kind: 'crew',
+                            crewId:
+                                'crew_design',
+                        },
                         fields: [
                             {
                                 id: '5JZ0LeKdPCa4QMtg1RsF1M',
@@ -1318,6 +1275,7 @@ export async function populateMockData(
                         positionY: 250,
                         isStart: false,
                         isComplete: false,
+                        crew: { kind: 'unassigned' },
                         fields: [
                             {
                                 id: 'AdQlKf43JV6yrhQbyskDkR',
@@ -1335,12 +1293,13 @@ export async function populateMockData(
                     },
                     {
                         id: '8jSnGiQ4Hedb2G75Y5aT7O',
-                        name: 'End',
+                        name: END_NODE_DEFAULT_NAME,
                         description: '',
                         positionX: 680,
                         positionY: 370,
                         isStart: false,
                         isComplete: true,
+                        crew: { kind: 'unassigned' },
                         fields: [],
                     },
                 ],
@@ -1400,22 +1359,24 @@ export async function populateMockData(
                 nodes: [
                     {
                         id: 'N8iGVHrr3iv0OCqICw2oWo',
-                        name: 'Start',
+                        name: START_NODE_DEFAULT_NAME,
                         description: '',
                         positionX: -702,
                         positionY: -236,
                         isStart: true,
                         isComplete: false,
+                        crew: { kind: 'unassigned' },
                         fields: [],
                     },
                     {
                         id: 'nKbwVydJZixw20nvP2XqfF',
-                        name: 'End',
+                        name: END_NODE_DEFAULT_NAME,
                         description: '',
                         positionX: 436,
                         positionY: 358,
                         isStart: false,
                         isComplete: true,
+                        crew: { kind: 'unassigned' },
                         fields: [],
                     },
                     {
@@ -1426,6 +1387,7 @@ export async function populateMockData(
                         positionY: -234,
                         isStart: false,
                         isComplete: false,
+                        crew: { kind: 'unassigned' },
                         fields: [],
                     },
                     {
@@ -1437,6 +1399,7 @@ export async function populateMockData(
                         positionY: -230,
                         isStart: false,
                         isComplete: false,
+                        crew: { kind: 'unassigned' },
                         fields: [],
                     },
                     {
@@ -1447,6 +1410,7 @@ export async function populateMockData(
                         positionY: -232,
                         isStart: false,
                         isComplete: false,
+                        crew: { kind: 'unassigned' },
                         fields: [],
                     },
                     {
@@ -1457,6 +1421,7 @@ export async function populateMockData(
                         positionY: -231,
                         isStart: false,
                         isComplete: false,
+                        crew: { kind: 'unassigned' },
                         fields: [],
                     },
                     {
@@ -1467,6 +1432,7 @@ export async function populateMockData(
                         positionY: -108,
                         isStart: false,
                         isComplete: false,
+                        crew: { kind: 'unassigned' },
                         fields: [],
                     },
                     {
@@ -1477,6 +1443,7 @@ export async function populateMockData(
                         positionY: -108,
                         isStart: false,
                         isComplete: false,
+                        crew: { kind: 'unassigned' },
                         fields: [],
                     },
                     {
@@ -1487,6 +1454,7 @@ export async function populateMockData(
                         positionY: 22,
                         isStart: false,
                         isComplete: false,
+                        crew: { kind: 'unassigned' },
                         fields: [],
                     },
                     {
@@ -1497,6 +1465,7 @@ export async function populateMockData(
                         positionY: 141,
                         isStart: false,
                         isComplete: false,
+                        crew: { kind: 'unassigned' },
                         fields: [],
                     },
                     {
@@ -1507,6 +1476,7 @@ export async function populateMockData(
                         positionY: -108,
                         isStart: false,
                         isComplete: false,
+                        crew: { kind: 'unassigned' },
                         fields: [],
                     },
                     {
@@ -1517,6 +1487,7 @@ export async function populateMockData(
                         positionY: -108,
                         isStart: false,
                         isComplete: false,
+                        crew: { kind: 'unassigned' },
                         fields: [],
                     },
                     {
@@ -1527,6 +1498,7 @@ export async function populateMockData(
                         positionY: 278,
                         isStart: false,
                         isComplete: false,
+                        crew: { kind: 'unassigned' },
                         fields: [],
                     },
                     {
@@ -1537,6 +1509,7 @@ export async function populateMockData(
                         positionY: -3,
                         isStart: false,
                         isComplete: false,
+                        crew: { kind: 'unassigned' },
                         fields: [],
                     },
                     {
@@ -1548,6 +1521,7 @@ export async function populateMockData(
                         positionY: -7,
                         isStart: false,
                         isComplete: false,
+                        crew: { kind: 'unassigned' },
                         fields: [],
                     },
                     {
@@ -1559,6 +1533,7 @@ export async function populateMockData(
                         positionY: 81,
                         isStart: false,
                         isComplete: false,
+                        crew: { kind: 'unassigned' },
                         fields: [],
                     },
                     {
@@ -1570,6 +1545,7 @@ export async function populateMockData(
                         positionY: 274,
                         isStart: false,
                         isComplete: false,
+                        crew: { kind: 'unassigned' },
                         fields: [],
                     },
                     {
@@ -1581,6 +1557,7 @@ export async function populateMockData(
                         positionY: 214,
                         isStart: false,
                         isComplete: false,
+                        crew: { kind: 'unassigned' },
                         fields: [],
                     },
                 ],
@@ -1774,12 +1751,13 @@ export async function populateMockData(
                 nodes: [
                     {
                         id: 'qfuFbfKwwlpKAewu3Uujb7',
-                        name: 'Start',
+                        name: START_NODE_DEFAULT_NAME,
                         description: '',
                         positionX: 0,
                         positionY: 0,
                         isStart: true,
                         isComplete: false,
+                        crew: { kind: 'unassigned' },
                         fields: [],
                     },
                     {
@@ -1790,6 +1768,7 @@ export async function populateMockData(
                         positionY: 0,
                         isStart: false,
                         isComplete: false,
+                        crew: { kind: 'unassigned' },
                         fields: [],
                     },
                     {
@@ -1800,6 +1779,7 @@ export async function populateMockData(
                         positionY: 0,
                         isStart: false,
                         isComplete: false,
+                        crew: { kind: 'unassigned' },
                         fields: [],
                     },
                     {
@@ -1810,6 +1790,7 @@ export async function populateMockData(
                         positionY: 0,
                         isStart: false,
                         isComplete: false,
+                        crew: { kind: 'unassigned' },
                         fields: [],
                     },
                     {
@@ -1820,6 +1801,7 @@ export async function populateMockData(
                         positionY: 0,
                         isStart: false,
                         isComplete: false,
+                        crew: { kind: 'unassigned' },
                         fields: [],
                     },
                     {
@@ -1830,6 +1812,7 @@ export async function populateMockData(
                         positionY: 0,
                         isStart: false,
                         isComplete: false,
+                        crew: { kind: 'unassigned' },
                         fields: [],
                     },
                     {
@@ -1840,6 +1823,7 @@ export async function populateMockData(
                         positionY: 0,
                         isStart: false,
                         isComplete: false,
+                        crew: { kind: 'unassigned' },
                         fields: [],
                     },
                     {
@@ -1850,6 +1834,7 @@ export async function populateMockData(
                         positionY: 0,
                         isStart: false,
                         isComplete: false,
+                        crew: { kind: 'unassigned' },
                         fields: [],
                     },
                     {
@@ -1860,6 +1845,7 @@ export async function populateMockData(
                         positionY: 0,
                         isStart: false,
                         isComplete: false,
+                        crew: { kind: 'unassigned' },
                         fields: [],
                     },
                     {
@@ -1870,6 +1856,7 @@ export async function populateMockData(
                         positionY: 0,
                         isStart: false,
                         isComplete: false,
+                        crew: { kind: 'unassigned' },
                         fields: [],
                     },
                     {
@@ -1880,6 +1867,7 @@ export async function populateMockData(
                         positionY: 0,
                         isStart: false,
                         isComplete: false,
+                        crew: { kind: 'unassigned' },
                         fields: [],
                     },
                     {
@@ -1890,6 +1878,7 @@ export async function populateMockData(
                         positionY: 0,
                         isStart: false,
                         isComplete: false,
+                        crew: { kind: 'unassigned' },
                         fields: [],
                     },
                     {
@@ -1900,6 +1889,7 @@ export async function populateMockData(
                         positionY: 0,
                         isStart: false,
                         isComplete: false,
+                        crew: { kind: 'unassigned' },
                         fields: [],
                     },
                     {
@@ -1910,6 +1900,7 @@ export async function populateMockData(
                         positionY: 0,
                         isStart: false,
                         isComplete: false,
+                        crew: { kind: 'unassigned' },
                         fields: [],
                     },
                     {
@@ -1920,6 +1911,7 @@ export async function populateMockData(
                         positionY: 0,
                         isStart: false,
                         isComplete: false,
+                        crew: { kind: 'unassigned' },
                         fields: [],
                     },
                     {
@@ -1930,16 +1922,18 @@ export async function populateMockData(
                         positionY: 0,
                         isStart: false,
                         isComplete: false,
+                        crew: { kind: 'unassigned' },
                         fields: [],
                     },
                     {
                         id: '9r0eSQ4ndyaRoYbKTTDpW2',
-                        name: 'End',
+                        name: END_NODE_DEFAULT_NAME,
                         description: '',
                         positionX: 0,
                         positionY: 0,
                         isStart: false,
                         isComplete: true,
+                        crew: { kind: 'unassigned' },
                         fields: [],
                     },
                 ],
@@ -2171,9 +2165,9 @@ export async function populateMockData(
         'wDcQp0cIycrtWXEde6IsB1';
     const woNodeComplete =
         '8jSnGiQ4Hedb2G75Y5aT7O';
-    const woUserSarah =
+    const woPersonSarah =
         'LhfaUUf4IumVsCSGB4xjdK';
-    const woUserMike =
+    const woPersonMike =
         'bLP3X1hb1mSz8gY9neogU3';
     const fCompanyName =
         '5JZ0LeKdPCa4QMtg1RsF1M';
@@ -2236,7 +2230,7 @@ export async function populateMockData(
             work_order_id: woId,
             from_node_id: '',
             to_node_id: woNodeNew,
-            user_id: woUserSarah,
+            person_id: woPersonSarah,
             transitioned_at:
                 woCreated,
         },
@@ -2245,7 +2239,7 @@ export async function populateMockData(
             work_order_id: woId,
             from_node_id: woNodeNew,
             to_node_id: woNodeCapture,
-            user_id: woUserSarah,
+            person_id: woPersonSarah,
             transitioned_at:
                 woCreated,
         },
@@ -2255,7 +2249,7 @@ export async function populateMockData(
             from_node_id:
                 woNodeCapture,
             to_node_id: woNodeReview,
-            user_id: woUserMike,
+            person_id: woPersonMike,
             transitioned_at:
                 dt(13, 14, 30),
         },
@@ -2266,7 +2260,7 @@ export async function populateMockData(
                 woNodeReview,
             to_node_id:
                 woNodeComplete,
-            user_id: woUserSarah,
+            person_id: woPersonSarah,
             transitioned_at:
                 dt(12, 9, 15),
         },
@@ -2360,174 +2354,72 @@ export async function populateMockData(
         ),
     ]);
 
-    const teams: {
-        id: string;
-        project_id: string;
-        user_id: string;
-        role: string;
-        type: string;
-    }[] = [
-        {
-            id: 'XARaNl9lkkoEoyGA31GeiR',
-            project_id: 'u6YkHhlGc91oDMkr3x0isa',
-            user_id: 'LhfaUUf4IumVsCSGB4xjdK',
-            role: 'lead',
-            type: 'business',
-        },
-        {
-            id: 'qOzPKSg2EAYWZpBlnRIVec',
-            project_id: 'u6YkHhlGc91oDMkr3x0isa',
-            user_id: 'bLP3X1hb1mSz8gY9neogU3',
-            role: 'ML Engineer',
-            type: 'engineering',
-        },
-        {
-            id: '5uWbMZKZDKs951Zl0qA7IA',
-            project_id: 'u6YkHhlGc91oDMkr3x0isa',
-            user_id: 'zyTbfbjcGEfbpCsNTP0XjX',
-            role: 'Data Scientist',
-            type: 'engineering',
-        },
-        {
-            id: 'JjEKNqt7EDSkhj0gHnMFnj',
-            project_id: 'u6YkHhlGc91oDMkr3x0isa',
-            user_id: '6xBfK5If82JKfThXb1wlzS',
-            role: 'Backend Developer',
-            type: 'engineering',
-        },
-        {
-            id: 'wn3gLT5QSvsaQUKrXWucAF',
-            project_id: 'jRE2Tj32NHsFGZIeEADp0p',
-            user_id: 'bLP3X1hb1mSz8gY9neogU3',
-            role: 'lead',
-            type: 'business',
-        },
-        {
-            id: 'gXbBsrFFPTNdg6J0ykx1ou',
-            project_id: 'YXUxtljJj6ebsQEFZ5nSI1',
-            user_id: '53J8h9dr76XFqCjYcNVwIR',
-            role: 'lead',
-            type: 'business',
-        },
-        {
-            id: '4mPPt7wT0Qq10gQwTYxGq2',
-            project_id: 'sf1hZEIvey6seX1fbUwXMq',
-            user_id: 'jBoWiyWxj7pp4sG3JgX5l2',
-            role: 'lead',
-            type: 'business',
-        },
-        {
-            id: 'TT2kiaUOSCGnF1zgT0jvmf',
-            project_id: 'efwJPwQFljYHZYMuhetyow',
-            user_id: 'Trf1Up2jMsPhEnjbW4Ji1n',
-            role: 'lead',
-            type: 'business',
-        },
-        {
-            id: '5No60FKBCvuB0F5osnsM3U',
-            project_id: 'zzcBNqWXtKs6kt7ggcRndY',
-            user_id: 'zyTbfbjcGEfbpCsNTP0XjX',
-            role: 'lead',
-            type: 'business',
-        },
-    ];
-    await Promise.all([
-        ...teams.map(tm =>
-            adapter.teams.put(
-                tm.id,
-                {
-                    role: tm.role,
-                    type: tm.type,
-                },
-            ),
-        ),
-        ...teams.map(tm =>
-            adapter.teamProjects
-                .put(`tmp-${tm.id}`, {
-                    team_id:
-                        tm.id,
-                    project_id:
-                        tm.project_id,
-                    created_at: dt(75, 9, 0),
-                }),
-        ),
-        ...teams.map(tm =>
-            adapter.teamUsers
-                .put(`tmu-${tm.id}`, {
-                    team_id:
-                        tm.id,
-                    user_id: tm.user_id,
-                    created_at: dt(75, 9, 0),
-                }),
-        ),
-    ]);
-
     const ideaSubmissions:
         IdeaSubmissionEntity[] = [
         {
             id: 'k4dY2dPq90mQVwwCkhWIo3',
             idea_id: 'eT5xdKjzLDmuRn3r7XMX4R',
-            user_id: 'LhfaUUf4IumVsCSGB4xjdK',
+            person_id: 'LhfaUUf4IumVsCSGB4xjdK',
             created_at: dt(75, 9, 30),
         },
         {
             id: 'XC7hsfNJueKQ8q0UfCuC7o',
             idea_id: 'cbTuSs0Ex84PeFGSvoAEFZ',
-            user_id: 'bLP3X1hb1mSz8gY9neogU3',
+            person_id: 'bLP3X1hb1mSz8gY9neogU3',
             created_at: dt(70, 9, 0),
         },
         {
             id: 'YmzT46BbGVFALpiXFDnlVd',
             idea_id: 'wuCMQqo4IkEksx7MYmu8g2',
-            user_id: '53J8h9dr76XFqCjYcNVwIR',
+            person_id: '53J8h9dr76XFqCjYcNVwIR',
             created_at: dt(65, 9, 0),
         },
         {
             id: 'cmoTu4GRGmO8y5QrfPIHSm',
             idea_id: 'ojOEXtdzdtTZtpM81TxVca',
-            user_id: 'jBoWiyWxj7pp4sG3JgX5l2',
+            person_id: 'jBoWiyWxj7pp4sG3JgX5l2',
             created_at: dt(55, 9, 0),
         },
         {
             id: 'kIUtvgTOLPjsSmAEVOhPb1',
             idea_id: 'T2vAafLDcshDONlYxpzPLc',
-            user_id: 'Trf1Up2jMsPhEnjbW4Ji1n',
+            person_id: 'Trf1Up2jMsPhEnjbW4Ji1n',
             created_at: dt(50, 9, 0),
         },
         {
             id: 'r04u9qpJKSyNjP9Owxr5Be',
             idea_id: 'HRYrImq1rBJ5ZRe1T9TAVk',
-            user_id: 'zyTbfbjcGEfbpCsNTP0XjX',
+            person_id: 'zyTbfbjcGEfbpCsNTP0XjX',
             created_at: dt(45, 9, 0),
         },
         {
             id: '2mPJTlujj1RF6gexFwbDqJ',
             idea_id: 'MCxK0hzT9CPjJx1ZV5unfr',
-            user_id: 'LhfaUUf4IumVsCSGB4xjdK',
+            person_id: 'LhfaUUf4IumVsCSGB4xjdK',
             created_at: dt(75, 10, 0),
         },
         {
             id: 'caBSqTgzDnvP8joamAG9OG',
             idea_id: 'SUb4gKXsZ1OsEauzqszg0t',
-            user_id: 'WxQn4LVWb76YkmqK5B0EPp',
+            person_id: 'WxQn4LVWb76YkmqK5B0EPp',
             created_at: dt(35, 9, 0),
         },
         {
             id: 'UfsCp7WYUybhwxD170okb4',
             idea_id: 'gxa84W9KvEgD0wT1F4TOM9',
-            user_id: '53J8h9dr76XFqCjYcNVwIR',
+            person_id: '53J8h9dr76XFqCjYcNVwIR',
             created_at: dt(30, 9, 0),
         },
         {
             id: 'mbTZAQbC5cJSEIzhEEFpyq',
             idea_id: '1Z68gROMrlTAfPEGiyJJAY',
-            user_id: 'jBoWiyWxj7pp4sG3JgX5l2',
+            person_id: 'jBoWiyWxj7pp4sG3JgX5l2',
             created_at: dt(25, 9, 0),
         },
         {
             id: '0LjTHFflWNaDZkKDqxmwJi',
             idea_id: 'Q2On2xwMpFdzOklBQJXrni',
-            user_id: 'Trf1Up2jMsPhEnjbW4Ji1n',
+            person_id: 'Trf1Up2jMsPhEnjbW4Ji1n',
             created_at: dt(20, 9, 0),
         },
     ];
@@ -2537,62 +2429,211 @@ export async function populateMockData(
         {
             id: 'b46Mr8QWIMo4EDBxxhfkWL',
             activity_id: 'Ng6GWmx7DNmLsGshK3lBfU',
-            user_id: 'LhfaUUf4IumVsCSGB4xjdK',
+            person_id: 'LhfaUUf4IumVsCSGB4xjdK',
             created_at: dt(0, 17, 50),
         },
         {
             id: 'pgyIzpoLgG8Vv6FgYF4DV8',
             activity_id: 'p3H9tGtQwFwQXpUiYyinT6',
-            user_id: 'WxQn4LVWb76YkmqK5B0EPp',
+            person_id: 'WxQn4LVWb76YkmqK5B0EPp',
             created_at: dt(0, 17, 35),
         },
         {
             id: 'SJalTSor6JhpoPincDXLeY',
             activity_id: '5PGE1WlEOTkSaNYjiBXLMA',
-            user_id: '53J8h9dr76XFqCjYcNVwIR',
+            person_id: '53J8h9dr76XFqCjYcNVwIR',
             created_at: dt(0, 17, 0),
         },
         {
             id: 'JvodSYYA6w1ithWEirfNVg',
             activity_id: 'fOqTfg9JPs73xsnC4QUmHs',
-            user_id: '6xBfK5If82JKfThXb1wlzS',
+            person_id: '6xBfK5If82JKfThXb1wlzS',
             created_at: dt(0, 16, 0),
         },
         {
             id: 'BExIeH5NDiGVGQnrP8phOs',
             activity_id: '3pBQbQp4LPK2udgd21HlTm',
-            user_id: 'I5ntELi16X3N3JYCCnxMjZ',
+            person_id: 'I5ntELi16X3N3JYCCnxMjZ',
             created_at: dt(0, 15, 0),
         },
         {
             id: 'pC3hoLmzaVyxJSGOHsmV5j',
             activity_id: 'CqXHcyiDNzFVcoUM2M1Tl3',
-            user_id: 'Trf1Up2jMsPhEnjbW4Ji1n',
+            person_id: 'Trf1Up2jMsPhEnjbW4Ji1n',
             created_at: dt(0, 14, 0),
         },
         {
             id: 'PsG42X7oevXgC5DRy4irTW',
             activity_id: 'Kj75MtFxnEpFZs4MSK1emd',
-            user_id: 'oU0bIe0eUC33mTbZrxdogC',
+            person_id: 'oU0bIe0eUC33mTbZrxdogC',
             created_at: dt(0, 13, 0),
         },
         {
             id: 'bPgxi8YCw4yTFctLef62gB',
             activity_id: 'xRmfZFNV8GYDQmq8j09Fsc',
-            user_id: 'LhfaUUf4IumVsCSGB4xjdK',
+            person_id: 'LhfaUUf4IumVsCSGB4xjdK',
             created_at: dt(0, 12, 0),
         },
         {
             id: '2dp7FPj4gjWYtfR78D3wI2',
             activity_id: 'hP80lUSXqn1PSleymgE3Ks',
-            user_id: '53J8h9dr76XFqCjYcNVwIR',
+            person_id: '53J8h9dr76XFqCjYcNVwIR',
             created_at: dt(1, 18, 0),
         },
         {
             id: 'Rf5G2Dh1ejnvzxbpW6hcrm',
             activity_id: 'XMltAG0dpolQLDTfd5GLWj',
-            user_id: 'WxQn4LVWb76YkmqK5B0EPp',
+            person_id: 'WxQn4LVWb76YkmqK5B0EPp',
             created_at: dt(1, 15, 0),
+        },
+    ];
+
+    const roles: RoleEntity[] = [
+        {
+            id: 'role_engineering',
+            name: 'Engineering',
+            description:
+                'Builds and maintains'
+                + ' the platform.',
+            created_at: dt(0, 9, 0),
+        },
+        {
+            id: 'role_qa',
+            name: 'QA',
+            description:
+                'Verifies that what ships'
+                + ' matches what was promised.',
+            created_at: dt(0, 9, 0),
+        },
+        {
+            id: 'role_product',
+            name: 'Product',
+            description:
+                'Decides what is worth'
+                + ' building, and why.',
+            created_at: dt(0, 9, 0),
+        },
+    ];
+
+    const roleMemberships:
+        RoleMembershipEntity[] = [
+        {
+            id: 'rm_eng_david',
+            role_id: 'role_engineering',
+            person_id: 'jBoWiyWxj7pp4sG3JgX5l2',
+            created_at: dt(0, 9, 5),
+        },
+        {
+            id: 'rm_eng_james',
+            role_id: 'role_engineering',
+            person_id: 'oU0bIe0eUC33mTbZrxdogC',
+            created_at: dt(0, 9, 5),
+        },
+        {
+            id: 'rm_qa_lisa',
+            role_id: 'role_qa',
+            person_id: 'Trf1Up2jMsPhEnjbW4Ji1n',
+            created_at: dt(0, 9, 6),
+        },
+        {
+            id: 'rm_product_marcus',
+            role_id: 'role_product',
+            person_id: 'WxQn4LVWb76YkmqK5B0EPp',
+            created_at: dt(0, 9, 7),
+        },
+    ];
+
+    const crews: CrewEntity[] = [
+        {
+            id: 'crew_delivery',
+            name: 'Delivery Squad',
+            description:
+                'Engineering and QA working'
+                + ' together on shipments.',
+            created_at: dt(0, 10, 0),
+        },
+        {
+            id: 'crew_design',
+            name: 'Design Crew',
+            description:
+                'Product and the demo user'
+                + ' shaping the experience.',
+            created_at: dt(0, 10, 1),
+        },
+    ];
+
+    const crewRoleMemberships:
+        CrewRoleMembershipEntity[] = [
+        {
+            id: 'crm_delivery_eng',
+            crew_id: 'crew_delivery',
+            role_id: 'role_engineering',
+            created_at: dt(0, 10, 5),
+        },
+        {
+            id: 'crm_delivery_qa',
+            crew_id: 'crew_delivery',
+            role_id: 'role_qa',
+            created_at: dt(0, 10, 5),
+        },
+        {
+            id: 'crm_design_product',
+            crew_id: 'crew_design',
+            role_id: 'role_product',
+            created_at: dt(0, 10, 6),
+        },
+        {
+            id: 'crm_design_current',
+            crew_id: 'crew_design',
+            role_id: 'user-private:current',
+            created_at: dt(0, 10, 6),
+        },
+    ];
+
+    const models: ModelEntity[] = [
+        {
+            id: 'model_claude_opus',
+            name: 'Claude Opus 4.7 Max',
+            provider: 'Anthropic',
+            description:
+                'Anthropic flagship — long'
+                + ' context, deep reasoning.',
+            created_at: dt(0, 11, 0),
+        },
+        {
+            id: 'model_claude_sonnet',
+            name: 'Claude Sonnet 4.6',
+            provider: 'Anthropic',
+            description:
+                'Anthropic mid-tier — fast'
+                + ' and capable.',
+            created_at: dt(0, 11, 0),
+        },
+        {
+            id: 'model_gpt_5_4_pro',
+            name: 'GPT-5.4 Pro',
+            provider: 'OpenAI',
+            description:
+                'OpenAI multimodal flagship.',
+            created_at: dt(0, 11, 0),
+        },
+        {
+            id: 'model_grok_heavy',
+            name: 'Grok 4.20 Heavy',
+            provider: 'xAI',
+            description:
+                'xAI heavy-compute model.',
+            created_at: dt(0, 11, 0),
+        },
+    ];
+
+    const roleModelMemberships:
+        RoleModelMembershipEntity[] = [
+        {
+            id: 'rmm_eng_claude_opus',
+            role_id: 'role_engineering',
+            model_id: 'model_claude_opus',
+            created_at: dt(0, 11, 5),
         },
     ];
 
@@ -2630,6 +2671,30 @@ export async function populateMockData(
             adapter.transitionFieldValues
                 .put(r.id, r),
         ),
+        ...roles.map(r =>
+            adapter.roles.put(r.id, r),
+        ),
+        ...roleMemberships.map(r =>
+            adapter.roleMemberships.put(
+                r.id, r,
+            ),
+        ),
+        ...crews.map(c =>
+            adapter.crews.put(c.id, c),
+        ),
+        ...models.map(m =>
+            adapter.models.put(m.id, m),
+        ),
+        ...roleModelMemberships.map(r =>
+            adapter.roleModelMemberships.put(
+                r.id, r,
+            ),
+        ),
+        ...crewRoleMemberships.map(r =>
+            adapter.crewRoleMemberships.put(
+                r.id, r,
+            ),
+        ),
     ]);
 }
 
@@ -2637,17 +2702,13 @@ export async function populateBootstrapData(
     adapter: DbAdapter,
 ): Promise<void> {
     await Promise.all([
-        adapter.users.put('current', {
+        adapter.people.put('current', {
             first_name: 'Tony',
             last_name: 'Stark',
             email: 'demo@example.com',
-            role: 'Admin',
+            title: 'Admin',
             department: 'Product',
-            status: 'active' as UserStatus,
-            availability: 100,
-            performance_score: 95,
-            projects_completed: 20,
-            current_projects: 5,
+            status: 'active' as PersonStatus,
             strengths: jsonArrayField([
                 'Strategic Planning',
                 'Data Analysis',
@@ -2663,13 +2724,10 @@ export async function populateBootstrapData(
             bio: 'Passionate about building'
                 + ' products that solve'
                 + ' real problems.',
-            last_active: dt(0, 18, 0),
-        }),
-        adapter.company.put({
-            name: 'Stark Industries',
-            domain: 'acmecorp.com',
         }),
         adapter.organization.put({
+            name: 'Stark Industries',
+            domain: 'acmecorp.com',
             plan: 'Business',
             plan_status: 'active',
             next_billing: dt(-300, 0, 0),
@@ -2686,7 +2744,7 @@ export async function populateBootstrapData(
             health_score: 92,
             health_status: 'excellent',
             last_activity: dt(0, 16, 0),
-            active_users: 14,
+            active_people: 14,
         }),
     ]);
 }

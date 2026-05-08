@@ -2,6 +2,7 @@ import {
     nowUtc,
     jsonObjectField,
     DEFAULT_LOCK_TIMEOUT,
+    DEFAULT_NODE_ASSIGNMENT,
     projectIsNotDeleted,
 } from '../../../api/types.ts';
 import type {
@@ -158,10 +159,9 @@ function buildFlowTxt(
         + minuteUtc(':') + '\n';
 }
 
-/* ── v2 backup format ───────────── */
+/* ── backup format ──────────────── */
 
-export interface BackupV2 {
-    version: 2;
+export interface Backup {
     exportedAt: string;
     projectId: string | undefined;
     flow: {
@@ -286,8 +286,7 @@ function buildBackupJson(
     const graph = validateStoredGraphJson(
         flow.graph, 'flow.graph',
     );
-    const backup: BackupV2 = {
-        version: 2,
+    const backup: Backup = {
         exportedAt: minuteUtc(':'),
         projectId,
         flow: {
@@ -384,22 +383,14 @@ export async function getFlowZip(
     };
 }
 
-/* ── v2 import ───────────────── */
+/* ── import ───────────────── */
 
-function validateBackupV2Json(
+function validateBackupJson(
     raw: string,
-): BackupV2 {
+): Backup {
     const label = 'backup';
     const parsed = parseOrThrow(raw, label);
     const obj = asObject(parsed, label);
-    const version = obj['version'];
-    if (version !== 2) {
-        throw new Error(
-            'unsupported backup version '
-                + 'for ' + label + ', got '
-                + String(version),
-        );
-    }
     const flowObj = asObject(
         obj['flow'], label + '.flow',
     );
@@ -416,7 +407,6 @@ function validateBackupV2Json(
                 label + '.projectId',
             );
     return {
-        version: 2,
         exportedAt: asString(
             obj['exportedAt'],
             label + '.exportedAt',
@@ -460,7 +450,7 @@ function validateBackupV2Json(
 
 export async function getBackupFromZip(
     data: Uint8Array,
-): Promise<BackupV2> {
+): Promise<Backup> {
     const entries = await getZipEntries(data);
     const jsonEntry = entries.find(
         e => e.name === 'flow.json'
@@ -476,12 +466,12 @@ export async function getBackupFromZip(
     const dec = new TextDecoder();
     const text =
         dec.decode(jsonEntry.data);
-    return validateBackupV2Json(text);
+    return validateBackupJson(text);
 }
 
 export async function computeFlowBackupResolution(
     ctx: FetchContext,
-    backup: BackupV2,
+    backup: Backup,
 ): Promise<ImportResolution> {
     const [flows, projects] =
         await Promise.all([
@@ -515,7 +505,7 @@ export async function computeFlowBackupResolution(
 export async function postFlowFromBackup(
     ctx: FetchContext,
     flowId: string,
-    backup: BackupV2,
+    backup: Backup,
     projectId: string,
 ): Promise<string> {
     const now = nowUtc();
@@ -537,6 +527,7 @@ export async function postFlowFromBackup(
             positionY: n.positionY,
             isStart: n.isStart,
             isComplete: n.isComplete,
+            crew: n.crew,
             fields: n.fields.map(
                 f => ({
                     id: generateCryptoSafeBase62(),
@@ -574,8 +565,7 @@ export async function postFlowFromBackup(
             };
         });
 
-    await ctx.PUT<void>('flows', {
-        id: flowId,
+    await ctx.PUT<void>(`flows/${flowId}`, {
         name: backup.flow.name,
         description:
             backup.flow.description,
@@ -594,9 +584,8 @@ export async function postFlowFromBackup(
     });
 
     await ctx.PUT<void>(
-        'project-flows',
+        `project-flows/${generateCryptoSafeBase62()}`,
         {
-            id: generateCryptoSafeBase62(),
             project_id: projectId,
             flow_id: flowId,
             created_at: now,
@@ -889,6 +878,7 @@ export async function postFlowFromMermaid(
                     positionY: pos.y,
                     isStart: false,
                     isComplete: false,
+                    crew: DEFAULT_NODE_ASSIGNMENT,
                     fields: [],
                 };
             },
@@ -911,8 +901,7 @@ export async function postFlowFromMermaid(
                 + ' intermediate state',
         );
     }
-    await ctx.PUT<void>('flows', {
-        id: flowId,
+    await ctx.PUT<void>(`flows/${flowId}`, {
         name:
             firstNode.name + ' (import)',
         description: '',
@@ -925,12 +914,14 @@ export async function postFlowFromMermaid(
         updated_at: now,
     });
 
-    await ctx.PUT<void>('project-flows', {
-        id: generateCryptoSafeBase62(),
-        project_id: projectId,
-        flow_id: flowId,
-        created_at: now,
-    });
+    await ctx.PUT<void>(
+        `project-flows/${generateCryptoSafeBase62()}`,
+        {
+            project_id: projectId,
+            flow_id: flowId,
+            created_at: now,
+        },
+    );
 
     notifyFlowChange();
     return {
@@ -1309,6 +1300,7 @@ export async function postFlowFromZip(
                     positionY: pos.y,
                     isStart: false,
                     isComplete: false,
+                    crew: DEFAULT_NODE_ASSIGNMENT,
                     fields: sc
                         ? sidecarFieldsToGraph(
                             sc,
@@ -1344,8 +1336,7 @@ export async function postFlowFromZip(
         ? sidecar.description
         : firstNode!.name;
 
-    await ctx.PUT<void>('flows', {
-        id: flowId,
+    await ctx.PUT<void>(`flows/${flowId}`, {
         name: flowName,
         description: flowDesc,
         is_locked: false,
@@ -1357,12 +1348,14 @@ export async function postFlowFromZip(
         updated_at: now,
     });
 
-    await ctx.PUT<void>('project-flows', {
-        id: generateCryptoSafeBase62(),
-        project_id: projectId,
-        flow_id: flowId,
-        created_at: now,
-    });
+    await ctx.PUT<void>(
+        `project-flows/${generateCryptoSafeBase62()}`,
+        {
+            project_id: projectId,
+            flow_id: flowId,
+            created_at: now,
+        },
+    );
 
     notifyFlowChange();
     return {
