@@ -13,18 +13,22 @@ import {
     navigateTo,
 } from '../app/core.ts';
 import {
-    createFetchContext,
+    createRequestContext,
     getFlowGraph,
     getFlowMermaid,
     getFlowZip,
     getFlowVersions,
     getPersonMap,
+    getRoleMap,
+    getRoleMembershipRows,
     getMembersOfCrew,
+    getCrewMap,
+    getModelMap,
     postClipboardCopy,
     subscribeResize,
 } from '../app/adapters/index.ts';
 import type {
-    FetchContext,
+    RequestContext,
 } from '../app/adapters/index.ts';
 import type { NodeAssignment } from '../../api/types.ts';
 import {
@@ -326,7 +330,7 @@ async function reportOpFailure(
 ): Promise<void> {
     showToast(toast, toastVariant);
     const g = await getFlowGraph(
-        createFetchContext(), flowId,
+        createRequestContext(), flowId,
     );
     const current = pageState.presenter().snapshot();
     commit({
@@ -863,7 +867,7 @@ async function handleCopyMermaid(
     try {
         text =
             await getFlowMermaid(
-                createFetchContext(), flowId,
+                createRequestContext(), flowId,
             );
     } catch (err) {
         log.error(
@@ -907,7 +911,7 @@ async function handleExportZip(
     try {
         result =
             await getFlowZip(
-                createFetchContext(), flowId,
+                createRequestContext(), flowId,
             );
     } catch (err) {
         log.error(
@@ -934,10 +938,10 @@ async function handleExportZip(
 }
 
 async function buildRoleMemberCounts(
-    ctx: FetchContext,
+    ctx: RequestContext,
 ): Promise<Map<string, number>> {
     const rows =
-        await ctx.getRoleMembershipRows();
+        await getRoleMembershipRows(ctx);
     const counts = new Map<string, number>();
     for (const row of rows) {
         counts.set(
@@ -949,9 +953,9 @@ async function buildRoleMemberCounts(
 }
 
 async function buildCrewMemberCounts(
-    ctx: FetchContext,
+    ctx: RequestContext,
 ): Promise<Map<string, number>> {
-    const crewMap = await ctx.getCrewMap();
+    const crewMap = await getCrewMap(ctx);
     const counts = new Map<string, number>();
     for (const crewId of crewMap.keys()) {
         const members = await getMembersOfCrew(
@@ -1243,7 +1247,7 @@ export async function init(
         container,
         buildSkeleton('detail', 1),
         async () => {
-            const ctx = createFetchContext();
+            const ctx = createRequestContext();
             const [
                 graph, versions,
                 personMap, roleMap,
@@ -1254,11 +1258,11 @@ export async function init(
                 getFlowGraph(ctx, flowId),
                 getFlowVersions(ctx, flowId),
                 getPersonMap(ctx),
-                ctx.getRoleMap(),
+                getRoleMap(ctx),
                 buildRoleMemberCounts(ctx),
-                ctx.getCrewMap(),
+                getCrewMap(ctx),
                 buildCrewMemberCounts(ctx),
-                ctx.getModelMap(),
+                getModelMap(ctx),
             ]);
             return {
                 graph, versions,

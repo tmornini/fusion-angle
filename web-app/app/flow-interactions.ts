@@ -27,6 +27,15 @@ type CooldownState =
     | { kind: 'never' }
     | { kind: 'last'; at: number };
 
+function isCooldownActive(
+    cooldown: CooldownState,
+    now: number,
+): boolean {
+    return cooldown.kind === 'last'
+        && now - cooldown.at
+            < WHEEL_TOAST_COOLDOWN_MS;
+}
+
 const toastWithCooldown = (() => {
     let cooldown: CooldownState =
         { kind: 'never' };
@@ -35,11 +44,7 @@ const toastWithCooldown = (() => {
         tone: 'error' | 'success',
     ): void => {
         const now = Date.now();
-        if (
-            cooldown.kind === 'last'
-            && now - cooldown.at
-                < WHEEL_TOAST_COOLDOWN_MS
-        ) return;
+        if (isCooldownActive(cooldown, now)) return;
         cooldown = { kind: 'last', at: now };
         showToast(msg, tone);
     };

@@ -8,13 +8,16 @@ import {
     Role,
     nowUtc,
 } from '../../../api/types.ts';
-import type { FetchContext } from './shared.ts';
+import type { RequestContext } from './shared.ts';
 import {
     createSubscriptionChannel,
 } from '../channels.ts';
 import {
     generateCryptoSafeBase62,
 } from './crypto-safe-base62.ts';
+import {
+    getRoleMap,
+} from './roles.ts';
 
 export {
     Model,
@@ -23,6 +26,26 @@ export type {
     ModelEntity,
     RoleModelMembershipEntity,
 } from '../../../api/types.ts';
+
+export async function getModelMap(
+    ctx: RequestContext,
+): Promise<Map<Id, Model>> {
+    const rows =
+        await ctx.GET<ModelEntity[]>('models');
+    return new Map(
+        rows.map(
+            entity => [entity.id, new Model(entity)],
+        ),
+    );
+}
+
+export async function getRoleModelMembershipRows(
+    ctx: RequestContext,
+): Promise<RoleModelMembershipEntity[]> {
+    return ctx.GET<RoleModelMembershipEntity[]>(
+        'role-model-memberships',
+    );
+}
 
 const modelChanges =
     createSubscriptionChannel([
@@ -48,17 +71,17 @@ export function subscribeRoleModelMembershipChanges(
 }
 
 export async function getModels(
-    ctx: FetchContext,
+    ctx: RequestContext,
 ): Promise<Model[]> {
-    const map = await ctx.getModelMap();
+    const map = await getModelMap(ctx);
     return Array.from(map.values());
 }
 
 export async function getModel(
-    ctx: FetchContext,
+    ctx: RequestContext,
     id: Id,
 ): Promise<Model> {
-    const map = await ctx.getModelMap();
+    const map = await getModelMap(ctx);
     const model = map.get(id);
     if (!model) {
         throw new Error(
@@ -69,7 +92,7 @@ export async function getModel(
 }
 
 export async function putModel(
-    ctx: FetchContext,
+    ctx: RequestContext,
     id: Id,
     entity: Omit<ModelEntity, 'id'>,
 ): Promise<void> {
@@ -82,11 +105,11 @@ export async function putModel(
 // the model itself, in a single ctx.commit.
 // Article on Atomicity.
 export async function deleteModel(
-    ctx: FetchContext,
+    ctx: RequestContext,
     modelId: Id,
 ): Promise<void> {
     const memberships =
-        await ctx.getRoleModelMembershipRows();
+        await getRoleModelMembershipRows(ctx);
     const cascadeIds = memberships
         .filter(m => m.model_id === modelId)
         .map(m => m.id);
@@ -108,13 +131,13 @@ export async function deleteModel(
 }
 
 export async function getModelsInRole(
-    ctx: FetchContext,
+    ctx: RequestContext,
     roleId: Id,
 ): Promise<Model[]> {
     const [memberships, modelMap] =
         await Promise.all([
-            ctx.getRoleModelMembershipRows(),
-            ctx.getModelMap(),
+            getRoleModelMembershipRows(ctx),
+            getModelMap(ctx),
         ]);
     return memberships
         .filter(m => m.role_id === roleId)
@@ -135,13 +158,13 @@ export async function getModelsInRole(
 }
 
 export async function getRolesContainingModel(
-    ctx: FetchContext,
+    ctx: RequestContext,
     modelId: Id,
 ): Promise<Role[]> {
     const [memberships, roleMap] =
         await Promise.all([
-            ctx.getRoleModelMembershipRows(),
-            ctx.getRoleMap(),
+            getRoleModelMembershipRows(ctx),
+            getRoleMap(ctx),
         ]);
     const roleIds = new Set(
         memberships
@@ -155,14 +178,14 @@ export async function getRolesContainingModel(
 }
 
 export async function addModelToRole(
-    ctx: FetchContext,
+    ctx: RequestContext,
     roleId: Id,
     modelId: Id,
 ): Promise<void> {
     const [roleMap, modelMap] =
         await Promise.all([
-            ctx.getRoleMap(),
-            ctx.getModelMap(),
+            getRoleMap(ctx),
+            getModelMap(ctx),
         ]);
     if (!roleMap.has(roleId)) {
         throw new Error(
@@ -189,7 +212,7 @@ export async function addModelToRole(
 }
 
 export async function removeModelFromRole(
-    ctx: FetchContext,
+    ctx: RequestContext,
     membershipId: Id,
 ): Promise<void> {
     await ctx.DELETE(

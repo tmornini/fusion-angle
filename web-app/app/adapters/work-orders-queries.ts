@@ -14,7 +14,7 @@ import {
 import {
     validateWorkOrderFlowGraphJson,
 } from '../../../api/validators.ts';
-import type { FetchContext } from './shared.ts';
+import type { RequestContext } from './shared.ts';
 
 export type {
     WorkOrderEntity,
@@ -69,7 +69,7 @@ export function validateWorkOrderFlowGraph(
 // no values has no entry (Map.get returns undefined,
 // which the call site treats as "no field values").
 export async function getTransitionFieldValuesByTransition(
-    ctx: FetchContext,
+    ctx: RequestContext,
 ): Promise<Map<Id, TransitionFieldValueEntity[]>> {
     const all = await ctx.GET<
         TransitionFieldValueEntity[]
@@ -107,7 +107,7 @@ export function isExpiredClaim(
 /* ── Reads ───────────────── */
 
 export async function getWorkOrderRows(
-    ctx: FetchContext,
+    ctx: RequestContext,
 ): Promise<WorkOrderEntity[]> {
     return ctx.GET<WorkOrderEntity[]>(
         'work-orders',
@@ -115,7 +115,7 @@ export async function getWorkOrderRows(
 }
 
 export async function getWorkOrderTransitionRows(
-    ctx: FetchContext,
+    ctx: RequestContext,
 ): Promise<WorkOrderTransitionEntity[]> {
     return ctx.GET<
         WorkOrderTransitionEntity[]
@@ -123,7 +123,7 @@ export async function getWorkOrderTransitionRows(
 }
 
 export async function getWorkOrderClaimRows(
-    ctx: FetchContext,
+    ctx: RequestContext,
 ): Promise<WorkOrderClaimEntity[]> {
     return ctx.GET<
         WorkOrderClaimEntity[]
@@ -131,7 +131,7 @@ export async function getWorkOrderClaimRows(
 }
 
 export async function getWorkOrder(
-    ctx: FetchContext,
+    ctx: RequestContext,
     id: string,
 ): Promise<WorkOrderEntity> {
     return ctx.GET<WorkOrderEntity>(
@@ -140,7 +140,7 @@ export async function getWorkOrder(
 }
 
 export async function getWorkOrderTransitionRowsByOrder(
-    ctx: FetchContext,
+    ctx: RequestContext,
     workOrderId: string,
 ): Promise<WorkOrderTransitionEntity[]> {
     const all = await ctx.GET<
@@ -152,7 +152,7 @@ export async function getWorkOrderTransitionRowsByOrder(
 }
 
 export async function getWorkOrderClaimRowsByOrder(
-    ctx: FetchContext,
+    ctx: RequestContext,
     workOrderId: string,
 ): Promise<WorkOrderClaimEntity[]> {
     const all = await ctx.GET<
@@ -164,7 +164,7 @@ export async function getWorkOrderClaimRowsByOrder(
 }
 
 export async function getFlowsForCreation(
-    ctx: FetchContext,
+    ctx: RequestContext,
 ): Promise<{
     id: string;
     name: string;

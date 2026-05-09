@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import {
-    createFetchContext,
+    createRequestContext,
 } from '../web-app/app/adapters/shared.ts';
 import {
     getRoles,
@@ -142,7 +142,7 @@ test(
         const db = new MemoryDbAdapter();
         await seedPerson(db, 'p-1', 'Alice');
         await seedPerson(db, 'p-2', 'Bob');
-        const ctx = createFetchContext(db);
+        const ctx = createRequestContext(db);
         const roles = await getRoles(ctx);
         const userPrivate = roles.filter(
             r => isUserPrivateRole(r),
@@ -160,7 +160,7 @@ test(
             db, 'p-1', 'Alice', 'deactivated',
         );
         await seedPerson(db, 'p-2', 'Bob');
-        const ctx = createFetchContext(db);
+        const ctx = createRequestContext(db);
         const roles = await getRoles(ctx);
         const userPrivate = roles.filter(
             r => isUserPrivateRole(r),
@@ -185,10 +185,10 @@ test(
             created_at: nowUtc(),
         });
         await addMember(
-            createFetchContext(db),
+            createRequestContext(db),
             'r-eng', 'p-1',
         );
-        const fresh = createFetchContext(db);
+        const fresh = createRequestContext(db);
         const roles = await getRolesForPerson(
             fresh, 'p-1',
         );
@@ -207,7 +207,7 @@ test(
     + ' unknown personId (no synthetic added)',
     async () => {
         const db = new MemoryDbAdapter();
-        const ctx = createFetchContext(db);
+        const ctx = createRequestContext(db);
         const roles = await getRolesForPerson(
             ctx, 'no-such-person',
         );
@@ -222,7 +222,7 @@ test(
         const db = new MemoryDbAdapter();
         await seedPerson(db, 'p-1');
         await seedPerson(db, 'p-2', 'Bob');
-        const ctx = createFetchContext(db);
+        const ctx = createRequestContext(db);
         await assert.rejects(
             () => addMember(
                 ctx,

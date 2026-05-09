@@ -4,8 +4,8 @@ import {
     MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import {
-    createFetchContext,
-    type FetchContext,
+    createRequestContext,
+    type RequestContext,
 } from '../web-app/app/adapters/shared.ts';
 import {
     postWorkOrderCreation,
@@ -43,7 +43,7 @@ function mintCreateIds(): CreateIds {
 }
 
 async function createWorkOrder(
-    ctx: FetchContext,
+    ctx: RequestContext,
     flowId: string,
 ): Promise<string> {
     const ids = mintCreateIds();
@@ -170,13 +170,13 @@ function buildLinearGraph(): StoredGraph {
 
 async function setupDb(): Promise<{
     db: MemoryDbAdapter;
-    ctx: FetchContext;
+    ctx: RequestContext;
 }> {
     const db = new MemoryDbAdapter();
     await db.people.put(
         'current', buildPerson('Demo'),
     );
-    const ctx = createFetchContext(db);
+    const ctx = createRequestContext(db);
     return { db, ctx };
 }
 

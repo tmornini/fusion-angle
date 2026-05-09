@@ -9,7 +9,7 @@ import {
 } from '../app/loading-states.ts';
 import {
     getDashboardGauges,
-    createFetchContext,
+    createRequestContext,
 } from '../app/adapters/index.ts';
 import {
     GaugePresenter,
@@ -21,7 +21,7 @@ export async function init(
         $('#gauge-container', document);
     if (!container) return;
 
-    const ctx = createFetchContext();
+    const ctx = createRequestContext();
     const gauges =
         await withLoadingState(
             container,

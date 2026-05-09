@@ -312,6 +312,12 @@ function insertDummies(
     return { layers: out, edges: augEdges };
 }
 
+function hasMultipleElements<T>(
+    list: T[] | undefined,
+): list is T[] {
+    return list !== undefined && list.length > 1;
+}
+
 function extractWaypoints(
     edges: readonly AugmentedEdge[],
     dummyPositions: Map<string, Position>,
@@ -341,7 +347,7 @@ function extractWaypoints(
     }
     for (const key of reversedIds) {
         const list = result.get(key);
-        if (list && list.length > 1) {
+        if (hasMultipleElements(list)) {
             result.set(key, [...list].reverse());
         }
     }
@@ -815,6 +821,21 @@ function centerGroupAround(
     });
 }
 
+function sharesSingleParent(
+    nps: readonly string[],
+    pred: string,
+): boolean {
+    return nps.length === 1 && nps[0] === pred;
+}
+
+function parentIsItselfFannedOut(
+    ps: readonly string[],
+    parentHasFanout: ReadonlySet<string>,
+): boolean {
+    return ps.length === 1
+        && parentHasFanout.has(ps[0]!);
+}
+
 function forwardPassLayer(
     layer: readonly string[],
     upN: Map<string, string[]>,
@@ -834,10 +855,7 @@ function forwardPassLayer(
         while (j < layer.length) {
             const nid = layer[j]!;
             const nps = upN.get(nid)!;
-            if (
-                nps.length === 1
-                && nps[0] === pred
-            ) {
+            if (sharesSingleParent(nps, pred)) {
                 j++;
             } else {
                 break;
@@ -875,7 +893,7 @@ function computeParentHasFanout(
     for (const layer of orderedLayers) {
         for (const id of layer) {
             const ps = upN.get(id)!;
-            if (ps.length === 1 && parentHasFanout.has(ps[0]!)) {
+            if (parentIsItselfFannedOut(ps, parentHasFanout)) {
                 parentHasFanout.add(id);
             }
         }
@@ -890,10 +908,7 @@ function computeParentHasFanout(
             let j = i + 1;
             while (j < layer.length) {
                 const nps = upN.get(layer[j]!)!;
-                if (
-                    nps.length === 1
-                    && nps[0] === pred
-                ) {
+                if (sharesSingleParent(nps, pred)) {
                     j++;
                 } else {
                     break;
@@ -921,6 +936,34 @@ function enforceSpacing(
             ys.set(layer[i]!, prev + SIBLING_STEP);
         }
     }
+}
+
+function isCanvasSized(
+    canvasW: number,
+    canvasH: number,
+): boolean {
+    return canvasW > 0 && canvasH > 0;
+}
+
+function canScaleAxis(
+    target: number,
+    source: number,
+): boolean {
+    return target > 0 && source > 0;
+}
+
+function scalesAreFinite(
+    sX: number,
+    sY: number,
+): boolean {
+    return isFinite(sX) && isFinite(sY);
+}
+
+function needsAxisFlip(
+    flipX: boolean,
+    flipY: boolean,
+): boolean {
+    return flipX || flipY;
 }
 
 function fitToCanvas(
@@ -951,8 +994,7 @@ function fitToCanvas(
         (natW + NODE_WIDTH) >= (natH + NODE_HEIGHT);
     const canvasLandscape = canvasW >= canvasH;
     const rotate =
-        canvasW > 0
-        && canvasH > 0
+        isCanvasSized(canvasW, canvasH)
         && graphLandscape !== canvasLandscape;
 
     const rotW = rotate ? natH : natW;
@@ -960,14 +1002,14 @@ function fitToCanvas(
 
     let scaleX = 1;
     let scaleY = 1;
-    if (canvasW > 0 && canvasH > 0) {
+    if (isCanvasSized(canvasW, canvasH)) {
         const tW = canvasW - NODE_WIDTH;
         const tH = canvasH - NODE_HEIGHT;
         let sX = Infinity;
         let sY = Infinity;
-        if (rotW > 0 && tW > 0) sX = tW / rotW;
-        if (rotH > 0 && tH > 0) sY = tH / rotH;
-        if (isFinite(sX) && isFinite(sY)) {
+        if (canScaleAxis(tW, rotW)) sX = tW / rotW;
+        if (canScaleAxis(tH, rotH)) sY = tH / rotH;
+        if (scalesAreFinite(sX, sY)) {
             const sSmall = Math.min(sX, sY);
             const sBig = Math.max(sX, sY);
             const cappedBig = Math.min(
@@ -1020,7 +1062,7 @@ function fitToCanvas(
         if (sp && ep) {
             const flipX = sp.x > ep.x;
             const flipY = sp.y > ep.y;
-            if (flipX || flipY) {
+            if (needsAxisFlip(flipX, flipY)) {
                 let rMinX = Infinity;
                 let rMaxX = -Infinity;
                 let rMinY = Infinity;

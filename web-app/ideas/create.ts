@@ -7,7 +7,7 @@ import {
 } from '../app/safe-html.ts';
 import { navigateTo } from '../app/core.ts';
 import {
-    createFetchContext,
+    createRequestContext,
     postActivity,
     putIdea,
     putIdeaSubmission,
@@ -129,7 +129,7 @@ export async function init():
             'click',
             async () => {
                 formState = readFormFromDom();
-                const ctx = createFetchContext();
+                const ctx = createRequestContext();
                 const ideaId =
                     generateCryptoSafeBase62();
                 await putIdea(

@@ -23,15 +23,17 @@ import {
     getWorkOrderTransitionRows,
     getWorkOrderClaimRows,
     getPersonMap,
-    getCurrentPersonRow,
+    getCurrentPerson,
     getFlowsForCreation,
     postWorkOrderCreation,
     putWorkOrder,
     getMembersOfCrew,
-    createFetchContext,
+    getCrewMap,
+    getRoleMembershipRows,
+    createRequestContext,
     generateCryptoSafeBase62,
     subscribeWorkOrderChanges,
-    type FetchContext,
+    type RequestContext,
     type WorkOrderEntity,
     type Id,
 } from '../app/adapters/index.ts';
@@ -66,7 +68,7 @@ export async function init(
     const archiveEl =
         $('#archive-list', document);
 
-    const ctx = createFetchContext();
+    const ctx = createRequestContext();
     if (activeEl) {
         await initActiveList(activeEl, ctx);
     }
@@ -93,7 +95,7 @@ export async function init(
 async function rerenderInbox(
     listEl: HTMLElement,
     mode: InboxMode,
-    ctx: FetchContext,
+    ctx: RequestContext,
 ): Promise<void> {
     const items = await loadInboxItems(mode, ctx);
     const presenter = new WorkboxInboxPresenter(
@@ -127,7 +129,7 @@ function renderTabs(): void {
 
 async function loadInboxItems(
     mode: InboxMode,
-    ctx: FetchContext,
+    ctx: RequestContext,
 ): Promise<InboxItem[]> {
     const [
         workOrders, transitions,
@@ -139,7 +141,7 @@ async function loadInboxItems(
         getWorkOrderTransitionRows(ctx),
         getWorkOrderClaimRows(ctx),
         getPersonMap(ctx),
-        getCurrentPersonRow(ctx),
+        getCurrentPerson(ctx),
         buildVisibilityScope(ctx),
     ]);
     workOrderEntities = new Map(
@@ -159,7 +161,7 @@ async function loadInboxItems(
 }
 
 async function buildVisibilityScope(
-    ctx: FetchContext,
+    ctx: RequestContext,
 ): Promise<{
     roleMemberSetByRoleId:
         ReadonlyMap<Id, ReadonlySet<Id>>;
@@ -168,8 +170,8 @@ async function buildVisibilityScope(
 }> {
     const [memberships, crewMap] =
         await Promise.all([
-            ctx.getRoleMembershipRows(),
-            ctx.getCrewMap(),
+            getRoleMembershipRows(ctx),
+            getCrewMap(ctx),
         ]);
     const roleMemberSetByRoleId =
         new Map<Id, Set<Id>>();
@@ -200,7 +202,7 @@ async function buildVisibilityScope(
 
 async function initActiveList(
     activeEl: HTMLElement,
-    ctx: FetchContext,
+    ctx: RequestContext,
 ): Promise<void> {
     const items = await withLoadingState(
         activeEl,
@@ -263,7 +265,7 @@ async function initActiveList(
 
 async function initArchiveList(
     archiveEl: HTMLElement,
-    ctx: FetchContext,
+    ctx: RequestContext,
 ): Promise<void> {
     const items = await withLoadingState(
         archiveEl,
@@ -313,7 +315,7 @@ function onRowClick(e: MouseEvent): void {
 
 async function createWorkOrderForFlow(
     flowId: string,
-    ctx: FetchContext,
+    ctx: RequestContext,
 ): Promise<void> {
     const workOrderId =
         generateCryptoSafeBase62();
@@ -354,7 +356,7 @@ async function createWorkOrderForFlow(
 }
 
 async function initCreateDropdown(
-    ctx: FetchContext,
+    ctx: RequestContext,
 ): Promise<void> {
     populateIcons([
         [
@@ -393,7 +395,7 @@ async function initCreateDropdown(
 function onDropdownClick(
     e: MouseEvent,
     dropdownEl: HTMLElement,
-    ctx: FetchContext,
+    ctx: RequestContext,
 ): void {
     if (
         !(e.target instanceof Element)

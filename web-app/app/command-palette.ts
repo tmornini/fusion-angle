@@ -20,7 +20,7 @@ import {
     getProjects,
     getPeople,
     featuredPeople,
-    createFetchContext,
+    createRequestContext,
     setLocation,
     subscribeSchemaChanges,
     type IdeaWithSubmitter,
@@ -295,7 +295,7 @@ export function initCommandPalette(
         if (state.isDataLoaded) return;
         state.isDataLoaded = true;
 
-        const ctx = createFetchContext();
+        const ctx = createRequestContext();
         const [ideas, projects, people] =
             await Promise.all([
                 getIdeas(ctx),

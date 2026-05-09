@@ -11,7 +11,7 @@ import {
 import {
     getOrganization,
     putOrganizationGeneralInfo,
-    createFetchContext,
+    createRequestContext,
     Organization,
     type GeneralInfoDraft,
 } from '../app/adapters/index.ts';
@@ -104,7 +104,7 @@ export async function init(): Promise<void> {
     let org: Organization;
     try {
         org = await getOrganization(
-            createFetchContext(),
+            createRequestContext(),
         );
     } catch (err) {
         log.error(
@@ -240,7 +240,7 @@ async function handleSave(): Promise<void> {
         return;
     }
     const trimmed = trimStrings(state.draft);
-    const ctx = createFetchContext();
+    const ctx = createRequestContext();
     try {
         await putOrganizationGeneralInfo(
             ctx, trimmed,
@@ -259,7 +259,7 @@ async function handleSave(): Promise<void> {
     }
     showToast('Organization saved', 'success');
     const fresh = await getOrganization(
-        createFetchContext(),
+        createRequestContext(),
     );
     state = { kind: 'reading', org: fresh };
     rerender();

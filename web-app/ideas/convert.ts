@@ -18,7 +18,7 @@ import {
     postActivity,
     postIdeaConversion,
     jsonObjectField,
-    createFetchContext,
+    createRequestContext,
     generateCryptoSafeBase62,
     type IdeaEntity,
 } from '../app/adapters/index.ts';
@@ -55,7 +55,7 @@ export async function init(
         buildSkeleton('detail', 4),
     );
 
-    const ctx = createFetchContext();
+    const ctx = createRequestContext();
     let tuple: Awaited<
         ReturnType<typeof getIdea>
     >;
@@ -468,7 +468,7 @@ function parseFiniteNumber(
 }
 
 async function performConversion(
-    ctx: ReturnType<typeof createFetchContext>,
+    ctx: ReturnType<typeof createRequestContext>,
     ideaId: string,
     projectId: string,
     fields: ConversionFields,

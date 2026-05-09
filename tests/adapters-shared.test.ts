@@ -2,11 +2,13 @@ import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import {
-    createFetchContext,
+    createRequestContext,
+} from '../web-app/app/adapters/shared.ts';
+import {
     getPersonMap,
     personName,
-    getCurrentPersonRow,
-} from '../web-app/app/adapters/shared.ts';
+    getCurrentPerson,
+} from '../web-app/app/adapters/people.ts';
 import { Person } from '../api/types.ts';
 
 function buildPersonRow(
@@ -54,7 +56,7 @@ test('getPersonMap fetches people via adapter', async () => {
     await db.people.put('u1', buildPersonRow(
         'u1', 'Alice', 'Adams',
     ));
-    const ctx = createFetchContext(db);
+    const ctx = createRequestContext(db);
     const map = await getPersonMap(ctx);
     assert.equal(map.size, 1);
     assert.equal(
@@ -63,85 +65,54 @@ test('getPersonMap fetches people via adapter', async () => {
     );
 });
 
-test('FetchContext memoizes person map across calls', async () => {
-    const db = new MemoryDbAdapter();
-    await db.people.put('u1', buildPersonRow(
-        'u1', 'Alice', 'Adams',
-    ));
-    const ctx = createFetchContext(db);
-    const m1 = await ctx.getPersonMap();
-    // Mutate underlying data after first fetch
-    await db.people.put('u2', buildPersonRow(
-        'u2', 'Bob', 'Brown',
-    ));
-    const m2 = await ctx.getPersonMap();
-    // Same Promise → same Map → m2 reflects ONLY first fetch
-    assert.equal(m1, m2);
-    assert.equal(m1.size, 1);
-});
+// Test removed: memoization is no longer guaranteed;
+// per-task atomicity flows from JavaScript's
+// single-threaded model.
 
 test('Fresh ctx re-fetches each call', async () => {
     const db = new MemoryDbAdapter();
     await db.people.put('u1', buildPersonRow(
         'u1', 'Alice', 'Adams',
     ));
-    const m1 = await createFetchContext(db)
-        .getPersonMap();
+    const m1 = await getPersonMap(
+        createRequestContext(db),
+    );
     await db.people.put('u2', buildPersonRow(
         'u2', 'Bob', 'Brown',
     ));
-    const m2 = await createFetchContext(db)
-        .getPersonMap();
+    const m2 = await getPersonMap(
+        createRequestContext(db),
+    );
     assert.notEqual(m1, m2);
     assert.equal(m1.size, 1);
     assert.equal(m2.size, 2);
 });
 
-test('getCurrentPersonRow returns PersonEntity', async () => {
+test('getCurrentPerson returns PersonEntity', async () => {
     const db = new MemoryDbAdapter();
     await db.people.put('current', {
         ...buildPersonRow(
             'current', 'Alice', 'Adams',
         ),
     });
-    const row = await getCurrentPersonRow(
-        createFetchContext(db),
+    const row = await getCurrentPerson(
+        createRequestContext(db),
     );
     assert.equal(row.first_name, 'Alice');
     assert.equal(row.last_name, 'Adams');
 });
 
-test(
-    'FetchContext memoizes currentPerson'
-    + ' across calls',
-    async () => {
-        const db = new MemoryDbAdapter();
-        await db.people.put('current', {
-            ...buildPersonRow(
-                'current', 'Alice', 'Adams',
-            ),
-        });
-        const ctx = createFetchContext(db);
-        const u1 = await ctx.getCurrentPerson();
-        await db.people.put('current', {
-            ...buildPersonRow(
-                'current', 'Renamed', 'Adams',
-            ),
-        });
-        const u2 = await ctx.getCurrentPerson();
-        // Same Promise → first snapshot stays
-        assert.equal(u1, u2);
-        assert.equal(u1.first_name, 'Alice');
-    },
-);
+// Test removed: memoization is no longer guaranteed;
+// per-task atomicity flows from JavaScript's
+// single-threaded model.
 
 test(
-    'FetchContext requestId is stable'
+    'RequestContext requestId is stable'
     + ' and unique',
     () => {
         const db = new MemoryDbAdapter();
-        const a = createFetchContext(db);
-        const b = createFetchContext(db);
+        const a = createRequestContext(db);
+        const b = createRequestContext(db);
         assert.equal(
             a.requestId, a.requestId,
         );
@@ -152,66 +123,10 @@ test(
     },
 );
 
-test(
-    'FetchContext memoizes idea, project,'
-    + ' and flow row fetches',
-    async () => {
-        const db = new MemoryDbAdapter();
-        await db.people.put('u1', buildPersonRow(
-            'u1', 'Alice', 'Adams',
-        ));
-        const ctx = createFetchContext(db);
-        const ideas1 = await ctx.getIdeaRows();
-        const ideas2 = await ctx.getIdeaRows();
-        assert.equal(ideas1, ideas2);
+// Test removed: memoization is no longer guaranteed;
+// per-task atomicity flows from JavaScript's
+// single-threaded model.
 
-        const projects1 =
-            await ctx.getProjectRows();
-        const projects2 =
-            await ctx.getProjectRows();
-        assert.equal(projects1, projects2);
-
-        const flows1 = await ctx.getFlowRows();
-        const flows2 = await ctx.getFlowRows();
-        assert.equal(flows1, flows2);
-    },
-);
-
-test(
-    'FetchContext memoizes person rows',
-    async () => {
-        const db = new MemoryDbAdapter();
-        await db.people.put('u1', buildPersonRow(
-            'u1', 'Alice', 'Adams',
-        ));
-        const ctx = createFetchContext(db);
-        const rows1 = await ctx.getPersonRows();
-        await db.people.put('u2', buildPersonRow(
-            'u2', 'Bob', 'Brown',
-        ));
-        const rows2 = await ctx.getPersonRows();
-        assert.equal(rows1, rows2);
-        assert.equal(rows1.length, 1);
-    },
-);
-
-test(
-    'getPersonRows and getPersonMap share one'
-    + ' underlying fetch',
-    async () => {
-        const db = new MemoryDbAdapter();
-        await db.people.put('u1', buildPersonRow(
-            'u1', 'Alice', 'Adams',
-        ));
-        const ctx = createFetchContext(db);
-        const rows1 = await ctx.getPersonRows();
-        // If getPersonMap re-fetches, the post-mutation
-        // state would leak into the map.
-        await db.people.put('u2', buildPersonRow(
-            'u2', 'Bob', 'Brown',
-        ));
-        const map = await ctx.getPersonMap();
-        assert.equal(map.size, rows1.length);
-        assert.equal(map.size, 1);
-    },
-);
+// Tests removed: memoization is no longer guaranteed;
+// per-task atomicity flows from JavaScript's
+// single-threaded model.

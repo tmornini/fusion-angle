@@ -12,7 +12,8 @@ import {
     asBoolean,
     validateStoredGraphJson,
 } from '../../../api/validators.ts';
-import type { FetchContext } from './shared.ts';
+import type { RequestContext } from './shared.ts';
+import { getFlowRows } from './flows.ts';
 
 export type {
     GraphNode, GraphEdge, GraphField,
@@ -57,9 +58,9 @@ export interface FlowListItem {
 }
 
 export async function getFlows(
-    ctx: FetchContext,
+    ctx: RequestContext,
 ): Promise<FlowSummary[]> {
-    const flows = await ctx.getFlowRows();
+    const flows = await getFlowRows(ctx);
     return flows.map(f => {
         const g = parseGraph(f.graph);
         return {
@@ -73,7 +74,7 @@ export async function getFlows(
 }
 
 export async function getProjectFlowRows(
-    ctx: FetchContext,
+    ctx: RequestContext,
 ): Promise<ProjectFlowEntity[]> {
     return ctx.GET<ProjectFlowEntity[]>(
         'project-flows',
@@ -87,7 +88,7 @@ export interface FlowWithProjectName {
 
 export async function
 getFlowsWithProjectNames(
-    ctx: FetchContext,
+    ctx: RequestContext,
 ): Promise<FlowWithProjectName[]> {
     const [
         flows, projectFlows, allProjects,
@@ -135,7 +136,7 @@ export type {
 } from '../../../api/types.ts';
 
 export async function getFlowsByProject(
-    ctx: FetchContext,
+    ctx: RequestContext,
     projectId: string,
 ): Promise<FlowListItem[]> {
     const [projectFlows, flows] =
@@ -177,7 +178,7 @@ export async function getFlowsByProject(
 }
 
 export async function getFlowGraph(
-    ctx: FetchContext,
+    ctx: RequestContext,
     flowId: string,
 ): Promise<FlowGraph> {
     const flow =

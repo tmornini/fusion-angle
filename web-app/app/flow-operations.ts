@@ -11,7 +11,7 @@ import {
     DEFAULT_TRANSITION_NAME,
 } from '../../api/types.ts';
 import {
-    createFetchContext,
+    createRequestContext,
     postFlowVersion,
     putFlow,
     deleteFlowVersion,
@@ -85,7 +85,7 @@ async function commitFlowMutation(
     nodes: GraphNode[],
     edges: GraphEdge[],
 ): Promise<void> {
-    const ctx = createFetchContext();
+    const ctx = createRequestContext();
     await postFlowVersion(
         ctx,
         generateCryptoSafeBase62(),
@@ -130,6 +130,26 @@ export interface EdgeAddOk {
     readonly advanceHistory: true;
 }
 
+function hasEdgeBetween(
+    edges: readonly GraphEdge[],
+    fromId: string,
+    toId: string,
+): boolean {
+    return edges.some(
+        e => e.fromNodeId === fromId
+            && e.toNodeId === toId,
+    );
+}
+
+function nodeHasOutgoingEdges(
+    nodeId: string,
+    edges: readonly GraphEdge[],
+): boolean {
+    return edges.some(
+        e => e.fromNodeId === nodeId,
+    );
+}
+
 export async function performAddEdge(
     snap: FlowSnapshot,
     fromId: string,
@@ -168,24 +188,18 @@ export async function performAddEdge(
             + ' to start state',
         );
     }
-    const hasDuplicate = snap.edges.some(
-        e => e.fromNodeId === fromId
-            && e.toNodeId === toId,
-    );
-    if (hasDuplicate) {
+    if (hasEdgeBetween(snap.edges, fromId, toId)) {
         return failOp('Transition already exists');
     }
-    if (from.isStart) {
-        const hasOutgoing = snap.edges.some(
-            e => e.fromNodeId === fromId,
+    if (
+        from.isStart
+        && nodeHasOutgoingEdges(fromId, snap.edges)
+    ) {
+        return failOp(
+            'Start state allows'
+            + ' only one outgoing'
+            + ' transition',
         );
-        if (hasOutgoing) {
-            return failOp(
-                'Start state allows'
-                + ' only one outgoing'
-                + ' transition',
-            );
-        }
     }
     const edgeId = generateCryptoSafeBase62();
     const newEdges = applyAddEdge(
@@ -246,17 +260,15 @@ export async function performAddNodeAtPosition(
             'Cannot create from end state',
         );
     }
-    if (fromNode.isStart) {
-        const hasOut = snap.edges.some(
-            e => e.fromNodeId === fromNodeId,
+    if (
+        fromNode.isStart
+        && nodeHasOutgoingEdges(fromNodeId, snap.edges)
+    ) {
+        return failOp(
+            'Start state allows'
+            + ' only one outgoing'
+            + ' transition',
         );
-        if (hasOut) {
-            return failOp(
-                'Start state allows'
-                + ' only one outgoing'
-                + ' transition',
-            );
-        }
     }
     const nodeId = generateCryptoSafeBase62();
     const edgeId = generateCryptoSafeBase62();
@@ -530,7 +542,7 @@ export async function performUndo(
         return failOp('Flow is locked');
     }
     try {
-        const ctx = createFetchContext();
+        const ctx = createRequestContext();
         const versions = await getFlowVersions(
             ctx, snap.flowId,
         );
@@ -612,7 +624,7 @@ export async function performRedo(
         };
     }
     try {
-        const ctx = createFetchContext();
+        const ctx = createRequestContext();
         await postFlowVersion(
             ctx,
             generateCryptoSafeBase62(),

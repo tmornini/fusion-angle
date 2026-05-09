@@ -14,7 +14,9 @@ import {
 import {
     notifyFlowChange,
 } from './flow-mutations.ts';
-import type { FetchContext } from './shared.ts';
+import type {
+    RequestContext, WriteOp,
+} from './shared.ts';
 
 export interface FlowVersion {
     id: string;
@@ -74,41 +76,59 @@ function compareRows(
 }
 
 export async function postFlowVersion(
-    ctx: FetchContext,
+    ctx: RequestContext,
     versionId: string,
     flowId: string,
 ): Promise<void> {
-    const flow = await ctx.GET<FlowEntity>(
-        'flows/' + flowId,
-    );
-    await ctx.PUT<void>(`flow-versions/${versionId}`, {
-        flow_id: flowId,
-        name: flow.name,
-        description: flow.description,
-        is_locked: flow.is_locked,
-        is_auto_layout: flow.is_auto_layout,
-        is_auto_fit: flow.is_auto_fit,
-        lock_timeout: flow.lock_timeout,
-        graph: flow.graph,
-        created_at: nowUtc(),
-    });
-    const all = await ctx.GET<
-        FlowVersionEntity[]
-    >('flow-versions');
-    const mine = all
+    const [flow, allVersions] = await Promise.all([
+        ctx.GET<FlowEntity>('flows/' + flowId),
+        ctx.GET<FlowVersionEntity[]>(
+            'flow-versions',
+        ),
+    ]);
+    const mine = allVersions
         .filter(v => v.flow_id === flowId)
         .sort(compareRows);
-    const excess = mine.length - FLOW_VERSION_CAP;
+    // Anticipate the version about to be written;
+    // trim the oldest if that pushes us past cap.
+    const excess =
+        (mine.length + 1) - FLOW_VERSION_CAP;
+    const trims: WriteOp[] = [];
     for (let i = 0; i < excess; i++) {
-        await ctx.DELETE(
-            'flow-versions/' + mine[i]!.id,
-        );
+        trims.push({
+            method: 'delete',
+            resource:
+                'flow-versions/' + mine[i]!.id,
+        });
     }
+    await ctx.commit({
+        ops: [
+            {
+                method: 'put',
+                resource:
+                    `flow-versions/${versionId}`,
+                body: {
+                    flow_id: flowId,
+                    name: flow.name,
+                    description: flow.description,
+                    is_locked: flow.is_locked,
+                    is_auto_layout:
+                        flow.is_auto_layout,
+                    is_auto_fit: flow.is_auto_fit,
+                    lock_timeout:
+                        flow.lock_timeout,
+                    graph: flow.graph,
+                    created_at: nowUtc(),
+                },
+            },
+            ...trims,
+        ],
+    });
     notifyFlowChange();
 }
 
 export async function getFlowVersions(
-    ctx: FetchContext,
+    ctx: RequestContext,
     flowId: string,
 ): Promise<FlowVersion[]> {
     const all = await ctx.GET<
@@ -121,7 +141,7 @@ export async function getFlowVersions(
 }
 
 export async function deleteFlowVersion(
-    ctx: FetchContext,
+    ctx: RequestContext,
     versionId: string,
 ): Promise<void> {
     await ctx.DELETE(

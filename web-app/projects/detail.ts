@@ -22,8 +22,8 @@ import {
     postFlowCreation,
     subscribeProjectChanges,
     generateCryptoSafeBase62,
-    createFetchContext,
-    type FetchContext,
+    createRequestContext,
+    type RequestContext,
     type ProjectEntity,
 } from '../app/adapters/index.ts';
 import type {
@@ -76,7 +76,7 @@ function isFieldKey(
 
 async function loadProjectView(
     projectId: string,
-    ctx: FetchContext,
+    ctx: RequestContext,
 ): Promise<{
     view: ProjectView;
     entity: ProjectEntity;
@@ -139,7 +139,7 @@ export async function init(
     };
     let flows: FlowListItem[];
     try {
-        const ctx = createFetchContext();
+        const ctx = createRequestContext();
         [project, flows] = await Promise.all([
             loadProjectView(projectId, ctx),
             getFlowsByProject(ctx, projectId),
@@ -180,7 +180,7 @@ export async function init(
         if (!state || !pageContainer) {
             return;
         }
-        const ctx = createFetchContext();
+        const ctx = createRequestContext();
         const [upd, updFlows] =
             await Promise.all([
                 loadProjectView(projectId, ctx),
@@ -413,7 +413,7 @@ async function handleSave(): Promise<void> {
             state.draft,
         ),
     );
-    const ctx = createFetchContext();
+    const ctx = createRequestContext();
     try {
         await putProject(ctx, projectId, {
             ...entity, ...patch,
@@ -447,7 +447,7 @@ async function handleNewFlowSubmit(
     const linkId = generateCryptoSafeBase62();
     try {
         await postFlowCreation(
-            createFetchContext(),
+            createRequestContext(),
             {
                 flowId,
                 linkId,

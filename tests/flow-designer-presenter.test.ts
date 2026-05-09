@@ -329,7 +329,7 @@ test(
 // lives in flow-designer-actions.test.ts as a
 // direct applyUpdateNode test. The presenter
 // wrapping triggers #saveFlow which calls
-// createFetchContext() with the default
+// createRequestContext() with the default
 // LocalStorage adapter — not available under
 // node:test. Same reason no other withNode*
 // mutation test exists in this file.

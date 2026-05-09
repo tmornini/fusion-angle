@@ -4,8 +4,8 @@ import {
     MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import {
-    createFetchContext,
-    type FetchContext,
+    createRequestContext,
+    type RequestContext,
 } from '../web-app/app/adapters/shared.ts';
 import {
     postFlowCreation,
@@ -24,10 +24,10 @@ import {
 
 function setupMemDb(): {
     db: MemoryDbAdapter;
-    ctx: FetchContext;
+    ctx: RequestContext;
 } {
     const db = new MemoryDbAdapter();
-    const ctx = createFetchContext(db);
+    const ctx = createRequestContext(db);
     return { db, ctx };
 }
 
@@ -64,7 +64,7 @@ function buildEdge(
 }
 
 async function createBaseFlow(
-    ctx: FetchContext,
+    ctx: RequestContext,
     flowId: string,
 ): Promise<void> {
     await postFlowCreation(ctx, {

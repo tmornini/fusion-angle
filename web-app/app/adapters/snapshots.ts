@@ -1,6 +1,6 @@
 import { MissingTableError } from '../../../api/db.ts';
 import type { PersonEntity } from '../../../api/types.ts';
-import type { FetchContext } from './shared.ts';
+import type { RequestContext } from './shared.ts';
 
 // Fallback when navigator.storage.estimate() is
 // unavailable (older browsers, Node test runtime).
@@ -55,19 +55,19 @@ async function computeAvailableForUpload(
 }
 
 export async function deleteSchema(
-    ctx: FetchContext,
+    ctx: RequestContext,
 ): Promise<void> {
     await ctx.DELETE('snapshots/schema');
 }
 
 export async function postSchemaCreation(
-    ctx: FetchContext,
+    ctx: RequestContext,
 ): Promise<void> {
     await ctx.POST('snapshots/schema', {});
 }
 
 export async function postMockDataLoad(
-    ctx: FetchContext,
+    ctx: RequestContext,
 ): Promise<void> {
     await ctx.POST(
         'snapshots/mock-data', {},
@@ -75,7 +75,7 @@ export async function postMockDataLoad(
 }
 
 export async function postBootstrap(
-    ctx: FetchContext,
+    ctx: RequestContext,
 ): Promise<void> {
     await ctx.POST(
         'snapshots/bootstrap', {},
@@ -83,14 +83,14 @@ export async function postBootstrap(
 }
 
 export async function putSnapshot(
-    ctx: FetchContext,
+    ctx: RequestContext,
     json: string,
 ): Promise<void> {
     await ctx.PUT('snapshots/import', { json });
 }
 
 export async function putSnapshotFromFile(
-    ctx: FetchContext,
+    ctx: RequestContext,
     file: File,
 ): Promise<void> {
     const available =
@@ -108,17 +108,17 @@ export async function putSnapshotFromFile(
 }
 
 export async function getSnapshot(
-    ctx: FetchContext,
+    ctx: RequestContext,
 ): Promise<string> {
     return ctx.GET<string>('snapshots/schema');
 }
 
-// Bypasses ctx.getPersonRows() on purpose: a missing
-// table is the expected non-error path here, and the
-// memoized accessor would cache the rejection for any
-// later caller sharing this ctx.
+// Uses ctx.GET directly on purpose: a missing table
+// is the expected non-error path here, and a
+// higher-level accessor could obscure the error
+// type for any later caller sharing this ctx.
 export async function getDataPresent(
-    ctx: FetchContext,
+    ctx: RequestContext,
 ): Promise<boolean> {
     try {
         const people =

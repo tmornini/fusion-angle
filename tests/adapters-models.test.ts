@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import {
-    createFetchContext,
+    createRequestContext,
 } from '../web-app/app/adapters/shared.ts';
 import {
     getModels,
@@ -48,14 +48,14 @@ test(
     'putModel persists; getModel returns it',
     async () => {
         const db = new MemoryDbAdapter();
-        const ctx = createFetchContext(db);
+        const ctx = createRequestContext(db);
         await putModel(ctx, 'm-1', {
             name: 'Claude Opus 4.7 Max',
             provider: 'Anthropic',
             description: 'Flagship.',
             created_at: nowUtc(),
         });
-        const fresh = createFetchContext(db);
+        const fresh = createRequestContext(db);
         const model = await getModel(fresh, 'm-1');
         assert.equal(
             model.nameText(),
@@ -69,7 +69,7 @@ test(
     'getModel throws on unknown id',
     async () => {
         const db = new MemoryDbAdapter();
-        const ctx = createFetchContext(db);
+        const ctx = createRequestContext(db);
         await assert.rejects(
             () => getModel(ctx, 'missing'),
             /unknown model missing/,
@@ -87,7 +87,7 @@ test(
         await seedModel(
             db, 'm-2', 'GPT-5.4 Pro', 'OpenAI',
         );
-        const ctx = createFetchContext(db);
+        const ctx = createRequestContext(db);
         const list = await getModels(ctx);
         assert.equal(list.length, 2);
     },
@@ -100,10 +100,10 @@ test(
         const db = new MemoryDbAdapter();
         await seedModel(db, 'm-1', 'Opus');
         await seedRole(db, 'r-eng', 'Engineering');
-        const ctx = createFetchContext(db);
+        const ctx = createRequestContext(db);
         await addModelToRole(ctx, 'r-eng', 'm-1');
         const list = await getModelsInRole(
-            createFetchContext(db), 'r-eng',
+            createRequestContext(db), 'r-eng',
         );
         assert.equal(list.length, 1);
         assert.equal(
@@ -121,16 +121,16 @@ test(
         await seedRole(db, 'r-eng', 'Eng');
         await seedRole(db, 'r-design', 'Design');
         await addModelToRole(
-            createFetchContext(db),
+            createRequestContext(db),
             'r-eng', 'm-1',
         );
         await addModelToRole(
-            createFetchContext(db),
+            createRequestContext(db),
             'r-design', 'm-1',
         );
         const roles =
             await getRolesContainingModel(
-                createFetchContext(db), 'm-1',
+                createRequestContext(db), 'm-1',
             );
         assert.equal(roles.length, 2);
     },
@@ -143,7 +143,7 @@ test(
         await seedModel(db, 'm-1', 'Opus');
         await seedRole(db, 'r-eng', 'Eng');
         await addModelToRole(
-            createFetchContext(db),
+            createRequestContext(db),
             'r-eng', 'm-1',
         );
         const before =
@@ -151,7 +151,7 @@ test(
                 .getAll();
         assert.equal(before.length, 1);
         await removeModelFromRole(
-            createFetchContext(db),
+            createRequestContext(db),
             before[0].id,
         );
         const after =
@@ -169,14 +169,14 @@ test(
         await seedModel(db, 'm-1', 'Opus');
         await seedRole(db, 'r-eng', 'Eng');
         await seedRole(db, 'r-design', 'Design');
-        const ctx = createFetchContext(db);
+        const ctx = createRequestContext(db);
         await addModelToRole(ctx, 'r-eng', 'm-1');
         await addModelToRole(
-            createFetchContext(db),
+            createRequestContext(db),
             'r-design', 'm-1',
         );
         await deleteModel(
-            createFetchContext(db), 'm-1',
+            createRequestContext(db), 'm-1',
         );
         const memberships =
             await db.roleModelMemberships
@@ -184,7 +184,7 @@ test(
         assert.equal(memberships.length, 0);
         await assert.rejects(
             () => getModel(
-                createFetchContext(db), 'm-1',
+                createRequestContext(db), 'm-1',
             ),
         );
     },
@@ -195,7 +195,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await seedModel(db, 'm-1', 'Opus');
-        const ctx = createFetchContext(db);
+        const ctx = createRequestContext(db);
         await assert.rejects(
             () => addModelToRole(
                 ctx, 'no-role', 'm-1',
@@ -210,7 +210,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await seedRole(db, 'r-eng', 'Eng');
-        const ctx = createFetchContext(db);
+        const ctx = createRequestContext(db);
         await assert.rejects(
             () => addModelToRole(
                 ctx, 'r-eng', 'no-model',
@@ -230,7 +230,7 @@ test(
             () => { count++; },
         );
         await putModel(
-            createFetchContext(db), 'm-1', {
+            createRequestContext(db), 'm-1', {
                 name: 'Opus',
                 provider: 'Anthropic',
                 description: '',
@@ -238,7 +238,7 @@ test(
             },
         );
         await deleteModel(
-            createFetchContext(db), 'm-1',
+            createRequestContext(db), 'm-1',
         );
         unsubscribe();
         assert.ok(
@@ -262,14 +262,14 @@ test(
                 () => { count++; },
             );
         await addModelToRole(
-            createFetchContext(db),
+            createRequestContext(db),
             'r-eng', 'm-1',
         );
         const memberships =
             await db.roleModelMemberships
                 .getAll();
         await removeModelFromRole(
-            createFetchContext(db),
+            createRequestContext(db),
             memberships[0].id,
         );
         unsubscribe();

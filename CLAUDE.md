@@ -121,20 +121,39 @@ and `END_NODE_DEFAULT_NAME` constants in `api/types.ts` and
 override `node.name` at SVG-render and panel-render time, so
 existing flows whose persisted name is "Start"/"End" still
 display the new labels without a data migration. Regular
-nodes (not start/end) carry a `crew: Crew` field — a
-3-variant discriminated union (`unassigned`/`user`/`model`)
-persisted on the node and rendered in the panel body as a
-labeled `<select>` with `<optgroup>` sections, matching the
-Name/Description label pattern. Crew respects `isLocked`
-(disabled when locked) but is otherwise cosmetic — not
-consumed by execution, layout, mermaid, or export. Regular
-nodes whose crew is `unassigned` render a hazard triangle
-(`iconAlertTriangle` colored via `.flow-node-hazard`) in the
-bottom-left corner of the node SVG. Model names live in
-`CREW_MODELS` in `api/types.ts`. The `<select>` value crosses
-the DOM seam as `'user:<id>'` / `'model:<name>'` /
-`'unassigned'` and is parsed back to the typed union via
-`parseCrewSelectValue` in `flows/detail.ts`.
+nodes (not start/end) carry a `crew: NodeAssignment` field
+— a 4-variant discriminated union (`unassigned`/`role`/
+`crew`/`model`) persisted on the node and rendered in the
+panel body as a labeled `<select>` with `<optgroup>`
+sections (Roles → People (private) → Crews → Models),
+matching the Name/Description label pattern. The
+assignment respects `isLocked` (disabled when locked).
+Regular nodes whose assignment is `unassigned` render a
+hazard triangle (`iconAlertTriangle` colored via
+`.flow-node-hazard`) in the bottom-left corner; the same
+hazard fires for role-assigned and crew-assigned nodes
+when the role or crew has zero members (user-private
+roles always count as 1). Model assignments are never
+hazardous. The `<select>` value crosses the DOM seam as
+`'role:<id>'` / `'crew:<id>'` / `'model:<id>'` /
+`'unassigned'` and is parsed by
+`parseNodeAssignmentSelectValue` in `flows/detail.ts`.
+
+Models live in their own `models` table — a `ModelEntity`
+with name/provider/description, persisted just like roles
+and crews. The string-enum predecessor (`CREW_MODELS`)
+was deleted; `validateModelEntity` rejects the old shape
+clean. Models bind to roles via `role_model_memberships`.
+
+The workbox filters work orders by their current node's
+assignment via `isWorkOrderVisibleToPerson` in
+`presenters/workbox-inbox.ts`. Unassigned is visible to
+all (the hazard triangle brands it as misconfiguration);
+model is visible to no human (a model participates, not
+a person); role and crew resolve through member sets,
+with user-private roles short-circuiting to the encoded
+person id. `loadInboxItems` builds the visibility scope
+once per request.
 
 ### API Layer (`/api`)
 

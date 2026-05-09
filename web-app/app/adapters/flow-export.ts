@@ -36,7 +36,7 @@ import {
     getFlowGraph,
 } from './flow-queries.ts';
 import type { FlowGraph } from './flow-queries.ts';
-import type { FetchContext } from './shared.ts';
+import type { RequestContext } from './shared.ts';
 import {
     generateMermaid,
 } from '../mermaid-generate.ts';
@@ -64,7 +64,7 @@ import {
 /* ── Mermaid export ──────────────── */
 
 export async function getFlowMermaid(
-    ctx: FetchContext,
+    ctx: RequestContext,
     flowId: string,
 ): Promise<string> {
     const graph =
@@ -255,7 +255,7 @@ function buildDialogConfig(
 }
 
 async function getFlowBackupData(
-    ctx: FetchContext,
+    ctx: RequestContext,
     flowId: string,
 ): Promise<{
     flow: FlowEntity;
@@ -317,7 +317,7 @@ function buildBackupJson(
 }
 
 export async function getFlowZip(
-    ctx: FetchContext,
+    ctx: RequestContext,
     flowId: string,
 ): Promise<{
     data: Uint8Array;
@@ -470,7 +470,7 @@ export async function getBackupFromZip(
 }
 
 export async function computeFlowBackupResolution(
-    ctx: FetchContext,
+    ctx: RequestContext,
     backup: Backup,
 ): Promise<ImportResolution> {
     const [flows, projects] =
@@ -503,7 +503,7 @@ export async function computeFlowBackupResolution(
 }
 
 export async function postFlowFromBackup(
-    ctx: FetchContext,
+    ctx: RequestContext,
     flowId: string,
     backup: Backup,
     projectId: string,
@@ -565,32 +565,43 @@ export async function postFlowFromBackup(
             };
         });
 
-    await ctx.PUT<void>(`flows/${flowId}`, {
-        name: backup.flow.name,
-        description:
-            backup.flow.description,
-        is_locked: backup.flow.isLocked,
-        is_auto_layout:
-            backup.flow.isAutoLayout,
-        is_auto_fit:
-            backup.flow.isAutoFit,
-        lock_timeout:
-            backup.flow.lockTimeout,
-        graph: putFlowGraph({
-            nodes, edges,
-        }),
-        created_at: now,
-        updated_at: now,
+    const linkId = generateCryptoSafeBase62();
+    await ctx.commit({
+        ops: [
+            {
+                method: 'put',
+                resource: `flows/${flowId}`,
+                body: {
+                    name: backup.flow.name,
+                    description:
+                        backup.flow.description,
+                    is_locked:
+                        backup.flow.isLocked,
+                    is_auto_layout:
+                        backup.flow.isAutoLayout,
+                    is_auto_fit:
+                        backup.flow.isAutoFit,
+                    lock_timeout:
+                        backup.flow.lockTimeout,
+                    graph: putFlowGraph({
+                        nodes, edges,
+                    }),
+                    created_at: now,
+                    updated_at: now,
+                },
+            },
+            {
+                method: 'put',
+                resource:
+                    `project-flows/${linkId}`,
+                body: {
+                    project_id: projectId,
+                    flow_id: flowId,
+                    created_at: now,
+                },
+            },
+        ],
     });
-
-    await ctx.PUT<void>(
-        `project-flows/${generateCryptoSafeBase62()}`,
-        {
-            project_id: projectId,
-            flow_id: flowId,
-            created_at: now,
-        },
-    );
 
     notifyFlowChange();
     return flowId;
@@ -782,7 +793,7 @@ function putFlowGraph(
 }
 
 export async function postFlowFromMermaid(
-    ctx: FetchContext,
+    ctx: RequestContext,
     flowId: string,
     text: string,
     projectId: string,
@@ -901,27 +912,38 @@ export async function postFlowFromMermaid(
                 + ' intermediate state',
         );
     }
-    await ctx.PUT<void>(`flows/${flowId}`, {
-        name:
-            firstNode.name + ' (import)',
-        description: '',
-        is_locked: false,
-        is_auto_layout: true,
-        is_auto_fit: true,
-        lock_timeout: DEFAULT_LOCK_TIMEOUT,
-        graph: putFlowGraph(graph),
-        created_at: now,
-        updated_at: now,
+    const linkId = generateCryptoSafeBase62();
+    await ctx.commit({
+        ops: [
+            {
+                method: 'put',
+                resource: `flows/${flowId}`,
+                body: {
+                    name: firstNode.name
+                        + ' (import)',
+                    description: '',
+                    is_locked: false,
+                    is_auto_layout: true,
+                    is_auto_fit: true,
+                    lock_timeout:
+                        DEFAULT_LOCK_TIMEOUT,
+                    graph: putFlowGraph(graph),
+                    created_at: now,
+                    updated_at: now,
+                },
+            },
+            {
+                method: 'put',
+                resource:
+                    `project-flows/${linkId}`,
+                body: {
+                    project_id: projectId,
+                    flow_id: flowId,
+                    created_at: now,
+                },
+            },
+        ],
     });
-
-    await ctx.PUT<void>(
-        `project-flows/${generateCryptoSafeBase62()}`,
-        {
-            project_id: projectId,
-            flow_id: flowId,
-            created_at: now,
-        },
-    );
 
     notifyFlowChange();
     return {
@@ -1110,7 +1132,7 @@ function applySidecarToDefault(
 }
 
 export async function postFlowFromZip(
-    ctx: FetchContext,
+    ctx: RequestContext,
     flowId: string,
     data: Uint8Array,
     projectId: string,
@@ -1336,26 +1358,37 @@ export async function postFlowFromZip(
         ? sidecar.description
         : firstNode!.name;
 
-    await ctx.PUT<void>(`flows/${flowId}`, {
-        name: flowName,
-        description: flowDesc,
-        is_locked: false,
-        is_auto_layout: true,
-        is_auto_fit: true,
-        lock_timeout: DEFAULT_LOCK_TIMEOUT,
-        graph: putFlowGraph(graph),
-        created_at: now,
-        updated_at: now,
+    const linkId = generateCryptoSafeBase62();
+    await ctx.commit({
+        ops: [
+            {
+                method: 'put',
+                resource: `flows/${flowId}`,
+                body: {
+                    name: flowName,
+                    description: flowDesc,
+                    is_locked: false,
+                    is_auto_layout: true,
+                    is_auto_fit: true,
+                    lock_timeout:
+                        DEFAULT_LOCK_TIMEOUT,
+                    graph: putFlowGraph(graph),
+                    created_at: now,
+                    updated_at: now,
+                },
+            },
+            {
+                method: 'put',
+                resource:
+                    `project-flows/${linkId}`,
+                body: {
+                    project_id: projectId,
+                    flow_id: flowId,
+                    created_at: now,
+                },
+            },
+        ],
     });
-
-    await ctx.PUT<void>(
-        `project-flows/${generateCryptoSafeBase62()}`,
-        {
-            project_id: projectId,
-            flow_id: flowId,
-            created_at: now,
-        },
-    );
 
     notifyFlowChange();
     return {

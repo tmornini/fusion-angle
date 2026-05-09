@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import {
-    createFetchContext,
+    createRequestContext,
 } from '../web-app/app/adapters/shared.ts';
 import {
     getPeople,
@@ -59,7 +59,7 @@ test('getPeople returns all people', async () => {
         buildPersonRow({ id: 'u1' }),
         buildPersonRow({ id: 'u2', first: 'Bob' }),
     ]);
-    const ctx = createFetchContext(db);
+    const ctx = createRequestContext(db);
     const people = await getPeople(ctx);
     assert.equal(people.length, 2);
     assert.ok(people[0] instanceof Person);
@@ -72,7 +72,7 @@ test(
         await seed(db, [
             buildPersonRow({ id: 'u1' }),
         ]);
-        const ctx = createFetchContext(db);
+        const ctx = createRequestContext(db);
         const rows = await getPersonRows(ctx);
         assert.equal(rows.length, 1);
         assert.equal(rows[0].id, 'u1');
@@ -126,7 +126,7 @@ test(
                 id: 'u1', status: 'active',
             }),
         ]);
-        const ctx = createFetchContext(db);
+        const ctx = createRequestContext(db);
         await putPersonStatus(
             ctx, 'u1', 'deactivated',
         );
@@ -148,7 +148,7 @@ test(
         );
         try {
             await putPersonStatus(
-                createFetchContext(db),
+                createRequestContext(db),
                 'u1', 'deactivated',
             );
         } finally {
@@ -162,7 +162,7 @@ test(
     'putPersonStatus throws on unknown person',
     async () => {
         const db = new MemoryDbAdapter();
-        const ctx = createFetchContext(db);
+        const ctx = createRequestContext(db);
         await assert.rejects(
             () => putPersonStatus(
                 ctx, 'missing', 'active',

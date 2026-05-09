@@ -159,6 +159,14 @@ export interface DeleteNodesResult {
     readonly edges: GraphEdge[];
 }
 
+function edgeSurvivesNodeDeletion(
+    edge: GraphEdge,
+    deletedNodeIds: ReadonlySet<string>,
+): boolean {
+    return !deletedNodeIds.has(edge.fromNodeId)
+        && !deletedNodeIds.has(edge.toNodeId);
+}
+
 export function applyDeleteNodes(
     nodes: readonly GraphNode[],
     edges: readonly GraphEdge[],
@@ -169,8 +177,7 @@ export function applyDeleteNodes(
             n => !nodeIds.has(n.id),
         ),
         edges: edges.filter(
-            e => !nodeIds.has(e.fromNodeId)
-                && !nodeIds.has(e.toNodeId),
+            e => edgeSurvivesNodeDeletion(e, nodeIds),
         ),
     };
 }
@@ -246,6 +253,12 @@ export interface AutoLayoutResult {
         Map<string, Waypoint[]>;
 }
 
+function hasWaypoints(
+    wp: Waypoint[] | undefined,
+): wp is Waypoint[] {
+    return wp !== undefined && wp.length > 0;
+}
+
 export function applyAutoLayout(
     nodes: readonly GraphNode[],
     edges: readonly GraphEdge[],
@@ -313,7 +326,7 @@ export function applyAutoLayout(
         );
         const wp =
             result.waypoints.get(key);
-        if (wp && wp.length > 0) {
+        if (hasWaypoints(wp)) {
             edgeWaypoints.set(e.id, wp);
         }
     }
@@ -410,6 +423,30 @@ export interface PanelTransitionResult {
     readonly shouldPanToReveal: boolean;
 }
 
+type SavedViewBoxOpen =
+    Extract<SavedViewBox, { kind: 'saved' }>;
+
+function panelJustOpened(
+    isPanelOpen: boolean,
+    savedViewBox: SavedViewBox,
+): boolean {
+    return isPanelOpen && savedViewBox.kind !== 'saved';
+}
+
+function panelJustClosed(
+    isPanelOpen: boolean,
+    savedViewBox: SavedViewBox,
+): savedViewBox is SavedViewBoxOpen {
+    return !isPanelOpen && savedViewBox.kind === 'saved';
+}
+
+function panelStaysOpen(
+    isPanelOpen: boolean,
+    savedViewBox: SavedViewBox,
+): boolean {
+    return isPanelOpen && savedViewBox.kind === 'saved';
+}
+
 export function applyPanelTransition(
     isAutoFit: boolean,
     isPanelOpen: boolean,
@@ -417,9 +454,7 @@ export function applyPanelTransition(
     viewBox: ViewBox,
 ): PanelTransitionResult | null {
     if (isAutoFit) return null;
-    const wasOpen =
-        savedViewBox.kind === 'saved';
-    if (isPanelOpen && !wasOpen) {
+    if (panelJustOpened(isPanelOpen, savedViewBox)) {
         return {
             savedViewBox: {
                 kind: 'saved',
@@ -432,7 +467,7 @@ export function applyPanelTransition(
             shouldPanToReveal: true,
         };
     }
-    if (!isPanelOpen && wasOpen) {
+    if (panelJustClosed(isPanelOpen, savedViewBox)) {
         return {
             savedViewBox: { kind: 'none' },
             viewBox: {
@@ -444,7 +479,7 @@ export function applyPanelTransition(
             shouldPanToReveal: false,
         };
     }
-    if (isPanelOpen && wasOpen) {
+    if (panelStaysOpen(isPanelOpen, savedViewBox)) {
         return {
             savedViewBox,
             viewBox,

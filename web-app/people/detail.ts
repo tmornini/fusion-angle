@@ -22,7 +22,7 @@ import {
     trimStrings,
 } from '../app/core.ts';
 import {
-    createFetchContext,
+    createRequestContext,
     getPerson,
     getPersonRow,
     putPerson,
@@ -93,7 +93,7 @@ export async function init(
     if (!container) return;
     pageContainer = container;
 
-    const ctx = createFetchContext();
+    const ctx = createRequestContext();
     const person = await withLoadingState(
         container,
         buildSkeleton('detail', 4),
@@ -111,7 +111,7 @@ export async function init(
     subscribePersonChanges(async () => {
         if (!pageContainer || !state) return;
         const fresh = await getPerson(
-            createFetchContext(), personId,
+            createRequestContext(), personId,
         );
         state = { kind: 'reading', person: fresh };
         rerender();
@@ -133,7 +133,7 @@ async function renderRolesSection(
         '.person-roles-slot',
     );
     if (!(slot instanceof HTMLElement)) return;
-    const ctx = createFetchContext();
+    const ctx = createRequestContext();
     const [members, roles] = await Promise.all([
         getMembersForPerson(ctx, personId),
         getRoles(ctx),
@@ -347,7 +347,7 @@ async function handleSave(): Promise<void> {
         return;
     }
     const personId = state.person.idForLink();
-    const ctx = createFetchContext();
+    const ctx = createRequestContext();
     let row;
     try {
         row = await getPersonRow(ctx, personId);
@@ -393,7 +393,7 @@ async function handleAddToRole(): Promise<void> {
     if (!roleId) return;
     try {
         await addMember(
-            createFetchContext(),
+            createRequestContext(),
             roleId, personId,
         );
         showToast('Added to role', 'success');
@@ -413,7 +413,7 @@ async function handleRemoveFromRole(
 ): Promise<void> {
     try {
         await removeMember(
-            createFetchContext(), membershipId,
+            createRequestContext(), membershipId,
         );
         showToast(
             'Removed from role', 'success',

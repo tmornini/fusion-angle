@@ -1,5 +1,5 @@
 import {
-    createFetchContext,
+    createRequestContext,
     deleteSchema,
     postSchemaCreation,
     postBootstrap,
@@ -70,7 +70,7 @@ export async function init(
     );
     if (!root) return;
 
-    const ctx = createFetchContext();
+    const ctx = createRequestContext();
     let pending: PendingState =
         { kind: 'idle' };
 
@@ -493,7 +493,7 @@ function mutateMissingTableBanner(
 
 async function mutateEmptyBanner(
     root: HTMLElement,
-    ctx: ReturnType<typeof createFetchContext>,
+    ctx: ReturnType<typeof createRequestContext>,
 ): Promise<void> {
     const hasExistingData =
         await getDataPresent(ctx);

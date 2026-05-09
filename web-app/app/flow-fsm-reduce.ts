@@ -99,6 +99,13 @@ function onCanvasPointerDown(
     };
 }
 
+function shouldStartConnection(
+    isPort: boolean,
+    isDraggable: boolean,
+): boolean {
+    return isPort || !isDraggable;
+}
+
 function onNodePointerDown(
     state: FsmState,
     input: Extract<FsmInput, {
@@ -118,7 +125,7 @@ function onNodePointerDown(
         id: input.nodeId,
         time: input.now,
     };
-    if (input.isPort || !input.isDraggable) {
+    if (shouldStartConnection(input.isPort, input.isDraggable)) {
         const next: FsmState = {
             ...state,
             lastClick,
@@ -653,6 +660,13 @@ function onWheel(
     };
 }
 
+function isGestureActive(state: FsmState): boolean {
+    return state.drag.kind === 'dragging'
+        || state.connect.kind === 'connecting'
+        || state.marquee.kind === 'selecting'
+        || state.pan.kind === 'panning';
+}
+
 function onSpaceToggle(
     state: FsmState,
     input: Extract<FsmInput, {
@@ -662,12 +676,7 @@ function onSpaceToggle(
     if (input.isFormFocused) {
         return { state, actions: [] };
     }
-    if (
-        state.drag.kind === 'dragging'
-        || state.connect.kind === 'connecting'
-        || state.marquee.kind === 'selecting'
-        || state.pan.kind === 'panning'
-    ) {
+    if (isGestureActive(state)) {
         return { state, actions: [] };
     }
     const turningOn = !state.isPanMode;

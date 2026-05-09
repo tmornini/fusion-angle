@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import {
-    createFetchContext,
+    createRequestContext,
 } from '../web-app/app/adapters/shared.ts';
 import {
     putSnapshotFromFile,
@@ -23,7 +23,7 @@ test('SnapshotTooLargeError carries sizes', () => {
 
 test('rejects file larger than half of available quota', async () => {
     const db = new MemoryDbAdapter();
-    const ctx = createFetchContext(db);
+    const ctx = createRequestContext(db);
     const nav = navigator as unknown as {
         storage?: {
             estimate(): Promise<{

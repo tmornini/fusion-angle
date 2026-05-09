@@ -8,13 +8,16 @@ import {
     Person,
     nowUtc,
 } from '../../../api/types.ts';
-import type { FetchContext } from './shared.ts';
+import type { RequestContext } from './shared.ts';
 import {
     createSubscriptionChannel,
 } from '../channels.ts';
 import {
     generateCryptoSafeBase62,
 } from './crypto-safe-base62.ts';
+import {
+    getPersonMap,
+} from './people.ts';
 
 export {
     Role,
@@ -110,12 +113,35 @@ export function userPrivateRoleFor(
     });
 }
 
+export async function getRoleMap(
+    ctx: RequestContext,
+): Promise<Map<Id, Role>> {
+    const rows =
+        await ctx.GET<RoleEntity[]>('roles');
+    return new Map(
+        rows.map(
+            entity => [
+                entity.id,
+                new Role(entity),
+            ],
+        ),
+    );
+}
+
+export async function getRoleMembershipRows(
+    ctx: RequestContext,
+): Promise<RoleMembershipEntity[]> {
+    return ctx.GET<RoleMembershipEntity[]>(
+        'role-memberships',
+    );
+}
+
 export async function getRoles(
-    ctx: FetchContext,
+    ctx: RequestContext,
 ): Promise<Role[]> {
     const [roleMap, personMap] = await Promise.all([
-        ctx.getRoleMap(),
-        ctx.getPersonMap(),
+        getRoleMap(ctx),
+        getPersonMap(ctx),
     ]);
     const persisted = Array.from(
         roleMap.values(),
@@ -132,17 +158,17 @@ export async function getRoles(
 // belong to membership UIs; the index of named roles
 // the organization manages excludes them by intent.
 export async function getPersistedRoles(
-    ctx: FetchContext,
+    ctx: RequestContext,
 ): Promise<Role[]> {
-    const map = await ctx.getRoleMap();
+    const map = await getRoleMap(ctx);
     return Array.from(map.values());
 }
 
 export async function getRole(
-    ctx: FetchContext,
+    ctx: RequestContext,
     id: Id,
 ): Promise<Role> {
-    const map = await ctx.getRoleMap();
+    const map = await getRoleMap(ctx);
     const role = map.get(id);
     if (!role) {
         throw new Error(
@@ -153,7 +179,7 @@ export async function getRole(
 }
 
 export async function putRole(
-    ctx: FetchContext,
+    ctx: RequestContext,
     id: Id,
     entity: Omit<RoleEntity, 'id'>,
 ): Promise<void> {
@@ -168,11 +194,11 @@ export async function putRole(
 // primitive the platform provides — never
 // simulated at the application layer.
 export async function deleteRole(
-    ctx: FetchContext,
+    ctx: RequestContext,
     roleId: Id,
 ): Promise<void> {
     const memberships =
-        await ctx.getRoleMembershipRows();
+        await getRoleMembershipRows(ctx);
     const cascadeIds = memberships
         .filter(m => m.role_id === roleId)
         .map(m => m.id);
@@ -194,15 +220,15 @@ export async function deleteRole(
 }
 
 export async function getMembersOfRole(
-    ctx: FetchContext,
+    ctx: RequestContext,
     roleId: Id,
 ): Promise<Member[]> {
     const [
         memberships, roleMap, personMap,
     ] = await Promise.all([
-        ctx.getRoleMembershipRows(),
-        ctx.getRoleMap(),
-        ctx.getPersonMap(),
+        getRoleMembershipRows(ctx),
+        getRoleMap(ctx),
+        getPersonMap(ctx),
     ]);
     const role = roleMap.get(roleId);
     if (!role) {
@@ -219,15 +245,15 @@ export async function getMembersOfRole(
 }
 
 export async function getRolesForPerson(
-    ctx: FetchContext,
+    ctx: RequestContext,
     personId: Id,
 ): Promise<Role[]> {
     const [
         memberships, roleMap, personMap,
     ] = await Promise.all([
-        ctx.getRoleMembershipRows(),
-        ctx.getRoleMap(),
-        ctx.getPersonMap(),
+        getRoleMembershipRows(ctx),
+        getRoleMap(ctx),
+        getPersonMap(ctx),
     ]);
     const persisted = memberships
         .filter(m => m.person_id === personId)
@@ -252,15 +278,15 @@ export async function getRolesForPerson(
 }
 
 export async function getMembersForPerson(
-    ctx: FetchContext,
+    ctx: RequestContext,
     personId: Id,
 ): Promise<Member[]> {
     const [
         memberships, roleMap, personMap,
     ] = await Promise.all([
-        ctx.getRoleMembershipRows(),
-        ctx.getRoleMap(),
-        ctx.getPersonMap(),
+        getRoleMembershipRows(ctx),
+        getRoleMap(ctx),
+        getPersonMap(ctx),
     ]);
     return memberships
         .filter(m => m.person_id === personId)
@@ -281,7 +307,7 @@ export async function getMembersForPerson(
 }
 
 export async function addMember(
-    ctx: FetchContext,
+    ctx: RequestContext,
     roleId: Id,
     personId: Id,
 ): Promise<void> {
@@ -293,8 +319,8 @@ export async function addMember(
         );
     }
     const [roleMap, personMap] = await Promise.all([
-        ctx.getRoleMap(),
-        ctx.getPersonMap(),
+        getRoleMap(ctx),
+        getPersonMap(ctx),
     ]);
     if (!roleMap.has(roleId)) {
         throw new Error(
@@ -320,7 +346,7 @@ export async function addMember(
 }
 
 export async function removeMember(
-    ctx: FetchContext,
+    ctx: RequestContext,
     membershipId: Id,
 ): Promise<void> {
     await ctx.DELETE(

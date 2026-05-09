@@ -18,7 +18,7 @@ import {
     closeDialog,
 } from '../app/core.ts';
 import {
-    createFetchContext,
+    createRequestContext,
     getProjects,
     getFlowsWithProjectNames,
     getFlowGraph,
@@ -87,7 +87,7 @@ export async function init(
         listEl,
         buildSkeleton('card-list', 4),
         () => getFlowsWithProjectNames(
-            createFetchContext(),
+            createRequestContext(),
         ),
         init,
         {
@@ -156,7 +156,7 @@ async function rerenderFlowList(
 ): Promise<void> {
     const items =
         await getFlowsWithProjectNames(
-            createFetchContext(),
+            createRequestContext(),
         );
     const rendered = items.map(
         ({ summary, projectName }) =>
@@ -254,7 +254,7 @@ async function openImportDialog(
     importStore.reset();
 
     const projects = await getProjects(
-        createFetchContext(),
+        createRequestContext(),
     );
     if (projects.length === 0) {
         showToast(
@@ -332,7 +332,7 @@ async function handleFileSelect(
         );
         try {
             result = await postFlowFromZip(
-                createFetchContext(),
+                createRequestContext(),
                 uuid, bytes, projectId,
             );
         } catch (err) {
@@ -347,7 +347,7 @@ async function handleFileSelect(
         const text = await file.text();
         try {
             result = await postFlowFromMermaid(
-                createFetchContext(),
+                createRequestContext(),
                 uuid, text, projectId,
             );
         } catch (err) {
@@ -392,7 +392,7 @@ async function handleBackupZip(
     try {
         resolution =
             await computeFlowBackupResolution(
-                createFetchContext(), backup,
+                createRequestContext(), backup,
             );
     } catch (err) {
         log.error(
@@ -518,7 +518,7 @@ async function handleOverwrite(
     resetImportDialog();
     const flowId = stOw.backup.flow.id;
     try {
-        const ctx = createFetchContext();
+        const ctx = createRequestContext();
         const existing =
             await getFlowGraph(ctx, flowId);
         await putFlow(ctx, flowId, {
@@ -566,7 +566,7 @@ async function handleCreateNew(
     let flowId: string;
     try {
         flowId = await postFlowFromBackup(
-            createFetchContext(),
+            createRequestContext(),
             generateCryptoSafeBase62(),
             stRe.backup, projectId,
         );
@@ -605,7 +605,7 @@ async function handleCreate(
     let flowId: string;
     try {
         flowId = await postFlowFromBackup(
-            createFetchContext(),
+            createRequestContext(),
             generateCryptoSafeBase62(),
             stNw.backup, projectId,
         );

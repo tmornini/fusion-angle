@@ -1,7 +1,7 @@
-import type { FetchContext } from './shared.ts';
+import type { RequestContext } from './shared.ts';
 
 export async function deleteWorkOrderClaim(
-    ctx: FetchContext,
+    ctx: RequestContext,
     claimId: string,
 ): Promise<void> {
     await ctx.DELETE(

@@ -4,14 +4,14 @@ import type {
 import {
     formatDate,
 } from '../format.ts';
-import type { FetchContext } from './shared.ts';
+import type { RequestContext } from './shared.ts';
 
 export type {
     OrganizationEntity,
 } from '../../../api/types.ts';
 
 async function getOrganizationRow(
-    ctx: FetchContext,
+    ctx: RequestContext,
 ): Promise<OrganizationEntity> {
     return ctx.GET<OrganizationEntity>(
         'organization',
@@ -130,7 +130,7 @@ export class Organization {
 }
 
 export async function getOrganization(
-    ctx: FetchContext,
+    ctx: RequestContext,
 ): Promise<Organization> {
     const entity =
         await getOrganizationRow(ctx);
@@ -144,7 +144,7 @@ export interface GeneralInfoDraft {
 
 export async function
 putOrganizationGeneralInfo(
-    ctx: FetchContext,
+    ctx: RequestContext,
     draft: GeneralInfoDraft,
 ): Promise<void> {
     const current = await getOrganizationRow(ctx);

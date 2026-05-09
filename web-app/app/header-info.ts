@@ -15,18 +15,18 @@ interface HeaderData {
 async function getHeaderData(
 ): Promise<HeaderData> {
     const {
-        createFetchContext,
-        getCurrentPersonRow,
+        createRequestContext,
+        getCurrentPerson,
         getOrganization,
         getDashboardStats,
         Person,
     } = await import('./adapters');
     const { getTimeOfDay } =
         await import('./format');
-    const ctx = createFetchContext();
+    const ctx = createRequestContext();
     const [personRow, org, stats] =
         await Promise.all([
-            getCurrentPersonRow(ctx),
+            getCurrentPerson(ctx),
             getOrganization(ctx),
             getDashboardStats(ctx),
         ]);

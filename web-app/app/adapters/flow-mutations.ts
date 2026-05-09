@@ -15,7 +15,7 @@ import {
 import {
     createSubscriptionChannel,
 } from '../channels.ts';
-import type { FetchContext } from './shared.ts';
+import type { RequestContext } from './shared.ts';
 
 const flowChanges =
     createSubscriptionChannel(
@@ -55,7 +55,7 @@ export interface FlowCreationInput {
 }
 
 export async function postFlowCreation(
-    ctx: FetchContext,
+    ctx: RequestContext,
     input: FlowCreationInput,
 ): Promise<void> {
     const now = nowUtc();
@@ -66,22 +66,38 @@ export async function postFlowCreation(
         edges: [],
     };
 
-    await ctx.PUT<void>(`flows/${input.flowId}`, {
-        name: input.name,
-        description: input.description,
-        is_locked: false,
-        is_auto_layout: false,
-        is_auto_fit: false,
-        lock_timeout: DEFAULT_LOCK_TIMEOUT,
-        graph: putFlowGraph(graph),
-        created_at: now,
-        updated_at: now,
-    });
-
-    await ctx.PUT<void>(`project-flows/${input.linkId}`, {
-        project_id: input.projectId,
-        flow_id: input.flowId,
-        created_at: now,
+    await ctx.commit({
+        ops: [
+            {
+                method: 'put',
+                resource:
+                    `flows/${input.flowId}`,
+                body: {
+                    name: input.name,
+                    description:
+                        input.description,
+                    is_locked: false,
+                    is_auto_layout: false,
+                    is_auto_fit: false,
+                    lock_timeout:
+                        DEFAULT_LOCK_TIMEOUT,
+                    graph: putFlowGraph(graph),
+                    created_at: now,
+                    updated_at: now,
+                },
+            },
+            {
+                method: 'put',
+                resource:
+                    `project-flows/`
+                    + `${input.linkId}`,
+                body: {
+                    project_id: input.projectId,
+                    flow_id: input.flowId,
+                    created_at: now,
+                },
+            },
+        ],
     });
 
     flowChanges.notify();
@@ -100,7 +116,7 @@ export interface FlowSaveShape {
 }
 
 export async function putFlow(
-    ctx: FetchContext,
+    ctx: RequestContext,
     id: string,
     save: FlowSaveShape,
 ): Promise<void> {

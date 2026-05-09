@@ -18,6 +18,7 @@ import {
 import { log } from './logger.ts';
 import { MissingTableError } from './adapters/index.ts';
 import { navigateTo } from './navigation.ts';
+import { PAGE_REGISTRY } from './page-registry.ts';
 
 export { navigateTo } from './navigation.ts';
 export {
@@ -46,14 +47,6 @@ async function loadAndInitCommandPalette(): Promise<void> {
     const cp = await import('./command-palette');
     cp.initCommandPalette();
 }
-
-const PAGES_WITHOUT_SCHEMA: ReadonlySet<string> = new Set([
-    'snapshots',
-    'auth',
-    'not-found',
-    'design-system',
-    'landing',
-]);
 
 function redirectIfMissingTable(
     err: unknown,
@@ -98,7 +91,8 @@ document.addEventListener(
 
         if (
             !hasSchema
-            && !PAGES_WITHOUT_SCHEMA.has(pageName)
+            && PAGE_REGISTRY[pageName]?.requiresSchema
+                !== false
         ) {
             navigateTo('snapshots');
             return;

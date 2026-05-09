@@ -7,12 +7,15 @@ import {
     Idea, nowUtc,
     ideaIsVisible,
 } from '../../../api/types.ts';
+import type { RequestContext } from './shared.ts';
 import {
     getPersonMap,
     personName,
-} from './shared.ts';
-import type { FetchContext } from './shared.ts';
-import { putProject } from './projects.ts';
+    getCurrentPerson,
+} from './people.ts';
+import {
+    notifyProjectChange,
+} from './projects.ts';
 import {
     createSubscriptionChannel,
 } from '../channels.ts';
@@ -36,15 +39,21 @@ export {
     IDEA_STATUS_CONFIG,
 } from '../../../api/types.ts';
 
-async function getIdeaRows(
-    ctx: FetchContext,
+export async function getIdeaRows(
+    ctx: RequestContext,
 ): Promise<IdeaEntity[]> {
-    const all = await ctx.getIdeaRows();
+    return ctx.GET<IdeaEntity[]>('ideas');
+}
+
+async function getVisibleIdeaRows(
+    ctx: RequestContext,
+): Promise<IdeaEntity[]> {
+    const all = await getIdeaRows(ctx);
     return all.filter(ideaIsVisible);
 }
 
 export async function getIdeaRow(
-    ctx: FetchContext,
+    ctx: RequestContext,
     id: string,
 ): Promise<IdeaEntity> {
     return ctx.GET<IdeaEntity>(
@@ -53,7 +62,7 @@ export async function getIdeaRow(
 }
 
 async function getIdeaSubmissionRows(
-    ctx: FetchContext,
+    ctx: RequestContext,
 ): Promise<IdeaSubmissionEntity[]> {
     return ctx.GET<
         IdeaSubmissionEntity[]
@@ -61,7 +70,7 @@ async function getIdeaSubmissionRows(
 }
 
 async function getIdeaSubmissionRow(
-    ctx: FetchContext,
+    ctx: RequestContext,
     ideaId: string,
 ): Promise<IdeaSubmissionEntity> {
     const all = await getIdeaSubmissionRows(ctx);
@@ -89,12 +98,12 @@ export interface IdeaWithSubmitter {
 }
 
 export async function getIdeas(
-    ctx: FetchContext,
+    ctx: RequestContext,
 ): Promise<IdeaWithSubmitter[]> {
     const [
         ideas, personMap, submissions,
     ] = await Promise.all([
-        getIdeaRows(ctx),
+        getVisibleIdeaRows(ctx),
         getPersonMap(ctx),
         getIdeaSubmissionRows(ctx),
     ]);
@@ -124,7 +133,7 @@ export async function getIdeas(
 }
 
 export async function getIdea(
-    ctx: FetchContext,
+    ctx: RequestContext,
     ideaId: string,
 ): Promise<IdeaWithSubmitter> {
     const [
@@ -145,7 +154,7 @@ export async function getIdea(
 }
 
 export async function putIdea(
-    ctx: FetchContext,
+    ctx: RequestContext,
     id: string,
     entity: Omit<IdeaEntity, 'id'>,
 ): Promise<void> {
@@ -154,11 +163,11 @@ export async function putIdea(
 }
 
 export async function putIdeaSubmission(
-    ctx: FetchContext,
+    ctx: RequestContext,
     submissionId: string,
     ideaId: string,
 ): Promise<void> {
-    const person = await ctx.getCurrentPerson();
+    const person = await getCurrentPerson(ctx);
     await ctx.PUT(
         'idea-submissions/'
             + submissionId,
@@ -171,13 +180,38 @@ export async function putIdeaSubmission(
 }
 
 // Idempotent: retry recovers from partial failure.
+// Inlined writes (rather than delegating to the
+// putProject / putIdea helpers) so the project and
+// idea writes commit together as one logical
+// operation. The helpers stay — they have other
+// callers whose writes are genuinely independent.
 export async function postIdeaConversion(
-    ctx: FetchContext,
+    ctx: RequestContext,
     ideaId: string,
     projectId: string,
     project: Omit<ProjectEntity, 'id'>,
     promotedIdea: Omit<IdeaEntity, 'id'>,
 ): Promise<void> {
-    await putProject(ctx, projectId, project);
-    await putIdea(ctx, ideaId, promotedIdea);
+    type AnyBody = Record<string, unknown>;
+    const projectBody =
+        project as unknown as AnyBody;
+    const ideaBody =
+        promotedIdea as unknown as AnyBody;
+    await ctx.commit({
+        ops: [
+            {
+                method: 'put',
+                resource:
+                    `projects/${projectId}`,
+                body: projectBody,
+            },
+            {
+                method: 'put',
+                resource: `ideas/${ideaId}`,
+                body: ideaBody,
+            },
+        ],
+    });
+    notifyProjectChange();
+    ideaChanges.notify();
 }

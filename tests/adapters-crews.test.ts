@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import {
-    createFetchContext,
+    createRequestContext,
 } from '../web-app/app/adapters/shared.ts';
 import {
     getCrews,
@@ -77,14 +77,14 @@ test(
     + ' persisted crew',
     async () => {
         const db = new MemoryDbAdapter();
-        const ctx = createFetchContext(db);
+        const ctx = createRequestContext(db);
         await putCrew(ctx, 'c-1', {
             name: 'Delivery Squad',
             description: '',
             created_at: nowUtc(),
         });
         const crew = await getCrew(
-            createFetchContext(db), 'c-1',
+            createRequestContext(db), 'c-1',
         );
         assert.equal(
             crew.nameText(), 'Delivery Squad',
@@ -99,7 +99,7 @@ test(
         const db = new MemoryDbAdapter();
         await seedCrew(db, 'c-1', 'Squad A');
         await seedCrew(db, 'c-2', 'Squad B');
-        const ctx = createFetchContext(db);
+        const ctx = createRequestContext(db);
         const crews = await getCrews(ctx);
         assert.equal(crews.length, 2);
     },
@@ -112,10 +112,10 @@ test(
         const db = new MemoryDbAdapter();
         await seedCrew(db, 'c-1', 'Squad');
         await seedRole(db, 'r-eng', 'Engineering');
-        const ctx = createFetchContext(db);
+        const ctx = createRequestContext(db);
         await addRoleToCrew(ctx, 'c-1', 'r-eng');
         const roles = await getRolesInCrew(
-            createFetchContext(db), 'c-1',
+            createRequestContext(db), 'c-1',
         );
         assert.equal(roles.length, 1);
         assert.equal(
@@ -133,15 +133,15 @@ test(
         await seedCrew(db, 'c-2', 'Squad B');
         await seedRole(db, 'r-eng', 'Engineering');
         await addRoleToCrew(
-            createFetchContext(db),
+            createRequestContext(db),
             'c-1', 'r-eng',
         );
         await addRoleToCrew(
-            createFetchContext(db),
+            createRequestContext(db),
             'c-2', 'r-eng',
         );
         const crews = await getCrewsContainingRole(
-            createFetchContext(db), 'r-eng',
+            createRequestContext(db), 'r-eng',
         );
         assert.equal(crews.length, 2);
     },
@@ -154,7 +154,7 @@ test(
         await seedCrew(db, 'c-1', 'Squad');
         await seedRole(db, 'r-eng', 'Engineering');
         await addRoleToCrew(
-            createFetchContext(db),
+            createRequestContext(db),
             'c-1', 'r-eng',
         );
         const before =
@@ -162,7 +162,7 @@ test(
                 .getAll();
         assert.equal(before.length, 1);
         await removeRoleFromCrew(
-            createFetchContext(db),
+            createRequestContext(db),
             before[0].id,
         );
         const after =
@@ -179,14 +179,14 @@ test(
         await seedCrew(db, 'c-1', 'Squad');
         await seedRole(db, 'r-eng', 'Engineering');
         await seedRole(db, 'r-qa', 'QA');
-        const ctx = createFetchContext(db);
+        const ctx = createRequestContext(db);
         await addRoleToCrew(ctx, 'c-1', 'r-eng');
         await addRoleToCrew(
-            createFetchContext(db),
+            createRequestContext(db),
             'c-1', 'r-qa',
         );
         await deleteCrew(
-            createFetchContext(db), 'c-1',
+            createRequestContext(db), 'c-1',
         );
         const memberships =
             await db.crewRoleMemberships
@@ -194,7 +194,7 @@ test(
         assert.equal(memberships.length, 0);
         await assert.rejects(
             () => getCrew(
-                createFetchContext(db), 'c-1',
+                createRequestContext(db), 'c-1',
             ),
         );
     },
@@ -208,12 +208,12 @@ test(
         await seedCrew(db, 'c-1', 'Squad');
         await seedPerson(db, 'p-1', 'Sarah');
         await addRoleToCrew(
-            createFetchContext(db),
+            createRequestContext(db),
             'c-1',
             userPrivateRoleId('p-1'),
         );
         const roles = await getRolesInCrew(
-            createFetchContext(db), 'c-1',
+            createRequestContext(db), 'c-1',
         );
         assert.equal(roles.length, 1);
         assert.equal(
@@ -230,7 +230,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await seedCrew(db, 'c-1', 'Squad');
-        const ctx = createFetchContext(db);
+        const ctx = createRequestContext(db);
         await assert.rejects(
             () => addRoleToCrew(
                 ctx, 'c-1', 'no-such-role',
@@ -245,7 +245,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await seedRole(db, 'r-eng', 'Engineering');
-        const ctx = createFetchContext(db);
+        const ctx = createRequestContext(db);
         await assert.rejects(
             () => addRoleToCrew(
                 ctx, 'no-crew', 'r-eng',
@@ -261,7 +261,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await seedCrew(db, 'c-1', 'Squad');
-        const ctx = createFetchContext(db);
+        const ctx = createRequestContext(db);
         await assert.rejects(
             () => addRoleToCrew(
                 ctx, 'c-1',
@@ -283,27 +283,27 @@ test(
         await seedPerson(db, 'p-1', 'Alice');
         await seedPerson(db, 'p-2', 'Bob');
         await addMember(
-            createFetchContext(db),
+            createRequestContext(db),
             'r-eng', 'p-1',
         );
         await addMember(
-            createFetchContext(db),
+            createRequestContext(db),
             'r-eng', 'p-2',
         );
         await addMember(
-            createFetchContext(db),
+            createRequestContext(db),
             'r-qa', 'p-1',
         );
         await addRoleToCrew(
-            createFetchContext(db),
+            createRequestContext(db),
             'c-1', 'r-eng',
         );
         await addRoleToCrew(
-            createFetchContext(db),
+            createRequestContext(db),
             'c-1', 'r-qa',
         );
         const members = await getMembersOfCrew(
-            createFetchContext(db), 'c-1',
+            createRequestContext(db), 'c-1',
         );
         assert.equal(members.size, 2);
         assert.ok(members.has('p-1'));
@@ -319,12 +319,12 @@ test(
         await seedCrew(db, 'c-1', 'Squad');
         await seedPerson(db, 'p-1', 'Alice');
         await addRoleToCrew(
-            createFetchContext(db),
+            createRequestContext(db),
             'c-1',
             userPrivateRoleId('p-1'),
         );
         const members = await getMembersOfCrew(
-            createFetchContext(db), 'c-1',
+            createRequestContext(db), 'c-1',
         );
         assert.equal(members.size, 1);
         assert.ok(members.has('p-1'));

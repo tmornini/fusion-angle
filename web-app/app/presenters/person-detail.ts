@@ -651,13 +651,19 @@ export function buildPersonRolesSection(
 </section>`;
 }
 
+function hasAnyRolesToShow(
+    members: readonly Member[],
+    userPrivateRole: Role | null,
+): boolean {
+    return members.length > 0
+        || userPrivateRole !== null;
+}
+
 function buildMembershipsList(
     members: readonly Member[],
     userPrivateRole: Role | null,
 ): SafeHtml {
-    const hasAny = members.length > 0
-        || userPrivateRole !== null;
-    if (!hasAny) {
+    if (!hasAnyRolesToShow(members, userPrivateRole)) {
         return html`<p class="${
             'text-sm text-muted mb-3'
         }">

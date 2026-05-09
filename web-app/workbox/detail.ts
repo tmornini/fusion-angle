@@ -24,8 +24,8 @@ import {
     postWorkOrderTransition,
     postWorkOrderClaim,
     deleteWorkOrderClaim,
-    getCurrentPersonRow,
-    createFetchContext,
+    getCurrentPerson,
+    createRequestContext,
     generateCryptoSafeBase62,
 } from '../app/adapters/index.ts';
 
@@ -60,12 +60,27 @@ function collectFieldValues(
     return values;
 }
 
+function hasEmptyRequiredField(
+    fields: readonly {
+        id: string;
+        isRequired: boolean;
+    }[],
+    values: Record<string, string>,
+): boolean {
+    return fields
+        .filter(f => f.isRequired)
+        .some(f => {
+            const v = values[f.id];
+            return v === undefined || v === '';
+        });
+}
+
 /* ── Event wiring ────────── */
 
 function initTransitionButtons(
     container: HTMLElement,
     detail: WorkboxDetailPresenter,
-    ctx: ReturnType<typeof createFetchContext>,
+    ctx: ReturnType<typeof createRequestContext>,
 ): void {
     const buttons =
         container.querySelectorAll<
@@ -82,18 +97,10 @@ function initTransitionButtons(
                     collectFieldValues(
                         container,
                     );
-                const hasEmpty =
-                    detail
-                        .renderableFields()
-                        .filter(
-                            f => f.isRequired,
-                        )
-                        .some(f => {
-                            const v
-                                = values[f.id];
-                            return v === undefined
-                                || v === '';
-                        });
+                const hasEmpty = hasEmptyRequiredField(
+                    detail.renderableFields(),
+                    values,
+                );
                 if (hasEmpty) {
                     showToast(
                         'Please fill'
@@ -186,7 +193,7 @@ function initTransitionButtons(
 function initUnclaimButton(
     container: HTMLElement,
     detail: WorkboxDetailPresenter,
-    ctx: ReturnType<typeof createFetchContext>,
+    ctx: ReturnType<typeof createRequestContext>,
 ): void {
     const btn = $(
         '#unclaim-btn', container,
@@ -228,7 +235,7 @@ function initUnclaimButton(
 async function loadPresenter(
     workOrderId: string,
     currentPersonId: string,
-    ctx: ReturnType<typeof createFetchContext>,
+    ctx: ReturnType<typeof createRequestContext>,
 ): Promise<WorkboxDetailPresenter> {
     const [
         workOrder, transitions,
@@ -269,9 +276,9 @@ export async function init(
     );
     if (!container) return;
 
-    const ctx = createFetchContext();
+    const ctx = createRequestContext();
     const personRow =
-        await getCurrentPersonRow(ctx);
+        await getCurrentPerson(ctx);
     const personId = personRow.id;
 
     const detail = await withLoadingState(

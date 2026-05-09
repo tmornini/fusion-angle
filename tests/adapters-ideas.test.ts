@@ -4,8 +4,8 @@ import {
     MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import {
-    createFetchContext,
-    type FetchContext,
+    createRequestContext,
+    type RequestContext,
 } from '../web-app/app/adapters/shared.ts';
 import {
     getIdeas,
@@ -54,10 +54,10 @@ function buildIdea(
 
 function setupDb(): {
     db: MemoryDbAdapter;
-    ctx: FetchContext;
+    ctx: RequestContext;
 } {
     const db = new MemoryDbAdapter();
-    const ctx = createFetchContext(db);
+    const ctx = createRequestContext(db);
     return { db, ctx };
 }
 

@@ -735,11 +735,26 @@ on. Run these in order.
 
 - [ ] **F58** Open a regular-node properties panel and click
   the Crew dropdown. PASS: the dropdown opens showing
-  "Unassigned" first, then a "Users" group containing every
-  system user sorted alphabetically by full name, then a
-  "Models" group containing exactly: Grok 4.20 Heavy,
-  Claude Opus 4.7 Max, Gemini 3.1 Pro, Copilot, GPT-5.4 Pro
-  (in declared order).
+  "Unassigned" first, then a "Roles" group containing every
+  persisted role, a "People (private)" group containing
+  every active person's user-private role, a "Crews"
+  group containing every persisted crew, and a "Models"
+  group containing every persisted model — each section
+  alphabetized.
+- [ ] **F58a** Select a crew from the dropdown. Reload the
+  page and reopen the same node panel. PASS: the dropdown
+  shows the same crew selected. The persisted shape is
+  `{ kind: 'crew', crewId: <id> }` — verify in
+  `localStorage['fusion-ai:flows']`.
+- [ ] **F58b** Pick an unassigned crew (zero members) for a
+  node and close the panel. PASS: the node renders a hazard
+  triangle in the bottom-left corner. Add a member to the
+  crew via `/crews` (expand, add a role with people).
+  Reopen the flow. PASS: the hazard clears.
+- [ ] **F58c** Select a model from the dropdown. Reload the
+  page and reopen the same node panel. PASS: the dropdown
+  shows the same model selected; the persisted shape is
+  `{ kind: 'model', modelId: <id> }`.
 - [ ] **F59** Select a user from the Crew dropdown. Reload the
   page and reopen the same node panel. PASS: the dropdown
   shows the same user selected.
@@ -928,6 +943,35 @@ on. Run these in order.
   PASS: each row has an immutable shape (from_node_id, to_node_id,
   person_id, values, transitioned_at). Verify no app code path mutates
   an existing transition row — transitions are append-only.
+
+### Workbox Visibility Filter
+
+- [ ] **WB20** As `current` person, navigate to
+  `workbox/`. PASS: only work orders whose
+  current node is unassigned, role-assigned to a
+  role you're in, or crew-assigned to a crew
+  containing you appear in the active or archive
+  list. Hidden: model-assigned and crews/roles
+  you're not in.
+- [ ] **WB21** Open the seeded "Customer
+  Onboarding" work order. Its archive entry is
+  visible because the final transition lands on
+  the unassigned Archive node, and unassigned is
+  visible to all (the hazard triangle brands
+  unassigned as misconfiguration in the designer).
+- [ ] **WB22** Construct a flow whose current
+  node is `{ kind: 'crew', crewId: <id> }` for a
+  crew the demo user belongs to (`crew_design`
+  contains the demo user via the seeded
+  user-private membership). Create a work order
+  from that flow and confirm it appears in the
+  active list.
+- [ ] **WB23** Construct a flow whose current
+  node is `{ kind: 'model', modelId: <id> }`
+  (any seeded model). Create a work order from
+  that flow. PASS: it does NOT appear in any
+  workbox — model assignments are visible to no
+  human.
 
 ---
 
@@ -1118,6 +1162,64 @@ feature is implemented.
   sidebar. PASS: tab 2 reflects the collapsed state without manual
   reload (cross-tab sync via StorageEvent on
   `fusion-sidebar-collapsed`).
+
+---
+
+## K. Roles
+
+- [ ] **K1** Navigate to `roles/`. PASS: roles
+  index renders with a "New Role" button and a
+  search bar. With pristine data, table is empty
+  but shell remains.
+- [ ] **K2** Click "New Role", enter
+  `Engineering` as name and a short description,
+  click Create. PASS: row appears in the table
+  with member count "0 members".
+- [ ] **K3** From `/people/<id>` for any person,
+  add the new Engineering role via the role
+  membership UI. Return to `/roles`. PASS: row's
+  member count increments to "1 member".
+- [ ] **K4** Type `engin` into the search bar.
+  PASS: only matching rows remain visible;
+  case-insensitive.
+- [ ] **K5** Open a second tab on `/roles`. In
+  tab 1, create another role. PASS: tab 2 shows
+  the new row without manual reload (cross-tab
+  via StorageEvent).
+- [ ] **K6** Click the trash icon on a row;
+  confirm in the dialog. PASS: row disappears;
+  any person-detail no longer shows the role
+  (cascade tested in `adapters-roles.test.ts`).
+
+---
+
+## L. Crews
+
+- [ ] **L1** Navigate to `crews/`. PASS: crews
+  index renders with a "New Crew" button and
+  search.
+- [ ] **L2** Click "New Crew", enter `Delivery`
+  as name and a short description, click Create.
+  PASS: row appears with role count "0 roles".
+- [ ] **L3** Click the row body to expand. PASS:
+  expansion reveals "No roles in this crew yet"
+  plus an Add-role select listing every
+  persisted role.
+- [ ] **L4** Select a role and click Add. PASS:
+  role appears in the expansion; role count
+  updates to "1 role".
+- [ ] **L5** Click the trash icon next to a role.
+  PASS: role removed from expansion.
+- [ ] **L6** Click another crew's row to expand.
+  PASS: only one crew expanded at a time —
+  previous expansion collapses.
+- [ ] **L7** Type into the search bar. PASS:
+  only matching crews remain visible.
+- [ ] **L8** Click the trash icon on a row,
+  confirm. PASS: crew is removed; any
+  crew_role_memberships rows for it are also
+  removed (cascade tested in
+  `adapters-crews.test.ts`).
 
 ---
 

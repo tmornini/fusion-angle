@@ -7,7 +7,10 @@ import {
 import {
     formatCompactCurrency,
 } from '../format.ts';
-import type { FetchContext } from './shared.ts';
+import type { RequestContext } from './shared.ts';
+import { getIdeaRows } from './ideas.ts';
+import { getProjectRows } from './projects.ts';
+import { getFlowRows } from './flows.ts';
 
 export type GaugeIcon =
     | 'clock'
@@ -37,10 +40,10 @@ export interface GaugeData {
 }
 
 export async function getDashboardGauges(
-    ctx: FetchContext,
+    ctx: RequestContext,
 ): Promise<GaugeData[]> {
     const allProjects =
-        await ctx.getProjectRows();
+        await getProjectRows(ctx);
     const projects = allProjects.filter(
         projectIsApproved,
     );
@@ -166,15 +169,15 @@ export async function getDashboardGauges(
 }
 
 export async function getDashboardStats(
-    ctx: FetchContext,
+    ctx: RequestContext,
 ): Promise<
     { label: string; value: number }[]
 > {
     const [ideas, projects, flows] =
         await Promise.all([
-            ctx.getIdeaRows(),
-            ctx.getProjectRows(),
-            ctx.getFlowRows(),
+            getIdeaRows(ctx),
+            getProjectRows(ctx),
+            getFlowRows(ctx),
         ]);
 
     return [

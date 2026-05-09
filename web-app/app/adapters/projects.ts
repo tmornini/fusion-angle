@@ -9,11 +9,11 @@ import {
     COST_DIVISOR,
     MS_PER_DAY,
 } from '../../../api/types.ts';
+import type { RequestContext } from './shared.ts';
 import {
     getPersonMap,
     personName,
-} from './shared.ts';
-import type { FetchContext } from './shared.ts';
+} from './people.ts';
 import {
     createSubscriptionChannel,
 } from '../channels.ts';
@@ -27,6 +27,10 @@ export function subscribeProjectChanges(
     return projectChanges.subscribe(fn);
 }
 
+export function notifyProjectChange(): void {
+    projectChanges.notify();
+}
+
 export {
     Project,
     type ProjectStatus,
@@ -36,10 +40,16 @@ export {
     COST_DIVISOR,
 } from '../../../api/types.ts';
 
+export async function getProjectRows(
+    ctx: RequestContext,
+): Promise<ProjectEntity[]> {
+    return ctx.GET<ProjectEntity[]>('projects');
+}
+
 export async function getProjects(
-    ctx: FetchContext,
+    ctx: RequestContext,
 ): Promise<Project[]> {
-    const rows = await ctx.getProjectRows();
+    const rows = await getProjectRows(ctx);
     return rows
         .filter(projectIsNotDeleted)
         .map(row => new Project(row));
@@ -147,7 +157,7 @@ export class ProjectView {
 }
 
 export async function getProjectRow(
-    ctx: FetchContext,
+    ctx: RequestContext,
     id: string,
 ): Promise<ProjectEntity> {
     return ctx.GET<ProjectEntity>(
@@ -156,7 +166,7 @@ export async function getProjectRow(
 }
 
 export async function putProject(
-    ctx: FetchContext,
+    ctx: RequestContext,
     id: string,
     entity: Omit<ProjectEntity, 'id'>,
 ): Promise<void> {
