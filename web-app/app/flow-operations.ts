@@ -1,5 +1,7 @@
 import type { FlowSnapshot } from
     './presenters/flow-designer.ts';
+import type { DbAdapter } from
+    '../../api/db.ts';
 import type {
     GraphEdge,
     GraphField,
@@ -81,11 +83,12 @@ function snapToSave(
 }
 
 async function commitFlowMutation(
+    db: DbAdapter,
     snap: FlowSnapshot,
     nodes: GraphNode[],
     edges: GraphEdge[],
 ): Promise<void> {
-    const ctx = createRequestContext();
+    const ctx = createRequestContext(db);
     await postFlowVersion(
         ctx,
         generateCryptoSafeBase62(),
@@ -151,6 +154,7 @@ function nodeHasOutgoingEdges(
 }
 
 export async function performAddEdge(
+    db: DbAdapter,
     snap: FlowSnapshot,
     fromId: string,
     toId: string,
@@ -211,7 +215,7 @@ export async function performAddEdge(
     );
     try {
         await commitFlowMutation(
-            snap, snap.nodes, newEdges,
+            db, snap, snap.nodes, newEdges,
         );
     } catch (err) {
         log.error(
@@ -237,6 +241,7 @@ export interface NodeAddOk {
 }
 
 export async function performAddNodeAtPosition(
+    db: DbAdapter,
     snap: FlowSnapshot,
     fromNodeId: string,
     x: number,
@@ -290,7 +295,7 @@ export async function performAddNodeAtPosition(
     );
     try {
         await commitFlowMutation(
-            snap, newNodes, newEdges,
+            db, snap, newNodes, newEdges,
         );
     } catch (err) {
         log.error(
@@ -315,6 +320,7 @@ export interface NodesDeleteOk {
 }
 
 export async function performDeleteSelectedNodes(
+    db: DbAdapter,
     snap: FlowSnapshot,
 ): Promise<OpResult<NodesDeleteOk> | OpNoop> {
     if (snap.isLocked) {
@@ -342,7 +348,7 @@ export async function performDeleteSelectedNodes(
     );
     try {
         await commitFlowMutation(
-            snap, result.nodes, result.edges,
+            db, snap, result.nodes, result.edges,
         );
     } catch (err) {
         log.error(
@@ -365,6 +371,7 @@ export interface EdgeDeleteOk {
 }
 
 export async function performDeleteSelectedEdge(
+    db: DbAdapter,
     snap: FlowSnapshot,
 ): Promise<OpResult<EdgeDeleteOk> | OpNoop> {
     if (snap.isLocked) {
@@ -380,7 +387,7 @@ export async function performDeleteSelectedEdge(
     );
     try {
         await commitFlowMutation(
-            snap, snap.nodes, newEdges,
+            db, snap, snap.nodes, newEdges,
         );
     } catch (err) {
         log.error(
@@ -405,6 +412,7 @@ export interface FieldAddOk {
 }
 
 export async function performAddField(
+    db: DbAdapter,
     snap: FlowSnapshot,
     name: string,
     fieldType: string,
@@ -440,7 +448,7 @@ export async function performAddField(
     );
     try {
         await commitFlowMutation(
-            snap, newNodes, snap.edges,
+            db, snap, newNodes, snap.edges,
         );
     } catch (err) {
         log.error(
@@ -464,6 +472,7 @@ export interface FieldDeleteOk {
 }
 
 export async function performDeleteField(
+    db: DbAdapter,
     snap: FlowSnapshot,
     fieldId: string,
 ): Promise<OpResult<FieldDeleteOk> | OpNoop> {
@@ -479,7 +488,7 @@ export async function performDeleteField(
     );
     try {
         await commitFlowMutation(
-            snap, newNodes, snap.edges,
+            db, snap, newNodes, snap.edges,
         );
     } catch (err) {
         log.error(
@@ -535,6 +544,7 @@ function applyServerGraph(
 }
 
 export async function performUndo(
+    db: DbAdapter,
     snap: FlowSnapshot,
     history: FlowHistorySnapshot,
 ): Promise<OpResult<HistoryOpOk>> {
@@ -542,7 +552,7 @@ export async function performUndo(
         return failOp('Flow is locked');
     }
     try {
-        const ctx = createRequestContext();
+        const ctx = createRequestContext(db);
         const versions = await getFlowVersions(
             ctx, snap.flowId,
         );
@@ -609,6 +619,7 @@ export async function performUndo(
 }
 
 export async function performRedo(
+    db: DbAdapter,
     snap: FlowSnapshot,
     history: FlowHistorySnapshot,
 ): Promise<OpResult<HistoryOpOk>> {
@@ -624,7 +635,7 @@ export async function performRedo(
         };
     }
     try {
-        const ctx = createRequestContext();
+        const ctx = createRequestContext(db);
         await postFlowVersion(
             ctx,
             generateCryptoSafeBase62(),

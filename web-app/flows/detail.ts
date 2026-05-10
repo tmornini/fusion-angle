@@ -30,6 +30,7 @@ import {
 import type {
     RequestContext,
 } from '../app/adapters/index.ts';
+import { getDbAdapter } from '../app/adapters/init.ts';
 import type { NodeAssignment } from '../../api/types.ts';
 import {
     downloadBlob,
@@ -300,7 +301,7 @@ async function handleAddEdge(
 ): Promise<void> {
     const snap = pageState.presenter().snapshot();
     const op = await performAddEdge(
-        snap, fromId, toId,
+        getDbAdapter(), snap, fromId, toId,
     );
     if (op.kind === 'fail') {
         await reportOpFailure(
@@ -348,7 +349,7 @@ async function reportOpFailure(
 async function handleUndo(): Promise<void> {
     const snap = pageState.presenter().snapshot();
     const op = await performUndo(
-        snap, pageState.history(),
+        getDbAdapter(), snap, pageState.history(),
     );
     if (op.kind === 'fail') {
         showToast(op.toast, op.toastVariant);
@@ -364,7 +365,7 @@ async function handleUndo(): Promise<void> {
 async function handleRedo(): Promise<void> {
     const snap = pageState.presenter().snapshot();
     const op = await performRedo(
-        snap, pageState.history(),
+        getDbAdapter(), snap, pageState.history(),
     );
     if (op.kind === 'fail') {
         showToast(op.toast, op.toastVariant);
@@ -390,7 +391,9 @@ async function handleDeleteSelected(): Promise<void> {
 async function handleDeleteSelectedNodes(
 ): Promise<void> {
     const snap = pageState.presenter().snapshot();
-    const op = await performDeleteSelectedNodes(snap);
+    const op = await performDeleteSelectedNodes(
+        getDbAdapter(), snap,
+    );
     if (op.kind === 'noop') return;
     if (op.kind === 'fail') {
         await reportOpFailure(
@@ -419,7 +422,9 @@ async function handleDeleteSelectedNodes(
 async function handleDeleteSelectedEdge(
 ): Promise<void> {
     const snap = pageState.presenter().snapshot();
-    const op = await performDeleteSelectedEdge(snap);
+    const op = await performDeleteSelectedEdge(
+        getDbAdapter(), snap,
+    );
     if (op.kind === 'noop') return;
     if (op.kind === 'fail') {
         await reportOpFailure(
@@ -454,7 +459,7 @@ async function handleAddField(
 ): Promise<void> {
     const snap = pageState.presenter().snapshot();
     const op = await performAddField(
-        snap, name, fieldType,
+        getDbAdapter(), snap, name, fieldType,
         isRequired, options,
     );
     if (op.kind === 'noop') return;
@@ -481,7 +486,7 @@ async function handleDeleteField(
 ): Promise<void> {
     const snap = pageState.presenter().snapshot();
     const op = await performDeleteField(
-        snap, fieldId,
+        getDbAdapter(), snap, fieldId,
     );
     if (op.kind === 'noop') return;
     if (op.kind === 'fail') {
@@ -509,7 +514,7 @@ async function handleAddNodeAtPosition(
 ): Promise<void> {
     const snap = pageState.presenter().snapshot();
     const op = await performAddNodeAtPosition(
-        snap, fromId, x, y,
+        getDbAdapter(), snap, fromId, x, y,
     );
     if (op.kind === 'fail') {
         await reportOpFailure(
