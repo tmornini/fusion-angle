@@ -252,6 +252,11 @@ import { navigateTo, openDialog, closeDialog } from '../app/core';
   `crypto-safe-base62.ts`, etc.) wrap browser primitives so the
   app speaks one voice. Tiny shims are not a smell — they are
   the divorce point.
+- **Mutation adapters return `Promise<void>`.**
+  Change-awareness flows through notification channels (e.g.,
+  `ideaChanges.notify()`), never through return values —
+  callers tell the channel rather than branch on a result.
+  The type's silence is intentional.
 
 ### Dark Mode
 

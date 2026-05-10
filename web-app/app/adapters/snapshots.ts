@@ -117,7 +117,7 @@ export async function getSnapshot(
 // is the expected non-error path here, and a
 // higher-level accessor could obscure the error
 // type for any later caller sharing this ctx.
-export async function getDataPresent(
+export async function getHasAnyPeople(
     ctx: RequestContext,
 ): Promise<boolean> {
     try {

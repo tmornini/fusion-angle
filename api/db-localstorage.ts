@@ -596,30 +596,14 @@ function createSingletonStore<
                 const index = rows.findIndex(
                     entity => entity.id === '1',
                 );
-
-                if (index >= 0) {
-                    rows[index] = {
-                        ...serialized,
-                        id: '1',
-                    } as T;
-                } else {
-                    rows.push({
-                        ...serialized,
-                        id: '1',
-                    } as T);
-                }
-
-                await writeTable(tableName, rows);
-                const pos = index >= 0
-                    ? index
-                    : rows.length - 1;
-                const written = rows[pos];
-                if (!written) {
-                    throw new Error(
-                        'Internal error: entity'
-                        + ' not found after write',
-                    );
-                }
+                const written = {
+                    ...serialized,
+                    id: '1',
+                } as T;
+                const next = index >= 0
+                    ? rows.with(index, written)
+                    : [...rows, written];
+                await writeTable(tableName, next);
                 return written;
             });
         },

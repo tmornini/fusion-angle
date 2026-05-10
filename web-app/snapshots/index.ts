@@ -7,7 +7,7 @@ import {
     putSnapshotFromFile,
     SnapshotTooLargeError,
     getSnapshot,
-    getDataPresent,
+    getHasAnyPeople,
     nowUtc,
     getUrlParam,
 } from '../app/adapters/index.ts';
@@ -496,7 +496,7 @@ async function mutateEmptyBanner(
     ctx: ReturnType<typeof createRequestContext>,
 ): Promise<void> {
     const hasExistingData =
-        await getDataPresent(ctx);
+        await getHasAnyPeople(ctx);
     const existing = $(
         '#' + BANNER_ID, document,
     );
