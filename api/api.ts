@@ -479,7 +479,7 @@ const routes: Route[] = [
     route('snapshots/mock-data', {
         post: async (db) => {
             const { populateMockData } =
-                await import('./mock-data');
+                await import('./mock-data.ts');
             await populateMockData(db);
         },
     }),
@@ -487,7 +487,7 @@ const routes: Route[] = [
         post: async (db) => {
             const {
                 populateBootstrapData,
-            } = await import('./mock-data');
+            } = await import('./mock-data.ts');
             await populateBootstrapData(db);
         },
     }),
