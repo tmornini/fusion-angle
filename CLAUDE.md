@@ -39,9 +39,9 @@ TMPDIR=/tmp/claude ./serve 8080
 
 `TMPDIR=/tmp/claude` redirects both tsx's IPC socket and `./serve`'s temp build dir into the sandbox-allowed path. `localhost` is reachable from the sandbox, so the Chrome MCP tools can drive the page normally.
 
-`./validate` runs `tsc --noEmit` (type checking), then `./test` (automated tests against pure modules and the `api/`/`adapters/` layer, via `node --test --strip-types tests/*.test.ts`), then enforces 78-character maximum line length on all `.ts`, `.html`, and `.css` files (excluding `compose.ts`).
+`./validate` runs `tsc --noEmit` (type checking), then `./test` (automated tests against pure modules and the `api/`, `adapters/`, and `presenters/` layers, via `node --test --strip-types tests/*.test.ts`), then enforces 78-character maximum line length on all `.ts`, `.html`, and `.css` files (excluding `compose.ts`).
 
-Automated tests cover pure modules and adapter behavior; UI behavior is still covered by the manual browser regression protocol — see `## Testing` below.
+Automated tests cover pure modules, flow-edit logic, all data adapters, the workbox inbox aggregation, navigation, mock-data validity, and presenter HTML output; UI behavior — gestures, layout, visual rendering, end-to-end DOM flows — is still covered by the manual browser regression protocol — see `## Testing` below.
 
 ## TypeScript
 
@@ -332,8 +332,14 @@ and copied — read it, don't read this section.
 Two layers, both zero-dependency:
 
 **Automated tests** (Node's built-in `node:test` runner with
-`--strip-types`, no devDependencies). Tests cover pure modules,
-adapters, and api routing — see `tests/` for the current set.
+`--strip-types`, no devDependencies; ~694 tests). Tests cover
+pure modules, flow-edit business logic and the connection-
+validation rules (`tests/flow-operations.test.ts`), the flow
+version/query adapters, every data adapter, the workbox inbox
+aggregation plus the visibility filter, the mermaid round-trip,
+in-browser ZIP, snapshot import-validation/quota/wipe-on-fail,
+api routing, navigation, mock-data validity, and the SafeHtml
+output of the presenters — see `tests/` for the current set.
 `api/db-memory.ts` provides an in-memory `DbAdapter` so adapter
 and api-layer tests run without `localStorage`.
 
@@ -341,11 +347,13 @@ Run via `./validate` (which also type-checks and lints) or
 directly: `node --test --strip-types tests/*.test.ts`.
 
 **Manual browser regression** for UI behavior: a pass against
-`TEST-PLAN.md` (269 cases), driven either by a single human
+`TEST-PLAN.md` (~265 cases), driven either by a single human
 tester serially or by Claude Code agents in parallel via the
 `claude-in-chrome` MCP. Anything DOM-driven (gestures, layout,
-visual rendering) lives here. Pure transitions, adapters, and
-API routing live in the automated suite.
+visual rendering) lives here; where a manual case is the browser
+counterpart of an automated area it carries an inline pointer at
+the test file. Pure transitions, flow-edit logic, adapters,
+presenter output, and API routing live in the automated suite.
 
 ### Six-phase parallel protocol
 

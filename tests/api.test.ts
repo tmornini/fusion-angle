@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import {
-    GET, PUT, DELETE,
+    GET, PUT, DELETE, POST,
 } from '../api/api.ts';
 import {
     MemoryDbAdapter,
@@ -230,5 +230,56 @@ test(
                 db, 'role-model-memberships',
             );
         assert.equal(after.length, 0);
+    },
+);
+
+test(
+    'POST snapshots/mock-data populates the'
+    + ' tables',
+    async () => {
+        const db = new MemoryDbAdapter();
+        await POST(
+            db, 'snapshots/mock-data', {},
+        );
+        const people =
+            await GET<unknown[]>(db, 'people');
+        assert.ok(people.length > 0);
+    },
+);
+
+test(
+    'POST on a route with no post handler is'
+    + ' 405 Method Not Allowed',
+    async () => {
+        const db = new MemoryDbAdapter();
+        await assert.rejects(
+            () => POST(db, 'ideas', {}),
+            /not allowed/i,
+        );
+    },
+);
+
+test(
+    'POST on an unknown route is 404',
+    async () => {
+        const db = new MemoryDbAdapter();
+        await assert.rejects(
+            () => POST(
+                db, 'no-such-resource', {},
+            ),
+            /not found|404/i,
+        );
+    },
+);
+
+test(
+    'a path with the wrong number of segments'
+    + ' matches no route and is 404',
+    async () => {
+        const db = new MemoryDbAdapter();
+        await assert.rejects(
+            () => GET(db, 'roles/r-1/extra'),
+            /not found|404/i,
+        );
     },
 );

@@ -102,6 +102,8 @@ class Debouncer {
         const count = this.#scheduleCount;
         this.#timer = setTimeout(
             () => {
+                this.#timer = undefined;
+                this.#pending = undefined;
                 const burstDurMs =
                     performance.now() - startedAt;
                 const ratePerSec =
@@ -131,8 +133,6 @@ class Debouncer {
                             ) / 100,
                     },
                 );
-                this.#timer = undefined;
-                this.#pending = undefined;
             },
             this.#delayMs,
         );
@@ -143,12 +143,12 @@ class Debouncer {
             clearTimeout(this.#timer);
             this.#timer = undefined;
         }
-        if (
-            this.#pending !== undefined
-        ) {
+        const pending = this.#pending;
+        this.#pending = undefined;
+        if (pending !== undefined) {
             const callStart =
                 performance.now();
-            this.#pending();
+            pending();
             const callDurMs =
                 performance.now() - callStart;
             log.info(
@@ -161,7 +161,6 @@ class Debouncer {
                         ) / 100,
                 },
             );
-            this.#pending = undefined;
         }
     }
 }

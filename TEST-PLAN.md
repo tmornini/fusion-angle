@@ -16,6 +16,32 @@ This UI plan therefore focuses on what automated tests cannot
 verify: layout, gestures, navigation, drag-and-drop, dialog
 behavior, and end-to-end user flows through the rendered DOM.
 
+The fast suite (`./test` / `./validate`) now also covers:
+flow-edit business logic and the connection-validation rules
+(`tests/flow-operations.test.ts` — `performAddEdge` /
+`performAddNodeAtPosition` / `performDeleteSelected*` /
+`performAddField` / `performDeleteField` / `performUndo` /
+`performRedo`, including no-edge-to-a-start-node, none-from-an-
+end-node, no-duplicate-edge, start-node-single-outgoing, and the
+lock/noop/commit-error branches); the flow version and query
+adapters (`tests/adapters-flow-versions.test.ts`,
+`tests/adapters-flow-queries.test.ts`); the workbox inbox
+aggregation plus the visibility filter (`tests/workbox-inbox.test.ts`,
+`tests/workbox-filter.test.ts`); the mermaid round-trip
+(`tests/mermaid.test.ts`); the in-browser ZIP (`tests/zip-guards.test.ts`);
+snapshot import-validation, quota pre-flight, and wipe-on-fail
+(`tests/snapshot-import-validation.test.ts`,
+`tests/snapshot-quota.test.ts`, `tests/snapshot-wipe-on-fail.test.ts`,
+`tests/db-localstorage-compression.test.ts`); every data adapter
+(`tests/adapters-*.test.ts`); navigation
+(`tests/navigation.test.ts`); mock-data validity
+(`tests/mock-data-valid.test.ts`); and the SafeHtml output of the
+presenters (`tests/presenter-*.test.ts`). So the manual cases in
+those areas can focus on the DOM/visual/gesture affordance rather
+than re-deriving the logic. Where a case below is the browser
+counterpart of one of those automated areas it carries an inline
+note pointing at the test file.
+
 ### Protocol
 
 All sections are executed over HTTP. Two execution modes:
@@ -149,6 +175,15 @@ on. Run these in order.
   auto-connected from the start by an edge with
   a default name. The start node is also
   draggable by its body.
+  (The node-creation + auto-edge logic — including
+  the start-node-single-outgoing rule — is now
+  covered by `tests/flow-operations.test.ts`
+  (`performAddNodeAtPosition` + `performAddEdge`).
+  This browser case remains BLOCKED for the port-
+  drag gesture itself per the MCP pointer-capture
+  limitation; if the gesture cannot be driven,
+  validate end-state via direct JSON injection per
+  the CLAUDE.md workaround.)
 - [ ] **AA28** Double-click the new blue-bordered
   node. PASS: properties panel appears with the
   Crew dropdown centered in the header (no "State
@@ -172,6 +207,12 @@ on. Run these in order.
   new middle node; rename it "Review" via its
   properties panel. Rename the new edge
   "submit".
+  (The add-node-at-position + auto-edge logic is
+  now covered by `tests/flow-operations.test.ts`.
+  This browser case remains BLOCKED for the port-
+  drag gesture per the MCP pointer-capture
+  limitation — validate end-state via JSON
+  injection per the CLAUDE.md workaround.)
 - [ ] **AA32** Hold Shift and drag from "Review"
   onto "Data Capture". PASS: during the drag the
   preview redraws as a dashed-orange curved
@@ -184,11 +225,24 @@ on. Run these in order.
   solid-blue curved bezier (no return path).
   Release to create the edge; rename it
   "approve".
+  (The connection-validation rules this would
+  check — no edge to a start node, none from an
+  end node, no duplicate, start-node-single-
+  outgoing, and the cycle-vs-forward
+  classification via the reachability check — are
+  now covered by `tests/flow-operations.test.ts`
+  (`performAddEdge`). This browser case remains
+  BLOCKED for the shift-drag gesture itself per
+  the MCP pointer-capture limitation.)
 - [ ] **AA33** In the "Data Capture" properties
   panel, click "+ Add Field". Enter name "Company
   Name", type "text", check "Required". PASS:
   field appears in the fields list with a "text"
   badge and a red asterisk (*) required indicator.
+  (The add-field logic is now covered by
+  `tests/flow-operations.test.ts` (`performAddField`)
+  — this case verifies the panel form and the
+  fields-list rendering only.)
 - [ ] **AA34** Add more fields to "Data Capture":
   Contact Email (email, required), Industry (select
   with options "Technology, Finance, Healthcare"),
@@ -234,6 +288,13 @@ on. Run these in order.
   wiped. Click "Upload Snapshot", select the
   downloaded file. PASS: all data restored.
   Spot-check 3 pages to confirm data matches.
+  (Snapshot serialization/validation, the quota
+  pre-flight, and wipe-on-fail are covered by
+  `tests/snapshot-import-validation.test.ts`,
+  `tests/snapshot-quota.test.ts`, and
+  `tests/snapshot-wipe-on-fail.test.ts` — this
+  case verifies the download/upload UI affordance
+  and the end-to-end page-level restore.)
 
 ---
 
@@ -445,9 +506,15 @@ on. Run these in order.
 
 ### Flow Import
 
+(Mermaid parse/serialize round-trip is covered by
+`tests/mermaid.test.ts` and ZIP read/write by
+`tests/zip-guards.test.ts` — the cases below verify the import
+dialog, the file-upload affordance, and that the imported flow
+opens and renders.)
+
 - [ ] **F4** Click "Import Flow" button on the flows list page. PASS: import dialog opens with a file upload input and a project selector dropdown.
 - [ ] **F5** Select a `.mmd` file via the file input and choose a project from the dropdown. Click "Import". PASS: flow is created, toast confirms import, and browser navigates to the flow designer for the imported flow.
-- [ ] **F6** Repeat with a `.zip` file exported from a previous flow. PASS: imported flow contains the same nodes, edges, and fields as the original.
+- [ ] **F6** Repeat with a `.zip` file exported from a previous flow. PASS: imported flow renders with nodes, edges, and fields visible (round-trip fidelity is covered by `tests/mermaid.test.ts` + `tests/zip-guards.test.ts`).
 
 ### Flow Designer (`flows/detail.html?flowId=...`)
 
@@ -536,6 +603,12 @@ on. Run these in order.
   created at the drop position and
   auto-connected from the source node with a
   default edge name.
+  (The node-creation + auto-edge logic is now
+  covered by `tests/flow-operations.test.ts`
+  (`performAddNodeAtPosition` + `performAddEdge`).
+  This browser case remains BLOCKED for the port-
+  drag gesture itself per the MCP pointer-capture
+  limitation.)
 - [ ] **F16** Drag a standard node to a new
   position. PASS: node follows the pointer and
   can be placed freely on the canvas.
@@ -561,6 +634,18 @@ on. Run these in order.
   over the target, a new edge is created with a
   default name. No "New State" ghost card is
   shown while Shift is held.
+  (Applies to F19–F23: the connection-validation
+  rules these would check — no edge to a start
+  node, none from an end node, no duplicate edge,
+  start-node-single-outgoing, and the cycle-vs-
+  forward classification via the reachability
+  check — are now covered by
+  `tests/flow-operations.test.ts` (`performAddEdge`,
+  including the noop branch for a release in empty
+  canvas). F19–F23 remain BLOCKED for the shift-
+  drag gesture itself per the MCP pointer-capture
+  limitation; the FSM preview transitions are also
+  exercised by `tests/flow-fsm-reduce.test.ts`.)
 - [ ] **F20** Shift-drag forward (earlier node →
   later node). PASS: the curved preview is solid
   blue while over the target. The committed edge
@@ -620,6 +705,15 @@ on. Run these in order.
 
 ### Flow Designer — Undo/Redo
 
+(The undo/redo version-stack semantics — apply the previous
+version, advance the redo cursor, clear the redo stack on a new
+action, no-op at the ends of the stack, the persisted
+`FLOW_VERSION_CAP` trimming — are covered by
+`tests/flow-operations.test.ts` (`performUndo` / `performRedo`)
+and `tests/adapters-flow-versions.test.ts`. The cases below
+verify the toolbar buttons, the keyboard shortcuts, the disabled
+states, and that the canvas re-renders after each step.)
+
 - [ ] **F32** After adding a state, click the Undo
   toolbar button. PASS: the state and its
   connecting edge are removed. Redo button
@@ -667,27 +761,37 @@ on. Run these in order.
   per-type colors return (Start green, Complete red, Regular blue,
   Cycle amber).
 - [ ] **F41** With a non-trivial flow loaded, click "Copy Mermaid"
-  in the toolbar. PASS: toast confirms the clipboard copy. Paste the
-  clipboard contents into a text editor — the result is valid Mermaid
-  flowchart syntax that round-trips through `parseMermaid` without
-  losing nodes, edges, or field definitions.
+  in the toolbar. PASS: toast confirms the clipboard copy, and the
+  clipboard holds Mermaid flowchart syntax for the current graph.
+  (Round-trip correctness — `generateMermaid` → `parseMermaid`
+  preserving nodes, edges, and field definitions — is covered by
+  `tests/mermaid.test.ts`; this case verifies the toolbar action
+  and the clipboard write.)
 - [ ] **F42** Click "Export" in the toolbar. PASS: a `.zip` file
   downloads. Unzip the archive — it contains `flow.mmd` (Mermaid
   source), `flow.json` (graph with node positions), and a
-  human-readable `flow.txt`.
+  human-readable `flow.txt`. (ZIP read/write correctness is covered
+  by `tests/zip-guards.test.ts`.)
 - [ ] **F43** On `flows/index.html` click "Import Flow", select a
   `.mmd` file previously exported from a known flow, choose a
   project, and submit. PASS: the imported flow opens in the designer
-  with the same node count, edge count, and field definitions as the
-  original (compare to source flow side-by-side).
-- [ ] **F44** Repeat F43 with a `.zip` archive. PASS: node
-  positions are preserved as well as structural data — the imported
-  flow looks visually identical to the original, not auto-laid-out.
+  and renders nodes, edges, and fields. (Structural fidelity of the
+  mermaid round-trip is covered by `tests/mermaid.test.ts`; this
+  case verifies the import dialog and that the designer opens on the
+  imported flow.)
+- [ ] **F44** Repeat F43 with a `.zip` archive. PASS: the imported
+  flow renders with node positions preserved (not auto-laid-out).
+  (ZIP round-trip is covered by `tests/zip-guards.test.ts`; this
+  case verifies the `.zip` import path through the dialog and the
+  preserved-position rendering.)
 - [ ] **F45** Make 11 edits in the flow designer (e.g. rename 11
   nodes one at a time, waiting for each auto-save). PASS: the
   persistent undo history retains at most 10 versions (inspect
   `fusion-ai:flow_versions` in DevTools — at most 10 rows for this
-  `flow_id`; the oldest has been hard-deleted).
+  `flow_id`; the oldest has been hard-deleted). (The
+  `FLOW_VERSION_CAP` trimming logic itself is covered by
+  `tests/adapters-flow-versions.test.ts`; this case verifies it
+  end-to-end through the designer's auto-save.)
 - [ ] **F46** Edit a flow (rename a state), let auto-save complete.
   Navigate away from the designer to `flows/index.html`. Re-open the
   same flow. Click Undo. PASS: the rename reverts — the undo history
@@ -946,6 +1050,15 @@ on. Run these in order.
 
 ### Workbox Visibility Filter
 
+(The visibility predicate — unassigned visible to all, model
+visible to no human, role/crew resolved through member sets with
+user-private roles short-circuiting to the encoded person id — is
+covered by `tests/workbox-filter.test.ts` (`isWorkOrderVisibleToPerson`),
+and the inbox aggregation that applies it (active vs archive,
+claimed-and-unfinished exclusion, sort-by-position) by
+`tests/workbox-inbox.test.ts` (`buildInboxItems`). The cases below
+verify that the inbox page actually renders the filtered set.)
+
 - [ ] **WB20** As `current` person, navigate to
   `workbox/`. PASS: only work orders whose
   current node is unassigned, role-assigned to a
@@ -1030,6 +1143,15 @@ on. Run these in order.
 
 ### Snapshots (`snapshots/`) — Run These Last
 
+(Snapshot serialization, per-row import-validation, the quota
+pre-flight, column-level compression, and wipe-on-fail are
+covered by `tests/snapshot-import-validation.test.ts`,
+`tests/snapshot-quota.test.ts`, `tests/snapshot-wipe-on-fail.test.ts`,
+and `tests/db-localstorage-compression.test.ts`. The cases below
+verify the four operation cards, the file-picker affordance, the
+post-operation redirect, and that pages render against the
+restored data.)
+
 - [ ] **G30** Navigate to `snapshots/`. PASS: shows 4 operation cards: Create Pristine Environment, Wipe and Load Mock Data, Upload Snapshot, Download Snapshot.
 - [ ] **G31** Click "Download Snapshot". PASS: browser downloads `fusion-ai-snapshot-YYYY-MM-DD.json`. File contains valid JSON with entity data.
 - [ ] **G32** Click "Create Pristine Environment", confirm the dialog. PASS: redirects to `dashboard/index.html`. Dashboard renders with zeroed-out metrics (empty database). All 20 `fusion-ai:*` keys exist in localStorage as empty arrays.
@@ -1043,6 +1165,10 @@ on. Run these in order.
   inline error reports the upload failed with a human-readable
   message; existing data in localStorage is untouched (verify via
   DevTools that no fusion-ai:* keys were overwritten or cleared).
+  (The rejection logic and the wipe-on-fail behavior are covered
+  by `tests/snapshot-import-validation.test.ts` and
+  `tests/snapshot-wipe-on-fail.test.ts` — this case verifies the
+  error toast/inline-error surfaces in the UI.)
 - [ ] **G36** On `people/index.html`, status mutation lives on
   the detail page rather than as inline row buttons. Click any
   active or pending person's row. PASS: navigates to their detail
@@ -1150,7 +1276,7 @@ feature is implemented.
 
 ### Snapshot Round-Trip
 
-- [ ] **I26** Download a snapshot, wipe data (Create Pristine), upload the snapshot. PASS: all data restored correctly — spot-check 3 pages to confirm content matches pre-wipe state.
+- [ ] **I26** Download a snapshot, wipe data (Create Pristine), upload the snapshot. PASS: all data restored correctly — spot-check 3 pages to confirm content matches pre-wipe state. (Snapshot serialization/validation/compression is covered by `tests/snapshot-import-validation.test.ts`, `tests/snapshot-quota.test.ts`, `tests/snapshot-wipe-on-fail.test.ts`, and `tests/db-localstorage-compression.test.ts`; this case verifies the download → wipe → upload UI flow end-to-end.)
 
 ### General
 
