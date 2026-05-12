@@ -51,15 +51,10 @@ import {
 import {
     buildStartAndCompleteNodes,
 } from './flow-defaults.ts';
+import type { LayoutInput } from '../flow-layout.ts';
 import {
-    computeLayout,
-} from '../flow-layout.ts';
-import type {
-    LayoutInput, LayoutEdge,
-} from '../flow-layout.ts';
-import {
-    computeEdgeLabelWidth,
-} from '../flow-graph.ts';
+    runLayoutFromInputs,
+} from '../flow-graph-layout.ts';
 
 /* ── Mermaid export ──────────────── */
 
@@ -675,22 +670,9 @@ function layoutImportedGraph(
             isComplete: true,
         },
     ];
-    const layoutEdges: LayoutEdge[] =
-        edges.map(e => ({
-            fromId: e.fromNodeId,
-            toId: e.toNodeId,
-            labelWidth:
-                e.fromNodeId === startId
-                    ? 0
-                    : computeEdgeLabelWidth(
-                        e.name,
-                    ),
-        }));
-    return computeLayout({
-        nodes: inputs,
-        edges: layoutEdges,
-        canvasWidth: IMPORT_CANVAS_W,
-        canvasHeight: IMPORT_CANVAS_H,
+    return runLayoutFromInputs(inputs, edges, {
+        w: IMPORT_CANVAS_W,
+        h: IMPORT_CANVAS_H,
     }).positions;
 }
 

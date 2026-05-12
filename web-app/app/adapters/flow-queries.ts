@@ -14,6 +14,7 @@ import {
 } from '../../../api/validators.ts';
 import type { RequestContext } from './shared.ts';
 import { getFlowRows } from './flows.ts';
+import { withRenderableLayout } from '../flow-graph-layout.ts';
 
 export type {
     GraphNode, GraphEdge, GraphField,
@@ -186,7 +187,7 @@ export async function getFlowGraph(
             `flows/${flowId}`,
         );
     const g = parseGraph(flow.graph);
-    return {
+    return withRenderableLayout({
         id: flow.id,
         name: flow.name,
         description: flow.description,
@@ -206,5 +207,5 @@ export async function getFlowGraph(
         createdAt: flow.created_at,
         nodes: g.nodes,
         edges: g.edges,
-    };
+    });
 }

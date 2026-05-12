@@ -81,11 +81,12 @@ See `CLAUDE.md` section `## Testing`.
 | E. Core: Projects | 11 |
 | F. Tools | 74 |
 | F2. Workbox | 19 |
+| FS. Flow Statistics | 9 |
 | G. Admin Pages | 27 |
 | H. Reference & System | 2 |
 | I. Cross-Cutting Concerns | 27 |
 | J. Teardown | 3 |
-| **Total** | **269** |
+| **Total** | **278** |
 
 ---
 
@@ -1085,6 +1086,76 @@ verify that the inbox page actually renders the filtered set.)
   that flow. PASS: it does NOT appear in any
   workbox — model assignments are visible to no
   human.
+
+---
+
+## FS. Flow Statistics (Agent-F2 read-only domain)
+
+**Mock-data blast radius:** the flow-statistics work added ~38
+work orders to "Customer Onboarding" and ~6 to a second flow,
+plus their flow-work-order join rows and transition chains.
+Workbox cases (WB1–WB19) and dashboard counts re-baseline
+against the parallel-protocol's "greater-than-or-equal-N"
+tolerance; expected counts in those sections are now lower
+bounds, not equalities.
+
+**MCP note:** hover/click on SVG `<g>` works with synthetic
+events on this page (no pointer-capture FSM, unlike
+`flows/detail`), so FS4 / FS5 / FS7 are directly drivable by
+the claude-in-chrome MCP.
+
+### Flow Statistics Page (`flows/stats.html`)
+
+- [ ] **FS1** From `flows/index`, click a flow card's chart
+  icon → lands on `flows/stats.html?flowId=<id>`. The page
+  renders the heat-tinted SVG canvas, a path stepper, and a
+  legend gradient bar. No left toolbar, no slide-in props
+  panel, no connection ports, no marquee. The cursor over a
+  node is `pointer` (clicking is allowed); no port-drag
+  affordance appears.
+- [ ] **FS2** From `flows/detail`, click the Stats button in
+  the header → same stats page. The "Designer" / back button
+  returns to `flows/detail.html?flowId=<id>` (and preserves
+  `projectId` if set).
+- [ ] **FS3** Node tints span the ramp on the flagship flow
+  ("Customer Onboarding"): Data Capture is yellow/red (hot),
+  Review is warm, Create/Archive carry the cool (or no-data)
+  tint. Node faces show the em-dash on Create and Archive and
+  a value like `8.5m` / `2.1d` on regular nodes.
+- [ ] **FS4** Hover a node → a read-only stat card pops near
+  it with: % of flow time, avg/median/p90 durations, visits /
+  distinct WOs / WIP, ~N/wk throughput, loop-back rate, clan
+  size + active producers, top producer (name + % of clan avg
+  + % of node's work, with "(not in current clan)" iff
+  applicable). For a branch node, `next` shows the per-edge
+  split. The card has NO inputs and NO Save button.
+  Mouse-out → card hides.
+- [ ] **FS5** Click a node → the card pins (stays open on
+  mouse-out). Click empty canvas → unpins. Click another
+  node → re-pins to it.
+- [ ] **FS6** A model-assigned node's card shows
+  `Model: <name>` and no clan / producer rows; the node
+  displays no hazard. An unassigned non-special node displays
+  the hazard triangle. A zero-member-role or zero-member-crew
+  node also hazards.
+- [ ] **FS7** Path stepper: `Path 1 of M, X% of N work
+  orders` with prev/next controls. Clicking next advances;
+  the selected path's nodes + edges get an accent stroke and
+  off-path elements dim to ~28% opacity. The highlight does
+  NOT pulse or animate (deliberately distinct from the
+  editor's selection glow). At the last visible path, next is
+  disabled (or, if there's a rest bucket, advances to
+  "+N rarer paths, combined Z%" which highlights nothing).
+- [ ] **FS8** Dark-mode toggle persists across navigation to
+  the stats page; the heat tints and the card remain legible
+  in both themes. The face number text contrasts adequately
+  at all heat levels.
+- [ ] **FS9** Data-shape regression: heat fractions sum to
+  ~100% across non-special nodes on the flagship flow. WIP
+  counts in the card match the WOs currently sitting in each
+  node (cross-check against the Workbox). Direct navigation
+  to `flows/stats.html` with no `flowId` redirects to
+  `flows/index.html`.
 
 ---
 

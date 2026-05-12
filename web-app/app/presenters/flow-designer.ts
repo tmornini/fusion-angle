@@ -74,7 +74,10 @@ import type {
     Waypoint,
     SavedViewBox,
 } from '../flow-designer-actions.ts';
-import { iconArrowLeft } from '../icons.ts';
+import {
+    iconArrowLeft,
+    iconBarChart,
+} from '../icons.ts';
 import {
     buildToolbar,
     buildFieldEditor,
@@ -533,6 +536,12 @@ class="flow-designer">
     title="Back"
     aria-label="Back"
     >${iconArrowLeft(20, '')}</button>
+<button
+    class="btn btn-ghost btn-icon"
+    id="flow-stats-btn"
+    title="Stats"
+    aria-label="Flow statistics"
+    >${iconBarChart(20, '')}</button>
 <div class="flex-1 flow-name-header-slot"
     ></div>
 <div class="flex flex-col gap-2">

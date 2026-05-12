@@ -10,14 +10,11 @@ import {
     DEFAULT_NODE_ASSIGNMENT,
 } from '../../api/types.ts';
 import {
-    computeLayout,
     edgeWaypointKey,
     NODE_WIDTH,
     NODE_HEIGHT,
 } from './flow-layout.ts';
-import {
-    computeEdgeLabelWidth,
-} from './flow-graph.ts';
+import { runFlowLayout } from './flow-graph-layout.ts';
 import type {
     ViewBox,
     DragMode,
@@ -267,43 +264,14 @@ export function applyAutoLayout(
     panelOpen: boolean,
     panelWidthPx: number,
 ): AutoLayoutResult {
-    const nodeById = new Map(
-        nodes.map(n => [n.id, n]),
-    );
-    const layoutInputs = nodes.map(n => ({
-        id: n.id,
-        isStart: n.isStart,
-        isComplete: n.isComplete,
-    }));
-    const layoutEdges = edges.map(e => {
-        const from =
-            nodeById.get(e.fromNodeId);
-        const isStart = from?.isStart ?? false;
-        return {
-            fromId: e.fromNodeId,
-            toId: e.toNodeId,
-            labelWidth: isStart
-                ? 0
-                : computeEdgeLabelWidth(
-                    e.name,
-                ),
-        };
-    });
     const effectiveW = panelOpen
-        ? Math.max(
-            0,
-            canvasW - panelWidthPx,
-        )
+        ? Math.max(0, canvasW - panelWidthPx)
         : canvasW;
-    const result = computeLayout({
-        nodes: layoutInputs,
-        edges: layoutEdges,
-        canvasWidth: effectiveW,
-        canvasHeight: canvasH,
-    });
+    const result = runFlowLayout(
+        nodes, edges, { w: effectiveW, h: canvasH },
+    );
     const newNodes = nodes.map(n => {
-        const pos =
-            result.positions.get(n.id);
+        const pos = result.positions.get(n.id);
         if (!pos) {
             throw new Error(
                 'invariant violated:'
@@ -324,16 +292,12 @@ export function applyAutoLayout(
         const key = edgeWaypointKey(
             e.fromNodeId, e.toNodeId,
         );
-        const wp =
-            result.waypoints.get(key);
+        const wp = result.waypoints.get(key);
         if (hasWaypoints(wp)) {
             edgeWaypoints.set(e.id, wp);
         }
     }
-    return {
-        nodes: newNodes,
-        edgeWaypoints,
-    };
+    return { nodes: newNodes, edgeWaypoints };
 }
 
 export interface ViewBoxOrigin {

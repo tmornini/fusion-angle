@@ -27,6 +27,7 @@ export * from './flow-mutations.ts';
 export * from './flow-versions.ts';
 export * from './flow-export.ts';
 export * from './work-orders-queries.ts';
+export * from './flow-stats.ts';
 export * from './work-orders-mutations.ts';
 export * from './work-orders-deletions.ts';
 export * from './flow-defaults.ts';

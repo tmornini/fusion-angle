@@ -18,7 +18,8 @@
       "Skill(update-config)",
       "WebFetch(domain:localhost)",
       "WebFetch(domain:raw.githubusercontent.com)",
-      "Bash(awk 'NR==203' /Users/tmornini/code/fusion-ai/CLAUDE.md)"
+      "Bash(awk 'NR==203' /Users/tmornini/code/fusion-ai/CLAUDE.md)",
+      "Bash(TMPDIR=/tmp/claude ./serve 8080)"
     ]
   },
   "outputStyle": "Explanatory",

@@ -29,6 +29,7 @@ import {
 import {
     START_NODE_DEFAULT_NAME,
     END_NODE_DEFAULT_NAME,
+    userPrivateRoleId,
 } from '../../../api/types.ts';
 
 export function buildFieldBadge(
@@ -272,7 +273,7 @@ ${sortedRoles.map(r => html`<option
 <optgroup label="People (private)">
 ${sortedPeople.map(p => {
     const privateRoleId =
-        'user-private:' + p.idForLink();
+        userPrivateRoleId(p.idForLink());
     return html`<option
     value="role:${privateRoleId}"
     data-role-private="user"${

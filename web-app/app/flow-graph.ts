@@ -10,10 +10,12 @@ import {
     NODE_WIDTH, NODE_HEIGHT,
 } from './flow-layout.ts';
 import { pluralize } from './format.ts';
+import { findCycleEdgeIds } from './flow-cycle-edges.ts';
 import { iconAlertTriangle } from './icons.ts';
 import {
     START_NODE_DEFAULT_NAME,
     END_NODE_DEFAULT_NAME,
+    isUserPrivateRoleId,
 } from '../../api/types.ts';
 
 function nodeHasConnections(
@@ -41,7 +43,7 @@ const WARN = '#d97706';
 const GREEN = '#16a34a';
 const RED = '#b91c1c';
 
-const GRID_CELL = 24;
+export const GRID_CELL = 24;
 const GRID_DOT_RADIUS = 0.7;
 
 // Glow filter on highlighted edges. Filter
@@ -65,7 +67,7 @@ const STROKE_NORMAL = 2;
 const STROKE_START = 2.5;
 const STROKE_COMPLETE = 3;
 
-const NODE_RADIUS = 10;
+export const NODE_RADIUS = 10;
 
 const PORT_RADIUS = 5;
 const PORT_STROKE = 2;
@@ -426,12 +428,6 @@ export function computeEdgeLabelWidth(
     );
 }
 
-// User-private role ids share their own
-// prefix; mirrored here so flow-graph.ts is
-// not coupled to the roles adapter.
-const USER_PRIVATE_ROLE_PREFIX_FOR_GRAPH =
-    'user-private:';
-
 export function shouldShowHazard(
     node: GraphNode,
     roleMemberCounts:
@@ -444,9 +440,7 @@ export function shouldShowHazard(
     if (a.kind === 'role') {
         // User-private roles always have
         // cardinality 1 by construction.
-        if (a.roleId.startsWith(
-            USER_PRIVATE_ROLE_PREFIX_FOR_GRAPH,
-        )) {
+        if (isUserPrivateRoleId(a.roleId)) {
             return false;
         }
         const count = roleMemberCounts
@@ -1027,34 +1021,7 @@ export function buildGraphSvg(
         nodes.map(n => [n.id, n]),
     );
 
-    const outAdj = new Map<string, GraphEdge[]>();
-    for (const n of nodes) {
-        outAdj.set(n.id, []);
-    }
-    for (const edge of edges) {
-        outAdj.get(edge.fromNodeId)?.push(edge);
-    }
-    const cycleEdgeIds = new Set<string>();
-    const visited = new Set<string>();
-    const onStack = new Set<string>();
-    const dfs = (id: string): void => {
-        visited.add(id);
-        onStack.add(id);
-        const outs = outAdj.get(id) ?? [];
-        for (const e of outs) {
-            if (onStack.has(e.toNodeId)) {
-                cycleEdgeIds.add(e.id);
-            } else if (!visited.has(e.toNodeId)) {
-                dfs(e.toNodeId);
-            }
-        }
-        onStack.delete(id);
-    };
-    const startNode = nodes.find(n => n.isStart);
-    if (startNode) dfs(startNode.id);
-    for (const n of nodes) {
-        if (!visited.has(n.id)) dfs(n.id);
-    }
+    const cycleEdgeIds = findCycleEdgeIds(nodes, edges);
 
     const pairCounts =
         new Map<string, number>();

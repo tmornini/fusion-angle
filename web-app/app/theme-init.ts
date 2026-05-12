@@ -4,17 +4,26 @@
 // page paints in the correct state. Inline-script equivalent
 // of FOUC prevention; extracted to a same-origin file so a
 // strict Content-Security-Policy (script-src 'self') can
-// forbid inline scripts.
+// forbid inline scripts. esbuild bundles the imports below
+// into a self-contained IIFE per ./build.
+
+import {
+    STORAGE_KEY_THEME,
+    STORAGE_KEY_SIDEBAR,
+} from './storage-keys.ts';
+import {
+    mediaQueryMatches,
+} from './adapters/media-query.ts';
 
 (function applyTheme(): void {
     const stored = localStorage.getItem(
-        'fusion-theme',
+        STORAGE_KEY_THEME,
     );
     const dark = stored === 'dark'
         || (stored !== 'light'
-            && matchMedia(
+            && mediaQueryMatches(
                 '(prefers-color-scheme: dark)',
-            ).matches);
+            ));
     if (dark) {
         const root = document.documentElement;
         root.setAttribute('data-theme', 'dark');
@@ -24,7 +33,7 @@
 
 (function applySidebarCollapsed(): void {
     const stored = localStorage.getItem(
-        'fusion-sidebar-collapsed',
+        STORAGE_KEY_SIDEBAR,
     );
     if (stored === 'true') {
         document.documentElement.classList.add(

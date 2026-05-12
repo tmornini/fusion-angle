@@ -7,8 +7,6 @@ import {
     personName,
     validateWorkOrderFlowGraph,
     isExpiredClaim,
-    isUserPrivateRoleId,
-    personIdFromUserPrivateRoleId,
     type WorkOrderEntity,
     type WorkOrderTransitionEntity,
     type WorkOrderClaimEntity,
@@ -21,6 +19,8 @@ import type {
 import {
     SECONDS_PER_DAY,
     MS_PER_SECOND,
+    isUserPrivateRoleId,
+    personIdFromUserPrivateRoleId,
 } from '../../../api/types.ts';
 
 const DAY_MS = SECONDS_PER_DAY * MS_PER_SECOND;

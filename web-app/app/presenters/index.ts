@@ -116,3 +116,7 @@ export {
     type CrewListState,
     type CrewRoleMember,
 } from './crew.ts';
+export {
+    FlowStatsPresenter,
+    type FlowStatsUi,
+} from './flow-stats.ts';

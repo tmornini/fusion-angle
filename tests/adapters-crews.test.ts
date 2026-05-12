@@ -17,9 +17,11 @@ import {
 } from '../web-app/app/adapters/crews.ts';
 import {
     addMember,
-    userPrivateRoleId,
     isUserPrivateRole,
 } from '../web-app/app/adapters/roles.ts';
+import {
+    userPrivateRoleId,
+} from '../api/types.ts';
 import {
     Crew,
     jsonArrayField,

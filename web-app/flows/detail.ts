@@ -726,6 +726,32 @@ function bindBackButton(
         );
 }
 
+// Navigate to the stats page for the current
+// flow, preserving projectId if present.
+function bindStatsButton(
+    container: HTMLElement,
+    flowId: string,
+    signal: AbortSignal,
+): void {
+    const pid = pageState.projectId();
+    $('#flow-stats-btn', container)
+        ?.addEventListener(
+            'click',
+            () => {
+                navigateTo(
+                    'flow-stats',
+                    {
+                        flowId,
+                        ...(pid
+                            ? { projectId: pid }
+                            : {}),
+                    },
+                );
+            },
+            { signal },
+        );
+}
+
 function bindCanvasInteractions(
     container: HTMLElement,
     presenter: FlowDesignerPresenter,
@@ -1312,6 +1338,7 @@ export async function init(
     const signal = pageState.signal();
     presenter.renderShell(container);
     bindBackButton(container, signal);
+    bindStatsButton(container, flowId, signal);
     bindCanvasInteractions(
         container, presenter,
         panelStateRef, signal,

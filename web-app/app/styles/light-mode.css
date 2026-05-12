@@ -92,4 +92,11 @@
   /* Chart Colors (extended palette) */
   --chart-5: 217 71% 53%;
   --chart-6: 280 65% 60%;
+
+  /* Heat-map ramp (flow-stats page) -- four fixed stops, non-uniform */
+  /* positions: blue @0% -> green @50% -> yellow @75% -> red @100%.   */
+  --heat-stop-low:  210 85% 55%;
+  --heat-stop-mid:  145 65% 50%;
+  --heat-stop-high:  48 95% 55%;
+  --heat-stop-peak:   0 80% 55%;
 }

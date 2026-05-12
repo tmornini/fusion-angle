@@ -180,6 +180,41 @@ Cmd+K (or Ctrl+K) overlay for quick navigation and search. Implemented in `web-a
 | Donut | `buildDonutChart()` | Proportions, status distribution |
 | Area | `buildAreaChart()` | Volume trends |
 
+### Heat ramp (flow-stats)
+
+A fixed-scale 4-stop ramp used by `flows/stats.html` to visualize a
+node's share of trailing-90-day flow time. Stop positions are
+*non-uniform* — the top quarter of the value range compresses
+yellow → red, making a "bottleneck zone" visually salient:
+
+| Token              | Position | Light          | Dark           |
+|--------------------|----------|----------------|----------------|
+| `--heat-stop-low`  | 0%       | `210 85% 55%`  | `210 60% 60%`  |
+| `--heat-stop-mid`  | 50%      | `145 65% 50%`  | `145 50% 55%`  |
+| `--heat-stop-high` | 75%      | `48 95% 55%`   | `48 80% 60%`   |
+| `--heat-stop-peak` | 100%     | `0 80% 55%`    | `0 65% 60%`    |
+
+**Mechanism.** Each node carries `style="--heat-t:${t}"` (a number in
+`[0, 1]` — the raw share of flow time). The fill is computed in CSS by
+three chained `color-mix(in oklch, ...)` invocations, one per ramp
+segment, with each segment's mix fraction expressed as
+`clamp(0%, calc((var(--heat-t) - <lo>) / <span> * 100%), 100%)` so
+the segment activates over its t-range and saturates outside it.
+Result: the palette stays in design tokens, the per-element data is a
+single number, dark mode follows automatically, and there is *no*
+color math in TypeScript.
+
+**Legend.** A plain CSS `linear-gradient(to right, ...)` referencing
+the same four tokens at the same four positions; end labels read `0%`
+and `100%`. The exact percentage for each node is always available in
+its hover stat card.
+
+**Accessibility.** Blue / green / yellow / red is a classic
+colorblind-tricky palette, but on this page color is never the sole
+information channel: every node carries its avg-sojourn duration on
+its face, and the hover card carries the exact percentage. The
+gradient is decoration over data; the data path is colorblind-safe.
+
 ### Flow Designer
 
 SVG workflow canvas in `web-app/app/flow-graph.ts`

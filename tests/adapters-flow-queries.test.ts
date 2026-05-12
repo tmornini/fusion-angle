@@ -30,6 +30,8 @@ import type {
 import {
     DEFAULT_LOCK_TIMEOUT,
 } from '../api/types.ts';
+import { populateMockData } from '../api/mock-data.ts';
+import { NODE_WIDTH } from '../web-app/app/flow-layout.ts';
 
 function setupMemDb(): {
     db: MemoryDbAdapter;
@@ -480,5 +482,40 @@ test(
         );
         assert.equal(rows.length, 1);
         assert.equal(rows[0]!.id, 'flow-1');
+    },
+);
+
+// The mock "Layout Test: Proposal Review Cycle" flow:
+// 17 nodes, every one at (0,0), is_auto_layout true —
+// the case that rendered the stats canvas as one giant
+// scaled-up "Archive" rect.
+const LAYOUT_TEST_FLOW_ID = '7COt7Kf4OaOBg6AjaNO04s';
+
+test(
+    'getFlowGraph lays out an auto-layout flow whose'
+    + ' stored positions are placeholders',
+    async () => {
+        const db = new MemoryDbAdapter();
+        await populateMockData(db);
+        const g = await getFlowGraph(
+            createRequestContext(db),
+            LAYOUT_TEST_FLOW_ID,
+        );
+        const xs = g.nodes.map(n => n.positionX);
+        const spanX =
+            Math.max(...xs) - Math.min(...xs);
+        assert.ok(
+            spanX > 2 * NODE_WIDTH,
+            `expected a real x-span, got ${spanX}`,
+        );
+        const distinct = new Set(
+            g.nodes.map(
+                n => `${n.positionX},${n.positionY}`,
+            ),
+        ).size;
+        assert.equal(distinct, g.nodes.length);
+        const start = g.nodes.find(n => n.isStart)!;
+        const end = g.nodes.find(n => n.isComplete)!;
+        assert.ok(start.positionX < end.positionX);
     },
 );

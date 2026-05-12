@@ -198,14 +198,19 @@ state has been held too long.
 
 ### 6. Reports, dashboards, and analytics
 
-Fusion-ai has three hardcoded gauges. TeamTrack had a configurable
-report engine.
+Fusion-ai has three hardcoded gauges plus a per-flow heat-map
+analytics page (`flows/stats`) that shows trailing-90-day
+median time per node and path-stepper breakdowns. TeamTrack had a
+configurable report engine.
 
 - Saved queries / saved filters — personal and shared.
 - Tabular reports with user-chosen columns and grouping.
 - Trend reports — open count over time, throughput,
 cumulative flow.
 - Aging reports — time-in-state distributions, oldest-open.
+  (`flows/stats` partially addresses per-node time-in-state
+  for a single flow; cross-flow, cross-project, and oldest-open
+  remain gaps.)
 - Distribution charts — pie/bar by any field.
 - Personal dashboards — multiple, configurable, layout-aware.
 - Shared / role-default dashboards.

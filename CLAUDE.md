@@ -80,6 +80,11 @@ Target: **ES2024** · Strict mode with `noUncheckedIndexedAccess`. Config at `we
   sidebar.
 - **Durations**: Persisted in seconds; UI displays days via
   `durationInDays(seconds)`.
+- **Read-only siblings of editable pages**: `flow-stats.html` is a
+  flat, non-editable rendering of one flow's diagram (heat-tinted by
+  share of trailing-90-day flow time, with a hover/click stat card
+  and a path stepper). It is a sibling, not an extension, of
+  `flow-detail` — see `### Flow Canvas` for the renderer split.
 
 ### Flow Canvas
 
@@ -155,6 +160,55 @@ with user-private roles short-circuiting to the encoded
 person id. `loadInboxItems` builds the visibility scope
 once per request.
 
+The read-only stats variant (`flow-stats`) uses its own renderer
+`flow-stats-graph.ts` and presenter `FlowStatsPresenter`,
+deliberately *not* a parametrization of
+`flow-graph.ts`/`FlowDesignerPresenter` (Commandment IX). It
+shares only the pure pieces: geometry constants
+(`NODE_WIDTH`/`NODE_HEIGHT` from `flow-layout.ts`,
+`NODE_RADIUS` / `GRID_CELL` exported from `flow-graph.ts`),
+the already-exported edge-path helpers (`perimeterPoint`,
+`whichEdge`, `controlOffset`), `findCycleEdgeIds` from the
+pure `flow-cycle-edges.ts` (the designer's back-edge DFS,
+extracted so both renderers mark loop-backs identically),
+`iconAlertTriangle`, and the START/END display-name
+constants. Node positions, though, do *not* come from
+the renderer: `getFlowGraph` runs `flow-graph-layout.ts`'s
+`withRenderableLayout`, which lays a flow out
+(`computeLayout`) whenever it is `is_auto_layout` or its
+stored positions are degenerate — so the stats renderer
+and the designer both start from real coordinates, not
+the persisted (0,0) placeholders. `runFlowLayout` /
+`runLayoutFromInputs` is the one `computeLayout` wrapper,
+shared by `getFlowGraph`, the designer's `applyAutoLayout`,
+and `flow-export`'s mermaid-import path (Commandment IX).
+Its emitted SVG carries *none* of the editor's
+interactivity tells (no `<animate>`, `role="button"`,
+`tabindex`, connection ports, `data-connect-port`,
+`aria-current`) and *no paint either* — edge/node strokes,
+the arrowhead, the loop-back dash all live in `pages.css`
+(`§48 FLOW STATS`); the renderer emits structure (`d`,
+`transform`, `x/y`, `class`, `data-*`) only. The one
+presentational inline attribute is the per-node
+`style="--heat-t:${t}"`; CSS computes the fill via a 4-stop
+chained `color-mix(in oklch, ...)` driven by `--heat-t`.
+Loop-back edges carry `data-cycle="true"` → CSS dashes +
+warning-colours them, mirroring the designer; the single
+`#stats-arrow` marker's head tracks each line's own stroke
+via `fill: context-stroke`, so default / on-path / cycle
+arrows match for free. Path selection highlights via
+`data-on-path` / `data-dim` (off-path fades *and*
+desaturates, leaving the lit path the only colour on the
+canvas), never an animated filter — the editor uses a glow;
+the stats canvas does not. A path is lit by default (the
+most-travelled one), so `.flow-stats-body:has([data-on-path])`
+accent-flags the stepper bar — itself an eyebrow-labelled
+widget ("Most-traveled paths") — tying control to canvas. The
+aggregate logic lives in the pure module
+`flow-stats-aggregate.ts` (`buildFlowStats(input) → model`);
+the I/O wrapper is `adapters/flow-stats.ts`'s
+`getFlowStats(ctx, flowId)`.
+
 ### API Layer (`/api`)
 
 `api/types.ts` (row types + shared aliases), `api/db.ts`
@@ -165,16 +219,26 @@ adapter; threaded explicitly**), `api/mock-data.ts`,
 `api/validators.ts`. The `DbAdapter` interface is the migration
 seam to Postgres.
 
-The composition root is `web-app/app/adapters/init.ts`.
-`createFetchContext()` defaults to the LocalStorage adapter;
-tests pass `createFetchContext(db)` with a `MemoryDbAdapter`.
+`web-app/app/adapters/init.ts` wires the production LocalStorage
+adapter singleton (`initAdapter()` / `getDbAdapter()`).
+`web-app/app/adapters/shared.ts` defines the `RequestContext`
+interface and `createRequestContext(adapter?)`, defaulting to
+that singleton; tests pass it a `MemoryDbAdapter`.
 
 ### Page Module Pattern
 
 Every entry in `PAGE_REGISTRY` declares both `sourceDir` and `sourceFile` explicitly (e.g., `flow-detail` → `web-app/flows/detail.ts` + `web-app/flows/detail.html`). The most common values are `index`, `detail`, `create`, and `convert`. Each page module exports:
 - `init(): Promise<void>` — fetches data, populates DOM placeholders, binds event listeners
 
-Sidebar-layout pages have `index.html` containing page content that gets composed with the layout template. Standalone pages have a complete hand-written `index.html` with a `<div id="page-root">` that `init()` renders into.
+Sidebar-layout pages have `index.html` containing page content
+that gets composed with the layout template. Standalone pages
+have a complete hand-written `index.html` with a
+`<div id="page-root">` that `init()` renders into.
+
+Notable registry entries:
+- `flow-stats` → `web-app/flows/stats.ts` + `stats.html`
+  (read-only flow heat map; sidebar layout;
+  `searchable: false`).
 
 ### Presenter Pattern
 
@@ -197,6 +261,15 @@ construct until that scroll opens.
 `'../app/presenters'`. `WorkboxDetailPresenter` uses a public
 `buildPage()` orchestrating private `#build*` helpers; the rest
 expose `build*` directly.
+
+`FlowStatsPresenter` (`web-app/app/presenters/flow-stats.ts`) is
+the read-only counterpart to `FlowDesignerPresenter`. It exposes
+pure `build*` helpers (`buildShell`, `buildStepperBar`,
+`buildLegend`, `buildCard`) returning `SafeHtml` for testability,
+plus DOM-touching `renderShell` / `renderUpdate` / `renderCard`.
+It is flow-name-agnostic by design — the page module writes the
+flow name and description into the header after `renderShell`,
+keeping `buildFlowStats` independent of presentation strings.
 
 ### Import Conventions
 
@@ -237,8 +310,8 @@ import { navigateTo, openDialog, closeDialog } from '../app/core';
   `personName` with a fallback. UI renders `'—'` via
   `DISPLAY_ABSENT` for legitimately absent values. Never use
   magic strings like `'Unknown'`.
-- **`FetchContext` is the only I/O surface.** Every data-access
-  adapter takes `ctx: FetchContext` first and uses
+- **`RequestContext` is the only I/O surface.** Every data-access
+  adapter takes `ctx: RequestContext` first and uses
   `ctx.GET/PUT/DELETE/POST/commit`. The standalone `GET/PUT/...`
   exports in `api/api.ts` are the transport `ctx` delegates to —
   adapters never import them directly. A ctx executes against an
@@ -252,6 +325,15 @@ import { navigateTo, openDialog, closeDialog } from '../app/core';
   `crypto-safe-base62.ts`, etc.) wrap browser primitives so the
   app speaks one voice. Tiny shims are not a smell — they are
   the divorce point.
+- **`getFlowStats(ctx, flowId)`** — the stats adapter — resolves
+  the work-order set for a flow through the `flow-work-orders`
+  join table (relational truth per Codd), **not** through each
+  work order's frozen `flow_graph.flowId`. It returns
+  `{ model, graph }` so the page can derive the canvas viewBox
+  from the flow graph's node positions — which `getFlowGraph`
+  has already resolved to a real layout (`computeLayout` runs
+  for `is_auto_layout` or degenerately-positioned flows), so
+  the stats canvas never collapses onto one scaled-up node.
 - **Mutation adapters return `Promise<void>`.**
   Change-awareness flows through notification channels (e.g.,
   `ideaChanges.notify()`), never through return values —
@@ -270,10 +352,15 @@ All styling lives in `web-app/app/styles/`. Inline `style="..."`
 strings are forbidden except:
 
 1. **Dynamic per-element values** (progress widths, fill
-   percentages) — passed via CSS custom properties:
-   `style="--progress-fill:${value}%"` consumed by a CSS rule
-   reading `var(--progress-fill, 0%)`. The value is **data**,
-   not styling.
+   percentages, heat intensities) — passed via CSS custom
+   properties: `style="--progress-fill:${value}%"` consumed
+   by a CSS rule reading `var(--progress-fill, 0%)`, and the
+   flow-stats heat ramp: per-node `style="--heat-t:${0..1}"`
+   on the SVG canvas, with CSS computing the fill via a
+   chained `color-mix(in oklch, ...)` over four
+   `--heat-stop-*` design tokens (blue → green → yellow →
+   red at non-uniform stops 0 / 50 / 75 / 100). The value is
+   **data**; the colors stay in the design system.
 2. **Bootstrap fallbacks** in `database-init.ts` — error UI
    before CSS may have loaded, marked with a file-header
    comment.
@@ -300,6 +387,11 @@ All UI components are vanilla HTML/CSS with ARIA attributes, defined as CSS clas
 See `DESIGN-SYSTEM.md`. Key invariant: never use raw hex colors
 in CSS — always `hsl(var(--token))`. Icons are ~100 inline SVG
 functions in `web-app/app/icons.ts`.
+
+**Heat ramp** — see `DESIGN-SYSTEM.md`. Four `--heat-stop-*`
+tokens (low / mid / high / peak) define the flow-stats
+fixed-scale heat ramp; the per-node `--heat-t` (0..1) drives a
+4-stop chained `color-mix(in oklch, ...)` in `pages.css`.
 
 ### Mobile Responsiveness
 
@@ -332,14 +424,20 @@ and copied — read it, don't read this section.
 Two layers, both zero-dependency:
 
 **Automated tests** (Node's built-in `node:test` runner with
-`--strip-types`, no devDependencies; ~694 tests). Tests cover
+`--strip-types`, no devDependencies; ~738 tests). Tests cover
 pure modules, flow-edit business logic and the connection-
 validation rules (`tests/flow-operations.test.ts`), the flow
 version/query adapters, every data adapter, the workbox inbox
 aggregation plus the visibility filter, the mermaid round-trip,
 in-browser ZIP, snapshot import-validation/quota/wipe-on-fail,
 api routing, navigation, mock-data validity, and the SafeHtml
-output of the presenters — see `tests/` for the current set.
+output of the presenters; the automated suite now also covers
+`flow-stats-aggregate` (pure heat / sojourn / path / clan
+math), `adapters-flow-stats` (the read-only adapter via
+`MemoryDbAdapter`), `presenter-flow-stats` (the SafeHtml
+shape — including the *absence* of editor affordances), and
+`duration-units` (the compact ascending-unit duration
+formatter) — see `tests/` for the current set.
 `api/db-memory.ts` provides an in-memory `DbAdapter` so adapter
 and api-layer tests run without `localStorage`.
 

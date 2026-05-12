@@ -9,8 +9,6 @@ import {
     iconPlus,
 } from '../icons.ts';
 import {
-    isUserPrivateRoleId,
-    personIdFromUserPrivateRoleId,
     userPrivateRoleFor,
 } from '../adapters/index.ts';
 import type {
@@ -20,6 +18,10 @@ import type {
     Person,
     CrewRoleMembershipEntity,
 } from '../adapters/index.ts';
+import {
+    isUserPrivateRoleId,
+    personIdFromUserPrivateRoleId,
+} from '../../../api/types.ts';
 
 export interface CrewRoleMember {
     readonly membershipId: Id;

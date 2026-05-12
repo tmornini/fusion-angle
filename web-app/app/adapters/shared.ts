@@ -107,7 +107,6 @@ export function createRequestContext(
                             op.resource,
                         );
                     }
-                    applied.push(op);
                 } catch (e) {
                     throw new CommitError(
                         i,
@@ -115,6 +114,7 @@ export function createRequestContext(
                         e as Error,
                     );
                 }
+                applied.push(op);
             }
             if (tx.notifyChannels) {
                 for (

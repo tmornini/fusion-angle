@@ -125,6 +125,28 @@ export async function init(
                 !(e.target
                     instanceof Element)
             ) return;
+            // Stats button takes priority
+            // so it doesn't also fire
+            // card navigation.
+            const statsBtn =
+                e.target
+                    .closest<HTMLElement>(
+                    '[data-flow-stats]',
+                );
+            if (statsBtn) {
+                navigateTo(
+                    'flow-stats',
+                    {
+                        flowId:
+                            getRequiredAttribute(
+                                statsBtn,
+                                'data-flow'
+                                + '-stats',
+                            ),
+                    },
+                );
+                return;
+            }
             const card =
                 e.target
                     .closest<HTMLElement>(

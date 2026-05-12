@@ -87,6 +87,22 @@ test('buildPageUrl percent-encodes param values', () => {
     );
 });
 
+// --- buildPageUrl: flow-stats page ---
+
+test('buildPageUrl resolves flow-stats to flows/stats.html', () => {
+    assert.equal(
+        buildPageUrl('flow-stats'),
+        '../flows/stats.html',
+    );
+});
+
+test('buildPageUrl appends flowId param for flow-stats', () => {
+    assert.equal(
+        buildPageUrl('flow-stats', { flowId: 'f1' }),
+        '../flows/stats.html?flowId=f1',
+    );
+});
+
 // --- buildPageUrl: unknown page ---
 
 test('buildPageUrl throws on an unknown page', () => {

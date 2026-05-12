@@ -3,6 +3,7 @@ import {
     SafeHtml,
 } from '../safe-html.ts';
 import {
+    iconBarChart,
     iconCircle,
     iconShare,
     iconChevronRight,
@@ -103,8 +104,19 @@ export class FlowPresenter {
                 </div>
             </div>
             <div class="${
-                'flex items-center'
-            }">${
+                'flex items-center gap-1'
+            }"><button
+                class="${
+                    'btn btn-ghost'
+                    + ' btn-icon'
+                    + ' flow-card-stats-btn'
+                }"
+                data-flow-stats="${f.id}"
+                title="Stats"
+                aria-label="Flow statistics"
+                >${
+                iconBarChart(16, '')
+            }</button>${
                 iconChevronRight(
                     20,
                     'text-muted',

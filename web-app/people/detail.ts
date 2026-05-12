@@ -34,10 +34,12 @@ import {
     subscribeRoleChanges,
     subscribeMembershipChanges,
     userPrivateRoleFor,
-    isUserPrivateRoleId,
     type Person,
     type PersonStatus,
 } from '../app/adapters/index.ts';
+import {
+    isUserPrivateRoleId,
+} from '../../api/types.ts';
 
 const pageAbort = new AbortController();
 const signal = pageAbort.signal;

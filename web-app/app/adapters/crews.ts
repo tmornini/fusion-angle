@@ -16,12 +16,14 @@ import {
     generateCryptoSafeBase62,
 } from './crypto-safe-base62.ts';
 import {
-    isUserPrivateRoleId,
-    personIdFromUserPrivateRoleId,
     userPrivateRoleFor,
     getMembersOfRole,
     getRoleMap,
 } from './roles.ts';
+import {
+    isUserPrivateRoleId,
+    personIdFromUserPrivateRoleId,
+} from '../../../api/types.ts';
 import {
     getPersonMap,
 } from './people.ts';

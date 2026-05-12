@@ -7,6 +7,9 @@ import {
     Role,
     Person,
     nowUtc,
+    userPrivateRoleId,
+    isUserPrivateRoleId,
+    personIdFromUserPrivateRoleId,
 } from '../../../api/types.ts';
 import type { RequestContext } from './shared.ts';
 import {
@@ -54,42 +57,6 @@ export interface Member {
     readonly role: Role;
     readonly person: Person;
     readonly createdAt: string;
-}
-
-// User-private roles are derived, never persisted.
-// The id encodes the owning person's id under a
-// known prefix; predicate at the gate decides
-// "is this user-private?" — Article on Validation.
-const USER_PRIVATE_ROLE_PREFIX =
-    'user-private:';
-
-export function userPrivateRoleId(
-    personId: Id,
-): Id {
-    return USER_PRIVATE_ROLE_PREFIX + personId;
-}
-
-export function isUserPrivateRoleId(
-    id: Id,
-): boolean {
-    return id.startsWith(
-        USER_PRIVATE_ROLE_PREFIX,
-    );
-}
-
-export function personIdFromUserPrivateRoleId(
-    id: Id,
-): Id {
-    if (!isUserPrivateRoleId(id)) {
-        throw new Error(
-            'personIdFromUserPrivateRoleId:'
-            + ' not a user-private role id: '
-            + id,
-        );
-    }
-    return id.slice(
-        USER_PRIVATE_ROLE_PREFIX.length,
-    );
 }
 
 export function isUserPrivateRole(

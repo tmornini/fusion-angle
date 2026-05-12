@@ -582,3 +582,50 @@ test(
         assert.equal(woIds.size, 1);
     },
 );
+
+// ── getFlowWorkOrderRows ──────────
+
+import {
+    getFlowWorkOrderRows,
+} from
+'../web-app/app/adapters/work-orders-queries.ts';
+
+test(
+    'getFlowWorkOrderRows returns seeded '
+    + 'flow-work-order rows',
+    async () => {
+        const db = new MemoryDbAdapter();
+        await db.flowWorkOrders.put(
+            'fwo1',
+            {
+                flow_id: 'flow1',
+                work_order_id: 'wo1',
+                created_at:
+                    '2024-01-01T00:00:00Z',
+            },
+        );
+        await db.flowWorkOrders.put(
+            'fwo2',
+            {
+                flow_id: 'flow2',
+                work_order_id: 'wo2',
+                created_at:
+                    '2024-01-01T00:00:00Z',
+            },
+        );
+        const ctx = createRequestContext(db);
+        const rows =
+            await getFlowWorkOrderRows(ctx);
+        assert.equal(rows.length, 2);
+        assert.ok(
+            rows.some(
+                r => r.work_order_id === 'wo1',
+            ),
+        );
+        assert.ok(
+            rows.some(
+                r => r.work_order_id === 'wo2',
+            ),
+        );
+    },
+);

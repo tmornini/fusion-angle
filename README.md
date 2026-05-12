@@ -5,7 +5,8 @@ Enterprise innovation management platform for capturing ideas, defining business
 ## Modules
 
 - **Ideas** — submit, score, and review innovation ideas
-- **Flow** — process documentation and flow management
+- **Flow** — process documentation, flow management, and per-node
+  throughput heat map (`flows/stats`)
 - **Projects** — track approved ideas through execution
 - **Teams** — team roster and assignments
 - **Account** — organization settings, users, billing, and activity

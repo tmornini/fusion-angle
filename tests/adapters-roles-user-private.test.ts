@@ -8,12 +8,14 @@ import {
     getRoles,
     getRolesForPerson,
     addMember,
-    userPrivateRoleId,
-    isUserPrivateRoleId,
-    personIdFromUserPrivateRoleId,
     isUserPrivateRole,
     userPrivateRoleFor,
 } from '../web-app/app/adapters/roles.ts';
+import {
+    userPrivateRoleId,
+    isUserPrivateRoleId,
+    personIdFromUserPrivateRoleId,
+} from '../api/types.ts';
 import {
     Person,
     jsonArrayField,

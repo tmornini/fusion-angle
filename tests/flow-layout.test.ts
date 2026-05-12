@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import {
+    computeLayout,
     edgeWaypointKey,
     buildAdjacency,
     isReachable,
@@ -122,3 +123,99 @@ test('wouldBeCycle: detects deep transitive cycle', () => {
         wouldBeCycle('e', 'a', edges),
     );
 });
+
+function lin(
+    id: string,
+    f: { start?: boolean; complete?: boolean } = {},
+): { id: string; isStart: boolean; isComplete: boolean } {
+    return {
+        id,
+        isStart: f.start ?? false,
+        isComplete: f.complete ?? false,
+    };
+}
+
+test(
+    'computeLayout: an empty graph yields empty maps',
+    () => {
+        const r = computeLayout({
+            nodes: [], edges: [],
+            canvasWidth: 0, canvasHeight: 0,
+        });
+        assert.equal(r.positions.size, 0);
+        assert.equal(r.waypoints.size, 0);
+    },
+);
+
+test(
+    'computeLayout: throws when there is no start node',
+    () => {
+        assert.throws(
+            () => computeLayout({
+                nodes: [lin('a')],
+                edges: [],
+                canvasWidth: 0, canvasHeight: 0,
+            }),
+            /no start node/i,
+        );
+    },
+);
+
+test(
+    'computeLayout: a linear chain reads start before'
+    + ' complete',
+    () => {
+        const r = computeLayout({
+            nodes: [
+                lin('s', { start: true }),
+                lin('a'),
+                lin('z', { complete: true }),
+            ],
+            edges: [
+                { fromId: 's', toId: 'a', labelWidth: 0 },
+                { fromId: 'a', toId: 'z', labelWidth: 0 },
+            ],
+            canvasWidth: 0, canvasHeight: 0,
+        });
+        assert.ok(
+            r.positions.get('s')!.x
+                < r.positions.get('z')!.x,
+        );
+    },
+);
+
+test(
+    'computeLayout: every input node gets a distinct'
+    + ' position',
+    () => {
+        const r = computeLayout({
+            nodes: [
+                lin('s', { start: true }),
+                lin('a'),
+                lin('b'),
+                lin('z', { complete: true }),
+            ],
+            edges: [
+                { fromId: 's', toId: 'a', labelWidth: 0 },
+                { fromId: 's', toId: 'b', labelWidth: 0 },
+                { fromId: 'a', toId: 'z', labelWidth: 0 },
+                { fromId: 'b', toId: 'z', labelWidth: 0 },
+            ],
+            canvasWidth: 0, canvasHeight: 0,
+        });
+        const ids = ['s', 'a', 'b', 'z'];
+        for (const id of ids) {
+            assert.ok(
+                r.positions.has(id),
+                `missing position for ${id}`,
+            );
+        }
+        const seen = new Set(
+            ids.map(id => {
+                const p = r.positions.get(id)!;
+                return `${p.x},${p.y}`;
+            }),
+        );
+        assert.equal(seen.size, 4);
+    },
+);

@@ -1,5 +1,6 @@
 import type {
     FlowEntity,
+    FlowWorkOrderEntity,
     WorkOrderEntity,
     WorkOrderTransitionEntity,
     TransitionFieldValueEntity,
@@ -128,6 +129,14 @@ export async function getWorkOrderClaimRows(
     return ctx.GET<
         WorkOrderClaimEntity[]
     >('work-order-claims');
+}
+
+export async function getFlowWorkOrderRows(
+    ctx: RequestContext,
+): Promise<FlowWorkOrderEntity[]> {
+    return ctx.GET<
+        FlowWorkOrderEntity[]
+    >('flow-work-orders');
 }
 
 export async function getWorkOrder(
