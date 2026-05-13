@@ -553,4 +553,7 @@ patterns apply only to the parallel run.
 
 ## Worktrees
 
-Use `/tmp/claude` as the worktree directory for isolated feature work.
+Do not use git worktrees. Work directly in the main checkout.
+Worktrees fragment review surface, hide state from the
+working tree, and add ceremony without buying isolation that
+small focused commits don't already provide.

@@ -123,12 +123,12 @@ export class IdeaConversionPresenter {
             conversionFieldIsReady(
                 this.#fields, field,
             );
-        const cls = isSet
-            ? 'field-check'
-            : 'field-check hidden';
         return html`<span
             id="check-${field}"
-            class="${cls}">
+            class="field-check"
+            data-ready="${
+                isSet ? 'true' : 'false'
+            }">
             ${iconCheckCircle2(16, '')}
         </span>`;
     }

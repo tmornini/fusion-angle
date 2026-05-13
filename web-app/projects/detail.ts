@@ -67,6 +67,15 @@ const FIELDS: ReadonlySet<ProjectFieldKey> =
         'costBaseline', 'impactBaseline',
     ]);
 
+const SUBMIT_ON_ENTER_IDS:
+    ReadonlySet<string> =
+    new Set([
+        'project-edit-title',
+        'project-edit-cost-baseline',
+        'project-edit-impact-baseline',
+        'new-flow-name',
+    ]);
+
 function isFieldKey(
     s: string | null,
 ): s is ProjectFieldKey {
@@ -371,7 +380,9 @@ function onContainerKeydown(
 ): void {
     if (e.key !== 'Enter') return;
     const target = e.target as HTMLElement;
-    if (!target.matches('input.input')) return;
+    if (
+        !SUBMIT_ON_ENTER_IDS.has(target.id)
+    ) return;
     e.preventDefault();
     e.stopPropagation();
     if (target.id === 'new-flow-name') {

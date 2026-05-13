@@ -1560,6 +1560,10 @@ svg.flow-canvas [data-edge-id] {
   color: hsl(var(--success));
 }
 
+.field-check[data-ready="false"] {
+  visibility: hidden;
+}
+
 .input-prefix-wrap {
   position: relative;
 }

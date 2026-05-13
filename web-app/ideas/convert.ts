@@ -136,12 +136,14 @@ export async function init(
                 `#check-${field}`, document,
             );
             if (chk) {
-                chk.style.display =
+                chk.setAttribute(
+                    'data-ready',
                     conversionFieldIsReady(
                         fields, field,
                     )
-                        ? ''
-                        : 'none';
+                        ? 'true'
+                        : 'false',
+                );
             }
         }
         const count =
@@ -307,14 +309,6 @@ export async function init(
             '#convert-submit-btn';
         bindEnterToClick(
             '#convert-project-name',
-            submitSel,
-        );
-        bindEnterToClick(
-            '#convert-start-date',
-            submitSel,
-        );
-        bindEnterToClick(
-            '#convert-target-end-date',
             submitSel,
         );
         bindEnterToClick(
