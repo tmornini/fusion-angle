@@ -4,24 +4,19 @@ import {
 import { iconGripVertical } from '../icons.ts';
 import { DISPLAY_ABSENT } from '../format.ts';
 import {
-    personName,
+    workerName,
     validateWorkOrderFlowGraph,
     isExpiredClaim,
     type WorkOrderEntity,
     type WorkOrderTransitionEntity,
     type WorkOrderClaimEntity,
-    type Id,
 } from '../adapters/index.ts';
-import type { Person } from '../adapters/index.ts';
-import type {
-    NodeAssignment,
-} from '../../../api/types.ts';
+import type { Worker } from '../adapters/index.ts';
 import {
     SECONDS_PER_DAY,
     MS_PER_SECOND,
-    isUserPrivateRoleId,
-    personIdFromUserPrivateRoleId,
 } from '../../../api/types.ts';
+import type { Id } from '../../../api/types.ts';
 
 const DAY_MS = SECONDS_PER_DAY * MS_PER_SECOND;
 
@@ -168,52 +163,6 @@ export class WorkboxInboxPresenter {
     }
 }
 
-export interface VisibilityScope {
-    readonly currentPersonId: Id;
-    readonly roleMemberSetByRoleId:
-        ReadonlyMap<Id, ReadonlySet<Id>>;
-    readonly crewMemberSetByCrewId:
-        ReadonlyMap<Id, ReadonlySet<Id>>;
-}
-
-// Decides whether a work order whose current node
-// has the given assignment is visible to the
-// person. Unassigned is visible to all (the hazard
-// triangle already brands it as misconfiguration);
-// model is visible to no person (a model
-// participates, not a human). Role and crew
-// resolve through the supplied member maps;
-// user-private roles short-circuit to the person
-// encoded in the role id.
-export function isWorkOrderVisibleToPerson(
-    assignment: NodeAssignment,
-    scope: VisibilityScope,
-): boolean {
-    if (assignment.kind === 'unassigned') {
-        return true;
-    }
-    if (assignment.kind === 'model') {
-        return false;
-    }
-    if (assignment.kind === 'role') {
-        if (isUserPrivateRoleId(
-            assignment.roleId,
-        )) {
-            return personIdFromUserPrivateRoleId(
-                assignment.roleId,
-            ) === scope.currentPersonId;
-        }
-        return scope.roleMemberSetByRoleId
-            .get(assignment.roleId)
-            ?.has(scope.currentPersonId)
-            ?? false;
-    }
-    return scope.crewMemberSetByCrewId
-        .get(assignment.crewId)
-        ?.has(scope.currentPersonId)
-        ?? false;
-}
-
 export function buildInboxItems(
     workOrders:
         readonly WorkOrderEntity[],
@@ -221,9 +170,8 @@ export function buildInboxItems(
         readonly WorkOrderTransitionEntity[],
     claims:
         readonly WorkOrderClaimEntity[],
-    personMap: Map<Id, Person>,
+    workerMap: Map<Id, Worker>,
     mode: InboxMode,
-    scope: VisibilityScope | null = null,
 ): InboxItem[] {
     const transitionsByWo = Map.groupBy(
         transitions,
@@ -283,7 +231,7 @@ export function buildInboxItems(
                 + ' node ' + lastToId,
             );
         }
-        const completed = curNode.isComplete;
+        const completed = curNode.isArchive;
 
         const claim =
             claimByWo.get(wo.id);
@@ -295,12 +243,6 @@ export function buildInboxItems(
         )) continue;
         if (!itemMatchesMode(mode, completed))
             continue;
-        if (
-            scope
-            && !isWorkOrderVisibleToPerson(
-                curNode.crew, scope,
-            )
-        ) continue;
 
         const last = sorted.at(-1);
 
@@ -310,8 +252,8 @@ export function buildInboxItems(
             flowName: fg.name,
             stateName: curNode.name,
             transitionerName: last
-                ? personName(
-                    personMap, last.person_id,
+                ? workerName(
+                    workerMap, last.person_id,
                 )
                 : null,
             lastTransitionedAt: last

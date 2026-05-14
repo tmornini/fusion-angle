@@ -9,10 +9,12 @@ import {
 } from '../../../api/types.ts';
 import type { RequestContext } from './shared.ts';
 import {
-    getPersonMap,
-    personName,
-    getCurrentPerson,
-} from './people.ts';
+    getCurrentHumanWorker,
+} from './workers.ts';
+import {
+    getWorkerMap,
+    workerName,
+} from './workers-union.ts';
 import {
     notifyProjectChange,
 } from './projects.ts';
@@ -101,10 +103,10 @@ export async function getIdeas(
     ctx: RequestContext,
 ): Promise<IdeaWithSubmitter[]> {
     const [
-        ideas, personMap, submissions,
+        ideas, workerMap, submissions,
     ] = await Promise.all([
         getVisibleIdeaRows(ctx),
-        getPersonMap(ctx),
+        getWorkerMap(ctx),
         getIdeaSubmissionRows(ctx),
     ]);
     const submissionMap = new Map(
@@ -122,8 +124,8 @@ export async function getIdeas(
         return {
             idea: new Idea(row),
             entity: row,
-            submitterName: personName(
-                personMap,
+            submitterName: workerName(
+                workerMap,
                 submission.person_id,
             ),
             submittedAt:
@@ -137,17 +139,17 @@ export async function getIdea(
     ideaId: string,
 ): Promise<IdeaWithSubmitter> {
     const [
-        row, submission, personMap,
+        row, submission, workerMap,
     ] = await Promise.all([
         getIdeaRow(ctx, ideaId),
         getIdeaSubmissionRow(ctx, ideaId),
-        getPersonMap(ctx),
+        getWorkerMap(ctx),
     ]);
     return {
         idea: new Idea(row),
         entity: row,
-        submitterName: personName(
-            personMap, submission.person_id,
+        submitterName: workerName(
+            workerMap, submission.person_id,
         ),
         submittedAt: submission.created_at,
     };
@@ -167,13 +169,13 @@ export async function putIdeaSubmission(
     submissionId: string,
     ideaId: string,
 ): Promise<void> {
-    const person = await getCurrentPerson(ctx);
+    const worker = await getCurrentHumanWorker(ctx);
     await ctx.PUT(
         'idea-submissions/'
             + submissionId,
         {
             idea_id: ideaId,
-            person_id: person.id,
+            person_id: worker.id,
             created_at: nowUtc(),
         },
     );

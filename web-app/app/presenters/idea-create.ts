@@ -42,7 +42,7 @@ export class IdeaCreatePresenter {
     }
 
     render(): SafeHtml {
-        const isComplete =
+        const isArchive =
             ideaCreateDraftIsComplete(
                 this.#draft,
             );
@@ -134,7 +134,7 @@ export class IdeaCreatePresenter {
                 id=${'idea-create'
                     + '-step-next'}
                 ${trusted(
-                    isComplete
+                    isArchive
                         ? ''
                         : 'disabled',
                 )}>

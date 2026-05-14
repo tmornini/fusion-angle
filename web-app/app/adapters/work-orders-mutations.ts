@@ -22,8 +22,12 @@ import type {
     RequestContext, WriteOp,
 } from './shared.ts';
 import {
-    getCurrentPerson,
-} from './people.ts';
+    getCurrentHumanWorker,
+} from './workers.ts';
+import {
+    validateFlowForCreation,
+    formatFlowProblem,
+} from './flow-publish.ts';
 
 const workOrderChanges =
     createSubscriptionChannel(
@@ -90,17 +94,26 @@ export async function postWorkOrderCreation(
     ctx: RequestContext,
     input: WorkOrderCreationInput,
 ): Promise<void> {
-    const person = await getCurrentPerson(ctx);
+    const worker = await getCurrentHumanWorker(ctx);
     const flow = await ctx.GET<FlowEntity>(
         `flows/${input.flowId}`,
     );
+    const readiness = validateFlowForCreation(flow);
+    if (!readiness.ready) {
+        throw new Error(
+            'flow not ready: '
+            + readiness.problems
+                .map(formatFlowProblem)
+                .join('; '),
+        );
+    }
     const graph: StoredGraph =
         validateStoredGraphJson(
             flow.graph, 'flow.graph',
         );
 
     const startNode = graph.nodes.find(
-        n => n.isStart,
+        n => n.isCreate,
     );
     if (!startNode) {
         throw new Error(
@@ -184,7 +197,7 @@ export async function postWorkOrderCreation(
                         input.workOrderId,
                     from_node_id: '',
                     to_node_id: startNode.id,
-                    person_id: person.id,
+                    person_id: worker.id,
                     transitioned_at: now,
                 },
             },
@@ -200,7 +213,7 @@ export async function postWorkOrderCreation(
                         input.workOrderId,
                     from_node_id: startNode.id,
                     to_node_id: postStartNodeId,
-                    person_id: person.id,
+                    person_id: worker.id,
                     transitioned_at: now,
                 },
             },
@@ -212,7 +225,7 @@ export async function postWorkOrderCreation(
                 body: {
                     work_order_id:
                         input.workOrderId,
-                    person_id: person.id,
+                    person_id: worker.id,
                     claimed_at: now,
                 },
             },
@@ -240,7 +253,7 @@ export async function postWorkOrderTransition(
         values, fieldValueIds,
         currentNodeId,
     } = input;
-    const person = await getCurrentPerson(ctx);
+    const worker = await getCurrentHumanWorker(ctx);
     const wo = await ctx.GET<WorkOrderEntity>(
         `work-orders/${workOrderId}`,
     );
@@ -314,7 +327,7 @@ export async function postWorkOrderTransition(
                     work_order_id: workOrderId,
                     from_node_id: currentNodeId,
                     to_node_id: edge.toNodeId,
-                    person_id: person.id,
+                    person_id: worker.id,
                     transitioned_at: now,
                 },
             },
@@ -352,14 +365,14 @@ export async function postWorkOrderClaim(
     claimId: string,
     workOrderId: string,
 ): Promise<void> {
-    const person = await getCurrentPerson(ctx);
+    const worker = await getCurrentHumanWorker(ctx);
     const now = nowUtc();
 
     await ctx.PUT<void>(
         `work-order-claims/${claimId}`,
         {
             work_order_id: workOrderId,
-            person_id: person.id,
+            person_id: worker.id,
             claimed_at: now,
         },
     );

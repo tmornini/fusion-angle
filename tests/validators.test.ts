@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import {
-    validatePersonEntity,
+    validateHumanWorkerEntity,
+    validateAIWorkerEntity,
     validateIdeaEntity,
     validateProjectEntity,
     validateActivityEntity,
@@ -15,15 +16,12 @@ import {
     validateIdeaSubmissionEntity,
     validateActivityActorEntity,
     validateProjectFlowEntity,
-    validateModelEntity,
-    validateRoleModelMembershipEntity,
-    asNodeAssignment,
     asStoredGraph,
 } from '../api/validators.ts';
 
-// --- PersonEntity ---
+// --- HumanWorkerEntity ---
 
-const validPerson = {
+const validHumanWorker = {
     first_name: 'Ada',
     last_name: 'Lovelace',
     email: 'ada@example.com',
@@ -36,45 +34,137 @@ const validPerson = {
     bio: 'Pioneer',
 };
 
-test('validatePersonEntity accepts valid payload', () => {
-    const result = validatePersonEntity(validPerson);
-    assert.equal(result.first_name, 'Ada');
-    assert.equal(result.status, 'active');
-});
-
-test('validatePersonEntity rejects missing email', () => {
-    const body = { ...validPerson };
-    delete (body as Record<string, unknown>)['email'];
-    assert.throws(
-        () => validatePersonEntity(body),
-        /missing required key "email"/,
-    );
-});
+test(
+    'validateHumanWorkerEntity accepts valid payload',
+    () => {
+        const result = validateHumanWorkerEntity(
+            validHumanWorker,
+        );
+        assert.equal(result.first_name, 'Ada');
+        assert.equal(result.status, 'active');
+    },
+);
 
 test(
-    'validatePersonEntity rejects unexpected key',
+    'validateHumanWorkerEntity rejects missing email',
     () => {
-    assert.throws(
-        () => validatePersonEntity({
-            ...validPerson,
-            admin: true,
-        }),
-        /unexpected key "admin"/,
-    );
-});
+        const body = { ...validHumanWorker };
+        delete (
+            body as Record<string, unknown>
+        )['email'];
+        assert.throws(
+            () => validateHumanWorkerEntity(body),
+            /missing required key "email"/,
+        );
+    },
+);
 
 test(
-    'validatePersonEntity rejects missing required key',
+    'validateHumanWorkerEntity rejects unexpected key',
     () => {
-    const body = { ...validPerson };
-    delete (
-        body as Record<string, unknown>
-    )['last_name'];
-    assert.throws(
-        () => validatePersonEntity(body),
-        /missing required key "last_name"/,
-    );
-});
+        assert.throws(
+            () => validateHumanWorkerEntity({
+                ...validHumanWorker,
+                admin: true,
+            }),
+            /unexpected key "admin"/,
+        );
+    },
+);
+
+test(
+    'validateHumanWorkerEntity rejects missing'
+    + ' required key',
+    () => {
+        const body = { ...validHumanWorker };
+        delete (
+            body as Record<string, unknown>
+        )['last_name'];
+        assert.throws(
+            () => validateHumanWorkerEntity(body),
+            /missing required key "last_name"/,
+        );
+    },
+);
+
+// --- AIWorkerEntity ---
+
+const validAIWorker = {
+    name: 'Claude Opus 4.7 Max',
+    provider: 'Anthropic',
+    description: 'Long context, deep reasoning.',
+    auth_token: 'sk-PLACEHOLDER-DEMOTOKEN-XXXX',
+    created_at: '2026-01-01T00:00:00Z',
+};
+
+test(
+    'validateAIWorkerEntity accepts valid payload',
+    () => {
+        const result = validateAIWorkerEntity(
+            validAIWorker,
+        );
+        assert.equal(
+            result.name, 'Claude Opus 4.7 Max',
+        );
+        assert.equal(result.provider, 'Anthropic');
+        assert.equal(
+            result.auth_token,
+            'sk-PLACEHOLDER-DEMOTOKEN-XXXX',
+        );
+    },
+);
+
+test(
+    'validateAIWorkerEntity rejects empty auth_token',
+    () => {
+        assert.throws(
+            () => validateAIWorkerEntity({
+                ...validAIWorker,
+                auth_token: '',
+            }),
+            /auth_token must be non-empty/,
+        );
+    },
+);
+
+test(
+    'validateAIWorkerEntity rejects unexpected key',
+    () => {
+        assert.throws(
+            () => validateAIWorkerEntity({
+                ...validAIWorker,
+                surprise: 'oops',
+            }),
+            /unexpected key "surprise"/,
+        );
+    },
+);
+
+test(
+    'validateAIWorkerEntity rejects missing name',
+    () => {
+        const { name: _omit, ...rest } =
+            validAIWorker;
+        assert.throws(
+            () => validateAIWorkerEntity(rest),
+            /missing required key "name"/,
+        );
+    },
+);
+
+test(
+    'validateAIWorkerEntity rejects missing'
+    + ' auth_token',
+    () => {
+        const {
+            auth_token: _omit, ...rest
+        } = validAIWorker;
+        assert.throws(
+            () => validateAIWorkerEntity(rest),
+            /missing required key "auth_token"/,
+        );
+    },
+);
 
 // --- IdeaEntity ---
 
@@ -152,7 +242,6 @@ const validProject = {
     position: 1,
     business_context: '{}',
     timeline_label: 'Q1',
-    budget_label: '$1K',
 };
 
 test('validateProjectEntity accepts valid payload', () => {
@@ -615,198 +704,7 @@ test(
     );
 });
 
-// --- validateModelEntity ---
-
-const validModel = {
-    name: 'Claude Opus 4.7 Max',
-    provider: 'Anthropic',
-    description: 'Long context, deep reasoning.',
-    created_at: '2024-01-01T00:00:00Z',
-};
-
-test(
-    'validateModelEntity accepts valid payload',
-    () => {
-        const result = validateModelEntity(
-            validModel,
-        );
-        assert.equal(
-            result.name, 'Claude Opus 4.7 Max',
-        );
-        assert.equal(
-            result.provider, 'Anthropic',
-        );
-    },
-);
-
-test(
-    'validateModelEntity rejects unexpected key',
-    () => {
-        assert.throws(
-            () => validateModelEntity({
-                ...validModel,
-                surprise: 'oops',
-            }),
-        );
-    },
-);
-
-test(
-    'validateModelEntity rejects missing name',
-    () => {
-        const { name: _omit, ...rest } =
-            validModel;
-        assert.throws(
-            () => validateModelEntity(rest),
-        );
-    },
-);
-
-// --- validateRoleModelMembershipEntity ---
-
-const validRoleModelMembership = {
-    role_id: 'role_engineering',
-    model_id: 'model_claude_opus',
-    created_at: '2024-01-01T00:00:00Z',
-};
-
-test(
-    'validateRoleModelMembershipEntity accepts'
-    + ' valid payload',
-    () => {
-        const result =
-            validateRoleModelMembershipEntity(
-                validRoleModelMembership,
-            );
-        assert.equal(
-            result.model_id,
-            'model_claude_opus',
-        );
-    },
-);
-
-test(
-    'validateRoleModelMembershipEntity rejects'
-    + ' missing model_id',
-    () => {
-        const { model_id: _omit, ...rest } =
-            validRoleModelMembership;
-        assert.throws(
-            () =>
-                validateRoleModelMembershipEntity(
-                    rest,
-                ),
-        );
-    },
-);
-
-// --- asNodeAssignment (NodeAssignment discriminated union) ---
-
-test('asNodeAssignment accepts unassigned variant', () => {
-    const result = asNodeAssignment(
-        { kind: 'unassigned' }, 'assignment',
-    );
-    assert.equal(result.kind, 'unassigned');
-});
-
-test('asNodeAssignment accepts the new role variant', () => {
-    const result = asNodeAssignment(
-        { kind: 'role', roleId: 'r-eng' },
-        'assignment',
-    );
-    assert.equal(result.kind, 'role');
-    if (result.kind === 'role') {
-        assert.equal(result.roleId, 'r-eng');
-    }
-});
-
-test('asNodeAssignment accepts model variant', () => {
-    const result = asNodeAssignment(
-        { kind: 'model', modelId: 'm-1' },
-        'assignment',
-    );
-    assert.equal(result.kind, 'model');
-    if (result.kind === 'model') {
-        assert.equal(result.modelId, 'm-1');
-    }
-});
-
-test(
-    'asNodeAssignment rejects the old model'
-    + ' shape (string model field)',
-    () => {
-        assert.throws(
-            () => asNodeAssignment(
-                {
-                    kind: 'model',
-                    model: 'Copilot',
-                },
-                'assignment',
-            ),
-        );
-    },
-);
-
-test('asNodeAssignment accepts crew variant', () => {
-    const result = asNodeAssignment(
-        { kind: 'crew', crewId: 'c-1' },
-        'assignment',
-    );
-    assert.equal(result.kind, 'crew');
-    if (result.kind === 'crew') {
-        assert.equal(result.crewId, 'c-1');
-    }
-});
-
-test(
-    'asNodeAssignment rejects crew without'
-    + ' crewId',
-    () => {
-        assert.throws(
-            () => asNodeAssignment(
-                { kind: 'crew' },
-                'assignment',
-            ),
-        );
-    },
-);
-
-test('asNodeAssignment rejects invalid kind', () => {
-    assert.throws(
-        () => asNodeAssignment(
-            { kind: 'invalid' }, 'assignment',
-        ),
-        /assignment\.kind in/,
-    );
-});
-
-test(
-    'asNodeAssignment rejects role without'
-    + ' roleId',
-    () => {
-        assert.throws(
-            () => asNodeAssignment(
-                { kind: 'role' },
-                'assignment',
-            ),
-        );
-    },
-);
-
-test(
-    'asNodeAssignment rejects model without'
-    + ' modelId',
-    () => {
-        assert.throws(
-            () => asNodeAssignment(
-                { kind: 'model' },
-                'assignment',
-            ),
-        );
-    },
-);
-
-// --- asGraphNode crew validation ---
+// --- asStoredGraph (workerIds shape) ---
 
 const baseNode = {
     id: 'n1',
@@ -814,13 +712,13 @@ const baseNode = {
     description: '',
     positionX: 0,
     positionY: 0,
-    isStart: false,
-    isComplete: false,
+    isCreate: false,
+    isArchive: false,
     fields: [],
 };
 
 test(
-    'asStoredGraph throws on missing crew',
+    'asStoredGraph throws on missing workerIds',
     () => {
         assert.throws(
             () => asStoredGraph(
@@ -832,17 +730,14 @@ test(
 );
 
 test(
-    'asStoredGraph round-trips a role crew',
+    'asStoredGraph round-trips an empty workerIds',
     () => {
         const result = asStoredGraph(
             {
                 nodes: [
                     {
                         ...baseNode,
-                        crew: {
-                            kind: 'role',
-                            roleId: 'r-eng',
-                        },
+                        workerIds: [],
                     },
                 ],
                 edges: [],
@@ -850,27 +745,23 @@ test(
             'graph',
         );
         const n = result.nodes[0]!;
-        assert.equal(n.crew.kind, 'role');
-        if (n.crew.kind === 'role') {
-            assert.equal(
-                n.crew.roleId, 'r-eng',
-            );
-        }
+        assert.deepEqual(n.workerIds, []);
     },
 );
 
 test(
-    'asStoredGraph round-trips a model crew',
+    'asStoredGraph round-trips a populated'
+    + ' workerIds list',
     () => {
         const result = asStoredGraph(
             {
                 nodes: [
                     {
                         ...baseNode,
-                        crew: {
-                            kind: 'model',
-                            modelId: 'm-1',
-                        },
+                        workerIds: [
+                            'hw_sarah_chen',
+                            'ai_claude_opus',
+                        ],
                     },
                 ],
                 edges: [],
@@ -878,38 +769,30 @@ test(
             'graph',
         );
         const n = result.nodes[0]!;
-        assert.equal(n.crew.kind, 'model');
-        if (n.crew.kind === 'model') {
-            assert.equal(
-                n.crew.modelId, 'm-1',
-            );
-        }
+        assert.deepEqual(
+            n.workerIds,
+            ['hw_sarah_chen', 'ai_claude_opus'],
+        );
     },
 );
 
 test(
-    'asStoredGraph round-trips a crew'
-    + ' assignment',
+    'asStoredGraph rejects non-string entries in'
+    + ' workerIds',
     () => {
-        const result = asStoredGraph(
-            {
-                nodes: [
-                    {
-                        ...baseNode,
-                        crew: {
-                            kind: 'crew',
-                            crewId: 'c-1',
+        assert.throws(
+            () => asStoredGraph(
+                {
+                    nodes: [
+                        {
+                            ...baseNode,
+                            workerIds: [123],
                         },
-                    },
-                ],
-                edges: [],
-            },
-            'graph',
+                    ],
+                    edges: [],
+                },
+                'graph',
+            ),
         );
-        const n = result.nodes[0]!;
-        assert.equal(n.crew.kind, 'crew');
-        if (n.crew.kind === 'crew') {
-            assert.equal(n.crew.crewId, 'c-1');
-        }
     },
 );

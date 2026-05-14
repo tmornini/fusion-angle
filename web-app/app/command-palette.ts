@@ -18,14 +18,14 @@ import {
 import {
     getIdeas,
     getProjects,
-    getPeople,
-    featuredPeople,
+    getHumanWorkers,
+    featuredHumanWorkers,
     createRequestContext,
     setLocation,
     subscribeSchemaChanges,
     type IdeaWithSubmitter,
     Project,
-    Person,
+    HumanWorker,
 } from './adapters/index.ts';
 // init.ts is the composition root —
 // intentionally outside the adapter barrel.
@@ -46,7 +46,7 @@ export interface SearchItem {
     category:
         | 'ideas'
         | 'projects'
-        | 'people'
+        | 'workers'
         | 'pages';
     icon: SafeHtml;
     href: string;
@@ -153,14 +153,14 @@ const categoryOrder:
     SearchItem['category'][] = [
         'ideas',
         'projects',
-        'people',
+        'workers',
         'pages',
     ];
 const categoryLabels:
     Record<string, string> = {
         ideas: 'Ideas',
         projects: 'Projects',
-        people: 'People',
+        workers: 'Workers',
         pages: 'Pages',
     };
 
@@ -213,23 +213,23 @@ export function projectToSearchItem(
     };
 }
 
-export function personToSearchItem(
-    person: Person,
+export function humanWorkerToSearchItem(
+    worker: HumanWorker,
 ): SearchItem {
     return {
-        id: 'person-' + person.idForLink(),
-        title: person.fullName(),
-        meta: person.titleLabel()
+        id: 'worker-' + worker.idForLink(),
+        title: worker.fullName(),
+        meta: worker.titleLabel()
             + ' · '
-            + person.departmentLabel(),
-        category: 'people',
+            + worker.departmentLabel(),
+        category: 'workers',
         icon: iconPerson(
             PALETTE_ICON_SIZE_SM, '',
         ),
-        href: buildPageUrl('people'),
-        keywords: person.titleLabel()
-            + ' ' + person.departmentLabel()
-            + ' ' + person.emailAddress(),
+        href: buildPageUrl('workers'),
+        keywords: worker.titleLabel()
+            + ' ' + worker.departmentLabel()
+            + ' ' + worker.emailAddress(),
     };
 }
 
@@ -296,21 +296,23 @@ export function initCommandPalette(
         state.isDataLoaded = true;
 
         const ctx = createRequestContext();
-        const [ideas, projects, people] =
+        const [ideas, projects, humans] =
             await Promise.all([
                 getIdeas(ctx),
                 getProjects(ctx),
-                getPeople(ctx),
+                getHumanWorkers(ctx),
             ]);
-        const members =
-            featuredPeople(people);
+        const featured =
+            featuredHumanWorkers(humans);
 
         state.allItems = [
             ...ideas.map(ideaToSearchItem),
             ...projects.map(
                 projectToSearchItem,
             ),
-            ...members.map(personToSearchItem),
+            ...featured.map(
+                humanWorkerToSearchItem,
+            ),
             ...pages.map(pageToSearchItem),
         ];
     }
@@ -575,7 +577,7 @@ posIndex === state.activeIndex
             class="command-palette-input"
             placeholder="${
                 'Search ideas, projects,'
-                + ' people, pages...'
+                + ' workers, pages...'
             }"
             type="text"
             role="combobox"

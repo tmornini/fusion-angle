@@ -13,17 +13,13 @@ import {
     iconBriefcase,
     iconStar,
     iconCheckCircle2,
-    iconShield,
-    iconTrash,
 } from '../icons.ts';
 import {
-    Person,
-    Role,
-    USER_STATUS_CONFIG,
-    type PersonStatus,
-    type PersonEntity,
-    type Member,
-    isPersonStatus,
+    HumanWorker,
+    WORKER_STATUS_CONFIG,
+    type WorkerStatus,
+    type HumanWorkerEntity,
+    isWorkerStatus,
     jsonArrayField,
 } from '../adapters/index.ts';
 import {
@@ -52,19 +48,19 @@ const DEPARTMENTS: readonly string[] = [
     'Analytics',
 ];
 
-export interface PersonDraftFields {
+export interface HumanWorkerDraftFields {
     firstName: string;
     lastName: string;
     email: string;
     phone: string;
     title: string;
     department: string;
-    status: PersonStatus;
+    status: WorkerStatus;
     bio: string;
     strengths: readonly string[];
 }
 
-export type PersonFieldKey =
+export type HumanWorkerFieldKey =
     | 'firstName'
     | 'lastName'
     | 'email'
@@ -74,39 +70,42 @@ export type PersonFieldKey =
     | 'status'
     | 'bio';
 
-const FIELD_KEYS: ReadonlySet<PersonFieldKey> =
+const FIELD_KEYS:
+    ReadonlySet<HumanWorkerFieldKey> =
     new Set([
         'firstName', 'lastName', 'email',
         'phone', 'title', 'department',
         'status', 'bio',
     ]);
 
-export function isPersonFieldKey(
+export function isHumanWorkerFieldKey(
     s: string | null,
-): s is PersonFieldKey {
+): s is HumanWorkerFieldKey {
     return s !== null
-        && FIELD_KEYS.has(s as PersonFieldKey);
+        && FIELD_KEYS.has(
+            s as HumanWorkerFieldKey,
+        );
 }
 
-export function personDraftFromPerson(
-    person: Person,
-): PersonDraftFields {
+export function humanWorkerDraftFromWorker(
+    worker: HumanWorker,
+): HumanWorkerDraftFields {
     return {
-        firstName: person.firstNameText(),
-        lastName: person.lastNameText(),
-        email: person.emailAddress(),
-        phone: person.phoneNumber(),
-        title: person.titleLabel(),
-        department: person.departmentLabel(),
-        status: person.statusValue(),
-        bio: person.bioText(),
-        strengths: person.parsedStrengths(),
+        firstName: worker.firstNameText(),
+        lastName: worker.lastNameText(),
+        email: worker.emailAddress(),
+        phone: worker.phoneNumber(),
+        title: worker.titleLabel(),
+        department: worker.departmentLabel(),
+        status: worker.statusValue(),
+        bio: worker.bioText(),
+        strengths: worker.parsedStrengths(),
     };
 }
 
-export function personPatchFromDraft(
-    draft: PersonDraftFields,
-): Pick<PersonEntity,
+export function humanWorkerPatchFromDraft(
+    draft: HumanWorkerDraftFields,
+): Pick<HumanWorkerEntity,
     | 'first_name' | 'last_name' | 'email'
     | 'phone' | 'title' | 'department'
     | 'status' | 'bio' | 'strengths'> {
@@ -129,12 +128,12 @@ function buildShell(
     container: HTMLElement,
 ): void {
     setHtml(container, html`
-<div class="person-detail-host">
-    <div class="person-detail-wrap">
+<div class="worker-detail-host">
+    <div class="worker-detail-wrap">
         <div class="${
             'flex items-center gap-2'
             + ' text-sm text-muted mb-4'
-            + ' person-breadcrumb-slot'
+            + ' worker-breadcrumb-slot'
         }"></div>
         <div class="${
             'flex items-start'
@@ -147,24 +146,21 @@ function buildShell(
                     class="${
                         'btn btn-ghost btn-icon'
                     }"
-                    id="person-back-btn"
-                    data-person-action="back"
+                    id="worker-back-btn"
+                    data-worker-action="back"
                     aria-label="Back">
                     ${iconArrowLeft(20, '')}
                 </button>
-                <div class="person-title-slot">
+                <div class="worker-title-slot">
                 </div>
             </div>
             <div class="${
                 'flex items-center gap-2'
-                + ' person-actions-slot'
+                + ' worker-actions-slot'
             }"></div>
         </div>
         <div class="${
-            'stack-lg person-cards-slot'
-        }"></div>
-        <div class="${
-            'person-roles-slot mt-6'
+            'stack-lg worker-cards-slot'
         }"></div>
     </div>
 </div>`);
@@ -182,9 +178,9 @@ function buildBreadcrumb(
     fullName: string,
 ): SafeHtml {
     return html`
-        <a href="../people/index.html"
+        <a href="../workers/index.html"
             class="hover-link">
-            People
+            Workers
         </a>
         <span>/</span>
         <span>${fullName}</span>`;
@@ -194,7 +190,7 @@ function buildAvatar(
     initialsStr: string,
 ): SafeHtml {
     return html`
-        <div class="person-avatar">
+        <div class="worker-avatar">
             <span class="${
                 'text-3xl font-bold'
                 + ' text-primary'
@@ -203,7 +199,7 @@ function buildAvatar(
 }
 
 function buildReadonlyTitleSection(
-    person: Person,
+    worker: HumanWorker,
 ): SafeHtml {
     return html`
         <div class="${
@@ -215,26 +211,26 @@ function buildReadonlyTitleSection(
                 + ' font-display'
                 + ' font-bold'
             }">
-                ${person.fullName()}
+                ${worker.fullName()}
             </h1>
             <span class="${
                 'badge '
-                + person.statusClassName()
+                + worker.statusClassName()
                 + ' text-xs'
             }">
-                ${person.statusLabel()}
+                ${worker.statusLabel()}
             </span>
         </div>
         <p class="text-sm text-muted">
-            ${person.titleLabel()}
+            ${worker.titleLabel()}
             •
-            ${person.departmentLabel()}
+            ${worker.departmentLabel()}
         </p>`;
 }
 
 function buildEditableTitleSection(
-    person: Person,
-    draft: PersonDraftFields,
+    worker: HumanWorker,
+    draft: HumanWorkerDraftFields,
 ): SafeHtml {
     return html`
         <div class="${
@@ -246,14 +242,14 @@ function buildEditableTitleSection(
                 + ' font-display'
                 + ' font-bold'
             }">
-                ${person.fullName()}
+                ${worker.fullName()}
             </h1>
             <span class="${
                 'badge '
-                + person.statusClassName()
+                + worker.statusClassName()
                 + ' text-xs'
             }">
-                ${person.statusLabel()}
+                ${worker.statusLabel()}
             </span>
         </div>
         <p class="text-sm text-muted">
@@ -283,7 +279,7 @@ function buildReadonlyField(
 
 function buildEditableField(
     id: string,
-    field: PersonFieldKey,
+    field: HumanWorkerFieldKey,
     label: string,
     value: string,
     inputType: string,
@@ -300,7 +296,7 @@ function buildEditableField(
             <input class="input"
                 id="${id}"
                 type="${inputType}"
-                data-person-field="${field}"
+                data-worker-field="${field}"
                 value="${value}" />
         </div>`;
 }
@@ -312,11 +308,11 @@ function buildEditableDepartment(
         <div>
             <label class="${
                 'label mb-2 block'
-            }" for="person-department"
+            }" for="worker-department"
             >Department</label>
             <select class="input"
-                id="person-department"
-                data-person-field="department"
+                id="worker-department"
+                data-worker-field="department"
             >${DEPARTMENTS.map(d =>
                 html`<option
                     value="${d}"
@@ -331,22 +327,22 @@ function buildEditableDepartment(
 }
 
 function buildEditableStatus(
-    value: PersonStatus,
+    value: WorkerStatus,
 ): SafeHtml {
     const options = (
         Object.keys(
-            USER_STATUS_CONFIG,
-        ) as PersonStatus[]
-    ).filter(isPersonStatus);
+            WORKER_STATUS_CONFIG,
+        ) as WorkerStatus[]
+    ).filter(isWorkerStatus);
     return html`
         <div>
             <label class="${
                 'label mb-2 block'
-            }" for="person-status"
+            }" for="worker-status"
             >Status</label>
             <select class="input"
-                id="person-status"
-                data-person-field="status"
+                id="worker-status"
+                data-worker-field="status"
             >${options.map(s =>
                 html`<option
                     value="${s}"
@@ -356,7 +352,7 @@ function buildEditableStatus(
                             : '',
                     )}
                 >${
-                    USER_STATUS_CONFIG[s].label
+                    WORKER_STATUS_CONFIG[s].label
                 }</option>`)
             }</select>
         </div>`;
@@ -383,11 +379,11 @@ function buildEditableBio(
         <div>
             <label class="${
                 'label mb-2 block'
-            }" for="person-bio">Bio</label>
+            }" for="worker-bio">Bio</label>
             <textarea class="textarea"
                 rows="3"
-                id="person-bio"
-                data-person-field="bio"
+                id="worker-bio"
+                data-worker-field="bio"
             >${value}</textarea>
         </div>`;
 }
@@ -406,25 +402,25 @@ function buildPersonalInfoCard(
 }
 
 function buildReadonlyPersonalInfoBody(
-    person: Person,
+    worker: HumanWorker,
 ): SafeHtml {
     return html`
         <div class="${
             'flex items-start gap-6 mb-6'
         }">
             ${buildAvatar(
-                initials(person.fullName()),
+                initials(worker.fullName()),
             )}
             <div class="${
                 'grid grid-cols-2 gap-4 flex-1'
             }">
                 ${buildReadonlyField(
                     'First Name',
-                    person.firstNameText(),
+                    worker.firstNameText(),
                 )}
                 ${buildReadonlyField(
                     'Last Name',
-                    person.lastNameText(),
+                    worker.lastNameText(),
                 )}
             </div>
         </div>
@@ -433,12 +429,12 @@ function buildReadonlyPersonalInfoBody(
         }">
             ${buildReadonlyField(
                 'Email',
-                person.emailAddress(),
+                worker.emailAddress(),
                 iconMail(16, ''),
             )}
             ${buildReadonlyField(
                 'Phone',
-                person.phoneNumber(),
+                worker.phoneNumber(),
                 iconPhone(16, ''),
             )}
         </div>
@@ -447,40 +443,40 @@ function buildReadonlyPersonalInfoBody(
         }">
             ${buildReadonlyField(
                 'Title',
-                person.titleLabel(),
+                worker.titleLabel(),
                 iconBriefcase(16, ''),
             )}
             ${buildReadonlyField(
                 'Department',
-                person.departmentLabel(),
+                worker.departmentLabel(),
             )}
         </div>
-        ${buildReadonlyBio(person.bioText())}`;
+        ${buildReadonlyBio(worker.bioText())}`;
 }
 
 function buildEditablePersonalInfoBody(
-    person: Person,
-    draft: PersonDraftFields,
+    worker: HumanWorker,
+    draft: HumanWorkerDraftFields,
 ): SafeHtml {
     return html`
         <div class="${
             'flex items-start gap-6 mb-6'
         }">
             ${buildAvatar(
-                initials(person.fullName()),
+                initials(worker.fullName()),
             )}
             <div class="${
                 'grid grid-cols-2 gap-4 flex-1'
             }">
                 ${buildEditableField(
-                    'person-first-name',
+                    'worker-first-name',
                     'firstName',
                     'First Name',
                     draft.firstName,
                     'text',
                 )}
                 ${buildEditableField(
-                    'person-last-name',
+                    'worker-last-name',
                     'lastName',
                     'Last Name',
                     draft.lastName,
@@ -492,7 +488,7 @@ function buildEditablePersonalInfoBody(
             'grid grid-cols-2 gap-4 mb-4'
         }">
             ${buildEditableField(
-                'person-email',
+                'worker-email',
                 'email',
                 'Email',
                 draft.email,
@@ -500,7 +496,7 @@ function buildEditablePersonalInfoBody(
                 iconMail(16, ''),
             )}
             ${buildEditableField(
-                'person-phone',
+                'worker-phone',
                 'phone',
                 'Phone',
                 draft.phone,
@@ -512,7 +508,7 @@ function buildEditablePersonalInfoBody(
             'grid grid-cols-2 gap-4 mb-4'
         }">
             ${buildEditableField(
-                'person-title',
+                'worker-title',
                 'title',
                 'Title',
                 draft.title,
@@ -544,7 +540,7 @@ function buildStrengthsCard(
             } Strengths</h3>
             <div class="${
                 'flex flex-wrap gap-2'
-            }" id="person-strengths">
+            }" id="worker-strengths">
                 ${chips}
             </div>
         </div>`;
@@ -593,8 +589,8 @@ function buildReadonlyActionButtons(
             class="${
                 'btn btn-outline gap-2'
             }"
-            id="person-edit-btn"
-            data-person-action="edit">
+            id="worker-edit-btn"
+            data-worker-action="edit">
             ${iconEdit(16, '')} Edit
         </button>`;
 }
@@ -606,172 +602,37 @@ function buildEditableActionButtons(
             class="${
                 'btn btn-outline gap-2'
             }"
-            id="person-cancel-btn"
-            data-person-action="cancel">
+            id="worker-cancel-btn"
+            data-worker-action="cancel">
             ${iconX(16, '')} Cancel
         </button>
         <button
             class="${
                 'btn btn-primary gap-2'
             }"
-            id="person-save-btn"
-            data-person-action="save">
+            id="worker-save-btn"
+            data-worker-action="save">
             ${iconSave(16, '')} Save
         </button>`;
 }
 
 function buildTeamDimensionsCard(
-    person: Person,
+    worker: HumanWorker,
 ): SafeHtml {
     return new WorkingStylesPresenter(
-        person.parsedTeamDimensions(),
+        worker.parsedTeamDimensions(),
     ).buildCard();
 }
 
-export function buildPersonRolesSection(
-    members: readonly Member[],
-    userPrivateRole: Role | null,
-    availableRoles: readonly Role[],
-): SafeHtml {
-    return html`
-<section class="${
-    'person-roles-card card p-4'
-}">
-    <h2 class="${
-        'text-base font-semibold mb-3 flex'
-        + ' items-center gap-2'
-    }">
-        ${iconShield(16, '')}
-        Roles
-    </h2>
-    ${buildMembershipsList(
-        members, userPrivateRole,
-    )}
-    ${buildAddToRoleSelect(availableRoles)}
-</section>`;
-}
+export class HumanWorkerDetailPresenter {
+    readonly #worker: HumanWorker;
 
-function hasAnyRolesToShow(
-    members: readonly Member[],
-    userPrivateRole: Role | null,
-): boolean {
-    return members.length > 0
-        || userPrivateRole !== null;
-}
-
-function buildMembershipsList(
-    members: readonly Member[],
-    userPrivateRole: Role | null,
-): SafeHtml {
-    if (!hasAnyRolesToShow(members, userPrivateRole)) {
-        return html`<p class="${
-            'text-sm text-muted mb-3'
-        }">
-            Not a member of any role yet.
-        </p>`;
-    }
-    return html`<ul class="${
-        'stack-sm mb-3'
-    }">
-        ${members.map(buildMembershipRow)}
-        ${userPrivateRole === null
-            ? html``
-            : buildUserPrivateRow(
-                userPrivateRole,
-            )}
-    </ul>`;
-}
-
-function buildMembershipRow(
-    m: Member,
-): SafeHtml {
-    return html`<li class="${
-        'flex items-center'
-        + ' justify-between gap-2'
-        + ' role-membership-row'
-    }">
-        <span class="${
-            'inline-flex items-center'
-            + ' gap-2'
-        }">${m.role.nameText()}</span>
-        <button class="${
-            'btn btn-ghost btn-icon btn-xs'
-        }"
-            aria-label="${
-                'Remove from '
-                + m.role.nameText()
-            }"
-            data-role-action="remove"
-            data-membership-id="${
-                m.membershipId
-            }">
-            ${iconTrash(14, '')}
-        </button>
-    </li>`;
-}
-
-function buildUserPrivateRow(
-    role: Role,
-): SafeHtml {
-    return html`<li class="${
-        'flex items-center'
-        + ' justify-between gap-2'
-        + ' role-membership-row'
-    }"
-        data-role-private="user">
-        <span class="${
-            'inline-flex items-center'
-            + ' gap-2'
-        }">
-            ${role.nameText()}
-            <span class="${
-                'text-xs text-muted'
-            }">(your private role)</span>
-        </span>
-    </li>`;
-}
-
-function buildAddToRoleSelect(
-    availableRoles: readonly Role[],
-): SafeHtml {
-    if (availableRoles.length === 0) {
-        return html``;
-    }
-    return html`<div class="${
-        'flex items-center gap-2'
-    }">
-        <select id="person-add-role-select"
-            class="${
-                'input input-narrow flex-1'
-            }"
-            aria-label="${
-                'Add this person to a role'
-            }">
-            ${availableRoles.map(
-                r => html`<option
-                    value="${r.idForLink()}">
-                    ${r.nameText()}
-                </option>`,
-            )}
-        </select>
-        <button class="${
-            'btn btn-secondary btn-sm'
-        }"
-            data-role-action="add">
-            Add
-        </button>
-    </div>`;
-}
-
-export class PersonDetailPresenter {
-    readonly #person: Person;
-
-    constructor(person: Person) {
-        this.#person = person;
+    constructor(worker: HumanWorker) {
+        this.#worker = worker;
     }
 
     idForLink(): string {
-        return this.#person.idForLink();
+        return this.#worker.idForLink();
     }
 
     renderShell(
@@ -786,38 +647,38 @@ export class PersonDetailPresenter {
     ): void {
         mutateSlot(
             container,
-            '.person-breadcrumb-slot',
+            '.worker-breadcrumb-slot',
             buildBreadcrumb(
-                this.#person.fullName(),
+                this.#worker.fullName(),
             ),
         );
         mutateSlot(
             container,
-            '.person-title-slot',
+            '.worker-title-slot',
             buildReadonlyTitleSection(
-                this.#person,
+                this.#worker,
             ),
         );
         mutateSlot(
             container,
-            '.person-actions-slot',
+            '.worker-actions-slot',
             buildReadonlyActionButtons(),
         );
         mutateSlot(
             container,
-            '.person-cards-slot',
+            '.worker-cards-slot',
             html`
                 ${buildPersonalInfoCard(
                     buildReadonlyPersonalInfoBody(
-                        this.#person,
+                        this.#worker,
                     ),
                 )}
                 ${buildTeamDimensionsCard(
-                    this.#person,
+                    this.#worker,
                 )}
                 ${buildStrengthsCard(
                     buildSelectedStrengthChips(
-                        this.#person
+                        this.#worker
                             .parsedStrengths(),
                     ),
                 )}`,
@@ -825,23 +686,23 @@ export class PersonDetailPresenter {
     }
 }
 
-export class PersonDetailEditPresenter {
-    readonly #person: Person;
-    readonly #draft: PersonDraftFields;
+export class HumanWorkerDetailEditPresenter {
+    readonly #worker: HumanWorker;
+    readonly #draft: HumanWorkerDraftFields;
 
     constructor(
-        person: Person,
-        draft: PersonDraftFields,
+        worker: HumanWorker,
+        draft: HumanWorkerDraftFields,
     ) {
-        this.#person = person;
+        this.#worker = worker;
         this.#draft = draft;
     }
 
     idForLink(): string {
-        return this.#person.idForLink();
+        return this.#worker.idForLink();
     }
 
-    draft(): PersonDraftFields {
+    draft(): HumanWorkerDraftFields {
         return this.#draft;
     }
 
@@ -857,35 +718,35 @@ export class PersonDetailEditPresenter {
     ): void {
         mutateSlot(
             container,
-            '.person-breadcrumb-slot',
+            '.worker-breadcrumb-slot',
             buildBreadcrumb(
-                this.#person.fullName(),
+                this.#worker.fullName(),
             ),
         );
         mutateSlot(
             container,
-            '.person-title-slot',
+            '.worker-title-slot',
             buildEditableTitleSection(
-                this.#person, this.#draft,
+                this.#worker, this.#draft,
             ),
         );
         mutateSlot(
             container,
-            '.person-actions-slot',
+            '.worker-actions-slot',
             buildEditableActionButtons(),
         );
         mutateSlot(
             container,
-            '.person-cards-slot',
+            '.worker-cards-slot',
             html`
                 ${buildPersonalInfoCard(
                     buildEditablePersonalInfoBody(
-                        this.#person,
+                        this.#worker,
                         this.#draft,
                     ),
                 )}
                 ${buildTeamDimensionsCard(
-                    this.#person,
+                    this.#worker,
                 )}
                 ${buildStrengthsCard(
                     buildEditableStrengthChips(

@@ -21,7 +21,7 @@ export type ConversionField =
     | 'project-name'
     | 'start-date'
     | 'target-end-date'
-    | 'budget'
+    | 'cost'
     | 'impact'
     | 'success-criteria';
 
@@ -30,7 +30,7 @@ const REQUIRED_FIELDS:
     'project-name',
     'start-date',
     'target-end-date',
-    'budget',
+    'cost',
     'impact',
 ];
 
@@ -39,7 +39,7 @@ export const ALL_CONVERSION_FIELDS:
     'project-name',
     'start-date',
     'target-end-date',
-    'budget',
+    'cost',
     'impact',
     'success-criteria',
 ];
@@ -55,7 +55,7 @@ export function buildInitialConversionFields(
         'project-name': idea.titleText(),
         'start-date': '',
         'target-end-date': '',
-        'budget': '',
+        'cost': '',
         'impact': '',
         'success-criteria': '',
     };
@@ -492,7 +492,7 @@ export class IdeaConversionPresenter {
                             )}
                             Cost
                             ${this.#fieldCheck(
-                                'budget',
+                                'cost',
                             )}
                         </label>
                         <div class="${
@@ -513,15 +513,15 @@ export class IdeaConversionPresenter {
                                 }"
                                 id="${
                                     'convert'
-                                    + '-budget'
+                                    + '-cost'
                                 }"
                                 placeholder="${
                                     'Enter'
-                                    + ' budget'
+                                    + ' cost'
                                     + ' amount'
                                 }"
                                 value="${
-                                    fields['budget']
+                                    fields['cost']
                                 }" />
                         </div>
                     </div>

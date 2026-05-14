@@ -12,8 +12,6 @@ import {
     iconCreditCard,
     iconDatabase,
     iconPalette,
-    iconShield,
-    iconBriefcase,
 } from './icons.ts';
 
 export interface PageEntry {
@@ -173,45 +171,26 @@ export const PAGE_REGISTRY: Record<
             'organization billing plan',
         loader: () => import('../organization/index'),
     },
-    people: {
-        title: 'People',
+    workers: {
+        title: 'Workers',
         layout: 'sidebar',
         inSidebarNav: true,
-        sourceDir: 'people',
+        sourceDir: 'workers',
         sourceFile: 'index',
         icon: iconPeople,
-        keywords: 'people invite manage admin',
-        loader: () => import('../people/index'),
+        keywords:
+            'workers humans AI manage admin',
+        loader: () => import('../workers/index'),
     },
-    'people-detail': {
-        title: 'Person',
+    'worker-detail': {
+        title: 'Worker',
         layout: 'sidebar',
-        sidebarKey: 'people',
-        sourceDir: 'people',
+        sidebarKey: 'workers',
+        sourceDir: 'workers',
         sourceFile: 'detail',
         icon: iconPerson,
         searchable: false,
-        loader: () => import('../people/detail'),
-    },
-    roles: {
-        title: 'Roles',
-        layout: 'sidebar',
-        inSidebarNav: true,
-        sourceDir: 'roles',
-        sourceFile: 'index',
-        icon: iconShield,
-        keywords: 'roles teams membership',
-        loader: () => import('../roles/index'),
-    },
-    crews: {
-        title: 'Crews',
-        layout: 'sidebar',
-        inSidebarNav: true,
-        sourceDir: 'crews',
-        sourceFile: 'index',
-        icon: iconBriefcase,
-        keywords: 'crews collaborate team',
-        loader: () => import('../crews/index'),
+        loader: () => import('../workers/detail'),
     },
     billing: {
         title: 'Billing',

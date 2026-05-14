@@ -11,10 +11,6 @@ import {
 } from '../../../api/types.ts';
 import type { RequestContext } from './shared.ts';
 import {
-    getPersonMap,
-    personName,
-} from './people.ts';
-import {
     createSubscriptionChannel,
 } from '../channels.ts';
 

@@ -16,12 +16,11 @@ import {
     perimeterPoint, whichEdge, controlOffset,
 } from './flow-graph.ts';
 import { findCycleEdgeIds } from './flow-cycle-edges.ts';
-import { iconAlertTriangle } from './icons.ts';
-import { formatMinAscending } from './duration-units.ts';
 import {
-    START_NODE_DEFAULT_NAME,
-    END_NODE_DEFAULT_NAME,
-} from '../../api/types.ts';
+    iconAlertTriangle,
+    iconNoEntry,
+} from './icons.ts';
+import { formatMinAscending } from './duration-units.ts';
 import type {
     FlowStatsModel, NodeStat,
 } from './flow-stats-aggregate.ts';
@@ -211,17 +210,12 @@ function buildNode(
 ): string {
     const halfW = NODE_WIDTH / 2;
 
-    // Display name: special nodes use canonical labels.
-    const displayName = n.isStart
-        ? START_NODE_DEFAULT_NAME
-        : n.isComplete
-        ? END_NODE_DEFAULT_NAME
-        : n.displayName;
+    const displayName = n.displayName;
     const nameEsc = escapeForHtml(displayName);
 
     // Face stat: avg sojourn for regular nodes with
     // data; em-dash for start/complete/no-data.
-    const isSpecial = n.isStart || n.isComplete;
+    const isSpecial = n.isCreate || n.isArchive;
     const face = (!isSpecial && n.avgSeconds !== null)
         ? formatMinAscending(n.avgSeconds)
         : '—';
@@ -248,16 +242,37 @@ function buildNode(
         + ' y="' + String(NODE_FACE_Y) + '">'
         + faceEsc + '</text>';
 
-    if (n.hasHazard) {
+    if (n.workerHazard === 'warning') {
         inner += '<g'
-            + ' class="flow-stats-node-hazard"'
+            + ' class="flow-stats-node-warning"'
             + ' transform="translate('
             + String(HAZARD_X) + ', '
             + String(HAZARD_Y) + ')">'
             + '<title>'
-            + 'No assignment for this node.'
+            + 'Single worker assigned (no backup)'
             + '</title>'
             + iconAlertTriangle(HAZARD_ICON_SIZE, '')
+                .toString()
+            + '</g>';
+    } else if (n.workerHazard === 'danger') {
+        // Dead-end is the only danger variant the
+        // stats canvas can self-disambiguate
+        // (NodeStat carries outgoingEdgeIds but
+        // not workerIds); zero-workers falls
+        // through to the same generic title.
+        const dangerTitle =
+            n.outgoingEdgeIds.length === 0
+                ? 'Dead end (no outgoing edges)'
+                : 'Workers required';
+        inner += '<g'
+            + ' class="flow-stats-node-danger"'
+            + ' transform="translate('
+            + String(HAZARD_X) + ', '
+            + String(HAZARD_Y) + ')">'
+            + '<title>'
+            + dangerTitle
+            + '</title>'
+            + iconNoEntry(HAZARD_ICON_SIZE, '')
                 .toString()
             + '</g>';
     }
@@ -274,9 +289,9 @@ function buildNode(
     const onPathAttr = onPath ? ' data-on-path="true"' : '';
 
     // data-special only on start/complete nodes.
-    const specialAttr = n.isStart
+    const specialAttr = n.isCreate
         ? ' data-special="start"'
-        : n.isComplete
+        : n.isArchive
         ? ' data-special="archive"'
         : '';
 

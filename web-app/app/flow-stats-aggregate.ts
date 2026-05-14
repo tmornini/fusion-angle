@@ -7,9 +7,9 @@ import type {
 } from '../../api/types.ts';
 import {
     MS_PER_DAY,
-    isUserPrivateRoleId,
-    personIdFromUserPrivateRoleId,
 } from '../../api/types.ts';
+import { shouldShowWorkerHazard } from './flow-graph.ts';
+import type { WorkerHazardLevel } from './flow-graph.ts';
 
 export interface FlowStatsInput {
     readonly nodes: readonly GraphNode[];
@@ -20,25 +20,15 @@ export interface FlowStatsInput {
         readonly WorkOrderTransitionEntity[];
     readonly nowMs: number;
     readonly windowDays: number;
-    readonly roleMemberSetByRoleId:
-        ReadonlyMap<Id, ReadonlySet<Id>>;
-    readonly crewMemberSetByCrewId:
-        ReadonlyMap<Id, ReadonlySet<Id>>;
-    readonly personNameById:
-        ReadonlyMap<Id, string>;
-    readonly modelNameById:
-        ReadonlyMap<Id, string>;
-    readonly roleNameById:
-        ReadonlyMap<Id, string>;
-    readonly crewNameById:
+    readonly workerNameById:
         ReadonlyMap<Id, string>;
 }
 
 export interface NodeStat {
     readonly id: string;
     readonly displayName: string;
-    readonly isStart: boolean;
-    readonly isComplete: boolean;
+    readonly isCreate: boolean;
+    readonly isArchive: boolean;
     readonly positionX: number;
     readonly positionY: number;
     readonly outgoingEdgeIds: readonly string[];
@@ -60,9 +50,8 @@ export interface NodeStat {
         readonly sharePct: number | null;
         readonly inCurrentClan: boolean;
     } | null;
-    readonly modelName: string | null;
     readonly assignmentLabel: string;
-    readonly hasHazard: boolean;
+    readonly workerHazard: WorkerHazardLevel | null;
     readonly branchSplit: readonly {
         readonly edgeId: string;
         readonly label: string;
@@ -102,8 +91,8 @@ function emptyNodeStat(n: GraphNode): NodeStat {
     return {
         id: n.id,
         displayName: n.name,
-        isStart: n.isStart,
-        isComplete: n.isComplete,
+        isCreate: n.isCreate,
+        isArchive: n.isArchive,
         positionX: n.positionX,
         positionY: n.positionY,
         outgoingEdgeIds: [],
@@ -120,9 +109,8 @@ function emptyNodeStat(n: GraphNode): NodeStat {
         clanSize: 0,
         activeProducerCount: 0,
         topProducer: null,
-        modelName: null,
         assignmentLabel: 'Unassigned',
-        hasHazard: false,
+        workerHazard: null,
         branchSplit: [],
     };
 }
@@ -185,14 +173,14 @@ function reconstructRuns(
             const exitMs = nextT
                 ? Date.parse(nextT.transitioned_at)
                 : input.nowMs;
-            if (!node.isStart && !node.isComplete) {
+            if (!node.isCreate && !node.isArchive) {
                 sojourns.push({
                     nodeId: node.id,
                     enterMs, exitMs,
                     personId: t.person_id,
                 });
             }
-            if (node.isComplete) completed = true;
+            if (node.isArchive) completed = true;
         }
         runs.push({
             workOrderId: woId,
@@ -205,69 +193,27 @@ function reconstructRuns(
     return { runs, droppedNodeIds: dropped };
 }
 
-// Resolves the clan (member set) and display label
-// for a node based on its NodeAssignment variant.
-// User-private roles short-circuit to the one person
-// encoded in the role id — same rule as workbox-inbox.
+// A node's clan IS its workerIds directly.
+// The label lists the workers' display names,
+// or "Unassigned" if the list is empty.
 function resolveClan(
     n: GraphNode,
     input: FlowStatsInput,
 ): { ids: ReadonlySet<string>;
-     label: string;
-     modelName: string | null } {
-    const c = n.crew;
-    switch (c.kind) {
-        case 'unassigned':
-            return {
-                ids: new Set(),
-                label: 'Unassigned',
-                modelName: null,
-            };
-        case 'role': {
-            if (isUserPrivateRoleId(c.roleId)) {
-                const pid =
-                    personIdFromUserPrivateRoleId(
-                        c.roleId,
-                    );
-                return {
-                    ids: new Set([pid]),
-                    label: 'Role: '
-                        + (input.personNameById
-                               .get(pid) ?? '—'),
-                    modelName: null,
-                };
-            }
-            return {
-                ids: input.roleMemberSetByRoleId
-                         .get(c.roleId)
-                     ?? new Set(),
-                label: 'Role: '
-                    + (input.roleNameById
-                           .get(c.roleId) ?? '—'),
-                modelName: null,
-            };
-        }
-        case 'crew':
-            return {
-                ids: input.crewMemberSetByCrewId
-                         .get(c.crewId)
-                     ?? new Set(),
-                label: 'Crew: '
-                    + (input.crewNameById
-                           .get(c.crewId) ?? '—'),
-                modelName: null,
-            };
-        case 'model': {
-            const mn =
-                input.modelNameById.get(c.modelId)
-                ?? null;
-            return {
-                ids: new Set(),
-                label: 'Model: ' + (mn ?? '—'),
-                modelName: mn,
-            };
-        }
+     label: string } {
+    if (n.workerIds.length === 0) {
+        return {
+            ids: new Set(),
+            label: 'Unassigned',
+        };
     }
+    const names = n.workerIds.map(id =>
+        input.workerNameById.get(id) ?? id,
+    );
+    return {
+        ids: new Set(n.workerIds),
+        label: names.join(', '),
+    };
 }
 
 export function buildFlowStats(
@@ -353,7 +299,7 @@ export function buildFlowStats(
                     run.pathNodeIds.length - 1
                 ]!;
             const lastNode = nodeById.get(last);
-            if (lastNode && !lastNode.isComplete) {
+            if (lastNode && !lastNode.isArchive) {
                 currentlyAt.set(
                     last,
                     (currentlyAt.get(last) ?? 0) + 1,
@@ -397,8 +343,8 @@ export function buildFlowStats(
         const sec = nodeSec.get(n.id) ?? 0;
         const heatPct =
             flowSec > 0
-            && !n.isStart
-            && !n.isComplete
+            && !n.isCreate
+            && !n.isArchive
                 ? (sec / flowSec) * 100
                 : 0;
         const heatT =
@@ -426,10 +372,10 @@ export function buildFlowStats(
                     if (b[1] !== a[1])
                         return b[1] - a[1];
                     const na =
-                        input.personNameById.get(a[0])
+                        input.workerNameById.get(a[0])
                         ?? a[0];
                     const nb =
-                        input.personNameById.get(b[0])
+                        input.workerNameById.get(b[0])
                         ?? b[0];
                     if (na !== nb)
                         return na.localeCompare(nb);
@@ -438,7 +384,7 @@ export function buildFlowStats(
             const [pid, count] = sorted[0]!;
             topProducer = {
                 name:
-                    input.personNameById.get(pid)
+                    input.workerNameById.get(pid)
                     ?? pid,
                 sharePct: Math.round(
                     (count / totalOut) * 100,
@@ -488,15 +434,12 @@ export function buildFlowStats(
             })).sort((a, b) => b.pct - a.pct);
         }
 
-        // Unassigned, zero-member-role, and
-        // zero-member-crew nodes are hazardous —
-        // but never special nodes (start/complete),
-        // user-private roles (clan always ≥ 1),
-        // or model-assigned nodes.
-        const hasHazard =
-            !n.isStart && !n.isComplete
-            && n.crew.kind !== 'model'
-            && clan.ids.size === 0;
+        // Two-tier hazard rendering — see
+        // shouldShowWorkerHazard in flow-graph.ts.
+        // Shared with the designer canvas so both
+        // surfaces escalate identically.
+        const workerHazard =
+            shouldShowWorkerHazard(n, input.edges);
 
         return { ...emptyNodeStat(n),
             heatPct, heatT,
@@ -532,11 +475,10 @@ export function buildFlowStats(
             clanSize:            clan.ids.size,
             activeProducerCount: outMap.size,
             topProducer,
-            modelName:       clan.modelName,
             assignmentLabel: clan.label,
             outgoingEdgeIds: outEdges.map(e => e.id),
             branchSplit,
-            hasHazard,
+            workerHazard,
         };
     });
 

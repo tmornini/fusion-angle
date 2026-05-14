@@ -3,7 +3,8 @@ import { strict as assert } from 'node:assert';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import { populateMockData } from '../api/mock-data.ts';
 import {
-    validatePersonEntity,
+    validateHumanWorkerEntity,
+    validateAIWorkerEntity,
     validateIdeaEntity,
     validateProjectEntity,
     validateActivityEntity,
@@ -16,12 +17,6 @@ import {
     validateFlowWorkOrderEntity,
     validateWorkOrderTransitionEntity,
     validateTransitionFieldValueEntity,
-    validateRoleEntity,
-    validateRoleMembershipEntity,
-    validateCrewEntity,
-    validateCrewRoleMembershipEntity,
-    validateModelEntity,
-    validateRoleModelMembershipEntity,
 } from '../api/validators.ts';
 
 // Entity validators take Omit<T, 'id'> and reject an extra
@@ -47,8 +42,10 @@ const TABLES: ReadonlyArray<[
     (db: MemoryDbAdapter) => Promise<{ id: string }[]>,
     Validator,
 ]> = [
-    ['people', d => d.people.getAll(),
-        validatePersonEntity],
+    ['workers', d => d.workers.getAll(),
+        validateHumanWorkerEntity],
+    ['aiWorkers', d => d.aiWorkers.getAll(),
+        validateAIWorkerEntity],
     ['ideas', d => d.ideas.getAll(),
         validateIdeaEntity],
     ['projects', d => d.projects.getAll(),
@@ -76,21 +73,6 @@ const TABLES: ReadonlyArray<[
     ['transitionFieldValues',
         d => d.transitionFieldValues.getAll(),
         validateTransitionFieldValueEntity],
-    ['roles', d => d.roles.getAll(),
-        validateRoleEntity],
-    ['roleMemberships',
-        d => d.roleMemberships.getAll(),
-        validateRoleMembershipEntity],
-    ['crews', d => d.crews.getAll(),
-        validateCrewEntity],
-    ['crewRoleMemberships',
-        d => d.crewRoleMemberships.getAll(),
-        validateCrewRoleMembershipEntity],
-    ['models', d => d.models.getAll(),
-        validateModelEntity],
-    ['roleModelMemberships',
-        d => d.roleModelMemberships.getAll(),
-        validateRoleModelMembershipEntity],
 ];
 
 for (const [name, getAll, validate] of TABLES) {

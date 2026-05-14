@@ -185,7 +185,7 @@ export class ProjectPresenter {
         const endDateMs = new Date(
             project.targetEndDateValue(),
         ).getTime();
-        const timeBudget =
+        const timeBaseline =
             isNaN(startDateMs) || isNaN(endDateMs)
                 ? 0
                 : Math.max(0, Math.ceil(
@@ -198,13 +198,13 @@ export class ProjectPresenter {
                 (Date.now() - startDateMs)
                 / MS_PER_DAY,
             ));
-        const costBudget =
+        const costBaseline =
             project.estimatedCostAmount()
             / COST_DIVISOR;
         const costActual =
             project.actualCostAmount()
             / COST_DIVISOR;
-        const impactBudget =
+        const impactBaseline =
             project.estimatedImpactScore();
         const impactActual =
             project.actualImpactScore();
@@ -227,10 +227,10 @@ export class ProjectPresenter {
                 }">Time</p>
                 <p class="${
                     'text-sm font-medium'
-                }">${timeBudget
+                }">${timeBaseline
                     ? html`${timeElapsed}d <span
                         class="${metricLabelClasses}"
-                        >/ ${timeBudget}d</span>`
+                        >/ ${timeBaseline}d</span>`
                     : html`&mdash;`
                 }</p>
             </div>
@@ -249,12 +249,12 @@ export class ProjectPresenter {
                 }">Cost</p>
                 <p class="${
                     'text-sm font-medium'
-                }">${costBudget
+                }">${costBaseline
                     ? html`${'$' + costActual}k
                         <span class="${
                             metricLabelClasses
                         }">/ ${'$'
-                        + costBudget}k</span>`
+                        + costBaseline}k</span>`
                     : html`&mdash;`
                 }</p>
             </div>
@@ -273,10 +273,10 @@ export class ProjectPresenter {
                 }">Impact</p>
                 <p class="${
                     'text-sm font-medium'
-                }">${impactBudget
+                }">${impactBaseline
                     ? html`${impactActual} <span
                         class="${metricLabelClasses}"
-                        >/ ${impactBudget}</span>`
+                        >/ ${impactBaseline}</span>`
                     : html`&mdash;`
                 }</p>
             </div>

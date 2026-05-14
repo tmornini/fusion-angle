@@ -98,11 +98,11 @@ test(
         const adapter =
             await createLocalStorageAdapter();
         const json = JSON.stringify({
-            people: { not: 'an array' },
+            workers: { not: 'an array' },
         });
         await assert.rejects(
             () => adapter.importSnapshot(json),
-            /table "people" is not an array/,
+            /table "workers" is not an array/,
         );
     },
 );
@@ -114,11 +114,11 @@ test(
         const adapter =
             await createLocalStorageAdapter();
         const json = JSON.stringify({
-            people: ['not an object'],
+            workers: ['not an object'],
         });
         await assert.rejects(
             () => adapter.importSnapshot(json),
-            /row 0 in table "people" is not an object/,
+            /row 0 in table "workers" is not an object/,
         );
     },
 );
@@ -130,11 +130,11 @@ test(
         const adapter =
             await createLocalStorageAdapter();
         const json = JSON.stringify({
-            people: [null],
+            workers: [null],
         });
         await assert.rejects(
             () => adapter.importSnapshot(json),
-            /row 0 in table "people" is not an object/,
+            /row 0 in table "workers" is not an object/,
         );
     },
 );
@@ -146,11 +146,11 @@ test(
         const adapter =
             await createLocalStorageAdapter();
         const json = JSON.stringify({
-            people: [['not', 'an', 'object']],
+            workers: [['not', 'an', 'object']],
         });
         await assert.rejects(
             () => adapter.importSnapshot(json),
-            /row 0 in table "people" is not an object/,
+            /row 0 in table "workers" is not an object/,
         );
     },
 );
@@ -162,7 +162,7 @@ test(
         const adapter =
             await createLocalStorageAdapter();
         const json = JSON.stringify({
-            people: [
+            workers: [
                 {
                     id: 'u1',
                     first_name: 'Alice',
@@ -181,7 +181,7 @@ test(
         });
         await assert.rejects(
             () => adapter.importSnapshot(json),
-            /snapshot\.people\[0\]/,
+            /snapshot\.workers\[0\]/,
         );
     },
 );
@@ -193,7 +193,7 @@ test(
         const adapter =
             await createLocalStorageAdapter();
         const json = JSON.stringify({
-            people: [
+            workers: [
                 {
                     id: 'u1',
                     first_name: 'Alice',
@@ -211,7 +211,7 @@ test(
         });
         await adapter.importSnapshot(json);
         const stored = map.get(
-            KEY_PREFIX + 'people',
+            KEY_PREFIX + 'workers',
         );
         assert.ok(stored, 'users should persist');
     },
@@ -225,7 +225,7 @@ test(
             await createLocalStorageAdapter();
         await adapter.importSnapshot('{}');
         const usersBlob = map.get(
-            KEY_PREFIX + 'people',
+            KEY_PREFIX + 'workers',
         );
         assert.equal(
             usersBlob,
@@ -265,7 +265,7 @@ test(
         const adapter =
             await createLocalStorageAdapter();
         await adapter.createSchema();
-        await adapter.people.put('u1', {
+        await adapter.workers.put('u1', {
             first_name: 'Alice',
             last_name: 'Adams',
             email: 'a@example.com',
@@ -278,13 +278,13 @@ test(
             department: 'Product',
         });
         await adapter.createSchema();
-        const people = await adapter.people.getAll();
+        const workers = await adapter.workers.getAll();
         assert.equal(
-            people.length, 1,
+            workers.length, 1,
             'second createSchema preserves data',
         );
         assert.ok(
-            map.get(KEY_PREFIX + 'people'),
+            map.get(KEY_PREFIX + 'workers'),
         );
     },
 );
@@ -314,7 +314,8 @@ test(
             await adapter.exportSnapshot();
         const parsed = JSON.parse(json);
         const expected = [
-            'people', 'ideas', 'projects',
+            'workers', 'ai_workers',
+            'ideas', 'projects',
             'activities',
             'flows', 'flow_versions',
             'project_flows', 'work_orders',

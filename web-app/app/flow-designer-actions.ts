@@ -7,7 +7,7 @@ import {
     DEFAULT_NODE_DESCRIPTION,
     DEFAULT_EDGE_DESCRIPTION,
     DEFAULT_NODE_FIELDS,
-    DEFAULT_NODE_ASSIGNMENT,
+    DEFAULT_NODE_WORKER_IDS,
 } from '../../api/types.ts';
 import {
     edgeWaypointKey,
@@ -123,9 +123,9 @@ export function applyAddNode(
                 DEFAULT_NODE_DESCRIPTION,
             positionX,
             positionY,
-            isStart: false,
-            isComplete: false,
-            crew: DEFAULT_NODE_ASSIGNMENT,
+            isCreate: false,
+            isArchive: false,
+            workerIds: [...DEFAULT_NODE_WORKER_IDS],
             fields: [...DEFAULT_NODE_FIELDS],
         },
     ];

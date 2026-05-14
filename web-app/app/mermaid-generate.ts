@@ -23,11 +23,11 @@ function buildNodeLine(
 ): string {
     const id = sanitizeId(node.id);
     const label = quoteLabel(node.name);
-    if (node.isStart) {
+    if (node.isCreate) {
         return '  ' + id
             + '([' + label + '])';
     }
-    if (node.isComplete) {
+    if (node.isArchive) {
         return '  ' + id
             + '(((' + label + ')))';
     }

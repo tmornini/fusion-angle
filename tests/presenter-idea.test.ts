@@ -699,7 +699,7 @@ test(
         );
         assert.equal(fields['start-date'], '');
         assert.equal(fields['target-end-date'], '');
-        assert.equal(fields['budget'], '');
+        assert.equal(fields['cost'], '');
         assert.equal(fields['impact'], '');
         assert.equal(
             fields['success-criteria'], '',
@@ -728,7 +728,7 @@ test(
         );
         assert.equal(
             conversionFieldIsReady(
-                fields, 'budget',
+                fields, 'cost',
             ),
             false,
         );
@@ -749,7 +749,7 @@ test(
             'project-name': 'P',
             'start-date': '2026-06-01',
             'target-end-date': '2026-09-01',
-            'budget': '50000',
+            'cost': '50000',
             'impact': '80',
             'success-criteria': '',
         };
@@ -801,7 +801,7 @@ test(
             'project-name': 'New project',
             'start-date': '2026-06-01',
             'target-end-date': '2026-09-01',
-            'budget': '50000',
+            'cost': '50000',
             'impact': '80',
             'success-criteria': '',
         };

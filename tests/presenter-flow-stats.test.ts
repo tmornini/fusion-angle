@@ -12,26 +12,28 @@ function model(): FlowStatsModel {
     const node =
         (over: Partial<NodeStat> & { id: string }): NodeStat => ({
             id: over.id, displayName: over.id.toUpperCase(),
-            isStart: false, isComplete: false,
+            isCreate: false, isArchive: false,
             positionX: 0, positionY: 0,
             outgoingEdgeIds: [], heatPct: 0, heatT: 0,
             avgSeconds: null, medianSeconds: null, p90Seconds: null,
             visitsInWindow: 0, distinctWorkOrders: 0,
             currentlyHere: 0, throughputPerWeek: 0, revisitRatePct: 0,
             clanSize: 0, activeProducerCount: 0, topProducer: null,
-            modelName: null, assignmentLabel: 'Unassigned',
-            hasHazard: false, branchSplit: [],
+            assignmentLabel: 'Unassigned',
+            workerHazard: null, branchSplit: [],
             ...over,
         });
     return {
         nodes: [
-            node({ id:'c', displayName:'Create',  isStart:true,
+            node({ id:'c', displayName:'Create',  isCreate:true,
                    positionX:0,   positionY:0 }),
             node({ id:'a', displayName:'A',
                    positionX:200, positionY:0,
                    heatT:0.32, heatPct:32,
-                   avgSeconds: 510, hasHazard: true }),
-            node({ id:'z', displayName:'Archive', isComplete:true,
+                   avgSeconds: 510,
+                   outgoingEdgeIds: ['e2'],
+                   workerHazard: 'danger' }),
+            node({ id:'z', displayName:'Archive', isArchive:true,
                    positionX:400, positionY:0 }),
         ],
         edges: [
@@ -91,12 +93,29 @@ test('regular nodes show avg-sojourn face; special nodes show —',
         /data-node-id="c"[\s\S]*?flow-stats-node-face[^>]*>—</);
 });
 
-test('hazard glyph appears when hasHazard, not otherwise', () => {
+test('danger hazard glyph appears when workerHazard is danger',
+    () => {
     const html = buildStatsGraphSvg(model(), VB, null).toString();
     assert.match(nodeGroup(html, 'a'),
-        /class="flow-stats-node-hazard"/);
+        /class="flow-stats-node-danger"/);
     assert.doesNotMatch(nodeGroup(html, 'c'),
-        /flow-stats-node-hazard/);
+        /flow-stats-node-warning|flow-stats-node-danger/);
+});
+
+test('warning hazard glyph appears when workerHazard is warning',
+    () => {
+    const m = model();
+    const warned: FlowStatsModel = {
+        ...m,
+        nodes: m.nodes.map(n =>
+            n.id === 'a'
+                ? { ...n, workerHazard: 'warning' }
+                : n,
+        ),
+    };
+    const html = buildStatsGraphSvg(warned, VB, null).toString();
+    assert.match(nodeGroup(html, 'a'),
+        /class="flow-stats-node-warning"/);
 });
 
 test('edges carry data-edge-id and no interactive attributes', () => {
@@ -297,8 +316,8 @@ function nodeStat(
         id: over.id,
         displayName:
             over.displayName ?? over.id.toUpperCase(),
-        isStart: over.isStart ?? false,
-        isComplete: over.isComplete ?? false,
+        isCreate: over.isCreate ?? false,
+        isArchive: over.isArchive ?? false,
         positionX: over.positionX ?? 0,
         positionY: over.positionY ?? 0,
         outgoingEdgeIds:
@@ -319,10 +338,9 @@ function nodeStat(
         activeProducerCount:
             over.activeProducerCount ?? 0,
         topProducer: over.topProducer ?? null,
-        modelName: over.modelName ?? null,
         assignmentLabel:
             over.assignmentLabel ?? 'Unassigned',
-        hasHazard: over.hasHazard ?? false,
+        workerHazard: over.workerHazard ?? null,
         branchSplit: over.branchSplit ?? [],
     };
 }
@@ -350,7 +368,7 @@ test('rich card renders all stat blocks for a regular node',
             name: 'Lee', vsClanAvgPct: 140,
             sharePct: 31, inCurrentClan: true,
         },
-        assignmentLabel: 'Crew: Design',
+        assignmentLabel: 'Sarah Chen, Mike OBrien',
         branchSplit: [
             {
                 edgeId: 'e3', label: 'approve',
@@ -380,7 +398,7 @@ test('rich card renders all stat blocks for a regular node',
     assert.match(html, /140%/);
     assert.match(html, /31%/);
     assert.doesNotMatch(html, /not in current clan/);
-    assert.match(html, /Crew:\s*Design/);
+    assert.match(html, /Sarah Chen, Mike OBrien/);
     assert.match(html, /approve\s+81%/);
     assert.match(html, /revise\s+19%/);
 });
@@ -402,22 +420,6 @@ test('top producer not in clan is flagged', () => {
     assert.match(html, /not in current clan/);
 });
 
-test('model node card shows model name, no clan or producer',
-    () => {
-    const p = new FlowStatsPresenter(
-        modelWithPaths(),
-        { x: 0, y: 0, w: 600, h: 200 },
-    );
-    const s = nodeStat({
-        id: 'a', modelName: 'Claude Opus',
-        assignmentLabel: 'Model: Claude Opus',
-    });
-    const html = p.buildCard(s).toString();
-    assert.match(html, /Claude Opus/);
-    assert.doesNotMatch(html, /Clan size/);
-    assert.doesNotMatch(html, /Top producer/);
-});
-
 test('special-node card is lean (no clan/producer/branch)',
     () => {
     const p = new FlowStatsPresenter(
@@ -425,7 +427,7 @@ test('special-node card is lean (no clan/producer/branch)',
         { x: 0, y: 0, w: 600, h: 200 },
     );
     const s = nodeStat({
-        id: 'c', isStart: true,
+        id: 'c', isCreate: true,
         displayName: 'Create',
     });
     const html = p.buildCard(s).toString();

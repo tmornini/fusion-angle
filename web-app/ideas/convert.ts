@@ -169,8 +169,10 @@ export async function init(
             pFill instanceof
             HTMLElement
         ) {
-            pFill.style.width =
-                `${pct}%`;
+            pFill.style.setProperty(
+                '--convert-progress',
+                `${pct}%`,
+            );
         }
         const isReady =
             conversionIsReady(fields);
@@ -312,7 +314,7 @@ export async function init(
             submitSel,
         );
         bindEnterToClick(
-            '#convert-budget', submitSel,
+            '#convert-cost', submitSel,
         );
         bindEnterToClick(
             '#convert-impact', submitSel,
@@ -486,8 +488,8 @@ async function performConversion(
             estimated_duration: 0,
             actual_duration: 0,
             estimated_cost: parseFiniteNumber(
-                'budget',
-                fields['budget'],
+                'cost',
+                fields['cost'],
             ),
             actual_cost: 0,
             estimated_impact: parseFiniteNumber(
@@ -499,8 +501,6 @@ async function performConversion(
             business_context:
                 jsonObjectField({}),
             timeline_label: '',
-            budget_label:
-                fields['budget'],
         },
         { ...ideaEntity, status: 'promoted' },
     );

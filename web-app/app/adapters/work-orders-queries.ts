@@ -1,5 +1,4 @@
 import type {
-    FlowEntity,
     FlowWorkOrderEntity,
     WorkOrderEntity,
     WorkOrderTransitionEntity,
@@ -38,7 +37,7 @@ export interface HistoryFieldValue {
 export interface HistoryEntry {
     fromNodeName: string;
     toNodeName: string;
-    personName: string;
+    workerName: string;
     transitionedAt: string;
     fieldValues: HistoryFieldValue[];
 }
@@ -172,16 +171,3 @@ export async function getWorkOrderClaimRowsByOrder(
     );
 }
 
-export async function getFlowsForCreation(
-    ctx: RequestContext,
-): Promise<{
-    id: string;
-    name: string;
-}[]> {
-    const flows =
-        await ctx.GET<FlowEntity[]>('flows');
-    return flows.map(f => ({
-        id: f.id,
-        name: f.name,
-    }));
-}

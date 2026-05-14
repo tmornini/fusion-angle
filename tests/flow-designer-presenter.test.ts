@@ -123,9 +123,9 @@ const node = (
     description: '',
     positionX: x,
     positionY: y,
-    isStart: false,
-    isComplete: false,
-    crew: { kind: 'unassigned' as const },
+    isCreate: false,
+    isArchive: false,
+    workerIds: [] as string[],
     fields: [],
 });
 
@@ -325,7 +325,7 @@ test(
     },
 );
 
-// Successful-mutation coverage of withNodeAssignment
+// Successful-mutation coverage of withNodeWorkerIds
 // lives in flow-designer-actions.test.ts as a
 // direct applyUpdateNode test. The presenter
 // wrapping triggers #saveFlow which calls
@@ -334,14 +334,14 @@ test(
 // node:test. Same reason no other withNode*
 // mutation test exists in this file.
 //
-// Locked-state coverage of withNodeAssignment is
+// Locked-state coverage of withNodeWorkerIds is
 // manual (TEST-PLAN F51). The presenter's
 // #guardLocked() invokes showToast(), which
 // depends on document — no DOM under
 // node:test.
 
 test(
-    'withNodeAssignment is a no-op when no node'
+    'withNodeWorkerIds is a no-op when no node'
     + ' is selected',
     () => {
         const graph = {
@@ -356,43 +356,13 @@ test(
                 snap, 800, 600,
                 buildFlowHistorySnapshot(false),
             );
-        const next = presenter.withNodeAssignment({
-            kind: 'model', modelId: 'm-1',
-        });
+        const next = presenter.withNodeWorkerIds(
+            ['hw_1'],
+        );
         const n = next.nodes.find(
             x => x.id === 'n1',
         )!;
-        assert.equal(
-            n.crew.kind, 'unassigned',
-        );
-    },
-);
-
-test(
-    'withNodeAssignment is a no-op for a crew'
-    + ' variant when no node is selected',
-    () => {
-        const graph = {
-            ...emptyGraph,
-            nodes: [node('n1', 0, 0)],
-        };
-        const snap = buildInitialFlowSnapshot(
-            graph, 800, 600, new Map(),
-        );
-        const presenter =
-            new FlowDesignerPresenter(
-                snap, 800, 600,
-                buildFlowHistorySnapshot(false),
-            );
-        const next = presenter.withNodeAssignment({
-            kind: 'crew', crewId: 'c-1',
-        });
-        const n = next.nodes.find(
-            x => x.id === 'n1',
-        )!;
-        assert.equal(
-            n.crew.kind, 'unassigned',
-        );
+        assert.deepEqual(n.workerIds, []);
     },
 );
 

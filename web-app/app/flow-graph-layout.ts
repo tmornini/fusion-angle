@@ -24,7 +24,7 @@ export function runLayoutFromInputs(
     edges: readonly LayoutEdgeInput[],
     canvas?: { w: number; h: number },
 ): LayoutResult {
-    const startId = inputs.find(i => i.isStart)?.id;
+    const startId = inputs.find(i => i.isCreate)?.id;
     return computeLayout({
         nodes: inputs,
         edges: edges.map(e => ({
@@ -40,7 +40,7 @@ export function runLayoutFromInputs(
 }
 
 // Lay out a graph from its persisted nodes/edges. computeLayout
-// reads only id / isStart / isComplete and the edges — the
+// reads only id / isCreate / isArchive and the edges — the
 // stored positions are ignored — so re-laying-out an already-
 // laid-out graph is harmless.
 export function runFlowLayout(
@@ -51,8 +51,8 @@ export function runFlowLayout(
     return runLayoutFromInputs(
         nodes.map(n => ({
             id: n.id,
-            isStart: n.isStart,
-            isComplete: n.isComplete,
+            isCreate: n.isCreate,
+            isArchive: n.isArchive,
         })),
         edges,
         canvas,
@@ -103,7 +103,7 @@ export function withRenderableLayout(
     ) {
         return graph;
     }
-    if (!graph.nodes.some(n => n.isStart)) return graph;
+    if (!graph.nodes.some(n => n.isCreate)) return graph;
     const { positions } = runFlowLayout(
         graph.nodes, graph.edges,
     );

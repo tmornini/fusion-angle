@@ -127,11 +127,11 @@ test('wouldBeCycle: detects deep transitive cycle', () => {
 function lin(
     id: string,
     f: { start?: boolean; complete?: boolean } = {},
-): { id: string; isStart: boolean; isComplete: boolean } {
+): { id: string; isCreate: boolean; isArchive: boolean } {
     return {
         id,
-        isStart: f.start ?? false,
-        isComplete: f.complete ?? false,
+        isCreate: f.start ?? false,
+        isArchive: f.complete ?? false,
     };
 }
 

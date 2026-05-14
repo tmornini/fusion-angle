@@ -39,9 +39,9 @@ const baseVersion = {
             {
                 id: 'n1',
                 name: 'Start',
-                isStart: true,
-                isComplete: false,
-                crew: { kind: 'unassigned' },
+                isCreate: true,
+                isArchive: false,
+                workerIds: [],
                 fields: [],
                 positionX: 0,
                 positionY: 0,
@@ -124,7 +124,7 @@ test(
             (_, i) => `u-${i}`,
         );
         await Promise.all(
-            ids.map(id => adapter.people.put(id, {
+            ids.map(id => adapter.workers.put(id, {
                 first_name: 'F' + id,
                 last_name: 'L' + id,
                 email: id + '@example.com',
@@ -138,7 +138,7 @@ test(
                 bio: '',
             })),
         );
-        const all = await adapter.people.getAll();
+        const all = await adapter.workers.getAll();
         assert.equal(
             all.length, 11,
             'all 11 concurrent puts must persist',
@@ -166,7 +166,6 @@ test(
                 from_node_id: 'n-from',
                 to_node_id: 'n-to',
                 person_id: 'u-1',
-                values: jsonObjectField({}),
                 transitioned_at:
                     '2026-01-01T00:00:00.000Z',
             },
@@ -184,12 +183,12 @@ test(
 );
 
 test(
-    'people table is not compressed (raw JSON in storage)',
+    'workers table is not compressed (raw JSON in storage)',
     async () => {
         const map = installShim();
         const adapter = await createLocalStorageAdapter();
         await adapter.createSchema();
-        await adapter.people.put('u1', {
+        await adapter.workers.put('u1', {
             first_name: 'Alice',
             last_name: 'Adams',
             email: 'alice@example.com',
@@ -201,7 +200,7 @@ test(
             bio: '',
             department: 'Product',
         });
-        const stored = map.get(KEY_PREFIX + 'people');
+        const stored = map.get(KEY_PREFIX + 'workers');
         assert.ok(stored, 'expected stored people value');
         assert.ok(
             stored.startsWith('['),

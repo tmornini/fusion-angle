@@ -7,7 +7,7 @@
 
 interface CycleNode {
     readonly id: string;
-    readonly isStart: boolean;
+    readonly isCreate: boolean;
 }
 
 interface CycleEdge {
@@ -44,7 +44,7 @@ export function findCycleEdgeIds(
         onStack.delete(id);
     };
 
-    const startNode = nodes.find(n => n.isStart);
+    const startNode = nodes.find(n => n.isCreate);
     if (startNode) dfs(startNode.id);
     for (const node of nodes) {
         if (!visited.has(node.id)) dfs(node.id);

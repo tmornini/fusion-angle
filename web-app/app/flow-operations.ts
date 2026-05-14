@@ -51,8 +51,8 @@ function isIntermediateNode(
     node: GraphNode | undefined,
 ): node is GraphNode {
     return node !== undefined
-        && !node.isStart
-        && !node.isComplete;
+        && !node.isCreate
+        && !node.isArchive;
 }
 
 function singleSelectedNodeId(
@@ -180,13 +180,13 @@ export async function performAddEdge(
                 + toId,
         );
     }
-    if (from.isComplete) {
+    if (from.isArchive) {
         return failOp(
             'Cannot create transition'
             + ' from end state',
         );
     }
-    if (to.isStart) {
+    if (to.isCreate) {
         return failOp(
             'Cannot create transition'
             + ' to start state',
@@ -196,7 +196,7 @@ export async function performAddEdge(
         return failOp('Transition already exists');
     }
     if (
-        from.isStart
+        from.isCreate
         && nodeHasOutgoingEdges(fromId, snap.edges)
     ) {
         return failOp(
@@ -260,13 +260,13 @@ export async function performAddNodeAtPosition(
                 + fromNodeId,
         );
     }
-    if (fromNode.isComplete) {
+    if (fromNode.isArchive) {
         return failOp(
             'Cannot create from end state',
         );
     }
     if (
-        fromNode.isStart
+        fromNode.isCreate
         && nodeHasOutgoingEdges(fromNodeId, snap.edges)
     ) {
         return failOp(

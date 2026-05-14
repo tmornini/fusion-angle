@@ -11,7 +11,8 @@ import type {
 } from './db.ts';
 import type {
     Deleted,
-    PersonEntity,
+    HumanWorkerEntity,
+    AIWorkerEntity,
     IdeaEntity,
     ProjectEntity,
     ActivityEntity,
@@ -21,12 +22,6 @@ import type {
     IdeaSubmissionEntity,
     ActivityActorEntity,
     ProjectFlowEntity,
-    RoleEntity,
-    RoleMembershipEntity,
-    CrewEntity,
-    CrewRoleMembershipEntity,
-    ModelEntity,
-    RoleModelMembershipEntity,
     WorkOrderEntity,
     FlowWorkOrderEntity,
     WorkOrderTransitionEntity,
@@ -40,7 +35,8 @@ import {
 } from './latency.ts';
 import {
     asString,
-    validatePersonEntity,
+    validateHumanWorkerEntity,
+    validateAIWorkerEntity,
     validateIdeaEntity,
     validateProjectEntity,
     validateActivityEntity,
@@ -55,12 +51,6 @@ import {
     validateOrganizationEntity,
     validateIdeaSubmissionEntity,
     validateActivityActorEntity,
-    validateRoleEntity,
-    validateRoleMembershipEntity,
-    validateCrewEntity,
-    validateCrewRoleMembershipEntity,
-    validateModelEntity,
-    validateRoleModelMembershipEntity,
 } from './validators.ts';
 
 const KEY_PREFIX = 'fusion-ai:';
@@ -83,8 +73,11 @@ function validateSnapshotRow(
     const { id: _id, ...body } = row;
     try {
         switch (table) {
-            case 'people':
-                validatePersonEntity(body);
+            case 'workers':
+                validateHumanWorkerEntity(body);
+                break;
+            case 'ai_workers':
+                validateAIWorkerEntity(body);
                 break;
             case 'ideas':
                 validateIdeaEntity(body);
@@ -131,28 +124,6 @@ function validateSnapshotRow(
                 break;
             case 'activity_actors':
                 validateActivityActorEntity(body);
-                break;
-            case 'roles':
-                validateRoleEntity(body);
-                break;
-            case 'role_memberships':
-                validateRoleMembershipEntity(body);
-                break;
-            case 'crews':
-                validateCrewEntity(body);
-                break;
-            case 'crew_role_memberships':
-                validateCrewRoleMembershipEntity(
-                    body,
-                );
-                break;
-            case 'models':
-                validateModelEntity(body);
-                break;
-            case 'role_model_memberships':
-                validateRoleModelMembershipEntity(
-                    body,
-                );
                 break;
             case 'deleted':
                 // Shape: {id, deleted_at}
@@ -787,9 +758,14 @@ export async function createLocalStorageAdapter(
             );
         },
 
-        people:
-            createEntityStore<PersonEntity>(
-                'people',
+        workers:
+            createEntityStore<HumanWorkerEntity>(
+                'workers',
+                deletedStore,
+            ),
+        aiWorkers:
+            createEntityStore<AIWorkerEntity>(
+                'ai_workers',
                 deletedStore,
             ),
         ideas:
@@ -865,39 +841,6 @@ export async function createLocalStorageAdapter(
             createEntityStore<
                 ActivityActorEntity
             >('activity_actors', deletedStore),
-        roles:
-            createEntityStore<
-                RoleEntity
-            >('roles', deletedStore),
-        roleMemberships:
-            createEntityStore<
-                RoleMembershipEntity
-            >(
-                'role_memberships',
-                deletedStore,
-            ),
-        crews:
-            createEntityStore<
-                CrewEntity
-            >('crews', deletedStore),
-        crewRoleMemberships:
-            createEntityStore<
-                CrewRoleMembershipEntity
-            >(
-                'crew_role_memberships',
-                deletedStore,
-            ),
-        models:
-            createEntityStore<
-                ModelEntity
-            >('models', deletedStore),
-        roleModelMemberships:
-            createEntityStore<
-                RoleModelMembershipEntity
-            >(
-                'role_model_memberships',
-                deletedStore,
-            ),
         deleted: deletedStore,
     };
 

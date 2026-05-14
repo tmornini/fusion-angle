@@ -71,7 +71,6 @@ function buildProject(
         position: 1,
         business_context: '{}' as JsonObjectField,
         timeline_label: '',
-        budget_label: '',
     };
     const { id: _drop, ...rest } = {
         ...base, ...overrides, id,

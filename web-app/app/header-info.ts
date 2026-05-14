@@ -2,8 +2,8 @@ import { $ } from './dom.ts';
 import { navigateTo } from './navigation.ts';
 
 interface HeaderData {
-    personId: string;
-    personName: string;
+    workerId: string;
+    workerName: string;
     organization: string;
     greeting: string;
     stats: ReadonlyArray<{
@@ -16,24 +16,25 @@ async function getHeaderData(
 ): Promise<HeaderData> {
     const {
         createRequestContext,
-        getCurrentPerson,
+        getCurrentHumanWorker,
         getOrganization,
         getDashboardStats,
-        Person,
+        HumanWorker,
     } = await import('./adapters');
     const { getTimeOfDay } =
         await import('./format');
     const ctx = createRequestContext();
-    const [personRow, org, stats] =
+    const [workerRow, org, stats] =
         await Promise.all([
-            getCurrentPerson(ctx),
+            getCurrentHumanWorker(ctx),
             getOrganization(ctx),
             getDashboardStats(ctx),
         ]);
     return {
-        personId: personRow.id,
-        personName:
-            new Person(personRow).fullName(),
+        workerId: workerRow.id,
+        workerName:
+            new HumanWorker(workerRow)
+                .fullName(),
         organization: org.nameText(),
         greeting: getTimeOfDay(),
         stats,
@@ -53,13 +54,13 @@ export async function mutateHeaderInfo(
             html`<span
 class="font-normal">Good ${
 headerInfo.greeting},</span> ${
-headerInfo.personName}`,
+headerInfo.workerName}`,
         );
         greetingEl.addEventListener(
             'click',
             () => navigateTo(
-                'people-detail',
-                { personId: headerInfo.personId },
+                'worker-detail',
+                { workerId: headerInfo.workerId },
             ),
         );
     }

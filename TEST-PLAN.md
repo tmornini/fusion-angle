@@ -2,6 +2,33 @@
 
 > **Encoding:** `- [ ]` = pending, `- [ ]` = PASS, `- [FAIL]` = failure (add note)
 
+### How to invoke
+
+When the user says "run the test plan", the agent:
+
+1. Reads `CLAUDE.md` `## Testing` (six-phase protocol,
+   mutation domains, MCP limitations) — required context,
+   not optional reference.
+2. Executes section **AT** as a fail-fast gate; any AT
+   failure aborts the run before A1's build.
+3. Executes A1–A5 preflight; on success spawns the
+   six-phase parallel protocol (Phase 1 serial data setup,
+   Phase 2 seven concurrent agents, Phase 3 cross-cutting
+   alone, Phase 4 snapshot lifecycle alone, Phase 5
+   teardown). Or runs serially if `--serial` is requested.
+4. Emits the run summary in the canonical format
+   documented at the bottom of this file (`## Summary
+   Format`). The summary is the conversational artifact;
+   this document is NOT mutated by the run.
+
+This document plus `CLAUDE.md` `## Testing` is the complete
+contract — no other coordination state is read or written.
+
+BLOCKED ≠ FAIL. BLOCKED is reserved for known MCP
+environmental limits (pointer-capture gestures,
+`resize_window`, file I/O) — never used to mask a real
+failure.
+
 ### Scope
 
 This plan covers **UI behavior** — anything that requires a browser
@@ -44,7 +71,9 @@ note pointing at the test file.
 
 ### Protocol
 
-All sections are executed over HTTP. Two execution modes:
+The automated layer (`## AT`) runs first as a fail-fast
+gate. On green, the browser regression runs over HTTP in
+one of two modes:
 
 - **Serial (single human tester)**:
   `./build --no-zip /tmp/fusion-test/` then
@@ -59,41 +88,60 @@ All sections are executed over HTTP. Two execution modes:
 
 ### Execution Order
 
-Sections A through AA establish a pristine environment and populate
-it through the UI. Sections B through J then verify every page
-renders correctly against that data.
+**AT (automated tests) precedes everything.** Any AT
+failure aborts the run before A1's build — the expensive
+browser layer never tests against a validate-broken tree.
 
-In the serial run the plan is a single continuous regression pass.
-In the parallel run B–J split across seven agents each with its
-own browser tab and disjoint entity mutation domain; I runs alone
-(global UI state); G30–G35 run alone last (they wipe the database).
-See `CLAUDE.md` section `## Testing`.
+After AT passes, sections A through AA establish a pristine
+environment and populate it through the UI. Sections B
+through J then verify every page renders correctly against
+that data.
+
+In the serial run the plan is a single continuous regression
+pass. In the parallel run B–J split across seven agents
+each with its own browser tab and disjoint entity mutation
+domain; I runs alone (global UI state); G30–G35 run alone
+last (they wipe the database). See `CLAUDE.md` section
+`## Testing`.
 
 ## Summary
 
 | Section | Tests |
 |---|--:|
+| AT. Automated Test Suite | 3 |
 | A. Build & Setup | 5 |
-| AA. Data Entry Workflow | 43 |
+| AA. Data Entry Workflow | 46 |
 | B. Entry Pages | 14 |
 | C. Core: Dashboard | 7 |
 | D. Core: Ideas Workflow | 37 |
 | E. Core: Projects | 11 |
 | F. Tools | 74 |
-| F2. Workbox | 19 |
+| F2. Workbox | 25 |
 | FS. Flow Statistics | 9 |
 | G. Admin Pages | 27 |
 | H. Reference & System | 2 |
-| I. Cross-Cutting Concerns | 27 |
+| I. Cross-Cutting Concerns | 28 |
 | J. Teardown | 3 |
-| **Total** | **278** |
+| **Total** | **291** |
+
+---
+
+## AT. Automated Test Suite
+
+The automated layer is the gate. Any AT failure aborts the
+run before A1's build. The single canonical invocation is
+`./validate`, which composes all three sub-steps.
+
+- [ ] **AT1** Run `npx tsc --noEmit -p web-app/app/tsconfig.json`. PASS: exits 0; no diagnostics emitted.
+- [ ] **AT2** Run `./test` (delegates to `node --test --strip-types tests/*.test.ts`). PASS: exits 0; the runner's final summary reports `pass N` with `fail 0`.
+- [ ] **AT3** Run `./validate`. PASS: exits 0 (composes AT1+AT2 plus the 78-char awk lint over `api/`, `web-app/`, `tests/`). Any long-line violation prints `FILE:LINE: N chars` to stderr and fails the script.
 
 ---
 
 ## A. Build & Setup
 
 - [ ] **A1** Run `./build` from a clean working directory. PASS: exits 0, prints no errors, creates `~/Desktop/fusion-ai-<sha>.zip`.
-- [ ] **A2** Run `./build --no-zip /tmp/fusion-test/`. PASS: `/tmp/fusion-test/` contains `assets/app.js`, `assets/styles.css`, `assets/` (*.woff2 fonts), `index.html`, and 15 page directories containing 24 HTML page files, plus root `index.html`.
+- [ ] **A2** Run `./build --no-zip /tmp/fusion-test/`. PASS: `/tmp/fusion-test/` contains `assets/app.js`, `assets/styles.css`, `assets/` (*.woff2 fonts), 13 page directories (`auth`, `billing`, `dashboard`, `design-system`, `flows`, `ideas`, `landing`, `not-found`, `organization`, `projects`, `snapshots`, `workbox`, `workers`) with 22 HTML page files (including `flows/stats.html`), plus root `index.html`.
 - [ ] **A3** Start an HTTP server from the build directory (`cd /tmp/fusion-test/ && python3 -m http.server 8080`). PASS: server starts without errors.
 - [ ] **A4** Open `http://localhost:8080/` in the test browser. PASS: redirects to `snapshots/index.html` when no data exists, or `landing/index.html` (which auto-redirects to `dashboard/index.html` after ~2 seconds) when data has been loaded.
 - [ ] **A5** Open DevTools Console and confirm no JavaScript errors on initial load. PASS: console is clean (warnings from browser extensions are acceptable).
@@ -109,22 +157,75 @@ on. Run these in order.
 ### AA1. Create Pristine Environment
 
 - [ ] **AA1** Navigate to `snapshots/`. Click "Create Pristine Environment" and confirm the wipe dialog. PASS: redirects to dashboard. Dashboard shows empty/minimal state.
-- [ ] **AA2** Open DevTools, verify localStorage has `fusion-ai:*` keys (19 tables as empty arrays plus bootstrap data, including the `deleted` tombstone table).
+- [ ] **AA2** Open DevTools, verify localStorage has `fusion-ai:*` keys for the 17 tables in `TABLE_NAMES` (`api/db.ts`) — empty arrays plus bootstrap data, including the `deleted` tombstone table.
 - [ ] **AA3** Verify bootstrap data exists: user "Tony Stark" (id: `current`), organization "Stark Industries" (domain `acmecorp.com`) on the "Business" plan.
 
-### AA2. Create Users
+### AA2. Create Workers
 
-- [ ] **AA4** Navigate to People (sidebar). Click "Invite Person". PASS: invite dialog opens with fields for First Name, Last Name, Email, Role, Department, Status, Phone, and Bio.
-- [ ] **AA5** Fill all fields for user "Sarah Chen" (Engineering Manager, Engineering dept, active status). Submit. PASS: toast confirms creation, user appears in the list.
-- [ ] **AA6** Repeat for all 10 people: Sarah Chen, Mike Thompson, Jessica Park, David Martinez, Emily Rodriguez (pending), Alex Kim, Marcus Johnson, David Kim, Lisa Wang, James Miller (deactivated). PASS: all 10 appear on People page with correct name, email, role, and status badge.
-- [ ] **AA7** Reload the People page. PASS: people display with correct status badges (Active / Pending / Deactivated).
+- [ ] **AA4** Navigate to Workers (sidebar). Click "+ Add
+  Worker". PASS: dialog opens with a Kind toggle (Human /
+  AI, Human selected by default), a Human form below
+  showing First Name, Last Name, Email, Title, Department,
+  Phone, Bio, and an AI form (hidden by default) with
+  Name, Provider, Description, and a required Auth Token
+  password input plus a yellow security warning beginning
+  "⚠ Auth tokens are stored unencrypted...".
+- [ ] **AA5** With Human selected, fill all fields for
+  "Sarah Chen" (Title: Engineering Manager, Department:
+  Engineering). Click Create. PASS: toast confirms
+  creation, the new worker appears in the Humans group
+  on the list.
+- [ ] **AA6** Repeat for all 10 humans: Sarah Chen, Mike
+  Thompson, Jessica Park, David Martinez, Emily Rodriguez
+  (pending), Alex Kim, Marcus Johnson, David Kim, Lisa
+  Wang, James Miller (deactivated). PASS: all 10 appear
+  in the Humans group with correct name, email, title,
+  and status badge (Active / Pending / Deactivated).
+- [ ] **AA7** Reload the Workers page. PASS: every human
+  re-renders in the Humans group with the correct status
+  badge.
+- [ ] **AA7a** Click "+ Add Worker", switch the Kind
+  toggle to AI. PASS: the Human form hides and the AI
+  form appears. Fill Name, Provider, Description, and
+  Auth Token. Click Create. PASS: toast confirms, the
+  new AI appears in the AIs group. Repeat for 4 AIs
+  matching mock data (Claude Opus 4.7 Max, Claude
+  Sonnet 4.6, GPT-5.4 Pro, Grok 4.20 Heavy).
 
-### AA3. Person Detail & Organization
+### AA3. Worker Detail & Organization
 
-- [ ] **AA8** On People, click the current user's "You" row at the top. PASS: navigates to that person's detail page; read mode shows avatar, name, role, department, status badge, email, phone, role, department, bio, strengths chips, and a Working Styles card.
-- [ ] **AA9** Click Edit, change Phone and Bio, toggle one strength on and one off, click Save. PASS: toast "Person saved" appears. Navigate away and return to detail. PASS: edited Phone, Bio, and strengths persist.
-- [ ] **AA10** Navigate to Organization. In the General Information card, click Edit, change Domain (e.g. `acmecorp.io`), click Save. PASS: success toast "Organization saved" appears.
-- [ ] **AA11** Navigate away, return to Organization. PASS: edited Domain persists with saved value, card is back in read mode.
+- [ ] **AA8** On Workers, click the current user's row.
+  PASS: navigates to `worker-detail` for that human. Read
+  mode shows avatar, name, status badge, title ·
+  department subtitle, Personal Information card (First
+  Name, Last Name, Email, Phone, Title, Department, Bio),
+  Working Styles card, and Strengths card.
+- [ ] **AA8a** From the Workers list, click any AI
+  worker's row. PASS: navigates to `worker-detail` for
+  that AI. Read mode shows the AI identity card (Name,
+  Provider, Description) and a separate Auth Token row
+  showing the masked token (last 4 chars only,
+  e.g. `sk-...XXXX`).
+- [ ] **AA9** From the human worker detail, click Edit,
+  change Phone and Bio, toggle one strength on and one
+  off, click Save. PASS: toast "Worker saved" appears.
+  Navigate away and return to detail. PASS: edited
+  Phone, Bio, and strengths persist.
+- [ ] **AA9a** From an AI worker detail, click Edit,
+  change Description, leave Auth Token blank (placeholder
+  reads "Leave blank to keep current token"), click Save.
+  PASS: toast "AI worker saved" fires; on reopen the
+  masked token is unchanged. Click Edit again, type a new
+  token, Save. PASS: on reopen the masked-token last 4
+  chars reflect the new value.
+- [ ] **AA10** Navigate to Organization. Click the
+  page-level Edit button (a single button at the page
+  header, not per-card), change Domain (e.g.
+  `acmecorp.io`), click Save. PASS: success toast
+  "Organization saved" appears.
+- [ ] **AA11** Navigate away, return to Organization.
+  PASS: edited Domain persists with saved value, card is
+  back in read mode.
 
 ### AA4. Create Ideas
 
@@ -143,8 +244,8 @@ on. Run these in order.
 - [ ] **AA18** On Ideas list, filter by "In Review". Click idea #1. PASS: navigates to idea detail with approval footer.
 - [ ] **AA19** Click "Approve". PASS: idea status changes to approved, confirmation shown.
 - [ ] **AA20** Approve idea #4 as well (it was submitted for review in AA16). Leave others in their current status. PASS: statuses match mock data (2 approved, rest in-review/active).
-- [ ] **AA21** Navigate to approved idea #1. Click "Convert". PASS: conversion form loads with 5 required fields (Project Name, Start Date, Target End Date, Budget, Impact). No Project Lead field — the team data model has been retired.
-- [ ] **AA22** Fill all required fields: Project Name, Start Date, Target End Date, Budget, Impact. Click "Create Project". PASS: navigates to project detail for the new project.
+- [ ] **AA21** Navigate to approved idea #1. Click "Convert". PASS: conversion form loads with 5 required fields (Project Name, Start Date, Target End Date, Cost, Impact). No Project Lead field — the team data model has been retired.
+- [ ] **AA22** Fill all required fields: Project Name, Start Date, Target End Date, Cost, Impact. Click "Create Project". PASS: navigates to project detail for the new project.
 - [ ] **AA23** On project detail, click "Edit". Set fields (title, description, status, start date, end date, cost baseline, impact baseline) to match mock data. Save. PASS: project data persists.
 - [ ] **AA24** Approve remaining ideas (7, 8, 9, 10) from Ideas list (filter by "In Review"), then convert all 6 approved ideas to projects. PASS: Projects list shows all 6 with correct status and progress.
 
@@ -160,8 +261,8 @@ on. Run these in order.
   creation limited to approved projects only".
 - [ ] **AA26** Click "New Flow". PASS: navigates
   to the flow designer page. The SVG canvas
-  shows two nodes: "Start" (start, top-left with
-  green border) and "End" (end, bottom-right
+  shows two nodes: "Create" (start, top-left with
+  green border) and "Archive" (end, bottom-right
   with red 3-px border) connected by no edges.
   Toolbar shows Undo, Redo, Delete (trash icon),
   Auto Layout, Zoom −/Show All/+,
@@ -186,20 +287,22 @@ on. Run these in order.
   validate end-state via direct JSON injection per
   the CLAUDE.md workaround.)
 - [ ] **AA28** Double-click the new blue-bordered
-  node. PASS: properties panel appears with the
-  Crew dropdown centered in the header (no "State
-  Properties" title), close button on the right,
-  and below: State Name input, Description input,
-  empty Fields list, and outgoing transitions. The
-  node gets a gold glow selection effect on the
-  canvas.
+  node. PASS: properties panel appears with a
+  "State Properties" title and close button on
+  the right, then a `<fieldset>` labeled "Workers"
+  containing two groups — HUMANS and AIs — each
+  with a labeled checkbox per worker (no checkbox
+  ticked yet), then State Name input, Description
+  input, empty Fields list, and outgoing
+  transitions. The node gets a gold glow selection
+  effect on the canvas.
 - [ ] **AA29** Edit the state name in the
   properties panel to "Data Capture". PASS: the
   node label updates on the canvas immediately
   (auto-saves via 800ms debounce).
 - [ ] **AA30** Double-click the edge between
   start and "Data Capture". PASS: no properties
-  panel opens — the outgoing edge from Start is
+  panel opens — the outgoing edge from Create is
   intentionally not interactive. The edge has no
   name label visible on the canvas, just a plain
   blue arrow.
@@ -222,7 +325,7 @@ on. Run these in order.
   check recognises the release would close a
   loop. Release to create the cycle edge; rename
   it "needs revision". Hold Shift and drag from
-  "Review" onto "End". PASS: preview is a
+  "Review" onto "Archive". PASS: preview is a
   solid-blue curved bezier (no return path).
   Release to create the edge; rename it
   "approve".
@@ -273,9 +376,10 @@ on. Run these in order.
 - [ ] **AA40** Edit flow: navigate to flow
   designer, rename a state (auto-saves). Navigate
   away, return. PASS: changed state name persists.
-- [ ] **AA41** Edit person: navigate to a person's
-  detail page, click Edit, change phone number, Save.
-  Navigate away, return. PASS: changed phone persists.
+- [ ] **AA41** Edit human worker: navigate to a human
+  worker's detail page, click Edit, change phone number,
+  Save. Navigate away, return. PASS: changed phone
+  persists.
 - [ ] **AA42** Edit organization: in the General
   Information card, change Domain. Save, navigate
   away, return. PASS: changed Domain persists.
@@ -284,13 +388,19 @@ on. Run these in order.
 
 - [ ] **AA43** Navigate to Snapshots. Click
   "Download Snapshot". PASS: JSON file downloads
-  with all manually-entered data. Click "Create
+  with all manually-entered data. In **serial
+  mode** continue the round-trip: Click "Create
   Pristine Environment", confirm. PASS: all data
   wiped. Click "Upload Snapshot", select the
   downloaded file. PASS: all data restored.
-  Spot-check 3 pages to confirm data matches.
-  (Snapshot serialization/validation, the quota
-  pre-flight, and wipe-on-fail are covered by
+  Spot-check 3 pages to confirm data matches. In
+  **parallel mode** stop after the download step
+  to preserve the Phase 2 baseline — the wipe +
+  upload round-trip is exercised again at I26
+  (Phase 3) and G34 (Phase 4) on a different
+  baseline. (Snapshot serialization/validation,
+  the quota pre-flight, and wipe-on-fail are
+  covered by
   `tests/snapshot-import-validation.test.ts`,
   `tests/snapshot-quota.test.ts`, and
   `tests/snapshot-wipe-on-fail.test.ts` — this
@@ -315,7 +425,7 @@ on. Run these in order.
 - [ ] **B7** Enter `notanemail` in email, leave password empty. PASS: "Please enter a valid email address" error on email.
 - [ ] **B8** Enter `test@example.com`, password `123`. PASS: "Password must be at least 6 characters" error on password.
 - [ ] **B9** Enter `test@example.com`, password `password123`, click "Sign in →". PASS: button shows spinner briefly, then navigates to `dashboard/index.html`.
-- [ ] **B10** Click "Don't have an account?" toggle. PASS: switches to Sign Up mode — title changes to "Get started", "Company name (optional)" field appears, submit reads "Create account" with arrow icon.
+- [ ] **B10** Click the "Sign up" button (positioned next to the static "Don't have an account?" label — the label is not itself the toggle; the adjacent button is). PASS: switches to Sign Up mode — title changes to "Get started", "Company name (optional)" field appears, submit reads "Create account" with an SVG arrow icon (not a literal "→" character).
 - [ ] **B11** Fill valid email + password (≥6 chars) in Sign Up mode, click "Create account →". PASS: toast "Welcome to Fusion AI! Your account has been created." appears, then navigates to `dashboard/index.html` after a brief delay (the dedicated onboarding page has been retired — sign-up routes straight to the dashboard).
 
 ### Auth Validation Edge Cases
@@ -332,13 +442,14 @@ on. Run these in order.
 - [ ] **C2** Sidebar shows flat navigation
   links in this order: Dashboard, Ideas,
   Projects, Flows, Workbox, Organization,
-  People, Billing, Snapshots, Design System.
+  Workers, Billing, Snapshots, Design System.
   PASS: all 10 links present, in order, and
-  styled. (Teams, Company, Activity Feed, and
-  Profile sidebar entries have been retired —
-  the current user's detail is reachable via
-  the sidebar account chip and the header
-  greeting.)
+  styled. (Teams, People, Roles, Crews,
+  Company, Activity Feed, and Profile sidebar
+  entries have been retired — the current
+  user's detail is reachable via the sidebar
+  account chip and the header greeting; humans
+  and AIs both live on the Workers page.)
 - [ ] **C3** Header shows search bar, greeting
   ("Good {morning/afternoon/evening}, Tony
   Stark" — varies by time of day), company
@@ -405,7 +516,7 @@ on. Run these in order.
 
 ### Idea Convert (`ideas/convert.html`)
 
-- [ ] **D22** Navigate to `ideas/convert.html?ideaId=<id>` for a convertible idea. PASS: page loads with conversion form showing 5 required fields: Project Name, Start Date, Target End Date, Budget, Impact. Sticky sidebar shows "Problem & Solution" with title, problem, solution, and expected outcome. (No Project Lead field — that selector and its underlying TeamEntity have been retired.)
+- [ ] **D22** Navigate to `ideas/convert.html?ideaId=<id>` for a convertible idea. PASS: page loads with conversion form showing 5 required fields: Project Name, Start Date, Target End Date, Cost, Impact. Sticky sidebar shows "Problem & Solution" with title, problem, solution, and expected outcome. (No Project Lead field — that selector and its underlying TeamEntity have been retired.)
 - [ ] **D23** With required fields empty, "Create Project" button is disabled and progress bar shows 0/5. Fill fields one at a time. PASS: progress bar increments with each field, checkmarks appear next to completed fields, button enables only when all 5 required fields are filled.
 - [ ] **D24** Fill all required fields (progress bar reaches 100%), click "Create Project". PASS: navigates to project detail page for the newly created project.
 
@@ -447,7 +558,7 @@ on. Run these in order.
 
 ### Projects List (`projects/`)
 
-- [ ] **E1** Navigate to `projects/`. PASS: table/list shows 6 seeded projects with title, status, and progress. Project cards show "—" (em-dash) for missing/zero metric values (time, cost, impact).
+- [ ] **E1** Navigate to `projects/`. PASS: table/list shows 6 seeded projects with title, status, and progress. Each project card shows three metrics (time, cost, impact). Em-dash ("—") substitutes for the entire metric when its **baseline (denominator) is missing**; a zero current value over a non-zero baseline renders as `0d / 213d`, `$0k / $120k`, or `0 / 85` — not em-dash. Em-dash signals "no baseline to compare against," not "zero current value."
 - [ ] **E2** Click a status filter badge (e.g. "Active"). PASS: project list filters to show only projects with that status. Click the same badge again or "All". PASS: full list returns.
 - [ ] **E3** Click a project row. PASS: navigates to `projects/detail.html?projectId=<id>`.
 
@@ -557,7 +668,7 @@ opens and renders.)
   a level.
 - [ ] **F10** Connection ports (small circles) are
   visible on every middle node when the flow is
-  unlocked. Start and complete nodes show a port
+  unlocked. Create and Archive nodes show a port
   only when they have no connected edges yet —
   per `canShowPort` in `web-app/app/flow-graph.ts`,
   ports render when not locked AND (not a
@@ -572,11 +683,13 @@ opens and renders.)
   instead."
 - [ ] **F11** Click a node. PASS: node gets gold
   glow selection effect. Double-click the node.
-  PASS: properties panel appears with the Crew
-  dropdown centered in the header (regular nodes
-  only — Start/End nodes still show their kind
-  title), and below: state name, description,
-  form fields list, and outgoing transitions.
+  PASS: properties panel appears with the
+  "State Properties" title and close button on
+  the right (regular nodes only — Create/Archive
+  nodes still show their kind title), then a
+  Workers fieldset (HUMANS / AIs checkbox
+  groups), then state name, description, form
+  fields list, and outgoing transitions.
 - [ ] **F12** Pan so a node sits near the right
   edge of the canvas, then double-click it. PASS:
   the properties panel slides out from the
@@ -623,7 +736,7 @@ opens and renders.)
 - [ ] **F18** Toggle the Auto Layout header
   switch. PASS:
   all nodes reposition based on their rank from
-  start. Start is placed top-left, complete
+  start. Create is placed top-left, Archive
   bottom-right, others arranged by graph depth.
 - [ ] **F19** Hold Shift and drag from a middle
   node's port over another middle node, then
@@ -749,17 +862,18 @@ states, and that the canvas re-renders after each step.)
 - [ ] **F40** Toggle the Locked checkbox in the designer header.
   PASS: connection ports disappear from all middle nodes, the
   Delete toolbar button becomes disabled, and opening a properties
-  panel shows fields as read-only (inputs `disabled`, Crew
-  dropdown also `disabled` and unresponsive to clicks). Auto Layout
-  remains enabled because it only repositions nodes without
-  changing structure. Visual confirmation: nodes render with gold
-  strokes regardless of type (Start, Complete, Regular), edges
-  render with gold strokes (cycles remain dashed), edge-label
-  backgrounds gain gold strokes, and the dot-grid background
-  renders unchanged from its unlocked appearance. Untoggle Locked:
-  ports return, the Delete button re-enables, fields become
-  editable, the Crew dropdown becomes interactive again, and
-  per-type colors return (Start green, Complete red, Regular blue,
+  panel shows fields as read-only (inputs `disabled`, every
+  checkbox in the Workers fieldset also `disabled` and
+  unresponsive to clicks). Auto Layout remains enabled because
+  it only repositions nodes without changing structure. Visual
+  confirmation: nodes render with gold strokes regardless of
+  type (Create, Archive, Regular), edges render with gold
+  strokes (cycles remain dashed), edge-label backgrounds gain
+  gold strokes, and the dot-grid background renders unchanged
+  from its unlocked appearance. Untoggle Locked: ports return,
+  the Delete button re-enables, fields become editable, the
+  Workers checkboxes become interactive again, and per-type
+  colors return (Create green, Archive red, Regular blue,
   Cycle amber).
 - [ ] **F41** With a non-trivial flow loaded, click "Copy Mermaid"
   in the toolbar. PASS: toast confirms the clipboard copy, and the
@@ -836,61 +950,54 @@ states, and that the canvas re-renders after each step.)
   Tap the spacebar. PASS: a literal space character is inserted
   into the input; pan mode state is unchanged.
 
-### Crew Dropdown (Node Panel)
+### Workers Selector (Node Panel)
 
-- [ ] **F58** Open a regular-node properties panel and click
-  the Crew dropdown. PASS: the dropdown opens showing
-  "Unassigned" first, then a "Roles" group containing every
-  persisted role, a "People (private)" group containing
-  every active person's user-private role, a "Crews"
-  group containing every persisted crew, and a "Models"
-  group containing every persisted model — each section
-  alphabetized.
-- [ ] **F58a** Select a crew from the dropdown. Reload the
-  page and reopen the same node panel. PASS: the dropdown
-  shows the same crew selected. The persisted shape is
-  `{ kind: 'crew', crewId: <id> }` — verify in
-  `localStorage['fusion-ai:flows']`.
-- [ ] **F58b** Pick an unassigned crew (zero members) for a
-  node and close the panel. PASS: the node renders a hazard
-  triangle in the bottom-left corner. Add a member to the
-  crew via `/crews` (expand, add a role with people).
-  Reopen the flow. PASS: the hazard clears.
-- [ ] **F58c** Select a model from the dropdown. Reload the
-  page and reopen the same node panel. PASS: the dropdown
-  shows the same model selected; the persisted shape is
-  `{ kind: 'model', modelId: <id> }`.
-- [ ] **F59** Select a user from the Crew dropdown. Reload the
-  page and reopen the same node panel. PASS: the dropdown
-  shows the same user selected.
-- [ ] **F60** Select a model from the Crew dropdown. Reload
-  the page and reopen the same node panel. PASS: the dropdown
-  shows the same model selected.
-- [ ] **F61** With a user or model assigned, change the
-  selection to "Unassigned". Reload the page. PASS: the
-  dropdown shows "Unassigned" selected.
-- [ ] **F62** Lock the flow via the toolbar checkbox. Open a
-  regular-node panel. PASS: the Crew dropdown is visible but
-  `disabled`; clicking it does nothing.
-- [ ] **F63** Open a Start-node panel. PASS: the header shows
-  "Start State" title and close button — no Crew dropdown.
-- [ ] **F64** Open an End-node panel. PASS: the header shows
-  "End State" title and close button — no Crew dropdown.
+- [ ] **F58** Open a regular-node properties panel. PASS:
+  the Workers fieldset is the first body block, with a
+  "Workers" legend, a HUMANS group containing one
+  labeled `<input type="checkbox" data-worker-id="<id>">`
+  per active human (alphabetized by full name), and an
+  AIs group containing one checkbox per AI worker
+  (alphabetized by name). When the checkbox list overflows
+  the panel height, the fieldset scrolls inside its own
+  region.
+- [ ] **F59** Tick one human checkbox and one AI checkbox.
+  Reload the page and reopen the same node panel. PASS:
+  the same two checkboxes are still ticked. Inspect
+  `localStorage['fusion-ai:flows']` — the node carries
+  `workerIds: [<humanId>, <aiId>]`.
+- [ ] **F60** Untick one of the two checkboxes. Reload the
+  page and reopen the panel. PASS: only the remaining
+  ticked worker persists in `workerIds`.
+- [ ] **F61** Untick all checkboxes so `workerIds` is `[]`.
+  Reload the page. PASS: every checkbox in the panel is
+  unticked. The node now displays the danger badge per
+  F73.
+- [ ] **F62** Lock the flow via the toolbar Locked switch.
+  Open a regular-node panel. PASS: every checkbox in the
+  Workers fieldset is rendered with the `disabled`
+  attribute; clicking does nothing.
+- [ ] **F63** Open a Start-node panel. PASS: the header
+  shows the "Create" title and close button — no
+  Workers fieldset (Create nodes never assign workers).
+- [ ] **F64** Open an End-node panel. PASS: the header
+  shows the "Archive" title and close button — no
+  Workers fieldset.
 - [ ] **F65** Open an edge panel. PASS: the header shows
-  "Transition Properties" title and close button — no Crew
-  dropdown.
+  "Transition Properties" title and close button — no
+  Workers fieldset.
 - [ ] **F66** Inspect `localStorage['fusion-ai:flow_versions']`
-  before and after a Crew change. PASS: a new version row
-  appears for the flow after the change (Crew changes
-  participate in versioning).
-- [ ] **F67** Select a user via the Crew dropdown, then press
-  Cmd+Z (Mac) / Ctrl+Z (Win/Linux). PASS: the dropdown
-  reverts to its previous selection — Crew changes are
-  undoable like name/description changes.
+  before and after a `workerIds` change. PASS: a new
+  version row appears for the flow after the change
+  (worker assignment participates in versioning).
+- [ ] **F67** Tick one checkbox in the Workers fieldset,
+  then press Cmd+Z (Mac) / Ctrl+Z (Win/Linux). PASS: the
+  checkbox unticks — `workerIds` changes are undoable
+  like name/description changes.
 
 ### Field Editor (Node Panel)
 
-- [ ] **F68** Single-select a regular node (not Start/End)
+- [ ] **F68** Single-select a regular node (not Create/Archive)
   to open the properties panel. Click "+ Add Field". PASS:
   the field editor form appears below the button — name
   input, type select, required checkbox, options textarea,
@@ -911,24 +1018,30 @@ states, and that the canvas re-renders after each step.)
   Single-select a regular node and click "+ Add Field".
   PASS: a "Flow is locked" toast appears; the field
   editor form is NOT injected into the panel.
-- [ ] **F72** Single-select a regular node. Change the Crew
-  dropdown from Unassigned to a model. Click "+ Add Field"
-  in the same panel. PASS: the field editor form appears.
-  (Regression: a Crew commit replaces the presenter, so a
-  click handler that captured a stale presenter would have
-  acted on the pre-commit snapshot — this case proves the
-  handler reads the current presenter at click time.)
-- [ ] **F73** On a regular (non-start, non-complete)
-  node whose Crew is set to Unassigned, observe that
-  a hazard triangle icon renders in the bottom-left
-  corner of the node card (colored via the
-  `.flow-node-hazard` rule). Hover the triangle.
-  PASS: after the OS hover delay, the native browser
-  tooltip displays "No crew assigned to this node."
-  (delivered via an SVG `<title>` element, matching
-  the existing port-circle tooltip pattern). Set the
-  node's Crew to a user or a model. PASS: the
-  hazard triangle disappears.
+- [ ] **F72** Single-select a regular node. Tick one
+  worker checkbox in the Workers fieldset. Click "+ Add
+  Field" in the same panel. PASS: the field editor form
+  appears. (Regression: a `workerIds` commit replaces the
+  presenter, so a click handler that captured a stale
+  presenter would have acted on the pre-commit snapshot —
+  this case proves the handler reads the current presenter
+  at click time.)
+- [ ] **F73 — Hazard severity rendering.** On a regular
+  (non-start, non-complete) node, vary the worker count
+  and outgoing-edge count and confirm the bottom-left
+  badge:
+    - **0 workers** → red octagon (`iconNoEntry`,
+      `.flow-node-danger`). Hover → tooltip
+      "Workers required".
+    - **0 outgoing edges** (regardless of worker count) →
+      red octagon, tooltip "Dead end (no outgoing edges)"
+      when `workerIds.length > 0`.
+    - **1 worker AND ≥1 outgoing edge** → yellow triangle
+      (`iconAlertTriangle`, `.flow-node-warning`). Hover →
+      tooltip "Single worker assigned (no backup)".
+    - **≥2 workers AND ≥1 outgoing edge** → no badge.
+  Confirm the start node and the complete node never
+  display a badge regardless of state.
 - [ ] **F74** With the Properties panel closed,
   confirm the flow canvas fills the content area
   to the right of the global sidebar (panel-aware
@@ -945,7 +1058,7 @@ states, and that the canvas re-renders after each step.)
 
 ### AA13. Workbox Source Flow
 
-- [ ] **AA-WB-SETUP** Create one Workbox-only flow named `WB Test Flow` with three nodes: Start → Capture (text + select fields) → Done (`is_complete: true`). This flow is mutated only by Agent-F2. Agent-F2's WO creation reads from this flow, not from any Agent-F flow.
+- [ ] **AA-WB-SETUP** Create one Workbox-only flow named `WB Test Flow` with three nodes: Create → Capture (text + select fields) → Archive (`is_complete: true`). This flow is mutated only by Agent-F2. Agent-F2's WO creation reads from this flow, not from any Agent-F flow.
 
 ### Workbox Inbox (`workbox/`)
 
@@ -963,16 +1076,41 @@ states, and that the canvas re-renders after each step.)
 ### Workbox — Create Work Order
 
 - [ ] **WB4** Click "+ Create Work Order". PASS:
-  a dropdown menu opens listing available flows
-  by name (including `WB Test Flow` from
-  AA-WB-SETUP). (No separate dialog or Cancel
-  button; the flow listing itself is the
-  selector.)
-- [ ] **WB5** Select `WB Test Flow` and click
-  Create. PASS: work order is created, browser
-  navigates to the action screen at the first
-  post-start state ("Capture"). Display ID
+  a dropdown opens with up to two labeled
+  sections — `READY` (clickable rows, one per
+  publishable flow including `WB Test Flow`) and
+  `NOT READY` (disabled rows for any flow with
+  zero-worker or dead-end nodes; each carries a
+  red octagon icon and a subtitle "1 node needs
+  attention" or "N nodes need attention"). Hover
+  a `NOT READY` row. PASS: cursor stays default
+  (no `pointer`), `aria-disabled="true"` is
+  present, no `data-flow-id` attribute.
+- [ ] **WB4a** Click a `NOT READY` row. PASS:
+  nothing happens — the dropdown stays open, no
+  navigation occurs (the click handler ignores
+  rows without `data-flow-id`).
+- [ ] **WB5** Click `WB Test Flow` from the
+  `READY` section. PASS: work order is created,
+  browser navigates to the action screen at the
+  first post-start state ("Capture"). Display ID
   (8-char hex) is visible in the header.
+- [ ] **WB5a** Edit `WB Test Flow` to remove the
+  outgoing edge from `Capture` (creating a dead
+  end). Return to Workbox, open the Create Work
+  Order dropdown. PASS: `WB Test Flow` now
+  appears in the `NOT READY` section with
+  subtitle "1 node needs attention". Restore the
+  edge and verify it returns to `READY`.
+- [ ] **WB5b — Server-side gate.** With `WB Test
+  Flow` in a non-ready state, drive
+  `postWorkOrderCreation` directly via DevTools
+  console (`await
+  postWorkOrderCreation(createRequestContext(),
+  { flow_id: '<id>' })`). PASS: a thrown error
+  surfaces with message containing "flow not
+  ready" — defense in depth even if the picker
+  is bypassed.
 
 ### Workbox — Action Screen (`workbox/detail.html`)
 
@@ -1027,11 +1165,13 @@ states, and that the canvas re-renders after each step.)
 
 - [ ] **WB16** After creating and transitioning
   a work order, check localStorage. PASS:
-  work_orders table has 1 row with display_id
-  and flow_graph JSON. work_order_transitions
-  has immutable event records with from/to
-  node IDs, user ID, values JSON, and
-  timestamps.
+  `work_orders` table has 1 row with `display_id`
+  and `flow_graph` JSON. `work_order_transitions`
+  has immutable event records with `from_node_id`,
+  `to_node_id`, `person_id`, and
+  `transitioned_at`. Per-field values written by
+  the transition land in `transition_field_values`
+  rows referencing the transition by `transition_id`.
 - [ ] **WB17** Navigate away from the action
   screen and return. PASS: all data persists
   correctly across page navigation.
@@ -1043,49 +1183,37 @@ states, and that the canvas re-renders after each step.)
   same. PASS: tab 2 either navigates to a read-only/already-claimed
   view or the claim is rejected — no duplicate row exists in
   `fusion-ai:work_order_claims` for this work order.
-- [ ] **WB19** After transitioning a work order through at least
-  two states, read `fusion-ai:work_order_transitions` from DevTools.
-  PASS: each row has an immutable shape (from_node_id, to_node_id,
-  person_id, values, transitioned_at). Verify no app code path mutates
-  an existing transition row — transitions are append-only.
+- [ ] **WB19** After transitioning a work order through at
+  least two states, read `fusion-ai:work_order_transitions`
+  from DevTools. PASS: each row has an immutable shape
+  (`from_node_id`, `to_node_id`, `person_id`,
+  `transitioned_at`) — the field values themselves live in
+  the `transition_field_values` join table per Codd 1NF.
+  Verify no app code path mutates an existing transition
+  row — transitions are append-only.
 
-### Workbox Visibility Filter
+### Workbox — All-See-All Visibility
 
-(The visibility predicate — unassigned visible to all, model
-visible to no human, role/crew resolved through member sets with
-user-private roles short-circuiting to the encoded person id — is
-covered by `tests/workbox-filter.test.ts` (`isWorkOrderVisibleToPerson`),
-and the inbox aggregation that applies it (active vs archive,
-claimed-and-unfinished exclusion, sort-by-position) by
-`tests/workbox-inbox.test.ts` (`buildInboxItems`). The cases below
-verify that the inbox page actually renders the filtered set.)
+Every authenticated user sees every active and archived
+work order regardless of node assignment. There is no
+per-user visibility filter.
 
-- [ ] **WB20** As `current` person, navigate to
-  `workbox/`. PASS: only work orders whose
-  current node is unassigned, role-assigned to a
-  role you're in, or crew-assigned to a crew
-  containing you appear in the active or archive
-  list. Hidden: model-assigned and crews/roles
-  you're not in.
-- [ ] **WB21** Open the seeded "Customer
-  Onboarding" work order. Its archive entry is
-  visible because the final transition lands on
-  the unassigned Archive node, and unassigned is
-  visible to all (the hazard triangle brands
-  unassigned as misconfiguration in the designer).
-- [ ] **WB22** Construct a flow whose current
-  node is `{ kind: 'crew', crewId: <id> }` for a
-  crew the demo user belongs to (`crew_design`
-  contains the demo user via the seeded
-  user-private membership). Create a work order
-  from that flow and confirm it appears in the
-  active list.
-- [ ] **WB23** Construct a flow whose current
-  node is `{ kind: 'model', modelId: <id> }`
-  (any seeded model). Create a work order from
-  that flow. PASS: it does NOT appear in any
-  workbox — model assignments are visible to no
-  human.
+- [ ] **WB20** As the demo user, navigate to `workbox/`.
+  Active tab. PASS: every active (non-completed,
+  non-claimed-by-other) work order is listed regardless
+  of its current node's `workerIds` — including nodes
+  assigned only to AI workers and nodes with zero
+  workers (which carry the danger badge in the designer
+  but are still visible in the inbox).
+- [ ] **WB21** Switch to the Archive tab. PASS: every
+  completed work order is listed regardless of which
+  worker(s) the final transition referenced.
+- [ ] **WB22** Inspect `web-app/app/presenters/workbox-
+  inbox.ts`. PASS: `buildInboxItems` takes
+  `(workOrders, transitions, claims, workerMap, mode)`
+  with no scope parameter. The presenter exports nothing
+  related to per-user visibility — the workbox shows all
+  work orders to all users by construction.
 
 ---
 
@@ -1133,11 +1261,21 @@ the claude-in-chrome MCP.
 - [ ] **FS5** Click a node → the card pins (stays open on
   mouse-out). Click empty canvas → unpins. Click another
   node → re-pins to it.
-- [ ] **FS6** A model-assigned node's card shows
-  `Model: <name>` and no clan / producer rows; the node
-  displays no hazard. An unassigned non-special node displays
-  the hazard triangle. A zero-member-role or zero-member-crew
-  node also hazards.
+- [ ] **FS6 — Hazard severity rendering on the stats
+  canvas.** The stats renderer reads `n.workerHazard`
+  emitted by `flow-stats-aggregate.ts`. Confirm:
+    - **Zero workers** → red octagon (`iconNoEntry`,
+      `.flow-stats-node-danger`); tooltip "Workers
+      required".
+    - **Zero outgoing edges** (non-Archive node) → red octagon;
+      tooltip "Dead end (no outgoing edges)".
+    - **One worker AND ≥1 outgoing edge** → yellow triangle
+      (`iconAlertTriangle`, `.flow-stats-node-warning`);
+      tooltip "Single worker assigned (no backup)".
+    - **≥2 workers AND ≥1 outgoing edge** → no badge.
+  Create and Archive never display a badge. The
+  card subtitle shows the assigned workers' names joined
+  by ", " (or "Unassigned" if `workerIds` is empty).
 - [ ] **FS7** Path stepper: `Path 1 of M, X% of N work
   orders` with prev/next controls. Clicking next advances;
   the selected path's nodes + edges get an accent stroke and
@@ -1161,56 +1299,119 @@ the claude-in-chrome MCP.
 
 ## G. Admin Pages
 
-### Team (RETIRED)
+### Retired pages
 
-> Cases G1–G8 retired. The standalone Teams page
-> and the underlying TeamEntity/TeamProjectEntity/
-> TeamUserEntity data model have been removed. Roster
-> review now lives on the People page (formerly the
-> Manage People page) — see G19–G24.
+> The standalone Teams, People, Roles, Crews, Profile,
+> Company, and Activity Feed pages have all been removed.
+> Worker administration (humans + AI workers) now lives on
+> the unified Workers page — see G11 onward. Cases G1–G8,
+> G15–G18, G25–G29 and the former K/L sections (Roles,
+> Crews) are no longer part of the plan.
 
 ### Organization (`organization/index.html`)
 
-- [ ] **G9** Navigate to `organization/index.html`. PASS: page wears the standard sidebar + top-bar layout. Shows the page header "Organization", a General Information card at the top with read-only Organization Name and Domain plus an Edit button, then the overview card (plan info, health badge, seats stats), the Usage Overview card with progress bars, and the Security & Administration card linking to People and Billing. (Overview gauge values are hardcoded placeholders — verify the page renders without error; numeric accuracy will be addressed when wired to live tables.)
-- [ ] **G10** In the General Information card, click Edit. PASS: page header swaps Edit for Save/Cancel; the card body switches the read-only fields to two inputs prefilled with the current Organization Name and Domain. Health score (92, "excellent") still renders in the overview card below.
+- [ ] **G9** Navigate to `organization/index.html`. PASS:
+  page wears the standard sidebar + top-bar layout. Shows
+  the page header "Organization", a General Information
+  card at the top with read-only Organization Name and
+  Domain plus an Edit button, then the overview card
+  (plan info, health badge, seats stats), the Usage
+  Overview card with progress bars, and the Security &
+  Administration card linking to Workers and Billing.
+  (Overview gauge values are hardcoded placeholders —
+  verify the page renders without error; numeric accuracy
+  will be addressed when wired to live tables.)
+- [ ] **G10** In the General Information card, click Edit.
+  PASS: page header swaps Edit for Save/Cancel; the card
+  body switches the read-only fields to two inputs
+  prefilled with the current Organization Name and Domain.
+  Health score (92, "excellent") still renders in the
+  overview card below.
 
-### Person Detail (`people/detail.html`)
+### Workers list (`workers/index.html`)
 
-- [ ] **G11** From `people/index.html`, click any person's row. PASS: navigates to that person's detail page; URL carries `?personId=<id>`. Read mode shows avatar (initials), name + status badge, role · department subtitle, Personal Information card (First Name, Last Name, Email, Phone, Role, Department, Bio), Working Styles card (4-axis dimensions), and Strengths card (chips of selected strengths).
-- [ ] **G12** Click the sidebar account chip (lower-left). PASS: navigates to the current user's `people-detail` page. Click the header greeting ("Good {time-of-day}, {name}"). PASS: also navigates to the current user's `people-detail` page.
-- [ ] **G13** Click Edit. PASS: header swaps Edit for Cancel/Save; Personal Information card switches to inputs (First/Last Name text, Email email-input, Phone text, Role text, Department select, Status select, Bio textarea); Strengths card switches to a tag picker (chips toggle on click between primary/secondary). Working Styles card stays read-only.
-- [ ] **G14** Edit Phone and Bio, toggle one strength on and one off, change Status from Active to Pending, click Save. PASS: toast "Person saved" appears. Navigate away (e.g. to Dashboard) and return. PASS: all edits persist; the row on `people/index.html` reflects the new status badge.
-- [ ] **G15** Click Edit, change a field, press `Escape`. PASS: edits discarded, view returns to read mode unchanged.
-- [ ] **G16** Click Edit, change a text field, press `Enter` while focused on the input. PASS: save fires (toast "Person saved").
-- [ ] **G17** On `people/index.html`, the current user's row appears TWICE — once at the top with `data-self="true"` (CSS distinguishes it: accent left border, subtle background tint) and once inline in the list with `data-self="false"`. PASS: HTML is otherwise identical between the two; only the `data-self` attribute and CSS treatment differ.
-- [ ] **G18** From `people-detail`, click the back button. PASS: returns to `people/index.html`.
+- [ ] **G11** Navigate to `workers/index.html` (reachable
+  via the "Workers" sidebar entry). PASS: page header reads
+  "Manage Workers" with a subtitle showing the human and AI
+  counts (e.g. "10 humans, 4 AIs"). A `+ Add Worker` button
+  on the right opens the kind-picker dialog. Below the
+  header sit a search input and three filter chips (All /
+  Humans / AIs, with All pressed by default). The list
+  table groups workers under HUMANS first then AIs, each
+  group showing avatar/name, title (humans) or provider
+  (AIs), department (humans) or masked auth token (AIs),
+  and a status badge (humans only).
+- [ ] **G12** Click the sidebar account chip (lower-left).
+  PASS: navigates to the current human worker's
+  `worker-detail` page (`?workerId=<id>`). Click the
+  header greeting ("Good {time-of-day}, {name}"). PASS:
+  also navigates to the current human's `worker-detail`
+  page.
+- [ ] **G13** Type in the search input. PASS: filters the
+  list by name (humans) or name + provider (AIs) in
+  real-time. Click the Humans filter chip. PASS: only the
+  HUMANS group is visible. Click AIs. PASS: only the AIs
+  group is visible. Click All. PASS: both groups return.
+- [ ] **G14** Click `+ Add Worker`. PASS: dialog opens with
+  the Kind toggle defaulting to Human, the Human form
+  visible, and the AI form hidden. Switch the toggle to
+  AI. PASS: the Human form hides, the AI form appears
+  with the security warning (yellow text starting "⚠ Auth
+  tokens are stored unencrypted...").
+- [ ] **G14a** With Kind=AI selected, leave the Auth Token
+  field empty and click Create. PASS: the form is rejected
+  client-side (the input is `required`/`aria-required`); no
+  POST fires. Fill all four AI fields with valid values and
+  click Create. PASS: toast confirms; the new AI appears in
+  the AIs group.
 
-> The previous Company page (formerly cases G15–G18)
-> has been folded into the Organization page (G9–G10);
-> the renumbered G15–G18 above cover the new Person
-> Detail page that replaced the retired Profile page.
-> The CompanyEntity, its store, validator, REST route,
-> and presenter have been removed.
+### Worker detail — Human (`workers/detail.html?workerId=<hw_*>`)
 
-### People (`people/index.html`)
+- [ ] **G19** From `workers/index.html`, click any human
+  worker's row. PASS: navigates to `worker-detail`. Read
+  mode shows avatar (initials), name + status badge,
+  title · department subtitle, Personal Information card
+  (First Name, Last Name, Email, Phone, Title, Department,
+  Bio), Working Styles card (4-axis dimensions), and
+  Strengths card.
+- [ ] **G20** Click Edit. PASS: header swaps Edit for
+  Cancel/Save; Personal Information card switches to
+  inputs (First/Last Name text, Email email-input, Phone
+  text, Title text, Department select, Status select, Bio
+  textarea); Strengths card switches to a tag picker.
+  Working Styles card stays read-only.
+- [ ] **G21** Edit Phone and Bio, toggle one strength on
+  and one off, change Status from Active to Pending,
+  click Save. PASS: toast "Worker saved" appears. Navigate
+  away (e.g. to Dashboard) and return. PASS: all edits
+  persist; the row on `workers/index.html` reflects the new
+  status badge.
+- [ ] **G22** Click Edit, change a field, press `Escape`.
+  PASS: edits discarded, view returns to read mode.
+- [ ] **G23** Click Edit, change a text field, press
+  `Enter` while focused on the input. PASS: save fires
+  (toast "Worker saved").
+- [ ] **G23a** From `worker-detail`, click the back button.
+  PASS: returns to `workers/index.html`.
 
-- [ ] **G19** Navigate to `people/index.html` (also reachable via the "People" sidebar entry, which replaced the retired "Teams" entry). PASS: shows the current user's row at the top with `data-self="true"` styling (accent border + subtle tint), then a header row, then the full people table with avatar, name, email, role badge (job title), department, and status badge (Active/Pending/Deactivated). Header shows active/pending user counts. Search input and two filter dropdowns (All Roles, All Status) visible. The current user appears again inside the list (the duplicate is intentional).
-- [ ] **G20** Type in the search input. PASS: filters user list by name or email in real-time. Role and status dropdowns also filter the list. The "You" row at the top is unaffected by filters (always visible).
-- [ ] **G21** Deactivated person (James Miller) is visually distinguished with "Deactivated" badge (X icon) and reduced opacity styling. PASS: clearly different from active people.
-- [ ] **G22** Pending people show "Pending" badge with clock icon and "Invite sent" text. PASS: visually distinct from active people.
-- [ ] **G23** "Invite Person" button is visible. PASS: clicking it opens the invite dialog with fields for First Name, Last Name, Email, Role, Department, Status, Phone, and Bio.
-- [ ] **G24** Fill all required fields and submit the invite dialog. PASS: toast confirms user creation, new user appears in the user list with correct name, email, role, and status badge.
+### Worker detail — AI (`workers/detail.html?workerId=<ai_*>`)
 
-### Activity Feed (RETIRED)
-
-> Cases G25–G29 retired. The standalone Activity
-> Feed page has been removed along with the
-> orphaned read-side adapters (getActivityRows,
-> getActivityActorRows, ActivityPresenter, the
-> Activity wrapper class, RecentActivityItem,
-> RECENT_ACTIVITY_COUNT). Activities are still
-> WRITTEN by ideas/workbox/users via postActivity;
-> no UI currently reads them.
+- [ ] **G24** From `workers/index.html`, click any AI
+  worker's row. PASS: navigates to `worker-detail`. Read
+  mode shows the AI Worker identity card (Name, Provider,
+  Description) and a separate Auth Token card showing the
+  masked token (last 4 chars only, e.g. `sk-...XXXX`)
+  rendered in monospace.
+- [ ] **G24a** Click Edit. PASS: identity fields become
+  inputs (Name text, Provider text, Description textarea);
+  the Auth Token field becomes a `type="password"` input
+  with placeholder "Leave blank to keep current token" and
+  the security-warning paragraph below. Save with the token
+  field blank. PASS: toast "AI worker saved"; on reopen the
+  masked token is unchanged.
+- [ ] **G24b** Click Edit again, type a new token, click
+  Save. PASS: toast "AI worker saved"; on reopen the
+  masked token's last 4 chars match the new value.
 
 ### Snapshots (`snapshots/`) — Run These Last
 
@@ -1223,9 +1424,24 @@ verify the four operation cards, the file-picker affordance, the
 post-operation redirect, and that pages render against the
 restored data.)
 
-- [ ] **G30** Navigate to `snapshots/`. PASS: shows 4 operation cards: Create Pristine Environment, Wipe and Load Mock Data, Upload Snapshot, Download Snapshot.
+- [ ] **G30** Navigate to `snapshots/`. PASS: shows 3 operation cards (Create Pristine Environment, Wipe and Load Mock Data, Download Snapshot) plus an Upload Snapshot affordance rendered as a labeled file-input (`<input type="file" id="upload-input">`), not a fourth button card.
 - [ ] **G31** Click "Download Snapshot". PASS: browser downloads `fusion-ai-snapshot-YYYY-MM-DD.json`. File contains valid JSON with entity data.
-- [ ] **G32** Click "Create Pristine Environment", confirm the dialog. PASS: redirects to `dashboard/index.html`. Dashboard renders with zeroed-out metrics (empty database). All 20 `fusion-ai:*` keys exist in localStorage as empty arrays.
+- [ ] **G32** Click "Create Pristine Environment", confirm
+  the dialog. PASS: redirects to `dashboard/index.html`.
+  Dashboard renders with zeroed-out metrics (empty
+  database). 15 of the 17 `fusion-ai:*` keys are present
+  as empty arrays; `fusion-ai:workers` and
+  `fusion-ai:organization` are bootstrap-seeded by
+  `postBootstrap` after the pristine wipe — `workers`
+  holds the current user (Tony Stark), `organization`
+  holds Stark Industries. Empty-array tables persisted
+  via column-compression appear as a `gz1:H4sI…`
+  sentinel rather than the literal `[]` string; the
+  `db-localstorage` adapter decodes them transparently.
+  The full table set is the constant `TABLE_NAMES` in
+  `api/db.ts`;
+  cross-check against that. No tables outside that list
+  appear under any `fusion-ai:*` key.
 - [ ] **G33** Click "Wipe and Load Mock Data". PASS: redirects to `dashboard/index.html`. Navigate to `ideas/` — 11 ideas are back.
 - [ ] **G34** Return to `snapshots/`, wipe data, then use "Upload Snapshot" file input and select the previously downloaded JSON file. PASS: redirects to `dashboard/index.html`. Data matches the snapshot.
 
@@ -1236,20 +1452,26 @@ restored data.)
   inline error reports the upload failed with a human-readable
   message; existing data in localStorage is untouched (verify via
   DevTools that no fusion-ai:* keys were overwritten or cleared).
-  (The rejection logic and the wipe-on-fail behavior are covered
+  Note: malformed JSON is rejected at parse time — BEFORE any
+  write — so the wipe-on-fail path is NOT exercised by this case.
+  Wipe-on-fail fires for the rarer scenario where parse succeeds
+  but a per-row validator throws mid-write; that path is covered
+  by `tests/snapshot-wipe-on-fail.test.ts`. The pre-parse
+  rejection logic and the wipe-on-fail behavior are covered
   by `tests/snapshot-import-validation.test.ts` and
   `tests/snapshot-wipe-on-fail.test.ts` — this case verifies the
   error toast/inline-error surfaces in the UI.)
-- [ ] **G36** On `people/index.html`, status mutation lives on
-  the detail page rather than as inline row buttons. Click any
-  active or pending person's row. PASS: navigates to their detail
-  page. Click Edit, change Status to "Deactivated", click Save.
-  PASS: toast "Person saved" fires; navigating back to the people
-  list shows the row with the "Deactivated" badge and reduced
-  opacity styling, and the active count in the header has dropped
-  by one. Repeat in reverse to reactivate. The deactivate flow is
-  no longer a single-click action — it is part of the same edit
-  cycle as every other field.
+- [ ] **G36** On `workers/index.html`, status mutation for
+  human workers lives on the detail page rather than as
+  inline row buttons. Click any active or pending human
+  worker's row. PASS: navigates to their detail page. Click
+  Edit, change Status to "Deactivated", click Save. PASS:
+  toast "Worker saved" fires; navigating back to the
+  Workers list shows the row with the "Deactivated" badge
+  and reduced opacity styling, and the human-count subtitle
+  reflects the change. Repeat in reverse to reactivate. The
+  deactivate flow is part of the same edit cycle as every
+  other field — there is no single-click deactivation.
 
 ### Billing (`billing/`) — STUB
 
@@ -1276,7 +1498,7 @@ feature is implemented.
   Press `Escape`. PASS: card returns to read mode,
   Domain shows the original value (Escape behaves
   identically to Cancel; same code path as the
-  Person Detail and former Company edit pages).
+  Worker Detail edit cycle).
 - [ ] **G40** Click Edit. Modify both Organization
   Name and Domain. Click Save. PASS: toast
   "Organization saved" fires at top-center,
@@ -1332,7 +1554,7 @@ feature is implemented.
 - [ ] **I17** Type a search term (e.g. "ideas"). PASS: filtered results appear. Select a result — navigates to the corresponding page.
 - [ ] **I18** Press `Escape`. PASS: command palette closes.
 - [ ] **I19** Open command palette, type a search term. Use `Down Arrow` and `Up Arrow` to navigate results. PASS: active result highlight moves with arrow keys. Press `Enter`. PASS: navigates to the highlighted result.
-- [ ] **I20** Open command palette with an empty search field. PASS: results list shows up to 12 items from the combined index, grouped by category (Pages, Ideas, Projects, People) with category headers — when the dataset is sparse enough for multiple categories to fit in 12 items, multiple groups appear; otherwise a single group is shown. Type a multi-category term (e.g. "dashboard") that matches across groups. PASS: results regroup under multiple category headers. Type a term that matches no results. PASS: result list is empty or shows a no-results message.
+- [ ] **I20** Open command palette with an empty search field. PASS: results list shows up to 12 items from the combined index, grouped by category (Pages, Ideas, Projects, Workers) with category headers — when the dataset is sparse enough for multiple categories to fit in 12 items, multiple groups appear; otherwise a single group is shown. Type a multi-category term (e.g. "dashboard") that matches across groups. PASS: results regroup under multiple category headers. Type a term that matches no results. PASS: result list is empty or shows a no-results message.
 
 ### Loading States
 
@@ -1362,64 +1584,6 @@ feature is implemented.
 
 ---
 
-## K. Roles
-
-- [ ] **K1** Navigate to `roles/`. PASS: roles
-  index renders with a "New Role" button and a
-  search bar. With pristine data, table is empty
-  but shell remains.
-- [ ] **K2** Click "New Role", enter
-  `Engineering` as name and a short description,
-  click Create. PASS: row appears in the table
-  with member count "0 members".
-- [ ] **K3** From `/people/<id>` for any person,
-  add the new Engineering role via the role
-  membership UI. Return to `/roles`. PASS: row's
-  member count increments to "1 member".
-- [ ] **K4** Type `engin` into the search bar.
-  PASS: only matching rows remain visible;
-  case-insensitive.
-- [ ] **K5** Open a second tab on `/roles`. In
-  tab 1, create another role. PASS: tab 2 shows
-  the new row without manual reload (cross-tab
-  via StorageEvent).
-- [ ] **K6** Click the trash icon on a row;
-  confirm in the dialog. PASS: row disappears;
-  any person-detail no longer shows the role
-  (cascade tested in `adapters-roles.test.ts`).
-
----
-
-## L. Crews
-
-- [ ] **L1** Navigate to `crews/`. PASS: crews
-  index renders with a "New Crew" button and
-  search.
-- [ ] **L2** Click "New Crew", enter `Delivery`
-  as name and a short description, click Create.
-  PASS: row appears with role count "0 roles".
-- [ ] **L3** Click the row body to expand. PASS:
-  expansion reveals "No roles in this crew yet"
-  plus an Add-role select listing every
-  persisted role.
-- [ ] **L4** Select a role and click Add. PASS:
-  role appears in the expansion; role count
-  updates to "1 role".
-- [ ] **L5** Click the trash icon next to a role.
-  PASS: role removed from expansion.
-- [ ] **L6** Click another crew's row to expand.
-  PASS: only one crew expanded at a time —
-  previous expansion collapses.
-- [ ] **L7** Type into the search bar. PASS:
-  only matching crews remain visible.
-- [ ] **L8** Click the trash icon on a row,
-  confirm. PASS: crew is removed; any
-  crew_role_memberships rows for it are also
-  removed (cascade tested in
-  `adapters-crews.test.ts`).
-
----
-
 ## J. Teardown
 
 - [ ] **J1** Stop the HTTP server started in A3. PASS: process terminates.
@@ -1428,16 +1592,60 @@ feature is implemented.
 
 ---
 
-## Execution Log
+## Summary Format
 
-| Field | Value |
-|---|---|
-| Tester | |
-| Date | |
-| Browser & Version | |
-| OS | |
-| Build SHA | |
-| Tests Passed | /265 |
-| Tests Failed | /265 |
-| Tests Skipped | /265 |
-| Notes | |
+The run produces a single conversational summary in the
+following format. This is the contract `## How to invoke`
+references. The doc itself is NOT mutated by the run.
+
+```
+# Test Plan Run — <ISO-8601 timestamp, Zulu>
+
+Build SHA: <git rev-parse --short HEAD>  (clean | dirty: N files)
+Mode: parallel-agents | serial
+
+## Automated (AT)
+- AT1 tsc: PASS (0 diagnostics)
+- AT2 ./test: PASS (N/N, 0 fail, Xs)
+- AT3 ./validate: PASS (lint clean)
+
+## Manual Browser Regression
+Total: <N> cases — PASS X · BLOCKED Y · FAIL Z
+
+| Phase / Agent | Sections          | Pass | Blocked | Fail |
+|---------------|-------------------|-----:|--------:|-----:|
+| Preflight     | A1–A5             |    5 |       0 |    0 |
+| Phase-1       | AA1–AA43+subs     |    X |       Y |    Z |
+| Agent-B       | B1–B14            |   14 |       0 |    0 |
+| Agent-CH      | C1–C7 + H1–H2     |    9 |       0 |    0 |
+| Agent-D       | D1–D37            |    X |       Y |    Z |
+| Agent-E       | E1–E11            |   11 |       0 |    0 |
+| Agent-F       | F1–F74 + FS1–FS9  |    X |       Y |    Z |
+| Agent-F2      | WB1–WB22 + subs   |   25 |       0 |    0 |
+| Agent-G       | G9–14,19–24,36–40 |    X |       0 |    0 |
+| Phase-3       | I1–I28            |    X |       Y |    Z |
+| Phase-4       | G30–G35           |    6 |       0 |    0 |
+| Teardown      | J1–J3             |    3 |       0 |    0 |
+
+## BLOCKED detail (known MCP limitations — NOT failures)
+- <case ID>: <one-line reason>
+
+## FAIL detail
+(none) | <case ID>: <one-line symptom>
+
+## Drift Candidates
+| Case | Mode | Symptom | Likely cause |
+|------|------|---------|--------------|
+(none) | ... | ... | ...
+```
+
+A fully green run with no drift produces zero rows in FAIL
+and Drift Candidates, a one-line BLOCKED list, and fits in
+under 50 lines.
+
+`BLOCKED` is reserved for known MCP environmental limits
+(pointer-capture gestures, `resize_window`, file I/O).
+`FAIL` is for real regressions. A case that "mostly passes
+but one subassertion drifts" is scored PASS with the drift
+noted in the Drift Candidates table — the agent surfaces;
+the user adjudicates.

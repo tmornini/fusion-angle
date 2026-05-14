@@ -8,13 +8,14 @@ import {
 import {
     createChannel,
 } from '../web-app/app/channels.ts';
-import { nowUtc } from '../api/types.ts';
 
-function buildRoleBody(name: string) {
+function buildAIWorkerBody(name: string) {
     return {
         name,
+        provider: 'Anthropic',
         description: '',
-        created_at: nowUtc(),
+        auth_token: 'sk-test-XXXX',
+        created_at: '2026-01-01T00:00:00Z',
     };
 }
 
@@ -27,23 +28,25 @@ test(
             ops: [
                 {
                     method: 'put',
-                    resource: 'roles/r-1',
-                    body: buildRoleBody('First'),
+                    resource: 'ai-workers/ai_1',
+                    body: buildAIWorkerBody(
+                        'First',
+                    ),
                 },
                 {
                     method: 'put',
-                    resource: 'roles/r-2',
-                    body: buildRoleBody(
+                    resource: 'ai-workers/ai_2',
+                    body: buildAIWorkerBody(
                         'Second',
                     ),
                 },
                 {
                     method: 'delete',
-                    resource: 'roles/r-1',
+                    resource: 'ai-workers/ai_1',
                 },
             ],
         });
-        const r1 = await db.roles.getAll();
+        const r1 = await db.aiWorkers.getAll();
         assert.equal(r1.length, 1);
         assert.equal(r1[0]!.name, 'Second');
     },
@@ -65,13 +68,13 @@ test(
             ops: [
                 {
                     method: 'put',
-                    resource: 'roles/r-1',
-                    body: buildRoleBody('A'),
+                    resource: 'ai-workers/ai_1',
+                    body: buildAIWorkerBody('A'),
                 },
                 {
                     method: 'put',
-                    resource: 'roles/r-2',
-                    body: buildRoleBody('B'),
+                    resource: 'ai-workers/ai_2',
+                    body: buildAIWorkerBody('B'),
                 },
             ],
             notifyChannels: [ch1, ch2],
@@ -109,18 +112,18 @@ test(
         ch.subscribe(() => { count++; });
         const goodA = {
             method: 'put' as const,
-            resource: 'roles/r-1',
-            body: buildRoleBody('A'),
+            resource: 'ai-workers/ai_1',
+            body: buildAIWorkerBody('A'),
         };
         const bad = {
             method: 'put' as const,
-            resource: 'roles/r-2',
+            resource: 'ai-workers/ai_2',
             body: { rogue_field: 'oops' },
         };
         const goodC = {
             method: 'put' as const,
-            resource: 'roles/r-3',
-            body: buildRoleBody('C'),
+            resource: 'ai-workers/ai_3',
+            body: buildAIWorkerBody('C'),
         };
         let caught: unknown;
         try {
@@ -138,7 +141,7 @@ test(
         assert.equal(err.applied[0], goodA);
         assert.ok(err.cause instanceof Error);
         // No rollback: first op landed.
-        const all = await db.roles.getAll();
+        const all = await db.aiWorkers.getAll();
         assert.equal(all.length, 1);
         assert.equal(all[0]!.name, 'A');
         // Channel did NOT fire.
@@ -154,7 +157,7 @@ test(
         const ctx = createRequestContext(db);
         const bad = {
             method: 'put' as const,
-            resource: 'roles/r-1',
+            resource: 'ai-workers/ai_1',
             body: { rogue_field: 'oops' },
         };
         let caught: unknown;
@@ -180,17 +183,17 @@ test(
         const ctx = createRequestContext(db);
         const goodA = {
             method: 'put' as const,
-            resource: 'roles/r-1',
-            body: buildRoleBody('A'),
+            resource: 'ai-workers/ai_1',
+            body: buildAIWorkerBody('A'),
         };
         const goodB = {
             method: 'put' as const,
-            resource: 'roles/r-2',
-            body: buildRoleBody('B'),
+            resource: 'ai-workers/ai_2',
+            body: buildAIWorkerBody('B'),
         };
         const bad = {
             method: 'put' as const,
-            resource: 'roles/r-3',
+            resource: 'ai-workers/ai_3',
             body: { rogue_field: 'oops' },
         };
         let caught: unknown;

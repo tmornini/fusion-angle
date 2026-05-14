@@ -84,117 +84,50 @@ test('GET ideas/ normalizes to collection', async () => {
 });
 
 test(
-    'GET roles returns the persisted roles',
+    'GET workers returns the persisted humans',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.roles.put('r-eng', {
-            name: 'Engineering',
-            description: '',
-            created_at: '2026-01-01T00:00:00Z',
+        await db.workers.put('hw_1', {
+            first_name: 'Sarah',
+            last_name: 'Chen',
+            email: 'sarah@example.com',
+            phone: '',
+            title: 'Engineer',
+            department: 'Eng',
+            status: 'active',
+            strengths: '[]' as never,
+            team_dimensions: '{}' as never,
+            bio: '',
         });
-        const roles =
-            await GET<unknown[]>(db, 'roles');
-        assert.equal(roles.length, 1);
+        const workers =
+            await GET<unknown[]>(db, 'workers');
+        assert.equal(workers.length, 1);
     },
 );
 
 test(
-    'PUT roles/:id validates body',
+    'GET ai-workers returns persisted AIs',
     async () => {
         const db = new MemoryDbAdapter();
-        await assert.rejects(
-            () => PUT(db, 'roles/r-1', {
-                rogue_field: 'extra',
-            }),
-            /unexpected key|missing/,
-        );
-    },
-);
-
-test(
-    'DELETE roles/:id tombstones the role',
-    async () => {
-        const db = new MemoryDbAdapter();
-        await db.roles.put('r-eng', {
-            name: 'Engineering',
-            description: '',
-            created_at: '2026-01-01T00:00:00Z',
-        });
-        await DELETE(db, 'roles/r-eng');
-        await assert.rejects(
-            () => GET(db, 'roles/r-eng'),
-            /Not found|404/,
-        );
-    },
-);
-
-test(
-    'PUT role-memberships/:id validates body',
-    async () => {
-        const db = new MemoryDbAdapter();
-        await assert.rejects(
-            () => PUT(
-                db, 'role-memberships/m-1', {
-                    role_id: 'r-1',
-                },
-            ),
-            /missing/,
-        );
-    },
-);
-
-test(
-    'PUT then DELETE role-memberships/:id'
-    + ' removes the row',
-    async () => {
-        const db = new MemoryDbAdapter();
-        await PUT(
-            db, 'role-memberships/m-1', {
-                id: 'm-1',
-                role_id: 'r-1',
-                person_id: 'p-1',
-                created_at:
-                    '2026-01-01T00:00:00Z',
-            },
-        );
-        const before =
-            await GET<unknown[]>(
-                db, 'role-memberships',
-            );
-        assert.equal(before.length, 1);
-        await DELETE(
-            db, 'role-memberships/m-1',
-        );
-        const after =
-            await GET<unknown[]>(
-                db, 'role-memberships',
-            );
-        assert.equal(after.length, 0);
-    },
-);
-
-test(
-    'GET models returns persisted models',
-    async () => {
-        const db = new MemoryDbAdapter();
-        await db.models.put('m-1', {
+        await db.aiWorkers.put('ai_1', {
             name: 'Opus',
             provider: 'Anthropic',
             description: '',
+            auth_token: 'sk-real-token',
             created_at: '2026-01-01T00:00:00Z',
         });
-        const models =
-            await GET<unknown[]>(db, 'models');
-        assert.equal(models.length, 1);
+        const ais =
+            await GET<unknown[]>(db, 'ai-workers');
+        assert.equal(ais.length, 1);
     },
 );
 
 test(
-    'PUT models/:id validates body',
+    'PUT ai-workers/:id validates body',
     async () => {
         const db = new MemoryDbAdapter();
         await assert.rejects(
-            () => PUT(db, 'models/m-1', {
+            () => PUT(db, 'ai-workers/ai_1', {
                 rogue_field: 'extra',
             }),
             /unexpected key|missing/,
@@ -203,33 +136,21 @@ test(
 );
 
 test(
-    'PUT then DELETE role-model-memberships/:id'
-    + ' removes the row',
+    'DELETE ai-workers/:id tombstones the AI',
     async () => {
         const db = new MemoryDbAdapter();
-        await PUT(
-            db,
-            'role-model-memberships/m-1', {
-                id: 'm-1',
-                role_id: 'r-1',
-                model_id: 'mod-1',
-                created_at:
-                    '2026-01-01T00:00:00Z',
-            },
+        await db.aiWorkers.put('ai_1', {
+            name: 'Opus',
+            provider: 'Anthropic',
+            description: '',
+            auth_token: 'sk-real-token',
+            created_at: '2026-01-01T00:00:00Z',
+        });
+        await DELETE(db, 'ai-workers/ai_1');
+        await assert.rejects(
+            () => GET(db, 'ai-workers/ai_1'),
+            /Not found|404/,
         );
-        const before =
-            await GET<unknown[]>(
-                db, 'role-model-memberships',
-            );
-        assert.equal(before.length, 1);
-        await DELETE(
-            db, 'role-model-memberships/m-1',
-        );
-        const after =
-            await GET<unknown[]>(
-                db, 'role-model-memberships',
-            );
-        assert.equal(after.length, 0);
     },
 );
 
@@ -241,9 +162,9 @@ test(
         await POST(
             db, 'snapshots/mock-data', {},
         );
-        const people =
-            await GET<unknown[]>(db, 'people');
-        assert.ok(people.length > 0);
+        const workers =
+            await GET<unknown[]>(db, 'workers');
+        assert.ok(workers.length > 0);
     },
 );
 
@@ -278,7 +199,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await assert.rejects(
-            () => GET(db, 'roles/r-1/extra'),
+            () => GET(db, 'workers/w-1/extra'),
             /not found|404/i,
         );
     },

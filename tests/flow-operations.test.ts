@@ -71,9 +71,9 @@ function buildNode(
         description: '',
         positionX: 0,
         positionY: 0,
-        isStart: false,
-        isComplete: false,
-        crew: { kind: 'unassigned' },
+        isCreate: false,
+        isArchive: false,
+        workerIds: [],
         fields: [],
         ...overrides,
     };
@@ -279,7 +279,7 @@ test(
     async () => {
         const { db } = await setupFlow();
         const snap = snapFrom(buildGraph([
-            buildNode('s', { isStart: true }),
+            buildNode('s', { isCreate: true }),
             buildNode('a'),
         ]));
         const op = await performAddEdge(
@@ -342,7 +342,7 @@ test(
     async () => {
         const { db } = await setupFlow();
         const snap = snapFrom(buildGraph([
-            buildNode('e', { isComplete: true }),
+            buildNode('e', { isArchive: true }),
             buildNode('a'),
         ]));
         const op = await performAddEdge(
@@ -360,7 +360,7 @@ test(
         const { db } = await setupFlow();
         const snap = snapFrom(buildGraph([
             buildNode('a'),
-            buildNode('s', { isStart: true }),
+            buildNode('s', { isCreate: true }),
         ]));
         const op = await performAddEdge(
             db, snap, 'a', 's',
@@ -395,7 +395,7 @@ test(
         const { db } = await setupFlow();
         const snap = snapFrom(buildGraph(
             [
-                buildNode('s', { isStart: true }),
+                buildNode('s', { isCreate: true }),
                 buildNode('a'), buildNode('b'),
             ],
             [buildEdge('e1', 's', 'a')],
@@ -503,7 +503,7 @@ test(
     async () => {
         const { db } = await setupFlow();
         const snap = snapFrom(buildGraph([
-            buildNode('e', { isComplete: true }),
+            buildNode('e', { isArchive: true }),
         ]));
         const op = await performAddNodeAtPosition(
             db, snap, 'e', 0, 0,
@@ -521,7 +521,7 @@ test(
         const { db } = await setupFlow();
         const snap = snapFrom(buildGraph(
             [
-                buildNode('s', { isStart: true }),
+                buildNode('s', { isCreate: true }),
                 buildNode('a'),
             ],
             [buildEdge('e1', 's', 'a')],
@@ -567,9 +567,9 @@ test(
     async () => {
         const { db } = await setupFlow();
         const base = snapFrom(buildGraph([
-            buildNode('s', { isStart: true }),
+            buildNode('s', { isCreate: true }),
             buildNode('a'),
-            buildNode('e', { isComplete: true }),
+            buildNode('e', { isArchive: true }),
         ]));
         const op =
             await performDeleteSelectedNodes(
@@ -594,9 +594,9 @@ test(
     async () => {
         const { db } = await setupFlow();
         const base = snapFrom(buildGraph([
-            buildNode('s', { isStart: true }),
+            buildNode('s', { isCreate: true }),
             buildNode('a'),
-            buildNode('e', { isComplete: true }),
+            buildNode('e', { isArchive: true }),
         ]));
         const op =
             await performDeleteSelectedNodes(
@@ -654,8 +654,8 @@ test(
     async () => {
         const { db } = await setupFlow();
         const base = snapFrom(buildGraph([
-            buildNode('s', { isStart: true }),
-            buildNode('e', { isComplete: true }),
+            buildNode('s', { isCreate: true }),
+            buildNode('e', { isArchive: true }),
         ]));
         const op =
             await performDeleteSelectedNodes(

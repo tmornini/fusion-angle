@@ -10,7 +10,8 @@ import type {
 } from './db.ts';
 import type {
     Deleted,
-    PersonEntity,
+    HumanWorkerEntity,
+    AIWorkerEntity,
     IdeaEntity,
     ProjectEntity,
     ActivityEntity,
@@ -20,12 +21,6 @@ import type {
     IdeaSubmissionEntity,
     ActivityActorEntity,
     ProjectFlowEntity,
-    RoleEntity,
-    RoleMembershipEntity,
-    CrewEntity,
-    CrewRoleMembershipEntity,
-    ModelEntity,
-    RoleModelMembershipEntity,
     WorkOrderEntity,
     FlowWorkOrderEntity,
     WorkOrderTransitionEntity,
@@ -151,7 +146,8 @@ class MemDeletedStore implements DeletedStore {
 }
 
 interface Tables {
-    people: Map<string, PersonEntity>;
+    workers: Map<string, HumanWorkerEntity>;
+    aiWorkers: Map<string, AIWorkerEntity>;
     ideas: Map<string, IdeaEntity>;
     projects: Map<string, ProjectEntity>;
     activities: Map<string, ActivityEntity>;
@@ -170,18 +166,6 @@ interface Tables {
     >;
     projectFlows: Map<
         string, ProjectFlowEntity
-    >;
-    roles: Map<string, RoleEntity>;
-    roleMemberships: Map<
-        string, RoleMembershipEntity
-    >;
-    crews: Map<string, CrewEntity>;
-    crewRoleMemberships: Map<
-        string, CrewRoleMembershipEntity
-    >;
-    models: Map<string, ModelEntity>;
-    roleModelMemberships: Map<
-        string, RoleModelMembershipEntity
     >;
     workOrders: Map<string, WorkOrderEntity>;
     flowWorkOrders: Map<
@@ -204,8 +188,10 @@ export class MemoryDbAdapter
 {
     #tables: Tables | null = null;
     readonly #deletedStore: MemDeletedStore;
-    readonly people:
-        EntityStore<PersonEntity>;
+    readonly workers:
+        EntityStore<HumanWorkerEntity>;
+    readonly aiWorkers:
+        EntityStore<AIWorkerEntity>;
     readonly ideas:
         EntityStore<IdeaEntity>;
     readonly projects:
@@ -238,20 +224,6 @@ export class MemoryDbAdapter
         EntityStore<IdeaSubmissionEntity>;
     readonly activityActors:
         EntityStore<ActivityActorEntity>;
-    readonly roles:
-        EntityStore<RoleEntity>;
-    readonly roleMemberships:
-        EntityStore<RoleMembershipEntity>;
-    readonly crews:
-        EntityStore<CrewEntity>;
-    readonly crewRoleMemberships:
-        EntityStore<CrewRoleMembershipEntity>;
-    readonly models:
-        EntityStore<ModelEntity>;
-    readonly roleModelMemberships:
-        EntityStore<
-            RoleModelMembershipEntity
-        >;
     readonly deleted: DeletedStore;
 
     constructor() {
@@ -263,9 +235,13 @@ export class MemoryDbAdapter
         this.deleted = this.#deletedStore;
         const t = this.#tables;
         const ds = this.#deletedStore;
-        this.people =
+        this.workers =
             new MemEntityStore(
-                'people', t.people, ds,
+                'workers', t.workers, ds,
+            );
+        this.aiWorkers =
+            new MemEntityStore(
+                'ai_workers', t.aiWorkers, ds,
             );
         this.ideas =
             new MemEntityStore(
@@ -333,33 +309,6 @@ export class MemoryDbAdapter
             new MemEntityStore(
                 'activity_actors',
                 t.activityActors, ds,
-            );
-        this.roles =
-            new MemEntityStore(
-                'roles', t.roles, ds,
-            );
-        this.roleMemberships =
-            new MemEntityStore(
-                'role_memberships',
-                t.roleMemberships, ds,
-            );
-        this.crews =
-            new MemEntityStore(
-                'crews', t.crews, ds,
-            );
-        this.crewRoleMemberships =
-            new MemEntityStore(
-                'crew_role_memberships',
-                t.crewRoleMemberships, ds,
-            );
-        this.models =
-            new MemEntityStore(
-                'models', t.models, ds,
-            );
-        this.roleModelMemberships =
-            new MemEntityStore(
-                'role_model_memberships',
-                t.roleModelMemberships, ds,
             );
     }
 
@@ -434,7 +383,8 @@ export class MemoryDbAdapter
 
 function buildTables(): Tables {
     return {
-        people: new Map(),
+        workers: new Map(),
+        aiWorkers: new Map(),
         ideas: new Map(),
         projects: new Map(),
         activities: new Map(),
@@ -444,12 +394,6 @@ function buildTables(): Tables {
         ideaSubmissions: new Map(),
         activityActors: new Map(),
         projectFlows: new Map(),
-        roles: new Map(),
-        roleMemberships: new Map(),
-        crews: new Map(),
-        crewRoleMemberships: new Map(),
-        models: new Map(),
-        roleModelMemberships: new Map(),
         workOrders: new Map(),
         flowWorkOrders: new Map(),
         workOrderTransitions: new Map(),

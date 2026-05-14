@@ -1,5 +1,7 @@
 import { MissingTableError } from '../../../api/db.ts';
-import type { PersonEntity } from '../../../api/types.ts';
+import type {
+    HumanWorkerEntity,
+} from '../../../api/types.ts';
 import type { RequestContext } from './shared.ts';
 
 // Fallback when navigator.storage.estimate() is
@@ -117,13 +119,15 @@ export async function getSnapshot(
 // is the expected non-error path here, and a
 // higher-level accessor could obscure the error
 // type for any later caller sharing this ctx.
-export async function getHasAnyPeople(
+export async function getHasAnyHumanWorkers(
     ctx: RequestContext,
 ): Promise<boolean> {
     try {
-        const people =
-            await ctx.GET<PersonEntity[]>('people');
-        return people.length > 0;
+        const workers =
+            await ctx.GET<HumanWorkerEntity[]>(
+                'workers',
+            );
+        return workers.length > 0;
     } catch (err) {
         if (err instanceof MissingTableError) {
             return false;

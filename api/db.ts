@@ -1,6 +1,7 @@
 import type {
     Id,
-    PersonEntity,
+    HumanWorkerEntity,
+    AIWorkerEntity,
     IdeaEntity,
     ProjectEntity,
     ActivityEntity,
@@ -10,12 +11,6 @@ import type {
     IdeaSubmissionEntity,
     ActivityActorEntity,
     ProjectFlowEntity,
-    RoleEntity,
-    RoleMembershipEntity,
-    CrewEntity,
-    CrewRoleMembershipEntity,
-    ModelEntity,
-    RoleModelMembershipEntity,
     WorkOrderEntity,
     FlowWorkOrderEntity,
     WorkOrderTransitionEntity,
@@ -88,8 +83,10 @@ export interface DbAdapter {
         json: string,
     ): Promise<void>;
 
-    people:
-        EntityStore<PersonEntity>;
+    workers:
+        EntityStore<HumanWorkerEntity>;
+    aiWorkers:
+        EntityStore<AIWorkerEntity>;
     ideas:
         EntityStore<IdeaEntity>;
     projects:
@@ -134,29 +131,12 @@ export interface DbAdapter {
         EntityStore<
             ActivityActorEntity
         >;
-    roles:
-        EntityStore<RoleEntity>;
-    roleMemberships:
-        EntityStore<
-            RoleMembershipEntity
-        >;
-    crews:
-        EntityStore<CrewEntity>;
-    crewRoleMemberships:
-        EntityStore<
-            CrewRoleMembershipEntity
-        >;
-    models:
-        EntityStore<ModelEntity>;
-    roleModelMemberships:
-        EntityStore<
-            RoleModelMembershipEntity
-        >;
     deleted: DeletedStore;
 }
 
 export const TABLE_NAMES = [
-    'people',
+    'workers',
+    'ai_workers',
     'ideas',
     'projects',
     'activities',
@@ -171,11 +151,5 @@ export const TABLE_NAMES = [
     'organization',
     'idea_submissions',
     'activity_actors',
-    'roles',
-    'role_memberships',
-    'crews',
-    'crew_role_memberships',
-    'models',
-    'role_model_memberships',
     'deleted',
 ];

@@ -1,11 +1,11 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import {
-    Person,
+    HumanWorker,
     jsonArrayField,
     jsonObjectField,
     DEFAULT_LOCK_TIMEOUT,
-    type PersonEntity,
+    type HumanWorkerEntity,
     type WorkOrderEntity,
     type WorkOrderTransitionEntity,
     type TransitionFieldValueEntity,
@@ -15,6 +15,7 @@ import {
     type GraphEdge,
     type GraphField,
     type Id,
+    type Worker,
 } from '../api/types.ts';
 import {
     WorkboxDetailPresenter,
@@ -54,9 +55,9 @@ function makeNode(
         description: '',
         positionX: 0,
         positionY: 0,
-        isStart: false,
-        isComplete: false,
-        crew: { kind: 'unassigned' },
+        isCreate: false,
+        isArchive: false,
+        workerIds: [],
         fields: [],
         ...overrides,
     };
@@ -89,7 +90,7 @@ function makeFlowGraph(
             }),
             makeNode({
                 id: 'n-2', name: 'Done',
-                isComplete: true,
+                isArchive: true,
             }),
         ],
         edges: [
@@ -134,10 +135,10 @@ function makeTransition(
     };
 }
 
-function makePersonEntity(
+function makeHumanWorkerEntity(
     id: string,
     first: string,
-): PersonEntity {
+): HumanWorkerEntity {
     return {
         id,
         first_name: first,
@@ -153,17 +154,19 @@ function makePersonEntity(
     };
 }
 
-function makePersonMap(
-    entities: PersonEntity[],
-): Map<Id, Person> {
+function makeWorkerMap(
+    entities: HumanWorkerEntity[],
+): Map<Id, Worker> {
     return new Map(
-        entities.map(e => [e.id, new Person(e)]),
+        entities.map(
+            e => [e.id, new HumanWorker(e)],
+        ),
     );
 }
 
-const PERSON_MAP = makePersonMap([
-    makePersonEntity('p-1', 'Ada'),
-    makePersonEntity('p-2', 'Bo'),
+const WORKER_MAP = makeWorkerMap([
+    makeHumanWorkerEntity('p-1', 'Ada'),
+    makeHumanWorkerEntity('p-2', 'Bo'),
 ]);
 
 function makePresenter(
@@ -188,7 +191,7 @@ function makePresenter(
         transitions,
         args.fieldValues ?? new Map(),
         args.claims ?? [],
-        PERSON_MAP,
+        WORKER_MAP,
         args.currentPersonId ?? 'p-1',
     );
 }
@@ -338,7 +341,7 @@ test(
         assert.equal(
             presenter.currentNodeId(), 'n-2',
         );
-        assert.equal(presenter.isComplete(), true);
+        assert.equal(presenter.isArchive(), true);
     },
 );
 
@@ -370,7 +373,7 @@ test(
                 }),
                 makeNode({
                     id: 'n-2', name: 'Done',
-                    isComplete: true,
+                    isArchive: true,
                 }),
             ],
         });

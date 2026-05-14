@@ -5,13 +5,19 @@ import {
     createRequestContext,
 } from '../web-app/app/adapters/shared.ts';
 import {
-    getPersonMap,
-    personName,
-    getCurrentPerson,
-} from '../web-app/app/adapters/people.ts';
-import { Person } from '../api/types.ts';
+    getHumanWorkerMap,
+    getCurrentHumanWorker,
+} from '../web-app/app/adapters/workers.ts';
+import {
+    workerName,
+} from '../web-app/app/adapters/workers-union.ts';
+import {
+    HumanWorker,
+    type Worker,
+    type WorkerId,
+} from '../api/types.ts';
 
-function buildPersonRow(
+function buildHumanWorkerRow(
     id: string,
     first: string,
     last: string,
@@ -31,39 +37,49 @@ function buildPersonRow(
     };
 }
 
-test('personName returns fullName for known id', () => {
-    const map = new Map<string, Person>([
-        ['u1', new Person(
-            buildPersonRow('u1', 'Alice', 'Adams'),
-        )],
-    ]);
-    assert.equal(
-        personName(map, 'u1'),
-        'Alice Adams',
-    );
-});
+test(
+    'workerName returns fullName for known human id',
+    () => {
+        const map = new Map<WorkerId, Worker>([
+            ['u1', new HumanWorker(
+                buildHumanWorkerRow(
+                    'u1', 'Alice', 'Adams',
+                ),
+            )],
+        ]);
+        assert.equal(
+            workerName(map, 'u1'),
+            'Alice Adams',
+        );
+    },
+);
 
-test('personName throws for unknown id', () => {
-    const map = new Map<string, Person>();
+test('workerName throws for unknown id', () => {
+    const map = new Map<WorkerId, Worker>();
     assert.throws(
-        () => personName(map, 'missing'),
-        /unknown person/,
+        () => workerName(map, 'missing'),
+        /unknown worker/,
     );
 });
 
-test('getPersonMap fetches people via adapter', async () => {
-    const db = new MemoryDbAdapter();
-    await db.people.put('u1', buildPersonRow(
-        'u1', 'Alice', 'Adams',
-    ));
-    const ctx = createRequestContext(db);
-    const map = await getPersonMap(ctx);
-    assert.equal(map.size, 1);
-    assert.equal(
-        map.get('u1')?.fullName(),
-        'Alice Adams',
-    );
-});
+test(
+    'getHumanWorkerMap fetches workers via adapter',
+    async () => {
+        const db = new MemoryDbAdapter();
+        await db.workers.put(
+            'u1', buildHumanWorkerRow(
+                'u1', 'Alice', 'Adams',
+            ),
+        );
+        const ctx = createRequestContext(db);
+        const map = await getHumanWorkerMap(ctx);
+        assert.equal(map.size, 1);
+        assert.equal(
+            map.get('u1')?.fullName(),
+            'Alice Adams',
+        );
+    },
+);
 
 // Test removed: memoization is no longer guaranteed;
 // per-task atomicity flows from JavaScript's
@@ -71,16 +87,16 @@ test('getPersonMap fetches people via adapter', async () => {
 
 test('Fresh ctx re-fetches each call', async () => {
     const db = new MemoryDbAdapter();
-    await db.people.put('u1', buildPersonRow(
+    await db.workers.put('u1', buildHumanWorkerRow(
         'u1', 'Alice', 'Adams',
     ));
-    const m1 = await getPersonMap(
+    const m1 = await getHumanWorkerMap(
         createRequestContext(db),
     );
-    await db.people.put('u2', buildPersonRow(
+    await db.workers.put('u2', buildHumanWorkerRow(
         'u2', 'Bob', 'Brown',
     ));
-    const m2 = await getPersonMap(
+    const m2 = await getHumanWorkerMap(
         createRequestContext(db),
     );
     assert.notEqual(m1, m2);
@@ -88,19 +104,22 @@ test('Fresh ctx re-fetches each call', async () => {
     assert.equal(m2.size, 2);
 });
 
-test('getCurrentPerson returns PersonEntity', async () => {
-    const db = new MemoryDbAdapter();
-    await db.people.put('current', {
-        ...buildPersonRow(
-            'current', 'Alice', 'Adams',
-        ),
-    });
-    const row = await getCurrentPerson(
-        createRequestContext(db),
-    );
-    assert.equal(row.first_name, 'Alice');
-    assert.equal(row.last_name, 'Adams');
-});
+test(
+    'getCurrentHumanWorker returns HumanWorkerEntity',
+    async () => {
+        const db = new MemoryDbAdapter();
+        await db.workers.put('current', {
+            ...buildHumanWorkerRow(
+                'current', 'Alice', 'Adams',
+            ),
+        });
+        const row = await getCurrentHumanWorker(
+            createRequestContext(db),
+        );
+        assert.equal(row.first_name, 'Alice');
+        assert.equal(row.last_name, 'Adams');
+    },
+);
 
 // Test removed: memoization is no longer guaranteed;
 // per-task atomicity flows from JavaScript's

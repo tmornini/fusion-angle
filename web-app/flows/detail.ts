@@ -18,20 +18,13 @@ import {
     getFlowMermaid,
     getFlowZip,
     getFlowVersions,
-    getPersonMap,
-    getRoleMap,
-    getRoleMembershipRows,
-    getMembersOfCrew,
-    getCrewMap,
-    getModelMap,
+    getHumanWorkers,
+    getAIWorkers,
     postClipboardCopy,
     subscribeResize,
 } from '../app/adapters/index.ts';
-import type {
-    RequestContext,
-} from '../app/adapters/index.ts';
 import { getDbAdapter } from '../app/adapters/init.ts';
-import type { NodeAssignment } from '../../api/types.ts';
+import type { WorkerId } from '../../api/types.ts';
 import {
     downloadBlob,
 } from '../app/adapters/blob-download.ts';
@@ -967,62 +960,25 @@ async function handleExportZip(
     );
 }
 
-async function buildRoleMemberCounts(
-    ctx: RequestContext,
-): Promise<Map<string, number>> {
-    const rows =
-        await getRoleMembershipRows(ctx);
-    const counts = new Map<string, number>();
-    for (const row of rows) {
-        counts.set(
-            row.role_id,
-            (counts.get(row.role_id) ?? 0) + 1,
-        );
-    }
-    return counts;
-}
-
-async function buildCrewMemberCounts(
-    ctx: RequestContext,
-): Promise<Map<string, number>> {
-    const crewMap = await getCrewMap(ctx);
-    const counts = new Map<string, number>();
-    for (const crewId of crewMap.keys()) {
-        const members = await getMembersOfCrew(
-            ctx, crewId,
-        );
-        counts.set(crewId, members.size);
-    }
-    return counts;
-}
-
-function parseNodeAssignmentSelectValue(
-    raw: string,
-): NodeAssignment {
-    if (raw === 'unassigned') {
-        return { kind: 'unassigned' };
-    }
-    if (raw.startsWith('role:')) {
-        return {
-            kind: 'role',
-            roleId: raw.slice(5),
-        };
-    }
-    if (raw.startsWith('crew:')) {
-        return {
-            kind: 'crew',
-            crewId: raw.slice(5),
-        };
-    }
-    if (raw.startsWith('model:')) {
-        return {
-            kind: 'model',
-            modelId: raw.slice(6),
-        };
-    }
-    throw new Error(
-        'invalid assignment value: ' + raw,
+function parseWorkerIdsFromPanel(
+    panelEl: HTMLElement,
+): WorkerId[] {
+    const inputs = panelEl.querySelectorAll(
+        'input[type="checkbox"][data-worker-id]',
     );
+    const ids: WorkerId[] = [];
+    for (const input of inputs) {
+        if (
+            !(input instanceof
+                HTMLInputElement)
+        ) continue;
+        if (!input.checked) continue;
+        const id = input.getAttribute(
+            'data-worker-id',
+        );
+        if (id) ids.push(id);
+    }
+    return ids;
 }
 
 function bindPanelActions(
@@ -1040,17 +996,27 @@ function bindPanelActions(
             const target = e.target;
             if (
                 !(target instanceof
-                    HTMLSelectElement)
+                    HTMLInputElement)
             ) return;
             if (
-                target.id !== 'prop-node-assignment'
+                target.type !== 'checkbox'
             ) return;
-            const assignment = parseNodeAssignmentSelectValue(
-                target.value,
+            if (
+                !target.hasAttribute(
+                    'data-worker-id',
+                )
+            ) return;
+            const panel = target.closest(
+                '#prop-node-workers',
             );
+            if (!(panel instanceof HTMLElement)) {
+                return;
+            }
+            const workerIds =
+                parseWorkerIdsFromPanel(panel);
             commit(
                 pageState.presenter()
-                    .withNodeAssignment(assignment),
+                    .withNodeWorkerIds(workerIds),
                 { advanceHistory: true },
             );
         },
@@ -1280,26 +1246,16 @@ export async function init(
             const ctx = createRequestContext();
             const [
                 graph, versions,
-                personMap, roleMap,
-                roleMemberCounts,
-                crewMap, crewMemberCounts,
-                modelMap,
+                humanWorkers, aiWorkers,
             ] = await Promise.all([
                 getFlowGraph(ctx, flowId),
                 getFlowVersions(ctx, flowId),
-                getPersonMap(ctx),
-                getRoleMap(ctx),
-                buildRoleMemberCounts(ctx),
-                getCrewMap(ctx),
-                buildCrewMemberCounts(ctx),
-                getModelMap(ctx),
+                getHumanWorkers(ctx),
+                getAIWorkers(ctx),
             ]);
             return {
                 graph, versions,
-                personMap, roleMap,
-                roleMemberCounts,
-                crewMap, crewMemberCounts,
-                modelMap,
+                humanWorkers, aiWorkers,
             };
         },
     );
@@ -1318,12 +1274,8 @@ export async function init(
             loaded.graph,
             FALLBACK_W,
             FALLBACK_H,
-            loaded.personMap,
-            loaded.roleMap,
-            loaded.roleMemberCounts,
-            loaded.crewMap,
-            loaded.crewMemberCounts,
-            loaded.modelMap,
+            loaded.humanWorkers,
+            loaded.aiWorkers,
         );
     const presenter =
         new FlowDesignerPresenter(

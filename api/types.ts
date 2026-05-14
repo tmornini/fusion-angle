@@ -9,6 +9,10 @@ export type { Risk };
 
 export type Id = string;
 
+export type WorkerId = Id;
+
+export type WorkerKind = 'human' | 'ai';
+
 export type ConfidenceLevel = 'high' | 'medium' | 'low';
 
 export type FlowFieldType =
@@ -27,7 +31,7 @@ export type FlowFieldType =
     | 'radio'
     | 'image';
 
-export type PersonStatus =
+export type WorkerStatus =
     | 'active'
     | 'pending'
     | 'deactivated';
@@ -237,24 +241,24 @@ export function assertIdeaStatus(
     return v;
 }
 
-const PERSON_STATUSES: readonly PersonStatus[] =
+const WORKER_STATUSES: readonly WorkerStatus[] =
     ['active', 'pending', 'deactivated'];
 
-export function isPersonStatus(
+export function isWorkerStatus(
     v: string,
-): v is PersonStatus {
+): v is WorkerStatus {
     return includes(
-        PERSON_STATUSES, v,
+        WORKER_STATUSES, v,
     );
 }
 
-export function assertPersonStatus(
+export function assertWorkerStatus(
     v: string,
     label: string,
-): PersonStatus {
-    if (!includes(PERSON_STATUSES, v)) {
+): WorkerStatus {
+    if (!includes(WORKER_STATUSES, v)) {
         throw new Error(
-            'expected PersonStatus for '
+            'expected WorkerStatus for '
                 + label + ', got ' + v,
         );
     }
@@ -333,34 +337,37 @@ export interface Deleted {
     deleted_at: string;
 }
 
-export interface PersonEntity {
-    id: Id;
+export interface HumanWorkerEntity {
+    id: WorkerId;
     first_name: string;
     last_name: string;
     email: string;
     title: string;
     department: string;
-    status: PersonStatus;
+    status: WorkerStatus;
     strengths: JsonArrayField;
     team_dimensions: JsonObjectField;
     phone: string;
     bio: string;
 }
 
-export class Person {
-    readonly #id: string;
+export class HumanWorker {
+    readonly kind = 'human' as const;
+    readonly #id: WorkerId;
     readonly #firstName: string;
     readonly #lastName: string;
     readonly #email: string;
     readonly #title: string;
     readonly #department: string;
-    readonly #status: PersonStatus;
+    readonly #status: WorkerStatus;
     readonly #strengths: string;
     readonly #teamDimensions: string;
     readonly #phone: string;
     readonly #bio: string;
 
-    constructor(entity: PersonEntity) {
+    constructor(
+        entity: HumanWorkerEntity,
+    ) {
         this.#id = entity.id;
         this.#firstName =
             entity.first_name;
@@ -436,7 +443,7 @@ export class Person {
 
     statusLabel(): string {
         return (
-            USER_STATUS_CONFIG[
+            WORKER_STATUS_CONFIG[
                 this.#status
             ]
         )!.label;
@@ -444,7 +451,7 @@ export class Person {
 
     statusClassName(): string {
         return (
-            USER_STATUS_CONFIG[
+            WORKER_STATUS_CONFIG[
                 this.#status
             ]
         )!.className;
@@ -454,14 +461,14 @@ export class Person {
         return this.#department !== '';
     }
 
-    statusValue(): PersonStatus {
+    statusValue(): WorkerStatus {
         return this.#status;
     }
 
     parsedStrengths(): string[] {
         return validateStringArrayJson(
             this.#strengths,
-            'user.strengths',
+            'humanWorker.strengths',
         );
     }
 
@@ -470,7 +477,7 @@ export class Person {
         return (
             validateStringNumberRecordJson(
                 this.#teamDimensions,
-                'user.teamDimensions',
+                'humanWorker.teamDimensions',
             )
         );
     }
@@ -493,6 +500,98 @@ export class Person {
         );
     }
 
+}
+
+export interface AIWorkerEntity {
+    id: WorkerId;
+    name: string;
+    provider: string;
+    description: string;
+    auth_token: string;
+    created_at: string;
+}
+
+export class AIWorker {
+    readonly kind = 'ai' as const;
+    readonly #id: WorkerId;
+    readonly #name: string;
+    readonly #provider: string;
+    readonly #description: string;
+    readonly #authToken: string;
+    readonly #createdAt: string;
+
+    constructor(
+        entity: AIWorkerEntity,
+    ) {
+        this.#id = entity.id;
+        this.#name = entity.name;
+        this.#provider = entity.provider;
+        this.#description =
+            entity.description;
+        this.#authToken =
+            entity.auth_token;
+        this.#createdAt =
+            entity.created_at;
+    }
+
+    idForLink(): string {
+        return this.#id;
+    }
+
+    nameText(): string {
+        return this.#name;
+    }
+
+    providerText(): string {
+        return this.#provider;
+    }
+
+    descriptionText(): string {
+        return this.#description;
+    }
+
+    createdAtIso(): string {
+        return this.#createdAt;
+    }
+
+    maskedToken(): string {
+        const t = this.#authToken;
+        if (t.length <= 4) return t;
+        return (
+            t.slice(0, 3)
+            + '…'
+            + t.slice(-4)
+        );
+    }
+
+    matchesSearch(term: string): boolean {
+        const t = term.toLowerCase();
+        return (
+            this.#name
+                .toLowerCase()
+                .includes(t)
+            || this.#provider
+                .toLowerCase()
+                .includes(t)
+            || this.#description
+                .toLowerCase()
+                .includes(t)
+        );
+    }
+}
+
+export type Worker = HumanWorker | AIWorker;
+
+export function isHumanWorker(
+    w: Worker,
+): w is HumanWorker {
+    return w.kind === 'human';
+}
+
+export function isAIWorker(
+    w: Worker,
+): w is AIWorker {
+    return w.kind === 'ai';
 }
 
 export interface IdeaEntity {
@@ -528,7 +627,6 @@ export interface ProjectEntity {
     position: number;
     business_context: JsonObjectField;
     timeline_label: string;
-    budget_label: string;
 }
 
 export interface ActivityEntity {
@@ -550,24 +648,15 @@ export interface GraphField {
     options: string[];
 }
 
-export const START_NODE_DEFAULT_NAME = 'Create';
-export const END_NODE_DEFAULT_NAME = 'Archive';
-
-export type NodeAssignment =
-    | { kind: 'unassigned' }
-    | { kind: 'role'; roleId: Id }
-    | { kind: 'crew'; crewId: Id }
-    | { kind: 'model'; modelId: Id };
-
 export interface GraphNode {
     id: string;
     name: string;
     description: string;
     positionX: number;
     positionY: number;
-    isStart: boolean;
-    isComplete: boolean;
-    crew: NodeAssignment;
+    isCreate: boolean;
+    isArchive: boolean;
+    workerIds: WorkerId[];
     fields: GraphField[];
 }
 
@@ -599,8 +688,8 @@ export const DEFAULT_NEW_STATE_NAME =
     'New State';
 export const DEFAULT_TRANSITION_NAME =
     'Transition';
-export const DEFAULT_NODE_ASSIGNMENT: NodeAssignment =
-    { kind: 'unassigned' };
+export const DEFAULT_NODE_WORKER_IDS:
+    readonly WorkerId[] = [];
 
 export interface FlowEntity {
     id: Id;
@@ -723,93 +812,13 @@ export interface ProjectFlowEntity {
     created_at: string;
 }
 
-export interface RoleEntity {
-    id: Id;
-    name: string;
-    description: string;
-    created_at: string;
-}
-
-export interface RoleMembershipEntity {
-    id: Id;
-    role_id: Id;
-    person_id: Id;
-    created_at: string;
-}
-
-// User-private roles are derived, never persisted.
-// The id encodes the owning person's id under a
-// known prefix; predicate at the gate decides
-// "is this user-private?" — Article on Validation.
-const USER_PRIVATE_ROLE_PREFIX =
-    'user-private:';
-
-export function userPrivateRoleId(
-    personId: Id,
-): Id {
-    return USER_PRIVATE_ROLE_PREFIX + personId;
-}
-
-export function isUserPrivateRoleId(
-    id: Id,
-): boolean {
-    return id.startsWith(
-        USER_PRIVATE_ROLE_PREFIX,
-    );
-}
-
-export function personIdFromUserPrivateRoleId(
-    id: Id,
-): Id {
-    if (!isUserPrivateRoleId(id)) {
-        throw new Error(
-            'personIdFromUserPrivateRoleId:'
-            + ' not a user-private role id: '
-            + id,
-        );
-    }
-    return id.slice(
-        USER_PRIVATE_ROLE_PREFIX.length,
-    );
-}
-
-export interface CrewEntity {
-    id: Id;
-    name: string;
-    description: string;
-    created_at: string;
-}
-
-export interface CrewRoleMembershipEntity {
-    id: Id;
-    crew_id: Id;
-    role_id: Id;
-    created_at: string;
-}
-
-export interface ModelEntity {
-    id: Id;
-    name: string;
-    provider: string;
-    description: string;
-    created_at: string;
-}
-
-export interface RoleModelMembershipEntity {
-    id: Id;
-    role_id: Id;
-    model_id: Id;
-    created_at: string;
-}
-
-
 export interface StatusDisplay {
     label: string;
     className: string;
 }
 
-export const USER_STATUS_CONFIG: Record<
-    PersonStatus,
+export const WORKER_STATUS_CONFIG: Record<
+    WorkerStatus,
     StatusDisplay
 > = {
     active: {
@@ -1099,7 +1108,6 @@ export class Project {
     readonly #position: number;
     readonly #businessContext: string;
     readonly #timelineLabel: string;
-    readonly #budgetLabel: string;
 
     constructor(entity: ProjectEntity) {
         this.#id = entity.id;
@@ -1129,17 +1137,10 @@ export class Project {
             entity.business_context;
         this.#timelineLabel =
             entity.timeline_label;
-        this.#budgetLabel =
-            entity.budget_label;
     }
 
     isDeleted(): boolean {
         return this.#status === 'deleted';
-    }
-
-    isOverBudget(): boolean {
-        return this.#actualCost
-            > this.#estimatedCost;
     }
 
     isOverdue(): boolean {
@@ -1264,105 +1265,6 @@ export class Project {
         return this.#title
             .toLowerCase()
             .includes(t);
-    }
-}
-
-export class Role {
-    readonly #id: Id;
-    readonly #name: string;
-    readonly #description: string;
-    readonly #createdAt: string;
-
-    constructor(entity: RoleEntity) {
-        this.#id = entity.id;
-        this.#name = entity.name;
-        this.#description =
-            entity.description;
-        this.#createdAt = entity.created_at;
-    }
-
-    idForLink(): string {
-        return this.#id;
-    }
-
-    nameText(): string {
-        return this.#name;
-    }
-
-    descriptionText(): string {
-        return this.#description;
-    }
-
-    createdAtValue(): string {
-        return this.#createdAt;
-    }
-}
-
-export class Crew {
-    readonly #id: Id;
-    readonly #name: string;
-    readonly #description: string;
-    readonly #createdAt: string;
-
-    constructor(entity: CrewEntity) {
-        this.#id = entity.id;
-        this.#name = entity.name;
-        this.#description =
-            entity.description;
-        this.#createdAt = entity.created_at;
-    }
-
-    idForLink(): string {
-        return this.#id;
-    }
-
-    nameText(): string {
-        return this.#name;
-    }
-
-    descriptionText(): string {
-        return this.#description;
-    }
-
-    createdAtValue(): string {
-        return this.#createdAt;
-    }
-}
-
-export class Model {
-    readonly #id: Id;
-    readonly #name: string;
-    readonly #provider: string;
-    readonly #description: string;
-    readonly #createdAt: string;
-
-    constructor(entity: ModelEntity) {
-        this.#id = entity.id;
-        this.#name = entity.name;
-        this.#provider = entity.provider;
-        this.#description =
-            entity.description;
-        this.#createdAt = entity.created_at;
-    }
-
-    idForLink(): string {
-        return this.#id;
-    }
-
-    nameText(): string {
-        return this.#name;
-    }
-
-    providerText(): string {
-        return this.#provider;
-    }
-
-    descriptionText(): string {
-        return this.#description;
-    }
-
-    createdAtValue(): string {
-        return this.#createdAt;
     }
 }
 

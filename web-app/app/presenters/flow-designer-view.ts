@@ -18,19 +18,11 @@ import type {
     GraphField,
     GraphNode,
     GraphEdge,
-    Id,
 } from '../adapters/index.ts';
 import {
-    Person,
-    Role,
-    Crew,
-    Model,
+    HumanWorker,
+    AIWorker,
 } from '../adapters/index.ts';
-import {
-    START_NODE_DEFAULT_NAME,
-    END_NODE_DEFAULT_NAME,
-    userPrivateRoleId,
-} from '../../../api/types.ts';
 
 export function buildFieldBadge(
     fieldType: string,
@@ -165,17 +157,13 @@ export function buildNodePanel(
     node: GraphNode,
     outgoing: GraphEdge[],
     isLocked: boolean,
-    personMap: Map<Id, Person>,
-    roleMap: Map<Id, Role>,
-    crewMap: Map<Id, Crew> = new Map(),
-    modelMap: Map<Id, Model> = new Map(),
+    humans: HumanWorker[],
+    ais: AIWorker[],
 ): SafeHtml {
     const isSpecial =
-        node.isStart || node.isComplete;
+        node.isCreate || node.isArchive;
     if (isSpecial) {
-        const label = node.isStart
-            ? START_NODE_DEFAULT_NAME
-            : END_NODE_DEFAULT_NAME;
+        const label = node.name;
         return html`<div
 class="flow-props-panel">
 <div class="flow-props-header"
@@ -208,42 +196,33 @@ class="text-sm text-muted"
         .map(f => buildFieldRow(f));
     const lockAttr =
         trusted(isLocked ? ' disabled' : '');
-    const sortedPeople = Array.from(
-        personMap.values(),
-    ).sort((a, b) =>
-        a.fullName().localeCompare(
+    const sortedHumans = [...humans].sort(
+        (a, b) => a.fullName().localeCompare(
             b.fullName(),
         ),
     );
-    const sortedRoles = Array.from(
-        roleMap.values(),
-    ).sort((a, b) =>
-        a.nameText().localeCompare(
+    const sortedAis = [...ais].sort(
+        (a, b) => a.nameText().localeCompare(
             b.nameText(),
         ),
     );
-    const sortedCrews = Array.from(
-        crewMap.values(),
-    ).sort((a, b) =>
-        a.nameText().localeCompare(
-            b.nameText(),
+    const assigned = new Set(node.workerIds);
+    const humanCheckboxes = sortedHumans.map(
+        h => buildWorkerCheckbox(
+            h.idForLink(),
+            h.fullName(),
+            assigned.has(h.idForLink()),
+            isLocked,
         ),
     );
-    const sortedModels = Array.from(
-        modelMap.values(),
-    ).sort((a, b) =>
-        a.nameText().localeCompare(
-            b.nameText(),
+    const aiCheckboxes = sortedAis.map(
+        a => buildWorkerCheckbox(
+            a.idForLink(),
+            a.nameText(),
+            assigned.has(a.idForLink()),
+            isLocked,
         ),
     );
-    const isUnassigned =
-        node.crew.kind === 'unassigned';
-    const selRoleId = node.crew.kind === 'role'
-        ? node.crew.roleId : '';
-    const selCrewId = node.crew.kind === 'crew'
-        ? node.crew.crewId : '';
-    const selModelId = node.crew.kind === 'model'
-        ? node.crew.modelId : '';
     return html`<div
 class="flow-props-panel">
 <div class="flow-props-header"
@@ -255,49 +234,21 @@ class="flow-props-panel">
     aria-label="Close"
     >${iconX(14, '')}</button>
 </div>
-<div class="mb-2">
-<label class="text-xs text-muted"
-    >Assignment</label>
-<select class="input input-sm"
-    id="prop-node-assignment"${lockAttr}>
-<option value="unassigned"${
-    trusted(isUnassigned ? ' selected' : '')
-    }>Unassigned</option>
-<optgroup label="Roles">
-${sortedRoles.map(r => html`<option
-    value="role:${r.idForLink()}"${
-    trusted(selRoleId === r.idForLink()
-        ? ' selected' : '')
-    }>${r.nameText()}</option>`)}
-</optgroup>
-<optgroup label="People (private)">
-${sortedPeople.map(p => {
-    const privateRoleId =
-        userPrivateRoleId(p.idForLink());
-    return html`<option
-    value="role:${privateRoleId}"
-    data-role-private="user"${
-    trusted(selRoleId === privateRoleId
-        ? ' selected' : '')
-    }>${p.fullName()}</option>`;
-})}
-</optgroup>
-<optgroup label="Crews">
-${sortedCrews.map(c => html`<option
-    value="crew:${c.idForLink()}"${
-    trusted(selCrewId === c.idForLink()
-        ? ' selected' : '')
-    }>${c.nameText()}</option>`)}
-</optgroup>
-<optgroup label="Models">
-${sortedModels.map(m => html`<option
-    value="model:${m.idForLink()}"${
-    trusted(selModelId === m.idForLink()
-        ? ' selected' : '')
-    }>${m.nameText()}</option>`)}
-</optgroup>
-</select>
+<fieldset class="worker-select-fieldset"
+    id="prop-node-workers">
+<legend class="text-xs text-muted"
+    >Workers</legend>
+<div class="worker-group">
+<div class="worker-group-label"
+    >HUMANS</div>
+${humanCheckboxes}
 </div>
+<div class="worker-group">
+<div class="worker-group-label"
+    >AIs</div>
+${aiCheckboxes}
+</div>
+</fieldset>
 <div class="mb-2">
 <label class="text-xs text-muted"
     >Name</label>
@@ -336,6 +287,27 @@ class="text-sm text-muted"
         >None</div>`}
 </div>
 </div>`;
+}
+
+function buildWorkerCheckbox(
+    workerId: string,
+    name: string,
+    checked: boolean,
+    isLocked: boolean,
+): SafeHtml {
+    const checkedAttr = trusted(
+        checked ? ' checked' : '',
+    );
+    const disabledAttr = trusted(
+        isLocked ? ' disabled' : '',
+    );
+    return html`<label
+class="worker-checkbox-label">
+<input type="checkbox"
+    data-worker-id="${workerId}"${
+    checkedAttr}${disabledAttr} />
+<span>${name}</span>
+</label>`;
 }
 
 export function buildEdgePanel(

@@ -42,14 +42,15 @@ export {
     GaugePresenter,
 } from './gauge.ts';
 export {
-    PersonPresenter,
-    ManagedPeoplePresenter,
-    buildInitialManagedPeopleState,
-    applyManagedPeopleSearch,
-    applyManagedPeopleTitle,
-    applyManagedPeopleStatus,
-    type ManagedPeopleState,
-} from './person.ts';
+    HumanWorkerRowPresenter,
+    AIWorkerRowPresenter,
+    ManagedWorkersPresenter,
+    buildInitialManagedWorkersState,
+    applyManagedWorkersSearch,
+    applyManagedWorkersKind,
+    type ManagedWorkersState,
+    type WorkerKindFilter,
+} from './worker.ts';
 export {
     FlowPresenter,
 } from './flow.ts';
@@ -68,15 +69,23 @@ export {
     type GeneralInfoFieldKey,
 } from './organization.ts';
 export {
-    PersonDetailPresenter,
-    PersonDetailEditPresenter,
-    buildPersonRolesSection,
-    personDraftFromPerson,
-    personPatchFromDraft,
-    isPersonFieldKey,
-    type PersonDraftFields,
-    type PersonFieldKey,
-} from './person-detail.ts';
+    HumanWorkerDetailPresenter,
+    HumanWorkerDetailEditPresenter,
+    humanWorkerDraftFromWorker,
+    humanWorkerPatchFromDraft,
+    isHumanWorkerFieldKey,
+    type HumanWorkerDraftFields,
+    type HumanWorkerFieldKey,
+} from './human-worker-detail.ts';
+export {
+    AIWorkerDetailPresenter,
+    AIWorkerDetailEditPresenter,
+    aiWorkerDraftFromWorker,
+    aiWorkerPatchFromDraft,
+    isAIWorkerFieldKey,
+    type AIWorkerDraftFields,
+    type AIWorkerFieldKey,
+} from './ai-worker-detail.ts';
 export {
     FlowDesignerPresenter,
     buildInitialFlowSnapshot,
@@ -88,34 +97,13 @@ export {
 export {
     WorkboxInboxPresenter,
     buildInboxItems,
-    isWorkOrderVisibleToPerson,
     type InboxMode,
     type InboxItem,
-    type VisibilityScope,
 } from './workbox-inbox.ts';
 export {
     buildFieldInputHtml,
     WorkboxDetailPresenter,
 } from './workbox-detail.ts';
-export {
-    RolePresenter,
-    RoleListPresenter,
-    buildInitialRoleListState,
-    applyRoleListSearch,
-    applyRoleListUpdate,
-    type RoleListState,
-} from './role.ts';
-export {
-    CrewPresenter,
-    CrewListPresenter,
-    buildInitialCrewListState,
-    applyCrewListSearch,
-    applyCrewListToggleExpand,
-    applyCrewListUpdate,
-    availableRolesForCrew,
-    type CrewListState,
-    type CrewRoleMember,
-} from './crew.ts';
 export {
     FlowStatsPresenter,
     type FlowStatsUi,

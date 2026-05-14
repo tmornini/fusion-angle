@@ -4,11 +4,11 @@ import {
     findCycleEdgeIds,
 } from '../web-app/app/flow-cycle-edges.ts';
 
-// A node only needs an id and an isStart flag here; an
+// A node only needs an id and an isCreate flag here; an
 // edge needs an id and its endpoints. Both GraphNode and
 // the stats model's NodeStat satisfy these shapes.
-function n(id: string, isStart = false) {
-    return { id, isStart };
+function n(id: string, isCreate = false) {
+    return { id, isCreate };
 }
 function e(
     id: string,

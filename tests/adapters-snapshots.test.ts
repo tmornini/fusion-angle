@@ -23,7 +23,7 @@ import {
     SnapshotTooLargeError,
 } from '../web-app/app/adapters/snapshots.ts';
 
-function buildPerson(id: string, first: string) {
+function buildWorker(id: string, first: string) {
     return {
         id,
         first_name: first,
@@ -51,7 +51,7 @@ test('getSnapshot returns a JSON object of tables', async () => {
     const { ctx } = setup();
     const json = await getSnapshot(ctx);
     const parsed = JSON.parse(json);
-    assert.ok(Array.isArray(parsed.people));
+    assert.ok(Array.isArray(parsed.workers));
     assert.ok(Array.isArray(parsed.activities));
     assert.ok(Array.isArray(parsed.deleted));
 });
@@ -91,9 +91,9 @@ test(
     async () => {
         const { db, ctx } = setup();
         await putSnapshot(ctx, JSON.stringify({
-            people: [buildPerson('u1', 'Alice')],
+            workers: [buildWorker('u1', 'Alice')],
         }));
-        const rows = await db.people.getAll();
+        const rows = await db.workers.getAll();
         assert.equal(rows.length, 1);
         assert.equal(rows[0]?.first_name, 'Alice');
     },
@@ -104,13 +104,13 @@ test(
     async () => {
         const { ctx } = setup();
         await putSnapshot(ctx, JSON.stringify({
-            people: [buildPerson('u1', 'Alice')],
+            workers: [buildWorker('u1', 'Alice')],
         }));
         const parsed =
             JSON.parse(await getSnapshot(ctx));
-        assert.equal(parsed.people.length, 1);
+        assert.equal(parsed.workers.length, 1);
         assert.equal(
-            parsed.people[0].id, 'u1',
+            parsed.workers[0].id, 'u1',
         );
     },
 );
@@ -121,12 +121,12 @@ test(
     async () => {
         const { db, ctx } = setup();
         await putSnapshot(ctx, JSON.stringify({
-            people: [buildPerson('u1', 'Alice')],
+            workers: [buildWorker('u1', 'Alice')],
         }));
         await putSnapshot(ctx, JSON.stringify({
-            people: [buildPerson('u2', 'Bob')],
+            workers: [buildWorker('u2', 'Bob')],
         }));
-        const rows = await db.people.getAll();
+        const rows = await db.workers.getAll();
         assert.equal(rows.length, 1);
         assert.equal(rows[0]?.id, 'u2');
         assert.equal(rows[0]?.first_name, 'Bob');
@@ -140,13 +140,13 @@ test(
         const { db, ctx } = setup();
         const file = new File(
             [JSON.stringify({
-                people: [buildPerson('u1', 'Alice')],
+                workers: [buildWorker('u1', 'Alice')],
             })],
             'snapshot.json',
             { type: 'application/json' },
         );
         await putSnapshotFromFile(ctx, file);
-        const rows = await db.people.getAll();
+        const rows = await db.workers.getAll();
         assert.equal(rows.length, 1);
         assert.equal(rows[0]?.first_name, 'Alice');
     },
@@ -193,33 +193,33 @@ test(
 
 test('postSchemaCreation keeps existing data', async () => {
     const { db, ctx } = setup();
-    await db.people.put(
-        'u1', buildPerson('u1', 'Alice'),
+    await db.workers.put(
+        'u1', buildWorker('u1', 'Alice'),
     );
     await postSchemaCreation(ctx);
-    const rows = await db.people.getAll();
+    const rows = await db.workers.getAll();
     assert.equal(rows.length, 1);
 });
 
 test('deleteSchema clears all table contents', async () => {
     const { db, ctx } = setup();
-    await db.people.put(
-        'u1', buildPerson('u1', 'Alice'),
+    await db.workers.put(
+        'u1', buildWorker('u1', 'Alice'),
     );
     await deleteSchema(ctx);
-    const rows = await db.people.getAll();
+    const rows = await db.workers.getAll();
     assert.equal(rows.length, 0);
 });
 
 test(
-    'postMockDataLoad populates the people table',
+    'postMockDataLoad populates the workers table',
     async () => {
         const { db, ctx } = setup();
         await postMockDataLoad(ctx);
-        const rows = await db.people.getAll();
+        const rows = await db.workers.getAll();
         assert.ok(
             rows.length > 0,
-            'mock data should seed people',
+            'mock data should seed workers',
         );
     },
 );

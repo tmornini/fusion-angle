@@ -7,8 +7,8 @@ import type {
 } from '../../../api/types.ts';
 import type { RequestContext } from './shared.ts';
 import {
-    getCurrentPerson,
-} from './people.ts';
+    getCurrentHumanWorker,
+} from './workers.ts';
 import {
     generateCryptoSafeBase62,
 } from './crypto-safe-base62.ts';
@@ -34,8 +34,8 @@ export async function postActivity(
     ctx: RequestContext,
     input: ActivityInput,
 ): Promise<void> {
-    const personRow =
-        await getCurrentPerson(ctx);
+    const workerRow =
+        await getCurrentHumanWorker(ctx);
     const activityId =
         generateCryptoSafeBase62();
     const actorId = generateCryptoSafeBase62();
@@ -61,7 +61,7 @@ export async function postActivity(
                     `activity-actors/${actorId}`,
                 body: {
                     activity_id: activityId,
-                    person_id: personRow.id,
+                    person_id: workerRow.id,
                     created_at: timestamp,
                 },
             },

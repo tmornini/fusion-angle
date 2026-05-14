@@ -22,7 +22,7 @@ import type {
     ActivityActorEntity,
 } from '../api/types.ts';
 
-function buildCurrentPerson() {
+function buildCurrentWorker() {
     return {
         first_name: 'Demo',
         last_name: 'User',
@@ -45,13 +45,13 @@ function setup(): {
     return { db, ctx: createRequestContext(db) };
 }
 
-async function withCurrentPerson(): Promise<{
+async function withCurrentWorker(): Promise<{
     db: MemoryDbAdapter;
     ctx: RequestContext;
 }> {
     const { db, ctx } = setup();
-    await db.people.put(
-        'current', buildCurrentPerson(),
+    await db.workers.put(
+        'current', buildCurrentWorker(),
     );
     return { db, ctx };
 }
@@ -65,7 +65,7 @@ const sampleInput = {
 };
 
 test('postActivity creates one activity row', async () => {
-    const { db, ctx } = await withCurrentPerson();
+    const { db, ctx } = await withCurrentWorker();
     await postActivity(ctx, sampleInput);
     const rows: ActivityEntity[] =
         await db.activities.getAll();
@@ -73,7 +73,7 @@ test('postActivity creates one activity row', async () => {
 });
 
 test('postActivity persists the input fields', async () => {
-    const { db, ctx } = await withCurrentPerson();
+    const { db, ctx } = await withCurrentWorker();
     await postActivity(ctx, sampleInput);
     const [row] = await db.activities.getAll();
     assert.equal(row?.type, 'idea_created');
@@ -84,7 +84,7 @@ test('postActivity persists the input fields', async () => {
 });
 
 test('postActivity stamps a timestamp', async () => {
-    const { db, ctx } = await withCurrentPerson();
+    const { db, ctx } = await withCurrentWorker();
     await postActivity(ctx, sampleInput);
     const [row] = await db.activities.getAll();
     assert.ok(
@@ -101,10 +101,10 @@ test('postActivity stamps a timestamp', async () => {
 
 test(
     'postActivity creates an actor row for the'
-    + ' current person',
+    + ' current worker',
     async () => {
         const { db, ctx } =
-            await withCurrentPerson();
+            await withCurrentWorker();
         await postActivity(ctx, sampleInput);
         const actors: ActivityActorEntity[] =
             await db.activityActors.getAll();
@@ -117,7 +117,7 @@ test(
     'postActivity links the actor to the activity',
     async () => {
         const { db, ctx } =
-            await withCurrentPerson();
+            await withCurrentWorker();
         await postActivity(ctx, sampleInput);
         const [activity] =
             await db.activities.getAll();
@@ -134,7 +134,7 @@ test(
     'postActivity actor row carries a created_at',
     async () => {
         const { db, ctx } =
-            await withCurrentPerson();
+            await withCurrentWorker();
         await postActivity(ctx, sampleInput);
         const [actor] =
             await db.activityActors.getAll();
@@ -149,7 +149,7 @@ test(
     + ' rows with distinct ids',
     async () => {
         const { db, ctx } =
-            await withCurrentPerson();
+            await withCurrentWorker();
         await postActivity(ctx, sampleInput);
         await postActivity(ctx, {
             ...sampleInput,
@@ -169,7 +169,7 @@ test(
     + ' a fresh request context',
     async () => {
         const { db, ctx } =
-            await withCurrentPerson();
+            await withCurrentWorker();
         await postActivity(ctx, sampleInput);
         const fresh = createRequestContext(db);
         const rows =
@@ -182,7 +182,7 @@ test(
 );
 
 test(
-    'postActivity throws when no current person'
+    'postActivity throws when no current worker'
     + ' exists',
     async () => {
         const { ctx } = setup();

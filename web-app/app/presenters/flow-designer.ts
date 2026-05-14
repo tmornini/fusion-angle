@@ -9,13 +9,8 @@ import {
     createRequestContext,
     putFlow,
     postFlowVersion,
-    Person,
-    Role,
-    Crew,
-    Model,
-} from '../adapters/index.ts';
-import type {
-    Id,
+    HumanWorker,
+    AIWorker,
 } from '../adapters/index.ts';
 import type {
     GraphNode,
@@ -24,7 +19,7 @@ import type {
     FlowVersion,
     FlowSaveShape,
 } from '../adapters/flows.ts';
-import type { NodeAssignment } from '../../../api/types.ts';
+import type { WorkerId } from '../../../api/types.ts';
 import {
     generateCryptoSafeBase62,
 } from '../adapters/index.ts';
@@ -102,12 +97,8 @@ interface DesignerState {
     isPanelOpen: boolean;
     interaction: InteractionState;
     savedViewBox: SavedViewBox;
-    personMap: Map<Id, Person>;
-    roleMap: Map<Id, Role>;
-    roleMemberCounts: Map<Id, number>;
-    crewMap: Map<Id, Crew>;
-    crewMemberCounts: Map<Id, number>;
-    modelMap: Map<Id, Model>;
+    humanWorkers: HumanWorker[];
+    aiWorkers: AIWorker[];
 }
 
 export type FlowSnapshot = Readonly<DesignerState>;
@@ -121,14 +112,8 @@ export function buildInitialFlowSnapshot(
     graph: FlowGraph,
     canvasW: number,
     canvasH: number,
-    personMap: Map<Id, Person>,
-    roleMap: Map<Id, Role> = new Map(),
-    roleMemberCounts: Map<Id, number>
-        = new Map(),
-    crewMap: Map<Id, Crew> = new Map(),
-    crewMemberCounts: Map<Id, number>
-        = new Map(),
-    modelMap: Map<Id, Model> = new Map(),
+    humanWorkers: HumanWorker[],
+    aiWorkers: AIWorker[],
 ): FlowSnapshot {
     const interaction = buildInteractionState(
         canvasW, canvasH,
@@ -149,12 +134,8 @@ export function buildInitialFlowSnapshot(
         isPanelOpen: false,
         interaction,
         savedViewBox: { kind: 'none' },
-        personMap,
-        roleMap,
-        roleMemberCounts,
-        crewMap,
-        crewMemberCounts,
-        modelMap,
+        humanWorkers,
+        aiWorkers,
     };
 }
 
@@ -811,8 +792,8 @@ Auto Fit</label>
         return next;
     }
 
-    withNodeAssignment(
-        assignment: NodeAssignment,
+    withNodeWorkerIds(
+        workerIds: WorkerId[],
     ): FlowSnapshot {
         if (this.#guardLocked()) {
             return this.#snapshot;
@@ -825,7 +806,7 @@ Auto Fit</label>
             nodes: applyUpdateNode(
                 this.#snapshot.nodes,
                 nodeId,
-                { crew: assignment },
+                { workerIds },
             ),
         };
         void this.#saveFlow(true, next);
@@ -1046,8 +1027,8 @@ Auto Fit</label>
                     );
                 if (
                     n
-                    && !n.isStart
-                    && !n.isComplete
+                    && !n.isCreate
+                    && !n.isArchive
                 ) {
                     return true;
                 }
@@ -1113,10 +1094,8 @@ Auto Fit</label>
             return buildNodePanel(
                 node, outgoing,
                 this.#snapshot.isLocked,
-                this.#snapshot.personMap,
-                this.#snapshot.roleMap,
-                this.#snapshot.crewMap,
-                this.#snapshot.modelMap,
+                this.#snapshot.humanWorkers,
+                this.#snapshot.aiWorkers,
             );
         }
 
@@ -1364,8 +1343,6 @@ Auto Fit</label>
             isConn,
             marqueeRect,
             this.#snapshot.edgeWaypoints,
-            this.#snapshot.roleMemberCounts,
-            this.#snapshot.crewMemberCounts,
         );
         const preview =
             this.#buildConnectPreview();

@@ -1341,24 +1341,3 @@
   font-weight: var(--font-weight-bold);
 }
 
-/* ==========================================
-   32. ROLE MEMBERSHIP ROWS
-   ========================================== */
-
-.role-membership-row {
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius);
-  background-color: hsl(var(--muted));
-}
-
-/* User-private row: a row of person, masquerading as
-   a role. Visually distinct so the workaround feels
-   like a workaround — Article on Validation
-   ("degrade visibly rather than corrupt silently"). */
-.role-membership-row[data-role-private="user"] {
-  background-color: transparent;
-  border: 1px dashed hsl(var(--border));
-  color: hsl(var(--muted-foreground));
-  font-style: italic;
-}
-

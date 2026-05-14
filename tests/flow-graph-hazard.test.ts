@@ -1,15 +1,17 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import {
-    shouldShowHazard,
+    shouldShowWorkerHazard,
 } from '../web-app/app/flow-graph.ts';
 import type {
-    GraphNode, NodeAssignment,
+    GraphEdge,
+    GraphNode,
+    WorkerId,
 } from '../api/types.ts';
 
 function buildNode(
     id: string,
-    crew: NodeAssignment,
+    workerIds: WorkerId[],
     overrides: Partial<GraphNode> = {},
 ): GraphNode {
     return {
@@ -18,178 +20,124 @@ function buildNode(
         description: '',
         positionX: 0,
         positionY: 0,
-        isStart: false,
-        isComplete: false,
-        crew,
+        isCreate: false,
+        isArchive: false,
+        workerIds,
         fields: [],
         ...overrides,
     };
 }
 
+function edge(
+    id: string,
+    from: string,
+    to: string,
+): GraphEdge {
+    return {
+        id,
+        name: '',
+        description: '',
+        fromNodeId: from,
+        toNodeId: to,
+    };
+}
+
 test(
-    'hazard renders for an unassigned node',
+    'zero workers on a regular node renders danger',
     () => {
-        const node = buildNode(
-            'n1', { kind: 'unassigned' },
-        );
+        const n = buildNode('n1', []);
         assert.equal(
-            shouldShowHazard(
-                node, new Map(),
+            shouldShowWorkerHazard(
+                n,
+                [edge('e1', 'n1', 'next')],
             ),
-            true,
+            'danger',
         );
     },
 );
 
 test(
-    'hazard renders for a role-assigned node'
-    + ' when the role has no members',
+    'one worker on a regular node with outgoing'
+    + ' edges renders warning',
     () => {
-        const node = buildNode(
-            'n1',
-            { kind: 'role', roleId: 'r-eng' },
-        );
-        const counts = new Map([
-            ['r-eng', 0],
-        ]);
+        const n = buildNode('n1', ['hw_1']);
         assert.equal(
-            shouldShowHazard(node, counts),
-            true,
-        );
-    },
-);
-
-test(
-    'hazard renders for a role-assigned node'
-    + ' when the role has no entry in counts'
-    + ' (treat as zero)',
-    () => {
-        const node = buildNode(
-            'n1',
-            { kind: 'role', roleId: 'r-eng' },
-        );
-        assert.equal(
-            shouldShowHazard(
-                node, new Map(),
+            shouldShowWorkerHazard(
+                n,
+                [edge('e1', 'n1', 'next')],
             ),
-            true,
+            'warning',
         );
     },
 );
 
 test(
-    'hazard does NOT render for a role-assigned'
-    + ' node with at least one member',
+    'two or more workers with outgoing edges'
+    + ' renders no hazard',
     () => {
-        const node = buildNode(
-            'n1',
-            { kind: 'role', roleId: 'r-eng' },
-        );
-        const counts = new Map([
-            ['r-eng', 1],
-        ]);
-        assert.equal(
-            shouldShowHazard(node, counts),
-            false,
-        );
-    },
-);
-
-test(
-    'hazard does NOT render for a user-private'
-    + ' role assignment (cardinality 1 by'
-    + ' construction)',
-    () => {
-        const node = buildNode(
-            'n1',
-            {
-                kind: 'role',
-                roleId: 'user-private:p-1',
-            },
+        const n = buildNode(
+            'n1', ['hw_1', 'hw_2'],
         );
         assert.equal(
-            shouldShowHazard(
-                node, new Map(),
+            shouldShowWorkerHazard(
+                n,
+                [edge('e1', 'n1', 'next')],
             ),
-            false,
+            null,
         );
     },
 );
 
 test(
-    'hazard does NOT render for a model'
-    + ' assignment',
+    'one worker with no outgoing edges (dead-end)'
+    + ' renders danger (precedence over warning)',
     () => {
-        const node = buildNode(
-            'n1',
-            {
-                kind: 'model',
-                modelId: 'm-1',
-            },
-        );
+        const n = buildNode('n1', ['hw_1']);
         assert.equal(
-            shouldShowHazard(
-                node, new Map(),
-            ),
-            false,
+            shouldShowWorkerHazard(n, []),
+            'danger',
         );
     },
 );
 
 test(
-    'hazard renders for a crew-assigned node'
-    + ' when the crew has no members',
+    'a start node never renders hazard regardless'
+    + ' of worker count',
     () => {
-        const node = buildNode(
-            'n1',
-            { kind: 'crew', crewId: 'c-1' },
-        );
-        const crewCounts = new Map([
-            ['c-1', 0],
-        ]);
+        const n = buildNode('n1', [], {
+            isCreate: true,
+        });
         assert.equal(
-            shouldShowHazard(
-                node, new Map(), crewCounts,
-            ),
-            true,
+            shouldShowWorkerHazard(n, []),
+            null,
         );
     },
 );
 
 test(
-    'hazard renders for a crew-assigned node'
-    + ' when the crew has no entry (treat as'
-    + ' zero)',
+    'a complete node never renders hazard'
+    + ' regardless of worker count',
     () => {
-        const node = buildNode(
-            'n1',
-            { kind: 'crew', crewId: 'c-1' },
-        );
+        const n = buildNode('n1', [], {
+            isArchive: true,
+        });
         assert.equal(
-            shouldShowHazard(
-                node, new Map(), new Map(),
-            ),
-            true,
+            shouldShowWorkerHazard(n, []),
+            null,
         );
     },
 );
 
 test(
-    'hazard does NOT render for a crew-assigned'
-    + ' node with at least one member',
+    'multiple workers but no outgoing edges still'
+    + ' renders danger (dead-end takes precedence)',
     () => {
-        const node = buildNode(
-            'n1',
-            { kind: 'crew', crewId: 'c-1' },
+        const n = buildNode(
+            'n1', ['hw_1', 'hw_2', 'hw_3'],
         );
-        const crewCounts = new Map([
-            ['c-1', 3],
-        ]);
         assert.equal(
-            shouldShowHazard(
-                node, new Map(), crewCounts,
-            ),
-            false,
+            shouldShowWorkerHazard(n, []),
+            'danger',
         );
     },
 );

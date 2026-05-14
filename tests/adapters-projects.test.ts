@@ -45,7 +45,6 @@ function buildProject(
         position: 1,
         business_context: '{}' as JsonObjectField,
         timeline_label: 'Q1-Q4',
-        budget_label: '$50k',
     };
     const { id: _drop, ...rest } = {
         ...base, ...overrides, id,
@@ -88,7 +87,6 @@ test(
         assert.equal(row.actual_impact, 30);
         assert.equal(row.position, 1);
         assert.equal(row.timeline_label, 'Q1-Q4');
-        assert.equal(row.budget_label, '$50k');
     },
 );
 

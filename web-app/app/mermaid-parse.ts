@@ -1,13 +1,8 @@
-import {
-    START_NODE_DEFAULT_NAME,
-    END_NODE_DEFAULT_NAME,
-} from '../../api/types.ts';
-
 export interface ParsedNode {
     mermaidId: string;
     name: string;
-    isStart: boolean;
-    isComplete: boolean;
+    isCreate: boolean;
+    isArchive: boolean;
 }
 
 export interface ParsedEdge {
@@ -115,8 +110,8 @@ function extractNodeDecl(
             name: unquote(
                 doubleCircleMatch[2]!,
             ),
-            isStart: false,
-            isComplete: true,
+            isCreate: false,
+            isArchive: true,
         };
     }
     const stadiumMatch =
@@ -125,8 +120,8 @@ function extractNodeDecl(
         return {
             mermaidId: stadiumMatch[1]!,
             name: unquote(stadiumMatch[2]!),
-            isStart: true,
-            isComplete: false,
+            isCreate: true,
+            isArchive: false,
         };
     }
     const rectMatch = RECT_RE.exec(token);
@@ -134,8 +129,8 @@ function extractNodeDecl(
         return {
             mermaidId: rectMatch[1]!,
             name: unquote(rectMatch[2]!),
-            isStart: false,
-            isComplete: false,
+            isCreate: false,
+            isArchive: false,
         };
     }
     return null;
@@ -157,8 +152,8 @@ function ensureNode(
         map.set(id, {
             mermaidId: id,
             name: id,
-            isStart: false,
-            isComplete: false,
+            isCreate: false,
+            isArchive: false,
         });
     }
     return id;
@@ -319,10 +314,10 @@ function parseStateDiagram(
         nodes.set(id, {
             mermaidId: id,
             name: kind === 'start'
-                ? START_NODE_DEFAULT_NAME
-                : END_NODE_DEFAULT_NAME,
-            isStart: kind === 'start',
-            isComplete: kind === 'complete',
+                ? 'Create'
+                : 'Archive',
+            isCreate: kind === 'start',
+            isArchive: kind === 'complete',
         });
         return id;
     };
@@ -334,8 +329,8 @@ function parseStateDiagram(
             nodes.set(id, {
                 mermaidId: id,
                 name: id,
-                isStart: false,
-                isComplete: false,
+                isCreate: false,
+                isArchive: false,
             });
         }
     };
@@ -424,8 +419,8 @@ function parseStateDiagram(
             nodes.set(id, {
                 mermaidId: id,
                 name: displayName,
-                isStart: false,
-                isComplete: false,
+                isCreate: false,
+                isArchive: false,
             });
             continue;
         }

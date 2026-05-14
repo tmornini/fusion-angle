@@ -63,7 +63,7 @@ function setupDb(): {
 
 test('getIdeas returns ideas with submitter', async () => {
     const { db, ctx } = setupDb();
-    await db.people.put(
+    await db.workers.put(
         'u1', buildPerson('u1', 'Alice'),
     );
     await db.ideas.put('i1', buildIdea(
@@ -88,7 +88,7 @@ test('getIdeas returns ideas with submitter', async () => {
 
 test('getIdeas throws when idea has no submission', async () => {
     const { db, ctx } = setupDb();
-    await db.people.put(
+    await db.workers.put(
         'u1', buildPerson('u1', 'Alice'),
     );
     await db.ideas.put('i1', buildIdea(
@@ -103,7 +103,7 @@ test('getIdeas throws when idea has no submission', async () => {
 
 test('getIdea finds submission for one idea', async () => {
     const { db, ctx } = setupDb();
-    await db.people.put(
+    await db.workers.put(
         'u1', buildPerson('u1', 'Alice'),
     );
     await db.ideas.put('i1', buildIdea(
@@ -123,7 +123,7 @@ test('getIdea finds submission for one idea', async () => {
 
 test('getIdea throws on missing submission', async () => {
     const { db, ctx } = setupDb();
-    await db.people.put(
+    await db.workers.put(
         'u1', buildPerson('u1', 'Alice'),
     );
     await db.ideas.put(
@@ -150,7 +150,7 @@ test('putIdea persists changes', async () => {
 
 test('deleted ideas are filtered from getIdeas', async () => {
     const { db, ctx } = setupDb();
-    await db.people.put(
+    await db.workers.put(
         'u1', buildPerson('u1', 'Alice'),
     );
     await db.ideas.put(

@@ -24,7 +24,7 @@ import { toggleStatusFilter } from
 import { orderedKeys } from
     '../web-app/app/presenters/ordered-keys.ts';
 import {
-    Person, Role, Crew, Model, nowUtc,
+    HumanWorker, AIWorker, nowUtc,
     jsonArrayField, jsonObjectField,
 } from '../api/types.ts';
 import type {
@@ -48,7 +48,7 @@ function makeGauge(
     isOverrunning: boolean,
 ): GaugeData {
     return {
-        title: 'Cost Budget',
+        title: 'Cost Baseline',
         icon: 'dollarSign',
         iconCssClass: 'text-primary',
         theme: 'blue',
@@ -98,9 +98,9 @@ function makeNode(
         description: 'Manager review step',
         positionX: 0,
         positionY: 0,
-        isStart: false,
-        isComplete: false,
-        crew: { kind: 'unassigned' },
+        isCreate: false,
+        isArchive: false,
+        workerIds: [],
         fields: [],
         ...over,
     };
@@ -119,10 +119,10 @@ function makeEdge(
     };
 }
 
-function makePerson(
+function makeHumanWorker(
     id: string, first: string, last: string,
-): Person {
-    return new Person({
+): HumanWorker {
+    return new HumanWorker({
         id,
         first_name: first,
         last_name: last,
@@ -137,24 +137,11 @@ function makePerson(
     });
 }
 
-function makeRole(id: string, name: string): Role {
-    return new Role({
-        id, name, description: '',
-        created_at: nowUtc(),
-    });
-}
-
-function makeCrew(id: string, name: string): Crew {
-    return new Crew({
-        id, name, description: '',
-        created_at: nowUtc(),
-    });
-}
-
-function makeModel(id: string, name: string): Model {
-    return new Model({
+function makeAIWorker(id: string, name: string): AIWorker {
+    return new AIWorker({
         id, name, provider: 'anthropic',
         description: '',
+        auth_token: 'sk-test-XXXX',
         created_at: nowUtc(),
     });
 }
@@ -179,7 +166,7 @@ test(
                 false,
             ),
         ).render().toString();
-        assert.match(out, /Cost Budget/);
+        assert.match(out, /Cost Baseline/);
         assert.match(out, /class="icon-box"/);
         assert.match(out, /Baseline/);
         assert.match(out, /Current/);
@@ -281,8 +268,8 @@ test(
                 false,
             ),
         ).render().toString();
-        assert.match(out, /id="outer-cost-budget"/);
-        assert.match(out, /id="inner-cost-budget"/);
+        assert.match(out, /id="outer-cost-baseline"/);
+        assert.match(out, /id="inner-cost-baseline"/);
     },
 );
 
@@ -554,11 +541,11 @@ test(
     () => {
         const out = buildNodePanel(
             makeNode({
-                isStart: true,
-                name: 'Start',
+                isCreate: true,
+                name: 'Create',
             }),
             [], false,
-            new Map(), new Map(),
+            [], [],
         ).toString();
         assert.match(out, /Create/);
         assert.equal(/State Properties/.test(out),
@@ -573,11 +560,11 @@ test(
     () => {
         const out = buildNodePanel(
             makeNode({
-                isComplete: true,
-                name: 'End',
+                isArchive: true,
+                name: 'Archive',
             }),
             [], false,
-            new Map(), new Map(),
+            [], [],
         ).toString();
         assert.match(out, /Archive/);
     },
@@ -585,64 +572,48 @@ test(
 
 test(
     'buildNodePanel for a regular node lists the'
-    + ' assignment select with optgroup sections',
+    + ' worker checkboxes grouped Humans / AIs',
     () => {
-        const personMap = new Map([
-            ['p-1', makePerson('p-1', 'Ada', 'L')],
-        ]);
-        const roleMap = new Map([
-            ['r-1', makeRole('r-1', 'Engineering')],
-        ]);
-        const crewMap = new Map([
-            ['c-1', makeCrew('c-1', 'Delivery')],
-        ]);
-        const modelMap = new Map([
-            ['m-1', makeModel('m-1', 'Sonnet')],
-        ]);
+        const humans = [
+            makeHumanWorker('hw_1', 'Ada', 'L'),
+        ];
+        const ais = [
+            makeAIWorker('ai_1', 'Sonnet'),
+        ];
         const out = buildNodePanel(
             makeNode(), [], false,
-            personMap, roleMap, crewMap, modelMap,
+            humans, ais,
         ).toString();
         assert.match(out, /State Properties/);
-        assert.match(out, /id="prop-node-assignment"/);
-        assert.match(out, /<optgroup label="Roles">/);
-        assert.match(
-            out,
-            /<optgroup label="People \(private\)">/,
-        );
-        assert.match(out, /<optgroup label="Crews">/);
-        assert.match(
-            out, /<optgroup label="Models">/,
-        );
-        assert.match(out, /Engineering/);
+        assert.match(out, /id="prop-node-workers"/);
+        assert.match(out, /worker-group-label[^>]*>HUMANS</);
+        assert.match(out, /worker-group-label[^>]*>AIs</);
+        assert.match(out, /data-worker-id="hw_1"/);
+        assert.match(out, /data-worker-id="ai_1"/);
         assert.match(out, /Ada L/);
-        assert.match(out, /Delivery/);
         assert.match(out, /Sonnet/);
-        assert.match(
-            out, /value="role:user-private:p-1"/,
-        );
     },
 );
 
 test(
-    'buildNodePanel marks the currently assigned'
-    + ' role option as selected',
+    'buildNodePanel marks currently assigned'
+    + ' worker checkboxes as checked',
     () => {
-        const roleMap = new Map([
-            ['r-1', makeRole('r-1', 'Engineering')],
-        ]);
+        const humans = [
+            makeHumanWorker('hw_1', 'Ada', 'L'),
+            makeHumanWorker('hw_2', 'Bea', 'M'),
+        ];
         const out = buildNodePanel(
-            makeNode({
-                crew: { kind: 'role', roleId: 'r-1' },
-            }),
-            [], false, new Map(), roleMap,
+            makeNode({ workerIds: ['hw_1'] }),
+            [], false, humans, [],
         ).toString();
         assert.match(
-            out, /value="role:r-1" selected/,
+            out,
+            /data-worker-id="hw_1"[^>]*checked/,
         );
-        assert.equal(
-            /value="unassigned" selected/.test(out),
-            false,
+        assert.doesNotMatch(
+            out,
+            /data-worker-id="hw_2"[^>]*checked/,
         );
     },
 );
@@ -651,16 +622,19 @@ test(
     'buildNodePanel disables inputs when the flow'
     + ' is locked',
     () => {
+        const humans = [
+            makeHumanWorker('hw_1', 'Ada', 'L'),
+        ];
         const out = buildNodePanel(
             makeNode(), [], true,
-            new Map(), new Map(),
+            humans, [],
         ).toString();
         assert.match(
             out, /id="prop-node-name"[^>]*disabled/,
         );
         assert.match(
             out,
-            /id="prop-node-assignment"[^>]*disabled/,
+            /data-worker-id="hw_1"[^>]*disabled/,
         );
     },
 );
@@ -672,12 +646,12 @@ test(
         const withEdges = buildNodePanel(
             makeNode(),
             [makeEdge({ name: 'Approve' })],
-            false, new Map(), new Map(),
+            false, [], [],
         ).toString();
         assert.match(withEdges, /Approve/);
         const none = buildNodePanel(
             makeNode(), [], false,
-            new Map(), new Map(),
+            [], [],
         ).toString();
         assert.match(none, /None/);
     },

@@ -542,6 +542,19 @@ export function iconAlertTriangle(
     );
 }
 
+export function iconNoEntry(
+    size: number,
+    cssClass: string,
+) {
+    return icon(
+        '<circle cx="12" cy="12" r="10"/>'
+        + '<line x1="5" x2="19" y1="12"'
+        + ' y2="12"/>',
+        size,
+        cssClass,
+    );
+}
+
 export function iconCheckCircle(
     size: number,
     cssClass: string,

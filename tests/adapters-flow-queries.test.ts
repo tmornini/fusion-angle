@@ -52,9 +52,9 @@ function buildNode(
         description: '',
         positionX: 0,
         positionY: 0,
-        isStart: false,
-        isComplete: false,
-        crew: { kind: 'unassigned' },
+        isCreate: false,
+        isArchive: false,
+        workerIds: [],
         fields: [],
         ...overrides,
     };
@@ -128,7 +128,6 @@ function putProject(
         position: 0,
         business_context: '{}',
         timeline_label: '',
-        budget_label: '',
     });
 }
 
@@ -142,11 +141,11 @@ test(
             'flow-1', 'p1',
         );
         const start = buildNode('start', {
-            isStart: true,
+            isCreate: true,
         });
         const mid = buildNode('mid');
         const end = buildNode('end', {
-            isComplete: true,
+            isArchive: true,
         });
         const e1 = buildEdge(
             'e1', 'start', 'mid',
@@ -514,8 +513,8 @@ test(
             ),
         ).size;
         assert.equal(distinct, g.nodes.length);
-        const start = g.nodes.find(n => n.isStart)!;
-        const end = g.nodes.find(n => n.isComplete)!;
+        const start = g.nodes.find(n => n.isCreate)!;
+        const end = g.nodes.find(n => n.isArchive)!;
         assert.ok(start.positionX < end.positionX);
     },
 );

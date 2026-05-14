@@ -39,9 +39,9 @@ test('generateMermaid emits start with stadium brackets', () => {
                 description: '',
                 positionX: 0,
                 positionY: 0,
-                isStart: true,
-                isComplete: false,
-                crew: { kind: 'unassigned' },
+                isCreate: true,
+                isArchive: false,
+                workerIds: [],
                 fields: [],
             },
         ],
@@ -55,18 +55,18 @@ test('generateMermaid emits complete with triple parens', () => {
         nodes: [
             {
                 id: 'n2',
-                name: 'End',
+                name: 'Archive',
                 description: '',
                 positionX: 0,
                 positionY: 0,
-                isStart: false,
-                isComplete: true,
-                crew: { kind: 'unassigned' },
+                isCreate: false,
+                isArchive: true,
+                workerIds: [],
                 fields: [],
             },
         ],
     } as never);
-    assert.match(result, /n2\(\(\(End\)\)\)/);
+    assert.match(result, /n2\(\(\(Archive\)\)\)/);
 });
 
 test('generateMermaid sanitizes dashes in IDs', () => {
@@ -79,9 +79,9 @@ test('generateMermaid sanitizes dashes in IDs', () => {
                 description: '',
                 positionX: 0,
                 positionY: 0,
-                isStart: false,
-                isComplete: false,
-                crew: { kind: 'unassigned' },
+                isCreate: false,
+                isArchive: false,
+                workerIds: [],
                 fields: [],
             },
         ],
@@ -98,18 +98,18 @@ test('generateMermaid emits labeled edges', () => {
                 id: 'a', name: 'A',
                 description: '',
                 positionX: 0, positionY: 0,
-                isStart: false,
-                isComplete: false,
-                crew: { kind: 'unassigned' },
+                isCreate: false,
+                isArchive: false,
+                workerIds: [],
                 fields: [],
             },
             {
                 id: 'b', name: 'B',
                 description: '',
                 positionX: 0, positionY: 0,
-                isStart: false,
-                isComplete: false,
-                crew: { kind: 'unassigned' },
+                isCreate: false,
+                isArchive: false,
+                workerIds: [],
                 fields: [],
             },
         ],
@@ -134,18 +134,18 @@ test('generateMermaid emits unlabeled edges', () => {
                 id: 'a', name: 'A',
                 description: '',
                 positionX: 0, positionY: 0,
-                isStart: false,
-                isComplete: false,
-                crew: { kind: 'unassigned' },
+                isCreate: false,
+                isArchive: false,
+                workerIds: [],
                 fields: [],
             },
             {
                 id: 'b', name: 'B',
                 description: '',
                 positionX: 0, positionY: 0,
-                isStart: false,
-                isComplete: false,
-                crew: { kind: 'unassigned' },
+                isCreate: false,
+                isArchive: false,
+                workerIds: [],
                 fields: [],
             },
         ],
@@ -169,9 +169,9 @@ test('generateMermaid quotes labels with special chars', () => {
                 name: 'Has [bracket]',
                 description: '',
                 positionX: 0, positionY: 0,
-                isStart: false,
-                isComplete: false,
-                crew: { kind: 'unassigned' },
+                isCreate: false,
+                isArchive: false,
+                workerIds: [],
                 fields: [],
             },
         ],
@@ -211,10 +211,10 @@ test('parseMermaid recognizes start and complete', () => {
     ].join('\n');
     const parsed = parseMermaid(text);
     const start = parsed.nodes.find(
-        n => n.isStart,
+        n => n.isCreate,
     );
     const end = parsed.nodes.find(
-        n => n.isComplete,
+        n => n.isArchive,
     );
     assert.equal(start?.name, 'Start');
     assert.equal(end?.name, 'End');
@@ -238,30 +238,30 @@ test('mermaid round-trip preserves structure', () => {
         ...minimalGraph,
         nodes: [
             {
-                id: 's', name: 'Start',
+                id: 's', name: 'Create',
                 description: '',
                 positionX: 0, positionY: 0,
-                isStart: true,
-                isComplete: false,
-                crew: { kind: 'unassigned' },
+                isCreate: true,
+                isArchive: false,
+                workerIds: [],
                 fields: [],
             },
             {
                 id: 'm', name: 'Middle',
                 description: '',
                 positionX: 0, positionY: 0,
-                isStart: false,
-                isComplete: false,
-                crew: { kind: 'unassigned' },
+                isCreate: false,
+                isArchive: false,
+                workerIds: [],
                 fields: [],
             },
             {
-                id: 'e', name: 'End',
+                id: 'e', name: 'Archive',
                 description: '',
                 positionX: 0, positionY: 0,
-                isStart: false,
-                isComplete: true,
-                crew: { kind: 'unassigned' },
+                isCreate: false,
+                isArchive: true,
+                workerIds: [],
                 fields: [],
             },
         ],
@@ -281,11 +281,11 @@ test('mermaid round-trip preserves structure', () => {
     assert.equal(parsed.nodes.length, 3);
     assert.equal(parsed.edges.length, 2);
     assert.equal(
-        parsed.nodes.filter(n => n.isStart).length,
+        parsed.nodes.filter(n => n.isCreate).length,
         1,
     );
     assert.equal(
-        parsed.nodes.filter(n => n.isComplete).length,
+        parsed.nodes.filter(n => n.isArchive).length,
         1,
     );
     assert.equal(

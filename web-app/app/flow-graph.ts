@@ -11,12 +11,10 @@ import {
 } from './flow-layout.ts';
 import { pluralize } from './format.ts';
 import { findCycleEdgeIds } from './flow-cycle-edges.ts';
-import { iconAlertTriangle } from './icons.ts';
 import {
-    START_NODE_DEFAULT_NAME,
-    END_NODE_DEFAULT_NAME,
-    isUserPrivateRoleId,
-} from '../../api/types.ts';
+    iconAlertTriangle,
+    iconNoEntry,
+} from './icons.ts';
 
 function nodeHasConnections(
     nodeId: string,
@@ -428,44 +426,30 @@ export function computeEdgeLabelWidth(
     );
 }
 
-export function shouldShowHazard(
+export type WorkerHazardLevel = 'warning' | 'danger';
+
+export function shouldShowWorkerHazard(
     node: GraphNode,
-    roleMemberCounts:
-        ReadonlyMap<string, number>,
-    crewMemberCounts:
-        ReadonlyMap<string, number> = new Map(),
-): boolean {
-    const a = node.crew;
-    if (a.kind === 'unassigned') return true;
-    if (a.kind === 'role') {
-        // User-private roles always have
-        // cardinality 1 by construction.
-        if (isUserPrivateRoleId(a.roleId)) {
-            return false;
-        }
-        const count = roleMemberCounts
-            .get(a.roleId) ?? 0;
-        return count === 0;
-    }
-    if (a.kind === 'crew') {
-        const count = crewMemberCounts
-            .get(a.crewId) ?? 0;
-        return count === 0;
-    }
-    return false;
+    allEdges: readonly GraphEdge[],
+): WorkerHazardLevel | null {
+    if (node.isCreate || node.isArchive) return null;
+    const outCount = allEdges
+        .filter(e => e.fromNodeId === node.id)
+        .length;
+    if (node.workerIds.length === 0) return 'danger';
+    if (outCount === 0) return 'danger';
+    if (node.workerIds.length === 1) return 'warning';
+    return null;
 }
 
 function buildNode(
     node: GraphNode,
+    edges: readonly GraphEdge[],
     isSelected: boolean,
     isLocked: boolean,
     portPos: {
         x: number; y: number;
     } | null,
-    roleMemberCounts:
-        ReadonlyMap<string, number>,
-    crewMemberCounts:
-        ReadonlyMap<string, number>,
 ): SafeHtml {
     const { positionX, positionY } = node;
     const halfH = NODE_HEIGHT / 2;
@@ -473,10 +457,10 @@ function buildNode(
 
     let borderColor = BLUE;
     let strokeW = STROKE_NORMAL;
-    if (node.isStart) {
+    if (node.isCreate) {
         borderColor = GREEN;
         strokeW = STROKE_START;
-    } else if (node.isComplete) {
+    } else if (node.isArchive) {
         borderColor = RED;
         strokeW = STROKE_COMPLETE;
     }
@@ -497,16 +481,12 @@ function buildNode(
         + ` stroke-width="${strokeW}"/>`;
 
     const isSpecial =
-        node.isStart || node.isComplete;
+        node.isCreate || node.isArchive;
     const labelY = isSpecial
         ? NODE_LABEL_Y_CENTERED
         : NODE_LABEL_Y;
 
-    const displayName = node.isStart
-        ? START_NODE_DEFAULT_NAME
-        : node.isComplete
-        ? END_NODE_DEFAULT_NAME
-        : node.name;
+    const displayName = node.name;
     const nameEsc = escapeForHtml(
         truncateLabel(
             displayName, NODE_MAX_CHARS,
@@ -561,20 +541,30 @@ function buildNode(
             + '</circle>';
     }
 
-    if (
-        !isSpecial
-        && shouldShowHazard(
-            node, roleMemberCounts,
-            crewMemberCounts,
-        )
-    ) {
+    const hazardLevel =
+        shouldShowWorkerHazard(node, edges);
+    if (hazardLevel === 'warning') {
         inner += '<g'
-            + ' class="flow-node-hazard"'
+            + ' class="flow-node-warning"'
             + ' transform="translate(6, 42)">'
             + '<title>'
-            + 'No assignment for this node.'
+            + 'Single worker assigned (no backup)'
             + '</title>'
             + iconAlertTriangle(16, '')
+                .toString()
+            + '</g>';
+    } else if (hazardLevel === 'danger') {
+        const dangerTitle =
+            node.workerIds.length === 0
+                ? 'Workers required'
+                : 'Dead end (no outgoing edges)';
+        inner += '<g'
+            + ' class="flow-node-danger"'
+            + ' transform="translate(6, 42)">'
+            + '<title>'
+            + dangerTitle
+            + '</title>'
+            + iconNoEntry(16, '')
                 .toString()
             + '</g>';
     }
@@ -773,7 +763,7 @@ function buildEdge(
 
     const strokeWidth = EDGE_STROKE;
 
-    if (fromNode.isStart) {
+    if (fromNode.isCreate) {
         return trusted(
             '<g aria-hidden="true">'
             + '<path'
@@ -1012,10 +1002,6 @@ export function buildGraphSvg(
         string,
         readonly { x: number; y: number }[]
     >,
-    roleMemberCounts:
-        ReadonlyMap<string, number> = new Map(),
-    crewMemberCounts:
-        ReadonlyMap<string, number> = new Map(),
 ): SafeHtml {
     const nodeMap = new Map(
         nodes.map(n => [n.id, n]),
@@ -1082,8 +1068,8 @@ export function buildGraphSvg(
         const isSelected =
             selectedNodeIds.has(node.id);
         const isSpecial =
-            node.isStart
-            || node.isComplete;
+            node.isCreate
+            || node.isArchive;
         const hasEdges = isSpecial
             && nodeHasConnections(
                 node.id, edges,
@@ -1098,10 +1084,8 @@ export function buildGraphSvg(
             : null;
         nodeMarkup +=
             buildNode(
-                node, isSelected,
+                node, edges, isSelected,
                 isLocked, portPos,
-                roleMemberCounts,
-                crewMemberCounts,
             ).toString();
     }
 

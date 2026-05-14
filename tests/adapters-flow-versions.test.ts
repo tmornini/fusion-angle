@@ -48,9 +48,9 @@ function buildNode(
         description: '',
         positionX: 0,
         positionY: 0,
-        isStart: false,
-        isComplete: false,
-        crew: { kind: 'unassigned' },
+        isCreate: false,
+        isArchive: false,
+        workerIds: [],
         fields: [],
         ...overrides,
     };
@@ -132,11 +132,11 @@ test(
             createRequestContext(db), 'flow-1',
         );
         const start = buildNode('start', {
-            isStart: true,
+            isCreate: true,
         });
         const mid = buildNode('mid');
         const end = buildNode('end', {
-            isComplete: true,
+            isArchive: true,
         });
         const edge = buildEdge(
             'e1', 'start', 'mid',

@@ -111,10 +111,10 @@ function buildFlowNodeSvg(
     label: string,
     subtitle: string,
     borderColor: string,
-    isComplete: boolean,
+    isArchive: boolean,
 ): SafeHtml {
     const halfW = NW / 2;
-    const sw = isComplete ? 3
+    const sw = isArchive ? 3
         : borderColor === FLOW_GREEN
             ? 2.5 : 2;
     let inner = '<rect'
@@ -125,7 +125,7 @@ function buildFlowNodeSvg(
         + '--color-card-bg)"'
         + ` stroke="${borderColor}"`
         + ` stroke-width="${sw}"/>`;
-    if (isComplete) {
+    if (isArchive) {
         inner += '<rect'
             + ' x="4" y="4"'
             + ` width="${NW - 8}"`

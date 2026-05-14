@@ -19,12 +19,12 @@ import {
     getWorkOrderTransitionRowsByOrder,
     getTransitionFieldValuesByTransition,
     getWorkOrderClaimRowsByOrder,
-    getPersonMap,
+    getWorkerMap,
     postActivity,
     postWorkOrderTransition,
     postWorkOrderClaim,
     deleteWorkOrderClaim,
-    getCurrentPerson,
+    getCurrentHumanWorker,
     createRequestContext,
     generateCryptoSafeBase62,
 } from '../app/adapters/index.ts';
@@ -240,7 +240,7 @@ async function loadPresenter(
     const [
         workOrder, transitions,
         fieldValuesByTransition,
-        claims, personMap,
+        claims, workerMap,
     ] = await Promise.all([
         getWorkOrder(ctx, workOrderId),
         getWorkOrderTransitionRowsByOrder(
@@ -248,14 +248,14 @@ async function loadPresenter(
         ),
         getTransitionFieldValuesByTransition(ctx),
         getWorkOrderClaimRowsByOrder(ctx, workOrderId),
-        getPersonMap(ctx),
+        getWorkerMap(ctx),
     ]);
     return new WorkboxDetailPresenter(
         workOrder,
         transitions,
         fieldValuesByTransition,
         claims,
-        personMap,
+        workerMap,
         currentPersonId,
     );
 }
@@ -278,7 +278,7 @@ export async function init(
 
     const ctx = createRequestContext();
     const personRow =
-        await getCurrentPerson(ctx);
+        await getCurrentHumanWorker(ctx);
     const personId = personRow.id;
 
     const detail = await withLoadingState(
@@ -296,7 +296,7 @@ export async function init(
             if (
                 (claim.kind !== 'claimed'
                     || !claim.byCurrentPerson)
-                && !presenter.isComplete()
+                && !presenter.isArchive()
             ) {
                 await postWorkOrderClaim(
                     ctx,
@@ -332,7 +332,7 @@ export async function init(
     }
 
     if (
-        !detail.isComplete()
+        !detail.isArchive()
     ) {
         initTransitionButtons(
             container, detail, ctx,

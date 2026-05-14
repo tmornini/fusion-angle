@@ -1,7 +1,7 @@
 export interface LayoutInput {
     id: string;
-    isStart: boolean;
-    isComplete: boolean;
+    isCreate: boolean;
+    isArchive: boolean;
 }
 
 export interface EdgePair {
@@ -153,7 +153,7 @@ export function computeLayout(
         };
     }
 
-    const startNode = nodes.find(n => n.isStart);
+    const startNode = nodes.find(n => n.isCreate);
     if (!startNode) {
         throw new Error('Flow has no start node');
     }
@@ -401,7 +401,7 @@ function removeCycles(
     };
 
     const startNode =
-        nodes.find(n => n.isStart);
+        nodes.find(n => n.isCreate);
     if (startNode) {
         dfs(startNode.id);
     }
@@ -1048,10 +1048,10 @@ function fitToCanvas(
     // right of (or below) the complete node, mirror the whole
     // graph so the user reads it in the natural direction.
     const startId = nodes.find(
-        n => n.isStart,
+        n => n.isCreate,
     )?.id;
     const endId = nodes.find(
-        n => n.isComplete,
+        n => n.isArchive,
     )?.id;
     if (
         startId && endId

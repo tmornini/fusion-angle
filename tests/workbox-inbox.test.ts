@@ -10,12 +10,11 @@ import {
 } from
 '../web-app/app/adapters/work-orders-mutations.ts';
 import {
-    getPersonMap,
+    getWorkerMap,
     generateCryptoSafeBase62,
 } from '../web-app/app/adapters/index.ts';
 import {
     buildInboxItems,
-    type VisibilityScope,
 } from
 '../web-app/app/presenters/workbox-inbox.ts';
 import {
@@ -23,7 +22,7 @@ import {
     DEFAULT_LOCK_TIMEOUT,
 } from '../api/types.ts';
 import type {
-    PersonEntity,
+    HumanWorkerEntity,
     FlowEntity,
     GraphNode,
     GraphEdge,
@@ -31,14 +30,15 @@ import type {
     WorkOrderEntity,
     WorkOrderTransitionEntity,
     WorkOrderClaimEntity,
-    Person,
+    Worker,
+    WorkerId,
 } from '../api/types.ts';
 
 // -- Fixtures ---------------------------------
 
-function buildPerson(
+function buildHumanWorker(
     name: string,
-): Omit<PersonEntity, 'id'> {
+): Omit<HumanWorkerEntity, 'id'> {
     return {
         first_name: name,
         last_name: 'Test',
@@ -64,9 +64,9 @@ function buildNode(
         description: '',
         positionX: 0,
         positionY: 0,
-        isStart: false,
-        isComplete: false,
-        crew: { kind: 'unassigned' },
+        isCreate: false,
+        isArchive: false,
+        workerIds: [],
         fields: [],
         ...overrides,
     };
@@ -107,14 +107,19 @@ function buildFlow(
 }
 
 function buildLinearGraph(): StoredGraph {
+    // n-middle carries one worker so the flow
+    // passes the publish gate (zero-worker nodes
+    // would mark the flow Not Ready).
     return {
         nodes: [
             buildNode('n-start', 'Start', {
-                isStart: true,
+                isCreate: true,
             }),
-            buildNode('n-middle', 'Doing work'),
+            buildNode('n-middle', 'Doing work', {
+                workerIds: ['current'],
+            }),
             buildNode('n-finish', 'Done', {
-                isComplete: true,
+                isArchive: true,
             }),
         ],
         edges: [
@@ -128,7 +133,7 @@ interface WoTables {
     workOrders: WorkOrderEntity[];
     transitions: WorkOrderTransitionEntity[];
     claims: WorkOrderClaimEntity[];
-    personMap: Map<string, Person>;
+    workerMap: Map<WorkerId, Worker>;
 }
 
 async function setupOneWorkOrder(): Promise<{
@@ -138,8 +143,8 @@ async function setupOneWorkOrder(): Promise<{
     tables: () => Promise<WoTables>;
 }> {
     const db = new MemoryDbAdapter();
-    await db.people.put(
-        'current', buildPerson('Demo'),
+    await db.workers.put(
+        'current', buildHumanWorker('Demo'),
     );
     const ctx = createRequestContext(db);
     await db.flows.put(
@@ -165,7 +170,7 @@ async function setupOneWorkOrder(): Promise<{
                 .workOrderTransitions.getAll(),
             claims: await db.workOrderClaims
                 .getAll(),
-            personMap: await getPersonMap(fresh),
+            workerMap: await getWorkerMap(fresh),
         };
     };
     return { db, ctx, woId, tables };
@@ -203,10 +208,10 @@ test(
             await setupOneWorkOrder();
         const { workOrders, transitions } =
             await tables();
-        const { personMap } = await tables();
+        const { workerMap } = await tables();
         const items = buildInboxItems(
             workOrders, transitions, [],
-            personMap, 'active',
+            workerMap, 'active',
         );
         assert.equal(items.length, 1);
         const item = items[0]!;
@@ -235,10 +240,10 @@ test(
             await setupOneWorkOrder();
         const { workOrders, transitions } =
             await tables();
-        const { personMap } = await tables();
+        const { workerMap } = await tables();
         const items = buildInboxItems(
             workOrders, transitions, [],
-            personMap, 'archived',
+            workerMap, 'archived',
         );
         assert.deepEqual(items, []);
     },
@@ -252,14 +257,14 @@ test(
             await setupOneWorkOrder();
         const {
             workOrders, transitions, claims,
-            personMap,
+            workerMap,
         } = await tables();
         // postWorkOrderCreation already minted a
         // fresh claim, so it is active.
         assert.equal(claims.length, 1);
         const items = buildInboxItems(
             workOrders, transitions, claims,
-            personMap, 'active',
+            workerMap, 'active',
         );
         assert.deepEqual(items, []);
     },
@@ -284,18 +289,18 @@ test(
             },
         );
         const {
-            workOrders, transitions, personMap,
+            workOrders, transitions, workerMap,
         } = await tables();
         assert.deepEqual(
             buildInboxItems(
                 workOrders, transitions, [],
-                personMap, 'active',
+                workerMap, 'active',
             ),
             [],
         );
         const archived = buildInboxItems(
             workOrders, transitions, [],
-            personMap, 'archived',
+            workerMap, 'archived',
         );
         assert.equal(archived.length, 1);
         assert.equal(archived[0]!.completed, true);
@@ -307,8 +312,8 @@ test(
     + ' position',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.people.put(
-            'current', buildPerson('Demo'),
+        await db.workers.put(
+            'current', buildHumanWorker('Demo'),
         );
         const ctx = createRequestContext(db);
         await db.flows.put(
@@ -333,7 +338,7 @@ test(
             await db.workOrders.getAll(),
             await db.workOrderTransitions.getAll(),
             [],
-            await getPersonMap(
+            await getWorkerMap(
                 createRequestContext(db),
             ),
             'active',
@@ -356,67 +361,14 @@ test(
     async () => {
         const { tables } =
             await setupOneWorkOrder();
-        const { workOrders, personMap } =
+        const { workOrders, workerMap } =
             await tables();
         assert.throws(
             () => buildInboxItems(
                 workOrders, [], [],
-                personMap, 'active',
+                workerMap, 'active',
             ),
             /no transitions/,
         );
     },
 );
-
-test(
-    'buildInboxItems honors a visibility scope:'
-    + ' a node visible to nobody is filtered out',
-    async () => {
-        const { tables } =
-            await setupOneWorkOrder();
-        const { workOrders, transitions } =
-            await tables();
-        const { personMap } = await tables();
-        // The current node (n-middle) is
-        // unassigned, so it is visible to all.
-        const allVisible = buildInboxItems(
-            workOrders, transitions, [],
-            personMap, 'active',
-            scopeFor('current'),
-        );
-        assert.equal(allVisible.length, 1);
-        // Re-stamp the frozen graph's n-middle
-        // node as model-assigned: model nodes are
-        // visible to no person.
-        const wo = workOrders[0]!;
-        const fg = JSON.parse(
-            wo.flow_graph as unknown as string,
-        ) as { nodes: GraphNode[] };
-        const mid = fg.nodes.find(
-            n => n.id === 'n-middle',
-        )!;
-        mid.crew = { kind: 'model', modelId: 'm1' };
-        const remapped: WorkOrderEntity[] = [{
-            ...wo,
-            flow_graph: jsonObjectField(
-                fg as unknown as Record<
-                    string, unknown
-                >,
-            ),
-        }];
-        const none = buildInboxItems(
-            remapped, transitions, [],
-            personMap, 'active',
-            scopeFor('current'),
-        );
-        assert.deepEqual(none, []);
-    },
-);
-
-function scopeFor(personId: string): VisibilityScope {
-    return {
-        currentPersonId: personId,
-        roleMemberSetByRoleId: new Map(),
-        crewMemberSetByCrewId: new Map(),
-    };
-}

@@ -17,8 +17,8 @@ type NodeOpts = {
     name?: string;
     positionX?: number;
     positionY?: number;
-    isStart?: boolean;
-    isComplete?: boolean;
+    isCreate?: boolean;
+    isArchive?: boolean;
 };
 
 function node(id: string, o: NodeOpts = {}): GraphNode {
@@ -28,9 +28,9 @@ function node(id: string, o: NodeOpts = {}): GraphNode {
         description: '',
         positionX: o.positionX ?? 0,
         positionY: o.positionY ?? 0,
-        isStart: o.isStart ?? false,
-        isComplete: o.isComplete ?? false,
-        crew: { kind: 'unassigned' },
+        isCreate: o.isCreate ?? false,
+        isArchive: o.isArchive ?? false,
+        workerIds: [],
         fields: [],
     };
 }
@@ -69,11 +69,11 @@ function flowGraph(o: {
 // A fan plus a back-edge: the layout has to do real work.
 function sampleNodes(): GraphNode[] {
     return [
-        node('s', { isStart: true }),
+        node('s', { isCreate: true }),
         node('a'),
         node('b'),
         node('c'),
-        node('z', { isComplete: true }),
+        node('z', { isArchive: true }),
     ];
 }
 
@@ -186,9 +186,9 @@ test(
     () => {
         const r = runLayoutFromInputs(
             [
-                { id: 's', isStart: true, isComplete: false },
-                { id: 'a', isStart: false, isComplete: false },
-                { id: 'z', isStart: false, isComplete: true },
+                { id: 's', isCreate: true, isArchive: false },
+                { id: 'a', isCreate: false, isArchive: false },
+                { id: 'z', isCreate: false, isArchive: true },
             ],
             [edge('s', 'a'), edge('a', 'z')],
         );
@@ -229,8 +229,8 @@ test(
         }));
         assert.equal(distinctXY(out.nodes), 5);
         assert.ok(spanX(out.nodes) > 2 * 160);
-        const s = out.nodes.find(n => n.isStart)!;
-        const z = out.nodes.find(n => n.isComplete)!;
+        const s = out.nodes.find(n => n.isCreate)!;
+        const z = out.nodes.find(n => n.isArchive)!;
         assert.ok(s.positionX < z.positionX);
     },
 );
@@ -256,10 +256,10 @@ test(
         const out = withRenderableLayout(flowGraph({
             isAutoLayout: false,
             nodes: [
-                node('s', { isStart: true }),
+                node('s', { isCreate: true }),
                 node('a', { positionX: 300 }),
                 node('z', {
-                    isComplete: true, positionX: 600,
+                    isArchive: true, positionX: 600,
                 }),
             ],
             edges: [edge('s', 'a'), edge('a', 'z')],

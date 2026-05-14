@@ -1,5 +1,5 @@
 import {
-    assertPersonStatus,
+    assertWorkerStatus,
     assertIdeaStatus,
     assertProjectStatus,
     assertReadinessLevel,
@@ -11,14 +11,15 @@ import type {
     StoredGraph,
     WorkOrderFlowGraph,
     FlowFieldType,
-    NodeAssignment,
-    PersonStatus,
+    WorkerId,
+    WorkerStatus,
     IdeaStatus,
     ProjectStatus,
     ReadinessLevel,
     JsonArrayField,
     JsonObjectField,
-    PersonEntity,
+    HumanWorkerEntity,
+    AIWorkerEntity,
     IdeaEntity,
     ProjectEntity,
     ActivityEntity,
@@ -33,12 +34,6 @@ import type {
     IdeaSubmissionEntity,
     ActivityActorEntity,
     ProjectFlowEntity,
-    RoleEntity,
-    RoleMembershipEntity,
-    CrewEntity,
-    CrewRoleMembershipEntity,
-    ModelEntity,
-    RoleModelMembershipEntity,
 } from './types.ts';
 
 export interface Risk {
@@ -284,48 +279,16 @@ function asGraphField(
     };
 }
 
-export function asNodeAssignment(
+export function asWorkerIds(
     value: unknown,
     label: string,
-): NodeAssignment {
-    const obj = asObject(value, label);
-    const kind = asString(
-        obj['kind'], label + '.kind',
-    );
-    if (kind === 'unassigned') {
-        return { kind: 'unassigned' };
-    }
-    if (kind === 'role') {
-        return {
-            kind: 'role',
-            roleId: asString(
-                obj['roleId'],
-                label + '.roleId',
-            ),
-        };
-    }
-    if (kind === 'crew') {
-        return {
-            kind: 'crew',
-            crewId: asString(
-                obj['crewId'],
-                label + '.crewId',
-            ),
-        };
-    }
-    if (kind === 'model') {
-        return {
-            kind: 'model',
-            modelId: asString(
-                obj['modelId'],
-                label + '.modelId',
-            ),
-        };
-    }
-    throw new Error(
-        'expected assignment.kind in {unassigned,'
-            + ' role, crew, model} for '
-            + label + ', got ' + kind,
+): WorkerId[] {
+    const arr = asArray(value, label);
+    return arr.map((v, i) =>
+        asString(
+            v,
+            label + '[' + i + ']',
+        ),
     );
 }
 
@@ -338,8 +301,9 @@ function asGraphNode(
         obj['fields'],
         label + '.fields',
     );
-    const crew = asNodeAssignment(
-        obj['crew'], label + '.crew',
+    const workerIds = asWorkerIds(
+        obj['workerIds'],
+        label + '.workerIds',
     );
     return {
         id: asString(
@@ -360,15 +324,15 @@ function asGraphNode(
             obj['positionY'],
             label + '.positionY',
         ),
-        isStart: asBoolean(
-            obj['isStart'],
-            label + '.isStart',
+        isCreate: asBoolean(
+            obj['isCreate'],
+            label + '.isCreate',
         ),
-        isComplete: asBoolean(
-            obj['isComplete'],
-            label + '.isComplete',
+        isArchive: asBoolean(
+            obj['isArchive'],
+            label + '.isArchive',
         ),
-        crew,
+        workerIds,
         fields: fieldsArr.map((f, i) =>
             asGraphField(
                 f,
@@ -518,11 +482,11 @@ function asJsonObjectField(
 
 // ── Enum validators ─────────────────
 
-export function asPersonStatus(
+export function asWorkerStatus(
     value: unknown,
     label: string,
-): PersonStatus {
-    return assertPersonStatus(
+): WorkerStatus {
+    return assertWorkerStatus(
         asString(value, label), label,
     );
 }
@@ -552,6 +516,77 @@ export function asReadinessLevel(
     return assertReadinessLevel(
         asString(value, label), label,
     );
+}
+
+// ── Pick-from-body helpers ───────────
+//
+// pick*(body, key) is the no-stutter form
+// of as*(body[key], key). The label IS the
+// key. For nested parsing where the label
+// must be a parent path (e.g., label +
+// '.kind'), keep using the as* form.
+
+export function pickString(
+    body: Record<string, unknown>,
+    key: string,
+): string {
+    return asString(body[key], key);
+}
+
+export function pickNumber(
+    body: Record<string, unknown>,
+    key: string,
+): number {
+    return asNumber(body[key], key);
+}
+
+export function pickBoolean(
+    body: Record<string, unknown>,
+    key: string,
+): boolean {
+    return asBoolean(body[key], key);
+}
+
+export function pickWorkerStatus(
+    body: Record<string, unknown>,
+    key: string,
+): WorkerStatus {
+    return asWorkerStatus(body[key], key);
+}
+
+export function pickIdeaStatus(
+    body: Record<string, unknown>,
+    key: string,
+): IdeaStatus {
+    return asIdeaStatus(body[key], key);
+}
+
+export function pickProjectStatus(
+    body: Record<string, unknown>,
+    key: string,
+): ProjectStatus {
+    return asProjectStatus(body[key], key);
+}
+
+export function pickReadinessLevel(
+    body: Record<string, unknown>,
+    key: string,
+): ReadinessLevel {
+    return asReadinessLevel(body[key], key);
+}
+
+export function pickJsonArrayField(
+    body: Record<string, unknown>,
+    key: string,
+): JsonArrayField {
+    return asJsonArrayField(body[key], key);
+}
+
+export function pickJsonObjectField(
+    body: Record<string, unknown>,
+    key: string,
+): JsonObjectField {
+    return asJsonObjectField(body[key], key);
 }
 
 // ── Key-set enforcement ──────────────
@@ -607,50 +642,98 @@ export function assertOnlyKeys(
 
 // ── Entity validators ────────────────
 
-const PERSON_BODY_KEYS: readonly string[] = [
+const HUMAN_WORKER_BODY_KEYS:
+    readonly string[] = [
     'first_name', 'last_name', 'email',
     'title', 'department', 'status',
     'strengths', 'team_dimensions',
     'phone', 'bio',
 ];
 
-export function validatePersonEntity(
+export function validateHumanWorkerEntity(
     body: Record<string, unknown>,
-): Omit<PersonEntity, 'id'> {
+): Omit<HumanWorkerEntity, 'id'> {
     assertOnlyKeys(
-        body, PERSON_BODY_KEYS, 'PersonEntity',
+        body,
+        HUMAN_WORKER_BODY_KEYS,
+        'HumanWorkerEntity',
     );
     return {
-        first_name: asString(
-            body['first_name'], 'first_name',
+        first_name: pickString(
+            body, 'first_name',
         ),
-        last_name: asString(
-            body['last_name'], 'last_name',
+        last_name: pickString(
+            body, 'last_name',
         ),
-        email: asString(
-            body['email'], 'email',
+        email: pickString(
+            body, 'email',
         ),
-        title: asString(
-            body['title'], 'title',
+        title: pickString(
+            body, 'title',
         ),
-        department: asString(
-            body['department'], 'department',
+        department: pickString(
+            body, 'department',
         ),
-        status: asPersonStatus(
-            body['status'], 'status',
+        status: pickWorkerStatus(
+            body, 'status',
         ),
-        strengths: asJsonArrayField(
-            body['strengths'], 'strengths',
+        strengths: pickJsonArrayField(
+            body, 'strengths',
         ),
-        team_dimensions: asJsonObjectField(
-            body['team_dimensions'],
-            'team_dimensions',
+        team_dimensions: pickJsonObjectField(
+            body, 'team_dimensions',
         ),
-        phone: asString(
-            body['phone'], 'phone',
+        phone: pickString(
+            body, 'phone',
         ),
-        bio: asString(
-            body['bio'], 'bio',
+        bio: pickString(
+            body, 'bio',
+        ),
+    };
+}
+
+const AI_WORKER_BODY_KEYS:
+    readonly string[] = [
+    'name', 'provider', 'description',
+    'auth_token', 'created_at',
+];
+
+// auth_token must be non-empty —
+// Sin of Null / Default Values fires
+// otherwise (empty would be a sentinel for
+// "not set"). Future feature will add
+// provider-side validation; this gate is
+// the first line of defense today.
+export function validateAIWorkerEntity(
+    body: Record<string, unknown>,
+): Omit<AIWorkerEntity, 'id'> {
+    assertOnlyKeys(
+        body,
+        AI_WORKER_BODY_KEYS,
+        'AIWorkerEntity',
+    );
+    const authToken = pickString(
+        body, 'auth_token',
+    );
+    if (authToken === '') {
+        throw new Error(
+            'auth_token must be non-empty'
+            + ' on AIWorkerEntity',
+        );
+    }
+    return {
+        name: pickString(
+            body, 'name',
+        ),
+        provider: pickString(
+            body, 'provider',
+        ),
+        description: pickString(
+            body, 'description',
+        ),
+        auth_token: authToken,
+        created_at: pickString(
+            body, 'created_at',
         ),
     };
 }
@@ -670,47 +753,41 @@ export function validateIdeaEntity(
         body, IDEA_BODY_KEYS, 'IdeaEntity',
     );
     return {
-        title: asString(
-            body['title'], 'title',
+        title: pickString(
+            body, 'title',
         ),
-        position: asNumber(
-            body['position'], 'position',
+        position: pickNumber(
+            body, 'position',
         ),
-        status: asIdeaStatus(
-            body['status'], 'status',
+        status: pickIdeaStatus(
+            body, 'status',
         ),
-        problem_statement: asString(
-            body['problem_statement'],
-            'problem_statement',
+        problem_statement: pickString(
+            body, 'problem_statement',
         ),
-        target_users: asString(
-            body['target_users'],
-            'target_users',
+        target_users: pickString(
+            body, 'target_users',
         ),
-        proposed_solution: asString(
-            body['proposed_solution'],
-            'proposed_solution',
+        proposed_solution: pickString(
+            body, 'proposed_solution',
         ),
-        expected_outcome: asString(
-            body['expected_outcome'],
-            'expected_outcome',
+        expected_outcome: pickString(
+            body, 'expected_outcome',
         ),
-        success_metrics: asString(
-            body['success_metrics'],
-            'success_metrics',
+        success_metrics: pickString(
+            body, 'success_metrics',
         ),
-        readiness: asReadinessLevel(
-            body['readiness'], 'readiness',
+        readiness: pickReadinessLevel(
+            body, 'readiness',
         ),
-        risks: asJsonArrayField(
-            body['risks'], 'risks',
+        risks: pickJsonArrayField(
+            body, 'risks',
         ),
-        assumptions: asJsonArrayField(
-            body['assumptions'],
-            'assumptions',
+        assumptions: pickJsonArrayField(
+            body, 'assumptions',
         ),
-        alignments: asJsonArrayField(
-            body['alignments'], 'alignments',
+        alignments: pickJsonArrayField(
+            body, 'alignments',
         ),
     };
 }
@@ -723,7 +800,6 @@ const PROJECT_BODY_KEYS: readonly string[] = [
     'actual_cost', 'estimated_impact',
     'actual_impact', 'position',
     'business_context', 'timeline_label',
-    'budget_label',
 ];
 
 export function validateProjectEntity(
@@ -735,64 +811,50 @@ export function validateProjectEntity(
         'ProjectEntity',
     );
     return {
-        title: asString(
-            body['title'], 'title',
+        title: pickString(
+            body, 'title',
         ),
-        description: asString(
-            body['description'],
-            'description',
+        description: pickString(
+            body, 'description',
         ),
-        status: asProjectStatus(
-            body['status'], 'status',
+        status: pickProjectStatus(
+            body, 'status',
         ),
-        progress: asNumber(
-            body['progress'], 'progress',
+        progress: pickNumber(
+            body, 'progress',
         ),
-        start_date: asString(
-            body['start_date'], 'start_date',
+        start_date: pickString(
+            body, 'start_date',
         ),
-        target_end_date: asString(
-            body['target_end_date'],
-            'target_end_date',
+        target_end_date: pickString(
+            body, 'target_end_date',
         ),
-        estimated_duration: asNumber(
-            body['estimated_duration'],
-            'estimated_duration',
+        estimated_duration: pickNumber(
+            body, 'estimated_duration',
         ),
-        actual_duration: asNumber(
-            body['actual_duration'],
-            'actual_duration',
+        actual_duration: pickNumber(
+            body, 'actual_duration',
         ),
-        estimated_cost: asNumber(
-            body['estimated_cost'],
-            'estimated_cost',
+        estimated_cost: pickNumber(
+            body, 'estimated_cost',
         ),
-        actual_cost: asNumber(
-            body['actual_cost'],
-            'actual_cost',
+        actual_cost: pickNumber(
+            body, 'actual_cost',
         ),
-        estimated_impact: asNumber(
-            body['estimated_impact'],
-            'estimated_impact',
+        estimated_impact: pickNumber(
+            body, 'estimated_impact',
         ),
-        actual_impact: asNumber(
-            body['actual_impact'],
-            'actual_impact',
+        actual_impact: pickNumber(
+            body, 'actual_impact',
         ),
-        position: asNumber(
-            body['position'], 'position',
+        position: pickNumber(
+            body, 'position',
         ),
-        business_context: asJsonObjectField(
-            body['business_context'],
-            'business_context',
+        business_context: pickJsonObjectField(
+            body, 'business_context',
         ),
-        timeline_label: asString(
-            body['timeline_label'],
-            'timeline_label',
-        ),
-        budget_label: asString(
-            body['budget_label'],
-            'budget_label',
+        timeline_label: pickString(
+            body, 'timeline_label',
         ),
     };
 }
@@ -812,23 +874,23 @@ export function validateActivityEntity(
         'ActivityEntity',
     );
     return {
-        type: asString(
-            body['type'], 'type',
+        type: pickString(
+            body, 'type',
         ),
-        action: asString(
-            body['action'], 'action',
+        action: pickString(
+            body, 'action',
         ),
-        target: asString(
-            body['target'], 'target',
+        target: pickString(
+            body, 'target',
         ),
-        timestamp: asString(
-            body['timestamp'], 'timestamp',
+        timestamp: pickString(
+            body, 'timestamp',
         ),
-        status: asString(
-            body['status'], 'status',
+        status: pickString(
+            body, 'status',
         ),
-        feedback: asString(
-            body['feedback'], 'feedback',
+        feedback: pickString(
+            body, 'feedback',
         ),
     };
 }
@@ -847,36 +909,32 @@ export function validateFlowEntity(
         body, FLOW_BODY_KEYS, 'FlowEntity',
     );
     return {
-        name: asString(
-            body['name'], 'name',
+        name: pickString(
+            body, 'name',
         ),
-        description: asString(
-            body['description'],
-            'description',
+        description: pickString(
+            body, 'description',
         ),
-        is_locked: asBoolean(
-            body['is_locked'], 'is_locked',
+        is_locked: pickBoolean(
+            body, 'is_locked',
         ),
-        is_auto_layout: asBoolean(
-            body['is_auto_layout'],
-            'is_auto_layout',
+        is_auto_layout: pickBoolean(
+            body, 'is_auto_layout',
         ),
-        is_auto_fit: asBoolean(
-            body['is_auto_fit'],
-            'is_auto_fit',
+        is_auto_fit: pickBoolean(
+            body, 'is_auto_fit',
         ),
-        lock_timeout: asNumber(
-            body['lock_timeout'],
-            'lock_timeout',
+        lock_timeout: pickNumber(
+            body, 'lock_timeout',
         ),
-        graph: asJsonObjectField(
-            body['graph'], 'graph',
+        graph: pickJsonObjectField(
+            body, 'graph',
         ),
-        created_at: asString(
-            body['created_at'], 'created_at',
+        created_at: pickString(
+            body, 'created_at',
         ),
-        updated_at: asString(
-            body['updated_at'], 'updated_at',
+        updated_at: pickString(
+            body, 'updated_at',
         ),
     };
 }
@@ -898,36 +956,32 @@ export function validateFlowVersionEntity(
         'FlowVersionEntity',
     );
     return {
-        flow_id: asString(
-            body['flow_id'], 'flow_id',
+        flow_id: pickString(
+            body, 'flow_id',
         ),
-        name: asString(
-            body['name'], 'name',
+        name: pickString(
+            body, 'name',
         ),
-        description: asString(
-            body['description'],
-            'description',
+        description: pickString(
+            body, 'description',
         ),
-        is_locked: asBoolean(
-            body['is_locked'], 'is_locked',
+        is_locked: pickBoolean(
+            body, 'is_locked',
         ),
-        is_auto_layout: asBoolean(
-            body['is_auto_layout'],
-            'is_auto_layout',
+        is_auto_layout: pickBoolean(
+            body, 'is_auto_layout',
         ),
-        is_auto_fit: asBoolean(
-            body['is_auto_fit'],
-            'is_auto_fit',
+        is_auto_fit: pickBoolean(
+            body, 'is_auto_fit',
         ),
-        lock_timeout: asNumber(
-            body['lock_timeout'],
-            'lock_timeout',
+        lock_timeout: pickNumber(
+            body, 'lock_timeout',
         ),
-        graph: asJsonObjectField(
-            body['graph'], 'graph',
+        graph: pickJsonObjectField(
+            body, 'graph',
         ),
-        created_at: asString(
-            body['created_at'], 'created_at',
+        created_at: pickString(
+            body, 'created_at',
         ),
     };
 }
@@ -947,17 +1001,17 @@ export function validateWorkOrderEntity(
         'WorkOrderEntity',
     );
     return {
-        display_id: asString(
-            body['display_id'], 'display_id',
+        display_id: pickString(
+            body, 'display_id',
         ),
-        flow_graph: asJsonObjectField(
-            body['flow_graph'], 'flow_graph',
+        flow_graph: pickJsonObjectField(
+            body, 'flow_graph',
         ),
-        position: asNumber(
-            body['position'], 'position',
+        position: pickNumber(
+            body, 'position',
         ),
-        created_at: asString(
-            body['created_at'], 'created_at',
+        created_at: pickString(
+            body, 'created_at',
         ),
     };
 }
@@ -976,15 +1030,14 @@ export function validateFlowWorkOrderEntity(
         'FlowWorkOrderEntity',
     );
     return {
-        flow_id: asString(
-            body['flow_id'], 'flow_id',
+        flow_id: pickString(
+            body, 'flow_id',
         ),
-        work_order_id: asString(
-            body['work_order_id'],
-            'work_order_id',
+        work_order_id: pickString(
+            body, 'work_order_id',
         ),
-        created_at: asString(
-            body['created_at'], 'created_at',
+        created_at: pickString(
+            body, 'created_at',
         ),
     };
 }
@@ -1006,23 +1059,20 @@ validateWorkOrderTransitionEntity(
         'WorkOrderTransitionEntity',
     );
     return {
-        work_order_id: asString(
-            body['work_order_id'],
-            'work_order_id',
+        work_order_id: pickString(
+            body, 'work_order_id',
         ),
-        from_node_id: asString(
-            body['from_node_id'],
-            'from_node_id',
+        from_node_id: pickString(
+            body, 'from_node_id',
         ),
-        to_node_id: asString(
-            body['to_node_id'], 'to_node_id',
+        to_node_id: pickString(
+            body, 'to_node_id',
         ),
-        person_id: asString(
-            body['person_id'], 'person_id',
+        person_id: pickString(
+            body, 'person_id',
         ),
-        transitioned_at: asString(
-            body['transitioned_at'],
-            'transitioned_at',
+        transitioned_at: pickString(
+            body, 'transitioned_at',
         ),
     };
 }
@@ -1042,15 +1092,14 @@ validateTransitionFieldValueEntity(
         'TransitionFieldValueEntity',
     );
     return {
-        transition_id: asString(
-            body['transition_id'],
-            'transition_id',
+        transition_id: pickString(
+            body, 'transition_id',
         ),
-        field_id: asString(
-            body['field_id'], 'field_id',
+        field_id: pickString(
+            body, 'field_id',
         ),
-        value: asString(
-            body['value'], 'value',
+        value: pickString(
+            body, 'value',
         ),
     };
 }
@@ -1069,15 +1118,14 @@ export function validateWorkOrderClaimEntity(
         'WorkOrderClaimEntity',
     );
     return {
-        work_order_id: asString(
-            body['work_order_id'],
-            'work_order_id',
+        work_order_id: pickString(
+            body, 'work_order_id',
         ),
-        person_id: asString(
-            body['person_id'], 'person_id',
+        person_id: pickString(
+            body, 'person_id',
         ),
-        claimed_at: asString(
-            body['claimed_at'], 'claimed_at',
+        claimed_at: pickString(
+            body, 'claimed_at',
         ),
     };
 }
@@ -1104,74 +1152,62 @@ export function validateOrganizationEntity(
         'OrganizationEntity',
     );
     return {
-        name: asString(
-            body['name'], 'name',
+        name: pickString(
+            body, 'name',
         ),
-        domain: asString(
-            body['domain'], 'domain',
+        domain: pickString(
+            body, 'domain',
         ),
-        plan: asString(
-            body['plan'], 'plan',
+        plan: pickString(
+            body, 'plan',
         ),
-        plan_status: asString(
-            body['plan_status'], 'plan_status',
+        plan_status: pickString(
+            body, 'plan_status',
         ),
-        next_billing: asString(
-            body['next_billing'],
-            'next_billing',
+        next_billing: pickString(
+            body, 'next_billing',
         ),
-        seats: asNumber(
-            body['seats'], 'seats',
+        seats: pickNumber(
+            body, 'seats',
         ),
-        used_seats: asNumber(
-            body['used_seats'], 'used_seats',
+        used_seats: pickNumber(
+            body, 'used_seats',
         ),
-        projects_limit: asNumber(
-            body['projects_limit'],
-            'projects_limit',
+        projects_limit: pickNumber(
+            body, 'projects_limit',
         ),
-        projects_current: asNumber(
-            body['projects_current'],
-            'projects_current',
+        projects_current: pickNumber(
+            body, 'projects_current',
         ),
-        ideas_limit: asNumber(
-            body['ideas_limit'], 'ideas_limit',
+        ideas_limit: pickNumber(
+            body, 'ideas_limit',
         ),
-        ideas_current: asNumber(
-            body['ideas_current'],
-            'ideas_current',
+        ideas_current: pickNumber(
+            body, 'ideas_current',
         ),
-        storage_limit: asNumber(
-            body['storage_limit'],
-            'storage_limit',
+        storage_limit: pickNumber(
+            body, 'storage_limit',
         ),
-        storage_current: asNumber(
-            body['storage_current'],
-            'storage_current',
+        storage_current: pickNumber(
+            body, 'storage_current',
         ),
-        ai_credits_limit: asNumber(
-            body['ai_credits_limit'],
-            'ai_credits_limit',
+        ai_credits_limit: pickNumber(
+            body, 'ai_credits_limit',
         ),
-        ai_credits_current: asNumber(
-            body['ai_credits_current'],
-            'ai_credits_current',
+        ai_credits_current: pickNumber(
+            body, 'ai_credits_current',
         ),
-        health_score: asNumber(
-            body['health_score'],
-            'health_score',
+        health_score: pickNumber(
+            body, 'health_score',
         ),
-        health_status: asString(
-            body['health_status'],
-            'health_status',
+        health_status: pickString(
+            body, 'health_status',
         ),
-        last_activity: asString(
-            body['last_activity'],
-            'last_activity',
+        last_activity: pickString(
+            body, 'last_activity',
         ),
-        active_people: asNumber(
-            body['active_people'],
-            'active_people',
+        active_people: pickNumber(
+            body, 'active_people',
         ),
     };
 }
@@ -1190,14 +1226,14 @@ export function validateIdeaSubmissionEntity(
         'IdeaSubmissionEntity',
     );
     return {
-        idea_id: asString(
-            body['idea_id'], 'idea_id',
+        idea_id: pickString(
+            body, 'idea_id',
         ),
-        person_id: asString(
-            body['person_id'], 'person_id',
+        person_id: pickString(
+            body, 'person_id',
         ),
-        created_at: asString(
-            body['created_at'], 'created_at',
+        created_at: pickString(
+            body, 'created_at',
         ),
     };
 }
@@ -1216,14 +1252,14 @@ export function validateActivityActorEntity(
         'ActivityActorEntity',
     );
     return {
-        activity_id: asString(
-            body['activity_id'], 'activity_id',
+        activity_id: pickString(
+            body, 'activity_id',
         ),
-        person_id: asString(
-            body['person_id'], 'person_id',
+        person_id: pickString(
+            body, 'person_id',
         ),
-        created_at: asString(
-            body['created_at'], 'created_at',
+        created_at: pickString(
+            body, 'created_at',
         ),
     };
 }
@@ -1242,165 +1278,15 @@ export function validateProjectFlowEntity(
         'ProjectFlowEntity',
     );
     return {
-        project_id: asString(
-            body['project_id'], 'project_id',
+        project_id: pickString(
+            body, 'project_id',
         ),
-        flow_id: asString(
-            body['flow_id'], 'flow_id',
+        flow_id: pickString(
+            body, 'flow_id',
         ),
-        created_at: asString(
-            body['created_at'], 'created_at',
-        ),
-    };
-}
-
-const ROLE_BODY_KEYS: readonly string[] = [
-    'name', 'description', 'created_at',
-];
-
-export function validateRoleEntity(
-    body: Record<string, unknown>,
-): Omit<RoleEntity, 'id'> {
-    assertOnlyKeys(
-        body, ROLE_BODY_KEYS, 'RoleEntity',
-    );
-    return {
-        name: asString(
-            body['name'], 'name',
-        ),
-        description: asString(
-            body['description'], 'description',
-        ),
-        created_at: asString(
-            body['created_at'], 'created_at',
+        created_at: pickString(
+            body, 'created_at',
         ),
     };
 }
 
-const ROLE_MEMBERSHIP_BODY_KEYS:
-    readonly string[] = [
-    'role_id', 'person_id', 'created_at',
-];
-
-export function validateRoleMembershipEntity(
-    body: Record<string, unknown>,
-): Omit<RoleMembershipEntity, 'id'> {
-    assertOnlyKeys(
-        body,
-        ROLE_MEMBERSHIP_BODY_KEYS,
-        'RoleMembershipEntity',
-    );
-    return {
-        role_id: asString(
-            body['role_id'], 'role_id',
-        ),
-        person_id: asString(
-            body['person_id'], 'person_id',
-        ),
-        created_at: asString(
-            body['created_at'], 'created_at',
-        ),
-    };
-}
-
-const CREW_BODY_KEYS: readonly string[] = [
-    'name', 'description', 'created_at',
-];
-
-export function validateCrewEntity(
-    body: Record<string, unknown>,
-): Omit<CrewEntity, 'id'> {
-    assertOnlyKeys(
-        body, CREW_BODY_KEYS, 'CrewEntity',
-    );
-    return {
-        name: asString(
-            body['name'], 'name',
-        ),
-        description: asString(
-            body['description'], 'description',
-        ),
-        created_at: asString(
-            body['created_at'], 'created_at',
-        ),
-    };
-}
-
-const CREW_ROLE_MEMBERSHIP_BODY_KEYS:
-    readonly string[] = [
-    'crew_id', 'role_id', 'created_at',
-];
-
-export function validateCrewRoleMembershipEntity(
-    body: Record<string, unknown>,
-): Omit<CrewRoleMembershipEntity, 'id'> {
-    assertOnlyKeys(
-        body,
-        CREW_ROLE_MEMBERSHIP_BODY_KEYS,
-        'CrewRoleMembershipEntity',
-    );
-    return {
-        crew_id: asString(
-            body['crew_id'], 'crew_id',
-        ),
-        role_id: asString(
-            body['role_id'], 'role_id',
-        ),
-        created_at: asString(
-            body['created_at'], 'created_at',
-        ),
-    };
-}
-
-const MODEL_BODY_KEYS: readonly string[] = [
-    'name', 'provider', 'description',
-    'created_at',
-];
-
-export function validateModelEntity(
-    body: Record<string, unknown>,
-): Omit<ModelEntity, 'id'> {
-    assertOnlyKeys(
-        body, MODEL_BODY_KEYS, 'ModelEntity',
-    );
-    return {
-        name: asString(
-            body['name'], 'name',
-        ),
-        provider: asString(
-            body['provider'], 'provider',
-        ),
-        description: asString(
-            body['description'], 'description',
-        ),
-        created_at: asString(
-            body['created_at'], 'created_at',
-        ),
-    };
-}
-
-const ROLE_MODEL_MEMBERSHIP_BODY_KEYS:
-    readonly string[] = [
-    'role_id', 'model_id', 'created_at',
-];
-
-export function validateRoleModelMembershipEntity(
-    body: Record<string, unknown>,
-): Omit<RoleModelMembershipEntity, 'id'> {
-    assertOnlyKeys(
-        body,
-        ROLE_MODEL_MEMBERSHIP_BODY_KEYS,
-        'RoleModelMembershipEntity',
-    );
-    return {
-        role_id: asString(
-            body['role_id'], 'role_id',
-        ),
-        model_id: asString(
-            body['model_id'], 'model_id',
-        ),
-        created_at: asString(
-            body['created_at'], 'created_at',
-        ),
-    };
-}

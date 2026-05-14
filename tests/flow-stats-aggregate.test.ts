@@ -20,26 +20,26 @@ export function makeFixture(): FlowStatsInput {
             { id: 'c', name: 'Create',
               description: '',
               positionX: 0,   positionY: 0,
-              isStart: true,  isComplete: false,
-              crew: { kind: 'unassigned' },
+              isCreate: true,  isArchive: false,
+              workerIds: [],
               fields: [] },
             { id: 'a', name: 'Data Capture',
               description: '',
               positionX: 200, positionY: 0,
-              isStart: false, isComplete: false,
-              crew: { kind: 'unassigned' },
+              isCreate: false, isArchive: false,
+              workerIds: [],
               fields: [] },
             { id: 'b', name: 'Review',
               description: '',
               positionX: 400, positionY: 0,
-              isStart: false, isComplete: false,
-              crew: { kind: 'unassigned' },
+              isCreate: false, isArchive: false,
+              workerIds: [],
               fields: [] },
             { id: 'z', name: 'Archive',
               description: '',
               positionX: 600, positionY: 0,
-              isStart: false, isComplete: true,
-              crew: { kind: 'unassigned' },
+              isCreate: false, isArchive: true,
+              workerIds: [],
               fields: [] },
         ],
         edges: [
@@ -62,12 +62,7 @@ export function makeFixture(): FlowStatsInput {
             '2026-05-10T00:00:00.000Z',
         ),
         windowDays: 90,
-        roleMemberSetByRoleId: new Map(),
-        crewMemberSetByCrewId: new Map(),
-        personNameById: new Map(),
-        modelNameById:  new Map(),
-        roleNameById:   new Map(),
-        crewNameById:   new Map(),
+        workerNameById: new Map(),
     };
 }
 
@@ -383,320 +378,393 @@ test(
     },
 );
 
-test('resolves clan, identifies top producer'
-    + ' + vsClanAvg + share', () => {
-    const f = makeFixture();
-    const nodes = f.nodes.map(n =>
-        n.id === 'a'
-            ? { ...n,
-                crew: {
-                    kind: 'role' as const,
-                    roleId: 'r1',
-                } }
-            : n);
-    const t = (msAgo: number) => tBefore(f, msAgo);
-    const H = 3600 * 1000;
-    // 4 OUT-transitions from a: p1×3, p2×1.
-    // p3 in clan but inactive.
-    const input: FlowStatsInput = { ...f, nodes,
-        workOrders: [emptyWO('w', t(10 * H))],
-        transitions: [
-            { id: 'in0', work_order_id: 'w',
-              from_node_id: '',
-              to_node_id: 'c', person_id: 'p1',
-              transitioned_at: t(10 * H) },
-            { id: 'in1', work_order_id: 'w',
-              from_node_id: 'c',
-              to_node_id: 'a', person_id: 'p1',
-              transitioned_at: t(10 * H) },
-            { id: 'o1', work_order_id: 'w',
-              from_node_id: 'a',
-              to_node_id: 'b', person_id: 'p1',
-              transitioned_at: t(9 * H) },
-            { id: 'r1', work_order_id: 'w',
-              from_node_id: 'b',
-              to_node_id: 'a', person_id: 'p1',
-              transitioned_at: t(8 * H) },
-            { id: 'o2', work_order_id: 'w',
-              from_node_id: 'a',
-              to_node_id: 'b', person_id: 'p1',
-              transitioned_at: t(7 * H) },
-            { id: 'r2', work_order_id: 'w',
-              from_node_id: 'b',
-              to_node_id: 'a', person_id: 'p1',
-              transitioned_at: t(6 * H) },
-            { id: 'o3', work_order_id: 'w',
-              from_node_id: 'a',
-              to_node_id: 'b', person_id: 'p1',
-              transitioned_at: t(5 * H) },
-            { id: 'r3', work_order_id: 'w',
-              from_node_id: 'b',
-              to_node_id: 'a', person_id: 'p2',
-              transitioned_at: t(4 * H) },
-            { id: 'o4', work_order_id: 'w',
-              from_node_id: 'a',
-              to_node_id: 'b', person_id: 'p2',
-              transitioned_at: t(3 * H) },
-            { id: 'fin', work_order_id: 'w',
-              from_node_id: 'b',
-              to_node_id: 'z', person_id: 'p2',
-              transitioned_at: t(0) },
-        ],
-        roleMemberSetByRoleId: new Map([
-            ['r1', new Set(['p1', 'p2', 'p3'])],
-        ]),
-        personNameById: new Map([
-            ['p1', 'Alex'],
-            ['p2', 'Bea'],
-            ['p3', 'Cy'],
-        ]),
-        roleNameById: new Map([['r1', 'Reviewer']]),
-    };
-    const m = buildFlowStats(input);
-    const a = m.nodes.find(n => n.id === 'a')!;
-    assert.equal(a.clanSize, 3);
-    assert.equal(a.activeProducerCount, 2);
-    assert.equal(a.assignmentLabel, 'Role: Reviewer');
-    assert.ok(a.topProducer);
-    assert.equal(a.topProducer!.name, 'Alex');
-    assert.equal(a.topProducer!.sharePct, 75);
-    assert.equal(a.topProducer!.vsClanAvgPct, 225);
-    assert.equal(a.topProducer!.inCurrentClan, true);
-});
+test(
+    'resolves clan from workerIds, identifies'
+    + ' top producer + vsClanAvg + share',
+    () => {
+        const f = makeFixture();
+        const nodes = f.nodes.map(n =>
+            n.id === 'a'
+                ? {
+                    ...n,
+                    workerIds: ['p1', 'p2', 'p3'],
+                }
+                : n);
+        const t = (msAgo: number) => tBefore(f, msAgo);
+        const H = 3600 * 1000;
+        // 4 OUT-transitions from a: p1×3, p2×1.
+        // p3 in clan but inactive.
+        const input: FlowStatsInput = { ...f, nodes,
+            workOrders: [emptyWO('w', t(10 * H))],
+            transitions: [
+                { id: 'in0', work_order_id: 'w',
+                  from_node_id: '',
+                  to_node_id: 'c', person_id: 'p1',
+                  transitioned_at: t(10 * H) },
+                { id: 'in1', work_order_id: 'w',
+                  from_node_id: 'c',
+                  to_node_id: 'a', person_id: 'p1',
+                  transitioned_at: t(10 * H) },
+                { id: 'o1', work_order_id: 'w',
+                  from_node_id: 'a',
+                  to_node_id: 'b', person_id: 'p1',
+                  transitioned_at: t(9 * H) },
+                { id: 'r1', work_order_id: 'w',
+                  from_node_id: 'b',
+                  to_node_id: 'a', person_id: 'p1',
+                  transitioned_at: t(8 * H) },
+                { id: 'o2', work_order_id: 'w',
+                  from_node_id: 'a',
+                  to_node_id: 'b', person_id: 'p1',
+                  transitioned_at: t(7 * H) },
+                { id: 'r2', work_order_id: 'w',
+                  from_node_id: 'b',
+                  to_node_id: 'a', person_id: 'p1',
+                  transitioned_at: t(6 * H) },
+                { id: 'o3', work_order_id: 'w',
+                  from_node_id: 'a',
+                  to_node_id: 'b', person_id: 'p1',
+                  transitioned_at: t(5 * H) },
+                { id: 'r3', work_order_id: 'w',
+                  from_node_id: 'b',
+                  to_node_id: 'a', person_id: 'p2',
+                  transitioned_at: t(4 * H) },
+                { id: 'o4', work_order_id: 'w',
+                  from_node_id: 'a',
+                  to_node_id: 'b', person_id: 'p2',
+                  transitioned_at: t(3 * H) },
+                { id: 'fin', work_order_id: 'w',
+                  from_node_id: 'b',
+                  to_node_id: 'z', person_id: 'p2',
+                  transitioned_at: t(0) },
+            ],
+            workerNameById: new Map([
+                ['p1', 'Alex'],
+                ['p2', 'Bea'],
+                ['p3', 'Cy'],
+            ]),
+        };
+        const m = buildFlowStats(input);
+        const a = m.nodes.find(n => n.id === 'a')!;
+        assert.equal(a.clanSize, 3);
+        assert.equal(a.activeProducerCount, 2);
+        assert.equal(
+            a.assignmentLabel, 'Alex, Bea, Cy',
+        );
+        assert.ok(a.topProducer);
+        assert.equal(a.topProducer!.name, 'Alex');
+        assert.equal(a.topProducer!.sharePct, 75);
+        assert.equal(a.topProducer!.vsClanAvgPct, 225);
+        assert.equal(a.topProducer!.inCurrentClan, true);
+    },
+);
 
-test('top producer outside the current clan'
-    + ' is flagged', () => {
-    const f = makeFixture();
-    const nodes = f.nodes.map(n =>
-        n.id === 'a'
-            ? { ...n,
-                crew: {
-                    kind: 'role' as const,
-                    roleId: 'r1',
-                } }
-            : n);
-    const t = (msAgo: number) => tBefore(f, msAgo);
-    const H = 3600 * 1000;
-    const input: FlowStatsInput = { ...f, nodes,
-        workOrders: [emptyWO('w', t(2 * H))],
-        transitions: [
-            { id: '1', work_order_id: 'w',
-              from_node_id: '',
-              to_node_id: 'c', person_id: 'p1',
-              transitioned_at: t(2 * H) },
-            { id: '2', work_order_id: 'w',
-              from_node_id: 'c',
-              to_node_id: 'a', person_id: 'p1',
-              transitioned_at: t(2 * H) },
-            { id: '3', work_order_id: 'w',
-              from_node_id: 'a',
-              to_node_id: 'z', person_id: 'p9',
-              transitioned_at: t(0) },
-        ],
-        roleMemberSetByRoleId: new Map([
-            ['r1', new Set(['p1'])],
-        ]),
-        personNameById: new Map([
-            ['p1', 'Alex'],
-            ['p9', 'Zed'],
-        ]),
-        roleNameById: new Map([['r1', 'Reviewer']]),
-    };
-    const m = buildFlowStats(input);
-    const a = m.nodes.find(n => n.id === 'a')!;
-    assert.equal(a.topProducer!.name, 'Zed');
-    assert.equal(a.topProducer!.inCurrentClan, false);
-});
+test(
+    'top producer outside the current clan'
+    + ' is flagged',
+    () => {
+        const f = makeFixture();
+        const nodes = f.nodes.map(n =>
+            n.id === 'a'
+                ? { ...n, workerIds: ['p1'] }
+                : n);
+        const t = (msAgo: number) => tBefore(f, msAgo);
+        const H = 3600 * 1000;
+        const input: FlowStatsInput = { ...f, nodes,
+            workOrders: [emptyWO('w', t(2 * H))],
+            transitions: [
+                { id: '1', work_order_id: 'w',
+                  from_node_id: '',
+                  to_node_id: 'c', person_id: 'p1',
+                  transitioned_at: t(2 * H) },
+                { id: '2', work_order_id: 'w',
+                  from_node_id: 'c',
+                  to_node_id: 'a', person_id: 'p1',
+                  transitioned_at: t(2 * H) },
+                { id: '3', work_order_id: 'w',
+                  from_node_id: 'a',
+                  to_node_id: 'z', person_id: 'p9',
+                  transitioned_at: t(0) },
+            ],
+            workerNameById: new Map([
+                ['p1', 'Alex'],
+                ['p9', 'Zed'],
+            ]),
+        };
+        const m = buildFlowStats(input);
+        const a = m.nodes.find(n => n.id === 'a')!;
+        assert.equal(a.topProducer!.name, 'Zed');
+        assert.equal(
+            a.topProducer!.inCurrentClan, false,
+        );
+    },
+);
 
-test('model-assigned node carries modelName,'
-    + ' no clan, no producer', () => {
-    const f = makeFixture();
-    const nodes = f.nodes.map(n =>
-        n.id === 'a'
-            ? { ...n,
-                crew: {
-                    kind: 'model' as const,
-                    modelId: 'm1',
-                } }
-            : n);
-    const input: FlowStatsInput = { ...f, nodes,
-        modelNameById: new Map([
-            ['m1', 'Claude Opus'],
-        ]),
-    };
-    const m = buildFlowStats(input);
-    const a = m.nodes.find(n => n.id === 'a')!;
-    assert.equal(a.modelName, 'Claude Opus');
-    assert.equal(a.clanSize, 0);
-    assert.equal(a.topProducer, null);
-    assert.equal(
-        a.assignmentLabel, 'Model: Claude Opus',
-    );
-});
+test(
+    'unassigned node has clan size 0 and label'
+    + ' "Unassigned"',
+    () => {
+        const m = buildFlowStats(makeFixture());
+        const a = m.nodes.find(n => n.id === 'a')!;
+        assert.equal(a.clanSize, 0);
+        assert.equal(a.assignmentLabel, 'Unassigned');
+    },
+);
 
-test('branch split distributes outgoing transitions across edges', () => {
-    const f = makeFixture();
-    const t = (msAgo: number) => tBefore(f, msAgo);
-    const H = 3600 * 1000;
-    // b has two outgoing edges (e3 approve→z, e4 revise→a).
-    // 8 OUT from b: 6 to z, 2 to a.
-    const enters = Array.from({ length: 8 }, (_, i) => ({
-        id:'in'+i, work_order_id:'w'+i,
-        from_node_id:'a', to_node_id:'b', person_id:'p1',
-        transitioned_at:t((20-i) * H),
-    }));
-    const outs = [
-        { id:'o1', work_order_id:'w0', from_node_id:'b',
-          to_node_id:'z', person_id:'p1', transitioned_at:t(0) },
-        { id:'o2', work_order_id:'w1', from_node_id:'b',
-          to_node_id:'z', person_id:'p1', transitioned_at:t(1*H) },
-        { id:'o3', work_order_id:'w2', from_node_id:'b',
-          to_node_id:'z', person_id:'p1', transitioned_at:t(2*H) },
-        { id:'o4', work_order_id:'w3', from_node_id:'b',
-          to_node_id:'z', person_id:'p1', transitioned_at:t(3*H) },
-        { id:'o5', work_order_id:'w4', from_node_id:'b',
-          to_node_id:'z', person_id:'p1', transitioned_at:t(4*H) },
-        { id:'o6', work_order_id:'w5', from_node_id:'b',
-          to_node_id:'z', person_id:'p1', transitioned_at:t(5*H) },
-        { id:'o7', work_order_id:'w6', from_node_id:'b',
-          to_node_id:'a', person_id:'p1', transitioned_at:t(6*H) },
-        { id:'o8', work_order_id:'w7', from_node_id:'b',
-          to_node_id:'a', person_id:'p1', transitioned_at:t(7*H) },
-    ];
-    const input: FlowStatsInput = { ...f,
-        workOrders: Array.from({length:8}, (_, i) =>
-            emptyWO('w' + i, t(20 * H))),
-        transitions: [...enters, ...outs],
-    };
-    const m = buildFlowStats(input);
-    const b = m.nodes.find(n => n.id === 'b')!;
-    assert.equal(b.branchSplit.length, 2);
-    assert.equal(b.branchSplit[0]!.label, 'approve');
-    assert.equal(b.branchSplit[0]!.pct, 75);
-    assert.equal(b.branchSplit[1]!.label, 'revise');
-    assert.equal(b.branchSplit[1]!.pct, 25);
-});
-
-test('branchSplit empty on linear (single-out) nodes', () => {
-    const m = buildFlowStats(makeFixture());
-    assert.equal(
-        m.nodes.find(n => n.id === 'a')!.branchSplit.length, 0);
-});
-
-test('hasHazard fires on unassigned non-special nodes', () => {
-    const m = buildFlowStats(makeFixture());
-    assert.equal(m.nodes.find(n => n.id === 'a')!.hasHazard, true);
-    assert.equal(m.nodes.find(n => n.id === 'b')!.hasHazard, true);
-    assert.equal(m.nodes.find(n => n.id === 'c')!.hasHazard, false);
-    assert.equal(m.nodes.find(n => n.id === 'z')!.hasHazard, false);
-});
-
-test('hasHazard fires on empty-role and empty-crew assignments', () => {
-    const f = makeFixture();
-    const nodes = f.nodes.map(n =>
-        n.id === 'a'
-            ? { ...n, crew: { kind:'role' as const, roleId:'empty' } }
-        : n.id === 'b'
-            ? { ...n, crew: { kind:'crew' as const, crewId:'empty' } }
-        : n);
-    const m = buildFlowStats({ ...f, nodes });
-    assert.equal(m.nodes.find(n => n.id === 'a')!.hasHazard, true);
-    assert.equal(m.nodes.find(n => n.id === 'b')!.hasHazard, true);
-});
-
-test('user-private role and model nodes never hazard', () => {
-    const f = makeFixture();
-    const nodes = f.nodes.map(n =>
-        n.id === 'a'
-            ? { ...n, crew: { kind:'role' as const,
-                              roleId:'user-private:p7' } }
-        : n.id === 'b'
-            ? { ...n, crew: { kind:'model' as const, modelId:'m1' } }
-        : n);
-    const m = buildFlowStats({ ...f, nodes });
-    assert.equal(m.nodes.find(n => n.id === 'a')!.hasHazard, false);
-    assert.equal(m.nodes.find(n => n.id === 'b')!.hasHazard, false);
-});
-
-test('groups completed paths and sorts by frequency desc', () => {
-    const f = makeFixture();
-    const t = (msAgo: number) => tBefore(f, msAgo);
-    const H = 3600 * 1000;
-    function happyTrans(woId: string, startMs: number) {
-        return [
-            { id:woId+'A', work_order_id:woId,
-              from_node_id:'',
-              to_node_id:'c', person_id:'p1',
-              transitioned_at:t(startMs) },
-            { id:woId+'B', work_order_id:woId,
-              from_node_id:'c',
-              to_node_id:'a', person_id:'p1',
-              transitioned_at:t(startMs) },
-            { id:woId+'C', work_order_id:woId,
-              from_node_id:'a',
-              to_node_id:'b', person_id:'p1',
-              transitioned_at:t(startMs - 1*H) },
-            { id:woId+'D', work_order_id:woId,
+test(
+    'branch split distributes outgoing transitions'
+    + ' across edges',
+    () => {
+        const f = makeFixture();
+        const t = (msAgo: number) => tBefore(f, msAgo);
+        const H = 3600 * 1000;
+        // b has two outgoing edges (e3 approve→z,
+        // e4 revise→a).  8 OUT from b: 6 to z, 2 to a.
+        const enters = Array.from(
+            { length: 8 },
+            (_, i) => ({
+                id:'in'+i, work_order_id:'w'+i,
+                from_node_id:'a', to_node_id:'b',
+                person_id:'p1',
+                transitioned_at:t((20-i) * H),
+            }),
+        );
+        const outs = [
+            { id:'o1', work_order_id:'w0',
               from_node_id:'b',
               to_node_id:'z', person_id:'p1',
-              transitioned_at:t(startMs - 2*H) },
+              transitioned_at:t(0) },
+            { id:'o2', work_order_id:'w1',
+              from_node_id:'b',
+              to_node_id:'z', person_id:'p1',
+              transitioned_at:t(1*H) },
+            { id:'o3', work_order_id:'w2',
+              from_node_id:'b',
+              to_node_id:'z', person_id:'p1',
+              transitioned_at:t(2*H) },
+            { id:'o4', work_order_id:'w3',
+              from_node_id:'b',
+              to_node_id:'z', person_id:'p1',
+              transitioned_at:t(3*H) },
+            { id:'o5', work_order_id:'w4',
+              from_node_id:'b',
+              to_node_id:'z', person_id:'p1',
+              transitioned_at:t(4*H) },
+            { id:'o6', work_order_id:'w5',
+              from_node_id:'b',
+              to_node_id:'z', person_id:'p1',
+              transitioned_at:t(5*H) },
+            { id:'o7', work_order_id:'w6',
+              from_node_id:'b',
+              to_node_id:'a', person_id:'p1',
+              transitioned_at:t(6*H) },
+            { id:'o8', work_order_id:'w7',
+              from_node_id:'b',
+              to_node_id:'a', person_id:'p1',
+              transitioned_at:t(7*H) },
         ];
-    }
-    const loopTrans = [
-        { id:'lA', work_order_id:'wl',
-          from_node_id:'',
-          to_node_id:'c', person_id:'p1',
-          transitioned_at:t(10*H) },
-        { id:'lB', work_order_id:'wl',
-          from_node_id:'c',
-          to_node_id:'a', person_id:'p1',
-          transitioned_at:t(10*H) },
-        { id:'lC', work_order_id:'wl',
-          from_node_id:'a',
-          to_node_id:'b', person_id:'p1',
-          transitioned_at:t(9*H) },
-        { id:'lD', work_order_id:'wl',
-          from_node_id:'b',
-          to_node_id:'a', person_id:'p1',
-          transitioned_at:t(8*H) },
-        { id:'lE', work_order_id:'wl',
-          from_node_id:'a',
-          to_node_id:'b', person_id:'p1',
-          transitioned_at:t(7*H) },
-        { id:'lF', work_order_id:'wl',
-          from_node_id:'b',
-          to_node_id:'z', person_id:'p1',
-          transitioned_at:t(6*H) },
-    ];
-    const input: FlowStatsInput = { ...f,
-        workOrders: [
-            emptyWO('w1', t(10*H)),
-            emptyWO('w2', t(9*H)),
-            emptyWO('w3', t(8*H)),
-            emptyWO('wl', t(10*H)),
-        ],
-        transitions: [
-            ...happyTrans('w1', 10 * H),
-            ...happyTrans('w2',  9 * H),
-            ...happyTrans('w3',  8 * H),
-            ...loopTrans,
-        ],
-    };
-    const m = buildFlowStats(input);
-    assert.equal(m.pathEntries.length, 2);
-    const top = m.pathEntries[0]! as
-        { kind: 'path'; path: FlowPath };
-    assert.deepEqual(top.path.nodeIds, ['c','a','b','z']);
-    assert.equal(top.path.workOrderCount, 3);
-    assert.equal(top.path.sharePct, 75);
-    assert.deepEqual(top.path.edgeIds, ['e1','e2','e3']);
-    const second = m.pathEntries[1]! as
-        { kind: 'path'; path: FlowPath };
-    assert.deepEqual(second.path.nodeIds,
-        ['c','a','b','a','b','z']);
-    assert.equal(second.path.workOrderCount, 1);
-    assert.equal(second.path.sharePct, 25);
-});
+        const input: FlowStatsInput = { ...f,
+            workOrders: Array.from(
+                {length:8}, (_, i) =>
+                    emptyWO('w' + i, t(20 * H)),
+            ),
+            transitions: [...enters, ...outs],
+        };
+        const m = buildFlowStats(input);
+        const b = m.nodes.find(n => n.id === 'b')!;
+        assert.equal(b.branchSplit.length, 2);
+        assert.equal(
+            b.branchSplit[0]!.label, 'approve',
+        );
+        assert.equal(b.branchSplit[0]!.pct, 75);
+        assert.equal(
+            b.branchSplit[1]!.label, 'revise',
+        );
+        assert.equal(b.branchSplit[1]!.pct, 25);
+    },
+);
+
+test(
+    'branchSplit empty on linear (single-out) nodes',
+    () => {
+        const m = buildFlowStats(makeFixture());
+        assert.equal(
+            m.nodes.find(n => n.id === 'a')!
+                .branchSplit.length,
+            0,
+        );
+    },
+);
+
+test(
+    'workerHazard is danger on zero-worker'
+    + ' regular nodes (per shouldShowWorkerHazard)',
+    () => {
+        const m = buildFlowStats(makeFixture());
+        assert.equal(
+            m.nodes.find(n => n.id === 'a')!
+                .workerHazard,
+            'danger',
+        );
+        assert.equal(
+            m.nodes.find(n => n.id === 'b')!
+                .workerHazard,
+            'danger',
+        );
+        // start and complete nodes never hazard
+        assert.equal(
+            m.nodes.find(n => n.id === 'c')!
+                .workerHazard,
+            null,
+        );
+        assert.equal(
+            m.nodes.find(n => n.id === 'z')!
+                .workerHazard,
+            null,
+        );
+    },
+);
+
+test(
+    'workerHazard is warning on single-worker'
+    + ' regular nodes with outgoing edges',
+    () => {
+        const f = makeFixture();
+        const nodes = f.nodes.map(n =>
+            n.id === 'a' || n.id === 'b'
+                ? { ...n, workerIds: ['hw_1'] }
+                : n);
+        const m = buildFlowStats({ ...f, nodes });
+        assert.equal(
+            m.nodes.find(n => n.id === 'a')!
+                .workerHazard,
+            'warning',
+        );
+        assert.equal(
+            m.nodes.find(n => n.id === 'b')!
+                .workerHazard,
+            'warning',
+        );
+    },
+);
+
+test(
+    'workerHazard is null on multi-worker regular'
+    + ' nodes with outgoing edges',
+    () => {
+        const f = makeFixture();
+        const nodes = f.nodes.map(n =>
+            n.id === 'a' || n.id === 'b'
+                ? {
+                    ...n,
+                    workerIds: ['hw_1', 'hw_2'],
+                }
+                : n);
+        const m = buildFlowStats({ ...f, nodes });
+        assert.equal(
+            m.nodes.find(n => n.id === 'a')!
+                .workerHazard,
+            null,
+        );
+        assert.equal(
+            m.nodes.find(n => n.id === 'b')!
+                .workerHazard,
+            null,
+        );
+    },
+);
+
+test(
+    'groups completed paths and sorts by frequency'
+    + ' desc',
+    () => {
+        const f = makeFixture();
+        const t = (msAgo: number) => tBefore(f, msAgo);
+        const H = 3600 * 1000;
+        function happyTrans(
+            woId: string, startMs: number,
+        ) {
+            return [
+                { id:woId+'A', work_order_id:woId,
+                  from_node_id:'',
+                  to_node_id:'c', person_id:'p1',
+                  transitioned_at:t(startMs) },
+                { id:woId+'B', work_order_id:woId,
+                  from_node_id:'c',
+                  to_node_id:'a', person_id:'p1',
+                  transitioned_at:t(startMs) },
+                { id:woId+'C', work_order_id:woId,
+                  from_node_id:'a',
+                  to_node_id:'b', person_id:'p1',
+                  transitioned_at:t(startMs - 1*H) },
+                { id:woId+'D', work_order_id:woId,
+                  from_node_id:'b',
+                  to_node_id:'z', person_id:'p1',
+                  transitioned_at:t(startMs - 2*H) },
+            ];
+        }
+        const loopTrans = [
+            { id:'lA', work_order_id:'wl',
+              from_node_id:'',
+              to_node_id:'c', person_id:'p1',
+              transitioned_at:t(10*H) },
+            { id:'lB', work_order_id:'wl',
+              from_node_id:'c',
+              to_node_id:'a', person_id:'p1',
+              transitioned_at:t(10*H) },
+            { id:'lC', work_order_id:'wl',
+              from_node_id:'a',
+              to_node_id:'b', person_id:'p1',
+              transitioned_at:t(9*H) },
+            { id:'lD', work_order_id:'wl',
+              from_node_id:'b',
+              to_node_id:'a', person_id:'p1',
+              transitioned_at:t(8*H) },
+            { id:'lE', work_order_id:'wl',
+              from_node_id:'a',
+              to_node_id:'b', person_id:'p1',
+              transitioned_at:t(7*H) },
+            { id:'lF', work_order_id:'wl',
+              from_node_id:'b',
+              to_node_id:'z', person_id:'p1',
+              transitioned_at:t(6*H) },
+        ];
+        const input: FlowStatsInput = { ...f,
+            workOrders: [
+                emptyWO('w1', t(10*H)),
+                emptyWO('w2', t(9*H)),
+                emptyWO('w3', t(8*H)),
+                emptyWO('wl', t(10*H)),
+            ],
+            transitions: [
+                ...happyTrans('w1', 10 * H),
+                ...happyTrans('w2',  9 * H),
+                ...happyTrans('w3',  8 * H),
+                ...loopTrans,
+            ],
+        };
+        const m = buildFlowStats(input);
+        assert.equal(m.pathEntries.length, 2);
+        const top = m.pathEntries[0]! as
+            { kind: 'path'; path: FlowPath };
+        assert.deepEqual(
+            top.path.nodeIds, ['c','a','b','z'],
+        );
+        assert.equal(top.path.workOrderCount, 3);
+        assert.equal(top.path.sharePct, 75);
+        assert.deepEqual(
+            top.path.edgeIds, ['e1','e2','e3'],
+        );
+        const second = m.pathEntries[1]! as
+            { kind: 'path'; path: FlowPath };
+        assert.deepEqual(
+            second.path.nodeIds,
+            ['c','a','b','a','b','z'],
+        );
+        assert.equal(second.path.workOrderCount, 1);
+        assert.equal(second.path.sharePct, 25);
+    },
+);
 
 test('collapses long tail into a rest bucket', () => {
     const f = makeFixture();

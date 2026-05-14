@@ -61,6 +61,9 @@
   --warning-border: 38 70% 75%;
   --warning-text: 38 80% 30%;
 
+  /* Status: Danger (escalation above warning) */
+  --danger: 0 80% 45%;
+
   /* Status: Error */
   --error: 0 72% 51%;
   --error-foreground: 0 0% 100%;

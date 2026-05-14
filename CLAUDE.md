@@ -49,7 +49,7 @@ Target: **ES2024** · Strict mode with `noUncheckedIndexedAccess`. Config at `we
 
 ## Architecture
 
-**Vanilla TypeScript** with zero runtime dependencies. Enterprise innovation management platform with modules for ideas, projects, people, flows, workbox, and analytics. Every page is a standalone HTML file served via HTTP. The code also supports `file:///` protocol locally, but testing is HTTP-only.
+**Vanilla TypeScript** with zero runtime dependencies. Enterprise innovation management platform with modules for ideas, projects, workers, flows, workbox, and analytics. Every page is a standalone HTML file served via HTTP. The code also supports `file:///` protocol locally, but testing is HTTP-only.
 
 ### Key Layers
 
@@ -120,45 +120,66 @@ so the auto-fit viewBox is the final state, not stomped by the
 FSM's frozen viewBox; on selection change while the panel is
 open, it then runs `withSelectionCentered` to pan the newly
 selected node to the visible canvas center (zoom unchanged).
-The two special nodes (`isStart` / `isComplete`) display as
-"Create" and "Archive" — names live in `START_NODE_DEFAULT_NAME`
-and `END_NODE_DEFAULT_NAME` constants in `api/types.ts` and
-override `node.name` at SVG-render and panel-render time, so
-existing flows whose persisted name is "Start"/"End" still
-display the new labels without a data migration. Regular
-nodes (not start/end) carry a `crew: NodeAssignment` field
-— a 4-variant discriminated union (`unassigned`/`role`/
-`crew`/`model`) persisted on the node and rendered in the
-panel body as a labeled `<select>` with `<optgroup>`
-sections (Roles → People (private) → Crews → Models),
-matching the Name/Description label pattern. The
-assignment respects `isLocked` (disabled when locked).
-Regular nodes whose assignment is `unassigned` render a
-hazard triangle (`iconAlertTriangle` colored via
-`.flow-node-hazard`) in the bottom-left corner; the same
-hazard fires for role-assigned and crew-assigned nodes
-when the role or crew has zero members (user-private
-roles always count as 1). Model assignments are never
-hazardous. The `<select>` value crosses the DOM seam as
-`'role:<id>'` / `'crew:<id>'` / `'model:<id>'` /
-`'unassigned'` and is parsed by
-`parseNodeAssignmentSelectValue` in `flows/detail.ts`.
+The two special nodes (`isCreate` / `isArchive`) persist
+their `name` field directly as "Create" and "Archive" — no
+constants, no render-time override. The flow renderer, the
+stats renderer, the properties panel header, and the mermaid
+generator all read `node.name` and emit it verbatim;
+persistence and presentation share one vocabulary. The
+mermaid parser does not translate either: a legacy `.mmd`
+file that names its special nodes `[Start]` / `[End]`
+imports with those literal names, surfacing the staleness
+rather than masking it via a shim. Regular
+nodes (not start/end) carry a `workerIds: WorkerId[]` field
+(zero or more) persisted on the node and rendered in the
+panel body as a `<fieldset>` with two `<div class=
+"worker-group">` children — HUMANS and AIs — each holding a
+labeled `<input type="checkbox">` per worker carrying
+`data-worker-id="<id>"`. The fieldset respects `isLocked`
+(every checkbox `disabled` when locked). On change, the
+panel collects every checked value into a `WorkerId[]`
+and dispatches the node-property-update action via the
+pure helper `parseWorkerIdsFromPanel(panelEl)` in
+`flows/detail.ts`.
 
-Models live in their own `models` table — a `ModelEntity`
-with name/provider/description, persisted just like roles
-and crews. The string-enum predecessor (`CREW_MODELS`)
-was deleted; `validateModelEntity` rejects the old shape
-clean. Models bind to roles via `role_model_memberships`.
+Hazards are two-tier and shared across the designer +
+stats canvases via the pure predicate
+`shouldShowWorkerHazard(node, allEdges)` in
+`web-app/app/flow-graph.ts`. Precedence: `isCreate` /
+`isArchive` → no hazard ever; zero workers → `'danger'`
+(red `iconNoEntry`, class `.flow-node-danger` /
+`.flow-stats-node-danger`); zero outgoing edges (strict
+dead-end) → `'danger'`; exactly one worker → `'warning'`
+(yellow `iconAlertTriangle`, class `.flow-node-warning` /
+`.flow-stats-node-warning`); two-or-more workers AND at
+least one outgoing edge → no hazard. Both badges sit in
+the bottom-left of the node, mutually exclusive at the
+slot. The aggregate model emitted by
+`flow-stats-aggregate.ts` carries the resolved level on
+each node as `workerHazard: 'warning' | 'danger' | null`;
+the stats renderer reads it directly.
 
-The workbox filters work orders by their current node's
-assignment via `isWorkOrderVisibleToPerson` in
-`presenters/workbox-inbox.ts`. Unassigned is visible to
-all (the hazard triangle brands it as misconfiguration);
-model is visible to no human (a model participates, not
-a person); role and crew resolve through member sets,
-with user-private roles short-circuiting to the encoded
-person id. `loadInboxItems` builds the visibility scope
-once per request.
+The flow-publish gate is the third call site of the same
+predicate. `validateFlowForCreation(flow)` in
+`web-app/app/adapters/flow-publish.ts` returns
+`{ ready: boolean, problems: FlowProblem[] }` —
+`zero_workers(nodeId)` and `dead_end(nodeId)` variants —
+and `getFlowsForCreation(ctx)` partitions all flows into
+`{ ready, notReady }` for the workbox "Create Work Order"
+dropdown. The picker renders two sections: READY
+(clickable, carries `data-flow-id`) and NOT READY
+(disabled, octagon icon, "N nodes need attention"
+subtitle, no `data-flow-id` so the click handler ignores
+it). `postWorkOrderCreation` re-runs
+`validateFlowForCreation` server-side and throws if the
+picker was somehow bypassed — defense in depth at the
+boundary.
+
+The workbox shows every active and archived work order
+to every user; there is no per-user visibility filter.
+`buildInboxItems` in `presenters/workbox-inbox.ts` runs
+the active/archive split, the claimed-and-unfinished
+exclusion, and the sort — nothing more.
 
 The read-only stats variant (`flow-stats`) uses its own renderer
 `flow-stats-graph.ts` and presenter `FlowStatsPresenter`,
@@ -171,9 +192,10 @@ the already-exported edge-path helpers (`perimeterPoint`,
 `whichEdge`, `controlOffset`), `findCycleEdgeIds` from the
 pure `flow-cycle-edges.ts` (the designer's back-edge DFS,
 extracted so both renderers mark loop-backs identically),
-`iconAlertTriangle`, and the START/END display-name
-constants. Node positions, though, do *not* come from
-the renderer: `getFlowGraph` runs `flow-graph-layout.ts`'s
+`iconAlertTriangle` and `iconNoEntry` (the two hazard
+icons), and the START/END display-name constants. Node
+positions, though, do *not* come from the renderer:
+`getFlowGraph` runs `flow-graph-layout.ts`'s
 `withRenderableLayout`, which lays a flow out
 (`computeLayout`) whenever it is `is_auto_layout` or its
 stored positions are degenerate — so the stats renderer
@@ -211,13 +233,21 @@ the I/O wrapper is `adapters/flow-stats.ts`'s
 
 ### API Layer (`/api`)
 
-`api/types.ts` (row types + shared aliases), `api/db.ts`
-(`DbAdapter` interface), `api/db-localstorage.ts` (production
-impl), `api/db-memory.ts` (test impl), `api/api.ts` (pure HTTP
-routing — `GET/PUT/DELETE/POST` helpers, **no module-level
-adapter; threaded explicitly**), `api/mock-data.ts`,
-`api/validators.ts`. The `DbAdapter` interface is the migration
-seam to Postgres.
+`api/types.ts` (row types + shared aliases — `WorkerId`,
+`Worker` discriminated union, `HumanWorker` /
+`AIWorker` classes, `GraphNode.workerIds: WorkerId[]`),
+`api/db.ts` (`DbAdapter` interface + `TABLE_NAMES` array
+listing every storage table — `workers`, `ai_workers`,
+`ideas`, `projects`, `flows`, `flow_versions`, etc.),
+`api/db-localstorage.ts` (production impl), `api/db-memory.ts`
+(test impl), `api/api.ts` (pure HTTP routing —
+`GET/PUT/DELETE/POST` helpers, **no module-level adapter;
+threaded explicitly**), `api/mock-data.ts` (seeds 6 humans
+in `workers` and 4 AIs in `ai_workers`), `api/validators.ts`
+(`validateHumanWorkerEntity` / `validateAIWorkerEntity`,
+where the AI validator rejects empty `auth_token` per the
+no-defaults doctrine). The `DbAdapter` interface is the
+migration seam to Postgres.
 
 `web-app/app/adapters/init.ts` wires the production LocalStorage
 adapter singleton (`initAdapter()` / `getDbAdapter()`).
@@ -239,6 +269,12 @@ Notable registry entries:
 - `flow-stats` → `web-app/flows/stats.ts` + `stats.html`
   (read-only flow heat map; sidebar layout;
   `searchable: false`).
+- `workers` → `web-app/workers/index.ts` + `index.html`
+  (single list grouped Humans / AIs; filter chips, search,
+  `+ Add Worker` dialog with a Human/AI kind picker).
+- `worker-detail` → `web-app/workers/detail.ts` +
+  `detail.html` (dispatches by `worker.kind` to the human
+  or AI detail presenter; `searchable: false`).
 
 ### Presenter Pattern
 
@@ -253,9 +289,14 @@ Editable detail views split into two presenters: a read presenter
 shape). The page module owns a `PageState` discriminated union
 (`{kind: 'reading'} | {kind: 'editing', draft}`) and constructs
 the appropriate one per render. This pattern applies to `Idea`,
-`Person`, and `ProjectDetail`. The word "Member" is reserved for a
-future `(user, role)` join — do not name a member-rendering
-construct until that scroll opens.
+`HumanWorker`, `AIWorker`, and `ProjectDetail`. The
+`worker-detail` page module reads `worker.kind` and dispatches
+to the right pair: `HumanWorkerDetailPresenter` /
+`HumanWorkerDetailEditPresenter` for humans,
+`AIWorkerDetailPresenter` / `AIWorkerDetailEditPresenter` for
+AIs (the AI edit presenter renders the auth-token input as
+`type="password"` and emits the security warning copy from
+`buildSecurityWarning()`).
 
 `presenters/index.ts` is the barrel; page modules import from
 `'../app/presenters'`. `WorkboxDetailPresenter` uses a public
@@ -304,20 +345,35 @@ import { navigateTo, openDialog, closeDialog } from '../app/core';
 
 ### Adapter Conventions
 
-- **`personName(personMap, personId: Id)`** throws on both missing
-  and unknown personId. Optional person references must branch at
-  the call site (`leadRow ? personName(...) : ''`) — never overload
-  `personName` with a fallback. UI renders `'—'` via
+- **Worker domain split.** `adapters/workers.ts` is the
+  humans-only surface (`getHumanWorker`, `putHumanWorker`,
+  `getCurrentHumanWorker`, etc.) backed by the `workers`
+  table. `adapters/ai-workers.ts` is the AIs-only surface
+  backed by `ai_workers`; it owns `maskAuthToken(token)`,
+  the only producer/consumer of auth tokens.
+  `adapters/workers-union.ts` is the union seam: `getWorkers(
+  ctx)`, `getWorkerMap(ctx)`, `workerName(workerMap,
+  workerId)`, plus `isHumanWorker` / `isAIWorker` re-exported
+  from `api/types.ts`. Anything that displays a worker's
+  name without caring about kind (node selector, flow-stats
+  adapter, workbox name display) imports from
+  `workers-union.ts`; kind-specific surfaces (status
+  mutations, AI auth-token storage) go through the per-kind
+  modules.
+- **`workerName(workerMap, workerId: WorkerId)`** throws on
+  both missing and unknown workerId. Optional worker
+  references must branch at the call site
+  (`row.person_id ? workerName(...) : ''`) — never overload
+  `workerName` with a fallback. UI renders `'—'` via
   `DISPLAY_ABSENT` for legitimately absent values. Never use
   magic strings like `'Unknown'`.
-- **`RequestContext` is the only I/O surface.** Every data-access
-  adapter takes `ctx: RequestContext` first and uses
-  `ctx.GET/PUT/DELETE/POST/commit`. The standalone `GET/PUT/...`
-  exports in `api/api.ts` are the transport `ctx` delegates to —
-  adapters never import them directly. A ctx executes against an
-  immutable snapshot: `ctx.getPersonMap()`, `ctx.getIdeaRows()`,
-  etc. are memoized for its lifetime so multiple adapter calls
-  see the same view.
+- **`RequestContext` is the only I/O surface.** Every data-
+  access adapter takes `ctx: RequestContext` first and uses
+  `ctx.GET/PUT/DELETE/POST/commit`. The standalone
+  `GET/PUT/...` exports in `api/api.ts` are the transport
+  `ctx` delegates to — adapters never import them directly.
+  Multi-table reads share one ctx so every adapter call in a
+  request sees the same snapshot.
 - **Platform-shim vs data-access adapters share `adapters/`.**
   Data-access adapters (`ideas.ts`, `flow-queries.ts`, etc.)
   fetch entity data through `ctx`. Platform shims
@@ -404,7 +460,8 @@ validators. `web-app/app/` — all source (TypeScript + CSS), with
 subdirectories `adapters/` (data-access + platform shims, both
 kinds share the folder), `presenters/` (presenter classes
 producing `SafeHtml`), and `styles/` (cascade-ordered CSS
-modules). `web-app/{dashboard,workbox,ideas,projects,flows,...}/`
+modules).
+`web-app/{dashboard,workbox,ideas,projects,flows,workers,...}/`
 — page directories registered in `PAGE_REGISTRY` (sidebar-layout
 + standalone). `billing/` is a stub.
 
@@ -424,28 +481,34 @@ and copied — read it, don't read this section.
 Two layers, both zero-dependency:
 
 **Automated tests** (Node's built-in `node:test` runner with
-`--strip-types`, no devDependencies; ~738 tests). Tests cover
+`--strip-types`, no devDependencies; 657 tests). Tests cover
 pure modules, flow-edit business logic and the connection-
 validation rules (`tests/flow-operations.test.ts`), the flow
-version/query adapters, every data adapter, the workbox inbox
-aggregation plus the visibility filter, the mermaid round-trip,
+version/query adapters, every data adapter (including
+`adapters-workers-union.test.ts` for the worker union seam
+and `adapters-flow-publish.test.ts` for
+`validateFlowForCreation` / `getFlowsForCreation`), the
+workbox inbox aggregation, the mermaid round-trip,
 in-browser ZIP, snapshot import-validation/quota/wipe-on-fail,
-api routing, navigation, mock-data validity, and the SafeHtml
-output of the presenters; the automated suite now also covers
-`flow-stats-aggregate` (pure heat / sojourn / path / clan
-math), `adapters-flow-stats` (the read-only adapter via
-`MemoryDbAdapter`), `presenter-flow-stats` (the SafeHtml
+api routing, navigation, mock-data validity, the two-tier
+hazard predicate (`tests/flow-graph-hazard.test.ts` covers
+`shouldShowWorkerHazard`), and the SafeHtml output of the
+presenters (`presenter-worker-detail.test.ts` checks the AI
+variant masks its auth token); the automated suite also
+covers `flow-stats-aggregate` (pure heat / sojourn / path /
+clan math), `adapters-flow-stats` (the read-only adapter
+via `MemoryDbAdapter`), `presenter-flow-stats` (the SafeHtml
 shape — including the *absence* of editor affordances), and
 `duration-units` (the compact ascending-unit duration
 formatter) — see `tests/` for the current set.
-`api/db-memory.ts` provides an in-memory `DbAdapter` so adapter
-and api-layer tests run without `localStorage`.
+`api/db-memory.ts` provides an in-memory `DbAdapter` so
+adapter and api-layer tests run without `localStorage`.
 
 Run via `./validate` (which also type-checks and lints) or
 directly: `node --test --strip-types tests/*.test.ts`.
 
 **Manual browser regression** for UI behavior: a pass against
-`TEST-PLAN.md` (~265 cases), driven either by a single human
+`TEST-PLAN.md` (~289 cases), driven either by a single human
 tester serially or by Claude Code agents in parallel via the
 `claude-in-chrome` MCP. Anything DOM-driven (gestures, layout,
 visual rendering) lives here; where a manual case is the browser
@@ -462,18 +525,22 @@ time budgets while keeping per-entity mutation domains disjoint:
    produce the distribution ZIP, `./build --no-zip` for the test
    server, start HTTP server, open tab 0. Covers A1–A5.
 2. **Phase 1 — Data setup** (one agent, serial): AA1–AA43 in
-   tab 0. Creates pristine environment, people, ideas, projects,
-   one flow. Populates the shared database that Phase 2
-   verifies.
+   tab 0. Creates pristine environment, workers (humans + AIs),
+   ideas, projects, one flow. Populates the shared database
+   that Phase 2 verifies.
 3. **Phase 2 — Parallel verification** (7 agents concurrent,
    each in its own tab, no shared tabs):
-   - Agent-B — Entry pages (B1–B16)
-   - Agent-CH — Dashboard + Reference (C1–C7, H1–H2), read-only
-   - Agent-D — Ideas (D1–D37)
-   - Agent-E — Projects (E1–E11)
-   - Agent-F — Flows (F1–F74)
-   - Agent-F2 — Workbox (WB1–WB19)
-   - Agent-G — Admin (G9–G14, G19–G24, G36–G40; skip G30–G35; G1–G8/G15–G18/G25–G29 retired)
+   - Agent-B — Entry pages
+   - Agent-CH — Dashboard + Reference (read-only)
+   - Agent-D — Ideas
+   - Agent-E — Projects
+   - Agent-F — Flows (includes hazard severity, flow-publish
+     gate)
+   - Agent-F2 — Workbox (includes Create-Work-Order picker
+     READY / NOT READY split)
+   - Agent-G — Admin (Workers page, Worker detail (human + AI),
+     Organization, Snapshots, Billing). The retired Teams /
+     Roles / Crews / Activity Feed pages have no cases.
 4. **Phase 3 — Cross-cutting** (one agent, alone): I1–I28.
    Mutates global UI state (theme, sidebar, command palette) —
    no concurrent agents.
@@ -491,12 +558,12 @@ subset of tables:
 
 | Agent | Mutation domain |
 |---|---|
-| Agent-B | creates one user via signup |
+| Agent-B | creates one human worker via signup |
 | Agent-D | `ideas` |
-| Agent-E | `projects` (plus one flow via E7) |
+| Agent-E | `projects` (plus one flow via the project-detail New Flow path) |
 | Agent-F | `flows`, `flow_versions` |
 | Agent-F2 | `work_orders`, `work_order_transitions`, `work_order_claims`, plus its own private flow in `flows`/`flow_versions` |
-| Agent-G | `people`, `organization` |
+| Agent-G | `workers`, `ai_workers`, `organization` |
 | Agent-CH | none (read-only) |
 
 Agent-F2 owns its source flow because `postWorkOrderCreation`
@@ -518,8 +585,12 @@ count checks are non-zero + consistency, not numeric equality.
   use pointer-capture semantics. Affected tests include
   AA27–AA34, F15, F19–F23, D36, D37, E11. Work around by
   validating end-state via direct JSON injection into
-  `fusion-ai:flows`, then reloading and verifying render. Mark
-  BLOCKED if neither path confirms behavior.
+  `fusion-ai:flows`, then reloading and verifying render. When
+  the injection succeeds and the SVG renders the expected end
+  state, the case is **PASS** with the note `verified via JSON
+  injection` — NOT BLOCKED. `BLOCKED` is reserved for cases
+  where neither gesture nor injection produces a verifiable
+  end state.
 - **`resize_window`** does not change the CSS viewport;
   responsive tests at specific widths (I10) cannot be driven.
   Inspect `responsive.css` manually to verify media queries.
@@ -530,13 +601,23 @@ count checks are non-zero + consistency, not numeric equality.
   `javascript_tool` and dispatching a synthetic change event.
 - **Keyboard events** (arrows, Cmd+K, Delete, Tab) work
   normally and bypass the pointer-capture limitation.
+- **`kill` syscall against the background HTTP server**: the
+  Claude Code sandbox rejects `kill -TERM` and `kill -9`
+  against PIDs of long-running background tasks started via
+  the Bash tool's `run_in_background: true` (EPERM). Phase 5
+  teardown's **J1** ("Stop the HTTP server") cannot terminate
+  the process from within the sandbox; mark J1 BLOCKED with
+  the reason "sandbox EPERM on kill". The server is cleaned
+  up at session end. Workaround: the user terminates manually
+  after the run via `lsof -ti tcp:8080 | xargs kill -9`
+  outside the sandbox.
 
 ### Serial single-tester mode
 
 The same TEST-PLAN.md runs serially by one human in one browser
-following document order (A → AA → B → C → D → E → F → F2 → G
-→ H → I → J). The agent-scoped mutation domains and tolerance
-patterns apply only to the parallel run.
+following document order (A → AA → B → C → D → E → F → F2 → FS
+→ G → H → I → J). The agent-scoped mutation domains and
+tolerance patterns apply only to the parallel run.
 
 ## Gotchas
 
@@ -557,3 +638,35 @@ Do not use git worktrees. Work directly in the main checkout.
 Worktrees fragment review surface, hide state from the
 working tree, and add ceremony without buying isolation that
 small focused commits don't already provide.
+
+## Subagents
+
+Subagents inherit no scripture and read no CLAUDE.md by
+default. Before delegating to a general-purpose Agent, the
+dispatching agent MUST push down the relevant Church of Code
+doctrine AND the codebase-specific patterns in the prompt:
+
+- **Voice rules**: 78-char max line, 4-space indent, no
+  inline styles (use CSS custom properties + classes per
+  the styling section above), present-tense imperative
+  commit messages, Co-Authored-By trailer.
+- **Commandments touched by the task** — name them. If the
+  work involves naming, cite Uniformity (III). If it
+  introduces an abstraction, cite Generality (IX) and the
+  third-instance threshold. If it crosses a boundary, cite
+  Validation at edges. If it removes something, cite
+  Simplicity (VIII).
+- **Abominations the task specifically risks** — name them.
+  Null, Default Values, Internal Defense, Greedy Catch,
+  Coupling, Magical Values, Cleverness — say which apply,
+  with examples relevant to the file the agent will touch.
+- **Existing codebase patterns to match** — RequestContext
+  as the only argument to adapter methods, SafeHtml from
+  presenters, snake_case storage / camelCase domain,
+  HTTP-verb adapter naming (`get_noun`/`put_noun`/`delete_noun`/
+  `post_noun_operation`), validators at the gate not
+  downstream, no untyped `any` from external boundaries.
+
+An agent of the Church does not unleash unwashed heathens on
+the codebase. Cite the doctrine the subagent is expected to
+honor; do not assume it knows.
