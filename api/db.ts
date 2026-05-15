@@ -16,6 +16,11 @@ import type {
     WorkOrderTransitionEntity,
     WorkOrderClaimEntity,
     TransitionFieldValueEntity,
+    Objective,
+    ObjectiveRevision,
+    DeprecatedObjective,
+    ProjectObjectiveBaselineScore,
+    ProjectObjectiveActualScore,
 } from './types.ts';
 
 export class EntityNotFound {
@@ -131,6 +136,20 @@ export interface DbAdapter {
         EntityStore<
             ActivityActorEntity
         >;
+    objectives:
+        EntityStore<Objective>;
+    objectiveRevisions:
+        EntityStore<ObjectiveRevision>;
+    deprecatedObjectives:
+        EntityStore<DeprecatedObjective>;
+    projectObjectiveBaselineScores:
+        EntityStore<
+            ProjectObjectiveBaselineScore
+        >;
+    projectObjectiveActualScores:
+        EntityStore<
+            ProjectObjectiveActualScore
+        >;
     deleted: DeletedStore;
 }
 
@@ -151,5 +170,10 @@ export const TABLE_NAMES = [
     'organization',
     'idea_submissions',
     'activity_actors',
+    'objectives',
+    'objective_revisions',
+    'deprecated_objectives',
+    'project_objective_baseline_scores',
+    'project_objective_actual_scores',
     'deleted',
 ];

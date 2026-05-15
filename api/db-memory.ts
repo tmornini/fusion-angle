@@ -26,6 +26,11 @@ import type {
     WorkOrderTransitionEntity,
     TransitionFieldValueEntity,
     WorkOrderClaimEntity,
+    Objective,
+    ObjectiveRevision,
+    DeprecatedObjective,
+    ProjectObjectiveBaselineScore,
+    ProjectObjectiveActualScore,
 } from './types.ts';
 import { nowUtc, type Id } from './types.ts';
 
@@ -180,6 +185,19 @@ interface Tables {
     workOrderClaims: Map<
         string, WorkOrderClaimEntity
     >;
+    objectives: Map<string, Objective>;
+    objectiveRevisions: Map<
+        string, ObjectiveRevision
+    >;
+    deprecatedObjectives: Map<
+        string, DeprecatedObjective
+    >;
+    projectObjectiveBaselineScores: Map<
+        string, ProjectObjectiveBaselineScore
+    >;
+    projectObjectiveActualScores: Map<
+        string, ProjectObjectiveActualScore
+    >;
     deleted: Map<string, Deleted>;
 }
 
@@ -224,6 +242,20 @@ export class MemoryDbAdapter
         EntityStore<IdeaSubmissionEntity>;
     readonly activityActors:
         EntityStore<ActivityActorEntity>;
+    readonly objectives:
+        EntityStore<Objective>;
+    readonly objectiveRevisions:
+        EntityStore<ObjectiveRevision>;
+    readonly deprecatedObjectives:
+        EntityStore<DeprecatedObjective>;
+    readonly projectObjectiveBaselineScores:
+        EntityStore<
+            ProjectObjectiveBaselineScore
+        >;
+    readonly projectObjectiveActualScores:
+        EntityStore<
+            ProjectObjectiveActualScore
+        >;
     readonly deleted: DeletedStore;
 
     constructor() {
@@ -309,6 +341,33 @@ export class MemoryDbAdapter
             new MemEntityStore(
                 'activity_actors',
                 t.activityActors, ds,
+            );
+        this.objectives =
+            new MemEntityStore(
+                'objectives',
+                t.objectives, ds,
+            );
+        this.objectiveRevisions =
+            new MemEntityStore(
+                'objective_revisions',
+                t.objectiveRevisions, ds,
+            );
+        this.deprecatedObjectives =
+            new MemEntityStore(
+                'deprecated_objectives',
+                t.deprecatedObjectives, ds,
+            );
+        this.projectObjectiveBaselineScores =
+            new MemEntityStore(
+                'project_objective_baseline_scores',
+                t.projectObjectiveBaselineScores,
+                ds,
+            );
+        this.projectObjectiveActualScores =
+            new MemEntityStore(
+                'project_objective_actual_scores',
+                t.projectObjectiveActualScores,
+                ds,
             );
     }
 
@@ -399,6 +458,11 @@ function buildTables(): Tables {
         workOrderTransitions: new Map(),
         transitionFieldValues: new Map(),
         workOrderClaims: new Map(),
+        objectives: new Map(),
+        objectiveRevisions: new Map(),
+        deprecatedObjectives: new Map(),
+        projectObjectiveBaselineScores: new Map(),
+        projectObjectiveActualScores: new Map(),
         deleted: new Map(),
     };
 }

@@ -27,6 +27,11 @@ import type {
     WorkOrderTransitionEntity,
     WorkOrderClaimEntity,
     TransitionFieldValueEntity,
+    Objective,
+    ObjectiveRevision,
+    DeprecatedObjective,
+    ProjectObjectiveBaselineScore,
+    ProjectObjectiveActualScore,
 } from './types.ts';
 import { nowUtc } from './types.ts';
 import {
@@ -841,6 +846,34 @@ export async function createLocalStorageAdapter(
             createEntityStore<
                 ActivityActorEntity
             >('activity_actors', deletedStore),
+        objectives:
+            createEntityStore<Objective>(
+                'objectives',
+                deletedStore,
+            ),
+        objectiveRevisions:
+            createHistoryEntityStore<
+                ObjectiveRevision
+            >('objective_revisions'),
+        deprecatedObjectives:
+            createEntityStore<
+                DeprecatedObjective
+            >(
+                'deprecated_objectives',
+                deletedStore,
+            ),
+        projectObjectiveBaselineScores:
+            createHistoryEntityStore<
+                ProjectObjectiveBaselineScore
+            >(
+                'project_objective_baseline_scores',
+            ),
+        projectObjectiveActualScores:
+            createHistoryEntityStore<
+                ProjectObjectiveActualScore
+            >(
+                'project_objective_actual_scores',
+            ),
         deleted: deletedStore,
     };
 

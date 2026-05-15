@@ -34,6 +34,11 @@ import type {
     IdeaSubmissionEntity,
     ActivityActorEntity,
     ProjectFlowEntity,
+    Objective,
+    ObjectiveRevision,
+    DeprecatedObjective,
+    ProjectObjectiveBaselineScore,
+    ProjectObjectiveActualScore,
 } from './types.ts';
 
 export interface Risk {
@@ -127,6 +132,26 @@ export function asNumber(
     ) {
         throw new Error(
             'expected finite number for '
+                + label
+                + ', got '
+                + typeName(value),
+        );
+    }
+    return value;
+}
+
+export function asScore(
+    value: unknown,
+    label: string,
+): number {
+    if (
+        typeof value !== 'number'
+        || !Number.isInteger(value)
+        || value < -100
+        || value > 100
+    ) {
+        throw new Error(
+            'expected integer in [-100, +100] for '
                 + label
                 + ', got '
                 + typeName(value),
@@ -797,8 +822,7 @@ const PROJECT_BODY_KEYS: readonly string[] = [
     'progress', 'start_date',
     'target_end_date', 'estimated_duration',
     'actual_duration', 'estimated_cost',
-    'actual_cost', 'estimated_impact',
-    'actual_impact', 'position',
+    'actual_cost', 'position',
     'business_context', 'timeline_label',
 ];
 
@@ -840,12 +864,6 @@ export function validateProjectEntity(
         ),
         actual_cost: pickNumber(
             body, 'actual_cost',
-        ),
-        estimated_impact: pickNumber(
-            body, 'estimated_impact',
-        ),
-        actual_impact: pickNumber(
-            body, 'actual_impact',
         ),
         position: pickNumber(
             body, 'position',
@@ -1286,6 +1304,149 @@ export function validateProjectFlowEntity(
         ),
         created_at: pickString(
             body, 'created_at',
+        ),
+    };
+}
+
+const OBJECTIVE_BODY_KEYS: readonly string[] = [
+    'position',
+];
+
+export function validateObjectiveEntity(
+    body: Record<string, unknown>,
+): Omit<Objective, 'id'> {
+    assertOnlyKeys(
+        body, OBJECTIVE_BODY_KEYS, 'Objective',
+    );
+    const position = asNumber(
+        body.position, 'Objective.position',
+    );
+    if (
+        !Number.isInteger(position)
+        || position < 0
+    ) {
+        throw new Error(
+            'expected non-negative integer for '
+                + 'Objective.position, got '
+                + String(position),
+        );
+    }
+    return { position };
+}
+
+const OBJECTIVE_REVISION_BODY_KEYS:
+    readonly string[] = [
+    'objective_id', 'name',
+    'description', 'revised_at',
+];
+
+export function validateObjectiveRevisionEntity(
+    body: Record<string, unknown>,
+): Omit<ObjectiveRevision, 'id'> {
+    assertOnlyKeys(
+        body,
+        OBJECTIVE_REVISION_BODY_KEYS,
+        'ObjectiveRevision',
+    );
+    const name = pickString(body, 'name');
+    if (name === '') {
+        throw new Error(
+            'ObjectiveRevision.name must be non-empty',
+        );
+    }
+    return {
+        objective_id: pickString(
+            body, 'objective_id',
+        ),
+        name,
+        description: pickString(
+            body, 'description',
+        ),
+        revised_at: pickString(
+            body, 'revised_at',
+        ),
+    };
+}
+
+const DEPRECATED_OBJECTIVE_BODY_KEYS:
+    readonly string[] = [
+    'objective_id', 'deprecated_at',
+];
+
+export function validateDeprecatedObjectiveEntity(
+    body: Record<string, unknown>,
+): Omit<DeprecatedObjective, 'id'> {
+    assertOnlyKeys(
+        body,
+        DEPRECATED_OBJECTIVE_BODY_KEYS,
+        'DeprecatedObjective',
+    );
+    return {
+        objective_id: pickString(
+            body, 'objective_id',
+        ),
+        deprecated_at: pickString(
+            body, 'deprecated_at',
+        ),
+    };
+}
+
+const BASELINE_SCORE_BODY_KEYS:
+    readonly string[] = [
+    'project_id', 'objective_id',
+    'score', 'scored_at',
+];
+
+export function validateBaselineScoreEntity(
+    body: Record<string, unknown>,
+): Omit<ProjectObjectiveBaselineScore, 'id'> {
+    assertOnlyKeys(
+        body,
+        BASELINE_SCORE_BODY_KEYS,
+        'BaselineScore',
+    );
+    return {
+        project_id: pickString(
+            body, 'project_id',
+        ),
+        objective_id: pickString(
+            body, 'objective_id',
+        ),
+        score: asScore(
+            body.score, 'BaselineScore.score',
+        ),
+        scored_at: pickString(
+            body, 'scored_at',
+        ),
+    };
+}
+
+const ACTUAL_SCORE_BODY_KEYS:
+    readonly string[] = [
+    'project_id', 'objective_id',
+    'score', 'scored_at',
+];
+
+export function validateActualScoreEntity(
+    body: Record<string, unknown>,
+): Omit<ProjectObjectiveActualScore, 'id'> {
+    assertOnlyKeys(
+        body,
+        ACTUAL_SCORE_BODY_KEYS,
+        'ActualScore',
+    );
+    return {
+        project_id: pickString(
+            body, 'project_id',
+        ),
+        objective_id: pickString(
+            body, 'objective_id',
+        ),
+        score: asScore(
+            body.score, 'ActualScore.score',
+        ),
+        scored_at: pickString(
+            body, 'scored_at',
         ),
     };
 }

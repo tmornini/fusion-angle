@@ -618,6 +618,7 @@ export interface Objective {
 }
 
 export interface ObjectiveRevision {
+    id: string;
     objective_id: ObjectiveId;
     name: string;
     description: string;
@@ -625,11 +626,13 @@ export interface ObjectiveRevision {
 }
 
 export interface DeprecatedObjective {
+    id: string;
     objective_id: ObjectiveId;
     deprecated_at: string;
 }
 
 export interface ProjectObjectiveBaselineScore {
+    id: string;
     project_id: Id;
     objective_id: ObjectiveId;
     score: number;
@@ -637,6 +640,7 @@ export interface ProjectObjectiveBaselineScore {
 }
 
 export interface ProjectObjectiveActualScore {
+    id: string;
     project_id: Id;
     objective_id: ObjectiveId;
     score: number;
