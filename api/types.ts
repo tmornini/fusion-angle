@@ -610,6 +610,39 @@ export interface IdeaEntity {
     alignments: JsonArrayField;
 }
 
+export type ObjectiveId = Id;
+
+export interface Objective {
+    id: ObjectiveId;
+    position: number;
+}
+
+export interface ObjectiveRevision {
+    objective_id: ObjectiveId;
+    name: string;
+    description: string;
+    revised_at: string;
+}
+
+export interface DeprecatedObjective {
+    objective_id: ObjectiveId;
+    deprecated_at: string;
+}
+
+export interface ProjectObjectiveBaselineScore {
+    project_id: Id;
+    objective_id: ObjectiveId;
+    score: number;
+    scored_at: string;
+}
+
+export interface ProjectObjectiveActualScore {
+    project_id: Id;
+    objective_id: ObjectiveId;
+    score: number;
+    scored_at: string;
+}
+
 export interface ProjectEntity {
     id: Id;
     title: string;
@@ -622,8 +655,6 @@ export interface ProjectEntity {
     actual_duration: number; // seconds
     estimated_cost: number;
     actual_cost: number;
-    estimated_impact: number;
-    actual_impact: number;
     position: number;
     business_context: JsonObjectField;
     timeline_label: string;
@@ -1103,8 +1134,6 @@ export class Project {
     readonly #actualDuration: number;
     readonly #estimatedCost: number;
     readonly #actualCost: number;
-    readonly #estimatedImpact: number;
-    readonly #actualImpact: number;
     readonly #position: number;
     readonly #businessContext: string;
     readonly #timelineLabel: string;
@@ -1128,10 +1157,6 @@ export class Project {
             entity.estimated_cost;
         this.#actualCost =
             entity.actual_cost;
-        this.#estimatedImpact =
-            entity.estimated_impact;
-        this.#actualImpact =
-            entity.actual_impact;
         this.#position = entity.position;
         this.#businessContext =
             entity.business_context;
@@ -1246,14 +1271,6 @@ export class Project {
 
     actualCostAmount(): number {
         return this.#actualCost;
-    }
-
-    estimatedImpactScore(): number {
-        return this.#estimatedImpact;
-    }
-
-    actualImpactScore(): number {
-        return this.#actualImpact;
     }
 
     positionSortKey(): number {
