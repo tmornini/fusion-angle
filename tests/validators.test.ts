@@ -237,8 +237,6 @@ const validProject = {
     actual_duration: 0,
     estimated_cost: 1000,
     actual_cost: 0,
-    estimated_impact: 500,
-    actual_impact: 0,
     position: 1,
     business_context: '{}',
     timeline_label: 'Q1',

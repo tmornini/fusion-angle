@@ -393,6 +393,50 @@ type SeedHumanWorker = Omit<
     >;
 };
 
+const MOCK_SEED_TIMESTAMP =
+    '2026-01-01T00:00:00.000Z';
+
+export const OBJECTIVE_SEEDS: Array<{
+    id: string;
+    position: number;
+    name: string;
+    description: string;
+}> = [
+    {
+        id: 'RgT2mNvKpQ8xLsYwBzHcUe',
+        position: 0,
+        name: 'Revenue Growth',
+        description:
+            'Drive sustainable top-line growth',
+    },
+    {
+        id: 'JkW7aEqFdX3nOiPtVhMrCy',
+        position: 1,
+        name: 'Cost Reduction',
+        description: 'Minimize operational waste',
+    },
+    {
+        id: 'bDf6uStZlA9eGmYjIoNcWq',
+        position: 2,
+        name: 'Customer Satisfaction',
+        description: 'Improve user-perceived value',
+    },
+    {
+        id: 'CvH4wRnXkU1pQsBgTyEzMo',
+        position: 3,
+        name: 'Team Wellbeing',
+        description:
+            'Sustainable, energizing work',
+    },
+    {
+        id: 'hL8iFjOdAe5rKtPmVcBwGx',
+        position: 4,
+        name: 'Operational Efficiency',
+        description:
+            'Reduce friction in delivery',
+    },
+];
+
 export async function populateMockData(
     adapter: DbAdapter,
 ): Promise<void> {
@@ -1195,8 +1239,6 @@ export async function populateMockData(
                 92 * SECONDS_PER_HOUR,
             estimated_cost: 88000,
             actual_cost: 51000,
-            estimated_impact: 88,
-            actual_impact: 35,
             position: 1,
             business_context: jsonObjectField({
                 problem:
@@ -1243,8 +1285,6 @@ export async function populateMockData(
                 75 * SECONDS_PER_HOUR,
             estimated_cost: 56000,
             actual_cost: 58000,
-            estimated_impact: 72,
-            actual_impact: 78,
             position: 2,
             business_context: jsonObjectField({}),
             timeline_label: 'Completed',
@@ -1270,8 +1310,6 @@ export async function populateMockData(
                 88 * SECONDS_PER_HOUR,
             estimated_cost: 78000,
             actual_cost: 48000,
-            estimated_impact: 91,
-            actual_impact: 38,
             position: 3,
             business_context: jsonObjectField({
                 problem:
@@ -1317,8 +1355,6 @@ export async function populateMockData(
                 12 * SECONDS_PER_HOUR,
             estimated_cost: 110000,
             actual_cost: 7000,
-            estimated_impact: 84,
-            actual_impact: 0,
             position: 4,
             business_context: jsonObjectField({}),
             timeline_label: 'Just Started',
@@ -1342,8 +1378,6 @@ export async function populateMockData(
                 70 * SECONDS_PER_HOUR,
             estimated_cost: 50000,
             actual_cost: 52000,
-            estimated_impact: 76,
-            actual_impact: 81,
             position: 5,
             business_context: jsonObjectField({}),
             timeline_label: 'Completed',
@@ -1367,8 +1401,6 @@ export async function populateMockData(
                 28 * SECONDS_PER_HOUR,
             estimated_cost: 64000,
             actual_cost: 84000,
-            estimated_impact: 67,
-            actual_impact: 0,
             position: 6,
             business_context: jsonObjectField({}),
             timeline_label: 'Over Budget',
@@ -1394,8 +1426,6 @@ export async function populateMockData(
                 6 * SECONDS_PER_HOUR,
             estimated_cost: 60000,
             actual_cost: 3500,
-            estimated_impact: 65,
-            actual_impact: 0,
             position: 7,
             business_context: jsonObjectField({}),
             timeline_label: 'Just Started',
@@ -1420,8 +1450,6 @@ export async function populateMockData(
                 65 * SECONDS_PER_HOUR,
             estimated_cost: 64000,
             actual_cost: 42000,
-            estimated_impact: 73,
-            actual_impact: 30,
             position: 8,
             business_context: jsonObjectField({}),
             timeline_label: 'On Track',
@@ -1446,8 +1474,6 @@ export async function populateMockData(
                 122 * SECONDS_PER_HOUR,
             estimated_cost: 102000,
             actual_cost: 142000,
-            estimated_impact: 81,
-            actual_impact: 42,
             position: 9,
             business_context: jsonObjectField({}),
             timeline_label: 'Over Budget',
@@ -1471,8 +1497,6 @@ export async function populateMockData(
                 168 * SECONDS_PER_HOUR,
             estimated_cost: 134000,
             actual_cost: 99000,
-            estimated_impact: 93,
-            actual_impact: 51,
             position: 10,
             business_context: jsonObjectField({}),
             timeline_label: 'On Track',
@@ -1497,8 +1521,6 @@ export async function populateMockData(
                 58 * SECONDS_PER_HOUR,
             estimated_cost: 76000,
             actual_cost: 36000,
-            estimated_impact: 68,
-            actual_impact: 22,
             position: 11,
             business_context: jsonObjectField({}),
             timeline_label: 'On Track',
@@ -1523,8 +1545,6 @@ export async function populateMockData(
                 90 * SECONDS_PER_HOUR,
             estimated_cost: 62000,
             actual_cost: 56000,
-            estimated_impact: 70,
-            actual_impact: 73,
             position: 12,
             business_context: jsonObjectField({}),
             timeline_label: 'Completed',
@@ -1548,8 +1568,6 @@ export async function populateMockData(
                 14 * SECONDS_PER_HOUR,
             estimated_cost: 90000,
             actual_cost: 8500,
-            estimated_impact: 79,
-            actual_impact: 0,
             position: 13,
             business_context: jsonObjectField({}),
             timeline_label: 'Just Started',
@@ -1573,8 +1591,6 @@ export async function populateMockData(
                 78 * SECONDS_PER_HOUR,
             estimated_cost: 70000,
             actual_cost: 45000,
-            estimated_impact: 71,
-            actual_impact: 33,
             position: 14,
             business_context: jsonObjectField({}),
             timeline_label: 'On Track',
@@ -1599,8 +1615,6 @@ export async function populateMockData(
                 60 * SECONDS_PER_HOUR,
             estimated_cost: 56000,
             actual_cost: 34000,
-            estimated_impact: 66,
-            actual_impact: 27,
             position: 15,
             business_context: jsonObjectField({}),
             timeline_label: 'On Track',
@@ -6215,6 +6229,126 @@ export async function populateMockData(
                 .put(r.id, r),
         ),
     ]);
+
+    for (const seed of OBJECTIVE_SEEDS) {
+        await adapter.objectives.put(seed.id, {
+            position: seed.position,
+        });
+        await adapter.objectiveRevisions.put(
+            `${seed.id}:${MOCK_SEED_TIMESTAMP}`,
+            {
+                objective_id: seed.id,
+                name: seed.name,
+                description: seed.description,
+                revised_at: MOCK_SEED_TIMESTAMP,
+            },
+        );
+    }
+
+    const allProjects = await adapter.projects.getAll();
+
+    function deterministicScore(
+        seed: string,
+        min: number,
+        max: number,
+    ): number {
+        let hash = 0;
+        for (let i = 0; i < seed.length; i++) {
+            hash = (hash * 31 + seed.charCodeAt(i)) | 0;
+        }
+        const range = max - min + 1;
+        const wrapped = ((hash % range) + range) % range;
+        return min + wrapped;
+    }
+
+    for (const p of allProjects) {
+        if (
+            p.status === 'submitted'
+            || p.status === 'declined'
+            || p.status === 'deleted'
+        ) {
+            continue;
+        }
+
+        const baselineCoverage =
+            p.status === 'approved'
+            || p.status === 'completed'
+                ? OBJECTIVE_SEEDS.length
+                : deterministicScore(
+                    p.id + ':coverage',
+                    0,
+                    OBJECTIVE_SEEDS.length - 1,
+                );
+
+        const baselineStart =
+            new Date(p.start_date).getTime();
+        for (let i = 0; i < baselineCoverage; i++) {
+            const obj = OBJECTIVE_SEEDS[i]!;
+            const score = deterministicScore(
+                `${p.id}:${obj.id}:baseline`,
+                -100,
+                100,
+            );
+            const scoredAt = new Date(
+                baselineStart + i * 1000,
+            ).toISOString();
+            await adapter
+                .projectObjectiveBaselineScores
+                .put(
+                    `${p.id}:${obj.id}:${scoredAt}`,
+                    {
+                        project_id: p.id,
+                        objective_id: obj.id,
+                        score,
+                        scored_at: scoredAt,
+                    },
+                );
+        }
+
+        if (
+            p.status === 'approved'
+            || p.status === 'completed'
+        ) {
+            const minActuals =
+                p.status === 'completed' ? 1 : 0;
+            const baseActualTime =
+                baselineStart + MS_PER_DAY;
+            for (
+                let i = 0; i < OBJECTIVE_SEEDS.length; i++
+            ) {
+                const obj = OBJECTIVE_SEEDS[i]!;
+                const nActuals =
+                    minActuals
+                    + deterministicScore(
+                        `${p.id}:${obj.id}:nactual`,
+                        0,
+                        2,
+                    );
+                for (let k = 0; k < nActuals; k++) {
+                    const score = deterministicScore(
+                        `${p.id}:${obj.id}:actual:${k}`,
+                        -100,
+                        100,
+                    );
+                    const scoredAt = new Date(
+                        baseActualTime
+                            + (i * 10 + k) * 1000,
+                    ).toISOString();
+                    await adapter
+                        .projectObjectiveActualScores
+                        .put(
+                            `${p.id}:${obj.id}:${scoredAt}`,
+                            {
+                                project_id: p.id,
+                                objective_id: obj.id,
+                                score,
+                                scored_at: scoredAt,
+                            },
+                        );
+                }
+            }
+        }
+    }
 }
 
 export async function populateBootstrapData(

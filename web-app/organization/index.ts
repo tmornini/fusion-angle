@@ -7,6 +7,7 @@ import { showToast } from '../app/toast.ts';
 import { log } from '../app/logger.ts';
 import {
     navigateTo, trimStrings,
+    openDialog, closeDialog,
 } from '../app/core.ts';
 import {
     getOrganization,
@@ -14,11 +15,22 @@ import {
     createRequestContext,
     Organization,
     type GeneralInfoDraft,
+    getActiveObjectives,
+    getObjectives,
+    getDeprecatedObjectiveIds,
+    getCurrentObjectiveDefinition,
+    postObjectiveCreation,
+    postObjectiveRevision,
+    postObjectiveDeprecation,
+    postObjectiveReactivation,
+    subscribeObjectiveChanges,
+    generateCryptoSafeBase62,
 } from '../app/adapters/index.ts';
 import {
     OrganizationPresenter,
     OrganizationEditPresenter,
     type GeneralInfoFieldKey,
+    OrganizationObjectivesPresenter,
 } from '../app/presenters/index.ts';
 
 const pageAbort = new AbortController();
@@ -89,6 +101,37 @@ function bindNavButtons(): void {
     );
 }
 
+async function renderObjectives(): Promise<void> {
+    const ctx = createRequestContext();
+    const [active, allObjs, deprecatedIds] =
+        await Promise.all([
+            getActiveObjectives(ctx),
+            getObjectives(ctx),
+            getDeprecatedObjectiveIds(ctx),
+        ]);
+    const deprecated = allObjs.filter(
+        o => deprecatedIds.has(o.id),
+    );
+    const defs = new Map<string,
+        { name: string; description: string }>();
+    for (const o of [...active, ...deprecated]) {
+        defs.set(
+            o.id,
+            await getCurrentObjectiveDefinition(
+                ctx, o.id,
+            ),
+        );
+    }
+    const deprecatedAt = new Map<string, string>();
+    const presenter =
+        new OrganizationObjectivesPresenter(
+            active, deprecated, defs, deprecatedAt,
+        );
+    const box = $('#objectives-box', document);
+    if (!box) return;
+    setHtml(box, presenter.buildBox());
+}
+
 export async function init(): Promise<void> {
     const container =
         $('#organization-content', document);
@@ -131,6 +174,140 @@ export async function init(): Promise<void> {
 
     state = { kind: 'reading', org };
     rerender();
+
+    subscribeObjectiveChanges(renderObjectives);
+    await renderObjectives();
+
+    // Click delegation on the objectives box
+    $('#objectives-box', document)!
+        .addEventListener('click',
+            async (e) => {
+                const target =
+                    e.target as HTMLElement;
+                const action = target
+                    .closest('[data-action]')
+                    ?.getAttribute('data-action');
+                const objectiveId = target
+                    .closest('[data-objective-id]')
+                    ?.getAttribute(
+                        'data-objective-id',
+                    );
+                const ctx = createRequestContext();
+                if (action === 'add-objective') {
+                    openDialog('add-objective');
+                } else if (
+                    action === 'edit'
+                    && objectiveId
+                ) {
+                    const def =
+                        await getCurrentObjectiveDefinition(
+                            ctx, objectiveId,
+                        );
+                    ($(
+                        '#edit-obj-id', document,
+                    ) as HTMLInputElement)
+                        .value = objectiveId;
+                    ($(
+                        '#edit-obj-name', document,
+                    ) as HTMLInputElement)
+                        .value = def.name;
+                    ($(
+                        '#edit-obj-description',
+                        document,
+                    ) as HTMLTextAreaElement)
+                        .value = def.description;
+                    openDialog('edit-objective');
+                } else if (
+                    action === 'deprecate'
+                    && objectiveId
+                ) {
+                    ($(
+                        '#confirm-deprecate-id',
+                        document,
+                    ) as HTMLInputElement)
+                        .value = objectiveId;
+                    openDialog('confirm-deprecate');
+                } else if (
+                    action === 'reactivate'
+                    && objectiveId
+                ) {
+                    await postObjectiveReactivation(
+                        ctx, objectiveId,
+                    );
+                }
+            }, { signal });
+
+    // Add-Objective dialog wiring
+    $(
+        '[data-action="cancel-add-objective"]',
+        document,
+    )!.addEventListener('click',
+        () => closeDialog('add-objective'),
+        { signal });
+    $(
+        '[data-action="confirm-add-objective"]',
+        document,
+    )!.addEventListener('click', async () => {
+        const name = ($(
+            '#add-obj-name', document,
+        ) as HTMLInputElement).value;
+        const desc = ($(
+            '#add-obj-description', document,
+        ) as HTMLTextAreaElement).value;
+        const ctx = createRequestContext();
+        const objs = await getObjectives(ctx);
+        const newId = generateCryptoSafeBase62();
+        await postObjectiveCreation(
+            ctx, newId, name, desc, objs.length,
+        );
+        closeDialog('add-objective');
+    }, { signal });
+
+    // Edit-Objective dialog wiring
+    $(
+        '[data-action="cancel-edit-objective"]',
+        document,
+    )!.addEventListener('click',
+        () => closeDialog('edit-objective'),
+        { signal });
+    $(
+        '[data-action="confirm-edit-objective"]',
+        document,
+    )!.addEventListener('click', async () => {
+        const id = ($(
+            '#edit-obj-id', document,
+        ) as HTMLInputElement).value;
+        const name = ($(
+            '#edit-obj-name', document,
+        ) as HTMLInputElement).value;
+        const desc = ($(
+            '#edit-obj-description', document,
+        ) as HTMLTextAreaElement).value;
+        const ctx = createRequestContext();
+        await postObjectiveRevision(
+            ctx, id, name, desc,
+        );
+        closeDialog('edit-objective');
+    }, { signal });
+
+    // Confirm-deprecate dialog wiring
+    $(
+        '[data-action="cancel-confirm-deprecate"]',
+        document,
+    )!.addEventListener('click',
+        () => closeDialog('confirm-deprecate'),
+        { signal });
+    $(
+        '[data-action="confirm-deprecate"]',
+        document,
+    )!.addEventListener('click', async () => {
+        const id = ($(
+            '#confirm-deprecate-id', document,
+        ) as HTMLInputElement).value;
+        const ctx = createRequestContext();
+        await postObjectiveDeprecation(ctx, id);
+        closeDialog('confirm-deprecate');
+    }, { signal });
 }
 
 function bindStableListeners(

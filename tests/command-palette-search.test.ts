@@ -53,8 +53,6 @@ function buildProject(
         actual_duration: 0,
         estimated_cost: 0,
         actual_cost: 0,
-        estimated_impact: 50,
-        actual_impact: 0,
         position: 1,
         business_context: jsonObjectField({}),
         timeline_label: '',

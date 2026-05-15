@@ -40,8 +40,6 @@ function buildProject(
         actual_duration: 86400 * 40,
         estimated_cost: 50000,
         actual_cost: 12000,
-        estimated_impact: 80,
-        actual_impact: 30,
         position: 1,
         business_context: '{}' as JsonObjectField,
         timeline_label: 'Q1-Q4',
@@ -83,8 +81,6 @@ test(
         );
         assert.equal(row.estimated_cost, 99000);
         assert.equal(row.actual_cost, 12000);
-        assert.equal(row.estimated_impact, 80);
-        assert.equal(row.actual_impact, 30);
         assert.equal(row.position, 1);
         assert.equal(row.timeline_label, 'Q1-Q4');
     },
@@ -239,8 +235,6 @@ test(
                 target_end_date: '2026-12-31',
                 estimated_cost: 4000,
                 actual_cost: 2000,
-                estimated_impact: 10,
-                actual_impact: 6,
             }),
             id: 'p1',
         });
@@ -263,8 +257,6 @@ test(
             view.costCurrentK(),
             2000 / COST_DIVISOR,
         );
-        assert.equal(view.impactBaseline(), 10);
-        assert.equal(view.impactCurrent(), 6);
     },
 );
 

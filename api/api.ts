@@ -20,6 +20,11 @@ import {
     validateOrganizationEntity,
     validateIdeaSubmissionEntity,
     validateActivityActorEntity,
+    validateObjectiveEntity,
+    validateObjectiveRevisionEntity,
+    validateDeprecatedObjectiveEntity,
+    validateBaselineScoreEntity,
+    validateActualScoreEntity,
 } from './validators.ts';
 
 export class ApiError {
@@ -372,6 +377,84 @@ const routes: Route[] = [
                 ),
             ),
     }),
+    route('objectives', {
+        get: (db) => db.objectives.getAll(),
+    }),
+    route('objectives/:id', {
+        get: (db, p) =>
+            db.objectives.getById(
+                param(p, 0),
+            ),
+        put: (db, p, body) =>
+            db.objectives.put(
+                param(p, 0),
+                validateObjectiveEntity(
+                    withoutId(body),
+                ),
+            ),
+        delete: (db, p) =>
+            db.objectives.delete(
+                param(p, 0),
+            ),
+    }),
+    route('objective-revisions', {
+        get: (db) =>
+            db.objectiveRevisions.getAll(),
+    }),
+    route('objective-revisions/:id', {
+        put: (db, p, body) =>
+            db.objectiveRevisions.put(
+                param(p, 0),
+                validateObjectiveRevisionEntity(
+                    withoutId(body),
+                ),
+            ),
+    }),
+    route('deprecated-objectives', {
+        get: (db) =>
+            db.deprecatedObjectives.getAll(),
+    }),
+    route('deprecated-objectives/:id', {
+        put: (db, p, body) =>
+            db.deprecatedObjectives.put(
+                param(p, 0),
+                validateDeprecatedObjectiveEntity(
+                    withoutId(body),
+                ),
+            ),
+        delete: (db, p) =>
+            db.deprecatedObjectives.delete(
+                param(p, 0),
+            ),
+    }),
+
+    route('project-objective-baseline-scores', {
+        get: (db) =>
+            db.projectObjectiveBaselineScores.getAll(),
+    }),
+    route('project-objective-baseline-scores/:id', {
+        put: (db, p, body) =>
+            db.projectObjectiveBaselineScores.put(
+                param(p, 0),
+                validateBaselineScoreEntity(
+                    withoutId(body),
+                ),
+            ),
+    }),
+    route('project-objective-actual-scores', {
+        get: (db) =>
+            db.projectObjectiveActualScores.getAll(),
+    }),
+    route('project-objective-actual-scores/:id', {
+        put: (db, p, body) =>
+            db.projectObjectiveActualScores.put(
+                param(p, 0),
+                validateActualScoreEntity(
+                    withoutId(body),
+                ),
+            ),
+    }),
+
     route('snapshots/schema', {
         get: async (db) =>
             (await db.hasSchema())

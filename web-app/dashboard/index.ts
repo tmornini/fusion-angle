@@ -8,12 +8,51 @@ import {
     withLoadingState,
 } from '../app/loading-states.ts';
 import {
-    getDashboardGauges,
     createRequestContext,
+    getDashboardGauges,
+    getPortfolioImpactSummary,
+    getObjectiveAggregates,
+    subscribeProjectScoreChanges,
+    getActiveObjectives,
+    getCurrentObjectiveDefinition,
+    subscribeObjectiveChanges,
+    subscribeProjectChanges,
 } from '../app/adapters/index.ts';
 import {
     GaugePresenter,
+    PortfolioImpactPresenter,
+    DashboardObjectiveAggregatesPresenter,
 } from '../app/presenters/index.ts';
+
+async function renderImpactSurfaces(): Promise<void> {
+    const ctx = createRequestContext();
+    const [summary, active, aggregates] =
+        await Promise.all([
+            getPortfolioImpactSummary(ctx),
+            getActiveObjectives(ctx),
+            getObjectiveAggregates(ctx),
+        ]);
+    const defs = new Map<string,
+        { name: string; description: string }>();
+    for (const o of active) {
+        defs.set(o.id,
+            await getCurrentObjectiveDefinition(
+                ctx, o.id,
+            ));
+    }
+    setHtml(
+        $('#portfolio-impact-card', document)!,
+        new PortfolioImpactPresenter(
+            summary,
+        ).buildCard(),
+    );
+    setHtml(
+        $('#objective-aggregates-card', document)!,
+        new DashboardObjectiveAggregatesPresenter(
+            active, defs, aggregates,
+        ).buildCard(),
+    );
+}
 
 export async function init(
 ): Promise<void> {
@@ -38,4 +77,12 @@ export async function init(
         container,
         html`${rendered}`,
     );
+
+    subscribeProjectScoreChanges(
+        renderImpactSurfaces,
+    );
+    subscribeObjectiveChanges(renderImpactSurfaces);
+    subscribeProjectChanges(renderImpactSurfaces);
+
+    await renderImpactSurfaces();
 }

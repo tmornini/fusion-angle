@@ -123,8 +123,6 @@ function putProject(
         actual_duration: 0,
         estimated_cost: 0,
         actual_cost: 0,
-        estimated_impact: 0,
-        actual_impact: 0,
         position: 0,
         business_context: '{}',
         timeline_label: '',

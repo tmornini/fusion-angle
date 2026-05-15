@@ -1,2 +1,67 @@
 <div id="organization-content">
 </div>
+
+<div id="objectives-box"></div>
+
+<!-- Add Objective dialog -->
+<div id="add-objective-backdrop"
+    class="dialog-backdrop hidden"></div>
+<div id="add-objective-dialog"
+    class="dialog hidden" aria-hidden="true">
+    <h3>Add objective</h3>
+    <label>Name<input id="add-obj-name"
+        type="text"></label>
+    <label>Description<textarea
+        id="add-obj-description"></textarea></label>
+    <div class="dialog-actions">
+        <button
+            data-action="cancel-add-objective">
+            Cancel
+        </button>
+        <button
+            data-action="confirm-add-objective"
+            class="btn-primary">Add</button>
+    </div>
+</div>
+
+<!-- Edit Objective dialog -->
+<div id="edit-objective-backdrop"
+    class="dialog-backdrop hidden"></div>
+<div id="edit-objective-dialog"
+    class="dialog hidden" aria-hidden="true">
+    <h3>Edit objective</h3>
+    <input id="edit-obj-id" type="hidden">
+    <label>Name<input id="edit-obj-name"
+        type="text"></label>
+    <label>Description<textarea
+        id="edit-obj-description"></textarea></label>
+    <div class="dialog-actions">
+        <button
+            data-action="cancel-edit-objective">
+            Cancel
+        </button>
+        <button
+            data-action="confirm-edit-objective"
+            class="btn-primary">Save</button>
+    </div>
+</div>
+
+<!-- Confirm-deprecate dialog -->
+<div id="confirm-deprecate-backdrop"
+    class="dialog-backdrop hidden"></div>
+<div id="confirm-deprecate-dialog"
+    class="dialog hidden" aria-hidden="true">
+    <h3>Deprecate objective?</h3>
+    <input id="confirm-deprecate-id" type="hidden">
+    <p>The objective stops appearing in active
+        rosters but its historical scores remain
+        visible.</p>
+    <div class="dialog-actions">
+        <button
+            data-action="cancel-confirm-deprecate">
+            Cancel
+        </button>
+        <button data-action="confirm-deprecate"
+            class="btn-primary">Deprecate</button>
+    </div>
+</div>

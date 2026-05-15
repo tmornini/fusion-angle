@@ -9,9 +9,12 @@ import {
     createRequestContext,
     getProjectRows,
     getProjects,
+    getProjectsScoreColumn,
     putProject,
     isProjectStatus,
     subscribeProjectChanges,
+    subscribeProjectScoreChanges,
+    subscribeObjectiveChanges,
     type ProjectStatus,
     type ProjectEntity,
 } from '../app/adapters/index.ts';
@@ -29,26 +32,41 @@ import {
 const pageAbort = new AbortController();
 const signal = pageAbort.signal;
 
+type ScoreRow = Awaited<
+    ReturnType<typeof getProjectsScoreColumn>
+>[number];
+
 let projectState: ProjectListState | null = null;
 let projectEntities:
     Map<string, ProjectEntity> = new Map();
+let scoreMap: Map<string, ScoreRow> = new Map();
 let projectListEl: HTMLElement | null = null;
 let projectBadgesEl: HTMLElement | null = null;
 
 async function loadProjectsAndEntities(
     ctx: ReturnType<typeof createRequestContext>,
 ): Promise<{
-    projects: Awaited<ReturnType<typeof getProjects>>;
+    projects: Awaited<
+        ReturnType<typeof getProjects>
+    >;
     entities: Map<string, ProjectEntity>;
+    scores: Map<string, ScoreRow>;
 }> {
-    const [rows, projects] = await Promise.all([
-        getProjectRows(ctx),
-        getProjects(ctx),
-    ]);
+    const [rows, projects, scoreColumn] =
+        await Promise.all([
+            getProjectRows(ctx),
+            getProjects(ctx),
+            getProjectsScoreColumn(ctx),
+        ]);
     return {
         projects,
         entities: new Map(
             rows.map(r => [r.id, r]),
+        ),
+        scores: new Map(
+            scoreColumn.map(
+                s => [s.projectId, s],
+            ),
         ),
     };
 }
@@ -85,6 +103,7 @@ export async function init(): Promise<void> {
             loaded.projects,
         );
     projectEntities = loaded.entities;
+    scoreMap = loaded.scores;
     projectListEl = listEl;
     projectBadgesEl = $(
         '#status-badges', document,
@@ -115,6 +134,29 @@ export async function init(): Promise<void> {
             projectState, refreshed.projects,
         );
         projectEntities = refreshed.entities;
+        scoreMap = refreshed.scores;
+        rerenderProjects();
+    });
+
+    subscribeProjectScoreChanges(async () => {
+        if (!projectListEl) return;
+        const col = await getProjectsScoreColumn(
+            createRequestContext(),
+        );
+        scoreMap = new Map(
+            col.map(s => [s.projectId, s]),
+        );
+        rerenderProjects();
+    });
+
+    subscribeObjectiveChanges(async () => {
+        if (!projectListEl) return;
+        const col = await getProjectsScoreColumn(
+            createRequestContext(),
+        );
+        scoreMap = new Map(
+            col.map(s => [s.projectId, s]),
+        );
         rerenderProjects();
     });
 
@@ -139,8 +181,9 @@ export async function init(): Promise<void> {
 
 function rerenderProjects(): void {
     if (!projectState || !projectListEl) return;
-    const presenter =
-        new ProjectListPresenter(projectState);
+    const presenter = new ProjectListPresenter(
+        projectState, scoreMap,
+    );
     if (projectBadgesEl) {
         presenter.renderBadges(projectBadgesEl);
     }

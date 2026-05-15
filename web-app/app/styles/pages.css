@@ -2352,6 +2352,215 @@ svg.flow-stats-canvas
   color: hsl(var(--muted-foreground));
 }
 
+/* ==========================================
+   49. PORTFOLIO IMPACT GAUGE
+   ========================================== */
+
+.portfolio-impact-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1.2em 1em;
+}
+
+.portfolio-impact-header {
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+  align-self: flex-start;
+  margin-bottom: 0.8em;
+}
+
+.portfolio-impact-header .icon-box {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.portfolio-impact-header
+    .icon-box[data-tone='positive'] {
+  background: hsl(var(--success) / 0.12);
+  color: hsl(var(--success));
+}
+
+.portfolio-impact-header
+    .icon-box[data-tone='negative'] {
+  background: hsl(var(--destructive) / 0.12);
+  color: hsl(var(--destructive));
+}
+
+.portfolio-impact-header
+    .icon-box[data-tone='neutral'] {
+  background: hsl(var(--muted) / 0.10);
+  opacity: 0.6;
+}
+
+.portfolio-impact-svg
+    .portfolio-impact-bg-outer,
+.portfolio-impact-svg
+    .portfolio-impact-bg-inner {
+  stroke: hsl(var(--foreground) / 0.10);
+  stroke-width: 14;
+}
+
+.portfolio-impact-svg
+    .portfolio-impact-tdc {
+  stroke: hsl(var(--foreground) / 0.55);
+  stroke-width: 1.5;
+}
+
+.portfolio-impact-arc-outer,
+.portfolio-impact-arc-inner {
+  stroke-width: 14;
+}
+
+.portfolio-impact-arc-outer[data-tone='positive'],
+.portfolio-impact-arc-inner[data-tone='positive'] {
+  stroke: hsl(var(--success));
+}
+
+.portfolio-impact-arc-outer[data-tone='negative'],
+.portfolio-impact-arc-inner[data-tone='negative'] {
+  stroke: hsl(var(--destructive));
+}
+
+.portfolio-impact-legend {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.8em;
+  margin-top: 0.6em;
+  text-align: center;
+  width: 100%;
+}
+
+.legend-dot[data-tone='positive'] {
+  background: hsl(var(--success));
+}
+
+.legend-dot[data-tone='negative'] {
+  background: hsl(var(--destructive));
+}
+
+.legend-dot[data-tone='neutral'] {
+  background: hsl(var(--muted));
+}
+
+/* ==========================================
+   50. SCORE / MEASUREMENT MODAL
+   ========================================== */
+
+.score-modal-body,
+.measurement-modal-body {
+  padding: 1.2em;
+  min-width: 480px;
+}
+
+.score-slider-row,
+.measurement-slider-row {
+  display: grid;
+  grid-template-columns: 200px 1fr 60px;
+  align-items: center;
+  gap: 0.6em;
+  padding: 0.6em 0;
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+.score-slider-row:last-of-type,
+.measurement-slider-row:last-of-type {
+  border-bottom: none;
+}
+
+.score-slider-label strong {
+  display: block;
+}
+
+.score-slider-desc,
+.measurement-caption {
+  display: block;
+  font-size: 0.85em;
+  opacity: 0.7;
+}
+
+.score-slider {
+  width: 100%;
+}
+
+.score-slider.unset {
+  opacity: 0.4;
+}
+
+.score-hint {
+  grid-column: 1 / -1;
+  font-size: 0.85em;
+  color: hsl(var(--warning));
+  margin-top: 0.2em;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6em;
+  margin-top: 1em;
+}
+
+/* ==========================================
+   51. ORG OBJECTIVES BOX
+   ========================================== */
+
+.org-objectives-box {
+  padding: 1em;
+}
+
+.org-objectives-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.8em;
+}
+
+.objective-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.objective-list-divider {
+  margin: 1em 0 0.4em;
+  font-size: 0.85em;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.6;
+}
+
+/* ==========================================
+   52. PROJECT HISTORY MODAL
+   ========================================== */
+
+.score-history-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.score-history-table th,
+.score-history-table td {
+  text-align: left;
+  padding: 0.4em 0.6em;
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+.score-history-table td[data-tone="negative"] {
+  color: hsl(var(--destructive));
+}
+
+.score-history-table td[data-tone="positive"] {
+  color: hsl(var(--success));
+}
+
+/* data-tone="neutral" inherits default text color */
+
 /* Below 768px the card becomes a bottom sheet with a */
 /* drag-handle affordance (pure decoration, ::before).  */
 @media (max-width: 767px) {

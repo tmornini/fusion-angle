@@ -25,10 +25,28 @@ import {
     createRequestContext,
     type RequestContext,
     type ProjectEntity,
+    getProjectScoring,
+    postProjectBaselineScoring,
+    postProjectActualMeasurement,
+    subscribeProjectScoreChanges,
+    getActiveObjectives,
+    getCurrentObjectiveDefinition,
+    getDeprecatedObjectiveIds,
+    getObjectiveRevisions,
+    subscribeObjectiveChanges,
+    postProjectApproval,
+    postProjectCompletion,
+    validateProjectForApproval,
+    validateProjectForCompletion,
 } from '../app/adapters/index.ts';
 import type {
     FlowListItem,
 } from '../app/adapters/index.ts';
+import type {
+    ObjectiveRevision,
+    DeprecatedObjective,
+} from '../../api/types.ts';
+import { latestPerPair } from '../app/scoring-format.ts';
 import {
     ProjectDetailPresenter,
     ProjectDetailEditPresenter,
@@ -36,6 +54,11 @@ import {
     projectPatchFromDraft,
     type ProjectFieldKey,
     type ProjectDraftFields,
+    ProjectActionBarPresenter,
+    ProjectObjectivesPresenter,
+    ScoreModalPresenter,
+    MeasurementModalPresenter,
+    ProjectScoreHistoryPresenter,
 } from '../app/presenters/index.ts';
 
 const pageAbort = new AbortController();
@@ -59,12 +82,13 @@ type PageState =
 let state: PageState | null = null;
 let pageContainer:
     HTMLElement | null = null;
+let currentProjectId: string | null = null;
 
 const FIELDS: ReadonlySet<ProjectFieldKey> =
     new Set([
         'title', 'description', 'status',
         'startDate', 'targetEndDate',
-        'costBaseline', 'impactBaseline',
+        'costBaseline',
     ]);
 
 const SUBMIT_ON_ENTER_IDS:
@@ -131,6 +155,7 @@ export async function init(
         navigateTo('projects');
         return;
     }
+    currentProjectId = projectId;
 
     const container = $(
         '#project-detail-content', document,
@@ -202,7 +227,248 @@ export async function init(
             flows: updFlows,
         };
         rerender();
+        void renderActionBarAndObjectives();
     });
+
+    subscribeProjectScoreChanges(
+        () => void renderActionBarAndObjectives(),
+    );
+    subscribeObjectiveChanges(
+        () => void renderActionBarAndObjectives(),
+    );
+
+    await renderActionBarAndObjectives();
+
+    $('#project-action-bar', document)!
+        .addEventListener(
+        'click',
+        async (e) => {
+            const action =
+                (e.target as HTMLElement)
+                    .closest('[data-action]')
+                    ?.getAttribute('data-action');
+            const ctx = createRequestContext();
+            if (action === 'score') {
+                await openScoreModal(
+                    ctx, projectId,
+                );
+            } else if (action === 'approve') {
+                openApproveConfirmation();
+            } else if (
+                action === 'log-measurement'
+            ) {
+                await openMeasurementModal(
+                    ctx, projectId,
+                );
+            } else if (action === 'complete') {
+                openCompleteConfirmation();
+            } else if (
+                action === 'view-history'
+            ) {
+                await openHistoryModal(
+                    ctx, projectId,
+                );
+            }
+        },
+        { signal },
+    );
+
+    $('#score-dialog', document)!.addEventListener(
+        'click',
+        async (e) => {
+            const action =
+                (e.target as HTMLElement)
+                    .closest('[data-action]')
+                    ?.getAttribute('data-action');
+            if (action === 'cancel') {
+                closeDialog('score');
+            } else if (
+                action === 'save-baselines'
+            ) {
+                const ctx = createRequestContext();
+                const moved: {
+                    objectiveId: string;
+                    score: number;
+                }[] = [];
+                const rows =
+                    document.querySelectorAll(
+                        '#score-modal-body'
+                        + ' .score-slider-row',
+                    );
+                rows.forEach(row => {
+                    const initial = Number(
+                        row.getAttribute(
+                            'data-initial-value',
+                        ),
+                    );
+                    const unset =
+                        row.getAttribute(
+                            'data-unset',
+                        ) === 'true';
+                    const objectiveId =
+                        row.getAttribute(
+                            'data-objective-id',
+                        )!;
+                    const slider =
+                        row.querySelector(
+                            'input[type="range"]',
+                        ) as HTMLInputElement;
+                    const value =
+                        Number(slider.value);
+                    const touched =
+                        (slider as HTMLElement & {
+                            dataset: DOMStringMap;
+                        }).dataset.touched ===
+                        'true';
+                    if (
+                        value !== initial
+                        || (unset && touched)
+                    ) {
+                        moved.push({
+                            objectiveId,
+                            score: value,
+                        });
+                    }
+                });
+                if (moved.length > 0) {
+                    await postProjectBaselineScoring(
+                        ctx, projectId, moved,
+                    );
+                }
+                closeDialog('score');
+            }
+        },
+        { signal },
+    );
+
+    $('#measurement-dialog', document)!
+        .addEventListener(
+        'click',
+        async (e) => {
+            const action =
+                (e.target as HTMLElement)
+                    .closest('[data-action]')
+                    ?.getAttribute('data-action');
+            if (action === 'cancel') {
+                closeDialog('measurement');
+            } else if (
+                action === 'save-measurement'
+            ) {
+                const ctx = createRequestContext();
+                const moved: {
+                    objectiveId: string;
+                    score: number;
+                }[] = [];
+                const rows =
+                    document.querySelectorAll(
+                        '#measurement-modal-body'
+                        + ' .measurement-slider-row',
+                    );
+                rows.forEach(row => {
+                    const initial = Number(
+                        row.getAttribute(
+                            'data-initial-value',
+                        ),
+                    );
+                    const objectiveId =
+                        row.getAttribute(
+                            'data-objective-id',
+                        )!;
+                    const slider =
+                        row.querySelector(
+                            'input[type="range"]',
+                        ) as HTMLInputElement;
+                    const value =
+                        Number(slider.value);
+                    if (value !== initial) {
+                        moved.push({
+                            objectiveId,
+                            score: value,
+                        });
+                    }
+                });
+                if (moved.length > 0) {
+                    await postProjectActualMeasurement(
+                        ctx, projectId, moved,
+                    );
+                }
+                closeDialog('measurement');
+            }
+        },
+        { signal },
+    );
+
+    $('#approve-dialog', document)!.addEventListener(
+        'click',
+        async (e) => {
+            const action =
+                (e.target as HTMLElement)
+                    .closest('[data-action]')
+                    ?.getAttribute('data-action');
+            if (action === 'cancel-approve') {
+                closeDialog('approve');
+            } else if (
+                action === 'confirm-approve'
+            ) {
+                const ctx = createRequestContext();
+                try {
+                    await postProjectApproval(
+                        ctx, projectId,
+                    );
+                    closeDialog('approve');
+                } catch (err) {
+                    const message =
+                        err instanceof Error
+                            ? err.message
+                            : String(err);
+                    showToast(message, 'error');
+                    closeDialog('approve');
+                    throw err;
+                }
+            }
+        },
+        { signal },
+    );
+
+    $('#complete-dialog', document)!
+        .addEventListener(
+        'click',
+        async (e) => {
+            const action =
+                (e.target as HTMLElement)
+                    .closest('[data-action]')
+                    ?.getAttribute('data-action');
+            if (action === 'cancel-complete') {
+                closeDialog('complete');
+            } else if (
+                action === 'confirm-complete'
+            ) {
+                const ctx = createRequestContext();
+                try {
+                    await postProjectCompletion(
+                        ctx, projectId,
+                    );
+                    closeDialog('complete');
+                } catch (err) {
+                    const message =
+                        err instanceof Error
+                            ? err.message
+                            : String(err);
+                    showToast(message, 'error');
+                    closeDialog('complete');
+                    throw err;
+                }
+            }
+        },
+        { signal },
+    );
+
+    $('#history-backdrop', document)!
+        .addEventListener(
+        'click',
+        () => closeDialog('history'),
+        { signal },
+    );
 }
 
 function bindStableListeners(
@@ -481,4 +747,250 @@ async function handleNewFlowSubmit(
     navigateTo('flow-detail', {
         flowId, projectId,
     });
+}
+
+async function renderActionBarAndObjectives(
+): Promise<void> {
+    const pid = currentProjectId;
+    if (!pid) return;
+    const ctx = createRequestContext();
+    const [project, active, scoring] =
+        await Promise.all([
+            ctx.GET<ProjectEntity>(
+                `projects/${pid}`,
+            ),
+            getActiveObjectives(ctx),
+            getProjectScoring(ctx, pid),
+        ]);
+    const defs = new Map<string, {
+        name: string; description: string;
+    }>();
+    for (const o of active) {
+        defs.set(
+            o.id,
+            await getCurrentObjectiveDefinition(
+                ctx, o.id,
+            ),
+        );
+    }
+    const latestBaselines = latestPerPair(
+        scoring.baseline,
+    );
+    const latestActuals = latestPerPair(
+        scoring.actual,
+    );
+
+    const approvalCheck = validateProjectForApproval(
+        project, active, latestBaselines,
+    );
+    const completionCheck =
+        validateProjectForCompletion(
+            project, latestBaselines, latestActuals,
+        );
+
+    const actionBar = new ProjectActionBarPresenter(
+        project, approvalCheck, completionCheck,
+    );
+    const actionBarEl =
+        $('#project-action-bar', document);
+    if (actionBarEl) {
+        setHtml(actionBarEl, actionBar.buildBar());
+    }
+
+    const objSection = new ProjectObjectivesPresenter(
+        active, defs, latestBaselines, latestActuals,
+    );
+    const objEl =
+        $('#project-objectives-section', document);
+    if (objEl) {
+        setHtml(objEl, objSection.buildSection());
+    }
+}
+
+async function openScoreModal(
+    ctx: RequestContext,
+    projectId: string,
+): Promise<void> {
+    const [project, active, scoring] =
+        await Promise.all([
+            ctx.GET<ProjectEntity>(
+                `projects/${projectId}`,
+            ),
+            getActiveObjectives(ctx),
+            getProjectScoring(ctx, projectId),
+        ]);
+    const defs = new Map<string, {
+        name: string; description: string;
+    }>();
+    for (const o of active) {
+        defs.set(
+            o.id,
+            await getCurrentObjectiveDefinition(
+                ctx, o.id,
+            ),
+        );
+    }
+    const presenter = new ScoreModalPresenter(
+        project, active, defs, scoring.baseline,
+    );
+    const bodyEl = $('#score-modal-body', document);
+    if (bodyEl) {
+        setHtml(bodyEl, presenter.buildBody());
+    }
+
+    const dialog = $('#score-dialog', document)!;
+    const onInput = (e: Event) => {
+        const t = e.target as HTMLElement;
+        if (t.matches('input[type="range"]')) {
+            (t as HTMLElement & {
+                dataset: DOMStringMap;
+            }).dataset.touched = 'true';
+        }
+    };
+    dialog.addEventListener('input', onInput);
+    const cleanupOnClose = () =>
+        dialog.removeEventListener(
+            'input', onInput,
+        );
+    dialog.addEventListener(
+        'close', cleanupOnClose, { once: true },
+    );
+
+    openDialog('score');
+}
+
+async function openMeasurementModal(
+    ctx: RequestContext,
+    projectId: string,
+): Promise<void> {
+    const [project, scoring] = await Promise.all([
+        ctx.GET<ProjectEntity>(
+            `projects/${projectId}`,
+        ),
+        getProjectScoring(ctx, projectId),
+    ]);
+    const defs = new Map<string, {
+        name: string; description: string;
+    }>();
+    const baselineObjIds = new Set(
+        latestPerPair(scoring.baseline)
+            .map(b => b.objective_id),
+    );
+    for (const objId of baselineObjIds) {
+        defs.set(
+            objId,
+            await getCurrentObjectiveDefinition(
+                ctx, objId,
+            ),
+        );
+    }
+    const presenter = new MeasurementModalPresenter(
+        project, defs,
+        scoring.baseline, scoring.actual,
+    );
+    const bodyEl =
+        $('#measurement-modal-body', document);
+    if (bodyEl) {
+        setHtml(bodyEl, presenter.buildBody());
+    }
+    openDialog('measurement');
+}
+
+function openApproveConfirmation(): void {
+    const msgEl =
+        $('#approve-message', document);
+    if (msgEl) {
+        msgEl.textContent =
+            'Approve this project? This action '
+            + 'records the baseline scores as '
+            + 'final and marks the project as '
+            + 'approved.';
+    }
+    openDialog('approve');
+}
+
+function openCompleteConfirmation(): void {
+    const msgEl =
+        $('#complete-message', document);
+    if (msgEl) {
+        msgEl.textContent =
+            'Mark this project as completed? '
+            + 'Every baseline-scored objective '
+            + 'must have at least one actual '
+            + 'measurement.';
+    }
+    openDialog('complete');
+}
+
+async function openHistoryModal(
+    ctx: RequestContext,
+    projectId: string,
+): Promise<void> {
+    const scoring = await getProjectScoring(
+        ctx, projectId,
+    );
+    const baselineObjIds = new Set(
+        scoring.baseline.map(b => b.objective_id),
+    );
+    for (const a of scoring.actual) {
+        baselineObjIds.add(a.objective_id);
+    }
+    const revisions: ObjectiveRevision[] = [];
+    const deprecations: DeprecatedObjective[] = [];
+    const deprecatedIds =
+        await getDeprecatedObjectiveIds(ctx);
+    for (const objId of baselineObjIds) {
+        const revs = await getObjectiveRevisions(
+            ctx, objId,
+        );
+        revisions.push(...revs);
+        if (deprecatedIds.has(objId)) {
+            const t =
+                await ctx.GET<DeprecatedObjective>(
+                    `deprecated-objectives/${objId}`,
+                );
+            deprecations.push(t);
+        }
+    }
+    const revsByObj = new Map<
+        string, ObjectiveRevision[]
+    >();
+    for (const r of revisions) {
+        const arr =
+            revsByObj.get(r.objective_id) ?? [];
+        arr.push(r);
+        revsByObj.set(r.objective_id, arr);
+    }
+    const resolver = (
+        objId: string, atTime: string,
+    ) => {
+        const arr =
+            revsByObj.get(objId) ?? [];
+        const eligible = arr.filter(
+            r => r.revised_at <= atTime,
+        );
+        if (eligible.length === 0) {
+            return undefined;
+        }
+        eligible.sort((a, b) =>
+            b.revised_at.localeCompare(
+                a.revised_at,
+            ),
+        );
+        return {
+            name: eligible[0]!.name,
+            description: eligible[0]!.description,
+        };
+    };
+    const presenter =
+        new ProjectScoreHistoryPresenter(
+            scoring.baseline, scoring.actual,
+            revisions, deprecations, resolver,
+        );
+    const bodyEl =
+        $('#history-modal-body', document);
+    if (bodyEl) {
+        setHtml(bodyEl, presenter.buildBody());
+    }
+    openDialog('history');
 }

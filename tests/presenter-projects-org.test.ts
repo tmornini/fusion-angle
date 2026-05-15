@@ -108,7 +108,6 @@ function makeProject(overrides: {
         | 'declined' | 'completed' | 'deleted';
     progress?: number;
     estimatedCost?: number;
-    estimatedImpact?: number;
     position?: number;
 }) {
     return new Project({
@@ -125,9 +124,6 @@ function makeProject(overrides: {
         estimated_cost:
             overrides.estimatedCost ?? 50000,
         actual_cost: 25000,
-        estimated_impact:
-            overrides.estimatedImpact ?? 80,
-        actual_impact: 40,
         position: overrides.position ?? 0,
         business_context: jsonObjectField({}),
         timeline_label: '',
@@ -262,13 +258,11 @@ test(
 
 test(
     'ProjectDetailPresenter renders the absent'
-    + ' placeholder for zero-valued cost and'
-    + ' impact baselines',
+    + ' placeholder for zero-valued cost baseline',
     () => {
         const view = new ProjectView(
             makeProject({
                 estimatedCost: 0,
-                estimatedImpact: 0,
             }),
         );
         const rec = makeRecordingContainer();

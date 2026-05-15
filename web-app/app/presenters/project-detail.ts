@@ -3,7 +3,7 @@ import {
 } from '../safe-html.ts';
 import { $required } from '../dom.ts';
 import {
-    iconTrendingUp, iconClock,
+    iconClock,
     iconDollarSign,
     iconCalendar, iconTarget,
     iconCheckCircle2,
@@ -38,7 +38,6 @@ export interface ProjectDraftFields {
     startDate: string;
     targetEndDate: string;
     costBaseline: string;
-    impactBaseline: string;
 }
 
 export type ProjectFieldKey =
@@ -51,8 +50,7 @@ export type ProjectEntityPatch =
         | 'status'
         | 'start_date'
         | 'target_end_date'
-        | 'estimated_cost'
-        | 'estimated_impact'>;
+        | 'estimated_cost'>;
 
 export function projectDraftFromView(
     view: ProjectView,
@@ -69,9 +67,6 @@ export function projectDraftFromView(
         ),
         costBaseline: String(
             view.costBaselineK(),
-        ),
-        impactBaseline: String(
-            view.impactBaseline(),
         ),
     };
 }
@@ -95,8 +90,6 @@ export function projectPatchFromDraft(
         estimated_cost:
             Number(draft.costBaseline)
             * COST_DIVISOR,
-        estimated_impact:
-            Number(draft.impactBaseline),
     };
 }
 
@@ -614,17 +607,6 @@ function buildReadonlyMetrics(
             prefix: '$',
             isLowerBetter: true,
         },
-        {
-            label: 'Impact',
-            inputId: 'impact',
-            field: 'impactBaseline',
-            icon: iconTrendingUp,
-            baseline: view.impactBaseline(),
-            current: view.impactCurrent(),
-            unit: ' pts',
-            prefix: '',
-            isLowerBetter: false,
-        },
     ];
     return html`
         <div class="card p-6">
@@ -683,18 +665,6 @@ function buildEditableMetrics(
             unit: 'k',
             prefix: '$',
             isLowerBetter: true,
-        },
-        {
-            label: 'Impact',
-            inputId: 'impact',
-            field: 'impactBaseline',
-            icon: iconTrendingUp,
-            baseline:
-                Number(draft.impactBaseline),
-            current: view.impactCurrent(),
-            unit: ' pts',
-            prefix: '',
-            isLowerBetter: false,
         },
     ];
     return html`

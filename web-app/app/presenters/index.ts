@@ -108,3 +108,27 @@ export {
     FlowStatsPresenter,
     type FlowStatsUi,
 } from './flow-stats.ts';
+export {
+    OrganizationObjectivesPresenter,
+} from './organization-objectives.ts';
+export {
+    ProjectActionBarPresenter,
+} from './project-action-bar.ts';
+export {
+    ScoreModalPresenter,
+} from './score-modal.ts';
+export {
+    MeasurementModalPresenter,
+} from './measurement-modal.ts';
+export {
+    ProjectObjectivesPresenter,
+} from './project-objectives.ts';
+export {
+    ProjectScoreHistoryPresenter,
+} from './project-score-history.ts';
+export {
+    PortfolioImpactPresenter,
+} from './portfolio-impact.ts';
+export {
+    DashboardObjectiveAggregatesPresenter,
+} from './dashboard-objective-aggregates.ts';

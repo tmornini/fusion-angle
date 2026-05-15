@@ -1,0 +1,140 @@
+import { test } from 'node:test';
+import { strict as assert } from 'node:assert';
+
+// ProjectScoreHistoryPresenter imports from
+// ../core.ts, whose module init reads theme/sidebar
+// from localStorage via state.ts. Stubs must land
+// before the dynamic import pulls in the presenter.
+
+const g = globalThis as Record<string, unknown>;
+g['localStorage'] = {
+    getItem: () => null,
+    setItem: () => {},
+    removeItem: () => {},
+};
+g['window'] = {
+    matchMedia: () => ({
+        matches: false,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+    }),
+    addEventListener: () => {},
+};
+g['document'] = { addEventListener: () => {} };
+
+const { ProjectScoreHistoryPresenter } = await import(
+    '../web-app/app/presenters/project-score-history.ts'
+);
+
+const baselines = [
+    { id: 'b1',
+      project_id: 'p1', objective_id: 'o1',
+      score: 50, scored_at: '2026-03-01T14:23:00.000Z' },
+    { id: 'b2',
+      project_id: 'p1', objective_id: 'o1',
+      score: 40, scored_at: '2026-03-05T09:10:00.000Z' },
+];
+const actuals = [
+    { id: 'a1',
+      project_id: 'p1', objective_id: 'o1',
+      score: 45, scored_at: '2026-04-01T16:45:00.000Z' },
+];
+const revisions = [
+    { id: 'r1',
+      objective_id: 'o1', name: 'Increase Revenue',
+      description: 'd1',
+      revised_at: '2026-02-01T00:00:00.000Z' },
+    { id: 'r2',
+      objective_id: 'o1', name: 'Drive Growth',
+      description: 'd2',
+      revised_at: '2026-03-18T11:02:00.000Z' },
+];
+const deprecations: { id: string; objective_id: string;
+    deprecated_at: string }[] = [];
+
+function resolver(objId: string, atTime: string) {
+    const eligible = revisions
+        .filter(r => r.revised_at <= atTime);
+    if (eligible.length === 0) return undefined;
+    eligible.sort((a, b) =>
+        b.revised_at.localeCompare(a.revised_at));
+    return {
+        name: eligible[0]!.name,
+        description: eligible[0]!.description,
+    };
+}
+
+test('merges all four streams chronologically', () => {
+    const p = new ProjectScoreHistoryPresenter(
+        baselines, actuals, revisions, deprecations,
+        resolver,
+    );
+    const html = p.buildBody().toString();
+    const positions = [
+        html.indexOf('2026-02-01'),
+        html.indexOf('2026-03-01'),
+        html.indexOf('2026-03-05'),
+        html.indexOf('2026-03-18'),
+        html.indexOf('2026-04-01'),
+    ];
+    for (let i = 1; i < positions.length; i++) {
+        assert.ok(positions[i]! > positions[i - 1]!,
+            'events out of order at index ' + i);
+    }
+});
+
+test('resolves historical objective name at each event',
+    () => {
+        const p = new ProjectScoreHistoryPresenter(
+            baselines, actuals, revisions, deprecations,
+            resolver,
+        );
+        const html = p.buildBody().toString();
+        const marchOnePos = html.indexOf('2026-03-01');
+        const aprilOnePos = html.indexOf('2026-04-01');
+        const incrRevPos = html.indexOf('Increase Revenue');
+        const driveGrowthPos = html.indexOf('Drive Growth');
+        assert.ok(
+            incrRevPos > marchOnePos
+                && incrRevPos < aprilOnePos,
+            'March score should render under '
+                + '"Increase Revenue"',
+        );
+        assert.ok(driveGrowthPos > aprilOnePos,
+            'April score should render under "Drive Growth"');
+    });
+
+test('positive score TD carries data-tone="positive"', () => {
+    const p = new ProjectScoreHistoryPresenter(
+        [{ id: 'b1', project_id: 'p1', objective_id: 'o1',
+            score: 40,
+            scored_at: '2026-03-05T09:10:00.000Z' }],
+        [], revisions, deprecations, resolver,
+    );
+    const html = p.buildBody().toString();
+    assert.match(html,
+        /<td data-tone="positive">\+40<\/td>/);
+});
+
+test('negative score TD carries data-tone="negative"', () => {
+    const p = new ProjectScoreHistoryPresenter(
+        [], [{ id: 'a1', project_id: 'p1',
+            objective_id: 'o1', score: -50,
+            scored_at: '2026-04-01T16:45:00.000Z' }],
+        revisions, deprecations, resolver,
+    );
+    const html = p.buildBody().toString();
+    assert.match(html,
+        /<td data-tone="negative">−50<\/td>/);
+});
+
+test('zero score TD carries data-tone="neutral"', () => {
+    const p = new ProjectScoreHistoryPresenter(
+        [{ id: 'b1', project_id: 'p1', objective_id: 'o1',
+            score: 0,
+            scored_at: '2026-03-05T09:10:00.000Z' }],
+        [], revisions, deprecations, resolver,
+    );
+    const html = p.buildBody().toString();
+    assert.match(html, /<td data-tone="neutral">0<\/td>/);
+});

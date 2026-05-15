@@ -54,14 +54,9 @@ export async function getDashboardGauges(
     let sumCurrentDays = 0;
     let sumEstimatedCost = 0;
     let sumActualCost = 0;
-    let sumEstimatedImpact = 0;
-    let sumActualImpact = 0;
     for (const p of projects) {
         sumEstimatedCost += p.estimated_cost;
         sumActualCost += p.actual_cost;
-        sumEstimatedImpact +=
-            p.estimated_impact;
-        sumActualImpact += p.actual_impact;
         const start = new Date(
             p.start_date,
         ).getTime();
@@ -90,10 +85,6 @@ export async function getDashboardGauges(
         Math.ceil(sumEstimatedCost);
     const actCost =
         Math.ceil(sumActualCost);
-    const maxImpact = Math.max(
-        sumEstimatedImpact,
-        sumActualImpact,
-    );
 
     return [
         {
@@ -141,29 +132,6 @@ export async function getDashboardGauges(
                     ),
             },
             isOverrunning: true,
-        },
-        {
-            title: 'Impact',
-            icon: 'zap',
-            iconCssClass: 'text-warning',
-            theme: 'amber',
-            outer: {
-                value: sumEstimatedImpact,
-                max: maxImpact,
-                label: 'Baseline',
-                display:
-                    `${sumEstimatedImpact}`
-                    + ` pts`,
-            },
-            inner: {
-                value: sumActualImpact,
-                max: maxImpact,
-                label: 'Current',
-                display:
-                    `${sumActualImpact}`
-                    + ` pts`,
-            },
-            isOverrunning: false,
         },
     ];
 }

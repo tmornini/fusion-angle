@@ -66,8 +66,6 @@ function buildProject(
         actual_duration: 0,
         estimated_cost: 1000,
         actual_cost: 500,
-        estimated_impact: 10,
-        actual_impact: 4,
         position: 1,
         business_context: '{}' as JsonObjectField,
         timeline_label: '',
@@ -205,17 +203,17 @@ test(
 );
 
 test(
-    'getDashboardGauges returns Time, Cost, Impact',
+    'getDashboardGauges returns Time and Cost',
     async () => {
         const { ctx } = setupDb();
         const gauges = await getDashboardGauges(ctx);
         assert.deepEqual(
             gauges.map(g => g.title),
-            ['Time', 'Cost', 'Impact'],
+            ['Time', 'Cost'],
         );
         assert.deepEqual(
             gauges.map(g => g.icon),
-            ['clock', 'dollarSign', 'zap'],
+            ['clock', 'dollarSign'],
         );
     },
 );
@@ -227,12 +225,8 @@ test(
         const gauges = await getDashboardGauges(ctx);
         const cost = gauges
             .find(g => g.title === 'Cost');
-        const impact = gauges
-            .find(g => g.title === 'Impact');
         assert.equal(cost?.outer.value, 0);
         assert.equal(cost?.inner.value, 0);
-        assert.equal(impact?.outer.value, 0);
-        assert.equal(impact?.inner.value, 0);
     },
 );
 
@@ -244,16 +238,12 @@ test(
             'p1', 'approved', {
                 estimated_cost: 1000,
                 actual_cost: 400,
-                estimated_impact: 10,
-                actual_impact: 3,
             },
         ));
         await db.projects.put('p2', buildProject(
             'p2', 'approved', {
                 estimated_cost: 2000,
                 actual_cost: 600,
-                estimated_impact: 5,
-                actual_impact: 7,
             },
         ));
         // Not approved: must be ignored.
@@ -261,39 +251,16 @@ test(
             'p3', 'submitted', {
                 estimated_cost: 9000,
                 actual_cost: 9000,
-                estimated_impact: 99,
-                actual_impact: 99,
             },
         ));
         const gauges = await getDashboardGauges(ctx);
         const cost = gauges
             .find(g => g.title === 'Cost');
-        const impact = gauges
-            .find(g => g.title === 'Impact');
         assert.equal(cost?.outer.value, 3000);
         assert.equal(cost?.inner.value, 1000);
-        assert.equal(impact?.outer.value, 15);
-        assert.equal(impact?.inner.value, 10);
     },
 );
 
-test(
-    'getDashboardGauges Impact max is the larger sum',
-    async () => {
-        const { db, ctx } = setupDb();
-        await db.projects.put('p1', buildProject(
-            'p1', 'approved', {
-                estimated_impact: 4,
-                actual_impact: 20,
-            },
-        ));
-        const gauges = await getDashboardGauges(ctx);
-        const impact = gauges
-            .find(g => g.title === 'Impact');
-        assert.equal(impact?.outer.max, 20);
-        assert.equal(impact?.inner.max, 20);
-    },
-);
 
 test(
     'getDashboardGauges Time sums the 10-day span',
@@ -312,3 +279,20 @@ test(
         assert.equal(time?.outer.display, '10d');
     },
 );
+
+test('getDashboardGauges returns exactly two gauges',
+    async () => {
+        const db = new MemoryDbAdapter();
+        const ctx = createRequestContext(db);
+        const gauges = await getDashboardGauges(ctx);
+        assert.equal(gauges.length, 2);
+        const titles = gauges.map(
+            g => g.title.toLowerCase(),
+        );
+        assert.ok(titles.some(t => t.includes('time')));
+        assert.ok(titles.some(t => t.includes('cost')));
+        assert.ok(
+            !titles.some(t => t.includes('impact')),
+            'old impact gauge still present',
+        );
+    });

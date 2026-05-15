@@ -8,15 +8,13 @@ import {
 } from '../../../api/validators.ts';
 import type { RequestContext } from './shared.ts';
 import { shouldShowWorkerHazard } from '../flow-graph.ts';
+import type { ValidationResult } from './validation.ts';
 
 export type FlowProblem =
     | { kind: 'zero_workers'; nodeId: Id }
     | { kind: 'dead_end'; nodeId: Id };
 
-export interface FlowReadiness {
-    ready: boolean;
-    problems: FlowProblem[];
-}
+export type FlowReadiness = ValidationResult<FlowProblem>;
 
 export function validateFlowForCreation(
     flow: FlowEntity,

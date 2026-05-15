@@ -492,11 +492,6 @@ async function performConversion(
                 fields['cost'],
             ),
             actual_cost: 0,
-            estimated_impact: parseFiniteNumber(
-                'impact',
-                fields['impact'],
-            ),
-            actual_impact: 0,
             position: 0,
             business_context:
                 jsonObjectField({}),

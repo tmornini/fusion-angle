@@ -1584,6 +1584,172 @@ feature is implemented.
 
 ---
 
+## K. Objectives & Scoring
+
+Owner agents: Agent-G (K1–K8), Agent-E (K9–K23 + K30),
+Agent-CH (K27–K29). Mutation domain delta:
+
+- Agent-G adds: `objectives`, `objective_revisions`,
+  `deprecated_objectives`
+- Agent-E adds: `project_objective_baseline_scores`,
+  `project_objective_actual_scores`
+- Agent-CH stays read-only
+
+### K1–K8 — Organization Objectives box (Agent-G)
+
+**K1.** Open Organization page; confirm Objectives box
+renders below the existing Overview/Usage/Admin cards with
+5 seeded active objectives in position order. PASS if all
+5 names display.
+
+**K2.** Click `+ Add objective`; confirm modal opens. Enter
+name "Test Objective" and description "Test desc"; click
+Add. PASS if the new objective appears at the bottom of the
+active list.
+
+**K3.** Click `Edit` on an active objective; confirm modal
+opens pre-filled. Change the name; click Save. PASS if the
+list re-renders with the new name.
+
+**K4.** Click `Deprecate` on an active objective; confirm
+dialog opens. Confirm. PASS if the objective moves from
+active to the Deprecated sub-section, with strikethrough.
+
+**K5.** Click `Reactivate` on a deprecated objective; PASS
+if it returns to the active list.
+
+**K6.** Drag an objective to a new position. PASS if the
+new position persists across a page reload.
+
+**K7.** Open an existing project's history modal (created
+in K30). PASS if events that predate a K3 edit display the
+OLD name, not the new one (temporal name resolution).
+
+**K8.** Empty state: wipe localStorage via DevTools
+(Application > Local Storage > Clear All), then navigate
+to the Organization page. PASS if the empty-state copy
+"No objectives yet. Add one to get started." renders
+(or the bootstrap redirects to the snapshots page per the
+existing missing-schema rule). Restore via mock data
+afterward.
+
+### K9–K18 — Project detail action bar + Score + Approve (Agent-E)
+
+**K9.** Open a `submitted` project; confirm action bar shows
+the existing buttons (no Score yet — until status is
+under-review).
+
+**K10.** Transition status to `under-review` via the edit
+form. PASS if `Score` button appears in the action bar.
+
+**K11.** Click `Approve`; PASS if disabled with tooltip
+"N objectives unscored" (matching the count of active
+objectives).
+
+**K12.** Click `Score`; PASS if modal opens with one slider
+per active objective, all rendering visibly unset with
+"Score required" hint.
+
+**K13.** Drag two of the sliders to non-zero values; click
+Save baselines. PASS if modal closes and the read-only
+Objectives section on the page shows two baseline-scored
+rows; Approve button **still** disabled because remaining
+objectives unscored.
+
+**K14.** Reopen Score modal; PASS if previously-set sliders
+are pre-filled with their values; un-set sliders remain
+visibly unset.
+
+**K15.** Drag remaining sliders; save. PASS if Approve
+button enables.
+
+**K16.** Click Approve; confirm dialog opens. Confirm. PASS
+if project status flips to `approved` and the action bar
+re-renders with `Log measurement` / `Complete` / `View
+history` buttons.
+
+**K17.** Verify negative-score path: open a different
+under-review project; in Score modal, drag one slider to
+the far left (-100). Save. PASS if the project history
+modal (open via View history later, once approved) shows
+the negative score in red.
+
+**K18.** Verify "no-payload" save: open Score modal on a
+fully-scored project; don't move any slider; click Save
+baselines. PASS if no new event rows are written (verify
+via console: `localStorage.getItem(
+'fusion-ai:project_objective_baseline_scores')` count
+unchanged).
+
+### K19–K23 — Log measurement + Complete (Agent-E)
+
+**K19.** Open an `approved` project; click `Log measurement`;
+PASS if modal opens with sliders pre-filled with baseline
+values (no prior actuals) and a caption "Baseline: X · Last
+actual: none yet."
+
+**K20.** Drag one slider; click Save measurement. PASS if
+the modal closes and the read-only Objectives section's
+actual column updates for that objective.
+
+**K21.** Click Log measurement again; PASS if the moved
+slider now pre-fills with its latest actual value, caption
+shows "Last actual: ... (date)."
+
+**K22.** Click Complete on an approved project that lacks
+actuals for some objectives; PASS if button is disabled
+with tooltip listing missing objectives.
+
+**K23.** Log measurements for every objective; click
+Complete; confirm. PASS if status flips to `completed`.
+
+### K24–K26 — Projects list Projected Impact column (Agent-E)
+
+**K24.** Open Projects list; PASS if new column "Projected
+Impact" renders for each row. Pre-approval projects with
+no scores show "—"; scored projects show signed value.
+
+**K25.** Sort by Projected Impact descending; PASS if rows
+re-order accordingly (most-positive first).
+
+**K26.** Filter to `under-review` status + sort by Projected
+Impact descending; PASS if the result is the "review queue
+ranked by impact" workflow we designed.
+
+### K27–K29 — Dashboard Portfolio Impact + Aggregates (Agent-CH)
+
+**K27.** Open dashboard; PASS if four cards render: Time,
+Cost, Portfolio Impact (new bipolar arc), Aggregate
+Objectives box (new full-width row below).
+
+**K28.** Inspect the Portfolio Impact gauge. PASS if:
+- The arc has muted background visible at all values
+- For a net-positive portfolio, value arcs sweep right and
+  use green tones
+- For a net-negative portfolio, value arcs sweep left and
+  use red tones
+- The "actual" tick is visually distinct from the baseline
+  area (thinner / different opacity)
+
+**K29.** From another tab, log a measurement on an approved
+project. PASS if the dashboard cards update within ~1
+second (StorageEvent + scoreChanges propagation).
+
+### K30 — Project history modal (Agent-E)
+
+**K30.** Open an approved project's View history modal.
+PASS if:
+- Events render in chronological order
+- Each row shows date, event kind, objective name (as it
+  was at the event's moment), and detail
+- After an objective rename (K3), historical events still
+  display the OLD name; events after the rename show the
+  NEW name
+- Baseline revisions appear as their own event rows (not
+  collapsed)
+
+---
+
 ## J. Teardown
 
 - [ ] **J1** Stop the HTTP server started in A3. PASS: process terminates.

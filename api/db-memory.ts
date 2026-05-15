@@ -1,15 +1,11 @@
-import {
-    EntityNotFound,
-    MissingTableError,
-} from './db.ts';
+import { TABLE_NAMES } from './db.ts';
 import type {
     DbAdapter,
-    DeletedStore,
-    EntityStore,
-    SingletonStore,
+    DeletedStore as IDeletedStore,
+    SingletonStore as ISingletonStore,
+    EntityStore as IEntityStore,
 } from './db.ts';
 import type {
-    Deleted,
     HumanWorkerEntity,
     AIWorkerEntity,
     IdeaEntity,
@@ -32,342 +28,126 @@ import type {
     ProjectObjectiveBaselineScore,
     ProjectObjectiveActualScore,
 } from './types.ts';
-import { nowUtc, type Id } from './types.ts';
+import { MemoryStorageBackend }
+    from './backend-memory.ts';
+import { EntityStore } from './store-entity.ts';
+import { HistoryEntityStore }
+    from './store-history-entity.ts';
+import { SingletonStore } from './store-singleton.ts';
+import { DeletedStore } from './store-deleted.ts';
 
-class MemEntityStore<T extends { id: string }>
-    implements EntityStore<T>
-{
-    readonly #table: string;
-    readonly #data: Map<string, T>;
-    readonly #deleted: MemDeletedStore;
+export class MemoryDbAdapter implements DbAdapter {
+    readonly #backend: MemoryStorageBackend;
 
-    constructor(
-        table: string,
-        data: Map<string, T>,
-        deleted: MemDeletedStore,
-    ) {
-        this.#table = table;
-        this.#data = data;
-        this.#deleted = deleted;
-    }
-
-    async getAll(): Promise<T[]> {
-        const all = [...this.#data.values()];
-        const deletedIds =
-            await this.#deleted.allDeletedIds();
-        return all.filter(
-            r => !deletedIds.has(r.id),
-        );
-    }
-
-    async getById(id: string): Promise<T> {
-        const row = this.#data.get(id);
-        const deletedIds =
-            await this.#deleted.allDeletedIds();
-        if (!row || deletedIds.has(id)) {
-            throw new EntityNotFound(
-                this.#table, id,
-            );
-        }
-        return row;
-    }
-
-    async put(
-        id: string,
-        fields: Omit<T, 'id'>,
-    ): Promise<T> {
-        const next = {
-            ...fields, id,
-        } as unknown as T;
-        this.#data.set(id, next);
-        return next;
-    }
-
-    async delete(id: string): Promise<void> {
-        await this.#deleted.record(id);
-    }
-}
-
-class MemSingletonStore<
-    T extends { id: string },
-> implements SingletonStore<T>
-{
-    readonly #table: string;
-    readonly #data: Map<string, T>;
-
-    constructor(
-        table: string,
-        data: Map<string, T>,
-    ) {
-        this.#table = table;
-        this.#data = data;
-    }
-
-    async get(): Promise<T> {
-        const all = [...this.#data.values()];
-        if (all.length === 0) {
-            throw new EntityNotFound(
-                this.#table, '<singleton>',
-            );
-        }
-        return all[0]!;
-    }
-
-    async put(
-        fields: Omit<T, 'id'>,
-    ): Promise<T> {
-        const existing =
-            [...this.#data.values()][0];
-        const id = existing?.id ?? 'singleton';
-        const next = {
-            ...fields, id,
-        } as unknown as T;
-        this.#data.clear();
-        this.#data.set(id, next);
-        return next;
-    }
-}
-
-class MemDeletedStore implements DeletedStore {
-    readonly #data: Map<string, Deleted>;
-
-    constructor(data: Map<string, Deleted>) {
-        this.#data = data;
-    }
-
-    async isDeleted(id: Id): Promise<boolean> {
-        return this.#data.has(id);
-    }
-
-    async record(id: Id): Promise<void> {
-        this.#data.set(id, {
-            id, deleted_at: nowUtc(),
-        });
-    }
-
-    async allDeletedIds(): Promise<Set<Id>> {
-        return new Set(this.#data.keys());
-    }
-}
-
-interface Tables {
-    workers: Map<string, HumanWorkerEntity>;
-    aiWorkers: Map<string, AIWorkerEntity>;
-    ideas: Map<string, IdeaEntity>;
-    projects: Map<string, ProjectEntity>;
-    activities: Map<string, ActivityEntity>;
-    flows: Map<string, FlowEntity>;
-    flowVersions: Map<
-        string, FlowVersionEntity
-    >;
-    organization: Map<
-        string, OrganizationEntity
-    >;
-    ideaSubmissions: Map<
-        string, IdeaSubmissionEntity
-    >;
-    activityActors: Map<
-        string, ActivityActorEntity
-    >;
-    projectFlows: Map<
-        string, ProjectFlowEntity
-    >;
-    workOrders: Map<string, WorkOrderEntity>;
-    flowWorkOrders: Map<
-        string, FlowWorkOrderEntity
-    >;
-    workOrderTransitions: Map<
-        string, WorkOrderTransitionEntity
-    >;
-    transitionFieldValues: Map<
-        string, TransitionFieldValueEntity
-    >;
-    workOrderClaims: Map<
-        string, WorkOrderClaimEntity
-    >;
-    objectives: Map<string, Objective>;
-    objectiveRevisions: Map<
-        string, ObjectiveRevision
-    >;
-    deprecatedObjectives: Map<
-        string, DeprecatedObjective
-    >;
-    projectObjectiveBaselineScores: Map<
-        string, ProjectObjectiveBaselineScore
-    >;
-    projectObjectiveActualScores: Map<
-        string, ProjectObjectiveActualScore
-    >;
-    deleted: Map<string, Deleted>;
-}
-
-export class MemoryDbAdapter
-    implements DbAdapter
-{
-    #tables: Tables | null = null;
-    readonly #deletedStore: MemDeletedStore;
-    readonly workers:
-        EntityStore<HumanWorkerEntity>;
-    readonly aiWorkers:
-        EntityStore<AIWorkerEntity>;
-    readonly ideas:
-        EntityStore<IdeaEntity>;
-    readonly projects:
-        EntityStore<ProjectEntity>;
-    readonly activities:
-        EntityStore<ActivityEntity>;
-    readonly flows:
-        EntityStore<FlowEntity>;
+    readonly workers: IEntityStore<HumanWorkerEntity>;
+    readonly aiWorkers: IEntityStore<AIWorkerEntity>;
+    readonly ideas: IEntityStore<IdeaEntity>;
+    readonly projects: IEntityStore<ProjectEntity>;
+    readonly activities: IEntityStore<ActivityEntity>;
+    readonly flows: IEntityStore<FlowEntity>;
     readonly flowVersions:
-        EntityStore<FlowVersionEntity>;
+        IEntityStore<FlowVersionEntity>;
     readonly projectFlows:
-        EntityStore<ProjectFlowEntity>;
-    readonly workOrders:
-        EntityStore<WorkOrderEntity>;
+        IEntityStore<ProjectFlowEntity>;
+    readonly workOrders: IEntityStore<WorkOrderEntity>;
     readonly flowWorkOrders:
-        EntityStore<FlowWorkOrderEntity>;
+        IEntityStore<FlowWorkOrderEntity>;
     readonly workOrderTransitions:
-        EntityStore<
-            WorkOrderTransitionEntity
-        >;
+        IEntityStore<WorkOrderTransitionEntity>;
     readonly transitionFieldValues:
-        EntityStore<
-            TransitionFieldValueEntity
-        >;
+        IEntityStore<TransitionFieldValueEntity>;
     readonly workOrderClaims:
-        EntityStore<WorkOrderClaimEntity>;
+        IEntityStore<WorkOrderClaimEntity>;
     readonly organization:
-        SingletonStore<OrganizationEntity>;
+        ISingletonStore<OrganizationEntity>;
     readonly ideaSubmissions:
-        EntityStore<IdeaSubmissionEntity>;
+        IEntityStore<IdeaSubmissionEntity>;
     readonly activityActors:
-        EntityStore<ActivityActorEntity>;
-    readonly objectives:
-        EntityStore<Objective>;
+        IEntityStore<ActivityActorEntity>;
+    readonly objectives: IEntityStore<Objective>;
     readonly objectiveRevisions:
-        EntityStore<ObjectiveRevision>;
+        IEntityStore<ObjectiveRevision>;
     readonly deprecatedObjectives:
-        EntityStore<DeprecatedObjective>;
+        IEntityStore<DeprecatedObjective>;
     readonly projectObjectiveBaselineScores:
-        EntityStore<
-            ProjectObjectiveBaselineScore
-        >;
+        IEntityStore<ProjectObjectiveBaselineScore>;
     readonly projectObjectiveActualScores:
-        EntityStore<
-            ProjectObjectiveActualScore
-        >;
-    readonly deleted: DeletedStore;
+        IEntityStore<ProjectObjectiveActualScore>;
+    readonly deleted: IDeletedStore;
 
     constructor() {
-        this.#tables = buildTables();
-        this.#deletedStore =
-            new MemDeletedStore(
-                this.#tables.deleted,
+        this.#backend = new MemoryStorageBackend();
+        const b = this.#backend;
+        const ds = new DeletedStore(b);
+        this.deleted = ds;
+        this.organization =
+            new SingletonStore<OrganizationEntity>(
+                'organization', b,
             );
-        this.deleted = this.#deletedStore;
-        const t = this.#tables;
-        const ds = this.#deletedStore;
+
         this.workers =
-            new MemEntityStore(
-                'workers', t.workers, ds,
-            );
+            new EntityStore('workers', b, ds);
         this.aiWorkers =
-            new MemEntityStore(
-                'ai_workers', t.aiWorkers, ds,
-            );
+            new EntityStore('ai_workers', b, ds);
         this.ideas =
-            new MemEntityStore(
-                'ideas', t.ideas, ds,
-            );
+            new EntityStore('ideas', b, ds);
         this.projects =
-            new MemEntityStore(
-                'projects', t.projects, ds,
-            );
+            new EntityStore('projects', b, ds);
         this.activities =
-            new MemEntityStore(
-                'activities',
-                t.activities, ds,
-            );
+            new EntityStore('activities', b, ds);
         this.flows =
-            new MemEntityStore(
-                'flows', t.flows, ds,
-            );
+            new EntityStore('flows', b, ds);
         this.flowVersions =
-            new MemEntityStore(
-                'flow_versions',
-                t.flowVersions, ds,
+            new HistoryEntityStore(
+                'flow_versions', b,
             );
         this.projectFlows =
-            new MemEntityStore(
-                'project_flows',
-                t.projectFlows, ds,
-            );
+            new EntityStore('project_flows', b, ds);
         this.workOrders =
-            new MemEntityStore(
-                'work_orders',
-                t.workOrders, ds,
-            );
+            new EntityStore('work_orders', b, ds);
         this.flowWorkOrders =
-            new MemEntityStore(
-                'flow_work_orders',
-                t.flowWorkOrders, ds,
+            new EntityStore(
+                'flow_work_orders', b, ds,
             );
         this.workOrderTransitions =
-            new MemEntityStore(
-                'work_order_transitions',
-                t.workOrderTransitions, ds,
+            new EntityStore(
+                'work_order_transitions', b, ds,
             );
         this.transitionFieldValues =
-            new MemEntityStore(
-                'transition_field_values',
-                t.transitionFieldValues, ds,
+            new EntityStore(
+                'transition_field_values', b, ds,
             );
         this.workOrderClaims =
-            new MemEntityStore(
-                'work_order_claims',
-                t.workOrderClaims, ds,
-            );
-        this.organization =
-            new MemSingletonStore(
-                'organization',
-                t.organization,
+            new EntityStore(
+                'work_order_claims', b, ds,
             );
         this.ideaSubmissions =
-            new MemEntityStore(
-                'idea_submissions',
-                t.ideaSubmissions, ds,
+            new EntityStore(
+                'idea_submissions', b, ds,
             );
         this.activityActors =
-            new MemEntityStore(
-                'activity_actors',
-                t.activityActors, ds,
+            new EntityStore(
+                'activity_actors', b, ds,
             );
         this.objectives =
-            new MemEntityStore(
-                'objectives',
-                t.objectives, ds,
-            );
+            new EntityStore('objectives', b, ds);
         this.objectiveRevisions =
-            new MemEntityStore(
-                'objective_revisions',
-                t.objectiveRevisions, ds,
+            new HistoryEntityStore(
+                'objective_revisions', b,
             );
         this.deprecatedObjectives =
-            new MemEntityStore(
-                'deprecated_objectives',
-                t.deprecatedObjectives, ds,
+            new HistoryEntityStore(
+                'deprecated_objectives', b,
             );
         this.projectObjectiveBaselineScores =
-            new MemEntityStore(
+            new HistoryEntityStore(
                 'project_objective_baseline_scores',
-                t.projectObjectiveBaselineScores,
-                ds,
+                b,
             );
         this.projectObjectiveActualScores =
-            new MemEntityStore(
+            new HistoryEntityStore(
                 'project_objective_actual_scores',
-                t.projectObjectiveActualScores,
-                ds,
+                b,
             );
     }
 
@@ -376,93 +156,33 @@ export class MemoryDbAdapter
     async flush(): Promise<void> {}
 
     async hasSchema(): Promise<boolean> {
-        return this.#tables !== null;
+        return true;
     }
 
     async createSchema(): Promise<void> {
-        if (this.#tables === null) {
-            this.#tables = buildTables();
-        }
     }
 
     async deleteSchema(): Promise<void> {
-        if (this.#tables) {
-            for (
-                const m
-                    of Object.values(
-                        this.#tables,
-                    )
-            ) {
-                m.clear();
-            }
-        }
+        await this.#backend.clearAll();
     }
 
-    async exportSnapshot(
-    ): Promise<string> {
-        if (!this.#tables) return '{}';
-        const obj: Record<string, unknown> = {};
-        for (
-            const [name, m]
-                of Object.entries(this.#tables)
-        ) {
-            obj[name] = [...m.values()];
+    async exportSnapshot(): Promise<string> {
+        const obj: Record<string, unknown[]> = {};
+        for (const table of TABLE_NAMES) {
+            obj[table] = await this.#backend.read(table);
         }
         return JSON.stringify(obj);
     }
 
-    async importSnapshot(
-        json: string,
-    ): Promise<void> {
+    async importSnapshot(json: string): Promise<void> {
         const obj = JSON.parse(json) as
             Record<string, { id: string }[]>;
-        if (!this.#tables) {
-            this.#tables = buildTables();
-        }
-        for (
-            const [name, rows]
-                of Object.entries(obj)
-        ) {
-            const tablesUnknown =
-                this.#tables as unknown;
-            const tablesAsMap =
-                tablesUnknown as Record<
-                    string,
-                    Map<string, { id: string }>
-                >;
-            const m = tablesAsMap[name];
-            if (!m) continue;
-            m.clear();
-            for (const row of rows) {
-                m.set(row.id, row);
+        await this.#backend.clearAll();
+        for (const table of TABLE_NAMES) {
+            const rows = obj[table];
+            if (rows) {
+                await this.#backend.write(table, rows);
             }
         }
     }
-}
-
-function buildTables(): Tables {
-    return {
-        workers: new Map(),
-        aiWorkers: new Map(),
-        ideas: new Map(),
-        projects: new Map(),
-        activities: new Map(),
-        flows: new Map(),
-        flowVersions: new Map(),
-        organization: new Map(),
-        ideaSubmissions: new Map(),
-        activityActors: new Map(),
-        projectFlows: new Map(),
-        workOrders: new Map(),
-        flowWorkOrders: new Map(),
-        workOrderTransitions: new Map(),
-        transitionFieldValues: new Map(),
-        workOrderClaims: new Map(),
-        objectives: new Map(),
-        objectiveRevisions: new Map(),
-        deprecatedObjectives: new Map(),
-        projectObjectiveBaselineScores: new Map(),
-        projectObjectiveActualScores: new Map(),
-        deleted: new Map(),
-    };
 }

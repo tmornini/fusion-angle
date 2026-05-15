@@ -75,6 +75,22 @@ export interface DeletedStore {
     allDeletedIds(): Promise<Set<Id>>;
 }
 
+// The byte-level seam. Store classes compose a backend
+// to obtain rows; backends own persistence + encoding,
+// stores own semantics (tombstones, splices, singletons).
+export interface StorageBackend {
+    read<T extends { id: string }>(
+        table: string,
+    ): Promise<T[]>;
+    write<T extends { id: string }>(
+        table: string,
+        rows: T[],
+    ): Promise<void>;
+    remove(table: string): Promise<void>;
+    clearAll(): Promise<void>;
+    list(): Promise<string[]>;
+}
+
 export interface DbAdapter {
     initialize(): Promise<void>;
     close(): Promise<void>;
