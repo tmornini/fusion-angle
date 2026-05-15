@@ -213,13 +213,12 @@ function generateFlowWorkload(args: {
     readonly totalWorkOrders: number;
     readonly oldestDaysAgo: number;
     readonly newestDaysAgo: number;
-    readonly idPrefix: string;
     readonly seed: number;
 }): GeneratedFlowData {
     const {
         flow, paths, sojourn, skill,
         totalWorkOrders, oldestDaysAgo,
-        newestDaysAgo, idPrefix, seed,
+        newestDaysAgo, seed,
     } = args;
 
     const rng = mulberry32(seed);
@@ -247,8 +246,7 @@ function generateFlowWorkload(args: {
     const nowMs = now.getTime();
 
     for (let i = 0; i < totalWorkOrders; i++) {
-        const woId = idPrefix + 'w'
-            + b62Id(rng, 20);
+        const woId = b62Id(rng, 22);
         const displayId = b62Id(rng, 8);
         const path = pickWeighted(
             rng, paths, p => p.weight,
@@ -315,8 +313,7 @@ function generateFlowWorkload(args: {
         const creatorPerson = stepWorker[1]!;
 
         transitions.push({
-            id: idPrefix + 't-'
-                + pad(i) + '-00-' + woId,
+            id: b62Id(rng, 22),
             work_order_id: woId,
             from_node_id: '',
             to_node_id: path.nodeIds[0]!,
@@ -328,8 +325,7 @@ function generateFlowWorkload(args: {
         if (N >= 2) {
             cursorMs += CREATE_DWELL_MS;
             transitions.push({
-                id: idPrefix + 't-'
-                    + pad(i) + '-01-' + woId,
+                id: b62Id(rng, 22),
                 work_order_id: woId,
                 from_node_id:
                     path.nodeIds[0]!,
@@ -350,9 +346,7 @@ function generateFlowWorkload(args: {
                 cursorMs = nowMs - 1000;
             }
             transitions.push({
-                id: idPrefix + 't-'
-                    + pad(i) + '-'
-                    + pad(j) + '-' + woId,
+                id: b62Id(rng, 22),
                 work_order_id: woId,
                 from_node_id:
                     path.nodeIds[j - 1]!,
@@ -374,7 +368,7 @@ function generateFlowWorkload(args: {
                 isoFromMs(createdAtMs),
         });
         flowWorkOrders.push({
-            id: idPrefix + 'fwo-' + woId,
+            id: b62Id(rng, 22),
             flow_id: flow.flowId,
             work_order_id: woId,
             created_at:
@@ -1202,7 +1196,7 @@ export async function populateMockData(
             estimated_cost: 88000,
             actual_cost: 51000,
             estimated_impact: 88,
-            actual_impact: 0,
+            actual_impact: 35,
             position: 1,
             business_context: jsonObjectField({
                 problem:
@@ -1277,7 +1271,7 @@ export async function populateMockData(
             estimated_cost: 78000,
             actual_cost: 48000,
             estimated_impact: 91,
-            actual_impact: 0,
+            actual_impact: 38,
             position: 3,
             business_context: jsonObjectField({
                 problem:
@@ -1427,7 +1421,7 @@ export async function populateMockData(
             estimated_cost: 64000,
             actual_cost: 42000,
             estimated_impact: 73,
-            actual_impact: 0,
+            actual_impact: 30,
             position: 8,
             business_context: jsonObjectField({}),
             timeline_label: 'On Track',
@@ -1453,7 +1447,7 @@ export async function populateMockData(
             estimated_cost: 102000,
             actual_cost: 142000,
             estimated_impact: 81,
-            actual_impact: 0,
+            actual_impact: 42,
             position: 9,
             business_context: jsonObjectField({}),
             timeline_label: 'Over Budget',
@@ -1478,7 +1472,7 @@ export async function populateMockData(
             estimated_cost: 134000,
             actual_cost: 99000,
             estimated_impact: 93,
-            actual_impact: 0,
+            actual_impact: 51,
             position: 10,
             business_context: jsonObjectField({}),
             timeline_label: 'On Track',
@@ -1504,7 +1498,7 @@ export async function populateMockData(
             estimated_cost: 76000,
             actual_cost: 36000,
             estimated_impact: 68,
-            actual_impact: 0,
+            actual_impact: 22,
             position: 11,
             business_context: jsonObjectField({}),
             timeline_label: 'On Track',
@@ -1580,7 +1574,7 @@ export async function populateMockData(
             estimated_cost: 70000,
             actual_cost: 45000,
             estimated_impact: 71,
-            actual_impact: 0,
+            actual_impact: 33,
             position: 14,
             business_context: jsonObjectField({}),
             timeline_label: 'On Track',
@@ -1606,7 +1600,7 @@ export async function populateMockData(
             estimated_cost: 56000,
             actual_cost: 34000,
             estimated_impact: 66,
-            actual_impact: 0,
+            actual_impact: 27,
             position: 15,
             business_context: jsonObjectField({}),
             timeline_label: 'On Track',
@@ -1732,7 +1726,7 @@ export async function populateMockData(
         'WxQn4LVWb76YkmqK5B0EPp';
     const workerMike = 'bLP3X1hb1mSz8gY9neogU3';
     const workerLisa = 'Trf1Up2jMsPhEnjbW4Ji1n';
-    const workerClaude = 'model_claude_sonnet';
+    const workerClaude = 'LdoTR1fnyYpS1jPzEs57ek';
 
     const leadToCloseDescription =
         'Sales pipeline: triage, discovery,'
@@ -3078,154 +3072,154 @@ export async function populateMockData(
         // with a fat right tail so Data Capture is
         // the hot node in heat stats.
         {
-            id: 'wo02Kd3pL8nXvQyRmJ5sT7',
+            id: 'kKtX2W0iVTWFPEoPrJmIHW',
             display_id: 'b2d4f6a8',
             flow_graph: woGraph(),
             position: 2,
             created_at: dt(88, 9, 0),
         },
         {
-            id: 'wo03Zn7gH2cWqFpBsYtE4X',
+            id: 'taUp8y0cuMhzf0UOk6Ev8Y',
             display_id: 'c3e5g7b9',
             flow_graph: woGraph(),
             position: 3,
             created_at: dt(82, 10, 0),
         },
         {
-            id: 'wo04Af5xM9dRkVoNhUwG1J',
+            id: 'KD2WFTEwzJFvxZ6cpCwpvc',
             display_id: 'd4f6h8c0',
             flow_graph: woGraph(),
             position: 4,
             created_at: dt(76, 8, 30),
         },
         {
-            id: 'wo05Bq8tP3yLsZnCgXdI6K',
+            id: 'b6YNHrFyi6V9dJNXyCXu1K',
             display_id: 'e5g7i9d1',
             flow_graph: woGraph(),
             position: 5,
             created_at: dt(71, 9, 0),
         },
         {
-            id: 'wo06Cr1uQ4zMtAoHewJ7L',
+            id: 'V3AXXlSjJwDQAmkNiRA8aP',
             display_id: 'f6h8j0e2',
             flow_graph: woGraph(),
             position: 6,
             created_at: dt(66, 11, 0),
         },
         {
-            id: 'wo07Ds2vR5aNuBpIfxK8M',
+            id: '9ooK5olzSsEnpgP8ASzBQi',
             display_id: 'g7i9k1f3',
             flow_graph: woGraph(),
             position: 7,
             created_at: dt(61, 9, 30),
         },
         {
-            id: 'wo08Et3wS6bOvCqJgyL9N',
+            id: 'cnXN4DZx9dUVIZL4OZnyw0',
             display_id: 'h8j0l2g4',
             flow_graph: woGraph(),
             position: 8,
             created_at: dt(57, 8, 0),
         },
         {
-            id: 'wo09Fu4xT7cPwDrKhzM0O',
+            id: 'kKw82RQDHRfgg5xQnw1lPk',
             display_id: 'i9k1m3h5',
             flow_graph: woGraph(),
             position: 9,
             created_at: dt(52, 10, 0),
         },
         {
-            id: 'wo10Gv5yU8dQxEsLinA1P',
+            id: 'ec0n7Ab6pJYLFDF6H0nyvV',
             display_id: 'j0l2n4i6',
             flow_graph: woGraph(),
             position: 10,
             created_at: dt(48, 9, 0),
         },
         {
-            id: 'wo11Hw6zV9eRyFtMjoB2Q',
+            id: 'gAjJnjirIrIgcFDMJyNsPa',
             display_id: 'k1m3o5j7',
             flow_graph: woGraph(),
             position: 11,
             created_at: dt(44, 10, 30),
         },
         {
-            id: 'wo12Ix7aW0fSzGuNkpC3R',
+            id: 'kyWtMAZPazKqAfIwPzACsL',
             display_id: 'l2n4p6k8',
             flow_graph: woGraph(),
             position: 12,
             created_at: dt(40, 9, 0),
         },
         {
-            id: 'wo13Jy8bX1gTaHvOlqD4S',
+            id: 'C41Hni5pMxp8xMQFEGNaib',
             display_id: 'm3o5q7l9',
             flow_graph: woGraph(),
             position: 13,
             created_at: dt(37, 8, 0),
         },
         {
-            id: 'wo14Kz9cY2hUbIwPmrE5T',
+            id: 'FGAZYYwoS9To1tNb24DfLc',
             display_id: 'n4p6r8m0',
             flow_graph: woGraph(),
             position: 14,
             created_at: dt(33, 9, 30),
         },
         {
-            id: 'wo15La0dZ3iVcJxQnsF6U',
+            id: '0zgLwuyPgtreVYjg4TScJR',
             display_id: 'o5q7s9n1',
             flow_graph: woGraph(),
             position: 15,
             created_at: dt(29, 10, 0),
         },
         {
-            id: 'wo16Mb1eA4jWdKyRotG7V',
+            id: 'XGJklKFO4aUtjSAEHEE8Zn',
             display_id: 'p6r8t0o2',
             flow_graph: woGraph(),
             position: 16,
             created_at: dt(26, 9, 0),
         },
         {
-            id: 'wo17Nc2fB5kXeLzSpuH8W',
+            id: 'rtuFD9uWn5zguEHyT3fh8s',
             display_id: 'q7s9u1p3',
             flow_graph: woGraph(),
             position: 17,
             created_at: dt(23, 8, 30),
         },
         {
-            id: 'wo18Od3gC6lYfMaTqvI9X',
+            id: 'XrO05MeyqldO8qm0O4VPdq',
             display_id: 'r8t0v2q4',
             flow_graph: woGraph(),
             position: 18,
             created_at: dt(20, 10, 0),
         },
         {
-            id: 'wo19Pe4hD7mZgNbUrwJ0Y',
+            id: 'S74N7CPA2dsMESryJNrFAC',
             display_id: 's9u1w3r5',
             flow_graph: woGraph(),
             position: 19,
             created_at: dt(17, 9, 0),
         },
         {
-            id: 'wo20Qf5iE8nAhOcVsxK1Z',
+            id: 'Cr8KZH5Q2j5n8Q8Yw3qdMw',
             display_id: 't0v2x4s6',
             flow_graph: woGraph(),
             position: 20,
             created_at: dt(14, 8, 0),
         },
         {
-            id: 'wo21Rg6jF9oBiPdWtyL2A',
+            id: '4T56gYme7ae4Ya7AMA0hpW',
             display_id: 'u1w3y5t7',
             flow_graph: woGraph(),
             position: 21,
             created_at: dt(11, 10, 30),
         },
         {
-            id: 'wo22Sh7kG0pCjQeXuzM3B',
+            id: 'aFCyJrvokoJM5iINwO3WCf',
             display_id: 'v2x4z6u8',
             flow_graph: woGraph(),
             position: 22,
             created_at: dt(9, 9, 0),
         },
         {
-            id: 'wo23Ti8lH1qDkRfYvaN4C',
+            id: 'Sr4k75y6vuKODCA9zlSUjk',
             display_id: 'w3y5a7v9',
             flow_graph: woGraph(),
             position: 23,
@@ -3236,42 +3230,42 @@ export async function populateMockData(
         // → Review → Archive. Exercises revisit
         // rate and the Review→Capture branch split.
         {
-            id: 'wo24Uj9mI2rElSgZwbO5D',
+            id: 'Mm6KUpykGSwjD7YofI6zpb',
             display_id: 'x4z6b8w0',
             flow_graph: woGraph(),
             position: 24,
             created_at: dt(77, 9, 0),
         },
         {
-            id: 'wo25Vk0nJ3sFmThaXcP6E',
+            id: 'BbZ3Z7OZnFmdF5MBgVIYzI',
             display_id: 'y5a7c9x1',
             flow_graph: woGraph(),
             position: 25,
             created_at: dt(63, 10, 0),
         },
         {
-            id: 'wo26Wl1oK4tGnUibYdQ7F',
+            id: 'NydsTqMmCgEKI7R9xxp36g',
             display_id: 'z6b8d0y2',
             flow_graph: woGraph(),
             position: 26,
             created_at: dt(50, 8, 30),
         },
         {
-            id: 'wo27Xm2pL5uHoVjcZeR8G',
+            id: 'x2uQev3HutthrUWRFkXSkH',
             display_id: 'a7c9e1z3',
             flow_graph: woGraph(),
             position: 27,
             created_at: dt(38, 9, 0),
         },
         {
-            id: 'wo28Yn3qM6vIpWkdAfS9H',
+            id: 'w7XA9UnuYI7e46RTQL1xGW',
             display_id: 'b8d0f2a4',
             flow_graph: woGraph(),
             position: 28,
             created_at: dt(25, 10, 0),
         },
         {
-            id: 'wo29Zo4rN7wJqXleBgT0I',
+            id: '3H3XeeNE4rS2wbANs3JvYz',
             display_id: 'c9e1g3b5',
             flow_graph: woGraph(),
             position: 29,
@@ -3282,35 +3276,35 @@ export async function populateMockData(
         // Review with no Archive; exercises WIP and
         // incompleteWorkOrderCount.
         {
-            id: 'wo30Ap5sO8xKrYmfChU1J',
+            id: 'i7YYgKN3ZUlrkulQ2aWdIE',
             display_id: 'd0f2h4c6',
             flow_graph: woGraph(),
             position: 30,
             created_at: dt(18, 9, 0),
         },
         {
-            id: 'wo31Bq6tP9yLsZngDiV2K',
+            id: '0brjvcoPEVBwMkUQ3tKHWc',
             display_id: 'e1g3i5d7',
             flow_graph: woGraph(),
             position: 31,
             created_at: dt(10, 10, 0),
         },
         {
-            id: 'wo32Cr7uQ0zMtAohEjW3L',
+            id: 'mTdhglHhl7pM0mKt0M2IjF',
             display_id: 'f2h4j6e8',
             flow_graph: woGraph(),
             position: 32,
             created_at: dt(7, 8, 0),
         },
         {
-            id: 'wo33Ds8vR1aNuBpiGkX4M',
+            id: 'GMhfH8lMQJXzE4vkjnSH1u',
             display_id: 'g3i5k7f9',
             flow_graph: woGraph(),
             position: 33,
             created_at: dt(4, 9, 0),
         },
         {
-            id: 'wo34Et9wS2bOvCqjHlY5N',
+            id: 'pLxCFGOINXVaXmrS0VG0vC',
             display_id: 'h4j6l8g0',
             flow_graph: woGraph(),
             position: 34,
@@ -3322,14 +3316,14 @@ export async function populateMockData(
         // node's workers, so topProducer.inCurrentClan
         // is false.
         {
-            id: 'wo35Fu0xT3cPwDrkImZ6O',
+            id: 'IyrpZrIl2hbmmnCtiifEGm',
             display_id: 'i5k7m9h1',
             flow_graph: woGraph(),
             position: 35,
             created_at: dt(35, 9, 0),
         },
         {
-            id: 'wo36Gv1yU4dQxEslJnA7P',
+            id: 'zYnDWBV4VP5guzW5fDWtHN',
             display_id: 'j6l8n0i2',
             flow_graph: woGraph(),
             position: 36,
@@ -3340,14 +3334,14 @@ export async function populateMockData(
         // trailing-90-day stats window — so heat
         // values for their node visits are clipped.
         {
-            id: 'wo37Hw2zV5eRyFtKjoB8Q',
+            id: '7HX7RPwlYopHWfD7I0QAPs',
             display_id: 'k7m9o1j3',
             flow_graph: woGraph(),
             position: 37,
             created_at: dt(108, 9, 0),
         },
         {
-            id: 'wo38Ix3aW6fSzGuNkpC9R',
+            id: 'EXphSopBU1Is2TH4QZo4nO',
             display_id: 'l8n0p2k4',
             flow_graph: woGraph(),
             position: 38,
@@ -3357,29 +3351,29 @@ export async function populateMockData(
         // second flow demo -- 4 happy-path, 1
         // revisit, 1 in-flight.
         {
-            id: 'prc01AaBbCcDdEeFfGgHhIi',
-            display_id: 'prc01aabb',
+            id: 'hRPNkjrYBTQqzzFe1t8FH6',
+            display_id: '5tb2nOoHyhRpy3UHlyrJKl',
             flow_graph: prcGraph(),
             position: 39,
             created_at: dt(60, 9, 0),
         },
         {
-            id: 'prc02JjKkLlMmNnOoPpQqRr',
-            display_id: 'prc02jjkk',
+            id: 'L3UhOvrAGluk4kNnN6J8NT',
+            display_id: 'ZifylnGqzY8uXQ30d1DgeP',
             flow_graph: prcGraph(),
             position: 40,
             created_at: dt(45, 10, 0),
         },
         {
-            id: 'prc03SsTtUuVvWwXxYyZz00',
-            display_id: 'prc03sstt',
+            id: 'oTscblsEOjZDkvkW3vs7rU',
+            display_id: 'IoF2qGX8bftkrW4QrLnBwp',
             flow_graph: prcGraph(),
             position: 41,
             created_at: dt(30, 8, 0),
         },
         {
-            id: 'prc04A1B2C3D4E5F6G7H8I9',
-            display_id: 'prc04a1b2',
+            id: 'Xpw9VGpZ6RyevuInSr8yze',
+            display_id: '3eC66vpxib66qPnv7hdxvJ',
             flow_graph: prcGraph(),
             position: 42,
             created_at: dt(20, 11, 0),
@@ -3387,16 +3381,16 @@ export async function populateMockData(
         // prc05: revisit -- Decision sends back
         // to Revise then Draft before completing.
         {
-            id: 'prc05J1K2L3M4N5O6P7Q8R9',
-            display_id: 'prc05j1k2',
+            id: 'yqPpJb0NoQDgx8DoZ183Nx',
+            display_id: 'tmj4YM3W8H1qgr4sUIpY35',
             flow_graph: prcGraph(),
             position: 43,
             created_at: dt(15, 9, 0),
         },
         // prc06: in-flight -- stuck at Decision.
         {
-            id: 'prc06S1T2U3V4W5X6Y7Z800',
-            display_id: 'prc06s1t2',
+            id: 'BUrGEVDMF6FeU35WUHUY5E',
+            display_id: 'Tb52zOWUVGcaSQRFSLDXPV',
             flow_graph: prcGraph(),
             position: 44,
             created_at: dt(5, 10, 0),
@@ -3406,7 +3400,7 @@ export async function populateMockData(
     const mockFlowWorkOrders:
         FlowWorkOrderEntity[] = [
         {
-            id: 'fwo-' + woId,
+            id: 'Cc7LblYXfmmZpg8DLZmhVw',
             flow_id:
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id: woId,
@@ -3414,352 +3408,352 @@ export async function populateMockData(
         },
         // happy-path
         {
-            id: 'fwo-wo02Kd3pL8nXvQyRmJ5sT7',
+            id: 'l1QwKaS2EYCT8nJCAFXXN0',
             flow_id:
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
-                'wo02Kd3pL8nXvQyRmJ5sT7',
+                'kKtX2W0iVTWFPEoPrJmIHW',
             created_at: dt(88, 9, 0),
         },
         {
-            id: 'fwo-wo03Zn7gH2cWqFpBsYtE4X',
+            id: 'FjjhKDthEYLf50lmPrKkaq',
             flow_id:
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
-                'wo03Zn7gH2cWqFpBsYtE4X',
+                'taUp8y0cuMhzf0UOk6Ev8Y',
             created_at: dt(82, 10, 0),
         },
         {
-            id: 'fwo-wo04Af5xM9dRkVoNhUwG1J',
+            id: 'vNj3XdrWhDpoFW8qsLsqKg',
             flow_id:
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
-                'wo04Af5xM9dRkVoNhUwG1J',
+                'KD2WFTEwzJFvxZ6cpCwpvc',
             created_at: dt(76, 8, 30),
         },
         {
-            id: 'fwo-wo05Bq8tP3yLsZnCgXdI6K',
+            id: 'hjPgB0KYD5Sesnjejnohf6',
             flow_id:
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
-                'wo05Bq8tP3yLsZnCgXdI6K',
+                'b6YNHrFyi6V9dJNXyCXu1K',
             created_at: dt(71, 9, 0),
         },
         {
-            id: 'fwo-wo06Cr1uQ4zMtAoHewJ7L',
+            id: 'UhSuMtC66uclQH5irfsqd0',
             flow_id:
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
-                'wo06Cr1uQ4zMtAoHewJ7L',
+                'V3AXXlSjJwDQAmkNiRA8aP',
             created_at: dt(66, 11, 0),
         },
         {
-            id: 'fwo-wo07Ds2vR5aNuBpIfxK8M',
+            id: 'J0GfRrP7J5tNhBDCXDDOPV',
             flow_id:
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
-                'wo07Ds2vR5aNuBpIfxK8M',
+                '9ooK5olzSsEnpgP8ASzBQi',
             created_at: dt(61, 9, 30),
         },
         {
-            id: 'fwo-wo08Et3wS6bOvCqJgyL9N',
+            id: 'nULvK3MsVfud7QkAlrNGpQ',
             flow_id:
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
-                'wo08Et3wS6bOvCqJgyL9N',
+                'cnXN4DZx9dUVIZL4OZnyw0',
             created_at: dt(57, 8, 0),
         },
         {
-            id: 'fwo-wo09Fu4xT7cPwDrKhzM0O',
+            id: 'NUnAiiPpzpQ9wKx6utsGwn',
             flow_id:
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
-                'wo09Fu4xT7cPwDrKhzM0O',
+                'kKw82RQDHRfgg5xQnw1lPk',
             created_at: dt(52, 10, 0),
         },
         {
-            id: 'fwo-wo10Gv5yU8dQxEsLinA1P',
+            id: 'tuqFkKJMD4baNSMgXFWIh3',
             flow_id:
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
-                'wo10Gv5yU8dQxEsLinA1P',
+                'ec0n7Ab6pJYLFDF6H0nyvV',
             created_at: dt(48, 9, 0),
         },
         {
-            id: 'fwo-wo11Hw6zV9eRyFtMjoB2Q',
+            id: 'G1IeM0YcxnPVe8ZuYnJ9oJ',
             flow_id:
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
-                'wo11Hw6zV9eRyFtMjoB2Q',
+                'gAjJnjirIrIgcFDMJyNsPa',
             created_at: dt(44, 10, 30),
         },
         {
-            id: 'fwo-wo12Ix7aW0fSzGuNkpC3R',
+            id: '5Ctl6blp1xESHHiQtp0hUU',
             flow_id:
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
-                'wo12Ix7aW0fSzGuNkpC3R',
+                'kyWtMAZPazKqAfIwPzACsL',
             created_at: dt(40, 9, 0),
         },
         {
-            id: 'fwo-wo13Jy8bX1gTaHvOlqD4S',
+            id: 'tlNTceD8uVvWlIjXDH0ayW',
             flow_id:
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
-                'wo13Jy8bX1gTaHvOlqD4S',
+                'C41Hni5pMxp8xMQFEGNaib',
             created_at: dt(37, 8, 0),
         },
         {
-            id: 'fwo-wo14Kz9cY2hUbIwPmrE5T',
+            id: 'RUF1gVmAhswD070VXbltZj',
             flow_id:
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
-                'wo14Kz9cY2hUbIwPmrE5T',
+                'FGAZYYwoS9To1tNb24DfLc',
             created_at: dt(33, 9, 30),
         },
         {
-            id: 'fwo-wo15La0dZ3iVcJxQnsF6U',
+            id: 's8LTGragbMejtSAdAVF1u3',
             flow_id:
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
-                'wo15La0dZ3iVcJxQnsF6U',
+                '0zgLwuyPgtreVYjg4TScJR',
             created_at: dt(29, 10, 0),
         },
         {
-            id: 'fwo-wo16Mb1eA4jWdKyRotG7V',
+            id: 'IAEG9nJXxCFzya2R3z9Rzy',
             flow_id:
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
-                'wo16Mb1eA4jWdKyRotG7V',
+                'XGJklKFO4aUtjSAEHEE8Zn',
             created_at: dt(26, 9, 0),
         },
         {
-            id: 'fwo-wo17Nc2fB5kXeLzSpuH8W',
+            id: 'c1BsfY0187lX0bv9IMRin6',
             flow_id:
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
-                'wo17Nc2fB5kXeLzSpuH8W',
+                'rtuFD9uWn5zguEHyT3fh8s',
             created_at: dt(23, 8, 30),
         },
         {
-            id: 'fwo-wo18Od3gC6lYfMaTqvI9X',
+            id: 'HdDAafhVYetmEDZI57F2o9',
             flow_id:
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
-                'wo18Od3gC6lYfMaTqvI9X',
+                'XrO05MeyqldO8qm0O4VPdq',
             created_at: dt(20, 10, 0),
         },
         {
-            id: 'fwo-wo19Pe4hD7mZgNbUrwJ0Y',
+            id: 'yFhQ6jemy8OUls9GCH9sJq',
             flow_id:
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
-                'wo19Pe4hD7mZgNbUrwJ0Y',
+                'S74N7CPA2dsMESryJNrFAC',
             created_at: dt(17, 9, 0),
         },
         {
-            id: 'fwo-wo20Qf5iE8nAhOcVsxK1Z',
+            id: 'C7ASzGoDhS3c9Er43SznuQ',
             flow_id:
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
-                'wo20Qf5iE8nAhOcVsxK1Z',
+                'Cr8KZH5Q2j5n8Q8Yw3qdMw',
             created_at: dt(14, 8, 0),
         },
         {
-            id: 'fwo-wo21Rg6jF9oBiPdWtyL2A',
+            id: 'gj9UFVp6N0LY43tiZO7kEH',
             flow_id:
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
-                'wo21Rg6jF9oBiPdWtyL2A',
+                '4T56gYme7ae4Ya7AMA0hpW',
             created_at: dt(11, 10, 30),
         },
         {
-            id: 'fwo-wo22Sh7kG0pCjQeXuzM3B',
+            id: 'QXnnDlwCXKN12k4oUPse4B',
             flow_id:
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
-                'wo22Sh7kG0pCjQeXuzM3B',
+                'aFCyJrvokoJM5iINwO3WCf',
             created_at: dt(9, 9, 0),
         },
         {
-            id: 'fwo-wo23Ti8lH1qDkRfYvaN4C',
+            id: 'hyC8PMVNYng3UIO93yexAR',
             flow_id:
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
-                'wo23Ti8lH1qDkRfYvaN4C',
+                'Sr4k75y6vuKODCA9zlSUjk',
             created_at: dt(6, 11, 0),
         },
         // needs-revision
         {
-            id: 'fwo-wo24Uj9mI2rElSgZwbO5D',
+            id: '9lPGvmt7DdS6Uy7RuOYCxZ',
             flow_id:
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
-                'wo24Uj9mI2rElSgZwbO5D',
+                'Mm6KUpykGSwjD7YofI6zpb',
             created_at: dt(77, 9, 0),
         },
         {
-            id: 'fwo-wo25Vk0nJ3sFmThaXcP6E',
+            id: 'w9t0kM5OR9xNz8Qd8YMvWd',
             flow_id:
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
-                'wo25Vk0nJ3sFmThaXcP6E',
+                'BbZ3Z7OZnFmdF5MBgVIYzI',
             created_at: dt(63, 10, 0),
         },
         {
-            id: 'fwo-wo26Wl1oK4tGnUibYdQ7F',
+            id: 'OynJa34EkAifV6XvROGJHO',
             flow_id:
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
-                'wo26Wl1oK4tGnUibYdQ7F',
+                'NydsTqMmCgEKI7R9xxp36g',
             created_at: dt(50, 8, 30),
         },
         {
-            id: 'fwo-wo27Xm2pL5uHoVjcZeR8G',
+            id: 'hFaKVhqcwwCtiDmjHOhglF',
             flow_id:
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
-                'wo27Xm2pL5uHoVjcZeR8G',
+                'x2uQev3HutthrUWRFkXSkH',
             created_at: dt(38, 9, 0),
         },
         {
-            id: 'fwo-wo28Yn3qM6vIpWkdAfS9H',
+            id: 'lJalI8qDpdF8zng1mr7dkW',
             flow_id:
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
-                'wo28Yn3qM6vIpWkdAfS9H',
+                'w7XA9UnuYI7e46RTQL1xGW',
             created_at: dt(25, 10, 0),
         },
         {
-            id: 'fwo-wo29Zo4rN7wJqXleBgT0I',
+            id: 'UFSLHfELrPhlOvdaQv8yrC',
             flow_id:
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
-                'wo29Zo4rN7wJqXleBgT0I',
+                '3H3XeeNE4rS2wbANs3JvYz',
             created_at: dt(12, 9, 30),
         },
         // in-flight
         {
-            id: 'fwo-wo30Ap5sO8xKrYmfChU1J',
+            id: 'U0vPeW2wXXSwUQ1IWSxa2O',
             flow_id:
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
-                'wo30Ap5sO8xKrYmfChU1J',
+                'i7YYgKN3ZUlrkulQ2aWdIE',
             created_at: dt(18, 9, 0),
         },
         {
-            id: 'fwo-wo31Bq6tP9yLsZngDiV2K',
+            id: 'uhMESfwESpe11vhqKvQ2kB',
             flow_id:
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
-                'wo31Bq6tP9yLsZngDiV2K',
+                '0brjvcoPEVBwMkUQ3tKHWc',
             created_at: dt(10, 10, 0),
         },
         {
-            id: 'fwo-wo32Cr7uQ0zMtAohEjW3L',
+            id: 'ZNrxNuiqHTULou4TqYPtXL',
             flow_id:
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
-                'wo32Cr7uQ0zMtAohEjW3L',
+                'mTdhglHhl7pM0mKt0M2IjF',
             created_at: dt(7, 8, 0),
         },
         {
-            id: 'fwo-wo33Ds8vR1aNuBpiGkX4M',
+            id: '5AsLDAhvbkXZ6OUvvoZhND',
             flow_id:
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
-                'wo33Ds8vR1aNuBpiGkX4M',
+                'GMhfH8lMQJXzE4vkjnSH1u',
             created_at: dt(4, 9, 0),
         },
         {
-            id: 'fwo-wo34Et9wS2bOvCqjHlY5N',
+            id: 'avduZh1Hyokc9xiUjDQA0F',
             flow_id:
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
-                'wo34Et9wS2bOvCqjHlY5N',
+                'pLxCFGOINXVaXmrS0VG0vC',
             created_at: dt(2, 11, 0),
         },
         // out-of-clan
         {
-            id: 'fwo-wo35Fu0xT3cPwDrkImZ6O',
+            id: 'XeHGIWNzurFqBqHkQqV6El',
             flow_id:
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
-                'wo35Fu0xT3cPwDrkImZ6O',
+                'IyrpZrIl2hbmmnCtiifEGm',
             created_at: dt(35, 9, 0),
         },
         {
-            id: 'fwo-wo36Gv1yU4dQxEslJnA7P',
+            id: 'jxMN634ymWUYVZQK5on62x',
             flow_id:
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
-                'wo36Gv1yU4dQxEslJnA7P',
+                'zYnDWBV4VP5guzW5fDWtHN',
             created_at: dt(22, 10, 30),
         },
         // old (outside 90-day window)
         {
-            id: 'fwo-wo37Hw2zV5eRyFtKjoB8Q',
+            id: 'ChEQk8m36NL0ADf6Nfez5f',
             flow_id:
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
-                'wo37Hw2zV5eRyFtKjoB8Q',
+                '7HX7RPwlYopHWfD7I0QAPs',
             created_at: dt(108, 9, 0),
         },
         {
-            id: 'fwo-wo38Ix3aW6fSzGuNkpC9R',
+            id: 'nycbBiutlHj1MUnI02Pw20',
             flow_id:
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
-                'wo38Ix3aW6fSzGuNkpC9R',
+                'EXphSopBU1Is2TH4QZo4nO',
             created_at: dt(103, 10, 0),
         },
         // prc join rows (Proposal Review Cycle)
         {
-            id: 'fwo-prc01AaBbCcDdEeFfGgHhIi',
+            id: '1MMz7BIQ0qgacH3CCUafKk',
             flow_id:
                 '7COt7Kf4OaOBg6AjaNO04s',
             work_order_id:
-                'prc01AaBbCcDdEeFfGgHhIi',
+                'hRPNkjrYBTQqzzFe1t8FH6',
             created_at: dt(60, 9, 0),
         },
         {
-            id: 'fwo-prc02JjKkLlMmNnOoPpQqRr',
+            id: 'UXIU5zCYBFkQnMnChd1Q6T',
             flow_id:
                 '7COt7Kf4OaOBg6AjaNO04s',
             work_order_id:
-                'prc02JjKkLlMmNnOoPpQqRr',
+                'L3UhOvrAGluk4kNnN6J8NT',
             created_at: dt(45, 10, 0),
         },
         {
-            id: 'fwo-prc03SsTtUuVvWwXxYyZz00',
+            id: 'jQUWpOW1y7QcYSS49Cy3dE',
             flow_id:
                 '7COt7Kf4OaOBg6AjaNO04s',
             work_order_id:
-                'prc03SsTtUuVvWwXxYyZz00',
+                'oTscblsEOjZDkvkW3vs7rU',
             created_at: dt(30, 8, 0),
         },
         {
-            id: 'fwo-prc04A1B2C3D4E5F6G7H8I9',
+            id: 'y9Aba8YosD7VcSMV2Ncwoc',
             flow_id:
                 '7COt7Kf4OaOBg6AjaNO04s',
             work_order_id:
-                'prc04A1B2C3D4E5F6G7H8I9',
+                'Xpw9VGpZ6RyevuInSr8yze',
             created_at: dt(20, 11, 0),
         },
         {
-            id: 'fwo-prc05J1K2L3M4N5O6P7Q8R9',
+            id: 'RKSovIx9Jb03ZHsLWpI1EC',
             flow_id:
                 '7COt7Kf4OaOBg6AjaNO04s',
             work_order_id:
-                'prc05J1K2L3M4N5O6P7Q8R9',
+                'yqPpJb0NoQDgx8DoZ183Nx',
             created_at: dt(15, 9, 0),
         },
         {
-            id: 'fwo-prc06S1T2U3V4W5X6Y7Z800',
+            id: 'XAQNINxgYd6Ngjv06NztQh',
             flow_id:
                 '7COt7Kf4OaOBg6AjaNO04s',
             work_order_id:
-                'prc06S1T2U3V4W5X6Y7Z800',
+                'BUrGEVDMF6FeU35WUHUY5E',
             created_at: dt(5, 10, 0),
         },
     ];
@@ -3767,7 +3761,7 @@ export async function populateMockData(
     const mockWoTransitions:
         WorkOrderTransitionEntity[] = [
         {
-            id: 'wot-01-' + woId,
+            id: '9nP0K7FVlCFps3eqMnbnMU',
             work_order_id: woId,
             from_node_id: '',
             to_node_id: woNodeNew,
@@ -3776,7 +3770,7 @@ export async function populateMockData(
                 woCreated,
         },
         {
-            id: 'wot-02-' + woId,
+            id: 'MbiHcJxVA5Tde3oBh3Ka8p',
             work_order_id: woId,
             from_node_id: woNodeNew,
             to_node_id: woNodeCapture,
@@ -3785,7 +3779,7 @@ export async function populateMockData(
                 woCreated,
         },
         {
-            id: 'wot-03-' + woId,
+            id: 'eJEybxfXaf3sjwFilZnunU',
             work_order_id: woId,
             from_node_id:
                 woNodeCapture,
@@ -3795,7 +3789,7 @@ export async function populateMockData(
                 dt(13, 14, 30),
         },
         {
-            id: 'wot-04-' + woId,
+            id: 'C2xb2bbjyHD11WfLayh8Om',
             work_order_id: woId,
             from_node_id:
                 woNodeReview,
@@ -3807,36 +3801,36 @@ export async function populateMockData(
         },
         // happy-path WO02: DC sojourn 1 day
         {
-            id: 'wot02-1-wo02Kd3pL8nXvQyRmJ5sT7',
+            id: '6eT1jG5MoR9A5PvRvgCUBq',
             work_order_id:
-                'wo02Kd3pL8nXvQyRmJ5sT7',
+                'kKtX2W0iVTWFPEoPrJmIHW',
             from_node_id: '',
             to_node_id: woNodeNew,
             person_id: woPersonSarah,
             transitioned_at: dt(88, 9, 0),
         },
         {
-            id: 'wot02-2-wo02Kd3pL8nXvQyRmJ5sT7',
+            id: 'MEsinaVfIifb90ByaJBjrp',
             work_order_id:
-                'wo02Kd3pL8nXvQyRmJ5sT7',
+                'kKtX2W0iVTWFPEoPrJmIHW',
             from_node_id: woNodeNew,
             to_node_id: woNodeCapture,
             person_id: woPersonSarah,
             transitioned_at: dt(88, 9, 5),
         },
         {
-            id: 'wot02-3-wo02Kd3pL8nXvQyRmJ5sT7',
+            id: 'xI5NDQXN8Ns5oe0XeEPX2o',
             work_order_id:
-                'wo02Kd3pL8nXvQyRmJ5sT7',
+                'kKtX2W0iVTWFPEoPrJmIHW',
             from_node_id: woNodeCapture,
             to_node_id: woNodeReview,
             person_id: woPersonMarcus,
             transitioned_at: dt(87, 10, 0),
         },
         {
-            id: 'wot02-4-wo02Kd3pL8nXvQyRmJ5sT7',
+            id: 'k4yValdb0nLdwsZdgvuwtq',
             work_order_id:
-                'wo02Kd3pL8nXvQyRmJ5sT7',
+                'kKtX2W0iVTWFPEoPrJmIHW',
             from_node_id: woNodeReview,
             to_node_id: woNodeComplete,
             person_id: woPersonSarah,
@@ -3844,36 +3838,36 @@ export async function populateMockData(
         },
         // happy-path WO03: DC sojourn 2 days
         {
-            id: 'wot03-1-wo03Zn7gH2cWqFpBsYtE4X',
+            id: 'rAnt2MH37Zm1uvaDdJQIU7',
             work_order_id:
-                'wo03Zn7gH2cWqFpBsYtE4X',
+                'taUp8y0cuMhzf0UOk6Ev8Y',
             from_node_id: '',
             to_node_id: woNodeNew,
             person_id: woPersonMike,
             transitioned_at: dt(82, 10, 0),
         },
         {
-            id: 'wot03-2-wo03Zn7gH2cWqFpBsYtE4X',
+            id: 'VwD21aMsYlSZ91oOeKoQv3',
             work_order_id:
-                'wo03Zn7gH2cWqFpBsYtE4X',
+                'taUp8y0cuMhzf0UOk6Ev8Y',
             from_node_id: woNodeNew,
             to_node_id: woNodeCapture,
             person_id: woPersonMike,
             transitioned_at: dt(82, 10, 8),
         },
         {
-            id: 'wot03-3-wo03Zn7gH2cWqFpBsYtE4X',
+            id: 'lntXIDCTtC6uXtkanv5XYm',
             work_order_id:
-                'wo03Zn7gH2cWqFpBsYtE4X',
+                'taUp8y0cuMhzf0UOk6Ev8Y',
             from_node_id: woNodeCapture,
             to_node_id: woNodeReview,
             person_id: woPersonMarcus,
             transitioned_at: dt(80, 11, 0),
         },
         {
-            id: 'wot03-4-wo03Zn7gH2cWqFpBsYtE4X',
+            id: 'oSOuQpIKaTo9TU70OtfU8P',
             work_order_id:
-                'wo03Zn7gH2cWqFpBsYtE4X',
+                'taUp8y0cuMhzf0UOk6Ev8Y',
             from_node_id: woNodeReview,
             to_node_id: woNodeComplete,
             person_id: woPersonMike,
@@ -3881,36 +3875,36 @@ export async function populateMockData(
         },
         // happy-path WO04: DC sojourn 3 days
         {
-            id: 'wot04-1-wo04Af5xM9dRkVoNhUwG1J',
+            id: 'ggJA4BZvTpqxEPkgbiNnyt',
             work_order_id:
-                'wo04Af5xM9dRkVoNhUwG1J',
+                'KD2WFTEwzJFvxZ6cpCwpvc',
             from_node_id: '',
             to_node_id: woNodeNew,
             person_id: woPersonSarah,
             transitioned_at: dt(76, 8, 30),
         },
         {
-            id: 'wot04-2-wo04Af5xM9dRkVoNhUwG1J',
+            id: 'LzLQkGqfrjFNaQIQNVp2yt',
             work_order_id:
-                'wo04Af5xM9dRkVoNhUwG1J',
+                'KD2WFTEwzJFvxZ6cpCwpvc',
             from_node_id: woNodeNew,
             to_node_id: woNodeCapture,
             person_id: woPersonSarah,
             transitioned_at: dt(76, 8, 40),
         },
         {
-            id: 'wot04-3-wo04Af5xM9dRkVoNhUwG1J',
+            id: 'ZpwjIdExxdeZP7m5YDH5Qt',
             work_order_id:
-                'wo04Af5xM9dRkVoNhUwG1J',
+                'KD2WFTEwzJFvxZ6cpCwpvc',
             from_node_id: woNodeCapture,
             to_node_id: woNodeReview,
             person_id: woPersonCurrent,
             transitioned_at: dt(73, 10, 0),
         },
         {
-            id: 'wot04-4-wo04Af5xM9dRkVoNhUwG1J',
+            id: 'ZdoF8Ka2fa6xFFdzWi3odO',
             work_order_id:
-                'wo04Af5xM9dRkVoNhUwG1J',
+                'KD2WFTEwzJFvxZ6cpCwpvc',
             from_node_id: woNodeReview,
             to_node_id: woNodeComplete,
             person_id: woPersonMike,
@@ -3918,36 +3912,36 @@ export async function populateMockData(
         },
         // happy-path WO05: DC sojourn 1 day
         {
-            id: 'wot05-1-wo05Bq8tP3yLsZnCgXdI6K',
+            id: 'IJKj026ouhbUQv7w4y7V7o',
             work_order_id:
-                'wo05Bq8tP3yLsZnCgXdI6K',
+                'b6YNHrFyi6V9dJNXyCXu1K',
             from_node_id: '',
             to_node_id: woNodeNew,
             person_id: woPersonMike,
             transitioned_at: dt(71, 9, 0),
         },
         {
-            id: 'wot05-2-wo05Bq8tP3yLsZnCgXdI6K',
+            id: 'g4q1KxVqvyS8ZxOIDnu4MG',
             work_order_id:
-                'wo05Bq8tP3yLsZnCgXdI6K',
+                'b6YNHrFyi6V9dJNXyCXu1K',
             from_node_id: woNodeNew,
             to_node_id: woNodeCapture,
             person_id: woPersonMike,
             transitioned_at: dt(71, 9, 10),
         },
         {
-            id: 'wot05-3-wo05Bq8tP3yLsZnCgXdI6K',
+            id: '6kwY7EJsL4khehGbJmS9YV',
             work_order_id:
-                'wo05Bq8tP3yLsZnCgXdI6K',
+                'b6YNHrFyi6V9dJNXyCXu1K',
             from_node_id: woNodeCapture,
             to_node_id: woNodeReview,
             person_id: woPersonMarcus,
             transitioned_at: dt(70, 14, 0),
         },
         {
-            id: 'wot05-4-wo05Bq8tP3yLsZnCgXdI6K',
+            id: 'zK2ywEqCxPE75HKfGdGtEY',
             work_order_id:
-                'wo05Bq8tP3yLsZnCgXdI6K',
+                'b6YNHrFyi6V9dJNXyCXu1K',
             from_node_id: woNodeReview,
             to_node_id: woNodeComplete,
             person_id: woPersonSarah,
@@ -3955,36 +3949,36 @@ export async function populateMockData(
         },
         // happy-path WO06: DC sojourn 5 days
         {
-            id: 'wot06-1-wo06Cr1uQ4zMtAoHewJ7L',
+            id: '3lD2Yf5csm1zBR9vdGnnh2',
             work_order_id:
-                'wo06Cr1uQ4zMtAoHewJ7L',
+                'V3AXXlSjJwDQAmkNiRA8aP',
             from_node_id: '',
             to_node_id: woNodeNew,
             person_id: woPersonSarah,
             transitioned_at: dt(66, 11, 0),
         },
         {
-            id: 'wot06-2-wo06Cr1uQ4zMtAoHewJ7L',
+            id: 'Kqw1IND5JwmUemrbWDKSg1',
             work_order_id:
-                'wo06Cr1uQ4zMtAoHewJ7L',
+                'V3AXXlSjJwDQAmkNiRA8aP',
             from_node_id: woNodeNew,
             to_node_id: woNodeCapture,
             person_id: woPersonSarah,
             transitioned_at: dt(66, 11, 12),
         },
         {
-            id: 'wot06-3-wo06Cr1uQ4zMtAoHewJ7L',
+            id: '8fuCWUtGDYOCBszoGuYhNZ',
             work_order_id:
-                'wo06Cr1uQ4zMtAoHewJ7L',
+                'V3AXXlSjJwDQAmkNiRA8aP',
             from_node_id: woNodeCapture,
             to_node_id: woNodeReview,
             person_id: woPersonMarcus,
             transitioned_at: dt(61, 9, 0),
         },
         {
-            id: 'wot06-4-wo06Cr1uQ4zMtAoHewJ7L',
+            id: 'vqxo8lToEgDdEItcJg8GMI',
             work_order_id:
-                'wo06Cr1uQ4zMtAoHewJ7L',
+                'V3AXXlSjJwDQAmkNiRA8aP',
             from_node_id: woNodeReview,
             to_node_id: woNodeComplete,
             person_id: woPersonMike,
@@ -3992,36 +3986,36 @@ export async function populateMockData(
         },
         // happy-path WO07: DC sojourn 2 days
         {
-            id: 'wot07-1-wo07Ds2vR5aNuBpIfxK8M',
+            id: 'DkCRDYtzbHbaGZY45hrIrB',
             work_order_id:
-                'wo07Ds2vR5aNuBpIfxK8M',
+                '9ooK5olzSsEnpgP8ASzBQi',
             from_node_id: '',
             to_node_id: woNodeNew,
             person_id: woPersonMike,
             transitioned_at: dt(61, 9, 30),
         },
         {
-            id: 'wot07-2-wo07Ds2vR5aNuBpIfxK8M',
+            id: 'g7Fnaud4XIGM4bceFOFtim',
             work_order_id:
-                'wo07Ds2vR5aNuBpIfxK8M',
+                '9ooK5olzSsEnpgP8ASzBQi',
             from_node_id: woNodeNew,
             to_node_id: woNodeCapture,
             person_id: woPersonMike,
             transitioned_at: dt(61, 9, 45),
         },
         {
-            id: 'wot07-3-wo07Ds2vR5aNuBpIfxK8M',
+            id: 'gdnClJs1LLxrx2fvZ3vQQ4',
             work_order_id:
-                'wo07Ds2vR5aNuBpIfxK8M',
+                '9ooK5olzSsEnpgP8ASzBQi',
             from_node_id: woNodeCapture,
             to_node_id: woNodeReview,
             person_id: woPersonCurrent,
             transitioned_at: dt(59, 11, 0),
         },
         {
-            id: 'wot07-4-wo07Ds2vR5aNuBpIfxK8M',
+            id: 'WT4tD5XUmDdh40hI5Ny17B',
             work_order_id:
-                'wo07Ds2vR5aNuBpIfxK8M',
+                '9ooK5olzSsEnpgP8ASzBQi',
             from_node_id: woNodeReview,
             to_node_id: woNodeComplete,
             person_id: woPersonSarah,
@@ -4029,36 +4023,36 @@ export async function populateMockData(
         },
         // happy-path WO08: DC sojourn 4 days
         {
-            id: 'wot08-1-wo08Et3wS6bOvCqJgyL9N',
+            id: 'hKpS4YMC7r7PivyHgc2Swa',
             work_order_id:
-                'wo08Et3wS6bOvCqJgyL9N',
+                'cnXN4DZx9dUVIZL4OZnyw0',
             from_node_id: '',
             to_node_id: woNodeNew,
             person_id: woPersonSarah,
             transitioned_at: dt(57, 8, 0),
         },
         {
-            id: 'wot08-2-wo08Et3wS6bOvCqJgyL9N',
+            id: 'hhTvFksUIDQyQA401xmNXg',
             work_order_id:
-                'wo08Et3wS6bOvCqJgyL9N',
+                'cnXN4DZx9dUVIZL4OZnyw0',
             from_node_id: woNodeNew,
             to_node_id: woNodeCapture,
             person_id: woPersonSarah,
             transitioned_at: dt(57, 8, 15),
         },
         {
-            id: 'wot08-3-wo08Et3wS6bOvCqJgyL9N',
+            id: 'mAOQLPzk3Ud64ndZnbjMPB',
             work_order_id:
-                'wo08Et3wS6bOvCqJgyL9N',
+                'cnXN4DZx9dUVIZL4OZnyw0',
             from_node_id: woNodeCapture,
             to_node_id: woNodeReview,
             person_id: woPersonMarcus,
             transitioned_at: dt(53, 10, 0),
         },
         {
-            id: 'wot08-4-wo08Et3wS6bOvCqJgyL9N',
+            id: 'qMAn5oFts3CEnMsqbNYPA8',
             work_order_id:
-                'wo08Et3wS6bOvCqJgyL9N',
+                'cnXN4DZx9dUVIZL4OZnyw0',
             from_node_id: woNodeReview,
             to_node_id: woNodeComplete,
             person_id: woPersonMike,
@@ -4066,36 +4060,36 @@ export async function populateMockData(
         },
         // happy-path WO09: DC sojourn 7 days (fat tail)
         {
-            id: 'wot09-1-wo09Fu4xT7cPwDrKhzM0O',
+            id: 'KcxCc7AQLnNZddDwJ8YMOu',
             work_order_id:
-                'wo09Fu4xT7cPwDrKhzM0O',
+                'kKw82RQDHRfgg5xQnw1lPk',
             from_node_id: '',
             to_node_id: woNodeNew,
             person_id: woPersonMike,
             transitioned_at: dt(52, 10, 0),
         },
         {
-            id: 'wot09-2-wo09Fu4xT7cPwDrKhzM0O',
+            id: 'HM3YTTlopkJetDhpXglt3l',
             work_order_id:
-                'wo09Fu4xT7cPwDrKhzM0O',
+                'kKw82RQDHRfgg5xQnw1lPk',
             from_node_id: woNodeNew,
             to_node_id: woNodeCapture,
             person_id: woPersonMike,
             transitioned_at: dt(52, 10, 20),
         },
         {
-            id: 'wot09-3-wo09Fu4xT7cPwDrKhzM0O',
+            id: 'ZXc0n8qwamt9gjeXFZYPYQ',
             work_order_id:
-                'wo09Fu4xT7cPwDrKhzM0O',
+                'kKw82RQDHRfgg5xQnw1lPk',
             from_node_id: woNodeCapture,
             to_node_id: woNodeReview,
             person_id: woPersonMarcus,
             transitioned_at: dt(45, 9, 0),
         },
         {
-            id: 'wot09-4-wo09Fu4xT7cPwDrKhzM0O',
+            id: 'h4s2ZGnlkiHKTB41nfKXzR',
             work_order_id:
-                'wo09Fu4xT7cPwDrKhzM0O',
+                'kKw82RQDHRfgg5xQnw1lPk',
             from_node_id: woNodeReview,
             to_node_id: woNodeComplete,
             person_id: woPersonSarah,
@@ -4103,36 +4097,36 @@ export async function populateMockData(
         },
         // happy-path WO10: DC sojourn 3 days
         {
-            id: 'wot10-1-wo10Gv5yU8dQxEsLinA1P',
+            id: 'i13zOn0NJF0wZANpm9qtz8',
             work_order_id:
-                'wo10Gv5yU8dQxEsLinA1P',
+                'ec0n7Ab6pJYLFDF6H0nyvV',
             from_node_id: '',
             to_node_id: woNodeNew,
             person_id: woPersonSarah,
             transitioned_at: dt(48, 9, 0),
         },
         {
-            id: 'wot10-2-wo10Gv5yU8dQxEsLinA1P',
+            id: 'hSuu3PNyZ6vzzQRse3MT2y',
             work_order_id:
-                'wo10Gv5yU8dQxEsLinA1P',
+                'ec0n7Ab6pJYLFDF6H0nyvV',
             from_node_id: woNodeNew,
             to_node_id: woNodeCapture,
             person_id: woPersonSarah,
             transitioned_at: dt(48, 9, 10),
         },
         {
-            id: 'wot10-3-wo10Gv5yU8dQxEsLinA1P',
+            id: 'f78pCgCBuvzSIHNSiksOY3',
             work_order_id:
-                'wo10Gv5yU8dQxEsLinA1P',
+                'ec0n7Ab6pJYLFDF6H0nyvV',
             from_node_id: woNodeCapture,
             to_node_id: woNodeReview,
             person_id: woPersonCurrent,
             transitioned_at: dt(45, 14, 0),
         },
         {
-            id: 'wot10-4-wo10Gv5yU8dQxEsLinA1P',
+            id: 'FHTXZEVfwmd8eXb3Kc4iyn',
             work_order_id:
-                'wo10Gv5yU8dQxEsLinA1P',
+                'ec0n7Ab6pJYLFDF6H0nyvV',
             from_node_id: woNodeReview,
             to_node_id: woNodeComplete,
             person_id: woPersonMike,
@@ -4140,36 +4134,36 @@ export async function populateMockData(
         },
         // happy-path WO11: DC sojourn 2 days
         {
-            id: 'wot11-1-wo11Hw6zV9eRyFtMjoB2Q',
+            id: '4tXtqSAncDHgMSfj292vLB',
             work_order_id:
-                'wo11Hw6zV9eRyFtMjoB2Q',
+                'gAjJnjirIrIgcFDMJyNsPa',
             from_node_id: '',
             to_node_id: woNodeNew,
             person_id: woPersonMike,
             transitioned_at: dt(44, 10, 30),
         },
         {
-            id: 'wot11-2-wo11Hw6zV9eRyFtMjoB2Q',
+            id: 'EuTRGmhwi9ZKpu4bICyIAA',
             work_order_id:
-                'wo11Hw6zV9eRyFtMjoB2Q',
+                'gAjJnjirIrIgcFDMJyNsPa',
             from_node_id: woNodeNew,
             to_node_id: woNodeCapture,
             person_id: woPersonMike,
             transitioned_at: dt(44, 10, 45),
         },
         {
-            id: 'wot11-3-wo11Hw6zV9eRyFtMjoB2Q',
+            id: 'SShq2HjeSjOa2tDzITkJHj',
             work_order_id:
-                'wo11Hw6zV9eRyFtMjoB2Q',
+                'gAjJnjirIrIgcFDMJyNsPa',
             from_node_id: woNodeCapture,
             to_node_id: woNodeReview,
             person_id: woPersonMarcus,
             transitioned_at: dt(42, 11, 0),
         },
         {
-            id: 'wot11-4-wo11Hw6zV9eRyFtMjoB2Q',
+            id: 'CgSA6m6TcjUwqAgugKt4U2',
             work_order_id:
-                'wo11Hw6zV9eRyFtMjoB2Q',
+                'gAjJnjirIrIgcFDMJyNsPa',
             from_node_id: woNodeReview,
             to_node_id: woNodeComplete,
             person_id: woPersonSarah,
@@ -4177,36 +4171,36 @@ export async function populateMockData(
         },
         // happy-path WO12: DC sojourn 6 days (fat tail)
         {
-            id: 'wot12-1-wo12Ix7aW0fSzGuNkpC3R',
+            id: 'YIZ38Dgl4BXjhVyOlXnevi',
             work_order_id:
-                'wo12Ix7aW0fSzGuNkpC3R',
+                'kyWtMAZPazKqAfIwPzACsL',
             from_node_id: '',
             to_node_id: woNodeNew,
             person_id: woPersonSarah,
             transitioned_at: dt(40, 9, 0),
         },
         {
-            id: 'wot12-2-wo12Ix7aW0fSzGuNkpC3R',
+            id: 'lx7EAKYYTwDEsOA0CTRXbz',
             work_order_id:
-                'wo12Ix7aW0fSzGuNkpC3R',
+                'kyWtMAZPazKqAfIwPzACsL',
             from_node_id: woNodeNew,
             to_node_id: woNodeCapture,
             person_id: woPersonSarah,
             transitioned_at: dt(40, 9, 15),
         },
         {
-            id: 'wot12-3-wo12Ix7aW0fSzGuNkpC3R',
+            id: '47p7RbBeyj6gq7UoglbTLQ',
             work_order_id:
-                'wo12Ix7aW0fSzGuNkpC3R',
+                'kyWtMAZPazKqAfIwPzACsL',
             from_node_id: woNodeCapture,
             to_node_id: woNodeReview,
             person_id: woPersonMarcus,
             transitioned_at: dt(34, 10, 0),
         },
         {
-            id: 'wot12-4-wo12Ix7aW0fSzGuNkpC3R',
+            id: 'TMBYhhOKzYesHHiHsNXfMH',
             work_order_id:
-                'wo12Ix7aW0fSzGuNkpC3R',
+                'kyWtMAZPazKqAfIwPzACsL',
             from_node_id: woNodeReview,
             to_node_id: woNodeComplete,
             person_id: woPersonMike,
@@ -4214,36 +4208,36 @@ export async function populateMockData(
         },
         // happy-path WO13: DC sojourn 1 day
         {
-            id: 'wot13-1-wo13Jy8bX1gTaHvOlqD4S',
+            id: 'VZsA9htg9Km4qLsfhRGETg',
             work_order_id:
-                'wo13Jy8bX1gTaHvOlqD4S',
+                'C41Hni5pMxp8xMQFEGNaib',
             from_node_id: '',
             to_node_id: woNodeNew,
             person_id: woPersonMike,
             transitioned_at: dt(37, 8, 0),
         },
         {
-            id: 'wot13-2-wo13Jy8bX1gTaHvOlqD4S',
+            id: 'Er9sQyVEvd6rSbmH2tC6zc',
             work_order_id:
-                'wo13Jy8bX1gTaHvOlqD4S',
+                'C41Hni5pMxp8xMQFEGNaib',
             from_node_id: woNodeNew,
             to_node_id: woNodeCapture,
             person_id: woPersonMike,
             transitioned_at: dt(37, 8, 10),
         },
         {
-            id: 'wot13-3-wo13Jy8bX1gTaHvOlqD4S',
+            id: 'QGs5QdbV9ANQf2reuiemRd',
             work_order_id:
-                'wo13Jy8bX1gTaHvOlqD4S',
+                'C41Hni5pMxp8xMQFEGNaib',
             from_node_id: woNodeCapture,
             to_node_id: woNodeReview,
             person_id: woPersonCurrent,
             transitioned_at: dt(36, 11, 0),
         },
         {
-            id: 'wot13-4-wo13Jy8bX1gTaHvOlqD4S',
+            id: 'nx5ooiuS68Mvj63uuuFpQN',
             work_order_id:
-                'wo13Jy8bX1gTaHvOlqD4S',
+                'C41Hni5pMxp8xMQFEGNaib',
             from_node_id: woNodeReview,
             to_node_id: woNodeComplete,
             person_id: woPersonSarah,
@@ -4251,36 +4245,36 @@ export async function populateMockData(
         },
         // happy-path WO14: DC sojourn 9 days (fat tail)
         {
-            id: 'wot14-1-wo14Kz9cY2hUbIwPmrE5T',
+            id: 'f2v27lmnpRGtYQxQ9omyeZ',
             work_order_id:
-                'wo14Kz9cY2hUbIwPmrE5T',
+                'FGAZYYwoS9To1tNb24DfLc',
             from_node_id: '',
             to_node_id: woNodeNew,
             person_id: woPersonSarah,
             transitioned_at: dt(33, 9, 30),
         },
         {
-            id: 'wot14-2-wo14Kz9cY2hUbIwPmrE5T',
+            id: 'GIJUAabpi1KGevTrAzXirD',
             work_order_id:
-                'wo14Kz9cY2hUbIwPmrE5T',
+                'FGAZYYwoS9To1tNb24DfLc',
             from_node_id: woNodeNew,
             to_node_id: woNodeCapture,
             person_id: woPersonSarah,
             transitioned_at: dt(33, 9, 45),
         },
         {
-            id: 'wot14-3-wo14Kz9cY2hUbIwPmrE5T',
+            id: '6r9REsvwOdW8DqriF2g76f',
             work_order_id:
-                'wo14Kz9cY2hUbIwPmrE5T',
+                'FGAZYYwoS9To1tNb24DfLc',
             from_node_id: woNodeCapture,
             to_node_id: woNodeReview,
             person_id: woPersonMarcus,
             transitioned_at: dt(24, 10, 0),
         },
         {
-            id: 'wot14-4-wo14Kz9cY2hUbIwPmrE5T',
+            id: 'Q56P9URSLJfpKaSMBejDla',
             work_order_id:
-                'wo14Kz9cY2hUbIwPmrE5T',
+                'FGAZYYwoS9To1tNb24DfLc',
             from_node_id: woNodeReview,
             to_node_id: woNodeComplete,
             person_id: woPersonMike,
@@ -4288,36 +4282,36 @@ export async function populateMockData(
         },
         // happy-path WO15: DC sojourn 2 days
         {
-            id: 'wot15-1-wo15La0dZ3iVcJxQnsF6U',
+            id: '7Qg7wrpNWmoTHlSPoXJrMm',
             work_order_id:
-                'wo15La0dZ3iVcJxQnsF6U',
+                '0zgLwuyPgtreVYjg4TScJR',
             from_node_id: '',
             to_node_id: woNodeNew,
             person_id: woPersonMike,
             transitioned_at: dt(29, 10, 0),
         },
         {
-            id: 'wot15-2-wo15La0dZ3iVcJxQnsF6U',
+            id: 'TFj780SI0g7CP9d1nO1mjy',
             work_order_id:
-                'wo15La0dZ3iVcJxQnsF6U',
+                '0zgLwuyPgtreVYjg4TScJR',
             from_node_id: woNodeNew,
             to_node_id: woNodeCapture,
             person_id: woPersonMike,
             transitioned_at: dt(29, 10, 15),
         },
         {
-            id: 'wot15-3-wo15La0dZ3iVcJxQnsF6U',
+            id: 'Ly9CvZo9IA5JS77ETKKtRj',
             work_order_id:
-                'wo15La0dZ3iVcJxQnsF6U',
+                '0zgLwuyPgtreVYjg4TScJR',
             from_node_id: woNodeCapture,
             to_node_id: woNodeReview,
             person_id: woPersonMarcus,
             transitioned_at: dt(27, 14, 0),
         },
         {
-            id: 'wot15-4-wo15La0dZ3iVcJxQnsF6U',
+            id: 'aWPQp3IBWqWnaqr45BhMba',
             work_order_id:
-                'wo15La0dZ3iVcJxQnsF6U',
+                '0zgLwuyPgtreVYjg4TScJR',
             from_node_id: woNodeReview,
             to_node_id: woNodeComplete,
             person_id: woPersonSarah,
@@ -4325,36 +4319,36 @@ export async function populateMockData(
         },
         // happy-path WO16: DC sojourn 3 days
         {
-            id: 'wot16-1-wo16Mb1eA4jWdKyRotG7V',
+            id: 'BKqz7auwaCm7bYitQ1V0yG',
             work_order_id:
-                'wo16Mb1eA4jWdKyRotG7V',
+                'XGJklKFO4aUtjSAEHEE8Zn',
             from_node_id: '',
             to_node_id: woNodeNew,
             person_id: woPersonSarah,
             transitioned_at: dt(26, 9, 0),
         },
         {
-            id: 'wot16-2-wo16Mb1eA4jWdKyRotG7V',
+            id: 'eReG7OzD6HyZ2ywVP6K7Ac',
             work_order_id:
-                'wo16Mb1eA4jWdKyRotG7V',
+                'XGJklKFO4aUtjSAEHEE8Zn',
             from_node_id: woNodeNew,
             to_node_id: woNodeCapture,
             person_id: woPersonSarah,
             transitioned_at: dt(26, 9, 12),
         },
         {
-            id: 'wot16-3-wo16Mb1eA4jWdKyRotG7V',
+            id: 'f1bm18FOcYixT5prK2pCcV',
             work_order_id:
-                'wo16Mb1eA4jWdKyRotG7V',
+                'XGJklKFO4aUtjSAEHEE8Zn',
             from_node_id: woNodeCapture,
             to_node_id: woNodeReview,
             person_id: woPersonCurrent,
             transitioned_at: dt(23, 11, 0),
         },
         {
-            id: 'wot16-4-wo16Mb1eA4jWdKyRotG7V',
+            id: 'MqxWBCMVJOc0RfEXCEUiEo',
             work_order_id:
-                'wo16Mb1eA4jWdKyRotG7V',
+                'XGJklKFO4aUtjSAEHEE8Zn',
             from_node_id: woNodeReview,
             to_node_id: woNodeComplete,
             person_id: woPersonMike,
@@ -4362,36 +4356,36 @@ export async function populateMockData(
         },
         // happy-path WO17: DC sojourn 1 day
         {
-            id: 'wot17-1-wo17Nc2fB5kXeLzSpuH8W',
+            id: 'G83ZLOMIsgg486X9QDNXvC',
             work_order_id:
-                'wo17Nc2fB5kXeLzSpuH8W',
+                'rtuFD9uWn5zguEHyT3fh8s',
             from_node_id: '',
             to_node_id: woNodeNew,
             person_id: woPersonMike,
             transitioned_at: dt(23, 8, 30),
         },
         {
-            id: 'wot17-2-wo17Nc2fB5kXeLzSpuH8W',
+            id: '6FaR1TmuHJgxw7KW1g8sbf',
             work_order_id:
-                'wo17Nc2fB5kXeLzSpuH8W',
+                'rtuFD9uWn5zguEHyT3fh8s',
             from_node_id: woNodeNew,
             to_node_id: woNodeCapture,
             person_id: woPersonMike,
             transitioned_at: dt(23, 8, 42),
         },
         {
-            id: 'wot17-3-wo17Nc2fB5kXeLzSpuH8W',
+            id: 'qsNwh43wdaGqGjeKeaAeh4',
             work_order_id:
-                'wo17Nc2fB5kXeLzSpuH8W',
+                'rtuFD9uWn5zguEHyT3fh8s',
             from_node_id: woNodeCapture,
             to_node_id: woNodeReview,
             person_id: woPersonMarcus,
             transitioned_at: dt(22, 10, 0),
         },
         {
-            id: 'wot17-4-wo17Nc2fB5kXeLzSpuH8W',
+            id: '7j8VyPb3kuq8TNVz0iPP9M',
             work_order_id:
-                'wo17Nc2fB5kXeLzSpuH8W',
+                'rtuFD9uWn5zguEHyT3fh8s',
             from_node_id: woNodeReview,
             to_node_id: woNodeComplete,
             person_id: woPersonSarah,
@@ -4399,36 +4393,36 @@ export async function populateMockData(
         },
         // happy-path WO18: DC sojourn 4 days
         {
-            id: 'wot18-1-wo18Od3gC6lYfMaTqvI9X',
+            id: 'cEd2hUuCY4EOandCCx6bQX',
             work_order_id:
-                'wo18Od3gC6lYfMaTqvI9X',
+                'XrO05MeyqldO8qm0O4VPdq',
             from_node_id: '',
             to_node_id: woNodeNew,
             person_id: woPersonSarah,
             transitioned_at: dt(20, 10, 0),
         },
         {
-            id: 'wot18-2-wo18Od3gC6lYfMaTqvI9X',
+            id: 'ZywDPM0MCJeweinimZA6wH',
             work_order_id:
-                'wo18Od3gC6lYfMaTqvI9X',
+                'XrO05MeyqldO8qm0O4VPdq',
             from_node_id: woNodeNew,
             to_node_id: woNodeCapture,
             person_id: woPersonSarah,
             transitioned_at: dt(20, 10, 18),
         },
         {
-            id: 'wot18-3-wo18Od3gC6lYfMaTqvI9X',
+            id: 'G5LYG1yT8213GM9zfqqKmU',
             work_order_id:
-                'wo18Od3gC6lYfMaTqvI9X',
+                'XrO05MeyqldO8qm0O4VPdq',
             from_node_id: woNodeCapture,
             to_node_id: woNodeReview,
             person_id: woPersonMarcus,
             transitioned_at: dt(16, 9, 0),
         },
         {
-            id: 'wot18-4-wo18Od3gC6lYfMaTqvI9X',
+            id: 'GUjeLpcj82NtxqFH0gcjtB',
             work_order_id:
-                'wo18Od3gC6lYfMaTqvI9X',
+                'XrO05MeyqldO8qm0O4VPdq',
             from_node_id: woNodeReview,
             to_node_id: woNodeComplete,
             person_id: woPersonMike,
@@ -4436,36 +4430,36 @@ export async function populateMockData(
         },
         // happy-path WO19: DC sojourn 8 days (fat tail)
         {
-            id: 'wot19-1-wo19Pe4hD7mZgNbUrwJ0Y',
+            id: '8woeY7cfbuSKMFI4wMrQZH',
             work_order_id:
-                'wo19Pe4hD7mZgNbUrwJ0Y',
+                'S74N7CPA2dsMESryJNrFAC',
             from_node_id: '',
             to_node_id: woNodeNew,
             person_id: woPersonMike,
             transitioned_at: dt(17, 9, 0),
         },
         {
-            id: 'wot19-2-wo19Pe4hD7mZgNbUrwJ0Y',
+            id: 'OJ5bx5CPsfeb8A1ieKyeQ7',
             work_order_id:
-                'wo19Pe4hD7mZgNbUrwJ0Y',
+                'S74N7CPA2dsMESryJNrFAC',
             from_node_id: woNodeNew,
             to_node_id: woNodeCapture,
             person_id: woPersonMike,
             transitioned_at: dt(17, 9, 20),
         },
         {
-            id: 'wot19-3-wo19Pe4hD7mZgNbUrwJ0Y',
+            id: 'uQQcXyLLxrVFiydl7FCGOZ',
             work_order_id:
-                'wo19Pe4hD7mZgNbUrwJ0Y',
+                'S74N7CPA2dsMESryJNrFAC',
             from_node_id: woNodeCapture,
             to_node_id: woNodeReview,
             person_id: woPersonCurrent,
             transitioned_at: dt(9, 10, 0),
         },
         {
-            id: 'wot19-4-wo19Pe4hD7mZgNbUrwJ0Y',
+            id: 'L1hWSVRmSjhvzoQUPDDhMc',
             work_order_id:
-                'wo19Pe4hD7mZgNbUrwJ0Y',
+                'S74N7CPA2dsMESryJNrFAC',
             from_node_id: woNodeReview,
             to_node_id: woNodeComplete,
             person_id: woPersonSarah,
@@ -4473,36 +4467,36 @@ export async function populateMockData(
         },
         // happy-path WO20: DC sojourn 2 days
         {
-            id: 'wot20-1-wo20Qf5iE8nAhOcVsxK1Z',
+            id: 'ZNE2sS8KyRpIzMAq7lR4uA',
             work_order_id:
-                'wo20Qf5iE8nAhOcVsxK1Z',
+                'Cr8KZH5Q2j5n8Q8Yw3qdMw',
             from_node_id: '',
             to_node_id: woNodeNew,
             person_id: woPersonSarah,
             transitioned_at: dt(14, 8, 0),
         },
         {
-            id: 'wot20-2-wo20Qf5iE8nAhOcVsxK1Z',
+            id: 'ahjiruKeA9qdnMDO4TZf39',
             work_order_id:
-                'wo20Qf5iE8nAhOcVsxK1Z',
+                'Cr8KZH5Q2j5n8Q8Yw3qdMw',
             from_node_id: woNodeNew,
             to_node_id: woNodeCapture,
             person_id: woPersonSarah,
             transitioned_at: dt(14, 8, 15),
         },
         {
-            id: 'wot20-3-wo20Qf5iE8nAhOcVsxK1Z',
+            id: '7ZtemWfFZOqf9SuQVzUwp6',
             work_order_id:
-                'wo20Qf5iE8nAhOcVsxK1Z',
+                'Cr8KZH5Q2j5n8Q8Yw3qdMw',
             from_node_id: woNodeCapture,
             to_node_id: woNodeReview,
             person_id: woPersonMarcus,
             transitioned_at: dt(12, 11, 0),
         },
         {
-            id: 'wot20-4-wo20Qf5iE8nAhOcVsxK1Z',
+            id: 'w36jEVysbnbIdaPhjIcvDI',
             work_order_id:
-                'wo20Qf5iE8nAhOcVsxK1Z',
+                'Cr8KZH5Q2j5n8Q8Yw3qdMw',
             from_node_id: woNodeReview,
             to_node_id: woNodeComplete,
             person_id: woPersonMike,
@@ -4510,36 +4504,36 @@ export async function populateMockData(
         },
         // happy-path WO21: DC sojourn 3 days
         {
-            id: 'wot21-1-wo21Rg6jF9oBiPdWtyL2A',
+            id: 'SSLVclkfoa6nJhoffBS2Zm',
             work_order_id:
-                'wo21Rg6jF9oBiPdWtyL2A',
+                '4T56gYme7ae4Ya7AMA0hpW',
             from_node_id: '',
             to_node_id: woNodeNew,
             person_id: woPersonMike,
             transitioned_at: dt(11, 10, 30),
         },
         {
-            id: 'wot21-2-wo21Rg6jF9oBiPdWtyL2A',
+            id: 'mSCE3Z6y5RpTb74TEW62ky',
             work_order_id:
-                'wo21Rg6jF9oBiPdWtyL2A',
+                '4T56gYme7ae4Ya7AMA0hpW',
             from_node_id: woNodeNew,
             to_node_id: woNodeCapture,
             person_id: woPersonMike,
             transitioned_at: dt(11, 10, 48),
         },
         {
-            id: 'wot21-3-wo21Rg6jF9oBiPdWtyL2A',
+            id: 'smCeF7cSnQQaysWwJPsiTu',
             work_order_id:
-                'wo21Rg6jF9oBiPdWtyL2A',
+                '4T56gYme7ae4Ya7AMA0hpW',
             from_node_id: woNodeCapture,
             to_node_id: woNodeReview,
             person_id: woPersonCurrent,
             transitioned_at: dt(8, 14, 0),
         },
         {
-            id: 'wot21-4-wo21Rg6jF9oBiPdWtyL2A',
+            id: 'KFrDOkEJ3SiUVB3OR29ntN',
             work_order_id:
-                'wo21Rg6jF9oBiPdWtyL2A',
+                '4T56gYme7ae4Ya7AMA0hpW',
             from_node_id: woNodeReview,
             to_node_id: woNodeComplete,
             person_id: woPersonSarah,
@@ -4547,36 +4541,36 @@ export async function populateMockData(
         },
         // happy-path WO22: DC sojourn 1 day
         {
-            id: 'wot22-1-wo22Sh7kG0pCjQeXuzM3B',
+            id: 'fwVQwEUQ8xG4McvCnNVFIV',
             work_order_id:
-                'wo22Sh7kG0pCjQeXuzM3B',
+                'aFCyJrvokoJM5iINwO3WCf',
             from_node_id: '',
             to_node_id: woNodeNew,
             person_id: woPersonSarah,
             transitioned_at: dt(9, 9, 0),
         },
         {
-            id: 'wot22-2-wo22Sh7kG0pCjQeXuzM3B',
+            id: 'UlPzcQK7dJWr6sLiV7qvfh',
             work_order_id:
-                'wo22Sh7kG0pCjQeXuzM3B',
+                'aFCyJrvokoJM5iINwO3WCf',
             from_node_id: woNodeNew,
             to_node_id: woNodeCapture,
             person_id: woPersonSarah,
             transitioned_at: dt(9, 9, 10),
         },
         {
-            id: 'wot22-3-wo22Sh7kG0pCjQeXuzM3B',
+            id: 'aicMwA0QmZUEzeUtlmQOOS',
             work_order_id:
-                'wo22Sh7kG0pCjQeXuzM3B',
+                'aFCyJrvokoJM5iINwO3WCf',
             from_node_id: woNodeCapture,
             to_node_id: woNodeReview,
             person_id: woPersonMarcus,
             transitioned_at: dt(8, 10, 0),
         },
         {
-            id: 'wot22-4-wo22Sh7kG0pCjQeXuzM3B',
+            id: 'ADeYyyUb4p3eknFC5v6nW2',
             work_order_id:
-                'wo22Sh7kG0pCjQeXuzM3B',
+                'aFCyJrvokoJM5iINwO3WCf',
             from_node_id: woNodeReview,
             to_node_id: woNodeComplete,
             person_id: woPersonMike,
@@ -4584,36 +4578,36 @@ export async function populateMockData(
         },
         // happy-path WO23: DC sojourn 2 days
         {
-            id: 'wot23-1-wo23Ti8lH1qDkRfYvaN4C',
+            id: 'DANvBctxus8NEMcTOUy1hi',
             work_order_id:
-                'wo23Ti8lH1qDkRfYvaN4C',
+                'Sr4k75y6vuKODCA9zlSUjk',
             from_node_id: '',
             to_node_id: woNodeNew,
             person_id: woPersonMike,
             transitioned_at: dt(6, 11, 0),
         },
         {
-            id: 'wot23-2-wo23Ti8lH1qDkRfYvaN4C',
+            id: '3EOMPhhyYNW6pY6LnIegUt',
             work_order_id:
-                'wo23Ti8lH1qDkRfYvaN4C',
+                'Sr4k75y6vuKODCA9zlSUjk',
             from_node_id: woNodeNew,
             to_node_id: woNodeCapture,
             person_id: woPersonMike,
             transitioned_at: dt(6, 11, 15),
         },
         {
-            id: 'wot23-3-wo23Ti8lH1qDkRfYvaN4C',
+            id: 'CYglhrk5PKScZSwHQX65Ss',
             work_order_id:
-                'wo23Ti8lH1qDkRfYvaN4C',
+                'Sr4k75y6vuKODCA9zlSUjk',
             from_node_id: woNodeCapture,
             to_node_id: woNodeReview,
             person_id: woPersonMarcus,
             transitioned_at: dt(4, 9, 0),
         },
         {
-            id: 'wot23-4-wo23Ti8lH1qDkRfYvaN4C',
+            id: 'hVa7HADjYHSSsW2qxPPzTw',
             work_order_id:
-                'wo23Ti8lH1qDkRfYvaN4C',
+                'Sr4k75y6vuKODCA9zlSUjk',
             from_node_id: woNodeReview,
             to_node_id: woNodeComplete,
             person_id: woPersonSarah,
@@ -4622,72 +4616,72 @@ export async function populateMockData(
         // needs-revision WO24: double loop DC->Review->DC
         // twice, creating a 3rd distinct completed path
         {
-            id: 'wot24-1-wo24Uj9mI2rElSgZwbO5D',
+            id: 'jNY1G5bpJ6aXd9s8hgqRtN',
             work_order_id:
-                'wo24Uj9mI2rElSgZwbO5D',
+                'Mm6KUpykGSwjD7YofI6zpb',
             from_node_id: '',
             to_node_id: woNodeNew,
             person_id: woPersonSarah,
             transitioned_at: dt(77, 9, 0),
         },
         {
-            id: 'wot24-2-wo24Uj9mI2rElSgZwbO5D',
+            id: 'dHUzDlpmED6x7Hv24kR2nB',
             work_order_id:
-                'wo24Uj9mI2rElSgZwbO5D',
+                'Mm6KUpykGSwjD7YofI6zpb',
             from_node_id: woNodeNew,
             to_node_id: woNodeCapture,
             person_id: woPersonSarah,
             transitioned_at: dt(77, 9, 10),
         },
         {
-            id: 'wot24-3-wo24Uj9mI2rElSgZwbO5D',
+            id: '0LxzRUVeucbfu95bWGkq75',
             work_order_id:
-                'wo24Uj9mI2rElSgZwbO5D',
+                'Mm6KUpykGSwjD7YofI6zpb',
             from_node_id: woNodeCapture,
             to_node_id: woNodeReview,
             person_id: woPersonMarcus,
             transitioned_at: dt(75, 11, 0),
         },
         {
-            id: 'wot24-4-wo24Uj9mI2rElSgZwbO5D',
+            id: 'CiXBfp5CJ8ZAWNahki1Cu8',
             work_order_id:
-                'wo24Uj9mI2rElSgZwbO5D',
+                'Mm6KUpykGSwjD7YofI6zpb',
             from_node_id: woNodeReview,
             to_node_id: woNodeCapture,
             person_id: woPersonMike,
             transitioned_at: dt(74, 14, 0),
         },
         {
-            id: 'wot24-5-wo24Uj9mI2rElSgZwbO5D',
+            id: 'wGVP4JjVdAS6FtQrhTGrC7',
             work_order_id:
-                'wo24Uj9mI2rElSgZwbO5D',
+                'Mm6KUpykGSwjD7YofI6zpb',
             from_node_id: woNodeCapture,
             to_node_id: woNodeReview,
             person_id: woPersonMarcus,
             transitioned_at: dt(73, 10, 0),
         },
         {
-            id: 'wot24-6-wo24Uj9mI2rElSgZwbO5D',
+            id: 'caS4tLtoEUOaPLr2VUxScZ',
             work_order_id:
-                'wo24Uj9mI2rElSgZwbO5D',
+                'Mm6KUpykGSwjD7YofI6zpb',
             from_node_id: woNodeReview,
             to_node_id: woNodeCapture,
             person_id: woPersonSarah,
             transitioned_at: dt(72, 14, 0),
         },
         {
-            id: 'wot24-7-wo24Uj9mI2rElSgZwbO5D',
+            id: 'bQsLuRYpBTppyQtdZqtR5L',
             work_order_id:
-                'wo24Uj9mI2rElSgZwbO5D',
+                'Mm6KUpykGSwjD7YofI6zpb',
             from_node_id: woNodeCapture,
             to_node_id: woNodeReview,
             person_id: woPersonCurrent,
             transitioned_at: dt(71, 10, 0),
         },
         {
-            id: 'wot24-8-wo24Uj9mI2rElSgZwbO5D',
+            id: 'eKFDk2YAO7K93hcrnIveru',
             work_order_id:
-                'wo24Uj9mI2rElSgZwbO5D',
+                'Mm6KUpykGSwjD7YofI6zpb',
             from_node_id: woNodeReview,
             to_node_id: woNodeComplete,
             person_id: woPersonMike,
@@ -4695,54 +4689,54 @@ export async function populateMockData(
         },
         // needs-revision WO25: loops DC->Review->DC
         {
-            id: 'wot25-1-wo25Vk0nJ3sFmThaXcP6E',
+            id: '0Zmtiyp7rFFameCdQwawr7',
             work_order_id:
-                'wo25Vk0nJ3sFmThaXcP6E',
+                'BbZ3Z7OZnFmdF5MBgVIYzI',
             from_node_id: '',
             to_node_id: woNodeNew,
             person_id: woPersonMike,
             transitioned_at: dt(63, 10, 0),
         },
         {
-            id: 'wot25-2-wo25Vk0nJ3sFmThaXcP6E',
+            id: 'lvvaw4Yx5lJnHZoLB3fQqI',
             work_order_id:
-                'wo25Vk0nJ3sFmThaXcP6E',
+                'BbZ3Z7OZnFmdF5MBgVIYzI',
             from_node_id: woNodeNew,
             to_node_id: woNodeCapture,
             person_id: woPersonMike,
             transitioned_at: dt(63, 10, 15),
         },
         {
-            id: 'wot25-3-wo25Vk0nJ3sFmThaXcP6E',
+            id: 'NkrcEkNWD9bu9ntBee8JnO',
             work_order_id:
-                'wo25Vk0nJ3sFmThaXcP6E',
+                'BbZ3Z7OZnFmdF5MBgVIYzI',
             from_node_id: woNodeCapture,
             to_node_id: woNodeReview,
             person_id: woPersonCurrent,
             transitioned_at: dt(61, 14, 0),
         },
         {
-            id: 'wot25-4-wo25Vk0nJ3sFmThaXcP6E',
+            id: 'H7PRtRrjeAoPlty7IxnTTF',
             work_order_id:
-                'wo25Vk0nJ3sFmThaXcP6E',
+                'BbZ3Z7OZnFmdF5MBgVIYzI',
             from_node_id: woNodeReview,
             to_node_id: woNodeCapture,
             person_id: woPersonSarah,
             transitioned_at: dt(60, 22, 0),
         },
         {
-            id: 'wot25-5-wo25Vk0nJ3sFmThaXcP6E',
+            id: 'Xjy85N6xcsUc0dCe49kC1h',
             work_order_id:
-                'wo25Vk0nJ3sFmThaXcP6E',
+                'BbZ3Z7OZnFmdF5MBgVIYzI',
             from_node_id: woNodeCapture,
             to_node_id: woNodeReview,
             person_id: woPersonMarcus,
             transitioned_at: dt(59, 14, 0),
         },
         {
-            id: 'wot25-6-wo25Vk0nJ3sFmThaXcP6E',
+            id: '3IwmCFVLZn4y18iTwydMpO',
             work_order_id:
-                'wo25Vk0nJ3sFmThaXcP6E',
+                'BbZ3Z7OZnFmdF5MBgVIYzI',
             from_node_id: woNodeReview,
             to_node_id: woNodeComplete,
             person_id: woPersonMike,
@@ -4750,54 +4744,54 @@ export async function populateMockData(
         },
         // needs-revision WO26: loops DC->Review->DC
         {
-            id: 'wot26-1-wo26Wl1oK4tGnUibYdQ7F',
+            id: '993Ka1UzsvcerLiBQkW8nn',
             work_order_id:
-                'wo26Wl1oK4tGnUibYdQ7F',
+                'NydsTqMmCgEKI7R9xxp36g',
             from_node_id: '',
             to_node_id: woNodeNew,
             person_id: woPersonSarah,
             transitioned_at: dt(50, 8, 30),
         },
         {
-            id: 'wot26-2-wo26Wl1oK4tGnUibYdQ7F',
+            id: 'EIo4tqqUH9XBmTxLKQa3wY',
             work_order_id:
-                'wo26Wl1oK4tGnUibYdQ7F',
+                'NydsTqMmCgEKI7R9xxp36g',
             from_node_id: woNodeNew,
             to_node_id: woNodeCapture,
             person_id: woPersonSarah,
             transitioned_at: dt(50, 8, 45),
         },
         {
-            id: 'wot26-3-wo26Wl1oK4tGnUibYdQ7F',
+            id: 'Q05vkdZMSIHF8dFhFdu2T9',
             work_order_id:
-                'wo26Wl1oK4tGnUibYdQ7F',
+                'NydsTqMmCgEKI7R9xxp36g',
             from_node_id: woNodeCapture,
             to_node_id: woNodeReview,
             person_id: woPersonMarcus,
             transitioned_at: dt(48, 11, 0),
         },
         {
-            id: 'wot26-4-wo26Wl1oK4tGnUibYdQ7F',
+            id: 'f4raRzWhac1d0qfMW4bHCo',
             work_order_id:
-                'wo26Wl1oK4tGnUibYdQ7F',
+                'NydsTqMmCgEKI7R9xxp36g',
             from_node_id: woNodeReview,
             to_node_id: woNodeCapture,
             person_id: woPersonMike,
             transitioned_at: dt(47, 14, 0),
         },
         {
-            id: 'wot26-5-wo26Wl1oK4tGnUibYdQ7F',
+            id: '8lTjUXAaJGsmi28M5VvnEs',
             work_order_id:
-                'wo26Wl1oK4tGnUibYdQ7F',
+                'NydsTqMmCgEKI7R9xxp36g',
             from_node_id: woNodeCapture,
             to_node_id: woNodeReview,
             person_id: woPersonCurrent,
             transitioned_at: dt(46, 10, 0),
         },
         {
-            id: 'wot26-6-wo26Wl1oK4tGnUibYdQ7F',
+            id: 'GNbLd7I9sqHDpu4xKbBdjV',
             work_order_id:
-                'wo26Wl1oK4tGnUibYdQ7F',
+                'NydsTqMmCgEKI7R9xxp36g',
             from_node_id: woNodeReview,
             to_node_id: woNodeComplete,
             person_id: woPersonSarah,
@@ -4805,54 +4799,54 @@ export async function populateMockData(
         },
         // needs-revision WO27: loops DC->Review->DC
         {
-            id: 'wot27-1-wo27Xm2pL5uHoVjcZeR8G',
+            id: 'CXA7kHHLRi4K7kuhFrrzpa',
             work_order_id:
-                'wo27Xm2pL5uHoVjcZeR8G',
+                'x2uQev3HutthrUWRFkXSkH',
             from_node_id: '',
             to_node_id: woNodeNew,
             person_id: woPersonMike,
             transitioned_at: dt(38, 9, 0),
         },
         {
-            id: 'wot27-2-wo27Xm2pL5uHoVjcZeR8G',
+            id: 't1qnertaXJmzaaELr6IsYU',
             work_order_id:
-                'wo27Xm2pL5uHoVjcZeR8G',
+                'x2uQev3HutthrUWRFkXSkH',
             from_node_id: woNodeNew,
             to_node_id: woNodeCapture,
             person_id: woPersonMike,
             transitioned_at: dt(38, 9, 18),
         },
         {
-            id: 'wot27-3-wo27Xm2pL5uHoVjcZeR8G',
+            id: 'h59lAwdhgMdefl9RisCCj7',
             work_order_id:
-                'wo27Xm2pL5uHoVjcZeR8G',
+                'x2uQev3HutthrUWRFkXSkH',
             from_node_id: woNodeCapture,
             to_node_id: woNodeReview,
             person_id: woPersonMarcus,
             transitioned_at: dt(36, 14, 0),
         },
         {
-            id: 'wot27-4-wo27Xm2pL5uHoVjcZeR8G',
+            id: 'c7ikZyOjtqlGuoz9zODuHy',
             work_order_id:
-                'wo27Xm2pL5uHoVjcZeR8G',
+                'x2uQev3HutthrUWRFkXSkH',
             from_node_id: woNodeReview,
             to_node_id: woNodeCapture,
             person_id: woPersonSarah,
             transitioned_at: dt(35, 22, 0),
         },
         {
-            id: 'wot27-5-wo27Xm2pL5uHoVjcZeR8G',
+            id: 'eKSPOrAHWb6CNNMhRQTYKt',
             work_order_id:
-                'wo27Xm2pL5uHoVjcZeR8G',
+                'x2uQev3HutthrUWRFkXSkH',
             from_node_id: woNodeCapture,
             to_node_id: woNodeReview,
             person_id: woPersonMarcus,
             transitioned_at: dt(34, 14, 0),
         },
         {
-            id: 'wot27-6-wo27Xm2pL5uHoVjcZeR8G',
+            id: 'zGJlSHo6fbztITB52k1vuP',
             work_order_id:
-                'wo27Xm2pL5uHoVjcZeR8G',
+                'x2uQev3HutthrUWRFkXSkH',
             from_node_id: woNodeReview,
             to_node_id: woNodeComplete,
             person_id: woPersonMike,
@@ -4860,54 +4854,54 @@ export async function populateMockData(
         },
         // needs-revision WO28: loops DC->Review->DC
         {
-            id: 'wot28-1-wo28Yn3qM6vIpWkdAfS9H',
+            id: 'ZHtYaVGAAmYCcJYUbDsEZl',
             work_order_id:
-                'wo28Yn3qM6vIpWkdAfS9H',
+                'w7XA9UnuYI7e46RTQL1xGW',
             from_node_id: '',
             to_node_id: woNodeNew,
             person_id: woPersonSarah,
             transitioned_at: dt(25, 10, 0),
         },
         {
-            id: 'wot28-2-wo28Yn3qM6vIpWkdAfS9H',
+            id: '9SqVX67zSGRvJr6LzgLoqA',
             work_order_id:
-                'wo28Yn3qM6vIpWkdAfS9H',
+                'w7XA9UnuYI7e46RTQL1xGW',
             from_node_id: woNodeNew,
             to_node_id: woNodeCapture,
             person_id: woPersonSarah,
             transitioned_at: dt(25, 10, 20),
         },
         {
-            id: 'wot28-3-wo28Yn3qM6vIpWkdAfS9H',
+            id: 'tgkwKH3qWOdn2BcWaazkdN',
             work_order_id:
-                'wo28Yn3qM6vIpWkdAfS9H',
+                'w7XA9UnuYI7e46RTQL1xGW',
             from_node_id: woNodeCapture,
             to_node_id: woNodeReview,
             person_id: woPersonCurrent,
             transitioned_at: dt(23, 14, 0),
         },
         {
-            id: 'wot28-4-wo28Yn3qM6vIpWkdAfS9H',
+            id: 'IGUf2HrDyAJCpT1OrdBEdb',
             work_order_id:
-                'wo28Yn3qM6vIpWkdAfS9H',
+                'w7XA9UnuYI7e46RTQL1xGW',
             from_node_id: woNodeReview,
             to_node_id: woNodeCapture,
             person_id: woPersonMike,
             transitioned_at: dt(22, 14, 0),
         },
         {
-            id: 'wot28-5-wo28Yn3qM6vIpWkdAfS9H',
+            id: 'PxLFPaM23m2rQXIzeJIywN',
             work_order_id:
-                'wo28Yn3qM6vIpWkdAfS9H',
+                'w7XA9UnuYI7e46RTQL1xGW',
             from_node_id: woNodeCapture,
             to_node_id: woNodeReview,
             person_id: woPersonMarcus,
             transitioned_at: dt(21, 10, 0),
         },
         {
-            id: 'wot28-6-wo28Yn3qM6vIpWkdAfS9H',
+            id: '01Xeks1usn4PgpxH0QwyHi',
             work_order_id:
-                'wo28Yn3qM6vIpWkdAfS9H',
+                'w7XA9UnuYI7e46RTQL1xGW',
             from_node_id: woNodeReview,
             to_node_id: woNodeComplete,
             person_id: woPersonSarah,
@@ -4915,54 +4909,54 @@ export async function populateMockData(
         },
         // needs-revision WO29: loops DC->Review->DC
         {
-            id: 'wot29-1-wo29Zo4rN7wJqXleBgT0I',
+            id: 'UsCm8zcTD7V2b5csEp7Mcr',
             work_order_id:
-                'wo29Zo4rN7wJqXleBgT0I',
+                '3H3XeeNE4rS2wbANs3JvYz',
             from_node_id: '',
             to_node_id: woNodeNew,
             person_id: woPersonMike,
             transitioned_at: dt(12, 9, 30),
         },
         {
-            id: 'wot29-2-wo29Zo4rN7wJqXleBgT0I',
+            id: 'eRBpgQtP1g4IrauEEkfOCl',
             work_order_id:
-                'wo29Zo4rN7wJqXleBgT0I',
+                '3H3XeeNE4rS2wbANs3JvYz',
             from_node_id: woNodeNew,
             to_node_id: woNodeCapture,
             person_id: woPersonMike,
             transitioned_at: dt(12, 9, 45),
         },
         {
-            id: 'wot29-3-wo29Zo4rN7wJqXleBgT0I',
+            id: 'vfWjLYPYadU0NFA6mk7yRl',
             work_order_id:
-                'wo29Zo4rN7wJqXleBgT0I',
+                '3H3XeeNE4rS2wbANs3JvYz',
             from_node_id: woNodeCapture,
             to_node_id: woNodeReview,
             person_id: woPersonMarcus,
             transitioned_at: dt(11, 11, 0),
         },
         {
-            id: 'wot29-4-wo29Zo4rN7wJqXleBgT0I',
+            id: 'G2eaGEcEP0s7q8ThefRKze',
             work_order_id:
-                'wo29Zo4rN7wJqXleBgT0I',
+                '3H3XeeNE4rS2wbANs3JvYz',
             from_node_id: woNodeReview,
             to_node_id: woNodeCapture,
             person_id: woPersonSarah,
             transitioned_at: dt(10, 14, 0),
         },
         {
-            id: 'wot29-5-wo29Zo4rN7wJqXleBgT0I',
+            id: 'ZstKsrHfLjCwfx2qFso2ZR',
             work_order_id:
-                'wo29Zo4rN7wJqXleBgT0I',
+                '3H3XeeNE4rS2wbANs3JvYz',
             from_node_id: woNodeCapture,
             to_node_id: woNodeReview,
             person_id: woPersonCurrent,
             transitioned_at: dt(9, 11, 0),
         },
         {
-            id: 'wot29-6-wo29Zo4rN7wJqXleBgT0I',
+            id: 'BZ2RDP2rbCFKJvqqERE7eE',
             work_order_id:
-                'wo29Zo4rN7wJqXleBgT0I',
+                '3H3XeeNE4rS2wbANs3JvYz',
             from_node_id: woNodeReview,
             to_node_id: woNodeComplete,
             person_id: woPersonMike,
@@ -4970,18 +4964,18 @@ export async function populateMockData(
         },
         // in-flight WO30: sitting in Data Capture
         {
-            id: 'wot30-1-wo30Ap5sO8xKrYmfChU1J',
+            id: '6DutgmmGcJ1gqIvJgAcUHc',
             work_order_id:
-                'wo30Ap5sO8xKrYmfChU1J',
+                'i7YYgKN3ZUlrkulQ2aWdIE',
             from_node_id: '',
             to_node_id: woNodeNew,
             person_id: woPersonSarah,
             transitioned_at: dt(18, 9, 0),
         },
         {
-            id: 'wot30-2-wo30Ap5sO8xKrYmfChU1J',
+            id: '8IEmMehaWoNrxS2NNocSNE',
             work_order_id:
-                'wo30Ap5sO8xKrYmfChU1J',
+                'i7YYgKN3ZUlrkulQ2aWdIE',
             from_node_id: woNodeNew,
             to_node_id: woNodeCapture,
             person_id: woPersonSarah,
@@ -4989,18 +4983,18 @@ export async function populateMockData(
         },
         // in-flight WO31: sitting in Data Capture
         {
-            id: 'wot31-1-wo31Bq6tP9yLsZngDiV2K',
+            id: 'y0Mx6OUCbfA0HXgyqArpcv',
             work_order_id:
-                'wo31Bq6tP9yLsZngDiV2K',
+                '0brjvcoPEVBwMkUQ3tKHWc',
             from_node_id: '',
             to_node_id: woNodeNew,
             person_id: woPersonMike,
             transitioned_at: dt(10, 10, 0),
         },
         {
-            id: 'wot31-2-wo31Bq6tP9yLsZngDiV2K',
+            id: 'xPBiF7zri62itn9FCXWtUE',
             work_order_id:
-                'wo31Bq6tP9yLsZngDiV2K',
+                '0brjvcoPEVBwMkUQ3tKHWc',
             from_node_id: woNodeNew,
             to_node_id: woNodeCapture,
             person_id: woPersonMike,
@@ -5008,18 +5002,18 @@ export async function populateMockData(
         },
         // in-flight WO32: sitting in Data Capture
         {
-            id: 'wot32-1-wo32Cr7uQ0zMtAohEjW3L',
+            id: 'vX4jtsFFLGpU3CXPRpdCrv',
             work_order_id:
-                'wo32Cr7uQ0zMtAohEjW3L',
+                'mTdhglHhl7pM0mKt0M2IjF',
             from_node_id: '',
             to_node_id: woNodeNew,
             person_id: woPersonSarah,
             transitioned_at: dt(7, 8, 0),
         },
         {
-            id: 'wot32-2-wo32Cr7uQ0zMtAohEjW3L',
+            id: 'du3liNmXeejdDA0OMRfibW',
             work_order_id:
-                'wo32Cr7uQ0zMtAohEjW3L',
+                'mTdhglHhl7pM0mKt0M2IjF',
             from_node_id: woNodeNew,
             to_node_id: woNodeCapture,
             person_id: woPersonSarah,
@@ -5027,27 +5021,27 @@ export async function populateMockData(
         },
         // in-flight WO33: sitting in Review
         {
-            id: 'wot33-1-wo33Ds8vR1aNuBpiGkX4M',
+            id: 'YhSbU5pZG78ab0G4SepE3j',
             work_order_id:
-                'wo33Ds8vR1aNuBpiGkX4M',
+                'GMhfH8lMQJXzE4vkjnSH1u',
             from_node_id: '',
             to_node_id: woNodeNew,
             person_id: woPersonMike,
             transitioned_at: dt(4, 9, 0),
         },
         {
-            id: 'wot33-2-wo33Ds8vR1aNuBpiGkX4M',
+            id: 'oapOBSYlGiuRXZDQoODFj7',
             work_order_id:
-                'wo33Ds8vR1aNuBpiGkX4M',
+                'GMhfH8lMQJXzE4vkjnSH1u',
             from_node_id: woNodeNew,
             to_node_id: woNodeCapture,
             person_id: woPersonMike,
             transitioned_at: dt(4, 9, 18),
         },
         {
-            id: 'wot33-3-wo33Ds8vR1aNuBpiGkX4M',
+            id: '4GQOHCMoSVszRiPyPIEJFj',
             work_order_id:
-                'wo33Ds8vR1aNuBpiGkX4M',
+                'GMhfH8lMQJXzE4vkjnSH1u',
             from_node_id: woNodeCapture,
             to_node_id: woNodeReview,
             person_id: woPersonMarcus,
@@ -5055,27 +5049,27 @@ export async function populateMockData(
         },
         // in-flight WO34: sitting in Review
         {
-            id: 'wot34-1-wo34Et9wS2bOvCqjHlY5N',
+            id: 'W1A4TYQHkFgG0ijSUUQPR1',
             work_order_id:
-                'wo34Et9wS2bOvCqjHlY5N',
+                'pLxCFGOINXVaXmrS0VG0vC',
             from_node_id: '',
             to_node_id: woNodeNew,
             person_id: woPersonSarah,
             transitioned_at: dt(2, 11, 0),
         },
         {
-            id: 'wot34-2-wo34Et9wS2bOvCqjHlY5N',
+            id: 'IUWLLWpuMM5EHbpESuAG13',
             work_order_id:
-                'wo34Et9wS2bOvCqjHlY5N',
+                'pLxCFGOINXVaXmrS0VG0vC',
             from_node_id: woNodeNew,
             to_node_id: woNodeCapture,
             person_id: woPersonSarah,
             transitioned_at: dt(2, 11, 20),
         },
         {
-            id: 'wot34-3-wo34Et9wS2bOvCqjHlY5N',
+            id: 'IvGW6Yw71dy7s5wmMEYxDr',
             work_order_id:
-                'wo34Et9wS2bOvCqjHlY5N',
+                'pLxCFGOINXVaXmrS0VG0vC',
             from_node_id: woNodeCapture,
             to_node_id: woNodeReview,
             person_id: woPersonCurrent,
@@ -5084,36 +5078,36 @@ export async function populateMockData(
         // out-of-clan WO35: Sarah (not in DC workers)
         // transitions DC out
         {
-            id: 'wot35-1-wo35Fu0xT3cPwDrkImZ6O',
+            id: 'uGXz0fPBwWaBQcviQP5ZsV',
             work_order_id:
-                'wo35Fu0xT3cPwDrkImZ6O',
+                'IyrpZrIl2hbmmnCtiifEGm',
             from_node_id: '',
             to_node_id: woNodeNew,
             person_id: woPersonMike,
             transitioned_at: dt(35, 9, 0),
         },
         {
-            id: 'wot35-2-wo35Fu0xT3cPwDrkImZ6O',
+            id: 'cEFDawHdIHfIaZQYGhH5xu',
             work_order_id:
-                'wo35Fu0xT3cPwDrkImZ6O',
+                'IyrpZrIl2hbmmnCtiifEGm',
             from_node_id: woNodeNew,
             to_node_id: woNodeCapture,
             person_id: woPersonMike,
             transitioned_at: dt(35, 9, 12),
         },
         {
-            id: 'wot35-3-wo35Fu0xT3cPwDrkImZ6O',
+            id: 'MGhDId9jZaFJZ5fBhnrGem',
             work_order_id:
-                'wo35Fu0xT3cPwDrkImZ6O',
+                'IyrpZrIl2hbmmnCtiifEGm',
             from_node_id: woNodeCapture,
             to_node_id: woNodeReview,
             person_id: woPersonSarah,
             transitioned_at: dt(33, 10, 0),
         },
         {
-            id: 'wot35-4-wo35Fu0xT3cPwDrkImZ6O',
+            id: 'Zch8By7ZpKFDwCNMEPI62h',
             work_order_id:
-                'wo35Fu0xT3cPwDrkImZ6O',
+                'IyrpZrIl2hbmmnCtiifEGm',
             from_node_id: woNodeReview,
             to_node_id: woNodeComplete,
             person_id: woPersonMike,
@@ -5122,36 +5116,36 @@ export async function populateMockData(
         // out-of-clan WO36: Mike (not in DC workers)
         // transitions DC out
         {
-            id: 'wot36-1-wo36Gv1yU4dQxEslJnA7P',
+            id: 'VrxyiUJqWcdd3hBdMyoTBt',
             work_order_id:
-                'wo36Gv1yU4dQxEslJnA7P',
+                'zYnDWBV4VP5guzW5fDWtHN',
             from_node_id: '',
             to_node_id: woNodeNew,
             person_id: woPersonSarah,
             transitioned_at: dt(22, 10, 30),
         },
         {
-            id: 'wot36-2-wo36Gv1yU4dQxEslJnA7P',
+            id: 'yikZQBGGjkiZXksUJM3gkS',
             work_order_id:
-                'wo36Gv1yU4dQxEslJnA7P',
+                'zYnDWBV4VP5guzW5fDWtHN',
             from_node_id: woNodeNew,
             to_node_id: woNodeCapture,
             person_id: woPersonSarah,
             transitioned_at: dt(22, 10, 45),
         },
         {
-            id: 'wot36-3-wo36Gv1yU4dQxEslJnA7P',
+            id: '0J4UMtQY7x8cfN8FNXaToL',
             work_order_id:
-                'wo36Gv1yU4dQxEslJnA7P',
+                'zYnDWBV4VP5guzW5fDWtHN',
             from_node_id: woNodeCapture,
             to_node_id: woNodeReview,
             person_id: woPersonMike,
             transitioned_at: dt(20, 11, 0),
         },
         {
-            id: 'wot36-4-wo36Gv1yU4dQxEslJnA7P',
+            id: 'XqSDgqjNZLihLPd2MX8fRR',
             work_order_id:
-                'wo36Gv1yU4dQxEslJnA7P',
+                'zYnDWBV4VP5guzW5fDWtHN',
             from_node_id: woNodeReview,
             to_node_id: woNodeComplete,
             person_id: woPersonSarah,
@@ -5162,36 +5156,36 @@ export async function populateMockData(
         // only the in-window ~82 days of DC sojourn
         // count toward heat (exercises window clipping)
         {
-            id: 'wot37-1-wo37Hw2zV5eRyFtKjoB8Q',
+            id: 'QsV9mE5GIUpMXGh3SVTCB7',
             work_order_id:
-                'wo37Hw2zV5eRyFtKjoB8Q',
+                '7HX7RPwlYopHWfD7I0QAPs',
             from_node_id: '',
             to_node_id: woNodeNew,
             person_id: woPersonMike,
             transitioned_at: dt(108, 9, 0),
         },
         {
-            id: 'wot37-2-wo37Hw2zV5eRyFtKjoB8Q',
+            id: 'pq0sBjRnF8XBooRpIPhsQp',
             work_order_id:
-                'wo37Hw2zV5eRyFtKjoB8Q',
+                '7HX7RPwlYopHWfD7I0QAPs',
             from_node_id: woNodeNew,
             to_node_id: woNodeCapture,
             person_id: woPersonMike,
             transitioned_at: dt(108, 9, 15),
         },
         {
-            id: 'wot37-3-wo37Hw2zV5eRyFtKjoB8Q',
+            id: 'BNbXMdM5RReniv5obnnHF8',
             work_order_id:
-                'wo37Hw2zV5eRyFtKjoB8Q',
+                '7HX7RPwlYopHWfD7I0QAPs',
             from_node_id: woNodeCapture,
             to_node_id: woNodeReview,
             person_id: woPersonMarcus,
             transitioned_at: dt(8, 10, 0),
         },
         {
-            id: 'wot37-4-wo37Hw2zV5eRyFtKjoB8Q',
+            id: 'txMcs1q11W87MhhBuR83vx',
             work_order_id:
-                'wo37Hw2zV5eRyFtKjoB8Q',
+                '7HX7RPwlYopHWfD7I0QAPs',
             from_node_id: woNodeReview,
             to_node_id: woNodeComplete,
             person_id: woPersonSarah,
@@ -5201,36 +5195,36 @@ export async function populateMockData(
         // entirely outside the 90-day window; contributes
         // ~0 to heat stats
         {
-            id: 'wot38-1-wo38Ix3aW6fSzGuNkpC9R',
+            id: 'jobf5lBzIn2MPw34grYi2d',
             work_order_id:
-                'wo38Ix3aW6fSzGuNkpC9R',
+                'EXphSopBU1Is2TH4QZo4nO',
             from_node_id: '',
             to_node_id: woNodeNew,
             person_id: woPersonSarah,
             transitioned_at: dt(103, 10, 0),
         },
         {
-            id: 'wot38-2-wo38Ix3aW6fSzGuNkpC9R',
+            id: 'o97Okl09WcFIc5EHkfBNL0',
             work_order_id:
-                'wo38Ix3aW6fSzGuNkpC9R',
+                'EXphSopBU1Is2TH4QZo4nO',
             from_node_id: woNodeNew,
             to_node_id: woNodeCapture,
             person_id: woPersonSarah,
             transitioned_at: dt(103, 10, 18),
         },
         {
-            id: 'wot38-3-wo38Ix3aW6fSzGuNkpC9R',
+            id: '783y3zl2CZTp98AaqPhggs',
             work_order_id:
-                'wo38Ix3aW6fSzGuNkpC9R',
+                'EXphSopBU1Is2TH4QZo4nO',
             from_node_id: woNodeCapture,
             to_node_id: woNodeReview,
             person_id: woPersonMarcus,
             transitioned_at: dt(101, 11, 0),
         },
         {
-            id: 'wot38-4-wo38Ix3aW6fSzGuNkpC9R',
+            id: 'HXbhOvQZXx6DnrRB0T3mve',
             work_order_id:
-                'wo38Ix3aW6fSzGuNkpC9R',
+                'EXphSopBU1Is2TH4QZo4nO',
             from_node_id: woNodeReview,
             to_node_id: woNodeComplete,
             person_id: woPersonMike,
@@ -5238,72 +5232,72 @@ export async function populateMockData(
         },
         // prc01: happy path, ~3 day draft sojourn
         {
-            id: 'wprc01-1',
+            id: 'fGWA9Dk2EKdOzT2DDU9XOC',
             work_order_id:
-                'prc01AaBbCcDdEeFfGgHhIi',
+                'hRPNkjrYBTQqzzFe1t8FH6',
             from_node_id: '',
             to_node_id: prcNodeStart,
             person_id: woPersonSarah,
             transitioned_at: dt(60, 9, 0),
         },
         {
-            id: 'wprc01-2',
+            id: '3ksjRuCLxe6hNXR0dNzxWQ',
             work_order_id:
-                'prc01AaBbCcDdEeFfGgHhIi',
+                'hRPNkjrYBTQqzzFe1t8FH6',
             from_node_id: prcNodeStart,
             to_node_id: prcNodeDraft,
             person_id: woPersonSarah,
             transitioned_at: dt(60, 9, 5),
         },
         {
-            id: 'wprc01-3',
+            id: 'uWiv67EN75R9nQ1njZxhuv',
             work_order_id:
-                'prc01AaBbCcDdEeFfGgHhIi',
+                'hRPNkjrYBTQqzzFe1t8FH6',
             from_node_id: prcNodeDraft,
             to_node_id: prcNodeSubmit,
             person_id: woPersonMike,
             transitioned_at: dt(57, 10, 0),
         },
         {
-            id: 'wprc01-4',
+            id: 'odxDZFFHmZwFy1FmpUuxU5',
             work_order_id:
-                'prc01AaBbCcDdEeFfGgHhIi',
+                'hRPNkjrYBTQqzzFe1t8FH6',
             from_node_id: prcNodeSubmit,
             to_node_id: prcNodeTriage,
             person_id: woPersonMike,
             transitioned_at: dt(57, 10, 30),
         },
         {
-            id: 'wprc01-5',
+            id: 'AC5WlYdwXBnnE58qHaHmIo',
             work_order_id:
-                'prc01AaBbCcDdEeFfGgHhIi',
+                'hRPNkjrYBTQqzzFe1t8FH6',
             from_node_id: prcNodeTriage,
             to_node_id: prcNodeQuickRev,
             person_id: woPersonMarcus,
             transitioned_at: dt(57, 11, 0),
         },
         {
-            id: 'wprc01-6',
+            id: 'RgZgN0b8utwKl61fc4TzZP',
             work_order_id:
-                'prc01AaBbCcDdEeFfGgHhIi',
+                'hRPNkjrYBTQqzzFe1t8FH6',
             from_node_id: prcNodeQuickRev,
             to_node_id: prcNodeDecision,
             person_id: woPersonMarcus,
             transitioned_at: dt(56, 14, 0),
         },
         {
-            id: 'wprc01-7',
+            id: 'z6hNmYbEWvegszxhwcJ61f',
             work_order_id:
-                'prc01AaBbCcDdEeFfGgHhIi',
+                'hRPNkjrYBTQqzzFe1t8FH6',
             from_node_id: prcNodeDecision,
             to_node_id: prcNodeApproved,
             person_id: woPersonSarah,
             transitioned_at: dt(56, 15, 0),
         },
         {
-            id: 'wprc01-8',
+            id: 'XdBVq4IIUbuiefP1w0g0yu',
             work_order_id:
-                'prc01AaBbCcDdEeFfGgHhIi',
+                'hRPNkjrYBTQqzzFe1t8FH6',
             from_node_id: prcNodeApproved,
             to_node_id: prcNodeArchive,
             person_id: woPersonSarah,
@@ -5311,72 +5305,72 @@ export async function populateMockData(
         },
         // prc02: happy path, ~2 day draft sojourn
         {
-            id: 'wprc02-1',
+            id: 'Voznw9q5B5mGSoQek1jAHs',
             work_order_id:
-                'prc02JjKkLlMmNnOoPpQqRr',
+                'L3UhOvrAGluk4kNnN6J8NT',
             from_node_id: '',
             to_node_id: prcNodeStart,
             person_id: woPersonMike,
             transitioned_at: dt(45, 10, 0),
         },
         {
-            id: 'wprc02-2',
+            id: 'm0nfsE2rTHaRbAWuxmum9d',
             work_order_id:
-                'prc02JjKkLlMmNnOoPpQqRr',
+                'L3UhOvrAGluk4kNnN6J8NT',
             from_node_id: prcNodeStart,
             to_node_id: prcNodeDraft,
             person_id: woPersonMike,
             transitioned_at: dt(45, 10, 10),
         },
         {
-            id: 'wprc02-3',
+            id: 'yxbLBIMHtHgVjO74NsrNgX',
             work_order_id:
-                'prc02JjKkLlMmNnOoPpQqRr',
+                'L3UhOvrAGluk4kNnN6J8NT',
             from_node_id: prcNodeDraft,
             to_node_id: prcNodeSubmit,
             person_id: woPersonMike,
             transitioned_at: dt(43, 9, 0),
         },
         {
-            id: 'wprc02-4',
+            id: 'z9NN5xeQ6CMu9DChJ16m1V',
             work_order_id:
-                'prc02JjKkLlMmNnOoPpQqRr',
+                'L3UhOvrAGluk4kNnN6J8NT',
             from_node_id: prcNodeSubmit,
             to_node_id: prcNodeTriage,
             person_id: woPersonMarcus,
             transitioned_at: dt(43, 9, 20),
         },
         {
-            id: 'wprc02-5',
+            id: 'UAO4qYna7zIzLSJwM8iIoh',
             work_order_id:
-                'prc02JjKkLlMmNnOoPpQqRr',
+                'L3UhOvrAGluk4kNnN6J8NT',
             from_node_id: prcNodeTriage,
             to_node_id: prcNodeQuickRev,
             person_id: woPersonMarcus,
             transitioned_at: dt(43, 10, 0),
         },
         {
-            id: 'wprc02-6',
+            id: 'UrbW8eFstKcsHbh99uRUds',
             work_order_id:
-                'prc02JjKkLlMmNnOoPpQqRr',
+                'L3UhOvrAGluk4kNnN6J8NT',
             from_node_id: prcNodeQuickRev,
             to_node_id: prcNodeDecision,
             person_id: woPersonSarah,
             transitioned_at: dt(42, 14, 0),
         },
         {
-            id: 'wprc02-7',
+            id: 'KW7NkVunQCIEUzL9R78DpF',
             work_order_id:
-                'prc02JjKkLlMmNnOoPpQqRr',
+                'L3UhOvrAGluk4kNnN6J8NT',
             from_node_id: prcNodeDecision,
             to_node_id: prcNodeApproved,
             person_id: woPersonSarah,
             transitioned_at: dt(42, 15, 0),
         },
         {
-            id: 'wprc02-8',
+            id: 'wVgv2i4c1o7t11tIrmngjN',
             work_order_id:
-                'prc02JjKkLlMmNnOoPpQqRr',
+                'L3UhOvrAGluk4kNnN6J8NT',
             from_node_id: prcNodeApproved,
             to_node_id: prcNodeArchive,
             person_id: woPersonMike,
@@ -5384,72 +5378,72 @@ export async function populateMockData(
         },
         // prc03: happy path, ~1 day draft sojourn
         {
-            id: 'wprc03-1',
+            id: 'jMUHUNKZX9A0LJOuoDt3UQ',
             work_order_id:
-                'prc03SsTtUuVvWwXxYyZz00',
+                'oTscblsEOjZDkvkW3vs7rU',
             from_node_id: '',
             to_node_id: prcNodeStart,
             person_id: woPersonSarah,
             transitioned_at: dt(30, 8, 0),
         },
         {
-            id: 'wprc03-2',
+            id: '5opUgNKNUIWnlm3MnpGX9F',
             work_order_id:
-                'prc03SsTtUuVvWwXxYyZz00',
+                'oTscblsEOjZDkvkW3vs7rU',
             from_node_id: prcNodeStart,
             to_node_id: prcNodeDraft,
             person_id: woPersonSarah,
             transitioned_at: dt(30, 8, 10),
         },
         {
-            id: 'wprc03-3',
+            id: '0XabGfXLVpJqRrrA8Tmo4S',
             work_order_id:
-                'prc03SsTtUuVvWwXxYyZz00',
+                'oTscblsEOjZDkvkW3vs7rU',
             from_node_id: prcNodeDraft,
             to_node_id: prcNodeSubmit,
             person_id: woPersonCurrent,
             transitioned_at: dt(29, 9, 0),
         },
         {
-            id: 'wprc03-4',
+            id: 'sbPLHxmfJUpk3tfXZ7ShRX',
             work_order_id:
-                'prc03SsTtUuVvWwXxYyZz00',
+                'oTscblsEOjZDkvkW3vs7rU',
             from_node_id: prcNodeSubmit,
             to_node_id: prcNodeTriage,
             person_id: woPersonCurrent,
             transitioned_at: dt(29, 9, 15),
         },
         {
-            id: 'wprc03-5',
+            id: 'CEUHkraKtR9HC4heDL8OaZ',
             work_order_id:
-                'prc03SsTtUuVvWwXxYyZz00',
+                'oTscblsEOjZDkvkW3vs7rU',
             from_node_id: prcNodeTriage,
             to_node_id: prcNodeQuickRev,
             person_id: woPersonMarcus,
             transitioned_at: dt(29, 10, 0),
         },
         {
-            id: 'wprc03-6',
+            id: 'EqVBgaYCFKRwp9uIHOyVle',
             work_order_id:
-                'prc03SsTtUuVvWwXxYyZz00',
+                'oTscblsEOjZDkvkW3vs7rU',
             from_node_id: prcNodeQuickRev,
             to_node_id: prcNodeDecision,
             person_id: woPersonMarcus,
             transitioned_at: dt(28, 15, 0),
         },
         {
-            id: 'wprc03-7',
+            id: '1DfCm0yI6ycGmVNPcudsOU',
             work_order_id:
-                'prc03SsTtUuVvWwXxYyZz00',
+                'oTscblsEOjZDkvkW3vs7rU',
             from_node_id: prcNodeDecision,
             to_node_id: prcNodeApproved,
             person_id: woPersonMike,
             transitioned_at: dt(28, 16, 0),
         },
         {
-            id: 'wprc03-8',
+            id: 'lAOOAfrD4ZO0rKWfQFI8Px',
             work_order_id:
-                'prc03SsTtUuVvWwXxYyZz00',
+                'oTscblsEOjZDkvkW3vs7rU',
             from_node_id: prcNodeApproved,
             to_node_id: prcNodeArchive,
             person_id: woPersonMike,
@@ -5457,72 +5451,72 @@ export async function populateMockData(
         },
         // prc04: happy path, ~4 day draft sojourn
         {
-            id: 'wprc04-1',
+            id: 'JOz3BgXyTUkvWLmmNGszc7',
             work_order_id:
-                'prc04A1B2C3D4E5F6G7H8I9',
+                'Xpw9VGpZ6RyevuInSr8yze',
             from_node_id: '',
             to_node_id: prcNodeStart,
             person_id: woPersonMike,
             transitioned_at: dt(20, 11, 0),
         },
         {
-            id: 'wprc04-2',
+            id: 'JpSsbb9JNMnGteG4RBWrZB',
             work_order_id:
-                'prc04A1B2C3D4E5F6G7H8I9',
+                'Xpw9VGpZ6RyevuInSr8yze',
             from_node_id: prcNodeStart,
             to_node_id: prcNodeDraft,
             person_id: woPersonMike,
             transitioned_at: dt(20, 11, 5),
         },
         {
-            id: 'wprc04-3',
+            id: 'dn32O6s5Ibe5aDOByr87J7',
             work_order_id:
-                'prc04A1B2C3D4E5F6G7H8I9',
+                'Xpw9VGpZ6RyevuInSr8yze',
             from_node_id: prcNodeDraft,
             to_node_id: prcNodeSubmit,
             person_id: woPersonMarcus,
             transitioned_at: dt(16, 10, 0),
         },
         {
-            id: 'wprc04-4',
+            id: 'nFGAxCNAthhvb9m4walDUe',
             work_order_id:
-                'prc04A1B2C3D4E5F6G7H8I9',
+                'Xpw9VGpZ6RyevuInSr8yze',
             from_node_id: prcNodeSubmit,
             to_node_id: prcNodeTriage,
             person_id: woPersonSarah,
             transitioned_at: dt(16, 10, 20),
         },
         {
-            id: 'wprc04-5',
+            id: 'fjM70dtNCzEFNoQ6cjJCWO',
             work_order_id:
-                'prc04A1B2C3D4E5F6G7H8I9',
+                'Xpw9VGpZ6RyevuInSr8yze',
             from_node_id: prcNodeTriage,
             to_node_id: prcNodeQuickRev,
             person_id: woPersonSarah,
             transitioned_at: dt(16, 11, 0),
         },
         {
-            id: 'wprc04-6',
+            id: '12eJcjUwJ7G1iqPAU6cSx0',
             work_order_id:
-                'prc04A1B2C3D4E5F6G7H8I9',
+                'Xpw9VGpZ6RyevuInSr8yze',
             from_node_id: prcNodeQuickRev,
             to_node_id: prcNodeDecision,
             person_id: woPersonSarah,
             transitioned_at: dt(15, 14, 0),
         },
         {
-            id: 'wprc04-7',
+            id: 'eM38EYOkl4REWI8y8IhCzA',
             work_order_id:
-                'prc04A1B2C3D4E5F6G7H8I9',
+                'Xpw9VGpZ6RyevuInSr8yze',
             from_node_id: prcNodeDecision,
             to_node_id: prcNodeApproved,
             person_id: woPersonMike,
             transitioned_at: dt(15, 15, 30),
         },
         {
-            id: 'wprc04-8',
+            id: 'Vx8TlX4GIyRQPYS6oocHhd',
             work_order_id:
-                'prc04A1B2C3D4E5F6G7H8I9',
+                'Xpw9VGpZ6RyevuInSr8yze',
             from_node_id: prcNodeApproved,
             to_node_id: prcNodeArchive,
             person_id: woPersonMike,
@@ -5531,54 +5525,54 @@ export async function populateMockData(
         // prc05: revisit -- Decision sends to
         // Revise, then Draft again, then completes
         {
-            id: 'wprc05-1',
+            id: '4PaHruvvvyktmxiaGvTjM2',
             work_order_id:
-                'prc05J1K2L3M4N5O6P7Q8R9',
+                'yqPpJb0NoQDgx8DoZ183Nx',
             from_node_id: '',
             to_node_id: prcNodeStart,
             person_id: woPersonSarah,
             transitioned_at: dt(15, 9, 0),
         },
         {
-            id: 'wprc05-2',
+            id: 'WMNTfIbJPW1m39FOKqMZhH',
             work_order_id:
-                'prc05J1K2L3M4N5O6P7Q8R9',
+                'yqPpJb0NoQDgx8DoZ183Nx',
             from_node_id: prcNodeStart,
             to_node_id: prcNodeDraft,
             person_id: woPersonSarah,
             transitioned_at: dt(15, 9, 10),
         },
         {
-            id: 'wprc05-3',
+            id: 'tMWEwY6qb3ICXZtz6P28Ut',
             work_order_id:
-                'prc05J1K2L3M4N5O6P7Q8R9',
+                'yqPpJb0NoQDgx8DoZ183Nx',
             from_node_id: prcNodeDraft,
             to_node_id: prcNodeSubmit,
             person_id: woPersonMike,
             transitioned_at: dt(14, 10, 0),
         },
         {
-            id: 'wprc05-4',
+            id: 'gOUPiWUJiZa99BUOQTrYjh',
             work_order_id:
-                'prc05J1K2L3M4N5O6P7Q8R9',
+                'yqPpJb0NoQDgx8DoZ183Nx',
             from_node_id: prcNodeSubmit,
             to_node_id: prcNodeTriage,
             person_id: woPersonMike,
             transitioned_at: dt(14, 10, 15),
         },
         {
-            id: 'wprc05-5',
+            id: 'zQbr7dr0N8gG14HJT8hCop',
             work_order_id:
-                'prc05J1K2L3M4N5O6P7Q8R9',
+                'yqPpJb0NoQDgx8DoZ183Nx',
             from_node_id: prcNodeTriage,
             to_node_id: prcNodeQuickRev,
             person_id: woPersonMarcus,
             transitioned_at: dt(14, 11, 0),
         },
         {
-            id: 'wprc05-6',
+            id: 'c1O3BtoItm3bp1owvVmVWY',
             work_order_id:
-                'prc05J1K2L3M4N5O6P7Q8R9',
+                'yqPpJb0NoQDgx8DoZ183Nx',
             from_node_id: prcNodeQuickRev,
             to_node_id: prcNodeDecision,
             person_id: woPersonMarcus,
@@ -5586,9 +5580,9 @@ export async function populateMockData(
         },
         // Decision routes to Revise (revisit)
         {
-            id: 'wprc05-7',
+            id: '3g2Tomp04bLGvwNRss9zCi',
             work_order_id:
-                'prc05J1K2L3M4N5O6P7Q8R9',
+                'yqPpJb0NoQDgx8DoZ183Nx',
             from_node_id: prcNodeDecision,
             to_node_id: prcNodeRevise,
             person_id: woPersonCurrent,
@@ -5596,63 +5590,63 @@ export async function populateMockData(
         },
         // Revise sends back to Draft
         {
-            id: 'wprc05-8',
+            id: 'clXy8qWTzs8eNo3YaNi3Q5',
             work_order_id:
-                'prc05J1K2L3M4N5O6P7Q8R9',
+                'yqPpJb0NoQDgx8DoZ183Nx',
             from_node_id: prcNodeRevise,
             to_node_id: prcNodeDraft,
             person_id: woPersonSarah,
             transitioned_at: dt(12, 9, 0),
         },
         {
-            id: 'wprc05-9',
+            id: 'T0hms37kIuFsjCmKKnt5Je',
             work_order_id:
-                'prc05J1K2L3M4N5O6P7Q8R9',
+                'yqPpJb0NoQDgx8DoZ183Nx',
             from_node_id: prcNodeDraft,
             to_node_id: prcNodeSubmit,
             person_id: woPersonSarah,
             transitioned_at: dt(11, 10, 0),
         },
         {
-            id: 'wprc05-10',
+            id: 'GnfjTPti69qF7OyWRdJTQV',
             work_order_id:
-                'prc05J1K2L3M4N5O6P7Q8R9',
+                'yqPpJb0NoQDgx8DoZ183Nx',
             from_node_id: prcNodeSubmit,
             to_node_id: prcNodeTriage,
             person_id: woPersonMike,
             transitioned_at: dt(11, 10, 20),
         },
         {
-            id: 'wprc05-11',
+            id: 'QnMQPkZbvU0IPt6XODVj2K',
             work_order_id:
-                'prc05J1K2L3M4N5O6P7Q8R9',
+                'yqPpJb0NoQDgx8DoZ183Nx',
             from_node_id: prcNodeTriage,
             to_node_id: prcNodeQuickRev,
             person_id: woPersonMike,
             transitioned_at: dt(11, 11, 0),
         },
         {
-            id: 'wprc05-12',
+            id: 'boVwgdzs2FbJ3lV2BK6rFe',
             work_order_id:
-                'prc05J1K2L3M4N5O6P7Q8R9',
+                'yqPpJb0NoQDgx8DoZ183Nx',
             from_node_id: prcNodeQuickRev,
             to_node_id: prcNodeDecision,
             person_id: woPersonMarcus,
             transitioned_at: dt(10, 14, 0),
         },
         {
-            id: 'wprc05-13',
+            id: 'JeIgVixuJXQgtsLJ2jVEV6',
             work_order_id:
-                'prc05J1K2L3M4N5O6P7Q8R9',
+                'yqPpJb0NoQDgx8DoZ183Nx',
             from_node_id: prcNodeDecision,
             to_node_id: prcNodeApproved,
             person_id: woPersonMarcus,
             transitioned_at: dt(10, 15, 0),
         },
         {
-            id: 'wprc05-14',
+            id: 'N09pFEf67fHMeaf5d9Hmud',
             work_order_id:
-                'prc05J1K2L3M4N5O6P7Q8R9',
+                'yqPpJb0NoQDgx8DoZ183Nx',
             from_node_id: prcNodeApproved,
             to_node_id: prcNodeArchive,
             person_id: woPersonSarah,
@@ -5660,54 +5654,54 @@ export async function populateMockData(
         },
         // prc06: in-flight -- stuck at Decision
         {
-            id: 'wprc06-1',
+            id: 'iGftzPJwYdoaZr4Hm5MlsE',
             work_order_id:
-                'prc06S1T2U3V4W5X6Y7Z800',
+                'BUrGEVDMF6FeU35WUHUY5E',
             from_node_id: '',
             to_node_id: prcNodeStart,
             person_id: woPersonMike,
             transitioned_at: dt(5, 10, 0),
         },
         {
-            id: 'wprc06-2',
+            id: 'sCPs7p4WtQgm0VuR81yMyy',
             work_order_id:
-                'prc06S1T2U3V4W5X6Y7Z800',
+                'BUrGEVDMF6FeU35WUHUY5E',
             from_node_id: prcNodeStart,
             to_node_id: prcNodeDraft,
             person_id: woPersonMike,
             transitioned_at: dt(5, 10, 8),
         },
         {
-            id: 'wprc06-3',
+            id: 'bHOxRfjKzqHi2DH8w3I8Xg',
             work_order_id:
-                'prc06S1T2U3V4W5X6Y7Z800',
+                'BUrGEVDMF6FeU35WUHUY5E',
             from_node_id: prcNodeDraft,
             to_node_id: prcNodeSubmit,
             person_id: woPersonCurrent,
             transitioned_at: dt(4, 11, 0),
         },
         {
-            id: 'wprc06-4',
+            id: 'LlXYA4dYJtau7GSAu2549Z',
             work_order_id:
-                'prc06S1T2U3V4W5X6Y7Z800',
+                'BUrGEVDMF6FeU35WUHUY5E',
             from_node_id: prcNodeSubmit,
             to_node_id: prcNodeTriage,
             person_id: woPersonSarah,
             transitioned_at: dt(4, 11, 20),
         },
         {
-            id: 'wprc06-5',
+            id: 'pojq7QRvrUQorLUztKWUW5',
             work_order_id:
-                'prc06S1T2U3V4W5X6Y7Z800',
+                'BUrGEVDMF6FeU35WUHUY5E',
             from_node_id: prcNodeTriage,
             to_node_id: prcNodeQuickRev,
             person_id: woPersonSarah,
             transitioned_at: dt(4, 12, 0),
         },
         {
-            id: 'wprc06-6',
+            id: 'C4i8pmiwfwvwRFk19mjOa8',
             work_order_id:
-                'prc06S1T2U3V4W5X6Y7Z800',
+                'BUrGEVDMF6FeU35WUHUY5E',
             from_node_id: prcNodeQuickRev,
             to_node_id: prcNodeDecision,
             person_id: woPersonMarcus,
@@ -5719,44 +5713,44 @@ export async function populateMockData(
     const mockTransitionFieldValues:
         TransitionFieldValueEntity[] = [
         {
-            id: 'tfv-03-name-' + woId,
-            transition_id: 'wot-03-' + woId,
+            id: '4izDJCuygAL7iqjeHdephl',
+            transition_id: 'eJEybxfXaf3sjwFilZnunU',
             field_id: fCompanyName,
             value: 'Acme Corp',
         },
         {
-            id: 'tfv-03-email-' + woId,
-            transition_id: 'wot-03-' + woId,
+            id: 'NBmVbZMOWPSMZ11zhTpzEQ',
+            transition_id: 'eJEybxfXaf3sjwFilZnunU',
             field_id: fEmail,
             value: 'onboard@acme.com',
         },
         {
-            id: 'tfv-03-phone-' + woId,
-            transition_id: 'wot-03-' + woId,
+            id: 'lxSMfOtoXk89FTuxLj895r',
+            transition_id: 'eJEybxfXaf3sjwFilZnunU',
             field_id: fPhone,
             value: '+1-555-0100',
         },
         {
-            id: 'tfv-03-ind-' + woId,
-            transition_id: 'wot-03-' + woId,
+            id: 'F8Cagh2PlkwHakidXqGEXq',
+            transition_id: 'eJEybxfXaf3sjwFilZnunU',
             field_id: fIndustry,
             value: 'Technology',
         },
         {
-            id: 'tfv-03-rev-' + woId,
-            transition_id: 'wot-03-' + woId,
+            id: '57xrfe07Pqj38qvutRJk2N',
+            transition_id: 'eJEybxfXaf3sjwFilZnunU',
             field_id: fRevenue,
             value: '5000000',
         },
         {
-            id: 'tfv-03-emp-' + woId,
-            transition_id: 'wot-03-' + woId,
+            id: 'juYwNY2S35qCJqT3SAnwyW',
+            transition_id: 'eJEybxfXaf3sjwFilZnunU',
             field_id: fEmployees,
             value: '250',
         },
         {
-            id: 'tfv-04-notes-' + woId,
-            transition_id: 'wot-04-' + woId,
+            id: 'vtXOj3CjsGIYGlnds0FSJd',
+            transition_id: 'C2xb2bbjyHD11WfLayh8Om',
             field_id: fReviewerNotes,
             value: 'Approved. Strong fit.',
         },
@@ -5968,7 +5962,6 @@ export async function populateMockData(
             totalWorkOrders: 100,
             oldestDaysAgo: 80,
             newestDaysAgo: 5,
-            idPrefix: 'lc',
             seed: 0xC0DEF00D,
         });
 
@@ -6128,7 +6121,7 @@ export async function populateMockData(
 
     const aiWorkers: AIWorkerEntity[] = [
         {
-            id: 'model_claude_opus',
+            id: 'tuJwPxYtBur2KCLquScShB',
             name: 'Claude Opus 4.7 Max',
             provider: 'Anthropic',
             description:
@@ -6139,7 +6132,7 @@ export async function populateMockData(
             created_at: dt(0, 11, 0),
         },
         {
-            id: 'model_claude_sonnet',
+            id: 'LdoTR1fnyYpS1jPzEs57ek',
             name: 'Claude Sonnet 4.6',
             provider: 'Anthropic',
             description:
@@ -6150,7 +6143,7 @@ export async function populateMockData(
             created_at: dt(0, 11, 0),
         },
         {
-            id: 'model_gpt_5_4_pro',
+            id: 'Xv89xOCXR6awwoXcPvEY9Y',
             name: 'GPT-5.4 Pro',
             provider: 'OpenAI',
             description:
@@ -6160,7 +6153,7 @@ export async function populateMockData(
             created_at: dt(0, 11, 0),
         },
         {
-            id: 'model_grok_heavy',
+            id: '42vHYDCvtkaO3sTnoqg7aJ',
             name: 'Grok 4.20 Heavy',
             provider: 'xAI',
             description:
