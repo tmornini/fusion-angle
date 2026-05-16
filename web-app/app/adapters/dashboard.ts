@@ -1,7 +1,7 @@
 import {
     ideaIsVisible,
-    projectIsApproved,
-    projectIsNotDeleted,
+    projectStateIsApproved,
+    projectStateIsNotDeleted,
     MS_PER_DAY,
 } from '../../../api/types.ts';
 import {
@@ -9,6 +9,10 @@ import {
 } from '../format.ts';
 import type { RequestContext } from './shared.ts';
 import { getIdeaRows } from './ideas.ts';
+import {
+    getIdeaStates,
+    getProjectStates,
+} from './state-events.ts';
 import { getProjectRows } from './projects.ts';
 import { getFlowRows } from './flows.ts';
 
@@ -42,11 +46,21 @@ export interface GaugeData {
 export async function getDashboardGauges(
     ctx: RequestContext,
 ): Promise<GaugeData[]> {
-    const allProjects =
-        await getProjectRows(ctx);
-    const projects = allProjects.filter(
-        projectIsApproved,
-    );
+    const [allProjects, projectStates] =
+        await Promise.all([
+            getProjectRows(ctx),
+            getProjectStates(ctx),
+        ]);
+    const projects = allProjects.filter(p => {
+        const s = projectStates.get(p.id);
+        if (s === undefined) {
+            throw new Error(
+                'Project has no state event: '
+                + p.id,
+            );
+        }
+        return projectStateIsApproved(s);
+    });
 
     const msPerDay = MS_PER_DAY;
     const now = Date.now();
@@ -141,25 +155,33 @@ export async function getDashboardStats(
 ): Promise<
     { label: string; value: number }[]
 > {
-    const [ideas, projects, flows] =
-        await Promise.all([
-            getIdeaRows(ctx),
-            getProjectRows(ctx),
-            getFlowRows(ctx),
-        ]);
+    const [
+        ideas, ideaStates, projects,
+        projectStates, flows,
+    ] = await Promise.all([
+        getIdeaRows(ctx),
+        getIdeaStates(ctx),
+        getProjectRows(ctx),
+        getProjectStates(ctx),
+        getFlowRows(ctx),
+    ]);
 
     return [
         {
             label: 'Ideas',
-            value: ideas
-                .filter(ideaIsVisible)
-                .length,
+            value: ideas.filter(row => {
+                const s = ideaStates.get(row.id);
+                return s !== undefined
+                    && ideaIsVisible(s);
+            }).length,
         },
         {
             label: 'Projects',
-            value: projects
-                .filter(projectIsNotDeleted)
-                .length,
+            value: projects.filter(p => {
+                const s = projectStates.get(p.id);
+                return s !== undefined
+                    && projectStateIsNotDeleted(s);
+            }).length,
         },
         {
             label: 'Flows',

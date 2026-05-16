@@ -35,7 +35,6 @@ function buildHumanWorkerEntity(
         email: first.toLowerCase() + '@example.com',
         title: 'Engineer',
         department: 'Eng',
-        status: 'active',
         strengths: '[]' as never,
         team_dimensions: '{}' as never,
         phone: '',
@@ -57,6 +56,19 @@ function buildAIWorkerEntity(
     };
 }
 
+async function seedWorkerState(
+    db: MemoryDbAdapter,
+    workerId: WorkerId,
+    state: string = 'active',
+): Promise<void> {
+    await db.states.record(
+        `st-${workerId}`,
+        workerId,
+        state,
+        'system',
+    );
+}
+
 async function setupSeeded(): Promise<{
     db: MemoryDbAdapter;
 }> {
@@ -71,6 +83,8 @@ async function setupSeeded(): Promise<{
     const { id: _a, ...opusBody } = opus;
     await db.workers.put('hw_sarah_chen', sarahBody);
     await db.aiWorkers.put('ai_claude_opus', opusBody);
+    await seedWorkerState(db, 'hw_sarah_chen');
+    await seedWorkerState(db, 'ai_claude_opus');
     return { db };
 }
 

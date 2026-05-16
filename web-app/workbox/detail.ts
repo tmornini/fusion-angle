@@ -16,9 +16,9 @@ import {
 import { navigateTo } from '../app/core.ts';
 import {
     getWorkOrder,
-    getWorkOrderTransitionRowsByOrder,
-    getTransitionFieldValuesByTransition,
-    getWorkOrderClaimRowsByOrder,
+    getWorkOrderTransitionEvents,
+    getStateFieldValuesByEvent,
+    getWorkOrderActiveClaim,
     getWorkerMap,
     postActivity,
     postWorkOrderTransition,
@@ -27,6 +27,7 @@ import {
     getCurrentHumanWorker,
     createRequestContext,
     generateCryptoSafeBase62,
+    validateWorkOrderFlowGraph,
 } from '../app/adapters/index.ts';
 
 /* ── Helpers ─────────────── */
@@ -120,16 +121,11 @@ function initTransitionButtons(
                     await postWorkOrderTransition(
                         ctx,
                         {
-                            transitionId:
-                                generateCryptoSafeBase62(),
                             workOrderId:
                                 detail.idValue(),
                             edgeId,
                             values,
                             fieldValueIds,
-                            currentNodeId:
-                                detail
-                                    .currentNodeId(),
                         },
                     );
                 } catch (err) {
@@ -201,13 +197,13 @@ function initUnclaimButton(
     if (!btn) return;
     const claim = detail.claimStatus();
     if (claim.kind !== 'claimed') return;
-    const claimId = claim.claimId;
+    const workOrderId = detail.idValue();
     btn.addEventListener(
         'click',
         async () => {
             try {
                 await deleteWorkOrderClaim(
-                    ctx, claimId,
+                    ctx, workOrderId,
                 );
             } catch (err) {
                 log.error(
@@ -234,29 +230,36 @@ function initUnclaimButton(
 
 async function loadPresenter(
     workOrderId: string,
-    currentPersonId: string,
+    currentWorkerId: string,
     ctx: ReturnType<typeof createRequestContext>,
 ): Promise<WorkboxDetailPresenter> {
+    const workOrder =
+        await getWorkOrder(ctx, workOrderId);
+    const fg = validateWorkOrderFlowGraph(
+        workOrder.flow_graph,
+    );
     const [
-        workOrder, transitions,
-        fieldValuesByTransition,
-        claims, workerMap,
+        transitions,
+        fieldValuesByEvent,
+        activeClaim,
+        workerMap,
     ] = await Promise.all([
-        getWorkOrder(ctx, workOrderId),
-        getWorkOrderTransitionRowsByOrder(
+        getWorkOrderTransitionEvents(
             ctx, workOrderId,
         ),
-        getTransitionFieldValuesByTransition(ctx),
-        getWorkOrderClaimRowsByOrder(ctx, workOrderId),
+        getStateFieldValuesByEvent(ctx),
+        getWorkOrderActiveClaim(
+            ctx, workOrderId, fg.lockTimeout,
+        ),
         getWorkerMap(ctx),
     ]);
     return new WorkboxDetailPresenter(
         workOrder,
         transitions,
-        fieldValuesByTransition,
-        claims,
+        fieldValuesByEvent,
+        activeClaim,
         workerMap,
-        currentPersonId,
+        currentWorkerId,
     );
 }
 
@@ -277,9 +280,9 @@ export async function init(
     if (!container) return;
 
     const ctx = createRequestContext();
-    const personRow =
+    const workerRow =
         await getCurrentHumanWorker(ctx);
-    const personId = personRow.id;
+    const workerId = workerRow.id;
 
     const detail = await withLoadingState(
         container,
@@ -288,25 +291,24 @@ export async function init(
             let presenter =
                 await loadPresenter(
                     id,
-                    personId,
+                    workerId,
                     ctx,
                 );
             const claim =
                 presenter.claimStatus();
             if (
                 (claim.kind !== 'claimed'
-                    || !claim.byCurrentPerson)
+                    || !claim.byCurrentWorker)
                 && !presenter.isArchive()
             ) {
                 await postWorkOrderClaim(
                     ctx,
-                    generateCryptoSafeBase62(),
                     id,
                 );
                 presenter =
                     await loadPresenter(
                         id,
-                        personId,
+                        workerId,
                         ctx,
                     );
             }

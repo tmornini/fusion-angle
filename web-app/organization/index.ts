@@ -23,9 +23,11 @@ import {
     postObjectiveRevision,
     postObjectiveDeprecation,
     postObjectiveReactivation,
+    postObjectiveReordering,
     subscribeObjectiveChanges,
     generateCryptoSafeBase62,
 } from '../app/adapters/index.ts';
+import { initDragReorder } from '../app/drag-reorder.ts';
 import {
     OrganizationPresenter,
     OrganizationEditPresenter,
@@ -177,6 +179,42 @@ export async function init(): Promise<void> {
 
     subscribeObjectiveChanges(renderObjectives);
     await renderObjectives();
+
+    const box = $('#objectives-box', document);
+    if (box) {
+        initDragReorder(
+            box as HTMLElement,
+            '[data-objective-id]'
+            + ':not([data-deprecated="true"])',
+            'data-objective-id',
+            async (id, newPosition) => {
+                const ctx = createRequestContext();
+                const active =
+                    await getActiveObjectives(ctx);
+                const moved = active.find(
+                    o => o.id === id,
+                );
+                if (!moved) return;
+                const others = active.filter(
+                    o => o.id !== id,
+                );
+                let insertIdx = others.findIndex(
+                    o => o.position > newPosition,
+                );
+                if (insertIdx === -1) {
+                    insertIdx = others.length;
+                }
+                const newOrder = [
+                    ...others.slice(0, insertIdx),
+                    moved,
+                    ...others.slice(insertIdx),
+                ];
+                await postObjectiveReordering(
+                    ctx, newOrder.map(o => o.id),
+                );
+            },
+        );
+    }
 
     // Click delegation on the objectives box
     $('#objectives-box', document)!

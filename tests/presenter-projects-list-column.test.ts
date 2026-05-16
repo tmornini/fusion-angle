@@ -38,7 +38,6 @@ function makeProject(id: string): InstanceType<
         id,
         title: 't',
         description: 'd',
-        status: 'under-review' as const,
         progress: 0,
         start_date: '2026-05-14T00:00:00.000Z',
         target_end_date:
@@ -50,7 +49,7 @@ function makeProject(id: string): InstanceType<
         position: 0,
         business_context: jsonObjectField({}),
         timeline_label: 'q1',
-    });
+    }, 'under-review');
 }
 
 test(
@@ -128,6 +127,107 @@ test(
                 'data-score-present="false"',
             ),
             'expected data-score-present="false"',
+        );
+    },
+);
+
+test(
+    'applyProjectSortToggle orders by projected'
+    + ' impact descending with no-score last',
+    async () => {
+        const {
+            applyProjectSortToggle,
+        } = await import(
+            '../web-app/app/presenters/project.ts'
+        );
+        const projects = [
+            makeProject('p-low'),
+            makeProject('p-high'),
+            makeProject('p-none'),
+        ];
+        const scoreMap = new Map([
+            ['p-low', {
+                projectId: 'p-low',
+                baselineAvg: -10,
+                latestActualAvg: undefined,
+                baselineCount: 3,
+                totalActiveObjectives: 3,
+            }],
+            ['p-high', {
+                projectId: 'p-high',
+                baselineAvg: 50,
+                latestActualAvg: undefined,
+                baselineCount: 3,
+                totalActiveObjectives: 3,
+            }],
+            ['p-none', {
+                projectId: 'p-none',
+                baselineAvg: undefined,
+                latestActualAvg: undefined,
+                baselineCount: 0,
+                totalActiveObjectives: 3,
+            }],
+        ]);
+        const initial =
+            buildInitialProjectListState(projects);
+        const sorted =
+            applyProjectSortToggle(initial);
+        assert.equal(
+            sorted.sort.kind,
+            'projected-impact-desc',
+        );
+        const p = new ProjectListPresenter(
+            sorted, scoreMap,
+        );
+        const listEl = {
+            innerHTML: '',
+        } as unknown as HTMLElement;
+        p.renderList(listEl);
+        const html = listEl.innerHTML;
+        const highIdx = html.indexOf('p-high');
+        const lowIdx = html.indexOf('p-low');
+        const noneIdx = html.indexOf('p-none');
+        assert.ok(
+            highIdx < lowIdx,
+            'p-high (+50) should render'
+            + ' before p-low (-10)',
+        );
+        assert.ok(
+            lowIdx < noneIdx,
+            'p-low (-10) should render before'
+            + ' p-none (no score)',
+        );
+        const backToPosition =
+            applyProjectSortToggle(sorted);
+        assert.equal(
+            backToPosition.sort.kind,
+            'position',
+        );
+    },
+);
+
+test(
+    'sort toggle renders with correct label and'
+    + ' aria-pressed state',
+    () => {
+        const state =
+            buildInitialProjectListState([]);
+        const sortEl = {
+            innerHTML: '',
+        } as unknown as HTMLElement;
+        new ProjectListPresenter(state, new Map())
+            .renderSortControls(sortEl);
+        assert.ok(
+            sortEl.innerHTML.includes(
+                'aria-pressed="false"',
+            ),
+            'default sort should be unpressed',
+        );
+        assert.ok(
+            sortEl.innerHTML.includes(
+                'Sort by projected impact',
+            ),
+            'default label should prompt sort',
         );
     },
 );

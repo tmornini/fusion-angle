@@ -115,7 +115,6 @@ function putProject(
     return db.projects.put(id, {
         title,
         description: '',
-        status: 'approved',
         progress: 0,
         start_date: '2026-01-01',
         target_end_date: '2026-12-31',

@@ -479,7 +479,6 @@ async function performConversion(
                 fields['project-name'],
             description:
                 fields['success-criteria'],
-            status: 'submitted',
             progress: 0,
             start_date:
                 fields['start-date'],
@@ -497,6 +496,7 @@ async function performConversion(
                 jsonObjectField({}),
             timeline_label: '',
         },
-        { ...ideaEntity, status: 'promoted' },
+        'submitted',
+        ideaEntity,
     );
 }

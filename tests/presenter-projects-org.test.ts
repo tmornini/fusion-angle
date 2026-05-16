@@ -102,7 +102,7 @@ function makeProject(overrides: {
     id?: string;
     title?: string;
     description?: string;
-    status?:
+    state?:
         | 'submitted' | 'under-review'
         | 'sent-back' | 'approved'
         | 'declined' | 'completed' | 'deleted';
@@ -115,7 +115,6 @@ function makeProject(overrides: {
         title: overrides.title ?? 'Apollo',
         description:
             overrides.description ?? 'Go to space.',
-        status: overrides.status ?? 'approved',
         progress: overrides.progress ?? 42,
         start_date: '2026-01-01',
         target_end_date: '2026-06-01',
@@ -127,7 +126,7 @@ function makeProject(overrides: {
         position: overrides.position ?? 0,
         business_context: jsonObjectField({}),
         timeline_label: '',
-    });
+    }, overrides.state ?? 'approved');
 }
 
 function makeOrg() {
@@ -164,14 +163,13 @@ test(
         const p = new ProjectPresenter(
             makeProject({
                 title: 'Gemini',
-                status: 'completed',
+                state: 'completed',
             }),
         );
         const out = p.buildCard('position', false)
             .toString();
         assert.match(out, /Gemini/);
-        // 'completed' status config label is 'Active'
-        assert.match(out, /Active/);
+        assert.match(out, /Completed/);
         // completed projects show 100% timeline
         assert.match(out, /100%/);
         assert.match(
@@ -189,36 +187,36 @@ test(
         );
         assert.match(
             p.buildCard('position', true).toString(),
-            /cursor-grab/,
+            /drag-handle/,
         );
         assert.equal(
             p.buildCard('position', false)
                 .toString()
-                .includes('cursor-grab'),
+                .includes('drag-handle'),
             false,
         );
     },
 );
 
 test(
-    'ProjectPresenter.buildStatusBadge carries'
-    + ' status and dimmed data attributes',
+    'ProjectPresenter.buildStateBadge carries'
+    + ' state and dimmed data attributes',
     () => {
         const p = new ProjectPresenter(
-            makeProject({ status: 'under-review' }),
+            makeProject({ state: 'under-review' }),
         );
-        const dimmed = p.buildStatusBadge(false)
+        const dimmed = p.buildStateBadge(false)
             .toString();
         assert.match(
-            dimmed, /data-status="under-review"/,
+            dimmed, /data-state="under-review"/,
         );
         assert.match(dimmed, /data-dimmed="true"/);
-        const lit = p.buildStatusBadge(true)
+        const lit = p.buildStateBadge(true)
             .toString();
         assert.match(lit, /data-dimmed="false"/);
         assert.equal(p.idForLink(), 'pr-1');
         assert.equal(
-            p.statusGroup(), 'under-review',
+            p.stateGroup(), 'under-review',
         );
         assert.equal(p.positionSortKey(), 0);
     },
@@ -235,7 +233,7 @@ test(
             makeProject({
                 title: 'Apollo',
                 description: 'Go to the moon.',
-                status: 'approved',
+                state: 'approved',
             }),
         );
         const rec = makeRecordingContainer();
@@ -288,7 +286,7 @@ test(
         const approvedRec = makeRecordingContainer();
         new ProjectDetailPresenter(
             new ProjectView(
-                makeProject({ status: 'approved' }),
+                makeProject({ state: 'approved' }),
             ),
             [],
         ).renderShell(approvedRec.container);
@@ -303,7 +301,7 @@ test(
         new ProjectDetailPresenter(
             new ProjectView(
                 makeProject({
-                    status: 'under-review',
+                    state: 'under-review',
                 }),
             ),
             [],
@@ -318,7 +316,7 @@ test(
     + ' with the flow name and node/edge counts',
     () => {
         const view = new ProjectView(
-            makeProject({ status: 'approved' }),
+            makeProject({ state: 'approved' }),
         );
         const rec = makeRecordingContainer();
         new ProjectDetailPresenter(view, [
@@ -341,7 +339,7 @@ test(
 
 test(
     'ProjectDetailEditPresenter renders an'
-    + ' editable title input, status select and'
+    + ' editable title input, state select and'
     + ' Save/Cancel actions',
     () => {
         const view = new ProjectView(
@@ -357,7 +355,7 @@ test(
             out, /data-project-field="title"/,
         );
         assert.match(
-            out, /data-project-field="status"/,
+            out, /data-project-field="state"/,
         );
         assert.match(
             out, /data-project-field="description"/,

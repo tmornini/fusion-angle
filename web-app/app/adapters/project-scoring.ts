@@ -5,11 +5,17 @@ import type {
     ProjectObjectiveBaselineScore,
     ProjectObjectiveActualScore,
 } from '../../../api/types.ts';
-import { nowUtc } from '../../../api/types.ts';
+import {
+    nowUtc,
+    projectStateIsApproved,
+} from '../../../api/types.ts';
 import type { RequestContext } from './shared.ts';
 import {
     getActiveObjectives,
 } from './objectives.ts';
+import {
+    getProjectStates,
+} from './state-events.ts';
 import { latestPerPair } from '../scoring-format.ts';
 import {
     createSubscriptionChannel,
@@ -105,10 +111,12 @@ export async function getPortfolioImpactSummary(
 }> {
     const [
         projectRows,
+        projectStates,
         allBaseline,
         allActual,
     ] = await Promise.all([
         ctx.GET<ProjectEntity[]>('projects'),
+        getProjectStates(ctx),
         ctx.GET<ProjectObjectiveBaselineScore[]>(
             'project-objective-baseline-scores',
         ),
@@ -116,9 +124,11 @@ export async function getPortfolioImpactSummary(
             'project-objective-actual-scores',
         ),
     ]);
-    const approved = projectRows.filter(
-        p => p.status === 'approved',
-    );
+    const approved = projectRows.filter(p => {
+        const s = projectStates.get(p.id);
+        return s !== undefined
+            && projectStateIsApproved(s);
+    });
     const baselineByProject = groupByProject(allBaseline);
     const actualByProject = groupByProject(allActual);
 
@@ -188,11 +198,13 @@ export async function getObjectiveAggregates(
     const [
         activeObjs,
         projectRows,
+        projectStates,
         allBaseline,
         allActual,
     ] = await Promise.all([
         getActiveObjectives(ctx),
         ctx.GET<ProjectEntity[]>('projects'),
+        getProjectStates(ctx),
         ctx.GET<ProjectObjectiveBaselineScore[]>(
             'project-objective-baseline-scores',
         ),
@@ -200,9 +212,11 @@ export async function getObjectiveAggregates(
             'project-objective-actual-scores',
         ),
     ]);
-    const approved = projectRows.filter(
-        p => p.status === 'approved',
-    );
+    const approved = projectRows.filter(p => {
+        const s = projectStates.get(p.id);
+        return s !== undefined
+            && projectStateIsApproved(s);
+    });
     const approvedIds = new Set(approved.map(p => p.id));
     const latestB = latestPerPair(
         allBaseline.filter(

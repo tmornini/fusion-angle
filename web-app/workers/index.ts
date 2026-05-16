@@ -21,8 +21,8 @@ import {
 import {
     createRequestContext,
     getWorkers,
-    putHumanWorker,
-    putAIWorker,
+    postHumanWorkerStateChange,
+    postAIWorkerCreate,
     getCurrentHumanWorker,
     postActivity,
     jsonArrayField,
@@ -666,7 +666,7 @@ async function submitHumanForm(): Promise<void> {
     )!.value;
     const id = generateCryptoSafeBase62();
     try {
-        await putHumanWorker(
+        await postHumanWorkerStateChange(
             createRequestContext(),
             id,
             trimStrings({
@@ -675,7 +675,6 @@ async function submitHumanForm(): Promise<void> {
                 email,
                 title,
                 department: dept,
-                status: 'active',
                 strengths:
                     jsonArrayField([]),
                 team_dimensions:
@@ -690,10 +689,11 @@ async function submitHumanForm(): Promise<void> {
                 phone,
                 bio,
             }),
+            'active',
         );
     } catch (err) {
         log.error(
-            'putHumanWorker failed',
+            'postHumanWorkerStateChange failed',
             'workers', err,
         );
         showToast(
@@ -756,7 +756,7 @@ async function submitAIForm(): Promise<void> {
     }
     const id = generateCryptoSafeBase62();
     try {
-        await putAIWorker(
+        await postAIWorkerCreate(
             createRequestContext(),
             id,
             trimStrings({
@@ -769,7 +769,7 @@ async function submitAIForm(): Promise<void> {
         );
     } catch (err) {
         log.error(
-            'putAIWorker failed',
+            'postAIWorkerCreate failed',
             'workers', err,
         );
         showToast(

@@ -22,6 +22,22 @@ function ctxFor(db: MemoryDbAdapter) {
     return createRequestContext(db);
 }
 
+async function seedCurrentWorker(
+    db: MemoryDbAdapter,
+): Promise<void> {
+    await db.workers.put('current', {
+        first_name: 'Demo',
+        last_name: 'User',
+        email: 'demo@example.com',
+        phone: '',
+        title: 'Admin',
+        strengths: '[]' as never,
+        team_dimensions: '{}' as never,
+        bio: '',
+        department: 'Product',
+    });
+}
+
 test('getObjective returns a single row', async () => {
     const db = new MemoryDbAdapter();
     await db.objectives.put('o1', { position: 0 });
@@ -42,10 +58,9 @@ test('getObjectives returns all', async () => {
 
 test('getDeprecatedObjectiveIds returns a Set', async () => {
     const db = new MemoryDbAdapter();
-    await db.deprecatedObjectives.put('o1', {
-        objective_id: 'o1',
-        deprecated_at: '2026-05-14T00:00:00.000Z',
-    });
+    await db.states.record(
+        'e1', 'o1', 'deprecated', 'system',
+    );
     const ctx = ctxFor(db);
     const ids = await getDeprecatedObjectiveIds(ctx);
     assert.ok(ids.has('o1'));
@@ -95,10 +110,9 @@ test('getActiveObjectives filters deprecated',
         const db = new MemoryDbAdapter();
         await db.objectives.put('o1', { position: 0 });
         await db.objectives.put('o2', { position: 1 });
-        await db.deprecatedObjectives.put('o2', {
-            objective_id: 'o2',
-            deprecated_at: '2026-05-14T00:00:00.000Z',
-        });
+        await db.states.record(
+            'e1', 'o2', 'deprecated', 'system',
+        );
         const ctx = ctxFor(db);
         const active = await getActiveObjectives(ctx);
         assert.equal(active.length, 1);
@@ -186,23 +200,24 @@ test('postObjectiveRevision appends a revision row',
         assert.equal(revs.length, 2);
     });
 
-test('postObjectiveDeprecation tombstones an objective',
+test('postObjectiveDeprecation deprecates an objective',
     async () => {
         const db = new MemoryDbAdapter();
+        await seedCurrentWorker(db);
         const ctx = ctxFor(db);
         await postObjectiveCreation(
             ctx, 'o1', 'Revenue', 'd', 0,
         );
         await postObjectiveDeprecation(ctx, 'o1');
-        const tombstones =
-            await db.deprecatedObjectives.getAll();
-        assert.equal(tombstones.length, 1);
-        assert.equal(tombstones[0]!.objective_id, 'o1');
+        const ids = await getDeprecatedObjectiveIds(ctx);
+        assert.equal(ids.size, 1);
+        assert.ok(ids.has('o1'));
     });
 
 test('postObjectiveReactivation returns objective to active list',
     async () => {
         const db = new MemoryDbAdapter();
+        await seedCurrentWorker(db);
         const ctx = ctxFor(db);
         await postObjectiveCreation(
             ctx, 'o1', 'Rev', 'd', 0,
@@ -215,25 +230,26 @@ test('postObjectiveReactivation returns objective to active list',
             'objective must return to active list',
         );
         const deprecated =
-            await db.deprecatedObjectives.getAll();
-        assert.equal(deprecated.length, 0,
-            'deprecation row must be spliced');
+            await getDeprecatedObjectiveIds(ctx);
+        assert.equal(deprecated.size, 0,
+            'reactivation supersedes deprecation in '
+            + 'latest-by-at query');
     });
 
-test('reactivation does not write to deleted keyspace',
+test('reactivation does not emit a deleted state event',
     async () => {
         const db = new MemoryDbAdapter();
+        await seedCurrentWorker(db);
         const ctx = ctxFor(db);
         await postObjectiveCreation(
             ctx, 'o1', 'Rev', 'd', 0,
         );
         await postObjectiveDeprecation(ctx, 'o1');
         await postObjectiveReactivation(ctx, 'o1');
-        const tombstones =
-            await db.deleted.allDeletedIds();
-        assert.ok(!tombstones.has('o1'),
-            'history-store delete must splice, not'
-            + ' tombstone');
+        const deleted = await db.states.deletedIds();
+        assert.ok(!deleted.has('o1'),
+            'reactivation must appear in the states'
+            + ' log as active, never as deleted');
     });
 
 test('postObjectiveReordering updates positions',

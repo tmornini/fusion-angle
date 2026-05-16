@@ -31,7 +31,6 @@ function buildWorker(id: string, first: string) {
         email: `${first}@example.com`.toLowerCase(),
         phone: '',
         title: 'product_manager',
-        status: 'active',
         strengths: '[]',
         team_dimensions: '{}',
         bio: '',
@@ -53,7 +52,7 @@ test('getSnapshot returns a JSON object of tables', async () => {
     const parsed = JSON.parse(json);
     assert.ok(Array.isArray(parsed.workers));
     assert.ok(Array.isArray(parsed.activities));
-    assert.ok(Array.isArray(parsed.deleted));
+    assert.ok(Array.isArray(parsed.states));
 });
 
 test(
@@ -65,13 +64,11 @@ test(
             id: 'i1',
             title: 'Seeded idea',
             position: 1,
-            status: 'active',
             problem_statement: 'p',
             target_users: 't',
             proposed_solution: 's',
             expected_outcome: 'o',
             success_metrics: 'm',
-            readiness: 'ready',
             risks: '[]',
             assumptions: '[]',
             alignments: '[]',

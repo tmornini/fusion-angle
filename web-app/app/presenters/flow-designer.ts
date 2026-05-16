@@ -1016,6 +1016,7 @@ Auto Fit</label>
     }
 
     #canDelete(): boolean {
+        if (this.isLocked()) return false;
         const sel =
             this.#snapshot.interaction
                 .selection;

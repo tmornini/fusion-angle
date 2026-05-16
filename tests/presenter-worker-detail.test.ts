@@ -96,7 +96,6 @@ function makeHumanWorker() {
         email: 'sarah@example.com',
         title: 'Engineer',
         department: 'Engineering',
-        status: 'active',
         strengths: jsonArrayField(['Leadership']),
         team_dimensions: jsonObjectField({
             driver: 60, analytical: 40,
@@ -104,7 +103,7 @@ function makeHumanWorker() {
         }),
         phone: '555-0100',
         bio: 'Builds things.',
-    });
+    }, 'active');
 }
 
 function makeAIWorker() {
@@ -115,7 +114,7 @@ function makeAIWorker() {
         description: 'Long context, deep reasoning.',
         auth_token: 'sk-PLACEHOLDER-DEMOTOKEN-XYZ4',
         created_at: '2026-01-01T00:00:00Z',
-    });
+    }, 'active');
 }
 
 test(

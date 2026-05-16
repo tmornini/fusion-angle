@@ -1,31 +1,39 @@
 import type {
     FlowWorkOrderEntity,
     WorkOrderEntity,
-    WorkOrderTransitionEntity,
-    TransitionFieldValueEntity,
-    WorkOrderClaimEntity,
+    StateFieldValueEntity,
     WorkOrderFlowGraph,
     Id,
-} from '../../../api/types.ts';
-import {
-    msSinceUtc,
-    MS_PER_SECOND,
 } from '../../../api/types.ts';
 import {
     validateWorkOrderFlowGraphJson,
 } from '../../../api/validators.ts';
 import type { RequestContext } from './shared.ts';
+import {
+    getTransitionEventsByWorkOrder,
+    getWorkOrderTransitionEvents,
+    getWorkOrderActiveClaim,
+    getWorkOrderCurrentNodeId,
+    type TransitionEvent,
+} from './state-events.ts';
 
 export type {
     WorkOrderEntity,
-    WorkOrderTransitionEntity,
-    TransitionFieldValueEntity,
-    WorkOrderClaimEntity,
+    StateFieldValueEntity,
     WorkOrderFlowGraph,
     GraphNode,
     GraphEdge,
     GraphField,
 } from '../../../api/types.ts';
+
+export type { TransitionEvent } from './state-events.ts';
+
+export {
+    getWorkOrderActiveClaim,
+    getWorkOrderCurrentNodeId,
+    getWorkOrderTransitionEvents,
+    getTransitionEventsByWorkOrder,
+} from './state-events.ts';
 
 /* ── Types ───────────────── */
 
@@ -46,8 +54,8 @@ export type ClaimStatus =
     | { kind: 'unclaimed' }
     | {
         kind: 'claimed';
-        claimId: string;
-        byCurrentPerson: boolean;
+        byCurrentWorker: boolean;
+        at: string;
     };
 
 /* ── Helpers ─────────────── */
@@ -60,48 +68,36 @@ export function validateWorkOrderFlowGraph(
     );
 }
 
-/* ── transition_field_values ─── */
+/* ── state_field_values ─── */
 
-// Group all transition_field_values rows by their
-// parent transition_id. Callers iterate the work
-// order's transitions and look up its field/values
-// from the resulting map; each transition that wrote
-// no values has no entry (Map.get returns undefined,
-// which the call site treats as "no field values").
-export async function getTransitionFieldValuesByTransition(
+// Group all state_field_values rows by their parent
+// state_event_id. Callers iterate the work order's
+// transition events and look up its field/values from
+// the resulting map; each event that wrote no values
+// has no entry (Map.get returns undefined, which the
+// call site treats as "no field values").
+export async function getStateFieldValuesByEvent(
     ctx: RequestContext,
-): Promise<Map<Id, TransitionFieldValueEntity[]>> {
+): Promise<Map<Id, StateFieldValueEntity[]>> {
     const all = await ctx.GET<
-        TransitionFieldValueEntity[]
-    >('transition-field-values');
-    const byTransition = new Map<
+        StateFieldValueEntity[]
+    >('state-field-values');
+    const byEvent = new Map<
         Id,
-        TransitionFieldValueEntity[]
+        StateFieldValueEntity[]
     >();
     for (const row of all) {
         const list =
-            byTransition.get(row.transition_id);
+            byEvent.get(row.state_event_id);
         if (list) {
             list.push(row);
         } else {
-            byTransition.set(
-                row.transition_id, [row],
+            byEvent.set(
+                row.state_event_id, [row],
             );
         }
     }
-    return byTransition;
-}
-
-export function isExpiredClaim(
-    claim: WorkOrderClaimEntity,
-    lockTimeout: number,
-): boolean {
-    const elapsed = msSinceUtc(
-        claim.claimed_at,
-    );
-    const ms =
-        lockTimeout * MS_PER_SECOND;
-    return elapsed >= ms;
+    return byEvent;
 }
 
 /* ── Reads ───────────────── */
@@ -112,22 +108,6 @@ export async function getWorkOrderRows(
     return ctx.GET<WorkOrderEntity[]>(
         'work-orders',
     );
-}
-
-export async function getWorkOrderTransitionRows(
-    ctx: RequestContext,
-): Promise<WorkOrderTransitionEntity[]> {
-    return ctx.GET<
-        WorkOrderTransitionEntity[]
-    >('work-order-transitions');
-}
-
-export async function getWorkOrderClaimRows(
-    ctx: RequestContext,
-): Promise<WorkOrderClaimEntity[]> {
-    return ctx.GET<
-        WorkOrderClaimEntity[]
-    >('work-order-claims');
 }
 
 export async function getFlowWorkOrderRows(
@@ -147,27 +127,20 @@ export async function getWorkOrder(
     );
 }
 
-export async function getWorkOrderTransitionRowsByOrder(
+// Resolves every work order's transition history into
+// the shape the workbox inbox aggregation consumes —
+// the union of every per-entity event projection.
+export async function getAllTransitionEvents(
     ctx: RequestContext,
-    workOrderId: string,
-): Promise<WorkOrderTransitionEntity[]> {
-    const all = await ctx.GET<
-        WorkOrderTransitionEntity[]
-    >('work-order-transitions');
-    return all.filter(
-        t => t.work_order_id === workOrderId,
+): Promise<TransitionEvent[]> {
+    const byWo = await getTransitionEventsByWorkOrder(
+        ctx,
     );
+    const out: TransitionEvent[] = [];
+    for (const events of byWo.values()) {
+        for (const ev of events) {
+            out.push(ev);
+        }
+    }
+    return out;
 }
-
-export async function getWorkOrderClaimRowsByOrder(
-    ctx: RequestContext,
-    workOrderId: string,
-): Promise<WorkOrderClaimEntity[]> {
-    const all = await ctx.GET<
-        WorkOrderClaimEntity[]
-    >('work-order-claims');
-    return all.filter(
-        c => c.work_order_id === workOrderId,
-    );
-}
-

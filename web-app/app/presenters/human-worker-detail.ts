@@ -16,10 +16,10 @@ import {
 } from '../icons.ts';
 import {
     HumanWorker,
-    WORKER_STATUS_CONFIG,
-    type WorkerStatus,
+    WORKER_STATE_CONFIG,
+    type WorkerState,
     type HumanWorkerEntity,
-    isWorkerStatus,
+    isWorkerState,
     jsonArrayField,
 } from '../adapters/index.ts';
 import {
@@ -55,7 +55,7 @@ export interface HumanWorkerDraftFields {
     phone: string;
     title: string;
     department: string;
-    status: WorkerStatus;
+    state: WorkerState;
     bio: string;
     strengths: readonly string[];
 }
@@ -67,7 +67,7 @@ export type HumanWorkerFieldKey =
     | 'phone'
     | 'title'
     | 'department'
-    | 'status'
+    | 'state'
     | 'bio';
 
 const FIELD_KEYS:
@@ -75,7 +75,7 @@ const FIELD_KEYS:
     new Set([
         'firstName', 'lastName', 'email',
         'phone', 'title', 'department',
-        'status', 'bio',
+        'state', 'bio',
     ]);
 
 export function isHumanWorkerFieldKey(
@@ -97,7 +97,7 @@ export function humanWorkerDraftFromWorker(
         phone: worker.phoneNumber(),
         title: worker.titleLabel(),
         department: worker.departmentLabel(),
-        status: worker.statusValue(),
+        state: worker.stateValue(),
         bio: worker.bioText(),
         strengths: worker.parsedStrengths(),
     };
@@ -108,7 +108,7 @@ export function humanWorkerPatchFromDraft(
 ): Pick<HumanWorkerEntity,
     | 'first_name' | 'last_name' | 'email'
     | 'phone' | 'title' | 'department'
-    | 'status' | 'bio' | 'strengths'> {
+    | 'bio' | 'strengths'> {
     return {
         first_name: draft.firstName,
         last_name: draft.lastName,
@@ -116,7 +116,6 @@ export function humanWorkerPatchFromDraft(
         phone: draft.phone,
         title: draft.title,
         department: draft.department,
-        status: draft.status,
         bio: draft.bio,
         strengths: jsonArrayField(
             [...draft.strengths],
@@ -215,10 +214,10 @@ function buildReadonlyTitleSection(
             </h1>
             <span class="${
                 'badge '
-                + worker.statusClassName()
+                + worker.stateClassName()
                 + ' text-xs'
             }">
-                ${worker.statusLabel()}
+                ${worker.stateLabel()}
             </span>
         </div>
         <p class="text-sm text-muted">
@@ -246,10 +245,10 @@ function buildEditableTitleSection(
             </h1>
             <span class="${
                 'badge '
-                + worker.statusClassName()
+                + worker.stateClassName()
                 + ' text-xs'
             }">
-                ${worker.statusLabel()}
+                ${worker.stateLabel()}
             </span>
         </div>
         <p class="text-sm text-muted">
@@ -326,23 +325,23 @@ function buildEditableDepartment(
         </div>`;
 }
 
-function buildEditableStatus(
-    value: WorkerStatus,
+function buildEditableState(
+    value: WorkerState,
 ): SafeHtml {
     const options = (
         Object.keys(
-            WORKER_STATUS_CONFIG,
-        ) as WorkerStatus[]
-    ).filter(isWorkerStatus);
+            WORKER_STATE_CONFIG,
+        ) as WorkerState[]
+    ).filter(isWorkerState);
     return html`
         <div>
             <label class="${
                 'label mb-2 block'
-            }" for="worker-status"
-            >Status</label>
+            }" for="worker-state"
+            >State</label>
             <select class="input"
-                id="worker-status"
-                data-worker-field="status"
+                id="worker-state"
+                data-worker-field="state"
             >${options.map(s =>
                 html`<option
                     value="${s}"
@@ -352,7 +351,7 @@ function buildEditableStatus(
                             : '',
                     )}
                 >${
-                    WORKER_STATUS_CONFIG[s].label
+                    WORKER_STATE_CONFIG[s].label
                 }</option>`)
             }</select>
         </div>`;
@@ -522,7 +521,7 @@ function buildEditablePersonalInfoBody(
         <div class="${
             'grid grid-cols-2 gap-4 mb-4'
         }">
-            ${buildEditableStatus(draft.status)}
+            ${buildEditableState(draft.state)}
         </div>
         ${buildEditableBio(draft.bio)}`;
 }

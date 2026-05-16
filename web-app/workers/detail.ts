@@ -30,6 +30,7 @@ import {
     getHumanWorker,
     getHumanWorkerRow,
     putHumanWorker,
+    postHumanWorkerStateChange,
     subscribeHumanWorkerChanges,
     getAIWorker,
     getAIWorkerRow,
@@ -38,7 +39,7 @@ import {
     HumanWorker,
     AIWorker,
     type Worker,
-    type WorkerStatus,
+    type WorkerState,
 } from '../app/adapters/index.ts';
 
 const pageAbort = new AbortController();
@@ -352,14 +353,14 @@ function onInput(e: Event): void {
     );
     if (state.variant === 'human') {
         if (!isHumanWorkerFieldKey(field)) return;
-        if (field === 'status') {
+        if (field === 'state') {
             state = {
                 ...state,
                 draft: {
                     ...state.draft,
-                    status:
+                    state:
                         target.value as
-                            WorkerStatus,
+                            WorkerState,
                 },
             };
             return;
@@ -443,14 +444,22 @@ async function saveHumanWorker(
         humanWorkerPatchFromDraft(s.draft),
     );
     const { id: _id, ...rest } = row;
+    const next = { ...rest, ...patch };
+    const stateChanged =
+        s.draft.state !== s.worker.stateValue();
     try {
-        await putHumanWorker(
-            ctx, workerId,
-            { ...rest, ...patch },
-        );
+        if (stateChanged) {
+            await postHumanWorkerStateChange(
+                ctx, workerId, next, s.draft.state,
+            );
+        } else {
+            await putHumanWorker(
+                ctx, workerId, next,
+            );
+        }
     } catch (err) {
         log.error(
-            'putHumanWorker failed',
+            'human worker save failed',
             'workers', err,
         );
         showToast(

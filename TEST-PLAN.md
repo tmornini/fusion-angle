@@ -6,9 +6,9 @@
 
 When the user says "run the test plan", the agent:
 
-1. Reads `CLAUDE.md` `## Testing` (six-phase protocol,
-   mutation domains, MCP limitations) — required context,
-   not optional reference.
+1. Reads this document's `### Protocol` section (six-phase
+   protocol, mutation domains, MCP limitations) — required
+   context, not optional reference.
 2. Executes section **AT** as a fail-fast gate; any AT
    failure aborts the run before A1's build.
 3. Executes A1–A5 preflight; on success spawns the
@@ -21,13 +21,31 @@ When the user says "run the test plan", the agent:
    Format`). The summary is the conversational artifact;
    this document is NOT mutated by the run.
 
-This document plus `CLAUDE.md` `## Testing` is the complete
-contract — no other coordination state is read or written.
+This document is the complete regression contract — no other
+coordination state is read or written.
 
 BLOCKED ≠ FAIL. BLOCKED is reserved for known MCP
 environmental limits (pointer-capture gestures,
 `resize_window`, file I/O) — never used to mask a real
 failure.
+
+### Sub-agent invocation contract
+
+Every agent dispatched by the orchestrator — Phase 1
+serial agent, all seven Phase 2 agents, the Phase 3
+cross-cutting agent, and the Phase 4 snapshot-lifecycle
+agent — MUST begin its turn by invoking the
+`church-of-code:church-of-code` skill via the Skill tool
+and reading `CHURCH-OF-CODE-small-context.md` in full.
+Subagents inherit no scripture and read no CLAUDE.md by
+default (see CLAUDE.md § Subagents). The orchestrator's
+dispatch prompt MUST embed this requirement as the first
+line of every sub-agent prompt.
+
+After the scripture, each sub-agent reads
+`/Users/tmornini/code/fusion-ai/CLAUDE.md` in full, then
+begins its assigned case list. The discipline costs
+context; the discipline IS the point.
 
 ### Scope
 
@@ -82,9 +100,124 @@ one of two modes:
 - **Parallel (Claude Code agents)**:
   `TMPDIR=/tmp/claude ./build --no-zip ~/Desktop/fusion-test/`
   then `cd ~/Desktop/fusion-test/ && python3 -m http.server 8080`.
-  See `CLAUDE.md` section `## Testing` for the six-phase agent
-  protocol, entity mutation domain scoping, and known MCP
-  limitations (flow-designer gestures, `resize_window`, file I/O).
+
+#### Six-phase parallel protocol
+
+Agents execute the plan in six phases to fit within context and
+time budgets while keeping per-entity mutation domains disjoint:
+
+1. **Phase 0 — Preflight** (main): `./validate`, `./build` to
+   produce the distribution ZIP, `./build --no-zip` for the test
+   server, start HTTP server, open tab 0. Covers A1–A5.
+2. **Phase 1 — Data setup** (one agent, serial): AA1–AA43 in
+   tab 0. Creates pristine environment, workers (humans + AIs),
+   ideas, projects, one flow. Populates the shared database
+   that Phase 2 verifies.
+3. **Phase 2 — Parallel verification** (7 agents concurrent,
+   each in its own tab, no shared tabs):
+   - Agent-B — Entry pages
+   - Agent-CH — Dashboard + Reference (read-only)
+   - Agent-D — Ideas
+   - Agent-E — Projects
+   - Agent-F — Flows (includes hazard severity, flow-publish
+     gate)
+   - Agent-F2 — Workbox (includes Create-Work-Order picker
+     READY / NOT READY split)
+   - Agent-G — Admin (Workers page, Worker detail (human + AI),
+     Organization, Snapshots, Billing). The retired Teams /
+     Roles / Crews / Activity Feed pages have no cases.
+4. **Phase 3 — Cross-cutting** (one agent, alone): I1–I28.
+   Mutates global UI state (theme, sidebar, command palette) —
+   no concurrent agents.
+5. **Phase 4 — Snapshot lifecycle** (one agent, alone):
+   G30–G35. Wipes and reloads the database — strictly last
+   before teardown.
+6. **Phase 5 — Teardown** (main): stop HTTP server, remove
+   build directory, verify distribution ZIP remains, aggregate
+   results.
+
+#### Entity mutation domain scoping
+
+Phase 2 agents share one localStorage but each owns a disjoint
+subset of tables:
+
+| Agent | Mutation domain |
+|---|---|
+| Agent-B | creates one human worker via signup |
+| Agent-D | `ideas` |
+| Agent-E | `projects` (plus one flow via the project-detail New Flow path) |
+| Agent-F | `flows`, `flow_versions` |
+| Agent-F2 | `work_orders`, `flow_work_orders`, `states` (work-order entity_ids), `state_field_values`, plus its own private flow in `flows`/`flow_versions` |
+| Agent-G | `workers`, `ai_workers`, `organization` |
+| Agent-CH | none (read-only) |
+
+Agent-F2 owns its source flow because `postWorkOrderCreation`
+freezes `flow_graph` at creation time. If Agent-F edits the
+shared flow concurrently, the captured snapshot reflects
+mid-edit state, not a clean baseline.
+
+Because `StorageEvent` propagation makes sibling changes visible
+to every tab, cross-boundary assertions use `≥ N` or
+"displayed-count matches current localStorage at read time"
+framing rather than frozen expected values. Agent-CH's dashboard
+count checks are non-zero + consistency, not numeric equality.
+
+#### Known MCP limitations
+
+- **Flow designer gestures** (port drag, shift-drag to connect,
+  marquee select): synthetic PointerEvents do not reliably
+  drive the `flow-interactions.ts` state machines because they
+  use pointer-capture semantics. Affected tests include
+  AA27–AA34, F15, F19–F23, D36, D37, E11. Work around by
+  validating end-state via direct JSON injection into
+  `fusion-ai:flows`, then reloading and verifying render. When
+  the injection succeeds and the SVG renders the expected end
+  state, the case is **PASS** with the note `verified via JSON
+  injection` — NOT BLOCKED. `BLOCKED` is reserved for cases
+  where neither gesture nor injection produces a verifiable
+  end state.
+- **`resize_window`** does not change the CSS viewport;
+  responsive tests at specific widths (I10) cannot be driven.
+  Inspect `responsive.css` manually to verify media queries.
+- **File downloads** cannot write to disk from the MCP
+  sandbox. Capture Blob content via `javascript_tool`
+  intercepting `URL.createObjectURL` for validation.
+- **File uploads** require constructing a `DataTransfer` in
+  `javascript_tool` and dispatching a synthetic change event.
+- **Keyboard events** (arrows, Cmd+K, Delete, Tab) work
+  normally and bypass the pointer-capture limitation.
+- **`kill` syscall against the background HTTP server**: the
+  Claude Code sandbox rejects `kill -TERM` and `kill -9`
+  against PIDs of long-running background tasks started via
+  the Bash tool's `run_in_background: true` (EPERM). Phase 5
+  teardown's **J1** ("Stop the HTTP server") cannot terminate
+  the process from within the sandbox; mark J1 BLOCKED with
+  the reason "sandbox EPERM on kill". The server is cleaned
+  up at session end. Workaround: the user terminates manually
+  after the run via `lsof -ti tcp:8080 | xargs kill -9`
+  outside the sandbox.
+- **Phase 5 build-dir cleanup (J2)**: deferred while the
+  server remains alive. Deleting `/tmp/claude/fusion-serve.*`
+  while the python `http.server` holds open file descriptors
+  leaves the server in an unrecoverable state. After the
+  user kills the server outside the sandbox
+  (`lsof -ti tcp:8080 | xargs kill -9`), they should run
+  `rm -rf /tmp/claude/fusion-serve.*` to reclaim the build
+  artifacts. J2 is marked DEFERRED whenever J1 is BLOCKED.
+- **Chrome MCP tab-group volatility**: the MCP tab group can
+  dissolve between calls when no tabs in the group are
+  actively held. If `tabs_create_mcp` returns "No tab
+  available", recover via
+  `tabs_context_mcp({ createIfEmpty: true })` to allocate a
+  fresh group, then proceed. Pre-existing tab IDs from
+  before the dissolution are invalidated.
+
+#### Serial single-tester mode
+
+The same TEST-PLAN.md runs serially by one human in one browser
+following document order (A → AA → B → C → D → E → F → F2 → FS
+→ G → H → I → J). The agent-scoped mutation domains and
+tolerance patterns apply only to the parallel run.
 
 ### Execution Order
 
@@ -110,7 +243,7 @@ last (they wipe the database). See `CLAUDE.md` section
 |---|--:|
 | AT. Automated Test Suite | 3 |
 | A. Build & Setup | 5 |
-| AA. Data Entry Workflow | 46 |
+| AA. Data Entry Workflow | 47 |
 | B. Entry Pages | 14 |
 | C. Core: Dashboard | 7 |
 | D. Core: Ideas Workflow | 37 |
@@ -122,7 +255,42 @@ last (they wipe the database). See `CLAUDE.md` section
 | H. Reference & System | 2 |
 | I. Cross-Cutting Concerns | 28 |
 | J. Teardown | 3 |
-| **Total** | **291** |
+| K. Objectives & Scoring | 30 |
+| **Total** | **322** |
+
+### Combined Totals (CLI + Browser)
+
+The per-section table above counts browser-regression cases
+only. Combined with the CLI automated suite:
+
+| Layer                  | Cases    |
+|------------------------|---------:|
+| CLI automated tests    |      781 |
+| Browser regression     |      322 |
+| **Combined TOTAL**     | **1103** |
+
+CLI count = most recent `./validate` (AT2) report; the number
+grows as tests land in `tests/*.test.ts`. Browser count = the
+per-section table above. Update both numbers when either side
+changes.
+
+Outcome categories used by run summaries (see `## Summary
+Format` at the bottom of this file):
+
+| Status   | Meaning                              | Fails? |
+|----------|--------------------------------------|:------:|
+| PASS     | Assertion satisfied                  |   no   |
+| FAIL     | Real regression; investigate         |  YES   |
+| BLOCKED  | Known MCP environmental limit        |   no   |
+| DEFERRED | Skipped — dependency BLOCKED         |   no   |
+| DRIFT    | Passes but doc/UI mismatch surfaced  |   no   |
+| pending  | Default (`- [ ]`); not yet executed  |  n/a   |
+
+A fully green run reports:
+`PASS = 1103, FAIL = 0, BLOCKED ≤ k, DEFERRED ≤ j, DRIFT = 0`,
+where the six status counts sum to **Combined TOTAL** (1103).
+`BLOCKED ≠ FAIL` and `DRIFT ≠ FAIL` — only `FAIL` indicates a
+regression.
 
 ---
 
@@ -157,7 +325,7 @@ on. Run these in order.
 ### AA1. Create Pristine Environment
 
 - [ ] **AA1** Navigate to `snapshots/`. Click "Create Pristine Environment" and confirm the wipe dialog. PASS: redirects to dashboard. Dashboard shows empty/minimal state.
-- [ ] **AA2** Open DevTools, verify localStorage has `fusion-ai:*` keys for the 17 tables in `TABLE_NAMES` (`api/db.ts`) — empty arrays plus bootstrap data, including the `deleted` tombstone table.
+- [ ] **AA2** Open DevTools, verify localStorage has a `fusion-ai:*` key for every table listed in `TABLE_NAMES` (`api/db.ts`) — empty arrays plus bootstrap data, including the `states` event log (with the seeded `'system'`-worker and `'current'`-user 'active' bootstrap events).
 - [ ] **AA3** Verify bootstrap data exists: user "Tony Stark" (id: `current`), organization "Stark Industries" (domain `acmecorp.com`) on the "Business" plan.
 
 ### AA2. Create Workers
@@ -178,9 +346,9 @@ on. Run these in order.
 - [ ] **AA6** Repeat for all 10 humans: Sarah Chen, Mike
   Thompson, Jessica Park, David Martinez, Emily Rodriguez
   (pending), Alex Kim, Marcus Johnson, David Kim, Lisa
-  Wang, James Miller (deactivated). PASS: all 10 appear
+  Wang, James Miller (archived). PASS: all 10 appear
   in the Humans group with correct name, email, title,
-  and status badge (Active / Pending / Deactivated).
+  and status badge (Active / Pending / Archived).
 - [ ] **AA7** Reload the Workers page. PASS: every human
   re-renders in the Humans group with the correct status
   badge.
@@ -226,6 +394,15 @@ on. Run these in order.
 - [ ] **AA11** Navigate away, return to Organization.
   PASS: edited Domain persists with saved value, card is
   back in read mode.
+- [ ] **AA-Obj** On the Organization page, locate the
+  Objectives box. Click `+ Add objective` five times,
+  creating in order: "Revenue Growth", "Cost Reduction",
+  "Customer Satisfaction", "Team Wellbeing", "Operational
+  Efficiency". PASS: all five appear in the active list
+  in the order created. End-state delivered to Phase 2:
+  5 active objectives — required by Agent-E's K9–K23
+  scoring lifecycle, which has a read-dependency on the
+  Organization Objectives produced here.
 
 ### AA4. Create Ideas
 
@@ -265,7 +442,7 @@ on. Run these in order.
   green border) and "Archive" (end, bottom-right
   with red 3-px border) connected by no edges.
   Toolbar shows Undo, Redo, Delete (trash icon),
-  Auto Layout, Zoom −/Show All/+,
+  Auto Layout, Zoom −/+,
   Copy Mermaid, Export. Changes auto-save
   (no explicit Save button).
 - [ ] **AA27** Drag the port circle on the start
@@ -415,7 +592,7 @@ on. Run these in order.
 
 - [ ] **B1** Page renders with marketing hero content, feature sections, and call-to-action buttons, then auto-redirects to `dashboard/index.html` after ~2 seconds. PASS: layout renders briefly, redirect occurs.
 - [ ] **B2** "Start Free Trial" (hero CTA) and "Get Started" (navbar CTA) are present and navigate to `auth/index.html` if clicked before the auto-redirect. PASS: buttons exist with correct target.
-- [ ] **B3** "Sign In" link is present and navigates to `auth/index.html` if clicked before the auto-redirect. PASS: link exists with correct target.
+- [ ] **B3** "Sign In" button is present and navigates to `auth/index.html` if clicked before the auto-redirect. PASS: button exists with correct target.
 
 ### Auth Page (`auth/`)
 
@@ -456,10 +633,20 @@ on. Run these in order.
   stats ("Stark Industries · 11 Ideas ·
   6 Projects · 1 Flows"), and theme toggle.
   PASS: elements visible and styled.
-- [ ] **C4** Dashboard displays 3 gauge/metric cards (Time, Cost, Impact) with baseline and current values. PASS: cards render with non-zero values and concentric arc gauges.
+- [ ] **C4** Dashboard renders 4 surfaces in order: Time
+  gauge, Cost gauge, Portfolio Impact card (bipolar arc,
+  post-b2c0684), Aggregate Objectives box (full-width row
+  below, post-b2c0684). PASS: all 4 render with baseline
+  and current values; the 2 gauges show concentric arcs;
+  the Portfolio Impact card shows its bipolar arc; the
+  Aggregates box shows per-objective rows.
 - [ ] **C5** Sidebar navigation links all function correctly. PASS: clicking a sidebar link navigates to the expected page.
 - [ ] **C6** Scroll the page. PASS: sidebar stays fixed, main content scrolls independently.
-- [ ] **C7** Check that seed data populates all dashboard widgets. PASS: no "No data" empty states on initial load (seed data provides content for all widgets).
+- [ ] **C7** Check that seed data populates all 4 dashboard
+  surfaces (2 gauges + Portfolio Impact card + Aggregate
+  Objectives box). PASS: no "No data" empty states on
+  initial load against the Phase 1 baseline (10 humans,
+  4 AIs, 11 ideas, 6 projects, 1 flow, 5 objectives).
 
 ---
 
@@ -1166,12 +1353,14 @@ states, and that the canvas re-renders after each step.)
 - [ ] **WB16** After creating and transitioning
   a work order, check localStorage. PASS:
   `work_orders` table has 1 row with `display_id`
-  and `flow_graph` JSON. `work_order_transitions`
-  has immutable event records with `from_node_id`,
-  `to_node_id`, `person_id`, and
-  `transitioned_at`. Per-field values written by
-  the transition land in `transition_field_values`
-  rows referencing the transition by `transition_id`.
+  and `flow_graph` JSON. The `states` table has
+  one row per transition with `entity_id` =
+  work-order id, `state` = the target node id (a
+  base62 token), `worker_id` = the actor, and
+  `at` = RFC-3339 Zulu. Per-field values written
+  by the transition land in `state_field_values`
+  rows referencing the state event by
+  `state_event_id`.
 - [ ] **WB17** Navigate away from the action
   screen and return. PASS: all data persists
   correctly across page navigation.
@@ -1181,16 +1370,21 @@ states, and that the canvas re-renders after each step.)
 - [ ] **WB18** Open the same unclaimed work order in two browser
   tabs. In tab 1, click the row to claim it. In tab 2, attempt the
   same. PASS: tab 2 either navigates to a read-only/already-claimed
-  view or the claim is rejected — no duplicate row exists in
-  `fusion-ai:work_order_claims` for this work order.
+  view or the claim is rejected — and the `fusion-ai:states` log
+  contains at most one live `'claimed'` event for this work
+  order's `entity_id` (a stale prior claim is superseded by a
+  materialized `'claim_expired'` event, never overwritten in
+  place).
 - [ ] **WB19** After transitioning a work order through at
-  least two states, read `fusion-ai:work_order_transitions`
-  from DevTools. PASS: each row has an immutable shape
-  (`from_node_id`, `to_node_id`, `person_id`,
-  `transitioned_at`) — the field values themselves live in
-  the `transition_field_values` join table per Codd 1NF.
-  Verify no app code path mutates an existing transition
-  row — transitions are append-only.
+  least two states, read `fusion-ai:states` from DevTools and
+  filter to `entity_id` = this work order's id. PASS: each
+  non-claim event has the immutable shape `{id, entity_id,
+  state, worker_id, at}`, with `state` carrying the target
+  node's base62 id — the field values themselves live in the
+  `state_field_values` join table per Codd 1NF, referencing
+  the parent event by `state_event_id`. Verify no app code
+  path mutates an existing event row — the states log is
+  append-only.
 
 ### Workbox — All-See-All Visibility
 
@@ -1398,9 +1592,9 @@ the claude-in-chrome MCP.
 
 - [ ] **G24** From `workers/index.html`, click any AI
   worker's row. PASS: navigates to `worker-detail`. Read
-  mode shows the AI Worker identity card (Name, Provider,
-  Description) and a separate Auth Token card showing the
-  masked token (last 4 chars only, e.g. `sk-...XXXX`)
+  mode shows the AI Worker card (Name, Provider,
+  Description) with an inline Auth Token section showing
+  the masked token (last 4 chars only, e.g. `sk-...XXXX`)
   rendered in monospace.
 - [ ] **G24a** Click Edit. PASS: identity fields become
   inputs (Name text, Provider text, Description textarea);
@@ -1413,7 +1607,14 @@ the claude-in-chrome MCP.
   Save. PASS: toast "AI worker saved"; on reopen the
   masked token's last 4 chars match the new value.
 
-### Snapshots (`snapshots/`) — Run These Last
+### Snapshots (`snapshots/`) — Phase 4 (Run These Last)
+
+**Phase 4 — Snapshot lifecycle & objective wipe.** Cases
+G30–G35 (snapshot lifecycle) and K8 (DevTools localStorage
+wipe → Organization empty-state check → mock-data restore)
+all destroy and restore the shared database. They MUST run
+alone in tab 0 after Phase 3 completes — never concurrent
+with Phase 2.
 
 (Snapshot serialization, per-row import-validation, the quota
 pre-flight, column-level compression, and wipe-on-fail are
@@ -1424,15 +1625,15 @@ verify the four operation cards, the file-picker affordance, the
 post-operation redirect, and that pages render against the
 restored data.)
 
-- [ ] **G30** Navigate to `snapshots/`. PASS: shows 3 operation cards (Create Pristine Environment, Wipe and Load Mock Data, Download Snapshot) plus an Upload Snapshot affordance rendered as a labeled file-input (`<input type="file" id="upload-input">`), not a fourth button card.
+- [ ] **G30** Navigate to `snapshots/`. PASS: shows 4 operation cards (Create Pristine Environment, Wipe and Load Mock Data, Download Snapshot, Upload Snapshot). The Upload Snapshot card hosts a hidden `<input type="file" id="upload-input">` that the card's button triggers.
 - [ ] **G31** Click "Download Snapshot". PASS: browser downloads `fusion-ai-snapshot-YYYY-MM-DD.json`. File contains valid JSON with entity data.
 - [ ] **G32** Click "Create Pristine Environment", confirm
   the dialog. PASS: redirects to `dashboard/index.html`.
   Dashboard renders with zeroed-out metrics (empty
-  database). 15 of the 17 `fusion-ai:*` keys are present
-  as empty arrays; `fusion-ai:workers` and
-  `fusion-ai:organization` are bootstrap-seeded by
-  `postBootstrap` after the pristine wipe — `workers`
+  database). Every table in `TABLE_NAMES` is present as
+  an empty array EXCEPT `fusion-ai:workers` and
+  `fusion-ai:organization`, which `postBootstrap`
+  bootstrap-seeds after the pristine wipe — `workers`
   holds the current user (Tony Stark), `organization`
   holds Stark Industries. Empty-array tables persisted
   via column-compression appear as a `gz1:H4sI…`
@@ -1461,17 +1662,19 @@ restored data.)
   by `tests/snapshot-import-validation.test.ts` and
   `tests/snapshot-wipe-on-fail.test.ts` — this case verifies the
   error toast/inline-error surfaces in the UI.)
-- [ ] **G36** On `workers/index.html`, status mutation for
-  human workers lives on the detail page rather than as
-  inline row buttons. Click any active or pending human
-  worker's row. PASS: navigates to their detail page. Click
-  Edit, change Status to "Deactivated", click Save. PASS:
-  toast "Worker saved" fires; navigating back to the
-  Workers list shows the row with the "Deactivated" badge
-  and reduced opacity styling, and the human-count subtitle
-  reflects the change. Repeat in reverse to reactivate. The
-  deactivate flow is part of the same edit cycle as every
-  other field — there is no single-click deactivation.
+- [ ] **G36** Worker lifecycle is recorded in the `states`
+  event log via `archiveHumanWorker` / `archiveAIWorker`,
+  which write a terminal `'archived'` state event for the
+  worker's `entity_id`. The unified terminal vocabulary is
+  shared across both worker kinds per Commandment III
+  (Uniformity). Verify by inspecting `fusion-ai:states` in
+  DevTools after the operation: a row appears with
+  `entity_id` = the worker's id, `state` = `'archived'`,
+  `worker_id` = the actor, and the worker row in
+  `workers` / `ai_workers` itself is unchanged — the
+  states log carries the lifecycle stage, not a column on
+  the entity. The Archived badge text ("Archived") and
+  reduced-opacity row styling reflect the state on render.
 
 ### Billing (`billing/`) — STUB
 
@@ -1586,16 +1789,24 @@ feature is implemented.
 
 ## K. Objectives & Scoring
 
-Owner agents: Agent-G (K1–K8), Agent-E (K9–K23 + K30),
-Agent-CH (K27–K29). Mutation domain delta:
+Owner agents: Agent-G (K1–K6 in Phase 2, K8 in Phase 4),
+Agent-E (K7, K9–K23, K30), Agent-CH (K27–K29). Mutation
+domain delta:
 
 - Agent-G adds: `objectives`, `objective_revisions`,
-  `deprecated_objectives`
+  `deprecated`
 - Agent-E adds: `project_objective_baseline_scores`,
   `project_objective_actual_scores`
 - Agent-CH stays read-only
 
-### K1–K8 — Organization Objectives box (Agent-G)
+### K1–K6 — Organization Objectives box (Agent-G, Phase 2)
+
+K7 has been reassigned to Agent-E and appears at the end of
+the K30 subsection. K8 has been moved to Phase 4 alongside
+G30–G35 (snapshot lifecycle) and is documented in the
+Snapshots section below — it MUST NOT run in Phase 2
+because it wipes localStorage, which is shared across the
+seven Phase 2 agents.
 
 **K1.** Open Organization page; confirm Objectives box
 renders below the existing Overview/Usage/Admin cards with
@@ -1621,11 +1832,12 @@ if it returns to the active list.
 **K6.** Drag an objective to a new position. PASS if the
 new position persists across a page reload.
 
-**K7.** Open an existing project's history modal (created
-in K30). PASS if events that predate a K3 edit display the
-OLD name, not the new one (temporal name resolution).
+**K8.** **Phase 4 case** — runs alone alongside G30–G35
+after Phase 2 and Phase 3 complete. Catastrophic if run
+in Phase 2 because it wipes localStorage, which is shared
+across all seven Phase 2 agents.
 
-**K8.** Empty state: wipe localStorage via DevTools
+Empty state: wipe localStorage via DevTools
 (Application > Local Storage > Clear All), then navigate
 to the Organization page. PASS if the empty-state copy
 "No objectives yet. Add one to get started." renders
@@ -1735,7 +1947,13 @@ Objectives box (new full-width row below).
 project. PASS if the dashboard cards update within ~1
 second (StorageEvent + scoreChanges propagation).
 
-### K30 — Project history modal (Agent-E)
+### K30 + K7 — Project history modal & temporal name resolution (Agent-E)
+
+K7 runs LAST in Agent-E's block, after K30. K7 verifies the
+temporal-name-resolution invariant that K30 only describes;
+it has a cross-agent prerequisite on K3 (Agent-G's objective
+rename in Phase 2). The orchestrator embeds the polling
+contract in Agent-E's dispatch prompt.
 
 **K30.** Open an approved project's View history modal.
 PASS if:
@@ -1747,6 +1965,17 @@ PASS if:
   NEW name
 - Baseline revisions appear as their own event rows (not
   collapsed)
+
+**K7.** After K30 has run AND Agent-G's K3 has executed
+(verify via
+`localStorage.getItem('fusion-ai:objective_revisions')` —
+≥1 row with a `name` change confirms K3 ran), reopen the
+project's history modal. PASS if events that predate the
+K3 edit display the OLD objective name, not the new one
+(temporal name resolution). If after 10 minutes
+`objective_revisions` shows no rename, mark K7 BLOCKED
+with reason "no K3 rename to verify against — Agent-G did
+not produce the prerequisite in time".
 
 ---
 

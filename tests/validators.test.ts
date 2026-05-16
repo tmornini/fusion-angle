@@ -10,8 +10,7 @@ import {
     validateFlowVersionEntity,
     validateWorkOrderEntity,
     validateFlowWorkOrderEntity,
-    validateWorkOrderTransitionEntity,
-    validateWorkOrderClaimEntity,
+    validateStateFieldValueEntity,
     validateOrganizationEntity,
     validateIdeaSubmissionEntity,
     validateActivityActorEntity,
@@ -27,7 +26,6 @@ const validHumanWorker = {
     email: 'ada@example.com',
     title: 'Engineer',
     department: 'R&D',
-    status: 'active',
     strengths: '["analytical"]',
     team_dimensions: '{"driver":0.5}',
     phone: '555-1234',
@@ -41,7 +39,20 @@ test(
             validHumanWorker,
         );
         assert.equal(result.first_name, 'Ada');
-        assert.equal(result.status, 'active');
+    },
+);
+
+test(
+    'validateHumanWorkerEntity rejects status key '
+    + '(retired by Stage 10b+c)',
+    () => {
+        assert.throws(
+            () => validateHumanWorkerEntity({
+                ...validHumanWorker,
+                status: 'active',
+            }),
+            /unexpected key "status"/,
+        );
     },
 );
 
@@ -171,13 +182,11 @@ test(
 const validIdea = {
     title: 'Idea One',
     position: 1,
-    status: 'active',
     problem_statement: 'A problem',
     target_users: 'Users',
     proposed_solution: 'A solution',
     expected_outcome: 'Better',
     success_metrics: 'Metrics',
-    readiness: 'ready',
     risks: '[]',
     assumptions: '[]',
     alignments: '[]',
@@ -186,17 +195,7 @@ const validIdea = {
 test('validateIdeaEntity accepts valid payload', () => {
     const result = validateIdeaEntity(validIdea);
     assert.equal(result.title, 'Idea One');
-    assert.equal(result.readiness, 'ready');
-});
-
-test('validateIdeaEntity rejects bad status', () => {
-    assert.throws(
-        () => validateIdeaEntity({
-            ...validIdea,
-            status: 'submitted',
-        }),
-        /expected IdeaStatus for status/,
-    );
+    assert.equal(result.position, 1);
 });
 
 test(
@@ -208,6 +207,30 @@ test(
             secret: 'pwned',
         }),
         /unexpected key "secret"/,
+    );
+});
+
+test(
+    'validateIdeaEntity rejects status key (retired)',
+    () => {
+    assert.throws(
+        () => validateIdeaEntity({
+            ...validIdea,
+            status: 'active',
+        }),
+        /unexpected key "status"/,
+    );
+});
+
+test(
+    'validateIdeaEntity rejects readiness key (retired)',
+    () => {
+    assert.throws(
+        () => validateIdeaEntity({
+            ...validIdea,
+            readiness: 'ready',
+        }),
+        /unexpected key "readiness"/,
     );
 });
 
@@ -229,7 +252,6 @@ test(
 const validProject = {
     title: 'Proj',
     description: 'Desc',
-    status: 'submitted',
     progress: 0,
     start_date: '2024-01-01',
     target_end_date: '2024-12-31',
@@ -246,16 +268,15 @@ test('validateProjectEntity accepts valid payload', () => {
     const result =
         validateProjectEntity(validProject);
     assert.equal(result.title, 'Proj');
-    assert.equal(result.status, 'submitted');
 });
 
-test('validateProjectEntity rejects bad status', () => {
+test('validateProjectEntity rejects unknown key', () => {
     assert.throws(
         () => validateProjectEntity({
             ...validProject,
-            status: 'unknown-status',
+            status: 'submitted',
         }),
-        /expected ProjectStatus for status/,
+        /unexpected key "status"/,
     );
 });
 
@@ -451,86 +472,35 @@ test(
     );
 });
 
-// --- WorkOrderTransitionEntity ---
+// --- StateFieldValueEntity ---
 
-const validTransition = {
-    work_order_id: 'wo-1',
-    from_node_id: 'n-1',
-    to_node_id: 'n-2',
-    person_id: 'u-1',
-    transitioned_at: '2024-01-01T00:00:00Z',
+const validStateFieldValue = {
+    state_event_id: 'evt-1',
+    field_id: 'f-1',
+    value: 'Acme Corp',
 };
 
 test(
-    'validateWorkOrderTransitionEntity accepts'
-    + ' valid payload',
-    () => {
-    const result =
-        validateWorkOrderTransitionEntity(
-            validTransition,
-        );
-    assert.equal(result.work_order_id, 'wo-1');
-});
-
-test(
-    'validateWorkOrderTransitionEntity'
-    + ' rejects missing transitioned_at',
-    () => {
-    const body = { ...validTransition };
-    delete (
-        body as Record<string, unknown>
-    )['transitioned_at'];
-    assert.throws(
-        () => validateWorkOrderTransitionEntity(
-            body,
-        ),
-        /missing required key "transitioned_at"/,
-    );
-});
-
-test(
-    'validateWorkOrderTransitionEntity rejects'
-    + ' lingering values key',
-    () => {
-    const body = {
-        ...validTransition,
-        values: '{}',
-    };
-    assert.throws(
-        () => validateWorkOrderTransitionEntity(
-            body,
-        ),
-        /unexpected key "values"/,
-    );
-});
-
-// --- WorkOrderClaimEntity ---
-
-const validClaim = {
-    work_order_id: 'wo-1',
-    person_id: 'u-1',
-    claimed_at: '2024-01-01T00:00:00Z',
-};
-
-test(
-    'validateWorkOrderClaimEntity accepts valid'
+    'validateStateFieldValueEntity accepts valid'
     + ' payload',
     () => {
     const result =
-        validateWorkOrderClaimEntity(validClaim);
-    assert.equal(result.person_id, 'u-1');
+        validateStateFieldValueEntity(
+            validStateFieldValue,
+        );
+    assert.equal(result.state_event_id, 'evt-1');
 });
 
 test(
-    'validateWorkOrderClaimEntity rejects missing'
-    + ' claimed_at',
+    'validateStateFieldValueEntity rejects missing'
+    + ' state_event_id',
     () => {
     assert.throws(
-        () => validateWorkOrderClaimEntity({
-            work_order_id: 'wo-1',
-            person_id: 'u-1',
+        () => validateStateFieldValueEntity({
+            field_id: 'f-1',
+            value: 'x',
         }),
-        /missing required key "claimed_at"/,
+        /missing required key "state_event_id"/,
     );
 });
 
@@ -611,7 +581,7 @@ test(
 
 const validIdeaSubmission = {
     idea_id: 'i-1',
-    person_id: 'u-1',
+    worker_id: 'u-1',
     created_at: '2024-01-01T00:00:00Z',
 };
 
@@ -632,7 +602,7 @@ test(
     () => {
     assert.throws(
         () => validateIdeaSubmissionEntity({
-            person_id: 'u-1',
+            worker_id: 'u-1',
             created_at: '2024-01-01T00:00:00Z',
         }),
         /missing required key "idea_id"/,
@@ -643,7 +613,7 @@ test(
 
 const validActivityActor = {
     activity_id: 'act-1',
-    person_id: 'u-1',
+    worker_id: 'u-1',
     created_at: '2024-01-01T00:00:00Z',
 };
 
@@ -664,7 +634,7 @@ test(
     () => {
     assert.throws(
         () => validateActivityActorEntity({
-            person_id: 'u-1',
+            worker_id: 'u-1',
             created_at: '2024-01-01T00:00:00Z',
         }),
         /missing required key "activity_id"/,

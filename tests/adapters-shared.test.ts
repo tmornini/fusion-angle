@@ -29,12 +29,23 @@ function buildHumanWorkerRow(
         email: `${first}@example.com`.toLowerCase(),
         phone: '',
         title: 'product_manager',
-        status: 'active' as const,
         strengths: '[]' as const,
         team_dimensions: '{}' as const,
         bio: '',
         department: 'Product',
     };
+}
+
+async function seedWorkerState(
+    db: MemoryDbAdapter,
+    workerId: string,
+): Promise<void> {
+    await db.states.record(
+        `st-${workerId}`,
+        workerId,
+        'active',
+        'system',
+    );
 }
 
 test(
@@ -45,6 +56,7 @@ test(
                 buildHumanWorkerRow(
                     'u1', 'Alice', 'Adams',
                 ),
+                'active',
             )],
         ]);
         assert.equal(
@@ -71,6 +83,7 @@ test(
                 'u1', 'Alice', 'Adams',
             ),
         );
+        await seedWorkerState(db, 'u1');
         const ctx = createRequestContext(db);
         const map = await getHumanWorkerMap(ctx);
         assert.equal(map.size, 1);
@@ -90,12 +103,14 @@ test('Fresh ctx re-fetches each call', async () => {
     await db.workers.put('u1', buildHumanWorkerRow(
         'u1', 'Alice', 'Adams',
     ));
+    await seedWorkerState(db, 'u1');
     const m1 = await getHumanWorkerMap(
         createRequestContext(db),
     );
     await db.workers.put('u2', buildHumanWorkerRow(
         'u2', 'Bob', 'Brown',
     ));
+    await seedWorkerState(db, 'u2');
     const m2 = await getHumanWorkerMap(
         createRequestContext(db),
     );

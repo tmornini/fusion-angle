@@ -3,11 +3,12 @@ import type {
     GraphNode,
     Id,
     WorkOrderEntity,
-    WorkOrderTransitionEntity,
 } from '../../api/types.ts';
 import {
     MS_PER_DAY,
 } from '../../api/types.ts';
+import type { TransitionEvent }
+    from './adapters/state-events.ts';
 import { shouldShowWorkerHazard } from './flow-graph.ts';
 import type { WorkerHazardLevel } from './flow-graph.ts';
 
@@ -17,7 +18,7 @@ export interface FlowStatsInput {
     readonly workOrders:
         readonly WorkOrderEntity[];
     readonly transitions:
-        readonly WorkOrderTransitionEntity[];
+        readonly TransitionEvent[];
     readonly nowMs: number;
     readonly windowDays: number;
     readonly workerNameById:
@@ -119,7 +120,7 @@ interface Sojourn {
     readonly nodeId: string;
     readonly enterMs: number;
     readonly exitMs: number;
-    readonly personId: string;
+    readonly workerId: string;
 }
 
 interface WoRun {
@@ -138,7 +139,7 @@ function reconstructRuns(
     droppedNodeIds: ReadonlySet<string>;
 } {
     const byWo =
-        new Map<string, WorkOrderTransitionEntity[]>();
+        new Map<string, TransitionEvent[]>();
     for (const t of input.transitions) {
         const arr = byWo.get(t.work_order_id) ?? [];
         arr.push(t);
@@ -148,8 +149,8 @@ function reconstructRuns(
     const runs: WoRun[] = [];
     for (const [woId, ts] of byWo) {
         ts.sort((a, b) =>
-            a.transitioned_at.localeCompare(
-                b.transitioned_at,
+            a.at.localeCompare(
+                b.at,
             ),
         );
         const sojourns: Sojourn[] = [];
@@ -166,18 +167,18 @@ function reconstructRuns(
             }
             pathNodeIds.push(node.id);
             const enterMs =
-                Date.parse(t.transitioned_at);
+                Date.parse(t.at);
             const nextT = ts[i + 1];
             // Open-ended sojourn uses nowMs as the
             // exit so in-flight WOs contribute heat.
             const exitMs = nextT
-                ? Date.parse(nextT.transitioned_at)
+                ? Date.parse(nextT.at)
                 : input.nowMs;
             if (!node.isCreate && !node.isArchive) {
                 sojourns.push({
                     nodeId: node.id,
                     enterMs, exitMs,
-                    personId: t.person_id,
+                    workerId: t.worker_id,
                 });
             }
             if (node.isArchive) completed = true;
@@ -310,7 +311,7 @@ export function buildFlowStats(
 
     const weeks = input.windowDays / 7;
 
-    // Count OUT-transitions per (node, person) within
+    // Count OUT-transitions per (node, worker) within
     // the window.  Transitions with from_node_id='' are
     // creation events and carry no producer signal.
     const outByNode =
@@ -318,14 +319,14 @@ export function buildFlowStats(
     for (const t of input.transitions) {
         if (t.from_node_id === '') continue;
         if (!nodeById.has(t.from_node_id)) continue;
-        const ms = Date.parse(t.transitioned_at);
+        const ms = Date.parse(t.at);
         if (ms < winLo || ms > winHi) continue;
         const inner =
             outByNode.get(t.from_node_id)
             ?? new Map<string, number>();
         inner.set(
-            t.person_id,
-            (inner.get(t.person_id) ?? 0) + 1,
+            t.worker_id,
+            (inner.get(t.worker_id) ?? 0) + 1,
         );
         outByNode.set(t.from_node_id, inner);
     }
@@ -408,7 +409,7 @@ export function buildFlowStats(
             const perTarget = new Map<string, number>();
             for (const tx of input.transitions) {
                 if (tx.from_node_id !== n.id) continue;
-                const ms = Date.parse(tx.transitioned_at);
+                const ms = Date.parse(tx.at);
                 if (ms < winLo || ms > winHi) continue;
                 perTarget.set(tx.to_node_id,
                     (perTarget.get(tx.to_node_id) ?? 0)

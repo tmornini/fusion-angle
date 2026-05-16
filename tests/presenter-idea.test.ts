@@ -4,6 +4,7 @@ import {
     Idea,
     jsonArrayField,
     type IdeaEntity,
+    type IdeaState,
 } from '../api/types.ts';
 import {
     DISPLAY_ABSENT,
@@ -119,7 +120,6 @@ function makeIdeaEntity(
         id: 'idea-1',
         title: 'Self-serve onboarding',
         position: 3,
-        status: 'active',
         problem_statement:
             'New users churn before activation',
         target_users: 'Trial signups',
@@ -129,7 +129,6 @@ function makeIdeaEntity(
             'Higher 7-day activation rate',
         success_metrics:
             '20% lift in activation',
-        readiness: 'ready',
         risks: jsonArrayField([]),
         assumptions: jsonArrayField([]),
         alignments: jsonArrayField([]),
@@ -139,18 +138,22 @@ function makeIdeaEntity(
 
 function makeIdea(
     overrides: Partial<IdeaEntity> = {},
+    state: IdeaState = 'active:ready',
 ): Idea {
-    return new Idea(makeIdeaEntity(overrides));
+    return new Idea(
+        makeIdeaEntity(overrides), state,
+    );
 }
 
 function makeWithSubmitter(
     overrides: Partial<IdeaEntity> = {},
     submitterName = 'Ada Lovelace',
     submittedAt = '2026-01-15T10:00:00.000Z',
+    state: IdeaState = 'active:ready',
 ): IdeaWithSubmitter {
     const entity = makeIdeaEntity(overrides);
     return {
-        idea: new Idea(entity),
+        idea: new Idea(entity, state),
         entity,
         submitterName,
         submittedAt,
@@ -237,9 +240,10 @@ test(
         const patch = ideaPatchFromDraft(
             FILLED_DRAFT,
         );
-        const roundTripped = new Idea({
-            ...base, ...patch,
-        });
+        const roundTripped = new Idea(
+            { ...base, ...patch },
+            'active:ready',
+        );
         assert.deepEqual(
             ideaDraftFromIdea(roundTripped),
             FILLED_DRAFT,
@@ -251,7 +255,7 @@ test(
 
 test(
     'IdeaPresenter.buildCard renders the title,'
-    + ' status badge, and card data attributes',
+    + ' state badge, and card data attributes',
     () => {
         const presenter = new IdeaPresenter(
             makeIdea(), 'Ada Lovelace',
@@ -261,7 +265,7 @@ test(
             .buildCard('position', true).toString();
         assert.match(out, /Self-serve onboarding/);
         assert.match(out, /badge badge-success/);
-        assert.match(out, />\s*Active\s*</);
+        assert.match(out, /Active . Ready/);
         assert.match(
             out, /data-idea-card="idea-1"/,
         );
@@ -282,9 +286,9 @@ test(
         const withoutGrip = presenter
             .buildCard('position', false)
             .toString();
-        assert.match(withGrip, /cursor-grab/);
+        assert.match(withGrip, /drag-handle/);
         assert.ok(!withoutGrip.includes(
-            'cursor-grab',
+            'drag-handle',
         ));
     },
 );
@@ -294,11 +298,11 @@ test(
     + ' affordance only for approved ideas',
     () => {
         const approved = new IdeaPresenter(
-            makeIdea({ status: 'approved' }),
+            makeIdea({}, 'approved'),
             'X', 'y',
         );
         const active = new IdeaPresenter(
-            makeIdea({ status: 'active' }), 'X', 'y',
+            makeIdea({}, 'active:ready'), 'X', 'y',
         );
         assert.match(
             approved.buildCard('position', false)
@@ -314,19 +318,19 @@ test(
 );
 
 test(
-    'IdeaPresenter.buildStatusBadge marks the'
+    'IdeaPresenter.buildStateBadge marks the'
     + ' badge dimmed when isActive is false',
     () => {
         const presenter = new IdeaPresenter(
-            makeIdea({ status: 'in-review' }),
+            makeIdea({}, 'in-review'),
             'X', 'y',
         );
         const dimmed = presenter
-            .buildStatusBadge(false).toString();
+            .buildStateBadge(false).toString();
         const lit = presenter
-            .buildStatusBadge(true).toString();
+            .buildStateBadge(true).toString();
         const neutral = presenter
-            .buildStatusBadge(null).toString();
+            .buildStateBadge(null).toString();
         assert.match(
             dimmed, /data-dimmed="true"/,
         );
@@ -335,37 +339,37 @@ test(
             neutral, /data-dimmed="false"/,
         );
         assert.match(
-            dimmed, /data-status="in-review"/,
+            dimmed, /data-state="in-review"/,
         );
         assert.match(dimmed, /In Review/);
     },
 );
 
 test(
-    'IdeaPresenter status predicates reflect the'
-    + ' wrapped idea status',
+    'IdeaPresenter state predicates reflect the'
+    + ' wrapped idea state',
     () => {
         const review = new IdeaPresenter(
-            makeIdea({ status: 'in-review' }),
+            makeIdea({}, 'in-review'),
             'X', 'y',
         );
         assert.equal(review.isReviewable(), true);
         assert.equal(review.isConvertible(), false);
         assert.equal(review.canSubmit(), false);
         assert.equal(
-            review.statusGroup(), 'in-review',
+            review.stateGroup(), 'in-review',
         );
         assert.equal(
-            review.matchesStatus('in-review'), true,
+            review.matchesState('in-review'), true,
         );
         assert.equal(
-            review.matchesStatus('active'), false,
+            review.matchesState('active:ready'), false,
         );
 
         const active = new IdeaPresenter(
-            makeIdea({
-                status: 'active', position: 9,
-            }),
+            makeIdea(
+                { position: 9 }, 'active:incomplete',
+            ),
             'X', 'y',
         );
         assert.equal(active.canSubmit(), true);
@@ -518,7 +522,7 @@ test(
         );
         assert.equal(slot.writes, 1);
         const out = slot.captured;
-        assert.match(out, /cursor-grab/);
+        assert.match(out, /drag-handle/);
         assert.ok(
             out.indexOf('Alpha idea')
             < out.indexOf('Beta idea'),
@@ -534,14 +538,22 @@ test(
     + ' the grip',
     () => {
         const ideas = [
-            makeWithSubmitter({
-                id: 'i-rev', title: 'Review me',
-                status: 'in-review', position: 2,
-            }),
-            makeWithSubmitter({
-                id: 'i-act', title: 'Active one',
-                status: 'active', position: 1,
-            }),
+            makeWithSubmitter(
+                {
+                    id: 'i-rev', title: 'Review me',
+                    position: 2,
+                },
+                'Ada', '2026-01-15T10:00:00Z',
+                'in-review',
+            ),
+            makeWithSubmitter(
+                {
+                    id: 'i-act', title: 'Active one',
+                    position: 1,
+                },
+                'Ada', '2026-01-15T10:00:00Z',
+                'active:ready',
+            ),
         ];
         const presenter = new IdeaListPresenter(
             applyIdeaFilterToggle(
@@ -556,24 +568,30 @@ test(
         const out = slot.captured;
         assert.match(out, /Review me/);
         assert.ok(!out.includes('Active one'));
-        assert.ok(!out.includes('cursor-grab'));
+        assert.ok(!out.includes('drag-handle'));
     },
 );
 
 test(
     'IdeaListPresenter.renderBadges renders one'
-    + ' badge per present status group',
+    + ' badge per present state',
     () => {
         const ideas = [
-            makeWithSubmitter({
-                id: 'i1', status: 'active',
-            }),
-            makeWithSubmitter({
-                id: 'i2', status: 'active',
-            }),
-            makeWithSubmitter({
-                id: 'i3', status: 'in-review',
-            }),
+            makeWithSubmitter(
+                { id: 'i1' },
+                'Ada', '2026-01-15T10:00:00Z',
+                'active:ready',
+            ),
+            makeWithSubmitter(
+                { id: 'i2' },
+                'Ada', '2026-01-15T10:00:00Z',
+                'active:ready',
+            ),
+            makeWithSubmitter(
+                { id: 'i3' },
+                'Ada', '2026-01-15T10:00:00Z',
+                'in-review',
+            ),
         ];
         const presenter = new IdeaListPresenter(
             buildInitialIdeaListState(ideas),
@@ -583,15 +601,16 @@ test(
             slot as unknown as HTMLElement,
         );
         const badges = slot.captured.match(
-            /data-status="/g,
+            /data-state="/g,
         ) ?? [];
         assert.equal(badges.length, 2);
         assert.match(
-            slot.captured, /data-status="active"/,
+            slot.captured,
+            /data-state="active:ready"/,
         );
         assert.match(
             slot.captured,
-            /data-status="in-review"/,
+            /data-state="in-review"/,
         );
     },
 );

@@ -49,8 +49,8 @@ const revisions = [
       description: 'd2',
       revised_at: '2026-03-18T11:02:00.000Z' },
 ];
-const deprecations: { id: string; objective_id: string;
-    deprecated_at: string }[] = [];
+const deprecations: { objectiveId: string;
+    at: string }[] = [];
 
 function resolver(objId: string, atTime: string) {
     const eligible = revisions
@@ -92,16 +92,38 @@ test('resolves historical objective name at each event',
         const html = p.buildBody().toString();
         const marchOnePos = html.indexOf('2026-03-01');
         const aprilOnePos = html.indexOf('2026-04-01');
-        const incrRevPos = html.indexOf('Increase Revenue');
-        const driveGrowthPos = html.indexOf('Drive Growth');
+        const incrRevAfterMarch = html
+            .indexOf('Increase Revenue', marchOnePos);
+        const driveGrowthAfterApril = html
+            .indexOf('Drive Growth', aprilOnePos);
         assert.ok(
-            incrRevPos > marchOnePos
-                && incrRevPos < aprilOnePos,
+            incrRevAfterMarch > marchOnePos
+                && incrRevAfterMarch < aprilOnePos,
             'March score should render under '
                 + '"Increase Revenue"',
         );
-        assert.ok(driveGrowthPos > aprilOnePos,
+        assert.ok(driveGrowthAfterApril > aprilOnePos,
             'April score should render under "Drive Growth"');
+    });
+
+test('revision event row shows the new objective name',
+    () => {
+        const p = new ProjectScoreHistoryPresenter(
+            [], [], revisions, deprecations, resolver,
+        );
+        const html = p.buildBody().toString();
+        const r1Pos = html.indexOf('2026-02-01');
+        const r2Pos = html.indexOf('2026-03-18');
+        const incrRevPos = html
+            .indexOf('Increase Revenue', r1Pos);
+        const driveGrowthPos = html
+            .indexOf('Drive Growth', r2Pos);
+        assert.ok(
+            incrRevPos > r1Pos && incrRevPos < r2Pos,
+            'r1 row should render "Increase Revenue"',
+        );
+        assert.ok(driveGrowthPos > r2Pos,
+            'r2 row should render "Drive Growth"');
     });
 
 test('positive score TD carries data-tone="positive"', () => {
@@ -137,4 +159,28 @@ test('zero score TD carries data-tone="neutral"', () => {
     );
     const html = p.buildBody().toString();
     assert.match(html, /<td data-tone="neutral">0<\/td>/);
+});
+
+test('deprecation event row resolves the objective name '
+    + 'from the event objectiveId', () => {
+    const dep = [{
+        objectiveId: 'o1',
+        at: '2026-05-01T08:00:00.000Z',
+    }];
+    const p = new ProjectScoreHistoryPresenter(
+        [], [], revisions, dep, resolver,
+    );
+    const html = p.buildBody().toString();
+    const depPos = html.indexOf('2026-05-01');
+    assert.ok(depPos >= 0,
+        'deprecation row missing for 2026-05-01');
+    const labelPos = html.indexOf(
+        'Objective deprecated', depPos,
+    );
+    assert.ok(labelPos > depPos,
+        'deprecation event label missing');
+    const namePos = html.indexOf('Drive Growth', depPos);
+    assert.ok(namePos > depPos,
+        'resolver should resolve o1 → Drive Growth at '
+            + '2026-05-01 (latest revision applies)');
 });

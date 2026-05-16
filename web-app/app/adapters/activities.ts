@@ -61,7 +61,7 @@ export async function postActivity(
                     `activity-actors/${actorId}`,
                 body: {
                     activity_id: activityId,
-                    person_id: workerRow.id,
+                    worker_id: workerRow.id,
                     created_at: timestamp,
                 },
             },

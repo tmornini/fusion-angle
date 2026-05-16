@@ -11,11 +11,10 @@ import {
     getProjects,
     getProjectsScoreColumn,
     putProject,
-    isProjectStatus,
+    isProjectState,
     subscribeProjectChanges,
     subscribeProjectScoreChanges,
     subscribeObjectiveChanges,
-    type ProjectStatus,
     type ProjectEntity,
 } from '../app/adapters/index.ts';
 import {
@@ -23,6 +22,7 @@ import {
     buildInitialProjectListState,
     applyProjectListUpdate,
     applyProjectFilterToggle,
+    applyProjectSortToggle,
     type ProjectListState,
 } from '../app/presenters/index.ts';
 import {
@@ -42,6 +42,7 @@ let projectEntities:
 let scoreMap: Map<string, ScoreRow> = new Map();
 let projectListEl: HTMLElement | null = null;
 let projectBadgesEl: HTMLElement | null = null;
+let projectSortControlsEl: HTMLElement | null = null;
 
 async function loadProjectsAndEntities(
     ctx: ReturnType<typeof createRequestContext>,
@@ -108,11 +109,20 @@ export async function init(): Promise<void> {
     projectBadgesEl = $(
         '#status-badges', document,
     );
+    projectSortControlsEl = $(
+        '#sort-controls', document,
+    );
 
     rerenderProjects();
     if (projectBadgesEl) {
         projectBadgesEl.addEventListener(
             'click', onBadgeClick,
+            { signal },
+        );
+    }
+    if (projectSortControlsEl) {
+        projectSortControlsEl.addEventListener(
+            'click', onSortClick,
             { signal },
         );
     }
@@ -187,7 +197,27 @@ function rerenderProjects(): void {
     if (projectBadgesEl) {
         presenter.renderBadges(projectBadgesEl);
     }
+    if (projectSortControlsEl) {
+        presenter.renderSortControls(
+            projectSortControlsEl,
+        );
+    }
     presenter.renderList(projectListEl);
+}
+
+function onSortClick(e: MouseEvent): void {
+    if (!projectState) return;
+    if (
+        !(e.target instanceof HTMLElement)
+    ) return;
+    const toggle = e.target.closest<HTMLElement>(
+        '[data-sort-toggle]',
+    );
+    if (!toggle) return;
+    projectState = applyProjectSortToggle(
+        projectState,
+    );
+    rerenderProjects();
 }
 
 function onBadgeClick(e: MouseEvent): void {
@@ -199,11 +229,11 @@ function onBadgeClick(e: MouseEvent): void {
         !(e.target instanceof HTMLElement)
     ) return;
     const badge = e.target.closest<HTMLElement>(
-        '[data-status]',
+        '[data-state]',
     );
     if (!badge) return;
-    const s = getRequiredAttribute(badge, 'data-status');
-    if (!isProjectStatus(s)) return;
+    const s = getRequiredAttribute(badge, 'data-state');
+    if (!isProjectState(s)) return;
     projectState = applyProjectFilterToggle(
         projectState, s,
     );

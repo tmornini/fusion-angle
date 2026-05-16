@@ -1,6 +1,6 @@
 import {
     EntityNotFound,
-    type DeletedStore,
+    type StateStore,
     type EntityStore as EntityStoreInterface,
     type StorageBackend,
 } from './db.ts';
@@ -11,18 +11,18 @@ export class EntityStore<T extends { id: string }>
 {
     readonly #table: string;
     readonly #backend: StorageBackend;
-    readonly #deleted: DeletedStore;
+    readonly #stateStore: StateStore;
     readonly #serialize:
         <R>(fn: () => Promise<R>) => Promise<R>;
 
     constructor(
         table: string,
         backend: StorageBackend,
-        deleted: DeletedStore,
+        stateStore: StateStore,
     ) {
         this.#table = table;
         this.#backend = backend;
-        this.#deleted = deleted;
+        this.#stateStore = stateStore;
         this.#serialize = createSerializer();
     }
 
@@ -31,14 +31,14 @@ export class EntityStore<T extends { id: string }>
             this.#table,
         );
         const deletedIds =
-            await this.#deleted.allDeletedIds();
+            await this.#stateStore.deletedIds();
         return rows.filter(
             row => !deletedIds.has(row.id),
         );
     }
 
     async getById(id: string): Promise<T> {
-        if (await this.#deleted.isDeleted(id)) {
+        if (await this.#stateStore.isDeleted(id)) {
             throw new EntityNotFound(
                 this.#table, id,
             );
@@ -82,7 +82,24 @@ export class EntityStore<T extends { id: string }>
         });
     }
 
+    // Hard splice. The states log is for entities whose
+    // history matters; transient entities (claims,
+    // field values) simply leave the table when no
+    // longer referenced.
     async delete(id: string): Promise<void> {
-        await this.#deleted.record(id);
+        return this.#serialize(async () => {
+            const rows = await this.#backend.read<T>(
+                this.#table,
+            );
+            const idx = rows.findIndex(
+                entity => entity.id === id,
+            );
+            if (idx >= 0) {
+                await this.#backend.write(
+                    this.#table,
+                    rows.toSpliced(idx, 1),
+                );
+            }
+        });
     }
 }

@@ -3,11 +3,10 @@ import { strict as assert } from 'node:assert';
 import { TABLE_NAMES } from '../api/db.ts';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 
-test('TABLE_NAMES includes the five new tables', () => {
+test('TABLE_NAMES includes the objective tables', () => {
     const expected = [
         'objectives',
         'objective_revisions',
-        'deprecated_objectives',
         'project_objective_baseline_scores',
         'project_objective_actual_scores',
     ];
@@ -19,7 +18,7 @@ test('TABLE_NAMES includes the five new tables', () => {
     }
 });
 
-test('MemoryDbAdapter exposes the five new EntityStores',
+test('MemoryDbAdapter exposes objective stores',
     async () => {
         const db = new MemoryDbAdapter();
         await db.objectives.put('o1', { position: 0 });
@@ -36,14 +35,6 @@ test('MemoryDbAdapter exposes the five new EntityStores',
         const revs =
             await db.objectiveRevisions.getAll();
         assert.equal(revs.length, 1);
-
-        await db.deprecatedObjectives.put('o1', {
-            objective_id: 'o1',
-            deprecated_at: '2026-05-14T00:00:00.000Z',
-        });
-        const deps =
-            await db.deprecatedObjectives.getAll();
-        assert.equal(deps.length, 1);
 
         await db.projectObjectiveBaselineScores.put(
             'p1:o1:t1', {

@@ -44,7 +44,7 @@ export class HumanWorkerRowPresenter {
             'flex items-center '
             + 'gap-4 p-4 worker-row '
             + 'worker-row-divider '
-            + (this.#worker.isDeactivated()
+            + (this.#worker.isArchived()
                 ? 'opacity-50' : '')
         }"
             data-self="${isSelf ? 'true' : 'false'}"
@@ -125,7 +125,7 @@ export class HumanWorkerRowPresenter {
                 'status-badge-error'
             }">
             ${iconPersonX(14, '')}
-            Deactivated
+            Archived
         </span>`;
     }
 

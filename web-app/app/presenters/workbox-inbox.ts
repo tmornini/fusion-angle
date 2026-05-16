@@ -6,10 +6,8 @@ import { DISPLAY_ABSENT } from '../format.ts';
 import {
     workerName,
     validateWorkOrderFlowGraph,
-    isExpiredClaim,
     type WorkOrderEntity,
-    type WorkOrderTransitionEntity,
-    type WorkOrderClaimEntity,
+    type TransitionEvent,
 } from '../adapters/index.ts';
 import type { Worker } from '../adapters/index.ts';
 import {
@@ -20,21 +18,11 @@ import type { Id } from '../../../api/types.ts';
 
 const DAY_MS = SECONDS_PER_DAY * MS_PER_SECOND;
 
-function isClaimActive(
-    claim: WorkOrderClaimEntity | undefined,
-    lockTimeout: number,
-): boolean {
-    return claim !== undefined
-        && !isExpiredClaim(
-            claim, lockTimeout,
-        );
-}
-
 function isClaimedAndUnfinished(
-    isClaimed: boolean,
+    hasActiveClaim: boolean,
     completed: boolean,
 ): boolean {
-    return isClaimed && !completed;
+    return hasActiveClaim && !completed;
 }
 
 function itemMatchesMode(
@@ -71,6 +59,14 @@ export interface InboxItem {
 }
 
 export type InboxMode = 'active' | 'archived';
+
+// An active claim resolved from the states log for one
+// work order. The inbox does not care which worker
+// holds it — only whether one is held.
+export interface ActiveClaim {
+    workerId: Id;
+    at: string;
+}
 
 export class WorkboxInboxPresenter {
     readonly #items: readonly InboxItem[];
@@ -109,7 +105,7 @@ export class WorkboxInboxPresenter {
         const grip = this.#showGrip
             ? html`<div class="${
                 'hidden-mobile text-muted'
-                + ' cursor-grab'
+                + ' drag-handle'
             }">${
                 iconGripVertical(20, '')
             }</div>`
@@ -166,26 +162,13 @@ export class WorkboxInboxPresenter {
 export function buildInboxItems(
     workOrders:
         readonly WorkOrderEntity[],
-    transitions:
-        readonly WorkOrderTransitionEntity[],
-    claims:
-        readonly WorkOrderClaimEntity[],
+    transitionsByWo:
+        ReadonlyMap<Id, readonly TransitionEvent[]>,
+    activeClaimsByWo:
+        ReadonlyMap<Id, ActiveClaim>,
     workerMap: Map<Id, Worker>,
     mode: InboxMode,
 ): InboxItem[] {
-    const transitionsByWo = Map.groupBy(
-        transitions,
-        t => t.work_order_id,
-    );
-    const claimByWo = new Map<
-        string, WorkOrderClaimEntity
-    >();
-    for (const c of claims) {
-        claimByWo.set(
-            c.work_order_id, c,
-        );
-    }
-
     const items: InboxItem[] = [];
     for (const wo of workOrders) {
         const fg =
@@ -194,29 +177,19 @@ export function buildInboxItems(
             );
         const woTransitions =
             transitionsByWo.get(wo.id);
-        if (!woTransitions) {
+        if (!woTransitions
+            || woTransitions.length === 0) {
             throw new Error(
                 `Work order ${wo.id}`
                 + ' has no transitions',
             );
         }
-        const sorted = woTransitions
-            .toSorted(
+        const sorted = [...woTransitions]
+            .sort(
                 (a, b) =>
-                    a.transitioned_at
-                        .localeCompare(
-                            b.transitioned_at,
-                        ),
+                    a.at.localeCompare(b.at),
             );
-        const lastTransition = sorted.at(-1);
-        if (!lastTransition) {
-            throw new Error(
-                'invariant violated: work'
-                + ' order ' + wo.id
-                + ' has empty transitions'
-                + ' array',
-            );
-        }
+        const lastTransition = sorted.at(-1)!;
         const lastToId =
             lastTransition.to_node_id;
         const curNode = fg.nodes.find(
@@ -233,32 +206,24 @@ export function buildInboxItems(
         }
         const completed = curNode.isArchive;
 
-        const claim =
-            claimByWo.get(wo.id);
-        const isClaimed = isClaimActive(
-            claim, fg.lockTimeout,
-        );
+        const hasActiveClaim =
+            activeClaimsByWo.has(wo.id);
         if (isClaimedAndUnfinished(
-            isClaimed, completed,
+            hasActiveClaim, completed,
         )) continue;
         if (!itemMatchesMode(mode, completed))
             continue;
-
-        const last = sorted.at(-1);
 
         items.push({
             id: wo.id,
             displayId: wo.display_id,
             flowName: fg.name,
             stateName: curNode.name,
-            transitionerName: last
-                ? workerName(
-                    workerMap, last.person_id,
-                )
-                : null,
-            lastTransitionedAt: last
-                ? last.transitioned_at
-                : null,
+            transitionerName: workerName(
+                workerMap, lastTransition.worker_id,
+            ),
+            lastTransitionedAt:
+                lastTransition.at,
             completed,
             position: wo.position,
         });

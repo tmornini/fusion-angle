@@ -7,6 +7,11 @@ import type { RequestContext } from './shared.ts';
 import {
     createSubscriptionChannel,
 } from '../channels.ts';
+import {
+    buildStateEventOp,
+    getWorkerState,
+    getWorkerStates,
+} from './state-events.ts';
 
 export {
     AIWorker,
@@ -16,7 +21,7 @@ export type {
 } from '../../../api/types.ts';
 
 const aiWorkerChanges =
-    createSubscriptionChannel(['ai_workers']);
+    createSubscriptionChannel(['ai_workers', 'states']);
 
 export function subscribeAIWorkerChanges(
     fn: () => void,
@@ -37,14 +42,24 @@ export async function getAIWorkerRows(
 export async function getAIWorkerMap(
     ctx: RequestContext,
 ): Promise<Map<WorkerId, AIWorker>> {
-    const rows = await getAIWorkerRows(ctx);
+    const [rows, stateMap] = await Promise.all([
+        getAIWorkerRows(ctx),
+        getWorkerStates(ctx),
+    ]);
     return new Map(
-        rows.map(
-            entity => [
+        rows.map(entity => {
+            const state = stateMap.get(entity.id);
+            if (state === undefined) {
+                throw new Error(
+                    'no state event for AI worker '
+                    + entity.id,
+                );
+            }
+            return [
                 entity.id,
-                new AIWorker(entity),
-            ],
-        ),
+                new AIWorker(entity, state),
+            ];
+        }),
     );
 }
 
@@ -59,8 +74,11 @@ export async function getAIWorker(
     ctx: RequestContext,
     id: WorkerId,
 ): Promise<AIWorker> {
-    const row = await getAIWorkerRow(ctx, id);
-    return new AIWorker(row);
+    const [row, state] = await Promise.all([
+        getAIWorkerRow(ctx, id),
+        getWorkerState(ctx, id),
+    ]);
+    return new AIWorker(row, state);
 }
 
 export async function getAIWorkerRow(
@@ -81,11 +99,52 @@ export async function putAIWorker(
     aiWorkerChanges.notify();
 }
 
-export async function deleteAIWorker(
+// AI-worker row write paired with a states-log
+// event in one ctx.commit batch. Use at every site
+// that creates an AI worker. The AI worker row
+// carries no state column — its lifecycle on the
+// log begins at 'active' here and terminates at
+// 'archived' via archiveAIWorker. putAIWorker
+// remains for pure edits (name, provider,
+// auth_token) that do not change the lifecycle
+// stage.
+export async function postAIWorkerCreate(
+    ctx: RequestContext,
+    id: WorkerId,
+    entity: Omit<AIWorkerEntity, 'id'>,
+): Promise<void> {
+    const workerBody =
+        entity as unknown as Record<string, unknown>;
+    await ctx.commit({
+        ops: [
+            {
+                method: 'put',
+                resource: `ai-workers/${id}`,
+                body: workerBody,
+            },
+            await buildStateEventOp(ctx, id, 'active'),
+        ],
+    });
+    aiWorkerChanges.notify();
+}
+
+// Archives an AI worker by writing a terminal
+// 'archived' state event. The row persists — only
+// the lifecycle stage advances. Mirrors the
+// terminal state used for humans, per
+// Commandment III (Uniformity): one terminal
+// vocabulary across worker kinds.
+export async function archiveAIWorker(
     ctx: RequestContext,
     id: WorkerId,
 ): Promise<void> {
-    await ctx.DELETE(`ai-workers/${id}`);
+    await ctx.commit({
+        ops: [
+            await buildStateEventOp(
+                ctx, id, 'archived',
+            ),
+        ],
+    });
     aiWorkerChanges.notify();
 }
 

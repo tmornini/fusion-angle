@@ -104,11 +104,14 @@ export class OrganizationObjectivesPresenter {
         return html`
             <li class="objective-list-item"
                 data-objective-id="${o.id}"
+                data-position="${o.position}"
                 data-deprecated="${isDeprecated}">
-                <span class="drag-handle"
-                    aria-label="Drag to reorder">
-                    &#x22EE;&#x22EE;
-                </span>
+                ${!isDeprecated
+                    ? html`<span class="drag-handle"
+                        aria-label="Drag to reorder">
+                        &#x22EE;&#x22EE;
+                      </span>`
+                    : html``}
                 <div class="objective-text">
                     <strong>${def.name}</strong>
                     <span class="objective-desc">

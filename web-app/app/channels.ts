@@ -1,6 +1,5 @@
 import {
     STORAGE_KEY_PREFIX,
-    STORAGE_KEY_TOMBSTONE,
 } from './storage-keys.ts';
 import {
     subscribeStorageEvent,
@@ -46,10 +45,7 @@ export function bridgeStorageToChannel(
     );
     subscribeStorageEvent((e) => {
         if (e.key === null) return;
-        if (
-            watchedKeys.has(e.key)
-            || e.key === STORAGE_KEY_TOMBSTONE
-        ) {
+        if (watchedKeys.has(e.key)) {
             channel.send();
         }
     });

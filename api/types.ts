@@ -31,24 +31,38 @@ export type FlowFieldType =
     | 'radio'
     | 'image';
 
-export type WorkerStatus =
-    | 'active'
-    | 'pending'
-    | 'deactivated';
+// The state alphabet for workers. Three values
+// shared by humans and AIs. Commandment III
+// (Uniformity): one terminal state across both
+// kinds. Stage 10b+c retires the dual-vocabulary
+// snowflake — both humans and AIs now end at
+// 'archived'.
+export const WORKER_STATES = [
+    'active',
+    'pending',
+    'archived',
+] as const;
 
-export type ReadinessLevel =
-    | 'ready'
-    | 'needs-info'
-    | 'incomplete';
+export type WorkerState = typeof WORKER_STATES[number];
 
-export type IdeaStatus =
-    | 'active'
-    | 'in-review'
-    | 'approved'
-    | 'promoted'
-    | 'sent-back'
-    | 'archived'
-    | 'deleted';
+// The composite state alphabet for ideas. Three
+// 'active' sub-states encode the readiness dimension;
+// the remaining six states stand alone. One string,
+// one truth — the dual-column representation that
+// preceded this is retired (Stage 8b+c).
+export const IDEA_STATES = [
+    'active:incomplete',
+    'active:needs-info',
+    'active:ready',
+    'in-review',
+    'approved',
+    'promoted',
+    'sent-back',
+    'archived',
+    'deleted',
+] as const;
+
+export type IdeaState = typeof IDEA_STATES[number];
 
 export type ActivityType =
     | 'idea_created'
@@ -107,14 +121,21 @@ export function isDimensionKey(
         .includes(v);
 }
 
-export type ProjectStatus =
-    | 'submitted'
-    | 'under-review'
-    | 'sent-back'
-    | 'approved'
-    | 'declined'
-    | 'completed'
-    | 'deleted';
+// The state alphabet for projects. Stage 9b+c
+// retires the dual-column representation; the
+// states log IS the truth. Projects have no
+// composite dimension — each state stands alone.
+export const PROJECT_STATES = [
+    'submitted',
+    'under-review',
+    'sent-back',
+    'approved',
+    'declined',
+    'completed',
+    'deleted',
+] as const;
+
+export type ProjectState = typeof PROJECT_STATES[number];
 
 export type StoredBoolean = 0 | 1;
 
@@ -181,109 +202,63 @@ export function isFlowFieldType(
     );
 }
 
-const PROJECT_STATUSES:
-    readonly ProjectStatus[]
-    = [
-        'submitted', 'under-review',
-        'sent-back', 'approved',
-        'declined', 'completed',
-        'deleted',
-    ];
-
-export function isProjectStatus(
+export function isProjectState(
     v: string,
-): v is ProjectStatus {
+): v is ProjectState {
     return includes(
-        PROJECT_STATUSES, v,
+        PROJECT_STATES, v,
     );
 }
 
-export function assertProjectStatus(
+export function assertProjectState(
     v: string,
     label: string,
-): ProjectStatus {
-    if (!includes(PROJECT_STATUSES, v)) {
+): ProjectState {
+    if (!includes(PROJECT_STATES, v)) {
         throw new Error(
-            'expected ProjectStatus for '
+            'expected ProjectState for '
                 + label + ', got ' + v,
         );
     }
     return v;
 }
 
-const IDEA_STATUSES:
-    readonly IdeaStatus[]
-    = [
-        'active', 'in-review',
-        'approved', 'promoted',
-        'sent-back', 'archived',
-        'deleted',
-    ];
-
-export function isIdeaStatus(
+export function isIdeaState(
     v: string,
-): v is IdeaStatus {
+): v is IdeaState {
     return includes(
-        IDEA_STATUSES, v,
+        IDEA_STATES, v,
     );
 }
 
-export function assertIdeaStatus(
+export function assertIdeaState(
     v: string,
     label: string,
-): IdeaStatus {
-    if (!includes(IDEA_STATUSES, v)) {
+): IdeaState {
+    if (!includes(IDEA_STATES, v)) {
         throw new Error(
-            'expected IdeaStatus for '
+            'expected IdeaState for '
                 + label + ', got ' + v,
         );
     }
     return v;
 }
 
-const WORKER_STATUSES: readonly WorkerStatus[] =
-    ['active', 'pending', 'deactivated'];
-
-export function isWorkerStatus(
+export function isWorkerState(
     v: string,
-): v is WorkerStatus {
+): v is WorkerState {
     return includes(
-        WORKER_STATUSES, v,
+        WORKER_STATES, v,
     );
 }
 
-export function assertWorkerStatus(
+export function assertWorkerState(
     v: string,
     label: string,
-): WorkerStatus {
-    if (!includes(WORKER_STATUSES, v)) {
+): WorkerState {
+    if (!includes(WORKER_STATES, v)) {
         throw new Error(
-            'expected WorkerStatus for '
-                + label + ', got ' + v,
-        );
-    }
-    return v;
-}
-
-const READINESS_LEVELS:
-    readonly ReadinessLevel[] =
-    ['ready', 'needs-info', 'incomplete'];
-
-export function isReadinessLevel(
-    v: string,
-): v is ReadinessLevel {
-    return includes(
-        READINESS_LEVELS, v,
-    );
-}
-
-export function assertReadinessLevel(
-    v: string,
-    label: string,
-): ReadinessLevel {
-    if (!includes(READINESS_LEVELS, v)) {
-        throw new Error(
-            'expected ReadinessLevel for '
+            'expected WorkerState for '
                 + label + ', got ' + v,
         );
     }
@@ -337,6 +312,16 @@ export interface Deleted {
     deleted_at: string;
 }
 
+export interface StateEntity {
+    id: Id;
+    entity_id: Id;
+    state: string;
+    worker_id: Id;
+    at: string;
+}
+
+export const SYSTEM_WORKER_ID: Id = 'system';
+
 export interface HumanWorkerEntity {
     id: WorkerId;
     first_name: string;
@@ -344,7 +329,6 @@ export interface HumanWorkerEntity {
     email: string;
     title: string;
     department: string;
-    status: WorkerStatus;
     strengths: JsonArrayField;
     team_dimensions: JsonObjectField;
     phone: string;
@@ -359,7 +343,7 @@ export class HumanWorker {
     readonly #email: string;
     readonly #title: string;
     readonly #department: string;
-    readonly #status: WorkerStatus;
+    readonly #state: WorkerState;
     readonly #strengths: string;
     readonly #teamDimensions: string;
     readonly #phone: string;
@@ -367,6 +351,7 @@ export class HumanWorker {
 
     constructor(
         entity: HumanWorkerEntity,
+        state: WorkerState,
     ) {
         this.#id = entity.id;
         this.#firstName =
@@ -377,7 +362,7 @@ export class HumanWorker {
         this.#title = entity.title;
         this.#department =
             entity.department;
-        this.#status = entity.status;
+        this.#state = state;
         this.#strengths =
             entity.strengths;
         this.#teamDimensions =
@@ -426,34 +411,26 @@ export class HumanWorker {
     }
 
     isActive(): boolean {
-        return this.#status === 'active';
+        return this.#state === 'active';
     }
 
     isPending(): boolean {
-        return (
-            this.#status === 'pending'
-        );
+        return this.#state === 'pending';
     }
 
-    isDeactivated(): boolean {
-        return (
-            this.#status === 'deactivated'
-        );
+    isArchived(): boolean {
+        return this.#state === 'archived';
     }
 
-    statusLabel(): string {
+    stateLabel(): string {
         return (
-            WORKER_STATUS_CONFIG[
-                this.#status
-            ]
+            WORKER_STATE_CONFIG[this.#state]
         )!.label;
     }
 
-    statusClassName(): string {
+    stateClassName(): string {
         return (
-            WORKER_STATUS_CONFIG[
-                this.#status
-            ]
+            WORKER_STATE_CONFIG[this.#state]
         )!.className;
     }
 
@@ -461,8 +438,8 @@ export class HumanWorker {
         return this.#department !== '';
     }
 
-    statusValue(): WorkerStatus {
-        return this.#status;
+    stateValue(): WorkerState {
+        return this.#state;
     }
 
     parsedStrengths(): string[] {
@@ -519,9 +496,11 @@ export class AIWorker {
     readonly #description: string;
     readonly #authToken: string;
     readonly #createdAt: string;
+    readonly #state: WorkerState;
 
     constructor(
         entity: AIWorkerEntity,
+        state: WorkerState,
     ) {
         this.#id = entity.id;
         this.#name = entity.name;
@@ -532,6 +511,7 @@ export class AIWorker {
             entity.auth_token;
         this.#createdAt =
             entity.created_at;
+        this.#state = state;
     }
 
     idForLink(): string {
@@ -562,6 +542,34 @@ export class AIWorker {
             + '…'
             + t.slice(-4)
         );
+    }
+
+    isActive(): boolean {
+        return this.#state === 'active';
+    }
+
+    isPending(): boolean {
+        return this.#state === 'pending';
+    }
+
+    isArchived(): boolean {
+        return this.#state === 'archived';
+    }
+
+    stateLabel(): string {
+        return (
+            WORKER_STATE_CONFIG[this.#state]
+        )!.label;
+    }
+
+    stateClassName(): string {
+        return (
+            WORKER_STATE_CONFIG[this.#state]
+        )!.className;
+    }
+
+    stateValue(): WorkerState {
+        return this.#state;
     }
 
     matchesSearch(term: string): boolean {
@@ -598,13 +606,11 @@ export interface IdeaEntity {
     id: Id;
     title: string;
     position: number;
-    status: IdeaStatus;
     problem_statement: string;
     target_users: string;
     proposed_solution: string;
     expected_outcome: string;
     success_metrics: string;
-    readiness: ReadinessLevel;
     risks: JsonArrayField;
     assumptions: JsonArrayField;
     alignments: JsonArrayField;
@@ -623,12 +629,6 @@ export interface ObjectiveRevision {
     name: string;
     description: string;
     revised_at: string;
-}
-
-export interface DeprecatedObjective {
-    id: string;
-    objective_id: ObjectiveId;
-    deprecated_at: string;
 }
 
 export interface ProjectObjectiveBaselineScore {
@@ -651,7 +651,6 @@ export interface ProjectEntity {
     id: Id;
     title: string;
     description: string;
-    status: ProjectStatus;
     progress: number;
     start_date: string;
     target_end_date: string;
@@ -776,31 +775,16 @@ export interface FlowWorkOrderEntity {
     created_at: string;
 }
 
-export interface WorkOrderTransitionEntity {
+// Per-field values written when a state event
+// records a work-order transition. Each row pins
+// the payload to its parent event by state_event_id
+// (Codd 1NF — a relation belongs in a table, not a
+// column on the event row).
+export interface StateFieldValueEntity {
     id: Id;
-    work_order_id: Id;
-    from_node_id: Id;
-    to_node_id: Id;
-    person_id: Id;
-    transitioned_at: string;
-}
-
-// Per-field values written when a transition fires.
-// Replaces the former JSON `values` blob on
-// work_order_transitions — a relation belongs in a
-// table, not a column. (Codd 1NF.)
-export interface TransitionFieldValueEntity {
-    id: Id;
-    transition_id: Id;
+    state_event_id: Id;
     field_id: Id;
     value: string;
-}
-
-export interface WorkOrderClaimEntity {
-    id: Id;
-    work_order_id: Id;
-    person_id: Id;
-    claimed_at: string;
 }
 
 export interface OrganizationEntity {
@@ -829,14 +813,14 @@ export interface OrganizationEntity {
 export interface IdeaSubmissionEntity {
     id: Id;
     idea_id: Id;
-    person_id: Id;
+    worker_id: Id;
     created_at: string;
 }
 
 export interface ActivityActorEntity {
     id: Id;
     activity_id: Id;
-    person_id: Id;
+    worker_id: Id;
     created_at: string;
 }
 
@@ -852,8 +836,14 @@ export interface StatusDisplay {
     className: string;
 }
 
-export const WORKER_STATUS_CONFIG: Record<
-    WorkerStatus,
+// Visual identity preserved across the Stage 10b+c
+// rename: the 'archived' badge keeps the
+// 'badge-default' className it inherited from the
+// retired terminal state, so existing CSS
+// continues to color it correctly. The label text
+// updates to match the new vocabulary.
+export const WORKER_STATE_CONFIG: Record<
+    WorkerState,
     StatusDisplay
 > = {
     active: {
@@ -864,18 +854,26 @@ export const WORKER_STATUS_CONFIG: Record<
         label: 'Pending',
         className: 'badge-warning',
     },
-    deactivated: {
-        label: 'Deactivated',
+    archived: {
+        label: 'Archived',
         className: 'badge-default',
     },
 };
 
-export const IDEA_STATUS_CONFIG: Record<
-    IdeaStatus,
+export const IDEA_STATE_CONFIG: Record<
+    IdeaState,
     StatusDisplay
 > = {
-    'active': {
-        label: 'Active',
+    'active:incomplete': {
+        label: 'Active · Incomplete',
+        className: 'badge-success',
+    },
+    'active:needs-info': {
+        label: 'Active · Needs Info',
+        className: 'badge-success',
+    },
+    'active:ready': {
+        label: 'Active · Ready',
         className: 'badge-success',
     },
     'in-review': {
@@ -904,8 +902,8 @@ export const IDEA_STATUS_CONFIG: Record<
     },
 };
 
-export const PROJECT_STATUS_CONFIG: Record<
-    ProjectStatus,
+export const PROJECT_STATE_CONFIG: Record<
+    ProjectState,
     StatusDisplay
 > = {
     'submitted': {
@@ -929,7 +927,7 @@ export const PROJECT_STATUS_CONFIG: Record<
         className: 'badge-error',
     },
     'completed': {
-        label: 'Active',
+        label: 'Completed',
         className: 'badge-success',
     },
     'deleted': {
@@ -956,44 +954,28 @@ export const CONFIDENCE_CONFIG: Record<
     },
 };
 
-export const READINESS_CONFIG: Record<
-    ReadinessLevel,
-    StatusDisplay
-> = {
-    ready: {
-        label: 'Ready for Review',
-        className: 'text-success',
-    },
-    'needs-info': {
-        label: 'Needs Info',
-        className: 'text-warning',
-    },
-    incomplete: {
-        label: 'Incomplete',
-        className: 'text-error',
-    },
-};
-
 export class Idea {
     readonly #id: string;
     readonly #title: string;
     readonly #position: number;
-    readonly #status: IdeaStatus;
+    readonly #state: IdeaState;
     readonly #problemStatement: string;
     readonly #targetUsers: string;
     readonly #proposedSolution: string;
     readonly #expectedOutcome: string;
     readonly #successMetrics: string;
-    readonly #readiness: ReadinessLevel;
     readonly #risks: string;
     readonly #assumptions: string;
     readonly #alignments: string;
 
-    constructor(entity: IdeaEntity) {
+    constructor(
+        entity: IdeaEntity,
+        state: IdeaState,
+    ) {
         this.#id = entity.id;
         this.#title = entity.title;
         this.#position = entity.position;
-        this.#status = entity.status;
+        this.#state = state;
         this.#problemStatement =
             entity.problem_statement;
         this.#targetUsers =
@@ -1004,58 +986,33 @@ export class Idea {
             entity.expected_outcome;
         this.#successMetrics =
             entity.success_metrics;
-        this.#readiness = entity.readiness;
         this.#risks = entity.risks;
         this.#assumptions = entity.assumptions;
         this.#alignments = entity.alignments;
     }
 
-    isDeleted(): boolean {
-        return this.#status === 'deleted';
-    }
-
-    isInReview(): boolean {
-        return this.#status === 'in-review';
-    }
-
     isReviewable(): boolean {
-        return this.#status === 'in-review';
+        return this.#state === 'in-review';
     }
 
     isConvertible(): boolean {
-        return this.#status === 'approved';
+        return this.#state === 'approved';
     }
 
     canBeSubmittedForReview(): boolean {
-        return this.#status === 'active'
-            || this.#status === 'sent-back';
+        return this.#state.startsWith('active:')
+            || this.#state === 'sent-back';
     }
 
-    isReady(): boolean {
-        return this.#readiness === 'ready';
-    }
-
-    statusLabel(): string {
+    stateLabel(): string {
         return (
-            IDEA_STATUS_CONFIG[this.#status]
+            IDEA_STATE_CONFIG[this.#state]
         )!.label;
     }
 
-    statusClassName(): string {
+    stateClassName(): string {
         return (
-            IDEA_STATUS_CONFIG[this.#status]
-        )!.className;
-    }
-
-    readinessLabel(): string {
-        return (
-            READINESS_CONFIG[this.#readiness]
-        )!.label;
-    }
-
-    readinessClassName(): string {
-        return (
-            READINESS_CONFIG[this.#readiness]
+            IDEA_STATE_CONFIG[this.#state]
         )!.className;
     }
 
@@ -1097,8 +1054,8 @@ export class Idea {
         return this.#position;
     }
 
-    statusValue(): IdeaStatus {
-        return this.#status;
+    stateValue(): IdeaState {
+        return this.#state;
     }
 
     problemStatementText(): string {
@@ -1120,17 +1077,13 @@ export class Idea {
     successMetricsText(): string {
         return this.#successMetrics;
     }
-
-    readinessValue(): ReadinessLevel {
-        return this.#readiness;
-    }
 }
 
 export class Project {
     readonly #id: string;
     readonly #title: string;
     readonly #description: string;
-    readonly #status: ProjectStatus;
+    readonly #state: ProjectState;
     readonly #progress: number;
     readonly #startDate: string;
     readonly #targetEndDate: string;
@@ -1142,12 +1095,15 @@ export class Project {
     readonly #businessContext: string;
     readonly #timelineLabel: string;
 
-    constructor(entity: ProjectEntity) {
+    constructor(
+        entity: ProjectEntity,
+        state: ProjectState,
+    ) {
         this.#id = entity.id;
         this.#title = entity.title;
         this.#description =
             entity.description;
-        this.#status = entity.status;
+        this.#state = state;
         this.#progress = entity.progress;
         this.#startDate =
             entity.start_date;
@@ -1169,7 +1125,7 @@ export class Project {
     }
 
     isDeleted(): boolean {
-        return this.#status === 'deleted';
+        return this.#state === 'deleted';
     }
 
     isOverdue(): boolean {
@@ -1190,7 +1146,7 @@ export class Project {
     }
 
     timelineProgress(): number {
-        if (this.#status === 'completed')
+        if (this.#state === 'completed')
             return 100;
         const start =
             new Date(this.#startDate);
@@ -1225,18 +1181,18 @@ export class Project {
         );
     }
 
-    statusLabel(): string {
+    stateLabel(): string {
         return (
-            PROJECT_STATUS_CONFIG[
-                this.#status
+            PROJECT_STATE_CONFIG[
+                this.#state
             ]
         )!.label;
     }
 
-    statusClassName(): string {
+    stateClassName(): string {
         return (
-            PROJECT_STATUS_CONFIG[
-                this.#status
+            PROJECT_STATE_CONFIG[
+                this.#state
             ]
         )!.className;
     }
@@ -1253,8 +1209,8 @@ export class Project {
         return this.#description;
     }
 
-    statusValue(): ProjectStatus {
-        return this.#status;
+    stateValue(): ProjectState {
+        return this.#state;
     }
 
     progressPercent(): number {
@@ -1296,21 +1252,21 @@ export interface RecentActivityItem {
 }
 
 export function ideaIsVisible(
-    e: IdeaEntity,
+    state: IdeaState,
 ): boolean {
-    return e.status !== 'archived'
-        && e.status !== 'deleted';
+    return state !== 'archived'
+        && state !== 'deleted';
 }
 
-export function projectIsNotDeleted(
-    e: ProjectEntity,
+export function projectStateIsNotDeleted(
+    state: ProjectState,
 ): boolean {
-    return e.status !== 'deleted';
+    return state !== 'deleted';
 }
 
-export function projectIsApproved(
-    e: ProjectEntity,
+export function projectStateIsApproved(
+    state: ProjectState,
 ): boolean {
-    return e.status === 'approved';
+    return state === 'approved';
 }
 

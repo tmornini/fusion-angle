@@ -101,14 +101,18 @@ async function seedTwoApprovedProjects(
     };
     await db.projects.put('p1', {
         ...projectBody,
-        status: 'approved' as const,
         title: 't1', position: 0,
     });
+    await db.states.record(
+        'st-p1', 'p1', 'approved', 'system',
+    );
     await db.projects.put('p2', {
         ...projectBody,
-        status: 'approved' as const,
         title: 't2', position: 1,
     });
+    await db.states.record(
+        'st-p2', 'p2', 'approved', 'system',
+    );
     await db.objectives.put('o1', { position: 0 });
     await db.objectiveRevisions.put('o1:t0', {
         objective_id: 'o1', name: 'O', description: 'd',

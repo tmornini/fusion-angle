@@ -19,20 +19,18 @@ async function getSidebarWorker(
 }> {
     const {
         createRequestContext,
-        getCurrentHumanWorker,
+        getHumanWorker,
         getOrganization,
-        HumanWorker,
     } = await import('./adapters');
     const ctx = createRequestContext();
-    const [workerRow, org] =
+    const [worker, org] =
         await Promise.all([
-            getCurrentHumanWorker(ctx),
+            getHumanWorker(ctx, 'current'),
             getOrganization(ctx),
         ]);
     return {
-        id: workerRow.id,
-        name: new HumanWorker(workerRow)
-            .fullName(),
+        id: worker.idForLink(),
+        name: worker.fullName(),
         organization: org.nameText(),
     };
 }

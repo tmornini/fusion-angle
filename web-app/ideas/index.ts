@@ -12,7 +12,7 @@ import {
     getIdeas,
     putIdea,
     subscribeIdeaChanges,
-    isIdeaStatus,
+    isIdeaState,
     createRequestContext,
 } from '../app/adapters/index.ts';
 import {
@@ -144,11 +144,11 @@ function onBadgeClick(e: MouseEvent): void {
         !(e.target instanceof HTMLElement)
     ) return;
     const badge = e.target.closest<HTMLElement>(
-        '[data-status]',
+        '[data-state]',
     );
     if (!badge) return;
-    const s = getRequiredAttribute(badge, 'data-status');
-    if (!isIdeaStatus(s)) return;
+    const s = getRequiredAttribute(badge, 'data-state');
+    if (!isIdeaState(s)) return;
     ideaState = applyIdeaFilterToggle(
         ideaState, s,
     );

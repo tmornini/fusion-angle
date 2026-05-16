@@ -21,11 +21,12 @@ import {
 import type {
     ProjectView,
     ProjectEntity,
+    ProjectState,
 } from '../adapters/index.ts';
 import {
-    PROJECT_STATUS_CONFIG,
+    PROJECT_STATE_CONFIG,
     COST_DIVISOR,
-    isProjectStatus,
+    isProjectState,
 } from '../adapters/index.ts';
 import type {
     FlowListItem,
@@ -34,7 +35,7 @@ import type {
 export interface ProjectDraftFields {
     title: string;
     description: string;
-    status: string;
+    state: string;
     startDate: string;
     targetEndDate: string;
     costBaseline: string;
@@ -47,10 +48,14 @@ export type ProjectEntityPatch =
     Pick<ProjectEntity,
         | 'title'
         | 'description'
-        | 'status'
         | 'start_date'
         | 'target_end_date'
         | 'estimated_cost'>;
+
+export interface ProjectPatch {
+    entity: ProjectEntityPatch;
+    state: ProjectState;
+}
 
 export function projectDraftFromView(
     view: ProjectView,
@@ -58,7 +63,7 @@ export function projectDraftFromView(
     return {
         title: view.titleText(),
         description: view.descriptionText(),
-        status: view.statusValue(),
+        state: view.stateValue(),
         startDate: toDateInputValue(
             view.startDateValue(),
         ),
@@ -74,22 +79,22 @@ export function projectDraftFromView(
 export function projectPatchFromDraft(
     view: ProjectView,
     draft: ProjectDraftFields,
-): ProjectEntityPatch {
-    const fallbackStatus = view.statusValue();
-    const status = isProjectStatus(draft.status)
-        ? draft.status
-        : (isProjectStatus(fallbackStatus)
-            ? fallbackStatus
-            : 'submitted');
+): ProjectPatch {
+    const fallbackState = view.stateValue();
+    const state = isProjectState(draft.state)
+        ? draft.state
+        : fallbackState;
     return {
-        title: draft.title,
-        description: draft.description,
-        status,
-        start_date: draft.startDate,
-        target_end_date: draft.targetEndDate,
-        estimated_cost:
-            Number(draft.costBaseline)
-            * COST_DIVISOR,
+        entity: {
+            title: draft.title,
+            description: draft.description,
+            start_date: draft.startDate,
+            target_end_date: draft.targetEndDate,
+            estimated_cost:
+                Number(draft.costBaseline)
+                * COST_DIVISOR,
+        },
+        state,
     };
 }
 
@@ -197,11 +202,11 @@ function buildReadonlyTitleSection(
             </h1>
             <span class="${
                 'badge '
-                + view.statusClassName()
+                + view.stateClassName()
                 + ' text-xs'
             }">
                 ${iconCheckCircle2(14, '')}
-                ${view.statusLabel()}
+                ${view.stateLabel()}
             </span>
         </div>
         ${buildSubtitle(view)}`;
@@ -211,14 +216,14 @@ function buildEditableTitleSection(
     view: ProjectView,
     draft: ProjectDraftFields,
 ): SafeHtml {
-    const statusOptions =
+    const stateOptions =
         Object.entries(
-            PROJECT_STATUS_CONFIG,
+            PROJECT_STATE_CONFIG,
         ).map(([key, cfg]) =>
             html`<option
                 value="${key}"
                 ${trusted(
-                    key === draft.status
+                    key === draft.state
                         ? 'selected'
                         : '',
                 )}>${cfg.label}</option>`,
@@ -237,9 +242,9 @@ function buildEditableTitleSection(
             <select class="${
                 'input select-auto'
             }"
-                id="project-edit-status"
-                data-project-field="status">
-                ${statusOptions}
+                id="project-edit-state"
+                data-project-field="state">
+                ${stateOptions}
             </select>
         </div>
         ${buildSubtitle(view)}`;
@@ -901,7 +906,7 @@ export class ProjectDetailPresenter {
     }
 
     isApproved(): boolean {
-        return this.#view.statusValue()
+        return this.#view.stateValue()
             === 'approved';
     }
 
@@ -977,7 +982,7 @@ export class ProjectDetailEditPresenter {
     }
 
     isApproved(): boolean {
-        return this.#view.statusValue()
+        return this.#view.stateValue()
             === 'approved';
     }
 

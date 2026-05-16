@@ -1,13 +1,14 @@
 import type {
     FlowEntity,
     WorkOrderEntity,
-    WorkOrderClaimEntity,
     WorkOrderFlowGraph,
     StoredGraph,
 } from '../../../api/types.ts';
 import {
     nowUtc,
     jsonObjectField,
+    msSinceUtc,
+    MS_PER_SECOND,
 } from '../../../api/types.ts';
 import {
     validateStoredGraphJson,
@@ -28,13 +29,20 @@ import {
     validateFlowForCreation,
     formatFlowProblem,
 } from './flow-publish.ts';
+import {
+    buildStateEventOp,
+} from './state-events.ts';
+import {
+    generateCryptoSafeBase62,
+} from './crypto-safe-base62.ts';
+import type { StateEntity } from '../../../api/types.ts';
 
 const workOrderChanges =
     createSubscriptionChannel(
         [
             'work-orders',
-            'work-order-transitions',
-            'work-order-claims',
+            'states',
+            'state-field-values',
             'flow-work-orders',
         ],
     );
@@ -47,6 +55,12 @@ export function subscribeWorkOrderChanges(
 
 const FIRST_POSITION = 1;
 const POSITION_STEP = 1;
+
+const CLAIM_STATES: ReadonlySet<string> = new Set([
+    'claimed',
+    'claim_released',
+    'claim_expired',
+]);
 
 async function generateDisplayId(
     uuid: string,
@@ -81,12 +95,40 @@ async function nextWorkOrderPosition(
     return maxPosition + POSITION_STEP;
 }
 
+// Locate the latest claim-vocabulary event for one
+// work order from a snapshot of the global states
+// log. Returns null if none. Used by
+// postWorkOrderClaim to decide whether a prior
+// 'claimed' event has aged past the flow's lock
+// timeout — if so, the new claim records
+// 'claim_expired' for the prior claimant alongside
+// its own 'claimed' event.
+function latestClaimEvent(
+    states: readonly StateEntity[],
+    workOrderId: string,
+): StateEntity | null {
+    let latest: StateEntity | null = null;
+    for (const ev of states) {
+        if (ev.entity_id !== workOrderId) continue;
+        if (!CLAIM_STATES.has(ev.state)) continue;
+        if (latest === null || ev.at >= latest.at) {
+            latest = ev;
+        }
+    }
+    return latest;
+}
+
+function isClaimEventExpired(
+    claim: StateEntity,
+    lockTimeoutSeconds: number,
+): boolean {
+    return msSinceUtc(claim.at)
+        >= lockTimeoutSeconds * MS_PER_SECOND;
+}
+
 export interface WorkOrderCreationInput {
     workOrderId: string;
     flowLinkId: string;
-    initTransitionId: string;
-    postStartTransitionId: string;
-    claimId: string;
     flowId: string;
 }
 
@@ -94,7 +136,6 @@ export async function postWorkOrderCreation(
     ctx: RequestContext,
     input: WorkOrderCreationInput,
 ): Promise<void> {
-    const worker = await getCurrentHumanWorker(ctx);
     const flow = await ctx.GET<FlowEntity>(
         `flows/${input.flowId}`,
     );
@@ -187,48 +228,21 @@ export async function postWorkOrderCreation(
                     created_at: now,
                 },
             },
-            {
-                method: 'put',
-                resource:
-                    `work-order-transitions/`
-                    + `${input.initTransitionId}`,
-                body: {
-                    work_order_id:
-                        input.workOrderId,
-                    from_node_id: '',
-                    to_node_id: startNode.id,
-                    person_id: worker.id,
-                    transitioned_at: now,
-                },
-            },
-            {
-                method: 'put',
-                resource:
-                    `work-order-transitions/`
-                    + `${
-                        input.postStartTransitionId
-                    }`,
-                body: {
-                    work_order_id:
-                        input.workOrderId,
-                    from_node_id: startNode.id,
-                    to_node_id: postStartNodeId,
-                    person_id: worker.id,
-                    transitioned_at: now,
-                },
-            },
-            {
-                method: 'put',
-                resource:
-                    `work-order-claims/`
-                    + `${input.claimId}`,
-                body: {
-                    work_order_id:
-                        input.workOrderId,
-                    person_id: worker.id,
-                    claimed_at: now,
-                },
-            },
+            await buildStateEventOp(
+                ctx,
+                input.workOrderId,
+                startNode.id,
+            ),
+            await buildStateEventOp(
+                ctx,
+                input.workOrderId,
+                postStartNodeId,
+            ),
+            await buildStateEventOp(
+                ctx,
+                input.workOrderId,
+                'claimed',
+            ),
         ],
     });
 
@@ -236,12 +250,10 @@ export async function postWorkOrderCreation(
 }
 
 export interface WorkOrderTransitionInput {
-    transitionId: string;
     workOrderId: string;
     edgeId: string;
     values: Record<string, string>;
     fieldValueIds: Record<string, string>;
-    currentNodeId: string;
 }
 
 export async function postWorkOrderTransition(
@@ -249,11 +261,9 @@ export async function postWorkOrderTransition(
     input: WorkOrderTransitionInput,
 ): Promise<void> {
     const {
-        transitionId, workOrderId, edgeId,
+        workOrderId, edgeId,
         values, fieldValueIds,
-        currentNodeId,
     } = input;
-    const worker = await getCurrentHumanWorker(ctx);
     const wo = await ctx.GET<WorkOrderEntity>(
         `work-orders/${workOrderId}`,
     );
@@ -270,12 +280,20 @@ export async function postWorkOrderTransition(
         );
     }
 
-    const now = nowUtc();
+    // The transition event is built first so its id
+    // can serve as the state_event_id foreign key on
+    // every per-field row written in the same batch.
+    // Codd 1NF — the relation lives in a table, the
+    // event id is the joiner.
+    const transitionOp = await buildStateEventOp(
+        ctx, workOrderId, edge.toNodeId,
+    );
+    const transitionEventId =
+        transitionOp.resource.split('/')[1]!;
 
-    // Each field/value pair becomes its own row
-    // in the transition_field_values table — Codd
-    // 1NF, replacing the former JSON blob. IDs
-    // are caller-supplied for retry safety.
+    // Each field/value pair becomes its own row in
+    // the state_field_values table — caller-supplied
+    // ids for retry safety.
     const fieldValueOps: WriteOp[] = [];
     for (
         const [fieldId, value]
@@ -291,48 +309,44 @@ export async function postWorkOrderTransition(
         fieldValueOps.push({
             method: 'put',
             resource:
-                `transition-field-values/${id}`,
+                `state-field-values/${id}`,
             body: {
-                transition_id: transitionId,
+                state_event_id: transitionEventId,
                 field_id: fieldId,
                 value,
             },
         });
     }
 
-    const claims =
-        await ctx.GET<WorkOrderClaimEntity[]>(
-            'work-order-claims',
-        );
-    const claim = claims.find(
-        c => c.work_order_id
-            === workOrderId,
+    // If a live claim exists for the work order, the
+    // transition implicitly releases it — record a
+    // 'claim_released' event in the same batch.
+    const states = await ctx.GET<StateEntity[]>(
+        'states',
     );
-    const claimDelete: WriteOp[] = claim
-        ? [{
-            method: 'delete',
-            resource:
-                `work-order-claims/${claim.id}`,
-        }]
+    const latestClaim = latestClaimEvent(
+        states, workOrderId,
+    );
+    const hasLiveClaim = latestClaim !== null
+        && latestClaim.state === 'claimed'
+        && !isClaimEventExpired(
+            latestClaim, fg.lockTimeout,
+        );
+    const claimReleasedEvent: WriteOp[] = hasLiveClaim
+        ? [
+            await buildStateEventOp(
+                ctx,
+                workOrderId,
+                'claim_released',
+            ),
+        ]
         : [];
 
     await ctx.commit({
         ops: [
-            {
-                method: 'put',
-                resource:
-                    `work-order-transitions/`
-                    + `${transitionId}`,
-                body: {
-                    work_order_id: workOrderId,
-                    from_node_id: currentNodeId,
-                    to_node_id: edge.toNodeId,
-                    person_id: worker.id,
-                    transitioned_at: now,
-                },
-            },
+            transitionOp,
             ...fieldValueOps,
-            ...claimDelete,
+            ...claimReleasedEvent,
         ],
     });
 
@@ -348,34 +362,71 @@ export async function putWorkOrder(
     workOrderChanges.notify();
 }
 
-// Two tabs can both read an empty
-// claims table, both write a claim,
-// both succeed — duplicate claim rows
-// for one work order. localStorage has
-// no compare-and-swap, so any
-// read-check-write inside this function
-// would still have a TOCTOU window.
-// Structural fix lives in the Postgres
-// migration: UNIQUE (work_order_id)
-// WHERE active. Until then, the UI
-// disables the claim button while a
-// request is pending.
+// Two tabs can both observe no live claim, both
+// write a 'claimed' event, both succeed —
+// duplicate claims for one work order. localStorage
+// has no compare-and-swap, so any
+// read-check-write inside this function would
+// still have a TOCTOU window. Structural fix lives
+// in the Postgres migration: UNIQUE partial index
+// on the live-claim view. Until then, the UI
+// disables the claim button while a request is
+// pending.
 export async function postWorkOrderClaim(
     ctx: RequestContext,
-    claimId: string,
     workOrderId: string,
 ): Promise<void> {
-    const worker = await getCurrentHumanWorker(ctx);
-    const now = nowUtc();
-
-    await ctx.PUT<void>(
-        `work-order-claims/${claimId}`,
-        {
-            work_order_id: workOrderId,
-            person_id: worker.id,
-            claimed_at: now,
-        },
+    // Notice any prior 'claimed' event that has
+    // already aged past the flow's lockTimeout — the
+    // new claim is superseding it. The
+    // 'claim_expired' event names the previous
+    // claimant (Codd: the event records who held
+    // the claim that aged out), and lands in the
+    // same atomic batch as the new claim's
+    // 'claimed' event.
+    const wo = await ctx.GET<WorkOrderEntity>(
+        `work-orders/${workOrderId}`,
     );
+    const fg = validateWorkOrderFlowGraph(
+        wo.flow_graph,
+    );
+    const states = await ctx.GET<StateEntity[]>(
+        'states',
+    );
+    const priorClaim = latestClaimEvent(
+        states, workOrderId,
+    );
+    const isPriorExpired =
+        priorClaim !== null
+        && priorClaim.state === 'claimed'
+        && isClaimEventExpired(
+            priorClaim, fg.lockTimeout,
+        );
+    const expiredOps: WriteOp[] = isPriorExpired
+        ? [{
+            method: 'put',
+            resource:
+                `states/`
+                + `${generateCryptoSafeBase62()}`,
+            body: {
+                entity_id: workOrderId,
+                state: 'claim_expired',
+                worker_id: priorClaim!.worker_id,
+                at: nowUtc(),
+            },
+        }]
+        : [];
+
+    await ctx.commit({
+        ops: [
+            ...expiredOps,
+            await buildStateEventOp(
+                ctx,
+                workOrderId,
+                'claimed',
+            ),
+        ],
+    });
 
     workOrderChanges.notify();
 }

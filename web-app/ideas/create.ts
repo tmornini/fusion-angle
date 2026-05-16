@@ -8,8 +8,9 @@ import {
 import { navigateTo } from '../app/core.ts';
 import {
     createRequestContext,
+    getIdeaRows,
     postActivity,
-    putIdea,
+    postIdeaStateChange,
     putIdeaSubmission,
     jsonArrayField,
     generateCryptoSafeBase62,
@@ -132,7 +133,17 @@ export async function init():
                 const ctx = createRequestContext();
                 const ideaId =
                     generateCryptoSafeBase62();
-                await putIdea(
+                const existing =
+                    await getIdeaRows(ctx);
+                const nextPosition =
+                    existing.length === 0
+                        ? 0
+                        : Math.max(
+                            ...existing.map(
+                                r => r.position,
+                            ),
+                        ) + 1;
+                await postIdeaStateChange(
                     ctx,
                     ideaId,
                     {
@@ -153,12 +164,8 @@ export async function init():
                         success_metrics:
                             formState
                             .successMetrics,
-                        status:
-                            'active',
                         position:
-                            0,
-                        readiness:
-                            'incomplete',
+                            nextPosition,
                         risks:
                             jsonArrayField(
                                 [],
@@ -172,6 +179,7 @@ export async function init():
                                 [],
                             ),
                     },
+                    'active:incomplete',
                 );
                 await putIdeaSubmission(
                     ctx,

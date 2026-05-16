@@ -1,8 +1,7 @@
 import type { DbAdapter } from './db.ts';
 import type {
     HumanWorkerEntity,
-    WorkerStatus,
-    ReadinessLevel,
+    WorkerState,
     IdeaEntity,
     ProjectEntity,
     ActivityEntity,
@@ -13,8 +12,8 @@ import type {
     AIWorkerEntity,
     WorkOrderEntity,
     FlowWorkOrderEntity,
-    WorkOrderTransitionEntity,
-    TransitionFieldValueEntity,
+    StateEntity,
+    StateFieldValueEntity,
     JsonObjectField,
     Id,
     GraphNode,
@@ -27,6 +26,7 @@ import {
     SECONDS_PER_HOUR,
     MS_PER_SECOND,
     MS_PER_DAY,
+    SYSTEM_WORKER_ID,
 } from './types.ts';
 
 const now = new Date();
@@ -201,8 +201,8 @@ interface GeneratedFlowData {
         readonly WorkOrderEntity[];
     readonly flowWorkOrders:
         readonly FlowWorkOrderEntity[];
-    readonly transitions:
-        readonly WorkOrderTransitionEntity[];
+    readonly stateEvents:
+        readonly StateEntity[];
 }
 
 function generateFlowWorkload(args: {
@@ -240,8 +240,7 @@ function generateFlowWorkload(args: {
     const workOrders: WorkOrderEntity[] = [];
     const flowWorkOrders:
         FlowWorkOrderEntity[] = [];
-    const transitions:
-        WorkOrderTransitionEntity[] = [];
+    const stateEvents: StateEntity[] = [];
 
     const nowMs = now.getTime();
 
@@ -309,31 +308,26 @@ function generateFlowWorkload(args: {
 
         // The worker who takes the WO into the
         // first working node also stamps the
-        // from='' and Create-exit transitions.
+        // Create-entry and Create-exit state
+        // events.
         const creatorPerson = stepWorker[1]!;
 
-        transitions.push({
+        stateEvents.push({
             id: b62Id(rng, 22),
-            work_order_id: woId,
-            from_node_id: '',
-            to_node_id: path.nodeIds[0]!,
-            person_id: creatorPerson,
-            transitioned_at:
-                isoFromMs(cursorMs),
+            entity_id: woId,
+            state: path.nodeIds[0]!,
+            worker_id: creatorPerson,
+            at: isoFromMs(cursorMs),
         });
 
         if (N >= 2) {
             cursorMs += CREATE_DWELL_MS;
-            transitions.push({
+            stateEvents.push({
                 id: b62Id(rng, 22),
-                work_order_id: woId,
-                from_node_id:
-                    path.nodeIds[0]!,
-                to_node_id:
-                    path.nodeIds[1]!,
-                person_id: creatorPerson,
-                transitioned_at:
-                    isoFromMs(cursorMs),
+                entity_id: woId,
+                state: path.nodeIds[1]!,
+                worker_id: creatorPerson,
+                at: isoFromMs(cursorMs),
             });
         }
 
@@ -341,21 +335,16 @@ function generateFlowWorkload(args: {
             cursorMs += stepSojournMs[j - 1]!;
             // Clamp long-tail sojourns that
             // would overrun today, so no
-            // transition is future-dated.
+            // event is future-dated.
             if (cursorMs >= nowMs) {
                 cursorMs = nowMs - 1000;
             }
-            transitions.push({
+            stateEvents.push({
                 id: b62Id(rng, 22),
-                work_order_id: woId,
-                from_node_id:
-                    path.nodeIds[j - 1]!,
-                to_node_id:
-                    path.nodeIds[j]!,
-                person_id:
-                    stepWorker[j - 1]!,
-                transitioned_at:
-                    isoFromMs(cursorMs),
+                entity_id: woId,
+                state: path.nodeIds[j]!,
+                worker_id: stepWorker[j - 1]!,
+                at: isoFromMs(cursorMs),
             });
         }
 
@@ -379,7 +368,7 @@ function generateFlowWorkload(args: {
     return {
         workOrders,
         flowWorkOrders,
-        transitions,
+        stateEvents,
     };
 }
 
@@ -391,6 +380,11 @@ type SeedHumanWorker = Omit<
     team_dimensions: Record<
         string, number
     >;
+    // The initial worker state seeded into the
+    // states log alongside the row. Lives on the
+    // seed (not the entity) because the entity
+    // carries no state column.
+    state: WorkerState;
 };
 
 const MOCK_SEED_TIMESTAMP =
@@ -442,13 +436,27 @@ export async function populateMockData(
 ): Promise<void> {
     const workers: SeedHumanWorker[] = [
         {
+            id: SYSTEM_WORKER_ID,
+            first_name: 'System',
+            last_name: 'Worker',
+            email: 'system@fusion.local',
+            title: 'System',
+            department: 'System',
+            state: 'active',
+            strengths: [],
+            team_dimensions: {},
+            phone: '',
+            bio: 'Synthetic worker that owns'
+                + ' system-authored state events.',
+        },
+        {
             id: 'LhfaUUf4IumVsCSGB4xjdK',
             first_name: 'Sarah',
             last_name: 'Chen',
             email: 'sarah.chen@company.com',
             title: 'Project Lead',
             department: 'Operations',
-            status: 'active',
+            state: 'active',
             strengths: [
                 'Strategic Planning',
                 'Team Leadership',
@@ -473,7 +481,7 @@ export async function populateMockData(
             email: 'mike.thompson@company.com',
             title: 'ML Engineer',
             department: 'Engineering',
-            status: 'active',
+            state: 'active',
             strengths: [
                 'Machine Learning',
                 'Python',
@@ -498,7 +506,7 @@ export async function populateMockData(
             email: 'jessica.park@company.com',
             title: 'Data Scientist',
             department: 'Analytics',
-            status: 'active',
+            state: 'active',
             strengths: [
                 'Statistical Analysis',
                 'Visualization',
@@ -523,7 +531,7 @@ export async function populateMockData(
             email: 'david.martinez@company.com',
             title: 'Backend Developer',
             department: 'Engineering',
-            status: 'active',
+            state: 'active',
             strengths: [
                 'API Development',
                 'Database Design',
@@ -548,7 +556,7 @@ export async function populateMockData(
             email: 'emily.rodriguez@company.com',
             title: 'UX Designer',
             department: 'Design',
-            status: 'pending',
+            state: 'pending',
             strengths: [
                 'User Research',
                 'Prototyping',
@@ -573,7 +581,7 @@ export async function populateMockData(
             email: 'alex.kim@company.com',
             title: 'Product Manager',
             department: 'Product',
-            status: 'active',
+            state: 'active',
             strengths: [
                 'Roadmap Planning',
                 'Stakeholder Management',
@@ -598,7 +606,7 @@ export async function populateMockData(
             email: 'marcus@acmecorp.com',
             title: 'manager',
             department: 'Product',
-            status: 'active',
+            state: 'active',
             strengths: [
                 'Product Strategy',
                 'Team Management',
@@ -622,7 +630,7 @@ export async function populateMockData(
             email: 'david.kim@company.com',
             title: 'member',
             department: 'Engineering',
-            status: 'active',
+            state: 'active',
             strengths: [
                 'Frontend Development',
                 'React',
@@ -647,7 +655,7 @@ export async function populateMockData(
             email: 'lisa@acmecorp.com',
             title: 'viewer',
             department: 'Sales',
-            status: 'active',
+            state: 'active',
             strengths: [
                 'Sales Strategy',
                 'Client Relations',
@@ -671,7 +679,7 @@ export async function populateMockData(
             email: 'james@acmecorp.com',
             title: 'member',
             department: 'Engineering',
-            status: 'deactivated',
+            state: 'archived',
             strengths: [
                 'Backend Development',
                 'Python',
@@ -695,7 +703,7 @@ export async function populateMockData(
             email: 'demo@example.com',
             title: 'Admin',
             department: 'Product',
-            status: 'active',
+            state: 'active',
             strengths: [
                 'Strategic Planning',
                 'Data Analysis',
@@ -714,17 +722,34 @@ export async function populateMockData(
         },
     ];
 
-    await Promise.all(workers.map(worker =>
-        adapter.workers.put(worker.id, {
-            ...worker,
+    await Promise.all(workers.map(worker => {
+        const {
+            id: _id, state: _state, ...rest
+        } = worker;
+        return adapter.workers.put(worker.id, {
+            ...rest,
             strengths:
                 jsonArrayField(worker.strengths),
             team_dimensions:
                 jsonObjectField(
                     worker.team_dimensions,
                 ),
-        }),
-    ));
+        });
+    }));
+
+    // Initial worker state events. Every seeded
+    // worker — human or AI — gets one event at
+    // creation. The states log is the sole source
+    // of worker state; the row carries no column.
+    const workerStateEvents: StateEntity[] = [
+        ...workers.map(w => ({
+            id: `seed-worker-${w.id}-${w.state}`,
+            entity_id: w.id,
+            state: w.state,
+            worker_id: SYSTEM_WORKER_ID,
+            at: MOCK_SEED_TIMESTAMP,
+        })),
+    ];
 
     const ideas: IdeaEntity[] = [
         {
@@ -732,8 +757,6 @@ export async function populateMockData(
             title: 'AI-Powered Customer'
                 + ' Segmentation',
             position: 1,
-            status: 'in-review',
-
             problem_statement:
                 'Marketing team spends 20+'
                 + ' hours weekly manually'
@@ -760,8 +783,6 @@ export async function populateMockData(
                 + ' segmentation time, 25%'
                 + ' increase in campaign'
                 + ' conversion rates',
-            readiness: 'ready',
-
             risks: jsonArrayField([]),
             assumptions: jsonArrayField([]),
             alignments: jsonArrayField([]),
@@ -771,8 +792,6 @@ export async function populateMockData(
             title: 'Automated Report'
                 + ' Generation',
             position: 2,
-            status: 'approved',
-
             problem_statement:
                 'Analysts spend 15+ hours'
                 + ' per week manually'
@@ -801,8 +820,6 @@ export async function populateMockData(
                 '90% reduction in report'
                 + ' preparation time,'
                 + ' 100% on-time delivery',
-            readiness: 'ready',
-
             risks: jsonArrayField([]),
             assumptions: jsonArrayField([]),
             alignments: jsonArrayField([]),
@@ -812,8 +829,6 @@ export async function populateMockData(
             title: 'Predictive Maintenance'
                 + ' System',
             position: 3,
-            status: 'active',
-
             problem_statement:
                 'Unplanned equipment'
                 + ' downtime costs $50K per'
@@ -836,8 +851,6 @@ export async function populateMockData(
                 + ' 20%, saving $150K'
                 + ' annually.',
             success_metrics: '',
-            readiness: 'needs-info',
-
             risks: jsonArrayField([]),
             assumptions: jsonArrayField([]),
             alignments: jsonArrayField([]),
@@ -847,8 +860,6 @@ export async function populateMockData(
             title: 'Real-time Analytics'
                 + ' Dashboard',
             position: 4,
-            status: 'in-review',
-
             problem_statement:
                 'Leadership relies on'
                 + ' weekly batch reports'
@@ -877,8 +888,6 @@ export async function populateMockData(
                 + ' under 2 seconds, 95%'
                 + ' daily active usage'
                 + ' by leadership',
-            readiness: 'ready',
-
             risks: jsonArrayField([]),
             assumptions: jsonArrayField([]),
             alignments: jsonArrayField([]),
@@ -888,8 +897,6 @@ export async function populateMockData(
             title: 'Smart Inventory'
                 + ' Optimization',
             position: 5,
-            status: 'active',
-
             problem_statement:
                 'Excess inventory ties up'
                 + ' $2M in capital while'
@@ -911,8 +918,6 @@ export async function populateMockData(
                 + ' improving customer'
                 + ' satisfaction scores.',
             success_metrics: '',
-            readiness: 'needs-info',
-
             risks: jsonArrayField([]),
             assumptions: jsonArrayField([]),
             alignments: jsonArrayField([]),
@@ -922,8 +927,6 @@ export async function populateMockData(
             title: 'Employee Training'
                 + ' Assistant',
             position: 6,
-            status: 'sent-back',
-
             problem_statement:
                 'New hire onboarding takes'
                 + ' 6 weeks on average, with'
@@ -949,8 +952,6 @@ export async function populateMockData(
                 '50% faster onboarding,'
                 + ' 40% higher new-hire'
                 + ' productivity scores',
-            readiness: 'incomplete',
-
             risks: jsonArrayField([]),
             assumptions: jsonArrayField([]),
             alignments: jsonArrayField([]),
@@ -960,8 +961,6 @@ export async function populateMockData(
             title: 'AI-Powered Customer'
                 + ' Support Chatbot',
             position: 8,
-            status: 'in-review',
-
             problem_statement:
                 'Support team handles'
                 + ' 500+ tier-1 tickets'
@@ -988,8 +987,6 @@ export async function populateMockData(
                 + ' rate, CSAT above 4.5,'
                 + ' average response time'
                 + ' under 30 seconds',
-            readiness: 'ready',
-
             risks: jsonArrayField([
                 {
                     title:
@@ -1051,8 +1048,6 @@ export async function populateMockData(
             title: 'Mobile App Push'
                 + ' Notification Revamp',
             position: 10,
-            status: 'in-review',
-
             problem_statement:
                 'Push notification opt-out'
                 + ' rate is 42% due to'
@@ -1075,8 +1070,6 @@ export async function populateMockData(
                 'Opt-out rate below 20%,'
                 + ' 35% higher engagement'
                 + ' on push notifications',
-            readiness: 'needs-info',
-
             risks: jsonArrayField([]),
             assumptions: jsonArrayField([]),
             alignments: jsonArrayField([]),
@@ -1086,8 +1079,6 @@ export async function populateMockData(
             title: 'Sustainability Dashboard'
                 + ' for Operations',
             position: 9,
-            status: 'in-review',
-
             problem_statement:
                 'No centralized view of'
                 + ' energy, water, and'
@@ -1108,8 +1099,6 @@ export async function populateMockData(
                 '15% energy cost'
                 + ' reduction, ESG report'
                 + ' delivery on schedule',
-            readiness: 'ready',
-
             risks: jsonArrayField([]),
             assumptions: jsonArrayField([]),
             alignments: jsonArrayField([]),
@@ -1119,8 +1108,6 @@ export async function populateMockData(
             title: 'Employee Wellness'
                 + ' Program Integration',
             position: 11,
-            status: 'in-review',
-
             problem_statement:
                 'Employee burnout rates'
                 + ' are rising with no'
@@ -1144,8 +1131,6 @@ export async function populateMockData(
                 '50% participation'
                 + ' increase, 12% lower'
                 + ' voluntary turnover',
-            readiness: 'incomplete',
-
             risks: jsonArrayField([]),
             assumptions: jsonArrayField([]),
             alignments: jsonArrayField([]),
@@ -1155,8 +1140,6 @@ export async function populateMockData(
             title: 'Real-time Inventory'
                 + ' Tracking System',
             position: 7,
-            status: 'in-review',
-
             problem_statement:
                 'Inventory counts rely on'
                 + ' manual audits that lag'
@@ -1180,8 +1163,6 @@ export async function populateMockData(
                 '99.5% inventory accuracy,'
                 + ' zero manual'
                 + ' reconciliation needed',
-            readiness: 'ready',
-
             risks: jsonArrayField([]),
             assumptions: jsonArrayField([]),
             alignments: jsonArrayField([]),
@@ -1229,7 +1210,6 @@ export async function populateMockData(
                 + ' in real time from'
                 + ' behavior, purchase'
                 + ' history, and engagement.',
-            status: 'approved',
             progress: 67,
             start_date: dt(60, 9, 0),
             target_end_date: dt(-30, 9, 0),
@@ -1275,7 +1255,6 @@ export async function populateMockData(
                 + ' multiple sources and'
                 + ' ships formatted reports'
                 + ' on a schedule.',
-            status: 'completed',
             progress: 100,
             start_date: dt(110, 9, 0),
             target_end_date: dt(45, 9, 0),
@@ -1300,7 +1279,6 @@ export async function populateMockData(
                 + ' discovery, qualification,'
                 + ' proposal, negotiation,'
                 + ' close.',
-            status: 'approved',
             progress: 69,
             start_date: dt(55, 9, 0),
             target_end_date: dt(-25, 9, 0),
@@ -1345,7 +1323,6 @@ export async function populateMockData(
                 + ' models that predict'
                 + ' equipment failures'
                 + ' before they occur.',
-            status: 'under-review',
             progress: 17,
             start_date: dt(18, 9, 0),
             target_end_date: dt(-90, 9, 0),
@@ -1368,7 +1345,6 @@ export async function populateMockData(
                 + ' streaming pipelines and'
                 + ' automated anomaly alerts'
                 + ' for leadership.',
-            status: 'completed',
             progress: 100,
             start_date: dt(95, 9, 0),
             target_end_date: dt(40, 9, 0),
@@ -1391,7 +1367,6 @@ export async function populateMockData(
                 + ' automatic reorder'
                 + ' triggers to cut carrying'
                 + ' costs and stockouts.',
-            status: 'sent-back',
             progress: 76,
             start_date: dt(38, 9, 0),
             target_end_date: dt(-12, 9, 0),
@@ -1416,7 +1391,6 @@ export async function populateMockData(
                 + ' paths and answers'
                 + ' procedural questions for'
                 + ' new hires.',
-            status: 'under-review',
             progress: 10,
             start_date: dt(12, 9, 0),
             target_end_date: dt(-110, 9, 0),
@@ -1440,7 +1414,6 @@ export async function populateMockData(
                 + ' across tickets,'
                 + ' runbooks, and product'
                 + ' docs.',
-            status: 'approved',
             progress: 69,
             start_date: dt(48, 9, 0),
             target_end_date: dt(-22, 9, 0),
@@ -1464,7 +1437,6 @@ export async function populateMockData(
                 + ' mappings, and ship the'
                 + ' annual SOC 2 dossier in'
                 + ' hours rather than weeks.',
-            status: 'approved',
             progress: 86,
             start_date: dt(72, 9, 0),
             target_end_date: dt(-12, 9, 0),
@@ -1487,7 +1459,6 @@ export async function populateMockData(
                 + ' across two regions with'
                 + ' five-minute RPO and'
                 + ' fifteen-minute RTO.',
-            status: 'approved',
             progress: 91,
             start_date: dt(82, 9, 0),
             target_end_date: dt(-8, 9, 0),
@@ -1511,7 +1482,6 @@ export async function populateMockData(
                 + ' updates, parts lookup,'
                 + ' and onsite knowledge'
                 + ' access.',
-            status: 'approved',
             progress: 53,
             start_date: dt(40, 9, 0),
             target_end_date: dt(-35, 9, 0),
@@ -1535,7 +1505,6 @@ export async function populateMockData(
                 + ' then surface the live'
                 + ' carbon ledger for ESG'
                 + ' reporting.',
-            status: 'completed',
             progress: 100,
             start_date: dt(120, 9, 0),
             target_end_date: dt(35, 9, 0),
@@ -1558,7 +1527,6 @@ export async function populateMockData(
                 + ' by region and skill,'
                 + ' then surface gaps eight'
                 + ' weeks before they bite.',
-            status: 'under-review',
             progress: 17,
             start_date: dt(22, 9, 0),
             target_end_date: dt(-105, 9, 0),
@@ -1581,7 +1549,6 @@ export async function populateMockData(
                 + ' urgency, and customer'
                 + ' tier without a human'
                 + ' bottleneck.',
-            status: 'approved',
             progress: 78,
             start_date: dt(65, 9, 0),
             target_end_date: dt(-18, 9, 0),
@@ -1605,7 +1572,6 @@ export async function populateMockData(
                 + ' statements, capital-call'
                 + ' workflows, and'
                 + ' audit-ready exports.',
-            status: 'approved',
             progress: 67,
             start_date: dt(58, 9, 0),
             target_end_date: dt(-28, 9, 0),
@@ -3772,1398 +3738,1246 @@ export async function populateMockData(
         },
     ];
 
-    const mockWoTransitions:
-        WorkOrderTransitionEntity[] = [
+    const mockStateEvents:
+        StateEntity[] = [
         {
             id: '9nP0K7FVlCFps3eqMnbnMU',
-            work_order_id: woId,
-            from_node_id: '',
-            to_node_id: woNodeNew,
-            person_id: woPersonSarah,
-            transitioned_at:
+            entity_id: woId,
+            state: woNodeNew,
+            worker_id: woPersonSarah,
+            at:
                 woCreated,
         },
         {
             id: 'MbiHcJxVA5Tde3oBh3Ka8p',
-            work_order_id: woId,
-            from_node_id: woNodeNew,
-            to_node_id: woNodeCapture,
-            person_id: woPersonSarah,
-            transitioned_at:
+            entity_id: woId,
+            state: woNodeCapture,
+            worker_id: woPersonSarah,
+            at:
                 woCreated,
         },
         {
             id: 'eJEybxfXaf3sjwFilZnunU',
-            work_order_id: woId,
-            from_node_id:
-                woNodeCapture,
-            to_node_id: woNodeReview,
-            person_id: woPersonMike,
-            transitioned_at:
+            entity_id: woId,
+            state: woNodeReview,
+            worker_id: woPersonMike,
+            at:
                 dt(13, 14, 30),
         },
         {
             id: 'C2xb2bbjyHD11WfLayh8Om',
-            work_order_id: woId,
-            from_node_id:
-                woNodeReview,
-            to_node_id:
+            entity_id: woId,
+            state:
                 woNodeComplete,
-            person_id: woPersonSarah,
-            transitioned_at:
+            worker_id: woPersonSarah,
+            at:
                 dt(12, 9, 15),
         },
         // happy-path WO02: DC sojourn 1 day
         {
             id: '6eT1jG5MoR9A5PvRvgCUBq',
-            work_order_id:
+            entity_id:
                 'kKtX2W0iVTWFPEoPrJmIHW',
-            from_node_id: '',
-            to_node_id: woNodeNew,
-            person_id: woPersonSarah,
-            transitioned_at: dt(88, 9, 0),
+            state: woNodeNew,
+            worker_id: woPersonSarah,
+            at: dt(88, 9, 0),
         },
         {
             id: 'MEsinaVfIifb90ByaJBjrp',
-            work_order_id:
+            entity_id:
                 'kKtX2W0iVTWFPEoPrJmIHW',
-            from_node_id: woNodeNew,
-            to_node_id: woNodeCapture,
-            person_id: woPersonSarah,
-            transitioned_at: dt(88, 9, 5),
+            state: woNodeCapture,
+            worker_id: woPersonSarah,
+            at: dt(88, 9, 5),
         },
         {
             id: 'xI5NDQXN8Ns5oe0XeEPX2o',
-            work_order_id:
+            entity_id:
                 'kKtX2W0iVTWFPEoPrJmIHW',
-            from_node_id: woNodeCapture,
-            to_node_id: woNodeReview,
-            person_id: woPersonMarcus,
-            transitioned_at: dt(87, 10, 0),
+            state: woNodeReview,
+            worker_id: woPersonMarcus,
+            at: dt(87, 10, 0),
         },
         {
             id: 'k4yValdb0nLdwsZdgvuwtq',
-            work_order_id:
+            entity_id:
                 'kKtX2W0iVTWFPEoPrJmIHW',
-            from_node_id: woNodeReview,
-            to_node_id: woNodeComplete,
-            person_id: woPersonSarah,
-            transitioned_at: dt(85, 14, 0),
+            state: woNodeComplete,
+            worker_id: woPersonSarah,
+            at: dt(85, 14, 0),
         },
         // happy-path WO03: DC sojourn 2 days
         {
             id: 'rAnt2MH37Zm1uvaDdJQIU7',
-            work_order_id:
+            entity_id:
                 'taUp8y0cuMhzf0UOk6Ev8Y',
-            from_node_id: '',
-            to_node_id: woNodeNew,
-            person_id: woPersonMike,
-            transitioned_at: dt(82, 10, 0),
+            state: woNodeNew,
+            worker_id: woPersonMike,
+            at: dt(82, 10, 0),
         },
         {
             id: 'VwD21aMsYlSZ91oOeKoQv3',
-            work_order_id:
+            entity_id:
                 'taUp8y0cuMhzf0UOk6Ev8Y',
-            from_node_id: woNodeNew,
-            to_node_id: woNodeCapture,
-            person_id: woPersonMike,
-            transitioned_at: dt(82, 10, 8),
+            state: woNodeCapture,
+            worker_id: woPersonMike,
+            at: dt(82, 10, 8),
         },
         {
             id: 'lntXIDCTtC6uXtkanv5XYm',
-            work_order_id:
+            entity_id:
                 'taUp8y0cuMhzf0UOk6Ev8Y',
-            from_node_id: woNodeCapture,
-            to_node_id: woNodeReview,
-            person_id: woPersonMarcus,
-            transitioned_at: dt(80, 11, 0),
+            state: woNodeReview,
+            worker_id: woPersonMarcus,
+            at: dt(80, 11, 0),
         },
         {
             id: 'oSOuQpIKaTo9TU70OtfU8P',
-            work_order_id:
+            entity_id:
                 'taUp8y0cuMhzf0UOk6Ev8Y',
-            from_node_id: woNodeReview,
-            to_node_id: woNodeComplete,
-            person_id: woPersonMike,
-            transitioned_at: dt(79, 9, 0),
+            state: woNodeComplete,
+            worker_id: woPersonMike,
+            at: dt(79, 9, 0),
         },
         // happy-path WO04: DC sojourn 3 days
         {
             id: 'ggJA4BZvTpqxEPkgbiNnyt',
-            work_order_id:
+            entity_id:
                 'KD2WFTEwzJFvxZ6cpCwpvc',
-            from_node_id: '',
-            to_node_id: woNodeNew,
-            person_id: woPersonSarah,
-            transitioned_at: dt(76, 8, 30),
+            state: woNodeNew,
+            worker_id: woPersonSarah,
+            at: dt(76, 8, 30),
         },
         {
             id: 'LzLQkGqfrjFNaQIQNVp2yt',
-            work_order_id:
+            entity_id:
                 'KD2WFTEwzJFvxZ6cpCwpvc',
-            from_node_id: woNodeNew,
-            to_node_id: woNodeCapture,
-            person_id: woPersonSarah,
-            transitioned_at: dt(76, 8, 40),
+            state: woNodeCapture,
+            worker_id: woPersonSarah,
+            at: dt(76, 8, 40),
         },
         {
             id: 'ZpwjIdExxdeZP7m5YDH5Qt',
-            work_order_id:
+            entity_id:
                 'KD2WFTEwzJFvxZ6cpCwpvc',
-            from_node_id: woNodeCapture,
-            to_node_id: woNodeReview,
-            person_id: woPersonCurrent,
-            transitioned_at: dt(73, 10, 0),
+            state: woNodeReview,
+            worker_id: woPersonCurrent,
+            at: dt(73, 10, 0),
         },
         {
             id: 'ZdoF8Ka2fa6xFFdzWi3odO',
-            work_order_id:
+            entity_id:
                 'KD2WFTEwzJFvxZ6cpCwpvc',
-            from_node_id: woNodeReview,
-            to_node_id: woNodeComplete,
-            person_id: woPersonMike,
-            transitioned_at: dt(71, 15, 0),
+            state: woNodeComplete,
+            worker_id: woPersonMike,
+            at: dt(71, 15, 0),
         },
         // happy-path WO05: DC sojourn 1 day
         {
             id: 'IJKj026ouhbUQv7w4y7V7o',
-            work_order_id:
+            entity_id:
                 'b6YNHrFyi6V9dJNXyCXu1K',
-            from_node_id: '',
-            to_node_id: woNodeNew,
-            person_id: woPersonMike,
-            transitioned_at: dt(71, 9, 0),
+            state: woNodeNew,
+            worker_id: woPersonMike,
+            at: dt(71, 9, 0),
         },
         {
             id: 'g4q1KxVqvyS8ZxOIDnu4MG',
-            work_order_id:
+            entity_id:
                 'b6YNHrFyi6V9dJNXyCXu1K',
-            from_node_id: woNodeNew,
-            to_node_id: woNodeCapture,
-            person_id: woPersonMike,
-            transitioned_at: dt(71, 9, 10),
+            state: woNodeCapture,
+            worker_id: woPersonMike,
+            at: dt(71, 9, 10),
         },
         {
             id: '6kwY7EJsL4khehGbJmS9YV',
-            work_order_id:
+            entity_id:
                 'b6YNHrFyi6V9dJNXyCXu1K',
-            from_node_id: woNodeCapture,
-            to_node_id: woNodeReview,
-            person_id: woPersonMarcus,
-            transitioned_at: dt(70, 14, 0),
+            state: woNodeReview,
+            worker_id: woPersonMarcus,
+            at: dt(70, 14, 0),
         },
         {
             id: 'zK2ywEqCxPE75HKfGdGtEY',
-            work_order_id:
+            entity_id:
                 'b6YNHrFyi6V9dJNXyCXu1K',
-            from_node_id: woNodeReview,
-            to_node_id: woNodeComplete,
-            person_id: woPersonSarah,
-            transitioned_at: dt(68, 10, 0),
+            state: woNodeComplete,
+            worker_id: woPersonSarah,
+            at: dt(68, 10, 0),
         },
         // happy-path WO06: DC sojourn 5 days
         {
             id: '3lD2Yf5csm1zBR9vdGnnh2',
-            work_order_id:
+            entity_id:
                 'V3AXXlSjJwDQAmkNiRA8aP',
-            from_node_id: '',
-            to_node_id: woNodeNew,
-            person_id: woPersonSarah,
-            transitioned_at: dt(66, 11, 0),
+            state: woNodeNew,
+            worker_id: woPersonSarah,
+            at: dt(66, 11, 0),
         },
         {
             id: 'Kqw1IND5JwmUemrbWDKSg1',
-            work_order_id:
+            entity_id:
                 'V3AXXlSjJwDQAmkNiRA8aP',
-            from_node_id: woNodeNew,
-            to_node_id: woNodeCapture,
-            person_id: woPersonSarah,
-            transitioned_at: dt(66, 11, 12),
+            state: woNodeCapture,
+            worker_id: woPersonSarah,
+            at: dt(66, 11, 12),
         },
         {
             id: '8fuCWUtGDYOCBszoGuYhNZ',
-            work_order_id:
+            entity_id:
                 'V3AXXlSjJwDQAmkNiRA8aP',
-            from_node_id: woNodeCapture,
-            to_node_id: woNodeReview,
-            person_id: woPersonMarcus,
-            transitioned_at: dt(61, 9, 0),
+            state: woNodeReview,
+            worker_id: woPersonMarcus,
+            at: dt(61, 9, 0),
         },
         {
             id: 'vqxo8lToEgDdEItcJg8GMI',
-            work_order_id:
+            entity_id:
                 'V3AXXlSjJwDQAmkNiRA8aP',
-            from_node_id: woNodeReview,
-            to_node_id: woNodeComplete,
-            person_id: woPersonMike,
-            transitioned_at: dt(59, 14, 0),
+            state: woNodeComplete,
+            worker_id: woPersonMike,
+            at: dt(59, 14, 0),
         },
         // happy-path WO07: DC sojourn 2 days
         {
             id: 'DkCRDYtzbHbaGZY45hrIrB',
-            work_order_id:
+            entity_id:
                 '9ooK5olzSsEnpgP8ASzBQi',
-            from_node_id: '',
-            to_node_id: woNodeNew,
-            person_id: woPersonMike,
-            transitioned_at: dt(61, 9, 30),
+            state: woNodeNew,
+            worker_id: woPersonMike,
+            at: dt(61, 9, 30),
         },
         {
             id: 'g7Fnaud4XIGM4bceFOFtim',
-            work_order_id:
+            entity_id:
                 '9ooK5olzSsEnpgP8ASzBQi',
-            from_node_id: woNodeNew,
-            to_node_id: woNodeCapture,
-            person_id: woPersonMike,
-            transitioned_at: dt(61, 9, 45),
+            state: woNodeCapture,
+            worker_id: woPersonMike,
+            at: dt(61, 9, 45),
         },
         {
             id: 'gdnClJs1LLxrx2fvZ3vQQ4',
-            work_order_id:
+            entity_id:
                 '9ooK5olzSsEnpgP8ASzBQi',
-            from_node_id: woNodeCapture,
-            to_node_id: woNodeReview,
-            person_id: woPersonCurrent,
-            transitioned_at: dt(59, 11, 0),
+            state: woNodeReview,
+            worker_id: woPersonCurrent,
+            at: dt(59, 11, 0),
         },
         {
             id: 'WT4tD5XUmDdh40hI5Ny17B',
-            work_order_id:
+            entity_id:
                 '9ooK5olzSsEnpgP8ASzBQi',
-            from_node_id: woNodeReview,
-            to_node_id: woNodeComplete,
-            person_id: woPersonSarah,
-            transitioned_at: dt(58, 9, 0),
+            state: woNodeComplete,
+            worker_id: woPersonSarah,
+            at: dt(58, 9, 0),
         },
         // happy-path WO08: DC sojourn 4 days
         {
             id: 'hKpS4YMC7r7PivyHgc2Swa',
-            work_order_id:
+            entity_id:
                 'cnXN4DZx9dUVIZL4OZnyw0',
-            from_node_id: '',
-            to_node_id: woNodeNew,
-            person_id: woPersonSarah,
-            transitioned_at: dt(57, 8, 0),
+            state: woNodeNew,
+            worker_id: woPersonSarah,
+            at: dt(57, 8, 0),
         },
         {
             id: 'hhTvFksUIDQyQA401xmNXg',
-            work_order_id:
+            entity_id:
                 'cnXN4DZx9dUVIZL4OZnyw0',
-            from_node_id: woNodeNew,
-            to_node_id: woNodeCapture,
-            person_id: woPersonSarah,
-            transitioned_at: dt(57, 8, 15),
+            state: woNodeCapture,
+            worker_id: woPersonSarah,
+            at: dt(57, 8, 15),
         },
         {
             id: 'mAOQLPzk3Ud64ndZnbjMPB',
-            work_order_id:
+            entity_id:
                 'cnXN4DZx9dUVIZL4OZnyw0',
-            from_node_id: woNodeCapture,
-            to_node_id: woNodeReview,
-            person_id: woPersonMarcus,
-            transitioned_at: dt(53, 10, 0),
+            state: woNodeReview,
+            worker_id: woPersonMarcus,
+            at: dt(53, 10, 0),
         },
         {
             id: 'qMAn5oFts3CEnMsqbNYPA8',
-            work_order_id:
+            entity_id:
                 'cnXN4DZx9dUVIZL4OZnyw0',
-            from_node_id: woNodeReview,
-            to_node_id: woNodeComplete,
-            person_id: woPersonMike,
-            transitioned_at: dt(51, 14, 0),
+            state: woNodeComplete,
+            worker_id: woPersonMike,
+            at: dt(51, 14, 0),
         },
         // happy-path WO09: DC sojourn 7 days (fat tail)
         {
             id: 'KcxCc7AQLnNZddDwJ8YMOu',
-            work_order_id:
+            entity_id:
                 'kKw82RQDHRfgg5xQnw1lPk',
-            from_node_id: '',
-            to_node_id: woNodeNew,
-            person_id: woPersonMike,
-            transitioned_at: dt(52, 10, 0),
+            state: woNodeNew,
+            worker_id: woPersonMike,
+            at: dt(52, 10, 0),
         },
         {
             id: 'HM3YTTlopkJetDhpXglt3l',
-            work_order_id:
+            entity_id:
                 'kKw82RQDHRfgg5xQnw1lPk',
-            from_node_id: woNodeNew,
-            to_node_id: woNodeCapture,
-            person_id: woPersonMike,
-            transitioned_at: dt(52, 10, 20),
+            state: woNodeCapture,
+            worker_id: woPersonMike,
+            at: dt(52, 10, 20),
         },
         {
             id: 'ZXc0n8qwamt9gjeXFZYPYQ',
-            work_order_id:
+            entity_id:
                 'kKw82RQDHRfgg5xQnw1lPk',
-            from_node_id: woNodeCapture,
-            to_node_id: woNodeReview,
-            person_id: woPersonMarcus,
-            transitioned_at: dt(45, 9, 0),
+            state: woNodeReview,
+            worker_id: woPersonMarcus,
+            at: dt(45, 9, 0),
         },
         {
             id: 'h4s2ZGnlkiHKTB41nfKXzR',
-            work_order_id:
+            entity_id:
                 'kKw82RQDHRfgg5xQnw1lPk',
-            from_node_id: woNodeReview,
-            to_node_id: woNodeComplete,
-            person_id: woPersonSarah,
-            transitioned_at: dt(43, 11, 0),
+            state: woNodeComplete,
+            worker_id: woPersonSarah,
+            at: dt(43, 11, 0),
         },
         // happy-path WO10: DC sojourn 3 days
         {
             id: 'i13zOn0NJF0wZANpm9qtz8',
-            work_order_id:
+            entity_id:
                 'ec0n7Ab6pJYLFDF6H0nyvV',
-            from_node_id: '',
-            to_node_id: woNodeNew,
-            person_id: woPersonSarah,
-            transitioned_at: dt(48, 9, 0),
+            state: woNodeNew,
+            worker_id: woPersonSarah,
+            at: dt(48, 9, 0),
         },
         {
             id: 'hSuu3PNyZ6vzzQRse3MT2y',
-            work_order_id:
+            entity_id:
                 'ec0n7Ab6pJYLFDF6H0nyvV',
-            from_node_id: woNodeNew,
-            to_node_id: woNodeCapture,
-            person_id: woPersonSarah,
-            transitioned_at: dt(48, 9, 10),
+            state: woNodeCapture,
+            worker_id: woPersonSarah,
+            at: dt(48, 9, 10),
         },
         {
             id: 'f78pCgCBuvzSIHNSiksOY3',
-            work_order_id:
+            entity_id:
                 'ec0n7Ab6pJYLFDF6H0nyvV',
-            from_node_id: woNodeCapture,
-            to_node_id: woNodeReview,
-            person_id: woPersonCurrent,
-            transitioned_at: dt(45, 14, 0),
+            state: woNodeReview,
+            worker_id: woPersonCurrent,
+            at: dt(45, 14, 0),
         },
         {
             id: 'FHTXZEVfwmd8eXb3Kc4iyn',
-            work_order_id:
+            entity_id:
                 'ec0n7Ab6pJYLFDF6H0nyvV',
-            from_node_id: woNodeReview,
-            to_node_id: woNodeComplete,
-            person_id: woPersonMike,
-            transitioned_at: dt(43, 10, 0),
+            state: woNodeComplete,
+            worker_id: woPersonMike,
+            at: dt(43, 10, 0),
         },
         // happy-path WO11: DC sojourn 2 days
         {
             id: '4tXtqSAncDHgMSfj292vLB',
-            work_order_id:
+            entity_id:
                 'gAjJnjirIrIgcFDMJyNsPa',
-            from_node_id: '',
-            to_node_id: woNodeNew,
-            person_id: woPersonMike,
-            transitioned_at: dt(44, 10, 30),
+            state: woNodeNew,
+            worker_id: woPersonMike,
+            at: dt(44, 10, 30),
         },
         {
             id: 'EuTRGmhwi9ZKpu4bICyIAA',
-            work_order_id:
+            entity_id:
                 'gAjJnjirIrIgcFDMJyNsPa',
-            from_node_id: woNodeNew,
-            to_node_id: woNodeCapture,
-            person_id: woPersonMike,
-            transitioned_at: dt(44, 10, 45),
+            state: woNodeCapture,
+            worker_id: woPersonMike,
+            at: dt(44, 10, 45),
         },
         {
             id: 'SShq2HjeSjOa2tDzITkJHj',
-            work_order_id:
+            entity_id:
                 'gAjJnjirIrIgcFDMJyNsPa',
-            from_node_id: woNodeCapture,
-            to_node_id: woNodeReview,
-            person_id: woPersonMarcus,
-            transitioned_at: dt(42, 11, 0),
+            state: woNodeReview,
+            worker_id: woPersonMarcus,
+            at: dt(42, 11, 0),
         },
         {
             id: 'CgSA6m6TcjUwqAgugKt4U2',
-            work_order_id:
+            entity_id:
                 'gAjJnjirIrIgcFDMJyNsPa',
-            from_node_id: woNodeReview,
-            to_node_id: woNodeComplete,
-            person_id: woPersonSarah,
-            transitioned_at: dt(41, 14, 0),
+            state: woNodeComplete,
+            worker_id: woPersonSarah,
+            at: dt(41, 14, 0),
         },
         // happy-path WO12: DC sojourn 6 days (fat tail)
         {
             id: 'YIZ38Dgl4BXjhVyOlXnevi',
-            work_order_id:
+            entity_id:
                 'kyWtMAZPazKqAfIwPzACsL',
-            from_node_id: '',
-            to_node_id: woNodeNew,
-            person_id: woPersonSarah,
-            transitioned_at: dt(40, 9, 0),
+            state: woNodeNew,
+            worker_id: woPersonSarah,
+            at: dt(40, 9, 0),
         },
         {
             id: 'lx7EAKYYTwDEsOA0CTRXbz',
-            work_order_id:
+            entity_id:
                 'kyWtMAZPazKqAfIwPzACsL',
-            from_node_id: woNodeNew,
-            to_node_id: woNodeCapture,
-            person_id: woPersonSarah,
-            transitioned_at: dt(40, 9, 15),
+            state: woNodeCapture,
+            worker_id: woPersonSarah,
+            at: dt(40, 9, 15),
         },
         {
             id: '47p7RbBeyj6gq7UoglbTLQ',
-            work_order_id:
+            entity_id:
                 'kyWtMAZPazKqAfIwPzACsL',
-            from_node_id: woNodeCapture,
-            to_node_id: woNodeReview,
-            person_id: woPersonMarcus,
-            transitioned_at: dt(34, 10, 0),
+            state: woNodeReview,
+            worker_id: woPersonMarcus,
+            at: dt(34, 10, 0),
         },
         {
             id: 'TMBYhhOKzYesHHiHsNXfMH',
-            work_order_id:
+            entity_id:
                 'kyWtMAZPazKqAfIwPzACsL',
-            from_node_id: woNodeReview,
-            to_node_id: woNodeComplete,
-            person_id: woPersonMike,
-            transitioned_at: dt(32, 9, 0),
+            state: woNodeComplete,
+            worker_id: woPersonMike,
+            at: dt(32, 9, 0),
         },
         // happy-path WO13: DC sojourn 1 day
         {
             id: 'VZsA9htg9Km4qLsfhRGETg',
-            work_order_id:
+            entity_id:
                 'C41Hni5pMxp8xMQFEGNaib',
-            from_node_id: '',
-            to_node_id: woNodeNew,
-            person_id: woPersonMike,
-            transitioned_at: dt(37, 8, 0),
+            state: woNodeNew,
+            worker_id: woPersonMike,
+            at: dt(37, 8, 0),
         },
         {
             id: 'Er9sQyVEvd6rSbmH2tC6zc',
-            work_order_id:
+            entity_id:
                 'C41Hni5pMxp8xMQFEGNaib',
-            from_node_id: woNodeNew,
-            to_node_id: woNodeCapture,
-            person_id: woPersonMike,
-            transitioned_at: dt(37, 8, 10),
+            state: woNodeCapture,
+            worker_id: woPersonMike,
+            at: dt(37, 8, 10),
         },
         {
             id: 'QGs5QdbV9ANQf2reuiemRd',
-            work_order_id:
+            entity_id:
                 'C41Hni5pMxp8xMQFEGNaib',
-            from_node_id: woNodeCapture,
-            to_node_id: woNodeReview,
-            person_id: woPersonCurrent,
-            transitioned_at: dt(36, 11, 0),
+            state: woNodeReview,
+            worker_id: woPersonCurrent,
+            at: dt(36, 11, 0),
         },
         {
             id: 'nx5ooiuS68Mvj63uuuFpQN',
-            work_order_id:
+            entity_id:
                 'C41Hni5pMxp8xMQFEGNaib',
-            from_node_id: woNodeReview,
-            to_node_id: woNodeComplete,
-            person_id: woPersonSarah,
-            transitioned_at: dt(35, 14, 0),
+            state: woNodeComplete,
+            worker_id: woPersonSarah,
+            at: dt(35, 14, 0),
         },
         // happy-path WO14: DC sojourn 9 days (fat tail)
         {
             id: 'f2v27lmnpRGtYQxQ9omyeZ',
-            work_order_id:
+            entity_id:
                 'FGAZYYwoS9To1tNb24DfLc',
-            from_node_id: '',
-            to_node_id: woNodeNew,
-            person_id: woPersonSarah,
-            transitioned_at: dt(33, 9, 30),
+            state: woNodeNew,
+            worker_id: woPersonSarah,
+            at: dt(33, 9, 30),
         },
         {
             id: 'GIJUAabpi1KGevTrAzXirD',
-            work_order_id:
+            entity_id:
                 'FGAZYYwoS9To1tNb24DfLc',
-            from_node_id: woNodeNew,
-            to_node_id: woNodeCapture,
-            person_id: woPersonSarah,
-            transitioned_at: dt(33, 9, 45),
+            state: woNodeCapture,
+            worker_id: woPersonSarah,
+            at: dt(33, 9, 45),
         },
         {
             id: '6r9REsvwOdW8DqriF2g76f',
-            work_order_id:
+            entity_id:
                 'FGAZYYwoS9To1tNb24DfLc',
-            from_node_id: woNodeCapture,
-            to_node_id: woNodeReview,
-            person_id: woPersonMarcus,
-            transitioned_at: dt(24, 10, 0),
+            state: woNodeReview,
+            worker_id: woPersonMarcus,
+            at: dt(24, 10, 0),
         },
         {
             id: 'Q56P9URSLJfpKaSMBejDla',
-            work_order_id:
+            entity_id:
                 'FGAZYYwoS9To1tNb24DfLc',
-            from_node_id: woNodeReview,
-            to_node_id: woNodeComplete,
-            person_id: woPersonMike,
-            transitioned_at: dt(22, 9, 0),
+            state: woNodeComplete,
+            worker_id: woPersonMike,
+            at: dt(22, 9, 0),
         },
         // happy-path WO15: DC sojourn 2 days
         {
             id: '7Qg7wrpNWmoTHlSPoXJrMm',
-            work_order_id:
+            entity_id:
                 '0zgLwuyPgtreVYjg4TScJR',
-            from_node_id: '',
-            to_node_id: woNodeNew,
-            person_id: woPersonMike,
-            transitioned_at: dt(29, 10, 0),
+            state: woNodeNew,
+            worker_id: woPersonMike,
+            at: dt(29, 10, 0),
         },
         {
             id: 'TFj780SI0g7CP9d1nO1mjy',
-            work_order_id:
+            entity_id:
                 '0zgLwuyPgtreVYjg4TScJR',
-            from_node_id: woNodeNew,
-            to_node_id: woNodeCapture,
-            person_id: woPersonMike,
-            transitioned_at: dt(29, 10, 15),
+            state: woNodeCapture,
+            worker_id: woPersonMike,
+            at: dt(29, 10, 15),
         },
         {
             id: 'Ly9CvZo9IA5JS77ETKKtRj',
-            work_order_id:
+            entity_id:
                 '0zgLwuyPgtreVYjg4TScJR',
-            from_node_id: woNodeCapture,
-            to_node_id: woNodeReview,
-            person_id: woPersonMarcus,
-            transitioned_at: dt(27, 14, 0),
+            state: woNodeReview,
+            worker_id: woPersonMarcus,
+            at: dt(27, 14, 0),
         },
         {
             id: 'aWPQp3IBWqWnaqr45BhMba',
-            work_order_id:
+            entity_id:
                 '0zgLwuyPgtreVYjg4TScJR',
-            from_node_id: woNodeReview,
-            to_node_id: woNodeComplete,
-            person_id: woPersonSarah,
-            transitioned_at: dt(25, 10, 0),
+            state: woNodeComplete,
+            worker_id: woPersonSarah,
+            at: dt(25, 10, 0),
         },
         // happy-path WO16: DC sojourn 3 days
         {
             id: 'BKqz7auwaCm7bYitQ1V0yG',
-            work_order_id:
+            entity_id:
                 'XGJklKFO4aUtjSAEHEE8Zn',
-            from_node_id: '',
-            to_node_id: woNodeNew,
-            person_id: woPersonSarah,
-            transitioned_at: dt(26, 9, 0),
+            state: woNodeNew,
+            worker_id: woPersonSarah,
+            at: dt(26, 9, 0),
         },
         {
             id: 'eReG7OzD6HyZ2ywVP6K7Ac',
-            work_order_id:
+            entity_id:
                 'XGJklKFO4aUtjSAEHEE8Zn',
-            from_node_id: woNodeNew,
-            to_node_id: woNodeCapture,
-            person_id: woPersonSarah,
-            transitioned_at: dt(26, 9, 12),
+            state: woNodeCapture,
+            worker_id: woPersonSarah,
+            at: dt(26, 9, 12),
         },
         {
             id: 'f1bm18FOcYixT5prK2pCcV',
-            work_order_id:
+            entity_id:
                 'XGJklKFO4aUtjSAEHEE8Zn',
-            from_node_id: woNodeCapture,
-            to_node_id: woNodeReview,
-            person_id: woPersonCurrent,
-            transitioned_at: dt(23, 11, 0),
+            state: woNodeReview,
+            worker_id: woPersonCurrent,
+            at: dt(23, 11, 0),
         },
         {
             id: 'MqxWBCMVJOc0RfEXCEUiEo',
-            work_order_id:
+            entity_id:
                 'XGJklKFO4aUtjSAEHEE8Zn',
-            from_node_id: woNodeReview,
-            to_node_id: woNodeComplete,
-            person_id: woPersonMike,
-            transitioned_at: dt(21, 14, 0),
+            state: woNodeComplete,
+            worker_id: woPersonMike,
+            at: dt(21, 14, 0),
         },
         // happy-path WO17: DC sojourn 1 day
         {
             id: 'G83ZLOMIsgg486X9QDNXvC',
-            work_order_id:
+            entity_id:
                 'rtuFD9uWn5zguEHyT3fh8s',
-            from_node_id: '',
-            to_node_id: woNodeNew,
-            person_id: woPersonMike,
-            transitioned_at: dt(23, 8, 30),
+            state: woNodeNew,
+            worker_id: woPersonMike,
+            at: dt(23, 8, 30),
         },
         {
             id: '6FaR1TmuHJgxw7KW1g8sbf',
-            work_order_id:
+            entity_id:
                 'rtuFD9uWn5zguEHyT3fh8s',
-            from_node_id: woNodeNew,
-            to_node_id: woNodeCapture,
-            person_id: woPersonMike,
-            transitioned_at: dt(23, 8, 42),
+            state: woNodeCapture,
+            worker_id: woPersonMike,
+            at: dt(23, 8, 42),
         },
         {
             id: 'qsNwh43wdaGqGjeKeaAeh4',
-            work_order_id:
+            entity_id:
                 'rtuFD9uWn5zguEHyT3fh8s',
-            from_node_id: woNodeCapture,
-            to_node_id: woNodeReview,
-            person_id: woPersonMarcus,
-            transitioned_at: dt(22, 10, 0),
+            state: woNodeReview,
+            worker_id: woPersonMarcus,
+            at: dt(22, 10, 0),
         },
         {
             id: '7j8VyPb3kuq8TNVz0iPP9M',
-            work_order_id:
+            entity_id:
                 'rtuFD9uWn5zguEHyT3fh8s',
-            from_node_id: woNodeReview,
-            to_node_id: woNodeComplete,
-            person_id: woPersonSarah,
-            transitioned_at: dt(21, 9, 0),
+            state: woNodeComplete,
+            worker_id: woPersonSarah,
+            at: dt(21, 9, 0),
         },
         // happy-path WO18: DC sojourn 4 days
         {
             id: 'cEd2hUuCY4EOandCCx6bQX',
-            work_order_id:
+            entity_id:
                 'XrO05MeyqldO8qm0O4VPdq',
-            from_node_id: '',
-            to_node_id: woNodeNew,
-            person_id: woPersonSarah,
-            transitioned_at: dt(20, 10, 0),
+            state: woNodeNew,
+            worker_id: woPersonSarah,
+            at: dt(20, 10, 0),
         },
         {
             id: 'ZywDPM0MCJeweinimZA6wH',
-            work_order_id:
+            entity_id:
                 'XrO05MeyqldO8qm0O4VPdq',
-            from_node_id: woNodeNew,
-            to_node_id: woNodeCapture,
-            person_id: woPersonSarah,
-            transitioned_at: dt(20, 10, 18),
+            state: woNodeCapture,
+            worker_id: woPersonSarah,
+            at: dt(20, 10, 18),
         },
         {
             id: 'G5LYG1yT8213GM9zfqqKmU',
-            work_order_id:
+            entity_id:
                 'XrO05MeyqldO8qm0O4VPdq',
-            from_node_id: woNodeCapture,
-            to_node_id: woNodeReview,
-            person_id: woPersonMarcus,
-            transitioned_at: dt(16, 9, 0),
+            state: woNodeReview,
+            worker_id: woPersonMarcus,
+            at: dt(16, 9, 0),
         },
         {
             id: 'GUjeLpcj82NtxqFH0gcjtB',
-            work_order_id:
+            entity_id:
                 'XrO05MeyqldO8qm0O4VPdq',
-            from_node_id: woNodeReview,
-            to_node_id: woNodeComplete,
-            person_id: woPersonMike,
-            transitioned_at: dt(14, 14, 0),
+            state: woNodeComplete,
+            worker_id: woPersonMike,
+            at: dt(14, 14, 0),
         },
         // happy-path WO19: DC sojourn 8 days (fat tail)
         {
             id: '8woeY7cfbuSKMFI4wMrQZH',
-            work_order_id:
+            entity_id:
                 'S74N7CPA2dsMESryJNrFAC',
-            from_node_id: '',
-            to_node_id: woNodeNew,
-            person_id: woPersonMike,
-            transitioned_at: dt(17, 9, 0),
+            state: woNodeNew,
+            worker_id: woPersonMike,
+            at: dt(17, 9, 0),
         },
         {
             id: 'OJ5bx5CPsfeb8A1ieKyeQ7',
-            work_order_id:
+            entity_id:
                 'S74N7CPA2dsMESryJNrFAC',
-            from_node_id: woNodeNew,
-            to_node_id: woNodeCapture,
-            person_id: woPersonMike,
-            transitioned_at: dt(17, 9, 20),
+            state: woNodeCapture,
+            worker_id: woPersonMike,
+            at: dt(17, 9, 20),
         },
         {
             id: 'uQQcXyLLxrVFiydl7FCGOZ',
-            work_order_id:
+            entity_id:
                 'S74N7CPA2dsMESryJNrFAC',
-            from_node_id: woNodeCapture,
-            to_node_id: woNodeReview,
-            person_id: woPersonCurrent,
-            transitioned_at: dt(9, 10, 0),
+            state: woNodeReview,
+            worker_id: woPersonCurrent,
+            at: dt(9, 10, 0),
         },
         {
             id: 'L1hWSVRmSjhvzoQUPDDhMc',
-            work_order_id:
+            entity_id:
                 'S74N7CPA2dsMESryJNrFAC',
-            from_node_id: woNodeReview,
-            to_node_id: woNodeComplete,
-            person_id: woPersonSarah,
-            transitioned_at: dt(7, 14, 0),
+            state: woNodeComplete,
+            worker_id: woPersonSarah,
+            at: dt(7, 14, 0),
         },
         // happy-path WO20: DC sojourn 2 days
         {
             id: 'ZNE2sS8KyRpIzMAq7lR4uA',
-            work_order_id:
+            entity_id:
                 'Cr8KZH5Q2j5n8Q8Yw3qdMw',
-            from_node_id: '',
-            to_node_id: woNodeNew,
-            person_id: woPersonSarah,
-            transitioned_at: dt(14, 8, 0),
+            state: woNodeNew,
+            worker_id: woPersonSarah,
+            at: dt(14, 8, 0),
         },
         {
             id: 'ahjiruKeA9qdnMDO4TZf39',
-            work_order_id:
+            entity_id:
                 'Cr8KZH5Q2j5n8Q8Yw3qdMw',
-            from_node_id: woNodeNew,
-            to_node_id: woNodeCapture,
-            person_id: woPersonSarah,
-            transitioned_at: dt(14, 8, 15),
+            state: woNodeCapture,
+            worker_id: woPersonSarah,
+            at: dt(14, 8, 15),
         },
         {
             id: '7ZtemWfFZOqf9SuQVzUwp6',
-            work_order_id:
+            entity_id:
                 'Cr8KZH5Q2j5n8Q8Yw3qdMw',
-            from_node_id: woNodeCapture,
-            to_node_id: woNodeReview,
-            person_id: woPersonMarcus,
-            transitioned_at: dt(12, 11, 0),
+            state: woNodeReview,
+            worker_id: woPersonMarcus,
+            at: dt(12, 11, 0),
         },
         {
             id: 'w36jEVysbnbIdaPhjIcvDI',
-            work_order_id:
+            entity_id:
                 'Cr8KZH5Q2j5n8Q8Yw3qdMw',
-            from_node_id: woNodeReview,
-            to_node_id: woNodeComplete,
-            person_id: woPersonMike,
-            transitioned_at: dt(10, 9, 0),
+            state: woNodeComplete,
+            worker_id: woPersonMike,
+            at: dt(10, 9, 0),
         },
         // happy-path WO21: DC sojourn 3 days
         {
             id: 'SSLVclkfoa6nJhoffBS2Zm',
-            work_order_id:
+            entity_id:
                 '4T56gYme7ae4Ya7AMA0hpW',
-            from_node_id: '',
-            to_node_id: woNodeNew,
-            person_id: woPersonMike,
-            transitioned_at: dt(11, 10, 30),
+            state: woNodeNew,
+            worker_id: woPersonMike,
+            at: dt(11, 10, 30),
         },
         {
             id: 'mSCE3Z6y5RpTb74TEW62ky',
-            work_order_id:
+            entity_id:
                 '4T56gYme7ae4Ya7AMA0hpW',
-            from_node_id: woNodeNew,
-            to_node_id: woNodeCapture,
-            person_id: woPersonMike,
-            transitioned_at: dt(11, 10, 48),
+            state: woNodeCapture,
+            worker_id: woPersonMike,
+            at: dt(11, 10, 48),
         },
         {
             id: 'smCeF7cSnQQaysWwJPsiTu',
-            work_order_id:
+            entity_id:
                 '4T56gYme7ae4Ya7AMA0hpW',
-            from_node_id: woNodeCapture,
-            to_node_id: woNodeReview,
-            person_id: woPersonCurrent,
-            transitioned_at: dt(8, 14, 0),
+            state: woNodeReview,
+            worker_id: woPersonCurrent,
+            at: dt(8, 14, 0),
         },
         {
             id: 'KFrDOkEJ3SiUVB3OR29ntN',
-            work_order_id:
+            entity_id:
                 '4T56gYme7ae4Ya7AMA0hpW',
-            from_node_id: woNodeReview,
-            to_node_id: woNodeComplete,
-            person_id: woPersonSarah,
-            transitioned_at: dt(6, 10, 0),
+            state: woNodeComplete,
+            worker_id: woPersonSarah,
+            at: dt(6, 10, 0),
         },
         // happy-path WO22: DC sojourn 1 day
         {
             id: 'fwVQwEUQ8xG4McvCnNVFIV',
-            work_order_id:
+            entity_id:
                 'aFCyJrvokoJM5iINwO3WCf',
-            from_node_id: '',
-            to_node_id: woNodeNew,
-            person_id: woPersonSarah,
-            transitioned_at: dt(9, 9, 0),
+            state: woNodeNew,
+            worker_id: woPersonSarah,
+            at: dt(9, 9, 0),
         },
         {
             id: 'UlPzcQK7dJWr6sLiV7qvfh',
-            work_order_id:
+            entity_id:
                 'aFCyJrvokoJM5iINwO3WCf',
-            from_node_id: woNodeNew,
-            to_node_id: woNodeCapture,
-            person_id: woPersonSarah,
-            transitioned_at: dt(9, 9, 10),
+            state: woNodeCapture,
+            worker_id: woPersonSarah,
+            at: dt(9, 9, 10),
         },
         {
             id: 'aicMwA0QmZUEzeUtlmQOOS',
-            work_order_id:
+            entity_id:
                 'aFCyJrvokoJM5iINwO3WCf',
-            from_node_id: woNodeCapture,
-            to_node_id: woNodeReview,
-            person_id: woPersonMarcus,
-            transitioned_at: dt(8, 10, 0),
+            state: woNodeReview,
+            worker_id: woPersonMarcus,
+            at: dt(8, 10, 0),
         },
         {
             id: 'ADeYyyUb4p3eknFC5v6nW2',
-            work_order_id:
+            entity_id:
                 'aFCyJrvokoJM5iINwO3WCf',
-            from_node_id: woNodeReview,
-            to_node_id: woNodeComplete,
-            person_id: woPersonMike,
-            transitioned_at: dt(7, 9, 0),
+            state: woNodeComplete,
+            worker_id: woPersonMike,
+            at: dt(7, 9, 0),
         },
         // happy-path WO23: DC sojourn 2 days
         {
             id: 'DANvBctxus8NEMcTOUy1hi',
-            work_order_id:
+            entity_id:
                 'Sr4k75y6vuKODCA9zlSUjk',
-            from_node_id: '',
-            to_node_id: woNodeNew,
-            person_id: woPersonMike,
-            transitioned_at: dt(6, 11, 0),
+            state: woNodeNew,
+            worker_id: woPersonMike,
+            at: dt(6, 11, 0),
         },
         {
             id: '3EOMPhhyYNW6pY6LnIegUt',
-            work_order_id:
+            entity_id:
                 'Sr4k75y6vuKODCA9zlSUjk',
-            from_node_id: woNodeNew,
-            to_node_id: woNodeCapture,
-            person_id: woPersonMike,
-            transitioned_at: dt(6, 11, 15),
+            state: woNodeCapture,
+            worker_id: woPersonMike,
+            at: dt(6, 11, 15),
         },
         {
             id: 'CYglhrk5PKScZSwHQX65Ss',
-            work_order_id:
+            entity_id:
                 'Sr4k75y6vuKODCA9zlSUjk',
-            from_node_id: woNodeCapture,
-            to_node_id: woNodeReview,
-            person_id: woPersonMarcus,
-            transitioned_at: dt(4, 9, 0),
+            state: woNodeReview,
+            worker_id: woPersonMarcus,
+            at: dt(4, 9, 0),
         },
         {
             id: 'hVa7HADjYHSSsW2qxPPzTw',
-            work_order_id:
+            entity_id:
                 'Sr4k75y6vuKODCA9zlSUjk',
-            from_node_id: woNodeReview,
-            to_node_id: woNodeComplete,
-            person_id: woPersonSarah,
-            transitioned_at: dt(2, 14, 0),
+            state: woNodeComplete,
+            worker_id: woPersonSarah,
+            at: dt(2, 14, 0),
         },
         // needs-revision WO24: double loop DC->Review->DC
         // twice, creating a 3rd distinct completed path
         {
             id: 'jNY1G5bpJ6aXd9s8hgqRtN',
-            work_order_id:
+            entity_id:
                 'Mm6KUpykGSwjD7YofI6zpb',
-            from_node_id: '',
-            to_node_id: woNodeNew,
-            person_id: woPersonSarah,
-            transitioned_at: dt(77, 9, 0),
+            state: woNodeNew,
+            worker_id: woPersonSarah,
+            at: dt(77, 9, 0),
         },
         {
             id: 'dHUzDlpmED6x7Hv24kR2nB',
-            work_order_id:
+            entity_id:
                 'Mm6KUpykGSwjD7YofI6zpb',
-            from_node_id: woNodeNew,
-            to_node_id: woNodeCapture,
-            person_id: woPersonSarah,
-            transitioned_at: dt(77, 9, 10),
+            state: woNodeCapture,
+            worker_id: woPersonSarah,
+            at: dt(77, 9, 10),
         },
         {
             id: '0LxzRUVeucbfu95bWGkq75',
-            work_order_id:
+            entity_id:
                 'Mm6KUpykGSwjD7YofI6zpb',
-            from_node_id: woNodeCapture,
-            to_node_id: woNodeReview,
-            person_id: woPersonMarcus,
-            transitioned_at: dt(75, 11, 0),
+            state: woNodeReview,
+            worker_id: woPersonMarcus,
+            at: dt(75, 11, 0),
         },
         {
             id: 'CiXBfp5CJ8ZAWNahki1Cu8',
-            work_order_id:
+            entity_id:
                 'Mm6KUpykGSwjD7YofI6zpb',
-            from_node_id: woNodeReview,
-            to_node_id: woNodeCapture,
-            person_id: woPersonMike,
-            transitioned_at: dt(74, 14, 0),
+            state: woNodeCapture,
+            worker_id: woPersonMike,
+            at: dt(74, 14, 0),
         },
         {
             id: 'wGVP4JjVdAS6FtQrhTGrC7',
-            work_order_id:
+            entity_id:
                 'Mm6KUpykGSwjD7YofI6zpb',
-            from_node_id: woNodeCapture,
-            to_node_id: woNodeReview,
-            person_id: woPersonMarcus,
-            transitioned_at: dt(73, 10, 0),
+            state: woNodeReview,
+            worker_id: woPersonMarcus,
+            at: dt(73, 10, 0),
         },
         {
             id: 'caS4tLtoEUOaPLr2VUxScZ',
-            work_order_id:
+            entity_id:
                 'Mm6KUpykGSwjD7YofI6zpb',
-            from_node_id: woNodeReview,
-            to_node_id: woNodeCapture,
-            person_id: woPersonSarah,
-            transitioned_at: dt(72, 14, 0),
+            state: woNodeCapture,
+            worker_id: woPersonSarah,
+            at: dt(72, 14, 0),
         },
         {
             id: 'bQsLuRYpBTppyQtdZqtR5L',
-            work_order_id:
+            entity_id:
                 'Mm6KUpykGSwjD7YofI6zpb',
-            from_node_id: woNodeCapture,
-            to_node_id: woNodeReview,
-            person_id: woPersonCurrent,
-            transitioned_at: dt(71, 10, 0),
+            state: woNodeReview,
+            worker_id: woPersonCurrent,
+            at: dt(71, 10, 0),
         },
         {
             id: 'eKFDk2YAO7K93hcrnIveru',
-            work_order_id:
+            entity_id:
                 'Mm6KUpykGSwjD7YofI6zpb',
-            from_node_id: woNodeReview,
-            to_node_id: woNodeComplete,
-            person_id: woPersonMike,
-            transitioned_at: dt(70, 9, 0),
+            state: woNodeComplete,
+            worker_id: woPersonMike,
+            at: dt(70, 9, 0),
         },
         // needs-revision WO25: loops DC->Review->DC
         {
             id: '0Zmtiyp7rFFameCdQwawr7',
-            work_order_id:
+            entity_id:
                 'BbZ3Z7OZnFmdF5MBgVIYzI',
-            from_node_id: '',
-            to_node_id: woNodeNew,
-            person_id: woPersonMike,
-            transitioned_at: dt(63, 10, 0),
+            state: woNodeNew,
+            worker_id: woPersonMike,
+            at: dt(63, 10, 0),
         },
         {
             id: 'lvvaw4Yx5lJnHZoLB3fQqI',
-            work_order_id:
+            entity_id:
                 'BbZ3Z7OZnFmdF5MBgVIYzI',
-            from_node_id: woNodeNew,
-            to_node_id: woNodeCapture,
-            person_id: woPersonMike,
-            transitioned_at: dt(63, 10, 15),
+            state: woNodeCapture,
+            worker_id: woPersonMike,
+            at: dt(63, 10, 15),
         },
         {
             id: 'NkrcEkNWD9bu9ntBee8JnO',
-            work_order_id:
+            entity_id:
                 'BbZ3Z7OZnFmdF5MBgVIYzI',
-            from_node_id: woNodeCapture,
-            to_node_id: woNodeReview,
-            person_id: woPersonCurrent,
-            transitioned_at: dt(61, 14, 0),
+            state: woNodeReview,
+            worker_id: woPersonCurrent,
+            at: dt(61, 14, 0),
         },
         {
             id: 'H7PRtRrjeAoPlty7IxnTTF',
-            work_order_id:
+            entity_id:
                 'BbZ3Z7OZnFmdF5MBgVIYzI',
-            from_node_id: woNodeReview,
-            to_node_id: woNodeCapture,
-            person_id: woPersonSarah,
-            transitioned_at: dt(60, 22, 0),
+            state: woNodeCapture,
+            worker_id: woPersonSarah,
+            at: dt(60, 22, 0),
         },
         {
             id: 'Xjy85N6xcsUc0dCe49kC1h',
-            work_order_id:
+            entity_id:
                 'BbZ3Z7OZnFmdF5MBgVIYzI',
-            from_node_id: woNodeCapture,
-            to_node_id: woNodeReview,
-            person_id: woPersonMarcus,
-            transitioned_at: dt(59, 14, 0),
+            state: woNodeReview,
+            worker_id: woPersonMarcus,
+            at: dt(59, 14, 0),
         },
         {
             id: '3IwmCFVLZn4y18iTwydMpO',
-            work_order_id:
+            entity_id:
                 'BbZ3Z7OZnFmdF5MBgVIYzI',
-            from_node_id: woNodeReview,
-            to_node_id: woNodeComplete,
-            person_id: woPersonMike,
-            transitioned_at: dt(58, 9, 0),
+            state: woNodeComplete,
+            worker_id: woPersonMike,
+            at: dt(58, 9, 0),
         },
         // needs-revision WO26: loops DC->Review->DC
         {
             id: '993Ka1UzsvcerLiBQkW8nn',
-            work_order_id:
+            entity_id:
                 'NydsTqMmCgEKI7R9xxp36g',
-            from_node_id: '',
-            to_node_id: woNodeNew,
-            person_id: woPersonSarah,
-            transitioned_at: dt(50, 8, 30),
+            state: woNodeNew,
+            worker_id: woPersonSarah,
+            at: dt(50, 8, 30),
         },
         {
             id: 'EIo4tqqUH9XBmTxLKQa3wY',
-            work_order_id:
+            entity_id:
                 'NydsTqMmCgEKI7R9xxp36g',
-            from_node_id: woNodeNew,
-            to_node_id: woNodeCapture,
-            person_id: woPersonSarah,
-            transitioned_at: dt(50, 8, 45),
+            state: woNodeCapture,
+            worker_id: woPersonSarah,
+            at: dt(50, 8, 45),
         },
         {
             id: 'Q05vkdZMSIHF8dFhFdu2T9',
-            work_order_id:
+            entity_id:
                 'NydsTqMmCgEKI7R9xxp36g',
-            from_node_id: woNodeCapture,
-            to_node_id: woNodeReview,
-            person_id: woPersonMarcus,
-            transitioned_at: dt(48, 11, 0),
+            state: woNodeReview,
+            worker_id: woPersonMarcus,
+            at: dt(48, 11, 0),
         },
         {
             id: 'f4raRzWhac1d0qfMW4bHCo',
-            work_order_id:
+            entity_id:
                 'NydsTqMmCgEKI7R9xxp36g',
-            from_node_id: woNodeReview,
-            to_node_id: woNodeCapture,
-            person_id: woPersonMike,
-            transitioned_at: dt(47, 14, 0),
+            state: woNodeCapture,
+            worker_id: woPersonMike,
+            at: dt(47, 14, 0),
         },
         {
             id: '8lTjUXAaJGsmi28M5VvnEs',
-            work_order_id:
+            entity_id:
                 'NydsTqMmCgEKI7R9xxp36g',
-            from_node_id: woNodeCapture,
-            to_node_id: woNodeReview,
-            person_id: woPersonCurrent,
-            transitioned_at: dt(46, 10, 0),
+            state: woNodeReview,
+            worker_id: woPersonCurrent,
+            at: dt(46, 10, 0),
         },
         {
             id: 'GNbLd7I9sqHDpu4xKbBdjV',
-            work_order_id:
+            entity_id:
                 'NydsTqMmCgEKI7R9xxp36g',
-            from_node_id: woNodeReview,
-            to_node_id: woNodeComplete,
-            person_id: woPersonSarah,
-            transitioned_at: dt(44, 14, 0),
+            state: woNodeComplete,
+            worker_id: woPersonSarah,
+            at: dt(44, 14, 0),
         },
         // needs-revision WO27: loops DC->Review->DC
         {
             id: 'CXA7kHHLRi4K7kuhFrrzpa',
-            work_order_id:
+            entity_id:
                 'x2uQev3HutthrUWRFkXSkH',
-            from_node_id: '',
-            to_node_id: woNodeNew,
-            person_id: woPersonMike,
-            transitioned_at: dt(38, 9, 0),
+            state: woNodeNew,
+            worker_id: woPersonMike,
+            at: dt(38, 9, 0),
         },
         {
             id: 't1qnertaXJmzaaELr6IsYU',
-            work_order_id:
+            entity_id:
                 'x2uQev3HutthrUWRFkXSkH',
-            from_node_id: woNodeNew,
-            to_node_id: woNodeCapture,
-            person_id: woPersonMike,
-            transitioned_at: dt(38, 9, 18),
+            state: woNodeCapture,
+            worker_id: woPersonMike,
+            at: dt(38, 9, 18),
         },
         {
             id: 'h59lAwdhgMdefl9RisCCj7',
-            work_order_id:
+            entity_id:
                 'x2uQev3HutthrUWRFkXSkH',
-            from_node_id: woNodeCapture,
-            to_node_id: woNodeReview,
-            person_id: woPersonMarcus,
-            transitioned_at: dt(36, 14, 0),
+            state: woNodeReview,
+            worker_id: woPersonMarcus,
+            at: dt(36, 14, 0),
         },
         {
             id: 'c7ikZyOjtqlGuoz9zODuHy',
-            work_order_id:
+            entity_id:
                 'x2uQev3HutthrUWRFkXSkH',
-            from_node_id: woNodeReview,
-            to_node_id: woNodeCapture,
-            person_id: woPersonSarah,
-            transitioned_at: dt(35, 22, 0),
+            state: woNodeCapture,
+            worker_id: woPersonSarah,
+            at: dt(35, 22, 0),
         },
         {
             id: 'eKSPOrAHWb6CNNMhRQTYKt',
-            work_order_id:
+            entity_id:
                 'x2uQev3HutthrUWRFkXSkH',
-            from_node_id: woNodeCapture,
-            to_node_id: woNodeReview,
-            person_id: woPersonMarcus,
-            transitioned_at: dt(34, 14, 0),
+            state: woNodeReview,
+            worker_id: woPersonMarcus,
+            at: dt(34, 14, 0),
         },
         {
             id: 'zGJlSHo6fbztITB52k1vuP',
-            work_order_id:
+            entity_id:
                 'x2uQev3HutthrUWRFkXSkH',
-            from_node_id: woNodeReview,
-            to_node_id: woNodeComplete,
-            person_id: woPersonMike,
-            transitioned_at: dt(33, 9, 0),
+            state: woNodeComplete,
+            worker_id: woPersonMike,
+            at: dt(33, 9, 0),
         },
         // needs-revision WO28: loops DC->Review->DC
         {
             id: 'ZHtYaVGAAmYCcJYUbDsEZl',
-            work_order_id:
+            entity_id:
                 'w7XA9UnuYI7e46RTQL1xGW',
-            from_node_id: '',
-            to_node_id: woNodeNew,
-            person_id: woPersonSarah,
-            transitioned_at: dt(25, 10, 0),
+            state: woNodeNew,
+            worker_id: woPersonSarah,
+            at: dt(25, 10, 0),
         },
         {
             id: '9SqVX67zSGRvJr6LzgLoqA',
-            work_order_id:
+            entity_id:
                 'w7XA9UnuYI7e46RTQL1xGW',
-            from_node_id: woNodeNew,
-            to_node_id: woNodeCapture,
-            person_id: woPersonSarah,
-            transitioned_at: dt(25, 10, 20),
+            state: woNodeCapture,
+            worker_id: woPersonSarah,
+            at: dt(25, 10, 20),
         },
         {
             id: 'tgkwKH3qWOdn2BcWaazkdN',
-            work_order_id:
+            entity_id:
                 'w7XA9UnuYI7e46RTQL1xGW',
-            from_node_id: woNodeCapture,
-            to_node_id: woNodeReview,
-            person_id: woPersonCurrent,
-            transitioned_at: dt(23, 14, 0),
+            state: woNodeReview,
+            worker_id: woPersonCurrent,
+            at: dt(23, 14, 0),
         },
         {
             id: 'IGUf2HrDyAJCpT1OrdBEdb',
-            work_order_id:
+            entity_id:
                 'w7XA9UnuYI7e46RTQL1xGW',
-            from_node_id: woNodeReview,
-            to_node_id: woNodeCapture,
-            person_id: woPersonMike,
-            transitioned_at: dt(22, 14, 0),
+            state: woNodeCapture,
+            worker_id: woPersonMike,
+            at: dt(22, 14, 0),
         },
         {
             id: 'PxLFPaM23m2rQXIzeJIywN',
-            work_order_id:
+            entity_id:
                 'w7XA9UnuYI7e46RTQL1xGW',
-            from_node_id: woNodeCapture,
-            to_node_id: woNodeReview,
-            person_id: woPersonMarcus,
-            transitioned_at: dt(21, 10, 0),
+            state: woNodeReview,
+            worker_id: woPersonMarcus,
+            at: dt(21, 10, 0),
         },
         {
             id: '01Xeks1usn4PgpxH0QwyHi',
-            work_order_id:
+            entity_id:
                 'w7XA9UnuYI7e46RTQL1xGW',
-            from_node_id: woNodeReview,
-            to_node_id: woNodeComplete,
-            person_id: woPersonSarah,
-            transitioned_at: dt(19, 14, 0),
+            state: woNodeComplete,
+            worker_id: woPersonSarah,
+            at: dt(19, 14, 0),
         },
         // needs-revision WO29: loops DC->Review->DC
         {
             id: 'UsCm8zcTD7V2b5csEp7Mcr',
-            work_order_id:
+            entity_id:
                 '3H3XeeNE4rS2wbANs3JvYz',
-            from_node_id: '',
-            to_node_id: woNodeNew,
-            person_id: woPersonMike,
-            transitioned_at: dt(12, 9, 30),
+            state: woNodeNew,
+            worker_id: woPersonMike,
+            at: dt(12, 9, 30),
         },
         {
             id: 'eRBpgQtP1g4IrauEEkfOCl',
-            work_order_id:
+            entity_id:
                 '3H3XeeNE4rS2wbANs3JvYz',
-            from_node_id: woNodeNew,
-            to_node_id: woNodeCapture,
-            person_id: woPersonMike,
-            transitioned_at: dt(12, 9, 45),
+            state: woNodeCapture,
+            worker_id: woPersonMike,
+            at: dt(12, 9, 45),
         },
         {
             id: 'vfWjLYPYadU0NFA6mk7yRl',
-            work_order_id:
+            entity_id:
                 '3H3XeeNE4rS2wbANs3JvYz',
-            from_node_id: woNodeCapture,
-            to_node_id: woNodeReview,
-            person_id: woPersonMarcus,
-            transitioned_at: dt(11, 11, 0),
+            state: woNodeReview,
+            worker_id: woPersonMarcus,
+            at: dt(11, 11, 0),
         },
         {
             id: 'G2eaGEcEP0s7q8ThefRKze',
-            work_order_id:
+            entity_id:
                 '3H3XeeNE4rS2wbANs3JvYz',
-            from_node_id: woNodeReview,
-            to_node_id: woNodeCapture,
-            person_id: woPersonSarah,
-            transitioned_at: dt(10, 14, 0),
+            state: woNodeCapture,
+            worker_id: woPersonSarah,
+            at: dt(10, 14, 0),
         },
         {
             id: 'ZstKsrHfLjCwfx2qFso2ZR',
-            work_order_id:
+            entity_id:
                 '3H3XeeNE4rS2wbANs3JvYz',
-            from_node_id: woNodeCapture,
-            to_node_id: woNodeReview,
-            person_id: woPersonCurrent,
-            transitioned_at: dt(9, 11, 0),
+            state: woNodeReview,
+            worker_id: woPersonCurrent,
+            at: dt(9, 11, 0),
         },
         {
             id: 'BZ2RDP2rbCFKJvqqERE7eE',
-            work_order_id:
+            entity_id:
                 '3H3XeeNE4rS2wbANs3JvYz',
-            from_node_id: woNodeReview,
-            to_node_id: woNodeComplete,
-            person_id: woPersonMike,
-            transitioned_at: dt(8, 9, 0),
+            state: woNodeComplete,
+            worker_id: woPersonMike,
+            at: dt(8, 9, 0),
         },
         // in-flight WO30: sitting in Data Capture
         {
             id: '6DutgmmGcJ1gqIvJgAcUHc',
-            work_order_id:
+            entity_id:
                 'i7YYgKN3ZUlrkulQ2aWdIE',
-            from_node_id: '',
-            to_node_id: woNodeNew,
-            person_id: woPersonSarah,
-            transitioned_at: dt(18, 9, 0),
+            state: woNodeNew,
+            worker_id: woPersonSarah,
+            at: dt(18, 9, 0),
         },
         {
             id: '8IEmMehaWoNrxS2NNocSNE',
-            work_order_id:
+            entity_id:
                 'i7YYgKN3ZUlrkulQ2aWdIE',
-            from_node_id: woNodeNew,
-            to_node_id: woNodeCapture,
-            person_id: woPersonSarah,
-            transitioned_at: dt(18, 9, 15),
+            state: woNodeCapture,
+            worker_id: woPersonSarah,
+            at: dt(18, 9, 15),
         },
         // in-flight WO31: sitting in Data Capture
         {
             id: 'y0Mx6OUCbfA0HXgyqArpcv',
-            work_order_id:
+            entity_id:
                 '0brjvcoPEVBwMkUQ3tKHWc',
-            from_node_id: '',
-            to_node_id: woNodeNew,
-            person_id: woPersonMike,
-            transitioned_at: dt(10, 10, 0),
+            state: woNodeNew,
+            worker_id: woPersonMike,
+            at: dt(10, 10, 0),
         },
         {
             id: 'xPBiF7zri62itn9FCXWtUE',
-            work_order_id:
+            entity_id:
                 '0brjvcoPEVBwMkUQ3tKHWc',
-            from_node_id: woNodeNew,
-            to_node_id: woNodeCapture,
-            person_id: woPersonMike,
-            transitioned_at: dt(10, 10, 20),
+            state: woNodeCapture,
+            worker_id: woPersonMike,
+            at: dt(10, 10, 20),
         },
         // in-flight WO32: sitting in Data Capture
         {
             id: 'vX4jtsFFLGpU3CXPRpdCrv',
-            work_order_id:
+            entity_id:
                 'mTdhglHhl7pM0mKt0M2IjF',
-            from_node_id: '',
-            to_node_id: woNodeNew,
-            person_id: woPersonSarah,
-            transitioned_at: dt(7, 8, 0),
+            state: woNodeNew,
+            worker_id: woPersonSarah,
+            at: dt(7, 8, 0),
         },
         {
             id: 'du3liNmXeejdDA0OMRfibW',
-            work_order_id:
+            entity_id:
                 'mTdhglHhl7pM0mKt0M2IjF',
-            from_node_id: woNodeNew,
-            to_node_id: woNodeCapture,
-            person_id: woPersonSarah,
-            transitioned_at: dt(7, 8, 12),
+            state: woNodeCapture,
+            worker_id: woPersonSarah,
+            at: dt(7, 8, 12),
         },
         // in-flight WO33: sitting in Review
         {
             id: 'YhSbU5pZG78ab0G4SepE3j',
-            work_order_id:
+            entity_id:
                 'GMhfH8lMQJXzE4vkjnSH1u',
-            from_node_id: '',
-            to_node_id: woNodeNew,
-            person_id: woPersonMike,
-            transitioned_at: dt(4, 9, 0),
+            state: woNodeNew,
+            worker_id: woPersonMike,
+            at: dt(4, 9, 0),
         },
         {
             id: 'oapOBSYlGiuRXZDQoODFj7',
-            work_order_id:
+            entity_id:
                 'GMhfH8lMQJXzE4vkjnSH1u',
-            from_node_id: woNodeNew,
-            to_node_id: woNodeCapture,
-            person_id: woPersonMike,
-            transitioned_at: dt(4, 9, 18),
+            state: woNodeCapture,
+            worker_id: woPersonMike,
+            at: dt(4, 9, 18),
         },
         {
             id: '4GQOHCMoSVszRiPyPIEJFj',
-            work_order_id:
+            entity_id:
                 'GMhfH8lMQJXzE4vkjnSH1u',
-            from_node_id: woNodeCapture,
-            to_node_id: woNodeReview,
-            person_id: woPersonMarcus,
-            transitioned_at: dt(3, 14, 0),
+            state: woNodeReview,
+            worker_id: woPersonMarcus,
+            at: dt(3, 14, 0),
         },
         // in-flight WO34: sitting in Review
         {
             id: 'W1A4TYQHkFgG0ijSUUQPR1',
-            work_order_id:
+            entity_id:
                 'pLxCFGOINXVaXmrS0VG0vC',
-            from_node_id: '',
-            to_node_id: woNodeNew,
-            person_id: woPersonSarah,
-            transitioned_at: dt(2, 11, 0),
+            state: woNodeNew,
+            worker_id: woPersonSarah,
+            at: dt(2, 11, 0),
         },
         {
             id: 'IUWLLWpuMM5EHbpESuAG13',
-            work_order_id:
+            entity_id:
                 'pLxCFGOINXVaXmrS0VG0vC',
-            from_node_id: woNodeNew,
-            to_node_id: woNodeCapture,
-            person_id: woPersonSarah,
-            transitioned_at: dt(2, 11, 20),
+            state: woNodeCapture,
+            worker_id: woPersonSarah,
+            at: dt(2, 11, 20),
         },
         {
             id: 'IvGW6Yw71dy7s5wmMEYxDr',
-            work_order_id:
+            entity_id:
                 'pLxCFGOINXVaXmrS0VG0vC',
-            from_node_id: woNodeCapture,
-            to_node_id: woNodeReview,
-            person_id: woPersonCurrent,
-            transitioned_at: dt(1, 10, 0),
+            state: woNodeReview,
+            worker_id: woPersonCurrent,
+            at: dt(1, 10, 0),
         },
         // out-of-clan WO35: Sarah (not in DC workers)
         // transitions DC out
         {
             id: 'uGXz0fPBwWaBQcviQP5ZsV',
-            work_order_id:
+            entity_id:
                 'IyrpZrIl2hbmmnCtiifEGm',
-            from_node_id: '',
-            to_node_id: woNodeNew,
-            person_id: woPersonMike,
-            transitioned_at: dt(35, 9, 0),
+            state: woNodeNew,
+            worker_id: woPersonMike,
+            at: dt(35, 9, 0),
         },
         {
             id: 'cEFDawHdIHfIaZQYGhH5xu',
-            work_order_id:
+            entity_id:
                 'IyrpZrIl2hbmmnCtiifEGm',
-            from_node_id: woNodeNew,
-            to_node_id: woNodeCapture,
-            person_id: woPersonMike,
-            transitioned_at: dt(35, 9, 12),
+            state: woNodeCapture,
+            worker_id: woPersonMike,
+            at: dt(35, 9, 12),
         },
         {
             id: 'MGhDId9jZaFJZ5fBhnrGem',
-            work_order_id:
+            entity_id:
                 'IyrpZrIl2hbmmnCtiifEGm',
-            from_node_id: woNodeCapture,
-            to_node_id: woNodeReview,
-            person_id: woPersonSarah,
-            transitioned_at: dt(33, 10, 0),
+            state: woNodeReview,
+            worker_id: woPersonSarah,
+            at: dt(33, 10, 0),
         },
         {
             id: 'Zch8By7ZpKFDwCNMEPI62h',
-            work_order_id:
+            entity_id:
                 'IyrpZrIl2hbmmnCtiifEGm',
-            from_node_id: woNodeReview,
-            to_node_id: woNodeComplete,
-            person_id: woPersonMike,
-            transitioned_at: dt(31, 14, 0),
+            state: woNodeComplete,
+            worker_id: woPersonMike,
+            at: dt(31, 14, 0),
         },
         // out-of-clan WO36: Mike (not in DC workers)
         // transitions DC out
         {
             id: 'VrxyiUJqWcdd3hBdMyoTBt',
-            work_order_id:
+            entity_id:
                 'zYnDWBV4VP5guzW5fDWtHN',
-            from_node_id: '',
-            to_node_id: woNodeNew,
-            person_id: woPersonSarah,
-            transitioned_at: dt(22, 10, 30),
+            state: woNodeNew,
+            worker_id: woPersonSarah,
+            at: dt(22, 10, 30),
         },
         {
             id: 'yikZQBGGjkiZXksUJM3gkS',
-            work_order_id:
+            entity_id:
                 'zYnDWBV4VP5guzW5fDWtHN',
-            from_node_id: woNodeNew,
-            to_node_id: woNodeCapture,
-            person_id: woPersonSarah,
-            transitioned_at: dt(22, 10, 45),
+            state: woNodeCapture,
+            worker_id: woPersonSarah,
+            at: dt(22, 10, 45),
         },
         {
             id: '0J4UMtQY7x8cfN8FNXaToL',
-            work_order_id:
+            entity_id:
                 'zYnDWBV4VP5guzW5fDWtHN',
-            from_node_id: woNodeCapture,
-            to_node_id: woNodeReview,
-            person_id: woPersonMike,
-            transitioned_at: dt(20, 11, 0),
+            state: woNodeReview,
+            worker_id: woPersonMike,
+            at: dt(20, 11, 0),
         },
         {
             id: 'XqSDgqjNZLihLPd2MX8fRR',
-            work_order_id:
+            entity_id:
                 'zYnDWBV4VP5guzW5fDWtHN',
-            from_node_id: woNodeReview,
-            to_node_id: woNodeComplete,
-            person_id: woPersonSarah,
-            transitioned_at: dt(18, 14, 0),
+            state: woNodeComplete,
+            worker_id: woPersonSarah,
+            at: dt(18, 14, 0),
         },
         // old WO37: straddles window edge; Create+DC
         // entry at dt(108) but DC exit at dt(8) so
@@ -5171,600 +4985,540 @@ export async function populateMockData(
         // count toward heat (exercises window clipping)
         {
             id: 'QsV9mE5GIUpMXGh3SVTCB7',
-            work_order_id:
+            entity_id:
                 '7HX7RPwlYopHWfD7I0QAPs',
-            from_node_id: '',
-            to_node_id: woNodeNew,
-            person_id: woPersonMike,
-            transitioned_at: dt(108, 9, 0),
+            state: woNodeNew,
+            worker_id: woPersonMike,
+            at: dt(108, 9, 0),
         },
         {
             id: 'pq0sBjRnF8XBooRpIPhsQp',
-            work_order_id:
+            entity_id:
                 '7HX7RPwlYopHWfD7I0QAPs',
-            from_node_id: woNodeNew,
-            to_node_id: woNodeCapture,
-            person_id: woPersonMike,
-            transitioned_at: dt(108, 9, 15),
+            state: woNodeCapture,
+            worker_id: woPersonMike,
+            at: dt(108, 9, 15),
         },
         {
             id: 'BNbXMdM5RReniv5obnnHF8',
-            work_order_id:
+            entity_id:
                 '7HX7RPwlYopHWfD7I0QAPs',
-            from_node_id: woNodeCapture,
-            to_node_id: woNodeReview,
-            person_id: woPersonMarcus,
-            transitioned_at: dt(8, 10, 0),
+            state: woNodeReview,
+            worker_id: woPersonMarcus,
+            at: dt(8, 10, 0),
         },
         {
             id: 'txMcs1q11W87MhhBuR83vx',
-            work_order_id:
+            entity_id:
                 '7HX7RPwlYopHWfD7I0QAPs',
-            from_node_id: woNodeReview,
-            to_node_id: woNodeComplete,
-            person_id: woPersonSarah,
-            transitioned_at: dt(5, 14, 0),
+            state: woNodeComplete,
+            worker_id: woPersonSarah,
+            at: dt(5, 14, 0),
         },
         // old WO38: all transitions ~100-103 days ago,
         // entirely outside the 90-day window; contributes
         // ~0 to heat stats
         {
             id: 'jobf5lBzIn2MPw34grYi2d',
-            work_order_id:
+            entity_id:
                 'EXphSopBU1Is2TH4QZo4nO',
-            from_node_id: '',
-            to_node_id: woNodeNew,
-            person_id: woPersonSarah,
-            transitioned_at: dt(103, 10, 0),
+            state: woNodeNew,
+            worker_id: woPersonSarah,
+            at: dt(103, 10, 0),
         },
         {
             id: 'o97Okl09WcFIc5EHkfBNL0',
-            work_order_id:
+            entity_id:
                 'EXphSopBU1Is2TH4QZo4nO',
-            from_node_id: woNodeNew,
-            to_node_id: woNodeCapture,
-            person_id: woPersonSarah,
-            transitioned_at: dt(103, 10, 18),
+            state: woNodeCapture,
+            worker_id: woPersonSarah,
+            at: dt(103, 10, 18),
         },
         {
             id: '783y3zl2CZTp98AaqPhggs',
-            work_order_id:
+            entity_id:
                 'EXphSopBU1Is2TH4QZo4nO',
-            from_node_id: woNodeCapture,
-            to_node_id: woNodeReview,
-            person_id: woPersonMarcus,
-            transitioned_at: dt(101, 11, 0),
+            state: woNodeReview,
+            worker_id: woPersonMarcus,
+            at: dt(101, 11, 0),
         },
         {
             id: 'HXbhOvQZXx6DnrRB0T3mve',
-            work_order_id:
+            entity_id:
                 'EXphSopBU1Is2TH4QZo4nO',
-            from_node_id: woNodeReview,
-            to_node_id: woNodeComplete,
-            person_id: woPersonMike,
-            transitioned_at: dt(100, 9, 0),
+            state: woNodeComplete,
+            worker_id: woPersonMike,
+            at: dt(100, 9, 0),
         },
         // prc01: happy path, ~3 day draft sojourn
         {
             id: 'fGWA9Dk2EKdOzT2DDU9XOC',
-            work_order_id:
+            entity_id:
                 'hRPNkjrYBTQqzzFe1t8FH6',
-            from_node_id: '',
-            to_node_id: prcNodeStart,
-            person_id: woPersonSarah,
-            transitioned_at: dt(60, 9, 0),
+            state: prcNodeStart,
+            worker_id: woPersonSarah,
+            at: dt(60, 9, 0),
         },
         {
             id: '3ksjRuCLxe6hNXR0dNzxWQ',
-            work_order_id:
+            entity_id:
                 'hRPNkjrYBTQqzzFe1t8FH6',
-            from_node_id: prcNodeStart,
-            to_node_id: prcNodeDraft,
-            person_id: woPersonSarah,
-            transitioned_at: dt(60, 9, 5),
+            state: prcNodeDraft,
+            worker_id: woPersonSarah,
+            at: dt(60, 9, 5),
         },
         {
             id: 'uWiv67EN75R9nQ1njZxhuv',
-            work_order_id:
+            entity_id:
                 'hRPNkjrYBTQqzzFe1t8FH6',
-            from_node_id: prcNodeDraft,
-            to_node_id: prcNodeSubmit,
-            person_id: woPersonMike,
-            transitioned_at: dt(57, 10, 0),
+            state: prcNodeSubmit,
+            worker_id: woPersonMike,
+            at: dt(57, 10, 0),
         },
         {
             id: 'odxDZFFHmZwFy1FmpUuxU5',
-            work_order_id:
+            entity_id:
                 'hRPNkjrYBTQqzzFe1t8FH6',
-            from_node_id: prcNodeSubmit,
-            to_node_id: prcNodeTriage,
-            person_id: woPersonMike,
-            transitioned_at: dt(57, 10, 30),
+            state: prcNodeTriage,
+            worker_id: woPersonMike,
+            at: dt(57, 10, 30),
         },
         {
             id: 'AC5WlYdwXBnnE58qHaHmIo',
-            work_order_id:
+            entity_id:
                 'hRPNkjrYBTQqzzFe1t8FH6',
-            from_node_id: prcNodeTriage,
-            to_node_id: prcNodeQuickRev,
-            person_id: woPersonMarcus,
-            transitioned_at: dt(57, 11, 0),
+            state: prcNodeQuickRev,
+            worker_id: woPersonMarcus,
+            at: dt(57, 11, 0),
         },
         {
             id: 'RgZgN0b8utwKl61fc4TzZP',
-            work_order_id:
+            entity_id:
                 'hRPNkjrYBTQqzzFe1t8FH6',
-            from_node_id: prcNodeQuickRev,
-            to_node_id: prcNodeDecision,
-            person_id: woPersonMarcus,
-            transitioned_at: dt(56, 14, 0),
+            state: prcNodeDecision,
+            worker_id: woPersonMarcus,
+            at: dt(56, 14, 0),
         },
         {
             id: 'z6hNmYbEWvegszxhwcJ61f',
-            work_order_id:
+            entity_id:
                 'hRPNkjrYBTQqzzFe1t8FH6',
-            from_node_id: prcNodeDecision,
-            to_node_id: prcNodeApproved,
-            person_id: woPersonSarah,
-            transitioned_at: dt(56, 15, 0),
+            state: prcNodeApproved,
+            worker_id: woPersonSarah,
+            at: dt(56, 15, 0),
         },
         {
             id: 'XdBVq4IIUbuiefP1w0g0yu',
-            work_order_id:
+            entity_id:
                 'hRPNkjrYBTQqzzFe1t8FH6',
-            from_node_id: prcNodeApproved,
-            to_node_id: prcNodeArchive,
-            person_id: woPersonSarah,
-            transitioned_at: dt(55, 9, 0),
+            state: prcNodeArchive,
+            worker_id: woPersonSarah,
+            at: dt(55, 9, 0),
         },
         // prc02: happy path, ~2 day draft sojourn
         {
             id: 'Voznw9q5B5mGSoQek1jAHs',
-            work_order_id:
+            entity_id:
                 'L3UhOvrAGluk4kNnN6J8NT',
-            from_node_id: '',
-            to_node_id: prcNodeStart,
-            person_id: woPersonMike,
-            transitioned_at: dt(45, 10, 0),
+            state: prcNodeStart,
+            worker_id: woPersonMike,
+            at: dt(45, 10, 0),
         },
         {
             id: 'm0nfsE2rTHaRbAWuxmum9d',
-            work_order_id:
+            entity_id:
                 'L3UhOvrAGluk4kNnN6J8NT',
-            from_node_id: prcNodeStart,
-            to_node_id: prcNodeDraft,
-            person_id: woPersonMike,
-            transitioned_at: dt(45, 10, 10),
+            state: prcNodeDraft,
+            worker_id: woPersonMike,
+            at: dt(45, 10, 10),
         },
         {
             id: 'yxbLBIMHtHgVjO74NsrNgX',
-            work_order_id:
+            entity_id:
                 'L3UhOvrAGluk4kNnN6J8NT',
-            from_node_id: prcNodeDraft,
-            to_node_id: prcNodeSubmit,
-            person_id: woPersonMike,
-            transitioned_at: dt(43, 9, 0),
+            state: prcNodeSubmit,
+            worker_id: woPersonMike,
+            at: dt(43, 9, 0),
         },
         {
             id: 'z9NN5xeQ6CMu9DChJ16m1V',
-            work_order_id:
+            entity_id:
                 'L3UhOvrAGluk4kNnN6J8NT',
-            from_node_id: prcNodeSubmit,
-            to_node_id: prcNodeTriage,
-            person_id: woPersonMarcus,
-            transitioned_at: dt(43, 9, 20),
+            state: prcNodeTriage,
+            worker_id: woPersonMarcus,
+            at: dt(43, 9, 20),
         },
         {
             id: 'UAO4qYna7zIzLSJwM8iIoh',
-            work_order_id:
+            entity_id:
                 'L3UhOvrAGluk4kNnN6J8NT',
-            from_node_id: prcNodeTriage,
-            to_node_id: prcNodeQuickRev,
-            person_id: woPersonMarcus,
-            transitioned_at: dt(43, 10, 0),
+            state: prcNodeQuickRev,
+            worker_id: woPersonMarcus,
+            at: dt(43, 10, 0),
         },
         {
             id: 'UrbW8eFstKcsHbh99uRUds',
-            work_order_id:
+            entity_id:
                 'L3UhOvrAGluk4kNnN6J8NT',
-            from_node_id: prcNodeQuickRev,
-            to_node_id: prcNodeDecision,
-            person_id: woPersonSarah,
-            transitioned_at: dt(42, 14, 0),
+            state: prcNodeDecision,
+            worker_id: woPersonSarah,
+            at: dt(42, 14, 0),
         },
         {
             id: 'KW7NkVunQCIEUzL9R78DpF',
-            work_order_id:
+            entity_id:
                 'L3UhOvrAGluk4kNnN6J8NT',
-            from_node_id: prcNodeDecision,
-            to_node_id: prcNodeApproved,
-            person_id: woPersonSarah,
-            transitioned_at: dt(42, 15, 0),
+            state: prcNodeApproved,
+            worker_id: woPersonSarah,
+            at: dt(42, 15, 0),
         },
         {
             id: 'wVgv2i4c1o7t11tIrmngjN',
-            work_order_id:
+            entity_id:
                 'L3UhOvrAGluk4kNnN6J8NT',
-            from_node_id: prcNodeApproved,
-            to_node_id: prcNodeArchive,
-            person_id: woPersonMike,
-            transitioned_at: dt(41, 10, 0),
+            state: prcNodeArchive,
+            worker_id: woPersonMike,
+            at: dt(41, 10, 0),
         },
         // prc03: happy path, ~1 day draft sojourn
         {
             id: 'jMUHUNKZX9A0LJOuoDt3UQ',
-            work_order_id:
+            entity_id:
                 'oTscblsEOjZDkvkW3vs7rU',
-            from_node_id: '',
-            to_node_id: prcNodeStart,
-            person_id: woPersonSarah,
-            transitioned_at: dt(30, 8, 0),
+            state: prcNodeStart,
+            worker_id: woPersonSarah,
+            at: dt(30, 8, 0),
         },
         {
             id: '5opUgNKNUIWnlm3MnpGX9F',
-            work_order_id:
+            entity_id:
                 'oTscblsEOjZDkvkW3vs7rU',
-            from_node_id: prcNodeStart,
-            to_node_id: prcNodeDraft,
-            person_id: woPersonSarah,
-            transitioned_at: dt(30, 8, 10),
+            state: prcNodeDraft,
+            worker_id: woPersonSarah,
+            at: dt(30, 8, 10),
         },
         {
             id: '0XabGfXLVpJqRrrA8Tmo4S',
-            work_order_id:
+            entity_id:
                 'oTscblsEOjZDkvkW3vs7rU',
-            from_node_id: prcNodeDraft,
-            to_node_id: prcNodeSubmit,
-            person_id: woPersonCurrent,
-            transitioned_at: dt(29, 9, 0),
+            state: prcNodeSubmit,
+            worker_id: woPersonCurrent,
+            at: dt(29, 9, 0),
         },
         {
             id: 'sbPLHxmfJUpk3tfXZ7ShRX',
-            work_order_id:
+            entity_id:
                 'oTscblsEOjZDkvkW3vs7rU',
-            from_node_id: prcNodeSubmit,
-            to_node_id: prcNodeTriage,
-            person_id: woPersonCurrent,
-            transitioned_at: dt(29, 9, 15),
+            state: prcNodeTriage,
+            worker_id: woPersonCurrent,
+            at: dt(29, 9, 15),
         },
         {
             id: 'CEUHkraKtR9HC4heDL8OaZ',
-            work_order_id:
+            entity_id:
                 'oTscblsEOjZDkvkW3vs7rU',
-            from_node_id: prcNodeTriage,
-            to_node_id: prcNodeQuickRev,
-            person_id: woPersonMarcus,
-            transitioned_at: dt(29, 10, 0),
+            state: prcNodeQuickRev,
+            worker_id: woPersonMarcus,
+            at: dt(29, 10, 0),
         },
         {
             id: 'EqVBgaYCFKRwp9uIHOyVle',
-            work_order_id:
+            entity_id:
                 'oTscblsEOjZDkvkW3vs7rU',
-            from_node_id: prcNodeQuickRev,
-            to_node_id: prcNodeDecision,
-            person_id: woPersonMarcus,
-            transitioned_at: dt(28, 15, 0),
+            state: prcNodeDecision,
+            worker_id: woPersonMarcus,
+            at: dt(28, 15, 0),
         },
         {
             id: '1DfCm0yI6ycGmVNPcudsOU',
-            work_order_id:
+            entity_id:
                 'oTscblsEOjZDkvkW3vs7rU',
-            from_node_id: prcNodeDecision,
-            to_node_id: prcNodeApproved,
-            person_id: woPersonMike,
-            transitioned_at: dt(28, 16, 0),
+            state: prcNodeApproved,
+            worker_id: woPersonMike,
+            at: dt(28, 16, 0),
         },
         {
             id: 'lAOOAfrD4ZO0rKWfQFI8Px',
-            work_order_id:
+            entity_id:
                 'oTscblsEOjZDkvkW3vs7rU',
-            from_node_id: prcNodeApproved,
-            to_node_id: prcNodeArchive,
-            person_id: woPersonMike,
-            transitioned_at: dt(27, 9, 0),
+            state: prcNodeArchive,
+            worker_id: woPersonMike,
+            at: dt(27, 9, 0),
         },
         // prc04: happy path, ~4 day draft sojourn
         {
             id: 'JOz3BgXyTUkvWLmmNGszc7',
-            work_order_id:
+            entity_id:
                 'Xpw9VGpZ6RyevuInSr8yze',
-            from_node_id: '',
-            to_node_id: prcNodeStart,
-            person_id: woPersonMike,
-            transitioned_at: dt(20, 11, 0),
+            state: prcNodeStart,
+            worker_id: woPersonMike,
+            at: dt(20, 11, 0),
         },
         {
             id: 'JpSsbb9JNMnGteG4RBWrZB',
-            work_order_id:
+            entity_id:
                 'Xpw9VGpZ6RyevuInSr8yze',
-            from_node_id: prcNodeStart,
-            to_node_id: prcNodeDraft,
-            person_id: woPersonMike,
-            transitioned_at: dt(20, 11, 5),
+            state: prcNodeDraft,
+            worker_id: woPersonMike,
+            at: dt(20, 11, 5),
         },
         {
             id: 'dn32O6s5Ibe5aDOByr87J7',
-            work_order_id:
+            entity_id:
                 'Xpw9VGpZ6RyevuInSr8yze',
-            from_node_id: prcNodeDraft,
-            to_node_id: prcNodeSubmit,
-            person_id: woPersonMarcus,
-            transitioned_at: dt(16, 10, 0),
+            state: prcNodeSubmit,
+            worker_id: woPersonMarcus,
+            at: dt(16, 10, 0),
         },
         {
             id: 'nFGAxCNAthhvb9m4walDUe',
-            work_order_id:
+            entity_id:
                 'Xpw9VGpZ6RyevuInSr8yze',
-            from_node_id: prcNodeSubmit,
-            to_node_id: prcNodeTriage,
-            person_id: woPersonSarah,
-            transitioned_at: dt(16, 10, 20),
+            state: prcNodeTriage,
+            worker_id: woPersonSarah,
+            at: dt(16, 10, 20),
         },
         {
             id: 'fjM70dtNCzEFNoQ6cjJCWO',
-            work_order_id:
+            entity_id:
                 'Xpw9VGpZ6RyevuInSr8yze',
-            from_node_id: prcNodeTriage,
-            to_node_id: prcNodeQuickRev,
-            person_id: woPersonSarah,
-            transitioned_at: dt(16, 11, 0),
+            state: prcNodeQuickRev,
+            worker_id: woPersonSarah,
+            at: dt(16, 11, 0),
         },
         {
             id: '12eJcjUwJ7G1iqPAU6cSx0',
-            work_order_id:
+            entity_id:
                 'Xpw9VGpZ6RyevuInSr8yze',
-            from_node_id: prcNodeQuickRev,
-            to_node_id: prcNodeDecision,
-            person_id: woPersonSarah,
-            transitioned_at: dt(15, 14, 0),
+            state: prcNodeDecision,
+            worker_id: woPersonSarah,
+            at: dt(15, 14, 0),
         },
         {
             id: 'eM38EYOkl4REWI8y8IhCzA',
-            work_order_id:
+            entity_id:
                 'Xpw9VGpZ6RyevuInSr8yze',
-            from_node_id: prcNodeDecision,
-            to_node_id: prcNodeApproved,
-            person_id: woPersonMike,
-            transitioned_at: dt(15, 15, 30),
+            state: prcNodeApproved,
+            worker_id: woPersonMike,
+            at: dt(15, 15, 30),
         },
         {
             id: 'Vx8TlX4GIyRQPYS6oocHhd',
-            work_order_id:
+            entity_id:
                 'Xpw9VGpZ6RyevuInSr8yze',
-            from_node_id: prcNodeApproved,
-            to_node_id: prcNodeArchive,
-            person_id: woPersonMike,
-            transitioned_at: dt(14, 9, 0),
+            state: prcNodeArchive,
+            worker_id: woPersonMike,
+            at: dt(14, 9, 0),
         },
         // prc05: revisit -- Decision sends to
         // Revise, then Draft again, then completes
         {
             id: '4PaHruvvvyktmxiaGvTjM2',
-            work_order_id:
+            entity_id:
                 'yqPpJb0NoQDgx8DoZ183Nx',
-            from_node_id: '',
-            to_node_id: prcNodeStart,
-            person_id: woPersonSarah,
-            transitioned_at: dt(15, 9, 0),
+            state: prcNodeStart,
+            worker_id: woPersonSarah,
+            at: dt(15, 9, 0),
         },
         {
             id: 'WMNTfIbJPW1m39FOKqMZhH',
-            work_order_id:
+            entity_id:
                 'yqPpJb0NoQDgx8DoZ183Nx',
-            from_node_id: prcNodeStart,
-            to_node_id: prcNodeDraft,
-            person_id: woPersonSarah,
-            transitioned_at: dt(15, 9, 10),
+            state: prcNodeDraft,
+            worker_id: woPersonSarah,
+            at: dt(15, 9, 10),
         },
         {
             id: 'tMWEwY6qb3ICXZtz6P28Ut',
-            work_order_id:
+            entity_id:
                 'yqPpJb0NoQDgx8DoZ183Nx',
-            from_node_id: prcNodeDraft,
-            to_node_id: prcNodeSubmit,
-            person_id: woPersonMike,
-            transitioned_at: dt(14, 10, 0),
+            state: prcNodeSubmit,
+            worker_id: woPersonMike,
+            at: dt(14, 10, 0),
         },
         {
             id: 'gOUPiWUJiZa99BUOQTrYjh',
-            work_order_id:
+            entity_id:
                 'yqPpJb0NoQDgx8DoZ183Nx',
-            from_node_id: prcNodeSubmit,
-            to_node_id: prcNodeTriage,
-            person_id: woPersonMike,
-            transitioned_at: dt(14, 10, 15),
+            state: prcNodeTriage,
+            worker_id: woPersonMike,
+            at: dt(14, 10, 15),
         },
         {
             id: 'zQbr7dr0N8gG14HJT8hCop',
-            work_order_id:
+            entity_id:
                 'yqPpJb0NoQDgx8DoZ183Nx',
-            from_node_id: prcNodeTriage,
-            to_node_id: prcNodeQuickRev,
-            person_id: woPersonMarcus,
-            transitioned_at: dt(14, 11, 0),
+            state: prcNodeQuickRev,
+            worker_id: woPersonMarcus,
+            at: dt(14, 11, 0),
         },
         {
             id: 'c1O3BtoItm3bp1owvVmVWY',
-            work_order_id:
+            entity_id:
                 'yqPpJb0NoQDgx8DoZ183Nx',
-            from_node_id: prcNodeQuickRev,
-            to_node_id: prcNodeDecision,
-            person_id: woPersonMarcus,
-            transitioned_at: dt(13, 14, 0),
+            state: prcNodeDecision,
+            worker_id: woPersonMarcus,
+            at: dt(13, 14, 0),
         },
         // Decision routes to Revise (revisit)
         {
             id: '3g2Tomp04bLGvwNRss9zCi',
-            work_order_id:
+            entity_id:
                 'yqPpJb0NoQDgx8DoZ183Nx',
-            from_node_id: prcNodeDecision,
-            to_node_id: prcNodeRevise,
-            person_id: woPersonCurrent,
-            transitioned_at: dt(13, 15, 0),
+            state: prcNodeRevise,
+            worker_id: woPersonCurrent,
+            at: dt(13, 15, 0),
         },
         // Revise sends back to Draft
         {
             id: 'clXy8qWTzs8eNo3YaNi3Q5',
-            work_order_id:
+            entity_id:
                 'yqPpJb0NoQDgx8DoZ183Nx',
-            from_node_id: prcNodeRevise,
-            to_node_id: prcNodeDraft,
-            person_id: woPersonSarah,
-            transitioned_at: dt(12, 9, 0),
+            state: prcNodeDraft,
+            worker_id: woPersonSarah,
+            at: dt(12, 9, 0),
         },
         {
             id: 'T0hms37kIuFsjCmKKnt5Je',
-            work_order_id:
+            entity_id:
                 'yqPpJb0NoQDgx8DoZ183Nx',
-            from_node_id: prcNodeDraft,
-            to_node_id: prcNodeSubmit,
-            person_id: woPersonSarah,
-            transitioned_at: dt(11, 10, 0),
+            state: prcNodeSubmit,
+            worker_id: woPersonSarah,
+            at: dt(11, 10, 0),
         },
         {
             id: 'GnfjTPti69qF7OyWRdJTQV',
-            work_order_id:
+            entity_id:
                 'yqPpJb0NoQDgx8DoZ183Nx',
-            from_node_id: prcNodeSubmit,
-            to_node_id: prcNodeTriage,
-            person_id: woPersonMike,
-            transitioned_at: dt(11, 10, 20),
+            state: prcNodeTriage,
+            worker_id: woPersonMike,
+            at: dt(11, 10, 20),
         },
         {
             id: 'QnMQPkZbvU0IPt6XODVj2K',
-            work_order_id:
+            entity_id:
                 'yqPpJb0NoQDgx8DoZ183Nx',
-            from_node_id: prcNodeTriage,
-            to_node_id: prcNodeQuickRev,
-            person_id: woPersonMike,
-            transitioned_at: dt(11, 11, 0),
+            state: prcNodeQuickRev,
+            worker_id: woPersonMike,
+            at: dt(11, 11, 0),
         },
         {
             id: 'boVwgdzs2FbJ3lV2BK6rFe',
-            work_order_id:
+            entity_id:
                 'yqPpJb0NoQDgx8DoZ183Nx',
-            from_node_id: prcNodeQuickRev,
-            to_node_id: prcNodeDecision,
-            person_id: woPersonMarcus,
-            transitioned_at: dt(10, 14, 0),
+            state: prcNodeDecision,
+            worker_id: woPersonMarcus,
+            at: dt(10, 14, 0),
         },
         {
             id: 'JeIgVixuJXQgtsLJ2jVEV6',
-            work_order_id:
+            entity_id:
                 'yqPpJb0NoQDgx8DoZ183Nx',
-            from_node_id: prcNodeDecision,
-            to_node_id: prcNodeApproved,
-            person_id: woPersonMarcus,
-            transitioned_at: dt(10, 15, 0),
+            state: prcNodeApproved,
+            worker_id: woPersonMarcus,
+            at: dt(10, 15, 0),
         },
         {
             id: 'N09pFEf67fHMeaf5d9Hmud',
-            work_order_id:
+            entity_id:
                 'yqPpJb0NoQDgx8DoZ183Nx',
-            from_node_id: prcNodeApproved,
-            to_node_id: prcNodeArchive,
-            person_id: woPersonSarah,
-            transitioned_at: dt(9, 9, 0),
+            state: prcNodeArchive,
+            worker_id: woPersonSarah,
+            at: dt(9, 9, 0),
         },
         // prc06: in-flight -- stuck at Decision
         {
             id: 'iGftzPJwYdoaZr4Hm5MlsE',
-            work_order_id:
+            entity_id:
                 'BUrGEVDMF6FeU35WUHUY5E',
-            from_node_id: '',
-            to_node_id: prcNodeStart,
-            person_id: woPersonMike,
-            transitioned_at: dt(5, 10, 0),
+            state: prcNodeStart,
+            worker_id: woPersonMike,
+            at: dt(5, 10, 0),
         },
         {
             id: 'sCPs7p4WtQgm0VuR81yMyy',
-            work_order_id:
+            entity_id:
                 'BUrGEVDMF6FeU35WUHUY5E',
-            from_node_id: prcNodeStart,
-            to_node_id: prcNodeDraft,
-            person_id: woPersonMike,
-            transitioned_at: dt(5, 10, 8),
+            state: prcNodeDraft,
+            worker_id: woPersonMike,
+            at: dt(5, 10, 8),
         },
         {
             id: 'bHOxRfjKzqHi2DH8w3I8Xg',
-            work_order_id:
+            entity_id:
                 'BUrGEVDMF6FeU35WUHUY5E',
-            from_node_id: prcNodeDraft,
-            to_node_id: prcNodeSubmit,
-            person_id: woPersonCurrent,
-            transitioned_at: dt(4, 11, 0),
+            state: prcNodeSubmit,
+            worker_id: woPersonCurrent,
+            at: dt(4, 11, 0),
         },
         {
             id: 'LlXYA4dYJtau7GSAu2549Z',
-            work_order_id:
+            entity_id:
                 'BUrGEVDMF6FeU35WUHUY5E',
-            from_node_id: prcNodeSubmit,
-            to_node_id: prcNodeTriage,
-            person_id: woPersonSarah,
-            transitioned_at: dt(4, 11, 20),
+            state: prcNodeTriage,
+            worker_id: woPersonSarah,
+            at: dt(4, 11, 20),
         },
         {
             id: 'pojq7QRvrUQorLUztKWUW5',
-            work_order_id:
+            entity_id:
                 'BUrGEVDMF6FeU35WUHUY5E',
-            from_node_id: prcNodeTriage,
-            to_node_id: prcNodeQuickRev,
-            person_id: woPersonSarah,
-            transitioned_at: dt(4, 12, 0),
+            state: prcNodeQuickRev,
+            worker_id: woPersonSarah,
+            at: dt(4, 12, 0),
         },
         {
             id: 'C4i8pmiwfwvwRFk19mjOa8',
-            work_order_id:
+            entity_id:
                 'BUrGEVDMF6FeU35WUHUY5E',
-            from_node_id: prcNodeQuickRev,
-            to_node_id: prcNodeDecision,
-            person_id: woPersonMarcus,
-            transitioned_at: dt(3, 14, 0),
+            state: prcNodeDecision,
+            worker_id: woPersonMarcus,
+            at: dt(3, 14, 0),
         },
         // stays at Decision -- no more transitions
     ];
 
-    const mockTransitionFieldValues:
-        TransitionFieldValueEntity[] = [
+    const mockStateFieldValues:
+        StateFieldValueEntity[] = [
         {
             id: '4izDJCuygAL7iqjeHdephl',
-            transition_id: 'eJEybxfXaf3sjwFilZnunU',
+            state_event_id: 'eJEybxfXaf3sjwFilZnunU',
             field_id: fCompanyName,
             value: 'Acme Corp',
         },
         {
             id: 'NBmVbZMOWPSMZ11zhTpzEQ',
-            transition_id: 'eJEybxfXaf3sjwFilZnunU',
+            state_event_id: 'eJEybxfXaf3sjwFilZnunU',
             field_id: fEmail,
             value: 'onboard@acme.com',
         },
         {
             id: 'lxSMfOtoXk89FTuxLj895r',
-            transition_id: 'eJEybxfXaf3sjwFilZnunU',
+            state_event_id: 'eJEybxfXaf3sjwFilZnunU',
             field_id: fPhone,
             value: '+1-555-0100',
         },
         {
             id: 'F8Cagh2PlkwHakidXqGEXq',
-            transition_id: 'eJEybxfXaf3sjwFilZnunU',
+            state_event_id: 'eJEybxfXaf3sjwFilZnunU',
             field_id: fIndustry,
             value: 'Technology',
         },
         {
             id: '57xrfe07Pqj38qvutRJk2N',
-            transition_id: 'eJEybxfXaf3sjwFilZnunU',
+            state_event_id: 'eJEybxfXaf3sjwFilZnunU',
             field_id: fRevenue,
             value: '5000000',
         },
         {
             id: 'juYwNY2S35qCJqT3SAnwyW',
-            transition_id: 'eJEybxfXaf3sjwFilZnunU',
+            state_event_id: 'eJEybxfXaf3sjwFilZnunU',
             field_id: fEmployees,
             value: '250',
         },
         {
             id: 'vtXOj3CjsGIYGlnds0FSJd',
-            transition_id: 'C2xb2bbjyHD11WfLayh8Om',
+            state_event_id: 'C2xb2bbjyHD11WfLayh8Om',
             field_id: fReviewerNotes,
             value: 'Approved. Strong fit.',
         },
@@ -6004,68 +5758,270 @@ export async function populateMockData(
         {
             id: 'k4dY2dPq90mQVwwCkhWIo3',
             idea_id: 'eT5xdKjzLDmuRn3r7XMX4R',
-            person_id: 'LhfaUUf4IumVsCSGB4xjdK',
+            worker_id: 'LhfaUUf4IumVsCSGB4xjdK',
             created_at: dt(75, 9, 30),
         },
         {
             id: 'XC7hsfNJueKQ8q0UfCuC7o',
             idea_id: 'cbTuSs0Ex84PeFGSvoAEFZ',
-            person_id: 'bLP3X1hb1mSz8gY9neogU3',
+            worker_id: 'bLP3X1hb1mSz8gY9neogU3',
             created_at: dt(70, 9, 0),
         },
         {
             id: 'YmzT46BbGVFALpiXFDnlVd',
             idea_id: 'wuCMQqo4IkEksx7MYmu8g2',
-            person_id: '53J8h9dr76XFqCjYcNVwIR',
+            worker_id: '53J8h9dr76XFqCjYcNVwIR',
             created_at: dt(65, 9, 0),
         },
         {
             id: 'cmoTu4GRGmO8y5QrfPIHSm',
             idea_id: 'ojOEXtdzdtTZtpM81TxVca',
-            person_id: 'jBoWiyWxj7pp4sG3JgX5l2',
+            worker_id: 'jBoWiyWxj7pp4sG3JgX5l2',
             created_at: dt(55, 9, 0),
         },
         {
             id: 'kIUtvgTOLPjsSmAEVOhPb1',
             idea_id: 'T2vAafLDcshDONlYxpzPLc',
-            person_id: 'Trf1Up2jMsPhEnjbW4Ji1n',
+            worker_id: 'Trf1Up2jMsPhEnjbW4Ji1n',
             created_at: dt(50, 9, 0),
         },
         {
             id: 'r04u9qpJKSyNjP9Owxr5Be',
             idea_id: 'HRYrImq1rBJ5ZRe1T9TAVk',
-            person_id: 'zyTbfbjcGEfbpCsNTP0XjX',
+            worker_id: 'zyTbfbjcGEfbpCsNTP0XjX',
             created_at: dt(45, 9, 0),
         },
         {
             id: '2mPJTlujj1RF6gexFwbDqJ',
             idea_id: 'MCxK0hzT9CPjJx1ZV5unfr',
-            person_id: 'LhfaUUf4IumVsCSGB4xjdK',
+            worker_id: 'LhfaUUf4IumVsCSGB4xjdK',
             created_at: dt(75, 10, 0),
         },
         {
             id: 'caBSqTgzDnvP8joamAG9OG',
             idea_id: 'SUb4gKXsZ1OsEauzqszg0t',
-            person_id: 'WxQn4LVWb76YkmqK5B0EPp',
+            worker_id: 'WxQn4LVWb76YkmqK5B0EPp',
             created_at: dt(35, 9, 0),
         },
         {
             id: 'UfsCp7WYUybhwxD170okb4',
             idea_id: 'gxa84W9KvEgD0wT1F4TOM9',
-            person_id: '53J8h9dr76XFqCjYcNVwIR',
+            worker_id: '53J8h9dr76XFqCjYcNVwIR',
             created_at: dt(30, 9, 0),
         },
         {
             id: 'mbTZAQbC5cJSEIzhEEFpyq',
             idea_id: '1Z68gROMrlTAfPEGiyJJAY',
-            person_id: 'jBoWiyWxj7pp4sG3JgX5l2',
+            worker_id: 'jBoWiyWxj7pp4sG3JgX5l2',
             created_at: dt(25, 9, 0),
         },
         {
             id: '0LjTHFflWNaDZkKDqxmwJi',
             idea_id: 'Q2On2xwMpFdzOklBQJXrni',
-            person_id: 'Trf1Up2jMsPhEnjbW4Ji1n',
+            worker_id: 'Trf1Up2jMsPhEnjbW4Ji1n',
             created_at: dt(20, 9, 0),
+        },
+    ];
+
+    // One state event per seeded idea — the
+    // current state of each idea on the states
+    // log. Stage 8b+c retires the dual-column
+    // representation; the log IS the truth. Each
+    // event is authored by the idea's submitter
+    // at submission time. UI surfaces this as the
+    // composite state badge.
+    const ideaStateEvents: StateEntity[] = [
+        {
+            id: 'qJoFXyzUUaq0vEpHL5e34l',
+            entity_id: 'eT5xdKjzLDmuRn3r7XMX4R',
+            state: 'in-review',
+            worker_id: 'LhfaUUf4IumVsCSGB4xjdK',
+            at: dt(75, 9, 30),
+        },
+        {
+            id: 'tIcL6f8KJoyG2YN9NofOMo',
+            entity_id: 'cbTuSs0Ex84PeFGSvoAEFZ',
+            state: 'approved',
+            worker_id: 'bLP3X1hb1mSz8gY9neogU3',
+            at: dt(70, 9, 0),
+        },
+        {
+            id: 'mGfBLqA7lScpEKxc5w0Yt2',
+            entity_id: 'wuCMQqo4IkEksx7MYmu8g2',
+            state: 'active:needs-info',
+            worker_id: '53J8h9dr76XFqCjYcNVwIR',
+            at: dt(65, 9, 0),
+        },
+        {
+            id: 'BvBRvDQ8b5l5Tg7iZSGyHF',
+            entity_id: 'ojOEXtdzdtTZtpM81TxVca',
+            state: 'in-review',
+            worker_id: 'jBoWiyWxj7pp4sG3JgX5l2',
+            at: dt(55, 9, 0),
+        },
+        {
+            id: 'BMS9TmTKR0DZ41vTUSpvxX',
+            entity_id: 'T2vAafLDcshDONlYxpzPLc',
+            state: 'active:needs-info',
+            worker_id: 'Trf1Up2jMsPhEnjbW4Ji1n',
+            at: dt(50, 9, 0),
+        },
+        {
+            id: 'XX2EXrIUcQVTnzGo0YO2Iw',
+            entity_id: 'HRYrImq1rBJ5ZRe1T9TAVk',
+            state: 'sent-back',
+            worker_id: 'zyTbfbjcGEfbpCsNTP0XjX',
+            at: dt(45, 9, 0),
+        },
+        {
+            id: 'fxlbcnsAmCWp4j8B2NkDKM',
+            entity_id: 'MCxK0hzT9CPjJx1ZV5unfr',
+            state: 'in-review',
+            worker_id: 'LhfaUUf4IumVsCSGB4xjdK',
+            at: dt(75, 10, 0),
+        },
+        {
+            id: 'JjkkkkrZw4FvOWBpJYE2J7',
+            entity_id: 'SUb4gKXsZ1OsEauzqszg0t',
+            state: 'in-review',
+            worker_id: 'WxQn4LVWb76YkmqK5B0EPp',
+            at: dt(35, 9, 0),
+        },
+        {
+            id: '4nzdNB97hgD1GZ7CjA2EwS',
+            entity_id: 'gxa84W9KvEgD0wT1F4TOM9',
+            state: 'in-review',
+            worker_id: '53J8h9dr76XFqCjYcNVwIR',
+            at: dt(30, 9, 0),
+        },
+        {
+            id: 'wmCY9xZdrk0XlydyABZqXY',
+            entity_id: '1Z68gROMrlTAfPEGiyJJAY',
+            state: 'in-review',
+            worker_id: 'jBoWiyWxj7pp4sG3JgX5l2',
+            at: dt(25, 9, 0),
+        },
+        {
+            id: 'OWGsZqEi1bnWUetzS2sURr',
+            entity_id: 'Q2On2xwMpFdzOklBQJXrni',
+            state: 'in-review',
+            worker_id: 'Trf1Up2jMsPhEnjbW4Ji1n',
+            at: dt(20, 9, 0),
+        },
+    ];
+
+    // One state event per seeded project — the
+    // current state of each project on the states
+    // log. Stage 9b+c retires the dual-column
+    // representation; the log IS the truth. Events
+    // are authored by SYSTEM_WORKER_ID at project
+    // start time. UI surfaces this as the state
+    // badge.
+    const projectStateEvents: StateEntity[] = [
+        {
+            id: 'pSe01Cu5tSegmAi5pEv01',
+            entity_id: 'u6YkHhlGc91oDMkr3x0isa',
+            state: 'approved',
+            worker_id: SYSTEM_WORKER_ID,
+            at: dt(60, 9, 0),
+        },
+        {
+            id: 'pSe02Aut0Rep0rtComp02',
+            entity_id: 'jRE2Tj32NHsFGZIeEADp0p',
+            state: 'completed',
+            worker_id: SYSTEM_WORKER_ID,
+            at: dt(110, 9, 0),
+        },
+        {
+            id: 'pSe03SalesP1p3App03Z',
+            entity_id: l2cProjectId,
+            state: 'approved',
+            worker_id: SYSTEM_WORKER_ID,
+            at: dt(55, 9, 0),
+        },
+        {
+            id: 'pSe04PredMa1ntRev04AB',
+            entity_id: 'P04PredMa1ntzyXY010203',
+            state: 'under-review',
+            worker_id: SYSTEM_WORKER_ID,
+            at: dt(18, 9, 0),
+        },
+        {
+            id: 'pSe05RtAna1ytComp05CD',
+            entity_id: 'P05RtAna1ytcsXY010203Z',
+            state: 'completed',
+            worker_id: SYSTEM_WORKER_ID,
+            at: dt(95, 9, 0),
+        },
+        {
+            id: 'pSe06SmInvOptSnt06EF',
+            entity_id: 'P06SmInvOptZyXY010203A',
+            state: 'sent-back',
+            worker_id: SYSTEM_WORKER_ID,
+            at: dt(38, 9, 0),
+        },
+        {
+            id: 'pSe07Empl0yTraRev07GH',
+            entity_id: 'P07Empl0yTrainZyXY00B0',
+            state: 'under-review',
+            worker_id: SYSTEM_WORKER_ID,
+            at: dt(12, 9, 0),
+        },
+        {
+            id: 'pSe08CustSuppApp08IJ',
+            entity_id: 'P08CustSuppKn0wXY01C0D',
+            state: 'approved',
+            worker_id: SYSTEM_WORKER_ID,
+            at: dt(48, 9, 0),
+        },
+        {
+            id: 'pSe09C0mp1AudApp09KL',
+            entity_id: 'P09C0mp1AudAut0mXY01E0',
+            state: 'approved',
+            worker_id: SYSTEM_WORKER_ID,
+            at: dt(72, 9, 0),
+        },
+        {
+            id: 'pSe10MlRgD1s4App10MN',
+            entity_id: 'P10MlRgD1s4stRc1XY01FG',
+            state: 'approved',
+            worker_id: SYSTEM_WORKER_ID,
+            at: dt(82, 9, 0),
+        },
+        {
+            id: 'pSe11V0iceField11OPQ',
+            entity_id: 'P11V0iceField0psXY01HJ',
+            state: 'approved',
+            worker_id: SYSTEM_WORKER_ID,
+            at: dt(40, 9, 0),
+        },
+        {
+            id: 'pSe12CarbF00tCmp12RS',
+            entity_id: 'P12CarbF00tprXY01K0L0M',
+            state: 'completed',
+            worker_id: SYSTEM_WORKER_ID,
+            at: dt(120, 9, 0),
+        },
+        {
+            id: 'pSe13W0rk4rcRev13TU',
+            entity_id: 'P13W0rk4rcF0r3castsXY1',
+            state: 'under-review',
+            worker_id: SYSTEM_WORKER_ID,
+            at: dt(22, 9, 0),
+        },
+        {
+            id: 'pSe14SmartD0cAp14VWX',
+            entity_id: 'P14SmartD0cumtR0utngX1',
+            state: 'approved',
+            worker_id: SYSTEM_WORKER_ID,
+            at: dt(65, 9, 0),
+        },
+        {
+            id: 'pSe15Inv3st0rAp15YZA',
+            entity_id: 'P15Inv3st0rRep0rtP1Y00',
+            state: 'approved',
+            worker_id: SYSTEM_WORKER_ID,
+            at: dt(58, 9, 0),
         },
     ];
 
@@ -6074,61 +6030,61 @@ export async function populateMockData(
         {
             id: 'b46Mr8QWIMo4EDBxxhfkWL',
             activity_id: 'Ng6GWmx7DNmLsGshK3lBfU',
-            person_id: 'LhfaUUf4IumVsCSGB4xjdK',
+            worker_id: 'LhfaUUf4IumVsCSGB4xjdK',
             created_at: dt(0, 17, 50),
         },
         {
             id: 'pgyIzpoLgG8Vv6FgYF4DV8',
             activity_id: 'p3H9tGtQwFwQXpUiYyinT6',
-            person_id: 'WxQn4LVWb76YkmqK5B0EPp',
+            worker_id: 'WxQn4LVWb76YkmqK5B0EPp',
             created_at: dt(0, 17, 35),
         },
         {
             id: 'SJalTSor6JhpoPincDXLeY',
             activity_id: '5PGE1WlEOTkSaNYjiBXLMA',
-            person_id: '53J8h9dr76XFqCjYcNVwIR',
+            worker_id: '53J8h9dr76XFqCjYcNVwIR',
             created_at: dt(0, 17, 0),
         },
         {
             id: 'JvodSYYA6w1ithWEirfNVg',
             activity_id: 'fOqTfg9JPs73xsnC4QUmHs',
-            person_id: '6xBfK5If82JKfThXb1wlzS',
+            worker_id: '6xBfK5If82JKfThXb1wlzS',
             created_at: dt(0, 16, 0),
         },
         {
             id: 'BExIeH5NDiGVGQnrP8phOs',
             activity_id: '3pBQbQp4LPK2udgd21HlTm',
-            person_id: 'I5ntELi16X3N3JYCCnxMjZ',
+            worker_id: 'I5ntELi16X3N3JYCCnxMjZ',
             created_at: dt(0, 15, 0),
         },
         {
             id: 'pC3hoLmzaVyxJSGOHsmV5j',
             activity_id: 'CqXHcyiDNzFVcoUM2M1Tl3',
-            person_id: 'Trf1Up2jMsPhEnjbW4Ji1n',
+            worker_id: 'Trf1Up2jMsPhEnjbW4Ji1n',
             created_at: dt(0, 14, 0),
         },
         {
             id: 'PsG42X7oevXgC5DRy4irTW',
             activity_id: 'Kj75MtFxnEpFZs4MSK1emd',
-            person_id: 'oU0bIe0eUC33mTbZrxdogC',
+            worker_id: 'oU0bIe0eUC33mTbZrxdogC',
             created_at: dt(0, 13, 0),
         },
         {
             id: 'bPgxi8YCw4yTFctLef62gB',
             activity_id: 'xRmfZFNV8GYDQmq8j09Fsc',
-            person_id: 'LhfaUUf4IumVsCSGB4xjdK',
+            worker_id: 'LhfaUUf4IumVsCSGB4xjdK',
             created_at: dt(0, 12, 0),
         },
         {
             id: '2dp7FPj4gjWYtfR78D3wI2',
             activity_id: 'hP80lUSXqn1PSleymgE3Ks',
-            person_id: '53J8h9dr76XFqCjYcNVwIR',
+            worker_id: '53J8h9dr76XFqCjYcNVwIR',
             created_at: dt(1, 18, 0),
         },
         {
             id: 'Rf5G2Dh1ejnvzxbpW6hcrm',
             activity_id: 'XMltAG0dpolQLDTfd5GLWj',
-            person_id: 'WxQn4LVWb76YkmqK5B0EPp',
+            worker_id: 'WxQn4LVWb76YkmqK5B0EPp',
             created_at: dt(1, 15, 0),
         },
     ];
@@ -6178,6 +6134,18 @@ export async function populateMockData(
         },
     ];
 
+    // AI workers start at 'active' on creation.
+    // Same single-event seeding as humans.
+    for (const ai of aiWorkers) {
+        workerStateEvents.push({
+            id: `seed-worker-${ai.id}-active`,
+            entity_id: ai.id,
+            state: 'active',
+            worker_id: SYSTEM_WORKER_ID,
+            at: MOCK_SEED_TIMESTAMP,
+        });
+    }
+
     await Promise.all([
         ...ideaSubmissions.map(r =>
             adapter.ideaSubmissions.put(
@@ -6204,12 +6172,40 @@ export async function populateMockData(
                 r.id, r,
             ),
         ),
-        ...mockWoTransitions.map(r =>
-            adapter.workOrderTransitions
-                .put(r.id, r),
+        ...mockStateEvents.map(r =>
+            adapter.states.put(r.id, {
+                entity_id: r.entity_id,
+                state: r.state,
+                worker_id: r.worker_id,
+                at: r.at,
+            }),
         ),
-        ...mockTransitionFieldValues.map(r =>
-            adapter.transitionFieldValues
+        ...ideaStateEvents.map(r =>
+            adapter.states.put(r.id, {
+                entity_id: r.entity_id,
+                state: r.state,
+                worker_id: r.worker_id,
+                at: r.at,
+            }),
+        ),
+        ...projectStateEvents.map(r =>
+            adapter.states.put(r.id, {
+                entity_id: r.entity_id,
+                state: r.state,
+                worker_id: r.worker_id,
+                at: r.at,
+            }),
+        ),
+        ...workerStateEvents.map(r =>
+            adapter.states.put(r.id, {
+                entity_id: r.entity_id,
+                state: r.state,
+                worker_id: r.worker_id,
+                at: r.at,
+            }),
+        ),
+        ...mockStateFieldValues.map(r =>
+            adapter.stateFieldValues
                 .put(r.id, r),
         ),
         ...aiWorkers.map(m =>
@@ -6224,9 +6220,13 @@ export async function populateMockData(
                     r.id, r,
                 ),
             ),
-        ...leadToCloseData.transitions.map(r =>
-            adapter.workOrderTransitions
-                .put(r.id, r),
+        ...leadToCloseData.stateEvents.map(r =>
+            adapter.states.put(r.id, {
+                entity_id: r.entity_id,
+                state: r.state,
+                worker_id: r.worker_id,
+                at: r.at,
+            }),
         ),
     ]);
 
@@ -6246,6 +6246,11 @@ export async function populateMockData(
     }
 
     const allProjects = await adapter.projects.getAll();
+    const projectStateById = new Map(
+        projectStateEvents.map(
+            ev => [ev.entity_id, ev.state],
+        ),
+    );
 
     function deterministicScore(
         seed: string,
@@ -6262,17 +6267,24 @@ export async function populateMockData(
     }
 
     for (const p of allProjects) {
+        const state = projectStateById.get(p.id);
+        if (state === undefined) {
+            throw new Error(
+                'seeded project has no state event: '
+                + p.id,
+            );
+        }
         if (
-            p.status === 'submitted'
-            || p.status === 'declined'
-            || p.status === 'deleted'
+            state === 'submitted'
+            || state === 'declined'
+            || state === 'deleted'
         ) {
             continue;
         }
 
         const baselineCoverage =
-            p.status === 'approved'
-            || p.status === 'completed'
+            state === 'approved'
+            || state === 'completed'
                 ? OBJECTIVE_SEEDS.length
                 : deterministicScore(
                     p.id + ':coverage',
@@ -6306,11 +6318,11 @@ export async function populateMockData(
         }
 
         if (
-            p.status === 'approved'
-            || p.status === 'completed'
+            state === 'approved'
+            || state === 'completed'
         ) {
             const minActuals =
-                p.status === 'completed' ? 1 : 0;
+                state === 'completed' ? 1 : 0;
             const baseActualTime =
                 baselineStart + MS_PER_DAY;
             for (
@@ -6355,13 +6367,24 @@ export async function populateBootstrapData(
     adapter: DbAdapter,
 ): Promise<void> {
     await Promise.all([
+        adapter.workers.put(SYSTEM_WORKER_ID, {
+            first_name: 'System',
+            last_name: 'Worker',
+            email: 'system@fusion.local',
+            title: 'System',
+            department: 'System',
+            strengths: jsonArrayField([]),
+            team_dimensions: jsonObjectField({}),
+            phone: '',
+            bio: 'Synthetic worker that owns'
+                + ' system-authored state events.',
+        }),
         adapter.workers.put('current', {
             first_name: 'Tony',
             last_name: 'Stark',
             email: 'demo@example.com',
             title: 'Admin',
             department: 'Product',
-            status: 'active' as WorkerStatus,
             strengths: jsonArrayField([
                 'Strategic Planning',
                 'Data Analysis',
@@ -6378,6 +6401,18 @@ export async function populateBootstrapData(
                 + ' products that solve'
                 + ' real problems.',
         }),
+        adapter.states.record(
+            'bootstrap-system-active',
+            SYSTEM_WORKER_ID,
+            'active',
+            SYSTEM_WORKER_ID,
+        ),
+        adapter.states.record(
+            'bootstrap-current-active',
+            'current',
+            'active',
+            SYSTEM_WORKER_ID,
+        ),
         adapter.organization.put({
             name: 'Stark Industries',
             domain: 'acmecorp.com',

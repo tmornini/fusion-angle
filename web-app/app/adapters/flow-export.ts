@@ -3,8 +3,11 @@ import {
     jsonObjectField,
     DEFAULT_LOCK_TIMEOUT,
     DEFAULT_NODE_WORKER_IDS,
-    projectIsNotDeleted,
+    projectStateIsNotDeleted,
 } from '../../../api/types.ts';
+import {
+    getProjectStates,
+} from './state-events.ts';
 import type {
     FlowEntity,
     ProjectFlowEntity,
@@ -468,24 +471,31 @@ export async function computeFlowBackupResolution(
     ctx: RequestContext,
     backup: Backup,
 ): Promise<ImportResolution> {
-    const [flows, projects] =
+    const [flows, projects, projectStates] =
         await Promise.all([
             ctx.GET<FlowEntity[]>('flows'),
             ctx.GET<ProjectEntity[]>(
                 'projects',
             ),
+            getProjectStates(ctx),
         ]);
     const flowExists = flows.some(
         f => f.id === backup.flow.id,
     );
     const project = backup.projectId
-        ? projects.find(
-            p => p.id
-                === backup.projectId
-                && projectIsNotDeleted(
-                    p,
-                ),
-        )
+        ? projects.find(p => {
+            if (p.id !== backup.projectId) {
+                return false;
+            }
+            const s = projectStates.get(p.id);
+            if (s === undefined) {
+                throw new Error(
+                    'Project has no state event: '
+                    + p.id,
+                );
+            }
+            return projectStateIsNotDeleted(s);
+        })
         : undefined;
 
     return {

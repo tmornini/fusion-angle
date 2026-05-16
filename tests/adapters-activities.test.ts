@@ -29,7 +29,6 @@ function buildCurrentWorker() {
         email: 'demo@example.com',
         phone: '',
         title: 'product_manager' as const,
-        status: 'active' as const,
         strengths: '[]' as const,
         team_dimensions: '{}' as const,
         bio: '',
@@ -109,7 +108,7 @@ test(
         const actors: ActivityActorEntity[] =
             await db.activityActors.getAll();
         assert.equal(actors.length, 1);
-        assert.equal(actors[0]?.person_id, 'current');
+        assert.equal(actors[0]?.worker_id, 'current');
     },
 );
 

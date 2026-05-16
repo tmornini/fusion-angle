@@ -151,36 +151,32 @@ test(
         // wo1: '' → c (daysAgo(40)), c → a
         // (daysAgo(40)), a → z (daysAgo(5))
         // ~35 days in node 'a', well within 90-day window
-        await db.workOrderTransitions.put('t1a', {
-            work_order_id: 'wo1',
-            from_node_id: '',
-            to_node_id: 'c',
-            person_id: 'p1',
-            transitioned_at: daysAgo(40),
+        await db.states.put('t1a', {
+            entity_id: 'wo1',
+            state: 'c',
+            worker_id: 'p1',
+            at: daysAgo(40),
         });
-        await db.workOrderTransitions.put('t1b', {
-            work_order_id: 'wo1',
-            from_node_id: 'c',
-            to_node_id: 'a',
-            person_id: 'p1',
-            transitioned_at: daysAgo(40),
+        await db.states.put('t1b', {
+            entity_id: 'wo1',
+            state: 'a',
+            worker_id: 'p1',
+            at: daysAgo(40),
         });
-        await db.workOrderTransitions.put('t1c', {
-            work_order_id: 'wo1',
-            from_node_id: 'a',
-            to_node_id: 'z',
-            person_id: 'p1',
-            transitioned_at: daysAgo(5),
+        await db.states.put('t1c', {
+            entity_id: 'wo1',
+            state: 'z',
+            worker_id: 'p1',
+            at: daysAgo(5),
         });
 
         // wo2 (OTHER flow): '' → c (daysAgo(40))
         // Must not affect f1 stats
-        await db.workOrderTransitions.put('t2a', {
-            work_order_id: 'wo2',
-            from_node_id: '',
-            to_node_id: 'c',
-            person_id: 'p1',
-            transitioned_at: daysAgo(40),
+        await db.states.put('t2a', {
+            entity_id: 'wo2',
+            state: 'c',
+            worker_id: 'p1',
+            at: daysAgo(40),
         });
 
         const ctx = createRequestContext(db);
@@ -241,12 +237,11 @@ test(
             work_order_id: 'wo1',
             created_at: daysAgo(10),
         });
-        await db.workOrderTransitions.put('t1', {
-            work_order_id: 'wo1',
-            from_node_id: '',
-            to_node_id: 'c',
-            person_id: 'p1',
-            transitioned_at: daysAgo(10),
+        await db.states.put('t1', {
+            entity_id: 'wo1',
+            state: 'c',
+            worker_id: 'p1',
+            at: daysAgo(10),
         });
         const ctx = createRequestContext(db);
         const { model, graph } =

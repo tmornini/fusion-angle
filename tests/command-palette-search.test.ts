@@ -13,28 +13,27 @@ import {
     Idea, Project, HumanWorker,
     jsonArrayField,
     jsonObjectField,
+    type IdeaState,
 } from '../api/types.ts';
 
 function buildIdea(
     id: string, title: string,
-    status: 'submitted' | 'approved' = 'submitted',
+    state: IdeaState = 'active:incomplete',
 ): Idea {
     return new Idea({
         id,
         title,
         position: 1,
-        status,
         problem_statement: '',
         target_users: '',
         proposed_solution: '',
         expected_outcome: '',
         success_metrics: '',
-        readiness: 'concept',
         risks: '',
         assumptions: '',
         alignments:
             jsonArrayField([]),
-    });
+    }, state);
 }
 
 function buildProject(
@@ -44,7 +43,6 @@ function buildProject(
         id,
         title,
         description: 'desc',
-        status: 'approved',
         progress: 42,
         start_date: '2026-01-01T00:00:00Z',
         target_end_date:
@@ -56,7 +54,7 @@ function buildProject(
         position: 1,
         business_context: jsonObjectField({}),
         timeline_label: '',
-    });
+    }, 'approved');
 }
 
 function buildHumanWorker(
@@ -73,12 +71,11 @@ function buildHumanWorker(
             + '@example.com',
         title,
         department,
-        status: 'active',
         strengths: jsonArrayField([]),
         team_dimensions: jsonObjectField({}),
         phone: '',
         bio: '',
-    });
+    }, 'active');
 }
 
 const sampleItems: SearchItem[] = [

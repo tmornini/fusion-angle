@@ -11,6 +11,7 @@ import {
     postObjectiveDeprecation,
     postObjectiveReactivation,
     getActiveObjectives,
+    getDeprecatedObjectiveIds,
 } from '../web-app/app/adapters/objectives.ts';
 import type { DbAdapter } from '../api/db.ts';
 
@@ -33,9 +34,20 @@ function installLocalStorageShim(): void {
 
 async function runReactivationScenario(db: DbAdapter): Promise<{
     active: { id: string }[];
-    tombstoneIds: Set<string>;
-    deprecated: { id: string }[];
+    deletedIds: Set<string>;
+    deprecatedIds: Set<string>;
 }> {
+    await db.workers.put('current', {
+        first_name: 'Demo',
+        last_name: 'User',
+        email: 'demo@example.com',
+        phone: '',
+        title: 'Admin',
+        strengths: '[]' as never,
+        team_dimensions: '{}' as never,
+        bio: '',
+        department: 'Product',
+    });
     const ctx = createRequestContext(db);
     await postObjectiveCreation(
         ctx, 'o1', 'Rev', 'd', 0,
@@ -44,17 +56,16 @@ async function runReactivationScenario(db: DbAdapter): Promise<{
     await postObjectiveReactivation(ctx, 'o1');
     return {
         active: await getActiveObjectives(ctx),
-        tombstoneIds:
-            await db.deleted.allDeletedIds(),
-        deprecated:
-            await db.deprecatedObjectives.getAll(),
+        deletedIds: await db.states.deletedIds(),
+        deprecatedIds:
+            await getDeprecatedObjectiveIds(ctx),
     };
 }
 
 // The K5 reactivation path executes identically against
-// memory and localStorage adapters because they instantiate
-// the same EntityStore / HistoryEntityStore / SingletonStore
-// / DeletedStore classes over different StorageBackends.
+// memory and localStorage adapters because they share the
+// same EntityStore / HistoryEntityStore / SingletonStore
+// / StateStore classes over different StorageBackends.
 // This test makes that structural guarantee observable —
 // any future drift between the adapters fails here.
 test('K5 reactivation parity across memory and localStorage',
@@ -72,13 +83,14 @@ test('K5 reactivation parity across memory and localStorage',
         assert.ok(ls.active.some(o => o.id === 'o1'),
             'localStorage: o1 returns to active list');
 
-        assert.ok(!mem.tombstoneIds.has('o1'),
-            'memory: no global tombstone for o1');
-        assert.ok(!ls.tombstoneIds.has('o1'),
-            'localStorage: no global tombstone for o1');
+        assert.ok(!mem.deletedIds.has('o1'),
+            'memory: no deleted state event for o1');
+        assert.ok(!ls.deletedIds.has('o1'),
+            'localStorage: no deleted state event for o1');
 
-        assert.equal(mem.deprecated.length, 0,
-            'memory: deprecation row spliced');
-        assert.equal(ls.deprecated.length, 0,
-            'localStorage: deprecation row spliced');
+        assert.equal(mem.deprecatedIds.size, 0,
+            'memory: active event supersedes deprecated');
+        assert.equal(ls.deprecatedIds.size, 0,
+            'localStorage: active event supersedes '
+            + 'deprecated');
     });

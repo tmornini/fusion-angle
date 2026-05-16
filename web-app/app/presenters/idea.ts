@@ -28,22 +28,24 @@ import {
 } from '../icons.ts';
 import type {
     Idea,
-    IdeaStatus,
+    IdeaState,
     IdeaEntity,
     IdeaWithSubmitter,
 } from '../adapters/index.ts';
 import {
-    IDEA_STATUS_CONFIG,
+    IDEA_STATE_CONFIG,
 } from '../adapters/index.ts';
 
-const STATUS_ICONS: Record<
-    IdeaStatus,
+const STATE_ICONS: Record<
+    IdeaState,
     (
         size: number,
         cssClass: string,
     ) => SafeHtml
 > = {
-    'active': iconLightbulb,
+    'active:incomplete': iconLightbulb,
+    'active:needs-info': iconLightbulb,
+    'active:ready': iconLightbulb,
     'in-review': iconClipboardCheck,
     'approved': iconCheckCircle2,
     'promoted': iconTrendingUp,
@@ -221,10 +223,10 @@ function buildReadonlyTitleSection(
             </h1>
             <span class="${
                 'badge '
-                + idea.statusClassName()
+                + idea.stateClassName()
                 + ' text-xs'
             }">
-                ${idea.statusLabel()}
+                ${idea.stateLabel()}
             </span>
         </div>
         ${buildSubmittedByLine(
@@ -252,10 +254,10 @@ function buildEditableTitleSection(
                 value="${draft.title}" />
             <span class="${
                 'badge '
-                + idea.statusClassName()
+                + idea.stateClassName()
                 + ' text-xs'
             }">
-                ${idea.statusLabel()}
+                ${idea.stateLabel()}
             </span>
         </div>
         ${buildSubmittedByLine(
@@ -613,24 +615,24 @@ export class IdeaPresenter {
         return this.#idea.positionSortKey();
     }
 
-    statusGroup(): IdeaStatus {
-        return this.#idea.statusValue();
+    stateGroup(): IdeaState {
+        return this.#idea.stateValue();
     }
 
-    matchesStatus(
-        status: IdeaStatus,
+    matchesState(
+        state: IdeaState,
     ): boolean {
-        return this.statusGroup() === status;
+        return this.stateGroup() === state;
     }
 
-    buildStatusBadge(
+    buildStateBadge(
         isActive: boolean | null,
     ): SafeHtml {
-        const cfg = IDEA_STATUS_CONFIG[
-            this.#idea.statusValue()
+        const cfg = IDEA_STATE_CONFIG[
+            this.#idea.stateValue()
         ]!;
-        const icon = STATUS_ICONS[
-            this.#idea.statusValue()
+        const icon = STATE_ICONS[
+            this.#idea.stateValue()
         ]!;
         const dimmed = isActive === false
             ? 'true'
@@ -640,8 +642,8 @@ export class IdeaPresenter {
             + cfg.className
             + ' text-xs badge-fixed-w'
             + ' cursor-pointer'
-        }" data-status="${
-            this.#idea.statusValue()
+        }" data-state="${
+            this.#idea.stateValue()
         }" data-dimmed="${dimmed}">${
             icon(14, '')
         } ${cfg.label}</span>`;
@@ -663,7 +665,7 @@ export class IdeaPresenter {
         }">
             ${showGrip ? html`<div class="${
                 'hidden-mobile text-muted'
-                + ' cursor-grab'
+                + ' drag-handle'
             }">${
                 iconGripVertical(20, '')
             }</div>` : html``}
@@ -691,13 +693,13 @@ export class IdeaPresenter {
         </h3>
         <span class="${
             'badge '
-            + this.#idea.statusClassName()
+            + this.#idea.stateClassName()
             + ' text-xs badge-fixed-w mt-1'
         }">${
-            STATUS_ICONS[
-                this.#idea.statusValue()
+            STATE_ICONS[
+                this.#idea.stateValue()
             ]!(14, '')
-        } ${this.#idea.statusLabel()}</span>`;
+        } ${this.#idea.stateLabel()}</span>`;
     }
 
     #buildActions(): SafeHtml {
@@ -914,7 +916,7 @@ export class IdeaEditPresenter {
 
 export type IdeaListFilter =
     | { kind: 'all' }
-    | { kind: 'filtered'; status: IdeaStatus };
+    | { kind: 'filtered'; status: IdeaState };
 
 export type IdeaListState = {
     ideas: IdeaWithSubmitter[];
@@ -935,14 +937,14 @@ export function applyIdeaListUpdate(
 }
 
 export function applyIdeaFilterToggle(
-    state: IdeaListState,
-    status: IdeaStatus,
+    listState: IdeaListState,
+    ideaState: IdeaState,
 ): IdeaListState {
     const next: IdeaListFilter =
         toggleStatusFilter(
-            state.filter, status,
+            listState.filter, ideaState,
         );
-    return { ...state, filter: next };
+    return { ...listState, filter: next };
 }
 
 export class IdeaListPresenter {
@@ -961,7 +963,7 @@ export class IdeaListPresenter {
     }
 
     activeFilter():
-        IdeaStatus | null {
+        IdeaState | null {
         return this.#filter.kind
             === 'filtered'
             ? this.#filter.status
@@ -986,17 +988,21 @@ export class IdeaListPresenter {
         const active = this.activeFilter();
         const groups = Object.groupBy(
             this.#ideas,
-            i => i.statusGroup(),
+            i => i.stateGroup(),
         );
-        const order: IdeaStatus[] = [
-            'active', 'in-review',
-            'sent-back', 'approved',
+        const order: IdeaState[] = [
+            'active:incomplete',
+            'active:needs-info',
+            'active:ready',
+            'in-review',
+            'sent-back',
+            'approved',
         ];
         const badges = orderedKeys(
             groups, order,
         )
             .map(s => ({
-                status: s,
+                state: s,
                 items: groups[s],
             }))
             .filter(
@@ -1004,10 +1010,10 @@ export class IdeaListPresenter {
                     && g.items.length > 0,
             )
             .map(g => g.items![0]!
-                .buildStatusBadge(
+                .buildStateBadge(
                     active === null
                         ? null
-                        : g.status === active,
+                        : g.state === active,
                 ));
         return html`${badges}`;
     }
@@ -1017,7 +1023,7 @@ export class IdeaListPresenter {
         const filtered =
             f.kind === 'filtered'
                 ? this.#ideas.filter(
-                    i => i.matchesStatus(
+                    i => i.matchesState(
                         f.status,
                     ),
                 )

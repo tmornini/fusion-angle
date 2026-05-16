@@ -35,8 +35,10 @@ export {
     buildInitialProjectListState,
     applyProjectListUpdate,
     applyProjectFilterToggle,
+    applyProjectSortToggle,
     type ProjectListState,
     type ProjectListFilter,
+    type ProjectListSort,
 } from './project.ts';
 export {
     GaugePresenter,

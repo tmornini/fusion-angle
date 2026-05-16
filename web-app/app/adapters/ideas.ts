@@ -1,7 +1,9 @@
 import type {
     IdeaEntity,
+    IdeaState,
     IdeaSubmissionEntity,
     ProjectEntity,
+    ProjectState,
 } from '../../../api/types.ts';
 import {
     Idea, nowUtc,
@@ -19,12 +21,17 @@ import {
     notifyProjectChange,
 } from './projects.ts';
 import {
+    buildStateEventOp,
+    getIdeaState,
+    getIdeaStates,
+} from './state-events.ts';
+import {
     createSubscriptionChannel,
 } from '../channels.ts';
 
 const ideaChanges =
     createSubscriptionChannel(
-        ['ideas', 'idea-submissions'],
+        ['ideas', 'idea-submissions', 'states'],
     );
 
 export function subscribeIdeaChanges(
@@ -35,23 +42,17 @@ export function subscribeIdeaChanges(
 
 export {
     Idea,
-    type IdeaStatus,
+    type IdeaState,
     type IdeaEntity,
-    isIdeaStatus,
-    IDEA_STATUS_CONFIG,
+    isIdeaState,
+    IDEA_STATES,
+    IDEA_STATE_CONFIG,
 } from '../../../api/types.ts';
 
 export async function getIdeaRows(
     ctx: RequestContext,
 ): Promise<IdeaEntity[]> {
     return ctx.GET<IdeaEntity[]>('ideas');
-}
-
-async function getVisibleIdeaRows(
-    ctx: RequestContext,
-): Promise<IdeaEntity[]> {
-    const all = await getIdeaRows(ctx);
-    return all.filter(ideaIsVisible);
 }
 
 export async function getIdeaRow(
@@ -103,35 +104,48 @@ export async function getIdeas(
     ctx: RequestContext,
 ): Promise<IdeaWithSubmitter[]> {
     const [
-        ideas, workerMap, submissions,
+        rows, workerMap, submissions, stateMap,
     ] = await Promise.all([
-        getVisibleIdeaRows(ctx),
+        getIdeaRows(ctx),
         getWorkerMap(ctx),
         getIdeaSubmissionRows(ctx),
+        getIdeaStates(ctx),
     ]);
     const submissionMap = new Map(
         submissions.map(s => [s.idea_id, s]),
     );
-    return ideas.map(row => {
-        const submission =
-            submissionMap.get(row.id);
-        if (!submission) {
-            throw new Error(
-                'Idea has no submission: '
-                + row.id,
-            );
-        }
-        return {
-            idea: new Idea(row),
-            entity: row,
-            submitterName: workerName(
-                workerMap,
-                submission.person_id,
-            ),
-            submittedAt:
-                submission.created_at,
-        };
-    });
+    return rows
+        .filter(row => {
+            const s = stateMap.get(row.id);
+            if (s === undefined) {
+                throw new Error(
+                    'Idea has no state event: '
+                    + row.id,
+                );
+            }
+            return ideaIsVisible(s);
+        })
+        .map(row => {
+            const submission =
+                submissionMap.get(row.id);
+            if (!submission) {
+                throw new Error(
+                    'Idea has no submission: '
+                    + row.id,
+                );
+            }
+            const state = stateMap.get(row.id)!;
+            return {
+                idea: new Idea(row, state),
+                entity: row,
+                submitterName: workerName(
+                    workerMap,
+                    submission.worker_id,
+                ),
+                submittedAt:
+                    submission.created_at,
+            };
+        });
 }
 
 export async function getIdea(
@@ -139,17 +153,18 @@ export async function getIdea(
     ideaId: string,
 ): Promise<IdeaWithSubmitter> {
     const [
-        row, submission, workerMap,
+        row, submission, workerMap, state,
     ] = await Promise.all([
         getIdeaRow(ctx, ideaId),
         getIdeaSubmissionRow(ctx, ideaId),
         getWorkerMap(ctx),
+        getIdeaState(ctx, ideaId),
     ]);
     return {
-        idea: new Idea(row),
+        idea: new Idea(row, state),
         entity: row,
         submitterName: workerName(
-            workerMap, submission.person_id,
+            workerMap, submission.worker_id,
         ),
         submittedAt: submission.created_at,
     };
@@ -164,6 +179,34 @@ export async function putIdea(
     ideaChanges.notify();
 }
 
+// Idea-row write paired with a states-log event in
+// one ctx.commit batch. Use at every site that
+// creates an idea or moves its state. putIdea
+// remains for writes (edits, position reorders)
+// that do not change state.
+export async function postIdeaStateChange(
+    ctx: RequestContext,
+    id: string,
+    entity: Omit<IdeaEntity, 'id'>,
+    state: IdeaState,
+): Promise<void> {
+    const ideaBody =
+        entity as unknown as Record<string, unknown>;
+    await ctx.commit({
+        ops: [
+            {
+                method: 'put',
+                resource: `ideas/${id}`,
+                body: ideaBody,
+            },
+            await buildStateEventOp(
+                ctx, id, state,
+            ),
+        ],
+    });
+    ideaChanges.notify();
+}
+
 export async function putIdeaSubmission(
     ctx: RequestContext,
     submissionId: string,
@@ -175,7 +218,7 @@ export async function putIdeaSubmission(
             + submissionId,
         {
             idea_id: ideaId,
-            person_id: worker.id,
+            worker_id: worker.id,
             created_at: nowUtc(),
         },
     );
@@ -185,13 +228,18 @@ export async function putIdeaSubmission(
 // Inlined writes (rather than delegating to the
 // putProject / putIdea helpers) so the project and
 // idea writes commit together as one logical
-// operation. The helpers stay — they have other
-// callers whose writes are genuinely independent.
+// operation. Two state events land in the same
+// batch: the idea moves to 'promoted' and the new
+// project enters at its initial state — both
+// atomic with the row updates. The helpers stay —
+// they have other callers whose writes are
+// genuinely independent.
 export async function postIdeaConversion(
     ctx: RequestContext,
     ideaId: string,
     projectId: string,
     project: Omit<ProjectEntity, 'id'>,
+    projectState: ProjectState,
     promotedIdea: Omit<IdeaEntity, 'id'>,
 ): Promise<void> {
     type AnyBody = Record<string, unknown>;
@@ -212,6 +260,12 @@ export async function postIdeaConversion(
                 resource: `ideas/${ideaId}`,
                 body: ideaBody,
             },
+            await buildStateEventOp(
+                ctx, ideaId, 'promoted',
+            ),
+            await buildStateEventOp(
+                ctx, projectId, projectState,
+            ),
         ],
     });
     notifyProjectChange();

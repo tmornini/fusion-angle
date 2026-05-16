@@ -15,8 +15,8 @@ import {
     validateProjectFlowEntity,
     validateWorkOrderEntity,
     validateFlowWorkOrderEntity,
-    validateWorkOrderTransitionEntity,
-    validateTransitionFieldValueEntity,
+    validateStateFieldValueEntity,
+    validateStateEntity,
 } from '../api/validators.ts';
 
 // Entity validators take Omit<T, 'id'> and reject an extra
@@ -67,12 +67,12 @@ const TABLES: ReadonlyArray<[
     ['flowWorkOrders',
         d => d.flowWorkOrders.getAll(),
         validateFlowWorkOrderEntity],
-    ['workOrderTransitions',
-        d => d.workOrderTransitions.getAll(),
-        validateWorkOrderTransitionEntity],
-    ['transitionFieldValues',
-        d => d.transitionFieldValues.getAll(),
-        validateTransitionFieldValueEntity],
+    ['states',
+        d => d.states.getAll(),
+        validateStateEntity],
+    ['stateFieldValues',
+        d => d.stateFieldValues.getAll(),
+        validateStateFieldValueEntity],
 ];
 
 for (const [name, getAll, validate] of TABLES) {

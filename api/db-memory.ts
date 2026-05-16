@@ -1,9 +1,9 @@
 import { TABLE_NAMES } from './db.ts';
 import type {
     DbAdapter,
-    DeletedStore as IDeletedStore,
     SingletonStore as ISingletonStore,
     EntityStore as IEntityStore,
+    StateStore as IStateStore,
 } from './db.ts';
 import type {
     HumanWorkerEntity,
@@ -19,12 +19,9 @@ import type {
     ProjectFlowEntity,
     WorkOrderEntity,
     FlowWorkOrderEntity,
-    WorkOrderTransitionEntity,
-    TransitionFieldValueEntity,
-    WorkOrderClaimEntity,
+    StateFieldValueEntity,
     Objective,
     ObjectiveRevision,
-    DeprecatedObjective,
     ProjectObjectiveBaselineScore,
     ProjectObjectiveActualScore,
 } from './types.ts';
@@ -34,7 +31,7 @@ import { EntityStore } from './store-entity.ts';
 import { HistoryEntityStore }
     from './store-history-entity.ts';
 import { SingletonStore } from './store-singleton.ts';
-import { DeletedStore } from './store-deleted.ts';
+import { StateStore } from './store-state.ts';
 
 export class MemoryDbAdapter implements DbAdapter {
     readonly #backend: MemoryStorageBackend;
@@ -52,12 +49,8 @@ export class MemoryDbAdapter implements DbAdapter {
     readonly workOrders: IEntityStore<WorkOrderEntity>;
     readonly flowWorkOrders:
         IEntityStore<FlowWorkOrderEntity>;
-    readonly workOrderTransitions:
-        IEntityStore<WorkOrderTransitionEntity>;
-    readonly transitionFieldValues:
-        IEntityStore<TransitionFieldValueEntity>;
-    readonly workOrderClaims:
-        IEntityStore<WorkOrderClaimEntity>;
+    readonly stateFieldValues:
+        IEntityStore<StateFieldValueEntity>;
     readonly organization:
         ISingletonStore<OrganizationEntity>;
     readonly ideaSubmissions:
@@ -67,77 +60,63 @@ export class MemoryDbAdapter implements DbAdapter {
     readonly objectives: IEntityStore<Objective>;
     readonly objectiveRevisions:
         IEntityStore<ObjectiveRevision>;
-    readonly deprecatedObjectives:
-        IEntityStore<DeprecatedObjective>;
     readonly projectObjectiveBaselineScores:
         IEntityStore<ProjectObjectiveBaselineScore>;
     readonly projectObjectiveActualScores:
         IEntityStore<ProjectObjectiveActualScore>;
-    readonly deleted: IDeletedStore;
+    readonly states: IStateStore;
 
     constructor() {
         this.#backend = new MemoryStorageBackend();
         const b = this.#backend;
-        const ds = new DeletedStore(b);
-        this.deleted = ds;
+        const ss = new StateStore(b, 'states');
+        this.states = ss;
         this.organization =
             new SingletonStore<OrganizationEntity>(
                 'organization', b,
             );
 
         this.workers =
-            new EntityStore('workers', b, ds);
+            new EntityStore('workers', b, ss);
         this.aiWorkers =
-            new EntityStore('ai_workers', b, ds);
+            new EntityStore('ai_workers', b, ss);
         this.ideas =
-            new EntityStore('ideas', b, ds);
+            new EntityStore('ideas', b, ss);
         this.projects =
-            new EntityStore('projects', b, ds);
+            new EntityStore('projects', b, ss);
         this.activities =
-            new EntityStore('activities', b, ds);
+            new EntityStore('activities', b, ss);
         this.flows =
-            new EntityStore('flows', b, ds);
+            new EntityStore('flows', b, ss);
         this.flowVersions =
             new HistoryEntityStore(
                 'flow_versions', b,
             );
         this.projectFlows =
-            new EntityStore('project_flows', b, ds);
+            new EntityStore('project_flows', b, ss);
         this.workOrders =
-            new EntityStore('work_orders', b, ds);
+            new EntityStore('work_orders', b, ss);
         this.flowWorkOrders =
             new EntityStore(
-                'flow_work_orders', b, ds,
+                'flow_work_orders', b, ss,
             );
-        this.workOrderTransitions =
+        this.stateFieldValues =
             new EntityStore(
-                'work_order_transitions', b, ds,
-            );
-        this.transitionFieldValues =
-            new EntityStore(
-                'transition_field_values', b, ds,
-            );
-        this.workOrderClaims =
-            new EntityStore(
-                'work_order_claims', b, ds,
+                'state_field_values', b, ss,
             );
         this.ideaSubmissions =
             new EntityStore(
-                'idea_submissions', b, ds,
+                'idea_submissions', b, ss,
             );
         this.activityActors =
             new EntityStore(
-                'activity_actors', b, ds,
+                'activity_actors', b, ss,
             );
         this.objectives =
-            new EntityStore('objectives', b, ds);
+            new EntityStore('objectives', b, ss);
         this.objectiveRevisions =
             new HistoryEntityStore(
                 'objective_revisions', b,
-            );
-        this.deprecatedObjectives =
-            new HistoryEntityStore(
-                'deprecated_objectives', b,
             );
         this.projectObjectiveBaselineScores =
             new HistoryEntityStore(

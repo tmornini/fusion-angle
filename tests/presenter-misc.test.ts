@@ -129,12 +129,11 @@ function makeHumanWorker(
         email: `${first}@example.com`.toLowerCase(),
         title: 'Engineer',
         department: 'Eng',
-        status: 'active',
         strengths: jsonArrayField([]),
         team_dimensions: jsonObjectField({}),
         phone: '',
         bio: '',
-    });
+    }, 'active');
 }
 
 function makeAIWorker(id: string, name: string): AIWorker {
@@ -143,7 +142,7 @@ function makeAIWorker(id: string, name: string): AIWorker {
         description: '',
         auth_token: 'sk-test-XXXX',
         created_at: nowUtc(),
-    });
+    }, 'active');
 }
 
 function noUnknownMagic(s: string): void {

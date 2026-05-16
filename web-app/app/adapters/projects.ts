@@ -1,24 +1,31 @@
 import type {
     ProjectEntity,
-    ProjectStatus,
+    ProjectState,
     Objective,
     ProjectObjectiveBaselineScore,
     ProjectObjectiveActualScore,
 } from '../../../api/types.ts';
 import {
     Project,
-    projectIsNotDeleted,
+    projectStateIsNotDeleted,
     msSinceUtc,
     COST_DIVISOR,
     MS_PER_DAY,
 } from '../../../api/types.ts';
 import type { RequestContext } from './shared.ts';
 import {
+    buildStateEventOp,
+    getProjectState,
+    getProjectStates,
+} from './state-events.ts';
+import {
     createSubscriptionChannel,
 } from '../channels.ts';
 
 const projectChanges =
-    createSubscriptionChannel(['projects']);
+    createSubscriptionChannel(
+        ['projects', 'states'],
+    );
 
 export function subscribeProjectChanges(
     fn: () => void,
@@ -32,10 +39,10 @@ export function notifyProjectChange(): void {
 
 export {
     Project,
-    type ProjectStatus,
+    type ProjectState,
     type ProjectEntity,
-    isProjectStatus,
-    PROJECT_STATUS_CONFIG,
+    isProjectState,
+    PROJECT_STATE_CONFIG,
     COST_DIVISOR,
 } from '../../../api/types.ts';
 
@@ -48,10 +55,35 @@ export async function getProjectRows(
 export async function getProjects(
     ctx: RequestContext,
 ): Promise<Project[]> {
-    const rows = await getProjectRows(ctx);
+    const [rows, stateMap] = await Promise.all([
+        getProjectRows(ctx),
+        getProjectStates(ctx),
+    ]);
     return rows
-        .filter(projectIsNotDeleted)
-        .map(row => new Project(row));
+        .filter(row => {
+            const s = stateMap.get(row.id);
+            if (s === undefined) {
+                throw new Error(
+                    'Project has no state event: '
+                    + row.id,
+                );
+            }
+            return projectStateIsNotDeleted(s);
+        })
+        .map(row => new Project(
+            row, stateMap.get(row.id)!,
+        ));
+}
+
+export async function getProject(
+    ctx: RequestContext,
+    id: string,
+): Promise<Project> {
+    const [row, state] = await Promise.all([
+        getProjectRow(ctx, id),
+        getProjectState(ctx, id),
+    ]);
+    return new Project(row, state);
 }
 
 export class ProjectView {
@@ -74,9 +106,9 @@ export class ProjectView {
             .descriptionText();
     }
 
-    statusValue(): ProjectStatus {
+    stateValue(): ProjectState {
         return this.#project
-            .statusValue();
+            .stateValue();
     }
 
     progressPercent(): number {
@@ -94,14 +126,14 @@ export class ProjectView {
             .targetEndDateValue();
     }
 
-    statusLabel(): string {
+    stateLabel(): string {
         return this.#project
-            .statusLabel();
+            .stateLabel();
     }
 
-    statusClassName(): string {
+    stateClassName(): string {
         return this.#project
-            .statusClassName();
+            .stateClassName();
     }
 
     timeBaselineDays(): number {
@@ -262,6 +294,34 @@ export async function putProject(
     entity: Omit<ProjectEntity, 'id'>,
 ): Promise<void> {
     await ctx.PUT(`projects/${id}`, entity);
+    projectChanges.notify();
+}
+
+// Project-row write paired with a states-log event
+// in one ctx.commit batch. Use at every site that
+// creates a project or moves its state. putProject
+// remains for writes (pure edits, position reorders)
+// that do not change state.
+export async function postProjectStateChange(
+    ctx: RequestContext,
+    id: string,
+    entity: Omit<ProjectEntity, 'id'>,
+    state: ProjectState,
+): Promise<void> {
+    const projectBody =
+        entity as unknown as Record<string, unknown>;
+    await ctx.commit({
+        ops: [
+            {
+                method: 'put',
+                resource: `projects/${id}`,
+                body: projectBody,
+            },
+            await buildStateEventOp(
+                ctx, id, state,
+            ),
+        ],
+    });
     projectChanges.notify();
 }
 

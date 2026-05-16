@@ -3,7 +3,6 @@ import { strict as assert } from 'node:assert';
 import {
     validateObjectiveEntity,
     validateObjectiveRevisionEntity,
-    validateDeprecatedObjectiveEntity,
     validateBaselineScoreEntity,
     validateActualScoreEntity,
     validateProjectEntity,
@@ -52,14 +51,6 @@ test('validateObjectiveRevisionEntity rejects empty name',
             /ObjectiveRevision\.name must be non-empty/,
         );
     });
-
-test('validateDeprecatedObjectiveEntity accepts valid', () => {
-    const v = validateDeprecatedObjectiveEntity({
-        objective_id: 'o1',
-        deprecated_at: '2026-05-14T00:00:00.000Z',
-    });
-    assert.equal(v.objective_id, 'o1');
-});
 
 test('validateBaselineScoreEntity accepts 0', () => {
     const v = validateBaselineScoreEntity({
@@ -149,7 +140,6 @@ test('validateProjectEntity ignores legacy impact fields',
         const baseValid = {
             title: 't',
             description: 'd',
-            status: 'submitted',
             progress: 0,
             start_date: '2026-05-14T00:00:00.000Z',
             target_end_date: '2026-05-14T00:00:00.000Z',

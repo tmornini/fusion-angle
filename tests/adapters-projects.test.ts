@@ -20,7 +20,7 @@ import {
 } from '../api/types.ts';
 import type {
     ProjectEntity,
-    ProjectStatus,
+    ProjectState,
     JsonObjectField,
 } from '../api/types.ts';
 
@@ -32,7 +32,6 @@ function buildProject(
     const base: Omit<ProjectEntity, 'id'> = {
         title,
         description: 'desc for ' + title,
-        status: 'approved' as ProjectStatus,
         progress: 25,
         start_date: '2026-01-01',
         target_end_date: '2026-12-31',
@@ -48,6 +47,21 @@ function buildProject(
         ...base, ...overrides, id,
     } as ProjectEntity;
     return rest;
+}
+
+async function seedProject(
+    db: MemoryDbAdapter,
+    id: string,
+    title: string,
+    state: ProjectState = 'approved',
+    overrides?: Partial<ProjectEntity>,
+): Promise<void> {
+    await db.projects.put(
+        id, buildProject(id, title, overrides),
+    );
+    await db.states.record(
+        `st-${id}`, id, state, 'system',
+    );
 }
 
 function setupDb(): {
@@ -73,7 +87,6 @@ test(
         assert.equal(row.id, 'p1');
         assert.equal(row.title, 'Alpha');
         assert.equal(row.description, 'desc for Alpha');
-        assert.equal(row.status, 'approved');
         assert.equal(row.progress, 73);
         assert.equal(row.start_date, '2026-01-01');
         assert.equal(
@@ -129,9 +142,7 @@ test(
     'getProjects wraps rows in Project objects',
     async () => {
         const { db, ctx } = setupDb();
-        await db.projects.put(
-            'p1', buildProject('p1', 'Alpha'),
-        );
+        await seedProject(db, 'p1', 'Alpha');
         const projects = await getProjects(ctx);
         assert.equal(projects.length, 1);
         assert.ok(projects[0] instanceof Project);
@@ -139,22 +150,18 @@ test(
             projects[0]?.titleText(), 'Alpha',
         );
         assert.equal(
-            projects[0]?.statusValue(), 'approved',
+            projects[0]?.stateValue(), 'approved',
         );
     },
 );
 
 test(
-    'getProjects excludes deleted-status rows',
+    'getProjects excludes deleted-state rows',
     async () => {
         const { db, ctx } = setupDb();
-        await db.projects.put(
-            'keep', buildProject('keep', 'Keep'),
-        );
-        await db.projects.put(
-            'gone', buildProject('gone', 'Gone', {
-                status: 'deleted',
-            }),
+        await seedProject(db, 'keep', 'Keep');
+        await seedProject(
+            db, 'gone', 'Gone', 'deleted',
         );
         const projects = await getProjects(ctx);
         assert.equal(projects.length, 1);
@@ -168,12 +175,8 @@ test(
     'getProjects excludes tombstoned rows',
     async () => {
         const { db, ctx } = setupDb();
-        await db.projects.put(
-            'keep', buildProject('keep', 'Keep'),
-        );
-        await db.projects.put(
-            'gone', buildProject('gone', 'Gone'),
-        );
+        await seedProject(db, 'keep', 'Keep');
+        await seedProject(db, 'gone', 'Gone');
         await db.projects.delete('gone');
         const projects = await getProjects(ctx);
         assert.equal(projects.length, 1);
@@ -192,7 +195,6 @@ test('putProject persists a new project', async () => {
     );
     const stored = await db.projects.getById('p1');
     assert.equal(stored.title, 'Created');
-    assert.equal(stored.status, 'approved');
 });
 
 test('putProject updates an existing project', async () => {
@@ -202,13 +204,11 @@ test('putProject updates an existing project', async () => {
     );
     await putProject(ctx, 'p1', buildProject(
         'p1', 'After', {
-            status: 'completed',
             progress: 100,
         },
     ));
     const stored = await db.projects.getById('p1');
     assert.equal(stored.title, 'After');
-    assert.equal(stored.status, 'completed');
     assert.equal(stored.progress, 100);
 });
 
@@ -230,19 +230,18 @@ test(
     () => {
         const project = new Project({
             ...buildProject('p1', 'Viewable', {
-                status: 'approved',
                 start_date: '2026-01-01',
                 target_end_date: '2026-12-31',
                 estimated_cost: 4000,
                 actual_cost: 2000,
             }),
             id: 'p1',
-        });
+        }, 'approved');
         const view = new ProjectView(project);
         assert.equal(view.idForLink(), 'p1');
         assert.equal(view.titleText(), 'Viewable');
-        assert.equal(view.statusValue(), 'approved');
-        assert.equal(view.statusLabel(), 'Approved');
+        assert.equal(view.stateValue(), 'approved');
+        assert.equal(view.stateLabel(), 'Approved');
         assert.equal(
             view.startDateValue(), '2026-01-01',
         );
@@ -269,7 +268,7 @@ test(
                 target_end_date: '2026-01-11',
             }),
             id: 'p1',
-        });
+        }, 'approved');
         const view = new ProjectView(project);
         assert.equal(view.timeBaselineDays(), 10);
     },

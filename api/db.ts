@@ -13,14 +13,12 @@ import type {
     ProjectFlowEntity,
     WorkOrderEntity,
     FlowWorkOrderEntity,
-    WorkOrderTransitionEntity,
-    WorkOrderClaimEntity,
-    TransitionFieldValueEntity,
+    StateFieldValueEntity,
     Objective,
     ObjectiveRevision,
-    DeprecatedObjective,
     ProjectObjectiveBaselineScore,
     ProjectObjectiveActualScore,
+    StateEntity,
 } from './types.ts';
 
 export class EntityNotFound {
@@ -69,10 +67,25 @@ export interface SingletonStore<
     put(fields: Omit<T, 'id'>): Promise<T>;
 }
 
-export interface DeletedStore {
+export interface StateStore {
+    getAll(): Promise<StateEntity[]>;
+    getById(id: Id): Promise<StateEntity>;
+    put(
+        id: Id,
+        fields: Omit<StateEntity, 'id'>,
+    ): Promise<StateEntity>;
+    record(
+        id: Id,
+        entityId: Id,
+        state: string,
+        workerId: Id,
+    ): Promise<void>;
+    currentFor(
+        entityId: Id,
+    ): Promise<StateEntity | null>;
+    allFor(entityId: Id): Promise<StateEntity[]>;
+    deletedIds(): Promise<Set<Id>>;
     isDeleted(id: Id): Promise<boolean>;
-    record(id: Id): Promise<void>;
-    allDeletedIds(): Promise<Set<Id>>;
 }
 
 // The byte-level seam. Store classes compose a backend
@@ -130,17 +143,9 @@ export interface DbAdapter {
         EntityStore<
             FlowWorkOrderEntity
         >;
-    workOrderTransitions:
+    stateFieldValues:
         EntityStore<
-            WorkOrderTransitionEntity
-        >;
-    transitionFieldValues:
-        EntityStore<
-            TransitionFieldValueEntity
-        >;
-    workOrderClaims:
-        EntityStore<
-            WorkOrderClaimEntity
+            StateFieldValueEntity
         >;
     organization:
         SingletonStore<OrganizationEntity>;
@@ -156,8 +161,6 @@ export interface DbAdapter {
         EntityStore<Objective>;
     objectiveRevisions:
         EntityStore<ObjectiveRevision>;
-    deprecatedObjectives:
-        EntityStore<DeprecatedObjective>;
     projectObjectiveBaselineScores:
         EntityStore<
             ProjectObjectiveBaselineScore
@@ -166,7 +169,7 @@ export interface DbAdapter {
         EntityStore<
             ProjectObjectiveActualScore
         >;
-    deleted: DeletedStore;
+    states: StateStore;
 }
 
 export const TABLE_NAMES = [
@@ -180,16 +183,13 @@ export const TABLE_NAMES = [
     'project_flows',
     'work_orders',
     'flow_work_orders',
-    'work_order_transitions',
-    'transition_field_values',
-    'work_order_claims',
+    'state_field_values',
     'organization',
     'idea_submissions',
     'activity_actors',
     'objectives',
     'objective_revisions',
-    'deprecated_objectives',
     'project_objective_baseline_scores',
     'project_objective_actual_scores',
-    'deleted',
+    'states',
 ];

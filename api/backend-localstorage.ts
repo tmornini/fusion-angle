@@ -7,7 +7,7 @@ import {
 const KEY_PREFIX = 'fusion-ai:';
 
 const COMPRESSED_TABLES: ReadonlySet<string> = new Set([
-    'work_order_transitions',
+    'states',
     'flow_versions',
 ]);
 
@@ -102,20 +102,16 @@ export class LocalStorageBackend
             throw new MissingTableError(table);
         }
         let json: string;
-        if (COMPRESSED_TABLES.has(table)) {
-            try {
-                json = await decompressJson(raw);
-            } catch (e) {
-                throw new Error(
-                    'Decompressing table "'
-                    + table + '" failed: '
-                    + (e instanceof Error
-                        ? e.message
-                        : String(e)),
-                );
-            }
-        } else {
-            json = raw;
+        try {
+            json = await decompressJson(raw);
+        } catch (e) {
+            throw new Error(
+                'Decompressing table "'
+                + table + '" failed: '
+                + (e instanceof Error
+                    ? e.message
+                    : String(e)),
+            );
         }
         let parsed: unknown;
         try {

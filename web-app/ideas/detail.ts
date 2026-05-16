@@ -24,6 +24,7 @@ import {
 import {
     getIdea,
     postActivity,
+    postIdeaStateChange,
     putIdea,
     subscribeIdeaChanges,
     createRequestContext,
@@ -104,22 +105,22 @@ const TRANSITION_CONFIG:
 
 async function transitionIdea(
     ideaId: string,
-    toStatus: IdeaTransition,
+    toState: IdeaTransition,
     feedback: string,
 ): Promise<void> {
     if (!state) return;
     const ctx = createRequestContext();
-    const cfg = TRANSITION_CONFIG[toStatus]!;
+    const cfg = TRANSITION_CONFIG[toState]!;
     const entity = state.view.entity;
     const title = entity.title;
     try {
-        await putIdea(
-            ctx, ideaId,
-            { ...entity, status: toStatus },
+        await postIdeaStateChange(
+            ctx, ideaId, entity, toState,
         );
     } catch (err) {
         log.error(
-            'putIdea failed', 'ideas', err,
+            'postIdeaStateChange failed',
+            'ideas', err,
         );
         showToast(cfg.failureToast, 'error');
         return;
@@ -128,7 +129,7 @@ async function transitionIdea(
         type: 'status_changed',
         action: cfg.activityAction,
         target: title,
-        status: toStatus,
+        status: toState,
         feedback,
     });
     showToast(

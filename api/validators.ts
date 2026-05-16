@@ -1,9 +1,3 @@
-import {
-    assertWorkerStatus,
-    assertIdeaStatus,
-    assertProjectStatus,
-    assertReadinessLevel,
-} from './types.ts';
 import type {
     GraphNode,
     GraphEdge,
@@ -12,10 +6,6 @@ import type {
     WorkOrderFlowGraph,
     FlowFieldType,
     WorkerId,
-    WorkerStatus,
-    IdeaStatus,
-    ProjectStatus,
-    ReadinessLevel,
     JsonArrayField,
     JsonObjectField,
     HumanWorkerEntity,
@@ -27,18 +17,16 @@ import type {
     FlowVersionEntity,
     WorkOrderEntity,
     FlowWorkOrderEntity,
-    WorkOrderTransitionEntity,
-    TransitionFieldValueEntity,
-    WorkOrderClaimEntity,
+    StateFieldValueEntity,
     OrganizationEntity,
     IdeaSubmissionEntity,
     ActivityActorEntity,
     ProjectFlowEntity,
     Objective,
     ObjectiveRevision,
-    DeprecatedObjective,
     ProjectObjectiveBaselineScore,
     ProjectObjectiveActualScore,
+    StateEntity,
 } from './types.ts';
 
 export interface Risk {
@@ -505,44 +493,6 @@ function asJsonObjectField(
     return raw as JsonObjectField;
 }
 
-// ── Enum validators ─────────────────
-
-export function asWorkerStatus(
-    value: unknown,
-    label: string,
-): WorkerStatus {
-    return assertWorkerStatus(
-        asString(value, label), label,
-    );
-}
-
-export function asIdeaStatus(
-    value: unknown,
-    label: string,
-): IdeaStatus {
-    return assertIdeaStatus(
-        asString(value, label), label,
-    );
-}
-
-export function asProjectStatus(
-    value: unknown,
-    label: string,
-): ProjectStatus {
-    return assertProjectStatus(
-        asString(value, label), label,
-    );
-}
-
-export function asReadinessLevel(
-    value: unknown,
-    label: string,
-): ReadinessLevel {
-    return assertReadinessLevel(
-        asString(value, label), label,
-    );
-}
-
 // ── Pick-from-body helpers ───────────
 //
 // pick*(body, key) is the no-stutter form
@@ -570,34 +520,6 @@ export function pickBoolean(
     key: string,
 ): boolean {
     return asBoolean(body[key], key);
-}
-
-export function pickWorkerStatus(
-    body: Record<string, unknown>,
-    key: string,
-): WorkerStatus {
-    return asWorkerStatus(body[key], key);
-}
-
-export function pickIdeaStatus(
-    body: Record<string, unknown>,
-    key: string,
-): IdeaStatus {
-    return asIdeaStatus(body[key], key);
-}
-
-export function pickProjectStatus(
-    body: Record<string, unknown>,
-    key: string,
-): ProjectStatus {
-    return asProjectStatus(body[key], key);
-}
-
-export function pickReadinessLevel(
-    body: Record<string, unknown>,
-    key: string,
-): ReadinessLevel {
-    return asReadinessLevel(body[key], key);
 }
 
 export function pickJsonArrayField(
@@ -670,7 +592,7 @@ export function assertOnlyKeys(
 const HUMAN_WORKER_BODY_KEYS:
     readonly string[] = [
     'first_name', 'last_name', 'email',
-    'title', 'department', 'status',
+    'title', 'department',
     'strengths', 'team_dimensions',
     'phone', 'bio',
 ];
@@ -698,9 +620,6 @@ export function validateHumanWorkerEntity(
         ),
         department: pickString(
             body, 'department',
-        ),
-        status: pickWorkerStatus(
-            body, 'status',
         ),
         strengths: pickJsonArrayField(
             body, 'strengths',
@@ -764,10 +683,10 @@ export function validateAIWorkerEntity(
 }
 
 const IDEA_BODY_KEYS: readonly string[] = [
-    'title', 'position', 'status',
+    'title', 'position',
     'problem_statement', 'target_users',
     'proposed_solution', 'expected_outcome',
-    'success_metrics', 'readiness',
+    'success_metrics',
     'risks', 'assumptions', 'alignments',
 ];
 
@@ -784,9 +703,6 @@ export function validateIdeaEntity(
         position: pickNumber(
             body, 'position',
         ),
-        status: pickIdeaStatus(
-            body, 'status',
-        ),
         problem_statement: pickString(
             body, 'problem_statement',
         ),
@@ -802,9 +718,6 @@ export function validateIdeaEntity(
         success_metrics: pickString(
             body, 'success_metrics',
         ),
-        readiness: pickReadinessLevel(
-            body, 'readiness',
-        ),
         risks: pickJsonArrayField(
             body, 'risks',
         ),
@@ -818,7 +731,7 @@ export function validateIdeaEntity(
 }
 
 const PROJECT_BODY_KEYS: readonly string[] = [
-    'title', 'description', 'status',
+    'title', 'description',
     'progress', 'start_date',
     'target_end_date', 'estimated_duration',
     'actual_duration', 'estimated_cost',
@@ -840,9 +753,6 @@ export function validateProjectEntity(
         ),
         description: pickString(
             body, 'description',
-        ),
-        status: pickProjectStatus(
-            body, 'status',
         ),
         progress: pickNumber(
             body, 'progress',
@@ -1060,90 +970,29 @@ export function validateFlowWorkOrderEntity(
     };
 }
 
-const WORK_ORDER_TRANSITION_BODY_KEYS:
+const STATE_FIELD_VALUE_BODY_KEYS:
     readonly string[] = [
-    'work_order_id', 'from_node_id',
-    'to_node_id', 'person_id',
-    'transitioned_at',
+    'state_event_id', 'field_id', 'value',
 ];
 
 export function
-validateWorkOrderTransitionEntity(
+validateStateFieldValueEntity(
     body: Record<string, unknown>,
-): Omit<WorkOrderTransitionEntity, 'id'> {
+): Omit<StateFieldValueEntity, 'id'> {
     assertOnlyKeys(
         body,
-        WORK_ORDER_TRANSITION_BODY_KEYS,
-        'WorkOrderTransitionEntity',
+        STATE_FIELD_VALUE_BODY_KEYS,
+        'StateFieldValueEntity',
     );
     return {
-        work_order_id: pickString(
-            body, 'work_order_id',
-        ),
-        from_node_id: pickString(
-            body, 'from_node_id',
-        ),
-        to_node_id: pickString(
-            body, 'to_node_id',
-        ),
-        person_id: pickString(
-            body, 'person_id',
-        ),
-        transitioned_at: pickString(
-            body, 'transitioned_at',
-        ),
-    };
-}
-
-const TRANSITION_FIELD_VALUE_BODY_KEYS:
-    readonly string[] = [
-    'transition_id', 'field_id', 'value',
-];
-
-export function
-validateTransitionFieldValueEntity(
-    body: Record<string, unknown>,
-): Omit<TransitionFieldValueEntity, 'id'> {
-    assertOnlyKeys(
-        body,
-        TRANSITION_FIELD_VALUE_BODY_KEYS,
-        'TransitionFieldValueEntity',
-    );
-    return {
-        transition_id: pickString(
-            body, 'transition_id',
+        state_event_id: pickString(
+            body, 'state_event_id',
         ),
         field_id: pickString(
             body, 'field_id',
         ),
         value: pickString(
             body, 'value',
-        ),
-    };
-}
-
-const WORK_ORDER_CLAIM_BODY_KEYS:
-    readonly string[] = [
-    'work_order_id', 'person_id', 'claimed_at',
-];
-
-export function validateWorkOrderClaimEntity(
-    body: Record<string, unknown>,
-): Omit<WorkOrderClaimEntity, 'id'> {
-    assertOnlyKeys(
-        body,
-        WORK_ORDER_CLAIM_BODY_KEYS,
-        'WorkOrderClaimEntity',
-    );
-    return {
-        work_order_id: pickString(
-            body, 'work_order_id',
-        ),
-        person_id: pickString(
-            body, 'person_id',
-        ),
-        claimed_at: pickString(
-            body, 'claimed_at',
         ),
     };
 }
@@ -1232,7 +1081,7 @@ export function validateOrganizationEntity(
 
 const IDEA_SUBMISSION_BODY_KEYS:
     readonly string[] = [
-    'idea_id', 'person_id', 'created_at',
+    'idea_id', 'worker_id', 'created_at',
 ];
 
 export function validateIdeaSubmissionEntity(
@@ -1247,8 +1096,8 @@ export function validateIdeaSubmissionEntity(
         idea_id: pickString(
             body, 'idea_id',
         ),
-        person_id: pickString(
-            body, 'person_id',
+        worker_id: pickString(
+            body, 'worker_id',
         ),
         created_at: pickString(
             body, 'created_at',
@@ -1258,7 +1107,7 @@ export function validateIdeaSubmissionEntity(
 
 const ACTIVITY_ACTOR_BODY_KEYS:
     readonly string[] = [
-    'activity_id', 'person_id', 'created_at',
+    'activity_id', 'worker_id', 'created_at',
 ];
 
 export function validateActivityActorEntity(
@@ -1273,8 +1122,8 @@ export function validateActivityActorEntity(
         activity_id: pickString(
             body, 'activity_id',
         ),
-        person_id: pickString(
-            body, 'person_id',
+        worker_id: pickString(
+            body, 'worker_id',
         ),
         created_at: pickString(
             body, 'created_at',
@@ -1368,29 +1217,6 @@ export function validateObjectiveRevisionEntity(
     };
 }
 
-const DEPRECATED_OBJECTIVE_BODY_KEYS:
-    readonly string[] = [
-    'objective_id', 'deprecated_at',
-];
-
-export function validateDeprecatedObjectiveEntity(
-    body: Record<string, unknown>,
-): Omit<DeprecatedObjective, 'id'> {
-    assertOnlyKeys(
-        body,
-        DEPRECATED_OBJECTIVE_BODY_KEYS,
-        'DeprecatedObjective',
-    );
-    return {
-        objective_id: pickString(
-            body, 'objective_id',
-        ),
-        deprecated_at: pickString(
-            body, 'deprecated_at',
-        ),
-    };
-}
-
 const BASELINE_SCORE_BODY_KEYS:
     readonly string[] = [
     'project_id', 'objective_id',
@@ -1448,6 +1274,28 @@ export function validateActualScoreEntity(
         scored_at: pickString(
             body, 'scored_at',
         ),
+    };
+}
+
+const STATE_BODY_KEYS: readonly string[] = [
+    'entity_id', 'state', 'worker_id', 'at',
+];
+
+export function validateStateEntity(
+    body: Record<string, unknown>,
+): Omit<StateEntity, 'id'> {
+    assertOnlyKeys(
+        body, STATE_BODY_KEYS, 'StateEntity',
+    );
+    return {
+        entity_id: pickString(
+            body, 'entity_id',
+        ),
+        state: pickString(body, 'state'),
+        worker_id: pickString(
+            body, 'worker_id',
+        ),
+        at: pickString(body, 'at'),
     };
 }
 

@@ -5,11 +5,9 @@ import type { SafeHtml } from '../safe-html.ts';
 import {
     workerName,
     validateWorkOrderFlowGraph,
-    isExpiredClaim,
     type WorkOrderEntity,
-    type WorkOrderTransitionEntity,
-    type TransitionFieldValueEntity,
-    type WorkOrderClaimEntity,
+    type TransitionEvent,
+    type StateFieldValueEntity,
     type WorkOrderFlowGraph,
     type GraphNode,
     type GraphEdge,
@@ -142,16 +140,16 @@ export class WorkboxDetailPresenter {
     constructor(
         workOrder: WorkOrderEntity,
         transitions:
-            readonly WorkOrderTransitionEntity[],
-        fieldValuesByTransition:
+            readonly TransitionEvent[],
+        fieldValuesByEvent:
             ReadonlyMap<
                 Id,
-                readonly TransitionFieldValueEntity[]
+                readonly StateFieldValueEntity[]
             >,
-        claims:
-            readonly WorkOrderClaimEntity[],
+        activeClaim:
+            { workerId: Id; at: string } | null,
         workerMap: Map<Id, Worker>,
-        currentPersonId: string,
+        currentWorkerId: string,
     ) {
         this.#workOrder = workOrder;
         this.#flowGraph =
@@ -162,10 +160,8 @@ export class WorkboxDetailPresenter {
         const sorted = [...transitions]
             .sort(
                 (a, b) =>
-                    a.transitioned_at
-                        .localeCompare(
-                            b.transitioned_at,
-                        ),
+                    a.at
+                        .localeCompare(b.at),
             );
 
         this.#currentNode = findCurrentNode(
@@ -179,28 +175,18 @@ export class WorkboxDetailPresenter {
             );
         this.#history = buildHistory(
             sorted,
-            fieldValuesByTransition,
+            fieldValuesByEvent,
             this.#flowGraph.nodes,
             workerMap,
         );
 
-        const active = claims.find(
-            c =>
-                c.work_order_id
-                    === workOrder.id
-                && !isExpiredClaim(
-                    c,
-                    this.#flowGraph
-                        .lockTimeout,
-                ),
-        );
-        this.#claim = active
+        this.#claim = activeClaim
             ? {
                 kind: 'claimed',
-                claimId: active.id,
-                byCurrentPerson:
-                    active.person_id
-                        === currentPersonId,
+                at: activeClaim.at,
+                byCurrentWorker:
+                    activeClaim.workerId
+                        === currentWorkerId,
             }
             : { kind: 'unclaimed' };
     }
@@ -448,7 +434,7 @@ export class WorkboxDetailPresenter {
 function findCurrentNode(
     nodes: readonly GraphNode[],
     sortedTransitions:
-        readonly WorkOrderTransitionEntity[],
+        readonly TransitionEvent[],
 ): GraphNode {
     const lastTransition =
         sortedTransitions.at(-1);
@@ -489,11 +475,11 @@ function nodeNameById(
 
 function buildHistory(
     sortedTransitions:
-        readonly WorkOrderTransitionEntity[],
-    fieldValuesByTransition:
+        readonly TransitionEvent[],
+    fieldValuesByEvent:
         ReadonlyMap<
             Id,
-            readonly TransitionFieldValueEntity[]
+            readonly StateFieldValueEntity[]
         >,
     nodes: readonly GraphNode[],
     workerMap: Map<Id, Worker>,
@@ -509,8 +495,7 @@ function buildHistory(
 
     return sortedTransitions.map(t => {
         const rows =
-            fieldValuesByTransition.get(t.id)
-            ?? [];
+            fieldValuesByEvent.get(t.id) ?? [];
         const fieldValues:
             HistoryFieldValue[] = [];
         for (const row of rows) {
@@ -539,10 +524,10 @@ function buildHistory(
                 nodes, t.to_node_id,
             ),
             workerName: workerName(
-                workerMap, t.person_id,
+                workerMap, t.worker_id,
             ),
             transitionedAt:
-                t.transitioned_at,
+                t.at,
             fieldValues,
         };
     });

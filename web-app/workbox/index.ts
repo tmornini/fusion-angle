@@ -21,8 +21,8 @@ import {
 } from '../app/core.ts';
 import {
     getWorkOrderRows,
-    getWorkOrderTransitionRows,
-    getWorkOrderClaimRows,
+    getTransitionEventsByWorkOrder,
+    getWorkOrderActiveClaim,
     getWorkerMap,
     getFlowsForCreation,
     postWorkOrderCreation,
@@ -30,10 +30,15 @@ import {
     createRequestContext,
     generateCryptoSafeBase62,
     subscribeWorkOrderChanges,
+    validateWorkOrderFlowGraph,
     type FlowPickerEntry,
     type RequestContext,
     type WorkOrderEntity,
 } from '../app/adapters/index.ts';
+import type {
+    ActiveClaim,
+} from '../app/presenters/workbox-inbox.ts';
+import type { Id } from '../../api/types.ts';
 import {
     WorkboxInboxPresenter,
     buildInboxItems,
@@ -129,20 +134,30 @@ async function loadInboxItems(
     ctx: RequestContext,
 ): Promise<InboxItem[]> {
     const [
-        workOrders, transitions,
-        claims, workerMap,
+        workOrders, transitionsByWo, workerMap,
     ] = await Promise.all([
         getWorkOrderRows(ctx),
-        getWorkOrderTransitionRows(ctx),
-        getWorkOrderClaimRows(ctx),
+        getTransitionEventsByWorkOrder(ctx),
         getWorkerMap(ctx),
     ]);
     workOrderEntities = new Map(
         workOrders.map(w => [w.id, w]),
     );
+    const activeClaimsByWo = new Map<Id, ActiveClaim>();
+    for (const wo of workOrders) {
+        const fg = validateWorkOrderFlowGraph(
+            wo.flow_graph,
+        );
+        const claim = await getWorkOrderActiveClaim(
+            ctx, wo.id, fg.lockTimeout,
+        );
+        if (claim !== null) {
+            activeClaimsByWo.set(wo.id, claim);
+        }
+    }
     return buildInboxItems(
-        workOrders, transitions, claims,
-        workerMap, mode,
+        workOrders, transitionsByWo,
+        activeClaimsByWo, workerMap, mode,
     );
 }
 
@@ -267,19 +282,10 @@ async function createWorkOrderForFlow(
         generateCryptoSafeBase62();
     const flowLinkId =
         generateCryptoSafeBase62();
-    const initTransitionId =
-        generateCryptoSafeBase62();
-    const postStartTransitionId =
-        generateCryptoSafeBase62();
-    const claimId =
-        generateCryptoSafeBase62();
     try {
         await postWorkOrderCreation(ctx, {
             workOrderId,
             flowLinkId,
-            initTransitionId,
-            postStartTransitionId,
-            claimId,
             flowId,
         });
         showToast(

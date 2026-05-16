@@ -18,27 +18,33 @@ import {
 } from
 '../web-app/app/adapters/crypto-safe-base62.ts';
 import {
+    getWorkOrderActiveClaim,
+    getWorkOrderCurrentNodeId,
+    getWorkOrderTransitionEvents,
+} from
+'../web-app/app/adapters/state-events.ts';
+import {
     jsonObjectField,
     DEFAULT_LOCK_TIMEOUT,
+} from '../api/types.ts';
+import type {
+    HumanWorkerEntity,
+    FlowEntity,
+    GraphNode,
+    GraphEdge,
+    StoredGraph,
+    StateEntity,
 } from '../api/types.ts';
 
 interface CreateIds {
     workOrderId: string;
     flowLinkId: string;
-    initTransitionId: string;
-    postStartTransitionId: string;
-    claimId: string;
 }
 
 function mintCreateIds(): CreateIds {
     return {
         workOrderId: generateCryptoSafeBase62(),
         flowLinkId: generateCryptoSafeBase62(),
-        initTransitionId:
-            generateCryptoSafeBase62(),
-        postStartTransitionId:
-            generateCryptoSafeBase62(),
-        claimId: generateCryptoSafeBase62(),
     };
 }
 
@@ -52,14 +58,6 @@ async function createWorkOrder(
     });
     return ids.workOrderId;
 }
-import type {
-    HumanWorkerEntity,
-    FlowEntity,
-    GraphNode,
-    GraphEdge,
-    StoredGraph,
-    WorkOrderClaimEntity,
-} from '../api/types.ts';
 
 function buildHumanWorker(
     name: string,
@@ -71,7 +69,6 @@ function buildHumanWorker(
             + '@example.com',
         phone: '',
         title: 'product_manager',
-        status: 'active',
         strengths: '[]' as never,
         team_dimensions: '{}' as never,
         bio: '',
@@ -181,11 +178,21 @@ async function setupDb(): Promise<{
     return { db, ctx };
 }
 
+// RFC-3339 timestamps from Date.now() share
+// millisecond resolution; pause guarantees
+// ordering on fast machines.
+async function pause(ms: number): Promise<void> {
+    return new Promise(resolve =>
+        setTimeout(resolve, ms),
+    );
+}
+
 // ── postWorkOrderCreation ─────────
 
 test(
-    'postWorkOrderCreation populates '
-    + 'all five tables in one call',
+    'postWorkOrderCreation seeds work order, '
+    + 'flow link, and three state events in one '
+    + 'call',
     async () => {
         const { db, ctx } = await setupDb();
         const graph = buildLinearGraph();
@@ -217,43 +224,28 @@ test(
             links[0]!.work_order_id, woId,
         );
 
-        const transitions =
-            await db.workOrderTransitions
-                .getAll();
-        assert.equal(
-            transitions.length, 2,
+        const events =
+            await db.states.allFor(woId);
+        // start node, post-start, claimed
+        assert.equal(events.length, 3);
+        const nonClaim = events.filter(
+            (e: StateEntity) =>
+                e.state !== 'claimed',
         );
-        // Initial transition uses '' for
-        // from_node_id today; Phase 1 will
-        // model this as null. When that
-        // lands, update the assertion.
+        assert.equal(nonClaim.length, 2);
         assert.equal(
-            transitions[0]!.from_node_id,
-            '',
+            nonClaim[0]!.state, 'n-start',
         );
         assert.equal(
-            transitions[0]!.to_node_id,
-            'n-start',
+            nonClaim[1]!.state, 'n-middle',
         );
-        assert.equal(
-            transitions[1]!.from_node_id,
-            'n-start',
+        const claims = events.filter(
+            (e: StateEntity) =>
+                e.state === 'claimed',
         );
-        assert.equal(
-            transitions[1]!.to_node_id,
-            'n-middle',
-        );
-
-        const claims =
-            await db.workOrderClaims
-                .getAll();
         assert.equal(claims.length, 1);
         assert.equal(
-            claims[0]!.work_order_id,
-            woId,
-        );
-        assert.equal(
-            claims[0]!.person_id, 'current',
+            claims[0]!.worker_id, 'current',
         );
     },
 );
@@ -263,9 +255,6 @@ test(
     + 'when flow has no start node',
     async () => {
         const { db, ctx } = await setupDb();
-        // Each regular node carries a worker so
-        // the publish gate passes; the start-node
-        // check is what we are exercising.
         const graph: StoredGraph = {
             nodes: [
                 buildNode('a', 'A', {
@@ -298,10 +287,6 @@ test(
     + 'outgoing edges',
     async () => {
         const { db, ctx } = await setupDb();
-        // Workers on regular nodes so the publish
-        // gate passes; the multi-outgoing-edge
-        // check on the start node is what we want
-        // to exercise.
         const graph: StoredGraph = {
             nodes: [
                 buildNode(
@@ -397,7 +382,8 @@ test(
 
 test(
     'postWorkOrderTransition records '
-    + 'transition and deletes claim',
+    + 'transition state event and releases the '
+    + 'claim',
     async () => {
         const { db, ctx } = await setupDb();
         await db.flows.put(
@@ -408,56 +394,42 @@ test(
             await createWorkOrder(
                 ctx, 'f1',
             );
+        await pause(2);
 
-        const before =
-            await db.workOrderTransitions
-                .getAll();
-        assert.equal(before.length, 2);
-        const claimsBefore =
-            await db.workOrderClaims
-                .getAll();
-        assert.equal(
-            claimsBefore.length, 1,
-        );
+        const beforeNode =
+            await getWorkOrderCurrentNodeId(
+                ctx, woId,
+            );
+        assert.equal(beforeNode, 'n-middle');
+        const beforeClaim =
+            await getWorkOrderActiveClaim(
+                ctx, woId, DEFAULT_LOCK_TIMEOUT,
+            );
+        assert.ok(beforeClaim !== null);
 
         await postWorkOrderTransition(ctx, {
-            transitionId:
-                generateCryptoSafeBase62(),
             workOrderId: woId,
             edgeId: 'e2',
             values: {},
             fieldValueIds: {},
-            currentNodeId: 'n-middle',
         });
 
-        const after =
-            await db.workOrderTransitions
-                .getAll();
-        assert.equal(after.length, 3);
-        const last = after.find(
-            t =>
-                t.from_node_id
-                    === 'n-middle'
-                && t.to_node_id
-                    === 'n-finish',
-        );
-        assert.ok(last);
-        assert.equal(
-            last.person_id, 'current',
-        );
-
-        const claimsAfter =
-            await db.workOrderClaims
-                .getAll();
-        assert.equal(
-            claimsAfter.length, 0,
-        );
+        const afterNode =
+            await getWorkOrderCurrentNodeId(
+                ctx, woId,
+            );
+        assert.equal(afterNode, 'n-finish');
+        const afterClaim =
+            await getWorkOrderActiveClaim(
+                ctx, woId, DEFAULT_LOCK_TIMEOUT,
+            );
+        assert.equal(afterClaim, null);
     },
 );
 
 test(
     'postWorkOrderTransition succeeds '
-    + 'when no claim exists',
+    + 'when no live claim exists',
     async () => {
         const { db, ctx } = await setupDb();
         await db.flows.put(
@@ -468,32 +440,35 @@ test(
             await createWorkOrder(
                 ctx, 'f1',
             );
-        // Manually clear any claim to
-        // simulate an unclaimed
+        await pause(2);
+        // Record an explicit release so no live
+        // claim remains, simulating an unclaimed
         // work order.
-        const claims =
-            await db.workOrderClaims
-                .getAll();
-        for (const c of claims) {
-            await db.workOrderClaims
-                .delete(c.id);
-        }
+        await db.states.put(
+            generateCryptoSafeBase62(),
+            {
+                entity_id: woId,
+                state: 'claim_released',
+                worker_id: 'current',
+                at: new Date().toISOString(),
+            },
+        );
 
         await postWorkOrderTransition(ctx, {
-            transitionId:
-                generateCryptoSafeBase62(),
             workOrderId: woId,
             edgeId: 'e2',
             values: {},
             fieldValueIds: {},
-            currentNodeId: 'n-middle',
         });
 
-        const transitions =
-            await db.workOrderTransitions
-                .getAll();
+        const events =
+            await getWorkOrderTransitionEvents(
+                ctx, woId,
+            );
+        // start, post-start, after-transition
+        assert.equal(events.length, 3);
         assert.equal(
-            transitions.length, 3,
+            events.at(-1)!.to_node_id, 'n-finish',
         );
     },
 );
@@ -514,14 +489,10 @@ test(
         await assert.rejects(
             () =>
                 postWorkOrderTransition(ctx, {
-                    transitionId:
-                        generateCryptoSafeBase62(),
                     workOrderId: woId,
                     edgeId: 'no-such-edge',
                     values: {},
                     fieldValueIds: {},
-                    currentNodeId:
-                        'n-middle',
                 }),
             /Edge not found/,
         );
@@ -531,34 +502,36 @@ test(
 // ── postWorkOrderClaim ────────────
 
 test(
-    'postWorkOrderClaim creates a '
-    + 'claim row with correct fields',
+    'postWorkOrderClaim records a fresh '
+    + 'claimed state event',
     async () => {
         const { db, ctx } = await setupDb();
-        const before =
-            await db.workOrderClaims
-                .getAll();
-        assert.equal(before.length, 0);
+        await db.flows.put(
+            'f1', buildFlow(buildLinearGraph()),
+        );
+        const woId =
+            await createWorkOrder(ctx, 'f1');
+        // Release the creation-time claim so this
+        // test exercises pure claim-creation
+        // without the expiration-notice branch.
+        await db.states.put(
+            generateCryptoSafeBase62(),
+            {
+                entity_id: woId,
+                state: 'claim_released',
+                worker_id: 'current',
+                at: new Date().toISOString(),
+            },
+        );
+        await pause(2);
+        await postWorkOrderClaim(ctx, woId);
 
-        const claimId =
-            generateCryptoSafeBase62();
-        await postWorkOrderClaim(
-            ctx, claimId, 'w1',
-        );
-
-        const after =
-            await db.workOrderClaims
-                .getAll();
-        assert.equal(after.length, 1);
-        const claim = after[0]!;
-        assert.equal(claim.id, claimId);
-        assert.equal(
-            claim.work_order_id, 'w1',
-        );
-        assert.equal(
-            claim.person_id, 'current',
-        );
-        assert.ok(claim.claimed_at);
+        const claim =
+            await getWorkOrderActiveClaim(
+                ctx, woId, DEFAULT_LOCK_TIMEOUT,
+            );
+        assert.ok(claim !== null);
+        assert.equal(claim.workerId, 'current');
     },
 );
 
@@ -568,36 +541,43 @@ test(
     + 'unfixable in localStorage; '
     + 'structural fix is the Postgres '
     + 'migration (UNIQUE partial '
-    + 'index). When that migration '
-    + 'lands, this test changes to '
-    + 'assert that the second call '
-    + 'either throws or returns the '
-    + 'existing claim id.',
+    + 'index).',
     async () => {
         const { db, ctx } = await setupDb();
-        await postWorkOrderClaim(
-            ctx,
+        await db.flows.put(
+            'f1', buildFlow(buildLinearGraph()),
+        );
+        const woId =
+            await createWorkOrder(ctx, 'f1');
+        // Release the creation-time claim so the
+        // two explicit claim calls below are the
+        // only contributors to the count.
+        await db.states.put(
             generateCryptoSafeBase62(),
-            'w1',
+            {
+                entity_id: woId,
+                state: 'claim_released',
+                worker_id: 'current',
+                at: new Date().toISOString(),
+            },
         );
-        await postWorkOrderClaim(
-            ctx,
-            generateCryptoSafeBase62(),
-            'w1',
+        await pause(2);
+        await postWorkOrderClaim(ctx, woId);
+        await pause(2);
+        await postWorkOrderClaim(ctx, woId);
+        const events =
+            await db.states.allFor(woId);
+        const claimed = events.filter(
+            (e: StateEntity) =>
+                e.state === 'claimed',
         );
-        const claims =
-            await db.workOrderClaims
-                .getAll();
-        assert.equal(claims.length, 2);
-        // Both rows reference the same
-        // (work_order_id, person_id) pair.
-        const woIds = new Set(
-            claims.map(
-                (c: WorkOrderClaimEntity) =>
-                    c.work_order_id,
-            ),
+        // Initial creation claim plus the two
+        // explicit calls.
+        assert.ok(
+            claimed.length >= 3,
+            'expected at least 3 claimed events,'
+            + ' got ' + claimed.length,
         );
-        assert.equal(woIds.size, 1);
     },
 );
 
@@ -645,5 +625,65 @@ test(
                 r => r.work_order_id === 'wo2',
             ),
         );
+    },
+);
+
+// ── lockTimeout-aware getWorkOrderActiveClaim ────
+
+test(
+    'getWorkOrderActiveClaim treats a stale '
+    + 'claimed event as implicitly expired',
+    async () => {
+        const db = new MemoryDbAdapter();
+        await db.workers.put(
+            'current', buildHumanWorker('Demo'),
+        );
+        const ctx = createRequestContext(db);
+        const woId = generateCryptoSafeBase62();
+        // Backdate ten seconds; lockTimeout=1s
+        // means this is past the live window.
+        const longAgo = new Date(
+            Date.now() - 10_000,
+        ).toISOString();
+        await db.states.put(
+            generateCryptoSafeBase62(),
+            {
+                entity_id: woId,
+                state: 'claimed',
+                worker_id: 'current',
+                at: longAgo,
+            },
+        );
+        const claim = await getWorkOrderActiveClaim(
+            ctx, woId, 1,
+        );
+        assert.equal(claim, null);
+    },
+);
+
+test(
+    'getWorkOrderActiveClaim returns the fresh '
+    + 'claim when within the lock window',
+    async () => {
+        const db = new MemoryDbAdapter();
+        await db.workers.put(
+            'current', buildHumanWorker('Demo'),
+        );
+        const ctx = createRequestContext(db);
+        const woId = generateCryptoSafeBase62();
+        await db.states.put(
+            generateCryptoSafeBase62(),
+            {
+                entity_id: woId,
+                state: 'claimed',
+                worker_id: 'current',
+                at: new Date().toISOString(),
+            },
+        );
+        const claim = await getWorkOrderActiveClaim(
+            ctx, woId, DEFAULT_LOCK_TIMEOUT,
+        );
+        assert.ok(claim !== null);
+        assert.equal(claim.workerId, 'current');
     },
 );

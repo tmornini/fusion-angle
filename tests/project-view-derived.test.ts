@@ -12,7 +12,7 @@ import type {
 
 function makeView(): ProjectView {
     return new ProjectView(new Project({
-        id: 'p1', status: 'approved', title: 't',
+        id: 'p1', title: 't',
         description: 'd', progress: 0,
         start_date: '2026-05-14T00:00:00.000Z',
         target_end_date: '2026-05-14T00:00:00.000Z',
@@ -20,7 +20,7 @@ function makeView(): ProjectView {
         estimated_cost: 0, actual_cost: 0,
         position: 0, business_context: '{}',
         timeline_label: 'q1',
-    }));
+    }, 'approved'));
 }
 
 const T1 = '2026-05-14T00:00:00.000Z';

@@ -14,10 +14,11 @@ import {
     closeDialog,
 } from '../app/core.ts';
 import {
+    getProject,
     getProjectRow,
-    Project,
     ProjectView,
     putProject,
+    postProjectStateChange,
     getFlowsByProject,
     postFlowCreation,
     subscribeProjectChanges,
@@ -31,8 +32,8 @@ import {
     subscribeProjectScoreChanges,
     getActiveObjectives,
     getCurrentObjectiveDefinition,
-    getDeprecatedObjectiveIds,
     getObjectiveRevisions,
+    getObjectiveDeprecationEvents,
     subscribeObjectiveChanges,
     postProjectApproval,
     postProjectCompletion,
@@ -44,7 +45,6 @@ import type {
 } from '../app/adapters/index.ts';
 import type {
     ObjectiveRevision,
-    DeprecatedObjective,
 } from '../../api/types.ts';
 import { latestPerPair } from '../app/scoring-format.ts';
 import {
@@ -86,7 +86,7 @@ let currentProjectId: string | null = null;
 
 const FIELDS: ReadonlySet<ProjectFieldKey> =
     new Set([
-        'title', 'description', 'status',
+        'title', 'description', 'state',
         'startDate', 'targetEndDate',
         'costBaseline',
     ]);
@@ -114,12 +114,11 @@ async function loadProjectView(
     view: ProjectView;
     entity: ProjectEntity;
 }> {
-    const entity = await getProjectRow(
-        ctx, projectId,
-    );
-    const view = new ProjectView(
-        new Project(entity),
-    );
+    const [project, entity] = await Promise.all([
+        getProject(ctx, projectId),
+        getProjectRow(ctx, projectId),
+    ]);
+    const view = new ProjectView(project);
     return { view, entity };
 }
 
@@ -684,20 +683,26 @@ async function handleSave(): Promise<void> {
     }
     const projectId = state.view.idForLink();
     const entity = state.entity;
-    const patch = trimStrings(
-        projectPatchFromDraft(
-            state.view,
-            state.draft,
-        ),
+    const patch = projectPatchFromDraft(
+        state.view,
+        state.draft,
     );
+    const patchEntity = trimStrings(patch.entity);
     const ctx = createRequestContext();
+    const next = { ...entity, ...patchEntity };
+    const stateChanged =
+        patch.state !== state.view.stateValue();
     try {
-        await putProject(ctx, projectId, {
-            ...entity, ...patch,
-        });
+        if (stateChanged) {
+            await postProjectStateChange(
+                ctx, projectId, next, patch.state,
+            );
+        } else {
+            await putProject(ctx, projectId, next);
+        }
     } catch (err) {
         log.error(
-            'putProject failed',
+            'project save failed',
             'projects', err,
         );
         showToast(
@@ -754,11 +759,10 @@ async function renderActionBarAndObjectives(
     const pid = currentProjectId;
     if (!pid) return;
     const ctx = createRequestContext();
-    const [project, active, scoring] =
+    const [project, entity, active, scoring] =
         await Promise.all([
-            ctx.GET<ProjectEntity>(
-                `projects/${pid}`,
-            ),
+            getProject(ctx, pid),
+            getProjectRow(ctx, pid),
             getActiveObjectives(ctx),
             getProjectScoring(ctx, pid),
         ]);
@@ -781,15 +785,21 @@ async function renderActionBarAndObjectives(
     );
 
     const approvalCheck = validateProjectForApproval(
-        project, active, latestBaselines,
+        entity, active, latestBaselines,
     );
     const completionCheck =
         validateProjectForCompletion(
-            project, latestBaselines, latestActuals,
+            entity, latestBaselines, latestActuals,
         );
 
+    const objectiveNames = new Map(
+        Array.from(defs.entries())
+            .map(([id, def]) => [id, def.name]),
+    );
     const actionBar = new ProjectActionBarPresenter(
-        project, approvalCheck, completionCheck,
+        pid, project.stateValue(),
+        approvalCheck, completionCheck,
+        objectiveNames,
     );
     const actionBarEl =
         $('#project-action-bar', document);
@@ -936,21 +946,16 @@ async function openHistoryModal(
         baselineObjIds.add(a.objective_id);
     }
     const revisions: ObjectiveRevision[] = [];
-    const deprecations: DeprecatedObjective[] = [];
-    const deprecatedIds =
-        await getDeprecatedObjectiveIds(ctx);
+    const allDeprecations =
+        await getObjectiveDeprecationEvents(ctx);
+    const deprecations = allDeprecations.filter(
+        d => baselineObjIds.has(d.objectiveId),
+    );
     for (const objId of baselineObjIds) {
         const revs = await getObjectiveRevisions(
             ctx, objId,
         );
         revisions.push(...revs);
-        if (deprecatedIds.has(objId)) {
-            const t =
-                await ctx.GET<DeprecatedObjective>(
-                    `deprecated-objectives/${objId}`,
-                );
-            deprecations.push(t);
-        }
     }
     const revsByObj = new Map<
         string, ObjectiveRevision[]

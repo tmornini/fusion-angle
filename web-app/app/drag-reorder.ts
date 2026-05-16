@@ -10,7 +10,7 @@ const INDICATOR_COLOR =
 const INDICATOR_BORDER_RADIUS = '2px';
 const INDICATOR_MARGIN = '2px 0';
 const DRAGGING_OPACITY = '0.4';
-const DRAG_HANDLE_SELECTOR = '.cursor-grab';
+const DRAG_HANDLE_SELECTOR = '.drag-handle';
 
 type DragState =
     | { kind: 'idle' }

@@ -1,26 +1,31 @@
 import type {
     WorkerId,
     HumanWorkerEntity,
-    WorkerStatus,
+    WorkerState,
 } from '../../../api/types.ts';
 import { HumanWorker } from '../../../api/types.ts';
 import type { RequestContext } from './shared.ts';
+import {
+    buildStateEventOp,
+    getWorkerState,
+    getWorkerStates,
+} from './state-events.ts';
 import {
     createSubscriptionChannel,
 } from '../channels.ts';
 export {
     HumanWorker,
-    WORKER_STATUS_CONFIG,
-    isWorkerStatus,
+    WORKER_STATE_CONFIG,
+    isWorkerState,
 } from '../../../api/types.ts';
 export type {
     WorkerId,
     HumanWorkerEntity,
-    WorkerStatus,
+    WorkerState,
 } from '../../../api/types.ts';
 
 const humanWorkerChanges =
-    createSubscriptionChannel(['workers']);
+    createSubscriptionChannel(['workers', 'states']);
 
 export function subscribeHumanWorkerChanges(
     fn: () => void,
@@ -41,14 +46,24 @@ export async function getHumanWorkerRows(
 export async function getHumanWorkerMap(
     ctx: RequestContext,
 ): Promise<Map<WorkerId, HumanWorker>> {
-    const rows = await getHumanWorkerRows(ctx);
+    const [rows, stateMap] = await Promise.all([
+        getHumanWorkerRows(ctx),
+        getWorkerStates(ctx),
+    ]);
     return new Map(
-        rows.map(
-            entity => [
+        rows.map(entity => {
+            const state = stateMap.get(entity.id);
+            if (state === undefined) {
+                throw new Error(
+                    'no state event for human worker '
+                    + entity.id,
+                );
+            }
+            return [
                 entity.id,
-                new HumanWorker(entity),
-            ],
-        ),
+                new HumanWorker(entity, state),
+            ];
+        }),
     );
 }
 
@@ -81,10 +96,11 @@ export async function getHumanWorker(
     ctx: RequestContext,
     id: string,
 ): Promise<HumanWorker> {
-    const row = await ctx.GET<HumanWorkerEntity>(
-        `workers/${id}`,
-    );
-    return new HumanWorker(row);
+    const [row, state] = await Promise.all([
+        ctx.GET<HumanWorkerEntity>(`workers/${id}`),
+        getWorkerState(ctx, id),
+    ]);
+    return new HumanWorker(row, state);
 }
 
 export async function getHumanWorkerRow(
@@ -105,23 +121,50 @@ export async function putHumanWorker(
     humanWorkerChanges.notify();
 }
 
-export async function putHumanWorkerStatus(
+// Human-worker row write paired with a states-log
+// event in one ctx.commit batch. Use at every site
+// that creates a worker or moves its lifecycle
+// state. putHumanWorker remains for pure edits
+// (phone, bio, title) that do not change state.
+// Stage 10b+c: the states log is now the sole
+// source of worker state; the row carries no
+// status column.
+export async function postHumanWorkerStateChange(
     ctx: RequestContext,
     id: string,
-    next: WorkerStatus,
+    entity: Omit<HumanWorkerEntity, 'id'>,
+    state: WorkerState,
 ): Promise<void> {
-    const rows = await getHumanWorkerRows(ctx);
-    const row = rows.find(r => r.id === id);
-    if (!row) {
-        throw new Error(
-            `putHumanWorkerStatus: unknown`
-            + ` worker ${id}`,
-        );
-    }
-    const { id: _id, ...rest } = row;
-    await ctx.PUT(`workers/${id}`, {
-        ...rest,
-        status: next,
+    const workerBody =
+        entity as unknown as Record<string, unknown>;
+    await ctx.commit({
+        ops: [
+            {
+                method: 'put',
+                resource: `workers/${id}`,
+                body: workerBody,
+            },
+            await buildStateEventOp(ctx, id, state),
+        ],
+    });
+    humanWorkerChanges.notify();
+}
+
+// Archives a human worker by writing a terminal
+// 'archived' state event. The row persists — only
+// the lifecycle stage advances. Mirrors
+// archiveAIWorker per Commandment III (Uniformity):
+// one operation name across worker kinds.
+export async function archiveHumanWorker(
+    ctx: RequestContext,
+    id: WorkerId,
+): Promise<void> {
+    await ctx.commit({
+        ops: [
+            await buildStateEventOp(
+                ctx, id, 'archived',
+            ),
+        ],
     });
     humanWorkerChanges.notify();
 }

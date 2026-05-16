@@ -14,17 +14,15 @@ import {
     validateProjectFlowEntity,
     validateWorkOrderEntity,
     validateFlowWorkOrderEntity,
-    validateWorkOrderTransitionEntity,
-    validateTransitionFieldValueEntity,
-    validateWorkOrderClaimEntity,
+    validateStateFieldValueEntity,
     validateOrganizationEntity,
     validateIdeaSubmissionEntity,
     validateActivityActorEntity,
     validateObjectiveEntity,
     validateObjectiveRevisionEntity,
-    validateDeprecatedObjectiveEntity,
     validateBaselineScoreEntity,
     validateActualScoreEntity,
+    validateStateEntity,
 } from './validators.ts';
 
 export class ApiError {
@@ -246,53 +244,21 @@ const routes: Route[] = [
                 ),
             ),
     }),
-    route('work-order-transitions', {
+    route('state-field-values', {
         get: (db) =>
-            db.workOrderTransitions
+            db.stateFieldValues
                 .getAll(),
     }),
-    route('work-order-transitions/:id', {
+    route('state-field-values/:id', {
         put: (db, params, body) =>
-            db.workOrderTransitions.put(
+            db.stateFieldValues.put(
                 param(params, 0),
-                validateWorkOrderTransitionEntity(
-                    withoutId(body),
-                ),
-            ),
-    }),
-    route('transition-field-values', {
-        get: (db) =>
-            db.transitionFieldValues
-                .getAll(),
-    }),
-    route('transition-field-values/:id', {
-        put: (db, params, body) =>
-            db.transitionFieldValues.put(
-                param(params, 0),
-                validateTransitionFieldValueEntity(
+                validateStateFieldValueEntity(
                     withoutId(body),
                 ),
             ),
         delete: (db, params) =>
-            db.transitionFieldValues.delete(
-                param(params, 0),
-            ),
-    }),
-    route('work-order-claims', {
-        get: (db) =>
-            db.workOrderClaims
-                .getAll(),
-    }),
-    route('work-order-claims/:id', {
-        put: (db, params, body) =>
-            db.workOrderClaims.put(
-                param(params, 0),
-                validateWorkOrderClaimEntity(
-                    withoutId(body),
-                ),
-            ),
-        delete: (db, params) =>
-            db.workOrderClaims.delete(
+            db.stateFieldValues.delete(
                 param(params, 0),
             ),
     }),
@@ -410,24 +376,6 @@ const routes: Route[] = [
                 ),
             ),
     }),
-    route('deprecated-objectives', {
-        get: (db) =>
-            db.deprecatedObjectives.getAll(),
-    }),
-    route('deprecated-objectives/:id', {
-        put: (db, p, body) =>
-            db.deprecatedObjectives.put(
-                param(p, 0),
-                validateDeprecatedObjectiveEntity(
-                    withoutId(body),
-                ),
-            ),
-        delete: (db, p) =>
-            db.deprecatedObjectives.delete(
-                param(p, 0),
-            ),
-    }),
-
     route('project-objective-baseline-scores', {
         get: (db) =>
             db.projectObjectiveBaselineScores.getAll(),
@@ -453,6 +401,28 @@ const routes: Route[] = [
                     withoutId(body),
                 ),
             ),
+    }),
+    route('states', {
+        get: (db) => db.states.getAll(),
+    }),
+    route('states/:id', {
+        get: (db, p) =>
+            db.states.getById(param(p, 0)),
+        put: (db, p, body) =>
+            db.states.put(
+                param(p, 0),
+                validateStateEntity(
+                    withoutId(body),
+                ),
+            ),
+    }),
+    route('entity-states/:id', {
+        get: (db, p) =>
+            db.states.currentFor(param(p, 0)),
+    }),
+    route('entity-states/:id/history', {
+        get: (db, p) =>
+            db.states.allFor(param(p, 0)),
     }),
 
     route('snapshots/schema', {

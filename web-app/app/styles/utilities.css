@@ -229,7 +229,7 @@
 
 /* Cursor */
 .cursor-pointer { cursor: pointer; }
-.cursor-grab { cursor: grab; }
+.drag-handle { cursor: grab; }
 
 /* Rounded */
 .rounded { border-radius: var(--radius); }

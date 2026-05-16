@@ -3,7 +3,6 @@ import { strict as assert } from 'node:assert';
 import type {
     Objective,
     ObjectiveRevision,
-    DeprecatedObjective,
     ProjectObjectiveBaselineScore,
     ProjectObjectiveActualScore,
     ProjectEntity,
@@ -21,14 +20,6 @@ test('ObjectiveRevision shape compiles', () => {
         name: 'Revenue Growth',
         description: 'Drive top-line growth',
         revised_at: '2026-05-14T00:00:00.000Z',
-    };
-    assert.equal(v.objective_id, 'o1');
-});
-
-test('DeprecatedObjective shape compiles', () => {
-    const v: DeprecatedObjective = {
-        objective_id: 'o1',
-        deprecated_at: '2026-05-14T00:00:00.000Z',
     };
     assert.equal(v.objective_id, 'o1');
 });

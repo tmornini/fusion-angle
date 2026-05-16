@@ -2,10 +2,12 @@ import { html, type SafeHtml } from '../safe-html.ts';
 import type {
     ObjectiveId,
     ObjectiveRevision,
-    DeprecatedObjective,
     ProjectObjectiveBaselineScore,
     ProjectObjectiveActualScore,
 } from '../../../api/types.ts';
+import type {
+    ObjectiveDeprecationEvent,
+} from '../adapters/objectives.ts';
 import {
     formatSigned,
     toneForScore,
@@ -31,14 +33,14 @@ export class ProjectScoreHistoryPresenter {
     readonly #baselines: ProjectObjectiveBaselineScore[];
     readonly #actuals: ProjectObjectiveActualScore[];
     readonly #revisions: ObjectiveRevision[];
-    readonly #deprecations: DeprecatedObjective[];
+    readonly #deprecations: ObjectiveDeprecationEvent[];
     readonly #resolver: DefinitionResolver;
 
     constructor(
         baselines: ProjectObjectiveBaselineScore[],
         actuals: ProjectObjectiveActualScore[],
         revisions: ObjectiveRevision[],
-        deprecations: DeprecatedObjective[],
+        deprecations: ObjectiveDeprecationEvent[],
         resolver: DefinitionResolver,
     ) {
         this.#baselines = baselines;
@@ -99,8 +101,8 @@ export class ProjectScoreHistoryPresenter {
         for (const d of this.#deprecations) {
             events.push({
                 kind: 'deprecation',
-                at: d.deprecated_at,
-                objectiveId: d.objective_id,
+                at: d.at,
+                objectiveId: d.objectiveId,
             });
         }
         events.sort((a, b) => a.at.localeCompare(b.at));
@@ -157,16 +159,20 @@ export class ProjectScoreHistoryPresenter {
                 return html`<tr>
                     ${dateCell}
                     <td>Objective revised</td>
-                    <td>—</td>
+                    <td>${e.name}</td>
                     <td>renamed/edited</td>
                 </tr>`;
-            case 'deprecation':
+            case 'deprecation': {
+                const def = this.#resolver(
+                    e.objectiveId, e.at,
+                );
                 return html`<tr>
                     ${dateCell}
                     <td>Objective deprecated</td>
-                    <td>—</td>
+                    <td>${def?.name ?? '—'}</td>
                     <td>—</td>
                 </tr>`;
+            }
         }
     }
 }

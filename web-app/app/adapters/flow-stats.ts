@@ -11,9 +11,12 @@ import {
 import { getFlowGraph } from './flow-queries.ts';
 import {
     getWorkOrderRows,
-    getWorkOrderTransitionRows,
     getFlowWorkOrderRows,
 } from './work-orders-queries.ts';
+import {
+    getTransitionEventsByWorkOrder,
+    type TransitionEvent,
+} from './state-events.ts';
 import { getWorkerMap } from './workers-union.ts';
 
 export async function getFlowStats(
@@ -26,13 +29,13 @@ export async function getFlowStats(
     const [
         graph,
         allWorkOrders,
-        allTransitions,
+        eventsByWo,
         fwoRows,
         workerMap,
     ] = await Promise.all([
         getFlowGraph(ctx, flowId),
         getWorkOrderRows(ctx),
-        getWorkOrderTransitionRows(ctx),
+        getTransitionEventsByWorkOrder(ctx),
         getFlowWorkOrderRows(ctx),
         getWorkerMap(ctx),
     ]);
@@ -44,10 +47,13 @@ export async function getFlowStats(
     );
     const workOrders =
         allWorkOrders.filter(w => woIds.has(w.id));
-    const transitions =
-        allTransitions.filter(
-            t => woIds.has(t.work_order_id),
-        );
+    const transitions: TransitionEvent[] = [];
+    for (const [woId, events] of eventsByWo) {
+        if (!woIds.has(woId)) continue;
+        for (const ev of events) {
+            transitions.push(ev);
+        }
+    }
 
     const workerNameById = new Map<Id, string>();
     for (const [id, w] of workerMap) {

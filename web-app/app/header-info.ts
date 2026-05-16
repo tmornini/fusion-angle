@@ -16,25 +16,22 @@ async function getHeaderData(
 ): Promise<HeaderData> {
     const {
         createRequestContext,
-        getCurrentHumanWorker,
+        getHumanWorker,
         getOrganization,
         getDashboardStats,
-        HumanWorker,
     } = await import('./adapters');
     const { getTimeOfDay } =
         await import('./format');
     const ctx = createRequestContext();
-    const [workerRow, org, stats] =
+    const [worker, org, stats] =
         await Promise.all([
-            getCurrentHumanWorker(ctx),
+            getHumanWorker(ctx, 'current'),
             getOrganization(ctx),
             getDashboardStats(ctx),
         ]);
     return {
-        workerId: workerRow.id,
-        workerName:
-            new HumanWorker(workerRow)
-                .fullName(),
+        workerId: worker.idForLink(),
+        workerName: worker.fullName(),
         organization: org.nameText(),
         greeting: getTimeOfDay(),
         stats,
@@ -56,12 +53,32 @@ class="font-normal">Good ${
 headerInfo.greeting},</span> ${
 headerInfo.workerName}`,
         );
-        greetingEl.addEventListener(
-            'click',
-            () => navigateTo(
+        greetingEl.setAttribute('role', 'button');
+        greetingEl.setAttribute('tabindex', '0');
+        greetingEl.setAttribute(
+            'aria-label',
+            'Open your worker profile',
+        );
+        greetingEl.classList.add('cursor-pointer');
+        const goToProfile = (): void => {
+            navigateTo(
                 'worker-detail',
                 { workerId: headerInfo.workerId },
-            ),
+            );
+        };
+        greetingEl.addEventListener(
+            'click', goToProfile,
+        );
+        greetingEl.addEventListener(
+            'keydown', (e) => {
+                if (
+                    e.key === 'Enter'
+                    || e.key === ' '
+                ) {
+                    e.preventDefault();
+                    goToProfile();
+                }
+            },
         );
     }
     const statsEl =

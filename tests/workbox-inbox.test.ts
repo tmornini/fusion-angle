@@ -12,11 +12,18 @@ import {
 import {
     getWorkerMap,
     generateCryptoSafeBase62,
+    getTransitionEventsByWorkOrder,
+    getWorkOrderActiveClaim,
+    validateWorkOrderFlowGraph,
 } from '../web-app/app/adapters/index.ts';
 import {
     buildInboxItems,
+    type ActiveClaim,
 } from
 '../web-app/app/presenters/workbox-inbox.ts';
+import type {
+    TransitionEvent,
+} from '../web-app/app/adapters/state-events.ts';
 import {
     jsonObjectField,
     DEFAULT_LOCK_TIMEOUT,
@@ -28,10 +35,9 @@ import type {
     GraphEdge,
     StoredGraph,
     WorkOrderEntity,
-    WorkOrderTransitionEntity,
-    WorkOrderClaimEntity,
     Worker,
     WorkerId,
+    Id,
 } from '../api/types.ts';
 
 // -- Fixtures ---------------------------------
@@ -45,12 +51,23 @@ function buildHumanWorker(
         email: name.toLowerCase() + '@example.com',
         phone: '',
         title: 'product_manager',
-        status: 'active',
         strengths: '[]' as never,
         team_dimensions: '{}' as never,
         bio: '',
         department: 'Product',
     };
+}
+
+async function seedWorkerState(
+    db: MemoryDbAdapter,
+    workerId: WorkerId,
+): Promise<void> {
+    await db.states.record(
+        `st-${workerId}`,
+        workerId,
+        'active',
+        'system',
+    );
 }
 
 function buildNode(
@@ -131,9 +148,38 @@ function buildLinearGraph(): StoredGraph {
 
 interface WoTables {
     workOrders: WorkOrderEntity[];
-    transitions: WorkOrderTransitionEntity[];
-    claims: WorkOrderClaimEntity[];
+    transitionsByWo:
+        Map<Id, readonly TransitionEvent[]>;
+    activeClaimsByWo: Map<Id, ActiveClaim>;
     workerMap: Map<WorkerId, Worker>;
+}
+
+async function collectTables(
+    db: MemoryDbAdapter,
+): Promise<WoTables> {
+    const ctx = createRequestContext(db);
+    const workOrders = await db.workOrders.getAll();
+    const transitionsByWo =
+        await getTransitionEventsByWorkOrder(ctx);
+    const activeClaimsByWo =
+        new Map<Id, ActiveClaim>();
+    for (const wo of workOrders) {
+        const fg = validateWorkOrderFlowGraph(
+            wo.flow_graph,
+        );
+        const claim = await getWorkOrderActiveClaim(
+            ctx, wo.id, fg.lockTimeout,
+        );
+        if (claim !== null) {
+            activeClaimsByWo.set(wo.id, claim);
+        }
+    }
+    return {
+        workOrders,
+        transitionsByWo,
+        activeClaimsByWo,
+        workerMap: await getWorkerMap(ctx),
+    };
 }
 
 async function setupOneWorkOrder(): Promise<{
@@ -146,6 +192,7 @@ async function setupOneWorkOrder(): Promise<{
     await db.workers.put(
         'current', buildHumanWorker('Demo'),
     );
+    await seedWorkerState(db, 'current');
     const ctx = createRequestContext(db);
     await db.flows.put(
         'f1', buildFlow(buildLinearGraph()),
@@ -154,25 +201,9 @@ async function setupOneWorkOrder(): Promise<{
     await postWorkOrderCreation(ctx, {
         workOrderId: woId,
         flowLinkId: generateCryptoSafeBase62(),
-        initTransitionId:
-            generateCryptoSafeBase62(),
-        postStartTransitionId:
-            generateCryptoSafeBase62(),
-        claimId: generateCryptoSafeBase62(),
         flowId: 'f1',
     });
-    const tables = async (): Promise<WoTables> => {
-        const fresh = createRequestContext(db);
-        return {
-            workOrders: await db.workOrders
-                .getAll(),
-            transitions: await db
-                .workOrderTransitions.getAll(),
-            claims: await db.workOrderClaims
-                .getAll(),
-            workerMap: await getWorkerMap(fresh),
-        };
-    };
+    const tables = () => collectTables(db);
     return { db, ctx, woId, tables };
 }
 
@@ -183,7 +214,8 @@ test(
     + ' active mode with no work orders',
     () => {
         const items = buildInboxItems(
-            [], [], [], new Map(), 'active',
+            [], new Map(), new Map(),
+            new Map(), 'active',
         );
         assert.deepEqual(items, []);
     },
@@ -194,7 +226,8 @@ test(
     + ' archived mode with no work orders',
     () => {
         const items = buildInboxItems(
-            [], [], [], new Map(), 'archived',
+            [], new Map(), new Map(),
+            new Map(), 'archived',
         );
         assert.deepEqual(items, []);
     },
@@ -206,12 +239,12 @@ test(
     async () => {
         const { tables } =
             await setupOneWorkOrder();
-        const { workOrders, transitions } =
-            await tables();
-        const { workerMap } = await tables();
+        const {
+            workOrders, transitionsByWo, workerMap,
+        } = await tables();
         const items = buildInboxItems(
-            workOrders, transitions, [],
-            workerMap, 'active',
+            workOrders, transitionsByWo,
+            new Map(), workerMap, 'active',
         );
         assert.equal(items.length, 1);
         const item = items[0]!;
@@ -238,12 +271,12 @@ test(
     async () => {
         const { tables } =
             await setupOneWorkOrder();
-        const { workOrders, transitions } =
-            await tables();
-        const { workerMap } = await tables();
+        const {
+            workOrders, transitionsByWo, workerMap,
+        } = await tables();
         const items = buildInboxItems(
-            workOrders, transitions, [],
-            workerMap, 'archived',
+            workOrders, transitionsByWo,
+            new Map(), workerMap, 'archived',
         );
         assert.deepEqual(items, []);
     },
@@ -256,15 +289,15 @@ test(
         const { tables } =
             await setupOneWorkOrder();
         const {
-            workOrders, transitions, claims,
-            workerMap,
+            workOrders, transitionsByWo,
+            activeClaimsByWo, workerMap,
         } = await tables();
         // postWorkOrderCreation already minted a
-        // fresh claim, so it is active.
-        assert.equal(claims.length, 1);
+        // fresh claim event, so it is active.
+        assert.equal(activeClaimsByWo.size, 1);
         const items = buildInboxItems(
-            workOrders, transitions, claims,
-            workerMap, 'active',
+            workOrders, transitionsByWo,
+            activeClaimsByWo, workerMap, 'active',
         );
         assert.deepEqual(items, []);
     },
@@ -276,31 +309,27 @@ test(
     async () => {
         const { db, woId, tables } =
             await setupOneWorkOrder();
-        // Hand-stitch a transition onto the
+        // Hand-stitch a state event on the
         // complete node, dated after the others.
-        await db.workOrderTransitions.put(
-            'extra', {
-                work_order_id: woId,
-                from_node_id: 'n-middle',
-                to_node_id: 'n-finish',
-                person_id: 'current',
-                transitioned_at:
-                    '2030-01-01T00:00:00.000Z',
-            },
-        );
+        await db.states.put('extra', {
+            entity_id: woId,
+            state: 'n-finish',
+            worker_id: 'current',
+            at: '2030-01-01T00:00:00.000Z',
+        });
         const {
-            workOrders, transitions, workerMap,
+            workOrders, transitionsByWo, workerMap,
         } = await tables();
         assert.deepEqual(
             buildInboxItems(
-                workOrders, transitions, [],
-                workerMap, 'active',
+                workOrders, transitionsByWo,
+                new Map(), workerMap, 'active',
             ),
             [],
         );
         const archived = buildInboxItems(
-            workOrders, transitions, [],
-            workerMap, 'archived',
+            workOrders, transitionsByWo,
+            new Map(), workerMap, 'archived',
         );
         assert.equal(archived.length, 1);
         assert.equal(archived[0]!.completed, true);
@@ -315,6 +344,7 @@ test(
         await db.workers.put(
             'current', buildHumanWorker('Demo'),
         );
+        await seedWorkerState(db, 'current');
         const ctx = createRequestContext(db);
         await db.flows.put(
             'f1', buildFlow(buildLinearGraph()),
@@ -325,22 +355,15 @@ test(
                     generateCryptoSafeBase62(),
                 flowLinkId:
                     generateCryptoSafeBase62(),
-                initTransitionId:
-                    generateCryptoSafeBase62(),
-                postStartTransitionId:
-                    generateCryptoSafeBase62(),
-                claimId:
-                    generateCryptoSafeBase62(),
                 flowId: 'f1',
             });
         }
+        const tables = await collectTables(db);
         const items = buildInboxItems(
-            await db.workOrders.getAll(),
-            await db.workOrderTransitions.getAll(),
-            [],
-            await getWorkerMap(
-                createRequestContext(db),
-            ),
+            tables.workOrders,
+            tables.transitionsByWo,
+            new Map(),
+            tables.workerMap,
             'active',
         );
         assert.equal(items.length, 3);
@@ -365,8 +388,8 @@ test(
             await tables();
         assert.throws(
             () => buildInboxItems(
-                workOrders, [], [],
-                workerMap, 'active',
+                workOrders, new Map(),
+                new Map(), workerMap, 'active',
             ),
             /no transitions/,
         );

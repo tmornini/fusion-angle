@@ -177,7 +177,7 @@ export function ideaToSearchItem(
     return {
         id: 'idea-' + tuple.idea.idForLink(),
         title: tuple.idea.titleText(),
-        meta: tuple.idea.statusValue()
+        meta: tuple.idea.stateValue()
             .replace(/-/g, ' '),
         category: 'ideas',
         icon: iconLightbulb(
@@ -187,7 +187,7 @@ export function ideaToSearchItem(
             ideaId: tuple.idea.idForLink(),
         }),
         keywords: tuple.submitterName + ' '
-            + tuple.idea.statusValue(),
+            + tuple.idea.stateValue(),
     };
 }
 
@@ -200,7 +200,7 @@ export function projectToSearchItem(
         meta: 'Progress: '
             + project.progressPercent()
             + '% · '
-            + project.statusValue()
+            + project.stateValue()
                 .replace(/-/g, ' '),
         category: 'projects',
         icon: iconFolderKanban(
@@ -209,7 +209,7 @@ export function projectToSearchItem(
         href: buildPageUrl('project-detail', {
             projectId: project.idForLink(),
         }),
-        keywords: project.statusValue(),
+        keywords: project.stateValue(),
     };
 }
 

@@ -130,7 +130,6 @@ test(
                 email: id + '@example.com',
                 title: 'member',
                 department: 'eng',
-                status: 'active',
                 strengths: jsonArrayField([]),
                 team_dimensions:
                     jsonObjectField({}),
@@ -154,24 +153,23 @@ test(
 );
 
 test(
-    'work_order_transitions write produces gz1: prefix',
+    'states write produces gz1: prefix',
     async () => {
         const map = installShim();
         const adapter = await createLocalStorageAdapter();
         await adapter.createSchema();
-        await adapter.workOrderTransitions.put(
-            'wot-prefix-test',
+        await adapter.states.put(
+            'evt-prefix-test',
             {
-                work_order_id: 'wo-1',
-                from_node_id: 'n-from',
-                to_node_id: 'n-to',
-                person_id: 'u-1',
-                transitioned_at:
+                entity_id: 'wo-1',
+                state: 'n-to',
+                worker_id: 'u-1',
+                at:
                     '2026-01-01T00:00:00.000Z',
             },
         );
         const stored = map.get(
-            KEY_PREFIX + 'work_order_transitions',
+            KEY_PREFIX + 'states',
         );
         assert.ok(stored, 'expected stored value');
         assert.ok(
@@ -194,7 +192,6 @@ test(
             email: 'alice@example.com',
             phone: '',
             title: 'product_manager',
-            status: 'active',
             strengths: jsonArrayField([]),
             team_dimensions: jsonObjectField({}),
             bio: '',
@@ -276,5 +273,45 @@ test(
             'expected gz1: prefix after import, got '
             + (stored?.slice(0, 20) ?? ''),
         );
+    },
+);
+
+test(
+    'read tolerates gz1: payload on normally-uncompressed table',
+    async () => {
+        const map = installShim();
+        const adapter = await createLocalStorageAdapter();
+        await adapter.createSchema();
+        const flowRow = {
+            id: 'flow-aaaaaaaaaaaaaaaaaaaa',
+            name: 'Test',
+            description: '',
+            is_locked: false,
+            is_auto_layout: true,
+            is_auto_fit: true,
+            lock_timeout: 60,
+            graph: jsonObjectField({
+                nodes: [], edges: [],
+            }),
+            current_version_id: 'fv-1',
+            created_at: '2026-01-01T00:00:00.000Z',
+        };
+        const rawJson = JSON.stringify([flowRow]);
+        const stream = new Blob([rawJson]).stream()
+            .pipeThrough(new CompressionStream('gzip'));
+        const buffer = await new Response(stream)
+            .arrayBuffer();
+        const bytes = new Uint8Array(buffer);
+        let binary = '';
+        for (const b of bytes) {
+            binary += String.fromCharCode(b);
+        }
+        map.set(
+            KEY_PREFIX + 'flows',
+            'gz1:' + btoa(binary),
+        );
+        const result = await adapter.flows.getAll();
+        assert.equal(result.length, 1);
+        assert.equal(result[0]!.name, 'Test');
     },
 );
