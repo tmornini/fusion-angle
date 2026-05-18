@@ -1,6 +1,7 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code (claude.ai/code)
+when working with code in this repository.
 
 ## Alignment
 
@@ -21,7 +22,9 @@ is a sin against Uniformity (Commandment III).
 ./serve <port>         # Build + start local HTTP server on <port>
 ```
 
-**Always commit before building.** `./build` requires a clean working directory. Use `./validate` to catch type errors and lint issues before committing, then commit, then build.
+**Always commit before building.** `./build` requires a clean
+working directory. Use `./validate` to catch type errors and
+lint issues before committing, then commit, then build.
 
 **Build and test locally:**
 
@@ -30,26 +33,52 @@ is a sin against Uniformity (Commandment III).
 # open http://localhost:8080/landing/index.html
 ```
 
-**When running under the Claude Code sandbox**, the defaults above fail two ways: `/tmp/` is not writable, and the tsx IPC pipe used by the `npx tsx` step inside `./build` lands in `$TMPDIR/tsx-501/…` which is outside the sandbox's allowed Unix-socket path (`/tmp/claude/tsx-501`). Use this invocation instead:
+**When running under the Claude Code sandbox**, the defaults
+above fail two ways: `/tmp/` is not writable, and the tsx IPC
+pipe used by the `npx tsx` step inside `./build` lands in
+`$TMPDIR/tsx-501/…` which is outside the sandbox's allowed
+Unix-socket path (`/tmp/claude/tsx-501`). Use this invocation
+instead:
 
 ```bash
 TMPDIR=/tmp/claude ./serve 8080
 # open http://localhost:8080/landing/index.html
 ```
 
-`TMPDIR=/tmp/claude` redirects both tsx's IPC socket and `./serve`'s temp build dir into the sandbox-allowed path. `localhost` is reachable from the sandbox, so the Chrome MCP tools can drive the page normally.
+`TMPDIR=/tmp/claude` redirects both tsx's IPC socket and
+`./serve`'s temp build dir into the sandbox-allowed path.
+`localhost` is reachable from the sandbox, so the Chrome MCP
+tools can drive the page normally.
 
-`./validate` runs `tsc --noEmit` (type checking), then `./test` (automated tests against pure modules and the `api/`, `adapters/`, and `presenters/` layers, via `node --test --strip-types tests/*.test.ts`), then enforces 78-character maximum line length on all `.ts`, `.html`, and `.css` files (excluding `compose.ts`).
+`./validate` runs `tsc --noEmit` (type checking), then
+`./test` (automated tests against pure modules and the
+`api/`, `adapters/`, and `presenters/` layers, via `node
+--test --strip-types tests/*.test.ts`), then enforces a
+78-character maximum line length on all `.ts`, `.html`, and
+`.css` files (excluding `compose.ts`) and on `CLAUDE.md`.
 
-Automated tests cover pure modules, flow-edit logic, all data adapters, the workbox inbox aggregation, navigation, mock-data validity, and presenter HTML output; UI behavior — gestures, layout, visual rendering, end-to-end DOM flows — is still covered by the manual browser regression protocol — see `## Testing` below.
+Automated tests cover pure modules, flow-edit logic, all
+data adapters, the workbox inbox aggregation, navigation,
+mock-data validity, and presenter HTML output; UI behavior
+— gestures, layout, visual rendering, end-to-end DOM flows
+— is still covered by the manual browser regression
+protocol — see `## Testing` below.
 
 ## TypeScript
 
-Target: **ES2024** · Strict mode with `noUncheckedIndexedAccess`. Config at `web-app/app/tsconfig.json`. The `compose.ts` build script is excluded from type checking (it runs in Node).
+Target: **ES2024** · Strict mode with
+`noUncheckedIndexedAccess`. Config at
+`web-app/app/tsconfig.json`. The `compose.ts` build script
+is excluded from type checking (it runs in Node).
 
 ## Architecture
 
-**Vanilla TypeScript** with zero runtime dependencies. Enterprise innovation management platform with modules for ideas, projects, workers, flows, workbox, and analytics. Every page is a standalone HTML file served via HTTP. The code also supports `file:///` protocol locally, but testing is HTTP-only.
+**Vanilla TypeScript** with zero runtime dependencies.
+Enterprise innovation management platform with modules for
+ideas, projects, workers, flows, workbox, and analytics.
+Every page is a standalone HTML file served via HTTP. The
+code also supports `file:///` protocol locally, but testing
+is HTTP-only.
 
 ### Key Layers
 
@@ -376,8 +405,13 @@ that singleton; tests pass it a `MemoryDbAdapter`.
 
 ### Page Module Pattern
 
-Every entry in `PAGE_REGISTRY` declares both `sourceDir` and `sourceFile` explicitly (e.g., `flow-detail` → `web-app/flows/detail.ts` + `web-app/flows/detail.html`). The most common values are `index`, `detail`, `create`, and `convert`. Each page module exports:
-- `init(): Promise<void>` — fetches data, populates DOM placeholders, binds event listeners
+Every entry in `PAGE_REGISTRY` declares both `sourceDir` and
+`sourceFile` explicitly (e.g., `flow-detail` →
+`web-app/flows/detail.ts` + `web-app/flows/detail.html`).
+The most common values are `index`, `detail`, `create`, and
+`convert`. Each page module exports:
+- `init(): Promise<void>` — fetches data, populates DOM
+  placeholders, binds event listeners
 
 Sidebar-layout pages have `index.html` containing page content
 that gets composed with the layout template. Standalone pages
@@ -444,9 +478,18 @@ import { iconPlus, iconTrash } from '../app/icons';
 import { navigateTo, openDialog, closeDialog } from '../app/core';
 ```
 
-`core.ts` re-exports from `format.ts`, `navigation.ts`, and `dialog.ts` so page modules can import `navigateTo`, `initials`, `durationInDays`, `formatDateTime`, `formatCompactCurrency`, `SECONDS_PER_DAY`, `openDialog`, `closeDialog`, `initTabs` from `'../app/core'`. The `adapters/` directory retains its barrel re-export (`adapters/index.ts`).
+`core.ts` re-exports from `format.ts`, `navigation.ts`, and
+`dialog.ts` so page modules can import `navigateTo`,
+`initials`, `durationInDays`, `formatDateTime`,
+`formatCompactCurrency`, `SECONDS_PER_DAY`, `openDialog`,
+`closeDialog`, `initTabs` from `'../app/core'`. The
+`adapters/` directory retains its barrel re-export
+(`adapters/index.ts`).
 
-**Page modules never import from `api/api.ts`** — all data access (reads and writes) goes through the adapter layer (`adapters/`). Only adapter modules import from the API layer directly.
+**Page modules never import from `api/api.ts`** — all data
+access (reads and writes) goes through the adapter layer
+(`adapters/`). Only adapter modules import from the API
+layer directly.
 
 ### Naming Conventions
 
@@ -517,7 +560,10 @@ import { navigateTo, openDialog, closeDialog } from '../app/core';
 
 ### Dark Mode
 
-CSS custom properties on `:root` (light) and `[data-theme="dark"]` (dark). Toggle persists to `localStorage` and carries across page navigation. Supports system preference detection via `prefers-color-scheme`.
+CSS custom properties on `:root` (light) and
+`[data-theme="dark"]` (dark). Toggle persists to
+`localStorage` and carries across page navigation. Supports
+system preference detection via `prefers-color-scheme`.
 
 ## UI & Styling
 
@@ -549,11 +595,21 @@ single-property primitives. Never use raw hex colors — always
 
 ### Component Library
 
-All UI components are vanilla HTML/CSS with ARIA attributes, defined as CSS classes in `web-app/app/styles/` and helper functions across `web-app/app/` modules. No external component library.
+All UI components are vanilla HTML/CSS with ARIA attributes,
+defined as CSS classes in `web-app/app/styles/` and helper
+functions across `web-app/app/` modules. No external
+component library.
 
-**Dialog pattern**: Use `openDialog(id)` / `closeDialog(id)` from `core.ts`. Requires matching HTML elements: `id="{id}-backdrop"` (with `class="dialog-backdrop hidden"`) and `id="{id}-dialog"` (with `class="dialog hidden" aria-hidden="true"`). Helpers manage visibility, ARIA attributes, and focus.
+**Dialog pattern**: Use `openDialog(id)` / `closeDialog(id)`
+from `core.ts`. Requires matching HTML elements:
+`id="{id}-backdrop"` (with `class="dialog-backdrop hidden"`)
+and `id="{id}-dialog"` (with `class="dialog hidden"
+aria-hidden="true"`). Helpers manage visibility, ARIA
+attributes, and focus.
 
-**Tab pattern**: Use `initTabs('[data-tab]', '.tab-panel')` from `core.ts`. Tab buttons use `data-tab="{name}"` attribute, panels use `id="tab-{name}"`.
+**Tab pattern**: Use `initTabs('[data-tab]', '.tab-panel')`
+from `core.ts`. Tab buttons use `data-tab="{name}"`
+attribute, panels use `id="tab-{name}"`.
 
 ### Design System
 
@@ -565,7 +621,10 @@ functions in `web-app/app/icons.ts`.
 
 ### Mobile Responsiveness
 
-CSS media queries in `web-app/app/styles/responsive.css` show/hide desktop vs mobile header and sidebar. Mobile sidebar uses Sheet (slide-in drawer) toggled by JS. Breakpoints: sm 640px, md 768px, lg 1024px, xl 1280px.
+CSS media queries in `web-app/app/styles/responsive.css`
+show/hide desktop vs mobile header and sidebar. Mobile
+sidebar uses Sheet (slide-in drawer) toggled by JS.
+Breakpoints: sm 640px, md 768px, lg 1024px, xl 1280px.
 
 ## Project Structure
 
@@ -637,17 +696,56 @@ in TEST-PLAN.md § Protocol — CLAUDE.md does not duplicate them.
 
 ## Gotchas
 
-- **`noUncheckedIndexedAccess`**: tsconfig enables this — array/object index access returns `T | undefined`, requiring explicit `!` assertions or guards.
-- **ES2024 target**: No transpilation. Native `Object.groupBy()`, `Map.groupBy()` are available. Assumes modern browser.
-- **`withLoadingState()` returns null**: Returns `null` on error AND when data is empty with an `emptyState` config — callers must check for null before using the result.
-- **Cross-tab theme sync**: `state.ts` listens to `StorageEvent` and syncs theme changes across browser tabs automatically.
-- **Non-critical writes logged at warn**: localStorage writes for theme and sidebar state are wrapped in try/catch that log at `warn` level — quota errors don't break the app but are observable via the logger.
-- **Snapshots wipe-first**: All snapshot operations (pristine, mock data, import) call `DELETE('snapshots/schema')` before writing — there is no merge, only replace.
-- **Snapshot quota pre-flight**: `putSnapshotFromFile` consults `navigator.storage.estimate()` and rejects with `SnapshotTooLargeError` if `file.size` exceeds half of `quota - usage` (the import doubles peak memory while parsing). Falls back to a 5 MB hard cap when `navigator.storage.estimate()` is unavailable.
-- **Snapshot wipe-on-fail**: With pre-flight quota checks + per-row validation + column-level compression, mid-write failure is rare; when it does happen, `importSnapshot` wipes every `fusion-ai:<table>` key so the next bootstrap detects no schema and routes the user to the snapshots page to re-import. No backup, no sentinel, no rollback — real atomicity arrives with Postgres.
-- **`file:///` protocol**: Navigation detects file protocol and skips link prefetching. Page URLs use relative paths. Code supports `file:///` locally but testing is HTTP-only.
-- **View Transition aborts**: rapid programmatic navigation surfaces `InvalidStateError` lines in console. Browser-internal (no app code calls `startViewTransition`); no app impact.
-- **The states log is append-only by convention**: `StateStore.record` only appends; the table never deletes. An entity's lifecycle reads as the latest event on its `entity_id`. Reversal is a *new* event with the new state, not an edit of the prior row. The doctrinal split between entity-lifecycle event (state log) and relationship-row splice (`EntityStore.delete` on relationship rows like `state_field_values`) is the seam — read `api/store-entity.ts` and `api/store-state.ts` together to see both halves.
+- **`noUncheckedIndexedAccess`**: tsconfig enables this —
+  array/object index access returns `T | undefined`,
+  requiring explicit `!` assertions or guards.
+- **ES2024 target**: No transpilation. Native
+  `Object.groupBy()`, `Map.groupBy()` are available. Assumes
+  modern browser.
+- **`withLoadingState()` returns null**: Returns `null` on
+  error AND when data is empty with an `emptyState` config —
+  callers must check for null before using the result.
+- **Cross-tab theme sync**: `state.ts` listens to
+  `StorageEvent` and syncs theme changes across browser tabs
+  automatically.
+- **Non-critical writes logged at warn**: localStorage writes
+  for theme and sidebar state are wrapped in try/catch that
+  log at `warn` level — quota errors don't break the app but
+  are observable via the logger.
+- **Snapshots wipe-first**: All snapshot operations
+  (pristine, mock data, import) call
+  `DELETE('snapshots/schema')` before writing — there is no
+  merge, only replace.
+- **Snapshot quota pre-flight**: `putSnapshotFromFile`
+  consults `navigator.storage.estimate()` and rejects with
+  `SnapshotTooLargeError` if `file.size` exceeds half of
+  `quota - usage` (the import doubles peak memory while
+  parsing). Falls back to a 5 MB hard cap when
+  `navigator.storage.estimate()` is unavailable.
+- **Snapshot wipe-on-fail**: With pre-flight quota checks +
+  per-row validation + column-level compression, mid-write
+  failure is rare; when it does happen, `importSnapshot`
+  wipes every `fusion-ai:<table>` key so the next bootstrap
+  detects no schema and routes the user to the snapshots
+  page to re-import. No backup, no sentinel, no rollback —
+  real atomicity arrives with Postgres.
+- **`file:///` protocol**: Navigation detects file protocol
+  and skips link prefetching. Page URLs use relative paths.
+  Code supports `file:///` locally but testing is HTTP-only.
+- **View Transition aborts**: rapid programmatic navigation
+  surfaces `InvalidStateError` lines in console.
+  Browser-internal (no app code calls `startViewTransition`);
+  no app impact.
+- **The states log is append-only by convention**:
+  `StateStore.record` only appends; the table never deletes.
+  An entity's lifecycle reads as the latest event on its
+  `entity_id`. Reversal is a *new* event with the new state,
+  not an edit of the prior row. The doctrinal split between
+  entity-lifecycle event (state log) and relationship-row
+  splice (`EntityStore.delete` on relationship rows like
+  `state_field_values`) is the seam — read
+  `api/store-entity.ts` and `api/store-state.ts` together to
+  see both halves.
 
 ## Worktrees
 
@@ -659,9 +757,16 @@ small focused commits don't already provide.
 ## Subagents
 
 Subagents inherit no scripture and read no CLAUDE.md by
-default. Before delegating to a general-purpose Agent, the
-dispatching agent MUST push down the relevant Church of Code
-doctrine AND the codebase-specific patterns in the prompt:
+default. Every subagent prompt MUST begin with the literal
+phrase `Go to Church!` — this invokes the `church-of-code`
+skill in the subagent's session, loading the full scripture
+before the work begins. A subagent unproselytized is a
+heathen given a hammer.
+
+The scripture is universal; the codebase is local. After
+the proselytization, the dispatching agent MUST also push
+down the codebase-specific patterns the scripture itself
+cannot know:
 
 - **Voice rules**: 78-char max line, 4-space indent, no
   inline styles (use CSS custom properties + classes per
@@ -685,5 +790,5 @@ doctrine AND the codebase-specific patterns in the prompt:
   downstream, no untyped `any` from external boundaries.
 
 An agent of the Church does not unleash unwashed heathens on
-the codebase. Cite the doctrine the subagent is expected to
-honor; do not assume it knows.
+the codebase. Proselytize first, then brief — the scripture
+loads via the skill, the patterns load via the prompt.

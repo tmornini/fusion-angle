@@ -5,8 +5,9 @@ npx tsc --noEmit -p web-app/app/tsconfig.json
 
 ./test
 
-LONG_LINES=$(find api web-app tests -type f \
-  \( -name '*.ts' -o -name '*.html' -o -name '*.css' \) \
+LONG_LINES=$(find api web-app tests CLAUDE.md -type f \
+  \( -name '*.ts' -o -name '*.html' -o -name '*.css' \
+     -o -name 'CLAUDE.md' \) \
   ! -path 'web-app/app/compose.ts' \
   -exec awk \
     'length > 78 {
