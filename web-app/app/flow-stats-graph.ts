@@ -157,18 +157,18 @@ function buildEdge(
         endPt.x - startPt.x,
         endPt.y - startPt.y,
     );
-    const se = whichEdge(
+    const startEdge = whichEdge(
         startPt.x, startPt.y,
         fromStat.positionX, fromStat.positionY,
         NODE_WIDTH, NODE_HEIGHT,
     );
-    const ee = whichEdge(
+    const endEdge = whichEdge(
         endPt.x, endPt.y,
         toStat.positionX, toStat.positionY,
         NODE_WIDTH, NODE_HEIGHT,
     );
-    const cp1 = controlOffset(se, dist);
-    const cp2 = controlOffset(ee, dist);
+    const cp1 = controlOffset(startEdge, dist);
+    const cp2 = controlOffset(endEdge, dist);
     const pathD = 'M '
         + String(startPt.x) + ' '
         + String(startPt.y)

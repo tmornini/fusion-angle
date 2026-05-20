@@ -12,11 +12,16 @@ const DEFAULT_LATENCY_CONFIG: LatencyConfig = {
     maxMs: 500,
 };
 
+const LOG_INPUT_FLOOR = 1e-10;
+
 function sampleLogNormalMs(
     mu: number,
     sigma: number,
 ): number {
-    const u1 = Math.max(Math.random(), 1e-10);
+    const u1 = Math.max(
+        Math.random(),
+        LOG_INPUT_FLOOR,
+    );
     const u2 = Math.random();
     const z = Math.sqrt(-2 * Math.log(u1))
         * Math.cos(2 * Math.PI * u2);

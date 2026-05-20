@@ -48,13 +48,13 @@ function dt(
         hour,
         minute,
     ));
-    const y = d.getUTCFullYear();
-    const mo = pad(d.getUTCMonth() + 1);
-    const da = pad(d.getUTCDate());
-    const h = pad(d.getUTCHours());
-    const mi = pad(d.getUTCMinutes());
-    return `${y}-${mo}-${da}`
-        + `T${h}:${mi}:00.000000Z`;
+    const year = d.getUTCFullYear();
+    const month = pad(d.getUTCMonth() + 1);
+    const day = pad(d.getUTCDate());
+    const hours = pad(d.getUTCHours());
+    const minutes = pad(d.getUTCMinutes());
+    return `${year}-${month}-${day}`
+        + `T${hours}:${minutes}:00.000000Z`;
 }
 
 const MS_PER_HOUR =

@@ -63,59 +63,80 @@ export class MemoryDbAdapter implements DbAdapter {
 
     constructor() {
         this.#backend = new MemoryStorageBackend();
-        const b = this.#backend;
-        const ss = new StateStore(b, 'states');
-        this.states = ss;
+        const backend = this.#backend;
+        const stateStore = new StateStore(
+            backend, 'states',
+        );
+        this.states = stateStore;
         this.organization =
             new SingletonStore<OrganizationEntity>(
-                'organization', b,
+                'organization', backend,
             );
 
         this.workers =
-            new EntityStore('workers', b, ss);
+            new EntityStore(
+                'workers', backend, stateStore,
+            );
         this.aiWorkers =
-            new EntityStore('ai_workers', b, ss);
+            new EntityStore(
+                'ai_workers', backend, stateStore,
+            );
         this.ideas =
-            new EntityStore('ideas', b, ss);
+            new EntityStore(
+                'ideas', backend, stateStore,
+            );
         this.projects =
-            new EntityStore('projects', b, ss);
+            new EntityStore(
+                'projects', backend, stateStore,
+            );
         this.flows =
-            new EntityStore('flows', b, ss);
+            new EntityStore(
+                'flows', backend, stateStore,
+            );
         this.flowVersions =
             new HistoryEntityStore(
-                'flow_versions', b,
+                'flow_versions', backend,
             );
         this.projectFlows =
-            new EntityStore('project_flows', b, ss);
+            new EntityStore(
+                'project_flows', backend, stateStore,
+            );
         this.workOrders =
-            new EntityStore('work_orders', b, ss);
+            new EntityStore(
+                'work_orders', backend, stateStore,
+            );
         this.flowWorkOrders =
             new EntityStore(
-                'flow_work_orders', b, ss,
+                'flow_work_orders',
+                backend, stateStore,
             );
         this.stateFieldValues =
             new EntityStore(
-                'state_field_values', b, ss,
+                'state_field_values',
+                backend, stateStore,
             );
         this.ideaSubmissions =
             new EntityStore(
-                'idea_submissions', b, ss,
+                'idea_submissions',
+                backend, stateStore,
             );
         this.objectives =
-            new EntityStore('objectives', b, ss);
+            new EntityStore(
+                'objectives', backend, stateStore,
+            );
         this.objectiveRevisions =
             new HistoryEntityStore(
-                'objective_revisions', b,
+                'objective_revisions', backend,
             );
         this.projectObjectiveBaselineScores =
             new HistoryEntityStore(
                 'project_objective_baseline_scores',
-                b,
+                backend,
             );
         this.projectObjectiveActualScores =
             new HistoryEntityStore(
                 'project_objective_actual_scores',
-                b,
+                backend,
             );
     }
 

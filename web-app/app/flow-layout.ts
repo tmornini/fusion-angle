@@ -997,8 +997,8 @@ function fitToCanvas(
         isCanvasSized(canvasW, canvasH)
         && graphLandscape !== canvasLandscape;
 
-    const rotW = rotate ? natH : natW;
-    const rotH = rotate ? natW : natH;
+    const rotatedWidth = rotate ? natH : natW;
+    const rotatedHeight = rotate ? natW : natH;
 
     let scaleX = 1;
     let scaleY = 1;
@@ -1007,8 +1007,12 @@ function fitToCanvas(
         const tH = canvasH - NODE_HEIGHT;
         let sX = Infinity;
         let sY = Infinity;
-        if (canScaleAxis(tW, rotW)) sX = tW / rotW;
-        if (canScaleAxis(tH, rotH)) sY = tH / rotH;
+        if (canScaleAxis(tW, rotatedWidth)) {
+            sX = tW / rotatedWidth;
+        }
+        if (canScaleAxis(tH, rotatedHeight)) {
+            sY = tH / rotatedHeight;
+        }
         if (scalesAreFinite(sX, sY)) {
             const sSmall = Math.min(sX, sY);
             const sBig = Math.max(sX, sY);
@@ -1035,11 +1039,11 @@ function fitToCanvas(
     for (const [id, p] of positions) {
         const cx_p = p.x - posCx;
         const cy_p = p.y - posCy;
-        const rx = rotate ? -cy_p : cx_p;
-        const ry = rotate ? cx_p : cy_p;
+        const rotatedX = rotate ? -cy_p : cx_p;
+        const rotatedY = rotate ? cx_p : cy_p;
         result.set(id, {
-            x: rx * scaleX - halfW,
-            y: ry * scaleY - halfH,
+            x: rotatedX * scaleX - halfW,
+            y: rotatedY * scaleY - halfH,
         });
     }
 

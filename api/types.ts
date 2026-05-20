@@ -453,20 +453,20 @@ export class HumanWorker {
     }
 
     matchesSearch(term: string): boolean {
-        const t = term.toLowerCase();
+        const lowerTerm = term.toLowerCase();
         return (
             this.fullName()
                 .toLowerCase()
-                .includes(t)
+                .includes(lowerTerm)
             || this.#email
                 .toLowerCase()
-                .includes(t)
+                .includes(lowerTerm)
             || this.#title
                 .toLowerCase()
-                .includes(t)
+                .includes(lowerTerm)
             || this.#department
                 .toLowerCase()
-                .includes(t)
+                .includes(lowerTerm)
         );
     }
 
@@ -524,12 +524,12 @@ export class AIWorker {
     }
 
     maskedToken(): string {
-        const t = this.#authToken;
-        if (t.length <= 4) return t;
+        const token = this.#authToken;
+        if (token.length <= 4) return token;
         return (
-            t.slice(0, 3)
+            token.slice(0, 3)
             + '…'
-            + t.slice(-4)
+            + token.slice(-4)
         );
     }
 
@@ -562,17 +562,17 @@ export class AIWorker {
     }
 
     matchesSearch(term: string): boolean {
-        const t = term.toLowerCase();
+        const lowerTerm = term.toLowerCase();
         return (
             this.#name
                 .toLowerCase()
-                .includes(t)
+                .includes(lowerTerm)
             || this.#provider
                 .toLowerCase()
-                .includes(t)
+                .includes(lowerTerm)
             || this.#description
                 .toLowerCase()
-                .includes(t)
+                .includes(lowerTerm)
         );
     }
 }
@@ -1138,10 +1138,10 @@ export class Project {
     }
 
     matchesSearch(term: string): boolean {
-        const t = term.toLowerCase();
+        const lowerTerm = term.toLowerCase();
         return this.#title
             .toLowerCase()
-            .includes(t);
+            .includes(lowerTerm);
     }
 }
 
