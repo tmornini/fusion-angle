@@ -1,0 +1,104 @@
+/* Projects: list, detail. */
+
+.project-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 7.5rem);
+  gap: var(--space-4);
+  align-items: center;
+  flex-shrink: 0;
+}
+
+/* .project-detail-wrap is now an alias
+   for .content-wrap-xl */
+.project-detail-wrap {
+  max-width: 64rem;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.detail-grid-spaced {
+  gap: var(--space-8);
+}
+
+.metric-cell {
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  background: hsl(var(--muted) / 0.3);
+  border: 1px solid hsl(var(--border));
+}
+
+.metric-cell-row-divider {
+  padding-top: var(--space-2);
+  border-top: 1px solid
+    hsl(var(--border));
+}
+
+.summary-stat-cell {
+  padding: var(--space-3);
+  border-radius: var(--radius);
+  background: hsl(var(--muted) / 0.5);
+}
+
+.team-member-avatar {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: var(--radius);
+  background: hsl(var(--primary) / 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.flow-icon-pill {
+  padding: var(--space-2);
+  border-radius: var(--radius);
+  background: hsl(var(--primary) / 0.1);
+}
+
+.flow-card-link {
+  padding: var(--space-4);
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+
+.input-narrow-num {
+  width: 5rem;
+  text-align: right;
+}
+
+.variance-good {
+  color: hsl(var(--success-text));
+}
+.variance-bad {
+  color: hsl(var(--error-text));
+}
+
+.dialog-section {
+  padding: var(--space-6);
+}
+.dialog-section-divider-bottom {
+  border-bottom: 1px solid
+    hsl(var(--border));
+}
+.dialog-section-divider-top {
+  border-top: 1px solid
+    hsl(var(--border));
+}
+.dialog-actions-row {
+  padding: var(--space-4) var(--space-6);
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}
+
+.select-auto {
+  width: auto;
+}
+
+.input-md-bold {
+  font-size: 1.125rem;
+  font-weight: var(--font-weight-bold);
+}
+

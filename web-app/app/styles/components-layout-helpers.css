@@ -1,0 +1,123 @@
+/* Layout primitives: stack, content-wrap, legend cell, list item. */
+
+/* Objective list item — used by Organization
+   Objectives box */
+.objective-list-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.8em;
+    padding: 0.6em;
+    border-radius: 6px;
+    background: hsl(var(--muted) / 0.05);
+    margin-bottom: 0.4em;
+}
+
+.objective-list-item .drag-handle {
+    cursor: grab;
+    opacity: 0.5;
+    user-select: none;
+}
+
+.objective-list-item[data-deprecated='true'] {
+    opacity: 0.7;
+}
+
+.objective-list-item[data-deprecated='true']
+    .objective-text strong {
+    text-decoration: line-through;
+}
+
+.objective-text {
+    flex: 1;
+}
+
+.objective-desc {
+    display: block;
+    opacity: 0.7;
+    font-size: 0.9em;
+}
+
+.objective-actions {
+    display: flex;
+    gap: 0.4em;
+}
+
+
+.legend-cell {
+  text-align: center;
+  padding: var(--space-3);
+  border-radius: var(--radius);
+  background: hsl(var(--card) / 0.8);
+  border: 1px solid hsl(var(--border) / 0.5);
+}
+
+.legend-cell-label {
+  font-size: var(--text-xs);
+  color: hsl(var(--muted-foreground));
+  font-weight: var(--font-weight-medium);
+}
+
+.legend-cell-value {
+  font-size: var(--text-2xl);
+  font-weight: var(--font-weight-bold);
+  color: hsl(var(--foreground));
+}
+
+.legend-dot {
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: var(--radius-full);
+  display: inline-block;
+}
+.legend-dot[data-tone="success"] {
+  background: hsl(var(--success));
+}
+.legend-dot[data-tone="primary"] {
+  background: hsl(var(--primary));
+}
+.legend-dot[data-tone="error"] {
+  background: hsl(var(--error));
+}
+.legend-dot[data-tone="muted"] {
+  background: hsl(var(--muted-foreground));
+}
+
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.stack-sm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.stack-lg {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+
+.content-wrap {
+  max-width: 48rem;
+  margin-left: auto;
+  margin-right: auto;
+}
+.content-wrap-md {
+  max-width: 56rem;
+  margin-left: auto;
+  margin-right: auto;
+}
+.content-wrap-xl {
+  max-width: 64rem;
+  margin-left: auto;
+  margin-right: auto;
+}
+.content-wrap-lg {
+  max-width: 72rem;
+  margin-left: auto;
+  margin-right: auto;
+}
+

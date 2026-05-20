@@ -92,3 +92,43 @@ p { line-height: var(--leading-normal); }
   color: hsl(var(--blue-900));
 }
 
+/* ==========================================
+   38. VIEW TRANSITIONS
+   ========================================== */
+
+@view-transition {
+  navigation: auto;
+}
+
+#desktop-sidebar {
+  view-transition-name: sidebar;
+}
+
+.top-header {
+  view-transition-name: header;
+}
+
+.page-content {
+  view-transition-name: page-content;
+}
+
+::view-transition-old(page-content) {
+  animation: var(--duration-fast) var(--ease-in) fade-out;
+}
+
+::view-transition-new(page-content) {
+  animation: var(--duration-normal) var(--ease-out) fade-in-up;
+}
+
+::view-transition-old(sidebar),
+::view-transition-new(sidebar),
+::view-transition-old(header),
+::view-transition-new(header) {
+  animation: none;
+}
+
+@keyframes fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+

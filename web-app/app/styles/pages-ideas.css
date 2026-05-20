@@ -1,0 +1,141 @@
+/* Ideas: detail, create, conversion pages. */
+
+.convert-icon {
+  width: 2.25rem;
+  height: 2.25rem;
+  color: hsl(var(--primary-foreground));
+}
+
+.convert-grid-2-3 {
+  grid-template-columns: 2fr 3fr;
+  gap: var(--space-8);
+}
+
+.convert-progress-bar {
+  width: 6rem;
+  height: 0.5rem;
+  background: hsl(var(--muted));
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.convert-progress-fill {
+  height: 100%;
+  background: hsl(var(--success));
+  transition: width var(--duration-progress);
+  width: var(--convert-progress, 0%);
+}
+
+.convert-summary-sticky {
+  position: sticky;
+  top: 6rem;
+}
+
+.field-check {
+  color: hsl(var(--success));
+}
+
+.field-check[data-ready="false"] {
+  visibility: hidden;
+}
+
+.input-prefix-wrap {
+  position: relative;
+}
+
+.input-prefix-symbol {
+  position: absolute;
+  left: var(--space-3);
+  top: 50%;
+  transform: translateY(-50%);
+  color: hsl(var(--muted-foreground));
+  pointer-events: none;
+}
+
+.input-suffix-symbol {
+  position: absolute;
+  right: var(--space-3);
+  top: 50%;
+  transform: translateY(-50%);
+  color: hsl(var(--muted-foreground));
+  pointer-events: none;
+}
+
+.input-with-prefix {
+  padding-left: 1.75rem;
+}
+
+.input-with-suffix {
+  padding-right: 2.5rem;
+}
+
+.convert-confirm-section {
+  border: 2px solid transparent;
+}
+
+.convert-confirm-section[data-ready="true"] {
+  border-color:
+    hsl(var(--success) / 0.3);
+  background:
+    hsl(var(--success) / 0.05);
+}
+
+.convert-confirm-icon {
+  width: 3rem;
+  height: 3rem;
+  border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: hsl(var(--muted));
+  color: hsl(var(--muted-foreground));
+}
+
+.convert-confirm-icon[data-ready="true"] {
+  background: hsl(var(--success));
+  color: hsl(var(--success-foreground));
+}
+
+
+.idea-create-icon {
+  width: 2.25rem;
+  height: 2.25rem;
+  color: hsl(var(--primary-foreground));
+}
+
+.input-large-title {
+  font-size: 1.125rem;
+  padding: var(--space-3) var(--space-4);
+}
+
+.section-divider-top {
+  border-top: 1px solid hsl(var(--border));
+}
+
+
+.idea-actions-stack {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-2);
+  min-width: 8rem;
+  padding-bottom: var(--space-2);
+}
+
+.idea-detail-wrap {
+  max-width: 48rem;
+  margin: 0 auto;
+}
+
+.idea-detail-wrap.has-footer-actions {
+  padding-bottom: 10rem;
+}
+
+.idea-edit-title {
+  font-size: 1.125rem;
+  font-weight: var(--font-weight-bold);
+}
+
+.dialog-narrow {
+  max-width: 28rem;
+}
+

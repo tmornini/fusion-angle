@@ -1,0 +1,219 @@
+/* Metric widgets, gauges, score rows: numeric displays. */
+
+.portfolio-impact-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--space-4);
+}
+
+.portfolio-impact-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  align-self: flex-start;
+  margin-bottom: var(--space-3);
+}
+
+.portfolio-impact-header .icon-box {
+  width: var(--space-8);
+  height: var(--space-8);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.portfolio-impact-header
+    .icon-box[data-tone='success'] {
+  background: hsl(var(--success-soft));
+  color: hsl(var(--success));
+}
+
+.portfolio-impact-header
+    .icon-box[data-tone='error'] {
+  background: hsl(var(--error-soft));
+  color: hsl(var(--destructive));
+}
+
+.portfolio-impact-header
+    .icon-box[data-tone='muted'] {
+  background: hsl(var(--muted-soft));
+  opacity: 0.6;
+}
+
+.portfolio-impact-svg
+    .portfolio-impact-bg-outer,
+.portfolio-impact-svg
+    .portfolio-impact-bg-inner {
+  stroke: hsl(var(--foreground) / 0.10);
+  stroke-width: var(--gauge-stroke-width);
+}
+
+.portfolio-impact-svg
+    .portfolio-impact-tdc {
+  stroke: hsl(var(--foreground) / 0.55);
+  stroke-width: 1.5;
+}
+
+.portfolio-impact-arc-outer,
+.portfolio-impact-arc-inner {
+  stroke-width: var(--gauge-stroke-width);
+}
+
+.portfolio-impact-arc-outer[data-tone='success'],
+.portfolio-impact-arc-inner[data-tone='success'] {
+  stroke: hsl(var(--success));
+}
+
+.portfolio-impact-arc-outer[data-tone='error'],
+.portfolio-impact-arc-inner[data-tone='error'] {
+  stroke: hsl(var(--destructive));
+}
+
+.portfolio-impact-legend {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+  text-align: center;
+  width: 100%;
+}
+
+
+.gauge-card {
+  padding: var(--space-4) var(--space-6) var(--space-6);
+}
+
+.gauge-card[data-tone="primary"] {
+  background: hsl(var(--primary-soft));
+  border-color: hsl(var(--primary) / 0.15);
+}
+
+.gauge-card[data-tone="success"] {
+  background: hsl(var(--success-soft));
+  border-color: hsl(var(--success) / 0.15);
+}
+
+.gauge-card[data-tone="warning"] {
+  background: hsl(var(--warning-soft));
+  border-color: hsl(var(--warning) / 0.15);
+}
+
+.gauge-arc-container {
+  display: flex;
+  justify-content: center;
+  margin-top: -3.5rem;
+  margin-bottom: var(--space-3);
+}
+
+.gauge-arc-track,
+.gauge-arc-outer,
+.gauge-arc-inner {
+  stroke-width: var(--gauge-stroke-width);
+}
+
+.gauge-arc-outer,
+.gauge-arc-inner {
+  animation: gauge-draw var(--duration-pulse)
+    ease-out;
+}
+
+.gauge-arc-inner.overrun {
+  animation:
+    gauge-draw var(--duration-pulse) ease-out,
+    gauge-flash var(--flash-speed, 0.5s)
+      infinite;
+}
+
+@keyframes gauge-draw {
+  from {
+    stroke-dashoffset: var(--dash-full);
+  }
+}
+
+
+/* Score row — used by ProjectObjectives and
+   DashboardObjectiveAggregates */
+.score-row {
+    display: grid;
+    grid-template-columns:
+        140px var(--bar-width) 50px 50px auto;
+    align-items: center;
+    gap: 0.8em;
+    padding: 0.4em 0;
+}
+
+.score-row[data-empty='true'] {
+    opacity: 0.55;
+}
+
+.score-row-label {
+    text-align: right;
+    font-size: 0.92em;
+}
+
+.score-row-baseline[data-tone='success'],
+.score-row-actual[data-tone='success'] {
+    color: hsl(var(--success));
+}
+
+.score-row-baseline[data-tone='error'],
+.score-row-actual[data-tone='error'] {
+    color: hsl(var(--destructive));
+}
+
+.score-row-count {
+    opacity: 0.6;
+    font-size: 0.85em;
+}
+
+
+.metric-icon-box {
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--radius);
+  background: hsl(var(--primary) / 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+
+.metric-widget {
+  background-color: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  padding: var(--space-4) var(--space-6);
+  transition: box-shadow var(--duration-normal) var(--ease-default),
+              transform var(--duration-normal) var(--ease-default);
+}
+.metric-widget:hover {
+  box-shadow: var(--shadow-card-hover);
+  transform: translateY(-1px);
+}
+
+.metric-widget-value {
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  font-weight: var(--font-weight-bold);
+  color: hsl(var(--foreground));
+}
+
+.metric-widget-label {
+  font-size: var(--text-sm);
+  color: hsl(var(--muted-foreground));
+}
+
+.metric-widget-trend {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+}
+.metric-widget-trend-up { color: hsl(var(--success-text)); }
+.metric-widget-trend-down { color: hsl(var(--error-text)); }
+

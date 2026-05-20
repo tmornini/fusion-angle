@@ -1,0 +1,122 @@
+/* Auth page: sign-in form layout, approval action footer. */
+
+.auth-branding {
+  width: 50%;
+  background: var(--gradient-hero);
+  position: relative;
+  overflow: hidden;
+}
+
+@media (max-width: 1023px) {
+  .auth-branding { display: none !important; }
+}
+
+.auth-form-wrapper {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-8);
+}
+
+@media (min-width: 1024px) {
+  .auth-form-wrapper { width: 50%; }
+}
+
+.auth-branding-content {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: var(--space-12) 5rem;
+  height: 100%;
+}
+
+.auth-form-card {
+  width: 100%;
+  max-width: 28rem;
+}
+
+.auth-mobile-logo {
+  width: 2.5rem;
+  height: 2.5rem;
+}
+
+.auth-brand-icon {
+  width: 3rem;
+  height: 3rem;
+  border-radius: var(--radius-xl);
+  background: hsl(var(--accent));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.auth-brand-name {
+  color: hsl(var(--primary-foreground));
+}
+
+.auth-headline {
+  font-size: 2.5rem;
+  color: hsl(var(--primary-foreground));
+  line-height: 1.2;
+  margin-bottom: var(--space-6);
+}
+
+.auth-subhead {
+  font-size: var(--text-lg);
+  color: hsl(
+    var(--primary-foreground) / 0.8
+  );
+  max-width: 28rem;
+}
+
+.auth-stat-value {
+  color: hsl(var(--accent));
+}
+
+.auth-stat-label {
+  color: hsl(
+    var(--primary-foreground) / 0.7
+  );
+}
+
+.auth-submit-btn {
+  height: 3rem;
+  font-size: var(--text-base);
+}
+
+.btn-link {
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+
+.action-footer {
+  position: fixed;
+  bottom: 0;
+  left: 16rem;
+  right: 0;
+  background: hsl(var(--background) / 0.95);
+  backdrop-filter: blur(8px);
+  border-top: 1px solid hsl(var(--border));
+  z-index: 20;
+}
+
+.action-footer-inner {
+  max-width: 60rem;
+  margin: 0 auto;
+  padding: var(--space-3) var(--space-6);
+}
+
+.btn-outline-error {
+  border: 1px solid hsl(var(--error) / 0.3);
+  background-color: transparent;
+  color: hsl(var(--error));
+}
+.btn-outline-error:hover {
+  background-color: hsl(var(--error-soft));
+}
+

@@ -1,0 +1,175 @@
+/* Dialogs and modals: centered overlay panels, slide-in sheets. */
+
+.score-history-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.score-history-table th,
+.score-history-table td {
+  text-align: left;
+  padding: 0.4em 0.6em;
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+.score-history-table td[data-tone="error"] {
+  color: hsl(var(--destructive));
+}
+
+.score-history-table td[data-tone="success"] {
+  color: hsl(var(--success));
+}
+
+/* Below 768px the card becomes a bottom sheet with a */
+/* drag-handle affordance (pure decoration, ::before).  */
+@media (max-width: 767px) {
+  .flow-stats-card {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    top: auto;
+    max-width: none;
+    padding-top: var(--space-3);
+    border-radius:
+      var(--radius-lg) var(--radius-lg) 0 0;
+  }
+  .flow-stats-card::before {
+    content: "";
+    display: block;
+    width: 2.5rem;
+    height: var(--space-1);
+    margin: 0 auto var(--space-3);
+    border-radius: var(--radius-full);
+    background: hsl(var(--border-strong));
+  }
+}
+
+.score-modal-body,
+.measurement-modal-body {
+  padding: var(--space-4);
+  min-width: 480px;
+}
+
+.score-slider-row,
+.measurement-slider-row {
+  display: grid;
+  grid-template-columns: 200px 1fr 60px;
+  align-items: center;
+  gap: 0.6em;
+  padding: 0.6em 0;
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+.score-slider-row:last-of-type,
+.measurement-slider-row:last-of-type {
+  border-bottom: none;
+}
+
+.score-slider-label strong {
+  display: block;
+}
+
+.score-slider-desc,
+.measurement-caption {
+  display: block;
+  font-size: 0.85em;
+  opacity: 0.7;
+}
+
+.score-slider {
+  width: 100%;
+}
+
+.score-slider.unset {
+  opacity: 0.4;
+}
+
+.score-hint {
+  grid-column: 1 / -1;
+  font-size: 0.85em;
+  color: hsl(var(--warning));
+  margin-top: 0.2em;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6em;
+  margin-top: 1em;
+}
+
+
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: hsl(var(--backdrop) / 0.5);
+  z-index: var(--z-modal-backdrop);
+  animation: fade-in var(--duration-normal) var(--ease-out);
+}
+
+.dialog {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: var(--z-modal);
+  background-color: hsl(var(--card));
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xl);
+  padding: var(--space-6);
+  width: min(90vw, 32rem);
+  max-height: 85vh;
+  overflow-y: auto;
+  animation: scale-in var(--duration-normal) var(--ease-out);
+}
+
+.dialog-header { margin-bottom: var(--space-4); }
+.dialog-title {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: var(--font-weight-semibold);
+}
+.dialog-description {
+  font-size: var(--text-sm);
+  color: hsl(var(--muted-foreground));
+  margin-top: var(--space-1);
+}
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-top: var(--space-6);
+}
+
+
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: hsl(var(--backdrop) / 0.5);
+  z-index: var(--z-modal-backdrop);
+  animation: fade-in var(--duration-normal) var(--ease-out);
+}
+
+.sheet {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  z-index: var(--z-modal);
+  background-color: hsl(var(--card));
+  box-shadow: var(--shadow-xl);
+  overflow-y: auto;
+}
+
+.sheet-left {
+  left: 0;
+  width: 18rem;
+  animation: slide-in-left var(--duration-slow) var(--ease-out);
+}
+
+.sheet-right {
+  right: 0;
+  width: 18rem;
+  animation: slide-in-right var(--duration-slow) var(--ease-out);
+}
+

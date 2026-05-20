@@ -1,0 +1,61 @@
+/* Workers: humans + AIs list, detail. */
+
+.user-dim-row {
+  margin-bottom: var(--space-4);
+}
+
+.user-dim-progress {
+  height: 0.5rem;
+}
+
+.worker-detail-wrap {
+  max-width: 48rem;
+  margin: 0 auto;
+}
+
+.worker-avatar {
+  width: 6rem;
+  height: 6rem;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg,
+    hsl(var(--primary) / 0.2),
+    hsl(var(--primary) / 0.05));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.worker-row {
+  cursor: pointer;
+  transition: background var(--duration-fast);
+}
+
+.worker-row:hover {
+  background: hsl(var(--muted) / 0.5);
+}
+
+.worker-row-divider {
+  border-bottom: 1px solid
+    hsl(var(--border));
+}
+
+.worker-row[data-self="true"] {
+  position: relative;
+  background: hsl(var(--primary) / 0.05);
+  border-left: 3px solid hsl(var(--primary));
+}
+
+.worker-row[data-self="true"]:hover {
+  background: hsl(var(--primary) / 0.1);
+}
+
+.sidebar-worker {
+  cursor: pointer;
+  transition: background var(--duration-fast);
+}
+
+.sidebar-worker:hover {
+  background: hsl(var(--muted) / 0.5);
+}
+
