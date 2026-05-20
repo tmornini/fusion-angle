@@ -336,7 +336,8 @@ test(
 
 test(
     'buildInboxItems sorts items by work-order'
-    + ' position',
+    + ' position with non-monotonic fractional'
+    + ' values',
     async () => {
         const db = new MemoryDbAdapter();
         await db.workers.put(
@@ -356,6 +357,17 @@ test(
                 flowId: 'f1',
             });
         }
+        // Mutate to explicit non-creation-order
+        // fractional positions so the assertion
+        // catches any caller that removes the sort.
+        const created = await db.workOrders.getAll();
+        const explicit = [7.5, 2.5, 5];
+        for (let i = 0; i < created.length; i++) {
+            await db.workOrders.put(created[i]!.id, {
+                ...created[i]!,
+                position: explicit[i]!,
+            });
+        }
         const tables = await collectTables(db);
         const items = buildInboxItems(
             tables.workOrders,
@@ -364,14 +376,9 @@ test(
             tables.workerMap,
             'active',
         );
-        assert.equal(items.length, 3);
-        const positions =
-            items.map(i => i.position);
         assert.deepEqual(
-            positions,
-            [...positions].toSorted(
-                (a, b) => a - b,
-            ),
+            items.map(i => i.position),
+            [2.5, 5, 7.5],
         );
     },
 );

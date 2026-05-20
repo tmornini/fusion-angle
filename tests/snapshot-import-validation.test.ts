@@ -4,6 +4,9 @@ import {
     createLocalStorageAdapter,
 } from '../api/db-localstorage.ts';
 import {
+    TABLE_NAMES,
+} from '../api/db.ts';
+import {
     jsonObjectField,
 } from '../api/types.ts';
 
@@ -186,6 +189,44 @@ test(
 );
 
 test(
+    'rejects objective row with unknown key',
+    async () => {
+        installShim();
+        const adapter =
+            await createLocalStorageAdapter();
+        const json = JSON.stringify({
+            objectives: [{
+                id: 'o1',
+                position: 1,
+                rogue_field: 'invalid',
+            }],
+        });
+        await assert.rejects(
+            () => adapter.importSnapshot(json),
+            /snapshot\.objectives\[0\]/,
+        );
+    },
+);
+
+test(
+    'accepts valid objective row through the'
+    + ' snapshot-validation gate',
+    async () => {
+        const map = installShim();
+        const adapter =
+            await createLocalStorageAdapter();
+        const json = JSON.stringify({
+            objectives: [{ id: 'o1', position: 1 }],
+        });
+        await adapter.importSnapshot(json);
+        assert.ok(
+            map.get(KEY_PREFIX + 'objectives'),
+            'objective row should persist',
+        );
+    },
+);
+
+test(
     'happy-path import populates target table',
     async () => {
         const map = installShim();
@@ -216,20 +257,22 @@ test(
 );
 
 test(
-    'omitted table keys default to empty arrays',
+    'importSnapshot materializes every known table as empty',
     async () => {
-        const map = installShim();
+        installShim();
         const adapter =
             await createLocalStorageAdapter();
         await adapter.importSnapshot('{}');
-        const usersBlob = map.get(
-            KEY_PREFIX + 'workers',
+        const reExported = JSON.parse(
+            await adapter.exportSnapshot(),
         );
-        assert.equal(
-            usersBlob,
-            '[]',
-            'missing table key materialises as []',
-        );
+        for (const table of TABLE_NAMES) {
+            assert.deepStrictEqual(
+                reExported[table],
+                [],
+                'table missing or non-empty: ' + table,
+            );
+        }
     },
 );
 
@@ -309,22 +352,21 @@ test(
         const json =
             await adapter.exportSnapshot();
         const parsed = JSON.parse(json);
-        const expected = [
-            'workers', 'ai_workers',
-            'ideas', 'projects',
-            'flows', 'flow_versions',
-            'project_flows', 'work_orders',
-            'flow_work_orders',
-            'state_field_values',
-            'states',
-            'organization',
-            'idea_submissions',
-        ];
-        for (const table of expected) {
+        for (const table of TABLE_NAMES) {
             assert.ok(
                 Array.isArray(parsed[table]),
                 'missing table in export: ' + table,
             );
         }
+        assert.strictEqual(
+            new Set(TABLE_NAMES).size,
+            TABLE_NAMES.length,
+            'TABLE_NAMES contains duplicates',
+        );
+        assert.strictEqual(
+            Object.keys(parsed).length,
+            TABLE_NAMES.length,
+            'export key count !== TABLE_NAMES length',
+        );
     },
 );

@@ -43,6 +43,10 @@ import {
     validateOrganizationEntity,
     validateIdeaSubmissionEntity,
     validateStateEntity,
+    validateObjectiveEntity,
+    validateObjectiveRevisionEntity,
+    validateBaselineScoreEntity,
+    validateActualScoreEntity,
 } from './validators.ts';
 
 const SIMULATE_LATENCY_PARAM = 'simulate-latency';
@@ -113,6 +117,18 @@ function validateSnapshotRow(
                 break;
             case 'states':
                 validateStateEntity(body);
+                break;
+            case 'objectives':
+                validateObjectiveEntity(body);
+                break;
+            case 'objective_revisions':
+                validateObjectiveRevisionEntity(body);
+                break;
+            case 'project_objective_baseline_scores':
+                validateBaselineScoreEntity(body);
+                break;
+            case 'project_objective_actual_scores':
+                validateActualScoreEntity(body);
                 break;
         }
     } catch (err) {

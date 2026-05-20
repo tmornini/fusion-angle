@@ -2,6 +2,8 @@ import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { PortfolioImpactPresenter } from
     '../web-app/app/presenters/portfolio-impact.ts';
+import { DISPLAY_ABSENT } from
+    '../web-app/app/format.ts';
 
 test('renders both arc segments when both means present',
     () => {
@@ -34,7 +36,7 @@ test('renders no value arcs when both means undefined',
         assert.ok(!html.includes(
             'class="portfolio-impact-arc-outer"',
         ));
-        assert.ok(html.includes('—'));
+        assert.ok(html.includes(DISPLAY_ABSENT));
     });
 
 test('positive baseline → data-tone="positive"', () => {

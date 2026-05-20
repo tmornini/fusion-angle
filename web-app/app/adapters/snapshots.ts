@@ -39,7 +39,7 @@ export class SnapshotTooLargeError extends Error {
 // Old snapshots carrying them are not migrated — the
 // importer rejects them with this error and routes the
 // user back to re-snapshot from current state.
-const RETIRED_KEYS_PER_TABLE:
+export const RETIRED_KEYS_PER_TABLE:
     Record<string, readonly string[]> = {
     ai_workers: ['created_at'],
     flows: ['created_at', 'updated_at'],
@@ -69,7 +69,7 @@ const RETIRED_KEYS_PER_TABLE:
     ],
 };
 
-const RETIRED_TABLES: readonly string[] = [
+export const RETIRED_TABLES: readonly string[] = [
     'activities',
     'activity_actors',
 ];

@@ -20,6 +20,8 @@ import {
     postSchemaCreation,
     postMockDataLoad,
     deleteSchema,
+    RETIRED_KEYS_PER_TABLE,
+    RETIRED_TABLES,
     SnapshotTooLargeError,
     SnapshotIncompatibleError,
 } from '../web-app/app/adapters/snapshots.ts';
@@ -276,5 +278,57 @@ test(
         const { ctx } = setup();
         const json = JSON.stringify({ workers: [] });
         await putSnapshot(ctx, json);
+    },
+);
+
+test(
+    'putSnapshot rejects every retired table'
+    + ' enumerated in RETIRED_TABLES',
+    async () => {
+        for (const table of RETIRED_TABLES) {
+            const { ctx } = setup();
+            const json = JSON.stringify({
+                [table]: [{ id: 'x' }],
+            });
+            await assert.rejects(
+                () => putSnapshot(ctx, json),
+                (err: Error) =>
+                    err instanceof
+                        SnapshotIncompatibleError
+                    && err.retired.includes(table),
+                'expected ' + table
+                + ' to surface as retired',
+            );
+        }
+    },
+);
+
+test(
+    'putSnapshot rejects every retired field'
+    + ' enumerated in RETIRED_KEYS_PER_TABLE',
+    async () => {
+        for (const [table, keys] of Object.entries(
+            RETIRED_KEYS_PER_TABLE,
+        )) {
+            for (const key of keys) {
+                const { ctx } = setup();
+                const json = JSON.stringify({
+                    [table]: [{
+                        id: 'x', [key]: 1,
+                    }],
+                });
+                const expected = table + '.' + key;
+                await assert.rejects(
+                    () => putSnapshot(ctx, json),
+                    (err: Error) =>
+                        err instanceof
+                            SnapshotIncompatibleError
+                        && err.retired
+                            .includes(expected),
+                    'expected ' + expected
+                    + ' to surface as retired',
+                );
+            }
+        }
     },
 );

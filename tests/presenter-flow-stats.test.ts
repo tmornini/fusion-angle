@@ -7,6 +7,8 @@ import type {
 } from '../web-app/app/flow-stats-aggregate.ts';
 import { FlowStatsPresenter }
     from '../web-app/app/presenters/flow-stats.ts';
+import { DISPLAY_ABSENT } from
+    '../web-app/app/format.ts';
 
 function model(): FlowStatsModel {
     const node =
@@ -89,8 +91,11 @@ test('regular nodes show avg-sojourn face; special nodes show —',
     () => {
     const html = buildStatsGraphSvg(model(), VB, null).toString();
     assert.match(html, />8\.5m</);
-    assert.match(html,
-        /data-node-id="c"[\s\S]*?flow-stats-node-face[^>]*>—</);
+    assert.match(html, new RegExp(
+        'data-node-id="c"[\\s\\S]*?'
+        + 'flow-stats-node-face[^>]*>'
+        + DISPLAY_ABSENT + '<',
+    ));
 });
 
 test('danger hazard glyph appears when workerHazard is danger',
@@ -433,8 +438,8 @@ test('special-node card is lean (no clan/producer/branch)',
     const html = p.buildCard(s).toString();
     assert.doesNotMatch(html, /Top producer/);
     assert.doesNotMatch(html, /Clan size/);
-    // null durations render as em-dash
-    assert.match(html, /—/);
+    // null durations render via DISPLAY_ABSENT
+    assert.match(html, new RegExp(DISPLAY_ABSENT));
 });
 
 test('renderCard hides the slot when nodeId is null', () => {
