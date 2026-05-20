@@ -26,21 +26,43 @@ export function dropIndex(
     return rects.length;
 }
 
-export function computeNewPosition(
+// The position that lies between two existing
+// positions — the room a new item needs to wedge in
+// without disturbing its neighbors. The arithmetic
+// is averaging; the semantic is BETWEENING.
+export function positionBetween(
+    left: number,
+    right: number,
+): number {
+    return (left + right) / 2;
+}
+
+// The next position past the tail of the list — the
+// seed for an empty list, or one POSITION_GAP beyond
+// the current last entry. The canonical append.
+export function nextPosition(
     positions: readonly number[],
-    idx: number,
 ): number {
     if (positions.length === 0) {
         return FIRST_POSITION;
     }
+    return positions[positions.length - 1]!
+        + POSITION_GAP;
+}
+
+export function computeNewPosition(
+    positions: readonly number[],
+    idx: number,
+): number {
+    if (positions.length === 0
+        || idx >= positions.length) {
+        return nextPosition(positions);
+    }
     if (idx === 0) {
         return positions[0]! - POSITION_GAP;
     }
-    if (idx >= positions.length) {
-        return positions[positions.length - 1]!
-            + POSITION_GAP;
-    }
-    return (
-        positions[idx - 1]! + positions[idx]!
-    ) / 2;
+    return positionBetween(
+        positions[idx - 1]!,
+        positions[idx]!,
+    );
 }

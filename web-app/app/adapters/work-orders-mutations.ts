@@ -35,6 +35,9 @@ import {
 import {
     generateCryptoSafeBase62,
 } from './crypto-safe-base62.ts';
+import {
+    nextPosition,
+} from '../drag-reorder-positions.ts';
 import type { StateEntity } from '../../../api/types.ts';
 
 const workOrderChanges =
@@ -52,9 +55,6 @@ export function subscribeWorkOrderChanges(
 ): () => void {
     return workOrderChanges.subscribe(fn);
 }
-
-const FIRST_POSITION = 1;
-const POSITION_STEP = 1;
 
 const CLAIM_STATES: ReadonlySet<string> = new Set([
     'claimed',
@@ -78,21 +78,6 @@ async function generateDisplayId(
             .padStart(2, '0');
     }
     return hex;
-}
-
-async function nextWorkOrderPosition(
-    ctx: RequestContext,
-): Promise<number> {
-    const existing = await ctx.GET<
-        WorkOrderEntity[]
-    >('work-orders');
-    if (existing.length === 0) {
-        return FIRST_POSITION;
-    }
-    const maxPosition = Math.max(
-        ...existing.map(w => w.position),
-    );
-    return maxPosition + POSITION_STEP;
 }
 
 // Locate the latest claim-vocabulary event for one
@@ -183,8 +168,11 @@ export async function postWorkOrderCreation(
 
     const displayId =
         await generateDisplayId(input.workOrderId);
-    const position =
-        await nextWorkOrderPosition(ctx);
+    const existing =
+        await ctx.GET<WorkOrderEntity[]>('work-orders');
+    const position = nextPosition(
+        existing.map(w => w.position),
+    );
     const now = nowUtc();
 
     const flowGraph: WorkOrderFlowGraph =

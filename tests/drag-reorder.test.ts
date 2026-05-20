@@ -4,6 +4,8 @@ import {
     computeNewPosition,
     dropIndex,
     FIRST_POSITION,
+    nextPosition,
+    positionBetween,
     type CardRect,
 } from '../web-app/app/drag-reorder-positions.ts';
 
@@ -119,5 +121,53 @@ test(
             computeNewPosition([5, 10, 15], 2),
             12.5,
         );
+    },
+);
+
+test(
+    'positionBetween returns the midpoint of two'
+    + ' integer positions',
+    () => {
+        assert.equal(positionBetween(5, 10), 7.5);
+    },
+);
+
+test(
+    'positionBetween wedges between adjacent'
+    + ' fractional positions',
+    () => {
+        assert.equal(positionBetween(7, 7.5), 7.25);
+    },
+);
+
+test(
+    'positionBetween handles a negative-anchor'
+    + ' prepend chain',
+    () => {
+        assert.equal(positionBetween(-1, 1), 0);
+    },
+);
+
+test(
+    'nextPosition returns FIRST_POSITION on'
+    + ' empty list',
+    () => {
+        assert.equal(nextPosition([]), FIRST_POSITION);
+    },
+);
+
+test(
+    'nextPosition appends one POSITION_GAP past'
+    + ' the last integer entry',
+    () => {
+        assert.equal(nextPosition([5, 10, 15]), 16);
+    },
+);
+
+test(
+    'nextPosition preserves fractional baseline'
+    + ' when appending',
+    () => {
+        assert.equal(nextPosition([7.5]), 8.5);
     },
 );

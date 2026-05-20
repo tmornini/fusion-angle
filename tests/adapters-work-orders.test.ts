@@ -247,6 +247,36 @@ test(
 );
 
 test(
+    'postWorkOrderCreation appends past a'
+    + ' fractional baseline without renumbering',
+    async () => {
+        const { db, ctx } = await setupDb();
+        const graph = buildLinearGraph();
+        await db.flows.put(
+            'f1', buildFlow(graph),
+        );
+
+        const firstId =
+            await createWorkOrder(ctx, 'f1');
+        const first = (
+            await db.workOrders.getAll()
+        )[0]!;
+        await db.workOrders.put(firstId, {
+            ...first,
+            position: 7.5,
+        });
+
+        await createWorkOrder(ctx, 'f1');
+
+        const all = await db.workOrders.getAll();
+        const second = all.find(
+            w => w.id !== firstId,
+        );
+        assert.equal(second!.position, 8.5);
+    },
+);
+
+test(
     'postWorkOrderCreation throws '
     + 'when flow has no start node',
     async () => {
