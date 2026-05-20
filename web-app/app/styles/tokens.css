@@ -88,6 +88,9 @@
   --space-12: 3rem;
   --space-16: 4rem;
 
+  /* Component sizing */
+  --gauge-stroke-width: 14;
+
   /* Font weights */
   --font-weight-regular: 400;
   --font-weight-medium: 500;

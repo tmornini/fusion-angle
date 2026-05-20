@@ -24,7 +24,7 @@ interface Aggregate {
 
 function toneFor(v: number | undefined): string {
     return v === undefined
-        ? 'neutral'
+        ? 'muted'
         : toneForScore(v);
 }
 

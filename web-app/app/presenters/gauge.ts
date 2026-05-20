@@ -39,6 +39,8 @@ const ICON_FNS: Record<
 
 const ARC_OUTER_R = 65;
 const ARC_INNER_R = 45;
+const OUTER_PATH_D = 'M 25 85 A 65 65 0 0 1 155 85';
+const INNER_PATH_D = 'M 45 85 A 45 45 0 0 1 135 85';
 
 export class GaugePresenter {
     readonly #data: GaugeData;
@@ -114,7 +116,7 @@ export class GaugePresenter {
         const stop0 =
             'hsl(var(--success))';
         const stop1 = isOverrun
-            ? 'red'
+            ? 'hsl(var(--error))'
             : 'hsl(var(--success))';
 
         let innerClass = 'gauge-arc-inner';
@@ -192,30 +194,22 @@ export class GaugePresenter {
                         }"/>
                 </linearGradient>
             </defs>
-            <path
-                d="${
-                    'M 25 85 A 65 65'
-                    + ' 0 0 1 155 85'
-                }"
+            <path class="gauge-arc-track"
+                d="${OUTER_PATH_D}"
                 fill="none"
                 stroke="${
                     'hsl(var(--muted))'
                 }"
-                stroke-width="14"
                 stroke-linecap="round"
                 opacity="0.3"/>
             <path
                 class="gauge-arc-outer"
-                d="${
-                    'M 25 85 A 65 65'
-                    + ' 0 0 1 155 85'
-                }"
+                d="${OUTER_PATH_D}"
                 fill="none"
                 stroke="${
                     'url(#outer-'
                     + elementId + ')'
                 }"
-                stroke-width="14"
                 stroke-linecap="round"
                 stroke-dasharray="${
                     outerArc
@@ -227,30 +221,22 @@ export class GaugePresenter {
                     '--dash-full:'
                     + outerArc
                 }"/>
-            <path
-                d="${
-                    'M 45 85 A 45 45'
-                    + ' 0 0 1 135 85'
-                }"
+            <path class="gauge-arc-track"
+                d="${INNER_PATH_D}"
                 fill="none"
                 stroke="${
                     'hsl(var(--muted))'
                 }"
-                stroke-width="14"
                 stroke-linecap="round"
                 opacity="0.3"/>
             <path
                 class="${innerClass}"
-                d="${
-                    'M 45 85 A 45 45'
-                    + ' 0 0 1 135 85'
-                }"
+                d="${INNER_PATH_D}"
                 fill="none"
                 stroke="${
                     'url(#inner-'
                     + elementId + ')'
                 }"
-                stroke-width="14"
                 stroke-linecap="round"
                 stroke-dasharray="${
                     innerArc

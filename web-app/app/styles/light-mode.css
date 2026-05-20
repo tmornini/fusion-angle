@@ -78,6 +78,10 @@
   --info-border: var(--blue-200);
   --info-text: var(--blue-700);
 
+  /* Soft variants for primary and muted (alias of palette) */
+  --primary-soft: var(--blue-50);
+  --muted-soft: var(--gray-100);
+
   /* Card shadows */
   --shadow-card:
       0 1px 3px 0 hsl(var(--blue-500) / 0.04),

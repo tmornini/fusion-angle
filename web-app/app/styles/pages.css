@@ -1302,17 +1302,17 @@ svg.flow-canvas [data-edge-id] {
 }
 
 .gauge-card[data-tone="primary"] {
-  background: hsl(var(--primary) / 0.04);
+  background: hsl(var(--primary-soft));
   border-color: hsl(var(--primary) / 0.15);
 }
 
 .gauge-card[data-tone="success"] {
-  background: hsl(var(--success) / 0.04);
+  background: hsl(var(--success-soft));
   border-color: hsl(var(--success) / 0.15);
 }
 
 .gauge-card[data-tone="warning"] {
-  background: hsl(var(--warning) / 0.04);
+  background: hsl(var(--warning-soft));
   border-color: hsl(var(--warning) / 0.15);
 }
 
@@ -1321,6 +1321,12 @@ svg.flow-canvas [data-edge-id] {
   justify-content: center;
   margin-top: -3.5rem;
   margin-bottom: var(--space-3);
+}
+
+.gauge-arc-track,
+.gauge-arc-outer,
+.gauge-arc-inner {
+  stroke-width: var(--gauge-stroke-width);
 }
 
 .gauge-arc-outer,
@@ -2157,12 +2163,12 @@ svg.flow-stats-canvas
 }
 .flow-stats-node-name {
   fill: hsl(var(--foreground));
-  font-size: 13px;
+  font-size: var(--text-xs);
   font-weight: 600;
 }
 .flow-stats-node-face {
   fill: hsl(var(--muted-foreground));
-  font-size: 11px;
+  font-size: var(--text-2xs);
 }
 .flow-stats-node-warning {
   color: hsl(var(--warning));
@@ -2360,41 +2366,41 @@ svg.flow-stats-canvas
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 1.2em 1em;
+  padding: var(--space-4);
 }
 
 .portfolio-impact-header {
   display: flex;
   align-items: center;
-  gap: 0.6em;
+  gap: var(--space-2);
   align-self: flex-start;
-  margin-bottom: 0.8em;
+  margin-bottom: var(--space-3);
 }
 
 .portfolio-impact-header .icon-box {
-  width: 32px;
-  height: 32px;
-  border-radius: 6px;
+  width: var(--space-8);
+  height: var(--space-8);
+  border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .portfolio-impact-header
-    .icon-box[data-tone='positive'] {
-  background: hsl(var(--success) / 0.12);
+    .icon-box[data-tone='success'] {
+  background: hsl(var(--success-soft));
   color: hsl(var(--success));
 }
 
 .portfolio-impact-header
-    .icon-box[data-tone='negative'] {
-  background: hsl(var(--destructive) / 0.12);
+    .icon-box[data-tone='error'] {
+  background: hsl(var(--error-soft));
   color: hsl(var(--destructive));
 }
 
 .portfolio-impact-header
-    .icon-box[data-tone='neutral'] {
-  background: hsl(var(--muted) / 0.10);
+    .icon-box[data-tone='muted'] {
+  background: hsl(var(--muted-soft));
   opacity: 0.6;
 }
 
@@ -2403,7 +2409,7 @@ svg.flow-stats-canvas
 .portfolio-impact-svg
     .portfolio-impact-bg-inner {
   stroke: hsl(var(--foreground) / 0.10);
-  stroke-width: 14;
+  stroke-width: var(--gauge-stroke-width);
 }
 
 .portfolio-impact-svg
@@ -2414,38 +2420,26 @@ svg.flow-stats-canvas
 
 .portfolio-impact-arc-outer,
 .portfolio-impact-arc-inner {
-  stroke-width: 14;
+  stroke-width: var(--gauge-stroke-width);
 }
 
-.portfolio-impact-arc-outer[data-tone='positive'],
-.portfolio-impact-arc-inner[data-tone='positive'] {
+.portfolio-impact-arc-outer[data-tone='success'],
+.portfolio-impact-arc-inner[data-tone='success'] {
   stroke: hsl(var(--success));
 }
 
-.portfolio-impact-arc-outer[data-tone='negative'],
-.portfolio-impact-arc-inner[data-tone='negative'] {
+.portfolio-impact-arc-outer[data-tone='error'],
+.portfolio-impact-arc-inner[data-tone='error'] {
   stroke: hsl(var(--destructive));
 }
 
 .portfolio-impact-legend {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 0.8em;
-  margin-top: 0.6em;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
   text-align: center;
   width: 100%;
-}
-
-.legend-dot[data-tone='positive'] {
-  background: hsl(var(--success));
-}
-
-.legend-dot[data-tone='negative'] {
-  background: hsl(var(--destructive));
-}
-
-.legend-dot[data-tone='neutral'] {
-  background: hsl(var(--muted));
 }
 
 /* ==========================================
@@ -2454,7 +2448,7 @@ svg.flow-stats-canvas
 
 .score-modal-body,
 .measurement-modal-body {
-  padding: 1.2em;
+  padding: var(--space-4);
   min-width: 480px;
 }
 
@@ -2551,15 +2545,13 @@ svg.flow-stats-canvas
   border-bottom: 1px solid hsl(var(--border));
 }
 
-.score-history-table td[data-tone="negative"] {
+.score-history-table td[data-tone="error"] {
   color: hsl(var(--destructive));
 }
 
-.score-history-table td[data-tone="positive"] {
+.score-history-table td[data-tone="success"] {
   color: hsl(var(--success));
 }
-
-/* data-tone="neutral" inherits default text color */
 
 /* Below 768px the card becomes a bottom sheet with a */
 /* drag-handle affordance (pure decoration, ::before).  */

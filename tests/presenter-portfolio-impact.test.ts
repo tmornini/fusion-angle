@@ -39,20 +39,20 @@ test('renders no value arcs when both means undefined',
         assert.ok(html.includes(DISPLAY_ABSENT));
     });
 
-test('positive baseline → data-tone="positive"', () => {
+test('positive baseline → data-tone="success"', () => {
     const p = new PortfolioImpactPresenter({
         baselineMean: 30, actualMean: 20,
         projectCount: 1, actualCount: 1,
     });
     const html = p.buildCard().toString();
-    assert.ok(html.includes('data-tone="positive"'));
+    assert.ok(html.includes('data-tone="success"'));
 });
 
-test('negative baseline → data-tone="negative"', () => {
+test('negative baseline → data-tone="error"', () => {
     const p = new PortfolioImpactPresenter({
         baselineMean: -30, actualMean: -20,
         projectCount: 1, actualCount: 1,
     });
     const html = p.buildCard().toString();
-    assert.ok(html.includes('data-tone="negative"'));
+    assert.ok(html.includes('data-tone="error"'));
 });

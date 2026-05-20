@@ -126,7 +126,7 @@ test('revision event row shows the new objective name',
             'r2 row should render "Drive Growth"');
     });
 
-test('positive score TD carries data-tone="positive"', () => {
+test('positive score TD carries data-tone="success"', () => {
     const p = new ProjectScoreHistoryPresenter(
         [{ id: 'b1', project_id: 'p1', objective_id: 'o1',
             score: 40,
@@ -135,10 +135,10 @@ test('positive score TD carries data-tone="positive"', () => {
     );
     const html = p.buildBody().toString();
     assert.match(html,
-        /<td data-tone="positive">\+40<\/td>/);
+        /<td data-tone="success">\+40<\/td>/);
 });
 
-test('negative score TD carries data-tone="negative"', () => {
+test('negative score TD carries data-tone="error"', () => {
     const p = new ProjectScoreHistoryPresenter(
         [], [{ id: 'a1', project_id: 'p1',
             objective_id: 'o1', score: -50,
@@ -147,10 +147,10 @@ test('negative score TD carries data-tone="negative"', () => {
     );
     const html = p.buildBody().toString();
     assert.match(html,
-        /<td data-tone="negative">−50<\/td>/);
+        /<td data-tone="error">−50<\/td>/);
 });
 
-test('zero score TD carries data-tone="neutral"', () => {
+test('zero score TD carries data-tone="muted"', () => {
     const p = new ProjectScoreHistoryPresenter(
         [{ id: 'b1', project_id: 'p1', objective_id: 'o1',
             score: 0,
@@ -158,7 +158,7 @@ test('zero score TD carries data-tone="neutral"', () => {
         [], revisions, deprecations, resolver,
     );
     const html = p.buildBody().toString();
-    assert.match(html, /<td data-tone="neutral">0<\/td>/);
+    assert.match(html, /<td data-tone="muted">0<\/td>/);
 });
 
 test('deprecation event row resolves the objective name '

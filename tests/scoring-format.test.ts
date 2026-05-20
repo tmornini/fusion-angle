@@ -46,8 +46,8 @@ test('formatSigned emits 0 for zero', () => {
     assert.equal(formatSigned(0), '0');
 });
 
-test('toneForScore positive/negative/neutral', () => {
-    assert.equal(toneForScore(1), 'positive');
-    assert.equal(toneForScore(-1), 'negative');
-    assert.equal(toneForScore(0), 'neutral');
+test('toneForScore maps to canonical tone vocabulary', () => {
+    assert.equal(toneForScore(1), 'success');
+    assert.equal(toneForScore(-1), 'error');
+    assert.equal(toneForScore(0), 'muted');
 });

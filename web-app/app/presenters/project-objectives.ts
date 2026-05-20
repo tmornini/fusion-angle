@@ -129,7 +129,7 @@ export class ProjectObjectivesPresenter {
                 <strong class="score-row-actual"
                     data-tone="${actual
                         ? toneForScore(actual.score)
-                        : 'neutral'}">
+                        : 'muted'}">
                     ${actual
                         ? formatSigned(actual.score)
                         : 'no measurements yet'}

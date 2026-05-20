@@ -1052,6 +1052,14 @@
   color: hsl(var(--info-text));
 }
 
+.icon-box[data-tone="muted"],
+.icon-box-lg[data-tone="muted"] {
+  background: linear-gradient(135deg,
+    hsl(var(--muted) / 0.2),
+    hsl(var(--muted) / 0.05));
+  color: hsl(var(--muted-foreground));
+}
+
 /* ==========================================
    23. AVATAR
    ========================================== */
@@ -1165,6 +1173,12 @@
 }
 .legend-dot[data-tone="primary"] {
   background: hsl(var(--primary));
+}
+.legend-dot[data-tone="error"] {
+  background: hsl(var(--error));
+}
+.legend-dot[data-tone="muted"] {
+  background: hsl(var(--muted-foreground));
 }
 
 /* ==========================================
@@ -1382,19 +1396,19 @@
     );
 }
 
-.bipolar-bar[data-tone='positive']::after {
+.bipolar-bar[data-tone='success']::after {
     --tone-current: var(--success);
     left: 50%;
     border-radius: 0 3px 3px 0;
 }
 
-.bipolar-bar[data-tone='negative']::after {
+.bipolar-bar[data-tone='error']::after {
     --tone-current: var(--destructive);
     right: 50%;
     border-radius: 3px 0 0 3px;
 }
 
-.bipolar-bar[data-tone='neutral']::after {
+.bipolar-bar[data-tone='muted']::after {
     display: none;
 }
 
@@ -1422,13 +1436,13 @@
     font-size: 0.92em;
 }
 
-.score-row-baseline[data-tone='positive'],
-.score-row-actual[data-tone='positive'] {
+.score-row-baseline[data-tone='success'],
+.score-row-actual[data-tone='success'] {
     color: hsl(var(--success));
 }
 
-.score-row-baseline[data-tone='negative'],
-.score-row-actual[data-tone='negative'] {
+.score-row-baseline[data-tone='error'],
+.score-row-actual[data-tone='error'] {
     color: hsl(var(--destructive));
 }
 

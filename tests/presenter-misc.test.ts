@@ -218,8 +218,9 @@ test(
 );
 
 test(
-    'GaugePresenter colors the inner arc red and'
-    + ' adds the overrun class on heavy overrun',
+    'GaugePresenter colors the inner arc with the'
+    + ' error token and adds the overrun class on'
+    + ' heavy overrun',
     () => {
         const out = new GaugePresenter(
             makeGauge(
@@ -228,7 +229,10 @@ test(
                 true,
             ),
         ).render().toString();
-        assert.match(out, /stop-color="red"/);
+        assert.match(
+            out,
+            /stop-color="hsl\(var\(--error\)\)"/,
+        );
         assert.match(
             out,
             /class="gauge-arc-inner overrun"/,
@@ -249,7 +253,9 @@ test(
             ),
         ).render().toString();
         assert.equal(
-            /stop-color="red"/.test(out), false,
+            /stop-color="hsl\(var\(--error\)\)"/
+                .test(out),
+            false,
         );
         assert.equal(/overrun/.test(out), false);
     },

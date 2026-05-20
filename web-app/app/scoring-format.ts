@@ -1,4 +1,4 @@
-export type Tone = 'positive' | 'negative' | 'neutral';
+export type Tone = 'success' | 'error' | 'muted';
 
 export function latestPerPair<T extends {
     project_id: string;
@@ -24,7 +24,7 @@ export function formatSigned(score: number): string {
 }
 
 export function toneForScore(score: number): Tone {
-    if (score > 0) return 'positive';
-    if (score < 0) return 'negative';
-    return 'neutral';
+    if (score > 0) return 'success';
+    if (score < 0) return 'error';
+    return 'muted';
 }

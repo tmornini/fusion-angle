@@ -159,7 +159,7 @@ export class ProjectPresenter {
         const hasScore = projected !== undefined;
         const tone = hasScore
             ? toneForScore(projected)
-            : 'neutral';
+            : 'muted';
         const display = hasScore
             ? formatSigned(projected)
             : DISPLAY_ABSENT;
