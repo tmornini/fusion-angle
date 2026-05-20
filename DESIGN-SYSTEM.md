@@ -427,8 +427,8 @@ The build cascade is locked in `./build`. Each file group loads
 in this order, and within glob groups, alphabetical order
 applies:
 
-1. `fonts.css` — `@font-face` declarations
-2. `tokens.css` — design tokens (CSS custom properties)
+1. `tokens.css` — design tokens (CSS custom properties)
+2. `fonts.css` — `@font-face` declarations
 3. `light-mode.css` — light theme HSL assignments
 4. `dark-mode.css` — dark theme overrides
 5. `base.css` — global resets, view transitions

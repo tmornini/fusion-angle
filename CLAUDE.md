@@ -233,8 +233,9 @@ propagates its new state to the presenter via the
 `request-update` action payload, consumed by detail.ts through
 `presenter.withInteractionState(state)` — the single sanctioned
 seam, no shared mutable state. The properties
-panel is positioned on the LEFT (`pages.css` `.flow-props-panel`
-uses `left: 0`); the visible canvas occupies pixels
+panel is positioned on the LEFT
+(`pages-flow-detail.css` `.flow-props-panel` uses
+`left: 0`); the visible canvas occupies pixels
 `[PANEL_WIDTH_PX, canvasW]`. When the panel is open, both Auto
 Layout (`applyAutoLayout`) and Auto Fit (`zoomToFit`) account
 for the panel-occupied left portion via `PANEL_WIDTH_PX`. The
@@ -357,8 +358,8 @@ Its emitted SVG carries *none* of the editor's
 interactivity tells (no `<animate>`, `role="button"`,
 `tabindex`, connection ports, `data-connect-port`,
 `aria-current`) and *no paint either* — edge/node strokes,
-the arrowhead, the loop-back dash all live in `pages.css`
-(`§48 FLOW STATS`); the renderer emits structure (`d`,
+the arrowhead, the loop-back dash all live in
+`pages-flow-stats.css`; the renderer emits structure (`d`,
 `transform`, `x/y`, `class`, `data-*`) only. The one
 presentational inline attribute is the per-node
 `style="--heat-t:${t}"`; CSS computes the fill via a 4-stop

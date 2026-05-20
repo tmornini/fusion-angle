@@ -92,8 +92,8 @@ npx esbuild web-app/app/root-redirect.ts \
 [ -s "$BUILD_DIR/assets/root-redirect.js" ] || { echo "ERROR: root-redirect.js is empty or missing" >&2; exit 1; }
 echo "Bundle created: assets/root-redirect.js ($(wc -c < "$BUILD_DIR/assets/root-redirect.js" | xargs) bytes)"
 
-cat web-app/app/styles/fonts.css \
-    web-app/app/styles/tokens.css \
+cat web-app/app/styles/tokens.css \
+    web-app/app/styles/fonts.css \
     web-app/app/styles/light-mode.css \
     web-app/app/styles/dark-mode.css \
     web-app/app/styles/base.css \

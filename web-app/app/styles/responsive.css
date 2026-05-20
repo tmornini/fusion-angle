@@ -1,6 +1,4 @@
-/* ==========================================
-   25. RESPONSIVE
-   ========================================== */
+/* Mobile breakpoint overrides; reduced-motion. */
 
 @media (min-width: 640px) {
   .sm\:grid-cols-2 { grid-template-columns: repeat(2, 1fr); }
@@ -78,9 +76,7 @@
   flex-shrink: 0;
 }
 
-/* ==========================================
-   26. REDUCED MOTION
-   ========================================== */
+/* Reduced motion */
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

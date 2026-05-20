@@ -137,7 +137,7 @@ export function buildInitialFlowSnapshot(
     };
 }
 
-// Must match .flow-props-panel width in pages.css
+// Must match .flow-props-panel width in pages-flow-detail.css
 // (18rem = 288px at 16px root).
 const PANEL_WIDTH_PX = 288;
 

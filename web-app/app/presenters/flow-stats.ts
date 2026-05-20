@@ -176,7 +176,7 @@ ${this.buildLegend()}${footnote}</div>`;
         // Eyebrow names the control so a first-time
         // reader knows the stepper walks the flow's
         // paths from most- to least-travelled; styling
-        // is in pages.css.
+        // is in pages-flow-stats.css.
         return html`<span class="${
             'flow-stats-stepper-eyebrow'
         }">Most-traveled paths</span><div class="${

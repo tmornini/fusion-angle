@@ -1,6 +1,4 @@
-/* ==========================================
-   2. DARK MODE TOKENS
-   ========================================== */
+/* Dark theme: semantic HSL overrides on [data-theme="dark"]. */
 
 [data-theme="dark"] {
   color-scheme: dark;
@@ -99,9 +97,7 @@
     hsl(var(--backdrop) / 0.7);
 }
 
-/* ==========================================
-   COMPONENT DARK MODE OVERRIDES
-   ========================================== */
+/* Component dark-mode overrides */
 
 /* Cards: stronger border for contrast */
 [data-theme="dark"] .card,

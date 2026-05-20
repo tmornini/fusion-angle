@@ -1,6 +1,4 @@
-/* ==========================================
-   3. RESET & BASE
-   ========================================== */
+/* Global resets, typography, focus, view transitions. */
 
 *, *::before, *::after {
   box-sizing: border-box;
@@ -46,9 +44,7 @@ ul, ol {
   list-style: none;
 }
 
-/* ==========================================
-   4. TYPOGRAPHY
-   ========================================== */
+/* Typography */
 
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-display);
@@ -78,9 +74,7 @@ p { line-height: var(--leading-normal); }
 .text-3xl { font-size: var(--text-3xl); line-height: 2.25rem; }
 .text-4xl { font-size: var(--text-4xl); line-height: 2.5rem; }
 
-/* ==========================================
-   5. FOCUS & SELECTION
-   ========================================== */
+/* Focus and selection */
 
 :focus-visible {
   outline: var(--focus-ring-width) solid hsl(var(--focus-ring-color));
@@ -92,9 +86,7 @@ p { line-height: var(--leading-normal); }
   color: hsl(var(--blue-900));
 }
 
-/* ==========================================
-   38. VIEW TRANSITIONS
-   ========================================== */
+/* View transitions */
 
 @view-transition {
   navigation: auto;

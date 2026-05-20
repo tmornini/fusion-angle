@@ -1,6 +1,4 @@
-/* ==========================================
-   22. LAYOUT: SIDEBAR
-   ========================================== */
+/* Page shell: sidebar, header, main content, named grids. */
 
 .sidebar-layout {
   display: flex;

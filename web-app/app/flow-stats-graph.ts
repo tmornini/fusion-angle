@@ -29,9 +29,9 @@ import type {
 // --- local geometry constants -------------------------
 // Geometry only. Every paint property — edge/arrowhead
 // stroke & dash, node text size/anchor/fill/halo, grid
-// colours — lives in pages.css (`§48 FLOW STATS`); this
-// renderer emits structure (d, transform, x/y, class,
-// data-*), nothing presentational.
+// colours — live in pages-flow-stats.css; this renderer
+// emits structure (d, transform, x/y, class, data-*),
+// nothing presentational.
 
 const GRID_DOT_RADIUS = 0.7;
 

@@ -1,37 +1,30 @@
-/* ============================================
-   FUSION AI DESIGN SYSTEM
-   Version: 2.0.0 — Vanilla CSS (no Tailwind)
-   ============================================ */
-
-/* ==========================================
-   FONT FACES
-   ========================================== */
+/* @font-face declarations: Inter, IBM Plex Sans, IBM Plex Mono. */
 
 @font-face {
   font-family: 'Inter';
   font-style: normal;
-  font-weight: var(--font-weight-regular);
+  font-weight: 400;
   font-display: swap;
   src: url('inter-400.woff2') format('woff2');
 }
 @font-face {
   font-family: 'Inter';
   font-style: normal;
-  font-weight: var(--font-weight-medium);
+  font-weight: 500;
   font-display: swap;
   src: url('inter-500.woff2') format('woff2');
 }
 @font-face {
   font-family: 'Inter';
   font-style: normal;
-  font-weight: var(--font-weight-semibold);
+  font-weight: 600;
   font-display: swap;
   src: url('inter-600.woff2') format('woff2');
 }
 @font-face {
   font-family: 'Inter';
   font-style: normal;
-  font-weight: var(--font-weight-bold);
+  font-weight: 700;
   font-display: swap;
   src: url('inter-700.woff2') format('woff2');
 }
@@ -39,28 +32,28 @@
 @font-face {
   font-family: 'IBM Plex Sans';
   font-style: normal;
-  font-weight: var(--font-weight-regular);
+  font-weight: 400;
   font-display: swap;
   src: url('ibm-plex-sans-400.woff2') format('woff2');
 }
 @font-face {
   font-family: 'IBM Plex Sans';
   font-style: normal;
-  font-weight: var(--font-weight-medium);
+  font-weight: 500;
   font-display: swap;
   src: url('ibm-plex-sans-500.woff2') format('woff2');
 }
 @font-face {
   font-family: 'IBM Plex Sans';
   font-style: normal;
-  font-weight: var(--font-weight-semibold);
+  font-weight: 600;
   font-display: swap;
   src: url('ibm-plex-sans-600.woff2') format('woff2');
 }
 @font-face {
   font-family: 'IBM Plex Sans';
   font-style: normal;
-  font-weight: var(--font-weight-bold);
+  font-weight: 700;
   font-display: swap;
   src: url('ibm-plex-sans-700.woff2') format('woff2');
 }
@@ -68,7 +61,7 @@
 @font-face {
   font-family: 'IBM Plex Mono';
   font-style: normal;
-  font-weight: var(--font-weight-regular);
+  font-weight: 400;
   font-display: swap;
   src: url('ibm-plex-mono-400.woff2') format('woff2');
 }
