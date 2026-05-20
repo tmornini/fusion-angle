@@ -293,7 +293,6 @@ export function initCommandPalette(
     async function getSearchIndex(
     ): Promise<void> {
         if (state.isDataLoaded) return;
-        state.isDataLoaded = true;
 
         const ctx = createRequestContext();
         const [ideas, projects, humans] =
@@ -315,6 +314,21 @@ export function initCommandPalette(
             ),
             ...pages.map(pageToSearchItem),
         ];
+        state.isDataLoaded = true;
+    }
+
+    function mutateLoadError(): void {
+        if (!state.list) return;
+        setHtml(
+            state.list,
+            html`<div
+class="command-palette-empty"
+>Search index failed to load. Close and reopen to retry.</div>`,
+        );
+        if (state.liveRegion) {
+            state.liveRegion.textContent =
+                'Search index failed to load';
+        }
     }
 
     function mutateResults(
@@ -516,6 +530,14 @@ posIndex === state.activeIndex
 
         getSearchIndex().then(
             () => mutateResults(''),
+            err => {
+                log.warn(
+                    'search index load failed',
+                    'palette',
+                    err,
+                );
+                mutateLoadError();
+            },
         );
     }
 

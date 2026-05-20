@@ -110,10 +110,12 @@ export function initThemeAndDropdowns(
                     if (
                         isValidTheme(theme)
                     ) {
+                        let persisted: boolean;
                         try {
-                            persistThemePreference(
-                                theme,
-                            );
+                            persisted =
+                                persistThemePreference(
+                                    theme,
+                                );
                         } catch (e) {
                             log.warn(
                                 'persistThemePreference'
@@ -128,6 +130,16 @@ export function initThemeAndDropdowns(
                                 'error',
                             );
                             return;
+                        }
+                        if (!persisted) {
+                            showToast(
+                                'Theme applied,'
+                                + ' but could not'
+                                + ' be saved.'
+                                + ' It will reset'
+                                + ' on next load.',
+                                'warning',
+                            );
                         }
                         mutateThemeToggleIcon();
                         $$(

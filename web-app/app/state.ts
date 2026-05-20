@@ -144,15 +144,21 @@ function applyResolvedTheme(): void {
         );
 }
 
+// Returns true when the preference was
+// persisted to localStorage; false when
+// the write was skipped (quota). The
+// theme is applied to in-memory state
+// and DOM either way so the user's
+// click is honored for the session.
 function persistThemePreference(
     theme: AppState['theme'],
-): void {
-    writePreference(
+): boolean {
+    setState({ theme });
+    applyResolvedTheme();
+    return writePreference(
         STORAGE_KEY_THEME,
         theme,
     );
-    setState({ theme });
-    applyResolvedTheme();
 }
 
 function applySidebarCollapsed(

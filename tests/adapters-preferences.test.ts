@@ -106,7 +106,8 @@ test(
 );
 
 test(
-    'writePreference swallows a QuotaExceededError',
+    'writePreference returns false on a'
+    + ' QuotaExceededError without throwing',
     () => {
         const original = globalThis.localStorage;
         try {
@@ -121,9 +122,35 @@ test(
                     throw err;
                 },
             };
-            assert.doesNotThrow(
-                () => writePreference('k', 'v'),
+            assert.equal(
+                writePreference('k', 'v'),
+                false,
             );
+        } finally {
+            globalThis.localStorage = original;
+        }
+    },
+);
+
+test(
+    'writePreference returns true on success',
+    () => {
+        const original = globalThis.localStorage;
+        try {
+            const writes: Array<[string, string]>
+                = [];
+            // @ts-expect-error - Node global stub
+            globalThis.localStorage = {
+                getItem: () => null,
+                setItem: (k: string, v: string) => {
+                    writes.push([k, v]);
+                },
+            };
+            assert.equal(
+                writePreference('k', 'v'),
+                true,
+            );
+            assert.deepEqual(writes, [['k', 'v']]);
         } finally {
             globalThis.localStorage = original;
         }

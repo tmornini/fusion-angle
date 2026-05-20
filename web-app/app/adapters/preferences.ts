@@ -10,14 +10,18 @@ function getPreference(
 // theme and sidebar state are observable
 // fallbacks if persistence fails (the app
 // just renders the default on next load).
-// Quota-exceeded is expected and logged
-// at warn; other errors propagate.
+// Quota-exceeded is expected and reported
+// via the false return; other errors
+// propagate. The boolean lets the caller
+// surface the failure to the user when the
+// preference is user-initiated.
 function writePreference(
     key: string,
     value: string,
-): void {
+): boolean {
     try {
         localStorage.setItem(key, value);
+        return true;
     } catch (err) {
         if (
             err instanceof DOMException
@@ -29,7 +33,7 @@ function writePreference(
                 + ' due to quota: ' + key,
                 'preferences', err,
             );
-            return;
+            return false;
         }
         throw err;
     }
