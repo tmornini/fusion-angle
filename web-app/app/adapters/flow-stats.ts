@@ -57,12 +57,7 @@ export async function getFlowStats(
 
     const workerNameById = new Map<Id, string>();
     for (const [id, w] of workerMap) {
-        workerNameById.set(
-            id,
-            w.kind === 'human'
-                ? w.fullName()
-                : w.nameText(),
-        );
+        workerNameById.set(id, w.name());
     }
 
     const input: FlowStatsInput = {

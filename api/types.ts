@@ -379,6 +379,10 @@ export class HumanWorker {
         ).trim();
     }
 
+    name(): string {
+        return this.fullName();
+    }
+
     titleLabel(): string {
         return this.#title;
     }
@@ -505,6 +509,10 @@ export class AIWorker {
 
     nameText(): string {
         return this.#name;
+    }
+
+    name(): string {
+        return this.nameText();
     }
 
     providerText(): string {

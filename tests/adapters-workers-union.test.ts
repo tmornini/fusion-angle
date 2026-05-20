@@ -128,8 +128,8 @@ test(
 );
 
 test(
-    'workerName returns fullName for humans and'
-    + ' nameText for AIs',
+    'workerName returns the display name for'
+    + ' both human and AI kinds',
     async () => {
         const { db } = await setupSeeded();
         const ctx = createRequestContext(db);
@@ -142,6 +142,20 @@ test(
             workerName(map, 'ai_claude_opus'),
             'Claude Opus',
         );
+    },
+);
+
+test(
+    'worker.name() is polymorphic across human'
+    + ' and AI kinds',
+    async () => {
+        const { db } = await setupSeeded();
+        const ctx = createRequestContext(db);
+        const map = await getWorkerMap(ctx);
+        const human = map.get('hw_sarah_chen')!;
+        const ai = map.get('ai_claude_opus')!;
+        assert.equal(human.name(), 'Sarah Test');
+        assert.equal(ai.name(), 'Claude Opus');
     },
 );
 

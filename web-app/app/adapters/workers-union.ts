@@ -50,8 +50,5 @@ export function workerName(
             + workerId,
         );
     }
-    if (worker.kind === 'human') {
-        return worker.fullName();
-    }
-    return worker.nameText();
+    return worker.name();
 }
