@@ -1,7 +1,6 @@
 import {
     readFileSync,
     writeFileSync,
-    copyFileSync,
     existsSync,
     mkdirSync,
 } from 'fs';
@@ -20,6 +19,7 @@ const sidebarPages = Object.entries(PAGE_REGISTRY)
             title: entry.title,
             sourceDir: entry.sourceDir,
             sourceFile: entry.sourceFile,
+            cssBundles: entry.cssBundles,
     }));
 
 const standalonePages = Object.entries(PAGE_REGISTRY)
@@ -28,7 +28,21 @@ const standalonePages = Object.entries(PAGE_REGISTRY)
             name,
             sourceDir: entry.sourceDir,
             sourceFile: entry.sourceFile,
+            cssBundles: entry.cssBundles,
     }));
+
+const PAGE_CSS_PLACEHOLDER = '        <!-- PAGE_CSS_LINKS -->\n';
+
+function buildPageCssLinks(
+    bundles: string[] | undefined,
+): string {
+    if (bundles === undefined) return '';
+    return bundles
+        .map((b) =>
+            '        <link rel="stylesheet" '
+            + `href="../assets/${b}.css" />\n`)
+        .join('');
+}
 
 const COMPONENTS = [
     {
@@ -84,14 +98,19 @@ function compose(): void {
         navHtml,
     );
 
-    for (const { name, title, sourceDir, sourceFile } of sidebarPages) {
+    for (const page of sidebarPages) {
+        const { name, title, sourceDir, sourceFile } = page;
         const pageHtmlPath = join(ROOT, sourceDir, `${sourceFile}.html`);
         const pageContent = readFileSync(pageHtmlPath, 'utf-8');
 
         const html = layout
             .replace('{{PAGE_NAME}}', name)
             .replace('{{PAGE_TITLE}}', title)
-            .replace('<!-- PAGE_CONTENT -->', pageContent);
+            .replace('<!-- PAGE_CONTENT -->', pageContent)
+            .replace(
+                PAGE_CSS_PLACEHOLDER,
+                buildPageCssLinks(page.cssBundles),
+            );
 
         const outDir = join(OUT, sourceDir);
         if (!existsSync(outDir)) mkdirSync(outDir, { recursive: true });
@@ -102,16 +121,22 @@ function compose(): void {
 
     console.log(`Composed ${sidebarPages.length} sidebar pages.`);
 
-    for (const { sourceDir, sourceFile } of standalonePages) {
+    for (const page of standalonePages) {
+        const { sourceDir, sourceFile } = page;
         const srcPath = join(ROOT, sourceDir, `${sourceFile}.html`);
+        const content = readFileSync(srcPath, 'utf-8');
+        const html = content.replace(
+            PAGE_CSS_PLACEHOLDER,
+            buildPageCssLinks(page.cssBundles),
+        );
 
         const outDir = join(OUT, sourceDir);
         if (!existsSync(outDir)) mkdirSync(outDir, { recursive: true });
 
-        copyFileSync(srcPath, join(outDir, `${sourceFile}.html`));
+        writeFileSync(join(outDir, `${sourceFile}.html`), html, 'utf-8');
     }
 
-    console.log(`Copied ${standalonePages.length} standalone pages.`);
+    console.log(`Composed ${standalonePages.length} standalone pages.`);
 }
 
 compose();

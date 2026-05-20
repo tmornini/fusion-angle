@@ -101,12 +101,19 @@ cat web-app/app/styles/fonts.css \
     web-app/app/styles/layout.css \
     web-app/app/styles/utilities.css \
     web-app/app/styles/responsive.css \
-    web-app/app/styles/pages-*.css \
     web-app/app/styles/command-palette.css \
   | npx esbuild --loader=css --minify > "$BUILD_DIR/assets/styles.css"
 
 [ -s "$BUILD_DIR/assets/styles.css" ] || { echo "ERROR: styles.css is empty or missing" >&2; exit 1; }
 echo "Styles created: assets/styles.css ($(wc -c < "$BUILD_DIR/assets/styles.css" | xargs) bytes)"
+
+for f in web-app/app/styles/pages-*.css; do
+  [ -f "$f" ] || continue
+  name=$(basename "$f" .css)
+  npx esbuild --minify "$f" --outfile="$BUILD_DIR/assets/$name.css"
+  [ -s "$BUILD_DIR/assets/$name.css" ] || { echo "ERROR: $name.css is empty or missing" >&2; exit 1; }
+  echo "Styles created: assets/$name.css ($(wc -c < "$BUILD_DIR/assets/$name.css" | xargs) bytes)"
+done
 cp web-app/assets/*.woff2 "$BUILD_DIR/assets/"
 cp web-app/index.html "$BUILD_DIR/"
 cp web-app/assets/favicon.ico "$BUILD_DIR/assets/"

@@ -416,7 +416,127 @@ CSS custom properties on `:root` define light theme values. The `[data-theme="da
 - **Tablet**: Two columns, collapsible sidebar
 - **Desktop**: Three columns, fixed sidebar
 
-## 12. Do's and Don'ts
+## 12. CSS Architecture
+
+Source lives in `web-app/app/styles/`. Single source of truth —
+no inline styles (CSP forbids `unsafe-inline`).
+
+### Cascade order
+
+The build cascade is locked in `./build`. Each file group loads
+in this order, and within glob groups, alphabetical order
+applies:
+
+1. `fonts.css` — `@font-face` declarations
+2. `tokens.css` — design tokens (CSS custom properties)
+3. `light-mode.css` — light theme HSL assignments
+4. `dark-mode.css` — dark theme overrides
+5. `base.css` — global resets, view transitions
+6. `components-*.css` — reusable component families
+   (avatar, badges, buttons, cards, controls, dialog,
+   feedback, inputs, layout-helpers, menus, metrics,
+   page-placeholder, tables, tabs, toast)
+7. `layout.css` — sidebar, header, main-content shell
+8. `utilities.css` — single-property primitives plus
+   container widths and hover-link
+9. `responsive.css` — mobile breakpoint overrides
+   (uses `!important` to win against earlier files)
+10. `command-palette.css` — search overlay
+
+These 10 groups concatenate into `assets/styles.css`, the
+shared bundle every page loads.
+
+11. `pages-*.css` — page-scoped styles (NOT in the shared
+    bundle; each file emits its own per-page bundle)
+
+### Per-page bundles
+
+Each page's `PageEntry` in `web-app/app/page-registry.ts`
+optionally declares which per-page bundles it loads:
+
+```typescript
+'flow-stats': {
+    // ...
+    cssBundles: ['pages-flow-stats'],
+},
+```
+
+Multiple pages can share one bundle — `idea-detail`,
+`idea-create`, and `idea-convert` all declare
+`['pages-ideas']`.
+
+At compose time, `compose.ts` reads `cssBundles` and replaces
+the `<!-- PAGE_CSS_LINKS -->` placeholder in the page's HTML
+with one `<link rel="stylesheet" href="../assets/pages-X.css"
+/>` tag per bundle. Pages without `cssBundles` get the
+placeholder removed entirely (no stray whitespace).
+
+At build time, every `pages-*.css` file emits its own minified
+bundle via the `pages-*.css` glob in `./build`.
+
+### Browser parallel-loading
+
+All modern browsers fetch `<link rel="stylesheet">` tags in
+parallel. HTTP/1.1 opens ~6 connections per origin; HTTP/2+
+multiplexes a single connection. Total page wait equals
+`max(file_load_times)`, not the sum. Splitting the monolith
+into shared + per-page bundles is a strict byte win because
+each page downloads less total CSS, all parallel-loaded.
+
+Caveat: very small files (under ~5KB) cost more per-request
+overhead than they save. Our per-page bundles range from
+~0.9 KB to ~9.6 KB — well above that threshold for the larger
+bundles, and the smaller ones still amortize via HTTP/2
+multiplexing.
+
+### When to add to which file
+
+| Pattern type                          | Target                    |
+|---------------------------------------|---------------------------|
+| Used by 3+ pages, component-shaped    | `components-X.css`        |
+| Used by one page, page-shaped         | `pages-X.css`             |
+| Single-property reusable              | `utilities.css`           |
+| Global reset, body/html, transitions  | `base.css`                |
+| Design token                          | `tokens.css`              |
+| Theme HSL assignment                  | `light-mode.css` / `dark-mode.css` |
+| Sidebar/header/main shell             | `layout.css`              |
+| Mobile-only override                  | `responsive.css` (use `!important`) |
+
+Below the 3-page threshold (Commandment IX, Generality), keep
+selectors in a `pages-X.css` file or duplicate without shame.
+At the third instance, promote to `components-X.css`.
+
+### Adding a new page-scoped CSS file
+
+1. Create `web-app/app/styles/pages-NAME.css` with a one-line
+   role header comment (e.g.,
+   `/* Inbox: tray, item card, sort affordances. */`).
+2. Add `cssBundles: ['pages-NAME']` to every matching entry in
+   `web-app/app/page-registry.ts`.
+3. Build emits the per-page bundle automatically via the
+   `pages-*.css` glob in `./build`.
+
+### Adding a new component family
+
+1. Create `web-app/app/styles/components-NAME.css` with a
+   role header.
+2. Build picks it up via the `components-*.css` glob; loads
+   alphabetically among other components.
+3. No `cssBundles` change — components ship in the shared
+   bundle for every page.
+
+### File-level rules
+
+- Each file leads with a one-line role header comment.
+- 78-char max per line in CSS files (enforced by `./validate`).
+- No raw hex colors — `hsl(var(--token))` only.
+- No `style="..."` inline strings except dynamic per-element
+  values via CSS custom properties (see § 5 Component
+  Guidelines for the pattern).
+- Files under ~600 lines. If a file grows past that, split by
+  sub-family.
+
+## 13. Do's and Don'ts
 
 ### Do
 - ✅ Use semantic color tokens, not raw hex values

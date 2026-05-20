@@ -25,6 +25,7 @@ export interface PageEntry {
     keywords?: string;
     searchable?: boolean;
     requiresSchema?: boolean;
+    cssBundles?: string[];
     loader: () => Promise<{
         init: (
             params?: Record<string, string>,
@@ -54,6 +55,7 @@ export const PAGE_REGISTRY: Record<
         sourceFile: 'index',
         icon: iconLightbulb,
         keywords: 'ideas list innovation',
+        cssBundles: ['pages-ideas'],
         loader: () => import('../ideas/index'),
     },
     'idea-detail': {
@@ -64,6 +66,7 @@ export const PAGE_REGISTRY: Record<
         sourceFile: 'detail',
         icon: iconLightbulb,
         searchable: false,
+        cssBundles: ['pages-ideas'],
         loader: () => import('../ideas/detail'),
     },
     'idea-create': {
@@ -74,6 +77,7 @@ export const PAGE_REGISTRY: Record<
         sourceFile: 'create',
         icon: iconLightbulb,
         keywords: 'new idea submit',
+        cssBundles: ['pages-ideas'],
         loader: () => import('../ideas/create'),
     },
     'idea-convert': {
@@ -84,6 +88,7 @@ export const PAGE_REGISTRY: Record<
         sourceFile: 'convert',
         icon: iconLightbulb,
         searchable: false,
+        cssBundles: ['pages-ideas'],
         loader: () => import('../ideas/convert'),
     },
     projects: {
@@ -95,6 +100,7 @@ export const PAGE_REGISTRY: Record<
         icon: iconFolderKanban,
         keywords:
             'projects list kanban',
+        cssBundles: ['pages-projects'],
         loader: () => import('../projects/index'),
     },
     'project-detail': {
@@ -105,6 +111,7 @@ export const PAGE_REGISTRY: Record<
         sourceFile: 'detail',
         icon: iconFolderKanban,
         searchable: false,
+        cssBundles: ['pages-projects'],
         loader: () => import('../projects/detail'),
     },
     flows: {
@@ -127,6 +134,7 @@ export const PAGE_REGISTRY: Record<
         sourceFile: 'detail',
         icon: iconGitBranch,
         searchable: false,
+        cssBundles: ['pages-flow-detail'],
         loader: () => import('../flows/detail'),
     },
     'flow-stats': {
@@ -137,6 +145,7 @@ export const PAGE_REGISTRY: Record<
         sourceFile: 'stats',
         icon: iconBarChart,
         searchable: false,
+        cssBundles: ['pages-flow-stats'],
         loader: () => import('../flows/stats'),
     },
     workbox: {
@@ -148,6 +157,7 @@ export const PAGE_REGISTRY: Record<
         icon: iconMail,
         keywords:
             'workbox inbox work order',
+        cssBundles: ['pages-workbox'],
         loader: () => import('../workbox/index'),
     },
     'workbox-detail': {
@@ -158,6 +168,7 @@ export const PAGE_REGISTRY: Record<
         sourceFile: 'detail',
         icon: iconMail,
         searchable: false,
+        cssBundles: ['pages-workbox'],
         loader: () => import('../workbox/detail'),
     },
     organization: {
@@ -180,6 +191,7 @@ export const PAGE_REGISTRY: Record<
         icon: iconPeople,
         keywords:
             'workers humans AI manage admin',
+        cssBundles: ['pages-workers'],
         loader: () => import('../workers/index'),
     },
     'worker-detail': {
@@ -190,6 +202,7 @@ export const PAGE_REGISTRY: Record<
         sourceFile: 'detail',
         icon: iconPerson,
         searchable: false,
+        cssBundles: ['pages-workers'],
         loader: () => import('../workers/detail'),
     },
     billing: {
@@ -226,6 +239,7 @@ export const PAGE_REGISTRY: Record<
         keywords:
             'components ui reference',
         requiresSchema: false,
+        cssBundles: ['pages-design-system'],
         loader: () => import('../design-system/index'),
     },
     auth: {
@@ -235,6 +249,7 @@ export const PAGE_REGISTRY: Record<
         sourceFile: 'index',
         searchable: false,
         requiresSchema: false,
+        cssBundles: ['pages-auth'],
         loader: () => import('../auth/index'),
     },
     landing: {
@@ -244,6 +259,7 @@ export const PAGE_REGISTRY: Record<
         sourceFile: 'index',
         searchable: false,
         requiresSchema: false,
+        cssBundles: ['pages-landing'],
         loader: () => import('../landing/index'),
     },
     'not-found': {

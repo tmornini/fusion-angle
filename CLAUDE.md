@@ -598,10 +598,14 @@ The variant pattern is `data-tone` / `data-level` attributes on
 a base class. The TS enum and the CSS attribute selector share
 one source of truth.
 
-When extending CSS: components.css for patterns appearing in 3+
-files; pages.css for page-scoped patterns; utilities.css for
-single-property primitives. Never use raw hex colors — always
-`hsl(var(--token))`.
+When extending CSS: `components-X.css` for patterns used by
+3+ pages (one file per family — buttons, cards, dialog, etc.),
+`pages-X.css` for page-scoped patterns (each page declares its
+bundles in `cssBundles` per `page-registry.ts`), `utilities.css`
+for single-property primitives. Never use raw hex colors —
+always `hsl(var(--token))`. See DESIGN-SYSTEM.md § 12 CSS
+Architecture for the full cascade order, per-page bundle
+mechanism, and decision tree.
 
 ### Component Library
 
