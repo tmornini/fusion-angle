@@ -6,6 +6,7 @@ import {
     postMockDataLoad,
     putSnapshotFromFile,
     SnapshotTooLargeError,
+    SnapshotIncompatibleError,
     getSnapshot,
     getHasAnyHumanWorkers,
     nowUtc,
@@ -364,6 +365,17 @@ export async function init(
                         'Snapshot too large'
                         + ' for available storage.'
                         + ' Free space and retry.',
+                        'error',
+                    );
+                } else if (
+                    err
+                    instanceof
+                        SnapshotIncompatibleError
+                ) {
+                    showToast(
+                        'Snapshot is from an older'
+                        + ' schema. Re-snapshot from'
+                        + ' current state.',
                         'error',
                     );
                 } else {

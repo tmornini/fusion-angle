@@ -29,11 +29,22 @@ import {
     DEFAULT_LOCK_TIMEOUT,
 } from '../api/types.ts';
 
-function setupMemDb(): {
+async function setupMemDb(): Promise<{
     db: MemoryDbAdapter;
     ctx: RequestContext;
-} {
+}> {
     const db = new MemoryDbAdapter();
+    await db.workers.put('current', {
+        first_name: 'Demo',
+        last_name: 'User',
+        email: 'demo@example.com',
+        phone: '',
+        title: 'Admin',
+        strengths: '[]' as never,
+        team_dimensions: '{}' as never,
+        bio: '',
+        department: 'Product',
+    });
     const ctx = createRequestContext(db);
     return { db, ctx };
 }
@@ -98,14 +109,13 @@ async function saveGraph(
         lockTimeout: DEFAULT_LOCK_TIMEOUT,
         nodes,
         edges,
-        createdAt: '2026-01-01T00:00:00.000Z',
     });
 }
 
 test(
     'postFlowVersion writes a version row',
     async () => {
-        const { db } = setupMemDb();
+        const { db } = await setupMemDb();
         await createBaseFlow(
             createRequestContext(db), 'flow-1',
         );
@@ -127,7 +137,7 @@ test(
     'postFlowVersion snapshots the current'
     + ' graph as the version',
     async () => {
-        const { db } = setupMemDb();
+        const { db } = await setupMemDb();
         await createBaseFlow(
             createRequestContext(db), 'flow-1',
         );
@@ -167,7 +177,7 @@ test(
     'postFlowVersion copies flow metadata'
     + ' onto the version row',
     async () => {
-        const { db } = setupMemDb();
+        const { db } = await setupMemDb();
         await createBaseFlow(
             createRequestContext(db), 'flow-1',
         );
@@ -182,8 +192,6 @@ test(
                 lockTimeout: 600,
                 nodes: [buildNode('a')],
                 edges: [],
-                createdAt:
-                    '2026-01-01T00:00:00.000Z',
             },
         );
         await postFlowVersion(
@@ -205,9 +213,9 @@ test(
 
 test(
     'postFlowVersion captures a fresh'
-    + ' created_at timestamp on the version',
+    + ' at timestamp on the version',
     async () => {
-        const { db } = setupMemDb();
+        const { db } = await setupMemDb();
         await createBaseFlow(
             createRequestContext(db), 'flow-1',
         );
@@ -217,7 +225,7 @@ test(
         );
         const rows = await db.flowVersions
             .getAll();
-        const stamp = rows[0]!.created_at;
+        const stamp = rows[0]!.at;
         assert.equal(typeof stamp, 'string');
         assert.ok(!Number.isNaN(
             Date.parse(stamp),
@@ -229,7 +237,7 @@ test(
     'getFlowVersions returns an empty list'
     + ' when no versions exist',
     async () => {
-        const { db } = setupMemDb();
+        const { db } = await setupMemDb();
         await createBaseFlow(
             createRequestContext(db), 'flow-1',
         );
@@ -244,7 +252,7 @@ test(
     'getFlowVersions returns versions for'
     + ' the asked flow only',
     async () => {
-        const { db } = setupMemDb();
+        const { db } = await setupMemDb();
         const c1 = createRequestContext(db);
         await createBaseFlow(c1, 'flow-1');
         await createBaseFlow(c1, 'flow-2');
@@ -278,7 +286,7 @@ test(
 test(
     'getFlowVersions orders newest first',
     async () => {
-        const { db } = setupMemDb();
+        const { db } = await setupMemDb();
         await createBaseFlow(
             createRequestContext(db), 'flow-1',
         );
@@ -307,7 +315,7 @@ test(
 test(
     'deleteFlowVersion hard-deletes the row',
     async () => {
-        const { db } = setupMemDb();
+        const { db } = await setupMemDb();
         await createBaseFlow(
             createRequestContext(db), 'flow-1',
         );
@@ -344,7 +352,7 @@ test(
     'postFlowVersion keeps at most'
     + ' FLOW_VERSION_CAP versions',
     async () => {
-        const { db } = setupMemDb();
+        const { db } = await setupMemDb();
         await createBaseFlow(
             createRequestContext(db), 'flow-1',
         );
@@ -371,7 +379,7 @@ test(
     'postFlowVersion trims the oldest version'
     + ' when over the cap',
     async () => {
-        const { db } = setupMemDb();
+        const { db } = await setupMemDb();
         await createBaseFlow(
             createRequestContext(db), 'flow-1',
         );
@@ -401,7 +409,7 @@ test(
     'cap trimming does not touch versions'
     + ' belonging to another flow',
     async () => {
-        const { db } = setupMemDb();
+        const { db } = await setupMemDb();
         const c1 = createRequestContext(db);
         await createBaseFlow(c1, 'flow-1');
         await createBaseFlow(c1, 'flow-2');
@@ -437,7 +445,7 @@ test(
     'a persisted version is visible through'
     + ' a fresh context and the raw table',
     async () => {
-        const { db } = setupMemDb();
+        const { db } = await setupMemDb();
         await createBaseFlow(
             createRequestContext(db), 'flow-1',
         );

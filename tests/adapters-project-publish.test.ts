@@ -34,10 +34,8 @@ const SAMPLE_PROJECT_BODY = {
     description: 'd', progress: 0,
     start_date: '2026-05-14T00:00:00.000Z',
     target_end_date: '2026-05-14T00:00:00.000Z',
-    estimated_duration: 0, actual_duration: 0,
     estimated_cost: 0, actual_cost: 0,
-    position: 0, business_context: '{}',
-    timeline_label: 'q1',
+    position: 0,
 };
 
 const SAMPLE_PROJECT = {
@@ -62,7 +60,7 @@ test('validator: ready when all scored', () => {
         [{ id: 'o1', position: 0 }],
         [{ id: 'b1', project_id: 'p1',
            objective_id: 'o1', score: 50,
-           scored_at: '2026-05-14T00:00:00.000Z' }],
+           at: '2026-05-14T00:00:00.000Z' }],
     );
     assert.equal(r.ready, true);
     assert.equal(r.problems.length, 0);
@@ -74,7 +72,7 @@ test('completion validator: not ready when actuals missing',
             SAMPLE_PROJECT,
             [{ id: 'b1', project_id: 'p1',
                objective_id: 'o1', score: 50,
-               scored_at: '2026-05-14T00:00:00.000Z' }],
+               at: '2026-05-14T00:00:00.000Z' }],
             [],
         );
         assert.equal(r.ready, false);
@@ -96,7 +94,7 @@ test('postProjectApproval moves state to approved',
             'b1',
             { project_id: 'p1', objective_id: 'o1',
               score: 50,
-              scored_at: '2026-05-14T00:00:00.000Z' },
+              at: '2026-05-14T00:00:00.000Z' },
         );
         const ctx = createRequestContext(db);
         await postProjectApproval(ctx, 'p1');
@@ -130,13 +128,13 @@ test('postProjectCompletion moves state to completed',
             'b1',
             { project_id: 'p1', objective_id: 'o1',
               score: 50,
-              scored_at: '2026-05-14T00:00:00.000Z' },
+              at: '2026-05-14T00:00:00.000Z' },
         );
         await db.projectObjectiveActualScores.put(
             'a1',
             { project_id: 'p1', objective_id: 'o1',
               score: 40,
-              scored_at: '2026-05-15T00:00:00.000Z' },
+              at: '2026-05-15T00:00:00.000Z' },
         );
         const ctx = createRequestContext(db);
         await postProjectCompletion(ctx, 'p1');

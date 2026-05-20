@@ -332,7 +332,6 @@ async function reportOpFailure(
         flowDescription: g.description,
         isLocked: g.isLocked,
         lockTimeout: g.lockTimeout,
-        createdAt: g.createdAt,
         nodes: g.nodes,
         edges: g.edges,
     });

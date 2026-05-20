@@ -21,7 +21,6 @@ import {
     createRequestContext,
     getProjects,
     getFlowsWithProjectNames,
-    getFlowGraph,
     putFlow,
     postFlowFromMermaid,
     postFlowFromZip,
@@ -541,8 +540,6 @@ async function handleOverwrite(
     const flowId = stOw.backup.flow.id;
     try {
         const ctx = createRequestContext();
-        const existing =
-            await getFlowGraph(ctx, flowId);
         await putFlow(ctx, flowId, {
             name: stOw.backup.flow.name,
             description:
@@ -556,7 +553,6 @@ async function handleOverwrite(
                 stOw.backup.flow.lockTimeout,
             nodes: stOw.backup.flow.graph.nodes,
             edges: stOw.backup.flow.graph.edges,
-            createdAt: existing.createdAt,
         });
     } catch (err) {
         clearPending(input);

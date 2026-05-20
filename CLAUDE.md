@@ -144,8 +144,6 @@ is HTTP-only.
   user actor reference this worker.
 - **State**: Module-level vars + pub-sub for theme, mobile, auth,
   sidebar.
-- **Durations**: Persisted in seconds; UI displays days via
-  `durationInDays(seconds)`.
 - **Read-only siblings of editable pages**: `flow-stats.html` is a
   flat, non-editable rendering of one flow's diagram (heat-tinted by
   share of trailing-90-day flow time, with a hover/click stat card
@@ -158,8 +156,9 @@ The states log carries entity lifecycle events. Each entity
 type uses its own state alphabet — distinct vocabularies for
 distinct lifecycles, all stored in the one log. Defined in
 `api/types.ts` as `IDEA_STATES`, `PROJECT_STATES`,
-`WORKER_STATES`, with `assertIdeaState` / `assertProjectState`
-/ `assertWorkerState` and the matching `is*` guards.
+`WORKER_STATES`, `FLOW_STATES`, with `assertIdeaState` /
+`assertProjectState` / `assertWorkerState` /
+`assertFlowState` and the matching `is*` guards.
 
 **Ideas** (9 values, composite of former status + readiness):
 - `active:incomplete`, `active:needs-info`, `active:ready`
@@ -172,6 +171,18 @@ distinct lifecycles, all stored in the one log. Defined in
 
 **Workers** (3 values, shared between humans and AIs):
 - `active`, `pending`, `archived`
+
+**Flows** (4 values, three lifecycle + one
+content-change marker):
+- `active`, `archived`, `deleted`, `updated`
+
+The flow lifecycle's `'updated'` event records every
+content mutation (graph edits, name/description/lock
+changes, auto-layout). Creation emits `'active'` —
+the first event records the initial lifecycle state,
+not a content edit. The retired `flows.created_at` /
+`flows.updated_at` columns are now derived from the
+head and tail of the entity's event sequence.
 
 The terminal state for both human and AI workers is
 `'archived'`. AI workers retire via `archiveAIWorker`; humans
@@ -480,11 +491,10 @@ import { navigateTo, openDialog, closeDialog } from '../app/core';
 
 `core.ts` re-exports from `format.ts`, `navigation.ts`, and
 `dialog.ts` so page modules can import `navigateTo`,
-`initials`, `durationInDays`, `formatDateTime`,
-`formatCompactCurrency`, `SECONDS_PER_DAY`, `openDialog`,
-`closeDialog`, `initTabs` from `'../app/core'`. The
-`adapters/` directory retains its barrel re-export
-(`adapters/index.ts`).
+`initials`, `formatDateTime`, `formatCompactCurrency`,
+`SECONDS_PER_DAY`, `openDialog`, `closeDialog`, `initTabs`
+from `'../app/core'`. The `adapters/` directory retains
+its barrel re-export (`adapters/index.ts`).
 
 **Page modules never import from `api/api.ts`** — all data
 access (reads and writes) goes through the adapter layer

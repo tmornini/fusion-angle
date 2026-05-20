@@ -16,17 +16,35 @@ import type {
     FlowEntity,
     GraphNode,
     GraphEdge,
+    StateEntity,
     StoredGraph,
 } from '../api/types.ts';
 import {
     DEFAULT_LOCK_TIMEOUT,
 } from '../api/types.ts';
 
-function setupMemDb(): {
+async function seedCurrentWorker(
+    db: MemoryDbAdapter,
+): Promise<void> {
+    await db.workers.put('current', {
+        first_name: 'Demo',
+        last_name: 'User',
+        email: 'demo@example.com',
+        phone: '',
+        title: 'Admin',
+        strengths: '[]' as never,
+        team_dimensions: '{}' as never,
+        bio: '',
+        department: 'Product',
+    });
+}
+
+async function setupMemDb(): Promise<{
     db: MemoryDbAdapter;
     ctx: RequestContext;
-} {
+}> {
     const db = new MemoryDbAdapter();
+    await seedCurrentWorker(db);
     const ctx = createRequestContext(db);
     return { db, ctx };
 }
@@ -79,7 +97,7 @@ async function createBaseFlow(
 test(
     'postFlowCreation creates flow plus link',
     async () => {
-        const { ctx } = setupMemDb();
+        const { ctx } = await setupMemDb();
         await createBaseFlow(ctx, 'flow-1');
         const flow = await ctx.GET<FlowEntity>(
             'flows/flow-1',
@@ -109,9 +127,52 @@ test(
 );
 
 test(
+    'postFlowCreation emits an active state event',
+    async () => {
+        const { ctx } = await setupMemDb();
+        await createBaseFlow(ctx, 'flow-1');
+        const events =
+            await ctx.GET<StateEntity[]>(
+                'entity-states/flow-1/history',
+            );
+        assert.equal(events.length, 1);
+        const ev = events[0]!;
+        assert.equal(ev.entity_id, 'flow-1');
+        assert.equal(ev.state, 'active');
+    },
+);
+
+test(
+    'putFlow emits an updated state event',
+    async () => {
+        const { ctx } = await setupMemDb();
+        await createBaseFlow(ctx, 'flow-1');
+        await putFlow(ctx, 'flow-1', {
+            name: 'Edited',
+            description: '',
+            isLocked: false,
+            isAutoLayout: false,
+            isAutoFit: false,
+            lockTimeout: DEFAULT_LOCK_TIMEOUT,
+            nodes: [],
+            edges: [],
+        });
+        const events =
+            await ctx.GET<StateEntity[]>(
+                'entity-states/flow-1/history',
+            );
+        assert.equal(events.length, 2);
+        const states = events.map(e => e.state);
+        assert.deepEqual(
+            states, ['active', 'updated'],
+        );
+    },
+);
+
+test(
     'putFlow persists every FlowSaveShape field',
     async () => {
-        const { ctx } = setupMemDb();
+        const { ctx } = await setupMemDb();
         await createBaseFlow(ctx, 'flow-1');
         const start = buildNode('start', {
             isCreate: true,
@@ -132,8 +193,6 @@ test(
             lockTimeout: 600,
             nodes: [start, middle, complete],
             edges: [edge],
-            createdAt:
-                '2026-01-01T00:00:00.000Z',
         });
         const flow = await ctx.GET<FlowEntity>(
             'flows/flow-1',
@@ -146,10 +205,6 @@ test(
         assert.equal(flow.is_auto_layout, true);
         assert.equal(flow.is_auto_fit, true);
         assert.equal(flow.lock_timeout, 600);
-        assert.equal(
-            flow.created_at,
-            '2026-01-01T00:00:00.000Z',
-        );
         const graph =
             JSON.parse(flow.graph) as StoredGraph;
         assert.equal(graph.nodes.length, 3);
@@ -164,7 +219,7 @@ test(
     'putFlow replaces graph fully'
     + ' (no bleed-through from prior writes)',
     async () => {
-        const { ctx } = setupMemDb();
+        const { ctx } = await setupMemDb();
         await createBaseFlow(ctx, 'flow-1');
         const a = buildNode('a');
         const b = buildNode('b');
@@ -178,8 +233,6 @@ test(
             lockTimeout: DEFAULT_LOCK_TIMEOUT,
             nodes: [a, b],
             edges: [ab],
-            createdAt:
-                '2026-01-01T00:00:00.000Z',
         });
         await putFlow(ctx, 'flow-1', {
             name: 'v2',
@@ -190,8 +243,6 @@ test(
             lockTimeout: DEFAULT_LOCK_TIMEOUT,
             nodes: [a],
             edges: [],
-            createdAt:
-                '2026-01-01T00:00:00.000Z',
         });
         const flow = await ctx.GET<FlowEntity>(
             'flows/flow-1',
@@ -208,7 +259,7 @@ test(
     'putFlow last-write-wins'
     + ' across two starting-from-same callers',
     async () => {
-        const { ctx } = setupMemDb();
+        const { ctx } = await setupMemDb();
         await createBaseFlow(ctx, 'flow-1');
         const baseNode = buildNode('base');
         const callerANodes = [
@@ -226,8 +277,6 @@ test(
             lockTimeout: DEFAULT_LOCK_TIMEOUT,
             nodes: callerANodes,
             edges: [],
-            createdAt:
-                '2026-01-01T00:00:00.000Z',
         });
         await putFlow(ctx, 'flow-1', {
             name: 'caller-B',
@@ -238,8 +287,6 @@ test(
             lockTimeout: DEFAULT_LOCK_TIMEOUT,
             nodes: callerBNodes,
             edges: [],
-            createdAt:
-                '2026-01-01T00:00:00.000Z',
         });
         const flow = await ctx.GET<FlowEntity>(
             'flows/flow-1',

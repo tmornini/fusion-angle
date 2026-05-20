@@ -8,10 +8,8 @@ const project = {
     description: 'd', progress: 0,
     start_date: '2026-05-14T00:00:00.000Z',
     target_end_date: '2026-05-14T00:00:00.000Z',
-    estimated_duration: 0, actual_duration: 0,
     estimated_cost: 0, actual_cost: 0,
-    position: 0, business_context: '{}',
-    timeline_label: 'q1',
+    position: 0,
 };
 
 const defs = new Map([
@@ -25,7 +23,7 @@ test('renders one slider per baseline-scored objective',
             [{ id: 'b1',
                project_id: 'p1', objective_id: 'o1',
                score: 50,
-               scored_at: '2026-05-14T00:00:00.000Z' }],
+               at: '2026-05-14T00:00:00.000Z' }],
             [],
         );
         const html = p.buildBody().toString();
@@ -39,11 +37,11 @@ test('pre-fills with latest actual when present', () => {
         [{ id: 'b1',
            project_id: 'p1', objective_id: 'o1',
            score: 50,
-           scored_at: '2026-05-14T00:00:00.000Z' }],
+           at: '2026-05-14T00:00:00.000Z' }],
         [{ id: 'a1',
            project_id: 'p1', objective_id: 'o1',
            score: 35,
-           scored_at: '2026-05-15T00:00:00.000Z' }],
+           at: '2026-05-15T00:00:00.000Z' }],
     );
     const html = p.buildBody().toString();
     assert.ok(html.includes('value="35"'));
@@ -55,7 +53,7 @@ test('pre-fills with baseline when no actuals yet', () => {
         [{ id: 'b1',
            project_id: 'p1', objective_id: 'o1',
            score: 50,
-           scored_at: '2026-05-14T00:00:00.000Z' }],
+           at: '2026-05-14T00:00:00.000Z' }],
         [],
     );
     const html = p.buildBody().toString();
@@ -68,7 +66,7 @@ test('caption shows baseline reference', () => {
         [{ id: 'b1',
            project_id: 'p1', objective_id: 'o1',
            score: 50,
-           scored_at: '2026-05-14T00:00:00.000Z' }],
+           at: '2026-05-14T00:00:00.000Z' }],
         [],
     );
     const html = p.buildBody().toString();

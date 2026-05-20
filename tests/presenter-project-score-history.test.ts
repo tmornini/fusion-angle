@@ -29,35 +29,35 @@ const { ProjectScoreHistoryPresenter } = await import(
 const baselines = [
     { id: 'b1',
       project_id: 'p1', objective_id: 'o1',
-      score: 50, scored_at: '2026-03-01T14:23:00.000Z' },
+      score: 50, at: '2026-03-01T14:23:00.000Z' },
     { id: 'b2',
       project_id: 'p1', objective_id: 'o1',
-      score: 40, scored_at: '2026-03-05T09:10:00.000Z' },
+      score: 40, at: '2026-03-05T09:10:00.000Z' },
 ];
 const actuals = [
     { id: 'a1',
       project_id: 'p1', objective_id: 'o1',
-      score: 45, scored_at: '2026-04-01T16:45:00.000Z' },
+      score: 45, at: '2026-04-01T16:45:00.000Z' },
 ];
 const revisions = [
     { id: 'r1',
       objective_id: 'o1', name: 'Increase Revenue',
       description: 'd1',
-      revised_at: '2026-02-01T00:00:00.000Z' },
+      at: '2026-02-01T00:00:00.000Z' },
     { id: 'r2',
       objective_id: 'o1', name: 'Drive Growth',
       description: 'd2',
-      revised_at: '2026-03-18T11:02:00.000Z' },
+      at: '2026-03-18T11:02:00.000Z' },
 ];
 const deprecations: { objectiveId: string;
     at: string }[] = [];
 
 function resolver(objId: string, atTime: string) {
     const eligible = revisions
-        .filter(r => r.revised_at <= atTime);
+        .filter(r => r.at <= atTime);
     if (eligible.length === 0) return undefined;
     eligible.sort((a, b) =>
-        b.revised_at.localeCompare(a.revised_at));
+        b.at.localeCompare(a.at));
     return {
         name: eligible[0]!.name,
         description: eligible[0]!.description,
@@ -130,7 +130,7 @@ test('positive score TD carries data-tone="positive"', () => {
     const p = new ProjectScoreHistoryPresenter(
         [{ id: 'b1', project_id: 'p1', objective_id: 'o1',
             score: 40,
-            scored_at: '2026-03-05T09:10:00.000Z' }],
+            at: '2026-03-05T09:10:00.000Z' }],
         [], revisions, deprecations, resolver,
     );
     const html = p.buildBody().toString();
@@ -142,7 +142,7 @@ test('negative score TD carries data-tone="negative"', () => {
     const p = new ProjectScoreHistoryPresenter(
         [], [{ id: 'a1', project_id: 'p1',
             objective_id: 'o1', score: -50,
-            scored_at: '2026-04-01T16:45:00.000Z' }],
+            at: '2026-04-01T16:45:00.000Z' }],
         revisions, deprecations, resolver,
     );
     const html = p.buildBody().toString();
@@ -154,7 +154,7 @@ test('zero score TD carries data-tone="neutral"', () => {
     const p = new ProjectScoreHistoryPresenter(
         [{ id: 'b1', project_id: 'p1', objective_id: 'o1',
             score: 0,
-            scored_at: '2026-03-05T09:10:00.000Z' }],
+            at: '2026-03-05T09:10:00.000Z' }],
         [], revisions, deprecations, resolver,
     );
     const html = p.buildBody().toString();

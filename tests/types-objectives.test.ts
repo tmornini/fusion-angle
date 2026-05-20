@@ -19,7 +19,7 @@ test('ObjectiveRevision shape compiles', () => {
         objective_id: 'o1',
         name: 'Revenue Growth',
         description: 'Drive top-line growth',
-        revised_at: '2026-05-14T00:00:00.000Z',
+        at: '2026-05-14T00:00:00.000Z',
     };
     assert.equal(v.objective_id, 'o1');
 });
@@ -29,7 +29,7 @@ test('ProjectObjectiveBaselineScore shape compiles', () => {
         project_id: 'p1',
         objective_id: 'o1',
         score: 42,
-        scored_at: '2026-05-14T00:00:00.000Z',
+        at: '2026-05-14T00:00:00.000Z',
     };
     assert.equal(v.score, 42);
 });
@@ -39,7 +39,7 @@ test('ProjectObjectiveActualScore shape compiles', () => {
         project_id: 'p1',
         objective_id: 'o1',
         score: -10,
-        scored_at: '2026-05-14T00:00:00.000Z',
+        at: '2026-05-14T00:00:00.000Z',
     };
     assert.equal(v.score, -10);
 });

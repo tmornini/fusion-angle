@@ -18,7 +18,7 @@ test('renders one row per baseline-scored objective', () => {
         [{ id: 'b1',
            project_id: 'p1', objective_id: 'o1',
            score: 50,
-           scored_at: '2026-05-14T00:00:00.000Z' }],
+           at: '2026-05-14T00:00:00.000Z' }],
         [],
     );
     const html = p.buildSection().toString();
@@ -32,7 +32,7 @@ test('shows "no measurements yet" when no actuals', () => {
         [{ id: 'b1',
            project_id: 'p1', objective_id: 'o1',
            score: 50,
-           scored_at: '2026-05-14T00:00:00.000Z' }],
+           at: '2026-05-14T00:00:00.000Z' }],
         [],
     );
     const html = p.buildSection().toString();
@@ -46,11 +46,11 @@ test('shows latest actual with sign', () => {
         [{ id: 'b1',
            project_id: 'p1', objective_id: 'o1',
            score: 50,
-           scored_at: '2026-05-14T00:00:00.000Z' }],
+           at: '2026-05-14T00:00:00.000Z' }],
         [{ id: 'a1',
            project_id: 'p1', objective_id: 'o1',
            score: -10,
-           scored_at: '2026-05-15T00:00:00.000Z' }],
+           at: '2026-05-15T00:00:00.000Z' }],
     );
     const html = p.buildSection().toString();
     assert.ok(html.includes('−10') || html.includes('-10'));
@@ -62,7 +62,7 @@ test('renders View history button', () => {
         [{ id: 'b1',
            project_id: 'p1', objective_id: 'o1',
            score: 50,
-           scored_at: '2026-05-14T00:00:00.000Z' }],
+           at: '2026-05-14T00:00:00.000Z' }],
         [],
     );
     const html = p.buildSection().toString();

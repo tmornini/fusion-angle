@@ -35,6 +35,92 @@ export class SnapshotTooLargeError extends Error {
     }
 }
 
+// Tables and per-table fields the schema has retired.
+// Old snapshots carrying them are not migrated — the
+// importer rejects them with this error and routes the
+// user back to re-snapshot from current state.
+const RETIRED_KEYS_PER_TABLE:
+    Record<string, readonly string[]> = {
+    ai_workers: ['created_at'],
+    flows: ['created_at', 'updated_at'],
+    work_orders: ['created_at'],
+    flow_versions: ['created_at'],
+    flow_work_orders: ['created_at'],
+    idea_submissions: ['created_at'],
+    project_flows: ['created_at'],
+    objective_revisions: ['revised_at'],
+    project_objective_baseline_scores: ['scored_at'],
+    project_objective_actual_scores: ['scored_at'],
+    ideas: ['risks', 'assumptions', 'alignments'],
+    projects: [
+        'business_context',
+        'timeline_label',
+        'estimated_duration',
+        'actual_duration',
+    ],
+    organization: [
+        'projects_current',
+        'ideas_current',
+        'storage_current',
+        'storage_limit',
+        'ai_credits_current',
+        'ai_credits_limit',
+        'active_people',
+    ],
+};
+
+const RETIRED_TABLES: readonly string[] = [
+    'activities',
+    'activity_actors',
+];
+
+export class SnapshotIncompatibleError extends Error {
+    readonly retired: readonly string[];
+    constructor(retired: readonly string[]) {
+        super(
+            'Snapshot contains retired fields: '
+            + retired.join(', ')
+            + '. Re-snapshot from current state.',
+        );
+        this.name = 'SnapshotIncompatibleError';
+        this.retired = retired;
+    }
+}
+
+function scanForRetiredKeys(
+    parsed: unknown,
+): string[] {
+    const findings: string[] = [];
+    if (!parsed || typeof parsed !== 'object') {
+        return findings;
+    }
+    const snap = parsed as Record<string, unknown>;
+    for (const table of RETIRED_TABLES) {
+        if (table in snap) {
+            findings.push(table);
+        }
+    }
+    for (const [table, keys] of Object.entries(
+        RETIRED_KEYS_PER_TABLE,
+    )) {
+        const rows = snap[table];
+        if (!Array.isArray(rows)) continue;
+        const seen = new Set<string>();
+        for (const row of rows) {
+            if (!row || typeof row !== 'object') {
+                continue;
+            }
+            for (const key of keys) {
+                if (key in row && !seen.has(key)) {
+                    findings.push(table + '.' + key);
+                    seen.add(key);
+                }
+            }
+        }
+    }
+    return findings;
+}
+
 async function computeAvailableForUpload(
 ): Promise<number> {
     const storage =
@@ -88,6 +174,12 @@ export async function putSnapshot(
     ctx: RequestContext,
     json: string,
 ): Promise<void> {
+    const findings = scanForRetiredKeys(
+        JSON.parse(json),
+    );
+    if (findings.length > 0) {
+        throw new SnapshotIncompatibleError(findings);
+    }
     await ctx.PUT('snapshots/import', { json });
 }
 

@@ -972,14 +972,14 @@ async function openHistoryModal(
         const arr =
             revsByObj.get(objId) ?? [];
         const eligible = arr.filter(
-            r => r.revised_at <= atTime,
+            r => r.at <= atTime,
         );
         if (eligible.length === 0) {
             return undefined;
         }
         eligible.sort((a, b) =>
-            b.revised_at.localeCompare(
-                a.revised_at,
+            b.at.localeCompare(
+                a.at,
             ),
         );
         return {

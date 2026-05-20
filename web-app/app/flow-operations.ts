@@ -78,7 +78,6 @@ function snapToSave(
         lockTimeout: snap.lockTimeout,
         nodes,
         edges,
-        createdAt: snap.createdAt,
     };
 }
 
@@ -519,7 +518,6 @@ function applyServerGraph(
         isAutoLayout: boolean;
         isAutoFit: boolean;
         lockTimeout: number;
-        createdAt: string;
         nodes: GraphNode[];
         edges: GraphEdge[];
     },
@@ -532,7 +530,6 @@ function applyServerGraph(
         isAutoLayout: graph.isAutoLayout,
         isAutoFit: graph.isAutoFit,
         lockTimeout: graph.lockTimeout,
-        createdAt: graph.createdAt,
         nodes: graph.nodes,
         edges: graph.edges,
         isPanelOpen: false,
@@ -591,7 +588,6 @@ export async function performUndo(
             lockTimeout: version.lockTimeout,
             nodes: version.nodes,
             edges: version.edges,
-            createdAt: snap.createdAt,
         });
         await deleteFlowVersion(ctx, version.id);
         const graph = await getFlowGraph(
@@ -651,7 +647,6 @@ export async function performRedo(
             lockTimeout: v.lockTimeout,
             nodes: v.nodes,
             edges: v.edges,
-            createdAt: snap.createdAt,
         });
         const graph = await getFlowGraph(
             ctx, snap.flowId,

@@ -29,7 +29,6 @@ export interface FlowGraph {
     isAutoLayout: boolean;
     isAutoFit: boolean;
     lockTimeout: number;
-    createdAt: string;
     nodes: GraphNode[];
     edges: GraphEdge[];
 }
@@ -204,7 +203,6 @@ export async function getFlowGraph(
             'is_auto_fit',
         ),
         lockTimeout: flow.lock_timeout,
-        createdAt: flow.created_at,
         nodes: g.nodes,
         edges: g.edges,
     });

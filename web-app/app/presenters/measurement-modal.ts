@@ -94,7 +94,7 @@ export class MeasurementModalPresenter {
                 latestActualScore:
                     a ? a.score : undefined,
                 latestActualAt:
-                    a ? a.scored_at : undefined,
+                    a ? a.at : undefined,
                 preFillValue: a ? a.score : b.score,
             });
         }

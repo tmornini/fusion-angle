@@ -19,7 +19,7 @@ interface Definition {
 function indexByObjective<T extends {
     objective_id: ObjectiveId;
     project_id: string;
-    scored_at: string;
+    at: string;
 }>(rows: readonly T[]): Map<ObjectiveId, T> {
     const map = new Map<ObjectiveId, T>();
     for (const r of latestPerPair(rows)) {

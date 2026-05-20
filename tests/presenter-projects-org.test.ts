@@ -21,7 +21,7 @@ import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 
 const {
-    Project, jsonObjectField,
+    Project,
 } = await import('../api/types.ts');
 const { DISPLAY_ABSENT } = await import(
     '../web-app/app/format.ts'
@@ -118,14 +118,10 @@ function makeProject(overrides: {
         progress: overrides.progress ?? 42,
         start_date: '2026-01-01',
         target_end_date: '2026-06-01',
-        estimated_duration: 0,
-        actual_duration: 0,
         estimated_cost:
             overrides.estimatedCost ?? 50000,
         actual_cost: 25000,
         position: overrides.position ?? 0,
-        business_context: jsonObjectField({}),
-        timeline_label: '',
     }, overrides.state ?? 'approved');
 }
 
@@ -140,18 +136,19 @@ function makeOrg() {
         seats: 50,
         used_seats: 12,
         projects_limit: 100,
-        projects_current: 8,
         ideas_limit: 200,
-        ideas_current: 30,
-        storage_limit: 100,
-        storage_current: 20,
-        ai_credits_limit: 1000,
-        ai_credits_current: 200,
         health_score: 92,
         health_status: 'Healthy',
         last_activity: '2026-05-01',
-        active_people: 12,
     });
+}
+
+function makeStats() {
+    return {
+        projectsCurrent: 8,
+        ideasCurrent: 30,
+        activePeopleCount: 12,
+    };
 }
 
 // ---- ProjectPresenter (project.ts) ----
@@ -383,7 +380,7 @@ test(
     + ' action',
     () => {
         const out = new OrganizationPresenter(
-            makeOrg(),
+            makeOrg(), makeStats(),
         ).buildPage().toString();
         assert.match(out, /Acme Innovations/);
         assert.match(out, /acme\.example/);
@@ -402,13 +399,12 @@ test(
     + ' current/limit values',
     () => {
         const out = new OrganizationPresenter(
-            makeOrg(),
+            makeOrg(), makeStats(),
         ).buildPage().toString();
         assert.match(out, /Active People/);
         assert.match(out, /Projects/);
         assert.match(out, /Ideas/);
         assert.match(out, /Usage Overview/);
-        assert.match(out, /AI Credits/);
         // a usage bar prints "current / limit"
         assert.match(out, /12 \/ 50/);
         assert.match(out, /Health Score: 92%/);
@@ -422,7 +418,9 @@ test(
     () => {
         const org = makeOrg();
         const out = new OrganizationEditPresenter(
-            org, org.toGeneralInfoDraft(),
+            org,
+            makeStats(),
+            org.toGeneralInfoDraft(),
         ).buildPage().toString();
         assert.match(out, /data-org-field="name"/);
         assert.match(

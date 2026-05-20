@@ -10,12 +10,10 @@ import type {
     AIWorkerEntity,
     IdeaEntity,
     ProjectEntity,
-    ActivityEntity,
     FlowEntity,
     FlowVersionEntity,
     OrganizationEntity,
     IdeaSubmissionEntity,
-    ActivityActorEntity,
     ProjectFlowEntity,
     WorkOrderEntity,
     FlowWorkOrderEntity,
@@ -40,7 +38,6 @@ export class MemoryDbAdapter implements DbAdapter {
     readonly aiWorkers: IEntityStore<AIWorkerEntity>;
     readonly ideas: IEntityStore<IdeaEntity>;
     readonly projects: IEntityStore<ProjectEntity>;
-    readonly activities: IEntityStore<ActivityEntity>;
     readonly flows: IEntityStore<FlowEntity>;
     readonly flowVersions:
         IEntityStore<FlowVersionEntity>;
@@ -55,8 +52,6 @@ export class MemoryDbAdapter implements DbAdapter {
         ISingletonStore<OrganizationEntity>;
     readonly ideaSubmissions:
         IEntityStore<IdeaSubmissionEntity>;
-    readonly activityActors:
-        IEntityStore<ActivityActorEntity>;
     readonly objectives: IEntityStore<Objective>;
     readonly objectiveRevisions:
         IEntityStore<ObjectiveRevision>;
@@ -84,8 +79,6 @@ export class MemoryDbAdapter implements DbAdapter {
             new EntityStore('ideas', b, ss);
         this.projects =
             new EntityStore('projects', b, ss);
-        this.activities =
-            new EntityStore('activities', b, ss);
         this.flows =
             new EntityStore('flows', b, ss);
         this.flowVersions =
@@ -107,10 +100,6 @@ export class MemoryDbAdapter implements DbAdapter {
         this.ideaSubmissions =
             new EntityStore(
                 'idea_submissions', b, ss,
-            );
-        this.activityActors =
-            new EntityStore(
-                'activity_actors', b, ss,
             );
         this.objectives =
             new EntityStore('objectives', b, ss);

@@ -17,11 +17,13 @@ export {
     HumanWorker,
     WORKER_STATE_CONFIG,
     isWorkerState,
+    isDimensionKey,
 } from '../../../api/types.ts';
 export type {
     WorkerId,
     HumanWorkerEntity,
     WorkerState,
+    DimensionKey,
 } from '../../../api/types.ts';
 
 const humanWorkerChanges =

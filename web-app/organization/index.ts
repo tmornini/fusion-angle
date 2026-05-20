@@ -11,9 +11,11 @@ import {
 } from '../app/core.ts';
 import {
     getOrganization,
+    getOrganizationStats,
     putOrganizationGeneralInfo,
     createRequestContext,
     Organization,
+    type OrganizationStats,
     type GeneralInfoDraft,
     getActiveObjectives,
     getObjectives,
@@ -42,10 +44,12 @@ type PageState =
     | {
         kind: 'reading';
         org: Organization;
+        stats: OrganizationStats;
     }
     | {
         kind: 'editing';
         org: Organization;
+        stats: OrganizationStats;
         draft: GeneralInfoDraft;
     };
 
@@ -72,9 +76,11 @@ function buildPresenter():
         );
     }
     return state.kind === 'reading'
-        ? new OrganizationPresenter(state.org)
+        ? new OrganizationPresenter(
+            state.org, state.stats,
+        )
         : new OrganizationEditPresenter(
-            state.org, state.draft,
+            state.org, state.stats, state.draft,
         );
 }
 
@@ -147,10 +153,13 @@ export async function init(): Promise<void> {
     );
 
     let org: Organization;
+    let stats: OrganizationStats;
     try {
-        org = await getOrganization(
-            createRequestContext(),
-        );
+        const ctx = createRequestContext();
+        [org, stats] = await Promise.all([
+            getOrganization(ctx),
+            getOrganizationStats(ctx),
+        ]);
     } catch (err) {
         log.error(
             'getOrganization failed',
@@ -174,7 +183,7 @@ export async function init(): Promise<void> {
         return;
     }
 
-    state = { kind: 'reading', org };
+    state = { kind: 'reading', org, stats };
     rerender();
 
     subscribeObjectiveChanges(renderObjectives);
@@ -384,6 +393,7 @@ function onClick(e: MouseEvent): void {
         state = {
             kind: 'editing',
             org: state.org,
+            stats: state.stats,
             draft: state.org
                 .toGeneralInfoDraft(),
         };
@@ -395,7 +405,9 @@ function onClick(e: MouseEvent): void {
             return;
         }
         state = {
-            kind: 'reading', org: state.org,
+            kind: 'reading',
+            org: state.org,
+            stats: state.stats,
         };
         rerender();
         return;
@@ -445,7 +457,9 @@ function onDocumentKeydown(
     }
     e.preventDefault();
     state = {
-        kind: 'reading', org: state.org,
+        kind: 'reading',
+        org: state.org,
+        stats: state.stats,
     };
     rerender();
 }
@@ -473,9 +487,16 @@ async function handleSave(): Promise<void> {
         return;
     }
     showToast('Organization saved', 'success');
-    const fresh = await getOrganization(
-        createRequestContext(),
-    );
-    state = { kind: 'reading', org: fresh };
+    const freshCtx = createRequestContext();
+    const [freshOrg, freshStats] =
+        await Promise.all([
+            getOrganization(freshCtx),
+            getOrganizationStats(freshCtx),
+        ]);
+    state = {
+        kind: 'reading',
+        org: freshOrg,
+        stats: freshStats,
+    };
     rerender();
 }

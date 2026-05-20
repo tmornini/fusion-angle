@@ -8,7 +8,6 @@ import {
     validateAIWorkerEntity,
     validateIdeaEntity,
     validateProjectEntity,
-    validateActivityEntity,
     validateFlowEntity,
     validateFlowVersionEntity,
     validateProjectFlowEntity,
@@ -17,7 +16,6 @@ import {
     validateStateFieldValueEntity,
     validateOrganizationEntity,
     validateIdeaSubmissionEntity,
-    validateActivityActorEntity,
     validateObjectiveEntity,
     validateObjectiveRevisionEntity,
     validateBaselineScoreEntity,
@@ -143,16 +141,9 @@ const routes: Route[] = [
     route('projects', {
         get: (db) => db.projects.getAll(),
     }),
-    route('activities', {
-        get: (db) => db.activities.getAll(),
-    }),
     route('idea-submissions', {
         get: (db) =>
             db.ideaSubmissions.getAll(),
-    }),
-    route('activity-actors', {
-        get: (db) =>
-            db.activityActors.getAll(),
     }),
     route('flows', {
         get: (db) =>
@@ -316,29 +307,11 @@ const routes: Route[] = [
         delete: (db, p) =>
             db.projects.delete(param(p, 0)),
     }),
-    route('activities/:id', {
-        put: (db, p, payload) =>
-            db.activities.put(
-                param(p, 0),
-                validateActivityEntity(
-                    withoutId(payload),
-                ),
-            ),
-    }),
     route('idea-submissions/:id', {
         put: (db, p, payload) =>
             db.ideaSubmissions.put(
                 param(p, 0),
                 validateIdeaSubmissionEntity(
-                    withoutId(payload),
-                ),
-            ),
-    }),
-    route('activity-actors/:id', {
-        put: (db, p, payload) =>
-            db.activityActors.put(
-                param(p, 0),
-                validateActivityActorEntity(
                     withoutId(payload),
                 ),
             ),

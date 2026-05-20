@@ -67,7 +67,6 @@ test(
             workers: [],
             ideas: [],
             projects: [],
-            activities: [],
             flows: [],
             flow_versions: [],
             project_flows: [],
@@ -77,7 +76,6 @@ test(
             state_field_values: [],
             organization: [],
             idea_submissions: [],
-            activity_actors: [],
             deleted: [],
         });
 

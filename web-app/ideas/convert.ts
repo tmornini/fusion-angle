@@ -15,9 +15,7 @@ import {
 import { navigateTo } from '../app/core.ts';
 import {
     getIdea,
-    postActivity,
     postIdeaConversion,
-    jsonObjectField,
     createRequestContext,
     generateCryptoSafeBase62,
     type IdeaEntity,
@@ -392,25 +390,6 @@ export async function init(
                     }
                     return;
                 }
-                const projectName =
-                    submitted['project-name'];
-                await postActivity(ctx, {
-                    type: 'idea_converted',
-                    action:
-                        'converted idea to'
-                        + ' project',
-                    target: projectName,
-                    status: '',
-                    feedback: '',
-                });
-                await postActivity(ctx, {
-                    type: 'project_created',
-                    action:
-                        'created new project',
-                    target: projectName,
-                    status: '',
-                    feedback: '',
-                });
                 showToast(
                     'Project created'
                     + ' successfully!',
@@ -484,17 +463,12 @@ async function performConversion(
                 fields['start-date'],
             target_end_date:
                 fields['target-end-date'],
-            estimated_duration: 0,
-            actual_duration: 0,
             estimated_cost: parseFiniteNumber(
                 'cost',
                 fields['cost'],
             ),
             actual_cost: 0,
             position: 0,
-            business_context:
-                jsonObjectField({}),
-            timeline_label: '',
         },
         'submitted',
         ideaEntity,

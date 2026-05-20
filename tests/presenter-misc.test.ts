@@ -141,7 +141,6 @@ function makeAIWorker(id: string, name: string): AIWorker {
         id, name, provider: 'anthropic',
         description: '',
         auth_token: 'sk-test-XXXX',
-        created_at: nowUtc(),
     }, 'active');
 }
 

@@ -89,7 +89,6 @@ interface DesignerState {
     isAutoLayout: boolean;
     isAutoFit: boolean;
     lockTimeout: number;
-    createdAt: string;
     isEditingName: boolean;
     nodes: GraphNode[];
     edges: GraphEdge[];
@@ -126,7 +125,6 @@ export function buildInitialFlowSnapshot(
         isAutoLayout: graph.isAutoLayout,
         isAutoFit: graph.isAutoFit,
         lockTimeout: graph.lockTimeout,
-        createdAt: graph.createdAt,
         isEditingName: false,
         nodes: graph.nodes,
         edges: graph.edges,
@@ -184,7 +182,6 @@ export class FlowDesignerPresenter {
             lockTimeout: snap.lockTimeout,
             nodes: snap.nodes,
             edges: snap.edges,
-            createdAt: snap.createdAt,
         };
     }
 

@@ -20,10 +20,6 @@ deserialized back on read. The in-memory and API-boundary
 shape is always a real boolean; the `0`|`1` form never
 escapes the storage layer.
 
-**Duration convention:** All numeric duration fields are
-persisted in seconds. UI displays days via
-`durationInDays(seconds)` from `format.ts`.
-
 **Timestamp convention:** TEXT columns storing timestamps
 use RFC-3339 Zulu format (e.g.,
 `2024-01-15T09:30:00.000000Z`). Temporal facts belong in
@@ -102,9 +98,6 @@ the `WORKER_STATES` alphabet (`active`, `pending`,
 | proposed_solution | TEXT |
 | expected_outcome | TEXT |
 | success_metrics | TEXT |
-| risks | TEXT (JSON array) |
-| assumptions | TEXT (JSON array) |
-| alignments | TEXT (JSON array) |
 
 Lifecycle state lives in `states` (alphabet
 `IDEA_STATES`): 9 values composite of former status +
@@ -122,13 +115,9 @@ readiness — `active:incomplete`, `active:needs-info`,
 | progress | INTEGER |
 | start_date | TEXT |
 | target_end_date | TEXT |
-| estimated_duration | INTEGER (seconds) |
-| actual_duration | INTEGER (seconds) |
 | estimated_cost | INTEGER |
 | actual_cost | INTEGER |
 | position | REAL |
-| business_context | TEXT (JSON object) |
-| timeline_label | TEXT |
 
 Lifecycle state lives in `states` (alphabet
 `PROJECT_STATES`): `submitted`, `under-review`,
@@ -149,8 +138,15 @@ Lifecycle state lives in `states` (alphabet
 | is_auto_fit | BOOLEAN | Default true |
 | lock_timeout | INTEGER | Seconds (default 28800 = 8h) |
 | graph | TEXT | JSON document (see below) |
-| created_at | TEXT | RFC-3339 Zulu |
-| updated_at | TEXT | RFC-3339 Zulu |
+
+Lifecycle state lives in `states` (alphabet
+`FLOW_STATES`): `active`, `archived`, `deleted`,
+`updated`. The first event records creation; each
+content-change mutation appends an `updated`
+event. Creation and last-update moments are the
+head and tail of the entity's event sequence —
+the retired `created_at` / `updated_at` columns
+are now derived from the log.
 
 The `graph` column stores the entire flow definition as a
 JSON document:
@@ -205,7 +201,6 @@ ai_workers (a unified WorkerId space; see
 | display_id | TEXT | 8-char hex SHA-256 |
 | flow_graph | TEXT | JSON (WorkOrderFlowGraph) |
 | position | REAL | Display order, ascending |
-| created_at | TEXT | RFC-3339 Zulu |
 
 The `flow_graph` column stores a snapshot of the flow
 definition at work order creation time. Same structure as
@@ -232,18 +227,6 @@ partitions them.
 
 ## Platform
 
-### activities
-
-| Column | Type |
-|--------|------|
-| id | TEXT |
-| type | TEXT |
-| action | TEXT |
-| target | TEXT |
-| timestamp | TEXT |
-| status | TEXT |
-| feedback | TEXT |
-
 ### organization
 
 Singleton table (single row, `id = '1'`).
@@ -259,17 +242,10 @@ Singleton table (single row, `id = '1'`).
 | seats | INTEGER |
 | used_seats | INTEGER |
 | projects_limit | INTEGER |
-| projects_current | INTEGER |
 | ideas_limit | INTEGER |
-| ideas_current | INTEGER |
-| storage_limit | REAL |
-| storage_current | REAL |
-| ai_credits_limit | INTEGER |
-| ai_credits_current | INTEGER |
 | health_score | INTEGER |
 | health_status | TEXT |
 | last_activity | TEXT |
-| active_people | INTEGER |
 
 ## Relationships
 
@@ -280,16 +256,7 @@ Singleton table (single row, `id = '1'`).
 | id | TEXT |
 | idea_id | TEXT (FK → ideas) |
 | worker_id | TEXT (FK → workers / ai_workers) |
-| created_at | TEXT |
-
-### activity_actors
-
-| Column | Type |
-|--------|------|
-| id | TEXT |
-| activity_id | TEXT (FK → activities) |
-| worker_id | TEXT (FK → workers / ai_workers) |
-| created_at | TEXT |
+| at | TEXT |
 
 ### project_flows
 
@@ -298,7 +265,7 @@ Singleton table (single row, `id = '1'`).
 | id | TEXT | PRIMARY KEY |
 | project_id | TEXT | References projects |
 | flow_id | TEXT | References flows |
-| created_at | TEXT | RFC-3339 Zulu |
+| at | TEXT | RFC-3339 Zulu |
 
 ### flow_work_orders
 
@@ -307,7 +274,7 @@ Singleton table (single row, `id = '1'`).
 | id | TEXT | PRIMARY KEY |
 | flow_id | TEXT | References flows |
 | work_order_id | TEXT | References work_orders |
-| created_at | TEXT | RFC-3339 Zulu |
+| at | TEXT | RFC-3339 Zulu |
 
 ### flow_versions
 
@@ -327,7 +294,7 @@ persistent undo on the flows/detail page.
 | is_auto_fit | BOOLEAN | Snapshot of flows.is_auto_fit |
 | lock_timeout | INTEGER | Snapshot of flows.lock_timeout |
 | graph | TEXT | Snapshot of flows.graph (JSON) |
-| created_at | TEXT | RFC-3339 Zulu — capture time |
+| at | TEXT | RFC-3339 Zulu — capture time |
 
 ### objectives
 
@@ -348,9 +315,9 @@ identity whose human-facing text evolves over time.
 | objective_id | TEXT | References objectives |
 | name | TEXT | Human-facing name at this revision |
 | description | TEXT | Human-facing description |
-| revised_at | TEXT | RFC-3339 Zulu |
+| at | TEXT | RFC-3339 Zulu |
 
-The latest row per `objective_id` by `revised_at` is the
+The latest row per `objective_id` by `at` is the
 current text.
 
 ### project_objective_baseline_scores
@@ -361,7 +328,7 @@ current text.
 | project_id | TEXT | References projects |
 | objective_id | TEXT | References objectives |
 | score | INTEGER | |
-| scored_at | TEXT | RFC-3339 Zulu |
+| at | TEXT | RFC-3339 Zulu |
 
 ### project_objective_actual_scores
 
@@ -371,7 +338,7 @@ current text.
 | project_id | TEXT | References projects |
 | objective_id | TEXT | References objectives |
 | score | INTEGER | |
-| scored_at | TEXT | RFC-3339 Zulu |
+| at | TEXT | RFC-3339 Zulu |
 
 ## State Event Log
 

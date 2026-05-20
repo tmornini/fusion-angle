@@ -76,7 +76,7 @@ test('getObjectiveRevisions returns all for an objective',
                 objective_id: 'o1',
                 name: 'Revenue',
                 description: 'd',
-                revised_at: '2026-05-14T00:00:00.000Z',
+                at: '2026-05-14T00:00:00.000Z',
             },
         );
         await db.objectiveRevisions.put(
@@ -85,7 +85,7 @@ test('getObjectiveRevisions returns all for an objective',
                 objective_id: 'o1',
                 name: 'Revenue Growth',
                 description: 'd2',
-                revised_at: '2026-05-15T00:00:00.000Z',
+                at: '2026-05-15T00:00:00.000Z',
             },
         );
         await db.objectiveRevisions.put(
@@ -94,7 +94,7 @@ test('getObjectiveRevisions returns all for an objective',
                 objective_id: 'o2',
                 name: 'Cost',
                 description: 'd',
-                revised_at: '2026-05-14T00:00:00.000Z',
+                at: '2026-05-14T00:00:00.000Z',
             },
         );
         const ctx = ctxFor(db);
@@ -127,7 +127,7 @@ test('getCurrentObjectiveDefinition returns latest revision',
             {
                 objective_id: 'o1', name: 'Old',
                 description: 'd1',
-                revised_at: '2026-05-14T00:00:00.000Z',
+                at: '2026-05-14T00:00:00.000Z',
             },
         );
         await db.objectiveRevisions.put(
@@ -135,7 +135,7 @@ test('getCurrentObjectiveDefinition returns latest revision',
             {
                 objective_id: 'o1', name: 'New',
                 description: 'd2',
-                revised_at: '2026-05-15T00:00:00.000Z',
+                at: '2026-05-15T00:00:00.000Z',
             },
         );
         const ctx = ctxFor(db);
@@ -154,7 +154,7 @@ test('getObjectiveDefinitionAt returns historical name',
             {
                 objective_id: 'o1', name: 'Old',
                 description: 'd1',
-                revised_at: '2026-05-14T00:00:00.000Z',
+                at: '2026-05-14T00:00:00.000Z',
             },
         );
         await db.objectiveRevisions.put(
@@ -162,7 +162,7 @@ test('getObjectiveDefinitionAt returns historical name',
             {
                 objective_id: 'o1', name: 'New',
                 description: 'd2',
-                revised_at: '2026-05-15T00:00:00.000Z',
+                at: '2026-05-15T00:00:00.000Z',
             },
         );
         const ctx = ctxFor(db);

@@ -5,6 +5,7 @@ import type {
     ObjectiveId,
     ProjectObjectiveBaselineScore,
 } from '../../../api/types.ts';
+import { DISPLAY_ABSENT } from '../format.ts';
 
 interface Definition {
     name: string;
@@ -64,7 +65,7 @@ export class ScoreModalPresenter {
             ProjectObjectiveBaselineScore>();
         for (const b of this.#latestBaselines) {
             const prev = latest.get(b.objective_id);
-            if (!prev || b.scored_at > prev.scored_at) {
+            if (!prev || b.at > prev.at) {
                 latest.set(b.objective_id, b);
             }
         }
@@ -106,7 +107,7 @@ export class ScoreModalPresenter {
                         isUnset ? ' unset' : ''
                     }">
                 <span class="score-value">
-                    ${isUnset ? '—' : value}
+                    ${isUnset ? DISPLAY_ABSENT : value}
                 </span>
                 ${isUnset
                     ? html`<span class="score-hint">

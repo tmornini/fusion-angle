@@ -21,7 +21,6 @@ import {
 import type {
     ProjectEntity,
     ProjectState,
-    JsonObjectField,
 } from '../api/types.ts';
 
 function buildProject(
@@ -35,13 +34,9 @@ function buildProject(
         progress: 25,
         start_date: '2026-01-01',
         target_end_date: '2026-12-31',
-        estimated_duration: 86400 * 100,
-        actual_duration: 86400 * 40,
         estimated_cost: 50000,
         actual_cost: 12000,
         position: 1,
-        business_context: '{}' as JsonObjectField,
-        timeline_label: 'Q1-Q4',
     };
     const { id: _drop, ...rest } = {
         ...base, ...overrides, id,
@@ -95,7 +90,6 @@ test(
         assert.equal(row.estimated_cost, 99000);
         assert.equal(row.actual_cost, 12000);
         assert.equal(row.position, 1);
-        assert.equal(row.timeline_label, 'Q1-Q4');
     },
 );
 

@@ -20,7 +20,6 @@ import {
     getStateFieldValuesByEvent,
     getWorkOrderActiveClaim,
     getWorkerMap,
-    postActivity,
     postWorkOrderTransition,
     postWorkOrderClaim,
     deleteWorkOrderClaim,
@@ -142,39 +141,6 @@ function initTransitionButtons(
                         'error',
                     );
                     return;
-                }
-                // Activity logging is
-                // best-effort: the user-
-                // visible operation
-                // (transition) already
-                // succeeded, so a logging
-                // failure shouldn't
-                // overwrite the success
-                // toast — but it must not
-                // be silent either.
-                try {
-                    await postActivity(ctx, {
-                        type: 'status_changed',
-                        action:
-                            'transitioned'
-                            + ' work order',
-                        target:
-                            detail
-                                .flowNameText()
-                            + ' #'
-                            + detail
-                                .displayIdText(),
-                        status: '',
-                        feedback: '',
-                    });
-                } catch (err) {
-                    log.warn(
-                        'activity logging'
-                        + ' failed after'
-                        + ' transition',
-                        'workbox',
-                        err,
-                    );
                 }
                 showToast(
                     'Transition complete',

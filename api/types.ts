@@ -1,11 +1,7 @@
 import {
     validateStringArrayJson,
     validateStringNumberRecordJson,
-    validateRisksJson,
 } from './validators.ts';
-import type { Risk } from './validators.ts';
-
-export type { Risk };
 
 export type Id = string;
 
@@ -64,42 +60,6 @@ export const IDEA_STATES = [
 
 export type IdeaState = typeof IDEA_STATES[number];
 
-export type ActivityType =
-    | 'idea_created'
-    | 'project_created'
-    | 'person_joined'
-    | 'status_changed'
-    | 'idea_converted';
-
-const ACTIVITY_TYPES:
-    readonly ActivityType[] = [
-    'idea_created',
-    'project_created',
-    'person_joined',
-    'status_changed',
-    'idea_converted',
-];
-
-export function isActivityType(
-    v: string,
-): v is ActivityType {
-    return (ACTIVITY_TYPES as readonly string[])
-        .includes(v);
-}
-
-export function assertActivityType(
-    v: string,
-    label: string,
-): ActivityType {
-    if (!isActivityType(v)) {
-        throw new Error(
-            'expected ActivityType for '
-                + label + ', got ' + v,
-        );
-    }
-    return v;
-}
-
 export type DimensionKey =
     | 'driver'
     | 'analytical'
@@ -136,6 +96,22 @@ export const PROJECT_STATES = [
 ] as const;
 
 export type ProjectState = typeof PROJECT_STATES[number];
+
+// The state alphabet for flows. Three lifecycle
+// states plus 'updated' for content-change events
+// (graph edits, name/description/lock changes,
+// auto-layout). The states log carries the full
+// audit trail — the retired created_at /
+// updated_at columns are now derived from the
+// head and tail of the entity's event sequence.
+export const FLOW_STATES = [
+    'active',
+    'archived',
+    'deleted',
+    'updated',
+] as const;
+
+export type FlowState = typeof FLOW_STATES[number];
 
 export type StoredBoolean = 0 | 1;
 
@@ -265,18 +241,31 @@ export function assertWorkerState(
     return v;
 }
 
+export function isFlowState(
+    v: string,
+): v is FlowState {
+    return includes(FLOW_STATES, v);
+}
+
+export function assertFlowState(
+    v: string,
+    label: string,
+): FlowState {
+    if (!includes(FLOW_STATES, v)) {
+        throw new Error(
+            'expected FlowState for '
+                + label + ', got ' + v,
+        );
+    }
+    return v;
+}
+
 export const MS_PER_SECOND = 1000;
 export const SECONDS_PER_HOUR = 3600;
 export const SECONDS_PER_DAY = 24 * SECONDS_PER_HOUR;
 export const MS_PER_DAY =
     SECONDS_PER_DAY * MS_PER_SECOND;
 export const COST_DIVISOR = 1000;
-
-export function durationInDays(
-    seconds: number,
-): number {
-    return Math.ceil(seconds / SECONDS_PER_DAY);
-}
 
 const BILLION = 1_000_000_000;
 const MILLION = 1_000_000;
@@ -485,7 +474,6 @@ export interface AIWorkerEntity {
     provider: string;
     description: string;
     auth_token: string;
-    created_at: string;
 }
 
 export class AIWorker {
@@ -495,7 +483,6 @@ export class AIWorker {
     readonly #provider: string;
     readonly #description: string;
     readonly #authToken: string;
-    readonly #createdAt: string;
     readonly #state: WorkerState;
 
     constructor(
@@ -509,8 +496,6 @@ export class AIWorker {
             entity.description;
         this.#authToken =
             entity.auth_token;
-        this.#createdAt =
-            entity.created_at;
         this.#state = state;
     }
 
@@ -528,10 +513,6 @@ export class AIWorker {
 
     descriptionText(): string {
         return this.#description;
-    }
-
-    createdAtIso(): string {
-        return this.#createdAt;
     }
 
     maskedToken(): string {
@@ -611,9 +592,6 @@ export interface IdeaEntity {
     proposed_solution: string;
     expected_outcome: string;
     success_metrics: string;
-    risks: JsonArrayField;
-    assumptions: JsonArrayField;
-    alignments: JsonArrayField;
 }
 
 export type ObjectiveId = Id;
@@ -628,7 +606,7 @@ export interface ObjectiveRevision {
     objective_id: ObjectiveId;
     name: string;
     description: string;
-    revised_at: string;
+    at: string;
 }
 
 export interface ProjectObjectiveBaselineScore {
@@ -636,7 +614,7 @@ export interface ProjectObjectiveBaselineScore {
     project_id: Id;
     objective_id: ObjectiveId;
     score: number;
-    scored_at: string;
+    at: string;
 }
 
 export interface ProjectObjectiveActualScore {
@@ -644,7 +622,7 @@ export interface ProjectObjectiveActualScore {
     project_id: Id;
     objective_id: ObjectiveId;
     score: number;
-    scored_at: string;
+    at: string;
 }
 
 export interface ProjectEntity {
@@ -654,23 +632,9 @@ export interface ProjectEntity {
     progress: number;
     start_date: string;
     target_end_date: string;
-    estimated_duration: number; // seconds
-    actual_duration: number; // seconds
     estimated_cost: number;
     actual_cost: number;
     position: number;
-    business_context: JsonObjectField;
-    timeline_label: string;
-}
-
-export interface ActivityEntity {
-    id: Id;
-    type: string;
-    action: string;
-    target: string;
-    timestamp: string;
-    status: string;
-    feedback: string;
 }
 
 export interface GraphField {
@@ -734,8 +698,6 @@ export interface FlowEntity {
     is_auto_fit: boolean;
     lock_timeout: number;
     graph: JsonObjectField;
-    created_at: string;
-    updated_at: string;
 }
 
 export interface FlowVersionEntity {
@@ -748,7 +710,7 @@ export interface FlowVersionEntity {
     is_auto_fit: boolean;
     lock_timeout: number;
     graph: JsonObjectField;
-    created_at: string;
+    at: string;
 }
 
 export interface WorkOrderFlowGraph {
@@ -765,14 +727,13 @@ export interface WorkOrderEntity {
     display_id: string;
     flow_graph: JsonObjectField;
     position: number;
-    created_at: string;
 }
 
 export interface FlowWorkOrderEntity {
     id: Id;
     flow_id: Id;
     work_order_id: Id;
-    created_at: string;
+    at: string;
 }
 
 // Per-field values written when a state event
@@ -797,38 +758,24 @@ export interface OrganizationEntity {
     seats: number;
     used_seats: number;
     projects_limit: number;
-    projects_current: number;
     ideas_limit: number;
-    ideas_current: number;
-    storage_limit: number;
-    storage_current: number;
-    ai_credits_limit: number;
-    ai_credits_current: number;
     health_score: number;
     health_status: string;
     last_activity: string;
-    active_people: number;
 }
 
 export interface IdeaSubmissionEntity {
     id: Id;
     idea_id: Id;
     worker_id: Id;
-    created_at: string;
-}
-
-export interface ActivityActorEntity {
-    id: Id;
-    activity_id: Id;
-    worker_id: Id;
-    created_at: string;
+    at: string;
 }
 
 export interface ProjectFlowEntity {
     id: Id;
     project_id: Id;
     flow_id: Id;
-    created_at: string;
+    at: string;
 }
 
 export interface StatusDisplay {
@@ -964,9 +911,6 @@ export class Idea {
     readonly #proposedSolution: string;
     readonly #expectedOutcome: string;
     readonly #successMetrics: string;
-    readonly #risks: string;
-    readonly #assumptions: string;
-    readonly #alignments: string;
 
     constructor(
         entity: IdeaEntity,
@@ -986,9 +930,6 @@ export class Idea {
             entity.expected_outcome;
         this.#successMetrics =
             entity.success_metrics;
-        this.#risks = entity.risks;
-        this.#assumptions = entity.assumptions;
-        this.#alignments = entity.alignments;
     }
 
     isReviewable(): boolean {
@@ -1014,26 +955,6 @@ export class Idea {
         return (
             IDEA_STATE_CONFIG[this.#state]
         )!.className;
-    }
-
-    parsedRisks(): Risk[] {
-        return validateRisksJson(
-            this.#risks,
-        );
-    }
-
-    parsedAssumptions(): string[] {
-        return validateStringArrayJson(
-            this.#assumptions,
-            'idea.assumptions',
-        );
-    }
-
-    parsedAlignments(): string[] {
-        return validateStringArrayJson(
-            this.#alignments,
-            'idea.alignments',
-        );
     }
 
     matchesSearch(term: string): boolean {
@@ -1087,13 +1008,9 @@ export class Project {
     readonly #progress: number;
     readonly #startDate: string;
     readonly #targetEndDate: string;
-    readonly #estimatedDuration: number;
-    readonly #actualDuration: number;
     readonly #estimatedCost: number;
     readonly #actualCost: number;
     readonly #position: number;
-    readonly #businessContext: string;
-    readonly #timelineLabel: string;
 
     constructor(
         entity: ProjectEntity,
@@ -1109,40 +1026,15 @@ export class Project {
             entity.start_date;
         this.#targetEndDate =
             entity.target_end_date;
-        this.#estimatedDuration =
-            entity.estimated_duration;
-        this.#actualDuration =
-            entity.actual_duration;
         this.#estimatedCost =
             entity.estimated_cost;
         this.#actualCost =
             entity.actual_cost;
         this.#position = entity.position;
-        this.#businessContext =
-            entity.business_context;
-        this.#timelineLabel =
-            entity.timeline_label;
     }
 
     isDeleted(): boolean {
         return this.#state === 'deleted';
-    }
-
-    isOverdue(): boolean {
-        return this.#actualDuration
-            > this.#estimatedDuration;
-    }
-
-    estimatedDurationDays(): number {
-        return durationInDays(
-            this.#estimatedDuration,
-        );
-    }
-
-    actualDurationDays(): number {
-        return durationInDays(
-            this.#actualDuration,
-        );
     }
 
     timelineProgress(): number {
@@ -1243,12 +1135,6 @@ export class Project {
             .toLowerCase()
             .includes(t);
     }
-}
-
-export interface RecentActivityItem {
-    type: string;
-    description: string;
-    time: string;
 }
 
 export function ideaIsVisible(

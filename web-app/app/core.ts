@@ -31,7 +31,6 @@ export {
     pluralize,
     toDateInputValue,
     trimStrings,
-    durationInDays,
     formatCompactCurrency,
     SECONDS_PER_DAY,
 } from './format.ts';

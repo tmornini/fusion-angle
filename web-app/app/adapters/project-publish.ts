@@ -23,14 +23,14 @@ export type ProjectProblem =
 function latestPerObjective(
     rows: Array<{
         objective_id: ObjectiveId;
-        scored_at: string;
+        at: string;
     }>,
 ): Set<ObjectiveId> {
     const map = new Map<ObjectiveId, string>();
     for (const r of rows) {
         const prev = map.get(r.objective_id);
-        if (!prev || r.scored_at > prev) {
-            map.set(r.objective_id, r.scored_at);
+        if (!prev || r.at > prev) {
+            map.set(r.objective_id, r.at);
         }
     }
     return new Set(map.keys());

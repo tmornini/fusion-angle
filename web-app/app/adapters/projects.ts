@@ -252,14 +252,14 @@ export class ProjectView {
 
     #latestPerObjective<T extends {
         objective_id: string;
-        scored_at: string;
+        at: string;
     }>(rows: T[]): T[] {
         const map = new Map<string, T>();
         for (const r of rows) {
             const prev = map.get(r.objective_id);
             if (
                 !prev
-                || r.scored_at > prev.scored_at
+                || r.at > prev.at
             ) {
                 map.set(r.objective_id, r);
             }
@@ -269,7 +269,7 @@ export class ProjectView {
 
     #objectiveIdSet<T extends {
         objective_id: string;
-        scored_at: string;
+        at: string;
     }>(rows: T[]): Set<string> {
         return new Set(
             this.#latestPerObjective(rows).map(

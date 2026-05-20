@@ -13,6 +13,9 @@ import {
     buildStartAndCompleteNodes,
 } from './flow-defaults.ts';
 import {
+    buildStateEventOp,
+} from './state-events.ts';
+import {
     createSubscriptionChannel,
 } from '../channels.ts';
 import type { RequestContext } from './shared.ts';
@@ -82,8 +85,6 @@ export async function postFlowCreation(
                     lock_timeout:
                         DEFAULT_LOCK_TIMEOUT,
                     graph: putFlowGraph(graph),
-                    created_at: now,
-                    updated_at: now,
                 },
             },
             {
@@ -94,9 +95,12 @@ export async function postFlowCreation(
                 body: {
                     project_id: input.projectId,
                     flow_id: input.flowId,
-                    created_at: now,
+                    at: now,
                 },
             },
+            await buildStateEventOp(
+                ctx, input.flowId, 'active',
+            ),
         ],
     });
 
@@ -112,7 +116,6 @@ export interface FlowSaveShape {
     lockTimeout: number;
     nodes: GraphNode[];
     edges: GraphEdge[];
-    createdAt: string;
 }
 
 export async function putFlow(
@@ -133,9 +136,22 @@ export async function putFlow(
             edges: save.edges as unknown as
                 Record<string, unknown>[],
         }),
-        created_at: save.createdAt,
-        updated_at: nowUtc(),
     };
-    await ctx.PUT(`flows/${id}`, entity);
+    const body =
+        entity as unknown as Record<
+            string, unknown
+        >;
+    await ctx.commit({
+        ops: [
+            {
+                method: 'put',
+                resource: `flows/${id}`,
+                body,
+            },
+            await buildStateEventOp(
+                ctx, id, 'updated',
+            ),
+        ],
+    });
     flowChanges.notify();
 }

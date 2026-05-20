@@ -3,14 +3,14 @@ export type Tone = 'positive' | 'negative' | 'neutral';
 export function latestPerPair<T extends {
     project_id: string;
     objective_id: string;
-    scored_at: string;
+    at: string;
 }>(rows: readonly T[]): T[] {
     const map = new Map<string, T>();
     for (const r of rows) {
         const key =
             `${r.project_id}:${r.objective_id}`;
         const prev = map.get(key);
-        if (!prev || r.scored_at > prev.scored_at) {
+        if (!prev || r.at > prev.at) {
             map.set(key, r);
         }
     }

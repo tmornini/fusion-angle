@@ -131,7 +131,7 @@ export async function getCurrentObjectiveDefinition(
         );
     }
     revs.sort((a, b) =>
-        b.revised_at.localeCompare(a.revised_at),
+        b.at.localeCompare(a.at),
     );
     const latest = revs[0]!;
     return {
@@ -147,7 +147,7 @@ export async function getObjectiveDefinitionAt(
 ): Promise<{ name: string; description: string }> {
     const revs = await getObjectiveRevisions(ctx, id);
     const eligible = revs.filter(
-        r => r.revised_at <= atTime,
+        r => r.at <= atTime,
     );
     if (eligible.length === 0) {
         throw new Error(
@@ -156,7 +156,7 @@ export async function getObjectiveDefinitionAt(
         );
     }
     eligible.sort((a, b) =>
-        b.revised_at.localeCompare(a.revised_at),
+        b.at.localeCompare(a.at),
     );
     const latest = eligible[0]!;
     return {
@@ -172,7 +172,7 @@ export async function postObjectiveCreation(
     description: string,
     position: number,
 ): Promise<void> {
-    const revisedAt = nowUtc();
+    const at = nowUtc();
     const revisionId = generateCryptoSafeBase62();
     await ctx.commit({
         ops: [
@@ -189,7 +189,7 @@ export async function postObjectiveCreation(
                     objective_id: id,
                     name,
                     description,
-                    revised_at: revisedAt,
+                    at,
                 },
             },
         ],
@@ -203,7 +203,7 @@ export async function postObjectiveRevision(
     name: string,
     description: string,
 ): Promise<void> {
-    const revisedAt = nowUtc();
+    const at = nowUtc();
     const revisionId = generateCryptoSafeBase62();
     await ctx.commit({
         ops: [{
@@ -214,7 +214,7 @@ export async function postObjectiveRevision(
                 objective_id: id,
                 name,
                 description,
-                revised_at: revisedAt,
+                at,
             },
         }],
     });

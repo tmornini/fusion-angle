@@ -304,8 +304,7 @@ test(
             graph: jsonObjectField({
                 nodes: [], edges: [],
             }),
-            created_at:
-                '2026-01-01T00:00:00.000Z',
+            at: '2026-01-01T00:00:00.000Z',
         });
         const json =
             await adapter.exportSnapshot();
@@ -313,7 +312,6 @@ test(
         const expected = [
             'workers', 'ai_workers',
             'ideas', 'projects',
-            'activities',
             'flows', 'flow_versions',
             'project_flows', 'work_orders',
             'flow_work_orders',
@@ -321,7 +319,6 @@ test(
             'states',
             'organization',
             'idea_submissions',
-            'activity_actors',
         ];
         for (const table of expected) {
             assert.ok(

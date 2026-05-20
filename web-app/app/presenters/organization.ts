@@ -12,6 +12,7 @@ import {
 } from '../icons.ts';
 import type {
     Organization,
+    OrganizationStats,
     GeneralInfoDraft,
 } from '../adapters/index.ts';
 
@@ -122,8 +123,8 @@ function buildGeneralInfoCard(
 
 function buildOverviewCard(
     org: Organization,
+    stats: OrganizationStats,
 ): SafeHtml {
-    const seats = org.seatsUsage();
     return html`
         <div class="card card-hover p-6 mb-6">
             <div
@@ -209,23 +210,20 @@ function buildOverviewCard(
                 ${buildStatCell(
                     iconPeople(16, ''),
                     'Active People',
-                    html`${seats.used}<span class="${
-                        'text-sm font-normal'
-                        + ' text-muted'
-                    }">/${seats.total}</span>`,
+                    html`${stats
+                        .activePeopleCount}`,
                     STAT_VALUE_2XL,
                 )}
                 ${buildStatCell(
                     iconFolderKanban(16, ''),
                     'Projects',
-                    html`${org
-                        .projectsCurrent()}`,
+                    html`${stats.projectsCurrent}`,
                     STAT_VALUE_2XL,
                 )}
                 ${buildStatCell(
                     iconLightbulb(16, ''),
                     'Ideas',
-                    html`${org.ideasCurrent()}`,
+                    html`${stats.ideasCurrent}`,
                     STAT_VALUE_2XL,
                 )}
                 ${buildStatCell(
@@ -295,6 +293,7 @@ function buildUsageBar(
 
 function buildUsageCard(
     org: Organization,
+    stats: OrganizationStats,
 ): SafeHtml {
     return html`
         <div class="card card-hover p-6">
@@ -314,23 +313,13 @@ function buildUsageCard(
                 )}
                 ${buildUsageBar(
                     'Projects',
-                    org.projectsCurrent(),
+                    stats.projectsCurrent,
                     org.projectsLimit(),
                 )}
                 ${buildUsageBar(
                     'Ideas',
-                    org.ideasCurrent(),
+                    stats.ideasCurrent,
                     org.ideasLimit(),
-                )}
-                ${buildUsageBar(
-                    'AI Credits',
-                    org.aiCreditsCurrent(),
-                    org.aiCreditsLimit(),
-                )}
-                ${buildUsageBar(
-                    'Storage (GB)',
-                    org.storageCurrent(),
-                    org.storageLimit(),
                 )}
             </div>
         </div>`;
@@ -403,6 +392,7 @@ function buildAdminCard(): SafeHtml {
 
 function buildPage(
     org: Organization,
+    stats: OrganizationStats,
     headerActions: SafeHtml,
     generalInfoBody: SafeHtml,
 ): SafeHtml {
@@ -410,17 +400,22 @@ function buildPage(
     <div class="content-wrap-xl">
         ${buildPageHeader(headerActions)}
         ${buildGeneralInfoCard(generalInfoBody)}
-        ${buildOverviewCard(org)}
-        ${buildUsageCard(org)}
+        ${buildOverviewCard(org, stats)}
+        ${buildUsageCard(org, stats)}
         ${buildAdminCard()}
     </div>`;
 }
 
 export class OrganizationPresenter {
     readonly #org: Organization;
+    readonly #stats: OrganizationStats;
 
-    constructor(org: Organization) {
+    constructor(
+        org: Organization,
+        stats: OrganizationStats,
+    ) {
         this.#org = org;
+        this.#stats = stats;
     }
 
     buildPage(): SafeHtml {
@@ -441,19 +436,24 @@ export class OrganizationPresenter {
                 'Domain',
                 org.domainText(),
             )}`;
-        return buildPage(org, actions, body);
+        return buildPage(
+            org, this.#stats, actions, body,
+        );
     }
 }
 
 export class OrganizationEditPresenter {
     readonly #org: Organization;
+    readonly #stats: OrganizationStats;
     readonly #draft: GeneralInfoDraft;
 
     constructor(
         org: Organization,
+        stats: OrganizationStats,
         draft: GeneralInfoDraft,
     ) {
         this.#org = org;
+        this.#stats = stats;
         this.#draft = draft;
     }
 
@@ -485,7 +485,7 @@ export class OrganizationEditPresenter {
                 this.#draft.domain,
             )}`;
         return buildPage(
-            this.#org, actions, body,
+            this.#org, this.#stats, actions, body,
         );
     }
 }

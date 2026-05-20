@@ -12,12 +12,10 @@ import type {
     AIWorkerEntity,
     IdeaEntity,
     ProjectEntity,
-    ActivityEntity,
     FlowEntity,
     FlowVersionEntity,
     OrganizationEntity,
     IdeaSubmissionEntity,
-    ActivityActorEntity,
     ProjectFlowEntity,
     WorkOrderEntity,
     FlowWorkOrderEntity,
@@ -36,7 +34,6 @@ import {
     validateAIWorkerEntity,
     validateIdeaEntity,
     validateProjectEntity,
-    validateActivityEntity,
     validateFlowEntity,
     validateFlowVersionEntity,
     validateProjectFlowEntity,
@@ -45,7 +42,6 @@ import {
     validateStateFieldValueEntity,
     validateOrganizationEntity,
     validateIdeaSubmissionEntity,
-    validateActivityActorEntity,
     validateStateEntity,
 } from './validators.ts';
 
@@ -89,9 +85,6 @@ function validateSnapshotRow(
             case 'projects':
                 validateProjectEntity(body);
                 break;
-            case 'activities':
-                validateActivityEntity(body);
-                break;
             case 'flows':
                 validateFlowEntity(body);
                 break;
@@ -117,9 +110,6 @@ function validateSnapshotRow(
                 break;
             case 'idea_submissions':
                 validateIdeaSubmissionEntity(body);
-                break;
-            case 'activity_actors':
-                validateActivityActorEntity(body);
                 break;
             case 'states':
                 validateStateEntity(body);
@@ -274,9 +264,6 @@ export async function createLocalStorageAdapter(
         projects: new EntityStore<ProjectEntity>(
             'projects', backend, stateStore,
         ),
-        activities: new EntityStore<ActivityEntity>(
-            'activities', backend, stateStore,
-        ),
         flows: new EntityStore<FlowEntity>(
             'flows', backend, stateStore,
         ),
@@ -308,11 +295,6 @@ export async function createLocalStorageAdapter(
         ideaSubmissions:
             new EntityStore<IdeaSubmissionEntity>(
                 'idea_submissions',
-                backend, stateStore,
-            ),
-        activityActors:
-            new EntityStore<ActivityActorEntity>(
-                'activity_actors',
                 backend, stateStore,
             ),
         objectives: new EntityStore<Objective>(

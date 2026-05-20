@@ -12,7 +12,6 @@ import type {
     AIWorkerEntity,
     IdeaEntity,
     ProjectEntity,
-    ActivityEntity,
     FlowEntity,
     FlowVersionEntity,
     WorkOrderEntity,
@@ -20,7 +19,6 @@ import type {
     StateFieldValueEntity,
     OrganizationEntity,
     IdeaSubmissionEntity,
-    ActivityActorEntity,
     ProjectFlowEntity,
     Objective,
     ObjectiveRevision,
@@ -28,12 +26,6 @@ import type {
     ProjectObjectiveActualScore,
     StateEntity,
 } from './types.ts';
-
-export interface Risk {
-    title: string;
-    severity: string;
-    mitigation: string;
-}
 
 const FLOW_FIELD_TYPE_VALUES:
     readonly FlowFieldType[] = [
@@ -216,35 +208,6 @@ validateStringNumberRecordJson(
         );
     }
     return out;
-}
-
-export function validateRisksJson(
-    raw: string,
-): Risk[] {
-    const label = 'risks';
-    const parsed = parseOrThrow(raw, label);
-    const arr = asArray(parsed, label);
-    return arr.map((item, i) => {
-        const itemLabel =
-            label + '[' + i + ']';
-        const obj = asObject(
-            item, itemLabel,
-        );
-        return {
-            title: asString(
-                obj['title'],
-                itemLabel + '.title',
-            ),
-            severity: asString(
-                obj['severity'],
-                itemLabel + '.severity',
-            ),
-            mitigation: asString(
-                obj['mitigation'],
-                itemLabel + '.mitigation',
-            ),
-        };
-    });
 }
 
 function asGraphField(
@@ -545,19 +508,14 @@ export function pickJsonObjectField(
 //
 // Follow-on: extend this same discipline
 // into JSON-encoded fields (graph,
-// flow_graph, business_context, values,
-// strengths, team_dimensions, etc.) — each
+// flow_graph, values, strengths,
+// team_dimensions, etc.) — each
 // JSON column's inner schema needs its own
 // enumerated key list. That is the
 // "recursive check" that closes the
 // remaining edges. Intentionally deferred
 // here because each column's shape must be
-// enumerated case-by-case (e.g.
-// business_context has its own keys; risks
-// is an array of {title, severity,
-// mitigation} objects — validateRisksJson
-// does deep field validation but not
-// key-count rejection). Bringing those
+// enumerated case-by-case. Bringing those
 // columns under key-count discipline is
 // the next iteration.
 
@@ -639,7 +597,7 @@ export function validateHumanWorkerEntity(
 const AI_WORKER_BODY_KEYS:
     readonly string[] = [
     'name', 'provider', 'description',
-    'auth_token', 'created_at',
+    'auth_token',
 ];
 
 // auth_token must be non-empty —
@@ -676,9 +634,6 @@ export function validateAIWorkerEntity(
             body, 'description',
         ),
         auth_token: authToken,
-        created_at: pickString(
-            body, 'created_at',
-        ),
     };
 }
 
@@ -687,7 +642,6 @@ const IDEA_BODY_KEYS: readonly string[] = [
     'problem_statement', 'target_users',
     'proposed_solution', 'expected_outcome',
     'success_metrics',
-    'risks', 'assumptions', 'alignments',
 ];
 
 export function validateIdeaEntity(
@@ -718,25 +672,14 @@ export function validateIdeaEntity(
         success_metrics: pickString(
             body, 'success_metrics',
         ),
-        risks: pickJsonArrayField(
-            body, 'risks',
-        ),
-        assumptions: pickJsonArrayField(
-            body, 'assumptions',
-        ),
-        alignments: pickJsonArrayField(
-            body, 'alignments',
-        ),
     };
 }
 
 const PROJECT_BODY_KEYS: readonly string[] = [
     'title', 'description',
     'progress', 'start_date',
-    'target_end_date', 'estimated_duration',
-    'actual_duration', 'estimated_cost',
+    'target_end_date', 'estimated_cost',
     'actual_cost', 'position',
-    'business_context', 'timeline_label',
 ];
 
 export function validateProjectEntity(
@@ -763,12 +706,6 @@ export function validateProjectEntity(
         target_end_date: pickString(
             body, 'target_end_date',
         ),
-        estimated_duration: pickNumber(
-            body, 'estimated_duration',
-        ),
-        actual_duration: pickNumber(
-            body, 'actual_duration',
-        ),
         estimated_cost: pickNumber(
             body, 'estimated_cost',
         ),
@@ -778,56 +715,14 @@ export function validateProjectEntity(
         position: pickNumber(
             body, 'position',
         ),
-        business_context: pickJsonObjectField(
-            body, 'business_context',
-        ),
-        timeline_label: pickString(
-            body, 'timeline_label',
-        ),
     };
 }
 
-
-const ACTIVITY_BODY_KEYS: readonly string[] = [
-    'type', 'action', 'target',
-    'timestamp', 'status', 'feedback',
-];
-
-export function validateActivityEntity(
-    body: Record<string, unknown>,
-): Omit<ActivityEntity, 'id'> {
-    assertOnlyKeys(
-        body,
-        ACTIVITY_BODY_KEYS,
-        'ActivityEntity',
-    );
-    return {
-        type: pickString(
-            body, 'type',
-        ),
-        action: pickString(
-            body, 'action',
-        ),
-        target: pickString(
-            body, 'target',
-        ),
-        timestamp: pickString(
-            body, 'timestamp',
-        ),
-        status: pickString(
-            body, 'status',
-        ),
-        feedback: pickString(
-            body, 'feedback',
-        ),
-    };
-}
 
 const FLOW_BODY_KEYS: readonly string[] = [
     'name', 'description', 'is_locked',
     'is_auto_layout', 'is_auto_fit',
     'lock_timeout', 'graph',
-    'created_at', 'updated_at',
 ];
 
 export function validateFlowEntity(
@@ -858,12 +753,6 @@ export function validateFlowEntity(
         graph: pickJsonObjectField(
             body, 'graph',
         ),
-        created_at: pickString(
-            body, 'created_at',
-        ),
-        updated_at: pickString(
-            body, 'updated_at',
-        ),
     };
 }
 
@@ -872,7 +761,7 @@ const FLOW_VERSION_BODY_KEYS:
     'flow_id', 'name', 'description',
     'is_locked', 'is_auto_layout',
     'is_auto_fit', 'lock_timeout',
-    'graph', 'created_at',
+    'graph', 'at',
 ];
 
 export function validateFlowVersionEntity(
@@ -908,8 +797,8 @@ export function validateFlowVersionEntity(
         graph: pickJsonObjectField(
             body, 'graph',
         ),
-        created_at: pickString(
-            body, 'created_at',
+        at: pickString(
+            body, 'at',
         ),
     };
 }
@@ -917,7 +806,7 @@ export function validateFlowVersionEntity(
 const WORK_ORDER_BODY_KEYS:
     readonly string[] = [
     'display_id', 'flow_graph',
-    'position', 'created_at',
+    'position',
 ];
 
 export function validateWorkOrderEntity(
@@ -938,15 +827,12 @@ export function validateWorkOrderEntity(
         position: pickNumber(
             body, 'position',
         ),
-        created_at: pickString(
-            body, 'created_at',
-        ),
     };
 }
 
 const FLOW_WORK_ORDER_BODY_KEYS:
     readonly string[] = [
-    'flow_id', 'work_order_id', 'created_at',
+    'flow_id', 'work_order_id', 'at',
 ];
 
 export function validateFlowWorkOrderEntity(
@@ -964,8 +850,8 @@ export function validateFlowWorkOrderEntity(
         work_order_id: pickString(
             body, 'work_order_id',
         ),
-        created_at: pickString(
-            body, 'created_at',
+        at: pickString(
+            body, 'at',
         ),
     };
 }
@@ -1002,12 +888,8 @@ const ORGANIZATION_BODY_KEYS:
     'name', 'domain',
     'plan', 'plan_status', 'next_billing',
     'seats', 'used_seats', 'projects_limit',
-    'projects_current', 'ideas_limit',
-    'ideas_current', 'storage_limit',
-    'storage_current', 'ai_credits_limit',
-    'ai_credits_current', 'health_score',
+    'ideas_limit', 'health_score',
     'health_status', 'last_activity',
-    'active_people',
 ];
 
 export function validateOrganizationEntity(
@@ -1043,26 +925,8 @@ export function validateOrganizationEntity(
         projects_limit: pickNumber(
             body, 'projects_limit',
         ),
-        projects_current: pickNumber(
-            body, 'projects_current',
-        ),
         ideas_limit: pickNumber(
             body, 'ideas_limit',
-        ),
-        ideas_current: pickNumber(
-            body, 'ideas_current',
-        ),
-        storage_limit: pickNumber(
-            body, 'storage_limit',
-        ),
-        storage_current: pickNumber(
-            body, 'storage_current',
-        ),
-        ai_credits_limit: pickNumber(
-            body, 'ai_credits_limit',
-        ),
-        ai_credits_current: pickNumber(
-            body, 'ai_credits_current',
         ),
         health_score: pickNumber(
             body, 'health_score',
@@ -1073,15 +937,12 @@ export function validateOrganizationEntity(
         last_activity: pickString(
             body, 'last_activity',
         ),
-        active_people: pickNumber(
-            body, 'active_people',
-        ),
     };
 }
 
 const IDEA_SUBMISSION_BODY_KEYS:
     readonly string[] = [
-    'idea_id', 'worker_id', 'created_at',
+    'idea_id', 'worker_id', 'at',
 ];
 
 export function validateIdeaSubmissionEntity(
@@ -1099,41 +960,15 @@ export function validateIdeaSubmissionEntity(
         worker_id: pickString(
             body, 'worker_id',
         ),
-        created_at: pickString(
-            body, 'created_at',
-        ),
-    };
-}
-
-const ACTIVITY_ACTOR_BODY_KEYS:
-    readonly string[] = [
-    'activity_id', 'worker_id', 'created_at',
-];
-
-export function validateActivityActorEntity(
-    body: Record<string, unknown>,
-): Omit<ActivityActorEntity, 'id'> {
-    assertOnlyKeys(
-        body,
-        ACTIVITY_ACTOR_BODY_KEYS,
-        'ActivityActorEntity',
-    );
-    return {
-        activity_id: pickString(
-            body, 'activity_id',
-        ),
-        worker_id: pickString(
-            body, 'worker_id',
-        ),
-        created_at: pickString(
-            body, 'created_at',
+        at: pickString(
+            body, 'at',
         ),
     };
 }
 
 const PROJECT_FLOW_BODY_KEYS:
     readonly string[] = [
-    'project_id', 'flow_id', 'created_at',
+    'project_id', 'flow_id', 'at',
 ];
 
 export function validateProjectFlowEntity(
@@ -1151,8 +986,8 @@ export function validateProjectFlowEntity(
         flow_id: pickString(
             body, 'flow_id',
         ),
-        created_at: pickString(
-            body, 'created_at',
+        at: pickString(
+            body, 'at',
         ),
     };
 }
@@ -1186,7 +1021,7 @@ export function validateObjectiveEntity(
 const OBJECTIVE_REVISION_BODY_KEYS:
     readonly string[] = [
     'objective_id', 'name',
-    'description', 'revised_at',
+    'description', 'at',
 ];
 
 export function validateObjectiveRevisionEntity(
@@ -1211,8 +1046,8 @@ export function validateObjectiveRevisionEntity(
         description: pickString(
             body, 'description',
         ),
-        revised_at: pickString(
-            body, 'revised_at',
+        at: pickString(
+            body, 'at',
         ),
     };
 }
@@ -1220,7 +1055,7 @@ export function validateObjectiveRevisionEntity(
 const BASELINE_SCORE_BODY_KEYS:
     readonly string[] = [
     'project_id', 'objective_id',
-    'score', 'scored_at',
+    'score', 'at',
 ];
 
 export function validateBaselineScoreEntity(
@@ -1241,8 +1076,8 @@ export function validateBaselineScoreEntity(
         score: asScore(
             body.score, 'BaselineScore.score',
         ),
-        scored_at: pickString(
-            body, 'scored_at',
+        at: pickString(
+            body, 'at',
         ),
     };
 }
@@ -1250,7 +1085,7 @@ export function validateBaselineScoreEntity(
 const ACTUAL_SCORE_BODY_KEYS:
     readonly string[] = [
     'project_id', 'objective_id',
-    'score', 'scored_at',
+    'score', 'at',
 ];
 
 export function validateActualScoreEntity(
@@ -1271,8 +1106,8 @@ export function validateActualScoreEntity(
         score: asScore(
             body.score, 'ActualScore.score',
         ),
-        scored_at: pickString(
-            body, 'scored_at',
+        at: pickString(
+            body, 'at',
         ),
     };
 }

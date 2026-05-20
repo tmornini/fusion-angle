@@ -8,7 +8,6 @@ import {
     toDateInputValue,
     formatDate,
     DISPLAY_ABSENT,
-    durationInDays,
     SECONDS_PER_DAY,
 } from '../web-app/app/format.ts';
 
@@ -96,13 +95,6 @@ test('toDateInputValue empty for empty', () => {
 
 test('SECONDS_PER_DAY equals 86400', () => {
     assert.equal(SECONDS_PER_DAY, 86400);
-});
-
-test('durationInDays converts whole days', () => {
-    assert.equal(durationInDays(86400), 1);
-    assert.equal(
-        durationInDays(86400 * 7), 7,
-    );
 });
 
 test('formatDate handles invalid input', () => {

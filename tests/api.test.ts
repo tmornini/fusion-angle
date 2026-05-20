@@ -41,9 +41,6 @@ test('PUT then GET round-trips an entity', async () => {
         proposed_solution: 's',
         expected_outcome: 'o',
         success_metrics: 'm',
-        risks: '[]',
-        assumptions: '[]',
-        alignments: '[]',
     };
     await PUT(db, 'ideas/i1', payload);
     const fetched =
@@ -62,8 +59,6 @@ test('DELETE marks entity tombstoned', async () => {
         proposed_solution: '',
         expected_outcome: '',
         success_metrics: '',
-        risks: '[]', assumptions: '[]',
-        alignments: '[]',
     });
     await DELETE(db, 'ideas/i1');
     await assert.rejects(
@@ -109,7 +104,6 @@ test(
             provider: 'Anthropic',
             description: '',
             auth_token: 'sk-real-token',
-            created_at: '2026-01-01T00:00:00Z',
         });
         const ais =
             await GET<unknown[]>(db, 'ai-workers');
@@ -139,7 +133,6 @@ test(
             provider: 'Anthropic',
             description: '',
             auth_token: 'sk-real-token',
-            created_at: '2026-01-01T00:00:00Z',
         });
         await DELETE(db, 'ai-workers/ai_1');
         await assert.rejects(

@@ -9,10 +9,8 @@ import { navigateTo } from '../app/core.ts';
 import {
     createRequestContext,
     getIdeaRows,
-    postActivity,
     postIdeaStateChange,
     putIdeaSubmission,
-    jsonArrayField,
     generateCryptoSafeBase62,
 } from '../app/adapters/index.ts';
 import {
@@ -166,18 +164,6 @@ export async function init():
                             .successMetrics,
                         position:
                             nextPosition,
-                        risks:
-                            jsonArrayField(
-                                [],
-                            ),
-                        assumptions:
-                            jsonArrayField(
-                                [],
-                            ),
-                        alignments:
-                            jsonArrayField(
-                                [],
-                            ),
                     },
                     'active:incomplete',
                 );
@@ -186,14 +172,6 @@ export async function init():
                     generateCryptoSafeBase62(),
                     ideaId,
                 );
-                await postActivity(ctx, {
-                    type: 'idea_created',
-                    action:
-                        'submitted new idea',
-                    target: formState.title,
-                    status: '',
-                    feedback: '',
-                });
                 navigateTo('ideas');
             },
         );

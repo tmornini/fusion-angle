@@ -21,6 +21,7 @@ import {
     iconNoEntry,
 } from './icons.ts';
 import { formatMinAscending } from './duration-units.ts';
+import { DISPLAY_ABSENT } from './format.ts';
 import type {
     FlowStatsModel, NodeStat,
 } from './flow-stats-aggregate.ts';
@@ -218,7 +219,7 @@ function buildNode(
     const isSpecial = n.isCreate || n.isArchive;
     const face = (!isSpecial && n.avgSeconds !== null)
         ? formatMinAscending(n.avgSeconds)
-        : '—';
+        : DISPLAY_ABSENT;
     const faceEsc = escapeForHtml(face);
 
     let inner = '';

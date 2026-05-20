@@ -4,12 +4,10 @@ import type {
     AIWorkerEntity,
     IdeaEntity,
     ProjectEntity,
-    ActivityEntity,
     FlowEntity,
     FlowVersionEntity,
     OrganizationEntity,
     IdeaSubmissionEntity,
-    ActivityActorEntity,
     ProjectFlowEntity,
     WorkOrderEntity,
     FlowWorkOrderEntity,
@@ -125,8 +123,6 @@ export interface DbAdapter {
         EntityStore<IdeaEntity>;
     projects:
         EntityStore<ProjectEntity>;
-    activities:
-        EntityStore<ActivityEntity>;
     flows:
         EntityStore<FlowEntity>;
     flowVersions:
@@ -153,10 +149,6 @@ export interface DbAdapter {
         EntityStore<
             IdeaSubmissionEntity
         >;
-    activityActors:
-        EntityStore<
-            ActivityActorEntity
-        >;
     objectives:
         EntityStore<Objective>;
     objectiveRevisions:
@@ -177,7 +169,6 @@ export const TABLE_NAMES = [
     'ai_workers',
     'ideas',
     'projects',
-    'activities',
     'flows',
     'flow_versions',
     'project_flows',
@@ -186,7 +177,6 @@ export const TABLE_NAMES = [
     'state_field_values',
     'organization',
     'idea_submissions',
-    'activity_actors',
     'objectives',
     'objective_revisions',
     'project_objective_baseline_scores',

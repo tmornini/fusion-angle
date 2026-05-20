@@ -143,7 +143,7 @@ export async function getIdeas(
                     submission.worker_id,
                 ),
                 submittedAt:
-                    submission.created_at,
+                    submission.at,
             };
         });
 }
@@ -166,7 +166,7 @@ export async function getIdea(
         submitterName: workerName(
             workerMap, submission.worker_id,
         ),
-        submittedAt: submission.created_at,
+        submittedAt: submission.at,
     };
 }
 
@@ -219,7 +219,7 @@ export async function putIdeaSubmission(
         {
             idea_id: ideaId,
             worker_id: worker.id,
-            created_at: nowUtc(),
+            at: nowUtc(),
         },
     );
 }

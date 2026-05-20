@@ -123,11 +123,11 @@ function tBefore(
     return new Date(input.nowMs - ms).toISOString();
 }
 
-function emptyWO(id: string, createdAt: string) {
+function emptyWO(id: string) {
     return {
         id, display_id: id,
         flow_graph: '{}' as JsonObjectField,
-        position: 0, created_at: createdAt,
+        position: 0,
     };
 }
 
@@ -142,7 +142,7 @@ test(
             tBefore(f, 1 * 3600 * 1000);
         const tEnterZ = tBefore(f, 0);
         const input: FlowStatsInput = { ...f,
-            workOrders: [emptyWO('w1', tCreated)],
+            workOrders: [emptyWO('w1')],
             transitions: [
                 { id: 't0', work_order_id: 'w1',
                   from_node_id: '',
@@ -200,7 +200,7 @@ test(
         const f = makeFixture();
         const tCreated = tBefore(f, 60_000);
         const input: FlowStatsInput = { ...f,
-            workOrders: [emptyWO('w1', tCreated)],
+            workOrders: [emptyWO('w1')],
             transitions: [
                 { id: 't0', work_order_id: 'w1',
                   from_node_id: '',
@@ -231,7 +231,7 @@ test(
         const t100d = tBefore(f, 100 * D);
         const t10d  = tBefore(f, 10  * D);
         const input: FlowStatsInput = { ...f,
-            workOrders: [emptyWO('w1', t100d)],
+            workOrders: [emptyWO('w1')],
             transitions: [
                 { id: 't0', work_order_id: 'w1',
                   from_node_id: '',
@@ -265,7 +265,7 @@ test(
         const f = makeFixture();
         const t = tBefore(f, 60_000);
         const input: FlowStatsInput = { ...f,
-            workOrders: [emptyWO('w1', t)],
+            workOrders: [emptyWO('w1')],
             transitions: [
                 { id: 't0', work_order_id: 'w1',
                   from_node_id: '',
@@ -300,9 +300,9 @@ test(
         // w3: c→a  (still in-flight at a)
         const input: FlowStatsInput = { ...f,
             workOrders: [
-                emptyWO('w1', t(3 * H)),
-                emptyWO('w2', t(6 * H)),
-                emptyWO('w3', t(1 * H)),
+                emptyWO('w1'),
+                emptyWO('w2'),
+                emptyWO('w3'),
             ],
             transitions: [
                 { id: '1a', work_order_id: 'w1',
@@ -397,7 +397,7 @@ test(
         // 4 OUT-transitions from a: p1×3, p2×1.
         // p3 in clan but inactive.
         const input: FlowStatsInput = { ...f, nodes,
-            workOrders: [emptyWO('w', t(10 * H))],
+            workOrders: [emptyWO('w')],
             transitions: [
                 { id: 'in0', work_order_id: 'w',
                   from_node_id: '',
@@ -473,7 +473,7 @@ test(
         const t = (msAgo: number) => tBefore(f, msAgo);
         const H = 3600 * 1000;
         const input: FlowStatsInput = { ...f, nodes,
-            workOrders: [emptyWO('w', t(2 * H))],
+            workOrders: [emptyWO('w')],
             transitions: [
                 { id: '1', work_order_id: 'w',
                   from_node_id: '',
@@ -568,7 +568,7 @@ test(
         const input: FlowStatsInput = { ...f,
             workOrders: Array.from(
                 {length:8}, (_, i) =>
-                    emptyWO('w' + i, t(20 * H)),
+                    emptyWO('w' + i),
             ),
             transitions: [...enters, ...outs],
         };
@@ -733,10 +733,10 @@ test(
         ];
         const input: FlowStatsInput = { ...f,
             workOrders: [
-                emptyWO('w1', t(10*H)),
-                emptyWO('w2', t(9*H)),
-                emptyWO('w3', t(8*H)),
-                emptyWO('wl', t(10*H)),
+                emptyWO('w1'),
+                emptyWO('w2'),
+                emptyWO('w3'),
+                emptyWO('wl'),
             ],
             transitions: [
                 ...happyTrans('w1', 10 * H),
@@ -776,7 +776,7 @@ test('collapses long tail into a rest bucket', () => {
     const transitions: TransitionEvent[] = [];
     for (let i = 0; i < 10; i++) {
         const woId = 'w' + i;
-        workOrders.push(emptyWO(woId, t(50 * H)));
+        workOrders.push(emptyWO(woId));
         let step = 0;
         let nowAgoH = 50;
         const push = (from: string, to: string) =>

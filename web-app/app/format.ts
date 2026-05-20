@@ -1,6 +1,5 @@
 import {
     SECONDS_PER_DAY,
-    durationInDays,
     formatCompactCurrency,
 } from './adapters/index.ts';
 
@@ -98,7 +97,6 @@ export {
     pluralize,
     toDateInputValue,
     trimStrings,
-    durationInDays,
     formatCompactCurrency,
     SECONDS_PER_DAY,
 };

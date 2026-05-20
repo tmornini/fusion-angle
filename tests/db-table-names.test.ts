@@ -30,7 +30,7 @@ test('MemoryDbAdapter exposes objective stores',
             objective_id: 'o1',
             name: 'Revenue',
             description: 'd',
-            revised_at: '2026-05-14T00:00:00.000Z',
+            at: '2026-05-14T00:00:00.000Z',
         });
         const revs =
             await db.objectiveRevisions.getAll();
@@ -41,7 +41,7 @@ test('MemoryDbAdapter exposes objective stores',
                 project_id: 'p1',
                 objective_id: 'o1',
                 score: 42,
-                scored_at: '2026-05-14T00:00:00.000Z',
+                at: '2026-05-14T00:00:00.000Z',
             },
         );
         const bs = await
@@ -53,7 +53,7 @@ test('MemoryDbAdapter exposes objective stores',
                 project_id: 'p1',
                 objective_id: 'o1',
                 score: -10,
-                scored_at: '2026-05-15T00:00:00.000Z',
+                at: '2026-05-15T00:00:00.000Z',
             },
         );
         const ac = await

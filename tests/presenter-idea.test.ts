@@ -2,7 +2,6 @@ import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import {
     Idea,
-    jsonArrayField,
     type IdeaEntity,
     type IdeaState,
 } from '../api/types.ts';
@@ -129,9 +128,6 @@ function makeIdeaEntity(
             'Higher 7-day activation rate',
         success_metrics:
             '20% lift in activation',
-        risks: jsonArrayField([]),
-        assumptions: jsonArrayField([]),
-        alignments: jsonArrayField([]),
         ...overrides,
     };
 }

@@ -4,9 +4,7 @@ import type {
     WorkerState,
     IdeaEntity,
     ProjectEntity,
-    ActivityEntity,
     IdeaSubmissionEntity,
-    ActivityActorEntity,
     FlowEntity,
     ProjectFlowEntity,
     AIWorkerEntity,
@@ -33,8 +31,6 @@ const now = new Date();
 
 const TIER_PROJECTS_LIMIT = 50;
 const TIER_IDEAS_LIMIT = 200;
-const TIER_STORAGE_GB = 10;
-const TIER_AI_CREDITS = 1000;
 
 function pad(n: number): string {
     return String(n).padStart(2, '0');
@@ -353,14 +349,12 @@ function generateFlowWorkload(args: {
             display_id: displayId,
             flow_graph: frozenFlowGraph,
             position: 100 + i,
-            created_at:
-                isoFromMs(createdAtMs),
         });
         flowWorkOrders.push({
             id: b62Id(rng, 22),
             flow_id: flow.flowId,
             work_order_id: woId,
-            created_at:
+            at:
                 isoFromMs(createdAtMs),
         });
     }
@@ -783,9 +777,6 @@ export async function populateMockData(
                 + ' segmentation time, 25%'
                 + ' increase in campaign'
                 + ' conversion rates',
-            risks: jsonArrayField([]),
-            assumptions: jsonArrayField([]),
-            alignments: jsonArrayField([]),
         },
         {
             id: 'cbTuSs0Ex84PeFGSvoAEFZ',
@@ -820,9 +811,6 @@ export async function populateMockData(
                 '90% reduction in report'
                 + ' preparation time,'
                 + ' 100% on-time delivery',
-            risks: jsonArrayField([]),
-            assumptions: jsonArrayField([]),
-            alignments: jsonArrayField([]),
         },
         {
             id: 'wuCMQqo4IkEksx7MYmu8g2',
@@ -851,9 +839,6 @@ export async function populateMockData(
                 + ' 20%, saving $150K'
                 + ' annually.',
             success_metrics: '',
-            risks: jsonArrayField([]),
-            assumptions: jsonArrayField([]),
-            alignments: jsonArrayField([]),
         },
         {
             id: 'ojOEXtdzdtTZtpM81TxVca',
@@ -888,9 +873,6 @@ export async function populateMockData(
                 + ' under 2 seconds, 95%'
                 + ' daily active usage'
                 + ' by leadership',
-            risks: jsonArrayField([]),
-            assumptions: jsonArrayField([]),
-            alignments: jsonArrayField([]),
         },
         {
             id: 'T2vAafLDcshDONlYxpzPLc',
@@ -918,9 +900,6 @@ export async function populateMockData(
                 + ' improving customer'
                 + ' satisfaction scores.',
             success_metrics: '',
-            risks: jsonArrayField([]),
-            assumptions: jsonArrayField([]),
-            alignments: jsonArrayField([]),
         },
         {
             id: 'HRYrImq1rBJ5ZRe1T9TAVk',
@@ -952,9 +931,6 @@ export async function populateMockData(
                 '50% faster onboarding,'
                 + ' 40% higher new-hire'
                 + ' productivity scores',
-            risks: jsonArrayField([]),
-            assumptions: jsonArrayField([]),
-            alignments: jsonArrayField([]),
         },
         {
             id: 'MCxK0hzT9CPjJx1ZV5unfr',
@@ -987,61 +963,6 @@ export async function populateMockData(
                 + ' rate, CSAT above 4.5,'
                 + ' average response time'
                 + ' under 30 seconds',
-            risks: jsonArrayField([
-                {
-                    title:
-                        'AI response accuracy',
-                    severity: 'high',
-                    mitigation:
-                        'Implement human'
-                        + ' escalation for'
-                        + ' low-confidence'
-                        + ' responses and'
-                        + ' continuous training'
-                        + ' loop',
-                },
-                {
-                    title:
-                        'Integration complexity',
-                    severity: 'medium',
-                    mitigation:
-                        'Phase rollout'
-                        + ' starting with'
-                        + ' FAQ-only queries'
-                        + ' before expanding'
-                        + ' scope',
-                },
-                {
-                    title:
-                        'Customer acceptance',
-                    severity: 'low',
-                    mitigation:
-                        'Clear bot'
-                        + ' identification and'
-                        + ' easy handoff to'
-                        + ' human agents',
-                },
-            ]),
-            assumptions: jsonArrayField([
-                'Current helpdesk API'
-                    + ' supports required'
-                    + ' integrations',
-                'Historical ticket data is'
-                    + ' clean and'
-                    + ' categorizable',
-                'Legal has approved AI'
-                    + ' usage for customer'
-                    + ' interactions',
-            ]),
-            alignments: jsonArrayField([
-                'Q1 OKR: Improve customer'
-                    + ' satisfaction score'
-                    + ' by 15%',
-                'Digital transformation'
-                    + ' initiative',
-                'Cost optimization'
-                    + ' program',
-            ]),
         },
         {
             id: 'SUb4gKXsZ1OsEauzqszg0t',
@@ -1070,9 +991,6 @@ export async function populateMockData(
                 'Opt-out rate below 20%,'
                 + ' 35% higher engagement'
                 + ' on push notifications',
-            risks: jsonArrayField([]),
-            assumptions: jsonArrayField([]),
-            alignments: jsonArrayField([]),
         },
         {
             id: 'gxa84W9KvEgD0wT1F4TOM9',
@@ -1099,9 +1017,6 @@ export async function populateMockData(
                 '15% energy cost'
                 + ' reduction, ESG report'
                 + ' delivery on schedule',
-            risks: jsonArrayField([]),
-            assumptions: jsonArrayField([]),
-            alignments: jsonArrayField([]),
         },
         {
             id: '1Z68gROMrlTAfPEGiyJJAY',
@@ -1131,9 +1046,6 @@ export async function populateMockData(
                 '50% participation'
                 + ' increase, 12% lower'
                 + ' voluntary turnover',
-            risks: jsonArrayField([]),
-            assumptions: jsonArrayField([]),
-            alignments: jsonArrayField([]),
         },
         {
             id: 'Q2On2xwMpFdzOklBQJXrni',
@@ -1163,9 +1075,6 @@ export async function populateMockData(
                 '99.5% inventory accuracy,'
                 + ' zero manual'
                 + ' reconciliation needed',
-            risks: jsonArrayField([]),
-            assumptions: jsonArrayField([]),
-            alignments: jsonArrayField([]),
         },
     ];
 
@@ -1182,17 +1091,10 @@ export async function populateMockData(
             seats: 25,
             used_seats: 18,
             projects_limit: TIER_PROJECTS_LIMIT,
-            projects_current: 12,
             ideas_limit: TIER_IDEAS_LIMIT,
-            ideas_current: 47,
-            storage_limit: TIER_STORAGE_GB,
-            storage_current: 2.4,
-            ai_credits_limit: TIER_AI_CREDITS,
-            ai_credits_current: 850,
             health_score: 92,
             health_status: 'excellent',
             last_activity: dt(0, 16, 0),
-            active_people: 14,
         }),
     ]);
 
@@ -1213,38 +1115,9 @@ export async function populateMockData(
             progress: 67,
             start_date: dt(60, 9, 0),
             target_end_date: dt(-30, 9, 0),
-            estimated_duration:
-                160 * SECONDS_PER_HOUR,
-            actual_duration:
-                92 * SECONDS_PER_HOUR,
             estimated_cost: 88000,
             actual_cost: 51000,
             position: 1,
-            business_context: jsonObjectField({
-                problem:
-                    'Manual segmentation'
-                    + ' takes two weeks and'
-                    + ' is stale by the time'
-                    + ' it ships.',
-                expectedOutcome:
-                    'Real-time segments'
-                    + ' that update'
-                    + ' automatically and'
-                    + ' lift conversion 40%.',
-                successMetrics: [
-                    'Segmentation time:'
-                        + ' weeks to seconds',
-                    'Conversion rate +40%',
-                    'Customer LTV +25%',
-                ],
-                constraints: [
-                    'Salesforce CRM'
-                        + ' integration',
-                    'GDPR compliance for EU',
-                    'Phase 1 capped at $90k',
-                ],
-            }),
-            timeline_label: 'On Track',
         },
         {
             id: 'jRE2Tj32NHsFGZIeEADp0p',
@@ -1258,15 +1131,9 @@ export async function populateMockData(
             progress: 100,
             start_date: dt(110, 9, 0),
             target_end_date: dt(45, 9, 0),
-            estimated_duration:
-                80 * SECONDS_PER_HOUR,
-            actual_duration:
-                75 * SECONDS_PER_HOUR,
             estimated_cost: 56000,
             actual_cost: 58000,
             position: 2,
-            business_context: jsonObjectField({}),
-            timeline_label: 'Completed',
         },
         {
             id: l2cProjectId,
@@ -1282,37 +1149,9 @@ export async function populateMockData(
             progress: 69,
             start_date: dt(55, 9, 0),
             target_end_date: dt(-25, 9, 0),
-            estimated_duration:
-                144 * SECONDS_PER_HOUR,
-            actual_duration:
-                88 * SECONDS_PER_HOUR,
             estimated_cost: 78000,
             actual_cost: 48000,
             position: 3,
-            business_context: jsonObjectField({
-                problem:
-                    'Leads sit untriaged'
-                    + ' for days; mid-funnel'
-                    + ' drops are'
-                    + ' unattributed.',
-                expectedOutcome:
-                    'AI-assisted triage'
-                    + ' cuts time-to-'
-                    + 'discovery by 80% and'
-                    + ' surfaces every'
-                    + ' stalled deal.',
-                successMetrics: [
-                    'Triage SLA < 4 hours',
-                    'Win rate +12 points',
-                    'Qualified pipeline +35%',
-                ],
-                constraints: [
-                    'Salesforce integration',
-                    'AI worker auth tokens'
-                        + ' rotated quarterly',
-                ],
-            }),
-            timeline_label: 'On Track',
         },
         {
             id: 'P04PredMa1ntzyXY010203',
@@ -1326,15 +1165,9 @@ export async function populateMockData(
             progress: 17,
             start_date: dt(18, 9, 0),
             target_end_date: dt(-90, 9, 0),
-            estimated_duration:
-                220 * SECONDS_PER_HOUR,
-            actual_duration:
-                12 * SECONDS_PER_HOUR,
             estimated_cost: 110000,
             actual_cost: 7000,
             position: 4,
-            business_context: jsonObjectField({}),
-            timeline_label: 'Just Started',
         },
         {
             id: 'P05RtAna1ytcsXY010203Z',
@@ -1348,15 +1181,9 @@ export async function populateMockData(
             progress: 100,
             start_date: dt(95, 9, 0),
             target_end_date: dt(40, 9, 0),
-            estimated_duration:
-                64 * SECONDS_PER_HOUR,
-            actual_duration:
-                70 * SECONDS_PER_HOUR,
             estimated_cost: 50000,
             actual_cost: 52000,
             position: 5,
-            business_context: jsonObjectField({}),
-            timeline_label: 'Completed',
         },
         {
             id: 'P06SmInvOptZyXY010203A',
@@ -1370,15 +1197,9 @@ export async function populateMockData(
             progress: 76,
             start_date: dt(38, 9, 0),
             target_end_date: dt(-12, 9, 0),
-            estimated_duration:
-                96 * SECONDS_PER_HOUR,
-            actual_duration:
-                28 * SECONDS_PER_HOUR,
             estimated_cost: 64000,
             actual_cost: 84000,
             position: 6,
-            business_context: jsonObjectField({}),
-            timeline_label: 'Over Budget',
         },
         {
             id: 'P07Empl0yTrainZyXY00B0',
@@ -1394,15 +1215,9 @@ export async function populateMockData(
             progress: 10,
             start_date: dt(12, 9, 0),
             target_end_date: dt(-110, 9, 0),
-            estimated_duration:
-                96 * SECONDS_PER_HOUR,
-            actual_duration:
-                6 * SECONDS_PER_HOUR,
             estimated_cost: 60000,
             actual_cost: 3500,
             position: 7,
-            business_context: jsonObjectField({}),
-            timeline_label: 'Just Started',
         },
         {
             id: 'P08CustSuppKn0wXY01C0D',
@@ -1417,15 +1232,9 @@ export async function populateMockData(
             progress: 69,
             start_date: dt(48, 9, 0),
             target_end_date: dt(-22, 9, 0),
-            estimated_duration:
-                110 * SECONDS_PER_HOUR,
-            actual_duration:
-                65 * SECONDS_PER_HOUR,
             estimated_cost: 64000,
             actual_cost: 42000,
             position: 8,
-            business_context: jsonObjectField({}),
-            timeline_label: 'On Track',
         },
         {
             id: 'P09C0mp1AudAut0mXY01E0',
@@ -1440,15 +1249,9 @@ export async function populateMockData(
             progress: 86,
             start_date: dt(72, 9, 0),
             target_end_date: dt(-12, 9, 0),
-            estimated_duration:
-                180 * SECONDS_PER_HOUR,
-            actual_duration:
-                122 * SECONDS_PER_HOUR,
             estimated_cost: 102000,
             actual_cost: 142000,
             position: 9,
-            business_context: jsonObjectField({}),
-            timeline_label: 'Over Budget',
         },
         {
             id: 'P10MlRgD1s4stRc1XY01FG',
@@ -1462,15 +1265,9 @@ export async function populateMockData(
             progress: 91,
             start_date: dt(82, 9, 0),
             target_end_date: dt(-8, 9, 0),
-            estimated_duration:
-                240 * SECONDS_PER_HOUR,
-            actual_duration:
-                168 * SECONDS_PER_HOUR,
             estimated_cost: 134000,
             actual_cost: 99000,
             position: 10,
-            business_context: jsonObjectField({}),
-            timeline_label: 'On Track',
         },
         {
             id: 'P11V0iceField0psXY01HJ',
@@ -1485,15 +1282,9 @@ export async function populateMockData(
             progress: 53,
             start_date: dt(40, 9, 0),
             target_end_date: dt(-35, 9, 0),
-            estimated_duration:
-                132 * SECONDS_PER_HOUR,
-            actual_duration:
-                58 * SECONDS_PER_HOUR,
             estimated_cost: 76000,
             actual_cost: 36000,
             position: 11,
-            business_context: jsonObjectField({}),
-            timeline_label: 'On Track',
         },
         {
             id: 'P12CarbF00tprXY01K0L0M',
@@ -1508,15 +1299,9 @@ export async function populateMockData(
             progress: 100,
             start_date: dt(120, 9, 0),
             target_end_date: dt(35, 9, 0),
-            estimated_duration:
-                100 * SECONDS_PER_HOUR,
-            actual_duration:
-                90 * SECONDS_PER_HOUR,
             estimated_cost: 62000,
             actual_cost: 56000,
             position: 12,
-            business_context: jsonObjectField({}),
-            timeline_label: 'Completed',
         },
         {
             id: 'P13W0rk4rcF0r3castsXY1',
@@ -1530,15 +1315,9 @@ export async function populateMockData(
             progress: 17,
             start_date: dt(22, 9, 0),
             target_end_date: dt(-105, 9, 0),
-            estimated_duration:
-                160 * SECONDS_PER_HOUR,
-            actual_duration:
-                14 * SECONDS_PER_HOUR,
             estimated_cost: 90000,
             actual_cost: 8500,
             position: 13,
-            business_context: jsonObjectField({}),
-            timeline_label: 'Just Started',
         },
         {
             id: 'P14SmartD0cumtR0utngX1',
@@ -1552,15 +1331,9 @@ export async function populateMockData(
             progress: 78,
             start_date: dt(65, 9, 0),
             target_end_date: dt(-18, 9, 0),
-            estimated_duration:
-                120 * SECONDS_PER_HOUR,
-            actual_duration:
-                78 * SECONDS_PER_HOUR,
             estimated_cost: 70000,
             actual_cost: 45000,
             position: 14,
-            business_context: jsonObjectField({}),
-            timeline_label: 'On Track',
         },
         {
             id: 'P15Inv3st0rRep0rtP1Y00',
@@ -1575,89 +1348,9 @@ export async function populateMockData(
             progress: 67,
             start_date: dt(58, 9, 0),
             target_end_date: dt(-28, 9, 0),
-            estimated_duration:
-                100 * SECONDS_PER_HOUR,
-            actual_duration:
-                60 * SECONDS_PER_HOUR,
             estimated_cost: 56000,
             actual_cost: 34000,
             position: 15,
-            business_context: jsonObjectField({}),
-            timeline_label: 'On Track',
-        },
-    ];
-
-    const activities: ActivityEntity[] = [
-        {
-            id: '5PGE1WlEOTkSaNYjiBXLMA',
-            type: 'idea_created',
-            action: 'submitted new idea',
-            target: 'Mobile App Redesign',
-            timestamp: dt(0, 17, 0),
-            status: 'active',
-            feedback:
-                'Addresses top user'
-                + ' feedback themes.',
-        },
-        {
-            id: 'fOqTfg9JPs73xsnC4QUmHs',
-            type: 'comment_added',
-            action: 'commented on',
-            target:
-                'Q1 Analytics Dashboard',
-            timestamp: dt(0, 16, 0),
-            status: 'active',
-            feedback:
-                'Great progress on the'
-                + ' charts!',
-        },
-        {
-            id: '3pBQbQp4LPK2udgd21HlTm',
-            type: 'user_joined',
-            action: 'joined the team',
-            target: 'Product Innovation',
-            timestamp: dt(0, 15, 0),
-            status: 'active',
-            feedback:
-                'Excited to contribute'
-                + ' to the team.',
-        },
-        {
-            id: 'CqXHcyiDNzFVcoUM2M1Tl3',
-            type: 'status_changed',
-            action: 'changed status of',
-            target:
-                'Customer Feedback Portal',
-            timestamp: dt(0, 14, 0),
-            status: 'In Progress',
-            feedback:
-                'Development sprint'
-                + ' started this week.',
-        },
-        {
-            id: 'Kj75MtFxnEpFZs4MSK1emd',
-            type: 'idea_converted',
-            action:
-                'converted idea to project',
-            target: 'Automated Testing'
-                + ' Framework',
-            timestamp: dt(0, 13, 0),
-            status: 'completed',
-            feedback:
-                'Approved by engineering'
-                + ' leadership.',
-        },
-        {
-            id: 'xRmfZFNV8GYDQmq8j09Fsc',
-            type: 'project_created',
-            action: 'created new project',
-            target: 'Performance'
-                + ' Optimization Initiative',
-            timestamp: dt(0, 12, 0),
-            status: 'active',
-            feedback:
-                'Targeting 40% latency'
-                + ' reduction.',
         },
     ];
 
@@ -2086,8 +1779,6 @@ export async function populateMockData(
                     },
                 ],
             }),
-            created_at: wfTimestamp,
-            updated_at: wfTimestamp,
         },
         {
             id: 'E2BnBlZyrriqsQYkmS4usb',
@@ -2475,8 +2166,6 @@ export async function populateMockData(
                     },
                 ],
             }),
-            created_at: wfTimestamp,
-            updated_at: wfTimestamp,
         },
         {
             id: '7COt7Kf4OaOBg6AjaNO04s',
@@ -2890,8 +2579,6 @@ export async function populateMockData(
                     },
                 ],
             }),
-            created_at: wfTimestamp,
-            updated_at: wfTimestamp,
         },
         {
             id: l2cFlowId,
@@ -2907,8 +2594,6 @@ export async function populateMockData(
                 nodes: leadToCloseNodes,
                 edges: leadToCloseEdges,
             }),
-            created_at: wfTimestamp,
-            updated_at: wfTimestamp,
         },
     ];
 
@@ -3044,7 +2729,6 @@ export async function populateMockData(
                 ).edges,
             }),
             position: 1,
-            created_at: woCreated,
         },
         // ── happy-path runs (WO02-WO23) ──────────
         // Create → Data Capture → Review → Archive.
@@ -3056,154 +2740,132 @@ export async function populateMockData(
             display_id: 'b2d4f6a8',
             flow_graph: woGraph(),
             position: 2,
-            created_at: dt(88, 9, 0),
         },
         {
             id: 'taUp8y0cuMhzf0UOk6Ev8Y',
             display_id: 'c3e5g7b9',
             flow_graph: woGraph(),
             position: 3,
-            created_at: dt(82, 10, 0),
         },
         {
             id: 'KD2WFTEwzJFvxZ6cpCwpvc',
             display_id: 'd4f6h8c0',
             flow_graph: woGraph(),
             position: 4,
-            created_at: dt(76, 8, 30),
         },
         {
             id: 'b6YNHrFyi6V9dJNXyCXu1K',
             display_id: 'e5g7i9d1',
             flow_graph: woGraph(),
             position: 5,
-            created_at: dt(71, 9, 0),
         },
         {
             id: 'V3AXXlSjJwDQAmkNiRA8aP',
             display_id: 'f6h8j0e2',
             flow_graph: woGraph(),
             position: 6,
-            created_at: dt(66, 11, 0),
         },
         {
             id: '9ooK5olzSsEnpgP8ASzBQi',
             display_id: 'g7i9k1f3',
             flow_graph: woGraph(),
             position: 7,
-            created_at: dt(61, 9, 30),
         },
         {
             id: 'cnXN4DZx9dUVIZL4OZnyw0',
             display_id: 'h8j0l2g4',
             flow_graph: woGraph(),
             position: 8,
-            created_at: dt(57, 8, 0),
         },
         {
             id: 'kKw82RQDHRfgg5xQnw1lPk',
             display_id: 'i9k1m3h5',
             flow_graph: woGraph(),
             position: 9,
-            created_at: dt(52, 10, 0),
         },
         {
             id: 'ec0n7Ab6pJYLFDF6H0nyvV',
             display_id: 'j0l2n4i6',
             flow_graph: woGraph(),
             position: 10,
-            created_at: dt(48, 9, 0),
         },
         {
             id: 'gAjJnjirIrIgcFDMJyNsPa',
             display_id: 'k1m3o5j7',
             flow_graph: woGraph(),
             position: 11,
-            created_at: dt(44, 10, 30),
         },
         {
             id: 'kyWtMAZPazKqAfIwPzACsL',
             display_id: 'l2n4p6k8',
             flow_graph: woGraph(),
             position: 12,
-            created_at: dt(40, 9, 0),
         },
         {
             id: 'C41Hni5pMxp8xMQFEGNaib',
             display_id: 'm3o5q7l9',
             flow_graph: woGraph(),
             position: 13,
-            created_at: dt(37, 8, 0),
         },
         {
             id: 'FGAZYYwoS9To1tNb24DfLc',
             display_id: 'n4p6r8m0',
             flow_graph: woGraph(),
             position: 14,
-            created_at: dt(33, 9, 30),
         },
         {
             id: '0zgLwuyPgtreVYjg4TScJR',
             display_id: 'o5q7s9n1',
             flow_graph: woGraph(),
             position: 15,
-            created_at: dt(29, 10, 0),
         },
         {
             id: 'XGJklKFO4aUtjSAEHEE8Zn',
             display_id: 'p6r8t0o2',
             flow_graph: woGraph(),
             position: 16,
-            created_at: dt(26, 9, 0),
         },
         {
             id: 'rtuFD9uWn5zguEHyT3fh8s',
             display_id: 'q7s9u1p3',
             flow_graph: woGraph(),
             position: 17,
-            created_at: dt(23, 8, 30),
         },
         {
             id: 'XrO05MeyqldO8qm0O4VPdq',
             display_id: 'r8t0v2q4',
             flow_graph: woGraph(),
             position: 18,
-            created_at: dt(20, 10, 0),
         },
         {
             id: 'S74N7CPA2dsMESryJNrFAC',
             display_id: 's9u1w3r5',
             flow_graph: woGraph(),
             position: 19,
-            created_at: dt(17, 9, 0),
         },
         {
             id: 'Cr8KZH5Q2j5n8Q8Yw3qdMw',
             display_id: 't0v2x4s6',
             flow_graph: woGraph(),
             position: 20,
-            created_at: dt(14, 8, 0),
         },
         {
             id: '4T56gYme7ae4Ya7AMA0hpW',
             display_id: 'u1w3y5t7',
             flow_graph: woGraph(),
             position: 21,
-            created_at: dt(11, 10, 30),
         },
         {
             id: 'aFCyJrvokoJM5iINwO3WCf',
             display_id: 'v2x4z6u8',
             flow_graph: woGraph(),
             position: 22,
-            created_at: dt(9, 9, 0),
         },
         {
             id: 'Sr4k75y6vuKODCA9zlSUjk',
             display_id: 'w3y5a7v9',
             flow_graph: woGraph(),
             position: 23,
-            created_at: dt(6, 11, 0),
         },
         // ── needs-revision loops (WO24-WO29) ─────
         // … → Data Capture → Review → Data Capture
@@ -3214,42 +2876,36 @@ export async function populateMockData(
             display_id: 'x4z6b8w0',
             flow_graph: woGraph(),
             position: 24,
-            created_at: dt(77, 9, 0),
         },
         {
             id: 'BbZ3Z7OZnFmdF5MBgVIYzI',
             display_id: 'y5a7c9x1',
             flow_graph: woGraph(),
             position: 25,
-            created_at: dt(63, 10, 0),
         },
         {
             id: 'NydsTqMmCgEKI7R9xxp36g',
             display_id: 'z6b8d0y2',
             flow_graph: woGraph(),
             position: 26,
-            created_at: dt(50, 8, 30),
         },
         {
             id: 'x2uQev3HutthrUWRFkXSkH',
             display_id: 'a7c9e1z3',
             flow_graph: woGraph(),
             position: 27,
-            created_at: dt(38, 9, 0),
         },
         {
             id: 'w7XA9UnuYI7e46RTQL1xGW',
             display_id: 'b8d0f2a4',
             flow_graph: woGraph(),
             position: 28,
-            created_at: dt(25, 10, 0),
         },
         {
             id: '3H3XeeNE4rS2wbANs3JvYz',
             display_id: 'c9e1g3b5',
             flow_graph: woGraph(),
             position: 29,
-            created_at: dt(12, 9, 30),
         },
         // in-flight runs (WO30-WO34):
         // Last transition lands in Data Capture or
@@ -3260,35 +2916,30 @@ export async function populateMockData(
             display_id: 'd0f2h4c6',
             flow_graph: woGraph(),
             position: 30,
-            created_at: dt(18, 9, 0),
         },
         {
             id: '0brjvcoPEVBwMkUQ3tKHWc',
             display_id: 'e1g3i5d7',
             flow_graph: woGraph(),
             position: 31,
-            created_at: dt(10, 10, 0),
         },
         {
             id: 'mTdhglHhl7pM0mKt0M2IjF',
             display_id: 'f2h4j6e8',
             flow_graph: woGraph(),
             position: 32,
-            created_at: dt(7, 8, 0),
         },
         {
             id: 'GMhfH8lMQJXzE4vkjnSH1u',
             display_id: 'g3i5k7f9',
             flow_graph: woGraph(),
             position: 33,
-            created_at: dt(4, 9, 0),
         },
         {
             id: 'pLxCFGOINXVaXmrS0VG0vC',
             display_id: 'h4j6l8g0',
             flow_graph: woGraph(),
             position: 34,
-            created_at: dt(2, 11, 0),
         },
         // ── out-of-clan runs (WO35-WO36) ─────────
         // OUT-transition from Data Capture is by
@@ -3300,14 +2951,12 @@ export async function populateMockData(
             display_id: 'i5k7m9h1',
             flow_graph: woGraph(),
             position: 35,
-            created_at: dt(35, 9, 0),
         },
         {
             id: 'zYnDWBV4VP5guzW5fDWtHN',
             display_id: 'j6l8n0i2',
             flow_graph: woGraph(),
             position: 36,
-            created_at: dt(22, 10, 30),
         },
         // old runs (WO37-WO38):
         // Created ~105 days ago, outside the
@@ -3318,14 +2967,12 @@ export async function populateMockData(
             display_id: 'k7m9o1j3',
             flow_graph: woGraph(),
             position: 37,
-            created_at: dt(108, 9, 0),
         },
         {
             id: 'EXphSopBU1Is2TH4QZo4nO',
             display_id: 'l8n0p2k4',
             flow_graph: woGraph(),
             position: 38,
-            created_at: dt(103, 10, 0),
         },
         // Proposal Review Cycle (prc01-prc06):
         // second flow demo -- 4 happy-path, 1
@@ -3335,28 +2982,24 @@ export async function populateMockData(
             display_id: '5tb2nOoHyhRpy3UHlyrJKl',
             flow_graph: prcGraph(),
             position: 39,
-            created_at: dt(60, 9, 0),
         },
         {
             id: 'L3UhOvrAGluk4kNnN6J8NT',
             display_id: 'ZifylnGqzY8uXQ30d1DgeP',
             flow_graph: prcGraph(),
             position: 40,
-            created_at: dt(45, 10, 0),
         },
         {
             id: 'oTscblsEOjZDkvkW3vs7rU',
             display_id: 'IoF2qGX8bftkrW4QrLnBwp',
             flow_graph: prcGraph(),
             position: 41,
-            created_at: dt(30, 8, 0),
         },
         {
             id: 'Xpw9VGpZ6RyevuInSr8yze',
             display_id: '3eC66vpxib66qPnv7hdxvJ',
             flow_graph: prcGraph(),
             position: 42,
-            created_at: dt(20, 11, 0),
         },
         // prc05: revisit -- Decision sends back
         // to Revise then Draft before completing.
@@ -3365,7 +3008,6 @@ export async function populateMockData(
             display_id: 'tmj4YM3W8H1qgr4sUIpY35',
             flow_graph: prcGraph(),
             position: 43,
-            created_at: dt(15, 9, 0),
         },
         // prc06: in-flight -- stuck at Decision.
         {
@@ -3373,7 +3015,6 @@ export async function populateMockData(
             display_id: 'Tb52zOWUVGcaSQRFSLDXPV',
             flow_graph: prcGraph(),
             position: 44,
-            created_at: dt(5, 10, 0),
         },
     ];
 
@@ -3384,7 +3025,7 @@ export async function populateMockData(
             flow_id:
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id: woId,
-            created_at: woCreated,
+            at: woCreated,
         },
         // happy-path
         {
@@ -3393,7 +3034,7 @@ export async function populateMockData(
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
                 'kKtX2W0iVTWFPEoPrJmIHW',
-            created_at: dt(88, 9, 0),
+            at: dt(88, 9, 0),
         },
         {
             id: 'FjjhKDthEYLf50lmPrKkaq',
@@ -3401,7 +3042,7 @@ export async function populateMockData(
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
                 'taUp8y0cuMhzf0UOk6Ev8Y',
-            created_at: dt(82, 10, 0),
+            at: dt(82, 10, 0),
         },
         {
             id: 'vNj3XdrWhDpoFW8qsLsqKg',
@@ -3409,7 +3050,7 @@ export async function populateMockData(
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
                 'KD2WFTEwzJFvxZ6cpCwpvc',
-            created_at: dt(76, 8, 30),
+            at: dt(76, 8, 30),
         },
         {
             id: 'hjPgB0KYD5Sesnjejnohf6',
@@ -3417,7 +3058,7 @@ export async function populateMockData(
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
                 'b6YNHrFyi6V9dJNXyCXu1K',
-            created_at: dt(71, 9, 0),
+            at: dt(71, 9, 0),
         },
         {
             id: 'UhSuMtC66uclQH5irfsqd0',
@@ -3425,7 +3066,7 @@ export async function populateMockData(
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
                 'V3AXXlSjJwDQAmkNiRA8aP',
-            created_at: dt(66, 11, 0),
+            at: dt(66, 11, 0),
         },
         {
             id: 'J0GfRrP7J5tNhBDCXDDOPV',
@@ -3433,7 +3074,7 @@ export async function populateMockData(
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
                 '9ooK5olzSsEnpgP8ASzBQi',
-            created_at: dt(61, 9, 30),
+            at: dt(61, 9, 30),
         },
         {
             id: 'nULvK3MsVfud7QkAlrNGpQ',
@@ -3441,7 +3082,7 @@ export async function populateMockData(
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
                 'cnXN4DZx9dUVIZL4OZnyw0',
-            created_at: dt(57, 8, 0),
+            at: dt(57, 8, 0),
         },
         {
             id: 'NUnAiiPpzpQ9wKx6utsGwn',
@@ -3449,7 +3090,7 @@ export async function populateMockData(
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
                 'kKw82RQDHRfgg5xQnw1lPk',
-            created_at: dt(52, 10, 0),
+            at: dt(52, 10, 0),
         },
         {
             id: 'tuqFkKJMD4baNSMgXFWIh3',
@@ -3457,7 +3098,7 @@ export async function populateMockData(
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
                 'ec0n7Ab6pJYLFDF6H0nyvV',
-            created_at: dt(48, 9, 0),
+            at: dt(48, 9, 0),
         },
         {
             id: 'G1IeM0YcxnPVe8ZuYnJ9oJ',
@@ -3465,7 +3106,7 @@ export async function populateMockData(
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
                 'gAjJnjirIrIgcFDMJyNsPa',
-            created_at: dt(44, 10, 30),
+            at: dt(44, 10, 30),
         },
         {
             id: '5Ctl6blp1xESHHiQtp0hUU',
@@ -3473,7 +3114,7 @@ export async function populateMockData(
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
                 'kyWtMAZPazKqAfIwPzACsL',
-            created_at: dt(40, 9, 0),
+            at: dt(40, 9, 0),
         },
         {
             id: 'tlNTceD8uVvWlIjXDH0ayW',
@@ -3481,7 +3122,7 @@ export async function populateMockData(
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
                 'C41Hni5pMxp8xMQFEGNaib',
-            created_at: dt(37, 8, 0),
+            at: dt(37, 8, 0),
         },
         {
             id: 'RUF1gVmAhswD070VXbltZj',
@@ -3489,7 +3130,7 @@ export async function populateMockData(
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
                 'FGAZYYwoS9To1tNb24DfLc',
-            created_at: dt(33, 9, 30),
+            at: dt(33, 9, 30),
         },
         {
             id: 's8LTGragbMejtSAdAVF1u3',
@@ -3497,7 +3138,7 @@ export async function populateMockData(
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
                 '0zgLwuyPgtreVYjg4TScJR',
-            created_at: dt(29, 10, 0),
+            at: dt(29, 10, 0),
         },
         {
             id: 'IAEG9nJXxCFzya2R3z9Rzy',
@@ -3505,7 +3146,7 @@ export async function populateMockData(
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
                 'XGJklKFO4aUtjSAEHEE8Zn',
-            created_at: dt(26, 9, 0),
+            at: dt(26, 9, 0),
         },
         {
             id: 'c1BsfY0187lX0bv9IMRin6',
@@ -3513,7 +3154,7 @@ export async function populateMockData(
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
                 'rtuFD9uWn5zguEHyT3fh8s',
-            created_at: dt(23, 8, 30),
+            at: dt(23, 8, 30),
         },
         {
             id: 'HdDAafhVYetmEDZI57F2o9',
@@ -3521,7 +3162,7 @@ export async function populateMockData(
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
                 'XrO05MeyqldO8qm0O4VPdq',
-            created_at: dt(20, 10, 0),
+            at: dt(20, 10, 0),
         },
         {
             id: 'yFhQ6jemy8OUls9GCH9sJq',
@@ -3529,7 +3170,7 @@ export async function populateMockData(
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
                 'S74N7CPA2dsMESryJNrFAC',
-            created_at: dt(17, 9, 0),
+            at: dt(17, 9, 0),
         },
         {
             id: 'C7ASzGoDhS3c9Er43SznuQ',
@@ -3537,7 +3178,7 @@ export async function populateMockData(
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
                 'Cr8KZH5Q2j5n8Q8Yw3qdMw',
-            created_at: dt(14, 8, 0),
+            at: dt(14, 8, 0),
         },
         {
             id: 'gj9UFVp6N0LY43tiZO7kEH',
@@ -3545,7 +3186,7 @@ export async function populateMockData(
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
                 '4T56gYme7ae4Ya7AMA0hpW',
-            created_at: dt(11, 10, 30),
+            at: dt(11, 10, 30),
         },
         {
             id: 'QXnnDlwCXKN12k4oUPse4B',
@@ -3553,7 +3194,7 @@ export async function populateMockData(
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
                 'aFCyJrvokoJM5iINwO3WCf',
-            created_at: dt(9, 9, 0),
+            at: dt(9, 9, 0),
         },
         {
             id: 'hyC8PMVNYng3UIO93yexAR',
@@ -3561,7 +3202,7 @@ export async function populateMockData(
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
                 'Sr4k75y6vuKODCA9zlSUjk',
-            created_at: dt(6, 11, 0),
+            at: dt(6, 11, 0),
         },
         // needs-revision
         {
@@ -3570,7 +3211,7 @@ export async function populateMockData(
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
                 'Mm6KUpykGSwjD7YofI6zpb',
-            created_at: dt(77, 9, 0),
+            at: dt(77, 9, 0),
         },
         {
             id: 'w9t0kM5OR9xNz8Qd8YMvWd',
@@ -3578,7 +3219,7 @@ export async function populateMockData(
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
                 'BbZ3Z7OZnFmdF5MBgVIYzI',
-            created_at: dt(63, 10, 0),
+            at: dt(63, 10, 0),
         },
         {
             id: 'OynJa34EkAifV6XvROGJHO',
@@ -3586,7 +3227,7 @@ export async function populateMockData(
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
                 'NydsTqMmCgEKI7R9xxp36g',
-            created_at: dt(50, 8, 30),
+            at: dt(50, 8, 30),
         },
         {
             id: 'hFaKVhqcwwCtiDmjHOhglF',
@@ -3594,7 +3235,7 @@ export async function populateMockData(
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
                 'x2uQev3HutthrUWRFkXSkH',
-            created_at: dt(38, 9, 0),
+            at: dt(38, 9, 0),
         },
         {
             id: 'lJalI8qDpdF8zng1mr7dkW',
@@ -3602,7 +3243,7 @@ export async function populateMockData(
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
                 'w7XA9UnuYI7e46RTQL1xGW',
-            created_at: dt(25, 10, 0),
+            at: dt(25, 10, 0),
         },
         {
             id: 'UFSLHfELrPhlOvdaQv8yrC',
@@ -3610,7 +3251,7 @@ export async function populateMockData(
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
                 '3H3XeeNE4rS2wbANs3JvYz',
-            created_at: dt(12, 9, 30),
+            at: dt(12, 9, 30),
         },
         // in-flight
         {
@@ -3619,7 +3260,7 @@ export async function populateMockData(
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
                 'i7YYgKN3ZUlrkulQ2aWdIE',
-            created_at: dt(18, 9, 0),
+            at: dt(18, 9, 0),
         },
         {
             id: 'uhMESfwESpe11vhqKvQ2kB',
@@ -3627,7 +3268,7 @@ export async function populateMockData(
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
                 '0brjvcoPEVBwMkUQ3tKHWc',
-            created_at: dt(10, 10, 0),
+            at: dt(10, 10, 0),
         },
         {
             id: 'ZNrxNuiqHTULou4TqYPtXL',
@@ -3635,7 +3276,7 @@ export async function populateMockData(
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
                 'mTdhglHhl7pM0mKt0M2IjF',
-            created_at: dt(7, 8, 0),
+            at: dt(7, 8, 0),
         },
         {
             id: '5AsLDAhvbkXZ6OUvvoZhND',
@@ -3643,7 +3284,7 @@ export async function populateMockData(
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
                 'GMhfH8lMQJXzE4vkjnSH1u',
-            created_at: dt(4, 9, 0),
+            at: dt(4, 9, 0),
         },
         {
             id: 'avduZh1Hyokc9xiUjDQA0F',
@@ -3651,7 +3292,7 @@ export async function populateMockData(
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
                 'pLxCFGOINXVaXmrS0VG0vC',
-            created_at: dt(2, 11, 0),
+            at: dt(2, 11, 0),
         },
         // out-of-clan
         {
@@ -3660,7 +3301,7 @@ export async function populateMockData(
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
                 'IyrpZrIl2hbmmnCtiifEGm',
-            created_at: dt(35, 9, 0),
+            at: dt(35, 9, 0),
         },
         {
             id: 'jxMN634ymWUYVZQK5on62x',
@@ -3668,7 +3309,7 @@ export async function populateMockData(
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
                 'zYnDWBV4VP5guzW5fDWtHN',
-            created_at: dt(22, 10, 30),
+            at: dt(22, 10, 30),
         },
         // old (outside 90-day window)
         {
@@ -3677,7 +3318,7 @@ export async function populateMockData(
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
                 '7HX7RPwlYopHWfD7I0QAPs',
-            created_at: dt(108, 9, 0),
+            at: dt(108, 9, 0),
         },
         {
             id: 'nycbBiutlHj1MUnI02Pw20',
@@ -3685,7 +3326,7 @@ export async function populateMockData(
                 'h5mErVBQhwdMKwi1co30jB',
             work_order_id:
                 'EXphSopBU1Is2TH4QZo4nO',
-            created_at: dt(103, 10, 0),
+            at: dt(103, 10, 0),
         },
         // prc join rows (Proposal Review Cycle)
         {
@@ -3694,7 +3335,7 @@ export async function populateMockData(
                 '7COt7Kf4OaOBg6AjaNO04s',
             work_order_id:
                 'hRPNkjrYBTQqzzFe1t8FH6',
-            created_at: dt(60, 9, 0),
+            at: dt(60, 9, 0),
         },
         {
             id: 'UXIU5zCYBFkQnMnChd1Q6T',
@@ -3702,7 +3343,7 @@ export async function populateMockData(
                 '7COt7Kf4OaOBg6AjaNO04s',
             work_order_id:
                 'L3UhOvrAGluk4kNnN6J8NT',
-            created_at: dt(45, 10, 0),
+            at: dt(45, 10, 0),
         },
         {
             id: 'jQUWpOW1y7QcYSS49Cy3dE',
@@ -3710,7 +3351,7 @@ export async function populateMockData(
                 '7COt7Kf4OaOBg6AjaNO04s',
             work_order_id:
                 'oTscblsEOjZDkvkW3vs7rU',
-            created_at: dt(30, 8, 0),
+            at: dt(30, 8, 0),
         },
         {
             id: 'y9Aba8YosD7VcSMV2Ncwoc',
@@ -3718,7 +3359,7 @@ export async function populateMockData(
                 '7COt7Kf4OaOBg6AjaNO04s',
             work_order_id:
                 'Xpw9VGpZ6RyevuInSr8yze',
-            created_at: dt(20, 11, 0),
+            at: dt(20, 11, 0),
         },
         {
             id: 'RKSovIx9Jb03ZHsLWpI1EC',
@@ -3726,7 +3367,7 @@ export async function populateMockData(
                 '7COt7Kf4OaOBg6AjaNO04s',
             work_order_id:
                 'yqPpJb0NoQDgx8DoZ183Nx',
-            created_at: dt(15, 9, 0),
+            at: dt(15, 9, 0),
         },
         {
             id: 'XAQNINxgYd6Ngjv06NztQh',
@@ -3734,7 +3375,7 @@ export async function populateMockData(
                 '7COt7Kf4OaOBg6AjaNO04s',
             work_order_id:
                 'BUrGEVDMF6FeU35WUHUY5E',
-            created_at: dt(5, 10, 0),
+            at: dt(5, 10, 0),
         },
     ];
 
@@ -5530,25 +5171,25 @@ export async function populateMockData(
             id: 'noogjofVfg6jFxYOVbdAnC',
             project_id: 'u6YkHhlGc91oDMkr3x0isa',
             flow_id: 'h5mErVBQhwdMKwi1co30jB',
-            created_at: wfTimestamp,
+            at: wfTimestamp,
         },
         {
             id: '5ddqhtwd3qcdodXLcsDdyt',
             project_id: 'jRE2Tj32NHsFGZIeEADp0p',
             flow_id: 'E2BnBlZyrriqsQYkmS4usb',
-            created_at: wfTimestamp,
+            at: wfTimestamp,
         },
         {
             id: '9YX7ZU4br6zxrHyVcmRjJP',
             project_id: 'u6YkHhlGc91oDMkr3x0isa',
             flow_id: '7COt7Kf4OaOBg6AjaNO04s',
-            created_at: wfTimestamp,
+            at: wfTimestamp,
         },
         {
             id: l2cProjectFlowId,
             project_id: l2cProjectId,
             flow_id: l2cFlowId,
-            created_at: wfTimestamp,
+            at: wfTimestamp,
         },
     ];
 
@@ -5740,12 +5381,6 @@ export async function populateMockData(
                 project,
             ),
         ),
-        ...activities.map(activity =>
-            adapter.activities.put(
-                activity.id,
-                activity,
-            ),
-        ),
         ...mockFlows.map(flow =>
             adapter.flows.put(
                 flow.id, flow,
@@ -5759,67 +5394,67 @@ export async function populateMockData(
             id: 'k4dY2dPq90mQVwwCkhWIo3',
             idea_id: 'eT5xdKjzLDmuRn3r7XMX4R',
             worker_id: 'LhfaUUf4IumVsCSGB4xjdK',
-            created_at: dt(75, 9, 30),
+            at: dt(75, 9, 30),
         },
         {
             id: 'XC7hsfNJueKQ8q0UfCuC7o',
             idea_id: 'cbTuSs0Ex84PeFGSvoAEFZ',
             worker_id: 'bLP3X1hb1mSz8gY9neogU3',
-            created_at: dt(70, 9, 0),
+            at: dt(70, 9, 0),
         },
         {
             id: 'YmzT46BbGVFALpiXFDnlVd',
             idea_id: 'wuCMQqo4IkEksx7MYmu8g2',
             worker_id: '53J8h9dr76XFqCjYcNVwIR',
-            created_at: dt(65, 9, 0),
+            at: dt(65, 9, 0),
         },
         {
             id: 'cmoTu4GRGmO8y5QrfPIHSm',
             idea_id: 'ojOEXtdzdtTZtpM81TxVca',
             worker_id: 'jBoWiyWxj7pp4sG3JgX5l2',
-            created_at: dt(55, 9, 0),
+            at: dt(55, 9, 0),
         },
         {
             id: 'kIUtvgTOLPjsSmAEVOhPb1',
             idea_id: 'T2vAafLDcshDONlYxpzPLc',
             worker_id: 'Trf1Up2jMsPhEnjbW4Ji1n',
-            created_at: dt(50, 9, 0),
+            at: dt(50, 9, 0),
         },
         {
             id: 'r04u9qpJKSyNjP9Owxr5Be',
             idea_id: 'HRYrImq1rBJ5ZRe1T9TAVk',
             worker_id: 'zyTbfbjcGEfbpCsNTP0XjX',
-            created_at: dt(45, 9, 0),
+            at: dt(45, 9, 0),
         },
         {
             id: '2mPJTlujj1RF6gexFwbDqJ',
             idea_id: 'MCxK0hzT9CPjJx1ZV5unfr',
             worker_id: 'LhfaUUf4IumVsCSGB4xjdK',
-            created_at: dt(75, 10, 0),
+            at: dt(75, 10, 0),
         },
         {
             id: 'caBSqTgzDnvP8joamAG9OG',
             idea_id: 'SUb4gKXsZ1OsEauzqszg0t',
             worker_id: 'WxQn4LVWb76YkmqK5B0EPp',
-            created_at: dt(35, 9, 0),
+            at: dt(35, 9, 0),
         },
         {
             id: 'UfsCp7WYUybhwxD170okb4',
             idea_id: 'gxa84W9KvEgD0wT1F4TOM9',
             worker_id: '53J8h9dr76XFqCjYcNVwIR',
-            created_at: dt(30, 9, 0),
+            at: dt(30, 9, 0),
         },
         {
             id: 'mbTZAQbC5cJSEIzhEEFpyq',
             idea_id: '1Z68gROMrlTAfPEGiyJJAY',
             worker_id: 'jBoWiyWxj7pp4sG3JgX5l2',
-            created_at: dt(25, 9, 0),
+            at: dt(25, 9, 0),
         },
         {
             id: '0LjTHFflWNaDZkKDqxmwJi',
             idea_id: 'Q2On2xwMpFdzOklBQJXrni',
             worker_id: 'Trf1Up2jMsPhEnjbW4Ji1n',
-            created_at: dt(20, 9, 0),
+            at: dt(20, 9, 0),
         },
     ];
 
@@ -6025,67 +5660,43 @@ export async function populateMockData(
         },
     ];
 
-    const activityActors:
-        ActivityActorEntity[] = [
+    // One state event per seeded flow — the
+    // creation moment of each flow on the states
+    // log. Tier 2.3 retires FlowEntity.created_at
+    // / updated_at; the log IS the truth. Events
+    // are authored by SYSTEM_WORKER_ID at the
+    // shared wfTimestamp moment.
+    const flowStateEvents: StateEntity[] = [
         {
-            id: 'b46Mr8QWIMo4EDBxxhfkWL',
-            activity_id: 'Ng6GWmx7DNmLsGshK3lBfU',
-            worker_id: 'LhfaUUf4IumVsCSGB4xjdK',
-            created_at: dt(0, 17, 50),
+            id: 'fSe01CustomerOnboard0aA',
+            entity_id:
+                'h5mErVBQhwdMKwi1co30jB',
+            state: 'active',
+            worker_id: SYSTEM_WORKER_ID,
+            at: wfTimestamp,
         },
         {
-            id: 'pgyIzpoLgG8Vv6FgYF4DV8',
-            activity_id: 'p3H9tGtQwFwQXpUiYyinT6',
-            worker_id: 'WxQn4LVWb76YkmqK5B0EPp',
-            created_at: dt(0, 17, 35),
+            id: 'fSe02FusionFl0w0aActiv',
+            entity_id:
+                'E2BnBlZyrriqsQYkmS4usb',
+            state: 'active',
+            worker_id: SYSTEM_WORKER_ID,
+            at: wfTimestamp,
         },
         {
-            id: 'SJalTSor6JhpoPincDXLeY',
-            activity_id: '5PGE1WlEOTkSaNYjiBXLMA',
-            worker_id: '53J8h9dr76XFqCjYcNVwIR',
-            created_at: dt(0, 17, 0),
+            id: 'fSe03Lay0utTest0aActiv',
+            entity_id:
+                '7COt7Kf4OaOBg6AjaNO04s',
+            state: 'active',
+            worker_id: SYSTEM_WORKER_ID,
+            at: wfTimestamp,
         },
         {
-            id: 'JvodSYYA6w1ithWEirfNVg',
-            activity_id: 'fOqTfg9JPs73xsnC4QUmHs',
-            worker_id: '6xBfK5If82JKfThXb1wlzS',
-            created_at: dt(0, 16, 0),
-        },
-        {
-            id: 'BExIeH5NDiGVGQnrP8phOs',
-            activity_id: '3pBQbQp4LPK2udgd21HlTm',
-            worker_id: 'I5ntELi16X3N3JYCCnxMjZ',
-            created_at: dt(0, 15, 0),
-        },
-        {
-            id: 'pC3hoLmzaVyxJSGOHsmV5j',
-            activity_id: 'CqXHcyiDNzFVcoUM2M1Tl3',
-            worker_id: 'Trf1Up2jMsPhEnjbW4Ji1n',
-            created_at: dt(0, 14, 0),
-        },
-        {
-            id: 'PsG42X7oevXgC5DRy4irTW',
-            activity_id: 'Kj75MtFxnEpFZs4MSK1emd',
-            worker_id: 'oU0bIe0eUC33mTbZrxdogC',
-            created_at: dt(0, 13, 0),
-        },
-        {
-            id: 'bPgxi8YCw4yTFctLef62gB',
-            activity_id: 'xRmfZFNV8GYDQmq8j09Fsc',
-            worker_id: 'LhfaUUf4IumVsCSGB4xjdK',
-            created_at: dt(0, 12, 0),
-        },
-        {
-            id: '2dp7FPj4gjWYtfR78D3wI2',
-            activity_id: 'hP80lUSXqn1PSleymgE3Ks',
-            worker_id: '53J8h9dr76XFqCjYcNVwIR',
-            created_at: dt(1, 18, 0),
-        },
-        {
-            id: 'Rf5G2Dh1ejnvzxbpW6hcrm',
-            activity_id: 'XMltAG0dpolQLDTfd5GLWj',
-            worker_id: 'WxQn4LVWb76YkmqK5B0EPp',
-            created_at: dt(1, 15, 0),
+            id: 'fSe04L3adt0Cl0se0aActiv',
+            entity_id: l2cFlowId,
+            state: 'active',
+            worker_id: SYSTEM_WORKER_ID,
+            at: wfTimestamp,
         },
     ];
 
@@ -6099,7 +5710,6 @@ export async function populateMockData(
                 + ' context, deep reasoning.',
             auth_token:
                 'sk-PLACEHOLDER-DEMOTOKEN-XXXX',
-            created_at: dt(0, 11, 0),
         },
         {
             id: 'LdoTR1fnyYpS1jPzEs57ek',
@@ -6110,7 +5720,6 @@ export async function populateMockData(
                 + ' and capable.',
             auth_token:
                 'sk-PLACEHOLDER-DEMOTOKEN-XXXX',
-            created_at: dt(0, 11, 0),
         },
         {
             id: 'Xv89xOCXR6awwoXcPvEY9Y',
@@ -6120,7 +5729,6 @@ export async function populateMockData(
                 'OpenAI multimodal flagship.',
             auth_token:
                 'sk-PLACEHOLDER-DEMOTOKEN-XXXX',
-            created_at: dt(0, 11, 0),
         },
         {
             id: '42vHYDCvtkaO3sTnoqg7aJ',
@@ -6130,7 +5738,6 @@ export async function populateMockData(
                 'xAI heavy-compute model.',
             auth_token:
                 'sk-PLACEHOLDER-DEMOTOKEN-XXXX',
-            created_at: dt(0, 11, 0),
         },
     ];
 
@@ -6149,11 +5756,6 @@ export async function populateMockData(
     await Promise.all([
         ...ideaSubmissions.map(r =>
             adapter.ideaSubmissions.put(
-                r.id, r,
-            ),
-        ),
-        ...activityActors.map(r =>
-            adapter.activityActors.put(
                 r.id, r,
             ),
         ),
@@ -6189,6 +5791,14 @@ export async function populateMockData(
             }),
         ),
         ...projectStateEvents.map(r =>
+            adapter.states.put(r.id, {
+                entity_id: r.entity_id,
+                state: r.state,
+                worker_id: r.worker_id,
+                at: r.at,
+            }),
+        ),
+        ...flowStateEvents.map(r =>
             adapter.states.put(r.id, {
                 entity_id: r.entity_id,
                 state: r.state,
@@ -6240,7 +5850,7 @@ export async function populateMockData(
                 objective_id: seed.id,
                 name: seed.name,
                 description: seed.description,
-                revised_at: MOCK_SEED_TIMESTAMP,
+                at: MOCK_SEED_TIMESTAMP,
             },
         );
     }
@@ -6312,7 +5922,7 @@ export async function populateMockData(
                         project_id: p.id,
                         objective_id: obj.id,
                         score,
-                        scored_at: scoredAt,
+                        at: scoredAt,
                     },
                 );
         }
@@ -6354,7 +5964,7 @@ export async function populateMockData(
                                 project_id: p.id,
                                 objective_id: obj.id,
                                 score,
-                                scored_at: scoredAt,
+                                at: scoredAt,
                             },
                         );
                 }
@@ -6422,17 +6032,10 @@ export async function populateBootstrapData(
             seats: 25,
             used_seats: 18,
             projects_limit: TIER_PROJECTS_LIMIT,
-            projects_current: 12,
             ideas_limit: TIER_IDEAS_LIMIT,
-            ideas_current: 47,
-            storage_limit: TIER_STORAGE_GB,
-            storage_current: 2.4,
-            ai_credits_limit: TIER_AI_CREDITS,
-            ai_credits_current: 850,
             health_score: 92,
             health_status: 'excellent',
             last_activity: dt(0, 16, 0),
-            active_people: 14,
         }),
     ]);
 }

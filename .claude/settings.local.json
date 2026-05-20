@@ -20,7 +20,10 @@
       "WebFetch(domain:raw.githubusercontent.com)",
       "Bash(awk 'NR==203' /Users/tmornini/code/fusion-ai/CLAUDE.md)",
       "Bash(TMPDIR=/tmp/claude ./serve 8080)",
-      "Skill(superpowers:writing-plans)"
+      "Skill(superpowers:writing-plans)",
+      "Bash(TMPDIR=/tmp/claude ./test)",
+      "Bash(TMPDIR=/tmp/claude npx tsc -p web-app/app/tsconfig.json --noEmit)",
+      "Bash(awk 'NR==1627,NR==2670' /Users/tmornini/code/fusion-ai/api/mock-data.ts)"
     ]
   },
   "outputStyle": "Explanatory",

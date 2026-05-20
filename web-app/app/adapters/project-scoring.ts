@@ -259,7 +259,7 @@ export async function postProjectBaselineScoring(
         score: number;
     }>,
 ): Promise<void> {
-    const scoredAt = nowUtc();
+    const at = nowUtc();
     const ops = scores.map(s => ({
         method: 'put' as const,
         resource:
@@ -269,7 +269,7 @@ export async function postProjectBaselineScoring(
             project_id: projectId,
             objective_id: s.objectiveId,
             score: s.score,
-            scored_at: scoredAt,
+            at,
         },
     }));
     await ctx.commit({ ops });
@@ -284,7 +284,7 @@ export async function postProjectActualMeasurement(
         score: number;
     }>,
 ): Promise<void> {
-    const scoredAt = nowUtc();
+    const at = nowUtc();
     const ops = scores.map(s => ({
         method: 'put' as const,
         resource:
@@ -294,7 +294,7 @@ export async function postProjectActualMeasurement(
             project_id: projectId,
             objective_id: s.objectiveId,
             score: s.score,
-            scored_at: scoredAt,
+            at,
         },
     }));
     await ctx.commit({ ops });

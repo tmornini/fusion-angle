@@ -6,6 +6,7 @@ import {
     projectStateIsNotDeleted,
 } from '../../../api/types.ts';
 import {
+    buildStateEventOp,
     getProjectStates,
 } from './state-events.ts';
 import type {
@@ -345,7 +346,6 @@ export async function getFlowZip(
             'is_auto_fit',
         ),
         lockTimeout: flow.lock_timeout,
-        createdAt: flow.created_at,
         nodes: graph.nodes,
         edges: graph.edges,
     };
@@ -591,8 +591,6 @@ export async function postFlowFromBackup(
                     graph: putFlowGraph({
                         nodes, edges,
                     }),
-                    created_at: now,
-                    updated_at: now,
                 },
             },
             {
@@ -602,9 +600,12 @@ export async function postFlowFromBackup(
                 body: {
                     project_id: projectId,
                     flow_id: flowId,
-                    created_at: now,
+                    at: now,
                 },
             },
+            await buildStateEventOp(
+                ctx, flowId, 'active',
+            ),
         ],
     });
 
@@ -922,8 +923,6 @@ export async function postFlowFromMermaid(
                     lock_timeout:
                         DEFAULT_LOCK_TIMEOUT,
                     graph: putFlowGraph(graph),
-                    created_at: now,
-                    updated_at: now,
                 },
             },
             {
@@ -933,9 +932,12 @@ export async function postFlowFromMermaid(
                 body: {
                     project_id: projectId,
                     flow_id: flowId,
-                    created_at: now,
+                    at: now,
                 },
             },
+            await buildStateEventOp(
+                ctx, flowId, 'active',
+            ),
         ],
     });
 
@@ -1369,8 +1371,6 @@ export async function postFlowFromZip(
                     lock_timeout:
                         DEFAULT_LOCK_TIMEOUT,
                     graph: putFlowGraph(graph),
-                    created_at: now,
-                    updated_at: now,
                 },
             },
             {
@@ -1380,9 +1380,12 @@ export async function postFlowFromZip(
                 body: {
                     project_id: projectId,
                     flow_id: flowId,
-                    created_at: now,
+                    at: now,
                 },
             },
+            await buildStateEventOp(
+                ctx, flowId, 'active',
+            ),
         ],
     });
 

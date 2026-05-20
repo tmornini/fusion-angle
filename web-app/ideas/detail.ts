@@ -1,5 +1,5 @@
 import {
-    $, $textarea, isFormField,
+    $, isFormField,
 } from '../app/dom.ts';
 import {
     IdeaPresenter,
@@ -23,7 +23,6 @@ import {
 } from '../app/core.ts';
 import {
     getIdea,
-    postActivity,
     postIdeaStateChange,
     putIdea,
     subscribeIdeaChanges,
@@ -33,8 +32,6 @@ import {
 
 const pageAbort = new AbortController();
 const signal = pageAbort.signal;
-
-const NO_FEEDBACK = '';
 
 type PageState =
     | {
@@ -73,7 +70,6 @@ interface TransitionConfig {
     failureToast: string;
     successToast: string;
     successVariant: 'success' | 'info';
-    activityAction: string;
 }
 
 const TRANSITION_CONFIG:
@@ -83,36 +79,29 @@ const TRANSITION_CONFIG:
         successToast:
             'Submitted for review',
         successVariant: 'success',
-        activityAction:
-            'submitted idea for review',
     },
     'approved': {
         failureToast: 'Failed to approve',
         successToast:
             'Idea approved successfully',
         successVariant: 'success',
-        activityAction: 'approved idea',
     },
     'sent-back': {
         failureToast: 'Failed to send back',
         successToast:
             'Idea sent back for revision',
         successVariant: 'info',
-        activityAction:
-            'sent idea back for revision',
     },
 };
 
 async function transitionIdea(
     ideaId: string,
     toState: IdeaTransition,
-    feedback: string,
 ): Promise<void> {
     if (!state) return;
     const ctx = createRequestContext();
     const cfg = TRANSITION_CONFIG[toState]!;
     const entity = state.view.entity;
-    const title = entity.title;
     try {
         await postIdeaStateChange(
             ctx, ideaId, entity, toState,
@@ -125,13 +114,6 @@ async function transitionIdea(
         showToast(cfg.failureToast, 'error');
         return;
     }
-    await postActivity(ctx, {
-        type: 'status_changed',
-        action: cfg.activityAction,
-        target: title,
-        status: toState,
-        feedback,
-    });
     showToast(
         cfg.successToast,
         cfg.successVariant,
@@ -327,13 +309,11 @@ function handleIdeaActions(
         case 'submit-review':
             void transitionIdea(
                 ideaId, 'in-review',
-                NO_FEEDBACK,
             );
             return true;
         case 'approve':
             void transitionIdea(
                 ideaId, 'approved',
-                NO_FEEDBACK,
             );
             return true;
         case 'send-back-confirm':
@@ -347,20 +327,9 @@ function handleIdeaActions(
 async function handleSendBackConfirm(
     ideaId: string,
 ): Promise<void> {
-    const ta = $textarea(
-        '#approval-send-back-feedback',
-        document,
-    );
-    if (!ta) {
-        throw new Error(
-            'Required:'
-            + ' #approval-send-back-feedback',
-        );
-    }
-    const feedback = ta.value.trim();
     closeDialog('approval-send-back');
     await transitionIdea(
-        ideaId, 'sent-back', feedback,
+        ideaId, 'sent-back',
     );
 }
 

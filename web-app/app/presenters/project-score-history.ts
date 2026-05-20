@@ -13,6 +13,7 @@ import {
     toneForScore,
 } from '../scoring-format.ts';
 import { formatDateTime } from '../core.ts';
+import { DISPLAY_ABSENT } from '../format.ts';
 
 export type DefinitionResolver = (
     objectiveId: ObjectiveId,
@@ -77,7 +78,7 @@ export class ProjectScoreHistoryPresenter {
         for (const b of this.#baselines) {
             events.push({
                 kind: 'baseline',
-                at: b.scored_at,
+                at: b.at,
                 objectiveId: b.objective_id,
                 score: b.score,
             });
@@ -85,7 +86,7 @@ export class ProjectScoreHistoryPresenter {
         for (const a of this.#actuals) {
             events.push({
                 kind: 'actual',
-                at: a.scored_at,
+                at: a.at,
                 objectiveId: a.objective_id,
                 score: a.score,
             });
@@ -93,7 +94,7 @@ export class ProjectScoreHistoryPresenter {
         for (const r of this.#revisions) {
             events.push({
                 kind: 'revision',
-                at: r.revised_at,
+                at: r.at,
                 objectiveId: r.objective_id,
                 name: r.name,
             });
@@ -169,8 +170,8 @@ export class ProjectScoreHistoryPresenter {
                 return html`<tr>
                     ${dateCell}
                     <td>Objective deprecated</td>
-                    <td>${def?.name ?? '—'}</td>
-                    <td>—</td>
+                    <td>${def?.name ?? DISPLAY_ABSENT}</td>
+                    <td>${DISPLAY_ABSENT}</td>
                 </tr>`;
             }
         }

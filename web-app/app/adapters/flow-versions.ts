@@ -60,7 +60,7 @@ function computeFlowVersion(
         lockTimeout: row.lock_timeout,
         nodes: g.nodes,
         edges: g.edges,
-        createdAt: row.created_at,
+        createdAt: row.at,
     };
 }
 
@@ -68,8 +68,8 @@ function compareRows(
     a: FlowVersionEntity,
     b: FlowVersionEntity,
 ): number {
-    if (a.created_at < b.created_at) return -1;
-    if (a.created_at > b.created_at) return 1;
+    if (a.at < b.at) return -1;
+    if (a.at > b.at) return 1;
     if (a.id < b.id) return -1;
     if (a.id > b.id) return 1;
     return 0;
@@ -118,7 +118,7 @@ export async function postFlowVersion(
                     lock_timeout:
                         flow.lock_timeout,
                     graph: flow.graph,
-                    created_at: nowUtc(),
+                    at: nowUtc(),
                 },
             },
             ...trims,

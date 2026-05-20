@@ -50,7 +50,7 @@ const baseVersion = {
         ],
         edges: [],
     }),
-    created_at: '2026-01-01T00:00:00.000Z',
+    at: '2026-01-01T00:00:00.000Z',
 };
 
 test(
@@ -293,8 +293,6 @@ test(
             graph: jsonObjectField({
                 nodes: [], edges: [],
             }),
-            current_version_id: 'fv-1',
-            created_at: '2026-01-01T00:00:00.000Z',
         };
         const rawJson = JSON.stringify([flowRow]);
         const stream = new Blob([rawJson]).stream()

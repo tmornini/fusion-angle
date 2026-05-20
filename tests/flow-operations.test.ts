@@ -199,6 +199,17 @@ async function setupFlow(): Promise<{
     ctx: RequestContext;
 }> {
     const db = new MemoryDbAdapter();
+    await db.workers.put('current', {
+        first_name: 'Demo',
+        last_name: 'User',
+        email: 'demo@example.com',
+        phone: '',
+        title: 'Admin',
+        strengths: '[]' as never,
+        team_dimensions: '{}' as never,
+        bio: '',
+        department: 'Product',
+    });
     const ctx = createRequestContext(db);
     await postFlowCreation(ctx, {
         flowId: FLOW_ID,
@@ -1027,7 +1038,7 @@ test(
                         ],
                         edges: [],
                     }),
-                    created_at:
+                    at:
                         '2026-01-01T00:00:00.000Z',
                 },
             }],

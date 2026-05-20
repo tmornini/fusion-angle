@@ -5,7 +5,6 @@ import {
     validateAIWorkerEntity,
     validateIdeaEntity,
     validateProjectEntity,
-    validateActivityEntity,
     validateFlowEntity,
     validateFlowVersionEntity,
     validateWorkOrderEntity,
@@ -13,7 +12,6 @@ import {
     validateStateFieldValueEntity,
     validateOrganizationEntity,
     validateIdeaSubmissionEntity,
-    validateActivityActorEntity,
     validateProjectFlowEntity,
     asStoredGraph,
 } from '../api/validators.ts';
@@ -105,7 +103,6 @@ const validAIWorker = {
     provider: 'Anthropic',
     description: 'Long context, deep reasoning.',
     auth_token: 'sk-PLACEHOLDER-DEMOTOKEN-XXXX',
-    created_at: '2026-01-01T00:00:00Z',
 };
 
 test(
@@ -187,9 +184,6 @@ const validIdea = {
     proposed_solution: 'A solution',
     expected_outcome: 'Better',
     success_metrics: 'Metrics',
-    risks: '[]',
-    assumptions: '[]',
-    alignments: '[]',
 };
 
 test('validateIdeaEntity accepts valid payload', () => {
@@ -240,10 +234,10 @@ test(
     const body = { ...validIdea };
     delete (
         body as Record<string, unknown>
-    )['alignments'];
+    )['expected_outcome'];
     assert.throws(
         () => validateIdeaEntity(body),
-        /missing required key "alignments"/,
+        /missing required key "expected_outcome"/,
     );
 });
 
@@ -255,13 +249,9 @@ const validProject = {
     progress: 0,
     start_date: '2024-01-01',
     target_end_date: '2024-12-31',
-    estimated_duration: 86400,
-    actual_duration: 0,
     estimated_cost: 1000,
     actual_cost: 0,
     position: 1,
-    business_context: '{}',
-    timeline_label: 'Q1',
 };
 
 test('validateProjectEntity accepts valid payload', () => {
@@ -280,36 +270,6 @@ test('validateProjectEntity rejects unknown key', () => {
     );
 });
 
-// --- ActivityEntity ---
-
-const validActivity = {
-    type: 'idea_created',
-    action: 'Created an idea',
-    target: 'idea-1',
-    timestamp: '2024-01-01T00:00:00Z',
-    status: 'complete',
-    feedback: '',
-};
-
-test('validateActivityEntity accepts valid payload', () => {
-    const result =
-        validateActivityEntity(validActivity);
-    assert.equal(result.type, 'idea_created');
-});
-
-test(
-    'validateActivityEntity rejects missing timestamp',
-    () => {
-    const body = { ...validActivity };
-    delete (
-        body as Record<string, unknown>
-    )['timestamp'];
-    assert.throws(
-        () => validateActivityEntity(body),
-        /missing required key "timestamp"/,
-    );
-});
-
 // --- FlowEntity ---
 
 const validFlow = {
@@ -320,8 +280,6 @@ const validFlow = {
     is_auto_fit: true,
     lock_timeout: 28800,
     graph: '{"nodes":[],"edges":[]}',
-    created_at: '2024-01-01T00:00:00Z',
-    updated_at: '2024-01-01T00:00:00Z',
 };
 
 test('validateFlowEntity accepts valid payload', () => {
@@ -360,10 +318,10 @@ test(
     const body = { ...validFlow };
     delete (
         body as Record<string, unknown>
-    )['updated_at'];
+    )['lock_timeout'];
     assert.throws(
         () => validateFlowEntity(body),
-        /missing required key "updated_at"/,
+        /missing required key "lock_timeout"/,
     );
 });
 
@@ -378,7 +336,7 @@ const validFlowVersion = {
     is_auto_fit: true,
     lock_timeout: 28800,
     graph: '{"nodes":[],"edges":[]}',
-    created_at: '2024-01-01T00:00:00Z',
+    at: '2024-01-01T00:00:00Z',
 };
 
 test(
@@ -417,7 +375,6 @@ const validWorkOrder = {
     display_id: 'WO-001',
     flow_graph: minimalWoGraph,
     position: 1,
-    created_at: '2024-01-01T00:00:00Z',
 };
 
 test(
@@ -446,7 +403,7 @@ test(
 const validFlowWorkOrder = {
     flow_id: 'f-1',
     work_order_id: 'wo-1',
-    created_at: '2024-01-01T00:00:00Z',
+    at: '2024-01-01T00:00:00Z',
 };
 
 test(
@@ -466,7 +423,7 @@ test(
     assert.throws(
         () => validateFlowWorkOrderEntity({
             flow_id: 'f-1',
-            created_at: '2024-01-01T00:00:00Z',
+            at: '2024-01-01T00:00:00Z',
         }),
         /missing required key "work_order_id"/,
     );
@@ -515,17 +472,10 @@ const validOrg = {
     seats: 10,
     used_seats: 5,
     projects_limit: 50,
-    projects_current: 3,
     ideas_limit: 200,
-    ideas_current: 10,
-    storage_limit: 1000,
-    storage_current: 100,
-    ai_credits_limit: 500,
-    ai_credits_current: 50,
     health_score: 85,
     health_status: 'healthy',
     last_activity: '2024-01-01T00:00:00Z',
-    active_people: 5,
 };
 
 test(
@@ -570,10 +520,10 @@ test(
     const body = { ...validOrg };
     delete (
         body as Record<string, unknown>
-    )['active_people'];
+    )['last_activity'];
     assert.throws(
         () => validateOrganizationEntity(body),
-        /missing required key "active_people"/,
+        /missing required key "last_activity"/,
     );
 });
 
@@ -582,7 +532,7 @@ test(
 const validIdeaSubmission = {
     idea_id: 'i-1',
     worker_id: 'u-1',
-    created_at: '2024-01-01T00:00:00Z',
+    at: '2024-01-01T00:00:00Z',
 };
 
 test(
@@ -603,41 +553,9 @@ test(
     assert.throws(
         () => validateIdeaSubmissionEntity({
             worker_id: 'u-1',
-            created_at: '2024-01-01T00:00:00Z',
+            at: '2024-01-01T00:00:00Z',
         }),
         /missing required key "idea_id"/,
-    );
-});
-
-// --- ActivityActorEntity ---
-
-const validActivityActor = {
-    activity_id: 'act-1',
-    worker_id: 'u-1',
-    created_at: '2024-01-01T00:00:00Z',
-};
-
-test(
-    'validateActivityActorEntity accepts valid'
-    + ' payload',
-    () => {
-    const result =
-        validateActivityActorEntity(
-            validActivityActor,
-        );
-    assert.equal(result.activity_id, 'act-1');
-});
-
-test(
-    'validateActivityActorEntity rejects missing'
-    + ' activity_id',
-    () => {
-    assert.throws(
-        () => validateActivityActorEntity({
-            worker_id: 'u-1',
-            created_at: '2024-01-01T00:00:00Z',
-        }),
-        /missing required key "activity_id"/,
     );
 });
 
@@ -646,7 +564,7 @@ test(
 const validProjectFlow = {
     project_id: 'p-1',
     flow_id: 'f-1',
-    created_at: '2024-01-01T00:00:00Z',
+    at: '2024-01-01T00:00:00Z',
 };
 
 test(
@@ -666,7 +584,7 @@ test(
     assert.throws(
         () => validateProjectFlowEntity({
             project_id: 'p-1',
-            created_at: '2024-01-01T00:00:00Z',
+            at: '2024-01-01T00:00:00Z',
         }),
         /missing required key "flow_id"/,
     );

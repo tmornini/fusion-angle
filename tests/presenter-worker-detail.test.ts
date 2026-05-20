@@ -113,7 +113,6 @@ function makeAIWorker() {
         provider: 'Anthropic',
         description: 'Long context, deep reasoning.',
         auth_token: 'sk-PLACEHOLDER-DEMOTOKEN-XYZ4',
-        created_at: '2026-01-01T00:00:00Z',
     }, 'active');
 }
 

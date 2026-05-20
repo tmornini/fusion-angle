@@ -213,7 +213,6 @@ export async function postWorkOrderCreation(
                     display_id: displayId,
                     flow_graph: flowGraphField,
                     position,
-                    created_at: now,
                 },
             },
             {
@@ -225,7 +224,7 @@ export async function postWorkOrderCreation(
                     flow_id: input.flowId,
                     work_order_id:
                         input.workOrderId,
-                    created_at: now,
+                    at: now,
                 },
             },
             await buildStateEventOp(

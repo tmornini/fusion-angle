@@ -6,21 +6,21 @@ import {
     toneForScore,
 } from '../web-app/app/scoring-format.ts';
 
-test('latestPerPair keeps the latest by scored_at',
+test('latestPerPair keeps the latest by at',
     () => {
         const rows = [
             { project_id: 'p1', objective_id: 'o1',
               score: 50,
-              scored_at: '2026-05-14T00:00:00.000Z' },
+              at: '2026-05-14T00:00:00.000Z' },
             { project_id: 'p1', objective_id: 'o1',
               score: 60,
-              scored_at: '2026-05-15T00:00:00.000Z' },
+              at: '2026-05-15T00:00:00.000Z' },
             { project_id: 'p1', objective_id: 'o2',
               score: -20,
-              scored_at: '2026-05-14T00:00:00.000Z' },
+              at: '2026-05-14T00:00:00.000Z' },
             { project_id: 'p2', objective_id: 'o1',
               score: 10,
-              scored_at: '2026-05-14T00:00:00.000Z' },
+              at: '2026-05-14T00:00:00.000Z' },
         ];
         const latest = latestPerPair(rows);
         assert.equal(latest.length, 3);

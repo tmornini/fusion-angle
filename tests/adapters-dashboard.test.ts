@@ -16,7 +16,6 @@ import type {
     ProjectEntity,
     ProjectState,
     FlowEntity,
-    JsonArrayField,
     JsonObjectField,
 } from '../api/types.ts';
 
@@ -40,9 +39,6 @@ function buildIdea(
         proposed_solution: 's',
         expected_outcome: 'o',
         success_metrics: 'm',
-        risks: '[]' as JsonArrayField,
-        assumptions: '[]' as JsonArrayField,
-        alignments: '[]' as JsonArrayField,
     };
 }
 
@@ -67,13 +63,9 @@ function buildProject(
         progress: 0,
         start_date: '2026-01-01',
         target_end_date: '2026-01-11',
-        estimated_duration: 0,
-        actual_duration: 0,
         estimated_cost: 1000,
         actual_cost: 500,
         position: 1,
-        business_context: '{}' as JsonObjectField,
-        timeline_label: '',
     };
     const { id: _drop, ...rest } = {
         ...base, ...overrides, id,
@@ -109,8 +101,6 @@ function buildFlow(
         is_auto_fit: true,
         lock_timeout: 28800,
         graph: EMPTY_GRAPH,
-        created_at: '2026-01-01T00:00:00Z',
-        updated_at: '2026-01-01T00:00:00Z',
     };
 }
 
