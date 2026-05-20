@@ -513,6 +513,31 @@ export async function handleRequest(
     const { route: matched, params } = match;
     const method = request.method;
 
+    // Parse the request body when the method
+    // has one. Malformed JSON is a client
+    // error (400), not a server fault — it
+    // must not flow into the domain-boundary
+    // try below.
+    let body: Record<string, unknown> | undefined;
+    if (method === 'PUT' || method === 'POST') {
+        try {
+            body = (await request.json()) as Record<
+                string,
+                unknown
+            >;
+        } catch {
+            return Response.json(
+                {
+                    error:
+                        'Invalid JSON body for '
+                        + method + ' '
+                        + pathname,
+                },
+                { status: HTTP_BAD_REQUEST },
+            );
+        }
+    }
+
     // HTTP boundary handler: each case
     // calls a single route handler; the
     // catch translates domain exceptions
@@ -550,16 +575,11 @@ export async function handleRequest(
                         { status: 405 },
                     );
                 }
-                const payload =
-                    (await request.json()) as Record<
-                        string,
-                        unknown
-                    >;
                 const result =
                     await matched.put(
                         adapter,
                         params,
-                        payload,
+                        body!,
                     );
                 if (result === undefined) {
                     return new Response(null, {
@@ -602,16 +622,11 @@ export async function handleRequest(
                         { status: 405 },
                     );
                 }
-                const payload =
-                    (await request.json()) as Record<
-                        string,
-                        unknown
-                    >;
                 const result =
                     await matched.post(
                         adapter,
                         params,
-                        payload,
+                        body!,
                     );
                 if (result === undefined) {
                     return new Response(null, {

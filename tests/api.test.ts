@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import {
     GET, PUT, DELETE, POST,
+    handleRequest,
 } from '../api/api.ts';
 import {
     MemoryDbAdapter,
@@ -190,5 +191,64 @@ test(
             () => GET(db, 'workers/w-1/extra'),
             /not found|404/i,
         );
+    },
+);
+
+test(
+    'PUT with a malformed JSON body is 400 Bad'
+    + ' Request, not 500',
+    async () => {
+        const db = new MemoryDbAdapter();
+        const response = await handleRequest(
+            db,
+            new Request(
+                'http://localhost/ideas/i1',
+                {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type':
+                            'application/json',
+                    },
+                    body: '{not valid json',
+                },
+            ),
+        );
+        assert.equal(response.status, 400);
+        const { error } =
+            (await response.json()) as {
+                error: string;
+            };
+        assert.match(error, /Invalid JSON body/);
+        assert.match(error, /PUT/);
+    },
+);
+
+test(
+    'POST with a malformed JSON body is 400 Bad'
+    + ' Request, not 500',
+    async () => {
+        const db = new MemoryDbAdapter();
+        const response = await handleRequest(
+            db,
+            new Request(
+                'http://localhost/snapshots/'
+                + 'mock-data',
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type':
+                            'application/json',
+                    },
+                    body: '{not valid json',
+                },
+            ),
+        );
+        assert.equal(response.status, 400);
+        const { error } =
+            (await response.json()) as {
+                error: string;
+            };
+        assert.match(error, /Invalid JSON body/);
+        assert.match(error, /POST/);
     },
 );
