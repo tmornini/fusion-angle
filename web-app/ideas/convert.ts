@@ -15,11 +15,15 @@ import {
 import { navigateTo } from '../app/core.ts';
 import {
     getIdea,
+    getProjectRows,
     postIdeaConversion,
     createRequestContext,
     generateCryptoSafeBase62,
     type IdeaEntity,
 } from '../app/adapters/index.ts';
+import {
+    nextPosition,
+} from '../app/drag-reorder-positions.ts';
 import {
     IdeaConversionPresenter,
     buildInitialConversionFields,
@@ -449,6 +453,10 @@ async function performConversion(
     fields: ConversionFields,
     ideaEntity: IdeaEntity,
 ): Promise<void> {
+    const projects = await getProjectRows(ctx);
+    const position = nextPosition(
+        projects.map(p => p.position),
+    );
     await postIdeaConversion(
         ctx,
         ideaId,
@@ -468,7 +476,7 @@ async function performConversion(
                 fields['cost'],
             ),
             actual_cost: 0,
-            position: 0,
+            position,
         },
         'submitted',
         ideaEntity,

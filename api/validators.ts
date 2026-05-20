@@ -1002,20 +1002,9 @@ export function validateObjectiveEntity(
     assertOnlyKeys(
         body, OBJECTIVE_BODY_KEYS, 'Objective',
     );
-    const position = asNumber(
-        body.position, 'Objective.position',
-    );
-    if (
-        !Number.isInteger(position)
-        || position < 0
-    ) {
-        throw new Error(
-            'expected non-negative integer for '
-                + 'Objective.position, got '
-                + String(position),
-        );
-    }
-    return { position };
+    return {
+        position: pickNumber(body, 'position'),
+    };
 }
 
 const OBJECTIVE_REVISION_BODY_KEYS:

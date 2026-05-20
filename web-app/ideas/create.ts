@@ -14,6 +14,9 @@ import {
     generateCryptoSafeBase62,
 } from '../app/adapters/index.ts';
 import {
+    nextPosition,
+} from '../app/drag-reorder-positions.ts';
+import {
     IdeaCreatePresenter,
     EMPTY_IDEA_CREATE_DRAFT,
     ideaCreateDraftIsComplete,
@@ -133,14 +136,9 @@ export async function init():
                     generateCryptoSafeBase62();
                 const existing =
                     await getIdeaRows(ctx);
-                const nextPosition =
-                    existing.length === 0
-                        ? 0
-                        : Math.max(
-                            ...existing.map(
-                                r => r.position,
-                            ),
-                        ) + 1;
+                const position = nextPosition(
+                    existing.map(r => r.position),
+                );
                 await postIdeaStateChange(
                     ctx,
                     ideaId,
@@ -162,8 +160,7 @@ export async function init():
                         success_metrics:
                             formState
                             .successMetrics,
-                        position:
-                            nextPosition,
+                        position,
                     },
                     'active:incomplete',
                 );

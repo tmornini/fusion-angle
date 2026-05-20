@@ -348,7 +348,7 @@ function generateFlowWorkload(args: {
             id: woId,
             display_id: displayId,
             flow_graph: frozenFlowGraph,
-            position: 100 + i,
+            position: i + 1,
         });
         flowWorkOrders.push({
             id: b62Id(rng, 22),
@@ -392,33 +392,33 @@ export const OBJECTIVE_SEEDS: Array<{
 }> = [
     {
         id: 'RgT2mNvKpQ8xLsYwBzHcUe',
-        position: 0,
+        position: 1,
         name: 'Revenue Growth',
         description:
             'Drive sustainable top-line growth',
     },
     {
         id: 'JkW7aEqFdX3nOiPtVhMrCy',
-        position: 1,
+        position: 2,
         name: 'Cost Reduction',
         description: 'Minimize operational waste',
     },
     {
         id: 'bDf6uStZlA9eGmYjIoNcWq',
-        position: 2,
+        position: 3,
         name: 'Customer Satisfaction',
         description: 'Improve user-perceived value',
     },
     {
         id: 'CvH4wRnXkU1pQsBgTyEzMo',
-        position: 3,
+        position: 4,
         name: 'Team Wellbeing',
         description:
             'Sustainable, energizing work',
     },
     {
         id: 'hL8iFjOdAe5rKtPmVcBwGx',
-        position: 4,
+        position: 5,
         name: 'Operational Efficiency',
         description:
             'Reduce friction in delivery',

@@ -25,11 +25,14 @@ import {
     postObjectiveRevision,
     postObjectiveDeprecation,
     postObjectiveReactivation,
-    postObjectiveReordering,
+    putObjectivePosition,
     subscribeObjectiveChanges,
     generateCryptoSafeBase62,
 } from '../app/adapters/index.ts';
 import { initDragReorder } from '../app/drag-reorder.ts';
+import {
+    nextPosition,
+} from '../app/drag-reorder-positions.ts';
 import {
     OrganizationPresenter,
     OrganizationEditPresenter,
@@ -198,28 +201,8 @@ export async function init(): Promise<void> {
             'data-objective-id',
             async (id, newPosition) => {
                 const ctx = createRequestContext();
-                const active =
-                    await getActiveObjectives(ctx);
-                const moved = active.find(
-                    o => o.id === id,
-                );
-                if (!moved) return;
-                const others = active.filter(
-                    o => o.id !== id,
-                );
-                let insertIdx = others.findIndex(
-                    o => o.position > newPosition,
-                );
-                if (insertIdx === -1) {
-                    insertIdx = others.length;
-                }
-                const newOrder = [
-                    ...others.slice(0, insertIdx),
-                    moved,
-                    ...others.slice(insertIdx),
-                ];
-                await postObjectiveReordering(
-                    ctx, newOrder.map(o => o.id),
+                await putObjectivePosition(
+                    ctx, id, newPosition,
                 );
             },
         );
@@ -303,9 +286,12 @@ export async function init(): Promise<void> {
         ) as HTMLTextAreaElement).value;
         const ctx = createRequestContext();
         const objs = await getObjectives(ctx);
+        const position = nextPosition(
+            objs.map(o => o.position),
+        );
         const newId = generateCryptoSafeBase62();
         await postObjectiveCreation(
-            ctx, newId, name, desc, objs.length,
+            ctx, newId, name, desc, position,
         );
         closeDialog('add-objective');
     }, { signal });

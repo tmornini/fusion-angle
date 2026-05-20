@@ -247,15 +247,17 @@ export async function postObjectiveReactivation(
     notifyObjectiveChange();
 }
 
-export async function postObjectiveReordering(
+export async function putObjectivePosition(
     ctx: RequestContext,
-    idsInOrder: ObjectiveId[],
+    id: ObjectiveId,
+    position: number,
 ): Promise<void> {
-    const ops = idsInOrder.map((id, i) => ({
-        method: 'put' as const,
-        resource: `objectives/${id}`,
-        body: { position: i },
-    }));
-    await ctx.commit({ ops });
+    await ctx.commit({
+        ops: [{
+            method: 'put' as const,
+            resource: `objectives/${id}`,
+            body: { position },
+        }],
+    });
     notifyObjectiveChange();
 }

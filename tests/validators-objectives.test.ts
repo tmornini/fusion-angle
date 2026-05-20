@@ -13,20 +13,16 @@ test('validateObjectiveEntity accepts valid', () => {
     assert.equal(v.position, 0);
 });
 
-test('validateObjectiveEntity rejects non-integer position',
+test('validateObjectiveEntity accepts fractional position',
     () => {
-        assert.throws(
-            () => validateObjectiveEntity({ position: 1.5 }),
-            /non-negative integer for Objective\.position/,
-        );
+        const v = validateObjectiveEntity({ position: 1.5 });
+        assert.equal(v.position, 1.5);
     });
 
-test('validateObjectiveEntity rejects negative position',
+test('validateObjectiveEntity accepts negative position',
     () => {
-        assert.throws(
-            () => validateObjectiveEntity({ position: -1 }),
-            /non-negative integer for Objective\.position/,
-        );
+        const v = validateObjectiveEntity({ position: -1 });
+        assert.equal(v.position, -1);
     });
 
 test('validateObjectiveRevisionEntity accepts valid', () => {
