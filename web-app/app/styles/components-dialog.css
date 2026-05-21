@@ -124,6 +124,10 @@
   animation: scale-in var(--duration-normal) var(--ease-out);
 }
 
+.dialog-narrow {
+  width: min(90vw, 28rem);
+}
+
 .dialog-header { margin-bottom: var(--space-4); }
 .dialog-title {
   font-family: var(--font-display);

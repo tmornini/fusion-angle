@@ -227,6 +227,7 @@ export const PAGE_REGISTRY: Record<
         keywords:
             'data export import wipe',
         requiresSchema: false,
+        cssBundles: ['pages-snapshots'],
         loader: () => import('../snapshots/index'),
     },
     'design-system': {

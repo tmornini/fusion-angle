@@ -1290,9 +1290,8 @@ export async function init(): Promise<void> {
                         + ' w-rem-5'
                     }">${space.name}</code>
                     <div class="ds-space-bar"
-                        style="${
-                            '--space-w:' + space.w
-                        }"></div>
+                        style="--space-w:${space.w}"
+                    ></div>
                     <span class="${''
                         }text-sm text-muted">${''
                         }${space.value}</span>

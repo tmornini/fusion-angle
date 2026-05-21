@@ -7,10 +7,11 @@
   --foreground: var(--gray-100);
 
   --card: var(--gray-800);
-  --color-card-bg: #232940;
-  --color-surface: #1a1f2e;
-  --color-foreground: #e0e4ef;
-  --color-muted-foreground: #5a6480;
+  --color-card-bg: hsl(var(--card));
+  --color-surface: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-muted-foreground:
+      hsl(var(--muted-foreground));
   --card-foreground: var(--gray-100);
   --popover: var(--gray-800);
   --popover-foreground: var(--gray-100);
