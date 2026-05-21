@@ -270,39 +270,49 @@ export async function createLocalStorageAdapter(
 
         workers: new EntityStore<HumanWorkerEntity>(
             'workers', backend, stateStore,
+            validateHumanWorkerEntity,
         ),
         aiWorkers: new EntityStore<AIWorkerEntity>(
             'ai_workers', backend, stateStore,
+            validateAIWorkerEntity,
         ),
         ideas: new EntityStore<IdeaEntity>(
             'ideas', backend, stateStore,
+            validateIdeaEntity,
         ),
         projects: new EntityStore<ProjectEntity>(
             'projects', backend, stateStore,
+            validateProjectEntity,
         ),
         flows: new EntityStore<FlowEntity>(
             'flows', backend, stateStore,
+            validateFlowEntity,
         ),
         flowVersions:
             new HistoryEntityStore<FlowVersionEntity>(
                 'flow_versions', backend,
+                validateFlowVersionEntity,
             ),
         projectFlows:
             new EntityStore<ProjectFlowEntity>(
                 'project_flows', backend, stateStore,
+                validateProjectFlowEntity,
             ),
         workOrders: new EntityStore<WorkOrderEntity>(
             'work_orders', backend, stateStore,
+            validateWorkOrderEntity,
         ),
         flowWorkOrders:
             new EntityStore<FlowWorkOrderEntity>(
                 'flow_work_orders',
                 backend, stateStore,
+                validateFlowWorkOrderEntity,
             ),
         stateFieldValues:
             new EntityStore<StateFieldValueEntity>(
                 'state_field_values',
                 backend, stateStore,
+                validateStateFieldValueEntity,
             ),
         organization:
             new SingletonStore<OrganizationEntity>(
@@ -312,13 +322,16 @@ export async function createLocalStorageAdapter(
             new EntityStore<IdeaSubmissionEntity>(
                 'idea_submissions',
                 backend, stateStore,
+                validateIdeaSubmissionEntity,
             ),
         objectives: new EntityStore<Objective>(
             'objectives', backend, stateStore,
+            validateObjectiveEntity,
         ),
         objectiveRevisions:
             new HistoryEntityStore<ObjectiveRevision>(
                 'objective_revisions', backend,
+                validateObjectiveRevisionEntity,
             ),
         projectObjectiveBaselineScores:
             new HistoryEntityStore<
@@ -326,6 +339,7 @@ export async function createLocalStorageAdapter(
             >(
                 'project_objective_baseline_scores',
                 backend,
+                validateBaselineScoreEntity,
             ),
         projectObjectiveActualScores:
             new HistoryEntityStore<
@@ -333,6 +347,7 @@ export async function createLocalStorageAdapter(
             >(
                 'project_objective_actual_scores',
                 backend,
+                validateActualScoreEntity,
             ),
         states: stateStore,
     };

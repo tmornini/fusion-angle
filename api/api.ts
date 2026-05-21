@@ -3,23 +3,25 @@ import {
     EntityNotFound,
     MissingTableError,
 } from './db.ts';
+import type {
+    AIWorkerEntity,
+    FlowEntity,
+    FlowVersionEntity,
+    FlowWorkOrderEntity,
+    HumanWorkerEntity,
+    IdeaEntity,
+    IdeaSubmissionEntity,
+    Objective,
+    ObjectiveRevision,
+    ProjectEntity,
+    ProjectFlowEntity,
+    ProjectObjectiveBaselineScore,
+    ProjectObjectiveActualScore,
+    StateFieldValueEntity,
+    WorkOrderEntity,
+} from './types.ts';
 import {
-    validateHumanWorkerEntity,
-    validateAIWorkerEntity,
-    validateIdeaEntity,
-    validateProjectEntity,
-    validateFlowEntity,
-    validateFlowVersionEntity,
-    validateProjectFlowEntity,
-    validateWorkOrderEntity,
-    validateFlowWorkOrderEntity,
-    validateStateFieldValueEntity,
     validateOrganizationEntity,
-    validateIdeaSubmissionEntity,
-    validateObjectiveEntity,
-    validateObjectiveRevisionEntity,
-    validateBaselineScoreEntity,
-    validateActualScoreEntity,
     validateStateEntity,
 } from './validators.ts';
 
@@ -126,9 +128,9 @@ const routes: Route[] = [
         put: (db, p, payload) =>
             db.aiWorkers.put(
                 param(p, 0),
-                validateAIWorkerEntity(
-                    withoutId(payload),
-                ),
+                withoutId(payload) as unknown as Omit<
+                    AIWorkerEntity, 'id'
+                >,
             ),
         delete: (db, p) =>
             db.aiWorkers.delete(
@@ -157,9 +159,9 @@ const routes: Route[] = [
         put: (db, params, body) =>
             db.flows.put(
                 param(params, 0),
-                validateFlowEntity(
-                    withoutId(body),
-                ),
+                withoutId(body) as unknown as Omit<
+                    FlowEntity, 'id'
+                >,
             ),
         delete: (db, params) =>
             db.flows.delete(
@@ -178,9 +180,9 @@ const routes: Route[] = [
         put: (db, params, body) =>
             db.flowVersions.put(
                 param(params, 0),
-                validateFlowVersionEntity(
-                    withoutId(body),
-                ),
+                withoutId(body) as unknown as Omit<
+                    FlowVersionEntity, 'id'
+                >,
             ),
         delete: (db, params) =>
             db.flowVersions.delete(
@@ -196,9 +198,9 @@ const routes: Route[] = [
         put: (db, params, body) =>
             db.projectFlows.put(
                 param(params, 0),
-                validateProjectFlowEntity(
-                    withoutId(body),
-                ),
+                withoutId(body) as unknown as Omit<
+                    ProjectFlowEntity, 'id'
+                >,
             ),
         delete: (db, params) =>
             db.projectFlows.delete(
@@ -217,9 +219,9 @@ const routes: Route[] = [
         put: (db, params, body) =>
             db.workOrders.put(
                 param(params, 0),
-                validateWorkOrderEntity(
-                    withoutId(body),
-                ),
+                withoutId(body) as unknown as Omit<
+                    WorkOrderEntity, 'id'
+                >,
             ),
     }),
     route('flow-work-orders', {
@@ -230,9 +232,9 @@ const routes: Route[] = [
         put: (db, params, body) =>
             db.flowWorkOrders.put(
                 param(params, 0),
-                validateFlowWorkOrderEntity(
-                    withoutId(body),
-                ),
+                withoutId(body) as unknown as Omit<
+                    FlowWorkOrderEntity, 'id'
+                >,
             ),
     }),
     route('state-field-values', {
@@ -244,9 +246,9 @@ const routes: Route[] = [
         put: (db, params, body) =>
             db.stateFieldValues.put(
                 param(params, 0),
-                validateStateFieldValueEntity(
-                    withoutId(body),
-                ),
+                withoutId(body) as unknown as Omit<
+                    StateFieldValueEntity, 'id'
+                >,
             ),
         delete: (db, params) =>
             db.stateFieldValues.delete(
@@ -274,9 +276,9 @@ const routes: Route[] = [
         put: (db, p, payload) =>
             db.workers.put(
                 param(p, 0),
-                validateHumanWorkerEntity(
-                    withoutId(payload),
-                ),
+                withoutId(payload) as unknown as Omit<
+                    HumanWorkerEntity, 'id'
+                >,
             ),
     }),
     route('ideas/:id', {
@@ -285,9 +287,9 @@ const routes: Route[] = [
         put: (db, p, payload) =>
             db.ideas.put(
                 param(p, 0),
-                validateIdeaEntity(
-                    withoutId(payload),
-                ),
+                withoutId(payload) as unknown as Omit<
+                    IdeaEntity, 'id'
+                >,
             ),
         delete: (db, p) =>
             db.ideas.delete(param(p, 0)),
@@ -300,9 +302,9 @@ const routes: Route[] = [
         put: (db, p, payload) =>
             db.projects.put(
                 param(p, 0),
-                validateProjectEntity(
-                    withoutId(payload),
-                ),
+                withoutId(payload) as unknown as Omit<
+                    ProjectEntity, 'id'
+                >,
             ),
         delete: (db, p) =>
             db.projects.delete(param(p, 0)),
@@ -311,9 +313,9 @@ const routes: Route[] = [
         put: (db, p, payload) =>
             db.ideaSubmissions.put(
                 param(p, 0),
-                validateIdeaSubmissionEntity(
-                    withoutId(payload),
-                ),
+                withoutId(payload) as unknown as Omit<
+                    IdeaSubmissionEntity, 'id'
+                >,
             ),
     }),
     route('objectives', {
@@ -327,9 +329,9 @@ const routes: Route[] = [
         put: (db, p, body) =>
             db.objectives.put(
                 param(p, 0),
-                validateObjectiveEntity(
-                    withoutId(body),
-                ),
+                withoutId(body) as unknown as Omit<
+                    Objective, 'id'
+                >,
             ),
         delete: (db, p) =>
             db.objectives.delete(
@@ -344,9 +346,9 @@ const routes: Route[] = [
         put: (db, p, body) =>
             db.objectiveRevisions.put(
                 param(p, 0),
-                validateObjectiveRevisionEntity(
-                    withoutId(body),
-                ),
+                withoutId(body) as unknown as Omit<
+                    ObjectiveRevision, 'id'
+                >,
             ),
     }),
     route('project-objective-baseline-scores', {
@@ -357,9 +359,9 @@ const routes: Route[] = [
         put: (db, p, body) =>
             db.projectObjectiveBaselineScores.put(
                 param(p, 0),
-                validateBaselineScoreEntity(
-                    withoutId(body),
-                ),
+                withoutId(body) as unknown as Omit<
+                    ProjectObjectiveBaselineScore, 'id'
+                >,
             ),
     }),
     route('project-objective-actual-scores', {
@@ -370,9 +372,9 @@ const routes: Route[] = [
         put: (db, p, body) =>
             db.projectObjectiveActualScores.put(
                 param(p, 0),
-                validateActualScoreEntity(
-                    withoutId(body),
-                ),
+                withoutId(body) as unknown as Omit<
+                    ProjectObjectiveActualScore, 'id'
+                >,
             ),
     }),
     route('states', {

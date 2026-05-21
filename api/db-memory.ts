@@ -30,6 +30,23 @@ import { HistoryEntityStore }
     from './store-history-entity.ts';
 import { SingletonStore } from './store-singleton.ts';
 import { StateStore } from './store-state.ts';
+import {
+    validateBaselineScoreEntity,
+    validateActualScoreEntity,
+    validateHumanWorkerEntity,
+    validateAIWorkerEntity,
+    validateIdeaEntity,
+    validateProjectEntity,
+    validateFlowEntity,
+    validateFlowVersionEntity,
+    validateProjectFlowEntity,
+    validateWorkOrderEntity,
+    validateFlowWorkOrderEntity,
+    validateStateFieldValueEntity,
+    validateIdeaSubmissionEntity,
+    validateObjectiveEntity,
+    validateObjectiveRevisionEntity,
+} from './validators.ts';
 
 export class MemoryDbAdapter implements DbAdapter {
     readonly #backend: MemoryStorageBackend;
@@ -76,67 +93,82 @@ export class MemoryDbAdapter implements DbAdapter {
         this.workers =
             new EntityStore(
                 'workers', backend, stateStore,
+                validateHumanWorkerEntity,
             );
         this.aiWorkers =
             new EntityStore(
                 'ai_workers', backend, stateStore,
+                validateAIWorkerEntity,
             );
         this.ideas =
             new EntityStore(
                 'ideas', backend, stateStore,
+                validateIdeaEntity,
             );
         this.projects =
             new EntityStore(
                 'projects', backend, stateStore,
+                validateProjectEntity,
             );
         this.flows =
             new EntityStore(
                 'flows', backend, stateStore,
+                validateFlowEntity,
             );
         this.flowVersions =
             new HistoryEntityStore(
                 'flow_versions', backend,
+                validateFlowVersionEntity,
             );
         this.projectFlows =
             new EntityStore(
                 'project_flows', backend, stateStore,
+                validateProjectFlowEntity,
             );
         this.workOrders =
             new EntityStore(
                 'work_orders', backend, stateStore,
+                validateWorkOrderEntity,
             );
         this.flowWorkOrders =
             new EntityStore(
                 'flow_work_orders',
                 backend, stateStore,
+                validateFlowWorkOrderEntity,
             );
         this.stateFieldValues =
             new EntityStore(
                 'state_field_values',
                 backend, stateStore,
+                validateStateFieldValueEntity,
             );
         this.ideaSubmissions =
             new EntityStore(
                 'idea_submissions',
                 backend, stateStore,
+                validateIdeaSubmissionEntity,
             );
         this.objectives =
             new EntityStore(
                 'objectives', backend, stateStore,
+                validateObjectiveEntity,
             );
         this.objectiveRevisions =
             new HistoryEntityStore(
                 'objective_revisions', backend,
+                validateObjectiveRevisionEntity,
             );
         this.projectObjectiveBaselineScores =
             new HistoryEntityStore(
                 'project_objective_baseline_scores',
                 backend,
+                validateBaselineScoreEntity,
             );
         this.projectObjectiveActualScores =
             new HistoryEntityStore(
                 'project_objective_actual_scores',
                 backend,
+                validateActualScoreEntity,
             );
     }
 

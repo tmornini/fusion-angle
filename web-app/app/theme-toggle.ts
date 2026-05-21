@@ -110,6 +110,14 @@ export function initThemeAndDropdowns(
                     if (
                         isValidTheme(theme)
                     ) {
+                        // persistThemePreference
+                        // applies theme to memory
+                        // and DOM BEFORE writing,
+                        // so the icon must update
+                        // on every branch — the
+                        // live state is the new
+                        // theme even when persist
+                        // throws.
                         let persisted: boolean;
                         try {
                             persisted =
@@ -124,11 +132,14 @@ export function initThemeAndDropdowns(
                                 e,
                             );
                             showToast(
-                                'Failed to'
-                                + ' save theme'
-                                + ' preference.',
+                                'Theme applied,'
+                                + ' but could not'
+                                + ' be saved.'
+                                + ' It will reset'
+                                + ' on next load.',
                                 'error',
                             );
+                            mutateThemeToggleIcon();
                             return;
                         }
                         if (!persisted) {

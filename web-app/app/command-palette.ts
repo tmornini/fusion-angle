@@ -910,15 +910,28 @@ posIndex === state.activeIndex
     // first Cmd+K opens instantly. Without
     // this, the user pays a 100-300 ms
     // adapter-fetch latency on first open.
+    function flagEagerLoadFailure(err: unknown): void {
+        log.warn(
+            'eager search index load failed',
+            'palette',
+            err,
+        );
+        if (searchInput) {
+            searchInput.setAttribute(
+                'title',
+                'Search index unavailable —'
+                + ' open the palette to retry.',
+            );
+            searchInput.setAttribute(
+                'data-state', 'error',
+            );
+        }
+    }
     void (async () => {
         const adapter = getDbAdapter();
         if (await adapter.hasSchema()) {
             getSearchIndex().catch(
-                err => log.warn(
-                    'eager search index load failed',
-                    'palette',
-                    err,
-                ),
+                flagEagerLoadFailure,
             );
             return;
         }
@@ -926,11 +939,7 @@ posIndex === state.activeIndex
             () => {
                 unsub();
                 getSearchIndex().catch(
-                    err => log.warn(
-                        'eager search index load failed',
-                        'palette',
-                        err,
-                    ),
+                    flagEagerLoadFailure,
                 );
             },
         );

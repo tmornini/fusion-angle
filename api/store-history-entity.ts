@@ -1,6 +1,7 @@
 import {
     EntityNotFound,
     type EntityStore as EntityStoreInterface,
+    type EntityValidator,
     type StorageBackend,
 } from './db.ts';
 import { createSerializer } from './store-serializer.ts';
@@ -16,15 +17,19 @@ export class HistoryEntityStore<
 {
     readonly #table: string;
     readonly #backend: StorageBackend;
+    readonly #validate: EntityValidator<T>;
     readonly #serialize:
         <R>(fn: () => Promise<R>) => Promise<R>;
 
     constructor(
         table: string,
         backend: StorageBackend,
+        validate: EntityValidator<T> = (b) =>
+            b as unknown as Omit<T, 'id'>,
     ) {
         this.#table = table;
         this.#backend = backend;
+        this.#validate = validate;
         this.#serialize = createSerializer();
     }
 
@@ -49,6 +54,9 @@ export class HistoryEntityStore<
         id: string,
         fields: Omit<T, 'id'>,
     ): Promise<T> {
+        const { id: _id, ...body } =
+            fields as unknown as Record<string, unknown>;
+        const validated = this.#validate(body);
         return this.#serialize(async () => {
             const rows = await this.#backend.read<T>(
                 this.#table,
@@ -56,7 +64,10 @@ export class HistoryEntityStore<
             const index = rows.findIndex(
                 e => e.id === id,
             );
-            const written = { ...fields, id } as T;
+            const written = {
+                ...validated,
+                id,
+            } as T;
             const next = index >= 0
                 ? rows.with(index, written)
                 : [...rows, written];

@@ -58,6 +58,18 @@ export interface EntityStore<
     delete(id: string): Promise<void>;
 }
 
+// The storage-edge validator. Stores accept one at
+// construction and re-verify every `put` body through
+// it — the same telling-shape function used by the
+// HTTP route validator. Threaded into stores so the
+// gate sits at the storage edge, not only at the
+// route layer.
+export type EntityValidator<
+    T extends { id: string },
+> = (
+    body: Record<string, unknown>,
+) => Omit<T, 'id'>;
+
 export interface SingletonStore<
     T extends { id: string },
 > {

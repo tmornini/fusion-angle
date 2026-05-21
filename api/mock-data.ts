@@ -149,15 +149,15 @@ function b62Id(
 }
 
 function isoFromMs(ms: number): string {
-    const d = new Date(ms);
-    const y = d.getUTCFullYear();
-    const mo = pad(d.getUTCMonth() + 1);
-    const da = pad(d.getUTCDate());
-    const h = pad(d.getUTCHours());
-    const mi = pad(d.getUTCMinutes());
-    const s = pad(d.getUTCSeconds());
-    return `${y}-${mo}-${da}`
-        + `T${h}:${mi}:${s}.000000Z`;
+    const date = new Date(ms);
+    const year = date.getUTCFullYear();
+    const month = pad(date.getUTCMonth() + 1);
+    const day = pad(date.getUTCDate());
+    const hour = pad(date.getUTCHours());
+    const minute = pad(date.getUTCMinutes());
+    const second = pad(date.getUTCSeconds());
+    return `${year}-${month}-${day}`
+        + `T${hour}:${minute}:${second}.000000Z`;
 }
 
 interface FlowSeedSpec {
