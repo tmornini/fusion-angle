@@ -12,11 +12,15 @@ import {
 import type { RequestContext } from './shared.ts';
 import {
     getActiveObjectives,
+    getObjectives,
 } from './objectives.ts';
 import {
     getProjectStates,
 } from './state-events.ts';
-import { latestPerPair } from '../scoring-format.ts';
+import {
+    latestPerPair,
+    weightedMeanByPosition,
+} from '../scoring-format.ts';
 import {
     createSubscriptionChannel,
 } from '../channels.ts';
@@ -110,11 +114,13 @@ export async function getPortfolioImpactSummary(
     actualCount: number;
 }> {
     const [
+        objectives,
         projectRows,
         projectStates,
         allBaseline,
         allActual,
     ] = await Promise.all([
+        getObjectives(ctx),
         ctx.GET<ProjectEntity[]>('projects'),
         getProjectStates(ctx),
         ctx.GET<ProjectObjectiveBaselineScore[]>(
@@ -129,6 +135,9 @@ export async function getPortfolioImpactSummary(
         return s !== undefined
             && projectStateIsApproved(s);
     });
+    const posByObj = new Map<ObjectiveId, number>(
+        objectives.map(o => [o.id, o.position]),
+    );
     const baselineByProject = groupByProject(allBaseline);
     const actualByProject = groupByProject(allActual);
 
@@ -139,13 +148,11 @@ export async function getPortfolioImpactSummary(
         const latestB = latestPerPair(
             baselineByProject.get(p.id) ?? [],
         );
-        if (latestB.length > 0) {
-            const m = meanOrUndefined(
-                latestB.map(r => r.score),
-            );
-            if (m !== undefined) {
-                baselineMeansPerProject.push(m);
-            }
+        const m = weightedMeanByPosition(
+            latestB, posByObj,
+        );
+        if (m !== null) {
+            baselineMeansPerProject.push(m);
         }
         const latestA = latestPerPair(
             actualByProject.get(p.id) ?? [],
@@ -157,18 +164,18 @@ export async function getPortfolioImpactSummary(
             actualedObjs.has(b.objective_id),
         );
         if (fullyActualed && latestB.length > 0) {
-            const aMap = new Map(
-                latestA.map(a =>
-                    [a.objective_id, a.score]),
+            const baselinedIds = new Set(
+                latestB.map(b => b.objective_id),
             );
-            const xs = latestB
-                .map(b => aMap.get(b.objective_id))
-                .filter(
-                    (x): x is number =>
-                        typeof x === 'number',
-                );
-            const am = meanOrUndefined(xs);
-            if (am !== undefined) {
+            const am = weightedMeanByPosition(
+                latestA.filter(
+                    a => baselinedIds.has(
+                        a.objective_id,
+                    ),
+                ),
+                posByObj,
+            );
+            if (am !== null) {
                 actualMeansPerProject.push(am);
             }
         }
@@ -312,11 +319,13 @@ export async function getProjectsScoreColumn(
 }>> {
     const [
         activeObjs,
+        objectives,
         projectRows,
         allBaseline,
         allActual,
     ] = await Promise.all([
         getActiveObjectives(ctx),
+        getObjectives(ctx),
         ctx.GET<ProjectEntity[]>('projects'),
         ctx.GET<ProjectObjectiveBaselineScore[]>(
             'project-objective-baseline-scores',
@@ -326,6 +335,9 @@ export async function getProjectsScoreColumn(
         ),
     ]);
     const totalActive = activeObjs.length;
+    const posByObj = new Map<ObjectiveId, number>(
+        objectives.map(o => [o.id, o.position]),
+    );
     const baselineByProject = groupByProject(allBaseline);
     const actualByProject = groupByProject(allActual);
 
@@ -337,14 +349,31 @@ export async function getProjectsScoreColumn(
         const latestA = latestPerPair(
             actualByProject.get(p.id) ?? [],
         );
+        const baselinedIds = new Set(
+            latestB.map(b => b.objective_id),
+        );
+        const actualedIds = new Set(
+            latestA.map(a => a.objective_id),
+        );
+        const fullyActualed = latestB.length > 0
+            && Array.from(baselinedIds).every(
+                id => actualedIds.has(id),
+            );
         out.push({
             projectId: p.id,
-            baselineAvg: meanOrUndefined(
-                latestB.map(b => b.score),
-            ),
-            latestActualAvg: meanOrUndefined(
-                latestA.map(a => a.score),
-            ),
+            baselineAvg: weightedMeanByPosition(
+                latestB, posByObj,
+            ) ?? undefined,
+            latestActualAvg: fullyActualed
+                ? weightedMeanByPosition(
+                    latestA.filter(
+                        a => baselinedIds.has(
+                            a.objective_id,
+                        ),
+                    ),
+                    posByObj,
+                ) ?? undefined
+                : undefined,
             baselineCount: latestB.length,
             totalActiveObjectives: totalActive,
         });

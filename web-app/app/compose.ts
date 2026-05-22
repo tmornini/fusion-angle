@@ -31,7 +31,7 @@ const standalonePages = Object.entries(PAGE_REGISTRY)
             cssBundles: entry.cssBundles,
     }));
 
-const PAGE_CSS_PLACEHOLDER = '        <!-- PAGE_CSS_LINKS -->\n';
+const PAGE_CSS_PLACEHOLDER = '        {{PAGE_CSS_LINKS}}\n';
 
 function buildPageCssLinks(
     bundles: string[] | undefined,
@@ -46,19 +46,19 @@ function buildPageCssLinks(
 
 const COMPONENTS = [
     {
-            placeholder: '<!-- COMPONENT_SIDEBAR -->',
+            placeholder: '{{COMPONENT_SIDEBAR}}',
             file: 'component-sidebar.html',
     },
     {
-            placeholder: '<!-- COMPONENT_TOP_BAR -->',
+            placeholder: '{{COMPONENT_TOP_BAR}}',
             file: 'component-top-bar.html',
     },
     {
-            placeholder: '<!-- COMPONENT_MOBILE_HEADER -->',
+            placeholder: '{{COMPONENT_MOBILE_HEADER}}',
             file: 'component-mobile-header.html',
     },
     {
-            placeholder: '<!-- COMPONENT_MOBILE_SIDEBAR -->',
+            placeholder: '{{COMPONENT_MOBILE_SIDEBAR}}',
             file: 'component-mobile-sidebar.html',
     },
 ] as const;
@@ -94,7 +94,7 @@ function compose(): void {
 
     const navHtml = buildSidebarNavItemsHtml();
     layout = layout.replaceAll(
-        '<!-- SIDEBAR_NAV_ITEMS -->',
+        '{{SIDEBAR_NAV_ITEMS}}',
         navHtml,
     );
 
@@ -106,7 +106,7 @@ function compose(): void {
         const html = layout
             .replace('{{PAGE_NAME}}', name)
             .replace('{{PAGE_TITLE}}', title)
-            .replace('<!-- PAGE_CONTENT -->', pageContent)
+            .replace('{{PAGE_CONTENT}}', pageContent)
             .replace(
                 PAGE_CSS_PLACEHOLDER,
                 buildPageCssLinks(page.cssBundles),

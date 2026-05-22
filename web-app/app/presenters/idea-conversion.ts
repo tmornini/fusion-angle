@@ -10,7 +10,7 @@ import {
     iconArrowLeft,
     iconTarget,
     iconRocket,
-    iconCalendar,
+    iconClock,
     iconPeople,
     iconTrendingUp,
     iconCheckCircle2,
@@ -19,8 +19,7 @@ import { type Idea } from '../adapters/index.ts';
 
 export type ConversionField =
     | 'project-name'
-    | 'start-date'
-    | 'target-end-date'
+    | 'time-days'
     | 'cost'
     | 'impact'
     | 'success-criteria';
@@ -28,8 +27,7 @@ export type ConversionField =
 const REQUIRED_FIELDS:
     readonly ConversionField[] = [
     'project-name',
-    'start-date',
-    'target-end-date',
+    'time-days',
     'cost',
     'impact',
 ];
@@ -37,8 +35,7 @@ const REQUIRED_FIELDS:
 export const ALL_CONVERSION_FIELDS:
     readonly ConversionField[] = [
     'project-name',
-    'start-date',
-    'target-end-date',
+    'time-days',
     'cost',
     'impact',
     'success-criteria',
@@ -53,8 +50,7 @@ export function buildInitialConversionFields(
 ): ConversionFields {
     return {
         'project-name': idea.titleText(),
-        'start-date': '',
-        'target-end-date': '',
+        'time-days': '',
         'cost': '',
         'impact': '',
         'success-criteria': '',
@@ -412,68 +408,51 @@ export class IdeaConversionPresenter {
                             }"
                         />
                     </div>
-                    <div class="${
-                        'grid grid-cols-2 gap-4'
-                    }">
-                        <div>
-                            <label class="${
-                                'label mb-2'
-                                + ' font-medium'
-                                + ' flex'
-                                + ' items-center'
-                                + ' gap-2'
-                            }">
-                                ${iconCalendar(
-                                    16,
-                                    'text-muted',
-                                )}
-                                Start Date
-                                ${this
-                                .#fieldCheck(
-                                'start-date',
-                                )}
-                            </label>
+                    <div>
+                        <label class="${
+                            'label mb-2'
+                            + ' font-medium'
+                            + ' flex'
+                            + ' items-center'
+                            + ' gap-2'
+                        }">
+                            ${iconClock(
+                                16,
+                                'text-muted',
+                            )}
+                            Time
+                            ${this.#fieldCheck(
+                                'time-days',
+                            )}
+                        </label>
+                        <div class="${
+                            'input-prefix-wrap'
+                        }">
+                            <span class="${
+                                'input-suffix-symbol'
+                            }">days</span>
                             <input
-                                class="input"
-                                type="date"
-                                id=${'convert'
-                                    + '-start'
-                                    + '-date'}
+                                class="${
+                                    'input'
+                                    + ' input-with'
+                                    + '-suffix'
+                                }"
+                                type="text"
+                                inputmode="${
+                                    'numeric'
+                                }"
+                                id="${
+                                    'convert'
+                                    + '-time-days'
+                                }"
+                                placeholder="${
+                                    'Enter'
+                                    + ' duration'
+                                    + ' in days'
+                                }"
                                 value="${
                                     fields[
-                                    'start-date'
-                                    ]
-                                }" />
-                        </div>
-                        <div>
-                            <label class="${
-                                'label mb-2'
-                                + ' font-medium'
-                                + ' flex'
-                                + ' items-center'
-                                + ' gap-2'
-                            }">
-                                ${iconTarget(
-                                    16,
-                                    'text-muted',
-                                )}
-                                ${'Target End'
-                                    + ' Date'}
-                                ${this
-                                .#fieldCheck(
-                                'target-end-date',
-                                )}
-                            </label>
-                            <input
-                                class="input"
-                                type="date"
-                                id=${'convert'
-                                    + '-target'
-                                    + '-end'
-                                    + '-date'}
-                                value="${
-                                    fields[
-                                    'target-end-date'
+                                    'time-days'
                                     ]
                                 }" />
                         </div>

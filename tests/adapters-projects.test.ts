@@ -231,7 +231,7 @@ test(
             }),
             id: 'p1',
         }, 'approved');
-        const view = new ProjectView(project);
+        const view = new ProjectView(project, [], [], []);
         assert.equal(view.idForLink(), 'p1');
         assert.equal(view.titleText(), 'Viewable');
         assert.equal(view.stateValue(), 'approved');
@@ -263,7 +263,7 @@ test(
             }),
             id: 'p1',
         }, 'approved');
-        const view = new ProjectView(project);
+        const view = new ProjectView(project, [], [], []);
         assert.equal(view.timeBaselineDays(), 10);
     },
 );

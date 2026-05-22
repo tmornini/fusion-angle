@@ -10,6 +10,7 @@ import {
     iconLightbulb,
     iconClipboardCheck,
     iconArrowLeft,
+    iconTrendingUp,
 } from '../icons.ts';
 import {
     toggleStatusFilter,
@@ -145,7 +146,7 @@ export class ProjectPresenter {
                         .stateLabel()
                 }</span>
             </div>
-            ${this.#buildMetrics()}
+            ${this.#buildMetrics(score)}
             ${this.#buildScoreCell(score)}
             ${this.#buildProgressRing()}
         </div>
@@ -218,7 +219,7 @@ export class ProjectPresenter {
     </div>`;
     }
 
-    #buildMetrics(): SafeHtml {
+    #buildMetrics(score?: ScoreRow): SafeHtml {
         const project = this.#project;
         const startDateMs = new Date(
             project.startDateValue(),
@@ -245,11 +246,11 @@ export class ProjectPresenter {
         const costActual =
             project.actualCostAmount()
             / COST_DIVISOR;
+        const impactBaseline = score?.baselineAvg;
+        const impactActual = score?.latestActualAvg;
         const metricLabelClasses = 'text-xs text-muted';
         return html`
-    <div class="${
-        'hidden-mobile project-metric-grid'
-    }">
+    <div class="project-metric-grid">
         <div class="${
             'flex items-center gap-2'
         }">
@@ -292,6 +293,29 @@ export class ProjectPresenter {
                             metricLabelClasses
                         }">/ ${'$'
                         + costBaseline}k</span>`
+                    : html`&mdash;`
+                }</p>
+            </div>
+        </div>
+        <div class="${
+            'flex items-center gap-2'
+        }">
+            <div class="metric-icon-box">${
+                iconTrendingUp(
+                    16, 'text-primary',
+                )
+            }</div>
+            <div>
+                <p class="${
+                    metricLabelClasses
+                }">Impact</p>
+                <p class="${
+                    'text-sm font-medium'
+                }">${impactBaseline !== undefined
+                    ? html`${impactActual ?? '—'}
+                        <span class="${
+                            metricLabelClasses
+                        }">/ ${impactBaseline} pts</span>`
                     : html`&mdash;`
                 }</p>
             </div>

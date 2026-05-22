@@ -21,6 +21,7 @@ import {
     generateCryptoSafeBase62,
     type IdeaEntity,
 } from '../app/adapters/index.ts';
+import { MS_PER_DAY } from '../../api/types.ts';
 import {
     nextPosition,
 } from '../app/drag-reorder-positions.ts';
@@ -316,6 +317,9 @@ export async function init(
             submitSel,
         );
         bindEnterToClick(
+            '#convert-time-days', submitSel,
+        );
+        bindEnterToClick(
             '#convert-cost', submitSel,
         );
         bindEnterToClick(
@@ -446,6 +450,10 @@ function parseFiniteNumber(
     return n;
 }
 
+function isoDateOnly(ms: number): string {
+    return new Date(ms).toISOString().slice(0, 10);
+}
+
 async function performConversion(
     ctx: ReturnType<typeof createRequestContext>,
     ideaId: string,
@@ -457,6 +465,11 @@ async function performConversion(
     const position = nextPosition(
         projects.map(p => p.position),
     );
+    const days = parseFiniteNumber(
+        'time-days', fields['time-days'],
+    );
+    const startMs = Date.now();
+    const endMs = startMs + days * MS_PER_DAY;
     await postIdeaConversion(
         ctx,
         ideaId,
@@ -467,10 +480,8 @@ async function performConversion(
             description:
                 fields['success-criteria'],
             progress: 0,
-            start_date:
-                fields['start-date'],
-            target_end_date:
-                fields['target-end-date'],
+            start_date: isoDateOnly(startMs),
+            target_end_date: isoDateOnly(endMs),
             estimated_cost: parseFiniteNumber(
                 'cost',
                 fields['cost'],

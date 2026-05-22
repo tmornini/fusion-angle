@@ -712,8 +712,7 @@ test(
         assert.equal(
             fields['project-name'], 'Edge caching',
         );
-        assert.equal(fields['start-date'], '');
-        assert.equal(fields['target-end-date'], '');
+        assert.equal(fields['time-days'], '');
         assert.equal(fields['cost'], '');
         assert.equal(fields['impact'], '');
         assert.equal(
@@ -723,10 +722,10 @@ test(
 );
 
 test(
-    'conversion progress counts only the five'
+    'conversion progress counts only the four'
     + ' required fields',
     () => {
-        assert.equal(conversionRequiredCount(), 5);
+        assert.equal(conversionRequiredCount(), 4);
         const fields = buildInitialConversionFields(
             makeIdea(),
         );
@@ -762,15 +761,14 @@ test(
     () => {
         const fields: ConversionFields = {
             'project-name': 'P',
-            'start-date': '2026-06-01',
-            'target-end-date': '2026-09-01',
+            'time-days': '90',
             'cost': '50000',
             'impact': '80',
             'success-criteria': '',
         };
         assert.equal(conversionIsReady(fields), true);
         assert.equal(
-            conversionCompletedCount(fields), 5,
+            conversionCompletedCount(fields), 4,
         );
     },
 );
@@ -795,7 +793,7 @@ test(
         assert.match(out, /Edge caching/);
         assert.match(out, /Slow far from origin/);
         assert.match(out, /Global users/);
-        assert.match(out, /1\/5 required fields/);
+        assert.match(out, /1\/4 required fields/);
         assert.match(out, /Complete Required Fields/);
         assert.match(out, /data-ready="false"/);
         assert.match(out, /disabled/);
@@ -814,8 +812,7 @@ test(
         const idea = makeIdea();
         const fields: ConversionFields = {
             'project-name': 'New project',
-            'start-date': '2026-06-01',
-            'target-end-date': '2026-09-01',
+            'time-days': '90',
             'cost': '50000',
             'impact': '80',
             'success-criteria': '',
@@ -823,7 +820,7 @@ test(
         const out = new IdeaConversionPresenter(
             idea, fields,
         ).render().toString();
-        assert.match(out, /5\/5 required fields/);
+        assert.match(out, /4\/4 required fields/);
         assert.match(out, /Ready to Create Project/);
         assert.match(out, /data-ready="true"/);
         assert.ok(!out.includes('disabled'));

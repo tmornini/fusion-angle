@@ -10,7 +10,6 @@ import {
 import {
     createRequestContext,
     getDashboardGauges,
-    getPortfolioImpactSummary,
     getObjectiveAggregates,
     subscribeProjectScoreChanges,
     getActiveObjectives,
@@ -20,15 +19,14 @@ import {
 } from '../app/adapters/index.ts';
 import {
     GaugePresenter,
-    PortfolioImpactPresenter,
     DashboardObjectiveAggregatesPresenter,
 } from '../app/presenters/index.ts';
 
-async function renderImpactSurfaces(): Promise<void> {
+async function renderObjectiveAggregates(
+): Promise<void> {
     const ctx = createRequestContext();
-    const [summary, active, aggregates] =
+    const [active, aggregates] =
         await Promise.all([
-            getPortfolioImpactSummary(ctx),
             getActiveObjectives(ctx),
             getObjectiveAggregates(ctx),
         ]);
@@ -40,12 +38,6 @@ async function renderImpactSurfaces(): Promise<void> {
                 ctx, o.id,
             ));
     }
-    setHtml(
-        $('#portfolio-impact-card', document)!,
-        new PortfolioImpactPresenter(
-            summary,
-        ).buildCard(),
-    );
     setHtml(
         $('#objective-aggregates-card', document)!,
         new DashboardObjectiveAggregatesPresenter(
@@ -79,10 +71,14 @@ export async function init(
     );
 
     subscribeProjectScoreChanges(
-        renderImpactSurfaces,
+        renderObjectiveAggregates,
     );
-    subscribeObjectiveChanges(renderImpactSurfaces);
-    subscribeProjectChanges(renderImpactSurfaces);
+    subscribeObjectiveChanges(
+        renderObjectiveAggregates,
+    );
+    subscribeProjectChanges(
+        renderObjectiveAggregates,
+    );
 
-    await renderImpactSurfaces();
+    await renderObjectiveAggregates();
 }

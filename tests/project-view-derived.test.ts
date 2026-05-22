@@ -10,85 +10,189 @@ import type {
     ProjectObjectiveActualScore,
 } from '../api/types.ts';
 
-function makeView(): ProjectView {
-    return new ProjectView(new Project({
+function makeProject(): Project {
+    return new Project({
         id: 'p1', title: 't',
         description: 'd', progress: 0,
         start_date: '2026-05-14T00:00:00.000Z',
         target_end_date: '2026-05-14T00:00:00.000Z',
         estimated_cost: 0, actual_cost: 0,
         position: 0,
-    }, 'approved'));
+    }, 'approved');
 }
 
 const T1 = '2026-05-14T00:00:00.000Z';
 const T2 = '2026-05-15T00:00:00.000Z';
 
-const activeOne: Objective[] = [
+const oneObjective: Objective[] = [
     { id: 'o1', position: 0 },
 ];
-const activeTwo: Objective[] = [
+const twoObjectives: Objective[] = [
     { id: 'o1', position: 0 },
     { id: 'o2', position: 1 },
 ];
-const baselineO1: ProjectObjectiveBaselineScore[] = [
-    { id: 'b1', project_id: 'p1', objective_id: 'o1',
-      score: 50, at: T1 },
-];
 
-test('isBaselineScored true when every active obj has row',
+test(
+    'impactBaselineMean returns null with no scores',
     () => {
-        const v = makeView();
-        assert.equal(
-            v.isBaselineScored(activeOne, baselineO1),
-            true,
+        const v = new ProjectView(
+            makeProject(),
+            oneObjective,
+            [],
+            [],
         );
-    });
+        assert.equal(v.impactBaselineMean(), null);
+    },
+);
 
-test('isBaselineScored false when missing one', () => {
-    const v = makeView();
-    assert.equal(
-        v.isBaselineScored(activeTwo, baselineO1),
-        false,
-    );
-});
-
-test('baselineTotal averages latest per pair', () => {
-    const v = makeView();
-    const score = v.baselineTotal([
-        { id: 'b1', project_id: 'p1', objective_id: 'o1',
-          score: 50, at: T1 },
-        { id: 'b2', project_id: 'p1', objective_id: 'o1',
-          score: 60, at: T2 },
-        { id: 'b3', project_id: 'p1', objective_id: 'o2',
-          score: -20, at: T1 },
-    ]);
-    assert.equal(score, 20); // (60 + -20) / 2
-});
-
-test('baselineTotal throws when no rows', () => {
-    const v = makeView();
-    assert.throws(() => v.baselineTotal([]));
-});
-
-test('actualTotal throws when not fully actual-scored',
+test(
+    'impactBaselineMean returns score for single objective',
     () => {
-        const v = makeView();
-        assert.throws(
-            () => v.actualTotal(baselineO1, []),
+        const baseline: ProjectObjectiveBaselineScore[] = [
+            { id: 'b1', project_id: 'p1',
+              objective_id: 'o1',
+              score: 50, at: T1 },
+        ];
+        const v = new ProjectView(
+            makeProject(),
+            oneObjective,
+            baseline,
+            [],
         );
-    });
+        assert.equal(v.impactBaselineMean(), 50);
+    },
+);
 
-test('actualTotal averages over baselined objectives',
+test(
+    'impactBaselineMean takes latest score per objective',
     () => {
-        const v = makeView();
-        const score = v.actualTotal(
-            baselineO1,
-            [{
-                id: 'a1', project_id: 'p1',
-                objective_id: 'o1',
-                score: 40, at: T2,
-            }],
+        const baseline: ProjectObjectiveBaselineScore[] = [
+            { id: 'b1', project_id: 'p1',
+              objective_id: 'o1',
+              score: 50, at: T1 },
+            { id: 'b2', project_id: 'p1',
+              objective_id: 'o1',
+              score: 60, at: T2 },
+        ];
+        const v = new ProjectView(
+            makeProject(),
+            oneObjective,
+            baseline,
+            [],
         );
-        assert.equal(score, 40);
-    });
+        assert.equal(v.impactBaselineMean(), 60);
+    },
+);
+
+test(
+    'impactBaselineMean weights by position',
+    () => {
+        // o1 at position 0 (weight 1.0), o2 at
+        // position 1 (weight 0.95).
+        // weighted sum = 60*1.0 + 40*0.95 = 98
+        // weight total = 1.95
+        // mean = 98 / 1.95 = 50.26 -> round = 50
+        const baseline: ProjectObjectiveBaselineScore[] = [
+            { id: 'b1', project_id: 'p1',
+              objective_id: 'o2',
+              score: 40, at: T1 },
+            { id: 'b2', project_id: 'p1',
+              objective_id: 'o1',
+              score: 60, at: T1 },
+        ];
+        const v = new ProjectView(
+            makeProject(),
+            twoObjectives,
+            baseline,
+            [],
+        );
+        assert.equal(v.impactBaselineMean(), 50);
+    },
+);
+
+test(
+    'impactActualMean is null when not fully scored',
+    () => {
+        const baseline: ProjectObjectiveBaselineScore[] = [
+            { id: 'b1', project_id: 'p1',
+              objective_id: 'o1',
+              score: 50, at: T1 },
+            { id: 'b2', project_id: 'p1',
+              objective_id: 'o2',
+              score: 40, at: T1 },
+        ];
+        const actual: ProjectObjectiveActualScore[] = [
+            { id: 'a1', project_id: 'p1',
+              objective_id: 'o1',
+              score: 45, at: T2 },
+        ];
+        const v = new ProjectView(
+            makeProject(),
+            twoObjectives,
+            baseline,
+            actual,
+        );
+        assert.equal(v.impactActualMean(), null);
+    },
+);
+
+test(
+    'impactActualMean weights actuals when fully scored',
+    () => {
+        // baselined o1, o2 → both must have actuals.
+        // o1 actual 30, o2 actual 50:
+        // weighted = 30*1.0 + 50*0.95 = 77.5
+        // total = 1.95 → 39.74 -> round = 40
+        const baseline: ProjectObjectiveBaselineScore[] = [
+            { id: 'b1', project_id: 'p1',
+              objective_id: 'o1',
+              score: 50, at: T1 },
+            { id: 'b2', project_id: 'p1',
+              objective_id: 'o2',
+              score: 40, at: T1 },
+        ];
+        const actual: ProjectObjectiveActualScore[] = [
+            { id: 'a1', project_id: 'p1',
+              objective_id: 'o2',
+              score: 50, at: T2 },
+            { id: 'a2', project_id: 'p1',
+              objective_id: 'o1',
+              score: 30, at: T2 },
+        ];
+        const v = new ProjectView(
+            makeProject(),
+            twoObjectives,
+            baseline,
+            actual,
+        );
+        assert.equal(v.impactActualMean(), 40);
+    },
+);
+
+test(
+    'impactActualMean ignores actuals for un-baselined objs',
+    () => {
+        // Only o1 baselined. Actuals for o1 and o2.
+        // Result should consider only o1 actual.
+        const baseline: ProjectObjectiveBaselineScore[] = [
+            { id: 'b1', project_id: 'p1',
+              objective_id: 'o1',
+              score: 50, at: T1 },
+        ];
+        const actual: ProjectObjectiveActualScore[] = [
+            { id: 'a1', project_id: 'p1',
+              objective_id: 'o1',
+              score: 70, at: T2 },
+            { id: 'a2', project_id: 'p1',
+              objective_id: 'o2',
+              score: 999, at: T2 },
+        ];
+        const v = new ProjectView(
+            makeProject(),
+            twoObjectives,
+            baseline,
+            actual,
+        );
+        assert.equal(v.impactActualMean(), 70);
+    },
+);

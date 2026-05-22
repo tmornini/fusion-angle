@@ -8,6 +8,12 @@
   flex-shrink: 0;
 }
 
+@media (max-width: 640px) {
+  .project-metric-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* .project-detail-wrap is now an alias
    for .content-wrap-xl */
 .project-detail-wrap {

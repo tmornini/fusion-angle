@@ -31,6 +31,7 @@ import {
     postProjectActualMeasurement,
     subscribeProjectScoreChanges,
     getActiveObjectives,
+    getObjectives,
     getCurrentObjectiveDefinition,
     getObjectiveRevisions,
     getObjectiveDeprecationEvents,
@@ -114,11 +115,23 @@ async function loadProjectView(
     view: ProjectView;
     entity: ProjectEntity;
 }> {
-    const [project, entity] = await Promise.all([
+    const [
+        project,
+        entity,
+        objectives,
+        scoring,
+    ] = await Promise.all([
         getProject(ctx, projectId),
         getProjectRow(ctx, projectId),
+        getObjectives(ctx),
+        getProjectScoring(ctx, projectId),
     ]);
-    const view = new ProjectView(project);
+    const view = new ProjectView(
+        project,
+        objectives,
+        scoring.baseline,
+        scoring.actual,
+    );
     return { view, entity };
 }
 

@@ -1306,6 +1306,61 @@ export async function init(): Promise<void> {
             <div>
                 <h2 class="${''
                     }text-2xl font-semibold ${''
+                    }font-display">Toast</h2>
+                <p class="text-muted mt-1">${''
+                    }Transient ${''
+                    }notifications ${''
+                    }dispatched via ${''
+                    }showToast()</p>
+            </div>
+            <div class="card p-6">
+                <div style="${
+                    'display:flex'
+                    + ';flex-direction:column'
+                    + ';gap:0.75rem'
+                    + ';max-width:24rem'
+                }">
+                    ${[
+                        {
+                            v: 'success',
+                            m: 'Saved successfully',
+                        },
+                        {
+                            v: 'error',
+                            m: 'Failed to save',
+                        },
+                        {
+                            v: 'warning',
+                            m: 'Connection unstable',
+                        },
+                        {
+                            v: 'info',
+                            m: 'New version available',
+                        },
+                    ].map(t => html`
+                    <div class="${
+                        'toast toast-' + t.v
+                    }" role="status">
+                        <span class="${
+                            'toast-message'
+                        }">${t.m}</span>
+                        <button class="${
+                            'toast-close'
+                        }"
+                            aria-label="Dismiss"
+                        >&times;</button>
+                    </div>
+                    `)}
+                </div>
+            </div>
+        </section>
+
+        <hr class="ds-hr"/>
+
+        <section class="ds-section">
+            <div>
+                <h2 class="${''
+                    }text-2xl font-semibold ${''
                     }font-display">${''
                     }Error &amp; System ${''
                     }States</h2>

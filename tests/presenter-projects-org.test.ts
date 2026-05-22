@@ -232,6 +232,7 @@ test(
                 description: 'Go to the moon.',
                 state: 'approved',
             }),
+            [], [], [],
         );
         const rec = makeRecordingContainer();
         new ProjectDetailPresenter(view, [])
@@ -259,6 +260,7 @@ test(
             makeProject({
                 estimatedCost: 0,
             }),
+            [], [], [],
         );
         const rec = makeRecordingContainer();
         new ProjectDetailPresenter(view, [])
@@ -284,6 +286,7 @@ test(
         new ProjectDetailPresenter(
             new ProjectView(
                 makeProject({ state: 'approved' }),
+                [], [], [],
             ),
             [],
         ).renderShell(approvedRec.container);
@@ -300,6 +303,7 @@ test(
                 makeProject({
                     state: 'under-review',
                 }),
+                [], [], [],
             ),
             [],
         ).renderShell(draftRec.container);
@@ -314,6 +318,7 @@ test(
     () => {
         const view = new ProjectView(
             makeProject({ state: 'approved' }),
+            [], [], [],
         );
         const rec = makeRecordingContainer();
         new ProjectDetailPresenter(view, [
@@ -341,6 +346,7 @@ test(
     () => {
         const view = new ProjectView(
             makeProject({ title: 'Apollo' }),
+            [], [], [],
         );
         const draft = projectDraftFromView(view);
         const rec = makeRecordingContainer();

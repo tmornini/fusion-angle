@@ -192,17 +192,17 @@ test(
 );
 
 test(
-    'getDashboardGauges returns Time and Cost',
+    'getDashboardGauges returns Time, Cost, Impact',
     async () => {
         const { ctx } = setupDb();
         const gauges = await getDashboardGauges(ctx);
         assert.deepEqual(
             gauges.map(g => g.title),
-            ['Time', 'Cost'],
+            ['Time', 'Cost', 'Impact'],
         );
         assert.deepEqual(
             gauges.map(g => g.icon),
-            ['clock', 'dollarSign'],
+            ['clock', 'dollarSign', 'zap'],
         );
     },
 );
@@ -261,19 +261,20 @@ test(
     },
 );
 
-test('getDashboardGauges returns exactly two gauges',
+test(
+    'getDashboardGauges returns the three sibling gauges',
     async () => {
         const db = new MemoryDbAdapter();
         const ctx = createRequestContext(db);
         const gauges = await getDashboardGauges(ctx);
-        assert.equal(gauges.length, 2);
+        assert.equal(gauges.length, 3);
         const titles = gauges.map(
             g => g.title.toLowerCase(),
         );
         assert.ok(titles.some(t => t.includes('time')));
         assert.ok(titles.some(t => t.includes('cost')));
         assert.ok(
-            !titles.some(t => t.includes('impact')),
-            'old impact gauge still present',
+            titles.some(t => t.includes('impact')),
+            'impact gauge missing from grid',
         );
     });

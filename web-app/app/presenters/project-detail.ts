@@ -12,6 +12,7 @@ import {
     iconMinus,
     iconGitBranch, iconInfo,
     iconEdit, iconSave, iconX,
+    iconTrendingUp,
 } from '../icons.ts';
 import {
     formatDate,
@@ -451,20 +452,24 @@ interface MetricArgs {
     icon: (
         s: number, c: string,
     ) => SafeHtml;
-    baseline: number;
-    current: number;
+    baseline: number | null;
+    current: number | null;
     unit: string;
     prefix: string;
     isLowerBetter: boolean;
 }
 
 function buildVariance(
-    baseline: number,
-    current: number,
+    baseline: number | null,
+    current: number | null,
     isLowerBetter: boolean,
     unit: string,
     prefix: string,
 ): SafeHtml {
+    if (baseline === null || current === null) {
+        return html`<span class="text-muted"
+            >${DISPLAY_ABSENT}</span>`;
+    }
     const diff = current - baseline;
     if (diff === 0)
         return html`<span class="text-muted"
@@ -612,6 +617,17 @@ function buildReadonlyMetrics(
             prefix: '$',
             isLowerBetter: true,
         },
+        {
+            label: 'Impact',
+            inputId: 'impact',
+            field: null,
+            icon: iconTrendingUp,
+            baseline: view.impactBaselineMean(),
+            current: view.impactActualMean(),
+            unit: ' pts',
+            prefix: '',
+            isLowerBetter: false,
+        },
     ];
     return html`
         <div class="card p-6">
@@ -670,6 +686,17 @@ function buildEditableMetrics(
             unit: 'k',
             prefix: '$',
             isLowerBetter: true,
+        },
+        {
+            label: 'Impact',
+            inputId: 'impact',
+            field: null,
+            icon: iconTrendingUp,
+            baseline: view.impactBaselineMean(),
+            current: view.impactActualMean(),
+            unit: ' pts',
+            prefix: '',
+            isLowerBetter: false,
         },
     ];
     return html`

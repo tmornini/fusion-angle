@@ -709,6 +709,14 @@ and the known MCP limitations (flow-designer gesture
 pointer-capture, `resize_window`, file I/O, kill EPERM) live
 in TEST-PLAN.md § Protocol — CLAUDE.md does not duplicate them.
 
+**Orchestrating a complete run.** When an agent runs the full
+test plan (CLI + browser), `./validate` is the gate: a failing
+type-check, test, or line-length lint ABORTS the run
+automatically. The agent does not ask whether to continue —
+the bundle is built from the same source, so a failing CLI
+suite makes the browser run meaningless. Report the failure,
+stop, await fix. This is doctrine, not a question.
+
 ## Gotchas
 
 - **`noUncheckedIndexedAccess`**: tsconfig enables this —

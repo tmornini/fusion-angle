@@ -2,6 +2,7 @@ import type {
     ProjectEntity,
     ProjectState,
     Objective,
+    ObjectiveId,
     ProjectObjectiveBaselineScore,
     ProjectObjectiveActualScore,
 } from '../../../api/types.ts';
@@ -21,6 +22,10 @@ import {
 import {
     createSubscriptionChannel,
 } from '../channels.ts';
+import {
+    latestPerPair,
+    weightedMeanByPosition,
+} from '../scoring-format.ts';
 
 const projectChanges =
     createSubscriptionChannel(
@@ -88,9 +93,49 @@ export async function getProject(
 
 export class ProjectView {
     readonly #project: Project;
+    readonly #impactBaselineMean: number | null;
+    readonly #impactActualMean: number | null;
 
-    constructor(project: Project) {
+    constructor(
+        project: Project,
+        objectives: readonly Objective[],
+        baselineScores:
+            readonly ProjectObjectiveBaselineScore[],
+        actualScores:
+            readonly ProjectObjectiveActualScore[],
+    ) {
         this.#project = project;
+        const posByObj =
+            new Map<ObjectiveId, number>(
+                objectives.map(
+                    o => [o.id, o.position],
+                ),
+            );
+        const latestB = latestPerPair(baselineScores);
+        this.#impactBaselineMean =
+            weightedMeanByPosition(latestB, posByObj);
+        const baselinedIds = new Set(
+            latestB.map(b => b.objective_id),
+        );
+        const latestA = latestPerPair(actualScores);
+        const actualedIds = new Set(
+            latestA.map(a => a.objective_id),
+        );
+        const fullyActualScored =
+            latestB.length > 0
+            && Array.from(baselinedIds).every(
+                id => actualedIds.has(id),
+            );
+        this.#impactActualMean = fullyActualScored
+            ? weightedMeanByPosition(
+                latestA.filter(
+                    a => baselinedIds.has(
+                        a.objective_id,
+                    ),
+                ),
+                posByObj,
+            )
+            : null;
     }
 
     idForLink(): string {
@@ -176,106 +221,12 @@ export class ProjectView {
             / COST_DIVISOR;
     }
 
-    isBaselineScored(
-        activeObjectives: Objective[],
-        baselineScores: ProjectObjectiveBaselineScore[],
-    ): boolean {
-        const scored =
-            this.#objectiveIdSet(baselineScores);
-        return activeObjectives.every(
-            o => scored.has(o.id),
-        );
+    impactBaselineMean(): number | null {
+        return this.#impactBaselineMean;
     }
 
-    isActualScored(
-        baselineScores: ProjectObjectiveBaselineScore[],
-        actualScores: ProjectObjectiveActualScore[],
-    ): boolean {
-        const baselined =
-            this.#objectiveIdSet(baselineScores);
-        const actualed =
-            this.#objectiveIdSet(actualScores);
-        for (const id of baselined) {
-            if (!actualed.has(id)) return false;
-        }
-        return true;
-    }
-
-    baselineTotal(
-        baselineScores: ProjectObjectiveBaselineScore[],
-    ): number {
-        const latest =
-            this.#latestPerObjective(baselineScores);
-        if (latest.length === 0) {
-            throw new Error(
-                'project '
-                + this.#project.idForLink()
-                + ' has no baseline scores',
-            );
-        }
-        const sum = latest.reduce(
-            (acc, r) => acc + r.score, 0,
-        );
-        return Math.round(sum / latest.length);
-    }
-
-    actualTotal(
-        baselineScores: ProjectObjectiveBaselineScore[],
-        actualScores: ProjectObjectiveActualScore[],
-    ): number {
-        if (
-            !this.isActualScored(
-                baselineScores, actualScores,
-            )
-        ) {
-            throw new Error(
-                'project '
-                + this.#project.idForLink()
-                + ' not fully actual-scored',
-            );
-        }
-        const baselined =
-            this.#latestPerObjective(baselineScores);
-        const actualMap = new Map(
-            this.#latestPerObjective(actualScores)
-                .map(r => [r.objective_id, r.score]),
-        );
-        const xs = baselined
-            .map(b => actualMap.get(b.objective_id))
-            .filter(
-                (x): x is number =>
-                    typeof x === 'number',
-            );
-        const sum = xs.reduce((a, b) => a + b, 0);
-        return Math.round(sum / xs.length);
-    }
-
-    #latestPerObjective<T extends {
-        objective_id: string;
-        at: string;
-    }>(rows: T[]): T[] {
-        const map = new Map<string, T>();
-        for (const r of rows) {
-            const prev = map.get(r.objective_id);
-            if (
-                !prev
-                || r.at > prev.at
-            ) {
-                map.set(r.objective_id, r);
-            }
-        }
-        return Array.from(map.values());
-    }
-
-    #objectiveIdSet<T extends {
-        objective_id: string;
-        at: string;
-    }>(rows: T[]): Set<string> {
-        return new Set(
-            this.#latestPerObjective(rows).map(
-                r => r.objective_id,
-            ),
-        );
+    impactActualMean(): number | null {
+        return this.#impactActualMean;
     }
 }
 

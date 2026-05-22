@@ -29,7 +29,6 @@ test('barrel exports all new presenters', async () => {
         'MeasurementModalPresenter',
         'ProjectObjectivesPresenter',
         'ProjectScoreHistoryPresenter',
-        'PortfolioImpactPresenter',
         'DashboardObjectiveAggregatesPresenter',
     ];
     for (const name of expected) {

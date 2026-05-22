@@ -6,7 +6,9 @@ import {
 } from '../../../api/types.ts';
 import {
     formatCompactCurrency,
+    DISPLAY_ABSENT,
 } from '../format.ts';
+import { formatSigned } from '../scoring-format.ts';
 import type { RequestContext } from './shared.ts';
 import { getIdeaRows } from './ideas.ts';
 import {
@@ -15,6 +17,9 @@ import {
 } from './state-events.ts';
 import { getProjectRows } from './projects.ts';
 import { getFlowRows } from './flows.ts';
+import {
+    getPortfolioImpactSummary,
+} from './project-scoring.ts';
 
 export type GaugeIcon =
     | 'clock'
@@ -46,10 +51,11 @@ export interface GaugeData {
 export async function getDashboardGauges(
     ctx: RequestContext,
 ): Promise<GaugeData[]> {
-    const [allProjects, projectStates] =
+    const [allProjects, projectStates, impact] =
         await Promise.all([
             getProjectRows(ctx),
             getProjectStates(ctx),
+            getPortfolioImpactSummary(ctx),
         ]);
     const projects = allProjects.filter(p => {
         const s = projectStates.get(p.id);
@@ -100,6 +106,13 @@ export async function getDashboardGauges(
     const actCost =
         Math.ceil(sumActualCost);
 
+    const impactDisplay = (
+        v: number | undefined,
+    ): string =>
+        v === undefined
+            ? DISPLAY_ABSENT
+            : formatSigned(v);
+
     return [
         {
             title: 'Time',
@@ -146,6 +159,35 @@ export async function getDashboardGauges(
                     ),
             },
             isOverrunning: true,
+        },
+        {
+            title: 'Impact',
+            icon: 'zap',
+            iconCssClass: 'text-warning',
+            theme: 'amber',
+            outer: {
+                value: Math.max(
+                    0,
+                    impact.baselineMean ?? 0,
+                ),
+                max: 100,
+                label: 'Baseline',
+                display: impactDisplay(
+                    impact.baselineMean,
+                ),
+            },
+            inner: {
+                value: Math.max(
+                    0,
+                    impact.actualMean ?? 0,
+                ),
+                max: 100,
+                label: 'Actual',
+                display: impactDisplay(
+                    impact.actualMean,
+                ),
+            },
+            isOverrunning: false,
         },
     ];
 }

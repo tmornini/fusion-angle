@@ -129,8 +129,5 @@ export {
     ProjectScoreHistoryPresenter,
 } from './project-score-history.ts';
 export {
-    PortfolioImpactPresenter,
-} from './portfolio-impact.ts';
-export {
     DashboardObjectiveAggregatesPresenter,
 } from './dashboard-objective-aggregates.ts';
