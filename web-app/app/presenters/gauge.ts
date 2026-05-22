@@ -211,7 +211,6 @@ function buildRatioGaugeSvg(
 ): SafeHtml {
     const outer = data.outer;
     const inner = data.inner;
-    const hasOverrun = data.isOverrunning;
     const outerPct =
         outer.max > 0
             ? Math.min(
@@ -235,8 +234,7 @@ function buildRatioGaugeSvg(
     const innerArc =
         Math.PI * ARC_INNER_R;
     const isOverrun =
-        hasOverrun
-        && inner.value > inner.max;
+        inner.value > inner.max;
     const stop0 =
         'hsl(var(--success))';
     const stop1 = isOverrun
@@ -246,10 +244,7 @@ function buildRatioGaugeSvg(
     let innerClass = 'gauge-arc-inner';
     let innerStyle =
         '--dash-full:' + innerArc;
-    if (
-        hasOverrun
-        && inner.max > 0
-    ) {
+    if (inner.max > 0) {
         const ratio =
             inner.value / inner.max;
         if (ratio > 1.5) {

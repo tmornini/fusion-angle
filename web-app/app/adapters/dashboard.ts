@@ -52,7 +52,6 @@ export interface RatioGauge {
     readonly theme: GaugeTheme;
     readonly outer: RatioArc;
     readonly inner: RatioArc;
-    readonly isOverrunning: boolean;
 }
 
 export interface BipolarGauge {
@@ -153,7 +152,6 @@ export async function getDashboardGauges(
                 display:
                     `${sumCurrentDays}d`,
             },
-            isOverrunning: true,
         },
         {
             kind: 'ratio',
@@ -179,7 +177,6 @@ export async function getDashboardGauges(
                         actCost,
                     ),
             },
-            isOverrunning: true,
         },
         {
             kind: 'bipolar',

@@ -48,7 +48,6 @@ function makeArc(
 function makeGauge(
     over: { value: number; max: number },
     inner: { value: number; max: number },
-    isOverrunning: boolean,
 ): GaugeData {
     return {
         kind: 'ratio',
@@ -62,7 +61,6 @@ function makeGauge(
         inner: makeArc(
             inner.value, inner.max, 'Current', '$8k',
         ),
-        isOverrunning,
     } satisfies RatioGauge;
 }
 
@@ -194,7 +192,6 @@ test(
             makeGauge(
                 { value: 5, max: 10 },
                 { value: 4, max: 10 },
-                false,
             ),
         ).render().toString();
         assert.match(out, /Cost Baseline/);
@@ -214,7 +211,6 @@ test(
             makeGauge(
                 { value: 30, max: 10 },
                 { value: 25, max: 10 },
-                false,
             ),
         ).render().toString();
         // outerOff and innerOff both collapse to 0
@@ -234,7 +230,6 @@ test(
             makeGauge(
                 { value: 0, max: 0 },
                 { value: 0, max: 0 },
-                false,
             ),
         ).render().toString();
         // outerArc = PI*65, innerArc = PI*45;
@@ -259,7 +254,6 @@ test(
             makeGauge(
                 { value: 10, max: 10 },
                 { value: 20, max: 10 },
-                true,
             ),
         ).render().toString();
         assert.match(
@@ -275,26 +269,6 @@ test(
 );
 
 test(
-    'GaugePresenter does not flag overrun when'
-    + ' isOverrunning is false even past max',
-    () => {
-        const out = new GaugePresenter(
-            makeGauge(
-                { value: 10, max: 10 },
-                { value: 20, max: 10 },
-                false,
-            ),
-        ).render().toString();
-        assert.equal(
-            /stop-color="hsl\(var\(--error\)\)"/
-                .test(out),
-            false,
-        );
-        assert.equal(/overrun/.test(out), false);
-    },
-);
-
-test(
     'GaugePresenter derives a kebab-case id from'
     + ' the title for its gradient defs',
     () => {
@@ -302,7 +276,6 @@ test(
             makeGauge(
                 { value: 1, max: 2 },
                 { value: 1, max: 2 },
-                false,
             ),
         ).render().toString();
         assert.match(out, /id="outer-cost-baseline"/);

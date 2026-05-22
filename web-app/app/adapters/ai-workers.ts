@@ -108,7 +108,7 @@ export async function putAIWorker(
 // remains for pure edits (name, provider,
 // auth_token) that do not change the lifecycle
 // stage.
-export async function postAIWorkerCreate(
+export async function postAIWorkerCreation(
     ctx: RequestContext,
     id: WorkerId,
     entity: Omit<AIWorkerEntity, 'id'>,

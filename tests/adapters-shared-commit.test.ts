@@ -27,27 +27,34 @@ test(
             ops: [
                 {
                     method: 'put',
-                    resource: 'ai-workers/ai_1',
-                    body: buildAIWorkerBody(
-                        'First',
-                    ),
+                    resource:
+                        'state-field-values/sfv_1',
+                    body: {
+                        state_event_id: 'evt_1',
+                        field_id: 'field_a',
+                        value: 'first',
+                    },
                 },
                 {
                     method: 'put',
-                    resource: 'ai-workers/ai_2',
-                    body: buildAIWorkerBody(
-                        'Second',
-                    ),
+                    resource:
+                        'state-field-values/sfv_2',
+                    body: {
+                        state_event_id: 'evt_1',
+                        field_id: 'field_b',
+                        value: 'second',
+                    },
                 },
                 {
                     method: 'delete',
-                    resource: 'ai-workers/ai_1',
+                    resource:
+                        'state-field-values/sfv_1',
                 },
             ],
         });
-        const r1 = await db.aiWorkers.getAll();
-        assert.equal(r1.length, 1);
-        assert.equal(r1[0]!.name, 'Second');
+        const r = await db.stateFieldValues.getAll();
+        assert.equal(r.length, 1);
+        assert.equal(r[0]!.value, 'second');
     },
 );
 

@@ -5895,11 +5895,21 @@ export async function populateMockData(
 
         const baselineStart =
             new Date(p.start_date).getTime();
+        // Committed work (approved + completed) is
+        // expected to advance objectives; baselines
+        // skew positive. Drafts (under-review +
+        // sent-back) can dip negative — a flagged
+        // risk worth surfacing on the dashboard.
+        const baselineMin =
+            state === 'approved'
+            || state === 'completed'
+                ? 0
+                : -100;
         for (let i = 0; i < baselineCoverage; i++) {
             const obj = OBJECTIVE_SEEDS[i]!;
             const score = deterministicScore(
                 `${p.id}:${obj.id}:baseline`,
-                -100,
+                baselineMin,
                 100,
             );
             const scoredAt = new Date(

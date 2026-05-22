@@ -22,7 +22,7 @@ import {
     createRequestContext,
     getWorkers,
     postHumanWorkerCreation,
-    postAIWorkerCreate,
+    postAIWorkerCreation,
     getCurrentHumanWorker,
     jsonArrayField,
     jsonObjectField,
@@ -738,7 +738,7 @@ async function submitAIForm(): Promise<void> {
     }
     const id = generateCryptoSafeBase62();
     try {
-        await postAIWorkerCreate(
+        await postAIWorkerCreation(
             createRequestContext(),
             id,
             trimStrings({
@@ -750,7 +750,7 @@ async function submitAIForm(): Promise<void> {
         );
     } catch (err) {
         log.error(
-            'postAIWorkerCreate failed',
+            'postAIWorkerCreation failed',
             'workers', err,
         );
         showToast(

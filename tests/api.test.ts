@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import {
-    GET, PUT, DELETE, POST,
+    GET, PUT, POST,
     handleRequest,
 } from '../api/api.ts';
 import {
@@ -49,23 +49,6 @@ test('PUT then GET round-trips an entity', async () => {
             db, 'ideas/i1',
         );
     assert.equal(fetched.title, 'Test');
-});
-
-test('DELETE marks entity tombstoned', async () => {
-    const db = new MemoryDbAdapter();
-    await db.ideas.put('i1', {
-        title: 'Test', position: 1,
-        problem_statement: '',
-        target_users: '',
-        proposed_solution: '',
-        expected_outcome: '',
-        success_metrics: '',
-    });
-    await DELETE(db, 'ideas/i1');
-    await assert.rejects(
-        () => GET(db, 'ideas/i1'),
-        /Not found|404/,
-    );
 });
 
 test('GET ideas/ normalizes to collection', async () => {
@@ -121,24 +104,6 @@ test(
                 rogue_field: 'extra',
             }),
             /unexpected key|missing/,
-        );
-    },
-);
-
-test(
-    'DELETE ai-workers/:id splices the row',
-    async () => {
-        const db = new MemoryDbAdapter();
-        await db.aiWorkers.put('ai_1', {
-            name: 'Opus',
-            provider: 'Anthropic',
-            description: '',
-            auth_token: 'sk-real-token',
-        });
-        await DELETE(db, 'ai-workers/ai_1');
-        await assert.rejects(
-            () => GET(db, 'ai-workers/ai_1'),
-            /Not found|404/,
         );
     },
 );

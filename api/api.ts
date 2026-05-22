@@ -132,10 +132,6 @@ const routes: Route[] = [
                     AIWorkerEntity, 'id'
                 >,
             ),
-        delete: (db, p) =>
-            db.aiWorkers.delete(
-                param(p, 0),
-            ),
     }),
     route('ideas', {
         get: (db) => db.ideas.getAll(),
@@ -162,10 +158,6 @@ const routes: Route[] = [
                 withoutId(body) as unknown as Omit<
                     FlowEntity, 'id'
                 >,
-            ),
-        delete: (db, params) =>
-            db.flows.delete(
-                param(params, 0),
             ),
     }),
     route('flow-versions', {
@@ -291,8 +283,6 @@ const routes: Route[] = [
                     IdeaEntity, 'id'
                 >,
             ),
-        delete: (db, p) =>
-            db.ideas.delete(param(p, 0)),
     }),
     route('projects/:id', {
         get: (db, p) =>
@@ -306,8 +296,6 @@ const routes: Route[] = [
                     ProjectEntity, 'id'
                 >,
             ),
-        delete: (db, p) =>
-            db.projects.delete(param(p, 0)),
     }),
     route('idea-submissions/:id', {
         put: (db, p, payload) =>
@@ -332,10 +320,6 @@ const routes: Route[] = [
                 withoutId(body) as unknown as Omit<
                     Objective, 'id'
                 >,
-            ),
-        delete: (db, p) =>
-            db.objectives.delete(
-                param(p, 0),
             ),
     }),
     route('objective-revisions', {
