@@ -278,3 +278,47 @@ test(
             'impact gauge missing from grid',
         );
     });
+
+test(
+    'getDashboardGauges marks Impact as bipolar',
+    async () => {
+        const { ctx } = setupDb();
+        const gauges = await getDashboardGauges(ctx);
+        const impact = gauges
+            .find(g => g.title === 'Impact');
+        assert.equal(impact?.kind, 'bipolar');
+    },
+);
+
+test(
+    'getDashboardGauges marks Time and Cost as ratio',
+    async () => {
+        const { ctx } = setupDb();
+        const gauges = await getDashboardGauges(ctx);
+        const time = gauges
+            .find(g => g.title === 'Time');
+        const cost = gauges
+            .find(g => g.title === 'Cost');
+        assert.equal(time?.kind, 'ratio');
+        assert.equal(cost?.kind, 'ratio');
+    },
+);
+
+test(
+    'getDashboardGauges Impact passes undefined'
+    + ' means without clamping to zero',
+    async () => {
+        const { ctx } = setupDb();
+        const gauges = await getDashboardGauges(ctx);
+        const impact = gauges
+            .find(g => g.title === 'Impact');
+        // Empty db => baselineMean and actualMean
+        // both undefined. The bipolar Impact gauge
+        // must NOT clamp them to 0 (the previous
+        // ratio behavior was Math.max(0, v ?? 0)).
+        assert.equal(impact?.kind, 'bipolar');
+        if (impact?.kind !== 'bipolar') return;
+        assert.equal(impact.outer.value, undefined);
+        assert.equal(impact.inner.value, undefined);
+    },
+);

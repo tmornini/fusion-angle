@@ -2,8 +2,11 @@ import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { GaugePresenter } from
     '../web-app/app/presenters/gauge.ts';
-import type { GaugeData } from
-    '../web-app/app/adapters/dashboard.ts';
+import type {
+    GaugeData,
+    RatioGauge,
+    BipolarGauge,
+} from '../web-app/app/adapters/dashboard.ts';
 import { FlowPresenter } from
     '../web-app/app/presenters/flow.ts';
 import type { FlowSummary } from
@@ -48,6 +51,7 @@ function makeGauge(
     isOverrunning: boolean,
 ): GaugeData {
     return {
+        kind: 'ratio',
         title: 'Cost Baseline',
         icon: 'dollarSign',
         iconCssClass: 'text-primary',
@@ -59,7 +63,36 @@ function makeGauge(
             inner.value, inner.max, 'Current', '$8k',
         ),
         isOverrunning,
-    };
+    } satisfies RatioGauge;
+}
+
+function makeBipolarGauge(
+    outerValue: number | undefined,
+    innerValue: number | undefined,
+): GaugeData {
+    return {
+        kind: 'bipolar',
+        title: 'Impact',
+        icon: 'zap',
+        iconCssClass: 'text-warning',
+        theme: 'amber',
+        outer: {
+            value: outerValue,
+            label: 'Baseline',
+            display: outerValue === undefined
+                ? '—'
+                : (outerValue >= 0 ? '+' : '')
+                    + outerValue,
+        },
+        inner: {
+            value: innerValue,
+            label: 'Actual',
+            display: innerValue === undefined
+                ? '—'
+                : (innerValue >= 0 ? '+' : '')
+                    + innerValue,
+        },
+    } satisfies BipolarGauge;
 }
 
 function makeFlowSummary(
@@ -274,6 +307,183 @@ test(
         ).render().toString();
         assert.match(out, /id="outer-cost-baseline"/);
         assert.match(out, /id="inner-cost-baseline"/);
+    },
+);
+
+// GaugePresenter — bipolar variant
+
+test(
+    'GaugePresenter bipolar at zero renders no'
+    + ' fill half-arc paths (track halves only)',
+    () => {
+        const out = new GaugePresenter(
+            makeBipolarGauge(0, 0),
+        ).render().toString();
+        // The half-arc fill paths start at top
+        // dead center (M 90 20 outer, M 90 40
+        // inner). At zero, neither half fills.
+        assert.equal(
+            /d="M 90 20 A 65 65/.test(out),
+            false,
+            'outer half-arc fill must be absent',
+        );
+        assert.equal(
+            /d="M 90 40 A 45 45/.test(out),
+            false,
+            'inner half-arc fill must be absent',
+        );
+    },
+);
+
+test(
+    'GaugePresenter bipolar at undefined renders'
+    + ' no fill half-arc paths',
+    () => {
+        const out = new GaugePresenter(
+            makeBipolarGauge(undefined, undefined),
+        ).render().toString();
+        assert.equal(
+            /d="M 90 20 A 65 65/.test(out),
+            false,
+        );
+        assert.equal(
+            /d="M 90 40 A 45 45/.test(out),
+            false,
+        );
+    },
+);
+
+test(
+    'GaugePresenter bipolar at negative draws'
+    + ' the LEFT half only',
+    () => {
+        const out = new GaugePresenter(
+            makeBipolarGauge(-50, -50),
+        ).render().toString();
+        // Outer left half = sweep 0 ending at
+        // (25, 85). Inner left half = sweep 0
+        // ending at (45, 85). Right halves
+        // (sweep 1) must be absent.
+        assert.match(
+            out,
+            /d="M 90 20 A 65 65 0 0 0 25 85"/,
+        );
+        assert.match(
+            out,
+            /d="M 90 40 A 45 45 0 0 0 45 85"/,
+        );
+        assert.equal(
+            /d="M 90 20 A 65 65 0 0 1 155 85"/
+                .test(out),
+            false,
+            'right half must NOT render',
+        );
+    },
+);
+
+test(
+    'GaugePresenter bipolar at positive draws'
+    + ' the RIGHT half only',
+    () => {
+        const out = new GaugePresenter(
+            makeBipolarGauge(50, 50),
+        ).render().toString();
+        assert.match(
+            out,
+            /d="M 90 20 A 65 65 0 0 1 155 85"/,
+        );
+        assert.match(
+            out,
+            /d="M 90 40 A 45 45 0 0 1 135 85"/,
+        );
+        assert.equal(
+            /d="M 90 20 A 65 65 0 0 0 25 85"/
+                .test(out),
+            false,
+            'left half must NOT render',
+        );
+    },
+);
+
+test(
+    'GaugePresenter bipolar at -50 sets the'
+    + ' dashoffset to half of the half-arc',
+    () => {
+        const out = new GaugePresenter(
+            makeBipolarGauge(-50, -50),
+        ).render().toString();
+        // Outer half = pi*65/2 ≈ 102.10; at 50%
+        // magnitude the dashoffset ≈ 51.05.
+        assert.match(
+            out, /stroke-dashoffset="51\.0[0-9]+/,
+        );
+        // Inner half = pi*45/2 ≈ 70.69; offset
+        // at 50% magnitude ≈ 35.34.
+        assert.match(
+            out, /stroke-dashoffset="35\.3[0-9]+/,
+        );
+    },
+);
+
+test(
+    'GaugePresenter bipolar at +-100 fills the'
+    + ' active half completely (offset 0)',
+    () => {
+        const out = new GaugePresenter(
+            makeBipolarGauge(-100, 100),
+        ).render().toString();
+        // Outer LEFT half fills fully (offset 0)
+        // and inner RIGHT half fills fully too.
+        const zeros = out.match(
+            /stroke-dashoffset="0"/g,
+        ) ?? [];
+        assert.equal(zeros.length, 2);
+    },
+);
+
+test(
+    'GaugePresenter bipolar declares the'
+    + ' red-amber-green tri-gradient stops',
+    () => {
+        const out = new GaugePresenter(
+            makeBipolarGauge(-50, 50),
+        ).render().toString();
+        // Left half: amber center, error
+        // extreme.
+        assert.match(
+            out,
+            /stop-color="hsl\(var\(--warning\)\)"/,
+        );
+        assert.match(
+            out,
+            /stop-color="hsl\(var\(--error\)\)"/,
+        );
+        // Right half: amber center, success
+        // extreme.
+        assert.match(
+            out,
+            /stop-color="hsl\(var\(--success\)\)"/,
+        );
+    },
+);
+
+test(
+    'GaugePresenter bipolar lets outer and inner'
+    + ' show different signs independently',
+    () => {
+        const out = new GaugePresenter(
+            makeBipolarGauge(2, -21),
+        ).render().toString();
+        // Outer +2 → right half. Inner -21 →
+        // left half.
+        assert.match(
+            out,
+            /d="M 90 20 A 65 65 0 0 1 155 85"/,
+        );
+        assert.match(
+            out,
+            /d="M 90 40 A 45 45 0 0 0 45 85"/,
+        );
     },
 );
 

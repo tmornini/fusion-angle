@@ -11,6 +11,8 @@ import {
     getIdeas,
     getIdea,
     putIdea,
+    postIdeaCreation,
+    postIdeaStateChange,
 } from '../web-app/app/adapters/ideas.ts';
 import type {
     IdeaEntity,
@@ -209,6 +211,70 @@ test('archived ideas are filtered from getIdeas', async () => {
         result[0]?.idea.titleText(), 'Keep',
     );
 });
+
+test(
+    'postIdeaCreation persists the row and'
+    + ' records the initial state event',
+    async () => {
+        const { db, ctx } = setupDb();
+        await db.workers.put(
+            'current',
+            buildPerson('current', 'Demo'),
+        );
+        await seedWorkerState(db, 'current');
+
+        await postIdeaCreation(
+            ctx,
+            'i1',
+            buildIdea('i1', 'Fresh'),
+            'active:incomplete',
+        );
+
+        const row =
+            await db.ideas.getById('i1');
+        assert.equal(row.title, 'Fresh');
+        const events =
+            await db.states.allFor('i1');
+        assert.equal(events.length, 1);
+        assert.equal(
+            events[0]?.state,
+            'active:incomplete',
+        );
+    },
+);
+
+test(
+    'postIdeaStateChange records a state event'
+    + ' without touching the idea row',
+    async () => {
+        const { db, ctx } = setupDb();
+        await db.workers.put(
+            'current',
+            buildPerson('current', 'Demo'),
+        );
+        await seedWorkerState(db, 'current');
+        await db.ideas.put(
+            'i1', buildIdea('i1', 'Original'),
+        );
+        await seedIdeaState(db, 'i1', 'in-review');
+        const before =
+            await db.ideas.getById('i1');
+
+        await postIdeaStateChange(
+            ctx, 'i1', 'approved',
+        );
+
+        const after =
+            await db.ideas.getById('i1');
+        assert.deepEqual(after, before);
+        const events =
+            await db.states.allFor('i1');
+        assert.equal(events.length, 2);
+        assert.equal(
+            events.at(-1)?.state, 'approved',
+        );
+    },
+);
 
 test('deleted ideas are filtered from getIdeas', async () => {
     const { db, ctx } = setupDb();

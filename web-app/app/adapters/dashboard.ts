@@ -31,22 +31,41 @@ export type GaugeTheme =
     | 'green'
     | 'amber';
 
-export interface ArcData {
+export interface RatioArc {
     readonly value: number;
     readonly max: number;
     readonly label: string;
     readonly display: string;
 }
 
-export interface GaugeData {
+export interface BipolarArc {
+    readonly value: number | undefined;
+    readonly label: string;
+    readonly display: string;
+}
+
+export interface RatioGauge {
+    readonly kind: 'ratio';
     readonly title: string;
     readonly icon: GaugeIcon;
     readonly iconCssClass: string;
     readonly theme: GaugeTheme;
-    readonly outer: ArcData;
-    readonly inner: ArcData;
+    readonly outer: RatioArc;
+    readonly inner: RatioArc;
     readonly isOverrunning: boolean;
 }
+
+export interface BipolarGauge {
+    readonly kind: 'bipolar';
+    readonly title: string;
+    readonly icon: GaugeIcon;
+    readonly iconCssClass: string;
+    readonly theme: GaugeTheme;
+    readonly outer: BipolarArc;
+    readonly inner: BipolarArc;
+}
+
+export type GaugeData = RatioGauge | BipolarGauge;
 
 export async function getDashboardGauges(
     ctx: RequestContext,
@@ -115,6 +134,7 @@ export async function getDashboardGauges(
 
     return [
         {
+            kind: 'ratio',
             title: 'Time',
             icon: 'clock',
             iconCssClass: 'text-success',
@@ -136,6 +156,7 @@ export async function getDashboardGauges(
             isOverrunning: true,
         },
         {
+            kind: 'ratio',
             title: 'Cost',
             icon: 'dollarSign',
             iconCssClass: 'text-primary',
@@ -161,33 +182,25 @@ export async function getDashboardGauges(
             isOverrunning: true,
         },
         {
+            kind: 'bipolar',
             title: 'Impact',
             icon: 'zap',
             iconCssClass: 'text-warning',
             theme: 'amber',
             outer: {
-                value: Math.max(
-                    0,
-                    impact.baselineMean ?? 0,
-                ),
-                max: 100,
+                value: impact.baselineMean,
                 label: 'Baseline',
                 display: impactDisplay(
                     impact.baselineMean,
                 ),
             },
             inner: {
-                value: Math.max(
-                    0,
-                    impact.actualMean ?? 0,
-                ),
-                max: 100,
+                value: impact.actualMean,
                 label: 'Actual',
                 display: impactDisplay(
                     impact.actualMean,
                 ),
             },
-            isOverrunning: false,
         },
     ];
 }

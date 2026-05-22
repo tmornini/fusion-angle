@@ -106,9 +106,8 @@ export async function postProjectApproval(
     if (!v.ready) {
         throw new ProjectNotReadyError(v.problems);
     }
-    const { id: _id, ...body } = project;
     await postProjectStateChange(
-        ctx, projectId, body, 'approved',
+        ctx, projectId, 'approved',
     );
 }
 
@@ -128,8 +127,7 @@ export async function postProjectCompletion(
     if (!v.ready) {
         throw new ProjectNotReadyError(v.problems);
     }
-    const { id: _id, ...body } = project;
     await postProjectStateChange(
-        ctx, projectId, body, 'completed',
+        ctx, projectId, 'completed',
     );
 }

@@ -11,6 +11,7 @@ import {
     getProjectRows,
     getProjects,
     getProjectRow,
+    postProjectStateChange,
     putProject,
     ProjectView,
 } from '../web-app/app/adapters/projects.ts';
@@ -249,6 +250,52 @@ test(
         assert.equal(
             view.costCurrentK(),
             2000 / COST_DIVISOR,
+        );
+    },
+);
+
+async function seedCurrentWorker(
+    db: MemoryDbAdapter,
+): Promise<void> {
+    await db.workers.put('current', {
+        first_name: 'Demo',
+        last_name: 'User',
+        email: 'demo@example.com',
+        title: 'Admin',
+        department: 'Product',
+        strengths: '[]' as const,
+        team_dimensions: '{}' as const,
+        phone: '',
+        bio: '',
+    });
+    await db.states.record(
+        'st-current', 'current', 'active', 'system',
+    );
+}
+
+test(
+    'postProjectStateChange records a state event'
+    + ' without touching the project row',
+    async () => {
+        const { db, ctx } = setupDb();
+        await seedCurrentWorker(db);
+        await seedProject(
+            db, 'p1', 'Original', 'approved',
+        );
+        const before =
+            await db.projects.getById('p1');
+
+        await postProjectStateChange(
+            ctx, 'p1', 'completed',
+        );
+
+        const after =
+            await db.projects.getById('p1');
+        assert.deepEqual(after, before);
+        const events = await db.states.allFor('p1');
+        assert.equal(events.length, 2);
+        assert.equal(
+            events.at(-1)?.state, 'completed',
         );
     },
 );

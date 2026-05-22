@@ -448,22 +448,25 @@ async function saveHumanWorker(
     const stateChanged =
         s.draft.state !== s.worker.stateValue();
     try {
+        await putHumanWorker(
+            ctx, workerId, next,
+        );
         if (stateChanged) {
             await postHumanWorkerStateChange(
-                ctx, workerId, next, s.draft.state,
-            );
-        } else {
-            await putHumanWorker(
-                ctx, workerId, next,
+                ctx, workerId, s.draft.state,
             );
         }
     } catch (err) {
+        const detail = err instanceof Error
+            ? err.message
+            : String(err);
         log.error(
             'human worker save failed',
             'workers', err,
         );
         showToast(
-            'Failed to save worker', 'error',
+            `Failed to save worker: ${detail}`,
+            'error',
         );
         return;
     }

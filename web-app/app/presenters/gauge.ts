@@ -8,9 +8,11 @@ import {
     iconZap,
 } from '../icons.ts';
 import type {
+    BipolarArc,
     GaugeData,
     GaugeIcon,
     GaugeTheme,
+    RatioGauge,
 } from '../adapters/dashboard.ts';
 
 type GaugeTone =
@@ -39,116 +41,238 @@ const ICON_FNS: Record<
 
 const ARC_OUTER_R = 65;
 const ARC_INNER_R = 45;
-const OUTER_PATH_D = 'M 25 85 A 65 65 0 0 1 155 85';
-const INNER_PATH_D = 'M 45 85 A 45 45 0 0 1 135 85';
+const ARC_OUTER_HALF = Math.PI * ARC_OUTER_R / 2;
+const ARC_INNER_HALF = Math.PI * ARC_INNER_R / 2;
+const OUTER_PATH_D =
+    'M 25 85 A 65 65 0 0 1 155 85';
+const INNER_PATH_D =
+    'M 45 85 A 45 45 0 0 1 135 85';
+const OUTER_HALF_LEFT_D =
+    'M 90 20 A 65 65 0 0 0 25 85';
+const OUTER_HALF_RIGHT_D =
+    'M 90 20 A 65 65 0 0 1 155 85';
+const INNER_HALF_LEFT_D =
+    'M 90 40 A 45 45 0 0 0 45 85';
+const INNER_HALF_RIGHT_D =
+    'M 90 40 A 45 45 0 0 1 135 85';
 
-export class GaugePresenter {
-    readonly #data: GaugeData;
+interface SvgDims {
+    readonly width: number;
+    readonly height: number;
+}
 
-    constructor(data: GaugeData) {
-        this.#data = data;
+const SVG_DIMS: Record<
+    'large' | 'small',
+    SvgDims
+> = {
+    large: { width: 180, height: 95 },
+    small: { width: 100, height: 53 },
+};
+
+interface BipolarFill {
+    readonly half: 'left' | 'right' | 'none';
+    readonly offset: number;
+}
+
+function bipolarFill(
+    value: number | undefined,
+    halfArc: number,
+): BipolarFill {
+    if (value === undefined || value === 0) {
+        return { half: 'none', offset: 0 };
     }
+    const mag = Math.min(
+        100, Math.abs(value),
+    ) / 100;
+    return {
+        half: value < 0 ? 'left' : 'right',
+        offset: halfArc - mag * halfArc,
+    };
+}
 
-    render(): SafeHtml {
-        const elementId = this.#data.title
-            .replace(/\s+/g, '-')
-            .toLowerCase();
-        const tone =
-            THEME_TONE[this.#data.theme];
-        const iconFn =
-            ICON_FNS[this.#data.icon];
-        return html`
-    <div class="card gauge-card"
-        data-tone="${tone}">
-        <div class="${
-            'flex items-center gap-3 mb-5'
-        }">
-            <div class="icon-box"
-                data-tone="${tone}">
-                ${iconFn(
-                    20,
-                    this.#data.iconCssClass,
-                )}
-            </div>
-            <h3 class="${
-                'text-sm font-semibold'
-            }">${this.#data.title}</h3>
-        </div>
-        <div class="gauge-arc-container">
-            ${this.#renderSvgArcs(elementId)}
-        </div>
-        ${this.#renderLegend()}
-    </div>`;
-    }
+function buildBipolarGradient(
+    id: string,
+    side: 'left' | 'right',
+): SafeHtml {
+    const x1 = side === 'left' ? '100%' : '0%';
+    const x2 = side === 'left' ? '0%' : '100%';
+    const extreme = side === 'left'
+        ? 'hsl(var(--error))'
+        : 'hsl(var(--success))';
+    return html`
+                <linearGradient
+                    id="${id}"
+                    x1="${x1}" y1="0%"
+                    x2="${x2}" y2="0%">
+                    <stop offset="0%"
+                        stop-color="${
+                            'hsl(var(--warning))'
+                        }"
+                        stop-opacity="0.6"/>
+                    <stop offset="100%"
+                        stop-color="${extreme}"
+                        stop-opacity="1"/>
+                </linearGradient>`;
+}
 
-    #renderSvgArcs(
-        elementId: string,
-    ): SafeHtml {
-        const outer = this.#data.outer;
-        const inner = this.#data.inner;
-        const hasOverrun =
-            this.#data.isOverrunning;
-        const outerPct =
-            outer.max > 0
-                ? Math.min(
-                    (outer.value
-                        / outer.max)
-                        * 100,
-                    100,
-                )
-                : 0;
-        const innerPct =
-            inner.max > 0
-                ? Math.min(
-                    (inner.value
-                        / inner.max)
-                        * 100,
-                    100,
-                )
-                : 0;
-        const outerArc =
-            Math.PI * ARC_OUTER_R;
-        const innerArc =
-            Math.PI * ARC_INNER_R;
-        const isOverrun =
-            hasOverrun
-            && inner.value > inner.max;
-        const stop0 =
-            'hsl(var(--success))';
-        const stop1 = isOverrun
-            ? 'hsl(var(--error))'
-            : 'hsl(var(--success))';
+function buildBipolarFillPath(
+    fill: BipolarFill,
+    leftPathD: string,
+    rightPathD: string,
+    leftGradId: string,
+    rightGradId: string,
+    halfArc: number,
+): SafeHtml {
+    if (fill.half === 'none') return html``;
+    const d = fill.half === 'left'
+        ? leftPathD
+        : rightPathD;
+    const gradId = fill.half === 'left'
+        ? leftGradId
+        : rightGradId;
+    return html`
+            <path class="gauge-arc-bipolar-half"
+                d="${d}"
+                fill="none"
+                stroke="${
+                    'url(#' + gradId + ')'
+                }"
+                stroke-linecap="round"
+                stroke-dasharray="${halfArc}"
+                stroke-dashoffset="${fill.offset}"
+                style="${
+                    '--dash-full:' + halfArc
+                }"/>`;
+}
 
-        let innerClass = 'gauge-arc-inner';
-        let innerStyle =
-            '--dash-full:' + innerArc;
-        if (
-            hasOverrun
-            && inner.max > 0
-        ) {
-            const ratio =
-                inner.value / inner.max;
-            if (ratio > 1.5) {
-                const dur = Math.max(
-                    0.333,
-                    1 - (ratio - 1.5)
-                        * 0.667,
-                );
-                innerClass += ' overrun';
-                innerStyle +=
-                    ';--flash-speed:'
-                    + dur.toFixed(3) + 's';
-            }
+export function buildBipolarGaugeSvg(
+    outer: BipolarArc,
+    inner: BipolarArc,
+    elementId: string,
+    size: 'large' | 'small',
+): SafeHtml {
+    const outerFill = bipolarFill(
+        outer.value, ARC_OUTER_HALF,
+    );
+    const innerFill = bipolarFill(
+        inner.value, ARC_INNER_HALF,
+    );
+    const dims = SVG_DIMS[size];
+    const ol = 'outer-left-' + elementId;
+    const or = 'outer-right-' + elementId;
+    const il = 'inner-left-' + elementId;
+    const ir = 'inner-right-' + elementId;
+    return html`
+        <svg width="${dims.width}"
+            height="${dims.height}"
+            viewBox="0 0 180 95"
+            class="overflow-visible"
+            data-size="${size}">
+            <defs>
+                ${buildBipolarGradient(ol, 'left')}
+                ${buildBipolarGradient(or, 'right')}
+                ${buildBipolarGradient(il, 'left')}
+                ${buildBipolarGradient(ir, 'right')}
+            </defs>
+            <path class="gauge-arc-track"
+                d="${OUTER_PATH_D}"
+                fill="none"
+                stroke="${
+                    'hsl(var(--muted))'
+                }"
+                stroke-linecap="round"
+                opacity="0.3"/>
+            ${buildBipolarFillPath(
+                outerFill,
+                OUTER_HALF_LEFT_D,
+                OUTER_HALF_RIGHT_D,
+                ol, or, ARC_OUTER_HALF,
+            )}
+            <path class="gauge-arc-track"
+                d="${INNER_PATH_D}"
+                fill="none"
+                stroke="${
+                    'hsl(var(--muted))'
+                }"
+                stroke-linecap="round"
+                opacity="0.3"/>
+            ${buildBipolarFillPath(
+                innerFill,
+                INNER_HALF_LEFT_D,
+                INNER_HALF_RIGHT_D,
+                il, ir, ARC_INNER_HALF,
+            )}
+        </svg>`;
+}
+
+function buildRatioGaugeSvg(
+    data: RatioGauge,
+    elementId: string,
+): SafeHtml {
+    const outer = data.outer;
+    const inner = data.inner;
+    const hasOverrun = data.isOverrunning;
+    const outerPct =
+        outer.max > 0
+            ? Math.min(
+                (outer.value
+                    / outer.max)
+                    * 100,
+                100,
+            )
+            : 0;
+    const innerPct =
+        inner.max > 0
+            ? Math.min(
+                (inner.value
+                    / inner.max)
+                    * 100,
+                100,
+            )
+            : 0;
+    const outerArc =
+        Math.PI * ARC_OUTER_R;
+    const innerArc =
+        Math.PI * ARC_INNER_R;
+    const isOverrun =
+        hasOverrun
+        && inner.value > inner.max;
+    const stop0 =
+        'hsl(var(--success))';
+    const stop1 = isOverrun
+        ? 'hsl(var(--error))'
+        : 'hsl(var(--success))';
+
+    let innerClass = 'gauge-arc-inner';
+    let innerStyle =
+        '--dash-full:' + innerArc;
+    if (
+        hasOverrun
+        && inner.max > 0
+    ) {
+        const ratio =
+            inner.value / inner.max;
+        if (ratio > 1.5) {
+            const dur = Math.max(
+                0.333,
+                1 - (ratio - 1.5)
+                    * 0.667,
+            );
+            innerClass += ' overrun';
+            innerStyle +=
+                ';--flash-speed:'
+                + dur.toFixed(3) + 's';
         }
+    }
 
-        const outerOff =
-            outerArc
-            - (outerPct / 100) * outerArc;
-        const innerOff =
-            innerArc
-            - (innerPct / 100) * innerArc;
+    const outerOff =
+        outerArc
+        - (outerPct / 100) * outerArc;
+    const innerOff =
+        innerArc
+        - (innerPct / 100) * innerArc;
 
-        return html`
+    return html`
         <svg width="180" height="95"
             viewBox="0 0 180 95"
             class="overflow-visible">
@@ -246,6 +370,54 @@ export class GaugePresenter {
                 }"
                 style="${innerStyle}"/>
         </svg>`;
+}
+
+export class GaugePresenter {
+    readonly #data: GaugeData;
+
+    constructor(data: GaugeData) {
+        this.#data = data;
+    }
+
+    render(): SafeHtml {
+        const data = this.#data;
+        const elementId = data.title
+            .replace(/\s+/g, '-')
+            .toLowerCase();
+        const tone = THEME_TONE[data.theme];
+        const iconFn = ICON_FNS[data.icon];
+        const svgArcs = data.kind === 'ratio'
+            ? buildRatioGaugeSvg(
+                data, elementId,
+            )
+            : buildBipolarGaugeSvg(
+                data.outer,
+                data.inner,
+                elementId,
+                'large',
+            );
+        return html`
+    <div class="card gauge-card"
+        data-tone="${tone}">
+        <div class="${
+            'flex items-center gap-3 mb-5'
+        }">
+            <div class="icon-box"
+                data-tone="${tone}">
+                ${iconFn(
+                    20,
+                    data.iconCssClass,
+                )}
+            </div>
+            <h3 class="${
+                'text-sm font-semibold'
+            }">${data.title}</h3>
+        </div>
+        <div class="gauge-arc-container">
+            ${svgArcs}
+        </div>
+        ${this.#renderLegend()}
+    </div>`;
     }
 
     #renderLegend(): SafeHtml {

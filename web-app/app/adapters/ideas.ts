@@ -179,16 +179,16 @@ export async function putIdea(
     ideaChanges.notify();
 }
 
-// Idea-row write paired with a states-log event in
-// one ctx.commit batch. Use at every site that
-// creates an idea or moves its state. putIdea
-// remains for writes (edits, position reorders)
-// that do not change state.
-export async function postIdeaStateChange(
+// Idea creation: row + initial state event in one
+// ctx.commit batch. Use only at the create call site;
+// transitions of an existing idea go through
+// postIdeaStateChange. putIdea remains for entity
+// edits (title, position) that do not change state.
+export async function postIdeaCreation(
     ctx: RequestContext,
     id: string,
     entity: Omit<IdeaEntity, 'id'>,
-    state: IdeaState,
+    initialState: IdeaState,
 ): Promise<void> {
     const ideaBody =
         entity as unknown as Record<string, unknown>;
@@ -199,6 +199,26 @@ export async function postIdeaStateChange(
                 resource: `ideas/${id}`,
                 body: ideaBody,
             },
+            await buildStateEventOp(
+                ctx, id, initialState,
+            ),
+        ],
+    });
+    ideaChanges.notify();
+}
+
+// State transition for an existing idea: one state
+// event, nothing else. The entity row is untouched —
+// per the doctrine "every state is an event; the
+// latest event is the truth", lifecycle stage is the
+// log, not a column on the row.
+export async function postIdeaStateChange(
+    ctx: RequestContext,
+    id: string,
+    state: IdeaState,
+): Promise<void> {
+    await ctx.commit({
+        ops: [
             await buildStateEventOp(
                 ctx, id, state,
             ),

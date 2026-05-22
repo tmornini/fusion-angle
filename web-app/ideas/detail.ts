@@ -101,17 +101,22 @@ async function transitionIdea(
     if (!state) return;
     const ctx = createRequestContext();
     const cfg = TRANSITION_CONFIG[toState]!;
-    const entity = state.view.entity;
     try {
         await postIdeaStateChange(
-            ctx, ideaId, entity, toState,
+            ctx, ideaId, toState,
         );
     } catch (err) {
+        const detail = err instanceof Error
+            ? err.message
+            : String(err);
         log.error(
             'postIdeaStateChange failed',
             'ideas', err,
         );
-        showToast(cfg.failureToast, 'error');
+        showToast(
+            `${cfg.failureToast}: ${detail}`,
+            'error',
+        );
         return;
     }
     showToast(

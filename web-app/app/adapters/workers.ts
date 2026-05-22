@@ -123,19 +123,15 @@ export async function putHumanWorker(
     humanWorkerChanges.notify();
 }
 
-// Human-worker row write paired with a states-log
-// event in one ctx.commit batch. Use at every site
-// that creates a worker or moves its lifecycle
-// state. putHumanWorker remains for pure edits
-// (phone, bio, title) that do not change state.
-// Stage 10b+c: the states log is now the sole
-// source of worker state; the row carries no
-// status column.
-export async function postHumanWorkerStateChange(
+// Human-worker creation: row + initial state event
+// in one ctx.commit batch. Use only at the Add
+// Worker call site; transitions of an existing
+// worker go through postHumanWorkerStateChange.
+export async function postHumanWorkerCreation(
     ctx: RequestContext,
     id: string,
     entity: Omit<HumanWorkerEntity, 'id'>,
-    state: WorkerState,
+    initialState: WorkerState,
 ): Promise<void> {
     const workerBody =
         entity as unknown as Record<string, unknown>;
@@ -146,6 +142,28 @@ export async function postHumanWorkerStateChange(
                 resource: `workers/${id}`,
                 body: workerBody,
             },
+            await buildStateEventOp(
+                ctx, id, initialState,
+            ),
+        ],
+    });
+    humanWorkerChanges.notify();
+}
+
+// State transition for an existing human worker:
+// one state event, nothing else. The row is
+// untouched — per the doctrine "every state is an
+// event; the latest event is the truth", lifecycle
+// stage is the log, not a column. Pair with
+// putHumanWorker in sequence when a caller needs
+// both an entity edit and a transition.
+export async function postHumanWorkerStateChange(
+    ctx: RequestContext,
+    id: string,
+    state: WorkerState,
+): Promise<void> {
+    await ctx.commit({
+        ops: [
             await buildStateEventOp(ctx, id, state),
         ],
     });

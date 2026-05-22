@@ -707,20 +707,23 @@ async function handleSave(): Promise<void> {
     const stateChanged =
         patch.state !== state.view.stateValue();
     try {
+        await putProject(ctx, projectId, next);
         if (stateChanged) {
             await postProjectStateChange(
-                ctx, projectId, next, patch.state,
+                ctx, projectId, patch.state,
             );
-        } else {
-            await putProject(ctx, projectId, next);
         }
     } catch (err) {
+        const detail = err instanceof Error
+            ? err.message
+            : String(err);
         log.error(
             'project save failed',
             'projects', err,
         );
         showToast(
-            'Failed to save project', 'error',
+            `Failed to save project: ${detail}`,
+            'error',
         );
         return;
     }

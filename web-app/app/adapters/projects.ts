@@ -248,26 +248,20 @@ export async function putProject(
     projectChanges.notify();
 }
 
-// Project-row write paired with a states-log event
-// in one ctx.commit batch. Use at every site that
-// creates a project or moves its state. putProject
-// remains for writes (pure edits, position reorders)
-// that do not change state.
+// State transition for an existing project: one
+// state event, nothing else. Per the doctrine
+// "every state is an event; the latest event is the
+// truth", lifecycle stage is the log, not a column
+// on the row. Pair with putProject in sequence
+// when a caller needs both an entity edit and a
+// transition (e.g., the project edit form).
 export async function postProjectStateChange(
     ctx: RequestContext,
     id: string,
-    entity: Omit<ProjectEntity, 'id'>,
     state: ProjectState,
 ): Promise<void> {
-    const projectBody =
-        entity as unknown as Record<string, unknown>;
     await ctx.commit({
         ops: [
-            {
-                method: 'put',
-                resource: `projects/${id}`,
-                body: projectBody,
-            },
             await buildStateEventOp(
                 ctx, id, state,
             ),

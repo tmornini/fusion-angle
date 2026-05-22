@@ -28,12 +28,14 @@
 
 .gauge-arc-track,
 .gauge-arc-outer,
-.gauge-arc-inner {
+.gauge-arc-inner,
+.gauge-arc-bipolar-half {
   stroke-width: var(--gauge-stroke-width);
 }
 
 .gauge-arc-outer,
-.gauge-arc-inner {
+.gauge-arc-inner,
+.gauge-arc-bipolar-half {
   animation: gauge-draw var(--duration-pulse)
     ease-out;
 }
@@ -61,6 +63,20 @@
     align-items: center;
     gap: 0.8em;
     padding: 0.4em 0;
+}
+
+/* DashboardObjectiveAggregates rows swap the
+   horizontal bipolar bar for the small bipolar
+   gauge; the cell narrows to fit the gauge. */
+.objective-aggregates-card .score-row {
+    grid-template-columns:
+        140px 110px 50px 50px auto;
+}
+
+.score-row-gauge {
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
 
 .score-row[data-empty='true'] {

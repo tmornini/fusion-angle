@@ -8,6 +8,7 @@ import {
     toneForScore,
 } from '../scoring-format.ts';
 import { DISPLAY_ABSENT } from '../format.ts';
+import { buildBipolarGaugeSvg } from './gauge.ts';
 
 interface Definition {
     name: string;
@@ -87,16 +88,20 @@ export class DashboardObjectiveAggregatesPresenter {
             ? agg.baselineMean : undefined;
         const actual = agg
             ? agg.latestActualMean : undefined;
-        const hasBaseline = baseline !== undefined;
-        const hasActual = actual !== undefined;
-        const styleParts: string[] = [];
-        if (hasBaseline) {
-            styleParts.push(`--baseline:${baseline}`);
-        }
-        if (hasActual) {
-            styleParts.push(`--actual:${actual}`);
-        }
-        const barStyle = styleParts.join(';');
+        const gauge = buildBipolarGaugeSvg(
+            {
+                value: baseline,
+                label: 'Baseline',
+                display: displaySigned(baseline),
+            },
+            {
+                value: actual,
+                label: 'Actual',
+                display: displaySigned(actual),
+            },
+            'objective-' + o.id,
+            'small',
+        );
         return html`
             <li class="score-row"
                 data-objective-id="${o.id}"
@@ -104,11 +109,8 @@ export class DashboardObjectiveAggregatesPresenter {
                 <span class="score-row-label">
                     ${def.name}
                 </span>
-                <span class="bipolar-bar"
-                    data-tone="${toneFor(baseline)}"
-                    data-has-baseline="${hasBaseline}"
-                    data-has-actual="${hasActual}"
-                    style="${barStyle}">
+                <span class="score-row-gauge">
+                    ${gauge}
                 </span>
                 <strong class="score-row-baseline"
                     data-tone="${toneFor(baseline)}">

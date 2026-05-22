@@ -9,7 +9,7 @@ import { navigateTo } from '../app/core.ts';
 import {
     createRequestContext,
     getIdeaRows,
-    postIdeaStateChange,
+    postIdeaCreation,
     putIdeaSubmission,
     generateCryptoSafeBase62,
 } from '../app/adapters/index.ts';
@@ -139,7 +139,7 @@ export async function init():
                 const position = nextPosition(
                     existing.map(r => r.position),
                 );
-                await postIdeaStateChange(
+                await postIdeaCreation(
                     ctx,
                     ideaId,
                     {
