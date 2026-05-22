@@ -1164,3 +1164,15 @@ export function projectStateIsApproved(
     return state === 'approved';
 }
 
+export function projectStateIsScorable(
+    state: ProjectState,
+): boolean {
+    return state === 'under-review';
+}
+
+export function projectStateAllowsMeasurement(
+    state: ProjectState,
+): boolean {
+    return state === 'approved';
+}
+

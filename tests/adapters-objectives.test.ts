@@ -77,7 +77,7 @@ test('getObjectiveRevisions returns all for an objective',
             'o1:2026-05-14T00:00:00.000Z',
             {
                 objective_id: 'o1',
-                name: 'Revenue',
+                name: 'Income',
                 description: 'd',
                 at: '2026-05-14T00:00:00.000Z',
             },
@@ -86,7 +86,7 @@ test('getObjectiveRevisions returns all for an objective',
             'o1:2026-05-15T00:00:00.000Z',
             {
                 objective_id: 'o1',
-                name: 'Revenue Growth',
+                name: 'Increase incomes',
                 description: 'd2',
                 at: '2026-05-15T00:00:00.000Z',
             },
@@ -95,7 +95,7 @@ test('getObjectiveRevisions returns all for an objective',
             'o2:2026-05-14T00:00:00.000Z',
             {
                 objective_id: 'o2',
-                name: 'Cost',
+                name: 'Expense',
                 description: 'd',
                 at: '2026-05-14T00:00:00.000Z',
             },
@@ -180,13 +180,13 @@ test('postObjectiveCreation writes objective + revision',
         const db = new MemoryDbAdapter();
         const ctx = ctxFor(db);
         await postObjectiveCreation(
-            ctx, 'o1', 'Revenue', 'Top line', 0,
+            ctx, 'o1', 'Income', 'Top line', 0,
         );
         const o = await db.objectives.getById('o1');
         assert.equal(o.id, 'o1');
         const revs = await db.objectiveRevisions.getAll();
         assert.equal(revs.length, 1);
-        assert.equal(revs[0]!.name, 'Revenue');
+        assert.equal(revs[0]!.name, 'Income');
     });
 
 test('postObjectiveRevision appends a revision row',
@@ -194,10 +194,10 @@ test('postObjectiveRevision appends a revision row',
         const db = new MemoryDbAdapter();
         const ctx = ctxFor(db);
         await postObjectiveCreation(
-            ctx, 'o1', 'Revenue', 'd1', 0,
+            ctx, 'o1', 'Income', 'd1', 0,
         );
         await postObjectiveRevision(
-            ctx, 'o1', 'Revenue Growth', 'd2',
+            ctx, 'o1', 'Increase incomes', 'd2',
         );
         const revs = await db.objectiveRevisions.getAll();
         assert.equal(revs.length, 2);
@@ -209,7 +209,7 @@ test('postObjectiveDeprecation deprecates an objective',
         await seedCurrentWorker(db);
         const ctx = ctxFor(db);
         await postObjectiveCreation(
-            ctx, 'o1', 'Revenue', 'd', 0,
+            ctx, 'o1', 'Income', 'd', 0,
         );
         await postObjectiveDeprecation(ctx, 'o1');
         const ids = await getDeprecatedObjectiveIds(ctx);

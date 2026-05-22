@@ -126,8 +126,8 @@ test('sent-back project: Score button hidden, other review actions shown',
 test('Approve tooltip enumerates unscored objective names',
     () => {
         const names = new Map([
-            ['o1', 'Revenue Growth'],
-            ['o2', 'Customer Satisfaction'],
+            ['o1', 'Increase incomes'],
+            ['o2', 'Raise customer NPS'],
         ]);
         const p = new ProjectActionBarPresenter(
             PROJECT_ID, 'under-review',
@@ -146,8 +146,8 @@ test('Approve tooltip enumerates unscored objective names',
         const html = p.buildBar().toString();
         assert.ok(
             html.includes(
-                'title="Revenue Growth, '
-                + 'Customer Satisfaction unscored"',
+                'title="Increase incomes, '
+                + 'Raise customer NPS unscored"',
             ),
             'Approve tooltip should enumerate'
             + ' unscored objective names',
@@ -157,7 +157,7 @@ test('Approve tooltip enumerates unscored objective names',
 test('Complete tooltip enumerates objectives lacking actuals',
     () => {
         const names = new Map([
-            ['o1', 'Team Wellbeing'],
+            ['o1', 'Improve employee morale'],
         ]);
         const p = new ProjectActionBarPresenter(
             PROJECT_ID, 'approved',
@@ -174,7 +174,7 @@ test('Complete tooltip enumerates objectives lacking actuals',
         const html = p.buildBar().toString();
         assert.ok(
             html.includes(
-                'title="Team Wellbeing'
+                'title="Improve employee morale'
                 + ' lack actual measurements"',
             ),
             'Complete tooltip should enumerate'

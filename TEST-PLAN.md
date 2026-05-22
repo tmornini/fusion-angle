@@ -395,14 +395,14 @@ on. Run these in order.
   PASS: edited Domain persists with saved value, card is
   back in read mode.
 - [ ] **AA-Obj** On the Organization page, locate the
-  Objectives box. Click `+ Add objective` five times,
-  creating in order: "Revenue Growth", "Cost Reduction",
-  "Customer Satisfaction", "Team Wellbeing", "Operational
-  Efficiency". PASS: all five appear in the active list
-  in the order created. End-state delivered to Phase 2:
-  5 active objectives — required by Agent-E's K9–K23
-  scoring lifecycle, which has a read-dependency on the
-  Organization Objectives produced here.
+  Objectives box. Click `+ Add objective` four times,
+  creating in order: "Lower expenses", "Increase incomes",
+  "Raise customer NPS", "Improve employee morale". PASS:
+  all four appear in the active list in the order created.
+  End-state delivered to Phase 2: 4 active objectives —
+  required by Agent-E's K9–K23 scoring lifecycle, which
+  has a read-dependency on the Organization Objectives
+  produced here.
 
 ### AA4. Create Ideas
 
@@ -646,7 +646,7 @@ on. Run these in order.
   surfaces (2 gauges + Portfolio Impact card + Aggregate
   Objectives box). PASS: no "No data" empty states on
   initial load against the Phase 1 baseline (10 humans,
-  4 AIs, 11 ideas, 6 projects, 1 flow, 5 objectives).
+  4 AIs, 11 ideas, 6 projects, 1 flow, 4 objectives).
 
 ---
 
@@ -1810,8 +1810,8 @@ seven Phase 2 agents.
 
 **K1.** Open Organization page; confirm Objectives box
 renders below the existing Overview/Usage/Admin cards with
-5 seeded active objectives in position order. PASS if all
-5 names display.
+4 seeded active objectives in position order. PASS if all
+4 names display.
 
 **K2.** Click `+ Add objective`; confirm modal opens. Enter
 name "Test Objective" and description "Test desc"; click

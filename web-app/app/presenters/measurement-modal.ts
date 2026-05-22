@@ -1,12 +1,16 @@
 import { html, type SafeHtml } from '../safe-html.ts';
 import { formatDate } from '../format.ts';
 import { latestPerPair } from '../scoring-format.ts';
-import type {
-    ProjectEntity,
-    ObjectiveId,
-    ProjectObjectiveBaselineScore,
-    ProjectObjectiveActualScore,
+import {
+    type ProjectEntity,
+    type ProjectState,
+    type ObjectiveId,
+    type ProjectObjectiveBaselineScore,
+    type ProjectObjectiveActualScore,
+    PROJECT_STATE_CONFIG,
+    projectStateAllowsMeasurement,
 } from '../../../api/types.ts';
+import { iconInfo } from '../icons.ts';
 
 interface Definition {
     name: string;
@@ -25,6 +29,7 @@ interface RowData {
 
 export class MeasurementModalPresenter {
     readonly #project: ProjectEntity;
+    readonly #state: ProjectState;
     readonly #defs: Map<ObjectiveId, Definition>;
     readonly #latestBaselines:
         ProjectObjectiveBaselineScore[];
@@ -33,11 +38,13 @@ export class MeasurementModalPresenter {
 
     constructor(
         project: ProjectEntity,
+        state: ProjectState,
         defs: Map<ObjectiveId, Definition>,
         latestBaselines: ProjectObjectiveBaselineScore[],
         latestActuals: ProjectObjectiveActualScore[],
     ) {
         this.#project = project;
+        this.#state = state;
         this.#defs = defs;
         this.#latestBaselines = latestBaselines;
         this.#latestActuals = latestActuals;
@@ -45,6 +52,13 @@ export class MeasurementModalPresenter {
 
     buildBody(): SafeHtml {
         const rows = this.#buildRows();
+        if (!projectStateAllowsMeasurement(this.#state)) {
+            return this.#buildGatedBody(rows);
+        }
+        return this.#buildActiveBody(rows);
+    }
+
+    #buildActiveBody(rows: RowData[]): SafeHtml {
         return html`
             <div class="measurement-modal-body">
                 <h3>Log measurement: ${
@@ -53,7 +67,7 @@ export class MeasurementModalPresenter {
                     Record current actual scores. Untouched
                     sliders are not recorded.
                 </p>
-                ${rows.map(r => this.#row(r))}
+                ${rows.map(r => this.#row(r, false))}
                 <div class="modal-actions">
                     <button data-action="cancel">
                         Cancel
@@ -61,6 +75,35 @@ export class MeasurementModalPresenter {
                     <button data-action="save-measurement"
                         class="btn-primary">
                         Save measurement
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
+    #buildGatedBody(rows: RowData[]): SafeHtml {
+        const stateLabel =
+            PROJECT_STATE_CONFIG[this.#state].label;
+        return html`
+            <div class="measurement-modal-body">
+                <h3>Log measurement: ${
+                    this.#project.title}</h3>
+                <div class="empty-banner"
+                    data-tone="warning">
+                    <span class="empty-banner-icon">
+                        ${iconInfo(20, '')}
+                    </span>
+                    <p class="text-sm m-0">
+                        Logging measurements is only
+                        available after the project is
+                        approved. The project is
+                        currently ${stateLabel}.
+                    </p>
+                </div>
+                ${rows.map(r => this.#row(r, true))}
+                <div class="modal-actions">
+                    <button data-action="cancel">
+                        Close
                     </button>
                 </div>
             </div>
@@ -101,7 +144,7 @@ export class MeasurementModalPresenter {
         return rows;
     }
 
-    #row(r: RowData): SafeHtml {
+    #row(r: RowData, disabled: boolean): SafeHtml {
         const actualText =
             r.latestActualScore !== undefined
             && r.latestActualAt !== undefined
@@ -111,7 +154,8 @@ export class MeasurementModalPresenter {
         return html`
             <div class="measurement-slider-row"
                 data-objective-id="${r.objectiveId}"
-                data-initial-value="${r.preFillValue}">
+                data-initial-value="${r.preFillValue}"
+                aria-disabled="${disabled}">
                 <label>
                     <strong>${r.name}</strong>
                     <span class="meta">
@@ -120,7 +164,8 @@ export class MeasurementModalPresenter {
                 </label>
                 <input type="range" min="-100" max="100"
                     step="1" value="${r.preFillValue}"
-                    data-objective-id="${r.objectiveId}">
+                    data-objective-id="${r.objectiveId}"
+                    ${disabled ? 'disabled' : ''}>
                 <span class="measurement-value">
                     ${r.preFillValue}
                 </span>

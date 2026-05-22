@@ -12,11 +12,11 @@ import {
     getDeprecatedObjectiveIds,
 } from '../web-app/app/adapters/objectives.ts';
 
-test('populateMockData seeds 5 objectives', async () => {
+test('populateMockData seeds 4 objectives', async () => {
     const db = new MemoryDbAdapter();
     await populateMockData(db);
     const rows = await db.objectives.getAll();
-    assert.equal(rows.length, 5);
+    assert.equal(rows.length, 4);
     for (const r of rows) {
         const { id: _id, ...body } = r;
         validateObjectiveEntity(body);
@@ -29,7 +29,7 @@ test('populateMockData seeds one revision per objective',
         await populateMockData(db);
         const revs =
             await db.objectiveRevisions.getAll();
-        assert.equal(revs.length, 5);
+        assert.equal(revs.length, 4);
         for (const r of revs) {
             const { id: _id, ...body } = r;
             validateObjectiveRevisionEntity(body);

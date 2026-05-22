@@ -11,8 +11,8 @@ const deprecatedObjs = [
     { id: 'o3', position: 99 },
 ];
 const defs = new Map([
-    ['o1', { name: 'Revenue Growth', description: 'd1' }],
-    ['o2', { name: 'Cost Reduction', description: 'd2' }],
+    ['o1', { name: 'Increase incomes', description: 'd1' }],
+    ['o2', { name: 'Lower expenses', description: 'd2' }],
     ['o3', { name: 'Old Quarterly', description: 'd3' }],
 ]);
 const deprecatedAt = new Map([
@@ -25,8 +25,8 @@ test('renders active section with each active objective',
             activeObjs, deprecatedObjs, defs, deprecatedAt,
         );
         const html = p.buildBox().toString();
-        assert.ok(html.includes('Revenue Growth'));
-        assert.ok(html.includes('Cost Reduction'));
+        assert.ok(html.includes('Increase incomes'));
+        assert.ok(html.includes('Lower expenses'));
         assert.ok(html.includes('data-objective-id="o1"'));
         assert.ok(html.includes('data-objective-id="o2"'));
     });

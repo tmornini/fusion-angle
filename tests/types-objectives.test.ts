@@ -17,8 +17,8 @@ test('Objective shape compiles', () => {
 test('ObjectiveRevision shape compiles', () => {
     const v: ObjectiveRevision = {
         objective_id: 'o1',
-        name: 'Revenue Growth',
-        description: 'Drive top-line growth',
+        name: 'Increase incomes',
+        description: 'Grow top-line through new channels',
         at: '2026-05-14T00:00:00.000Z',
     };
     assert.equal(v.objective_id, 'o1');

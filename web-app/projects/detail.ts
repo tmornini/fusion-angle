@@ -16,6 +16,7 @@ import {
 import {
     getProject,
     getProjectRow,
+    getProjectState,
     ProjectView,
     putProject,
     postProjectStateChange,
@@ -834,11 +835,10 @@ async function openScoreModal(
     ctx: RequestContext,
     projectId: string,
 ): Promise<void> {
-    const [project, active, scoring] =
+    const [project, state, active, scoring] =
         await Promise.all([
-            ctx.GET<ProjectEntity>(
-                `projects/${projectId}`,
-            ),
+            getProjectRow(ctx, projectId),
+            getProjectState(ctx, projectId),
             getActiveObjectives(ctx),
             getProjectScoring(ctx, projectId),
         ]);
@@ -854,7 +854,7 @@ async function openScoreModal(
         );
     }
     const presenter = new ScoreModalPresenter(
-        project, active, defs, scoring.baseline,
+        project, state, active, defs, scoring.baseline,
     );
     const bodyEl = $('#score-modal-body', document);
     if (bodyEl) {
@@ -886,12 +886,12 @@ async function openMeasurementModal(
     ctx: RequestContext,
     projectId: string,
 ): Promise<void> {
-    const [project, scoring] = await Promise.all([
-        ctx.GET<ProjectEntity>(
-            `projects/${projectId}`,
-        ),
-        getProjectScoring(ctx, projectId),
-    ]);
+    const [project, state, scoring] =
+        await Promise.all([
+            getProjectRow(ctx, projectId),
+            getProjectState(ctx, projectId),
+            getProjectScoring(ctx, projectId),
+        ]);
     const defs = new Map<string, {
         name: string; description: string;
     }>();
@@ -908,7 +908,7 @@ async function openMeasurementModal(
         );
     }
     const presenter = new MeasurementModalPresenter(
-        project, defs,
+        project, state, defs,
         scoring.baseline, scoring.actual,
     );
     const bodyEl =

@@ -391,37 +391,28 @@ export const OBJECTIVE_SEEDS: Array<{
     description: string;
 }> = [
     {
-        id: 'RgT2mNvKpQ8xLsYwBzHcUe',
+        id: 'JkW7aEqFdX3nOiPtVhMrCy',
         position: 1,
-        name: 'Revenue Growth',
-        description:
-            'Drive sustainable top-line growth',
+        name: 'Lower expenses',
+        description: 'Reduce operational outlay across the business',
     },
     {
-        id: 'JkW7aEqFdX3nOiPtVhMrCy',
+        id: 'RgT2mNvKpQ8xLsYwBzHcUe',
         position: 2,
-        name: 'Cost Reduction',
-        description: 'Minimize operational waste',
+        name: 'Increase incomes',
+        description: 'Grow top-line through new and existing channels',
     },
     {
         id: 'bDf6uStZlA9eGmYjIoNcWq',
         position: 3,
-        name: 'Customer Satisfaction',
-        description: 'Improve user-perceived value',
+        name: 'Raise customer NPS',
+        description: 'Lift Net Promoter Score across the journey',
     },
     {
         id: 'CvH4wRnXkU1pQsBgTyEzMo',
         position: 4,
-        name: 'Team Wellbeing',
-        description:
-            'Sustainable, energizing work',
-    },
-    {
-        id: 'hL8iFjOdAe5rKtPmVcBwGx',
-        position: 5,
-        name: 'Operational Efficiency',
-        description:
-            'Reduce friction in delivery',
+        name: 'Improve employee morale',
+        description: 'Make daily work energizing and sustainable',
     },
 ];
 

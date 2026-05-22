@@ -8,8 +8,8 @@ const activeObjs = [
     { id: 'o2', position: 1 },
 ];
 const defs = new Map([
-    ['o1', { name: 'Revenue Growth', description: 'd1' }],
-    ['o2', { name: 'Cost Reduction', description: 'd2' }],
+    ['o1', { name: 'Increase incomes', description: 'd1' }],
+    ['o2', { name: 'Lower expenses', description: 'd2' }],
 ]);
 const aggregates = [
     { objectiveId: 'o1',
@@ -28,8 +28,8 @@ test('renders one row per active objective', () => {
         activeObjs, defs, aggregates,
     );
     const html = p.buildCard().toString();
-    assert.ok(html.includes('Revenue Growth'));
-    assert.ok(html.includes('Cost Reduction'));
+    assert.ok(html.includes('Increase incomes'));
+    assert.ok(html.includes('Lower expenses'));
 });
 
 test('row with contributors shows means and counts',
