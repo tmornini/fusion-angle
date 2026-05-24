@@ -207,11 +207,6 @@ export async function postIdeaCreation(
     ideaChanges.notify();
 }
 
-// State transition for an existing idea: one state
-// event, nothing else. The entity row is untouched —
-// per the doctrine "every state is an event; the
-// latest event is the truth", lifecycle stage is the
-// log, not a column on the row.
 export async function postIdeaStateChange(
     ctx: RequestContext,
     id: string,

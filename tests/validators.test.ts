@@ -600,7 +600,7 @@ const baseNode = {
     positionY: 0,
     isCreate: false,
     isArchive: false,
-    fields: [],
+    attributes: [],
 };
 
 test(

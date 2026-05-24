@@ -39,15 +39,17 @@ import {
     performAddNodeAtPosition,
     performDeleteSelectedNodes,
     performDeleteSelectedEdge,
-    performAddField,
-    performDeleteField,
+    performAddAttributeRef,
+    performRemoveAttributeRef,
+    performUpdateAttributeMode,
+    performUpdateAttributeRequired,
     performUndo,
     performRedo,
 } from '../web-app/app/flow-operations.ts';
 import type {
     GraphNode,
     GraphEdge,
-    GraphField,
+    NodeAttribute,
     StoredGraph,
 } from '../api/types.ts';
 import {
@@ -74,7 +76,7 @@ function buildNode(
         isCreate: false,
         isArchive: false,
         workerIds: [],
-        fields: [],
+        attributes: [],
         ...overrides,
     };
 }
@@ -93,16 +95,15 @@ function buildEdge(
     };
 }
 
-function buildField(
-    id: string,
-): GraphField {
+function buildAttributeRef(
+    attributeId: string,
+    overrides?: Partial<NodeAttribute>,
+): NodeAttribute {
     return {
-        id,
-        name: id,
-        fieldType: 'text',
-        sortOrder: 0,
+        attribute_id: attributeId,
+        mode: 'editable',
         isRequired: false,
-        options: [],
+        ...overrides,
     };
 }
 
@@ -145,7 +146,7 @@ function buildFlowVersion(
 
 function snapFrom(graph: FlowGraph): FlowSnapshot {
     return buildInitialFlowSnapshot(
-        graph, 800, 600, new Map(),
+        graph, 800, 600, [], [], [],
     );
 }
 
@@ -783,185 +784,98 @@ test(
     },
 );
 
-// -- performAddField --------------------------
+// -- performAddAttributeRef -------------------
 
 test(
-    'performAddField: appends a trimmed field at'
-    + ' the next sort order',
-    async () => {
-        const { db } = await setupFlow();
-        const base = snapFrom(buildGraph([
-            buildNode('a', {
-                fields: [buildField('f0')],
-            }),
-        ]));
-        const op = await performAddField(
-            db, withNodeSelection(base, 'a'),
-            '  Priority  ', 'text', true,
-            ['low', 'high'],
-        );
-        assert.equal(op.kind, 'ok');
-        if (op.kind !== 'ok') return;
-        assert.equal(op.nodeId, 'a');
-        assert.equal(op.field.name, 'Priority');
-        assert.equal(op.field.sortOrder, 1);
-        assert.equal(op.field.isRequired, true);
-        assert.deepEqual(
-            op.field.options, ['low', 'high'],
-        );
-        assert.equal(op.advanceHistory, true);
-    },
-);
-
-test(
-    'performAddField: locked flow fails',
+    'performAddAttributeRef: appends a ref to the'
+    + ' single selected node',
     async () => {
         const { db } = await setupFlow();
         const base = snapFrom(buildGraph([
             buildNode('a'),
         ]));
-        const op = await performAddField(
+        const op = await performAddAttributeRef(
+            db, withNodeSelection(base, 'a'),
+            'attr-1', 'editable', true,
+        );
+        assert.equal(op.kind, 'ok');
+        if (op.kind !== 'ok') return;
+        assert.equal(op.nodeId, 'a');
+        assert.equal(
+            op.ref.attribute_id, 'attr-1',
+        );
+        assert.equal(op.ref.mode, 'editable');
+        assert.equal(op.ref.isRequired, true);
+        assert.equal(op.advanceHistory, true);
+    },
+);
+
+test(
+    'performAddAttributeRef: locked flow fails',
+    async () => {
+        const { db } = await setupFlow();
+        const base = snapFrom(buildGraph([
+            buildNode('a'),
+        ]));
+        const op = await performAddAttributeRef(
             db,
             locked(withNodeSelection(base, 'a')),
-            'X', 'text', false, [],
+            'attr-1', 'editable', false,
         );
         assert.equal(op.kind, 'fail');
     },
 );
 
 test(
-    'performAddField: no single selected node is'
-    + ' a no-op',
+    'performAddAttributeRef: no single selected'
+    + ' node is a no-op',
     async () => {
         const { db } = await setupFlow();
         const base = snapFrom(buildGraph([
             buildNode('a'), buildNode('b'),
         ]));
-        const noneOp = await performAddField(
+        const noneOp = await performAddAttributeRef(
             db, withNoSelection(base),
-            'X', 'text', false, [],
+            'attr-1', 'editable', false,
         );
         assert.equal(noneOp.kind, 'noop');
-        const manyOp = await performAddField(
+        const manyOp = await performAddAttributeRef(
             db,
             withNodeSelection(base, 'a', 'b'),
-            'X', 'text', false, [],
+            'attr-1', 'editable', false,
         );
         assert.equal(manyOp.kind, 'noop');
     },
 );
 
 test(
-    'performAddField: a selected id that is not'
-    + ' a node is a no-op',
+    'performAddAttributeRef: a selected id that'
+    + ' is not a node is a no-op',
     async () => {
         const { db } = await setupFlow();
         const base = snapFrom(buildGraph([
             buildNode('a'),
         ]));
-        const op = await performAddField(
+        const op = await performAddAttributeRef(
             db, withNodeSelection(base, 'ghost'),
-            'X', 'text', false, [],
+            'attr-1', 'editable', false,
         );
         assert.equal(op.kind, 'noop');
     },
 );
 
 test(
-    'performAddField: a commit failure yields a'
-    + ' fail result',
+    'performAddAttributeRef: a commit failure'
+    + ' yields a fail result',
     async () => {
         const db = setupNoFlow();
         const base = snapFrom(buildGraph([
             buildNode('a'),
         ]));
         const op = await silenceConsoleError(
-            () => performAddField(
+            () => performAddAttributeRef(
                 db, withNodeSelection(base, 'a'),
-                'X', 'text', false, [],
-            ),
-        );
-        const settled = await op;
-        assert.equal(settled.kind, 'fail');
-        if (settled.kind !== 'fail') return;
-        assert.match(
-            settled.toast, /failed to add field/i,
-        );
-    },
-);
-
-// -- performDeleteField -----------------------
-
-test(
-    'performDeleteField: removes the field from'
-    + ' the single selected node',
-    async () => {
-        const { db } = await setupFlow();
-        const base = snapFrom(buildGraph([
-            buildNode('a', {
-                fields: [buildField('f1')],
-            }),
-        ]));
-        const op = await performDeleteField(
-            db, withNodeSelection(base, 'a'), 'f1',
-        );
-        assert.equal(op.kind, 'ok');
-        if (op.kind !== 'ok') return;
-        assert.equal(op.nodeId, 'a');
-        assert.equal(op.fieldId, 'f1');
-        assert.equal(op.advanceHistory, true);
-    },
-);
-
-test(
-    'performDeleteField: locked flow fails',
-    async () => {
-        const { db } = await setupFlow();
-        const base = snapFrom(buildGraph([
-            buildNode('a', {
-                fields: [buildField('f1')],
-            }),
-        ]));
-        const op = await performDeleteField(
-            db,
-            locked(withNodeSelection(base, 'a')),
-            'f1',
-        );
-        assert.equal(op.kind, 'fail');
-    },
-);
-
-test(
-    'performDeleteField: no single selected node'
-    + ' is a no-op',
-    async () => {
-        const { db } = await setupFlow();
-        const base = snapFrom(buildGraph([
-            buildNode('a', {
-                fields: [buildField('f1')],
-            }),
-        ]));
-        const op = await performDeleteField(
-            db, withNoSelection(base), 'f1',
-        );
-        assert.equal(op.kind, 'noop');
-    },
-);
-
-test(
-    'performDeleteField: a commit failure yields'
-    + ' a fail result',
-    async () => {
-        const db = setupNoFlow();
-        const base = snapFrom(buildGraph([
-            buildNode('a', {
-                fields: [buildField('f1')],
-            }),
-        ]));
-        const op = await silenceConsoleError(
-            () => performDeleteField(
-                db, withNodeSelection(base, 'a'),
-                'f1',
+                'attr-1', 'editable', false,
             ),
         );
         const settled = await op;
@@ -969,8 +883,245 @@ test(
         if (settled.kind !== 'fail') return;
         assert.match(
             settled.toast,
-            /failed to delete field/i,
+            /failed to add attribute/i,
         );
+    },
+);
+
+// -- performRemoveAttributeRef ----------------
+
+test(
+    'performRemoveAttributeRef: removes the ref'
+    + ' from the single selected node',
+    async () => {
+        const { db } = await setupFlow();
+        const base = snapFrom(buildGraph([
+            buildNode('a', {
+                attributes: [
+                    buildAttributeRef('attr-1'),
+                ],
+            }),
+        ]));
+        const op = await performRemoveAttributeRef(
+            db, withNodeSelection(base, 'a'),
+            'attr-1',
+        );
+        assert.equal(op.kind, 'ok');
+        if (op.kind !== 'ok') return;
+        assert.equal(op.nodeId, 'a');
+        assert.equal(op.attributeId, 'attr-1');
+        assert.equal(op.advanceHistory, true);
+    },
+);
+
+test(
+    'performRemoveAttributeRef: locked flow fails',
+    async () => {
+        const { db } = await setupFlow();
+        const base = snapFrom(buildGraph([
+            buildNode('a', {
+                attributes: [
+                    buildAttributeRef('attr-1'),
+                ],
+            }),
+        ]));
+        const op = await performRemoveAttributeRef(
+            db,
+            locked(withNodeSelection(base, 'a')),
+            'attr-1',
+        );
+        assert.equal(op.kind, 'fail');
+    },
+);
+
+test(
+    'performRemoveAttributeRef: no single selected'
+    + ' node is a no-op',
+    async () => {
+        const { db } = await setupFlow();
+        const base = snapFrom(buildGraph([
+            buildNode('a', {
+                attributes: [
+                    buildAttributeRef('attr-1'),
+                ],
+            }),
+        ]));
+        const op = await performRemoveAttributeRef(
+            db, withNoSelection(base), 'attr-1',
+        );
+        assert.equal(op.kind, 'noop');
+    },
+);
+
+test(
+    'performRemoveAttributeRef: a commit failure'
+    + ' yields a fail result',
+    async () => {
+        const db = setupNoFlow();
+        const base = snapFrom(buildGraph([
+            buildNode('a', {
+                attributes: [
+                    buildAttributeRef('attr-1'),
+                ],
+            }),
+        ]));
+        const op = await silenceConsoleError(
+            () => performRemoveAttributeRef(
+                db, withNodeSelection(base, 'a'),
+                'attr-1',
+            ),
+        );
+        const settled = await op;
+        assert.equal(settled.kind, 'fail');
+        if (settled.kind !== 'fail') return;
+        assert.match(
+            settled.toast,
+            /failed to remove attribute/i,
+        );
+    },
+);
+
+// -- performUpdateAttributeMode ---------------
+
+test(
+    'performUpdateAttributeMode: updates the mode'
+    + ' on the matching ref',
+    async () => {
+        const { db } = await setupFlow();
+        const base = snapFrom(buildGraph([
+            buildNode('a', {
+                attributes: [
+                    buildAttributeRef('attr-1', {
+                        mode: 'editable',
+                    }),
+                ],
+            }),
+        ]));
+        const op = await performUpdateAttributeMode(
+            db, withNodeSelection(base, 'a'),
+            'attr-1', 'readonly',
+        );
+        assert.equal(op.kind, 'ok');
+        if (op.kind !== 'ok') return;
+        assert.equal(op.nodeId, 'a');
+        assert.equal(op.attributeId, 'attr-1');
+        assert.equal(op.mode, 'readonly');
+        assert.equal(op.advanceHistory, true);
+    },
+);
+
+test(
+    'performUpdateAttributeMode: locked flow fails',
+    async () => {
+        const { db } = await setupFlow();
+        const base = snapFrom(buildGraph([
+            buildNode('a', {
+                attributes: [
+                    buildAttributeRef('attr-1'),
+                ],
+            }),
+        ]));
+        const op = await performUpdateAttributeMode(
+            db,
+            locked(withNodeSelection(base, 'a')),
+            'attr-1', 'readonly',
+        );
+        assert.equal(op.kind, 'fail');
+    },
+);
+
+test(
+    'performUpdateAttributeMode: no single selected'
+    + ' node is a no-op',
+    async () => {
+        const { db } = await setupFlow();
+        const base = snapFrom(buildGraph([
+            buildNode('a', {
+                attributes: [
+                    buildAttributeRef('attr-1'),
+                ],
+            }),
+        ]));
+        const op = await performUpdateAttributeMode(
+            db, withNoSelection(base),
+            'attr-1', 'readonly',
+        );
+        assert.equal(op.kind, 'noop');
+    },
+);
+
+// -- performUpdateAttributeRequired -----------
+
+test(
+    'performUpdateAttributeRequired: updates the'
+    + ' isRequired flag on the matching ref',
+    async () => {
+        const { db } = await setupFlow();
+        const base = snapFrom(buildGraph([
+            buildNode('a', {
+                attributes: [
+                    buildAttributeRef('attr-1', {
+                        isRequired: false,
+                    }),
+                ],
+            }),
+        ]));
+        const op =
+            await performUpdateAttributeRequired(
+                db, withNodeSelection(base, 'a'),
+                'attr-1', true,
+            );
+        assert.equal(op.kind, 'ok');
+        if (op.kind !== 'ok') return;
+        assert.equal(op.nodeId, 'a');
+        assert.equal(op.attributeId, 'attr-1');
+        assert.equal(op.isRequired, true);
+        assert.equal(op.advanceHistory, true);
+    },
+);
+
+test(
+    'performUpdateAttributeRequired: locked flow'
+    + ' fails',
+    async () => {
+        const { db } = await setupFlow();
+        const base = snapFrom(buildGraph([
+            buildNode('a', {
+                attributes: [
+                    buildAttributeRef('attr-1'),
+                ],
+            }),
+        ]));
+        const op =
+            await performUpdateAttributeRequired(
+                db,
+                locked(
+                    withNodeSelection(base, 'a'),
+                ),
+                'attr-1', true,
+            );
+        assert.equal(op.kind, 'fail');
+    },
+);
+
+test(
+    'performUpdateAttributeRequired: no single'
+    + ' selected node is a no-op',
+    async () => {
+        const { db } = await setupFlow();
+        const base = snapFrom(buildGraph([
+            buildNode('a', {
+                attributes: [
+                    buildAttributeRef('attr-1'),
+                ],
+            }),
+        ]));
+        const op =
+            await performUpdateAttributeRequired(
+                db, withNoSelection(base),
+                'attr-1', true,
+            );
+        assert.equal(op.kind, 'noop');
     },
 );
 

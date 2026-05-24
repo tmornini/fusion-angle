@@ -200,12 +200,14 @@ export function computeLayout(
                     canvasAspect,
                 );
             if (snakeMismatch < sugiMismatch) {
+                const positions = fitToCanvas(
+                    snakePos,
+                    canvasWidth, canvasHeight,
+                    nodes,
+                );
+                pinArchiveToBottomRight(positions, nodes);
                 return {
-                    positions: fitToCanvas(
-                        snakePos,
-                        canvasWidth, canvasHeight,
-                        nodes,
-                    ),
+                    positions,
                     waypoints: new Map(),
                 };
             }
@@ -248,10 +250,55 @@ function finalizeLayout(
             positions.set(id, p);
         }
     }
+    pinArchiveToBottomRight(positions, nodes);
     const waypoints = extractWaypoints(
         edges, dummyPositions, reversedIds,
     );
     return { positions, waypoints };
+}
+
+// Sugiyama places nodes by graph rank, not by absolute
+// position. When a branch makes Archive reachable from
+// Create in fewer hops than the longest path, Archive
+// settles at an interior column. The convention for a
+// workflow chart is that the terminal node reads at the
+// lower-right; this pass enforces that explicitly after
+// fitToCanvas has done its mirroring.
+function pinArchiveToBottomRight(
+    positions: Map<string, Position>,
+    nodes: readonly LayoutInput[],
+): void {
+    const archive = nodes.find(n => n.isArchive);
+    if (!archive) return;
+    const archivePos = positions.get(archive.id);
+    if (!archivePos) return;
+
+    let otherMaxX = -Infinity;
+    for (const [id, p] of positions) {
+        if (id === archive.id) continue;
+        if (p.x > otherMaxX) otherMaxX = p.x;
+    }
+    if (otherMaxX === -Infinity) return;
+
+    const targetX = Math.max(archivePos.x, otherMaxX);
+
+    let maxYInCol = -Infinity;
+    for (const [id, p] of positions) {
+        if (id === archive.id) continue;
+        if (Math.abs(p.x - targetX) < 0.5) {
+            if (p.y > maxYInCol) maxYInCol = p.y;
+        }
+    }
+
+    let newY = archivePos.y;
+    if (maxYInCol > -Infinity && newY <= maxYInCol) {
+        newY = maxYInCol + SIBLING_STEP;
+    }
+
+    positions.set(archive.id, {
+        x: targetX,
+        y: newY,
+    });
 }
 
 function insertDummies(

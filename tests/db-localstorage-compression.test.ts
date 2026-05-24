@@ -42,7 +42,7 @@ const baseVersion = {
                 isCreate: true,
                 isArchive: false,
                 workerIds: [],
-                fields: [],
+                attributes: [],
                 positionX: 0,
                 positionY: 0,
                 description: '',

@@ -219,3 +219,49 @@ test(
         assert.equal(seen.size, 4);
     },
 );
+
+test(
+    'computeLayout: Archive is pinned to the rightmost'
+    + ' column when Sugiyama places it interior',
+    () => {
+        // Create → A → B, plus Create → Archive direct.
+        // Sugiyama places Archive at column 1 (depth 1
+        // from Create) while B is at column 2 (depth 2
+        // through A). The post-pass moves Archive to
+        // the rightmost column at the bottom.
+        const r = computeLayout({
+            nodes: [
+                lin('s', { start: true }),
+                lin('a'),
+                lin('b'),
+                lin('z', { complete: true }),
+            ],
+            edges: [
+                { fromId: 's', toId: 'a', labelWidth: 0 },
+                { fromId: 'a', toId: 'b', labelWidth: 0 },
+                { fromId: 's', toId: 'z', labelWidth: 0 },
+            ],
+            canvasWidth: 0, canvasHeight: 0,
+        });
+        const sPos = r.positions.get('s')!;
+        const aPos = r.positions.get('a')!;
+        const bPos = r.positions.get('b')!;
+        const zPos = r.positions.get('z')!;
+        const maxX = Math.max(
+            sPos.x, aPos.x, bPos.x, zPos.x,
+        );
+        assert.equal(
+            zPos.x, maxX,
+            'Archive at rightmost column',
+        );
+        const sharing = [sPos, aPos, bPos].filter(
+            p => Math.abs(p.x - maxX) < 0.5,
+        );
+        for (const p of sharing) {
+            assert.ok(
+                zPos.y >= p.y,
+                'Archive at bottom of rightmost column',
+            );
+        }
+    },
+);

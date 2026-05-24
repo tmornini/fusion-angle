@@ -104,13 +104,7 @@ function buildShell(
 ): void {
     setHtml(container, html`
 <div class="project-detail-host">
-    <div class="project-detail-wrap">
-        <div class="${
-            'flex items-center gap-2'
-            + ' text-sm text-muted mb-4'
-            + ' project-breadcrumb-slot'
-        }"></div>
-
+    <div class="overview">
         <div class="${
             'flex items-start'
             + ' justify-between gap-4 mb-6'
@@ -161,20 +155,6 @@ function mutateSlot(
     markup: SafeHtml,
 ): void {
     setHtml($required(cls, container), markup);
-}
-
-function buildBreadcrumb(
-    title: string,
-): SafeHtml {
-    return html`
-        <a href="${
-            '../projects/index.html'
-        }"
-            class="hover-link">
-            Projects
-        </a>
-        <span>/</span>
-        <span>${title}</span>`;
 }
 
 function buildSubtitle(
@@ -949,13 +929,6 @@ export class ProjectDetailPresenter {
     ): void {
         mutateSlot(
             container,
-            '.project-breadcrumb-slot',
-            buildBreadcrumb(
-                this.#view.titleText(),
-            ),
-        );
-        mutateSlot(
-            container,
             '.project-title-slot',
             buildReadonlyTitleSection(
                 this.#view,
@@ -1027,11 +1000,6 @@ export class ProjectDetailEditPresenter {
     renderUpdate(
         container: HTMLElement,
     ): void {
-        mutateSlot(
-            container,
-            '.project-breadcrumb-slot',
-            buildBreadcrumb(this.#draft.title),
-        );
         mutateSlot(
             container,
             '.project-title-slot',

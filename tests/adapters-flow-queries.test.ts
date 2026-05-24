@@ -66,7 +66,7 @@ function buildNode(
         isCreate: false,
         isArchive: false,
         workerIds: [],
-        fields: [],
+        attributes: [],
         ...overrides,
     };
 }

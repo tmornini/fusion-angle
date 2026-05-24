@@ -23,7 +23,7 @@ export type {
     WorkOrderFlowGraph,
     GraphNode,
     GraphEdge,
-    GraphField,
+    NodeAttribute,
 } from '../../../api/types.ts';
 
 export type { TransitionEvent } from './state-events.ts';

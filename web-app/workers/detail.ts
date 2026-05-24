@@ -186,6 +186,26 @@ export async function init(
     );
 }
 
+export function reduceRefresh(
+    current: PageState,
+    fresh: Worker | null,
+): PageState {
+    if (current.kind === 'editing') return current;
+    if (fresh === null) return current;
+    if (fresh.kind === 'human') {
+        return {
+            kind: 'reading',
+            variant: 'human',
+            worker: fresh,
+        };
+    }
+    return {
+        kind: 'reading',
+        variant: 'ai',
+        worker: fresh,
+    };
+}
+
 async function refresh(
     workerId: string,
 ): Promise<void> {
@@ -193,20 +213,7 @@ async function refresh(
     const fresh = await loadWorkerByEitherKind(
         workerId,
     );
-    if (!fresh) return;
-    if (fresh.kind === 'human') {
-        state = {
-            kind: 'reading',
-            variant: 'human',
-            worker: fresh,
-        };
-    } else {
-        state = {
-            kind: 'reading',
-            variant: 'ai',
-            worker: fresh,
-        };
-    }
+    state = reduceRefresh(state, fresh);
     rerender();
 }
 

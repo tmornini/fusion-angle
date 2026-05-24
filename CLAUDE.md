@@ -55,7 +55,10 @@ tools can drive the page normally.
 `api/`, `adapters/`, and `presenters/` layers, via `node
 --test --strip-types tests/*.test.ts`), then enforces a
 78-character maximum line length on all `.ts`, `.html`, and
-`.css` files (excluding `compose.ts`) and on `CLAUDE.md`.
+`.css` files (excluding `compose.ts`) and on every `.md`
+file at the repo root except `TEST-PLAN.md` — exempted
+because each test case bullet is meant to scan as one
+self-contained line.
 
 Automated tests cover pure modules, flow-edit logic, all
 data adapters, the workbox inbox aggregation, navigation,
@@ -108,10 +111,11 @@ is HTTP-only.
   current state, with `>=` tiebreak on same-millisecond
   writes so the deterministic insertion order of the
   append-only log decides ties. `StateStore` is its own
-  class (not a templated `EntityStore`) with five HTTP
-  routes: `GET/PUT states/:id`, `GET states`, `GET
-  entity-states/:id` (current), `GET entity-states/:id/
-  history` (ordered). Tombstones are retired — the
+  class (not a templated `EntityStore`) with four route
+  definitions covering five HTTP operations: `GET/PUT
+  states/:id`, `GET states`, `GET entity-states/:id`
+  (current), `GET entity-states/:id/history` (ordered).
+  Tombstones are retired — the
   `deprecated` and `deleted` tombstone tables, and the
   polymorphic `TombstoneStore` class, are gone; `'deleted'`
   is now a state event value, not a separate table.
@@ -156,9 +160,10 @@ The states log carries entity lifecycle events. Each entity
 type uses its own state alphabet — distinct vocabularies for
 distinct lifecycles, all stored in the one log. Defined in
 `api/types.ts` as `IDEA_STATES`, `PROJECT_STATES`,
-`WORKER_STATES`, `FLOW_STATES`, with `assertIdeaState` /
-`assertProjectState` / `assertWorkerState` /
-`assertFlowState` and the matching `is*` guards.
+`WORKER_STATES`, `FLOW_STATES`, `RECORD_STATES`, with
+`assertIdeaState` / `assertProjectState` /
+`assertWorkerState` / `assertFlowState` /
+`assertRecordState` and the matching `is*` guards.
 
 **Ideas** (9 values, composite of former status + readiness):
 - `active:incomplete`, `active:needs-info`, `active:ready`
@@ -175,6 +180,9 @@ distinct lifecycles, all stored in the one log. Defined in
 **Flows** (4 values, three lifecycle + one
 content-change marker):
 - `active`, `archived`, `deleted`, `updated`
+
+**Records** (3 values, single-dimension):
+- `active`, `archived`, `deleted`
 
 The flow lifecycle's `'updated'` event records every
 content mutation (graph edits, name/description/lock
@@ -282,6 +290,16 @@ and dispatches the node-property-update action via the
 pure helper `parseWorkerIdsFromPanel(panelEl)` in
 `flows/detail.ts`.
 
+Regular nodes also carry `attributes: NodeAttribute[]`
+(`{ attribute_id, mode, isRequired }`). Hidden is encoded
+by absence from the array. `mode` is `'editable'` or
+`'readonly'`. The per-node panel renders one row per ref
+with a mode picker + Required checkbox + remove button,
+plus a picker `<select>` listing every record_attribute on
+the bound Record not yet referenced. The flow header
+carries a Record-binding `<select>` driven by
+`getRecordForFlow` / `putFlowRecord` / `deleteFlowRecord`.
+
 Hazards are two-tier and shared across the designer +
 stats canvases via the pure predicate
 `shouldShowWorkerHazard(node, allEdges)` in
@@ -383,25 +401,76 @@ from `adapters/state-events.ts` — derived from the states
 log, not from any retired event table. The I/O wrapper is
 `adapters/flow-stats.ts`'s `getFlowStats(ctx, flowId)`.
 
+### Records
+
+A Record is a named data shape: name + description +
+ordered attributes + per-attribute constraints. A flow
+binds to one Record via `flow_records` (UNIQUE flow_id);
+a Record can back many flows. Each per-node attribute
+ref (`NodeAttribute`) points at one `record_attributes.id`
+and carries a `mode` (`'editable'` or `'readonly'`) and an
+`isRequired` flag. Hidden is structural: absence from the
+node's `attributes` array.
+
+Five attribute types: `text`, `number`, `select`, `date`,
+`checkbox`. Three constraint kinds: `regex` (text only),
+`range_min` and `range_max` (number or date only). The
+applicability rule has two enforcement sites:
+`assertConstraintAppliesTo` at the row writer and the
+editor filtering the kind picker.
+
+The property-test gate at work-order transitions:
+`validateRecordTransition(ctx, workOrderId, targetNodeId,
+pendingValues?)` walks work order → flow → Record →
+attributes; gathers stored values from `state_field_values`;
+overlays pending values from the form; runs requiredness
++ `validateAttributeValue`. Returns aggregated
+`ConstraintViolation[]`. `postWorkOrderTransition` throws
+`RecordTransitionViolations` on non-empty results; the
+workbox page module catches the typed error and surfaces
+the violations banner.
+
+The pure constraint runner is `record-constraints.ts`
+(`validateAttributeValue`, `formatViolation`) — three
+callers earn the abstraction: the gate, the editor live
+preview, and a future fuzz runner.
+
+A work order's frozen `flow_graph` references
+`record_attributes.id` directly. If a Record's attribute
+is deleted while a flow that targets it is in flight, the
+gate throws `node X references unknown attribute Y` rather
+than silently coercing — versioned Record snapshots arrive
+in a future iteration.
+
+The user-facing vocabulary is strict: `Record` is the
+definition, `Attribute` is one of its properties,
+`Constraint` is a per-attribute predicate. The storage
+term `entity` never appears in user-facing strings. UI
+copy says "Work orders using this Record" rather than
+"instances."
+
 ### API Layer (`/api`)
 
 `api/types.ts` (row types + shared aliases — `WorkerId`,
 `Worker` discriminated union, `HumanWorker` /
 `AIWorker` classes, `GraphNode.workerIds: WorkerId[]`,
-`StateEntity`, the four state alphabets, and
-`SYSTEM_WORKER_ID`), `api/db.ts` (`DbAdapter` interface +
-`TABLE_NAMES` array listing every storage table — `workers`,
-`ai_workers`, `ideas`, `projects`, `flows`, `flow_versions`,
-`states`, `state_field_values`, etc.),
+`GraphNode.attributes: NodeAttribute[]`, `RecordEntity` /
+`RecordAttributeEntity` / `FlowRecordEntity`, `Constraint`
+discriminated union, `StateEntity`, the five state
+alphabets, and `SYSTEM_WORKER_ID`), `api/db.ts`
+(`DbAdapter` interface + `TABLE_NAMES` array listing every
+storage table — `workers`, `ai_workers`, `ideas`,
+`projects`, `flows`, `flow_versions`, `records`,
+`record_attributes`, `flow_records`, `states`,
+`state_field_values`, etc.),
 `api/store-state.ts` (the `StateStore` class — `record`,
 `currentFor`, `allFor`, `deletedIds`, `isDeleted`),
 `api/store-entity.ts` (`EntityStore` — consults `StateStore`
 for delete filtering), `api/db-localstorage.ts` (production
 impl), `api/db-memory.ts` (test impl), `api/api.ts` (pure
 HTTP routing — `GET/PUT/DELETE/POST` helpers, **no
-module-level adapter; threaded explicitly** — plus the four
-state routes: `GET/PUT states/:id`, `GET states`, `GET
-entity-states/:id`, `GET entity-states/:id/history`),
+module-level adapter; threaded explicitly** — plus the
+state routes for the unified states log),
 `api/mock-data.ts` (seeds the `'system'` worker, 6 humans
 in `workers`, and 4 AIs in `ai_workers`), `api/validators.ts`
 (`validateHumanWorkerEntity` / `validateAIWorkerEntity` /
@@ -568,6 +637,21 @@ layer directly.
   `ideaChanges.notify()`), never through return values —
   callers tell the channel rather than branch on a result.
   The type's silence is intentional.
+- **Records adapters.** `adapters/records.ts` owns Record
+  lifecycle (CRUD + `archiveRecord`).
+  `adapters/record-attributes.ts` is the per-attribute
+  surface with `getRecordAttributesByRecord(ctx, recordId)`
+  returning sort-ordered rows.
+  `adapters/flow-records.ts` is the binding seam with three
+  cross-walkers: `getRecordForFlow`, `getFlowsForRecord`,
+  and `getWorkOrdersForRecord` (records → flows →
+  flow_work_orders → work_orders).
+  `adapters/record-transitions.ts` is the property-test
+  gate's orchestrator; it composes the pure
+  `validateAttributeValue` from `record-constraints.ts` with
+  the work order's stored + pending values.
+  `postWorkOrderTransition` runs the gate and throws
+  `RecordTransitionViolations` on non-empty result.
 
 ### Dark Mode
 
@@ -756,9 +840,11 @@ stop, await fix. This is doctrine, not a question.
   and skips link prefetching. Page URLs use relative paths.
   Code supports `file:///` locally but testing is HTTP-only.
 - **View Transition aborts**: rapid programmatic navigation
-  surfaces `InvalidStateError` lines in console.
-  Browser-internal (no app code calls `startViewTransition`);
-  no app impact.
+  surfaces both `AbortError: Transition was skipped` and
+  `InvalidStateError: Transition was aborted...` lines in
+  console — Chromium throws both classes for the same root
+  cause. Browser-internal (no app code calls
+  `startViewTransition`); no app impact.
 - **The states log is append-only by convention**:
   `StateStore.record` only appends; the table never deletes.
   An entity's lifecycle reads as the latest event on its
@@ -769,6 +855,10 @@ stop, await fix. This is doctrine, not a question.
   `state_field_values`) is the seam — read
   `api/store-entity.ts` and `api/store-state.ts` together to
   see both halves.
+- **`state_field_values.field_id` references
+  `record_attributes.id`**: the column name predates Records
+  and stays until a second non-Record consumer arrives. The
+  semantic note lives in `SCHEMA.md § state_field_values`.
 
 ## Worktrees
 
@@ -808,8 +898,8 @@ cannot know:
 - **Existing codebase patterns to match** — RequestContext
   as the only argument to adapter methods, SafeHtml from
   presenters, snake_case storage / camelCase domain,
-  HTTP-verb adapter naming (`get_noun`/`put_noun`/`delete_noun`/
-  `post_noun_operation`), validators at the gate not
+  HTTP-verb adapter naming (`getNoun`/`putNoun`/`deleteNoun`/
+  `postNounOperation`), validators at the gate not
   downstream, no untyped `any` from external boundaries.
 
 An agent of the Church does not unleash unwashed heathens on

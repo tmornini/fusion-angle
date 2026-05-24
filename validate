@@ -5,14 +5,19 @@ npx tsc --noEmit -p web-app/app/tsconfig.json
 
 ./test
 
-LONG_LINES=$(find api web-app tests CLAUDE.md -type f \
-  \( -name '*.ts' -o -name '*.html' -o -name '*.css' \
-     -o -name 'CLAUDE.md' \) \
-  ! -path 'web-app/app/compose.ts' \
-  -exec awk \
-    'length > 78 {
-      printf "%s:%d: %d chars\n", FILENAME, NR, length
-    }' {} +)
+AWK_LINT='length > 78 {
+  printf "%s:%d: %d chars\n", FILENAME, NR, length
+}'
+
+LONG_LINES=$( {
+  find api web-app tests -type f \
+    \( -name '*.ts' -o -name '*.html' -o -name '*.css' \) \
+    ! -path 'web-app/app/compose.ts' \
+    -exec awk "$AWK_LINT" {} +
+  find . -maxdepth 1 -type f -name '*.md' \
+    ! -name 'TEST-PLAN.md' \
+    -exec awk "$AWK_LINT" {} +
+} )
 
 if [ -n "$LONG_LINES" ]; then
   echo "Error: lines exceed 78 characters:" >&2

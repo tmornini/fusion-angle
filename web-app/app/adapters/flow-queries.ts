@@ -4,9 +4,9 @@ import type {
     ProjectFlowEntity,
     GraphNode,
     GraphEdge,
-    GraphField,
+    NodeAttribute,
     StoredGraph,
-    FlowFieldType,
+    AttributeType,
 } from '../../../api/types.ts';
 import {
     asBoolean,
@@ -17,8 +17,8 @@ import { getFlowRows } from './flows.ts';
 import { withRenderableLayout } from '../flow-graph-layout.ts';
 
 export type {
-    GraphNode, GraphEdge, GraphField,
-    FlowFieldType,
+    GraphNode, GraphEdge, NodeAttribute,
+    AttributeType,
 };
 
 export interface FlowGraph {

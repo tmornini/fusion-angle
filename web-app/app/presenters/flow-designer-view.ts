@@ -15,104 +15,65 @@ import {
     iconDownload,
 } from '../icons.ts';
 import type {
-    GraphField,
     GraphNode,
     GraphEdge,
+    NodeAttribute,
+    RecordAttributeEntity,
 } from '../adapters/index.ts';
 import {
     HumanWorker,
     AIWorker,
 } from '../adapters/index.ts';
 
-export function buildFieldBadge(
-    fieldType: string,
+export function buildAttributeRefRow(
+    ref: NodeAttribute,
+    attribute: RecordAttributeEntity,
+    isLocked: boolean,
 ): SafeHtml {
-    return html`<span
-class="badge badge-outline text-xs"
->${fieldType}</span>`;
-}
-
-export function buildFieldRow(
-    field: GraphField,
-): SafeHtml {
-    const req = field.isRequired
-        ? html`<span class="${
-            'text-xs flow-required-mark'
-        }"> *</span>`
-        : html``;
+    const disabledAttr = trusted(
+        isLocked ? ' disabled' : '',
+    );
+    const requiredDisabled = trusted(
+        isLocked ? ' disabled' : '',
+    );
+    const requiredChecked = trusted(
+        ref.isRequired ? ' checked' : '',
+    );
+    const editableSel = trusted(
+        ref.mode === 'editable'
+            ? ' selected' : '',
+    );
+    const readonlySel = trusted(
+        ref.mode === 'readonly'
+            ? ' selected' : '',
+    );
     return html`<div
-class="flow-field-row"
-data-field-id="${field.id}">
-${buildFieldBadge(field.fieldType)}
-<span class="text-sm"
-    >${field.name}</span>
-${req}
-<button
-    class="btn btn-ghost btn-xs ml-auto"
-    data-action="delete-field"
-    data-field-id="${field.id}"
-    >&times;</button>
-</div>`;
-}
-
-export function buildFieldEditor(
-    nodeId: string | null,
-): SafeHtml {
-    if (!nodeId) {
-        return html``;
-    }
-    return html`<div
-class="flow-field-editor"
-data-node-id="${nodeId}">
-<h4 class="text-sm font-semibold mb-2"
-    >Add Field</h4>
-<div class="mb-2">
-<input type="text"
+class="flow-attribute-ref-row"
+data-attribute-id="${attribute.id}">
+<span class="text-sm flow-attribute-name"
+    >${attribute.name}</span>
+<select
     class="input input-sm"
-    id="new-field-name"
-    placeholder="Field name" />
-</div>
-<div class="mb-2">
-<select class="input input-sm"
-    id="new-field-type">
-<option value="text">text</option>
-<option value="textarea"
-    >textarea</option>
-<option value="number">number</option>
-<option value="date">date</option>
-<option value="select">select</option>
-<option value="checkbox"
-    >checkbox</option>
-<option value="file">file</option>
-<option value="email">email</option>
-<option value="url">url</option>
-<option value="phone">phone</option>
-<option value="currency"
-    >currency</option>
-<option value="multi_select"
-    >multi_select</option>
-<option value="radio">radio</option>
-<option value="image">image</option>
+    data-action="update-attribute-mode"
+    data-attribute-id="${attribute.id}"${
+    disabledAttr}>
+<option value="editable"${editableSel}
+    >Editable</option>
+<option value="readonly"${readonlySel}
+    >Read-only</option>
 </select>
-</div>
-<div class="mb-2">
-<label class="text-sm">
+<label class="text-xs">
 <input type="checkbox"
-    id="new-field-required" />
+    data-action="update-attribute-required"
+    data-attribute-id="${attribute.id}"${
+    requiredChecked}${requiredDisabled} />
 Required</label>
-</div>
-<div class="mb-2">
-<textarea
-    class="input input-sm"
-    id="new-field-options"
-    placeholder="${
-        'Options (one per line)'
-    }"
-    rows="2"></textarea>
-</div>
-<button class="btn btn-primary btn-xs"
-    data-action="save-field"
-    >Add</button>
+<button
+    class="btn btn-ghost btn-xs"
+    data-action="remove-attribute-ref"
+    data-attribute-id="${attribute.id}"${
+    disabledAttr}
+    >&times;</button>
 </div>`;
 }
 
@@ -159,6 +120,7 @@ export function buildNodePanel(
     isLocked: boolean,
     humans: HumanWorker[],
     ais: AIWorker[],
+    attributes: readonly RecordAttributeEntity[],
 ): SafeHtml {
     const isSpecial =
         node.isCreate || node.isArchive;
@@ -192,8 +154,39 @@ class="text-sm text-muted"
 </div>
 </div>`;
     }
-    const fieldRows = node.fields
-        .map(f => buildFieldRow(f));
+    const attributeById = new Map(
+        attributes.map(
+            a => [a.id, a] as const,
+        ),
+    );
+    const refRows = node.attributes.map(ref => {
+        const attribute = attributeById.get(
+            ref.attribute_id,
+        );
+        if (!attribute) {
+            return html`<div
+class="text-xs text-muted"
+>Missing attribute</div>`;
+        }
+        return buildAttributeRefRow(
+            ref, attribute, isLocked,
+        );
+    });
+    const referencedIds = new Set(
+        node.attributes.map(
+            r => r.attribute_id,
+        ),
+    );
+    const pickerAttributes = attributes
+        .filter(a => !referencedIds.has(a.id))
+        .toSorted(
+            (a, b) =>
+                a.name.localeCompare(b.name),
+        );
+    const pickerDisabled = trusted(
+        isLocked || pickerAttributes.length === 0
+            ? ' disabled' : '',
+    );
     const lockAttr =
         trusted(isLocked ? ' disabled' : '');
     const sortedHumans = [...humans].sort(
@@ -266,16 +259,25 @@ ${aiCheckboxes}
     value="${node.description}"${
     lockAttr} />
 </div>
-<div class="mb-3">
-<label class="text-xs text-muted"
-    >Fields</label>
-${fieldRows}
-<button
-    class="btn btn-ghost btn-xs mt-1"
-    data-action="add-field"
-    >+ Add Field</button>
-<div id="field-editor-slot"></div>
+<fieldset class="flow-attribute-fieldset"
+    id="prop-node-attributes">
+<legend class="text-xs text-muted"
+    >Attributes</legend>
+${refRows}
+<div class="flow-attribute-picker">
+<select
+    class="input input-sm"
+    id="prop-node-attribute-picker"${
+    pickerDisabled}>
+<option value="">+ Add Attribute…</option>
+${pickerAttributes.map(
+    a => html`<option
+        value="${a.id}"
+        >${a.name}</option>`,
+)}
+</select>
 </div>
+</fieldset>
 <div class="mb-3">
 <label class="text-xs text-muted"
     >Outgoing Transitions</label>

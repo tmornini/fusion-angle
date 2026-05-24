@@ -1,10 +1,11 @@
 import type {
     GraphNode,
     GraphEdge,
-    GraphField,
+    NodeAttribute,
     StoredGraph,
     WorkOrderFlowGraph,
-    FlowFieldType,
+    AttributeType,
+    Constraint,
     WorkerId,
     JsonArrayField,
     JsonObjectField,
@@ -20,21 +21,19 @@ import type {
     OrganizationEntity,
     IdeaSubmissionEntity,
     ProjectFlowEntity,
+    RecordEntity,
+    RecordAttributeEntity,
+    FlowRecordEntity,
     Objective,
     ObjectiveRevision,
     ProjectObjectiveBaselineScore,
     ProjectObjectiveActualScore,
     StateEntity,
 } from './types.ts';
-
-const FLOW_FIELD_TYPE_VALUES:
-    readonly FlowFieldType[] = [
-        'text', 'textarea', 'number',
-        'date', 'select', 'checkbox',
-        'file', 'email', 'url', 'phone',
-        'currency', 'multi_select',
-        'radio', 'image',
-    ];
+import {
+    assertAttributeType,
+    assertConstraintAppliesTo,
+} from './types.ts';
 
 export function parseOrThrow(
     raw: string,
@@ -155,21 +154,14 @@ export function asBoolean(
     return value;
 }
 
-export function asFlowFieldType(
+export function asAttributeType(
     value: unknown,
     label: string,
-): FlowFieldType {
-    const str = asString(value, label);
-    if (
-        !(FLOW_FIELD_TYPE_VALUES as
-            readonly string[]).includes(str)
-    ) {
-        throw new Error(
-            'expected FlowFieldType for '
-                + label + ', got ' + str,
-        );
-    }
-    return str as FlowFieldType;
+): AttributeType {
+    return assertAttributeType(
+        asString(value, label),
+        label,
+    );
 }
 
 function typeName(value: unknown): string {
@@ -210,49 +202,82 @@ validateStringNumberRecordJson(
     return out;
 }
 
-function asGraphField(
+const NODE_ATTRIBUTE_MODES:
+    readonly ('editable' | 'readonly')[]
+    = ['editable', 'readonly'];
+
+function asNodeAttribute(
     value: unknown,
     label: string,
-): GraphField {
+): NodeAttribute {
     const obj = asObject(value, label);
-    const optsArr = asArray(
-        obj['options'],
-        label + '.options',
+    const mode = asString(
+        obj['mode'], label + '.mode',
     );
-    const name = asString(
-        obj['name'], label + '.name',
-    );
-    if (name.length === 0) {
+    if (
+        !(NODE_ATTRIBUTE_MODES as
+            readonly string[]).includes(mode)
+    ) {
         throw new Error(
-            'expected non-empty string'
-            + ' for ' + label + '.name',
+            "expected 'editable' or 'readonly'"
+            + ' for ' + label + '.mode, got '
+            + mode,
         );
     }
     return {
-        id: asString(
-            obj['id'], label + '.id',
+        attribute_id: asString(
+            obj['attribute_id'],
+            label + '.attribute_id',
         ),
-        name,
-        fieldType: asFlowFieldType(
-            obj['fieldType'],
-            label + '.fieldType',
-        ),
-        sortOrder: asNumber(
-            obj['sortOrder'],
-            label + '.sortOrder',
-        ),
+        mode: mode as
+            ('editable' | 'readonly'),
         isRequired: asBoolean(
             obj['isRequired'],
             label + '.isRequired',
         ),
-        options: optsArr.map((o, i) =>
-            asString(
-                o,
-                label + '.options['
-                    + i + ']',
-            ),
-        ),
     };
+}
+
+export function asConstraint(
+    value: unknown,
+    label: string,
+): Constraint {
+    const obj = asObject(value, label);
+    const kind = asString(
+        obj['kind'], label + '.kind',
+    );
+    if (kind === 'regex') {
+        return {
+            kind: 'regex',
+            pattern: asString(
+                obj['pattern'],
+                label + '.pattern',
+            ),
+        };
+    }
+    if (kind === 'range_min') {
+        return {
+            kind: 'range_min',
+            min: asString(
+                obj['min'],
+                label + '.min',
+            ),
+        };
+    }
+    if (kind === 'range_max') {
+        return {
+            kind: 'range_max',
+            max: asString(
+                obj['max'],
+                label + '.max',
+            ),
+        };
+    }
+    throw new Error(
+        "expected Constraint kind 'regex',"
+        + " 'range_min', or 'range_max' for "
+        + label + '.kind, got ' + kind,
+    );
 }
 
 export function asWorkerIds(
@@ -273,9 +298,9 @@ function asGraphNode(
     label: string,
 ): GraphNode {
     const obj = asObject(value, label);
-    const fieldsArr = asArray(
-        obj['fields'],
-        label + '.fields',
+    const attrsArr = asArray(
+        obj['attributes'],
+        label + '.attributes',
     );
     const workerIds = asWorkerIds(
         obj['workerIds'],
@@ -309,10 +334,10 @@ function asGraphNode(
             label + '.isArchive',
         ),
         workerIds,
-        fields: fieldsArr.map((f, i) =>
-            asGraphField(
-                f,
-                label + '.fields['
+        attributes: attrsArr.map((a, i) =>
+            asNodeAttribute(
+                a,
+                label + '.attributes['
                     + i + ']',
             ),
         ),
@@ -1118,6 +1143,118 @@ export function validateStateEntity(
         state: pickString(body, 'state'),
         worker_id: pickString(
             body, 'worker_id',
+        ),
+        at: pickString(body, 'at'),
+    };
+}
+
+const RECORD_BODY_KEYS: readonly string[] = [
+    'name', 'description',
+];
+
+export function validateRecordEntity(
+    body: Record<string, unknown>,
+): Omit<RecordEntity, 'id'> {
+    assertOnlyKeys(
+        body, RECORD_BODY_KEYS, 'RecordEntity',
+    );
+    const name = pickString(body, 'name');
+    if (name === '') {
+        throw new Error(
+            'RecordEntity.name must be'
+            + ' non-empty',
+        );
+    }
+    return {
+        name,
+        description: pickString(
+            body, 'description',
+        ),
+    };
+}
+
+const RECORD_ATTRIBUTE_BODY_KEYS:
+    readonly string[] = [
+    'record_id', 'name', 'attribute_type',
+    'sort_order', 'options', 'constraints',
+];
+
+export function validateRecordAttributeEntity(
+    body: Record<string, unknown>,
+): Omit<RecordAttributeEntity, 'id'> {
+    assertOnlyKeys(
+        body,
+        RECORD_ATTRIBUTE_BODY_KEYS,
+        'RecordAttributeEntity',
+    );
+    const name = pickString(body, 'name');
+    if (name === '') {
+        throw new Error(
+            'RecordAttributeEntity.name'
+            + ' must be non-empty',
+        );
+    }
+    const attributeType = asAttributeType(
+        body['attribute_type'],
+        'RecordAttributeEntity.attribute_type',
+    );
+    const constraintsField =
+        pickJsonArrayField(
+            body, 'constraints',
+        );
+    const parsedConstraints = parseOrThrow(
+        constraintsField,
+        'RecordAttributeEntity.constraints',
+    );
+    const constraintsArr = asArray(
+        parsedConstraints,
+        'RecordAttributeEntity.constraints',
+    );
+    for (let i = 0; i < constraintsArr.length; i++) {
+        const constraint = asConstraint(
+            constraintsArr[i],
+            'RecordAttributeEntity.constraints['
+            + i + ']',
+        );
+        assertConstraintAppliesTo(
+            constraint.kind,
+            attributeType,
+            'RecordAttributeEntity.constraints['
+            + i + ']',
+        );
+    }
+    return {
+        record_id: pickString(
+            body, 'record_id',
+        ),
+        name,
+        attribute_type: attributeType,
+        sort_order: pickNumber(
+            body, 'sort_order',
+        ),
+        options: pickJsonArrayField(
+            body, 'options',
+        ),
+        constraints: constraintsField,
+    };
+}
+
+const FLOW_RECORD_BODY_KEYS: readonly string[] = [
+    'flow_id', 'record_id', 'at',
+];
+
+export function validateFlowRecordEntity(
+    body: Record<string, unknown>,
+): Omit<FlowRecordEntity, 'id'> {
+    assertOnlyKeys(
+        body,
+        FLOW_RECORD_BODY_KEYS,
+        'FlowRecordEntity',
+    );
+    return {
+        flow_id: pickString(body, 'flow_id'),
+        record_id: pickString(
+            body, 'record_id',
         ),
         at: pickString(body, 'at'),
     };

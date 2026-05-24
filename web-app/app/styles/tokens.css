@@ -86,6 +86,12 @@
   --space-12: 3rem;
   --space-16: 4rem;
 
+  /* Page-content widths — named by the kind of work
+     the page supports, not by their measurements. */
+  --width-entity: 48rem;
+  --width-overview: 64rem;
+  --width-workspace: 96rem;
+
   /* Component sizing */
   --gauge-stroke-width: 14;
 

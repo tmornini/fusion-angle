@@ -27,11 +27,17 @@ import {
     createRequestContext,
     generateCryptoSafeBase62,
     validateWorkOrderFlowGraph,
+    getRecordForFlow,
+    getRecordAttributesByRecord,
 } from '../app/adapters/index.ts';
+import type {
+    NodeAttribute,
+    RecordAttributeEntity,
+} from '../../api/types.ts';
 
 /* ── Helpers ─────────────── */
 
-function collectFieldValues(
+function collectAttributeValues(
     container: HTMLElement,
 ): Record<string, string> {
     const values: Record<string, string> =
@@ -41,36 +47,33 @@ function collectFieldValues(
             HTMLInputElement
             | HTMLSelectElement
             | HTMLTextAreaElement
-        >('[data-field-id]');
+        >('[data-attribute-id]');
     for (const input of inputs) {
-        const fieldId = getRequiredAttribute(
-            input, 'data-field-id',
+        const attributeId = getRequiredAttribute(
+            input, 'data-attribute-id',
         );
         if (input.type === 'checkbox') {
-            values[fieldId] = (
+            values[attributeId] = (
                 input as HTMLInputElement
             ).checked
                 ? 'true'
                 : 'false';
         } else {
-            values[fieldId] =
+            values[attributeId] =
                 input.value.trim();
         }
     }
     return values;
 }
 
-function hasEmptyRequiredField(
-    fields: readonly {
-        id: string;
-        isRequired: boolean;
-    }[],
+function hasEmptyRequiredAttribute(
+    refs: readonly NodeAttribute[],
     values: Record<string, string>,
 ): boolean {
-    return fields
-        .filter(f => f.isRequired)
-        .some(f => {
-            const v = values[f.id];
+    return refs
+        .filter(r => r.isRequired)
+        .some(r => {
+            const v = values[r.attribute_id];
             return v === undefined || v === '';
         });
 }
@@ -94,18 +97,20 @@ function initTransitionButtons(
                     btn, 'data-edge-id',
                 );
                 const values =
-                    collectFieldValues(
+                    collectAttributeValues(
                         container,
                     );
-                const hasEmpty = hasEmptyRequiredField(
-                    detail.renderableFields(),
-                    values,
-                );
+                const hasEmpty =
+                    hasEmptyRequiredAttribute(
+                        detail
+                            .renderableAttributes(),
+                        values,
+                    );
                 if (hasEmpty) {
                     showToast(
                         'Please fill'
                         + ' all required'
-                        + ' fields',
+                        + ' attributes',
                         'error',
                     );
                     return;
@@ -209,6 +214,7 @@ async function loadPresenter(
         fieldValuesByEvent,
         activeClaim,
         workerMap,
+        recordId,
     ] = await Promise.all([
         getWorkOrderTransitionEvents(
             ctx, workOrderId,
@@ -218,7 +224,19 @@ async function loadPresenter(
             ctx, workOrderId, fg.lockTimeout,
         ),
         getWorkerMap(ctx),
+        getRecordForFlow(ctx, fg.flowId),
     ]);
+    const attributes: RecordAttributeEntity[] =
+        recordId === null
+            ? []
+            : await getRecordAttributesByRecord(
+                ctx, recordId,
+            );
+    const attributeMap = new Map(
+        attributes.map(
+            a => [a.id, a] as const,
+        ),
+    );
     return new WorkboxDetailPresenter(
         workOrder,
         transitions,
@@ -226,6 +244,7 @@ async function loadPresenter(
         activeClaim,
         workerMap,
         currentWorkerId,
+        attributeMap,
     );
 }
 

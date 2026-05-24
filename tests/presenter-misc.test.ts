@@ -14,8 +14,6 @@ import type { FlowSummary } from
 import { WorkingStylesPresenter } from
     '../web-app/app/presenters/working-styles.ts';
 import {
-    buildFieldRow,
-    buildFieldEditor,
     buildFlowNameHeader,
     buildNodePanel,
     buildEdgePanel,
@@ -31,7 +29,7 @@ import {
     jsonArrayField, jsonObjectField,
 } from '../api/types.ts';
 import type {
-    GraphField, GraphNode, GraphEdge,
+    GraphNode, GraphEdge,
 } from '../api/types.ts';
 
 // helpers
@@ -70,7 +68,7 @@ function makeBipolarGauge(
 ): GaugeData {
     return {
         kind: 'bipolar',
-        title: 'Impact',
+        title: 'Portfolio Impact',
         icon: 'zap',
         iconCssClass: 'text-warning',
         theme: 'amber',
@@ -106,20 +104,6 @@ function makeFlowSummary(
     };
 }
 
-function makeField(
-    over: Partial<GraphField> = {},
-): GraphField {
-    return {
-        id: 'f-1',
-        name: 'Title',
-        fieldType: 'text',
-        sortOrder: 0,
-        isRequired: false,
-        options: [],
-        ...over,
-    };
-}
-
 function makeNode(
     over: Partial<GraphNode> = {},
 ): GraphNode {
@@ -132,7 +116,7 @@ function makeNode(
         isCreate: false,
         isArchive: false,
         workerIds: [],
-        fields: [],
+        attributes: [],
         ...over,
     };
 }
@@ -635,62 +619,6 @@ test(
 // flow-designer-view builders
 
 test(
-    'buildFieldRow marks required fields with an'
-    + ' asterisk and omits it otherwise',
-    () => {
-        const required = buildFieldRow(
-            makeField({ isRequired: true }),
-        ).toString();
-        assert.match(
-            required, /flow-required-mark/,
-        );
-        const optional = buildFieldRow(
-            makeField({ isRequired: false }),
-        ).toString();
-        assert.equal(
-            /flow-required-mark/.test(optional),
-            false,
-        );
-    },
-);
-
-test(
-    'buildFieldRow shows the field type badge,'
-    + ' name, and a delete-field hook',
-    () => {
-        const out = buildFieldRow(
-            makeField({
-                name: 'Budget',
-                fieldType: 'currency',
-            }),
-        ).toString();
-        assert.match(out, /badge-outline/);
-        assert.match(out, /currency/);
-        assert.match(out, /Budget/);
-        assert.match(
-            out, /data-action="delete-field"/,
-        );
-        assert.match(out, /data-field-id="f-1"/);
-    },
-);
-
-test(
-    'buildFieldEditor returns empty markup when'
-    + ' no node id is given',
-    () => {
-        assert.equal(
-            buildFieldEditor(null).toString(), '',
-        );
-        const out =
-            buildFieldEditor('n-9').toString();
-        assert.match(out, /flow-field-editor/);
-        assert.match(out, /id="new-field-name"/);
-        assert.match(out, /data-action="save-field"/);
-        assert.match(out, /data-node-id="n-9"/);
-    },
-);
-
-test(
     'buildFlowNameHeader shows a heading and edit'
     + ' button in read mode',
     () => {
@@ -732,7 +660,7 @@ test(
                 name: 'Create',
             }),
             [], false,
-            [], [],
+            [], [], [],
         ).toString();
         assert.match(out, /Create/);
         assert.equal(/State Properties/.test(out),
@@ -751,7 +679,7 @@ test(
                 name: 'Archive',
             }),
             [], false,
-            [], [],
+            [], [], [],
         ).toString();
         assert.match(out, /Archive/);
     },
@@ -769,7 +697,7 @@ test(
         ];
         const out = buildNodePanel(
             makeNode(), [], false,
-            humans, ais,
+            humans, ais, [],
         ).toString();
         assert.match(out, /State Properties/);
         assert.match(out, /id="prop-node-workers"/);
@@ -792,7 +720,7 @@ test(
         ];
         const out = buildNodePanel(
             makeNode({ workerIds: ['hw_1'] }),
-            [], false, humans, [],
+            [], false, humans, [], [],
         ).toString();
         assert.match(
             out,
@@ -814,7 +742,7 @@ test(
         ];
         const out = buildNodePanel(
             makeNode(), [], true,
-            humans, [],
+            humans, [], [],
         ).toString();
         assert.match(
             out, /id="prop-node-name"[^>]*disabled/,
@@ -833,12 +761,12 @@ test(
         const withEdges = buildNodePanel(
             makeNode(),
             [makeEdge({ name: 'Approve' })],
-            false, [], [],
+            false, [], [], [],
         ).toString();
         assert.match(withEdges, /Approve/);
         const none = buildNodePanel(
             makeNode(), [], false,
-            [], [],
+            [], [], [],
         ).toString();
         assert.match(none, /None/);
     },

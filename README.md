@@ -1,6 +1,8 @@
 # Fusion AI
 
-Enterprise innovation management platform for capturing ideas, defining business cases, and tracking projects through approval and execution.
+Enterprise innovation management platform for capturing ideas,
+defining business cases, and tracking projects through approval
+and execution.
 
 ## Modules
 
@@ -8,9 +10,9 @@ Enterprise innovation management platform for capturing ideas, defining business
 - **Flow** — process documentation, flow management, and per-node
   throughput heat map (`flows/stats`)
 - **Projects** — track approved ideas through execution
-- **Teams** — team roster and assignments
-- **Account** — organization settings, users, billing, and activity
-- **DB Admin** — database management (wipe, reload, upload/download snapshots)
+- **Account** — organization settings, users, and billing
+- **DB Admin** — database management
+  (wipe, reload, upload/download snapshots)
 
 ## Getting Started
 
@@ -32,7 +34,9 @@ Everything operational — build, test, conventions — lives in `CLAUDE.md`.
 
 ## Development
 
-All code adheres to the [`church-of-code`](https://github.com/The-Church-of-Code/church-of-code) doctrine. Install the plugin into Claude Code:
+All code adheres to the
+[`church-of-code`](https://github.com/The-Church-of-Code/church-of-code)
+doctrine. Install the plugin into Claude Code:
 
 ```
 /plugin marketplace add The-Church-of-Code/church-of-code

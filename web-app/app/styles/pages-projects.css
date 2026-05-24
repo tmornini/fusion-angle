@@ -14,14 +14,6 @@
   }
 }
 
-/* .project-detail-wrap is now an alias
-   for .content-wrap-xl */
-.project-detail-wrap {
-  max-width: 64rem;
-  margin-left: auto;
-  margin-right: auto;
-}
-
 .detail-grid-spaced {
   gap: var(--space-8);
 }

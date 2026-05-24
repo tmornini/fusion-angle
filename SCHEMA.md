@@ -5,7 +5,7 @@
 > no `./generate-schema` script in the codebase; regenerate
 > by hand or via the next tool the maintainer wires in.
 
-19 tables stored in localStorage as JSON arrays, listed in
+20 tables stored in localStorage as JSON arrays, listed in
 `api/db.ts` as `TABLE_NAMES`. Each table is keyed as
 `fusion-ai:tableName`. All rows have a text `id` primary
 key. Column types: TEXT (string), INTEGER (number), REAL
@@ -162,13 +162,10 @@ JSON document:
     "isCreate": false,
     "isArchive": false,
     "workerIds": ["..."],
-    "fields": [{
-      "id": "...",
-      "name": "...",
-      "fieldType": "text",
-      "sortOrder": 1,
-      "isRequired": true,
-      "options": []
+    "attributes": [{
+      "attribute_id": "...",
+      "mode": "editable",
+      "isRequired": true
     }]
   }],
   "edges": [{
@@ -190,6 +187,63 @@ that node's id (a base62 token) in the `states` log.
 on the node — zero or more, drawn from either workers or
 ai_workers (a unified WorkerId space; see
 `adapters/workers-union.ts`).
+
+`attributes` is the per-node attribute reference list. Each
+entry points at a `record_attributes.id`; absence from the
+list means hidden. `mode` is `'editable'` or `'readonly'`.
+Bind the flow to a Record via `flow_records` to populate the
+attribute pool.
+
+## Records
+
+### records
+
+A Record is a named data shape. Attributes belong to one
+Record; flows bind to a Record via `flow_records`.
+Lifecycle state lives in `states` (alphabet
+`RECORD_STATES`: `active`, `archived`, `deleted`).
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | TEXT | PRIMARY KEY |
+| name | TEXT | non-empty |
+| description | TEXT | empty string allowed |
+
+### record_attributes
+
+One row per attribute of a Record. The `field_id` column
+on `state_field_values` references this `id` once the flow
+the work order belongs to is bound to the parent Record.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | TEXT | PRIMARY KEY |
+| record_id | TEXT | FK → records |
+| name | TEXT | non-empty; unique within record_id |
+| attribute_type | TEXT | one of text, number, select, date, checkbox |
+| sort_order | REAL | author-controlled ordering |
+| options | TEXT | JSON string[] (select-typed only) |
+| constraints | TEXT | JSON Constraint[] |
+
+Constraints discriminator (`Constraint['kind']`):
+`'regex'` (pattern, applies to text), `'range_min'` and
+`'range_max'` (min/max strings, apply to number or date).
+The runner parses per `attribute_type`; date bounds are
+RFC-3339 Zulu strings (lexicographic order = chronologic
+order).
+
+### flow_records
+
+Join table binding one flow to one Record. UNIQUE on
+`flow_id` — a flow has at most one Record; a Record may
+back many flows.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | TEXT | PRIMARY KEY |
+| flow_id | TEXT | FK → flows (UNIQUE) |
+| record_id | TEXT | FK → records |
+| at | TEXT | RFC-3339 Zulu — moment of the binding |
 
 ## Workbox
 
@@ -373,6 +427,8 @@ State alphabets by entity kind:
 - **workers** (humans and AIs share one alphabet) —
   `WORKER_STATES` (3 values): `active`, `pending`,
   `archived`
+- **records** — `RECORD_STATES` (3 values): `active`,
+  `archived`, `deleted`
 - **work orders** — open-ended transitions (state = any
   graph node id, a base62 token) plus the closed claim
   alphabet (`'claimed'`, `'claim_released'`,
@@ -386,7 +442,7 @@ entity-table op.
 
 ### state_field_values
 
-Per-field values written when a state event records a
+Per-attribute values written when a state event records a
 work-order transition. Each row pins the payload to its
 parent event by `state_event_id` — Codd 1NF, a relation
 belongs in a table not a column on the event row.
@@ -395,5 +451,9 @@ belongs in a table not a column on the event row.
 |--------|------|-------|
 | id | TEXT | PRIMARY KEY |
 | state_event_id | TEXT | References states |
-| field_id | TEXT | Node-field id from flow_graph |
+| field_id | TEXT | References record_attributes |
 | value | TEXT | Value as a string |
+
+The `field_id` column references `record_attributes.id`;
+the column name predates the Records iteration and will
+be renamed when a second non-Record consumer arrives.

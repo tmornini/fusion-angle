@@ -31,7 +31,7 @@ function node(id: string, o: NodeOpts = {}): GraphNode {
         isCreate: o.isCreate ?? false,
         isArchive: o.isArchive ?? false,
         workerIds: [],
-        fields: [],
+        attributes: [],
     };
 }
 

@@ -21,7 +21,7 @@ const node = (id: string, x = 0, y = 0) => ({
     isCreate: false,
     isArchive: false,
     workerIds: [] as string[],
-    fields: [],
+    attributes: [],
 });
 
 const edge = (

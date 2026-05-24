@@ -47,7 +47,7 @@ export class IdeaCreatePresenter {
                 this.#draft,
             );
         return html`
-    <div class="idea-detail-wrap">
+    <div class="entity">
     <div class="${
         'flex items-center'
         + ' justify-between'

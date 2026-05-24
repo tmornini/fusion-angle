@@ -180,7 +180,7 @@ export async function getDashboardGauges(
         },
         {
             kind: 'bipolar',
-            title: 'Impact',
+            title: 'Portfolio Impact',
             icon: 'zap',
             iconCssClass: 'text-warning',
             theme: 'amber',

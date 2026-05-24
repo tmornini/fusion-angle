@@ -4,10 +4,10 @@ import type { DbAdapter } from
     '../../api/db.ts';
 import type {
     GraphEdge,
-    GraphField,
     GraphNode,
-    FlowFieldType,
-} from './adapters/flows.ts';
+    NodeAttribute,
+    RecordAttributeId,
+} from '../../api/types.ts';
 import {
     DEFAULT_NEW_STATE_NAME,
     DEFAULT_TRANSITION_NAME,
@@ -32,10 +32,12 @@ import {
 import {
     applyAddNode,
     applyAddEdge,
-    applyAddField,
+    applyAddAttributeRef,
+    applyRemoveAttributeRef,
+    applyUpdateAttributeMode,
+    applyUpdateAttributeRequired,
     applyDeleteNodes,
     applyDeleteEdge,
-    applyDeleteField,
 } from './flow-designer-actions.ts';
 import {
     recordUndoHistoryMark,
@@ -404,24 +406,24 @@ export async function performDeleteSelectedEdge(
     };
 }
 
-export interface FieldAddOk {
+export interface AttributeRefAddOk {
     readonly nodeId: string;
-    readonly field: GraphField;
+    readonly ref: NodeAttribute;
     readonly advanceHistory: true;
 }
 
-export async function performAddField(
+export async function performAddAttributeRef(
     db: DbAdapter,
     snap: FlowSnapshot,
-    name: string,
-    fieldType: string,
+    attributeId: RecordAttributeId,
+    mode: 'editable' | 'readonly',
     isRequired: boolean,
-    options: string[],
-): Promise<OpResult<FieldAddOk> | OpNoop> {
+): Promise<
+    OpResult<AttributeRefAddOk> | OpNoop
+> {
     if (snap.isLocked) {
         return failOp('Flow is locked');
     }
-    const trimmed = name.trim();
     const nodeId = singleSelectedNodeId(snap);
     if (!nodeId) {
         return { kind: 'noop' };
@@ -432,18 +434,13 @@ export async function performAddField(
     if (!node) {
         return { kind: 'noop' };
     }
-    const sortOrder = node.fields.length;
-    const fieldId = generateCryptoSafeBase62();
-    const field: GraphField = {
-        id: fieldId,
-        name: trimmed,
-        fieldType: fieldType as FlowFieldType,
-        sortOrder,
+    const ref: NodeAttribute = {
+        attribute_id: attributeId,
+        mode,
         isRequired,
-        options,
     };
-    const newNodes = applyAddField(
-        snap.nodes, nodeId, field,
+    const newNodes = applyAddAttributeRef(
+        snap.nodes, nodeId, ref,
     );
     try {
         await commitFlowMutation(
@@ -451,30 +448,34 @@ export async function performAddField(
         );
     } catch (err) {
         log.error(
-            'performAddField failed',
+            'performAddAttributeRef failed',
             'flow-operations', err,
         );
-        return failOp('Failed to add field');
+        return failOp(
+            'Failed to add attribute',
+        );
     }
     return {
         kind: 'ok',
         nodeId,
-        field,
+        ref,
         advanceHistory: true,
     };
 }
 
-export interface FieldDeleteOk {
+export interface AttributeRefRemoveOk {
     readonly nodeId: string;
-    readonly fieldId: string;
+    readonly attributeId: RecordAttributeId;
     readonly advanceHistory: true;
 }
 
-export async function performDeleteField(
+export async function performRemoveAttributeRef(
     db: DbAdapter,
     snap: FlowSnapshot,
-    fieldId: string,
-): Promise<OpResult<FieldDeleteOk> | OpNoop> {
+    attributeId: RecordAttributeId,
+): Promise<
+    OpResult<AttributeRefRemoveOk> | OpNoop
+> {
     if (snap.isLocked) {
         return failOp('Flow is locked');
     }
@@ -482,8 +483,8 @@ export async function performDeleteField(
     if (!nodeId) {
         return { kind: 'noop' };
     }
-    const newNodes = applyDeleteField(
-        snap.nodes, nodeId, fieldId,
+    const newNodes = applyRemoveAttributeRef(
+        snap.nodes, nodeId, attributeId,
     );
     try {
         await commitFlowMutation(
@@ -491,15 +492,116 @@ export async function performDeleteField(
         );
     } catch (err) {
         log.error(
-            'performDeleteField failed',
+            'performRemoveAttributeRef failed',
             'flow-operations', err,
         );
-        return failOp('Failed to delete field');
+        return failOp(
+            'Failed to remove attribute',
+        );
     }
     return {
         kind: 'ok',
         nodeId,
-        fieldId,
+        attributeId,
+        advanceHistory: true,
+    };
+}
+
+export interface AttributeModeUpdateOk {
+    readonly nodeId: string;
+    readonly attributeId: RecordAttributeId;
+    readonly mode: 'editable' | 'readonly';
+    readonly advanceHistory: true;
+}
+
+export async function performUpdateAttributeMode(
+    db: DbAdapter,
+    snap: FlowSnapshot,
+    attributeId: RecordAttributeId,
+    mode: 'editable' | 'readonly',
+): Promise<
+    OpResult<AttributeModeUpdateOk> | OpNoop
+> {
+    if (snap.isLocked) {
+        return failOp('Flow is locked');
+    }
+    const nodeId = singleSelectedNodeId(snap);
+    if (!nodeId) {
+        return { kind: 'noop' };
+    }
+    const newNodes = applyUpdateAttributeMode(
+        snap.nodes, nodeId, attributeId, mode,
+    );
+    try {
+        await commitFlowMutation(
+            db, snap, newNodes, snap.edges,
+        );
+    } catch (err) {
+        log.error(
+            'performUpdateAttributeMode failed',
+            'flow-operations', err,
+        );
+        return failOp(
+            'Failed to update attribute mode',
+        );
+    }
+    return {
+        kind: 'ok',
+        nodeId,
+        attributeId,
+        mode,
+        advanceHistory: true,
+    };
+}
+
+export interface AttributeRequiredUpdateOk {
+    readonly nodeId: string;
+    readonly attributeId: RecordAttributeId;
+    readonly isRequired: boolean;
+    readonly advanceHistory: true;
+}
+
+export async function
+performUpdateAttributeRequired(
+    db: DbAdapter,
+    snap: FlowSnapshot,
+    attributeId: RecordAttributeId,
+    isRequired: boolean,
+): Promise<
+    OpResult<AttributeRequiredUpdateOk> | OpNoop
+> {
+    if (snap.isLocked) {
+        return failOp('Flow is locked');
+    }
+    const nodeId = singleSelectedNodeId(snap);
+    if (!nodeId) {
+        return { kind: 'noop' };
+    }
+    const newNodes =
+        applyUpdateAttributeRequired(
+            snap.nodes, nodeId,
+            attributeId, isRequired,
+        );
+    try {
+        await commitFlowMutation(
+            db, snap, newNodes, snap.edges,
+        );
+    } catch (err) {
+        log.error(
+            'performUpdateAttributeRequired'
+            + ' failed',
+            'flow-operations', err,
+        );
+        return failOp(
+            'Failed to update attribute'
+            + ' required',
+        );
+    }
+    return {
+        kind: 'ok',
+        nodeId,
+        attributeId,
+        isRequired,
         advanceHistory: true,
     };
 }

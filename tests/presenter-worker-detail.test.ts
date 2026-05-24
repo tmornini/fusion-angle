@@ -118,7 +118,7 @@ function makeAIWorker() {
 
 test(
     'HumanWorkerDetailPresenter renders the'
-    + ' breadcrumb, name, title, department, and'
+    + ' name, title, department, and'
     + ' personal-info card',
     () => {
         const rec = makeRecordingContainer();
@@ -126,7 +126,6 @@ test(
             makeHumanWorker(),
         ).renderShell(rec.container);
         const out = rec.allHtml();
-        assert.match(out, /Workers/);
         assert.match(out, /Sarah Chen/);
         assert.match(out, /Engineer/);
         assert.match(out, /Engineering/);

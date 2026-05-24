@@ -503,10 +503,12 @@ function buildNode(
         + nameEsc + '</text>';
 
     if (!isSpecial) {
-        const meta = String(node.fields.length)
+        const meta =
+            String(node.attributes.length)
             + ' '
             + pluralize(
-                node.fields.length, 'field',
+                node.attributes.length,
+                'attribute',
             );
         inner += '<text'
             + ` x="${halfW}"`

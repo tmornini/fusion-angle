@@ -12,6 +12,10 @@ import type {
     FlowWorkOrderEntity,
     StateEntity,
     StateFieldValueEntity,
+    RecordEntity,
+    RecordAttributeEntity,
+    FlowRecordEntity,
+    Constraint,
     JsonObjectField,
     Id,
     GraphNode,
@@ -1407,7 +1411,7 @@ export async function populateMockData(
             isCreate: true,
             isArchive: false,
             workerIds: [],
-            fields: [],
+            attributes: [],
         },
         {
             id: l2cTriageNodeId,
@@ -1420,7 +1424,7 @@ export async function populateMockData(
             workerIds: [
                 workerLisa, workerClaude,
             ],
-            fields: [],
+            attributes: [],
         },
         {
             id: l2cDiscoveryNodeId,
@@ -1433,7 +1437,7 @@ export async function populateMockData(
             workerIds: [
                 workerSarah, workerMarcus,
             ],
-            fields: [],
+            attributes: [],
         },
         {
             id: l2cQualifNodeId,
@@ -1446,7 +1450,7 @@ export async function populateMockData(
             workerIds: [
                 workerSarah, workerMarcus,
             ],
-            fields: [],
+            attributes: [],
         },
         {
             id: l2cProposalNodeId,
@@ -1459,7 +1463,7 @@ export async function populateMockData(
             workerIds: [
                 workerMike, workerSarah,
             ],
-            fields: [],
+            attributes: [],
         },
         {
             id: l2cNegotNodeId,
@@ -1470,7 +1474,7 @@ export async function populateMockData(
             isCreate: false,
             isArchive: false,
             workerIds: [workerSarah],
-            fields: [],
+            attributes: [],
         },
         {
             id: l2cArchiveNodeId,
@@ -1481,7 +1485,7 @@ export async function populateMockData(
             isCreate: false,
             isArchive: true,
             workerIds: [],
-            fields: [],
+            attributes: [],
         },
     ];
 
@@ -1575,7 +1579,7 @@ export async function populateMockData(
                         isCreate: true,
                         isArchive: false,
                         workerIds: [],
-                        fields: [],
+                        attributes: [],
                     },
                     {
                         id: 'KoWNvvHG8d3TLAVN5nrWGX',
@@ -1590,107 +1594,78 @@ export async function populateMockData(
                             'WxQn4LVWb76YkmqK5B0EPp',
                             'current',
                         ],
-                        fields: [
+                        attributes: [
                             {
-                                id: '5JZ0LeKdPCa4QMtg1RsF1M',
-                                name:
-                                    'Company'
-                                    + ' Name',
-                                fieldType:
-                                    'text',
-                                sortOrder: 1,
+                                attribute_id:
+                                    '5JZ0LeKdPCa4QMtg1RsF1M',
+                                mode:
+                                    'editable',
                                 isRequired:
                                     true,
-                                options: [],
                             },
                             {
-                                id: 'nplTIh0qXNtAyoWSwRaBYe',
-                                name:
-                                    'Contact'
-                                    + ' Email',
-                                fieldType:
-                                    'email',
-                                sortOrder: 2,
+                                attribute_id:
+                                    'nplTIh0qXNtAyoWSwRaBYe',
+                                mode:
+                                    'editable',
                                 isRequired:
                                     true,
-                                options: [],
                             },
                             {
-                                id: 'kzHpMw9f1thq79VoBYeIX3',
-                                name:
-                                    'Contact'
-                                    + ' Phone',
-                                fieldType:
-                                    'phone',
-                                sortOrder: 3,
+                                attribute_id:
+                                    'kzHpMw9f1thq79VoBYeIX3',
+                                mode:
+                                    'editable',
                                 isRequired:
                                     false,
-                                options: [],
                             },
                             {
-                                id: 'QsmqiOmPtoMLGpSjHOqdHA',
-                                name:
-                                    'Industry',
-                                fieldType:
-                                    'select',
-                                sortOrder: 4,
+                                attribute_id:
+                                    'QsmqiOmPtoMLGpSjHOqdHA',
+                                mode:
+                                    'editable',
                                 isRequired:
                                     false,
-                                options: [
-                                    'Technology',
-                                    'Finance',
-                                    'Healthcare',
-                                    'Retail',
-                                    'Manufacturing',
-                                ],
                             },
                             {
-                                id: '0TyjQRcygn3DIyXTe6x1F6',
-                                name:
-                                    'Annual'
-                                    + ' Revenue',
-                                fieldType:
-                                    'currency',
-                                sortOrder: 5,
+                                attribute_id:
+                                    '0TyjQRcygn3DIyXTe6x1F6',
+                                mode:
+                                    'editable',
                                 isRequired:
                                     false,
-                                options: [],
                             },
                             {
-                                id: '8Z62tcRHBpwCRH1kBffx0G',
-                                name:
-                                    'Number of'
-                                    + ' Employees',
-                                fieldType:
-                                    'number',
-                                sortOrder: 6,
+                                attribute_id:
+                                    '8Z62tcRHBpwCRH1kBffx0G',
+                                mode:
+                                    'editable',
                                 isRequired:
                                     false,
-                                options: [],
                             },
                             {
-                                id: 'mBrOOvQtZTTKb5TTnXvzXo',
-                                name:
-                                    'Company'
-                                    + ' Logo',
-                                fieldType:
-                                    'image',
-                                sortOrder: 7,
+                                attribute_id:
+                                    'aR8nKpQ9wEzVxL3CmBdYTf',
+                                mode:
+                                    'editable',
                                 isRequired:
                                     false,
-                                options: [],
                             },
                             {
-                                id: 'y9DiJ5QHNB5ho3K1n9myMc',
-                                name:
-                                    'Supporting'
-                                    + ' Documents',
-                                fieldType:
-                                    'file',
-                                sortOrder: 8,
+                                attribute_id:
+                                    'mBrOOvQtZTTKb5TTnXvzXo',
+                                mode:
+                                    'editable',
                                 isRequired:
                                     false,
-                                options: [],
+                            },
+                            {
+                                attribute_id:
+                                    'y9DiJ5QHNB5ho3K1n9myMc',
+                                mode:
+                                    'editable',
+                                isRequired:
+                                    false,
                             },
                         ],
                     },
@@ -1703,18 +1678,30 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         workerIds: [],
-                        fields: [
+                        attributes: [
                             {
-                                id: 'AdQlKf43JV6yrhQbyskDkR',
-                                name:
-                                    'Reviewer'
-                                    + ' Notes',
-                                fieldType:
-                                    'textarea',
-                                sortOrder: 1,
+                                attribute_id:
+                                    '5JZ0LeKdPCa4QMtg1RsF1M',
+                                mode:
+                                    'readonly',
+                                isRequired:
+                                    false,
+                            },
+                            {
+                                attribute_id:
+                                    'nplTIh0qXNtAyoWSwRaBYe',
+                                mode:
+                                    'readonly',
+                                isRequired:
+                                    false,
+                            },
+                            {
+                                attribute_id:
+                                    'AdQlKf43JV6yrhQbyskDkR',
+                                mode:
+                                    'editable',
                                 isRequired:
                                     true,
-                                options: [],
                             },
                         ],
                     },
@@ -1727,7 +1714,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: true,
                         workerIds: [],
-                        fields: [],
+                        attributes: [],
                     },
                 ],
                 edges: [
@@ -1791,7 +1778,7 @@ export async function populateMockData(
                         isCreate: true,
                         isArchive: false,
                         workerIds: [],
-                        fields: [],
+                        attributes: [],
                     },
                     {
                         id: 'nKbwVydJZixw20nvP2XqfF',
@@ -1802,7 +1789,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: true,
                         workerIds: [],
-                        fields: [],
+                        attributes: [],
                     },
                     {
                         id: 'aTGimTZZDvMb7iD9GuUbSG',
@@ -1813,7 +1800,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         workerIds: [],
-                        fields: [],
+                        attributes: [],
                     },
                     {
                         id: '6KXcks9x9Tl54iNGWQoXNN',
@@ -1825,7 +1812,24 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         workerIds: [],
-                        fields: [],
+                        attributes: [
+                            {
+                                attribute_id:
+                                    'pBA01Pr0j3ctBr13fNm3T1',
+                                mode:
+                                    'editable',
+                                isRequired:
+                                    true,
+                            },
+                            {
+                                attribute_id:
+                                    'pBA02Pr0j3ctBr13fDsc02',
+                                mode:
+                                    'editable',
+                                isRequired:
+                                    false,
+                            },
+                        ],
                     },
                     {
                         id: 'HmpBNWHjANtDY4qtKZENOE',
@@ -1836,7 +1840,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         workerIds: [],
-                        fields: [],
+                        attributes: [],
                     },
                     {
                         id: 'q1OZ85FQGwEbtIbFQo8H5o',
@@ -1847,7 +1851,24 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         workerIds: [],
-                        fields: [],
+                        attributes: [
+                            {
+                                attribute_id:
+                                    'pBA03Pr0j3ctBr13fPry03',
+                                mode:
+                                    'editable',
+                                isRequired:
+                                    false,
+                            },
+                            {
+                                attribute_id:
+                                    'pBA04Pr0j3ctBr13fApr04',
+                                mode:
+                                    'editable',
+                                isRequired:
+                                    false,
+                            },
+                        ],
                     },
                     {
                         id: 'Yt5GGbxJqVG5Ws4NrGWzDD',
@@ -1858,7 +1879,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         workerIds: [],
-                        fields: [],
+                        attributes: [],
                     },
                     {
                         id: 'm3sZ3Jk4ketOK9M9GD6qS1',
@@ -1869,7 +1890,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         workerIds: [],
-                        fields: [],
+                        attributes: [],
                     },
                     {
                         id: 'D5DUyVr3Azc8zfbqgMovTr',
@@ -1880,7 +1901,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         workerIds: [],
-                        fields: [],
+                        attributes: [],
                     },
                     {
                         id: '1TKczWqL7gndPvMGFxYWGI',
@@ -1891,7 +1912,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         workerIds: [],
-                        fields: [],
+                        attributes: [],
                     },
                     {
                         id: 'Woly7CQBAkkGpe3A21lXoz',
@@ -1902,7 +1923,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         workerIds: [],
-                        fields: [],
+                        attributes: [],
                     },
                     {
                         id: 'DOj4MO3NnhgCDKllZnxDWT',
@@ -1913,7 +1934,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         workerIds: [],
-                        fields: [],
+                        attributes: [],
                     },
                     {
                         id: 'Liv4abswHyIMx4kJz6dTFo',
@@ -1924,7 +1945,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         workerIds: [],
-                        fields: [],
+                        attributes: [],
                     },
                     {
                         id: 'yFZAcQT3sWkhyH0zB80nzH',
@@ -1935,7 +1956,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         workerIds: [],
-                        fields: [],
+                        attributes: [],
                     },
                     {
                         id: '9bPFthPRyPtvfXKti5Qtfo',
@@ -1947,7 +1968,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         workerIds: [],
-                        fields: [],
+                        attributes: [],
                     },
                     {
                         id: 'bNGKd3eRcKynXWfJRLPlx1',
@@ -1959,7 +1980,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         workerIds: [],
-                        fields: [],
+                        attributes: [],
                     },
                     {
                         id: 'Bxkqmeb8izINPj8fmDFh0s',
@@ -1971,7 +1992,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         workerIds: [],
-                        fields: [],
+                        attributes: [],
                     },
                     {
                         id: 'IwXZhOjZKETjhF6g9OJmeQ',
@@ -1983,7 +2004,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         workerIds: [],
-                        fields: [],
+                        attributes: [],
                     },
                 ],
                 edges: [
@@ -2181,7 +2202,7 @@ export async function populateMockData(
                         isCreate: true,
                         isArchive: false,
                         workerIds: [],
-                        fields: [],
+                        attributes: [],
                     },
                     {
                         id: 'M3HcytVGj8JNjrFS0AyVfA',
@@ -2192,7 +2213,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         workerIds: [],
-                        fields: [],
+                        attributes: [],
                     },
                     {
                         id: 'T6I6dn4MKD50QZXlvxIm9I',
@@ -2203,7 +2224,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         workerIds: [],
-                        fields: [],
+                        attributes: [],
                     },
                     {
                         id: 'OHPERFEO1EMfDoGZnccF5F',
@@ -2214,7 +2235,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         workerIds: [],
-                        fields: [],
+                        attributes: [],
                     },
                     {
                         id: 'NHIpcNdKKV4gbT4QOkkXEO',
@@ -2225,7 +2246,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         workerIds: [],
-                        fields: [],
+                        attributes: [],
                     },
                     {
                         id: '4z9uXoChh9HjMTEHfZQhAk',
@@ -2236,7 +2257,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         workerIds: [],
-                        fields: [],
+                        attributes: [],
                     },
                     {
                         id: 'zO7tsd7ndwm2uQDwS30EzR',
@@ -2247,7 +2268,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         workerIds: [],
-                        fields: [],
+                        attributes: [],
                     },
                     {
                         id: '32hICE8mCh9Ch0CMYyjEXR',
@@ -2258,7 +2279,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         workerIds: [],
-                        fields: [],
+                        attributes: [],
                     },
                     {
                         id: 'WwjEFe4v1am6etJDQqg0mi',
@@ -2269,7 +2290,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         workerIds: [],
-                        fields: [],
+                        attributes: [],
                     },
                     {
                         id: 'PU9ueWLOmK247RFNDwuh4R',
@@ -2280,7 +2301,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         workerIds: [],
-                        fields: [],
+                        attributes: [],
                     },
                     {
                         id: 'ybr0XraIXnlbOhYRmBnkz6',
@@ -2291,7 +2312,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         workerIds: [],
-                        fields: [],
+                        attributes: [],
                     },
                     {
                         id: 'qSJo6DFKY52Y0815TFax01',
@@ -2302,7 +2323,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         workerIds: [],
-                        fields: [],
+                        attributes: [],
                     },
                     {
                         id: 'rWdJ5vz4hm9dLVhBYROSoK',
@@ -2313,7 +2334,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         workerIds: [],
-                        fields: [],
+                        attributes: [],
                     },
                     {
                         id: '4zi5yzNsiA89SzrcEityhr',
@@ -2324,7 +2345,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         workerIds: [],
-                        fields: [],
+                        attributes: [],
                     },
                     {
                         id: '8yXx35sqhjAb3lfkSWbsG2',
@@ -2335,7 +2356,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         workerIds: [],
-                        fields: [],
+                        attributes: [],
                     },
                     {
                         id: 'HJBEhUvJ4rA9x8y3s2iVKZ',
@@ -2346,7 +2367,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         workerIds: [],
-                        fields: [],
+                        attributes: [],
                     },
                     {
                         id: '9r0eSQ4ndyaRoYbKTTDpW2',
@@ -2357,7 +2378,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: true,
                         workerIds: [],
-                        fields: [],
+                        attributes: [],
                     },
                 ],
                 edges: [
@@ -2585,6 +2606,253 @@ export async function populateMockData(
                 nodes: leadToCloseNodes,
                 edges: leadToCloseEdges,
             }),
+        },
+    ];
+
+    // Records: app-global data shapes that flows
+    // bind to. Customer Profile carries the
+    // company-info attributes referenced by the
+    // Customer Onboarding Data Capture and Review
+    // nodes, and is multi-bound to Lead-to-Close.
+    // Project Brief carries the idea-shape
+    // attributes referenced by Fusion Flow's
+    // Describe-problem and Solution nodes.
+    const customerProfileRecordId =
+        'rec01CustProfRec0rdAB1';
+    const projectBriefRecordId =
+        'rec02Pr0jBriefRec0rd02';
+
+    const mockRecords: RecordEntity[] = [
+        {
+            id: customerProfileRecordId,
+            name: 'Customer Profile',
+            description:
+                'Company-side facts captured during'
+                + ' onboarding and sales pursuits.',
+        },
+        {
+            id: projectBriefRecordId,
+            name: 'Project Brief',
+            description:
+                'Lightweight scoping shape used by'
+                + ' the Fusion Flow.',
+        },
+    ];
+
+    // Constraint payloads. Three kinds in the toy:
+    // 'regex' on text attributes, 'range_min' /
+    // 'range_max' on number or date attributes.
+    // Applicability is asserted at the row writer
+    // (validators.ts) per defense-in-depth.
+    const emailRegexConstraint: Constraint[] = [{
+        kind: 'regex',
+        pattern: '^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$',
+    }];
+    const revenueRangeMinConstraint:
+        Constraint[] = [{
+        kind: 'range_min',
+        min: '0',
+    }];
+    const foundedOnRangeMaxConstraint:
+        Constraint[] = [{
+        kind: 'range_max',
+        max: '2099-12-31',
+    }];
+
+    const mockRecordAttributes:
+        RecordAttributeEntity[] = [
+        {
+            id: '5JZ0LeKdPCa4QMtg1RsF1M',
+            record_id: customerProfileRecordId,
+            name: 'Company Name',
+            attribute_type: 'text',
+            sort_order: 1,
+            options: jsonArrayField([]),
+            constraints: jsonArrayField([]),
+        },
+        {
+            id: 'nplTIh0qXNtAyoWSwRaBYe',
+            record_id: customerProfileRecordId,
+            name: 'Contact Email',
+            attribute_type: 'text',
+            sort_order: 2,
+            options: jsonArrayField([]),
+            constraints: jsonArrayField(
+                emailRegexConstraint,
+            ),
+        },
+        {
+            id: 'kzHpMw9f1thq79VoBYeIX3',
+            record_id: customerProfileRecordId,
+            name: 'Contact Phone',
+            attribute_type: 'text',
+            sort_order: 3,
+            options: jsonArrayField([]),
+            constraints: jsonArrayField([]),
+        },
+        {
+            id: 'QsmqiOmPtoMLGpSjHOqdHA',
+            record_id: customerProfileRecordId,
+            name: 'Industry',
+            attribute_type: 'select',
+            sort_order: 4,
+            options: jsonArrayField([
+                'Technology',
+                'Finance',
+                'Healthcare',
+                'Retail',
+                'Manufacturing',
+            ]),
+            constraints: jsonArrayField([]),
+        },
+        {
+            id: '0TyjQRcygn3DIyXTe6x1F6',
+            record_id: customerProfileRecordId,
+            name: 'Annual Revenue',
+            attribute_type: 'number',
+            sort_order: 5,
+            options: jsonArrayField([]),
+            constraints: jsonArrayField(
+                revenueRangeMinConstraint,
+            ),
+        },
+        {
+            id: '8Z62tcRHBpwCRH1kBffx0G',
+            record_id: customerProfileRecordId,
+            name: 'Number of Employees',
+            attribute_type: 'number',
+            sort_order: 6,
+            options: jsonArrayField([]),
+            constraints: jsonArrayField([]),
+        },
+        {
+            id: 'aR8nKpQ9wEzVxL3CmBdYTf',
+            record_id: customerProfileRecordId,
+            name: 'Founded On',
+            attribute_type: 'date',
+            sort_order: 7,
+            options: jsonArrayField([]),
+            constraints: jsonArrayField(
+                foundedOnRangeMaxConstraint,
+            ),
+        },
+        {
+            id: 'mBrOOvQtZTTKb5TTnXvzXo',
+            record_id: customerProfileRecordId,
+            name: 'Company Logo',
+            attribute_type: 'text',
+            sort_order: 8,
+            options: jsonArrayField([]),
+            constraints: jsonArrayField([]),
+        },
+        {
+            id: 'y9DiJ5QHNB5ho3K1n9myMc',
+            record_id: customerProfileRecordId,
+            name: 'Supporting Documents',
+            attribute_type: 'text',
+            sort_order: 9,
+            options: jsonArrayField([]),
+            constraints: jsonArrayField([]),
+        },
+        {
+            id: 'AdQlKf43JV6yrhQbyskDkR',
+            record_id: customerProfileRecordId,
+            name: 'Reviewer Notes',
+            attribute_type: 'text',
+            sort_order: 10,
+            options: jsonArrayField([]),
+            constraints: jsonArrayField([]),
+        },
+        {
+            id: 'pBA01Pr0j3ctBr13fNm3T1',
+            record_id: projectBriefRecordId,
+            name: 'Project Name',
+            attribute_type: 'text',
+            sort_order: 1,
+            options: jsonArrayField([]),
+            constraints: jsonArrayField([]),
+        },
+        {
+            id: 'pBA02Pr0j3ctBr13fDsc02',
+            record_id: projectBriefRecordId,
+            name: 'Description',
+            attribute_type: 'text',
+            sort_order: 2,
+            options: jsonArrayField([]),
+            constraints: jsonArrayField([]),
+        },
+        {
+            id: 'pBA03Pr0j3ctBr13fPry03',
+            record_id: projectBriefRecordId,
+            name: 'Priority',
+            attribute_type: 'select',
+            sort_order: 3,
+            options: jsonArrayField([
+                'Low',
+                'Medium',
+                'High',
+                'Critical',
+            ]),
+            constraints: jsonArrayField([]),
+        },
+        {
+            id: 'pBA04Pr0j3ctBr13fApr04',
+            record_id: projectBriefRecordId,
+            name: 'Approved',
+            attribute_type: 'checkbox',
+            sort_order: 4,
+            options: jsonArrayField([]),
+            constraints: jsonArrayField([]),
+        },
+    ];
+
+    // Flow ↔ Record bindings. Customer Profile is
+    // bound to two flows (Customer Onboarding and
+    // Lead-to-Close); Project Brief is bound to
+    // Fusion Flow. The Layout Test flow is left
+    // unbound — it exists to exercise Auto Layout.
+    const mockFlowRecords: FlowRecordEntity[] = [
+        {
+            id: 'frb01CustOnbCustProfA1',
+            flow_id:
+                'h5mErVBQhwdMKwi1co30jB',
+            record_id: customerProfileRecordId,
+            at: wfTimestamp,
+        },
+        {
+            id: 'frb02L3adt0ClCustProf2',
+            flow_id: l2cFlowId,
+            record_id: customerProfileRecordId,
+            at: wfTimestamp,
+        },
+        {
+            id: 'frb03Fus10nPr0jBri3f03',
+            flow_id:
+                'E2BnBlZyrriqsQYkmS4usb',
+            record_id: projectBriefRecordId,
+            at: wfTimestamp,
+        },
+    ];
+
+    // One state event per seeded Record — the
+    // creation moment of each Record on the states
+    // log. Records start at 'active'; subordinate
+    // record_attributes hard-splice when the
+    // parent is deleted via EntityStore.delete.
+    const recordStateEvents: StateEntity[] = [
+        {
+            id: 'rSe01CustPr0fact1ve01A',
+            entity_id: customerProfileRecordId,
+            state: 'active',
+            worker_id: SYSTEM_WORKER_ID,
+            at: wfTimestamp,
+        },
+        {
+            id: 'rSe02Pr0jBri3fact1ve02',
+            entity_id: projectBriefRecordId,
+            state: 'active',
+            worker_id: SYSTEM_WORKER_ID,
+            at: wfTimestamp,
         },
     ];
 
@@ -3007,6 +3275,18 @@ export async function populateMockData(
             flow_graph: prcGraph(),
             position: 44,
         },
+        // Gate violation case: sits at Create with
+        // no values captured. The next transition
+        // to Data Capture must trip the property-
+        // test gate on Company Name + Contact
+        // Email (both Required, both null) — the
+        // reachable browser-testing case.
+        {
+            id: 'gateV101W0rkOrd3rXY0a1',
+            display_id: 'gate0001',
+            flow_graph: woGraph(),
+            position: 45,
+        },
     ];
 
     const mockFlowWorkOrders:
@@ -3367,6 +3647,14 @@ export async function populateMockData(
             work_order_id:
                 'BUrGEVDMF6FeU35WUHUY5E',
             at: dt(5, 10, 0),
+        },
+        {
+            id: 'gvFW01gateV101CustOnb1',
+            flow_id:
+                'h5mErVBQhwdMKwi1co30jB',
+            work_order_id:
+                'gateV101W0rkOrd3rXY0a1',
+            at: dt(1, 9, 0),
         },
     ];
 
@@ -5108,6 +5396,17 @@ export async function populateMockData(
             at: dt(3, 14, 0),
         },
         // stays at Decision -- no more transitions
+        // Gate-violation work order: only a Create
+        // event; transitioning to Data Capture
+        // trips the gate on Company Name + Email.
+        {
+            id: 'gvSe01CreateGateV101AB',
+            entity_id:
+                'gateV101W0rkOrd3rXY0a1',
+            state: woNodeNew,
+            worker_id: woPersonSarah,
+            at: dt(1, 9, 0),
+        },
     ];
 
     const mockStateFieldValues:
@@ -5449,13 +5748,6 @@ export async function populateMockData(
         },
     ];
 
-    // One state event per seeded idea — the
-    // current state of each idea on the states
-    // log. Stage 8b+c retires the dual-column
-    // representation; the log IS the truth. Each
-    // event is authored by the idea's submitter
-    // at submission time. UI surfaces this as the
-    // composite state badge.
     const ideaStateEvents: StateEntity[] = [
         {
             id: 'qJoFXyzUUaq0vEpHL5e34l',
@@ -5536,13 +5828,6 @@ export async function populateMockData(
         },
     ];
 
-    // One state event per seeded project — the
-    // current state of each project on the states
-    // log. Stage 9b+c retires the dual-column
-    // representation; the log IS the truth. Events
-    // are authored by SYSTEM_WORKER_ID at project
-    // start time. UI surfaces this as the state
-    // badge.
     const projectStateEvents: StateEntity[] = [
         {
             id: 'pSe01Cu5tSegmAi5pEv01',
@@ -5829,6 +6114,38 @@ export async function populateMockData(
                 at: r.at,
             }),
         ),
+        ...mockRecords.map(r =>
+            adapter.records.put(r.id, {
+                name: r.name,
+                description: r.description,
+            }),
+        ),
+        ...mockRecordAttributes.map(r =>
+            adapter.recordAttributes.put(r.id, {
+                record_id: r.record_id,
+                name: r.name,
+                attribute_type:
+                    r.attribute_type,
+                sort_order: r.sort_order,
+                options: r.options,
+                constraints: r.constraints,
+            }),
+        ),
+        ...mockFlowRecords.map(r =>
+            adapter.flowRecords.put(r.id, {
+                flow_id: r.flow_id,
+                record_id: r.record_id,
+                at: r.at,
+            }),
+        ),
+        ...recordStateEvents.map(r =>
+            adapter.states.put(r.id, {
+                entity_id: r.entity_id,
+                state: r.state,
+                worker_id: r.worker_id,
+                at: r.at,
+            }),
+        ),
     ]);
 
     for (const seed of OBJECTIVE_SEEDS) {
@@ -5977,6 +6294,197 @@ export async function populateMockData(
 export async function populateBootstrapData(
     adapter: DbAdapter,
 ): Promise<void> {
+    // Bootstrap Records: the same two shapes
+    // seeded by populateMockData, so the empty-
+    // state app still has a coherent Records UI
+    // to browse. No flows exist in the bootstrap
+    // seed, so no flow_records bindings either —
+    // bindings appear when mock data is loaded.
+    const customerProfileRecordId =
+        'rec01CustProfRec0rdAB1';
+    const projectBriefRecordId =
+        'rec02Pr0jBriefRec0rd02';
+
+    const bootstrapRecords: RecordEntity[] = [
+        {
+            id: customerProfileRecordId,
+            name: 'Customer Profile',
+            description:
+                'Company-side facts captured'
+                + ' during onboarding and sales'
+                + ' pursuits.',
+        },
+        {
+            id: projectBriefRecordId,
+            name: 'Project Brief',
+            description:
+                'Lightweight scoping shape used'
+                + ' by the Fusion Flow.',
+        },
+    ];
+
+    const emailRegexConstraint: Constraint[] = [{
+        kind: 'regex',
+        pattern: '^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$',
+    }];
+    const revenueRangeMinConstraint:
+        Constraint[] = [{
+        kind: 'range_min',
+        min: '0',
+    }];
+    const foundedOnRangeMaxConstraint:
+        Constraint[] = [{
+        kind: 'range_max',
+        max: '2099-12-31',
+    }];
+
+    const bootstrapRecordAttributes:
+        RecordAttributeEntity[] = [
+        {
+            id: '5JZ0LeKdPCa4QMtg1RsF1M',
+            record_id: customerProfileRecordId,
+            name: 'Company Name',
+            attribute_type: 'text',
+            sort_order: 1,
+            options: jsonArrayField([]),
+            constraints: jsonArrayField([]),
+        },
+        {
+            id: 'nplTIh0qXNtAyoWSwRaBYe',
+            record_id: customerProfileRecordId,
+            name: 'Contact Email',
+            attribute_type: 'text',
+            sort_order: 2,
+            options: jsonArrayField([]),
+            constraints: jsonArrayField(
+                emailRegexConstraint,
+            ),
+        },
+        {
+            id: 'kzHpMw9f1thq79VoBYeIX3',
+            record_id: customerProfileRecordId,
+            name: 'Contact Phone',
+            attribute_type: 'text',
+            sort_order: 3,
+            options: jsonArrayField([]),
+            constraints: jsonArrayField([]),
+        },
+        {
+            id: 'QsmqiOmPtoMLGpSjHOqdHA',
+            record_id: customerProfileRecordId,
+            name: 'Industry',
+            attribute_type: 'select',
+            sort_order: 4,
+            options: jsonArrayField([
+                'Technology',
+                'Finance',
+                'Healthcare',
+                'Retail',
+                'Manufacturing',
+            ]),
+            constraints: jsonArrayField([]),
+        },
+        {
+            id: '0TyjQRcygn3DIyXTe6x1F6',
+            record_id: customerProfileRecordId,
+            name: 'Annual Revenue',
+            attribute_type: 'number',
+            sort_order: 5,
+            options: jsonArrayField([]),
+            constraints: jsonArrayField(
+                revenueRangeMinConstraint,
+            ),
+        },
+        {
+            id: '8Z62tcRHBpwCRH1kBffx0G',
+            record_id: customerProfileRecordId,
+            name: 'Number of Employees',
+            attribute_type: 'number',
+            sort_order: 6,
+            options: jsonArrayField([]),
+            constraints: jsonArrayField([]),
+        },
+        {
+            id: 'aR8nKpQ9wEzVxL3CmBdYTf',
+            record_id: customerProfileRecordId,
+            name: 'Founded On',
+            attribute_type: 'date',
+            sort_order: 7,
+            options: jsonArrayField([]),
+            constraints: jsonArrayField(
+                foundedOnRangeMaxConstraint,
+            ),
+        },
+        {
+            id: 'mBrOOvQtZTTKb5TTnXvzXo',
+            record_id: customerProfileRecordId,
+            name: 'Company Logo',
+            attribute_type: 'text',
+            sort_order: 8,
+            options: jsonArrayField([]),
+            constraints: jsonArrayField([]),
+        },
+        {
+            id: 'y9DiJ5QHNB5ho3K1n9myMc',
+            record_id: customerProfileRecordId,
+            name: 'Supporting Documents',
+            attribute_type: 'text',
+            sort_order: 9,
+            options: jsonArrayField([]),
+            constraints: jsonArrayField([]),
+        },
+        {
+            id: 'AdQlKf43JV6yrhQbyskDkR',
+            record_id: customerProfileRecordId,
+            name: 'Reviewer Notes',
+            attribute_type: 'text',
+            sort_order: 10,
+            options: jsonArrayField([]),
+            constraints: jsonArrayField([]),
+        },
+        {
+            id: 'pBA01Pr0j3ctBr13fNm3T1',
+            record_id: projectBriefRecordId,
+            name: 'Project Name',
+            attribute_type: 'text',
+            sort_order: 1,
+            options: jsonArrayField([]),
+            constraints: jsonArrayField([]),
+        },
+        {
+            id: 'pBA02Pr0j3ctBr13fDsc02',
+            record_id: projectBriefRecordId,
+            name: 'Description',
+            attribute_type: 'text',
+            sort_order: 2,
+            options: jsonArrayField([]),
+            constraints: jsonArrayField([]),
+        },
+        {
+            id: 'pBA03Pr0j3ctBr13fPry03',
+            record_id: projectBriefRecordId,
+            name: 'Priority',
+            attribute_type: 'select',
+            sort_order: 3,
+            options: jsonArrayField([
+                'Low',
+                'Medium',
+                'High',
+                'Critical',
+            ]),
+            constraints: jsonArrayField([]),
+        },
+        {
+            id: 'pBA04Pr0j3ctBr13fApr04',
+            record_id: projectBriefRecordId,
+            name: 'Approved',
+            attribute_type: 'checkbox',
+            sort_order: 4,
+            options: jsonArrayField([]),
+            constraints: jsonArrayField([]),
+        },
+    ];
+
     await Promise.all([
         adapter.workers.put(SYSTEM_WORKER_ID, {
             first_name: 'System',
@@ -6038,5 +6546,34 @@ export async function populateBootstrapData(
             health_status: 'excellent',
             last_activity: dt(0, 16, 0),
         }),
+        ...bootstrapRecords.map(r =>
+            adapter.records.put(r.id, {
+                name: r.name,
+                description: r.description,
+            }),
+        ),
+        ...bootstrapRecordAttributes.map(r =>
+            adapter.recordAttributes.put(r.id, {
+                record_id: r.record_id,
+                name: r.name,
+                attribute_type:
+                    r.attribute_type,
+                sort_order: r.sort_order,
+                options: r.options,
+                constraints: r.constraints,
+            }),
+        ),
+        adapter.states.record(
+            'bootstrap-cust-profile-active',
+            customerProfileRecordId,
+            'active',
+            SYSTEM_WORKER_ID,
+        ),
+        adapter.states.record(
+            'bootstrap-project-brief-active',
+            projectBriefRecordId,
+            'active',
+            SYSTEM_WORKER_ID,
+        ),
     ]);
 }

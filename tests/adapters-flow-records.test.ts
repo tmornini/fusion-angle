@@ -1,0 +1,202 @@
+import { test } from 'node:test';
+import { strict as assert } from 'node:assert';
+import { MemoryDbAdapter } from '../api/db-memory.ts';
+import {
+    createRequestContext,
+} from '../web-app/app/adapters/shared.ts';
+import {
+    putFlowRecord,
+    getFlowRecord,
+    deleteFlowRecord,
+    getRecordForFlow,
+    getFlowsForRecord,
+    getWorkOrdersForRecord,
+} from '../web-app/app/adapters/flow-records.ts';
+import {
+    jsonObjectField,
+    DEFAULT_LOCK_TIMEOUT,
+} from '../api/types.ts';
+
+const AT = '2026-05-01T00:00:00.000Z';
+
+async function seedWorkOrder(
+    db: MemoryDbAdapter,
+    id: string,
+    displayId: string,
+    flowId: string,
+    position: number,
+): Promise<void> {
+    const flowGraph = jsonObjectField({
+        flowId,
+        name: 'Flow',
+        description: '',
+        lockTimeout: DEFAULT_LOCK_TIMEOUT,
+        nodes: [],
+        edges: [],
+    });
+    await db.workOrders.put(id, {
+        display_id: displayId,
+        flow_graph: flowGraph,
+        position,
+    });
+    await db.flowWorkOrders.put(
+        'fwo-' + id, {
+            flow_id: flowId,
+            work_order_id: id,
+            at: AT,
+        },
+    );
+}
+
+test(
+    'putFlowRecord then getFlowRecord round-trips'
+    + ' the binding row',
+    async () => {
+        const db = new MemoryDbAdapter();
+        const ctx = createRequestContext(db);
+        await putFlowRecord(ctx, 'fr-1', {
+            flow_id: 'flow-1',
+            record_id: 'rec-1',
+            at: AT,
+        });
+        const stored = await getFlowRecord(
+            ctx, 'fr-1',
+        );
+        assert.equal(stored.flow_id, 'flow-1');
+        assert.equal(stored.record_id, 'rec-1');
+        assert.equal(stored.at, AT);
+    },
+);
+
+test(
+    'getRecordForFlow returns the bound'
+    + ' record id, or null if unbound',
+    async () => {
+        const db = new MemoryDbAdapter();
+        const ctx = createRequestContext(db);
+        await putFlowRecord(ctx, 'fr-1', {
+            flow_id: 'flow-1',
+            record_id: 'rec-1',
+            at: AT,
+        });
+        assert.equal(
+            await getRecordForFlow(ctx, 'flow-1'),
+            'rec-1',
+        );
+        assert.equal(
+            await getRecordForFlow(
+                ctx, 'flow-unbound',
+            ),
+            null,
+        );
+    },
+);
+
+test(
+    'getFlowsForRecord returns every flow id'
+    + ' bound to a record',
+    async () => {
+        const db = new MemoryDbAdapter();
+        const ctx = createRequestContext(db);
+        await putFlowRecord(ctx, 'fr-1', {
+            flow_id: 'flow-a',
+            record_id: 'rec-1',
+            at: AT,
+        });
+        await putFlowRecord(ctx, 'fr-2', {
+            flow_id: 'flow-b',
+            record_id: 'rec-1',
+            at: AT,
+        });
+        await putFlowRecord(ctx, 'fr-3', {
+            flow_id: 'flow-c',
+            record_id: 'rec-other',
+            at: AT,
+        });
+        const flows = await getFlowsForRecord(
+            ctx, 'rec-1',
+        );
+        assert.deepEqual(
+            flows.sort(),
+            ['flow-a', 'flow-b'],
+        );
+    },
+);
+
+test(
+    'getWorkOrdersForRecord walks'
+    + ' flow_records → flow_work_orders →'
+    + ' work_orders correctly for a record bound'
+    + ' to multiple flows',
+    async () => {
+        const db = new MemoryDbAdapter();
+        const ctx = createRequestContext(db);
+        // Bind rec-1 to two flows.
+        await putFlowRecord(ctx, 'fr-1', {
+            flow_id: 'flow-a',
+            record_id: 'rec-1',
+            at: AT,
+        });
+        await putFlowRecord(ctx, 'fr-2', {
+            flow_id: 'flow-b',
+            record_id: 'rec-1',
+            at: AT,
+        });
+        // One work order on each.
+        await seedWorkOrder(
+            db, 'wo-a', 'A001', 'flow-a', 1,
+        );
+        await seedWorkOrder(
+            db, 'wo-b', 'B001', 'flow-b', 2,
+        );
+        // Plus a noise work order on an
+        // unrelated flow.
+        await seedWorkOrder(
+            db, 'wo-other', 'X001',
+            'flow-other', 3,
+        );
+        const workOrders =
+            await getWorkOrdersForRecord(
+                ctx, 'rec-1',
+            );
+        const ids = workOrders
+            .map(w => w.id)
+            .sort();
+        assert.deepEqual(ids, ['wo-a', 'wo-b']);
+    },
+);
+
+test(
+    'getWorkOrdersForRecord returns an empty'
+    + ' list for an unbound record',
+    async () => {
+        const db = new MemoryDbAdapter();
+        const ctx = createRequestContext(db);
+        const workOrders =
+            await getWorkOrdersForRecord(
+                ctx, 'rec-unknown',
+            );
+        assert.equal(workOrders.length, 0);
+    },
+);
+
+test(
+    'deleteFlowRecord removes the binding row',
+    async () => {
+        const db = new MemoryDbAdapter();
+        const ctx = createRequestContext(db);
+        await putFlowRecord(ctx, 'fr-1', {
+            flow_id: 'flow-1',
+            record_id: 'rec-1',
+            at: AT,
+        });
+        await deleteFlowRecord(ctx, 'fr-1');
+        await assert.rejects(
+            () => getFlowRecord(ctx, 'fr-1'),
+        );
+        assert.equal(
+            await getRecordForFlow(ctx, 'flow-1'),
+            null,
+        );
+    },
+);

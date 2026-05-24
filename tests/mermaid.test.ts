@@ -42,7 +42,7 @@ test('generateMermaid emits start with stadium brackets', () => {
                 isCreate: true,
                 isArchive: false,
                 workerIds: [],
-                fields: [],
+                attributes: [],
             },
         ],
     } as never);
@@ -62,7 +62,7 @@ test('generateMermaid emits complete with triple parens', () => {
                 isCreate: false,
                 isArchive: true,
                 workerIds: [],
-                fields: [],
+                attributes: [],
             },
         ],
     } as never);
@@ -82,7 +82,7 @@ test('generateMermaid sanitizes dashes in IDs', () => {
                 isCreate: false,
                 isArchive: false,
                 workerIds: [],
-                fields: [],
+                attributes: [],
             },
         ],
     } as never);
@@ -101,7 +101,7 @@ test('generateMermaid emits labeled edges', () => {
                 isCreate: false,
                 isArchive: false,
                 workerIds: [],
-                fields: [],
+                attributes: [],
             },
             {
                 id: 'b', name: 'B',
@@ -110,7 +110,7 @@ test('generateMermaid emits labeled edges', () => {
                 isCreate: false,
                 isArchive: false,
                 workerIds: [],
-                fields: [],
+                attributes: [],
             },
         ],
         edges: [
@@ -137,7 +137,7 @@ test('generateMermaid emits unlabeled edges', () => {
                 isCreate: false,
                 isArchive: false,
                 workerIds: [],
-                fields: [],
+                attributes: [],
             },
             {
                 id: 'b', name: 'B',
@@ -146,7 +146,7 @@ test('generateMermaid emits unlabeled edges', () => {
                 isCreate: false,
                 isArchive: false,
                 workerIds: [],
-                fields: [],
+                attributes: [],
             },
         ],
         edges: [
@@ -172,7 +172,7 @@ test('generateMermaid quotes labels with special chars', () => {
                 isCreate: false,
                 isArchive: false,
                 workerIds: [],
-                fields: [],
+                attributes: [],
             },
         ],
     } as never);
@@ -244,7 +244,7 @@ test('mermaid round-trip preserves structure', () => {
                 isCreate: true,
                 isArchive: false,
                 workerIds: [],
-                fields: [],
+                attributes: [],
             },
             {
                 id: 'm', name: 'Middle',
@@ -253,7 +253,7 @@ test('mermaid round-trip preserves structure', () => {
                 isCreate: false,
                 isArchive: false,
                 workerIds: [],
-                fields: [],
+                attributes: [],
             },
             {
                 id: 'e', name: 'Archive',
@@ -262,7 +262,7 @@ test('mermaid round-trip preserves structure', () => {
                 isCreate: false,
                 isArchive: true,
                 workerIds: [],
-                fields: [],
+                attributes: [],
             },
         ],
         edges: [

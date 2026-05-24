@@ -223,7 +223,7 @@ test(
 
 test(
     'ProjectDetailPresenter renders a read view'
-    + ' with breadcrumb, title, description and'
+    + ' with title, description and'
     + ' summary/metrics sections',
     () => {
         const view = new ProjectView(
@@ -238,7 +238,6 @@ test(
         new ProjectDetailPresenter(view, [])
             .renderShell(rec.container);
         const out = rec.allHtml();
-        assert.match(out, /Projects/);
         assert.match(out, /Apollo/);
         assert.match(out, /Go to the moon\./);
         assert.match(out, /Project Summary/);

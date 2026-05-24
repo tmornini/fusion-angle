@@ -1,0 +1,123 @@
+.record-list-row {
+    display: grid;
+    grid-template-columns:
+        1.5fr 2fr 0.6fr 0.6fr;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid
+        hsl(var(--color-border));
+    color: inherit;
+    text-decoration: none;
+}
+
+.record-list-row:hover {
+    background:
+        hsl(var(--color-muted) / 0.4);
+}
+
+.record-list-row-head {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: hsl(var(--color-muted-foreground));
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    cursor: default;
+}
+
+.record-list-row-head:hover {
+    background: none;
+}
+
+.record-attribute-row {
+    display: grid;
+    grid-template-columns:
+        1fr auto auto;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid
+        hsl(var(--color-border));
+}
+
+.record-attribute-row:last-child {
+    border-bottom: none;
+}
+
+.record-attribute-edit-row {
+    display: grid;
+    grid-template-columns:
+        1.2fr 0.8fr 1.5fr 1.5fr auto;
+    align-items: start;
+    gap: 0.5rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid
+        hsl(var(--color-border));
+}
+
+.record-constraint-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.record-constraint-row {
+    display: grid;
+    grid-template-columns:
+        auto 1fr auto;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.record-constraint-add {
+    margin-top: 0.25rem;
+}
+
+.record-bound-flows,
+.record-work-orders {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.flow-attribute-fieldset {
+    border: 1px solid
+        hsl(var(--color-border));
+    border-radius: 0.5rem;
+    padding: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+
+.flow-attribute-ref-row {
+    display: grid;
+    grid-template-columns:
+        1fr 1fr auto auto;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.25rem 0;
+}
+
+.flow-attribute-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.flow-attribute-picker {
+    margin-top: 0.5rem;
+}
+
+.flow-binding-slot {
+    display: flex;
+    align-items: center;
+    margin-left: 1rem;
+}
+
+.flow-binding-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}

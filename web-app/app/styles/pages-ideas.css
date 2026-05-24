@@ -121,15 +121,6 @@
   padding-bottom: var(--space-2);
 }
 
-.idea-detail-wrap {
-  max-width: 48rem;
-  margin: 0 auto;
-}
-
-.idea-detail-wrap.has-footer-actions {
-  padding-bottom: 10rem;
-}
-
 .idea-edit-title {
   font-size: 1.125rem;
   font-weight: var(--font-weight-bold);

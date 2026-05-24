@@ -150,13 +150,6 @@ export async function postHumanWorkerCreation(
     humanWorkerChanges.notify();
 }
 
-// State transition for an existing human worker:
-// one state event, nothing else. The row is
-// untouched — per the doctrine "every state is an
-// event; the latest event is the truth", lifecycle
-// stage is the log, not a column. Pair with
-// putHumanWorker in sequence when a caller needs
-// both an entity edit and a transition.
 export async function postHumanWorkerStateChange(
     ctx: RequestContext,
     id: string,
@@ -170,11 +163,6 @@ export async function postHumanWorkerStateChange(
     humanWorkerChanges.notify();
 }
 
-// Archives a human worker by writing a terminal
-// 'archived' state event. The row persists — only
-// the lifecycle stage advances. Mirrors
-// archiveAIWorker per Commandment III (Uniformity):
-// one operation name across worker kinds.
 export async function archiveHumanWorker(
     ctx: RequestContext,
     id: WorkerId,

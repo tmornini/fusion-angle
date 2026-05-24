@@ -103,7 +103,7 @@ export {
     type InboxItem,
 } from './workbox-inbox.ts';
 export {
-    buildFieldInputHtml,
+    buildAttributeInputHtml,
     WorkboxDetailPresenter,
 } from './workbox-detail.ts';
 export {
@@ -131,3 +131,17 @@ export {
 export {
     DashboardObjectiveAggregatesPresenter,
 } from './dashboard-objective-aggregates.ts';
+export {
+    RecordListPresenter,
+    type RecordListRow,
+} from './record-list.ts';
+export {
+    RecordDetailPresenter,
+    RecordDetailEditPresenter,
+    recordDraftFromView,
+    allowedConstraintKinds,
+    formatConstraint,
+    type RecordDetailView,
+    type RecordDetailDraft,
+    type AttributeDraft,
+} from './record-detail.ts';

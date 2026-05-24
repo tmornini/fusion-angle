@@ -192,13 +192,13 @@ test(
 );
 
 test(
-    'getDashboardGauges returns Time, Cost, Impact',
+    'getDashboardGauges returns Time, Cost, Portfolio Impact',
     async () => {
         const { ctx } = setupDb();
         const gauges = await getDashboardGauges(ctx);
         assert.deepEqual(
             gauges.map(g => g.title),
-            ['Time', 'Cost', 'Impact'],
+            ['Time', 'Cost', 'Portfolio Impact'],
         );
         assert.deepEqual(
             gauges.map(g => g.icon),
@@ -280,12 +280,12 @@ test(
     });
 
 test(
-    'getDashboardGauges marks Impact as bipolar',
+    'getDashboardGauges marks Portfolio Impact as bipolar',
     async () => {
         const { ctx } = setupDb();
         const gauges = await getDashboardGauges(ctx);
         const impact = gauges
-            .find(g => g.title === 'Impact');
+            .find(g => g.title === 'Portfolio Impact');
         assert.equal(impact?.kind, 'bipolar');
     },
 );
@@ -305,13 +305,13 @@ test(
 );
 
 test(
-    'getDashboardGauges Impact passes undefined'
-    + ' means without clamping to zero',
+    'getDashboardGauges Portfolio Impact passes'
+    + ' undefined means without clamping to zero',
     async () => {
         const { ctx } = setupDb();
         const gauges = await getDashboardGauges(ctx);
         const impact = gauges
-            .find(g => g.title === 'Impact');
+            .find(g => g.title === 'Portfolio Impact');
         // Empty db => baselineMean and actualMean
         // both undefined. The bipolar Impact gauge
         // must NOT clamp them to 0 (the previous

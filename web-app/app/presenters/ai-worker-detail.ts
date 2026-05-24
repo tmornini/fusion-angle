@@ -94,12 +94,7 @@ function buildShell(
 ): void {
     setHtml(container, html`
 <div class="worker-detail-host">
-    <div class="worker-detail-wrap">
-        <div class="${
-            'flex items-center gap-2'
-            + ' text-sm text-muted mb-4'
-            + ' worker-breadcrumb-slot'
-        }"></div>
+    <div class="entity">
         <div class="${
             'flex items-start'
             + ' justify-between gap-4 mb-6'
@@ -137,18 +132,6 @@ function mutateSlot(
     markup: SafeHtml,
 ): void {
     setHtml($required(cls, container), markup);
-}
-
-function buildBreadcrumb(
-    name: string,
-): SafeHtml {
-    return html`
-        <a href="../workers/index.html"
-            class="hover-link">
-            Workers
-        </a>
-        <span>/</span>
-        <span>${name}</span>`;
 }
 
 function buildAvatar(): SafeHtml {
@@ -486,13 +469,6 @@ export class AIWorkerDetailPresenter {
     ): void {
         mutateSlot(
             container,
-            '.worker-breadcrumb-slot',
-            buildBreadcrumb(
-                this.#worker.nameText(),
-            ),
-        );
-        mutateSlot(
-            container,
             '.worker-title-slot',
             buildReadonlyTitleSection(
                 this.#worker,
@@ -545,13 +521,6 @@ export class AIWorkerDetailEditPresenter {
     renderUpdate(
         container: HTMLElement,
     ): void {
-        mutateSlot(
-            container,
-            '.worker-breadcrumb-slot',
-            buildBreadcrumb(
-                this.#worker.nameText(),
-            ),
-        );
         mutateSlot(
             container,
             '.worker-title-slot',

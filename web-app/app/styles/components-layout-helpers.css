@@ -1,4 +1,4 @@
-/* Layout primitives: stack, content-wrap, legend cell, list item. */
+/* Layout primitives: stack, entity, legend cell, list item. */
 
 /* Objective list item — used by Organization
    Objectives box */
@@ -100,24 +100,24 @@
 }
 
 
-.content-wrap {
-  max-width: 48rem;
+.entity {
+  max-width: var(--width-entity);
   margin-left: auto;
   margin-right: auto;
 }
-.content-wrap-md {
-  max-width: 56rem;
+.overview {
+  max-width: var(--width-overview);
   margin-left: auto;
   margin-right: auto;
 }
-.content-wrap-xl {
-  max-width: 64rem;
+
+.workspace {
+  max-width: var(--width-workspace);
   margin-left: auto;
   margin-right: auto;
 }
-.content-wrap-lg {
-  max-width: 72rem;
-  margin-left: auto;
-  margin-right: auto;
+
+.has-footer-actions {
+  padding-bottom: 10rem;
 }
 

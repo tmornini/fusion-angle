@@ -12,6 +12,9 @@ import type {
     WorkOrderEntity,
     FlowWorkOrderEntity,
     StateFieldValueEntity,
+    RecordEntity,
+    RecordAttributeEntity,
+    FlowRecordEntity,
     Objective,
     ObjectiveRevision,
     ProjectObjectiveBaselineScore,
@@ -155,6 +158,12 @@ export interface DbAdapter {
         EntityStore<
             StateFieldValueEntity
         >;
+    records:
+        EntityStore<RecordEntity>;
+    recordAttributes:
+        EntityStore<RecordAttributeEntity>;
+    flowRecords:
+        EntityStore<FlowRecordEntity>;
     organization:
         SingletonStore<OrganizationEntity>;
     ideaSubmissions:
@@ -187,6 +196,9 @@ export const TABLE_NAMES = [
     'work_orders',
     'flow_work_orders',
     'state_field_values',
+    'records',
+    'record_attributes',
+    'flow_records',
     'organization',
     'idea_submissions',
     'objectives',

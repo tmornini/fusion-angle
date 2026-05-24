@@ -15,9 +15,7 @@ import type {
     ProjectEntity,
     GraphNode,
     GraphEdge,
-    GraphField,
     StoredGraph,
-    FlowFieldType,
 } from '../../../api/types.ts';
 import {
     generateCryptoSafeBase62,
@@ -34,7 +32,6 @@ import {
     asNumber,
     asBoolean,
     asStoredGraph,
-    asFlowFieldType,
 } from '../../../api/validators.ts';
 import {
     getFlowGraph,
@@ -71,14 +68,6 @@ export async function getFlowMermaid(
     return generateMermaid(graph);
 }
 
-interface SidecarField {
-    name: string;
-    fieldType: FlowFieldType;
-    sortOrder: number;
-    isRequired: boolean;
-    options: string[];
-}
-
 interface SidecarNode {
     mermaidId: string;
     name: string;
@@ -87,7 +76,6 @@ interface SidecarNode {
     positionY: number;
     isCreate: boolean;
     isArchive: boolean;
-    fields: SidecarField[];
 }
 
 interface SidecarEdge {
@@ -113,13 +101,6 @@ function buildSidecar(
             positionY: n.positionY,
             isCreate: n.isCreate,
             isArchive: n.isArchive,
-            fields: n.fields.map(f => ({
-                name: f.name,
-                fieldType: f.fieldType,
-                sortOrder: f.sortOrder,
-                isRequired: f.isRequired,
-                options: f.options,
-            })),
         }));
     const edges: SidecarEdge[] =
         graph.edges.map(e => ({
@@ -533,16 +514,7 @@ export async function postFlowFromBackup(
             isCreate: n.isCreate,
             isArchive: n.isArchive,
             workerIds: n.workerIds,
-            fields: n.fields.map(
-                f => ({
-                    id: generateCryptoSafeBase62(),
-                    name: f.name,
-                    fieldType: f.fieldType,
-                    sortOrder: f.sortOrder,
-                    isRequired: f.isRequired,
-                    options: f.options,
-                }),
-            ),
+            attributes: [],
         });
     }
 
@@ -885,7 +857,7 @@ export async function postFlowFromMermaid(
                     workerIds: [
                         ...DEFAULT_NODE_WORKER_IDS,
                     ],
-                    fields: [],
+                    attributes: [],
                 };
             },
         );
@@ -956,49 +928,11 @@ interface SidecarData {
     edges: SidecarEdge[];
 }
 
-function asSidecarField(
-    value: unknown,
-    label: string,
-): SidecarField {
-    const obj = asObject(value, label);
-    const optsArr = asArray(
-        obj['options'],
-        label + '.options',
-    );
-    return {
-        name: asString(
-            obj['name'], label + '.name',
-        ),
-        fieldType: asFlowFieldType(
-            obj['fieldType'],
-            label + '.fieldType',
-        ),
-        sortOrder: asNumber(
-            obj['sortOrder'],
-            label + '.sortOrder',
-        ),
-        isRequired: asBoolean(
-            obj['isRequired'],
-            label + '.isRequired',
-        ),
-        options: optsArr.map((o, i) =>
-            asString(
-                o,
-                label + '.options['
-                    + i + ']',
-            ),
-        ),
-    };
-}
-
 function asSidecarNode(
     value: unknown,
     label: string,
 ): SidecarNode {
     const obj = asObject(value, label);
-    const fieldsArr = asArray(
-        obj['fields'], label + '.fields',
-    );
     return {
         mermaidId: asString(
             obj['mermaidId'],
@@ -1026,13 +960,6 @@ function asSidecarNode(
         isArchive: asBoolean(
             obj['isArchive'],
             label + '.isArchive',
-        ),
-        fields: fieldsArr.map((f, i) =>
-            asSidecarField(
-                f,
-                label + '.fields['
-                    + i + ']',
-            ),
         ),
     };
 }
@@ -1102,19 +1029,6 @@ function validateSidecarDataJson(
     };
 }
 
-function sidecarFieldsToGraph(
-    sc: SidecarNode,
-): GraphField[] {
-    return sc.fields.map(f => ({
-        id: generateCryptoSafeBase62(),
-        name: f.name,
-        fieldType: f.fieldType,
-        sortOrder: f.sortOrder,
-        isRequired: f.isRequired,
-        options: f.options,
-    }));
-}
-
 function applySidecarToDefault(
     node: GraphNode,
     sc: SidecarNode | undefined,
@@ -1124,7 +1038,6 @@ function applySidecarToDefault(
     node.description = sc.description;
     node.positionX = sc.positionX;
     node.positionY = sc.positionY;
-    node.fields = sidecarFieldsToGraph(sc);
 }
 
 export async function postFlowFromZip(
@@ -1321,11 +1234,7 @@ export async function postFlowFromZip(
                     workerIds: [
                         ...DEFAULT_NODE_WORKER_IDS,
                     ],
-                    fields: sc
-                        ? sidecarFieldsToGraph(
-                            sc,
-                        )
-                        : [],
+                    attributes: [],
                 };
             },
         );

@@ -128,12 +128,6 @@ export async function postAIWorkerCreation(
     aiWorkerChanges.notify();
 }
 
-// Archives an AI worker by writing a terminal
-// 'archived' state event. The row persists — only
-// the lifecycle stage advances. Mirrors the
-// terminal state used for humans, per
-// Commandment III (Uniformity): one terminal
-// vocabulary across worker kinds.
 export async function archiveAIWorker(
     ctx: RequestContext,
     id: WorkerId,

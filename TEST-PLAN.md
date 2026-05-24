@@ -65,7 +65,7 @@ The fast suite (`./test` / `./validate`) now also covers:
 flow-edit business logic and the connection-validation rules
 (`tests/flow-operations.test.ts` — `performAddEdge` /
 `performAddNodeAtPosition` / `performDeleteSelected*` /
-`performAddField` / `performDeleteField` / `performUndo` /
+`performAddAttributeRef` / `performRemoveAttributeRef` / `performUndo` /
 `performRedo`, including no-edge-to-a-start-node, none-from-an-
 end-node, no-duplicate-edge, start-node-single-outgoing, and the
 lock/noop/commit-error branches); the flow version and query
@@ -243,20 +243,20 @@ last (they wipe the database). See `CLAUDE.md` section
 |---|--:|
 | AT. Automated Test Suite | 3 |
 | A. Build & Setup | 5 |
-| AA. Data Entry Workflow | 47 |
+| AA. Data Entry Workflow | 48 |
 | B. Entry Pages | 14 |
 | C. Core: Dashboard | 7 |
 | D. Core: Ideas Workflow | 37 |
 | E. Core: Projects | 11 |
 | F. Tools | 74 |
-| F2. Workbox | 25 |
+| F2. Workbox | 26 |
 | FS. Flow Statistics | 9 |
 | G. Admin Pages | 27 |
 | H. Reference & System | 2 |
 | I. Cross-Cutting Concerns | 28 |
 | J. Teardown | 3 |
 | K. Objectives & Scoring | 30 |
-| **Total** | **322** |
+| **Total** | **324** |
 
 ### Combined Totals (CLI + Browser)
 
@@ -265,9 +265,9 @@ only. Combined with the CLI automated suite:
 
 | Layer                  | Cases    |
 |------------------------|---------:|
-| CLI automated tests    |      781 |
-| Browser regression     |      322 |
-| **Combined TOTAL**     | **1103** |
+| CLI automated tests    |      837 |
+| Browser regression     |      324 |
+| **Combined TOTAL**     | **1161** |
 
 CLI count = most recent `./validate` (AT2) report; the number
 grows as tests land in `tests/*.test.ts`. Browser count = the
@@ -287,8 +287,8 @@ Format` at the bottom of this file):
 | pending  | Default (`- [ ]`); not yet executed  |  n/a   |
 
 A fully green run reports:
-`PASS = 1103, FAIL = 0, BLOCKED ≤ k, DEFERRED ≤ j, DRIFT = 0`,
-where the six status counts sum to **Combined TOTAL** (1103).
+`PASS = 1161, FAIL = 0, BLOCKED ≤ k, DEFERRED ≤ j, DRIFT = 0`,
+where the six status counts sum to **Combined TOTAL** (1161).
 `BLOCKED ≠ FAIL` and `DRIFT ≠ FAIL` — only `FAIL` indicates a
 regression.
 
@@ -309,7 +309,7 @@ run before A1's build. The single canonical invocation is
 ## A. Build & Setup
 
 - [ ] **A1** Run `./build` from a clean working directory. PASS: exits 0, prints no errors, creates `~/Desktop/fusion-ai-<sha>.zip`.
-- [ ] **A2** Run `./build --no-zip /tmp/fusion-test/`. PASS: `/tmp/fusion-test/` contains `assets/app.js`, `assets/styles.css`, `assets/` (*.woff2 fonts), 13 page directories (`auth`, `billing`, `dashboard`, `design-system`, `flows`, `ideas`, `landing`, `not-found`, `organization`, `projects`, `snapshots`, `workbox`, `workers`) with 22 HTML page files (including `flows/stats.html`), plus root `index.html`.
+- [ ] **A2** Run `./build --no-zip /tmp/fusion-test/`. PASS: `/tmp/fusion-test/` contains `assets/app.js`, `assets/styles.css`, `assets/` (*.woff2 fonts), 14 page directories (`auth`, `billing`, `dashboard`, `design-system`, `flows`, `ideas`, `landing`, `not-found`, `organization`, `projects`, `records`, `snapshots`, `workbox`, `workers`) with 24 HTML page files (including `flows/stats.html` and `records/detail.html`), plus root `index.html`.
 - [ ] **A3** Start an HTTP server from the build directory (`cd /tmp/fusion-test/ && python3 -m http.server 8080`). PASS: server starts without errors.
 - [ ] **A4** Open `http://localhost:8080/` in the test browser. PASS: redirects to `snapshots/index.html` when no data exists, or `landing/index.html` (which auto-redirects to `dashboard/index.html` after ~2 seconds) when data has been loaded.
 - [ ] **A5** Open DevTools Console and confirm no JavaScript errors on initial load. PASS: console is clean (warnings from browser extensions are acceptable).
@@ -421,10 +421,14 @@ on. Run these in order.
 - [ ] **AA18** On Ideas list, filter by "In Review". Click idea #1. PASS: navigates to idea detail with approval footer.
 - [ ] **AA19** Click "Approve". PASS: idea status changes to approved, confirmation shown.
 - [ ] **AA20** Approve idea #4 as well (it was submitted for review in AA16). Leave others in their current status. PASS: statuses match mock data (2 approved, rest in-review/active).
-- [ ] **AA21** Navigate to approved idea #1. Click "Convert". PASS: conversion form loads with 5 required fields (Project Name, Start Date, Target End Date, Cost, Impact). No Project Lead field — the team data model has been retired.
-- [ ] **AA22** Fill all required fields: Project Name, Start Date, Target End Date, Cost, Impact. Click "Create Project". PASS: navigates to project detail for the new project.
+- [ ] **AA21** Navigate to approved idea #1. Click "Convert". PASS: conversion form loads with 4 required fields (Project Name, Time (days), Cost, Impact) and an optional Success Criteria field.
+- [ ] **AA22** Fill all 4 required fields: Project Name, Time (days), Cost, Impact. Optionally fill Success Criteria. Click "Create Project". PASS: navigates to project detail for the new project.
 - [ ] **AA23** On project detail, click "Edit". Set fields (title, description, status, start date, end date, cost baseline, impact baseline) to match mock data. Save. PASS: project data persists.
 - [ ] **AA24** Approve remaining ideas (7, 8, 9, 10) from Ideas list (filter by "In Review"), then convert all 6 approved ideas to projects. PASS: Projects list shows all 6 with correct status and progress.
+
+### AA8. Score and Approve Projects
+
+- [ ] **AA24a** From the Projects list, click into project #1 (the first converted project, status `submitted`). Click Edit, change Status to `under-review`, Save. PASS: toast confirms; action bar re-renders with a Score button. Click Score. PASS: modal opens with one slider per active objective (4 sliders against the AA-Obj baseline). Drag every slider to a non-zero value; click Save baselines. PASS: modal closes; the read-only Objectives section shows 4 baseline-scored rows; the Approve button enables. Click Approve; confirm. PASS: status flips to `approved`; the action bar re-renders with `Log measurement` / `Complete` / `View history` buttons. The project is now eligible for the New Flow gate in AA25. (Codifies the post-commit `82f0d72 state-gate project scoring sliders` workflow that AA25 depends on; without scoring and approving, projects remain at `submitted` and the New Flow button stays hidden behind the `Approve to add flows` info badge.)
 
 ### AA9. Create Flows
 
@@ -470,9 +474,13 @@ on. Run these in order.
   containing two groups — HUMANS and AIs — each
   with a labeled checkbox per worker (no checkbox
   ticked yet), then State Name input, Description
-  input, empty Fields list, and outgoing
+  input, empty Attributes list, and outgoing
   transitions. The node gets a gold glow selection
   effect on the canvas.
+  (Properties panel double-click is BLOCKED per the
+  MCP pointer-capture limitation; validate end-state
+  via direct JSON injection into `fusion-ai:flows`
+  per the CLAUDE.md workaround.)
 - [ ] **AA29** Edit the state name in the
   properties panel to "Data Capture". PASS: the
   node label updates on the canvas immediately
@@ -516,22 +524,27 @@ on. Run these in order.
   BLOCKED for the shift-drag gesture itself per
   the MCP pointer-capture limitation.)
 - [ ] **AA33** In the "Data Capture" properties
-  panel, click "+ Add Field". Enter name "Company
-  Name", type "text", check "Required". PASS:
-  field appears in the fields list with a "text"
-  badge and a red asterisk (*) required indicator.
-  (The add-field logic is now covered by
-  `tests/flow-operations.test.ts` (`performAddField`)
-  — this case verifies the panel form and the
-  fields-list rendering only.)
-- [ ] **AA34** Add more fields to "Data Capture":
-  Contact Email (email, required), Industry (select
-  with options "Technology, Finance, Healthcare"),
-  Company Logo (image). PASS: all fields appear
-  with correct type badges.
+  panel, open the "Attributes" fieldset. Click the
+  "+ Add Attribute…" dropdown. PASS: the picker
+  lists available record attributes pre-defined
+  in the bound Record. Select an attribute (e.g.
+  "Company Name"). PASS: the attribute appears in
+  the attributes list with mode (Editable /
+  Read-only) and required toggles plus a remove
+  control. (The add-attribute logic is covered by
+  `tests/flow-operations.test.ts`
+  (`performAddAttributeRef`) — this case verifies
+  the picker rendering and attribute-binding UI
+  only.)
+- [ ] **AA34** Add more attributes to "Data
+  Capture": select 2–3 attributes from the
+  picker, each with a distinct mode (Editable /
+  Read-only) and required toggle. PASS: all
+  attributes appear in the list with correct
+  mode badges and toggle state.
 - [ ] **AA35** Wait for auto-save (800ms debounce).
   Navigate away and back. PASS: all nodes, edges,
-  and fields persist.
+  and attributes persist.
 
 ### AA10. Verify Dashboard
 
@@ -596,12 +609,12 @@ on. Run these in order.
 
 ### Auth Page (`auth/`)
 
-- [ ] **B4** Page loads in **Sign In** mode by default. PASS: title is "Welcome back", submit button reads "Sign in →".
+- [ ] **B4** Page loads in **Sign In** mode by default. PASS: title is "Welcome back", submit button reads "Sign in" with an SVG arrow icon (matching the Sign Up button's "Create account" affordance per B10).
 - [ ] **B5** On desktop (≥1024px), left panel shows branded marketing stats (10K+ Active Users, 98% Satisfaction, 50+ Integrations). PASS: two-column layout visible.
 - [ ] **B6** Submit with empty fields. PASS: "Email is required" error appears below email input; input gets error styling.
 - [ ] **B7** Enter `notanemail` in email, leave password empty. PASS: "Please enter a valid email address" error on email.
 - [ ] **B8** Enter `test@example.com`, password `123`. PASS: "Password must be at least 6 characters" error on password.
-- [ ] **B9** Enter `test@example.com`, password `password123`, click "Sign in →". PASS: button shows spinner briefly, then navigates to `dashboard/index.html`.
+- [ ] **B9** Enter `test@example.com`, password `password123`, click "Sign in". PASS: button shows spinner briefly, then navigates to `dashboard/index.html`.
 - [ ] **B10** Click the "Sign up" button (positioned next to the static "Don't have an account?" label — the label is not itself the toggle; the adjacent button is). PASS: switches to Sign Up mode — title changes to "Get started", "Company name (optional)" field appears, submit reads "Create account" with an SVG arrow icon (not a literal "→" character).
 - [ ] **B11** Fill valid email + password (≥6 chars) in Sign Up mode, click "Create account →". PASS: toast "Welcome to Fusion AI! Your account has been created." appears, then navigates to `dashboard/index.html` after a brief delay (the dedicated onboarding page has been retired — sign-up routes straight to the dashboard).
 
@@ -618,15 +631,19 @@ on. Run these in order.
 - [ ] **C1** Navigate to `dashboard/`. PASS: page loads with sidebar, header, and main content area.
 - [ ] **C2** Sidebar shows flat navigation
   links in this order: Dashboard, Ideas,
-  Projects, Flows, Workbox, Organization,
-  Workers, Billing, Snapshots, Design System.
-  PASS: all 10 links present, in order, and
-  styled. (Teams, People, Roles, Crews,
-  Company, Activity Feed, and Profile sidebar
-  entries have been retired — the current
-  user's detail is reachable via the sidebar
-  account chip and the header greeting; humans
-  and AIs both live on the Workers page.)
+  Projects, Flows, Records, Workbox,
+  Organization, Workers, Billing, Snapshots,
+  Design System. PASS: all 11 links present,
+  in order, and styled. Source of truth:
+  `PAGE_REGISTRY` (entries with
+  `inSidebarNav: true`) in
+  `web-app/app/page-registry.ts`.
+  (Teams, People, Roles, Crews, Company,
+  Activity Feed, and Profile sidebar entries
+  have been retired — the current user's
+  detail is reachable via the sidebar account
+  chip and the header greeting; humans and AIs
+  both live on the Workers page.)
 - [ ] **C3** Header shows search bar, greeting
   ("Good {morning/afternoon/evening}, Tony
   Stark" — varies by time of day), company
@@ -645,7 +662,8 @@ on. Run these in order.
 - [ ] **C7** Check that seed data populates all 4 dashboard
   surfaces (2 gauges + Portfolio Impact card + Aggregate
   Objectives box). PASS: no "No data" empty states on
-  initial load against the Phase 1 baseline (10 humans,
+  initial load against the Phase 1 baseline (12 humans —
+  10 created + Tony Stark + System Worker bootstrap,
   4 AIs, 11 ideas, 6 projects, 1 flow, 4 objectives).
 
 ---
@@ -664,7 +682,7 @@ on. Run these in order.
 
 ### Idea Create Form (`ideas/create.html`)
 
-- [ ] **D5** Page loads showing a single-page form with six fields: Title, Problem Statement, Target Users, Proposed Solution, Expected Outcome, Success Metrics. PASS: all six fields visible.
+- [ ] **D5** Page loads showing a single-page form with six conversationally-labeled fields: "Give your idea a clear title" (Title), "What problem does this solve?" (Problem Statement), "Who will benefit from this?" (Target Users), "How would you solve this?" (Proposed Solution), "What outcome do you expect?" (Expected Outcome), "How would you measure success?" (Success Metrics). The parenthetical identity is the field id; the prompt is the visible label. PASS: all six fields visible.
 - [ ] **D6** "Submit Idea" button is disabled when any required field is empty. PASS: button is visually disabled and not clickable.
 - [ ] **D7** Fill in all required fields (Title,
   Problem Statement, Proposed Solution,
@@ -703,8 +721,8 @@ on. Run these in order.
 
 ### Idea Convert (`ideas/convert.html`)
 
-- [ ] **D22** Navigate to `ideas/convert.html?ideaId=<id>` for a convertible idea. PASS: page loads with conversion form showing 5 required fields: Project Name, Start Date, Target End Date, Cost, Impact. Sticky sidebar shows "Problem & Solution" with title, problem, solution, and expected outcome. (No Project Lead field — that selector and its underlying TeamEntity have been retired.)
-- [ ] **D23** With required fields empty, "Create Project" button is disabled and progress bar shows 0/5. Fill fields one at a time. PASS: progress bar increments with each field, checkmarks appear next to completed fields, button enables only when all 5 required fields are filled.
+- [ ] **D22** Navigate to `ideas/convert.html?ideaId=<id>` for a convertible idea. PASS: page loads with conversion form showing 4 required fields: Project Name, Time (days), Cost, Impact. A 5th field "Success Criteria" is also present but optional (it maps to the project description). Sticky sidebar shows "Problem & Solution" with title, problem, solution, and expected outcome. Source of truth: `REQUIRED_FIELDS` in `web-app/app/presenters/idea-conversion.ts`.
+- [ ] **D23** With required fields empty, "Create Project" button is disabled and progress bar shows 0/4. Fill fields one at a time. PASS: progress bar increments with each required field, checkmarks appear next to completed fields, button enables only when all 4 required fields are filled. Typing in the optional "Success Criteria" field does NOT advance the progress bar or enable the button.
 - [ ] **D24** Fill all required fields (progress bar reaches 100%), click "Create Project". PASS: navigates to project detail page for the newly created project.
 
 ### Idea Status Filtering (`ideas/index.html`)
@@ -718,7 +736,7 @@ on. Run these in order.
 
 - [ ] **D29** Navigate to `ideas/detail.html?ideaId=7` (in-review idea). PASS: page loads with idea details and sticky approval footer showing Send Back / Approve.
 - [ ] **D30** Click "Approve". PASS: success toast, navigates to ideas list, idea status is now "approved".
-- [ ] **D31** Click "Send Back". PASS: dialog opens asking for feedback. Confirm. PASS: idea status changes to "sent-back", navigates to ideas list.
+- [ ] **D31** Click "Send Back". PASS: confirm dialog opens. Confirm. PASS: idea status changes to "sent-back", navigates to ideas list.
 - [ ] **D32** Navigate to idea detail for a non-in-review idea. PASS: no approval footer is shown.
 
 ### Ideas Workflow Integration
@@ -745,7 +763,7 @@ on. Run these in order.
 
 ### Projects List (`projects/`)
 
-- [ ] **E1** Navigate to `projects/`. PASS: table/list shows 6 seeded projects with title, status, and progress. Each project card shows three metrics (time, cost, impact). Em-dash ("—") substitutes for the entire metric when its **baseline (denominator) is missing**; a zero current value over a non-zero baseline renders as `0d / 213d`, `$0k / $120k`, or `0 / 85` — not em-dash. Em-dash signals "no baseline to compare against," not "zero current value."
+- [ ] **E1** Navigate to `projects/`. PASS: table/list shows 6 seeded projects with title, status, and progress. Each project card shows three metrics (time, cost, impact). Em-dash ("—") substitutes for the entire metric when its **baseline (denominator) is missing**; a zero current value over a non-zero baseline renders as `0d / 213d`, `$0k / $120k`, or `0 / 85` — not em-dash. Em-dash signals "no baseline to compare against," not "zero current value." When the current is missing but the baseline is present, the half-em-dash form (e.g. `— / 46 pts`) renders the absent current side only — distinct from full em-dash (both absent) and from `0d / 213d` (zero current over present baseline).
 - [ ] **E2** Click a status filter badge (e.g. "Active"). PASS: project list filters to show only projects with that status. Click the same badge again or "All". PASS: full list returns.
 - [ ] **E3** Click a project row. PASS: navigates to `projects/detail.html?projectId=<id>`.
 
@@ -813,7 +831,7 @@ opens and renders.)
 
 - [ ] **F4** Click "Import Flow" button on the flows list page. PASS: import dialog opens with a file upload input and a project selector dropdown.
 - [ ] **F5** Select a `.mmd` file via the file input and choose a project from the dropdown. Click "Import". PASS: flow is created, toast confirms import, and browser navigates to the flow designer for the imported flow.
-- [ ] **F6** Repeat with a `.zip` file exported from a previous flow. PASS: imported flow renders with nodes, edges, and fields visible (round-trip fidelity is covered by `tests/mermaid.test.ts` + `tests/zip-guards.test.ts`).
+- [ ] **F6** Repeat with a `.zip` file exported from a previous flow. PASS: imported flow renders with nodes, edges, and attributes visible (round-trip fidelity is covered by `tests/mermaid.test.ts` + `tests/zip-guards.test.ts`).
 
 ### Flow Designer (`flows/detail.html?flowId=...`)
 
@@ -841,8 +859,8 @@ opens and renders.)
 - [ ] **F8** Nodes display correctly: start node
   has green border with its name centered in the
   card and no subtitle, standard nodes have blue
-  border with field count subtitle, complete node
-  has a red 3-px border with its name centered
+  border with attribute count subtitle, complete
+  node has a red 3-px border with its name centered
   in the card and no subtitle.
 - [ ] **F9** Edges display correctly: forward
   edges are solid blue lines with arrow markers
@@ -876,13 +894,21 @@ opens and renders.)
   nodes still show their kind title), then a
   Workers fieldset (HUMANS / AIs checkbox
   groups), then state name, description, form
-  fields list, and outgoing transitions.
+  attributes list, and outgoing transitions.
+  (Properties panel double-click is BLOCKED per the
+  MCP pointer-capture limitation; validate end-state
+  via direct JSON injection into `fusion-ai:flows`
+  per the CLAUDE.md workaround.)
 - [ ] **F12** Pan so a node sits near the right
   edge of the canvas, then double-click it. PASS:
   the properties panel slides out from the
   toolbar edge over ~200ms and the canvas
   re-centers so the node sits at the visual center
   of the canvas region not covered by the panel.
+  (Properties panel double-click is BLOCKED per the
+  MCP pointer-capture limitation; validate end-state
+  via direct JSON injection into `fusion-ai:flows`
+  per the CLAUDE.md workaround.)
 - [ ] **F13** While the panel is open, double-click
   a different node. PASS: panel content updates to
   the new selection and the canvas re-centers on
@@ -975,11 +1001,13 @@ opens and renders.)
   the properties panel. PASS: the node label
   updates on the SVG canvas immediately (changes
   auto-save after 800ms debounce).
-- [ ] **F25** Double-click a node, click "+ Add
-  Field". Enter field name, select type from
-  dropdown, toggle required. PASS: field appears
-  in the fields list with lowercase type badge
-  (e.g. "text") and red asterisk (*) if required.
+- [ ] **F25** Double-click a node to open the
+  properties panel. In the "Attributes" fieldset,
+  click the "+ Add Attribute…" dropdown. PASS:
+  the picker lists available record attributes.
+  Select one. PASS: the attribute appears in the
+  attributes list with mode (Editable / Read-only)
+  and required toggles plus a remove control.
 - [ ] **F26** Click an edge to select it (gold glow).
   Double-click to open properties panel. PASS:
   panel shows transition name, description,
@@ -998,7 +1026,7 @@ opens and renders.)
 - [ ] **F30** Edit a node name via the properties
   panel, wait 1 second for auto-save. Navigate
   away and return to the designer. PASS: all
-  nodes, edges, fields, and positions persist.
+  nodes, edges, attributes, and positions persist.
 - [ ] **F31** Navigate to
   `flows/detail.html?flowId=nonexistent`. PASS:
   page handles gracefully — shows error state,
@@ -1049,7 +1077,7 @@ states, and that the canvas re-renders after each step.)
 - [ ] **F40** Toggle the Locked checkbox in the designer header.
   PASS: connection ports disappear from all middle nodes, the
   Delete toolbar button becomes disabled, and opening a properties
-  panel shows fields as read-only (inputs `disabled`, every
+  panel shows panel controls as read-only (inputs `disabled`, every
   checkbox in the Workers fieldset also `disabled` and
   unresponsive to clicks). Auto Layout remains enabled because
   it only repositions nodes without changing structure. Visual
@@ -1058,7 +1086,7 @@ states, and that the canvas re-renders after each step.)
   strokes (cycles remain dashed), edge-label backgrounds gain
   gold strokes, and the dot-grid background renders unchanged
   from its unlocked appearance. Untoggle Locked: ports return,
-  the Delete button re-enables, fields become editable, the
+  the Delete button re-enables, panel controls become editable, the
   Workers checkboxes become interactive again, and per-type
   colors return (Create green, Archive red, Regular blue,
   Cycle amber).
@@ -1066,7 +1094,7 @@ states, and that the canvas re-renders after each step.)
   in the toolbar. PASS: toast confirms the clipboard copy, and the
   clipboard holds Mermaid flowchart syntax for the current graph.
   (Round-trip correctness — `generateMermaid` → `parseMermaid`
-  preserving nodes, edges, and field definitions — is covered by
+  preserving nodes, edges, and attribute references — is covered by
   `tests/mermaid.test.ts`; this case verifies the toolbar action
   and the clipboard write.)
 - [ ] **F42** Click "Export" in the toolbar. PASS: a `.zip` file
@@ -1077,7 +1105,7 @@ states, and that the canvas re-renders after each step.)
 - [ ] **F43** On `flows/index.html` click "Import Flow", select a
   `.mmd` file previously exported from a known flow, choose a
   project, and submit. PASS: the imported flow opens in the designer
-  and renders nodes, edges, and fields. (Structural fidelity of the
+  and renders nodes, edges, and attributes. (Structural fidelity of the
   mermaid round-trip is covered by `tests/mermaid.test.ts`; this
   case verifies the import dialog and that the designer opens on the
   imported flow.)
@@ -1098,7 +1126,9 @@ states, and that the canvas re-renders after each step.)
   Navigate away from the designer to `flows/index.html`. Re-open the
   same flow. Click Undo. PASS: the rename reverts — the undo history
   survived navigation because versions are persisted to the schema,
-  not held in memory.
+  not held in memory. (Single-edit undo persistence is bounded by
+  `FLOW_VERSION_CAP` (10) per F45 — mass-rename testing beyond 10
+  edits will see the oldest version evicted.)
 
 ### Space Toggle (Pan Mode)
 
@@ -1182,37 +1212,42 @@ states, and that the canvas re-renders after each step.)
   checkbox unticks — `workerIds` changes are undoable
   like name/description changes.
 
-### Field Editor (Node Panel)
+### Attribute Editor (Node Panel)
 
 - [ ] **F68** Single-select a regular node (not Create/Archive)
-  to open the properties panel. Click "+ Add Field". PASS:
-  the field editor form appears below the button — name
-  input, type select, required checkbox, options textarea,
-  and an "Add" button are visible inside the panel.
+  to open the properties panel. In the "Attributes"
+  fieldset, click the "+ Add Attribute…" dropdown. PASS:
+  the picker lists available record attributes
+  pre-defined in the bound Record (the picker is
+  populated from `record_attributes`).
   (Regression for the captured-presenter bug at
   `detail.ts:1006`: this exact click used to do nothing
   because the handler closed over a presenter captured at
   init time, which had no selection.)
-- [ ] **F69** Continuing from F68, type "Email" in the name
-  input, change type to "email", check Required. Click
-  Add. PASS: a row "Email" with an "email" type badge and
-  a red asterisk appears in the fields list. The form
-  remains visible so additional fields can be added.
-- [ ] **F70** Continuing from F69, click the delete control
-  on the "Email" field row. PASS: the row disappears from
-  the fields list.
+- [ ] **F69** Continuing from F68, select an attribute
+  from the picker (e.g. "Email"). PASS: the row "Email"
+  appears in the attributes list with mode (Editable /
+  Read-only) and required toggles. The dropdown
+  remains available so additional attributes can be
+  added.
+- [ ] **F70** Continuing from F69, click the remove ("×")
+  control on the "Email" attribute row. PASS: the row
+  disappears from the attributes list.
 - [ ] **F71** Lock the flow via the toolbar checkbox.
-  Single-select a regular node and click "+ Add Field".
-  PASS: a "Flow is locked" toast appears; the field
-  editor form is NOT injected into the panel.
+  Single-select a regular node. Click the disabled
+  "+ Add Attribute…" dropdown in the Attributes
+  fieldset. PASS: nothing happens — no panel change,
+  no toast, no attribute row appended (a disabled
+  `<select>` does not fire `change`).
 - [ ] **F72** Single-select a regular node. Tick one
-  worker checkbox in the Workers fieldset. Click "+ Add
-  Field" in the same panel. PASS: the field editor form
-  appears. (Regression: a `workerIds` commit replaces the
-  presenter, so a click handler that captured a stale
-  presenter would have acted on the pre-commit snapshot —
-  this case proves the handler reads the current presenter
-  at click time.)
+  worker checkbox in the Workers fieldset. Click the
+  "+ Add Attribute…" dropdown in the same panel. PASS:
+  the dropdown remains functional and lists available
+  attributes. (Regression: a `workerIds` commit
+  replaces the presenter, so a click handler that
+  captured a stale presenter would have acted on the
+  pre-commit snapshot — this case proves the handler
+  reads the current presenter at click time.)
 - [ ] **F73 — Hazard severity rendering.** On a regular
   (non-start, non-complete) node, vary the worker count
   and outgoing-edge count and confirm the bottom-left
@@ -1245,7 +1280,7 @@ states, and that the canvas re-renders after each step.)
 
 ### AA13. Workbox Source Flow
 
-- [ ] **AA-WB-SETUP** Create one Workbox-only flow named `WB Test Flow` with three nodes: Create → Capture (text + select fields) → Archive (`is_complete: true`). This flow is mutated only by Agent-F2. Agent-F2's WO creation reads from this flow, not from any Agent-F flow.
+- [ ] **AA-WB-SETUP** Create one Workbox-only flow named `WB Test Flow` with three nodes: Create → Capture (text + select attributes) → Archive (`is_complete: true`). This flow is mutated only by Agent-F2. Agent-F2's WO creation reads from this flow, not from any Agent-F flow.
 
 ### Workbox Inbox (`workbox/`)
 
@@ -1289,30 +1324,31 @@ states, and that the canvas re-renders after each step.)
   appears in the `NOT READY` section with
   subtitle "1 node needs attention". Restore the
   edge and verify it returns to `READY`.
-- [ ] **WB5b — Server-side gate.** With `WB Test
-  Flow` in a non-ready state, drive
-  `postWorkOrderCreation` directly via DevTools
-  console (`await
-  postWorkOrderCreation(createRequestContext(),
-  { flow_id: '<id>' })`). PASS: a thrown error
-  surfaces with message containing "flow not
-  ready" — defense in depth even if the picker
-  is bypassed.
+- [ ] **WB5b — Server-side gate.** The server-side
+  gate is covered by
+  `tests/adapters-flow-publish.test.ts`
+  (`validateFlowForCreation` + `getFlowsForCreation`).
+  No manual browser verification needed; this case
+  PASSES by virtue of the automated coverage — the
+  production IIFE bundle does not expose
+  `postWorkOrderCreation` on the console, so a
+  DevTools-driven verification is not available
+  against the deployed build.
 
 ### Workbox — Action Screen (`workbox/detail.html`)
 
 - [ ] **WB6** The action screen shows: back button
   (icon-only), flow name, display ID, current
-  state badge, and dynamically rendered fields
-  matching the current node's field definitions
+  state badge, and dynamically rendered attributes
+  matching the current node's attribute references
   from the flow graph.
-- [ ] **WB7** Field types render correctly: text
+- [ ] **WB7** Attribute types render correctly: text
   inputs, textareas, selects, number inputs,
   date inputs, file inputs, checkboxes, radio
-  buttons as appropriate for each field type
+  buttons as appropriate for each attribute type
   in the flow definition.
 - [ ] **WB8** Transition buttons appear below
-  the fields, one per outgoing edge from the
+  the attributes, one per outgoing edge from the
   current node, labeled with the edge name.
 - [ ] **WB9** A "Release Work Order" button is
   visible,
@@ -1323,7 +1359,7 @@ states, and that the canvas re-renders after each step.)
 
 ### Workbox — Transitions
 
-- [ ] **WB11** Fill in required fields and click
+- [ ] **WB11** Fill in required attributes and click
   a transition button. PASS: transition is
   recorded, work order moves to the next state,
   browser navigates back to the inbox. The work
@@ -1331,7 +1367,7 @@ states, and that the canvas re-renders after each step.)
 - [ ] **WB12** Click the work order row in the
   Active tab. PASS: work order is claimed and
   browser navigates to the action screen
-  showing the new state's fields.
+  showing the new state's attributes.
 - [ ] **WB13** Click "Release Work Order". PASS:
   a single click soft-deletes the active claim
   and the browser navigates to the inbox, where
@@ -1345,7 +1381,7 @@ states, and that the canvas re-renders after each step.)
   longer appears in Active.
 - [ ] **WB15** Click a completed work order in
   the Archive tab. PASS: action screen shows
-  read-only view with history but no fields
+  read-only view with history but no attributes
   or transition buttons.
 
 ### Workbox — Data Integrity
@@ -1526,8 +1562,10 @@ the claude-in-chrome MCP.
 
 - [ ] **G11** Navigate to `workers/index.html` (reachable
   via the "Workers" sidebar entry). PASS: page header reads
-  "Manage Workers" with a subtitle showing the human and AI
-  counts (e.g. "10 humans, 4 AIs"). A `+ Add Worker` button
+  "Workers" with a static subtitle "Manage humans and AIs
+  in your organization" (no count display — header text is
+  static, populated counts live in the sidebar header and
+  the table grouping). A `+ Add Worker` button
   on the right opens the kind-picker dialog. Below the
   header sit a search input and three filter chips (All /
   Humans / AIs, with All pressed by default). The list
@@ -1566,20 +1604,23 @@ the claude-in-chrome MCP.
   mode shows avatar (initials), name + status badge,
   title · department subtitle, Personal Information card
   (First Name, Last Name, Email, Phone, Title, Department,
-  Bio), Working Styles card (4-axis dimensions), and
-  Strengths card.
+  Bio), Working Styles card (4-axis dimensions surfaced
+  under presentation labels Mover / Shaker / Prover /
+  Maker, backed by data keys `driver` / `analytical` /
+  `expressive` / `amiable`), and Strengths card.
 - [ ] **G20** Click Edit. PASS: header swaps Edit for
   Cancel/Save; Personal Information card switches to
   inputs (First/Last Name text, Email email-input, Phone
-  text, Title text, Department select, Status select, Bio
-  textarea); Strengths card switches to a tag picker.
-  Working Styles card stays read-only.
+  text, Title text, Department select, State select with
+  HTML id `worker-state` per the `WORKER_STATES`
+  alphabet, Bio textarea); Strengths card switches to a
+  tag picker. Working Styles card stays read-only.
 - [ ] **G21** Edit Phone and Bio, toggle one strength on
-  and one off, change Status from Active to Pending,
+  and one off, change State from Active to Pending,
   click Save. PASS: toast "Worker saved" appears. Navigate
   away (e.g. to Dashboard) and return. PASS: all edits
   persist; the row on `workers/index.html` reflects the new
-  status badge.
+  state badge.
 - [ ] **G22** Click Edit, change a field, press `Escape`.
   PASS: edits discarded, view returns to read mode.
 - [ ] **G23** Click Edit, change a text field, press
@@ -1625,20 +1666,27 @@ verify the four operation cards, the file-picker affordance, the
 post-operation redirect, and that pages render against the
 restored data.)
 
-- [ ] **G30** Navigate to `snapshots/`. PASS: shows 4 operation cards (Create Pristine Environment, Wipe and Load Mock Data, Download Snapshot, Upload Snapshot). The Upload Snapshot card hosts a hidden `<input type="file" id="upload-input">` that the card's button triggers.
+- [ ] **G30** Navigate to `snapshots/`. PASS: shows 4 operation cards (Create Pristine Environment, Wipe and Load Mock Data, Download Snapshot, Upload Snapshot). The Upload Snapshot card hosts a hidden `<input type="file" id="upload-input">` wrapped by a `<label>` styled as a button — the platform-primitive affordance for triggering a hidden file input (no JS click-forwarder).
 - [ ] **G31** Click "Download Snapshot". PASS: browser downloads `fusion-ai-snapshot-YYYY-MM-DD.json`. File contains valid JSON with entity data.
 - [ ] **G32** Click "Create Pristine Environment", confirm
   the dialog. PASS: redirects to `dashboard/index.html`.
   Dashboard renders with zeroed-out metrics (empty
-  database). Every table in `TABLE_NAMES` is present as
-  an empty array EXCEPT `fusion-ai:workers` and
-  `fusion-ai:organization`, which `postBootstrap`
-  bootstrap-seeds after the pristine wipe — `workers`
-  holds the current user (Tony Stark), `organization`
-  holds Stark Industries. Empty-array tables persisted
-  via column-compression appear as a `gz1:H4sI…`
-  sentinel rather than the literal `[]` string; the
-  `db-localstorage` adapter decodes them transparently.
+  database except for bootstrap seed). Every table in
+  `TABLE_NAMES` is present as an empty array EXCEPT
+  `fusion-ai:workers` (holds System Worker + Tony Stark),
+  `fusion-ai:organization` (holds Stark Industries),
+  `fusion-ai:records` (2 seeded shapes: Customer
+  Profile, Project Brief), `fusion-ai:record_attributes`
+  (14 bootstrap attributes across both record shapes),
+  and `fusion-ai:states` (bootstrap state events for the
+  seeded entities). Source of truth:
+  `populateBootstrapData` in `api/mock-data.ts`. Empty
+  `flow_versions` and other tables appear as `gz1:H4sI…`
+  sentinels
+  (column-compression is scoped to those two tables);
+  the other empty tables persist as the literal `[]`
+  string. The `db-localstorage` adapter decodes both
+  shapes transparently.
   The full table set is the constant `TABLE_NAMES` in
   `api/db.ts`;
   cross-check against that. No tables outside that list
@@ -1744,10 +1792,10 @@ feature is implemented.
 
 ### Mobile Responsive
 
-- [ ] **I10 — Mobile breakpoint** (NOT MCP-driven — `resize_window` does not change the CSS viewport). Verify by source: read `web-app/app/styles/responsive.css` and confirm `@media (max-width: 767px)` rules toggle the desktop sidebar (`.sidebar` → `display: none`) and reveal the mobile drawer. PASS = rules present and well-formed.
+- [ ] **I10 — Mobile breakpoint** (NOT MCP-driven — `resize_window` does not change the CSS viewport). Verify by source: read `web-app/app/styles/layout.css` lines 312–323 and confirm `@media (max-width: 767px)` rules toggle the desktop sidebar (`.sidebar` → `display: none`) and reveal the mobile drawer. PASS = rules present and well-formed.
 - [ ] **I11** Tap/click the hamburger menu. PASS: mobile sidebar sheet slides in from the left with navigation links.
 - [ ] **I12** Tap/click the backdrop or a nav link. PASS: mobile sidebar closes.
-- [ ] **I13** Tap a navigation link in the mobile sidebar. PASS: navigates to the target page and mobile sidebar closes.
+- [ ] **I13** Tap a navigation link in the mobile sidebar. PASS: navigates to the target page and mobile sidebar closes. (Note: the drawer closes implicitly via page navigation — the next page loads in default-hidden state. No explicit close-on-link-click handler is required; navigation is the close trigger.)
 - [ ] **I14** Open the mobile sidebar, press `Escape`. PASS: sidebar closes.
 - [ ] **I15** Open the mobile sidebar, press `Tab` repeatedly. PASS: focus cycles through focusable elements inside the sidebar without escaping to the page behind it. `Shift+Tab` at the first element wraps to the last.
 
@@ -1757,7 +1805,7 @@ feature is implemented.
 - [ ] **I17** Type a search term (e.g. "ideas"). PASS: filtered results appear. Select a result — navigates to the corresponding page.
 - [ ] **I18** Press `Escape`. PASS: command palette closes.
 - [ ] **I19** Open command palette, type a search term. Use `Down Arrow` and `Up Arrow` to navigate results. PASS: active result highlight moves with arrow keys. Press `Enter`. PASS: navigates to the highlighted result.
-- [ ] **I20** Open command palette with an empty search field. PASS: results list shows up to 12 items from the combined index, grouped by category (Pages, Ideas, Projects, Workers) with category headers — when the dataset is sparse enough for multiple categories to fit in 12 items, multiple groups appear; otherwise a single group is shown. Type a multi-category term (e.g. "dashboard") that matches across groups. PASS: results regroup under multiple category headers. Type a term that matches no results. PASS: result list is empty or shows a no-results message.
+- [ ] **I20** Open command palette with an empty search field. PASS: results list shows up to 12 items from the combined index, grouped by category (Pages, Ideas, Projects, Workers) with category headers — when the dataset is sparse enough for multiple categories to fit in 12 items, multiple groups appear; otherwise a single group is shown. Type a multi-category term (e.g. "a", which matches across Pages / Ideas / Projects / Workers) that matches across groups. PASS: results regroup under multiple category headers. Type a term that matches no results. PASS: result list is empty or shows a no-results message.
 
 ### Loading States
 
@@ -1855,8 +1903,10 @@ under-review).
 form. PASS if `Score` button appears in the action bar.
 
 **K11.** Click `Approve`; PASS if disabled with tooltip
-"N objectives unscored" (matching the count of active
-objectives).
+listing specific unscored objective names (e.g.
+"ObjName1, ObjName2 unscored"); count-only form
+("N objectives unscored") is also acceptable when names
+exceed readable length.
 
 **K12.** Click `Score`; PASS if modal opens with one slider
 per active objective, all rendering visibly unset with
@@ -1978,6 +2028,65 @@ with reason "no K3 rename to verify against — Agent-G did
 not produce the prerequisite in time".
 
 ---
+
+## R. Records
+
+Sidebar entry plus list/detail pages, attribute editor with
+constraint sub-editor, flow binding, per-node attribute
+panel, and the property-test gate.
+
+- [ ] **R1** Sidebar shows a Records entry; click navigates
+  to `records/`. PASS: list page renders ≥2 seeded Records
+  (Customer Profile, Project Brief).
+- [ ] **R2** Click "+ Add Record" → dialog opens with Name
+  and Description fields. Type values, click Create.
+  PASS: new Record appears at the top of the list and the
+  app navigates to its detail page.
+- [ ] **R3** Open Customer Profile detail. PASS: read mode
+  shows name + description + attribute table sorted by
+  sort_order + Bound flows (Customer Onboarding, Lead-to-
+  Close) + Work orders using this Record list.
+- [ ] **R4** Click Edit. PASS: edit mode renders name input,
+  description textarea, and one editable row per attribute
+  with name input, type picker, options textarea (for
+  select-typed), and constraint editor.
+- [ ] **R5** Add a new attribute via "+ Add Attribute".
+  PASS: blank row appended with default type `text`.
+- [ ] **R6** Change a text attribute to `select`. PASS: the
+  options textarea appears; the constraint picker offers
+  only kinds applicable to `select` (i.e. nothing in the
+  toy).
+- [ ] **R7** Add a `regex` constraint on a text attribute,
+  set the pattern. PASS: constraint row appears with the
+  pattern editable; the picker no longer offers `regex`
+  for that attribute (toy implementation may always offer
+  it — accept).
+- [ ] **R8** Drag-reorder attributes — toy may not yet
+  support; MARK BLOCKED if so.
+- [ ] **R9** Remove an attribute via its trash button.
+  PASS: row removed from the editor; not persisted until
+  Save.
+- [ ] **R10** Click Save. PASS: returns to read mode; the
+  list reflects the new attribute set and constraint
+  summaries.
+- [ ] **R11** Open a flow (Customer Onboarding). PASS: flow
+  header shows `Record: Customer Profile` dropdown
+  selected.
+- [ ] **R12** Open the Data Capture node panel. PASS: each
+  ref row shows attribute name + Editable/Read-only picker
+  + Required checkbox + remove (×) button; picker dropdown
+  lists unreferenced attributes only.
+- [ ] **R13** From workbox, open the gate-violation work
+  order (`#gate0001`). PASS: current node is the Create
+  node; transition to Data Capture is blocked with a
+  violation message naming Company Name and Contact Email
+  as required.
+- [ ] **R14** Fill the required values, transition. PASS:
+  transition succeeds; the work order advances.
+- [ ] **R15** Archive a Record from its detail page (if a
+  control exists in the toy) or via the snapshot wipe.
+  PASS: lifecycle state reads `archived`; the list page
+  excludes the row from active counts.
 
 ## J. Teardown
 

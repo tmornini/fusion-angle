@@ -397,7 +397,7 @@ function buildPage(
     generalInfoBody: SafeHtml,
 ): SafeHtml {
     return html`
-    <div class="content-wrap-xl">
+    <div class="overview">
         ${buildPageHeader(headerActions)}
         ${buildGeneralInfoCard(generalInfoBody)}
         ${buildOverviewCard(org, stats)}

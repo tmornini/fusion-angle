@@ -39,6 +39,10 @@ import {
     nextPosition,
 } from '../drag-reorder-positions.ts';
 import type { StateEntity } from '../../../api/types.ts';
+import {
+    validateRecordTransition,
+    RecordTransitionViolations,
+} from './record-transitions.ts';
 
 const workOrderChanges =
     createSubscriptionChannel(
@@ -267,30 +271,38 @@ export async function postWorkOrderTransition(
         );
     }
 
-    // The transition event is built first so its id
-    // can serve as the state_event_id foreign key on
-    // every per-field row written in the same batch.
-    // Codd 1NF — the relation lives in a table, the
-    // event id is the joiner.
+    const pendingValues = new Map(
+        Object.entries(values),
+    );
+    const violations = await
+        validateRecordTransition(
+            ctx,
+            workOrderId,
+            edge.toNodeId,
+            pendingValues,
+        );
+    if (violations.length > 0) {
+        throw new RecordTransitionViolations(
+            violations,
+        );
+    }
+
     const transitionOp = await buildStateEventOp(
         ctx, workOrderId, edge.toNodeId,
     );
     const transitionEventId =
         transitionOp.resource.split('/')[1]!;
 
-    // Each field/value pair becomes its own row in
-    // the state_field_values table — caller-supplied
-    // ids for retry safety.
     const fieldValueOps: WriteOp[] = [];
     for (
-        const [fieldId, value]
+        const [attributeId, value]
             of Object.entries(values)
     ) {
-        const id = fieldValueIds[fieldId];
+        const id = fieldValueIds[attributeId];
         if (id === undefined) {
             throw new Error(
                 'Missing fieldValueId for'
-                + ' field ' + fieldId,
+                + ' attribute ' + attributeId,
             );
         }
         fieldValueOps.push({
@@ -299,7 +311,7 @@ export async function postWorkOrderTransition(
                 `state-field-values/${id}`,
             body: {
                 state_event_id: transitionEventId,
-                field_id: fieldId,
+                field_id: attributeId,
                 value,
             },
         });

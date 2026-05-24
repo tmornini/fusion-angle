@@ -11,28 +11,33 @@ export type WorkerKind = 'human' | 'ai';
 
 export type ConfidenceLevel = 'high' | 'medium' | 'low';
 
-export type FlowFieldType =
-    | 'text'
-    | 'textarea'
-    | 'number'
-    | 'date'
-    | 'select'
-    | 'checkbox'
-    | 'file'
-    | 'email'
-    | 'url'
-    | 'phone'
-    | 'currency'
-    | 'multi_select'
-    | 'radio'
-    | 'image';
+export type RecordId = Id;
+export type RecordAttributeId = Id;
+export type FlowRecordId = Id;
 
-// The state alphabet for workers. Three values
-// shared by humans and AIs. Commandment III
-// (Uniformity): one terminal state across both
-// kinds. Stage 10b+c retires the dual-vocabulary
-// snowflake — both humans and AIs now end at
-// 'archived'.
+export const ATTRIBUTE_TYPES = [
+    'text',
+    'number',
+    'select',
+    'date',
+    'checkbox',
+] as const;
+
+export type AttributeType = typeof ATTRIBUTE_TYPES[number];
+
+export type Constraint =
+    | { kind: 'regex'; pattern: string }
+    | { kind: 'range_min'; min: string }
+    | { kind: 'range_max'; max: string };
+
+// Hidden is encoded by absence from the array, so
+// hidden + isRequired is structurally impossible.
+export interface NodeAttribute {
+    attribute_id: RecordAttributeId;
+    mode: 'editable' | 'readonly';
+    isRequired: boolean;
+}
+
 export const WORKER_STATES = [
     'active',
     'pending',
@@ -41,11 +46,8 @@ export const WORKER_STATES = [
 
 export type WorkerState = typeof WORKER_STATES[number];
 
-// The composite state alphabet for ideas. Three
-// 'active' sub-states encode the readiness dimension;
-// the remaining six states stand alone. One string,
-// one truth — the dual-column representation that
-// preceded this is retired (Stage 8b+c).
+// The 'active' sub-states encode the readiness
+// dimension as a single composite string.
 export const IDEA_STATES = [
     'active:incomplete',
     'active:needs-info',
@@ -81,10 +83,6 @@ export function isDimensionKey(
         .includes(v);
 }
 
-// The state alphabet for projects. Stage 9b+c
-// retires the dual-column representation; the
-// states log IS the truth. Projects have no
-// composite dimension — each state stands alone.
 export const PROJECT_STATES = [
     'submitted',
     'under-review',
@@ -97,13 +95,8 @@ export const PROJECT_STATES = [
 
 export type ProjectState = typeof PROJECT_STATES[number];
 
-// The state alphabet for flows. Three lifecycle
-// states plus 'updated' for content-change events
-// (graph edits, name/description/lock changes,
-// auto-layout). The states log carries the full
-// audit trail — the retired created_at /
-// updated_at columns are now derived from the
-// head and tail of the entity's event sequence.
+// 'updated' marks content-change events; the
+// other three are lifecycle.
 export const FLOW_STATES = [
     'active',
     'archived',
@@ -112,6 +105,14 @@ export const FLOW_STATES = [
 ] as const;
 
 export type FlowState = typeof FLOW_STATES[number];
+
+export const RECORD_STATES = [
+    'active',
+    'archived',
+    'deleted',
+] as const;
+
+export type RecordState = typeof RECORD_STATES[number];
 
 export type StoredBoolean = 0 | 1;
 
@@ -159,23 +160,53 @@ export function isConfidenceLevel(
     );
 }
 
-const FLOW_FIELD_TYPES:
-    readonly FlowFieldType[]
-    = [
-        'text', 'textarea', 'number',
-        'date', 'select', 'checkbox',
-        'file', 'email', 'url',
-        'phone', 'currency',
-        'multi_select', 'radio',
-        'image',
-    ];
-
-export function isFlowFieldType(
+export function isAttributeType(
     v: string,
-): v is FlowFieldType {
-    return includes(
-        FLOW_FIELD_TYPES, v,
-    );
+): v is AttributeType {
+    return includes(ATTRIBUTE_TYPES, v);
+}
+
+export function assertAttributeType(
+    v: string,
+    label: string,
+): AttributeType {
+    if (!includes(ATTRIBUTE_TYPES, v)) {
+        throw new Error(
+            'expected AttributeType for '
+                + label + ', got ' + v,
+        );
+    }
+    return v;
+}
+
+export function assertConstraintAppliesTo(
+    kind: Constraint['kind'],
+    attributeType: AttributeType,
+    label: string,
+): void {
+    if (kind === 'regex') {
+        if (attributeType !== 'text') {
+            throw new Error(
+                "'regex' constraint requires"
+                + " attribute_type 'text' for "
+                + label + ", got "
+                + attributeType,
+            );
+        }
+        return;
+    }
+    if (
+        attributeType !== 'number'
+        && attributeType !== 'date'
+    ) {
+        throw new Error(
+            "'" + kind + "' constraint"
+            + " requires attribute_type"
+            + " 'number' or 'date' for "
+            + label + ', got '
+            + attributeType,
+        );
+    }
 }
 
 export function isProjectState(
@@ -254,6 +285,25 @@ export function assertFlowState(
     if (!includes(FLOW_STATES, v)) {
         throw new Error(
             'expected FlowState for '
+                + label + ', got ' + v,
+        );
+    }
+    return v;
+}
+
+export function isRecordState(
+    v: string,
+): v is RecordState {
+    return includes(RECORD_STATES, v);
+}
+
+export function assertRecordState(
+    v: string,
+    label: string,
+): RecordState {
+    if (!includes(RECORD_STATES, v)) {
+        throw new Error(
+            'expected RecordState for '
                 + label + ', got ' + v,
         );
     }
@@ -645,15 +695,6 @@ export interface ProjectEntity {
     position: number;
 }
 
-export interface GraphField {
-    id: string;
-    name: string;
-    fieldType: FlowFieldType;
-    sortOrder: number;
-    isRequired: boolean;
-    options: string[];
-}
-
 export interface GraphNode {
     id: string;
     name: string;
@@ -663,7 +704,7 @@ export interface GraphNode {
     isCreate: boolean;
     isArchive: boolean;
     workerIds: WorkerId[];
-    fields: GraphField[];
+    attributes: NodeAttribute[];
 }
 
 export interface GraphEdge {
@@ -688,8 +729,8 @@ export const DEFAULT_LOCK_TIMEOUT = 28800;
 // coincidental.
 export const DEFAULT_NODE_DESCRIPTION = '';
 export const DEFAULT_EDGE_DESCRIPTION = '';
-export const DEFAULT_NODE_FIELDS:
-    readonly GraphField[] = [];
+export const DEFAULT_NODE_ATTRIBUTES:
+    readonly NodeAttribute[] = [];
 export const DEFAULT_NEW_STATE_NAME =
     'New State';
 export const DEFAULT_TRANSITION_NAME =
@@ -744,6 +785,29 @@ export interface FlowWorkOrderEntity {
     at: string;
 }
 
+export interface RecordEntity {
+    id: RecordId;
+    name: string;
+    description: string;
+}
+
+export interface RecordAttributeEntity {
+    id: RecordAttributeId;
+    record_id: RecordId;
+    name: string;
+    attribute_type: AttributeType;
+    sort_order: number;
+    options: JsonArrayField;
+    constraints: JsonArrayField;
+}
+
+export interface FlowRecordEntity {
+    id: FlowRecordId;
+    flow_id: Id;
+    record_id: RecordId;
+    at: string;
+}
+
 // Per-field values written when a state event
 // records a work-order transition. Each row pins
 // the payload to its parent event by state_event_id
@@ -791,12 +855,6 @@ export interface StatusDisplay {
     className: string;
 }
 
-// Visual identity preserved across the Stage 10b+c
-// rename: the 'archived' badge keeps the
-// 'badge-default' className it inherited from the
-// retired terminal state, so existing CSS
-// continues to color it correctly. The label text
-// updates to match the new vocabulary.
 export const WORKER_STATE_CONFIG: Record<
     WorkerState,
     StatusDisplay
@@ -852,6 +910,24 @@ export const IDEA_STATE_CONFIG: Record<
         className: 'badge-default',
     },
     'deleted': {
+        label: 'Deleted',
+        className: 'badge-default',
+    },
+};
+
+export const RECORD_STATE_CONFIG: Record<
+    RecordState,
+    StatusDisplay
+> = {
+    active: {
+        label: 'Active',
+        className: 'badge-success',
+    },
+    archived: {
+        label: 'Archived',
+        className: 'badge-default',
+    },
+    deleted: {
         label: 'Deleted',
         className: 'badge-default',
     },

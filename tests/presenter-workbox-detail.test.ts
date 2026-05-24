@@ -11,7 +11,9 @@ import {
     type WorkOrderFlowGraph,
     type GraphNode,
     type GraphEdge,
-    type GraphField,
+    type NodeAttribute,
+    type RecordAttributeEntity,
+    type AttributeType,
     type Id,
     type Worker,
 } from '../api/types.ts';
@@ -20,29 +22,43 @@ import type {
 } from '../web-app/app/adapters/state-events.ts';
 import {
     WorkboxDetailPresenter,
-    buildFieldInputHtml,
+    buildAttributeInputHtml,
 } from
 '../web-app/app/presenters/workbox-detail.ts';
 
 // WorkboxDetailPresenter is pure: the constructor
 // takes the work order, transition events, per-event
 // field values, the active claim (or null), a
-// workerMap, and the current worker id; buildPage()
-// returns SafeHtml. We build those inputs by hand.
+// workerMap, the current worker id, and the
+// attribute map; buildPage() returns SafeHtml.
 // The work order's flow_graph is a JsonObjectField
 // (a JSON string) that the presenter re-validates,
 // so we stringify a WorkOrderFlowGraph shape.
 
-function makeField(
-    overrides: Partial<GraphField> = {},
-): GraphField {
+function makeAttributeRef(
+    overrides: Partial<NodeAttribute> = {},
+): NodeAttribute {
     return {
-        id: 'f-1',
-        name: 'Notes',
-        fieldType: 'text',
-        sortOrder: 0,
+        attribute_id: 'a-1',
+        mode: 'editable',
         isRequired: false,
-        options: [],
+        ...overrides,
+    };
+}
+
+function makeAttribute(
+    overrides: Partial<RecordAttributeEntity> = {},
+): RecordAttributeEntity {
+    const attributeType: AttributeType =
+        overrides.attribute_type ?? 'text';
+    return {
+        id: 'a-1',
+        record_id: 'rec-1',
+        name: 'Notes',
+        attribute_type: attributeType,
+        sort_order: 0,
+        options: jsonArrayField([]),
+        constraints: jsonArrayField([]),
         ...overrides,
     };
 }
@@ -59,7 +75,7 @@ function makeNode(
         isCreate: false,
         isArchive: false,
         workerIds: [],
-        fields: [],
+        attributes: [],
         ...overrides,
     };
 }
@@ -163,6 +179,16 @@ function makeWorkerMap(
     );
 }
 
+function makeAttributeMap(
+    attributes: RecordAttributeEntity[],
+): ReadonlyMap<string, RecordAttributeEntity> {
+    return new Map(
+        attributes.map(
+            a => [a.id, a] as const,
+        ),
+    );
+}
+
 const WORKER_MAP = makeWorkerMap([
     makeHumanWorkerEntity('p-1', 'Ada'),
     makeHumanWorkerEntity('p-2', 'Bo'),
@@ -178,6 +204,7 @@ function makePresenter(
         activeClaim?:
             { workerId: Id; at: string } | null;
         currentWorkerId?: string;
+        attributes?: RecordAttributeEntity[];
     } = {},
 ): WorkboxDetailPresenter {
     const graph = args.graph ?? makeFlowGraph();
@@ -186,6 +213,7 @@ function makePresenter(
     const transitions = args.transitions ?? [
         makeTransition(),
     ];
+    const attributes = args.attributes ?? [];
     return new WorkboxDetailPresenter(
         workOrder,
         transitions,
@@ -193,59 +221,94 @@ function makePresenter(
         args.activeClaim ?? null,
         WORKER_MAP,
         args.currentWorkerId ?? 'p-1',
+        makeAttributeMap(attributes),
     );
 }
 
-// buildFieldInputHtml (the exported helper)
+// buildAttributeInputHtml (the exported helper)
 
 test(
-    'buildFieldInputHtml renders a text input'
-    + ' carrying the field id',
+    'buildAttributeInputHtml renders a text input'
+    + ' carrying the attribute id',
     () => {
-        const out = buildFieldInputHtml(
-            makeField({
-                id: 'f-x', fieldType: 'text',
-            }),
+        const ref = makeAttributeRef({
+            attribute_id: 'a-x',
+        });
+        const attribute = makeAttribute({
+            id: 'a-x', attribute_type: 'text',
+        });
+        const out = buildAttributeInputHtml(
+            ref, attribute,
         ).toString();
         assert.match(out, /<input/);
         assert.match(out, /type="text"/);
-        assert.match(out, /data-field-id="f-x"/);
+        assert.match(
+            out, /data-attribute-id="a-x"/,
+        );
         assert.ok(!out.includes('required'));
     },
 );
 
 test(
-    'buildFieldInputHtml adds the required'
-    + ' attribute for required fields',
+    'buildAttributeInputHtml adds the required'
+    + ' attribute for required refs',
     () => {
-        const out = buildFieldInputHtml(
-            makeField({ isRequired: true }),
+        const ref = makeAttributeRef({
+            isRequired: true,
+        });
+        const attribute = makeAttribute();
+        const out = buildAttributeInputHtml(
+            ref, attribute,
         ).toString();
         assert.match(out, /required/);
     },
 );
 
 test(
-    'buildFieldInputHtml renders a textarea for'
-    + ' the textarea field type',
+    'buildAttributeInputHtml renders a number'
+    + ' input for the number attribute type',
     () => {
-        const out = buildFieldInputHtml(
-            makeField({ fieldType: 'textarea' }),
+        const ref = makeAttributeRef();
+        const attribute = makeAttribute({
+            attribute_type: 'number',
+        });
+        const out = buildAttributeInputHtml(
+            ref, attribute,
         ).toString();
-        assert.match(out, /<textarea/);
-        assert.match(out, /data-field-id="f-1"/);
+        assert.match(out, /<input/);
+        assert.match(out, /type="number"/);
     },
 );
 
 test(
-    'buildFieldInputHtml renders a select with one'
-    + ' option per choice plus a placeholder',
+    'buildAttributeInputHtml renders a date input'
+    + ' for the date attribute type',
     () => {
-        const out = buildFieldInputHtml(
-            makeField({
-                fieldType: 'select',
-                options: ['Low', 'High'],
-            }),
+        const ref = makeAttributeRef();
+        const attribute = makeAttribute({
+            attribute_type: 'date',
+        });
+        const out = buildAttributeInputHtml(
+            ref, attribute,
+        ).toString();
+        assert.match(out, /<input/);
+        assert.match(out, /type="date"/);
+    },
+);
+
+test(
+    'buildAttributeInputHtml renders a select with'
+    + ' one option per choice plus a placeholder',
+    () => {
+        const ref = makeAttributeRef();
+        const attribute = makeAttribute({
+            attribute_type: 'select',
+            options: jsonArrayField(
+                ['Low', 'High'],
+            ),
+        });
+        const out = buildAttributeInputHtml(
+            ref, attribute,
         ).toString();
         assert.match(out, /<select/);
         assert.match(out, /Select\.\.\./);
@@ -255,31 +318,15 @@ test(
 );
 
 test(
-    'buildFieldInputHtml renders radio inputs for'
-    + ' the radio field type',
+    'buildAttributeInputHtml renders a bare'
+    + ' checkbox input for the checkbox type',
     () => {
-        const out = buildFieldInputHtml(
-            makeField({
-                id: 'f-r', fieldType: 'radio',
-                options: ['Yes', 'No'],
-            }),
-        ).toString();
-        const radios = out.match(
-            /type="radio"/g,
-        ) ?? [];
-        assert.equal(radios.length, 2);
-        assert.match(out, /name="f-r"/);
-        assert.match(out, /value="Yes"/);
-        assert.match(out, /value="No"/);
-    },
-);
-
-test(
-    'buildFieldInputHtml renders a bare checkbox'
-    + ' input for the checkbox field type',
-    () => {
-        const out = buildFieldInputHtml(
-            makeField({ fieldType: 'checkbox' }),
+        const ref = makeAttributeRef();
+        const attribute = makeAttribute({
+            attribute_type: 'checkbox',
+        });
+        const out = buildAttributeInputHtml(
+            ref, attribute,
         ).toString();
         assert.match(out, /type="checkbox"/);
         assert.ok(!out.includes('class="input"'));
@@ -287,14 +334,35 @@ test(
 );
 
 test(
-    'buildFieldInputHtml applies the currency step'
-    + ' extra on a number input',
+    'buildAttributeInputHtml renders readonly and'
+    + ' disabled attributes for a readonly ref',
     () => {
-        const out = buildFieldInputHtml(
-            makeField({ fieldType: 'currency' }),
+        const ref = makeAttributeRef({
+            mode: 'readonly',
+        });
+        const attribute = makeAttribute();
+        const out = buildAttributeInputHtml(
+            ref, attribute,
         ).toString();
-        assert.match(out, /type="number"/);
-        assert.match(out, /step="0\.01"/);
+        assert.match(out, /readonly/);
+    },
+);
+
+test(
+    'buildAttributeInputHtml on a readonly select'
+    + ' emits the disabled attribute',
+    () => {
+        const ref = makeAttributeRef({
+            mode: 'readonly',
+        });
+        const attribute = makeAttribute({
+            attribute_type: 'select',
+            options: jsonArrayField(['A']),
+        });
+        const out = buildAttributeInputHtml(
+            ref, attribute,
+        ).toString();
+        assert.match(out, /disabled/);
     },
 );
 
@@ -346,28 +414,34 @@ test(
 );
 
 test(
-    'renderableFields are the current node fields'
-    + ' and buildPage renders a labeled input per'
-    + ' required field with a marker',
+    'renderableAttributes are the current node'
+    + ' refs and buildPage renders a labeled input'
+    + ' per required attribute with a marker',
     () => {
+        const amountAttr = makeAttribute({
+            id: 'a-amt',
+            name: 'Amount',
+            attribute_type: 'number',
+            sort_order: 0,
+        });
+        const noteAttr = makeAttribute({
+            id: 'a-note',
+            name: 'Note',
+            attribute_type: 'text',
+            sort_order: 1,
+        });
         const graph = makeFlowGraph({
             nodes: [
                 makeNode({
                     id: 'n-1', name: 'Triage',
-                    fields: [
-                        makeField({
-                            id: 'f-amt',
-                            name: 'Amount',
-                            fieldType: 'currency',
+                    attributes: [
+                        makeAttributeRef({
+                            attribute_id: 'a-amt',
                             isRequired: true,
-                            sortOrder: 0,
                         }),
-                        makeField({
-                            id: 'f-note',
-                            name: 'Note',
-                            fieldType: 'textarea',
+                        makeAttributeRef({
+                            attribute_id: 'a-note',
                             isRequired: false,
-                            sortOrder: 1,
                         }),
                     ],
                 }),
@@ -377,16 +451,25 @@ test(
                 }),
             ],
         });
-        const presenter = makePresenter({ graph });
+        const presenter = makePresenter({
+            graph,
+            attributes: [amountAttr, noteAttr],
+        });
         assert.equal(
-            presenter.renderableFields().length, 2,
+            presenter
+                .renderableAttributes()
+                .length,
+            2,
         );
-        const out = presenter.buildPage().toString();
-        assert.match(out, /Fields/);
+        const out = presenter
+            .buildPage().toString();
+        assert.match(out, /Attributes/);
         assert.match(out, /Amount \*/);
         assert.match(out, /Note/);
-        assert.match(out, /data-field-id="f-amt"/);
-        assert.match(out, /step="0\.01"/);
+        assert.match(
+            out, /data-attribute-id="a-amt"/,
+        );
+        assert.match(out, /type="number"/);
         assert.ok(!out.includes('undefined'));
     },
 );
@@ -435,7 +518,7 @@ test(
 
 test(
     'buildPage on a complete work order hides the'
-    + ' fields card, transition buttons, and'
+    + ' attributes card, transition buttons, and'
     + ' release button',
     () => {
         const presenter = makePresenter({
@@ -473,16 +556,20 @@ test(
 
 test(
     'buildPage history lists transitions newest'
-    + ' first with their field values',
+    + ' first with their attribute values',
     () => {
+        const amountAttr = makeAttribute({
+            id: 'a-amt',
+            name: 'Amount',
+            attribute_type: 'number',
+        });
         const graph = makeFlowGraph({
             nodes: [
                 makeNode({
                     id: 'n-1', name: 'Triage',
-                    fields: [
-                        makeField({
-                            id: 'f-amt',
-                            name: 'Amount',
+                    attributes: [
+                        makeAttributeRef({
+                            attribute_id: 'a-amt',
                         }),
                     ],
                 }),
@@ -497,7 +584,7 @@ test(
             ['t-2', [{
                 id: 'fv-1',
                 state_event_id: 't-2',
-                field_id: 'f-amt',
+                field_id: 'a-amt',
                 value: '1200',
             }]],
         ]);
@@ -520,6 +607,7 @@ test(
                 }),
             ],
             fieldValues,
+            attributes: [amountAttr],
         });
         const out = presenter.buildPage().toString();
         // newest (Triage -> Approved) appears before

@@ -1,12 +1,17 @@
 # Fusion AI Design System
 
-A production-ready design system for enterprise applications prioritizing clarity, trust, focus, and calm decision-making.
+A production-ready design system for enterprise applications
+prioritizing clarity, trust, focus, and calm decision-making.
 
 ## 1. Brand & Visual Foundation
 
 ### Primary Colors
-- **Primary Blue**: `#4B6CA1` → `hsl(217, 36%, 46%)`
-- **Primary Yellow**: `#FDD31D` → `hsl(48, 98%, 55%)`
+
+Reference values only — never inline the hex, use the
+matching token from `tokens.css`:
+
+- **Primary Blue**: `hsl(217 36% 46%)`
+- **Primary Yellow**: `hsl(48 98% 55%)`
 
 ### Blue Scale
 | Token | HSL | Usage |
@@ -23,7 +28,8 @@ A production-ready design system for enterprise applications prioritizing clarit
 | `blue-900` | `217 45% 15%` | **Primary text** |
 
 ### Neutral Grays (Blue-tinted)
-All grays are derived from blue tones for brand cohesion. **Never use pure black (#000)**.
+All grays are derived from blue tones for brand cohesion.
+**Never use pure black (#000)**.
 
 ## 2. Typography System
 
@@ -57,8 +63,8 @@ All grays are derived from blue tones for brand cohesion. **Never use pure black
 
 | Status | Background | Border | Text | Usage |
 |--------|------------|--------|------|-------|
-| Success | `success-soft` | `success-border` | `success-text` | Approved, complete |
-| Warning | `warning-soft` | `warning-border` | `warning-text` | Under review, pending |
+| Success | `success-soft` | `success-border` | `success-text` | Approved |
+| Warning | `warning-soft` | `warning-border` | `warning-text` | Pending  |
 | Error | `error-soft` | `error-border` | `error-text` | Rejected, failed |
 | Info | `info-soft` | `info-border` | `info-text` | Informational |
 
@@ -70,20 +76,31 @@ All grays are derived from blue tones for brand cohesion. **Never use pure black
 
 ### Variants via `[data-tone]` and `[data-level]`
 
-Components apply semantic variants through `data-*` attributes on a base class rather than distinct class names. Presenters emit the attribute value; the attribute selectors in `components.css` bind it to the matching token set. The TypeScript enum returned by `toneFor*()` / `levelFor*()` helpers and the CSS selectors share a single source of truth.
+Components apply semantic variants through `data-*` attributes
+on a base class rather than distinct class names. Presenters
+emit the attribute value; the attribute selectors in
+`components.css` bind it to the matching token set. The
+TypeScript enum returned by `toneFor*()` / `levelFor*()`
+helpers and the CSS selectors share a single source of truth.
 
 ```html
 <div class="icon-box" data-tone="success">…</div>
-<div class="progress-bar" data-level="warning" style="--progress-fill:60%">…</div>
+<div class="progress-bar" data-level="warning"
+     style="--progress-fill:60%">…</div>
 ```
 
-**`[data-tone]` values**: `primary`, `success`, `warning`, `error`, `info`, `muted`.
-Applied to: `.pill`, `.icon-box`, `.status-dot`, `.legend-dot`, `.btn-outline`, `.action-card`, `.stat-cell`.
+**`[data-tone]` values**: `primary`, `success`, `warning`,
+`error`, `info`, `muted`.
+Applied to: `.pill`, `.icon-box`, `.status-dot`,
+`.legend-dot`, `.btn-outline`, `.action-card`, `.stat-cell`.
 
 **`[data-level]` values**: `normal`, `warning`, `danger`.
 Applied to: `.progress-bar`, `.gauge` fill regions.
 
-Helper naming: `toneFor*(status)` returns a `[data-tone]` value, `levelFor*(value)` returns a `[data-level]` value. Replaces the older `styleFor*` pattern that returned inline-style strings.
+Helper naming: `toneFor*(status)` returns a `[data-tone]`
+value, `levelFor*(value)` returns a `[data-level]` value.
+Replaces the older `styleFor*` pattern that returned
+inline-style strings.
 
 ## 4. Spacing System (8pt Grid)
 
@@ -162,7 +179,8 @@ Helper naming: `toneFor*(status)` returns a `[data-tone]` value, `levelFor*(valu
 
 ### Command Palette
 
-Cmd+K (or Ctrl+K) overlay for quick navigation and search. Implemented in `web-app/app/command-palette.ts`.
+Cmd+K (or Ctrl+K) overlay for quick navigation and search.
+Implemented in `web-app/app/command-palette.ts`.
 
 - Full keyboard navigation (arrow keys, Enter to select, Escape to close)
 - Searches across pages, ideas, and projects
@@ -171,7 +189,9 @@ Cmd+K (or Ctrl+K) overlay for quick navigation and search. Implemented in `web-a
 
 ### Charts
 
-`build*` functions in `web-app/app/charts.ts` return `SafeHtml` for inline SVG charts. All charts use design system colors and respond to dark mode.
+`build*` functions in `web-app/app/charts.ts` return
+`SafeHtml` for inline SVG charts. All charts use design
+system colors and respond to dark mode.
 
 | Type | Function | Usage |
 |------|----------|-------|
@@ -225,21 +245,27 @@ presenter in `presenters/flow-designer.ts`.
 `--color-surface` background.
 
 **Nodes**: 160×64 px rounded rectangles, 10 px corner
-radius. Three types:
+radius. Three types, all rendered with the unified
+`flow-node` class (stroke = `hsl(var(--primary))`):
 
-| Type | Border | Port | Draggable |
-|------|--------|------|-----------|
-| Start (New) | Green `#16a34a`, 2.5 px | None | No |
-| Complete | Red `#b91c1c`, 3 px | None | Yes |
-| Regular | Blue `#4B6CA1`, 2 px | Right side | Yes |
+| Type    | Port       | Draggable |
+|---------|------------|-----------|
+| Create  | None       | No        |
+| Archive | None       | Yes       |
+| Regular | Right side | Yes       |
 
 **Edges**: Cubic bezier curves between node
-perimeters.
+perimeters, rendered with the unified `flow-edge` class.
 
-| Type | Stroke | Arrow | Dash |
-|------|--------|-------|------|
-| Forward | Blue `#4B6CA1` | Blue | Solid |
-| Cycle | Amber `#d97706` | Amber | `6 3` |
+| Type    | Dash    |
+|---------|---------|
+| Forward | Solid   |
+| Cycle   | Dashed  |
+
+Forward edges stroke `hsl(var(--primary))`; cycle edges
+add a warning-color stroke and CSS dashes. The
+arrowhead's `fill: context-stroke` tracks each line's
+own stroke so default and cycle arrows match for free.
 
 Edge classification at render time uses DFS
 back-edge detection in `removeCycles`: during a
@@ -259,11 +285,9 @@ selected node, thicker stroke (3 px) on selected edge.
 
 **Locked**: When a flow is locked, all node rectangles,
 edge paths, and edge-label backgrounds re-stroke in
-`--accent-text` (theme-adapted gold). The dot grid
-renders in its default unlocked colors. Per-type
-border colors (Start green, Complete red, Regular
-blue, Cycle amber-dashed) are visually overridden by
-the locked-state stroke and restored when unlocked.
+`hsl(var(--accent-text))` (theme-adapted gold). The dot
+grid renders in its default unlocked colors. The unified
+primary stroke is restored when unlocked.
 
 **Constraints**:
 - No duplicate edges (same direction between a pair)
@@ -303,7 +327,10 @@ labels) is fine; no override needed.
 
 ### Dark Mode
 
-CSS custom properties on `:root` define light theme values. The `[data-theme="dark"]` selector overrides them for dark mode. Toggle is persisted to `localStorage` and respects `prefers-color-scheme` for initial detection.
+CSS custom properties on `:root` define light theme values.
+The `[data-theme="dark"]` selector overrides them for dark
+mode. Toggle is persisted to `localStorage` and respects
+`prefers-color-scheme` for initial detection.
 
 ```css
 :root { --bg-primary: hsl(0 0% 100%); }
@@ -360,7 +387,8 @@ CSS custom properties on `:root` define light theme values. The `[data-theme="da
 ## 9. Iconography
 
 ### Style Guide
-- **Library**: Inline SVG functions in `web-app/app/icons.ts` (line-based, each returns a `SafeHtml` value)
+- **Library**: Inline SVG functions in `web-app/app/icons.ts`
+  (line-based, each returns a `SafeHtml` value)
 - **Default size**: 16px (inline), 20px (buttons), 24px (standalone)
 - **Stroke width**: 2px
 - **Color**: Inherit from parent or use `text-muted-foreground`
@@ -383,10 +411,17 @@ CSS custom properties on `:root` define light theme values. The `[data-theme="da
 - Action-oriented
 
 ### Data Formatting
-- **Missing/zero values**: Display `—` (em-dash) instead of `0h`, `$0k`, or blank. Use the guard pattern: `value ? formatted : '—'`
-- **Singular/plural**: Use ternary grammar — `${count} ${count === 1 ? 'item' : 'items'}` — never parenthetical `item(s)` form
-- **Breadcrumb links**: Always use `class="hover-link"` for breadcrumb navigation links (not `text-primary`)
-- **Section headers (h3)**: Always include `font-display` class on section header h3 tags to use the display typeface (IBM Plex Sans)
+- **Missing/zero values**: Display `—` (em-dash) instead of
+  `0h`, `$0k`, or blank. Use the guard pattern:
+  `value ? formatted : '—'`
+- **Singular/plural**: Use ternary grammar —
+  `${count} ${count === 1 ? 'item' : 'items'}` — never
+  parenthetical `item(s)` form
+- **Breadcrumb links**: Always use `class="hover-link"` for
+  breadcrumb navigation links (not `text-primary`)
+- **Section headers (h3)**: Always include `font-display`
+  class on section header h3 tags to use the display
+  typeface (IBM Plex Sans)
 
 ### Error Messages
 **Do:**
@@ -500,7 +535,7 @@ multiplexing.
 | Design token                          | `tokens.css`              |
 | Theme HSL assignment                  | `light-mode.css` / `dark-mode.css` |
 | Sidebar/header/main shell             | `layout.css`              |
-| Mobile-only override                  | `responsive.css` (use `!important`) |
+| Mobile-only override                  | `responsive.css` (`!important`) |
 
 Below the 3-page threshold (Commandment IX, Generality), keep
 selectors in a `pages-X.css` file or duplicate without shame.

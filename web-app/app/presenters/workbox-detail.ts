@@ -11,7 +11,8 @@ import {
     type WorkOrderFlowGraph,
     type GraphNode,
     type GraphEdge,
-    type GraphField,
+    type NodeAttribute,
+    type RecordAttributeEntity,
     type HistoryEntry,
     type HistoryFieldValue,
     type ClaimStatus,
@@ -23,107 +24,71 @@ import {
     iconClock,
 } from '../icons.ts';
 
-const FIELD_HTML_TYPE: Record<
+const ATTRIBUTE_HTML_TYPE: Record<
     string,
-    { type: string; extra?: string }
+    { type: string }
 > = {
     text: { type: 'text' },
     number: { type: 'number' },
     date: { type: 'date' },
-    email: { type: 'email' },
-    url: { type: 'url' },
-    phone: { type: 'tel' },
-    currency: {
-        type: 'number',
-        extra: 'step="0.01"',
-    },
     checkbox: { type: 'checkbox' },
-    file: { type: 'file' },
-    image: {
-        type: 'file',
-        extra: 'accept="image/*"',
-    },
 };
 
-export function buildFieldInputHtml(
-    field: GraphField,
+export function buildAttributeInputHtml(
+    ref: NodeAttribute,
+    attribute: RecordAttributeEntity,
 ): SafeHtml {
-    const id = field.id;
-    const requiredAttr = field.isRequired
+    const id = attribute.id;
+    const isReadonly = ref.mode === 'readonly';
+    const requiredAttr = ref.isRequired
         ? trusted('required')
         : html``;
-    if (field.fieldType === 'textarea') {
-        return html`<textarea
-            class="input"
-            rows="3"
-            data-field-id="${id}"
-            ${requiredAttr}></textarea>`;
-    }
-    if (field.fieldType === 'select') {
+    const readonlyAttr = isReadonly
+        ? trusted('readonly')
+        : html``;
+    const disabledAttr = isReadonly
+        ? trusted('disabled')
+        : html``;
+    if (attribute.attribute_type === 'select') {
+        const options = JSON.parse(
+            attribute.options,
+        ) as string[];
         return html`<select
             class="input"
-            data-field-id="${id}"
+            data-attribute-id="${id}"
+            ${disabledAttr}
             ${requiredAttr}>
             <option value="">
                 Select...
             </option>
-            ${field.options.map(
+            ${options.map(
                 o => html`<option
                     value="${o}"
                     >${o}</option>`,
             )}
         </select>`;
     }
-    if (
-        field.fieldType === 'radio'
-        || field.fieldType
-            === 'multi_select'
-    ) {
-        const inputType =
-            field.fieldType === 'radio'
-                ? 'radio' : 'checkbox';
-        return html`<div
-            class="flex flex-col
-                gap-2">
-            ${field.options.map(
-                o => html`<label
-                    class="flex
-                        items-center
-                        gap-2">
-                    <input
-                        type="${inputType}"
-                        name="${id}"
-                        value="${o}"
-                        data-field-id
-                            ="${id}" />
-                    ${o}
-                </label>`,
-            )}
-        </div>`;
-    }
-    const spec =
-        FIELD_HTML_TYPE[field.fieldType];
+    const spec = ATTRIBUTE_HTML_TYPE[
+        attribute.attribute_type
+    ];
     if (!spec) {
-        return html`<input
-            type="text"
-            class="input"
-            data-field-id="${id}"
-            ${requiredAttr} />`;
+        throw new Error(
+            'unknown attribute_type: '
+            + attribute.attribute_type,
+        );
     }
     if (spec.type === 'checkbox') {
         return html`<input
             type="checkbox"
-            data-field-id="${id}"
+            data-attribute-id="${id}"
+            ${disabledAttr}
             ${requiredAttr} />`;
     }
-    const extra = spec.extra
-        ? trusted(spec.extra)
-        : html``;
     return html`<input
         type="${spec.type}"
         class="input"
-        data-field-id="${id}"
-        ${extra}
+        data-attribute-id="${id}"
+        ${readonlyAttr}
         ${requiredAttr} />`;
 }
 
@@ -136,6 +101,9 @@ export class WorkboxDetailPresenter {
     readonly #history:
         readonly HistoryEntry[];
     readonly #claim: ClaimStatus;
+    readonly #attributeMap: ReadonlyMap<
+        string, RecordAttributeEntity
+    >;
 
     constructor(
         workOrder: WorkOrderEntity,
@@ -150,12 +118,16 @@ export class WorkboxDetailPresenter {
             { workerId: Id; at: string } | null,
         workerMap: Map<Id, Worker>,
         currentWorkerId: string,
+        attributeMap: ReadonlyMap<
+            string, RecordAttributeEntity
+        >,
     ) {
         this.#workOrder = workOrder;
         this.#flowGraph =
             validateWorkOrderFlowGraph(
                 workOrder.flow_graph,
             );
+        this.#attributeMap = attributeMap;
 
         const sorted = [...transitions]
             .sort(
@@ -178,6 +150,7 @@ export class WorkboxDetailPresenter {
             fieldValuesByEvent,
             this.#flowGraph.nodes,
             workerMap,
+            attributeMap,
         );
 
         this.#claim = activeClaim
@@ -211,9 +184,9 @@ export class WorkboxDetailPresenter {
         return this.#currentNode.id;
     }
 
-    renderableFields():
-        readonly GraphField[] {
-        return this.#currentNode.fields;
+    renderableAttributes():
+        readonly NodeAttribute[] {
+        return this.#currentNode.attributes;
     }
 
     claimStatus(): ClaimStatus {
@@ -225,7 +198,7 @@ export class WorkboxDetailPresenter {
 
         const fields = complete
             ? html``
-            : this.#buildFieldsCard();
+            : this.#buildAttributesCard();
 
         const transitions = complete
             ? html``
@@ -240,7 +213,7 @@ export class WorkboxDetailPresenter {
             </button>`;
 
         return html`<div
-            class="content-wrap">
+            class="entity">
             <div id="work-order-header"
                 class="flex items-center
                     gap-4 mb-6">
@@ -309,25 +282,48 @@ export class WorkboxDetailPresenter {
         </div>`;
     }
 
-    #buildFieldsCard(): SafeHtml {
+    #buildAttributesCard(): SafeHtml {
+        const refs = this.renderableAttributes();
+        const resolved = refs
+            .map(ref => ({
+                ref,
+                attribute:
+                    this.#requireAttribute(ref),
+            }))
+            .toSorted(
+                (a, b) =>
+                    a.attribute.sort_order
+                    - b.attribute.sort_order,
+            );
         return html`<div
             id="work-order-fields"
             class="card mb-6 p-6">
             <h3 class="text-lg
                 font-semibold mb-4">
-                Fields
+                Attributes
             </h3>
-            ${this.renderableFields()
-                .toSorted(
-                    (a, b) =>
-                        a.sortOrder
-                        - b.sortOrder,
-                )
-                .map(
-                    f =>
-                        this.#buildFieldRow(f),
-                )}
+            ${resolved.map(
+                r => this.#buildAttributeRow(
+                    r.ref, r.attribute,
+                ),
+            )}
         </div>`;
+    }
+
+    #requireAttribute(
+        ref: NodeAttribute,
+    ): RecordAttributeEntity {
+        const attribute = this.#attributeMap.get(
+            ref.attribute_id,
+        );
+        if (!attribute) {
+            throw new Error(
+                'node attribute references'
+                + ' unknown attribute_id: '
+                + ref.attribute_id,
+            );
+        }
+        return attribute;
     }
 
     #buildTransitionButtons(): SafeHtml {
@@ -392,15 +388,18 @@ export class WorkboxDetailPresenter {
         </div>`;
     }
 
-    #buildFieldRow(
-        field: GraphField,
+    #buildAttributeRow(
+        ref: NodeAttribute,
+        attribute: RecordAttributeEntity,
     ): SafeHtml {
-        const label = field.name
-            + (field.isRequired ? ' *' : '');
+        const label = attribute.name
+            + (ref.isRequired ? ' *' : '');
         return html`<div class="mb-4">
             <label
                 class="label">${label}</label>
-            ${buildFieldInputHtml(field)}
+            ${buildAttributeInputHtml(
+                ref, attribute,
+            )}
         </div>`;
     }
 
@@ -483,32 +482,27 @@ function buildHistory(
         >,
     nodes: readonly GraphNode[],
     workerMap: Map<Id, Worker>,
+    attributeMap: ReadonlyMap<
+        string, RecordAttributeEntity
+    >,
 ): HistoryEntry[] {
-    const fieldNameMap = new Map<
-        string, string
-    >();
-    for (const node of nodes) {
-        for (const f of node.fields) {
-            fieldNameMap.set(f.id, f.name);
-        }
-    }
-
     return sortedTransitions.map(t => {
         const rows =
             fieldValuesByEvent.get(t.id) ?? [];
         const fieldValues:
             HistoryFieldValue[] = [];
         for (const row of rows) {
-            const fieldName =
-                fieldNameMap.get(row.field_id);
-            if (!fieldName) {
+            const attribute = attributeMap.get(
+                row.field_id,
+            );
+            if (!attribute) {
                 throw new Error(
-                    'Field not found: '
+                    'Attribute not found: '
                         + row.field_id,
                 );
             }
             fieldValues.push({
-                fieldName,
+                fieldName: attribute.name,
                 value: row.value,
             });
         }

@@ -1,12 +1,13 @@
 import type {
     GraphNode,
     GraphEdge,
-    GraphField,
-} from './adapters/flows.ts';
+    NodeAttribute,
+    RecordAttributeId,
+} from '../../api/types.ts';
 import {
     DEFAULT_NODE_DESCRIPTION,
     DEFAULT_EDGE_DESCRIPTION,
-    DEFAULT_NODE_FIELDS,
+    DEFAULT_NODE_ATTRIBUTES,
     DEFAULT_NODE_WORKER_IDS,
 } from '../../api/types.ts';
 import {
@@ -125,8 +126,12 @@ export function applyAddNode(
             positionY,
             isCreate: false,
             isArchive: false,
-            workerIds: [...DEFAULT_NODE_WORKER_IDS],
-            fields: [...DEFAULT_NODE_FIELDS],
+            workerIds: [
+                ...DEFAULT_NODE_WORKER_IDS,
+            ],
+            attributes: [
+                ...DEFAULT_NODE_ATTRIBUTES,
+            ],
         },
     ];
 }
@@ -212,32 +217,78 @@ export function applyUpdateEdge(
     );
 }
 
-export function applyAddField(
+export function applyAddAttributeRef(
     nodes: readonly GraphNode[],
     nodeId: string,
-    field: GraphField,
+    ref: NodeAttribute,
 ): GraphNode[] {
     return nodes.map(
         n => n.id === nodeId
             ? {
                 ...n,
-                fields: [...n.fields, field],
+                attributes: [
+                    ...n.attributes, ref,
+                ],
             }
             : n,
     );
 }
 
-export function applyDeleteField(
+export function applyRemoveAttributeRef(
     nodes: readonly GraphNode[],
     nodeId: string,
-    fieldId: string,
+    attributeId: RecordAttributeId,
 ): GraphNode[] {
     return nodes.map(
         n => n.id === nodeId
             ? {
                 ...n,
-                fields: n.fields.filter(
-                    f => f.id !== fieldId,
+                attributes:
+                    n.attributes.filter(
+                        a => a.attribute_id
+                            !== attributeId,
+                    ),
+            }
+            : n,
+    );
+}
+
+export function applyUpdateAttributeMode(
+    nodes: readonly GraphNode[],
+    nodeId: string,
+    attributeId: RecordAttributeId,
+    mode: 'editable' | 'readonly',
+): GraphNode[] {
+    return nodes.map(
+        n => n.id === nodeId
+            ? {
+                ...n,
+                attributes: n.attributes.map(
+                    a => a.attribute_id
+                        === attributeId
+                        ? { ...a, mode }
+                        : a,
+                ),
+            }
+            : n,
+    );
+}
+
+export function applyUpdateAttributeRequired(
+    nodes: readonly GraphNode[],
+    nodeId: string,
+    attributeId: RecordAttributeId,
+    isRequired: boolean,
+): GraphNode[] {
+    return nodes.map(
+        n => n.id === nodeId
+            ? {
+                ...n,
+                attributes: n.attributes.map(
+                    a => a.attribute_id
+                        === attributeId
+                        ? { ...a, isRequired }
+                        : a,
                 ),
             }
             : n,

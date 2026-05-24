@@ -22,9 +22,9 @@ test('mock seed produces portfolio Impact baseline +50',
         const ctx = createRequestContext(db);
         const gauges = await getDashboardGauges(ctx);
         const impact = gauges.find(
-            g => g.title === 'Impact',
+            g => g.title === 'Portfolio Impact',
         );
-        assert.ok(impact, 'Impact gauge present');
+        assert.ok(impact, 'Portfolio Impact gauge present');
         assert.equal(impact.kind, 'bipolar');
         assert.equal(impact.outer.value, 50);
     });

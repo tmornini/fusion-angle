@@ -9,6 +9,7 @@ import { showToast } from '../app/toast.ts';
 import {
     buildSkeleton,
     withLoadingState,
+    type EmptyStateConfig,
 } from '../app/loading-states.ts';
 import {
     iconMail, iconArchive, iconPlus,
@@ -94,12 +95,40 @@ export async function init(
     await initCreateDropdown(ctx);
 }
 
+function emptyStateFor(
+    mode: InboxMode,
+): EmptyStateConfig {
+    if (mode === 'active') {
+        return {
+            icon: iconMail(24, ''),
+            title: 'No Active Work Orders Yet',
+            description:
+                'Create a work order to get'
+                + ' started.',
+        };
+    }
+    return {
+        icon: iconMail(24, ''),
+        title: 'No Archived Work Orders Yet',
+        description:
+            'Completed work orders will'
+            + ' appear here.',
+    };
+}
+
 async function rerenderInbox(
     listEl: HTMLElement,
     mode: InboxMode,
     ctx: RequestContext,
 ): Promise<void> {
-    const items = await loadInboxItems(mode, ctx);
+    const items = await withLoadingState(
+        listEl,
+        buildSkeleton('card-list', 4),
+        () => loadInboxItems(mode, ctx),
+        init,
+        emptyStateFor(mode),
+    );
+    if (!items) return;
     const presenter = new WorkboxInboxPresenter(
         items, mode === 'active',
     );
@@ -170,14 +199,7 @@ async function initActiveList(
         buildSkeleton('card-list', 4),
         () => loadInboxItems('active', ctx),
         init,
-        {
-            icon: iconMail(24, ''),
-            title:
-                'No Active Work Orders Yet',
-            description:
-                'Create a work order to get'
-                + ' started.',
-        },
+        emptyStateFor('active'),
     );
     if (!items) return;
 
@@ -233,14 +255,7 @@ async function initArchiveList(
         buildSkeleton('card-list', 4),
         () => loadInboxItems('archived', ctx),
         init,
-        {
-            icon: iconMail(24, ''),
-            title:
-                'No Archived Work Orders Yet',
-            description:
-                'Completed work orders will'
-                + ' appear here.',
-        },
+        emptyStateFor('archived'),
     );
     if (!items) return;
 

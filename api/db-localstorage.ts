@@ -20,6 +20,9 @@ import type {
     WorkOrderEntity,
     FlowWorkOrderEntity,
     StateFieldValueEntity,
+    RecordEntity,
+    RecordAttributeEntity,
+    FlowRecordEntity,
     Objective,
     ObjectiveRevision,
     ProjectObjectiveBaselineScore,
@@ -40,6 +43,9 @@ import {
     validateWorkOrderEntity,
     validateFlowWorkOrderEntity,
     validateStateFieldValueEntity,
+    validateRecordEntity,
+    validateRecordAttributeEntity,
+    validateFlowRecordEntity,
     validateOrganizationEntity,
     validateIdeaSubmissionEntity,
     validateStateEntity,
@@ -108,6 +114,17 @@ function validateSnapshotRow(
                 validateStateFieldValueEntity(
                     body,
                 );
+                break;
+            case 'records':
+                validateRecordEntity(body);
+                break;
+            case 'record_attributes':
+                validateRecordAttributeEntity(
+                    body,
+                );
+                break;
+            case 'flow_records':
+                validateFlowRecordEntity(body);
                 break;
             case 'organization':
                 validateOrganizationEntity(body);
@@ -313,6 +330,23 @@ export async function createLocalStorageAdapter(
                 'state_field_values',
                 backend, stateStore,
                 validateStateFieldValueEntity,
+            ),
+        records:
+            new EntityStore<RecordEntity>(
+                'records', backend, stateStore,
+                validateRecordEntity,
+            ),
+        recordAttributes:
+            new EntityStore<RecordAttributeEntity>(
+                'record_attributes',
+                backend, stateStore,
+                validateRecordAttributeEntity,
+            ),
+        flowRecords:
+            new EntityStore<FlowRecordEntity>(
+                'flow_records',
+                backend, stateStore,
+                validateFlowRecordEntity,
             ),
         organization:
             new SingletonStore<OrganizationEntity>(

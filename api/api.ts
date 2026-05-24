@@ -8,6 +8,7 @@ import type {
     FlowEntity,
     FlowVersionEntity,
     FlowWorkOrderEntity,
+    FlowRecordEntity,
     HumanWorkerEntity,
     IdeaEntity,
     IdeaSubmissionEntity,
@@ -17,6 +18,8 @@ import type {
     ProjectFlowEntity,
     ProjectObjectiveBaselineScore,
     ProjectObjectiveActualScore,
+    RecordEntity,
+    RecordAttributeEntity,
     StateFieldValueEntity,
     WorkOrderEntity,
 } from './types.ts';
@@ -245,6 +248,64 @@ const routes: Route[] = [
         delete: (db, params) =>
             db.stateFieldValues.delete(
                 param(params, 0),
+            ),
+    }),
+    route('records', {
+        get: (db) => db.records.getAll(),
+    }),
+    route('records/:id', {
+        get: (db, p) =>
+            db.records.getById(param(p, 0)),
+        put: (db, p, body) =>
+            db.records.put(
+                param(p, 0),
+                withoutId(body) as unknown as Omit<
+                    RecordEntity, 'id'
+                >,
+            ),
+        delete: (db, p) =>
+            db.records.delete(param(p, 0)),
+    }),
+    route('record-attributes', {
+        get: (db) =>
+            db.recordAttributes.getAll(),
+    }),
+    route('record-attributes/:id', {
+        get: (db, p) =>
+            db.recordAttributes.getById(
+                param(p, 0),
+            ),
+        put: (db, p, body) =>
+            db.recordAttributes.put(
+                param(p, 0),
+                withoutId(body) as unknown as Omit<
+                    RecordAttributeEntity, 'id'
+                >,
+            ),
+        delete: (db, p) =>
+            db.recordAttributes.delete(
+                param(p, 0),
+            ),
+    }),
+    route('flow-records', {
+        get: (db) =>
+            db.flowRecords.getAll(),
+    }),
+    route('flow-records/:id', {
+        get: (db, p) =>
+            db.flowRecords.getById(
+                param(p, 0),
+            ),
+        put: (db, p, body) =>
+            db.flowRecords.put(
+                param(p, 0),
+                withoutId(body) as unknown as Omit<
+                    FlowRecordEntity, 'id'
+                >,
+            ),
+        delete: (db, p) =>
+            db.flowRecords.delete(
+                param(p, 0),
             ),
     }),
 

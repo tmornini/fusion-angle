@@ -1,9 +1,8 @@
 import {
     $, $input, $inputRequired, $select,
-    $textarea,
 } from '../app/dom.ts';
 import { log } from '../app/logger.ts';
-import { setHtml } from '../app/safe-html.ts';
+import { setHtml, html } from '../app/safe-html.ts';
 import { showToast } from '../app/toast.ts';
 import {
     buildSkeleton,
@@ -20,11 +19,24 @@ import {
     getFlowVersions,
     getHumanWorkers,
     getAIWorkers,
+    getRecords,
+    getRecordForFlow,
+    getRecordAttributesByRecord,
+    putFlowRecord,
+    deleteFlowRecord,
+    generateCryptoSafeBase62,
+    nowUtc,
     postClipboardCopy,
     subscribeResize,
 } from '../app/adapters/index.ts';
 import { getDbAdapter } from '../app/adapters/init.ts';
-import type { WorkerId } from '../../api/types.ts';
+import type {
+    WorkerId,
+    RecordAttributeEntity,
+    RecordAttributeId,
+    RecordEntity,
+    RecordId,
+} from '../../api/types.ts';
 import {
     downloadBlob,
 } from '../app/adapters/blob-download.ts';
@@ -49,23 +61,24 @@ import {
     performAddNodeAtPosition,
     performDeleteSelectedNodes,
     performDeleteSelectedEdge,
-    performAddField,
-    performDeleteField,
+    performAddAttributeRef,
+    performRemoveAttributeRef,
+    performUpdateAttributeMode,
+    performUpdateAttributeRequired,
     performUndo,
     performRedo,
 } from '../app/flow-operations.ts';
 import {
-    applyAddField,
-    applyDeleteField,
+    applyAddAttributeRef,
+    applyRemoveAttributeRef,
+    applyUpdateAttributeMode,
+    applyUpdateAttributeRequired,
 } from '../app/flow-designer-actions.ts';
 
 const FALLBACK_W = 800;
 const FALLBACK_H = 600;
 const SAVE_DELAY_MS = 800;
 
-// Unit 6a instrumentation: capture per-burst stats so
-// the debouncer can be measured against frame budget and
-// removed/lowered if it isn't earning its keep.
 class Debouncer {
     #timer: ReturnType<
         typeof setTimeout
@@ -442,16 +455,13 @@ async function handleDeleteSelectedEdge(
     );
 }
 
-async function handleAddField(
-    name: string,
-    fieldType: string,
-    isRequired: boolean,
-    options: string[],
+async function handleAddAttributeRef(
+    attributeId: RecordAttributeId,
 ): Promise<void> {
     const snap = pageState.presenter().snapshot();
-    const op = await performAddField(
-        getDbAdapter(), snap, name, fieldType,
-        isRequired, options,
+    const op = await performAddAttributeRef(
+        getDbAdapter(), snap, attributeId,
+        'editable', false,
     );
     if (op.kind === 'noop') return;
     if (op.kind === 'fail') {
@@ -463,8 +473,8 @@ async function handleAddField(
     const current = pageState.presenter().snapshot();
     const next: FlowSnapshot = {
         ...current,
-        nodes: applyAddField(
-            current.nodes, op.nodeId, op.field,
+        nodes: applyAddAttributeRef(
+            current.nodes, op.nodeId, op.ref,
         ),
     };
     commit(next, {
@@ -472,12 +482,12 @@ async function handleAddField(
     });
 }
 
-async function handleDeleteField(
-    fieldId: string,
+async function handleRemoveAttributeRef(
+    attributeId: RecordAttributeId,
 ): Promise<void> {
     const snap = pageState.presenter().snapshot();
-    const op = await performDeleteField(
-        getDbAdapter(), snap, fieldId,
+    const op = await performRemoveAttributeRef(
+        getDbAdapter(), snap, attributeId,
     );
     if (op.kind === 'noop') return;
     if (op.kind === 'fail') {
@@ -489,8 +499,66 @@ async function handleDeleteField(
     const current = pageState.presenter().snapshot();
     const next: FlowSnapshot = {
         ...current,
-        nodes: applyDeleteField(
-            current.nodes, op.nodeId, op.fieldId,
+        nodes: applyRemoveAttributeRef(
+            current.nodes, op.nodeId,
+            op.attributeId,
+        ),
+    };
+    commit(next, {
+        advanceHistory: op.advanceHistory,
+    });
+}
+
+async function handleUpdateAttributeMode(
+    attributeId: RecordAttributeId,
+    mode: 'editable' | 'readonly',
+): Promise<void> {
+    const snap = pageState.presenter().snapshot();
+    const op = await performUpdateAttributeMode(
+        getDbAdapter(), snap, attributeId, mode,
+    );
+    if (op.kind === 'noop') return;
+    if (op.kind === 'fail') {
+        await reportOpFailure(
+            op.toast, op.toastVariant, snap.flowId,
+        );
+        return;
+    }
+    const current = pageState.presenter().snapshot();
+    const next: FlowSnapshot = {
+        ...current,
+        nodes: applyUpdateAttributeMode(
+            current.nodes, op.nodeId,
+            op.attributeId, op.mode,
+        ),
+    };
+    commit(next, {
+        advanceHistory: op.advanceHistory,
+    });
+}
+
+async function handleUpdateAttributeRequired(
+    attributeId: RecordAttributeId,
+    isRequired: boolean,
+): Promise<void> {
+    const snap = pageState.presenter().snapshot();
+    const op = await performUpdateAttributeRequired(
+        getDbAdapter(), snap, attributeId,
+        isRequired,
+    );
+    if (op.kind === 'noop') return;
+    if (op.kind === 'fail') {
+        await reportOpFailure(
+            op.toast, op.toastVariant, snap.flowId,
+        );
+        return;
+    }
+    const current = pageState.presenter().snapshot();
+    const next: FlowSnapshot = {
+        ...current,
+        nodes: applyUpdateAttributeRequired(
+            current.nodes, op.nodeId,
+            op.attributeId, op.isRequired,
         ),
     };
     commit(next, {
@@ -994,30 +1062,85 @@ function bindPanelActions(
         (e) => {
             const target = e.target;
             if (
-                !(target instanceof
-                    HTMLInputElement)
-            ) return;
-            if (
-                target.type !== 'checkbox'
-            ) return;
-            if (
-                !target.hasAttribute(
+                target instanceof
+                    HTMLInputElement
+                && target.type === 'checkbox'
+                && target.hasAttribute(
                     'data-worker-id',
                 )
-            ) return;
-            const panel = target.closest(
-                '#prop-node-workers',
-            );
-            if (!(panel instanceof HTMLElement)) {
+            ) {
+                const panel = target.closest(
+                    '#prop-node-workers',
+                );
+                if (
+                    !(panel instanceof HTMLElement)
+                ) return;
+                const workerIds =
+                    parseWorkerIdsFromPanel(
+                        panel,
+                    );
+                commit(
+                    pageState.presenter()
+                        .withNodeWorkerIds(
+                            workerIds,
+                        ),
+                    { advanceHistory: true },
+                );
                 return;
             }
-            const workerIds =
-                parseWorkerIdsFromPanel(panel);
-            commit(
-                pageState.presenter()
-                    .withNodeWorkerIds(workerIds),
-                { advanceHistory: true },
-            );
+            if (
+                target instanceof
+                    HTMLSelectElement
+                && target.id
+                    === 'prop-node-attribute-picker'
+            ) {
+                const attributeId =
+                    target.value;
+                if (!attributeId) return;
+                target.value = '';
+                void handleAddAttributeRef(
+                    attributeId,
+                );
+                return;
+            }
+            if (
+                target instanceof
+                    HTMLSelectElement
+                && target.getAttribute(
+                    'data-action',
+                ) === 'update-attribute-mode'
+            ) {
+                const attributeId =
+                    target.getAttribute(
+                        'data-attribute-id',
+                    );
+                if (!attributeId) return;
+                const mode =
+                    target.value === 'readonly'
+                        ? 'readonly' : 'editable';
+                void handleUpdateAttributeMode(
+                    attributeId, mode,
+                );
+                return;
+            }
+            if (
+                target instanceof
+                    HTMLInputElement
+                && target.type === 'checkbox'
+                && target.getAttribute(
+                    'data-action',
+                ) === 'update-attribute-required'
+            ) {
+                const attributeId =
+                    target.getAttribute(
+                        'data-attribute-id',
+                    );
+                if (!attributeId) return;
+                void handleUpdateAttributeRequired(
+                    attributeId,
+                    target.checked,
+                );
+            }
         },
         { signal },
     );
@@ -1046,25 +1169,16 @@ function bindPanelActions(
                         .withFitReconciled(),
                 );
             } else if (
-                action === 'add-field'
+                action === 'remove-attribute-ref'
             ) {
-                showFieldEditor(
-                    container,
-                    pageState.presenter(),
-                );
-            } else if (
-                action === 'delete-field'
-            ) {
-                const fieldId = btn
-                    .getAttribute(
-                        'data-field-id',
+                const attributeId =
+                    btn.getAttribute(
+                        'data-attribute-id',
                     );
-                if (!fieldId) return;
-                void handleDeleteField(fieldId);
-            } else if (
-                action === 'save-field'
-            ) {
-                void handleSaveField(container);
+                if (!attributeId) return;
+                void handleRemoveAttributeRef(
+                    attributeId,
+                );
             }
         },
         { signal },
@@ -1131,91 +1245,128 @@ function bindPanelActions(
         },
         { signal },
     );
-    slot.addEventListener(
-        'keydown',
-        (e) => {
-            const target = e.target;
-            if (
-                !(
-                    target instanceof
-                    HTMLInputElement
-                )
-            ) return;
-            if (
-                target.id !== 'new-field-name'
-            ) return;
-            if (e.key !== 'Enter') return;
-            e.preventDefault();
-            e.stopPropagation();
-            slot.querySelector<
-                HTMLElement
-            >(
-                '[data-action='
-                + '"save-field"]',
-            )?.click();
+}
+
+function renderBindingSlot(
+    container: HTMLElement,
+    records: readonly RecordEntity[],
+    boundRecordId: RecordId | null,
+): void {
+    const slot = $(
+        '.flow-binding-slot', container,
+    );
+    if (!slot) return;
+    const sorted = [...records].toSorted(
+        (a, b) => a.name.localeCompare(b.name),
+    );
+    setHtml(
+        slot,
+        html`<label
+class="flow-binding-label text-sm">
+<span class="text-muted">Record:</span>
+<select
+    class="input input-sm"
+    id="flow-binding-select">
+<option value=""${
+    boundRecordId === null
+        ? ' selected' : ''
+}>(none)</option>
+${sorted.map(r => html`<option
+    value="${r.id}"${
+    r.id === boundRecordId
+        ? ' selected' : ''
+}>${r.name}</option>`)}
+</select>
+</label>`,
+    );
+}
+
+function bindBindingDropdown(
+    container: HTMLElement,
+    flowId: string,
+    signal: AbortSignal,
+): void {
+    const select = $select(
+        '#flow-binding-select', container,
+    );
+    if (!select) return;
+    select.addEventListener(
+        'change',
+        () => {
+            void handleBindRecord(
+                flowId,
+                select.value === ''
+                    ? null : select.value,
+            );
         },
         { signal },
     );
 }
 
-function showFieldEditor(
-    container: HTMLElement,
-    presenter: FlowDesignerPresenter,
-): void {
-    const result =
-        presenter.tryShowFieldEditor(container);
-    if (result === 'locked') {
-        showToast('Flow is locked', 'error');
+async function handleBindRecord(
+    flowId: string,
+    recordId: RecordId | null,
+): Promise<void> {
+    const ctx = createRequestContext();
+    try {
+        const existing = await
+            getRecordForFlow(ctx, flowId);
+        if (existing === recordId) return;
+        if (existing !== null) {
+            await deleteExistingFlowRecord(
+                flowId,
+            );
+        }
+        if (recordId !== null) {
+            await putFlowRecord(
+                ctx,
+                generateCryptoSafeBase62(),
+                {
+                    flow_id: flowId,
+                    record_id: recordId,
+                    at: nowUtc(),
+                },
+            );
+        }
+        const attributes =
+            recordId === null
+                ? []
+                : await
+                    getRecordAttributesByRecord(
+                        ctx, recordId,
+                    );
+        commit(
+            pageState.presenter()
+                .withRecordAttributes(attributes),
+        );
+        showToast(
+            'Record binding updated',
+            'success',
+        );
+    } catch (err) {
+        log.error(
+            'handleBindRecord failed',
+            'flow-detail', err,
+        );
+        showToast(
+            'Failed to update Record binding',
+            'error',
+        );
     }
 }
 
-async function handleSaveField(
-    container: HTMLElement,
+async function deleteExistingFlowRecord(
+    flowId: string,
 ): Promise<void> {
-    const nameEl = $inputRequired(
-        '#new-field-name', container,
+    const ctx = createRequestContext();
+    const all = await ctx.GET<
+        Array<{ id: string; flow_id: string }>
+    >('flow-records');
+    const existing = all.find(
+        r => r.flow_id === flowId,
     );
-    const typeEl = $select(
-        '#new-field-type', container,
-    );
-    if (!typeEl) {
-        throw new Error(
-            'Required: #new-field-type',
-        );
-    }
-    const reqEl = $inputRequired(
-        '#new-field-required', container,
-    );
-    const optEl = $textarea(
-        '#new-field-options', container,
-    );
-    if (!optEl) {
-        throw new Error(
-            'Required: #new-field-options',
-        );
-    }
-    const fieldName = nameEl.value.trim();
-    if (fieldName.length === 0) {
-        showToast(
-            'Field name is required',
-            'error',
-        );
-        return;
-    }
-    const fieldType = typeEl.value;
-    const isRequired = reqEl.checked;
-    const optionsText = optEl.value.trim();
-    const options =
-        optionsText.length > 0
-            ? optionsText
-                .split('\n')
-                .map(s => s.trim())
-                .filter(s => s.length > 0)
-            : [];
-    await handleAddField(
-        fieldName, fieldType,
-        isRequired, options,
-    );
+    if (!existing) return;
+    await deleteFlowRecord(ctx, existing.id);
 }
 
 export async function init(
@@ -1246,15 +1397,27 @@ export async function init(
             const [
                 graph, versions,
                 humanWorkers, aiWorkers,
+                records, boundRecordId,
             ] = await Promise.all([
                 getFlowGraph(ctx, flowId),
                 getFlowVersions(ctx, flowId),
                 getHumanWorkers(ctx),
                 getAIWorkers(ctx),
+                getRecords(ctx),
+                getRecordForFlow(ctx, flowId),
             ]);
+            const recordAttributes =
+                boundRecordId
+                    ? await
+                        getRecordAttributesByRecord(
+                            ctx, boundRecordId,
+                        )
+                    : [];
             return {
                 graph, versions,
                 humanWorkers, aiWorkers,
+                records, boundRecordId,
+                recordAttributes,
             };
         },
     );
@@ -1275,6 +1438,7 @@ export async function init(
             FALLBACK_H,
             loaded.humanWorkers,
             loaded.aiWorkers,
+            loaded.recordAttributes,
         );
     const presenter =
         new FlowDesignerPresenter(
@@ -1288,6 +1452,14 @@ export async function init(
         { open: false };
     const signal = pageState.signal();
     presenter.renderShell(container);
+    renderBindingSlot(
+        container,
+        loaded.records,
+        loaded.boundRecordId,
+    );
+    bindBindingDropdown(
+        container, flowId, signal,
+    );
     bindBackButton(container, signal);
     bindStatsButton(container, flowId, signal);
     bindCanvasInteractions(

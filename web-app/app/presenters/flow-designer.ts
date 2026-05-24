@@ -19,7 +19,10 @@ import type {
     FlowVersion,
     FlowSaveShape,
 } from '../adapters/flows.ts';
-import type { WorkerId } from '../../../api/types.ts';
+import type {
+    WorkerId,
+    RecordAttributeEntity,
+} from '../../../api/types.ts';
 import {
     generateCryptoSafeBase62,
 } from '../adapters/index.ts';
@@ -75,7 +78,6 @@ import {
 } from '../icons.ts';
 import {
     buildToolbar,
-    buildFieldEditor,
     buildNodePanel,
     buildEdgePanel,
     buildFlowNameHeader,
@@ -98,6 +100,7 @@ interface DesignerState {
     savedViewBox: SavedViewBox;
     humanWorkers: HumanWorker[];
     aiWorkers: AIWorker[];
+    recordAttributes: RecordAttributeEntity[];
 }
 
 export type FlowSnapshot = Readonly<DesignerState>;
@@ -113,6 +116,8 @@ export function buildInitialFlowSnapshot(
     canvasH: number,
     humanWorkers: HumanWorker[],
     aiWorkers: AIWorker[],
+    recordAttributes:
+        RecordAttributeEntity[],
 ): FlowSnapshot {
     const interaction = buildInteractionState(
         canvasW, canvasH,
@@ -134,6 +139,7 @@ export function buildInitialFlowSnapshot(
         savedViewBox: { kind: 'none' },
         humanWorkers,
         aiWorkers,
+        recordAttributes,
     };
 }
 
@@ -522,6 +528,7 @@ class="flow-designer">
     >${iconBarChart(20, '')}</button>
 <div class="flex-1 flow-name-header-slot"
     ></div>
+<div class="flow-binding-slot"></div>
 <div class="flex flex-col gap-2">
 <label class="${
     'flex items-center gap-2'
@@ -1045,28 +1052,19 @@ Auto Fit</label>
         );
     }
 
-    buildFieldEditor(): SafeHtml {
-        return buildFieldEditor(
-            this.#singleSelectedNodeId(),
-        );
+    withRecordAttributes(
+        attributes:
+            readonly RecordAttributeEntity[],
+    ): FlowSnapshot {
+        return {
+            ...this.#snapshot,
+            recordAttributes: [...attributes],
+        };
     }
 
-    tryShowFieldEditor(
-        container: HTMLElement,
-    ): 'opened' | 'locked' {
-        if (this.isLocked()) {
-            return 'locked';
-        }
-        const slot = $(
-            '#field-editor-slot', container,
-        );
-        if (slot) {
-            setHtml(
-                slot,
-                this.buildFieldEditor(),
-            );
-        }
-        return 'opened';
+    recordAttributes():
+        readonly RecordAttributeEntity[] {
+        return this.#snapshot.recordAttributes;
     }
 
     #buildPropsPanel(): SafeHtml {
@@ -1094,6 +1092,7 @@ Auto Fit</label>
                 this.#snapshot.isLocked,
                 this.#snapshot.humanWorkers,
                 this.#snapshot.aiWorkers,
+                this.#snapshot.recordAttributes,
             );
         }
 

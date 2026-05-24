@@ -1,11 +1,323 @@
-<div class="page-header">
-    <div>
-        <h1 class="page-title">Workers</h1>
-        <p class="text-sm text-muted">
-            Manage humans and AIs in your
-            organization
-        </p>
+<div class="workspace">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">Workers</h1>
+            <p class="text-sm text-muted">
+                Manage humans and AIs in your
+                organization
+            </p>
+        </div>
+        <button
+            class="btn btn-primary gap-2"
+            id="add-worker-btn"
+        >
+            <span id="add-worker-btn-icon"></span>
+            Add Worker
+        </button>
     </div>
-</div>
-<div id="manage-workers-content">
+
+    <div class="flex items-center gap-4 mb-6">
+        <div
+            class="search-wrapper flex-1
+                search-wrapper-md"
+        >
+            <span
+                class="search-icon"
+                id="worker-search-icon"
+            ></span>
+            <input
+                class="input search-input"
+                placeholder="Search workers..."
+                id="worker-search"
+                aria-label="Search workers"
+            />
+        </div>
+        <div
+            class="flex items-center gap-2"
+            role="tablist"
+            aria-label="Filter by kind"
+        >
+            <button
+                class="btn btn-secondary btn-sm"
+                data-kind-chip="all"
+                aria-pressed="true"
+            >All</button>
+            <button
+                class="btn btn-secondary btn-sm"
+                data-kind-chip="human"
+                aria-pressed="false"
+            >Humans</button>
+            <button
+                class="btn btn-secondary btn-sm"
+                data-kind-chip="ai"
+                aria-pressed="false"
+            >AIs</button>
+        </div>
+    </div>
+
+    <div class="card overflow-hidden">
+        <div
+            class="flex items-center gap-4 p-4
+                table-header-row"
+        >
+            <div
+                class="flex-2 text-xs font-medium
+                    text-muted"
+            >Worker</div>
+            <div
+                class="flex-1 text-xs font-medium
+                    text-muted"
+            >Title / Provider</div>
+            <div
+                class="flex-1 text-xs font-medium
+                    text-muted"
+            >Department / Token</div>
+            <div
+                class="flex-1 text-xs font-medium
+                    text-muted"
+            >Status</div>
+        </div>
+        <div id="worker-list"></div>
+    </div>
+
+    <div
+        id="add-worker-backdrop"
+        class="dialog-backdrop hidden"
+    ></div>
+    <div
+        id="add-worker-dialog"
+        class="dialog dialog-wide hidden"
+        aria-hidden="true"
+        role="dialog"
+        aria-modal="true"
+    >
+        <div class="dialog-header">
+            <h3
+                class="dialog-title flex
+                    items-center gap-2"
+            >
+                <span
+                    id="add-worker-dialog-icon"
+                ></span>
+                Add Worker
+            </h3>
+        </div>
+        <div
+            class="flex flex-col gap-3 py-4
+                dialog-scroll"
+        >
+            <fieldset
+                class="flex items-center gap-4"
+                id="add-worker-kind-toggle"
+            >
+                <legend class="label mr-2"
+                >Kind</legend>
+                <label
+                    class="flex items-center gap-1"
+                >
+                    <input
+                        type="radio"
+                        name="worker-kind"
+                        value="human"
+                        checked
+                    />
+                    Human
+                </label>
+                <label
+                    class="flex items-center gap-1"
+                >
+                    <input
+                        type="radio"
+                        name="worker-kind"
+                        value="ai"
+                    />
+                    AI
+                </label>
+            </fieldset>
+
+            <div
+                id="add-worker-human-form"
+                class="flex flex-col gap-3"
+            >
+                <div class="flex gap-3">
+                    <div class="flex-1">
+                        <label
+                            class="label mb-1 block"
+                        >First Name</label>
+                        <input
+                            class="input"
+                            id="hw-first"
+                            placeholder="First name"
+                        />
+                    </div>
+                    <div class="flex-1">
+                        <label
+                            class="label mb-1 block"
+                        >Last Name</label>
+                        <input
+                            class="input"
+                            id="hw-last"
+                            placeholder="Last name"
+                        />
+                    </div>
+                </div>
+                <div>
+                    <label
+                        class="label mb-1 block"
+                    >Email</label>
+                    <input
+                        class="input"
+                        type="email"
+                        placeholder="person@company.com"
+                        id="hw-email"
+                    />
+                </div>
+                <div class="flex gap-3">
+                    <div class="flex-1">
+                        <label
+                            class="label mb-1 block"
+                        >Title</label>
+                        <input
+                            class="input"
+                            type="text"
+                            placeholder="e.g. Engineer"
+                            id="hw-title"
+                        />
+                    </div>
+                    <div class="flex-1">
+                        <label
+                            class="label mb-1 block"
+                        >Department</label>
+                        <select
+                            class="input"
+                            id="hw-department"
+                        >
+                            <option
+                                value="Engineering"
+                            >Engineering</option>
+                            <option
+                                value="Product"
+                            >Product</option>
+                            <option
+                                value="Design"
+                            >Design</option>
+                            <option
+                                value="Sales"
+                            >Sales</option>
+                            <option
+                                value="Operations"
+                            >Operations</option>
+                            <option
+                                value="Analytics"
+                            >Analytics</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label
+                        class="label mb-1 block"
+                    >Phone</label>
+                    <input
+                        class="input"
+                        id="hw-phone"
+                        placeholder="+1 (555) 000-0000"
+                    />
+                </div>
+                <div>
+                    <label
+                        class="label mb-1 block"
+                    >Bio</label>
+                    <textarea
+                        class="textarea"
+                        rows="2"
+                        id="hw-bio"
+                        placeholder="Short bio..."
+                    ></textarea>
+                </div>
+            </div>
+
+            <div
+                id="add-worker-ai-form"
+                class="flex flex-col gap-3 hidden"
+            >
+                <div>
+                    <label
+                        class="label mb-1 block"
+                    >Name</label>
+                    <input
+                        class="input"
+                        id="ai-name"
+                        placeholder="e.g. Claude Opus"
+                    />
+                </div>
+                <div>
+                    <label
+                        class="label mb-1 block"
+                    >Provider</label>
+                    <input
+                        class="input"
+                        id="ai-provider"
+                        placeholder="e.g. Anthropic"
+                    />
+                </div>
+                <div>
+                    <label
+                        class="label mb-1 block"
+                    >Description</label>
+                    <textarea
+                        class="textarea"
+                        rows="2"
+                        id="ai-description"
+                        placeholder="Short description..."
+                    ></textarea>
+                </div>
+                <div>
+                    <label
+                        class="label mb-1 flex
+                            items-center gap-2"
+                    >
+                        <span
+                            id="ai-token-icon"
+                        ></span>
+                        Auth Token
+                    </label>
+                    <input
+                        class="input"
+                        type="password"
+                        id="ai-auth-token"
+                        required
+                        aria-required="true"
+                        placeholder="sk-..."
+                    />
+                    <p
+                        class="text-xs text-warning
+                            mt-2"
+                    >
+                        Auth tokens are stored
+                        unencrypted in this
+                        browser's local storage. Do
+                        not enter production keys
+                        today; secure storage
+                        arrives with the
+                        AI-invocation feature.
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="dialog-footer">
+            <button
+                class="btn btn-outline"
+                id="add-worker-cancel"
+            >Cancel</button>
+            <button
+                class="btn btn-primary gap-2"
+                id="add-worker-submit"
+            >
+                <span
+                    id="add-worker-submit-icon"
+                ></span>
+                Create
+            </button>
+        </div>
+    </div>
 </div>

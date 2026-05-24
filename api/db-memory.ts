@@ -18,6 +18,9 @@ import type {
     WorkOrderEntity,
     FlowWorkOrderEntity,
     StateFieldValueEntity,
+    RecordEntity,
+    RecordAttributeEntity,
+    FlowRecordEntity,
     Objective,
     ObjectiveRevision,
     ProjectObjectiveBaselineScore,
@@ -43,6 +46,9 @@ import {
     validateWorkOrderEntity,
     validateFlowWorkOrderEntity,
     validateStateFieldValueEntity,
+    validateRecordEntity,
+    validateRecordAttributeEntity,
+    validateFlowRecordEntity,
     validateIdeaSubmissionEntity,
     validateObjectiveEntity,
     validateObjectiveRevisionEntity,
@@ -65,6 +71,12 @@ export class MemoryDbAdapter implements DbAdapter {
         IEntityStore<FlowWorkOrderEntity>;
     readonly stateFieldValues:
         IEntityStore<StateFieldValueEntity>;
+    readonly records:
+        IEntityStore<RecordEntity>;
+    readonly recordAttributes:
+        IEntityStore<RecordAttributeEntity>;
+    readonly flowRecords:
+        IEntityStore<FlowRecordEntity>;
     readonly organization:
         ISingletonStore<OrganizationEntity>;
     readonly ideaSubmissions:
@@ -141,6 +153,23 @@ export class MemoryDbAdapter implements DbAdapter {
                 'state_field_values',
                 backend, stateStore,
                 validateStateFieldValueEntity,
+            );
+        this.records =
+            new EntityStore(
+                'records', backend, stateStore,
+                validateRecordEntity,
+            );
+        this.recordAttributes =
+            new EntityStore(
+                'record_attributes',
+                backend, stateStore,
+                validateRecordAttributeEntity,
+            );
+        this.flowRecords =
+            new EntityStore(
+                'flow_records',
+                backend, stateStore,
+                validateFlowRecordEntity,
             );
         this.ideaSubmissions =
             new EntityStore(
