@@ -7,10 +7,11 @@ when working with code in this repository.
 
 **Match the codebase's voice, or change the codebase.** A better
 pattern earns its place by replacing every site of the old one —
-never by living beside it. One codebase, one voice. The snowflake
-is a sin against Uniformity (Commandment III).
+never by living beside it. One codebase, one voice.
 
 ## Build & Dev Commands
+
+### Commands
 
 ```bash
 ./test                 # Run automated tests
@@ -22,18 +23,20 @@ is a sin against Uniformity (Commandment III).
 ./serve <port>         # Build + start local HTTP server on <port>
 ```
 
-**Always commit before building.** `./build` requires a clean
-working directory. Use `./validate` to catch type errors and
-lint issues before committing, then commit, then build.
+**Commit before building.** `./build` requires a clean
+working directory. Run `./validate` to catch type errors
+and lint issues; commit; then build.
 
-**Build and test locally:**
+For local test-as-you-go:
 
 ```bash
 ./serve 8080
 # open http://localhost:8080/landing/index.html
 ```
 
-**When running under the Claude Code sandbox**, the defaults
+### Sandbox invocation
+
+When running under the Claude Code sandbox, the defaults
 above fail two ways: `/tmp/` is not writable, and the tsx IPC
 pipe used by the `npx tsx` step inside `./build` lands in
 `$TMPDIR/tsx-501/…` which is outside the sandbox's allowed
@@ -50,6 +53,8 @@ TMPDIR=/tmp/claude ./serve 8080
 `localhost` is reachable from the sandbox, so the Chrome MCP
 tools can drive the page normally.
 
+### Validate semantics
+
 `./validate` runs `tsc --noEmit` (type checking), then
 `./test` (automated tests against pure modules and the
 `api/`, `adapters/`, and `presenters/` layers, via `node
@@ -60,12 +65,7 @@ file at the repo root except `TEST-PLAN.md` — exempted
 because each test case bullet is meant to scan as one
 self-contained line.
 
-Automated tests cover pure modules, flow-edit logic, all
-data adapters, the workbox inbox aggregation, navigation,
-mock-data validity, and presenter HTML output; UI behavior
-— gestures, layout, visual rendering, end-to-end DOM flows
-— is still covered by the manual browser regression
-protocol — see `## Testing` below.
+For what each test layer covers, see `## Testing`.
 
 ## TypeScript
 
@@ -85,25 +85,25 @@ is HTTP-only.
 
 ### Key Layers
 
-- **HTML Composition**: `web-app/app/compose.ts` assembles
+- **HTML Composition.** `web-app/app/compose.ts` assembles
   `components-layout.html` + `component-*.html` + each page's
   `index.html` into composed standalones in a temp build dir.
   Standalone pages are copied directly.
-- **Navigation**: `<a href>` between pages. `navigateTo(page,
+- **Navigation.** `<a href>` between pages. `navigateTo(page,
   params?)` builds relative URLs.
-- **Page Detection**: `<html data-page="dashboard">` →
+- **Page Detection.** `<html data-page="dashboard">` →
   `PAGE_REGISTRY` lookup → page module's `init()`.
-- **Source = Output Alignment**: `PAGE_REGISTRY` declares
+- **Source = Output Alignment.** `PAGE_REGISTRY` declares
   `sourceDir` and `sourceFile`. Both `compose.ts` and
   `navigateTo()` resolve output as
   `{sourceDir}/{sourceFile}.html` — the file you edit is the
   file the browser loads.
-- **Auth**: Mock, returns `demo@example.com`.
-- **Data**: REST-style API (`api/`) over localStorage. Adapters
+- **Auth.** Mock, returns `demo@example.com`.
+- **Data.** REST-style API (`api/`) over localStorage. Adapters
   in `web-app/app/adapters/` shape rows for pages.
-- **Presentation**: Presenters in `web-app/app/presenters/` emit
+- **Presentation.** Presenters in `web-app/app/presenters/` emit
   `SafeHtml`.
-- **Database**: localStorage with JSON serialization. Each
+- **Database.** localStorage with JSON serialization. Each
   entity table is a `fusion-ai:tableName` key. The `states`
   table is the unified append-only event log: every entity
   lifecycle change lands as one row `{id, entity_id, state,
@@ -129,26 +129,14 @@ is HTTP-only.
   columns. History stores hard-delete via splice. When no
   schema exists, non-entry pages redirect to snapshots.
 
-  Four doctrinal entries follow from this design:
-  *Every state is an event; the latest event is the truth.*
-  *State is not a property of a noun; it is a process that
-  happens to an entity at a time.* (Bohm's rheomode applied
-  to data.)
-  *Read the log; never trust a derived column.* (Derived
-  state columns retired; the log is the source.)
-  *Entity rows are eternal; lifecycle is the event sequence
-  over them.* (Codd: entities and tombstones occupy
-  separate relations — here, the tombstones became state
-  events, but the separation principle holds.)
-
   The `'system'` worker (`SYSTEM_WORKER_ID = 'system'` in
   `api/types.ts`) is the well-known actor seeded as a real
   `HumanWorkerEntity` row by both `populateMockData` and
   `populateBootstrapData`. State events without a specific
   user actor reference this worker.
-- **State**: Module-level vars + pub-sub for theme, mobile, auth,
+- **State.** Module-level vars + pub-sub for theme, mobile, auth,
   sidebar.
-- **Read-only siblings of editable pages**: `flow-stats.html` is a
+- **Read-only siblings of editable pages.** `flow-stats.html` is a
   flat, non-editable rendering of one flow's diagram (heat-tinted by
   share of trailing-90-day flow time, with a hover/click stat card
   and a path stepper). It is a sibling, not an extension, of
@@ -194,11 +182,7 @@ head and tail of the entity's event sequence.
 
 The terminal state for both human and AI workers is
 `'archived'`. AI workers retire via `archiveAIWorker`; humans
-via `archiveHumanWorker`. Per Commandment III (Uniformity),
-the kind of worker does not change the vocabulary of its
-lifecycle — the previous dual-vocabulary snowflake
-(humans terminating at `'deactivated'`, AIs at `'deleted'`)
-was a user-caught violation and has been retired.
+via `archiveHumanWorker`.
 
 **Work orders** (open-ended transitions + closed claim
 alphabet):
@@ -587,28 +571,19 @@ layer directly.
 
 ### Adapter Conventions
 
-- **Worker domain split.** `adapters/workers.ts` is the
-  humans-only surface (`getHumanWorker`, `putHumanWorker`,
-  `getCurrentHumanWorker`, etc.) backed by the `workers`
-  table. `adapters/ai-workers.ts` is the AIs-only surface
-  backed by `ai_workers`; it owns `maskAuthToken(token)`,
-  the only producer/consumer of auth tokens.
-  `adapters/workers-union.ts` is the union seam: `getWorkers(
-  ctx)`, `getWorkerMap(ctx)`, `workerName(workerMap,
-  workerId)`, plus `isHumanWorker` / `isAIWorker` re-exported
-  from `api/types.ts`. Anything that displays a worker's
-  name without caring about kind (node selector, flow-stats
-  adapter, workbox name display) imports from
-  `workers-union.ts`; kind-specific surfaces (status
-  mutations, AI auth-token storage) go through the per-kind
-  modules.
-- **`workerName(workerMap, workerId: WorkerId)`** throws on
-  both missing and unknown workerId. Optional worker
-  references must branch at the call site
-  (`row.worker_id ? workerName(...) : ''`) — never overload
-  `workerName` with a fallback. UI renders `'—'` via
-  `DISPLAY_ABSENT` for legitimately absent values. Never use
-  magic strings like `'Unknown'`.
+- **Worker domain split.** `adapters/workers.ts` is humans-
+  only (`getHumanWorker` etc., backed by `workers`).
+  `adapters/ai-workers.ts` is AIs-only (backed by
+  `ai_workers`, owns `maskAuthToken`).
+  `adapters/workers-union.ts` is the union seam (`getWorkers`,
+  `workerName`, `isHumanWorker` / `isAIWorker`). Import the
+  union for kind-agnostic display; per-kind modules for
+  status mutations and AI auth-token storage.
+- **`workerName(workerMap, workerId)`.** Throws on missing
+  and unknown ids. Optional worker references branch at the
+  call site (`row.worker_id ? workerName(...) : ''`); do not
+  overload with a fallback. UI renders `'—'` via
+  `DISPLAY_ABSENT`. Do not use magic strings like `'Unknown'`.
 - **`RequestContext` is the only I/O surface.** Every data-
   access adapter takes `ctx: RequestContext` first and uses
   `ctx.GET/PUT/DELETE/POST/commit`. The standalone
@@ -621,36 +596,28 @@ layer directly.
   fetch entity data through `ctx`. Platform shims
   (`clipboard.ts`, `viewport.ts`, `location.ts`,
   `crypto-safe-base62.ts`, etc.) wrap browser primitives so the
-  app speaks one voice. Tiny shims are not a smell — they are
-  the divorce point.
-- **`getFlowStats(ctx, flowId)`** — the stats adapter — resolves
-  the work-order set for a flow through the `flow-work-orders`
-  join table (relational truth per Codd), **not** through each
-  work order's frozen `flow_graph.flowId`. It returns
-  `{ model, graph }` so the page can derive the canvas viewBox
-  from the flow graph's node positions — which `getFlowGraph`
-  has already resolved to a real layout (`computeLayout` runs
-  for `is_auto_layout` or degenerately-positioned flows), so
-  the stats canvas never collapses onto one scaled-up node.
+  app speaks one voice.
+- **`getFlowStats(ctx, flowId)`.** Resolves the work-order
+  set via the `flow-work-orders` join table (relational
+  truth per Codd), not via each work order's frozen
+  `flow_graph.flowId`. Returns `{ model, graph }` so the
+  page derives the canvas viewBox from real laid-out
+  coordinates — `getFlowGraph` runs `computeLayout` for
+  `is_auto_layout` or degenerate flows.
 - **Mutation adapters return `Promise<void>`.**
   Change-awareness flows through notification channels (e.g.,
   `ideaChanges.notify()`), never through return values —
   callers tell the channel rather than branch on a result.
-  The type's silence is intentional.
 - **Records adapters.** `adapters/records.ts` owns Record
   lifecycle (CRUD + `archiveRecord`).
-  `adapters/record-attributes.ts` is the per-attribute
-  surface with `getRecordAttributesByRecord(ctx, recordId)`
-  returning sort-ordered rows.
-  `adapters/flow-records.ts` is the binding seam with three
-  cross-walkers: `getRecordForFlow`, `getFlowsForRecord`,
-  and `getWorkOrdersForRecord` (records → flows →
-  flow_work_orders → work_orders).
-  `adapters/record-transitions.ts` is the property-test
-  gate's orchestrator; it composes the pure
-  `validateAttributeValue` from `record-constraints.ts` with
-  the work order's stored + pending values.
-  `postWorkOrderTransition` runs the gate and throws
+  `adapters/record-attributes.ts` exposes
+  `getRecordAttributesByRecord`, sort-ordered.
+  `adapters/flow-records.ts` is the binding seam
+  (`getRecordForFlow`, `getFlowsForRecord`,
+  `getWorkOrdersForRecord`).
+  `adapters/record-transitions.ts` orchestrates the
+  property-test gate via `validateAttributeValue`;
+  `postWorkOrderTransition` runs it and throws
   `RecordTransitionViolations` on non-empty result.
 
 ### Dark Mode
@@ -664,20 +631,20 @@ system preference detection via `prefers-color-scheme`.
 
 ### CSS-first styling
 
-All styling lives in `web-app/app/styles/`. Inline `style="..."`
-strings are forbidden except:
+All styling lives in `web-app/app/styles/`. Do not use inline
+`style="..."` strings except:
 
-1. **Dynamic per-element values** (progress widths, fill
-   percentages, heat intensities) — passed via CSS custom
+1. **Dynamic per-element values.** Progress widths, fill
+   percentages, heat intensities — passed via CSS custom
    properties: `style="--progress-fill:${value}%"` consumed
    by a CSS rule reading `var(--progress-fill, 0%)`; the
    flow-stats heat ramp uses the same pattern with per-node
    `style="--heat-t:${0..1}"` — see DESIGN-SYSTEM.md §
    Heat ramp. The value is **data**; the colors stay in
    the design system.
-2. **Bootstrap fallbacks** in `database-init.ts` — error UI
-   before CSS may have loaded, marked with a file-header
-   comment.
+2. **Bootstrap fallbacks.** `database-init.ts` uses these
+   for error UI before CSS may have loaded; marked with a
+   file-header comment.
 
 The variant pattern is `data-tone` / `data-level` attributes on
 a base class. The TS enum and the CSS attribute selector share
@@ -687,8 +654,8 @@ When extending CSS: `components-X.css` for patterns used by
 3+ pages (one file per family — buttons, cards, dialog, etc.),
 `pages-X.css` for page-scoped patterns (each page declares its
 bundles in `cssBundles` per `page-registry.ts`), `utilities.css`
-for single-property primitives. Never use raw hex colors —
-always `hsl(var(--token))`. See DESIGN-SYSTEM.md § 12 CSS
+for single-property primitives. Do not use raw hex colors;
+use `hsl(var(--token))`. See DESIGN-SYSTEM.md § 12 CSS
 Architecture for the full cascade order, per-page bundle
 mechanism, and decision tree.
 
@@ -699,24 +666,24 @@ defined as CSS classes in `web-app/app/styles/` and helper
 functions across `web-app/app/` modules. No external
 component library.
 
-**Dialog pattern**: Use `openDialog(id)` / `closeDialog(id)`
+**Dialog pattern.** Use `openDialog(id)` / `closeDialog(id)`
 from `core.ts`. Requires matching HTML elements:
 `id="{id}-backdrop"` (with `class="dialog-backdrop hidden"`)
 and `id="{id}-dialog"` (with `class="dialog hidden"
 aria-hidden="true"`). Helpers manage visibility, ARIA
 attributes, and focus.
 
-**Tab pattern**: Use `initTabs('[data-tab]', '.tab-panel')`
+**Tab pattern.** Use `initTabs('[data-tab]', '.tab-panel')`
 from `core.ts`. Tab buttons use `data-tab="{name}"`
 attribute, panels use `id="tab-{name}"`.
 
 ### Design System
 
-See `DESIGN-SYSTEM.md`. Key invariant: never use raw hex colors
-in CSS — always `hsl(var(--token))`. Icons are ~100 inline SVG
+See `DESIGN-SYSTEM.md`. Key invariant: do not use raw hex
+colors in CSS; use `hsl(var(--token))`. Icons are ~100 inline SVG
 functions in `web-app/app/icons.ts`.
 
-**Heat ramp** — see DESIGN-SYSTEM.md § Heat ramp.
+**Heat ramp.** See DESIGN-SYSTEM.md § Heat ramp.
 
 ### Mobile Responsiveness
 
@@ -750,10 +717,12 @@ and copied — read it, don't read this section.
 
 ## Testing
 
-Two layers, both zero-dependency:
+Two layers, both zero-dependency.
 
-**Automated tests** (Node's built-in `node:test` runner with
-`--strip-types`, no devDependencies). Tests cover
+### Automated tests
+
+Node's built-in `node:test` runner with `--strip-types`,
+no devDependencies. Tests cover
 pure modules, flow-edit business logic and the connection-
 validation rules (`tests/flow-operations.test.ts`), the flow
 version/query adapters, every data adapter (including
@@ -779,8 +748,10 @@ adapter and api-layer tests run without `localStorage`.
 Run via `./validate` (which also type-checks and lints) or
 directly: `node --test --strip-types tests/*.test.ts`.
 
-**Manual browser regression** for UI behavior: a pass against
-`TEST-PLAN.md`, driven either by a single human tester
+### Manual browser regression
+
+UI behavior runs against `TEST-PLAN.md`, driven either by a
+single human tester
 serially or by Claude Code agents in parallel via the
 `claude-in-chrome` MCP. Anything DOM-driven (gestures, layout,
 visual rendering) lives here; where a manual case is the
@@ -793,59 +764,60 @@ and the known MCP limitations (flow-designer gesture
 pointer-capture, `resize_window`, file I/O, kill EPERM) live
 in TEST-PLAN.md § Protocol — CLAUDE.md does not duplicate them.
 
-**Orchestrating a complete run.** When an agent runs the full
-test plan (CLI + browser), `./validate` is the gate: a failing
-type-check, test, or line-length lint ABORTS the run
-automatically. The agent does not ask whether to continue —
-the bundle is built from the same source, so a failing CLI
-suite makes the browser run meaningless. Report the failure,
-stop, await fix. This is doctrine, not a question.
+### Orchestration
+
+When an agent runs the full test plan (CLI + browser),
+`./validate` is the gate: a failing type-check, test, or
+line-length lint ABORTS the run automatically. Do not ask
+whether to continue — the bundle is built from the same
+source, so a failing CLI suite makes the browser run
+meaningless. Report the failure, stop, await fix.
 
 ## Gotchas
 
-- **`noUncheckedIndexedAccess`**: tsconfig enables this —
+- **`noUncheckedIndexedAccess`.** tsconfig enables this —
   array/object index access returns `T | undefined`,
   requiring explicit `!` assertions or guards.
-- **ES2024 target**: No transpilation. Native
+- **ES2024 target.** No transpilation. Native
   `Object.groupBy()`, `Map.groupBy()` are available. Assumes
   modern browser.
-- **`withLoadingState()` returns null**: Returns `null` on
+- **`withLoadingState()` returns null.** Returns `null` on
   error AND when data is empty with an `emptyState` config —
   callers must check for null before using the result.
-- **Cross-tab theme sync**: `state.ts` listens to
+- **Cross-tab theme sync.** `state.ts` listens to
   `StorageEvent` and syncs theme changes across browser tabs
   automatically.
-- **Non-critical writes logged at warn**: localStorage writes
+- **Non-critical writes logged at warn.** localStorage writes
   for theme and sidebar state are wrapped in try/catch that
   log at `warn` level — quota errors don't break the app but
   are observable via the logger.
-- **Snapshots wipe-first**: All snapshot operations
+- **Snapshots wipe-first.** All snapshot operations
   (pristine, mock data, import) call
   `DELETE('snapshots/schema')` before writing — there is no
   merge, only replace.
-- **Snapshot quota pre-flight**: `putSnapshotFromFile`
+- **Snapshot quota pre-flight.** `putSnapshotFromFile`
   consults `navigator.storage.estimate()` and rejects with
   `SnapshotTooLargeError` if `file.size` exceeds half of
   `quota - usage` (the import doubles peak memory while
   parsing). Falls back to a 5 MB hard cap when
   `navigator.storage.estimate()` is unavailable.
-- **Snapshot wipe-on-fail**: With pre-flight quota checks +
+- **Snapshot wipe-on-fail.** With pre-flight quota checks +
   per-row validation + column-level compression, mid-write
   failure is rare; when it does happen, `importSnapshot`
   wipes every `fusion-ai:<table>` key so the next bootstrap
   detects no schema and routes the user to the snapshots
   page to re-import. No backup, no sentinel, no rollback —
   real atomicity arrives with Postgres.
-- **`file:///` protocol**: Navigation detects file protocol
+- **`file:///` protocol.** Navigation detects file protocol
   and skips link prefetching. Page URLs use relative paths.
   Code supports `file:///` locally but testing is HTTP-only.
-- **View Transition aborts**: rapid programmatic navigation
+- **View Transition aborts.** rapid programmatic navigation
   surfaces both `AbortError: Transition was skipped` and
   `InvalidStateError: Transition was aborted...` lines in
   console — Chromium throws both classes for the same root
   cause. Browser-internal (no app code calls
   `startViewTransition`); no app impact.
-- **The states log is append-only by convention**:
+- **The states log is append-only by convention.**
   `StateStore.record` only appends; the table never deletes.
   An entity's lifecycle reads as the latest event on its
   `entity_id`. Reversal is a *new* event with the new state,
@@ -856,9 +828,14 @@ stop, await fix. This is doctrine, not a question.
   `api/store-entity.ts` and `api/store-state.ts` together to
   see both halves.
 - **`state_field_values.field_id` references
-  `record_attributes.id`**: the column name predates Records
+  `record_attributes.id`.** the column name predates Records
   and stays until a second non-Record consumer arrives. The
   semantic note lives in `SCHEMA.md § state_field_values`.
+
+## Commits
+
+Commit completed, tested work. Do not ask. The Office of
+the Commit governs — ABC.
 
 ## Worktrees
 
@@ -881,27 +858,18 @@ the proselytization, the dispatching agent MUST also push
 down the codebase-specific patterns the scripture itself
 cannot know:
 
-- **Voice rules**: 78-char max line, 4-space indent, no
+- **Voice rules.** 78-char max line, 4-space indent, no
   inline styles (use CSS custom properties + classes per
   the styling section above), present-tense imperative
   commit messages, Co-Authored-By trailer.
-- **Commandments touched by the task** — name them. If the
-  work involves naming, cite Uniformity (III). If it
-  introduces an abstraction, cite Generality (IX) and the
-  third-instance threshold. If it crosses a boundary, cite
-  Validation at edges. If it removes something, cite
-  Simplicity (VIII).
-- **Abominations the task specifically risks** — name them.
-  Null, Default Values, Internal Defense, Greedy Catch,
-  Coupling, Magical Values, Cleverness — say which apply,
-  with examples relevant to the file the agent will touch.
-- **Existing codebase patterns to match** — RequestContext
+- **Commandments touched by the task.** Name them.
+- **Abominations the task specifically risks.** Name them.
+- **Existing codebase patterns to match.** RequestContext
   as the only argument to adapter methods, SafeHtml from
   presenters, snake_case storage / camelCase domain,
   HTTP-verb adapter naming (`getNoun`/`putNoun`/`deleteNoun`/
   `postNounOperation`), validators at the gate not
   downstream, no untyped `any` from external boundaries.
 
-An agent of the Church does not unleash unwashed heathens on
-the codebase. Proselytize first, then brief — the scripture
-loads via the skill, the patterns load via the prompt.
+Proselytize first, then brief — the scripture loads via the
+skill, the patterns load via the prompt.

@@ -15,6 +15,7 @@ import {
     validateFlowWorkOrderEntity,
     validateStateFieldValueEntity,
     validateStateEntity,
+    validateStoredGraphJson,
 } from '../api/validators.ts';
 
 // Entity validators take Omit<T, 'id'> and reject an extra
@@ -111,3 +112,33 @@ test('mock-data organization row passes the validator', async () => {
         () => validateOrganizationEntity(withoutId(org)),
     );
 });
+
+// validateFlowEntity only checks that flow.graph is a
+// JsonObjectField (an opaque branded string). The strict
+// per-node / per-edge shape lives behind asStoredGraph;
+// without this test, a seed that omits e.g. node.description
+// would pass entity-row validation and surface as a runtime
+// validator throw on the first read path. Pin the deep
+// content here.
+
+test(
+    'mock-data flow.graph JSON validates via asStoredGraph',
+    async () => {
+        const db = await seededDb();
+        const flows = await db.flows.getAll();
+        assert.ok(
+            flows.length > 0,
+            'precondition: flows seeded',
+        );
+        for (const flow of flows) {
+            assert.doesNotThrow(
+                () => validateStoredGraphJson(
+                    flow.graph,
+                    'flows[' + flow.id + '].graph',
+                ),
+                'flow ' + flow.id
+                    + ' should parse via asStoredGraph',
+            );
+        }
+    },
+);
