@@ -9,6 +9,7 @@ import {
     getProjectScoring,
     getPortfolioImpactSummary,
     getObjectiveAggregates,
+    getObjectiveTrendlines,
     getProjectsScoreColumn,
     postProjectBaselineScoring,
     postProjectActualMeasurement,
@@ -167,6 +168,114 @@ test('getProjectsScoreColumn returns per-project rollup',
         assert.equal(byId.get('p1')!.baselineAvg, 60);
         assert.equal(byId.get('p2')!.baselineAvg, -20);
     });
+
+test(
+    'getObjectiveTrendlines: baseline + two actuals',
+    async () => {
+        const db = new MemoryDbAdapter();
+        await seedTwoApprovedProjects(db);
+        await db.projectObjectiveActualScores.put(
+            'p1:o1:a1',
+            {
+                project_id: 'p1', objective_id: 'o1',
+                score: 40,
+                at: '2026-05-15T00:00:00.000Z',
+            },
+        );
+        await db.projectObjectiveActualScores.put(
+            'p2:o1:a1',
+            {
+                project_id: 'p2', objective_id: 'o1',
+                score: 10,
+                at: '2026-05-16T00:00:00.000Z',
+            },
+        );
+        const ctx = createRequestContext(db);
+        const trendlines = await getObjectiveTrendlines(
+            ctx,
+        );
+        const points = trendlines.get('o1');
+        assert.ok(points, 'o1 trendline must exist');
+        assert.deepEqual(points, [20, 40, 25]);
+        // baselineMean = (60 + -20) / 2 = 20
+        // after t1 (p1=40 only):        40
+        // after t2 (p1=40, p2=10):      (40 + 10) / 2 = 25
+    },
+);
+
+test(
+    'getObjectiveTrendlines: baseline + one actual',
+    async () => {
+        const db = new MemoryDbAdapter();
+        await seedTwoApprovedProjects(db);
+        await db.projectObjectiveActualScores.put(
+            'p1:o1:a1',
+            {
+                project_id: 'p1', objective_id: 'o1',
+                score: 40,
+                at: '2026-05-15T00:00:00.000Z',
+            },
+        );
+        const ctx = createRequestContext(db);
+        const trendlines = await getObjectiveTrendlines(
+            ctx,
+        );
+        assert.deepEqual(
+            trendlines.get('o1'),
+            [20, 40],
+        );
+    },
+);
+
+test(
+    'getObjectiveTrendlines: same-at batch is one point',
+    async () => {
+        const db = new MemoryDbAdapter();
+        await seedTwoApprovedProjects(db);
+        await db.projectObjectiveActualScores.put(
+            'p1:o1:a1',
+            {
+                project_id: 'p1', objective_id: 'o1',
+                score: 40,
+                at: '2026-05-15T00:00:00.000Z',
+            },
+        );
+        await db.projectObjectiveActualScores.put(
+            'p2:o1:a1',
+            {
+                project_id: 'p2', objective_id: 'o1',
+                score: 10,
+                at: '2026-05-15T00:00:00.000Z',
+            },
+        );
+        const ctx = createRequestContext(db);
+        const trendlines = await getObjectiveTrendlines(
+            ctx,
+        );
+        assert.deepEqual(
+            trendlines.get('o1'),
+            [20, 25],
+        );
+    },
+);
+
+test(
+    'getObjectiveTrendlines: no baseline returns empty',
+    async () => {
+        const db = new MemoryDbAdapter();
+        await db.objectives.put('o1', { position: 0 });
+        await db.objectiveRevisions.put('o1:t0', {
+            objective_id: 'o1',
+            name: 'O', description: 'd',
+            at: '2026-05-14T00:00:00.000Z',
+        });
+        const ctx = createRequestContext(db);
+        const trendlines = await getObjectiveTrendlines(
+            ctx,
+        );
+        assert.deepEqual(trendlines.get('o1'), []);
+    },
+);
 
 test('postProjectBaselineScoring appends event rows',
     async () => {

@@ -1,135 +1,296 @@
-import { html } from '../safe-html.ts';
-import type { SafeHtml } from '../safe-html.ts';
-import { iconPlus } from '../icons.ts';
+import { html, setHtml, SafeHtml } from '../safe-html.ts';
+import {
+    orderedKeys,
+} from './ordered-keys.ts';
+import {
+    toggleStatusFilter,
+} from './list-filter.ts';
+import {
+    iconGripVertical,
+    iconCheckCircle2,
+    iconClock,
+} from '../icons.ts';
 import type {
-    RecordEntity,
-    RecordId,
+    RecordModel,
+    RecordState,
+    RecordWithCounts,
+} from '../adapters/index.ts';
+import {
+    RECORD_STATE_CONFIG,
 } from '../adapters/index.ts';
 
-export interface RecordListRow {
-    readonly record: RecordEntity;
-    readonly attributeCount: number;
-    readonly boundFlowCount: number;
+const STATE_ICONS: Record<
+    RecordState,
+    (
+        size: number,
+        cssClass: string,
+    ) => SafeHtml
+> = {
+    active: iconCheckCircle2,
+    archived: iconClock,
+    deleted: iconClock,
+};
+
+export type RecordListFilter =
+    | { kind: 'all' }
+    | { kind: 'filtered'; status: RecordState };
+
+export type RecordListState = {
+    records: RecordWithCounts[];
+    filter: RecordListFilter;
+};
+
+export function buildInitialRecordListState(
+    records: RecordWithCounts[],
+): RecordListState {
+    return {
+        records,
+        filter: { kind: 'all' },
+    };
+}
+
+export function applyRecordListUpdate(
+    state: RecordListState,
+    records: RecordWithCounts[],
+): RecordListState {
+    return { ...state, records };
+}
+
+export function applyRecordFilterToggle(
+    listState: RecordListState,
+    recordState: RecordState,
+): RecordListState {
+    const next: RecordListFilter =
+        toggleStatusFilter(
+            listState.filter, recordState,
+        );
+    return { ...listState, filter: next };
+}
+
+export class RecordPresenter {
+    readonly #record: RecordModel;
+    readonly #attributeCount: number;
+    readonly #boundFlowCount: number;
+
+    constructor(
+        record: RecordModel,
+        attributeCount: number,
+        boundFlowCount: number,
+    ) {
+        this.#record = record;
+        this.#attributeCount = attributeCount;
+        this.#boundFlowCount = boundFlowCount;
+    }
+
+    idForLink(): string {
+        return this.#record.idForLink();
+    }
+
+    positionSortKey(): number {
+        return this.#record.positionSortKey();
+    }
+
+    stateGroup(): RecordState {
+        return this.#record.stateValue();
+    }
+
+    matchesState(s: RecordState): boolean {
+        return this.stateGroup() === s;
+    }
+
+    buildStateBadge(
+        isActive: boolean | null,
+    ): SafeHtml {
+        const cfg = RECORD_STATE_CONFIG[
+            this.#record.stateValue()
+        ]!;
+        const icon = STATE_ICONS[
+            this.#record.stateValue()
+        ]!;
+        const dimmed = isActive === false
+            ? 'true'
+            : 'false';
+        return html`<span class="${
+            'badge '
+            + cfg.className
+            + ' text-xs badge-fixed-w'
+            + ' cursor-pointer'
+        }" data-state="${
+            this.#record.stateValue()
+        }" data-dimmed="${dimmed}">${
+            icon(14, '')
+        } ${cfg.label}</span>`;
+    }
+
+    buildCard(showGrip: boolean): SafeHtml {
+        return html`
+    <div class="${
+        'card card-hover p-5 cursor-pointer'
+    }"
+        data-record-card="${
+            this.#record.idForLink()
+        }"
+        data-position="${
+            this.#record.positionSortKey()
+        }">
+        <div class="${
+            'flex items-center gap-4'
+        }">
+            ${showGrip ? html`<div class="${
+                'hidden-mobile text-muted'
+                + ' drag-handle'
+            }">${
+                iconGripVertical(20, '')
+            }</div>` : html``}
+            <div class="flex-fill min-w-0">
+                ${this.#buildHeading()}
+            </div>
+            <div class="${
+                'flex flex-col items-end'
+                + ' gap-2 ml-6'
+            }">
+                ${this.#buildMetadata()}
+            </div>
+        </div>
+    </div>`;
+    }
+
+    #buildHeading(): SafeHtml {
+        return html`
+        <h3 class="${
+            'font-display'
+            + ' font-semibold'
+            + ' truncate'
+        }">
+            ${this.#record.nameText()}
+        </h3>
+        <p class="${
+            'text-sm text-muted truncate'
+            + ' mt-1'
+        }">
+            ${this.#record.descriptionText()}
+        </p>
+        <span class="${
+            'badge '
+            + this.#record.stateClassName()
+            + ' text-xs badge-fixed-w mt-2'
+        }">${
+            STATE_ICONS[
+                this.#record.stateValue()
+            ]!(14, '')
+        } ${this.#record.stateLabel()}</span>`;
+    }
+
+    #buildMetadata(): SafeHtml {
+        return html`
+        <div class="${
+            'text-xs text-muted'
+            + ' text-right'
+        }">
+            ${String(this.#attributeCount)}
+            attribute${
+                this.#attributeCount === 1
+                    ? ''
+                    : 's'
+            }
+        </div>
+        <div class="${
+            'text-xs text-muted'
+            + ' text-right'
+        }">
+            ${String(this.#boundFlowCount)}
+            bound flow${
+                this.#boundFlowCount === 1
+                    ? ''
+                    : 's'
+            }
+        </div>`;
+    }
 }
 
 export class RecordListPresenter {
-    readonly #rows: readonly RecordListRow[];
+    #records: RecordPresenter[];
+    #filter: RecordListFilter;
 
-    constructor(rows: readonly RecordListRow[]) {
-        this.#rows = [...rows].toSorted(
-            (a, b) =>
-                a.record.name.localeCompare(
-                    b.record.name,
-                ),
+    constructor(state: RecordListState) {
+        this.#records = state.records.map(
+            r => new RecordPresenter(
+                r.record,
+                r.attributeCount,
+                r.boundFlowCount,
+            ),
+        );
+        this.#filter = state.filter;
+    }
+
+    activeFilter(): RecordState | null {
+        return this.#filter.kind === 'filtered'
+            ? this.#filter.status
+            : null;
+    }
+
+    renderBadges(
+        container: HTMLElement,
+    ): void {
+        setHtml(
+            container, this.#buildBadges(),
         );
     }
 
-    buildPage(): SafeHtml {
-        return html`<div class="entity">
-            <div class="${
-                'flex items-center'
-                + ' justify-between mb-6'
-            }">
-                <h1 class="${
-                    'text-2xl font-display'
-                    + ' font-bold'
-                }">Records</h1>
-                <button
-                    id="record-add-btn"
-                    class="${
-                        'btn btn-primary'
-                    }">
-                    ${iconPlus(16, '')}
-                    Add Record
-                </button>
-            </div>
-            ${this.#buildTable()}
-            ${this.#buildAddDialog()}
-        </div>`;
+    renderList(
+        container: HTMLElement,
+    ): void {
+        setHtml(container, this.#buildList());
     }
 
-    #buildTable(): SafeHtml {
-        if (this.#rows.length === 0) {
-            return html`<div
-                class="${
-                    'card p-6 text-muted'
-                }">
-                No Records yet. Add one to
-                bind data shapes to flows.
-            </div>`;
-        }
-        return html`<div class="card">
-            <div class="record-list-row
-                record-list-row-head">
-                <span>Name</span>
-                <span>Description</span>
-                <span>Attributes</span>
-                <span>Bound flows</span>
-            </div>
-            ${this.#rows.map(
-                r => this.#buildRow(r),
-            )}
-        </div>`;
+    #buildBadges(): SafeHtml {
+        const active = this.activeFilter();
+        const groups = Object.groupBy(
+            this.#records,
+            r => r.stateGroup(),
+        );
+        const order: RecordState[] = [
+            'active',
+            'archived',
+        ];
+        const badges = orderedKeys(
+            groups, order,
+        )
+            .map(s => ({
+                state: s,
+                items: groups[s],
+            }))
+            .filter(
+                g => g.items
+                    && g.items.length > 0,
+            )
+            .map(g => g.items![0]!
+                .buildStateBadge(
+                    active === null
+                        ? null
+                        : g.state === active,
+                ));
+        return html`${badges}`;
     }
 
-    #buildRow(
-        r: RecordListRow,
-    ): SafeHtml {
-        return html`<a
-            class="record-list-row"
-            data-record-id="${r.record.id}"
-            href="javascript:void(0)">
-            <span class="font-medium"
-                >${r.record.name}</span>
-            <span class="text-muted text-sm"
-                >${r.record.description}</span>
-            <span class="text-sm"
-                >${String(r.attributeCount)}</span>
-            <span class="text-sm"
-                >${String(r.boundFlowCount)}</span>
-        </a>`;
-    }
-
-    #buildAddDialog(): SafeHtml {
-        return html`
-<div id="record-add-backdrop"
-    class="dialog-backdrop hidden"></div>
-<div id="record-add-dialog"
-    class="dialog hidden"
-    aria-hidden="true">
-<div class="dialog-content">
-<h2 class="text-lg font-semibold mb-4"
-    >Add Record</h2>
-<div class="mb-3">
-<label class="label">Name</label>
-<input type="text"
-    class="input"
-    id="record-add-name"
-    placeholder="Record name" />
-</div>
-<div class="mb-3">
-<label class="label">Description</label>
-<textarea
-    class="input"
-    id="record-add-description"
-    placeholder="What this Record describes"
-    rows="3"></textarea>
-</div>
-<div class="${
-    'flex justify-end gap-2'
-}">
-<button class="btn btn-ghost"
-    id="record-add-cancel-btn"
-    >Cancel</button>
-<button class="btn btn-primary"
-    id="record-add-save-btn"
-    >Create</button>
-</div>
-</div>
-</div>`;
-    }
-
-    boundRecordIds(): RecordId[] {
-        return this.#rows.map(r => r.record.id);
+    #buildList(): SafeHtml {
+        const f = this.#filter;
+        const filtered =
+            f.kind === 'filtered'
+                ? this.#records.filter(
+                    r => r.matchesState(
+                        f.status,
+                    ),
+                )
+                : this.#records;
+        const sorted = filtered.toSorted(
+            (a, b) =>
+                a.positionSortKey()
+                - b.positionSortKey(),
+        );
+        const hasGrip = f.kind === 'all';
+        return html`${sorted.map(
+            r => r.buildCard(hasGrip),
+        )}`;
     }
 }

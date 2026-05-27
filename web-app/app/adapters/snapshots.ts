@@ -74,6 +74,18 @@ export const RETIRED_TABLES: readonly string[] = [
     'activity_actors',
 ];
 
+// State-event values the alphabet has retired. Old
+// snapshots carrying them in the states table are
+// rejected with SnapshotIncompatibleError.
+export const RETIRED_STATE_VALUES_PER_ENTITY:
+    Record<string, readonly string[]> = {
+    ideas: [
+        'active:incomplete',
+        'active:needs-info',
+        'active:ready',
+    ],
+};
+
 export class SnapshotIncompatibleError extends Error {
     readonly retired: readonly string[];
     constructor(retired: readonly string[]) {
@@ -115,6 +127,35 @@ function scanForRetiredKeys(
                     findings.push(table + '.' + key);
                     seen.add(key);
                 }
+            }
+        }
+    }
+    const retiredStates = new Set<string>();
+    for (const values of Object.values(
+        RETIRED_STATE_VALUES_PER_ENTITY,
+    )) {
+        for (const v of values) {
+            retiredStates.add(v);
+        }
+    }
+    const stateRows = snap['states'];
+    if (Array.isArray(stateRows)) {
+        const seenStates = new Set<string>();
+        for (const row of stateRows) {
+            if (!row || typeof row !== 'object') {
+                continue;
+            }
+            const r = row as Record<string, unknown>;
+            const v = r['state'];
+            if (
+                typeof v === 'string'
+                && retiredStates.has(v)
+                && !seenStates.has(v)
+            ) {
+                findings.push(
+                    'states[].state=' + v,
+                );
+                seenStates.add(v);
             }
         }
     }

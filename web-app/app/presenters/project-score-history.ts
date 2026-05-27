@@ -6,7 +6,7 @@ import type {
     ProjectObjectiveActualScore,
 } from '../../../api/types.ts';
 import type {
-    ObjectiveDeprecationEvent,
+    ObjectiveArchivalEvent,
 } from '../adapters/objectives.ts';
 import {
     formatSigned,
@@ -27,27 +27,27 @@ type Event =
         objectiveId: ObjectiveId; score: number }
     | { kind: 'revision'; at: string;
         objectiveId: ObjectiveId; name: string }
-    | { kind: 'deprecation'; at: string;
+    | { kind: 'archival'; at: string;
         objectiveId: ObjectiveId };
 
 export class ProjectScoreHistoryPresenter {
     readonly #baselines: ProjectObjectiveBaselineScore[];
     readonly #actuals: ProjectObjectiveActualScore[];
     readonly #revisions: ObjectiveRevision[];
-    readonly #deprecations: ObjectiveDeprecationEvent[];
+    readonly #archivations: ObjectiveArchivalEvent[];
     readonly #resolver: DefinitionResolver;
 
     constructor(
         baselines: ProjectObjectiveBaselineScore[],
         actuals: ProjectObjectiveActualScore[],
         revisions: ObjectiveRevision[],
-        deprecations: ObjectiveDeprecationEvent[],
+        archivations: ObjectiveArchivalEvent[],
         resolver: DefinitionResolver,
     ) {
         this.#baselines = baselines;
         this.#actuals = actuals;
         this.#revisions = revisions;
-        this.#deprecations = deprecations;
+        this.#archivations = archivations;
         this.#resolver = resolver;
     }
 
@@ -99,9 +99,9 @@ export class ProjectScoreHistoryPresenter {
                 name: r.name,
             });
         }
-        for (const d of this.#deprecations) {
+        for (const d of this.#archivations) {
             events.push({
-                kind: 'deprecation',
+                kind: 'archival',
                 at: d.at,
                 objectiveId: d.objectiveId,
             });
@@ -163,13 +163,13 @@ export class ProjectScoreHistoryPresenter {
                     <td>${e.name}</td>
                     <td>renamed/edited</td>
                 </tr>`;
-            case 'deprecation': {
+            case 'archival': {
                 const def = this.#resolver(
                     e.objectiveId, e.at,
                 );
                 return html`<tr>
                     ${dateCell}
-                    <td>Objective deprecated</td>
+                    <td>Objective archived</td>
                     <td>${def?.name ?? DISPLAY_ABSENT}</td>
                     <td>${DISPLAY_ABSENT}</td>
                 </tr>`;

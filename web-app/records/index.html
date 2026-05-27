@@ -1,3 +1,32 @@
 <div class="workspace">
-    <div id="page-root"></div>
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">Records</h1>
+            <p class="text-sm text-muted">
+                Data shapes that bind to flows
+            </p>
+        </div>
+        <button
+            class="btn btn-hero gap-2"
+            id="create-record-btn"
+        >
+            <span id="create-btn-icon"></span>
+            <span class="hidden-mobile"
+            >Add Record</span><span
+                class="visible-mobile"
+            >New Record</span>
+        </button>
+    </div>
+
+    <div class="mb-6">
+        <div
+            class="flex items-center gap-2"
+            id="status-badges"
+        ></div>
+    </div>
+
+    <div
+        id="records-list"
+        class="flex flex-col gap-3"
+    ></div>
 </div>

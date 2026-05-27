@@ -180,24 +180,6 @@
   color: hsl(var(--error-text));
 }
 
-/* Admin link card — bordered card with hover highlight */
-.admin-link-card {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-4);
-  border-radius: var(--radius-lg);
-  border: 1px solid hsl(var(--border));
-  cursor: pointer;
-  text-align: left;
-  width: 100%;
-  background: transparent;
-  transition: border-color var(--duration-fast) var(--ease-default);
-}
-.admin-link-card:hover {
-  border-color: hsl(var(--primary) / 0.5);
-}
-
 /* Quick-action button: outline btn variant
    that sits at top-left with vertical icon+label */
 .btn-quick-action {

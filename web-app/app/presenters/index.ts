@@ -133,7 +133,12 @@ export {
 } from './dashboard-objective-aggregates.ts';
 export {
     RecordListPresenter,
-    type RecordListRow,
+    RecordPresenter,
+    buildInitialRecordListState,
+    applyRecordListUpdate,
+    applyRecordFilterToggle,
+    type RecordListState,
+    type RecordListFilter,
 } from './record-list.ts';
 export {
     RecordDetailPresenter,

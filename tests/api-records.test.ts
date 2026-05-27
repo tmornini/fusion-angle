@@ -29,14 +29,17 @@ test(
             id: 'rec-1',
             name: 'Customer',
             description: 'A customer record',
+            position: 1,
         });
         const stored = await GET<{
             id: string;
             name: string;
             description: string;
+            position: number;
         }>(db, 'records/rec-1');
         assert.equal(stored.id, 'rec-1');
         assert.equal(stored.name, 'Customer');
+        assert.equal(stored.position, 1);
     },
 );
 
@@ -48,6 +51,7 @@ test(
             id: 'rec-1',
             name: 'X',
             description: '',
+            position: 1,
         });
         await DELETE(db, 'records/rec-1');
         await assert.rejects(

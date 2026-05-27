@@ -33,8 +33,9 @@ import {
 
 const now = new Date();
 
+const TIER_SEATS_LIMIT = 200;
 const TIER_PROJECTS_LIMIT = 50;
-const TIER_IDEAS_LIMIT = 200;
+const TIER_IDEAS_LIMIT = 1000;
 
 function pad(n: number): string {
     return String(n).padStart(2, '0');
@@ -888,12 +889,7 @@ export async function populateMockData(
                 + ' triggers based on'
                 + ' seasonality, trends, and'
                 + ' lead times.',
-            expected_outcome:
-                'Reduce carrying costs by'
-                + ' 30% and stockout'
-                + ' incidents by 60%,'
-                + ' improving customer'
-                + ' satisfaction scores.',
+            expected_outcome: '',
             success_metrics: '',
         },
         {
@@ -1083,7 +1079,7 @@ export async function populateMockData(
             plan: 'Business',
             plan_status: 'active',
             next_billing: dt(-300, 0, 0),
-            seats: 25,
+            seats: TIER_SEATS_LIMIT,
             used_seats: 18,
             projects_limit: TIER_PROJECTS_LIMIT,
             ideas_limit: TIER_IDEAS_LIMIT,
@@ -2629,6 +2625,7 @@ export async function populateMockData(
             description:
                 'Company-side facts captured during'
                 + ' onboarding and sales pursuits.',
+            position: 1,
         },
         {
             id: projectBriefRecordId,
@@ -2636,6 +2633,7 @@ export async function populateMockData(
             description:
                 'Lightweight scoping shape used by'
                 + ' the Fusion Flow.',
+            position: 2,
         },
     ];
 
@@ -5766,7 +5764,7 @@ export async function populateMockData(
         {
             id: 'mGfBLqA7lScpEKxc5w0Yt2',
             entity_id: 'wuCMQqo4IkEksx7MYmu8g2',
-            state: 'active:needs-info',
+            state: 'active',
             worker_id: '53J8h9dr76XFqCjYcNVwIR',
             at: dt(65, 9, 0),
         },
@@ -5780,7 +5778,7 @@ export async function populateMockData(
         {
             id: 'BMS9TmTKR0DZ41vTUSpvxX',
             entity_id: 'T2vAafLDcshDONlYxpzPLc',
-            state: 'active:needs-info',
+            state: 'active',
             worker_id: 'Trf1Up2jMsPhEnjbW4Ji1n',
             at: dt(50, 9, 0),
         },
@@ -6118,6 +6116,7 @@ export async function populateMockData(
             adapter.records.put(r.id, {
                 name: r.name,
                 description: r.description,
+                position: r.position,
             }),
         ),
         ...mockRecordAttributes.map(r =>
@@ -6313,6 +6312,7 @@ export async function populateBootstrapData(
                 'Company-side facts captured'
                 + ' during onboarding and sales'
                 + ' pursuits.',
+            position: 1,
         },
         {
             id: projectBriefRecordId,
@@ -6320,6 +6320,7 @@ export async function populateBootstrapData(
             description:
                 'Lightweight scoping shape used'
                 + ' by the Fusion Flow.',
+            position: 2,
         },
     ];
 
@@ -6538,7 +6539,7 @@ export async function populateBootstrapData(
             plan: 'Business',
             plan_status: 'active',
             next_billing: dt(-300, 0, 0),
-            seats: 25,
+            seats: TIER_SEATS_LIMIT,
             used_seats: 18,
             projects_limit: TIER_PROJECTS_LIMIT,
             ideas_limit: TIER_IDEAS_LIMIT,
@@ -6550,6 +6551,7 @@ export async function populateBootstrapData(
             adapter.records.put(r.id, {
                 name: r.name,
                 description: r.description,
+                position: r.position,
             }),
         ),
         ...bootstrapRecordAttributes.map(r =>

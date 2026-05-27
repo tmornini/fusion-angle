@@ -1,26 +1,39 @@
 <div id="organization-content">
 </div>
 
-<div id="objectives-box"></div>
-
 <!-- Add Objective dialog -->
 <div id="add-objective-backdrop"
     class="dialog-backdrop hidden"></div>
 <div id="add-objective-dialog"
-    class="dialog hidden" aria-hidden="true">
-    <h3>Add objective</h3>
-    <label>Name<input id="add-obj-name"
-        type="text"></label>
-    <label>Description<textarea
-        id="add-obj-description"></textarea></label>
-    <div class="dialog-actions">
-        <button
+    class="dialog dialog-narrow hidden"
+    aria-hidden="true"
+    role="dialog"
+    aria-labelledby="add-objective-title">
+    <div class="dialog-header">
+        <h3 id="add-objective-title"
+            class="dialog-title">Add objective</h3>
+    </div>
+    <div class="mb-3">
+        <label class="label mb-1"
+            for="add-obj-name">Name</label>
+        <input id="add-obj-name" type="text"
+            class="input w-full">
+    </div>
+    <div>
+        <label class="label mb-1"
+            for="add-obj-description">Description</label>
+        <textarea id="add-obj-description"
+            class="input w-full" rows="3"></textarea>
+    </div>
+    <div class="dialog-footer">
+        <button class="btn btn-outline"
             data-action="cancel-add-objective">
             Cancel
         </button>
-        <button
-            data-action="confirm-add-objective"
-            class="btn-primary">Add</button>
+        <button class="btn btn-primary"
+            data-action="confirm-add-objective">
+            Add
+        </button>
     </div>
 </div>
 
@@ -28,40 +41,67 @@
 <div id="edit-objective-backdrop"
     class="dialog-backdrop hidden"></div>
 <div id="edit-objective-dialog"
-    class="dialog hidden" aria-hidden="true">
-    <h3>Edit objective</h3>
+    class="dialog dialog-narrow hidden"
+    aria-hidden="true"
+    role="dialog"
+    aria-labelledby="edit-objective-title">
+    <div class="dialog-header">
+        <h3 id="edit-objective-title"
+            class="dialog-title">Edit objective</h3>
+    </div>
     <input id="edit-obj-id" type="hidden">
-    <label>Name<input id="edit-obj-name"
-        type="text"></label>
-    <label>Description<textarea
-        id="edit-obj-description"></textarea></label>
-    <div class="dialog-actions">
-        <button
+    <div class="mb-3">
+        <label class="label mb-1"
+            for="edit-obj-name">Name</label>
+        <input id="edit-obj-name" type="text"
+            class="input w-full">
+    </div>
+    <div>
+        <label class="label mb-1"
+            for="edit-obj-description">Description</label>
+        <textarea id="edit-obj-description"
+            class="input w-full" rows="3"></textarea>
+    </div>
+    <div class="dialog-footer">
+        <button class="btn btn-outline"
             data-action="cancel-edit-objective">
             Cancel
         </button>
-        <button
-            data-action="confirm-edit-objective"
-            class="btn-primary">Save</button>
+        <button class="btn btn-primary"
+            data-action="confirm-edit-objective">
+            Save
+        </button>
     </div>
 </div>
 
-<!-- Confirm-deprecate dialog -->
-<div id="confirm-deprecate-backdrop"
+<!-- Confirm Archive dialog -->
+<div id="confirm-archive-backdrop"
     class="dialog-backdrop hidden"></div>
-<div id="confirm-deprecate-dialog"
-    class="dialog hidden" aria-hidden="true">
-    <h3>Deprecate objective?</h3>
-    <input id="confirm-deprecate-id" type="hidden">
-    <p>The objective stops appearing in active
+<div id="confirm-archive-dialog"
+    class="dialog dialog-narrow hidden"
+    aria-hidden="true"
+    role="alertdialog"
+    aria-labelledby="confirm-archive-title"
+    aria-describedby="confirm-archive-message">
+    <div class="dialog-header">
+        <h3 id="confirm-archive-title"
+            class="dialog-title">Archive objective?</h3>
+    </div>
+    <input id="confirm-archive-id" type="hidden">
+    <p id="confirm-archive-message"
+        class="text-sm text-muted">
+        The objective stops appearing in active
         rosters but its historical scores remain
-        visible.</p>
-    <div class="dialog-actions">
-        <button
-            data-action="cancel-confirm-deprecate">
+        visible.
+    </p>
+    <div class="dialog-footer">
+        <button class="btn btn-outline"
+            data-action="cancel-confirm-archive">
             Cancel
         </button>
-        <button data-action="confirm-deprecate"
-            class="btn-primary">Deprecate</button>
+        <button class="btn btn-primary"
+            data-action="confirm-archive">
+            Archive
+        </button>
     </div>
 </div>

@@ -1,233 +1,177 @@
-import { $, $input } from '../app/dom.ts';
-import { setHtml } from '../app/safe-html.ts';
-import { showToast } from '../app/toast.ts';
+import {
+    $, getRequiredAttribute, populateIcons,
+} from '../app/dom.ts';
 import {
     buildSkeleton,
     withLoadingState,
 } from '../app/loading-states.ts';
 import {
-    openDialog,
-    closeDialog,
-    navigateTo,
-} from '../app/core.ts';
+    iconPlus, iconFolderKanban,
+} from '../app/icons.ts';
+import { navigateTo } from '../app/core.ts';
 import {
     createRequestContext,
     getRecords,
-    getRecordAttributeRows,
-    postRecordCreation,
+    getRecord,
+    putRecord,
     subscribeRecordChanges,
-    generateCryptoSafeBase62,
+    isRecordState,
 } from '../app/adapters/index.ts';
 import {
     RecordListPresenter,
-    type RecordListRow,
+    buildInitialRecordListState,
+    applyRecordListUpdate,
+    applyRecordFilterToggle,
+    type RecordListState,
 } from '../app/presenters/index.ts';
-import type {
-    RecordEntity,
-    FlowRecordEntity,
-} from '../../api/types.ts';
+import {
+    initDragReorder,
+} from '../app/drag-reorder.ts';
 
 const pageAbort = new AbortController();
 const signal = pageAbort.signal;
 
+let recordState: RecordListState | null = null;
+let listEl: HTMLElement | null = null;
+let badgesEl: HTMLElement | null = null;
+
 export async function init(): Promise<void> {
-    const root = $('#page-root', document);
-    if (!root) return;
-
-    const loaded = await withLoadingState(
-        root,
-        buildSkeleton('table', 5),
-        async () => {
-            const ctx = createRequestContext();
-            const [records, attributes,
-                flowRecords] =
-                await Promise.all([
-                    getRecords(ctx),
-                    getRecordAttributeRows(ctx),
-                    ctx.GET<FlowRecordEntity[]>(
-                        'flow-records',
-                    ),
-                ]);
-            return {
-                records, attributes,
-                flowRecords,
-            };
-        },
-        init,
+    const recordsListEl = $(
+        '#records-list', document,
     );
-    if (!loaded) return;
+    if (!recordsListEl) return;
 
-    const rows = buildRows(
-        loaded.records,
-        loaded.attributes,
-        loaded.flowRecords,
-    );
-    render(root, rows);
-    bindAddDialog(root);
-    bindRowClicks(root);
-
-    subscribeRecordChanges(() => {
-        void refresh(root);
-    });
-}
-
-async function refresh(
-    root: HTMLElement,
-): Promise<void> {
     const ctx = createRequestContext();
-    const [records, attributes, flowRecords]
-        = await Promise.all([
-            getRecords(ctx),
-            getRecordAttributeRows(ctx),
-            ctx.GET<FlowRecordEntity[]>(
-                'flow-records',
-            ),
-        ]);
-    const rows = buildRows(
-        records, attributes, flowRecords,
-    );
-    render(root, rows);
-}
-
-function buildRows(
-    records: RecordEntity[],
-    attributes: { record_id: string }[],
-    flowRecords: FlowRecordEntity[],
-): RecordListRow[] {
-    const attrCountByRecord = new Map<
-        string, number
-    >();
-    for (const a of attributes) {
-        attrCountByRecord.set(
-            a.record_id,
-            (attrCountByRecord.get(a.record_id)
-                ?? 0) + 1,
-        );
-    }
-    const flowCountByRecord = new Map<
-        string, number
-    >();
-    for (const fr of flowRecords) {
-        flowCountByRecord.set(
-            fr.record_id,
-            (flowCountByRecord.get(fr.record_id)
-                ?? 0) + 1,
-        );
-    }
-    return records.map(r => ({
-        record: r,
-        attributeCount:
-            attrCountByRecord.get(r.id) ?? 0,
-        boundFlowCount:
-            flowCountByRecord.get(r.id) ?? 0,
-    }));
-}
-
-function render(
-    root: HTMLElement,
-    rows: RecordListRow[],
-): void {
-    const presenter = new RecordListPresenter(
-        rows,
-    );
-    setHtml(root, presenter.buildPage());
-}
-
-function bindAddDialog(
-    root: HTMLElement,
-): void {
-    root.addEventListener(
-        'click',
-        e => {
-            const target = e.target;
-            if (
-                !(target instanceof Element)
-            ) return;
-            const btn = target.closest(
-                'button',
-            );
-            if (!btn) return;
-            if (btn.id === 'record-add-btn') {
-                openDialog('record-add');
-                return;
-            }
-            if (
-                btn.id === 'record-add-cancel-btn'
-            ) {
-                closeDialog('record-add');
-                return;
-            }
-            if (
-                btn.id === 'record-add-save-btn'
-            ) {
-                void handleAddRecord(root);
-            }
+    const records = await withLoadingState(
+        recordsListEl,
+        buildSkeleton('card-list', 4),
+        () => getRecords(ctx),
+        init,
+        {
+            icon: iconFolderKanban(24, ''),
+            title: 'No Records Yet',
+            description:
+                'Define a data shape to bind'
+                + ' to one or more flows.',
+            action: {
+                label: 'Add Your First Record',
+                href: 'create.html',
+            },
+            onEmpty: () => {
+                $(
+                    '#create-record-btn',
+                    document,
+                )?.remove();
+            },
         },
+    );
+
+    populateIcons([
+        ['#create-btn-icon', iconPlus(16, '')],
+    ]);
+
+    $('#create-record-btn', document)
+        ?.addEventListener(
+            'click',
+            () => navigateTo('record-create'),
+            { signal },
+        );
+
+    if (!records) return;
+
+    recordState =
+        buildInitialRecordListState(records);
+    listEl = recordsListEl;
+    badgesEl = $('#status-badges', document);
+
+    rerenderRecords();
+    if (badgesEl) {
+        badgesEl.addEventListener(
+            'click', onBadgeClick,
+            { signal },
+        );
+    }
+    listEl.addEventListener(
+        'click', onCardClick,
         { signal },
     );
-}
 
-async function handleAddRecord(
-    root: HTMLElement,
-): Promise<void> {
-    const nameEl = $input(
-        '#record-add-name', root,
-    );
-    const descEl = $input(
-        '#record-add-description', root,
-    );
-    const name = (nameEl?.value ?? '').trim();
-    const description =
-        (descEl?.value ?? '').trim();
-    if (name === '') {
-        showToast(
-            'Record name is required',
-            'error',
-        );
-        return;
-    }
-    const id = generateCryptoSafeBase62();
-    try {
-        await postRecordCreation(
+    subscribeRecordChanges(async () => {
+        if (!recordState || !listEl) return;
+        const updated = await getRecords(
             createRequestContext(),
-            id,
-            { name, description },
-            'active',
         );
-    } catch (err) {
-        showToast(
-            'Failed to create Record',
-            'error',
+        recordState = applyRecordListUpdate(
+            recordState, updated,
         );
-        return;
-    }
-    closeDialog('record-add');
-    navigateTo('record-detail', { id });
+        rerenderRecords();
+    });
+
+    initDragReorder(
+        listEl,
+        '[data-record-card]',
+        'data-record-card',
+        async (id, newPosition) => {
+            if (!recordState) return;
+            const found =
+                recordState.records.find(
+                    r => r.entity.id === id,
+                );
+            if (!found) return;
+            const ctx = createRequestContext();
+            const fresh = await getRecord(
+                ctx, id,
+            );
+            await putRecord(ctx, id, {
+                name: fresh.name,
+                description: fresh.description,
+                position: newPosition,
+            });
+        },
+    );
 }
 
-function bindRowClicks(
-    root: HTMLElement,
-): void {
-    root.addEventListener(
-        'click',
-        e => {
-            const target = e.target;
-            if (
-                !(target instanceof Element)
-            ) return;
-            const row = target.closest(
-                '[data-record-id]',
-            );
-            if (!(row instanceof HTMLElement)) {
-                return;
-            }
-            const id = row.getAttribute(
-                'data-record-id',
-            );
-            if (!id) return;
-            e.preventDefault();
-            navigateTo('record-detail', { id });
-        },
-        { signal },
+function rerenderRecords(): void {
+    if (!recordState || !listEl) return;
+    const presenter =
+        new RecordListPresenter(recordState);
+    if (badgesEl) {
+        presenter.renderBadges(badgesEl);
+    }
+    presenter.renderList(listEl);
+}
+
+function onBadgeClick(e: MouseEvent): void {
+    if (
+        !recordState || !badgesEl || !listEl
+    ) return;
+    if (
+        !(e.target instanceof HTMLElement)
+    ) return;
+    const badge = e.target
+        .closest<HTMLElement>('[data-state]');
+    if (!badge) return;
+    const s = getRequiredAttribute(
+        badge, 'data-state',
     );
+    if (!isRecordState(s)) return;
+    recordState = applyRecordFilterToggle(
+        recordState, s,
+    );
+    rerenderRecords();
+}
+
+function onCardClick(e: MouseEvent): void {
+    if (
+        !(e.target instanceof Element)
+    ) return;
+    const card = e.target.closest<HTMLElement>(
+        '[data-record-card]',
+    );
+    if (!card) return;
+    navigateTo('record-detail', {
+        id: getRequiredAttribute(
+            card, 'data-record-card',
+        ),
+    });
 }

@@ -1149,7 +1149,7 @@ export function validateStateEntity(
 }
 
 const RECORD_BODY_KEYS: readonly string[] = [
-    'name', 'description',
+    'name', 'description', 'position',
 ];
 
 export function validateRecordEntity(
@@ -1169,6 +1169,9 @@ export function validateRecordEntity(
         name,
         description: pickString(
             body, 'description',
+        ),
+        position: pickNumber(
+            body, 'position',
         ),
     };
 }

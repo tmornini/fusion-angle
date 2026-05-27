@@ -18,11 +18,11 @@
     user-select: none;
 }
 
-.objective-list-item[data-deprecated='true'] {
+.objective-list-item[data-archived='true'] {
     opacity: 0.7;
 }
 
-.objective-list-item[data-deprecated='true']
+.objective-list-item[data-archived='true']
     .objective-text strong {
     text-decoration: line-through;
 }

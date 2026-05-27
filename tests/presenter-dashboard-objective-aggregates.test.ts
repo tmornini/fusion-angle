@@ -22,40 +22,65 @@ const aggregates = [
       projectsBaselineScored: 0,
       projectsActualScored: 0 },
 ];
+const trendlines = new Map<string, number[]>([
+    ['o1', [32, 28, 25]],
+    ['o2', []],
+]);
 
 test('renders one row per active objective', () => {
     const p = new DashboardObjectiveAggregatesPresenter(
-        activeObjs, defs, aggregates,
+        activeObjs, defs, aggregates, trendlines,
     );
     const html = p.buildCard().toString();
     assert.ok(html.includes('Increase incomes'));
     assert.ok(html.includes('Lower expenses'));
 });
 
-test('row with contributors shows means and counts',
-    () => {
-        const p =
-            new DashboardObjectiveAggregatesPresenter(
-                activeObjs, defs, aggregates,
-            );
-        const html = p.buildCard().toString();
-        assert.ok(html.includes('+32'));
-        assert.ok(html.includes('+25'));
-        assert.ok(html.includes('12 projects'));
-    });
+test('card chassis matches Time/Cost/Impact pattern', () => {
+    const p = new DashboardObjectiveAggregatesPresenter(
+        activeObjs, defs, aggregates, trendlines,
+    );
+    const html = p.buildCard().toString();
+    assert.ok(
+        html.includes('card gauge-card'),
+        'card chassis classes must be present',
+    );
+    assert.ok(
+        html.includes('objective-aggregates-card'),
+        'section-scope class must be present',
+    );
+    assert.ok(
+        html.includes('icon-box'),
+        'icon-box header must be present',
+    );
+});
+
+test('heading reads "Objectives"', () => {
+    const p = new DashboardObjectiveAggregatesPresenter(
+        activeObjs, defs, aggregates, trendlines,
+    );
+    const html = p.buildCard().toString();
+    assert.match(
+        html,
+        /<h3[^>]*>\s*Objectives\s*<\/h3>/,
+        'heading must read "Objectives"',
+    );
+});
 
 test('zero-contributor row renders dimmed', () => {
     const p = new DashboardObjectiveAggregatesPresenter(
-        activeObjs, defs, aggregates,
+        activeObjs, defs, aggregates, trendlines,
     );
     const html = p.buildCard().toString();
-    assert.ok(html.includes('0 projects'));
-    assert.ok(html.includes('data-empty="true"'));
+    assert.ok(
+        html.includes('data-empty="true"'),
+        'empty row carries data-empty="true"',
+    );
 });
 
 test('row renders the small bipolar gauge SVG', () => {
     const p = new DashboardObjectiveAggregatesPresenter(
-        activeObjs, defs, aggregates,
+        activeObjs, defs, aggregates, trendlines,
     );
     const html = p.buildCard().toString();
     assert.ok(
@@ -70,7 +95,7 @@ test('row renders the small bipolar gauge SVG', () => {
 
 test('row no longer uses the .bipolar-bar span', () => {
     const p = new DashboardObjectiveAggregatesPresenter(
-        activeObjs, defs, aggregates,
+        activeObjs, defs, aggregates, trendlines,
     );
     const html = p.buildCard().toString();
     assert.equal(
@@ -90,7 +115,7 @@ test(
         // (outer) and M 90 40 (inner) must appear.
         const p =
             new DashboardObjectiveAggregatesPresenter(
-                activeObjs, defs, aggregates,
+                activeObjs, defs, aggregates, trendlines,
             );
         const html = p.buildCard().toString();
         assert.match(
@@ -110,16 +135,12 @@ test('row gauge omits fills for undefined means', () => {
     // o2 has baselineMean=undefined and
     // latestActualMean=undefined.
     const p = new DashboardObjectiveAggregatesPresenter(
-        activeObjs, defs, aggregates,
+        activeObjs, defs, aggregates, trendlines,
     );
     const html = p.buildCard().toString();
-    // Find the second row (objective-o2) and ensure
-    // no half-arc fill paths are within it. The
-    // tracks (full semicircle) are still present.
     const o2RowStart =
         html.indexOf('data-objective-id="o2"');
     const o2Slice = html.slice(o2RowStart);
-    // First </li> ends the o2 row.
     const o2RowEnd = o2Slice.indexOf('</li>');
     const o2Row = o2Slice.slice(0, o2RowEnd);
     assert.equal(
@@ -131,5 +152,48 @@ test('row gauge omits fills for undefined means', () => {
         /d="M 90 40/.test(o2Row),
         false,
         'undefined actual must not draw a fill',
+    );
+});
+
+test('row renders a sparkline cell with polyline', () => {
+    const p = new DashboardObjectiveAggregatesPresenter(
+        activeObjs, defs, aggregates, trendlines,
+    );
+    const html = p.buildCard().toString();
+    const o1RowStart =
+        html.indexOf('data-objective-id="o1"');
+    const o1Slice = html.slice(o1RowStart);
+    const o1Row = o1Slice.slice(
+        0, o1Slice.indexOf('</li>'),
+    );
+    assert.ok(
+        o1Row.includes('class="score-row-sparkline"'),
+        'sparkline cell class must be present',
+    );
+    assert.ok(
+        o1Row.includes('class="sparkline-line"'),
+        'sparkline polyline must be present',
+    );
+});
+
+test('empty trendline renders only the axis line', () => {
+    const p = new DashboardObjectiveAggregatesPresenter(
+        activeObjs, defs, aggregates, trendlines,
+    );
+    const html = p.buildCard().toString();
+    const o2RowStart =
+        html.indexOf('data-objective-id="o2"');
+    const o2Slice = html.slice(o2RowStart);
+    const o2Row = o2Slice.slice(
+        0, o2Slice.indexOf('</li>'),
+    );
+    assert.ok(
+        o2Row.includes('class="sparkline-axis"'),
+        'sparkline axis must always be present',
+    );
+    assert.equal(
+        o2Row.includes('class="sparkline-line"'),
+        false,
+        'no polyline for empty trendline',
     );
 });

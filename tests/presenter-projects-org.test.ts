@@ -390,7 +390,6 @@ test(
         assert.match(out, /Acme Innovations/);
         assert.match(out, /acme\.example/);
         assert.match(out, /Enterprise Plan/);
-        assert.match(out, /Organization Name/);
         assert.match(out, /data-org-action="edit"/);
         assert.equal(
             out.includes('Unknown'), false,

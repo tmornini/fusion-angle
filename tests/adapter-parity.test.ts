@@ -8,10 +8,10 @@ import { createRequestContext }
     from '../web-app/app/adapters/shared.ts';
 import {
     postObjectiveCreation,
-    postObjectiveDeprecation,
+    postObjectiveArchival,
     postObjectiveReactivation,
     getActiveObjectives,
-    getDeprecatedObjectiveIds,
+    getArchivedObjectiveIds,
 } from '../web-app/app/adapters/objectives.ts';
 import type { DbAdapter } from '../api/db.ts';
 
@@ -35,7 +35,7 @@ function installLocalStorageShim(): void {
 async function runReactivationScenario(db: DbAdapter): Promise<{
     active: { id: string }[];
     deletedIds: Set<string>;
-    deprecatedIds: Set<string>;
+    archivedIds: Set<string>;
 }> {
     await db.workers.put('current', {
         first_name: 'Demo',
@@ -52,13 +52,13 @@ async function runReactivationScenario(db: DbAdapter): Promise<{
     await postObjectiveCreation(
         ctx, 'o1', 'Rev', 'd', 0,
     );
-    await postObjectiveDeprecation(ctx, 'o1');
+    await postObjectiveArchival(ctx, 'o1');
     await postObjectiveReactivation(ctx, 'o1');
     return {
         active: await getActiveObjectives(ctx),
         deletedIds: await db.states.deletedIds(),
-        deprecatedIds:
-            await getDeprecatedObjectiveIds(ctx),
+        archivedIds:
+            await getArchivedObjectiveIds(ctx),
     };
 }
 
@@ -88,9 +88,9 @@ test('K5 reactivation parity across memory and localStorage',
         assert.ok(!ls.deletedIds.has('o1'),
             'localStorage: no deleted state event for o1');
 
-        assert.equal(mem.deprecatedIds.size, 0,
-            'memory: active event supersedes deprecated');
-        assert.equal(ls.deprecatedIds.size, 0,
+        assert.equal(mem.archivedIds.size, 0,
+            'memory: active event supersedes archived');
+        assert.equal(ls.archivedIds.size, 0,
             'localStorage: active event supersedes '
-            + 'deprecated');
+            + 'archived');
     });

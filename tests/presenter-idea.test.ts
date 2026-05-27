@@ -134,7 +134,7 @@ function makeIdeaEntity(
 
 function makeIdea(
     overrides: Partial<IdeaEntity> = {},
-    state: IdeaState = 'active:ready',
+    state: IdeaState = 'active',
 ): Idea {
     return new Idea(
         makeIdeaEntity(overrides), state,
@@ -145,7 +145,7 @@ function makeWithSubmitter(
     overrides: Partial<IdeaEntity> = {},
     submitterName = 'Ada Lovelace',
     submittedAt = '2026-01-15T10:00:00.000Z',
-    state: IdeaState = 'active:ready',
+    state: IdeaState = 'active',
 ): IdeaWithSubmitter {
     const entity = makeIdeaEntity(overrides);
     return {
@@ -238,7 +238,7 @@ test(
         );
         const roundTripped = new Idea(
             { ...base, ...patch },
-            'active:ready',
+            'active',
         );
         assert.deepEqual(
             ideaDraftFromIdea(roundTripped),
@@ -261,7 +261,8 @@ test(
             .buildCard('position', true).toString();
         assert.match(out, /Self-serve onboarding/);
         assert.match(out, /badge badge-success/);
-        assert.match(out, /Active . Ready/);
+        assert.match(out, /Active/);
+        assert.ok(!out.includes('Incomplete'));
         assert.match(
             out, /data-idea-card="idea-1"/,
         );
@@ -298,7 +299,7 @@ test(
             'X', 'y',
         );
         const active = new IdeaPresenter(
-            makeIdea({}, 'active:ready'), 'X', 'y',
+            makeIdea({}, 'active'), 'X', 'y',
         );
         assert.match(
             approved.buildCard('position', false)
@@ -359,12 +360,12 @@ test(
             review.matchesState('in-review'), true,
         );
         assert.equal(
-            review.matchesState('active:ready'), false,
+            review.matchesState('active'), false,
         );
 
         const active = new IdeaPresenter(
             makeIdea(
-                { position: 9 }, 'active:incomplete',
+                { position: 9 }, 'active',
             ),
             'X', 'y',
         );
@@ -372,6 +373,124 @@ test(
         assert.equal(active.isReviewable(), false);
         assert.equal(active.positionSortKey(), 9);
         assert.equal(active.idForLink(), 'idea-1');
+    },
+);
+
+test(
+    'Idea.readinessValue is ready when all four'
+    + ' required fields are non-empty',
+    () => {
+        const ready = makeIdea();
+        assert.equal(ready.readinessValue(), 'ready');
+        assert.equal(ready.isReady(), true);
+        assert.equal(ready.readinessLabel(), 'Ready');
+    },
+);
+
+test(
+    'Idea.readinessValue is incomplete when any'
+    + ' required field is empty',
+    () => {
+        const requiredFields: Array<
+            Partial<IdeaEntity>
+        > = [
+            { title: '' },
+            { problem_statement: '' },
+            { proposed_solution: '' },
+            { expected_outcome: '' },
+        ];
+        for (const empty of requiredFields) {
+            const idea = makeIdea(empty);
+            assert.equal(
+                idea.readinessValue(), 'incomplete',
+                JSON.stringify(empty),
+            );
+            assert.equal(idea.isReady(), false);
+        }
+    },
+);
+
+test(
+    'Idea.readinessValue stays ready when only'
+    + ' optional fields are empty',
+    () => {
+        const idea = makeIdea({
+            target_users: '',
+            success_metrics: '',
+        });
+        assert.equal(idea.readinessValue(), 'ready');
+    },
+);
+
+test(
+    'Idea.canBeSubmittedForReview gates on both'
+    + ' lifecycle and readiness',
+    () => {
+        const matrix: Array<{
+            state: IdeaState;
+            ready: boolean;
+            expected: boolean;
+        }> = [
+            { state: 'active', ready: true,
+                expected: true },
+            { state: 'active', ready: false,
+                expected: false },
+            { state: 'sent-back', ready: true,
+                expected: true },
+            { state: 'sent-back', ready: false,
+                expected: false },
+            { state: 'in-review', ready: true,
+                expected: false },
+            { state: 'approved', ready: true,
+                expected: false },
+            { state: 'promoted', ready: true,
+                expected: false },
+            { state: 'archived', ready: true,
+                expected: false },
+            { state: 'deleted', ready: true,
+                expected: false },
+        ];
+        for (const row of matrix) {
+            const overrides = row.ready
+                ? {}
+                : { expected_outcome: '' };
+            const idea = makeIdea(overrides, row.state);
+            assert.equal(
+                idea.canBeSubmittedForReview(),
+                row.expected,
+                `${row.state}, ready=${row.ready}`,
+            );
+        }
+    },
+);
+
+test(
+    'IdeaPresenter.buildCard renders the Incomplete'
+    + ' pill only for active ideas missing a'
+    + ' required field',
+    () => {
+        const incomplete = new IdeaPresenter(
+            makeIdea({ expected_outcome: '' }, 'active'),
+            'X', 'y',
+        );
+        const ready = new IdeaPresenter(
+            makeIdea({}, 'active'), 'X', 'y',
+        );
+        const review = new IdeaPresenter(
+            makeIdea(
+                { expected_outcome: '' }, 'in-review',
+            ),
+            'X', 'y',
+        );
+        const incOut = incomplete
+            .buildCard('position', false).toString();
+        const readyOut = ready
+            .buildCard('position', false).toString();
+        const reviewOut = review
+            .buildCard('position', false).toString();
+        assert.match(incOut, /Incomplete/);
+        assert.ok(!readyOut.includes('Incomplete'));
+        assert.ok(!reviewOut.includes('Incomplete'));
     },
 );
 
@@ -548,7 +667,7 @@ test(
                     position: 1,
                 },
                 'Ada', '2026-01-15T10:00:00Z',
-                'active:ready',
+                'active',
             ),
         ];
         const presenter = new IdeaListPresenter(
@@ -576,12 +695,12 @@ test(
             makeWithSubmitter(
                 { id: 'i1' },
                 'Ada', '2026-01-15T10:00:00Z',
-                'active:ready',
+                'active',
             ),
             makeWithSubmitter(
                 { id: 'i2' },
                 'Ada', '2026-01-15T10:00:00Z',
-                'active:ready',
+                'active',
             ),
             makeWithSubmitter(
                 { id: 'i3' },
@@ -602,7 +721,7 @@ test(
         assert.equal(badges.length, 2);
         assert.match(
             slot.captured,
-            /data-state="active:ready"/,
+            /data-state="active"/,
         );
         assert.match(
             slot.captured,

@@ -133,7 +133,7 @@ test(
         const { db, ctx } = setupDb();
         await seedWorker(db, 'u1', 'active');
         await seedIdea(
-            db, 'i1', 'active:ready', 'u1',
+            db, 'i1', 'active', 'u1',
         );
         await seedIdea(
             db, 'i2', 'in-review', 'u1',
@@ -171,7 +171,7 @@ test(
         await seedWorker(db, 'u1', 'active');
         await seedProject(db, 'p1', 'approved');
         await seedIdea(
-            db, 'i1', 'active:ready', 'u1',
+            db, 'i1', 'active', 'u1',
         );
         let stats =
             await getOrganizationStats(ctx);

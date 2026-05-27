@@ -41,63 +41,56 @@ export class HumanWorkerRowPresenter {
     buildRow(isSelf: boolean = false): SafeHtml {
         return html`
         <div class="${
-            'flex items-center '
-            + 'gap-4 p-4 worker-row '
-            + 'worker-row-divider '
+            'card card-hover p-4 cursor-pointer'
+            + ' flex items-center gap-4'
             + (this.#worker.isArchived()
-                ? 'opacity-50' : '')
+                ? ' opacity-50' : '')
         }"
-            data-self="${isSelf ? 'true' : 'false'}"
+            data-self="${
+                isSelf ? 'true' : 'false'
+            }"
             data-worker-id="${
                 this.#worker.idForLink()
             }">
             <div class="${
-                'flex items-center'
-                + ' gap-3 flex-2 min-w-0'
+                'avatar avatar-tinted'
             }">
-                <div class="${
-                    'avatar avatar-tinted'
+                <span class="${
+                    'text-sm font-bold'
+                    + ' text-primary'
                 }">
-                    <span
-                        class="${
-                            'text-sm '
-                            + 'font-bold '
-                            + 'text-primary'
-                        }">
-                        ${initials(
-                            this.#worker.fullName(),
-                        )}
+                    ${initials(
+                        this.#worker.fullName(),
+                    )}
+                </span>
+            </div>
+            <div class="flex-fill min-w-0">
+                <p class="${
+                    'font-medium truncate'
+                }">
+                    ${this.#worker.fullName()}
+                </p>
+                <p class="${
+                    'text-xs text-muted truncate'
+                }">
+                    ${this.#worker.emailAddress()}
+                </p>
+                <div class="${
+                    'flex items-center gap-2 mt-1'
+                }">
+                    ${this.#buildTitleBadge()}
+                    <span class="${
+                        'text-xs text-muted'
+                    }">
+                        ${this.#worker
+                            .departmentLabel()}
                     </span>
                 </div>
-                <div class="${
-                    'min-w-0'
-                }">
-                    <p class="${
-                        'font-medium '
-                        + 'truncate'
-                    }">
-                        ${this.#worker.fullName()}
-                    </p>
-                    <p
-                        class="${
-                            'text-xs '
-                            + 'text-muted '
-                            + 'truncate'
-                        }">
-                        ${this.#worker.emailAddress()}
-                    </p>
-                </div>
-            </div>
-            <div class="flex-1">
-                ${this.#buildTitleBadge()}
             </div>
             <div class="${
-                'flex-1'
-                + ' text-sm text-muted'
+                'flex flex-col items-end gap-2'
+                + ' ml-6'
             }">
-                ${this.#worker.departmentLabel()}
-            </div>
-            <div class="flex-1">
                 ${this.#buildStatusBadge()}
             </div>
         </div>`;
@@ -159,62 +152,52 @@ export class AIWorkerRowPresenter {
     buildRow(): SafeHtml {
         return html`
         <div class="${
-            'flex items-center '
-            + 'gap-4 p-4 worker-row '
-            + 'worker-row-divider'
+            'card card-hover p-4 cursor-pointer'
+            + ' flex items-center gap-4'
         }"
             data-worker-id="${
                 this.#worker.idForLink()
             }">
             <div class="${
-                'flex items-center'
-                + ' gap-3 flex-2 min-w-0'
+                'avatar avatar-tinted'
             }">
-                <div class="${
-                    'avatar avatar-tinted'
+                ${iconBrain(
+                    16,
+                    'text-primary',
+                )}
+            </div>
+            <div class="flex-fill min-w-0">
+                <p class="${
+                    'font-medium truncate'
                 }">
-                    ${iconBrain(
-                        16,
-                        'text-primary',
-                    )}
-                </div>
-                <div class="${
-                    'min-w-0'
+                    ${this.#worker.nameText()}
+                </p>
+                <p class="${
+                    'text-xs text-muted truncate'
                 }">
-                    <p class="${
-                        'font-medium '
-                        + 'truncate'
+                    ${
+                        this.#worker
+                            .descriptionText()
+                    }
+                </p>
+                <div class="${
+                    'flex items-center gap-2 mt-1'
+                }">
+                    <span class="${
+                        'badge badge-secondary'
                     }">
-                        ${this.#worker.nameText()}
-                    </p>
-                    <p
-                        class="${
-                            'text-xs '
-                            + 'text-muted '
-                            + 'truncate'
-                        }">
-                        ${
-                            this.#worker
-                                .descriptionText()
-                        }
-                    </p>
+                        ${this.#worker
+                            .providerText()}
+                    </span>
+                    <span class="${
+                        'text-xs text-muted'
+                        + ' font-mono'
+                    }">
+                        ${this.#worker
+                            .maskedToken()}
+                    </span>
                 </div>
             </div>
-            <div class="flex-1">
-                <span class="${
-                    'badge badge-secondary'
-                }">
-                    ${this.#worker.providerText()}
-                </span>
-            </div>
-            <div class="${
-                'flex-1'
-                + ' text-sm text-muted'
-                + ' font-mono'
-            }">
-                ${this.#worker.maskedToken()}
-            </div>
-            <div class="flex-1"></div>
         </div>`;
     }
 }
@@ -291,6 +274,8 @@ export class ManagedWorkersPresenter {
         container: HTMLElement,
     ): void {
         setHtml(container, html`${
+            this.#buildSelfSection()
+        }${
             this.#kind === 'ai'
                 ? html``
                 : this.#buildHumansSection()
@@ -301,35 +286,47 @@ export class ManagedWorkersPresenter {
         }`);
     }
 
-    #buildHumansSection(): SafeHtml {
-        const filtered = this.#humans.filter(
-            p => p.matchesSearch(this.#search),
-        );
-        const self = filtered.find(
+    #buildSelfSection(): SafeHtml {
+        if (this.#kind === 'ai') return html``;
+        const self = this.#humans.find(
             p => p.idForLink()
                 === this.#currentWorkerId,
         );
-        const others = filtered.filter(
-            p => p.idForLink()
-                !== this.#currentWorkerId,
-        );
+        if (!self) return html``;
+        if (!self.matchesSearch(this.#search)) {
+            return html``;
+        }
         return html`
             <div class="${
-                'worker-section-header p-3'
+                'worker-section-header'
                 + ' text-xs font-semibold'
                 + ' text-muted'
+            }">YOU</div>
+            ${self.buildRow(true)}`;
+    }
+
+    #buildHumansSection(): SafeHtml {
+        const others = this.#humans
+            .filter(
+                p => p.idForLink()
+                    !== this.#currentWorkerId,
+            )
+            .filter(
+                p => p.matchesSearch(this.#search),
+            );
+        return html`
+            <div class="${
+                'worker-section-header'
+                + ' text-xs font-semibold'
+                + ' text-muted mt-4'
             }">HUMANS</div>
             ${
-                filtered.length === 0
+                others.length === 0
                     ? this.#buildEmptyRow(
                         'No humans match'
                         + ' your filter.',
                     )
-                    : html`${
-                        self
-                            ? self.buildRow(true)
-                            : html``
-                    }${others.map(
+                    : html`${others.map(
                         p => p.buildRow(false),
                     )}`
             }`;
@@ -341,9 +338,9 @@ export class ManagedWorkersPresenter {
         );
         return html`
             <div class="${
-                'worker-section-header p-3'
+                'worker-section-header'
                 + ' text-xs font-semibold'
-                + ' text-muted'
+                + ' text-muted mt-4'
             }">AIs</div>
             ${
                 filtered.length === 0

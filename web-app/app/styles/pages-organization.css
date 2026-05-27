@@ -1,0 +1,8 @@
+/* Organization page: hide row editing affordances */
+/* while the page itself is in edit mode.          */
+
+[data-page-editing] .objective-actions,
+[data-page-editing] .objective-list-item .drag-handle,
+[data-page-editing] [data-action="add-objective"] {
+  display: none;
+}

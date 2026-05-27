@@ -18,7 +18,7 @@ import {
 
 function buildIdea(
     id: string, title: string,
-    state: IdeaState = 'active:incomplete',
+    state: IdeaState = 'active',
 ): Idea {
     return new Idea({
         id,

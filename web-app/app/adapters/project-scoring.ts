@@ -258,6 +258,85 @@ export async function getObjectiveAggregates(
     return result;
 }
 
+export async function getObjectiveTrendlines(
+    ctx: RequestContext,
+): Promise<Map<ObjectiveId, number[]>> {
+    const [
+        activeObjs,
+        projectRows,
+        projectStates,
+        allBaseline,
+        allActual,
+    ] = await Promise.all([
+        getActiveObjectives(ctx),
+        ctx.GET<ProjectEntity[]>('projects'),
+        getProjectStates(ctx),
+        ctx.GET<ProjectObjectiveBaselineScore[]>(
+            'project-objective-baseline-scores',
+        ),
+        ctx.GET<ProjectObjectiveActualScore[]>(
+            'project-objective-actual-scores',
+        ),
+    ]);
+    const approvedIds = new Set(
+        projectRows
+            .filter(p => {
+                const s = projectStates.get(p.id);
+                return s !== undefined
+                    && projectStateIsApproved(s);
+            })
+            .map(p => p.id),
+    );
+    const latestBaselineForApproved = latestPerPair(
+        allBaseline.filter(
+            b => approvedIds.has(b.project_id),
+        ),
+    );
+    const approvedActuals = allActual.filter(
+        a => approvedIds.has(a.project_id),
+    );
+
+    const result = new Map<ObjectiveId, number[]>();
+
+    for (const obj of activeObjs) {
+        const baselineMean = meanOrUndefined(
+            latestBaselineForApproved
+                .filter(r => r.objective_id === obj.id)
+                .map(r => r.score),
+        );
+        if (baselineMean === undefined) {
+            result.set(obj.id, []);
+            continue;
+        }
+        const points: number[] = [baselineMean];
+        const actualsForObj = approvedActuals
+            .filter(r => r.objective_id === obj.id)
+            .slice()
+            .sort((a, b) => a.at.localeCompare(b.at));
+        const runningLatest = new Map<string, number>();
+        let pendingAt: string | undefined = undefined;
+        for (const row of actualsForObj) {
+            if (pendingAt !== undefined
+                && row.at !== pendingAt) {
+                const m = meanOrUndefined(
+                    Array.from(runningLatest.values()),
+                );
+                if (m !== undefined) points.push(m);
+            }
+            runningLatest.set(row.project_id, row.score);
+            pendingAt = row.at;
+        }
+        if (pendingAt !== undefined) {
+            const m = meanOrUndefined(
+                Array.from(runningLatest.values()),
+            );
+            if (m !== undefined) points.push(m);
+        }
+        result.set(obj.id, points);
+    }
+    return result;
+}
+
 export async function postProjectBaselineScoring(
     ctx: RequestContext,
     projectId: Id,

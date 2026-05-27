@@ -153,10 +153,19 @@ distinct lifecycles, all stored in the one log. Defined in
 `assertWorkerState` / `assertFlowState` /
 `assertRecordState` and the matching `is*` guards.
 
-**Ideas** (9 values, composite of former status + readiness):
-- `active:incomplete`, `active:needs-info`, `active:ready`
-- `in-review`, `approved`, `promoted`, `sent-back`,
-  `archived`, `deleted`
+**Ideas** (7 values, single-dimension lifecycle):
+- `active`, `in-review`, `approved`, `promoted`,
+  `sent-back`, `archived`, `deleted`
+
+Readiness is a derived property of the `Idea` domain
+object, computed at instantiation from required-field
+presence: `title`, `problem_statement`,
+`proposed_solution`, `expected_outcome` all non-empty →
+`'ready'`; any one empty → `'incomplete'`. Readiness is
+not stored in the states log; `Idea.readinessValue()` /
+`Idea.isReady()` derive per call.
+`canBeSubmittedForReview()` gates on lifecycle
+(`active` or `sent-back`) AND `isReady()`.
 
 **Projects** (7 values, single-dimension):
 - `submitted`, `under-review`, `sent-back`, `approved`,
@@ -208,7 +217,10 @@ Domain classes wrap entity + state: `Idea(entity, state)`,
 `AIWorker(entity, state)` all expose `stateValue()`,
 `stateLabel()`, and `stateClassName()` — the lifecycle
 stage is part of the domain object, not a separate fetch
-the presenter has to reconcile.
+the presenter has to reconcile. `Idea` additionally
+exposes `readinessValue()`, `readinessLabel()`,
+`readinessClassName()`, and `isReady()` — readiness is
+derived from required-field presence on every call.
 
 ### Flow Canvas
 

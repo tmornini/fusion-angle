@@ -91,7 +91,7 @@ test('getIdeas returns ideas with submitter', async () => {
     await db.ideas.put('i1', buildIdea(
         'i1', 'First idea',
     ));
-    await seedIdeaState(db, 'i1', 'active:ready');
+    await seedIdeaState(db, 'i1', 'active');
     await db.ideaSubmissions.put('s1', {
         idea_id: 'i1',
         worker_id: 'u1',
@@ -109,7 +109,7 @@ test('getIdeas returns ideas with submitter', async () => {
     );
     assert.equal(
         result[0]?.idea.stateValue(),
-        'active:ready',
+        'active',
     );
 });
 
@@ -122,7 +122,7 @@ test('getIdeas throws when idea has no submission', async () => {
     await db.ideas.put('i1', buildIdea(
         'i1', 'Orphan',
     ));
-    await seedIdeaState(db, 'i1', 'active:ready');
+    await seedIdeaState(db, 'i1', 'active');
     // No submission for i1
     await assert.rejects(
         () => getIdeas(ctx),
@@ -139,7 +139,7 @@ test('getIdea finds submission for one idea', async () => {
     await db.ideas.put('i1', buildIdea(
         'i1', 'A',
     ));
-    await seedIdeaState(db, 'i1', 'active:ready');
+    await seedIdeaState(db, 'i1', 'active');
     await db.ideaSubmissions.put('s1', {
         idea_id: 'i1',
         worker_id: 'u1',
@@ -161,7 +161,7 @@ test('getIdea throws on missing submission', async () => {
     await db.ideas.put(
         'i1', buildIdea('i1', 'A'),
     );
-    await seedIdeaState(db, 'i1', 'active:ready');
+    await seedIdeaState(db, 'i1', 'active');
     await assert.rejects(
         () => getIdea(ctx, 'i1'),
         /submission not found/,
@@ -190,7 +190,7 @@ test('archived ideas are filtered from getIdeas', async () => {
     await db.ideas.put(
         'i1', buildIdea('i1', 'Keep'),
     );
-    await seedIdeaState(db, 'i1', 'active:ready');
+    await seedIdeaState(db, 'i1', 'active');
     await db.ideaSubmissions.put('s1', {
         idea_id: 'i1',
         worker_id: 'u1',
@@ -227,7 +227,7 @@ test(
             ctx,
             'i1',
             buildIdea('i1', 'Fresh'),
-            'active:incomplete',
+            'active',
         );
 
         const row =
@@ -238,7 +238,7 @@ test(
         assert.equal(events.length, 1);
         assert.equal(
             events[0]?.state,
-            'active:incomplete',
+            'active',
         );
     },
 );
@@ -285,7 +285,7 @@ test('deleted ideas are filtered from getIdeas', async () => {
     await db.ideas.put(
         'i1', buildIdea('i1', 'Keep'),
     );
-    await seedIdeaState(db, 'i1', 'active:ready');
+    await seedIdeaState(db, 'i1', 'active');
     await db.ideaSubmissions.put('s1', {
         idea_id: 'i1',
         worker_id: 'u1',
@@ -294,7 +294,7 @@ test('deleted ideas are filtered from getIdeas', async () => {
     await db.ideas.put(
         'i2', buildIdea('i2', 'Delete me'),
     );
-    await seedIdeaState(db, 'i2', 'active:ready');
+    await seedIdeaState(db, 'i2', 'active');
     await db.ideaSubmissions.put('s2', {
         idea_id: 'i2',
         worker_id: 'u1',

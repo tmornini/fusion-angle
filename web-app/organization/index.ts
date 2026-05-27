@@ -1,4 +1,4 @@
-import { $, $$, getRequiredAttribute } from '../app/dom.ts';
+import { $ } from '../app/dom.ts';
 import { setHtml } from '../app/safe-html.ts';
 import {
     buildSkeleton, buildErrorState,
@@ -6,7 +6,7 @@ import {
 import { showToast } from '../app/toast.ts';
 import { log } from '../app/logger.ts';
 import {
-    navigateTo, trimStrings,
+    trimStrings,
     openDialog, closeDialog,
 } from '../app/core.ts';
 import {
@@ -19,11 +19,11 @@ import {
     type GeneralInfoDraft,
     getActiveObjectives,
     getObjectives,
-    getDeprecatedObjectiveIds,
+    getArchivedObjectiveIds,
     getCurrentObjectiveDefinition,
     postObjectiveCreation,
     postObjectiveRevision,
-    postObjectiveDeprecation,
+    postObjectiveArchival,
     postObjectiveReactivation,
     putObjectivePosition,
     subscribeObjectiveChanges,
@@ -87,45 +87,33 @@ function buildPresenter():
         );
 }
 
-function rerender(): void {
+async function rerender(): Promise<void> {
     if (!pageContainer) return;
+    pageContainer.toggleAttribute(
+        'data-page-editing',
+        state?.kind === 'editing',
+    );
     setHtml(
         pageContainer,
         buildPresenter().buildPage(),
     );
-    bindNavButtons();
-}
-
-function bindNavButtons(): void {
-    $$('[data-nav-to]', document).forEach(
-        navButton => {
-            navButton.addEventListener(
-                'click',
-                () => navigateTo(
-                    getRequiredAttribute(
-                        navButton, 'data-nav-to',
-                    ),
-                ),
-                { signal },
-            );
-        },
-    );
+    await renderObjectives();
 }
 
 async function renderObjectives(): Promise<void> {
     const ctx = createRequestContext();
-    const [active, allObjs, deprecatedIds] =
+    const [active, allObjs, archivedIds] =
         await Promise.all([
             getActiveObjectives(ctx),
             getObjectives(ctx),
-            getDeprecatedObjectiveIds(ctx),
+            getArchivedObjectiveIds(ctx),
         ]);
-    const deprecated = allObjs.filter(
-        o => deprecatedIds.has(o.id),
+    const archived = allObjs.filter(
+        o => archivedIds.has(o.id),
     );
     const defs = new Map<string,
         { name: string; description: string }>();
-    for (const o of [...active, ...deprecated]) {
+    for (const o of [...active, ...archived]) {
         defs.set(
             o.id,
             await getCurrentObjectiveDefinition(
@@ -133,14 +121,84 @@ async function renderObjectives(): Promise<void> {
             ),
         );
     }
-    const deprecatedAt = new Map<string, string>();
+    const archivedAt = new Map<string, string>();
     const presenter =
         new OrganizationObjectivesPresenter(
-            active, deprecated, defs, deprecatedAt,
+            active, archived, defs, archivedAt,
         );
     const box = $('#objectives-box', document);
     if (!box) return;
     setHtml(box, presenter.buildBox());
+
+    const activeList = box.querySelector<HTMLElement>(
+        '[data-list="active"]',
+    );
+    if (!activeList) return;
+    initDragReorder(
+        activeList,
+        '[data-objective-id]',
+        'data-objective-id',
+        async (id, newPosition) => {
+            const dragCtx = createRequestContext();
+            await putObjectivePosition(
+                dragCtx, id, newPosition,
+            );
+        },
+    );
+}
+
+async function onObjectiveAction(
+    e: MouseEvent,
+): Promise<void> {
+    const target = e.target as HTMLElement;
+    const action = target
+        .closest('[data-action]')
+        ?.getAttribute('data-action');
+    if (!action) return;
+    const objectiveId = target
+        .closest('[data-objective-id]')
+        ?.getAttribute('data-objective-id');
+    const ctx = createRequestContext();
+    if (action === 'add-objective') {
+        openDialog('add-objective');
+    } else if (
+        action === 'edit'
+        && objectiveId
+    ) {
+        const def =
+            await getCurrentObjectiveDefinition(
+                ctx, objectiveId,
+            );
+        ($(
+            '#edit-obj-id', document,
+        ) as HTMLInputElement)
+            .value = objectiveId;
+        ($(
+            '#edit-obj-name', document,
+        ) as HTMLInputElement)
+            .value = def.name;
+        ($(
+            '#edit-obj-description', document,
+        ) as HTMLTextAreaElement)
+            .value = def.description;
+        openDialog('edit-objective');
+    } else if (
+        action === 'archive'
+        && objectiveId
+    ) {
+        ($(
+            '#confirm-archive-id', document,
+        ) as HTMLInputElement)
+            .value = objectiveId;
+        openDialog('confirm-archive');
+    } else if (
+        action === 'reactivate'
+        && objectiveId
+    ) {
+        await postObjectiveReactivation(
+            ctx, objectiveId,
+        );
+    }
 }
 
 export async function init(): Promise<void> {
@@ -187,85 +245,8 @@ export async function init(): Promise<void> {
     }
 
     state = { kind: 'reading', org, stats };
-    rerender();
-
     subscribeObjectiveChanges(renderObjectives);
-    await renderObjectives();
-
-    const box = $('#objectives-box', document);
-    if (box) {
-        initDragReorder(
-            box as HTMLElement,
-            '[data-objective-id]'
-            + ':not([data-deprecated="true"])',
-            'data-objective-id',
-            async (id, newPosition) => {
-                const ctx = createRequestContext();
-                await putObjectivePosition(
-                    ctx, id, newPosition,
-                );
-            },
-        );
-    }
-
-    // Click delegation on the objectives box
-    $('#objectives-box', document)!
-        .addEventListener('click',
-            async (e) => {
-                const target =
-                    e.target as HTMLElement;
-                const action = target
-                    .closest('[data-action]')
-                    ?.getAttribute('data-action');
-                const objectiveId = target
-                    .closest('[data-objective-id]')
-                    ?.getAttribute(
-                        'data-objective-id',
-                    );
-                const ctx = createRequestContext();
-                if (action === 'add-objective') {
-                    openDialog('add-objective');
-                } else if (
-                    action === 'edit'
-                    && objectiveId
-                ) {
-                    const def =
-                        await getCurrentObjectiveDefinition(
-                            ctx, objectiveId,
-                        );
-                    ($(
-                        '#edit-obj-id', document,
-                    ) as HTMLInputElement)
-                        .value = objectiveId;
-                    ($(
-                        '#edit-obj-name', document,
-                    ) as HTMLInputElement)
-                        .value = def.name;
-                    ($(
-                        '#edit-obj-description',
-                        document,
-                    ) as HTMLTextAreaElement)
-                        .value = def.description;
-                    openDialog('edit-objective');
-                } else if (
-                    action === 'deprecate'
-                    && objectiveId
-                ) {
-                    ($(
-                        '#confirm-deprecate-id',
-                        document,
-                    ) as HTMLInputElement)
-                        .value = objectiveId;
-                    openDialog('confirm-deprecate');
-                } else if (
-                    action === 'reactivate'
-                    && objectiveId
-                ) {
-                    await postObjectiveReactivation(
-                        ctx, objectiveId,
-                    );
-                }
-            }, { signal });
+    await rerender();
 
     // Add-Objective dialog wiring
     $(
@@ -323,23 +304,23 @@ export async function init(): Promise<void> {
         closeDialog('edit-objective');
     }, { signal });
 
-    // Confirm-deprecate dialog wiring
+    // Confirm-archive dialog wiring
     $(
-        '[data-action="cancel-confirm-deprecate"]',
+        '[data-action="cancel-confirm-archive"]',
         document,
     )!.addEventListener('click',
-        () => closeDialog('confirm-deprecate'),
+        () => closeDialog('confirm-archive'),
         { signal });
     $(
-        '[data-action="confirm-deprecate"]',
+        '[data-action="confirm-archive"]',
         document,
     )!.addEventListener('click', async () => {
         const id = ($(
-            '#confirm-deprecate-id', document,
+            '#confirm-archive-id', document,
         ) as HTMLInputElement).value;
         const ctx = createRequestContext();
-        await postObjectiveDeprecation(ctx, id);
-        closeDialog('confirm-deprecate');
+        await postObjectiveArchival(ctx, id);
+        closeDialog('confirm-archive');
     }, { signal });
 }
 
@@ -369,10 +350,10 @@ function bindStableListeners(
 function onClick(e: MouseEvent): void {
     const target = e.target as Element | null;
     if (!target) return;
-    const action = target
+    const orgAction = target
         .closest('[data-org-action]')
         ?.getAttribute('data-org-action');
-    if (action === 'edit') {
+    if (orgAction === 'edit') {
         if (!state || state.kind !== 'reading') {
             return;
         }
@@ -383,10 +364,10 @@ function onClick(e: MouseEvent): void {
             draft: state.org
                 .toGeneralInfoDraft(),
         };
-        rerender();
+        void rerender();
         return;
     }
-    if (action === 'cancel') {
+    if (orgAction === 'cancel') {
         if (!state || state.kind !== 'editing') {
             return;
         }
@@ -395,12 +376,14 @@ function onClick(e: MouseEvent): void {
             org: state.org,
             stats: state.stats,
         };
-        rerender();
+        void rerender();
         return;
     }
-    if (action === 'save') {
+    if (orgAction === 'save') {
         void handleSave();
+        return;
     }
+    void onObjectiveAction(e);
 }
 
 function onInput(e: Event): void {
@@ -447,7 +430,7 @@ function onDocumentKeydown(
         org: state.org,
         stats: state.stats,
     };
-    rerender();
+    void rerender();
 }
 
 async function handleSave(): Promise<void> {
@@ -484,5 +467,5 @@ async function handleSave(): Promise<void> {
         org: freshOrg,
         stats: freshStats,
     };
-    rerender();
+    await rerender();
 }

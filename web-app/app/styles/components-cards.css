@@ -1,16 +1,5 @@
 /* Cards: panels, action cards, icon-box cards, selection ring. */
 
-.org-objectives-box {
-  padding: 1em;
-}
-
-.org-objectives-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.8em;
-}
-
 .objective-list {
   list-style: none;
   padding: 0;

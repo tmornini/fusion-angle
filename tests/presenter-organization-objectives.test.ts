@@ -7,7 +7,7 @@ const activeObjs = [
     { id: 'o1', position: 0 },
     { id: 'o2', position: 1 },
 ];
-const deprecatedObjs = [
+const archivedObjs = [
     { id: 'o3', position: 99 },
 ];
 const defs = new Map([
@@ -15,14 +15,14 @@ const defs = new Map([
     ['o2', { name: 'Lower expenses', description: 'd2' }],
     ['o3', { name: 'Old Quarterly', description: 'd3' }],
 ]);
-const deprecatedAt = new Map([
+const archivedAt = new Map([
     ['o3', '2026-03-15T00:00:00.000Z'],
 ]);
 
 test('renders active section with each active objective',
     () => {
         const p = new OrganizationObjectivesPresenter(
-            activeObjs, deprecatedObjs, defs, deprecatedAt,
+            activeObjs, archivedObjs, defs, archivedAt,
         );
         const html = p.buildBox().toString();
         assert.ok(html.includes('Increase incomes'));
@@ -31,18 +31,18 @@ test('renders active section with each active objective',
         assert.ok(html.includes('data-objective-id="o2"'));
     });
 
-test('renders deprecated section under active', () => {
+test('renders archived section under active', () => {
     const p = new OrganizationObjectivesPresenter(
-        activeObjs, deprecatedObjs, defs, deprecatedAt,
+        activeObjs, archivedObjs, defs, archivedAt,
     );
     const html = p.buildBox().toString();
     assert.ok(html.includes('Old Quarterly'));
-    assert.ok(html.includes('Deprecated'));
+    assert.ok(html.includes('Archived'));
 });
 
 test('renders add-objective affordance', () => {
     const p = new OrganizationObjectivesPresenter(
-        activeObjs, deprecatedObjs, defs, deprecatedAt,
+        activeObjs, archivedObjs, defs, archivedAt,
     );
     const html = p.buildBox().toString();
     assert.ok(html.includes('data-action="add-objective"'));

@@ -19,7 +19,7 @@ import {
     getFlowVersions,
     getHumanWorkers,
     getAIWorkers,
-    getRecords,
+    getRecordRows,
     getRecordForFlow,
     getRecordAttributesByRecord,
     putFlowRecord,
@@ -1403,7 +1403,7 @@ export async function init(
                 getFlowVersions(ctx, flowId),
                 getHumanWorkers(ctx),
                 getAIWorkers(ctx),
-                getRecords(ctx),
+                getRecordRows(ctx),
                 getRecordForFlow(ctx, flowId),
             ]);
             const recordAttributes =

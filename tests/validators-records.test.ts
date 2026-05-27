@@ -15,11 +15,13 @@ test(
         const out = validateRecordEntity({
             name: 'Customer',
             description: 'Customer record',
+            position: 1,
         });
         assert.equal(out.name, 'Customer');
         assert.equal(
             out.description, 'Customer record',
         );
+        assert.equal(out.position, 1);
     },
 );
 
@@ -30,6 +32,7 @@ test(
             () => validateRecordEntity({
                 name: '',
                 description: 'x',
+                position: 1,
             }),
             /name must be/i,
         );
@@ -49,12 +52,26 @@ test(
 );
 
 test(
+    'validateRecordEntity rejects a missing position',
+    () => {
+        assert.throws(
+            () => validateRecordEntity({
+                name: 'C',
+                description: 'd',
+            } as never),
+            /missing required key/,
+        );
+    },
+);
+
+test(
     'validateRecordEntity rejects an extra key',
     () => {
         assert.throws(
             () => validateRecordEntity({
                 name: 'C',
                 description: 'd',
+                position: 1,
                 extra: 1,
             } as never),
             /unexpected key/,
@@ -69,6 +86,21 @@ test(
             () => validateRecordEntity({
                 name: 7,
                 description: 'd',
+                position: 1,
+            } as never),
+        );
+    },
+);
+
+test(
+    'validateRecordEntity rejects non-number'
+    + ' position',
+    () => {
+        assert.throws(
+            () => validateRecordEntity({
+                name: 'C',
+                description: 'd',
+                position: 'first',
             } as never),
         );
     },

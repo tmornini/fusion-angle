@@ -6,14 +6,14 @@ import { createRequestContext } from
 import {
     getObjective,
     getObjectives,
-    getDeprecatedObjectiveIds,
+    getArchivedObjectiveIds,
     getObjectiveRevisions,
     getActiveObjectives,
     getCurrentObjectiveDefinition,
     getObjectiveDefinitionAt,
     postObjectiveCreation,
     postObjectiveRevision,
-    postObjectiveDeprecation,
+    postObjectiveArchival,
     postObjectiveReactivation,
     putObjectivePosition,
 } from '../web-app/app/adapters/objectives.ts';
@@ -59,13 +59,14 @@ test('getObjectives returns all', async () => {
     assert.equal(rows.length, 2);
 });
 
-test('getDeprecatedObjectiveIds returns a Set', async () => {
+test('getArchivedObjectiveIds returns a Set', async () => {
     const db = new MemoryDbAdapter();
+    await db.objectives.put('o1', { position: 0 });
     await db.states.record(
-        'e1', 'o1', 'deprecated', 'system',
+        'e1', 'o1', 'archived', 'system',
     );
     const ctx = ctxFor(db);
-    const ids = await getDeprecatedObjectiveIds(ctx);
+    const ids = await getArchivedObjectiveIds(ctx);
     assert.ok(ids.has('o1'));
     assert.equal(ids.size, 1);
 });
@@ -108,13 +109,13 @@ test('getObjectiveRevisions returns all for an objective',
         }
     });
 
-test('getActiveObjectives filters deprecated',
+test('getActiveObjectives filters archived',
     async () => {
         const db = new MemoryDbAdapter();
         await db.objectives.put('o1', { position: 0 });
         await db.objectives.put('o2', { position: 1 });
         await db.states.record(
-            'e1', 'o2', 'deprecated', 'system',
+            'e1', 'o2', 'archived', 'system',
         );
         const ctx = ctxFor(db);
         const active = await getActiveObjectives(ctx);
@@ -203,7 +204,7 @@ test('postObjectiveRevision appends a revision row',
         assert.equal(revs.length, 2);
     });
 
-test('postObjectiveDeprecation deprecates an objective',
+test('postObjectiveArchival archives an objective',
     async () => {
         const db = new MemoryDbAdapter();
         await seedCurrentWorker(db);
@@ -211,8 +212,8 @@ test('postObjectiveDeprecation deprecates an objective',
         await postObjectiveCreation(
             ctx, 'o1', 'Income', 'd', 0,
         );
-        await postObjectiveDeprecation(ctx, 'o1');
-        const ids = await getDeprecatedObjectiveIds(ctx);
+        await postObjectiveArchival(ctx, 'o1');
+        const ids = await getArchivedObjectiveIds(ctx);
         assert.equal(ids.size, 1);
         assert.ok(ids.has('o1'));
     });
@@ -225,17 +226,17 @@ test('postObjectiveReactivation returns objective to active list',
         await postObjectiveCreation(
             ctx, 'o1', 'Rev', 'd', 0,
         );
-        await postObjectiveDeprecation(ctx, 'o1');
+        await postObjectiveArchival(ctx, 'o1');
         await postObjectiveReactivation(ctx, 'o1');
         const active = await getActiveObjectives(ctx);
         assert.ok(
             active.some(o => o.id === 'o1'),
             'objective must return to active list',
         );
-        const deprecated =
-            await getDeprecatedObjectiveIds(ctx);
-        assert.equal(deprecated.size, 0,
-            'reactivation supersedes deprecation in '
+        const archived =
+            await getArchivedObjectiveIds(ctx);
+        assert.equal(archived.size, 0,
+            'reactivation supersedes archival in '
             + 'latest-by-at query');
     });
 
@@ -247,7 +248,7 @@ test('reactivation does not emit a deleted state event',
         await postObjectiveCreation(
             ctx, 'o1', 'Rev', 'd', 0,
         );
-        await postObjectiveDeprecation(ctx, 'o1');
+        await postObjectiveArchival(ctx, 'o1');
         await postObjectiveReactivation(ctx, 'o1');
         const deleted = await db.states.deletedIds();
         assert.ok(!deleted.has('o1'),

@@ -132,7 +132,7 @@ test(
     'getDashboardStats counts seeded entities',
     async () => {
         const { db, ctx } = setupDb();
-        await seedIdea(db, 'i1', 'active:ready');
+        await seedIdea(db, 'i1', 'active');
         await seedIdea(db, 'i2', 'in-review');
         await seedProject(db, 'p1', 'approved');
         await db.flows.put('f1', buildFlow('f1'));
@@ -149,7 +149,7 @@ test(
     'getDashboardStats excludes archived ideas',
     async () => {
         const { db, ctx } = setupDb();
-        await seedIdea(db, 'i1', 'active:ready');
+        await seedIdea(db, 'i1', 'active');
         await seedIdea(db, 'i2', 'archived');
         await seedIdea(db, 'i3', 'deleted');
         const stats = await getDashboardStats(ctx);

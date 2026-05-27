@@ -35,7 +35,7 @@ import {
     getObjectives,
     getCurrentObjectiveDefinition,
     getObjectiveRevisions,
-    getObjectiveDeprecationEvents,
+    getObjectiveArchivalEvents,
     subscribeObjectiveChanges,
     postProjectApproval,
     postProjectCompletion,
@@ -962,9 +962,9 @@ async function openHistoryModal(
         baselineObjIds.add(a.objective_id);
     }
     const revisions: ObjectiveRevision[] = [];
-    const allDeprecations =
-        await getObjectiveDeprecationEvents(ctx);
-    const deprecations = allDeprecations.filter(
+    const allArchivations =
+        await getObjectiveArchivalEvents(ctx);
+    const archivations = allArchivations.filter(
         d => baselineObjIds.has(d.objectiveId),
     );
     for (const objId of baselineObjIds) {
@@ -1006,7 +1006,7 @@ async function openHistoryModal(
     const presenter =
         new ProjectScoreHistoryPresenter(
             scoring.baseline, scoring.actual,
-            revisions, deprecations, resolver,
+            revisions, archivations, resolver,
         );
     const bodyEl =
         $('#history-modal-body', document);

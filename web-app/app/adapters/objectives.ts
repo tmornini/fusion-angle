@@ -48,48 +48,67 @@ export async function getObjectives(
     return ctx.GET<Objective[]>('objectives');
 }
 
-export async function getDeprecatedObjectiveIds(
+export async function getArchivedObjectiveIds(
     ctx: RequestContext,
 ): Promise<Set<ObjectiveId>> {
-    const rows = await ctx.GET<StateEntity[]>('states');
+    const [rows, objectives] = await Promise.all([
+        ctx.GET<StateEntity[]>('states'),
+        getObjectives(ctx),
+    ]);
+    const objectiveIds = new Set<string>(
+        objectives.map(o => o.id),
+    );
     // Iterate in insertion order; on `at` tie the
     // later-inserted row wins. `nowUtc()` resolves to
     // milliseconds so back-to-back mutations on a fast
     // machine can collide; insertion order is the
     // deterministic tiebreak the event log already
-    // captures.
+    // captures. The `'archived'` value is shared across
+    // entity alphabets, so we restrict to objective ids.
     const latestByEntity = new Map<string, StateEntity>();
     for (const row of rows) {
+        if (!objectiveIds.has(row.entity_id)) continue;
         const seen = latestByEntity.get(row.entity_id);
         if (seen === undefined || row.at >= seen.at) {
             latestByEntity.set(row.entity_id, row);
         }
     }
-    const deprecated = new Set<ObjectiveId>();
+    const archived = new Set<ObjectiveId>();
     for (const [entityId, row] of latestByEntity) {
-        if (row.state === 'deprecated') {
-            deprecated.add(entityId as ObjectiveId);
+        if (row.state === 'archived') {
+            archived.add(entityId as ObjectiveId);
         }
     }
-    return deprecated;
+    return archived;
 }
 
-export interface ObjectiveDeprecationEvent {
+export interface ObjectiveArchivalEvent {
     objectiveId: ObjectiveId;
     at: string;
 }
 
-// Streams every `state='deprecated'` event from the
-// state log — one event per deprecation, including
-// re-deprecations after reactivation. Consumed by the
+// Streams every `state='archived'` event from the
+// state log — one event per archival, including
+// re-archivals after reactivation. Consumed by the
 // project score-history presenter which renders each
-// event chronologically alongside scoring rows.
-export async function getObjectiveDeprecationEvents(
+// event chronologically alongside scoring rows. The
+// `'archived'` value is shared across entity
+// alphabets, so we restrict to objective ids.
+export async function getObjectiveArchivalEvents(
     ctx: RequestContext,
-): Promise<ObjectiveDeprecationEvent[]> {
-    const rows = await ctx.GET<StateEntity[]>('states');
+): Promise<ObjectiveArchivalEvent[]> {
+    const [rows, objectives] = await Promise.all([
+        ctx.GET<StateEntity[]>('states'),
+        getObjectives(ctx),
+    ]);
+    const objectiveIds = new Set<string>(
+        objectives.map(o => o.id),
+    );
     return rows
-        .filter(r => r.state === 'deprecated')
+        .filter(r =>
+            r.state === 'archived'
+            && objectiveIds.has(r.entity_id),
+        )
         .map(r => ({
             objectiveId: r.entity_id as ObjectiveId,
             at: r.at,
@@ -111,12 +130,12 @@ export async function getObjectiveRevisions(
 export async function getActiveObjectives(
     ctx: RequestContext,
 ): Promise<Objective[]> {
-    const [all, deprecated] = await Promise.all([
+    const [all, archived] = await Promise.all([
         getObjectives(ctx),
-        getDeprecatedObjectiveIds(ctx),
+        getArchivedObjectiveIds(ctx),
     ]);
     return all
-        .filter(o => !deprecated.has(o.id))
+        .filter(o => !archived.has(o.id))
         .sort((a, b) => a.position - b.position);
 }
 
@@ -221,14 +240,14 @@ export async function postObjectiveRevision(
     notifyObjectiveChange();
 }
 
-export async function postObjectiveDeprecation(
+export async function postObjectiveArchival(
     ctx: RequestContext,
     id: ObjectiveId,
 ): Promise<void> {
     await ctx.commit({
         ops: [
             await buildStateEventOp(
-                ctx, id, 'deprecated',
+                ctx, id, 'archived',
             ),
         ],
     });

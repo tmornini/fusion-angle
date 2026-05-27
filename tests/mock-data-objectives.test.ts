@@ -9,7 +9,7 @@ import {
 import { createRequestContext }
     from '../web-app/app/adapters/shared.ts';
 import {
-    getDeprecatedObjectiveIds,
+    getArchivedObjectiveIds,
 } from '../web-app/app/adapters/objectives.ts';
 
 test('populateMockData seeds 4 objectives', async () => {
@@ -42,12 +42,12 @@ test('populateMockData seeds one revision per objective',
         assert.deepEqual(revObjIds, objIds);
     });
 
-test('populateMockData seeds zero deprecated objectives',
+test('populateMockData seeds zero archived objectives',
     async () => {
         const db = new MemoryDbAdapter();
         await populateMockData(db);
         const ctx = createRequestContext(db);
-        const ids = await getDeprecatedObjectiveIds(ctx);
+        const ids = await getArchivedObjectiveIds(ctx);
         assert.equal(ids.size, 0);
     });
 

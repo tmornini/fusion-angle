@@ -522,11 +522,14 @@ async function handleSave(
         );
         return;
     }
+    if (!currentView) return;
+    const entity = currentView.record;
     const ctx = createRequestContext();
     try {
         await putRecord(ctx, recordId, {
             name: draft.name.trim(),
             description: draft.description,
+            position: entity.position,
         });
         const currentIds = new Set(
             draft.attributes.map(a => a.id),

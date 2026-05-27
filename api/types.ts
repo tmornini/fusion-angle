@@ -46,12 +46,8 @@ export const WORKER_STATES = [
 
 export type WorkerState = typeof WORKER_STATES[number];
 
-// The 'active' sub-states encode the readiness
-// dimension as a single composite string.
 export const IDEA_STATES = [
-    'active:incomplete',
-    'active:needs-info',
-    'active:ready',
+    'active',
     'in-review',
     'approved',
     'promoted',
@@ -61,6 +57,14 @@ export const IDEA_STATES = [
 ] as const;
 
 export type IdeaState = typeof IDEA_STATES[number];
+
+export const IDEA_READINESS = [
+    'incomplete',
+    'ready',
+] as const;
+
+export type IdeaReadiness =
+    typeof IDEA_READINESS[number];
 
 export type DimensionKey =
     | 'driver'
@@ -113,6 +117,14 @@ export const RECORD_STATES = [
 ] as const;
 
 export type RecordState = typeof RECORD_STATES[number];
+
+export const OBJECTIVE_STATES = [
+    'active',
+    'archived',
+] as const;
+
+export type ObjectiveState =
+    typeof OBJECTIVE_STATES[number];
 
 export type StoredBoolean = 0 | 1;
 
@@ -304,6 +316,25 @@ export function assertRecordState(
     if (!includes(RECORD_STATES, v)) {
         throw new Error(
             'expected RecordState for '
+                + label + ', got ' + v,
+        );
+    }
+    return v;
+}
+
+export function isObjectiveState(
+    v: string,
+): v is ObjectiveState {
+    return includes(OBJECTIVE_STATES, v);
+}
+
+export function assertObjectiveState(
+    v: string,
+    label: string,
+): ObjectiveState {
+    if (!includes(OBJECTIVE_STATES, v)) {
+        throw new Error(
+            'expected ObjectiveState for '
                 + label + ', got ' + v,
         );
     }
@@ -789,6 +820,7 @@ export interface RecordEntity {
     id: RecordId;
     name: string;
     description: string;
+    position: number;
 }
 
 export interface RecordAttributeEntity {
@@ -877,16 +909,8 @@ export const IDEA_STATE_CONFIG: Record<
     IdeaState,
     StatusDisplay
 > = {
-    'active:incomplete': {
-        label: 'Active · Incomplete',
-        className: 'badge-success',
-    },
-    'active:needs-info': {
-        label: 'Active · Needs Info',
-        className: 'badge-success',
-    },
-    'active:ready': {
-        label: 'Active · Ready',
+    'active': {
+        label: 'Active',
         className: 'badge-success',
     },
     'in-review': {
@@ -912,6 +936,20 @@ export const IDEA_STATE_CONFIG: Record<
     'deleted': {
         label: 'Deleted',
         className: 'badge-default',
+    },
+};
+
+export const IDEA_READINESS_CONFIG: Record<
+    IdeaReadiness,
+    StatusDisplay
+> = {
+    'incomplete': {
+        label: 'Incomplete',
+        className: 'badge-warning',
+    },
+    'ready': {
+        label: 'Ready',
+        className: 'badge-success',
     },
 };
 
@@ -1025,8 +1063,36 @@ export class Idea {
     }
 
     canBeSubmittedForReview(): boolean {
-        return this.#state.startsWith('active:')
-            || this.#state === 'sent-back';
+        return (
+            this.#state === 'active'
+            || this.#state === 'sent-back'
+        ) && this.isReady();
+    }
+
+    readinessValue(): IdeaReadiness {
+        return (
+            this.#title !== ''
+            && this.#problemStatement !== ''
+            && this.#proposedSolution !== ''
+            && this.#expectedOutcome !== ''
+        ) ? 'ready'
+          : 'incomplete';
+    }
+
+    readinessLabel(): string {
+        return IDEA_READINESS_CONFIG[
+            this.readinessValue()
+        ].label;
+    }
+
+    readinessClassName(): string {
+        return IDEA_READINESS_CONFIG[
+            this.readinessValue()
+        ].className;
+    }
+
+    isReady(): boolean {
+        return this.readinessValue() === 'ready';
     }
 
     stateLabel(): string {
@@ -1218,6 +1284,72 @@ export class Project {
         return this.#title
             .toLowerCase()
             .includes(lowerTerm);
+    }
+}
+
+export class RecordModel {
+    readonly #id: string;
+    readonly #name: string;
+    readonly #description: string;
+    readonly #position: number;
+    readonly #state: RecordState;
+
+    constructor(
+        entity: RecordEntity,
+        state: RecordState,
+    ) {
+        this.#id = entity.id;
+        this.#name = entity.name;
+        this.#description = entity.description;
+        this.#position = entity.position;
+        this.#state = state;
+    }
+
+    idForLink(): string {
+        return this.#id;
+    }
+
+    stateValue(): RecordState {
+        return this.#state;
+    }
+
+    stateLabel(): string {
+        return (
+            RECORD_STATE_CONFIG[this.#state]
+        )!.label;
+    }
+
+    stateClassName(): string {
+        return (
+            RECORD_STATE_CONFIG[this.#state]
+        )!.className;
+    }
+
+    isActive(): boolean {
+        return this.#state === 'active';
+    }
+
+    isArchived(): boolean {
+        return this.#state === 'archived';
+    }
+
+    positionSortKey(): number {
+        return this.#position;
+    }
+
+    nameText(): string {
+        return this.#name;
+    }
+
+    descriptionText(): string {
+        return this.#description;
+    }
+
+    matchesSearch(term: string): boolean {
+        const lower = term.toLowerCase();
+        return this.#name
+            .toLowerCase()
+            .includes(lower);
     }
 }
 

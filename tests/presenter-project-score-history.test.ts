@@ -49,7 +49,7 @@ const revisions = [
       description: 'd2',
       at: '2026-03-18T11:02:00.000Z' },
 ];
-const deprecations: { objectiveId: string;
+const archivations: { objectiveId: string;
     at: string }[] = [];
 
 function resolver(objId: string, atTime: string) {
@@ -66,7 +66,7 @@ function resolver(objId: string, atTime: string) {
 
 test('merges all four streams chronologically', () => {
     const p = new ProjectScoreHistoryPresenter(
-        baselines, actuals, revisions, deprecations,
+        baselines, actuals, revisions, archivations,
         resolver,
     );
     const html = p.buildBody().toString();
@@ -86,7 +86,7 @@ test('merges all four streams chronologically', () => {
 test('resolves historical objective name at each event',
     () => {
         const p = new ProjectScoreHistoryPresenter(
-            baselines, actuals, revisions, deprecations,
+            baselines, actuals, revisions, archivations,
             resolver,
         );
         const html = p.buildBody().toString();
@@ -109,7 +109,7 @@ test('resolves historical objective name at each event',
 test('revision event row shows the new objective name',
     () => {
         const p = new ProjectScoreHistoryPresenter(
-            [], [], revisions, deprecations, resolver,
+            [], [], revisions, archivations, resolver,
         );
         const html = p.buildBody().toString();
         const r1Pos = html.indexOf('2026-02-01');
@@ -131,7 +131,7 @@ test('positive score TD carries data-tone="success"', () => {
         [{ id: 'b1', project_id: 'p1', objective_id: 'o1',
             score: 40,
             at: '2026-03-05T09:10:00.000Z' }],
-        [], revisions, deprecations, resolver,
+        [], revisions, archivations, resolver,
     );
     const html = p.buildBody().toString();
     assert.match(html,
@@ -143,7 +143,7 @@ test('negative score TD carries data-tone="error"', () => {
         [], [{ id: 'a1', project_id: 'p1',
             objective_id: 'o1', score: -50,
             at: '2026-04-01T16:45:00.000Z' }],
-        revisions, deprecations, resolver,
+        revisions, archivations, resolver,
     );
     const html = p.buildBody().toString();
     assert.match(html,
@@ -155,13 +155,13 @@ test('zero score TD carries data-tone="muted"', () => {
         [{ id: 'b1', project_id: 'p1', objective_id: 'o1',
             score: 0,
             at: '2026-03-05T09:10:00.000Z' }],
-        [], revisions, deprecations, resolver,
+        [], revisions, archivations, resolver,
     );
     const html = p.buildBody().toString();
     assert.match(html, /<td data-tone="muted">0<\/td>/);
 });
 
-test('deprecation event row resolves the objective name '
+test('archival event row resolves the objective name '
     + 'from the event objectiveId', () => {
     const dep = [{
         objectiveId: 'o1',
@@ -173,12 +173,12 @@ test('deprecation event row resolves the objective name '
     const html = p.buildBody().toString();
     const depPos = html.indexOf('2026-05-01');
     assert.ok(depPos >= 0,
-        'deprecation row missing for 2026-05-01');
+        'archival row missing for 2026-05-01');
     const labelPos = html.indexOf(
-        'Objective deprecated', depPos,
+        'Objective archived', depPos,
     );
     assert.ok(labelPos > depPos,
-        'deprecation event label missing');
+        'archival event label missing');
     const namePos = html.indexOf('Drive Growth', depPos);
     assert.ok(namePos > depPos,
         'resolver should resolve o1 → Drive Growth at '

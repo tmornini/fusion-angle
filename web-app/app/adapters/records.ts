@@ -1,21 +1,26 @@
 import type {
+    FlowRecordEntity,
+    RecordAttributeEntity,
     RecordEntity,
     RecordId,
     RecordState,
     StateEntity,
 } from '../../../api/types.ts';
 import {
+    RecordModel,
     assertRecordState,
 } from '../../../api/types.ts';
 import type { RequestContext } from './shared.ts';
 import {
     buildStateEventOp,
+    getRecordStates,
 } from './state-events.ts';
 import {
     createSubscriptionChannel,
 } from '../channels.ts';
 
 export {
+    RecordModel,
     RECORD_STATES,
     RECORD_STATE_CONFIG,
     isRecordState,
@@ -26,6 +31,13 @@ export type {
     RecordId,
     RecordState,
 } from '../../../api/types.ts';
+
+export interface RecordWithCounts {
+    readonly record: RecordModel;
+    readonly entity: RecordEntity;
+    readonly attributeCount: number;
+    readonly boundFlowCount: number;
+}
 
 const recordChanges = createSubscriptionChannel(
     ['records', 'record-attributes', 'states'],
@@ -84,8 +96,58 @@ export async function getRecordState(
 
 export async function getRecords(
     ctx: RequestContext,
-): Promise<RecordEntity[]> {
-    return getRecordRows(ctx);
+): Promise<RecordWithCounts[]> {
+    const [
+        rows, attributes, flowRecords, stateMap,
+    ] = await Promise.all([
+        getRecordRows(ctx),
+        ctx.GET<RecordAttributeEntity[]>(
+            'record-attributes',
+        ),
+        ctx.GET<FlowRecordEntity[]>(
+            'flow-records',
+        ),
+        getRecordStates(ctx),
+    ]);
+    const attrCountByRecord = new Map<
+        string, number
+    >();
+    for (const a of attributes) {
+        attrCountByRecord.set(
+            a.record_id,
+            (attrCountByRecord
+                .get(a.record_id) ?? 0) + 1,
+        );
+    }
+    const flowCountByRecord = new Map<
+        string, number
+    >();
+    for (const fr of flowRecords) {
+        flowCountByRecord.set(
+            fr.record_id,
+            (flowCountByRecord
+                .get(fr.record_id) ?? 0) + 1,
+        );
+    }
+    return rows.map(row => {
+        const state = stateMap.get(row.id);
+        if (state === undefined) {
+            throw new Error(
+                'Record has no state event: '
+                + row.id,
+            );
+        }
+        return {
+            record: new RecordModel(row, state),
+            entity: row,
+            attributeCount:
+                attrCountByRecord.get(row.id)
+                ?? 0,
+            boundFlowCount:
+                flowCountByRecord.get(row.id)
+                ?? 0,
+        };
+    });
 }
 
 export async function putRecord(

@@ -11,6 +11,7 @@ import {
     createRequestContext,
     getDashboardGauges,
     getObjectiveAggregates,
+    getObjectiveTrendlines,
     subscribeProjectScoreChanges,
     getActiveObjectives,
     getCurrentObjectiveDefinition,
@@ -25,10 +26,11 @@ import {
 async function renderObjectiveAggregates(
 ): Promise<void> {
     const ctx = createRequestContext();
-    const [active, aggregates] =
+    const [active, aggregates, trendlines] =
         await Promise.all([
             getActiveObjectives(ctx),
             getObjectiveAggregates(ctx),
+            getObjectiveTrendlines(ctx),
         ]);
     const defs = new Map<string,
         { name: string; description: string }>();
@@ -41,7 +43,7 @@ async function renderObjectiveAggregates(
     setHtml(
         $('#objective-aggregates-card', document)!,
         new DashboardObjectiveAggregatesPresenter(
-            active, defs, aggregates,
+            active, defs, aggregates, trendlines,
         ).buildCard(),
     );
 }

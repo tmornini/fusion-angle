@@ -1,6 +1,6 @@
 import type {
-    Id, IdeaState, ProjectState, StateEntity,
-    WorkerState,
+    Id, IdeaState, ProjectState, RecordState,
+    StateEntity, WorkerState,
 } from '../../../api/types.ts';
 import {
     assertIdeaState,
@@ -8,6 +8,7 @@ import {
     assertWorkerState,
     isIdeaState,
     isProjectState,
+    isRecordState,
     isWorkerState,
     msSinceUtc,
     MS_PER_SECOND,
@@ -311,6 +312,30 @@ export async function getProjectStates(
     const out = new Map<Id, ProjectState>();
     for (const [id, ev] of latestByEntity) {
         out.set(id, ev.state as ProjectState);
+    }
+    return out;
+}
+
+// Bulk variant for getRecords. One scan over the
+// states log builds the entity_id → RecordState map,
+// keeping only events whose state lies in the record
+// alphabet. O(N) on events; the Postgres tier will
+// use an entity_id index.
+export async function getRecordStates(
+    ctx: RequestContext,
+): Promise<Map<Id, RecordState>> {
+    const all = await ctx.GET<StateEntity[]>('states');
+    const latestByEntity = new Map<Id, StateEntity>();
+    for (const ev of all) {
+        if (!isRecordState(ev.state)) continue;
+        const seen = latestByEntity.get(ev.entity_id);
+        if (seen === undefined || ev.at >= seen.at) {
+            latestByEntity.set(ev.entity_id, ev);
+        }
+    }
+    const out = new Map<Id, RecordState>();
+    for (const [id, ev] of latestByEntity) {
+        out.set(id, ev.state as RecordState);
     }
     return out;
 }

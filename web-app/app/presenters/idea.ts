@@ -43,9 +43,7 @@ const STATE_ICONS: Record<
         cssClass: string,
     ) => SafeHtml
 > = {
-    'active:incomplete': iconLightbulb,
-    'active:needs-info': iconLightbulb,
-    'active:ready': iconLightbulb,
+    'active': iconLightbulb,
     'in-review': iconClipboardCheck,
     'approved': iconCheckCircle2,
     'promoted': iconTrendingUp,
@@ -53,6 +51,17 @@ const STATE_ICONS: Record<
     'archived': iconClock,
     'deleted': iconXCircle,
 };
+
+function buildReadinessPill(idea: Idea): SafeHtml {
+    if (
+        idea.stateValue() !== 'active'
+        || idea.isReady()
+    ) {
+        return html``;
+    }
+    return html`<span class="pill"
+        data-tone="warning">Incomplete</span>`;
+}
 
 export interface IdeaDraftFields {
     title: string;
@@ -211,6 +220,7 @@ function buildReadonlyTitleSection(
             }">
                 ${idea.stateLabel()}
             </span>
+            ${buildReadinessPill(idea)}
         </div>
         ${buildSubmittedByLine(
             submitterName, submittedAt,
@@ -242,6 +252,7 @@ function buildEditableTitleSection(
             }">
                 ${idea.stateLabel()}
             </span>
+            ${buildReadinessPill(idea)}
         </div>
         ${buildSubmittedByLine(
             submitterName, submittedAt,
@@ -674,15 +685,20 @@ export class IdeaPresenter {
         }">
             ${this.#idea.titleText()}
         </h3>
-        <span class="${
-            'badge '
-            + this.#idea.stateClassName()
-            + ' text-xs badge-fixed-w mt-1'
-        }">${
-            STATE_ICONS[
-                this.#idea.stateValue()
-            ]!(14, '')
-        } ${this.#idea.stateLabel()}</span>`;
+        <div class="${
+            'flex items-center gap-2 mt-1'
+        }">
+            <span class="${
+                'badge '
+                + this.#idea.stateClassName()
+                + ' text-xs badge-fixed-w'
+            }">${
+                STATE_ICONS[
+                    this.#idea.stateValue()
+                ]!(14, '')
+            } ${this.#idea.stateLabel()}</span>
+            ${buildReadinessPill(this.#idea)}
+        </div>`;
     }
 
     #buildActions(): SafeHtml {
@@ -960,9 +976,7 @@ export class IdeaListPresenter {
             i => i.stateGroup(),
         );
         const order: IdeaState[] = [
-            'active:incomplete',
-            'active:needs-info',
-            'active:ready',
+            'active',
             'in-review',
             'sent-back',
             'approved',

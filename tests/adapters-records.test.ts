@@ -42,6 +42,7 @@ test(
             {
                 name: 'Customer',
                 description: 'A customer record',
+                position: 1,
             },
             'active',
         );
@@ -63,11 +64,17 @@ test(
         const ctx = createRequestContext(db);
         await postRecordCreation(
             ctx, 'rec-1',
-            { name: 'A', description: 'first' },
+            {
+                name: 'A',
+                description: 'first',
+                position: 1,
+            },
             'active',
         );
         await putRecord(ctx, 'rec-1', {
-            name: 'B', description: 'second',
+            name: 'B',
+            description: 'second',
+            position: 1,
         });
         const stored = await getRecord(ctx, 'rec-1');
         assert.equal(stored.name, 'B');
@@ -84,19 +91,29 @@ test(
         const ctx = createRequestContext(db);
         await postRecordCreation(
             ctx, 'rec-1',
-            { name: 'Keep', description: '' },
+            {
+                name: 'Keep',
+                description: '',
+                position: 1,
+            },
             'active',
         );
         await postRecordCreation(
             ctx, 'rec-2',
-            { name: 'Drop', description: '' },
+            {
+                name: 'Drop',
+                description: '',
+                position: 2,
+            },
             'active',
         );
         await postRecordStateChange(
             ctx, 'rec-2', 'deleted',
         );
         const records = await getRecords(ctx);
-        const ids = records.map(r => r.id).sort();
+        const ids = records
+            .map(r => r.entity.id)
+            .sort();
         assert.deepEqual(ids, ['rec-1']);
     },
 );
@@ -110,7 +127,11 @@ test(
         const ctx = createRequestContext(db);
         await postRecordCreation(
             ctx, 'rec-1',
-            { name: 'X', description: '' },
+            {
+                name: 'X',
+                description: '',
+                position: 1,
+            },
             'active',
         );
         await archiveRecord(ctx, 'rec-1');
@@ -130,7 +151,11 @@ test(
         const ctx = createRequestContext(db);
         await postRecordCreation(
             ctx, 'rec-1',
-            { name: 'X', description: 'orig' },
+            {
+                name: 'X',
+                description: 'orig',
+                position: 1,
+            },
             'active',
         );
         await postRecordStateChange(
@@ -153,7 +178,11 @@ test(
         const ctx = createRequestContext(db);
         await postRecordCreation(
             ctx, 'rec-1',
-            { name: 'X', description: '' },
+            {
+                name: 'X',
+                description: '',
+                position: 1,
+            },
             'active',
         );
         await deleteRecord(ctx, 'rec-1');
@@ -185,7 +214,11 @@ test(
         const ctx = createRequestContext(db);
         await postRecordCreation(
             ctx, 'rec-1',
-            { name: 'X', description: '' },
+            {
+                name: 'X',
+                description: '',
+                position: 1,
+            },
             'active',
         );
         await postRecordStateChange(

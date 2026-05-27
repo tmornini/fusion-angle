@@ -21,6 +21,7 @@ import {
     postMockDataLoad,
     deleteSchema,
     RETIRED_KEYS_PER_TABLE,
+    RETIRED_STATE_VALUES_PER_ENTITY,
     RETIRED_TABLES,
     SnapshotTooLargeError,
     SnapshotIncompatibleError,
@@ -318,6 +319,42 @@ test(
                     }],
                 });
                 const expected = table + '.' + key;
+                await assert.rejects(
+                    () => putSnapshot(ctx, json),
+                    (err: Error) =>
+                        err instanceof
+                            SnapshotIncompatibleError
+                        && err.retired
+                            .includes(expected),
+                    'expected ' + expected
+                    + ' to surface as retired',
+                );
+            }
+        }
+    },
+);
+
+test(
+    'putSnapshot rejects every retired state value'
+    + ' enumerated in'
+    + ' RETIRED_STATE_VALUES_PER_ENTITY',
+    async () => {
+        for (const values of Object.values(
+            RETIRED_STATE_VALUES_PER_ENTITY,
+        )) {
+            for (const value of values) {
+                const { ctx } = setup();
+                const json = JSON.stringify({
+                    states: [{
+                        id: 's1',
+                        entity_id: 'e1',
+                        state: value,
+                        worker_id: 'w1',
+                        at: '2026-01-01T00:00:00Z',
+                    }],
+                });
+                const expected =
+                    'states[].state=' + value;
                 await assert.rejects(
                     () => putSnapshot(ctx, json),
                     (err: Error) =>

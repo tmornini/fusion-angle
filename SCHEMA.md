@@ -100,10 +100,12 @@ the `WORKER_STATES` alphabet (`active`, `pending`,
 | success_metrics | TEXT |
 
 Lifecycle state lives in `states` (alphabet
-`IDEA_STATES`): 9 values composite of former status +
-readiness — `active:incomplete`, `active:needs-info`,
-`active:ready`, `in-review`, `approved`, `promoted`,
-`sent-back`, `archived`, `deleted`.
+`IDEA_STATES`): 7 single-dimension values — `active`,
+`in-review`, `approved`, `promoted`, `sent-back`,
+`archived`, `deleted`. Readiness is derived from the
+required-field set (`title`, `problem_statement`,
+`proposed_solution`, `expected_outcome`) at domain-
+object instantiation, not stored.
 
 ### projects
 
@@ -417,9 +419,9 @@ the prior row.
 
 State alphabets by entity kind:
 
-- **ideas** — `IDEA_STATES` (9 values, composite):
-  `active:incomplete`, `active:needs-info`,
-  `active:ready`, `in-review`, `approved`, `promoted`,
+- **ideas** — `IDEA_STATES` (7 values, lifecycle only;
+  readiness is derived from required-field presence):
+  `active`, `in-review`, `approved`, `promoted`,
   `sent-back`, `archived`, `deleted`
 - **projects** — `PROJECT_STATES` (7 values):
   `submitted`, `under-review`, `sent-back`, `approved`,

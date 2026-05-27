@@ -1842,7 +1842,7 @@ Agent-E (K7, K9–K23, K30), Agent-CH (K27–K29). Mutation
 domain delta:
 
 - Agent-G adds: `objectives`, `objective_revisions`,
-  `deprecated`
+  `archived`
 - Agent-E adds: `project_objective_baseline_scores`,
   `project_objective_actual_scores`
 - Agent-CH stays read-only
@@ -1870,11 +1870,11 @@ active list.
 opens pre-filled. Change the name; click Save. PASS if the
 list re-renders with the new name.
 
-**K4.** Click `Deprecate` on an active objective; confirm
+**K4.** Click `Archive` on an active objective; confirm
 dialog opens. Confirm. PASS if the objective moves from
-active to the Deprecated sub-section, with strikethrough.
+active to the Archived sub-section, with strikethrough.
 
-**K5.** Click `Reactivate` on a deprecated objective; PASS
+**K5.** Click `Reactivate` on a archived objective; PASS
 if it returns to the active list.
 
 **K6.** Drag an objective to a new position. PASS if the

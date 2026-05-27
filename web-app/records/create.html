@@ -1,0 +1,48 @@
+<div class="workspace">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">
+                Create Record
+            </h1>
+            <p class="text-sm text-muted">
+                Define a new data shape
+            </p>
+        </div>
+    </div>
+
+    <div class="card p-6">
+        <div class="flex flex-col gap-4">
+            <div>
+                <label class="label mb-1 block"
+                >Name</label>
+                <input
+                    class="input"
+                    id="record-create-name"
+                    placeholder="Record name"
+                />
+            </div>
+            <div>
+                <label class="label mb-1 block"
+                >Description</label>
+                <textarea
+                    class="textarea"
+                    id="record-create-description"
+                    placeholder="What this Record describes"
+                    rows="3"
+                ></textarea>
+            </div>
+            <div class="flex justify-end gap-2">
+                <button
+                    class="btn btn-ghost"
+                    type="button"
+                    id="record-create-cancel"
+                >Cancel</button>
+                <button
+                    class="btn btn-primary"
+                    type="button"
+                    id="record-create-submit"
+                >Create Record</button>
+            </div>
+        </div>
+    </div>
+</div>

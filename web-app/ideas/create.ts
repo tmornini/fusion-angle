@@ -162,7 +162,7 @@ export async function init():
                             .successMetrics,
                         position,
                     },
-                    'active:incomplete',
+                    'active',
                 );
                 await putIdeaSubmission(
                     ctx,
