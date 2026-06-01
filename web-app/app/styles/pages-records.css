@@ -24,6 +24,13 @@
         hsl(var(--color-border));
 }
 
+.record-attribute-pending-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 0.5rem;
+}
+
 .record-constraint-list {
     display: flex;
     flex-direction: column;

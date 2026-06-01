@@ -19,7 +19,7 @@ import {
     HumanWorker,
     WORKER_STATE_CONFIG,
     type WorkerState,
-    type HumanWorkerEntity,
+    type HumanWorkerDraft,
     isWorkerState,
     jsonArrayField,
 } from '../adapters/index.ts';
@@ -50,8 +50,7 @@ const DEPARTMENTS: readonly string[] = [
 ];
 
 export interface HumanWorkerDraftFields {
-    firstName: string;
-    lastName: string;
+    name: string;
     email: string;
     phone: string;
     title: string;
@@ -62,8 +61,7 @@ export interface HumanWorkerDraftFields {
 }
 
 export type HumanWorkerFieldKey =
-    | 'firstName'
-    | 'lastName'
+    | 'name'
     | 'email'
     | 'phone'
     | 'title'
@@ -74,7 +72,7 @@ export type HumanWorkerFieldKey =
 const FIELD_KEYS:
     ReadonlySet<HumanWorkerFieldKey> =
     new Set([
-        'firstName', 'lastName', 'email',
+        'name', 'email',
         'phone', 'title', 'department',
         'state', 'bio',
     ]);
@@ -92,8 +90,7 @@ export function humanWorkerDraftFromWorker(
     worker: HumanWorker,
 ): HumanWorkerDraftFields {
     return {
-        firstName: worker.firstNameText(),
-        lastName: worker.lastNameText(),
+        name: worker.name(),
         email: worker.emailAddress(),
         phone: worker.phoneNumber(),
         title: worker.titleLabel(),
@@ -106,13 +103,9 @@ export function humanWorkerDraftFromWorker(
 
 export function humanWorkerPatchFromDraft(
     draft: HumanWorkerDraftFields,
-): Pick<HumanWorkerEntity,
-    | 'first_name' | 'last_name' | 'email'
-    | 'phone' | 'title' | 'department'
-    | 'bio' | 'strengths'> {
+): Omit<HumanWorkerDraft, 'team_dimensions'> {
     return {
-        first_name: draft.firstName,
-        last_name: draft.lastName,
+        name: draft.name,
         email: draft.email,
         phone: draft.phone,
         title: draft.title,
@@ -194,7 +187,7 @@ function buildReadonlyTitleSection(
                 + ' font-display'
                 + ' font-bold'
             }">
-                ${worker.fullName()}
+                ${worker.name()}
             </h1>
             <span class="${
                 'badge '
@@ -225,7 +218,7 @@ function buildEditableTitleSection(
                 + ' font-display'
                 + ' font-bold'
             }">
-                ${worker.fullName()}
+                ${worker.name()}
             </h1>
             <span class="${
                 'badge '
@@ -392,18 +385,12 @@ function buildReadonlyPersonalInfoBody(
             'flex items-start gap-6 mb-6'
         }">
             ${buildAvatar(
-                initials(worker.fullName()),
+                initials(worker.name()),
             )}
-            <div class="${
-                'grid grid-cols-2 gap-4 flex-1'
-            }">
+            <div class="flex-1">
                 ${buildReadonlyField(
-                    'First Name',
-                    worker.firstNameText(),
-                )}
-                ${buildReadonlyField(
-                    'Last Name',
-                    worker.lastNameText(),
+                    'Name',
+                    worker.name(),
                 )}
             </div>
         </div>
@@ -446,23 +433,14 @@ function buildEditablePersonalInfoBody(
             'flex items-start gap-6 mb-6'
         }">
             ${buildAvatar(
-                initials(worker.fullName()),
+                initials(worker.name()),
             )}
-            <div class="${
-                'grid grid-cols-2 gap-4 flex-1'
-            }">
+            <div class="flex-1">
                 ${buildEditableField(
-                    'worker-first-name',
-                    'firstName',
-                    'First Name',
-                    draft.firstName,
-                    'text',
-                )}
-                ${buildEditableField(
-                    'worker-last-name',
-                    'lastName',
-                    'Last Name',
-                    draft.lastName,
+                    'worker-name',
+                    'name',
+                    'Name',
+                    draft.name,
                     'text',
                 )}
             </div>

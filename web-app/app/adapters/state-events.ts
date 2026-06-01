@@ -1,15 +1,12 @@
 import type {
-    Id, IdeaState, ProjectState, RecordState,
-    StateEntity, WorkerState,
+    Id, IdeaEntity, IdeaState, ProjectEntity,
+    ProjectState, RecordEntity, RecordState,
+    StateEntity, WorkerEntity, WorkerState,
 } from '../../../api/types.ts';
 import {
     assertIdeaState,
     assertProjectState,
     assertWorkerState,
-    isIdeaState,
-    isProjectState,
-    isRecordState,
-    isWorkerState,
     msSinceUtc,
     MS_PER_SECOND,
     nowUtc,
@@ -79,6 +76,33 @@ function latestByAt(
     return latest;
 }
 
+// The states log is shared across entity types and the
+// alphabets overlap ('active', 'archived', 'approved',
+// 'sent-back', 'deleted'), so identity — not the state
+// value — is the discriminator: an event counts only when
+// its entity_id is in `ids`. Each id belongs to one entity
+// type, so every surviving event speaks that type's
+// alphabet and the `S` cast holds. On equal `at` the
+// later-inserted row wins — the order the log captures.
+export function latestStatesForIds<S extends string>(
+    events: readonly StateEntity[],
+    ids: ReadonlySet<Id>,
+): Map<Id, S> {
+    const latest = new Map<Id, StateEntity>();
+    for (const ev of events) {
+        if (!ids.has(ev.entity_id)) continue;
+        const seen = latest.get(ev.entity_id);
+        if (seen === undefined || ev.at >= seen.at) {
+            latest.set(ev.entity_id, ev);
+        }
+    }
+    const out = new Map<Id, S>();
+    for (const [id, ev] of latest) {
+        out.set(id, ev.state as S);
+    }
+    return out;
+}
+
 // A transition event in the shape flow-stats-aggregate
 // and the workbox detail presenter expect. Derived
 // from the states log: each non-claim event for a
@@ -144,6 +168,50 @@ export async function getWorkOrderActiveClaim(
         return null;
     }
     return { workerId: latest.worker_id, at: latest.at };
+}
+
+// Bulk variant of getWorkOrderActiveClaim for the
+// workbox inbox, which resolves every work order's
+// active claim at once. One scan over the states log
+// builds the latest-claim-per-entity map; each work
+// order's claim is then read against its own lockTimeout
+// (passed in — the timeout lives in the frozen flow_graph
+// the caller already parses). Replaces an N-per-page
+// re-derivation of the whole ledger with a single read.
+// O(N) on events; Postgres uses an entity_id index.
+export async function getActiveClaimsByWorkOrder(
+    ctx: RequestContext,
+    lockTimeoutByWorkOrder: ReadonlyMap<Id, number>,
+): Promise<Map<Id, { workerId: Id; at: string }>> {
+    const all = await ctx.GET<StateEntity[]>('states');
+    const latestClaim = new Map<Id, StateEntity>();
+    for (const ev of all) {
+        if (!isClaimState(ev.state)) continue;
+        const seen = latestClaim.get(ev.entity_id);
+        if (seen === undefined || ev.at >= seen.at) {
+            latestClaim.set(ev.entity_id, ev);
+        }
+    }
+    const out = new Map<
+        Id, { workerId: Id; at: string }
+    >();
+    for (const [entityId, ev] of latestClaim) {
+        const lockTimeout =
+            lockTimeoutByWorkOrder.get(entityId);
+        if (lockTimeout === undefined) continue;
+        if (ev.state !== 'claimed') continue;
+        if (
+            msSinceUtc(ev.at)
+            >= lockTimeout * MS_PER_SECOND
+        ) {
+            continue;
+        }
+        out.set(entityId, {
+            workerId: ev.worker_id,
+            at: ev.at,
+        });
+    }
+    return out;
 }
 
 // Project the non-claim events for one work order into
@@ -242,29 +310,17 @@ export async function getIdeaState(
     );
 }
 
-// Bulk variant for getIdeas. One scan over the
-// states log builds the entity_id → IdeaState map,
-// keeping only events whose state lies in the idea
-// alphabet (a work order's transition events share
-// the table). O(N) on events; the Postgres tier will
-// use an entity_id index.
+// Bulk variant for getIdeas, which calls this — so it
+// reads the ideas table directly to avoid recursing.
 export async function getIdeaStates(
     ctx: RequestContext,
 ): Promise<Map<Id, IdeaState>> {
-    const all = await ctx.GET<StateEntity[]>('states');
-    const latestByEntity = new Map<Id, StateEntity>();
-    for (const ev of all) {
-        if (!isIdeaState(ev.state)) continue;
-        const seen = latestByEntity.get(ev.entity_id);
-        if (seen === undefined || ev.at >= seen.at) {
-            latestByEntity.set(ev.entity_id, ev);
-        }
-    }
-    const out = new Map<Id, IdeaState>();
-    for (const [id, ev] of latestByEntity) {
-        out.set(id, ev.state as IdeaState);
-    }
-    return out;
+    const [events, rows] = await Promise.all([
+        ctx.GET<StateEntity[]>('states'),
+        ctx.GET<IdeaEntity[]>('ideas'),
+    ]);
+    const ids = new Set<Id>(rows.map(r => r.id));
+    return latestStatesForIds<IdeaState>(events, ids);
 }
 
 // Read the current state for one project from the
@@ -292,52 +348,30 @@ export async function getProjectState(
     );
 }
 
-// Bulk variant for getProjects. One scan over the
-// states log builds the entity_id → ProjectState
-// map, keeping only events whose state lies in the
-// project alphabet. O(N) on events; Postgres uses
-// an entity_id index.
+// Bulk variant for getProjects, which calls this — so it
+// reads the projects table directly to avoid recursing.
 export async function getProjectStates(
     ctx: RequestContext,
 ): Promise<Map<Id, ProjectState>> {
-    const all = await ctx.GET<StateEntity[]>('states');
-    const latestByEntity = new Map<Id, StateEntity>();
-    for (const ev of all) {
-        if (!isProjectState(ev.state)) continue;
-        const seen = latestByEntity.get(ev.entity_id);
-        if (seen === undefined || ev.at >= seen.at) {
-            latestByEntity.set(ev.entity_id, ev);
-        }
-    }
-    const out = new Map<Id, ProjectState>();
-    for (const [id, ev] of latestByEntity) {
-        out.set(id, ev.state as ProjectState);
-    }
-    return out;
+    const [events, rows] = await Promise.all([
+        ctx.GET<StateEntity[]>('states'),
+        ctx.GET<ProjectEntity[]>('projects'),
+    ]);
+    const ids = new Set<Id>(rows.map(r => r.id));
+    return latestStatesForIds<ProjectState>(events, ids);
 }
 
-// Bulk variant for getRecords. One scan over the
-// states log builds the entity_id → RecordState map,
-// keeping only events whose state lies in the record
-// alphabet. O(N) on events; the Postgres tier will
-// use an entity_id index.
+// Bulk variant for getRecords, which calls this — so it
+// reads the records table directly to avoid recursing.
 export async function getRecordStates(
     ctx: RequestContext,
 ): Promise<Map<Id, RecordState>> {
-    const all = await ctx.GET<StateEntity[]>('states');
-    const latestByEntity = new Map<Id, StateEntity>();
-    for (const ev of all) {
-        if (!isRecordState(ev.state)) continue;
-        const seen = latestByEntity.get(ev.entity_id);
-        if (seen === undefined || ev.at >= seen.at) {
-            latestByEntity.set(ev.entity_id, ev);
-        }
-    }
-    const out = new Map<Id, RecordState>();
-    for (const [id, ev] of latestByEntity) {
-        out.set(id, ev.state as RecordState);
-    }
-    return out;
+    const [events, rows] = await Promise.all([
+        ctx.GET<StateEntity[]>('states'),
+        ctx.GET<RecordEntity[]>('records'),
+    ]);
+    const ids = new Set<Id>(rows.map(r => r.id));
+    return latestStatesForIds<RecordState>(events, ids);
 }
 
 // Read the current state for one worker from the
@@ -367,27 +401,16 @@ export async function getWorkerState(
     );
 }
 
-// Bulk variant for getHumanWorkers / getAIWorkers.
-// One scan over the states log builds the
-// entity_id → WorkerState map, keeping only events
-// whose state lies in the worker alphabet (work
-// order claims and transitions share the table).
-// O(N) on events; Postgres uses an entity_id index.
+// Bulk variant for the human/ai/system worker maps, which
+// call this — so it reads the parent workers table
+// directly (covering all three kinds) to avoid recursing.
 export async function getWorkerStates(
     ctx: RequestContext,
 ): Promise<Map<Id, WorkerState>> {
-    const all = await ctx.GET<StateEntity[]>('states');
-    const latestByEntity = new Map<Id, StateEntity>();
-    for (const ev of all) {
-        if (!isWorkerState(ev.state)) continue;
-        const seen = latestByEntity.get(ev.entity_id);
-        if (seen === undefined || ev.at >= seen.at) {
-            latestByEntity.set(ev.entity_id, ev);
-        }
-    }
-    const out = new Map<Id, WorkerState>();
-    for (const [id, ev] of latestByEntity) {
-        out.set(id, ev.state as WorkerState);
-    }
-    return out;
+    const [events, rows] = await Promise.all([
+        ctx.GET<StateEntity[]>('states'),
+        ctx.GET<WorkerEntity[]>('workers'),
+    ]);
+    const ids = new Set<Id>(rows.map(r => r.id));
+    return latestStatesForIds<WorkerState>(events, ids);
 }

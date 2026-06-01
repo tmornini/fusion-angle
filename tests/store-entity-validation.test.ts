@@ -9,8 +9,15 @@ import { StateStore } from '../api/store-state.ts';
 
 interface Thing { id: string; n: number }
 
-test('EntityStore.put invokes the validator', async () => {
+async function primedBackend(): Promise<MemoryStorageBackend> {
     const backend = new MemoryStorageBackend();
+    await backend.write('things', []);
+    await backend.write('states', []);
+    return backend;
+}
+
+test('EntityStore.put invokes the validator', async () => {
+    const backend = await primedBackend();
     const stateStore = new StateStore(backend, 'states');
     let seen: Record<string, unknown> | null = null;
     const store = new EntityStore<Thing>(
@@ -26,7 +33,7 @@ test('EntityStore.put invokes the validator', async () => {
 
 test('EntityStore.put rethrows validator errors',
     async () => {
-        const backend = new MemoryStorageBackend();
+        const backend = await primedBackend();
         const stateStore =
             new StateStore(backend, 'states');
         const store = new EntityStore<Thing>(
@@ -41,7 +48,7 @@ test('EntityStore.put rethrows validator errors',
 
 test('EntityStore.put writes the validator output',
     async () => {
-        const backend = new MemoryStorageBackend();
+        const backend = await primedBackend();
         const stateStore =
             new StateStore(backend, 'states');
         const store = new EntityStore<Thing>(
@@ -58,7 +65,7 @@ test('EntityStore.put writes the validator output',
 
 test('EntityStore.put without validator passes through',
     async () => {
-        const backend = new MemoryStorageBackend();
+        const backend = await primedBackend();
         const stateStore =
             new StateStore(backend, 'states');
         const store = new EntityStore<Thing>(
@@ -70,7 +77,7 @@ test('EntityStore.put without validator passes through',
 
 test('HistoryEntityStore.put invokes the validator',
     async () => {
-        const backend = new MemoryStorageBackend();
+        const backend = await primedBackend();
         let seen: Record<string, unknown> | null = null;
         const store = new HistoryEntityStore<Thing>(
             'things', backend,
@@ -85,7 +92,7 @@ test('HistoryEntityStore.put invokes the validator',
 
 test('HistoryEntityStore.put rethrows validator errors',
     async () => {
-        const backend = new MemoryStorageBackend();
+        const backend = await primedBackend();
         const store = new HistoryEntityStore<Thing>(
             'things', backend,
             () => { throw new Error('nope'); },
@@ -98,7 +105,7 @@ test('HistoryEntityStore.put rethrows validator errors',
 
 test('HistoryEntityStore.put writes the validator output',
     async () => {
-        const backend = new MemoryStorageBackend();
+        const backend = await primedBackend();
         const store = new HistoryEntityStore<Thing>(
             'things', backend,
             (b) => ({
@@ -113,7 +120,7 @@ test('HistoryEntityStore.put writes the validator output',
 
 test('HistoryEntityStore.put without validator passes',
     async () => {
-        const backend = new MemoryStorageBackend();
+        const backend = await primedBackend();
         const store = new HistoryEntityStore<Thing>(
             'things', backend,
         );

@@ -19,11 +19,12 @@ import type {
     JsonObjectField,
 } from '../api/types.ts';
 
-function setupDb(): {
+async function setupDb(): Promise<{
     db: MemoryDbAdapter;
     ctx: RequestContext;
-} {
+}> {
     const db = new MemoryDbAdapter();
+    await db.createSchema();
     const ctx = createRequestContext(db);
     return { db, ctx };
 }
@@ -95,7 +96,6 @@ function buildFlow(
 ): Omit<FlowEntity, 'id'> {
     return {
         name: 'Flow ' + id,
-        description: '',
         is_locked: false,
         is_auto_layout: true,
         is_auto_fit: true,
@@ -107,7 +107,7 @@ function buildFlow(
 test(
     'getDashboardStats labels Ideas, Projects, Flows',
     async () => {
-        const { ctx } = setupDb();
+        const { ctx } = await setupDb();
         const stats = await getDashboardStats(ctx);
         assert.deepEqual(
             stats.map(s => s.label),
@@ -119,7 +119,7 @@ test(
 test(
     'getDashboardStats is all zeros on empty db',
     async () => {
-        const { ctx } = setupDb();
+        const { ctx } = await setupDb();
         const stats = await getDashboardStats(ctx);
         assert.deepEqual(
             stats.map(s => s.value),
@@ -131,7 +131,7 @@ test(
 test(
     'getDashboardStats counts seeded entities',
     async () => {
-        const { db, ctx } = setupDb();
+        const { db, ctx } = await setupDb();
         await seedIdea(db, 'i1', 'active');
         await seedIdea(db, 'i2', 'in-review');
         await seedProject(db, 'p1', 'approved');
@@ -148,7 +148,7 @@ test(
 test(
     'getDashboardStats excludes archived ideas',
     async () => {
-        const { db, ctx } = setupDb();
+        const { db, ctx } = await setupDb();
         await seedIdea(db, 'i1', 'active');
         await seedIdea(db, 'i2', 'archived');
         await seedIdea(db, 'i3', 'deleted');
@@ -162,7 +162,7 @@ test(
 test(
     'getDashboardStats excludes deleted projects',
     async () => {
-        const { db, ctx } = setupDb();
+        const { db, ctx } = await setupDb();
         await seedProject(db, 'p1', 'approved');
         await seedProject(db, 'p2', 'deleted');
         const stats = await getDashboardStats(ctx);
@@ -175,7 +175,7 @@ test(
 test(
     'getDashboardStats counts tombstoned out',
     async () => {
-        const { db, ctx } = setupDb();
+        const { db, ctx } = await setupDb();
         await seedProject(db, 'p1', 'approved');
         await seedProject(db, 'p2', 'approved');
         await db.projects.delete('p2');
@@ -192,13 +192,13 @@ test(
 );
 
 test(
-    'getDashboardGauges returns Time, Cost, Portfolio Impact',
+    'getDashboardGauges returns Time, Cost, Impact',
     async () => {
-        const { ctx } = setupDb();
+        const { ctx } = await setupDb();
         const gauges = await getDashboardGauges(ctx);
         assert.deepEqual(
             gauges.map(g => g.title),
-            ['Time', 'Cost', 'Portfolio Impact'],
+            ['Time', 'Cost', 'Impact'],
         );
         assert.deepEqual(
             gauges.map(g => g.icon),
@@ -210,7 +210,7 @@ test(
 test(
     'getDashboardGauges is zeroed on empty db',
     async () => {
-        const { ctx } = setupDb();
+        const { ctx } = await setupDb();
         const gauges = await getDashboardGauges(ctx);
         const cost = gauges
             .find(g => g.title === 'Cost');
@@ -222,7 +222,7 @@ test(
 test(
     'getDashboardGauges sums approved projects only',
     async () => {
-        const { db, ctx } = setupDb();
+        const { db, ctx } = await setupDb();
         await seedProject(db, 'p1', 'approved', {
             estimated_cost: 1000,
             actual_cost: 400,
@@ -248,7 +248,7 @@ test(
 test(
     'getDashboardGauges Time sums the 10-day span',
     async () => {
-        const { db, ctx } = setupDb();
+        const { db, ctx } = await setupDb();
         await seedProject(db, 'p1', 'approved', {
             start_date: '2026-01-01',
             target_end_date: '2026-01-11',
@@ -265,6 +265,7 @@ test(
     'getDashboardGauges returns the three sibling gauges',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         const ctx = createRequestContext(db);
         const gauges = await getDashboardGauges(ctx);
         assert.equal(gauges.length, 3);
@@ -280,12 +281,12 @@ test(
     });
 
 test(
-    'getDashboardGauges marks Portfolio Impact as bipolar',
+    'getDashboardGauges marks Impact as bipolar',
     async () => {
-        const { ctx } = setupDb();
+        const { ctx } = await setupDb();
         const gauges = await getDashboardGauges(ctx);
         const impact = gauges
-            .find(g => g.title === 'Portfolio Impact');
+            .find(g => g.title === 'Impact');
         assert.equal(impact?.kind, 'bipolar');
     },
 );
@@ -293,7 +294,7 @@ test(
 test(
     'getDashboardGauges marks Time and Cost as ratio',
     async () => {
-        const { ctx } = setupDb();
+        const { ctx } = await setupDb();
         const gauges = await getDashboardGauges(ctx);
         const time = gauges
             .find(g => g.title === 'Time');
@@ -305,13 +306,13 @@ test(
 );
 
 test(
-    'getDashboardGauges Portfolio Impact passes'
+    'getDashboardGauges Impact passes'
     + ' undefined means without clamping to zero',
     async () => {
-        const { ctx } = setupDb();
+        const { ctx } = await setupDb();
         const gauges = await getDashboardGauges(ctx);
         const impact = gauges
-            .find(g => g.title === 'Portfolio Impact');
+            .find(g => g.title === 'Impact');
         // Empty db => baselineMean and actualMean
         // both undefined. The bipolar Impact gauge
         // must NOT clamp them to 0 (the previous

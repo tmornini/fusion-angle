@@ -44,49 +44,8 @@ async function simulateNetworkLatency(
     );
 }
 
-function withSimulatedLatency<T extends object>(
-    target: T,
-    config: LatencyConfig,
-): T {
-    return new Proxy(target, {
-        get(obj, prop, receiver) {
-            const value = Reflect.get(
-                obj,
-                prop,
-                receiver,
-            );
-            if (typeof value === 'function') {
-                return async (
-                    ...args: unknown[]
-                ) => {
-                    await simulateNetworkLatency(
-                        config,
-                    );
-                    return (
-                        value as (
-                            ...a: unknown[]
-                        ) => unknown
-                    ).apply(obj, args);
-                };
-            }
-            if (
-                typeof value === 'object'
-                && value !== null
-                && !Array.isArray(value)
-            ) {
-                return withSimulatedLatency(
-                    value,
-                    config,
-                );
-            }
-            return value;
-        },
-    });
-}
-
 export {
     DEFAULT_LATENCY_CONFIG,
     simulateNetworkLatency,
-    withSimulatedLatency,
 };
 export type { LatencyConfig };

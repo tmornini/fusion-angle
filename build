@@ -117,6 +117,7 @@ done
 cp web-app/assets/*.woff2 "$BUILD_DIR/assets/"
 cp web-app/index.html "$BUILD_DIR/"
 cp web-app/assets/favicon.ico "$BUILD_DIR/assets/"
+cp web-app/assets/favicon.svg "$BUILD_DIR/assets/"
 
 if [ "$NO_ZIP" = true ]; then
   echo "Bundle: $BUILD_DIR"

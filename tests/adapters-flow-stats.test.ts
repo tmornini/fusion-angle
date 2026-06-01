@@ -30,7 +30,6 @@ function buildNode(
     return {
         id,
         name,
-        description: '',
         positionX: 0,
         positionY: 0,
         isCreate: false,
@@ -49,7 +48,6 @@ function buildEdge(
     return {
         id,
         name: '',
-        description: '',
         fromNodeId,
         toNodeId,
     };
@@ -61,7 +59,6 @@ function buildFlow(
 ): Omit<FlowEntity, 'id'> {
     return {
         name,
-        description: '',
         is_locked: false,
         is_auto_layout: true,
         is_auto_fit: true,
@@ -108,6 +105,7 @@ test(
     + ' work orders',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
 
         // Flow f1 with an Onboarding graph
         await db.flows.put(
@@ -204,6 +202,7 @@ test(
     + ' the underlying error',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         const ctx = createRequestContext(db);
         await assert.rejects(
             () => getFlowStats(ctx, 'nope'),
@@ -216,6 +215,7 @@ test(
     + ' returned graph and stat model are not degenerate',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         // buildFlow is is_auto_layout; buildTestGraph
         // seeds c→a→z all at (0,0).
         await db.flows.put(

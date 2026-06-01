@@ -30,7 +30,7 @@ async function getSidebarWorker(
         ]);
     return {
         id: worker.idForLink(),
-        name: worker.fullName(),
+        name: worker.name(),
         organization: org.nameText(),
     };
 }

@@ -29,7 +29,6 @@ async function seedWorkOrder(
     const flowGraph = jsonObjectField({
         flowId,
         name: 'Flow',
-        description: '',
         lockTimeout: DEFAULT_LOCK_TIMEOUT,
         nodes: [],
         edges: [],
@@ -53,6 +52,7 @@ test(
     + ' the binding row',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         const ctx = createRequestContext(db);
         await putFlowRecord(ctx, 'fr-1', {
             flow_id: 'flow-1',
@@ -73,6 +73,7 @@ test(
     + ' record id, or null if unbound',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         const ctx = createRequestContext(db);
         await putFlowRecord(ctx, 'fr-1', {
             flow_id: 'flow-1',
@@ -97,6 +98,7 @@ test(
     + ' bound to a record',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         const ctx = createRequestContext(db);
         await putFlowRecord(ctx, 'fr-1', {
             flow_id: 'flow-a',
@@ -130,6 +132,7 @@ test(
     + ' to multiple flows',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         const ctx = createRequestContext(db);
         // Bind rec-1 to two flows.
         await putFlowRecord(ctx, 'fr-1', {
@@ -171,6 +174,7 @@ test(
     + ' list for an unbound record',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         const ctx = createRequestContext(db);
         const workOrders =
             await getWorkOrdersForRecord(
@@ -184,6 +188,7 @@ test(
     'deleteFlowRecord removes the binding row',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         const ctx = createRequestContext(db);
         await putFlowRecord(ctx, 'fr-1', {
             flow_id: 'flow-1',

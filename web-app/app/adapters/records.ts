@@ -18,6 +18,9 @@ import {
 import {
     createSubscriptionChannel,
 } from '../channels.ts';
+import {
+    generateCryptoSafeBase62,
+} from './crypto-safe-base62.ts';
 
 export {
     RecordModel,
@@ -167,28 +170,50 @@ export async function deleteRecord(
     recordChanges.notify();
 }
 
-export async function postRecordCreation(
+export interface RecordChangeCreate {
+    readonly kind: 'create';
+    readonly record: Omit<RecordEntity, 'id'>;
+    readonly attributes: readonly RecordAttributeEntity[];
+    readonly initialState: RecordState;
+}
+
+export interface RecordChangeEdit {
+    readonly kind: 'edit';
+    readonly record: Omit<RecordEntity, 'id'>;
+    readonly attributes: readonly RecordAttributeEntity[];
+    readonly removedAttributeIds: readonly string[];
+}
+
+export type RecordChange =
+    | RecordChangeCreate
+    | RecordChangeEdit;
+
+export async function postRecordChange(
     ctx: RequestContext,
     id: RecordId,
-    entity: Omit<RecordEntity, 'id'>,
-    initialState: RecordState,
+    change: RecordChange,
 ): Promise<void> {
-    const recordBody =
-        entity as unknown as Record<
-            string, unknown
-        >;
-    await ctx.commit({
-        ops: [
-            {
-                method: 'put',
-                resource: `records/${id}`,
-                body: recordBody,
-            },
-            await buildStateEventOp(
-                ctx, id, initialState,
-            ),
-        ],
-    });
+    if (change.kind === 'create') {
+        const initialStateEventId =
+            generateCryptoSafeBase62();
+        await ctx.POST('records-multi-put', {
+            kind: 'create',
+            id,
+            record: change.record,
+            attributes: change.attributes,
+            initialState: change.initialState,
+            initialStateEventId,
+        });
+    } else {
+        await ctx.POST('records-multi-put', {
+            kind: 'edit',
+            id,
+            record: change.record,
+            attributes: change.attributes,
+            removedAttributeIds:
+                change.removedAttributeIds,
+        });
+    }
     recordChanges.notify();
 }
 

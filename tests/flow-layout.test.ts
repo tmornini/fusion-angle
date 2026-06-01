@@ -265,3 +265,174 @@ test(
         }
     },
 );
+
+function bboxMaxDim(
+    positions: Map<string, { x: number; y: number }>,
+): number {
+    let minX = Infinity, maxX = -Infinity;
+    let minY = Infinity, maxY = -Infinity;
+    for (const p of positions.values()) {
+        if (p.x < minX) minX = p.x;
+        if (p.x > maxX) maxX = p.x;
+        if (p.y < minY) minY = p.y;
+        if (p.y > maxY) maxY = p.y;
+    }
+    return Math.max(maxX - minX, maxY - minY);
+}
+
+function distinctRows(
+    positions: Map<string, { x: number; y: number }>,
+): number {
+    const rows = new Set<number>();
+    for (const p of positions.values()) {
+        rows.add(Math.round(p.y / 5));
+    }
+    return rows.size;
+}
+
+test(
+    'computeLayout: a Create->Archive shortcut routes'
+    + ' through a waypoint when Archive is terminal',
+    () => {
+        // Create → A → B, plus the Create → Archive
+        // shortcut. Archive is terminal, so it belongs in
+        // the last layer; the shortcut then spans two
+        // layers and must bend through a waypoint rather
+        // than jump straight across the canvas.
+        const r = computeLayout({
+            nodes: [
+                lin('s', { start: true }),
+                lin('a'),
+                lin('b'),
+                lin('z', { complete: true }),
+            ],
+            edges: [
+                { fromId: 's', toId: 'a', labelWidth: 0 },
+                { fromId: 'a', toId: 'b', labelWidth: 0 },
+                { fromId: 's', toId: 'z', labelWidth: 0 },
+            ],
+            canvasWidth: 0, canvasHeight: 0,
+        });
+        const wp = r.waypoints.get(
+            edgeWaypointKey('s', 'z'),
+        );
+        assert.ok(
+            wp !== undefined && wp.length >= 1,
+            'Create->Archive must route through a waypoint',
+        );
+    },
+);
+
+test(
+    'computeLayout: a real canvas does not upscale node'
+    + ' spacing beyond the natural layout (fan)',
+    () => {
+        // The camera (fitBoxToCanvas) fills the viewport; the
+        // layout must not stretch node spacing to fill.
+        const nodes = [
+            lin('s', { start: true }),
+            lin('a'), lin('b'), lin('c'),
+            lin('z', { complete: true }),
+        ];
+        const edges = [
+            { fromId: 's', toId: 'a', labelWidth: 0 },
+            { fromId: 's', toId: 'b', labelWidth: 0 },
+            { fromId: 's', toId: 'c', labelWidth: 0 },
+            { fromId: 'a', toId: 'z', labelWidth: 0 },
+            { fromId: 'b', toId: 'z', labelWidth: 0 },
+            { fromId: 'c', toId: 'z', labelWidth: 0 },
+        ];
+        const big = computeLayout({
+            nodes, edges,
+            canvasWidth: 1400, canvasHeight: 740,
+        });
+        const nat = computeLayout({
+            nodes, edges,
+            canvasWidth: 0, canvasHeight: 0,
+        });
+        assert.ok(
+            bboxMaxDim(big.positions)
+                <= bboxMaxDim(nat.positions) + 1,
+            'canvas must not stretch node spacing',
+        );
+    },
+);
+
+test(
+    'computeLayout: a wrapped (snake) layout keeps'
+    + ' comfortable spacing, not canvas-filling stretch',
+    () => {
+        // A long linear chain wraps into rows. The wrap
+        // makes it compact; spacing within stays at the
+        // natural density rather than stretching to fill.
+        const nodes = [
+            lin('s', { start: true }),
+            lin('a'), lin('b'), lin('c'), lin('d'),
+            lin('z', { complete: true }),
+        ];
+        const edges = [
+            { fromId: 's', toId: 'a', labelWidth: 0 },
+            { fromId: 'a', toId: 'b', labelWidth: 0 },
+            { fromId: 'b', toId: 'c', labelWidth: 0 },
+            { fromId: 'c', toId: 'd', labelWidth: 0 },
+            { fromId: 'd', toId: 'z', labelWidth: 0 },
+        ];
+        const big = computeLayout({
+            nodes, edges,
+            canvasWidth: 1400, canvasHeight: 740,
+        });
+        const nat = computeLayout({
+            nodes, edges,
+            canvasWidth: 0, canvasHeight: 0,
+        });
+        assert.ok(
+            distinctRows(big.positions) >= 2,
+            'expected the chain to wrap into rows',
+        );
+        assert.ok(
+            bboxMaxDim(big.positions)
+                <= bboxMaxDim(nat.positions) + 1,
+            'wrapped layout must not stretch to fill',
+        );
+    },
+);
+
+test(
+    'computeLayout: a long chain wraps to more rows rather'
+    + ' than overflowing the canvas width',
+    () => {
+        const nodes: ReturnType<typeof lin>[] = [
+            lin('s', { start: true }),
+        ];
+        for (let i = 0; i < 14; i++) {
+            nodes.push(lin('n' + i));
+        }
+        nodes.push(lin('z', { complete: true }));
+        const edges: {
+            fromId: string;
+            toId: string;
+            labelWidth: number;
+        }[] = [];
+        for (let i = 0; i < nodes.length - 1; i++) {
+            edges.push({
+                fromId: nodes[i]!.id,
+                toId: nodes[i + 1]!.id,
+                labelWidth: 0,
+            });
+        }
+        const big = computeLayout({
+            nodes, edges,
+            canvasWidth: 1400, canvasHeight: 740,
+        });
+        let minX = Infinity;
+        let maxX = -Infinity;
+        for (const p of big.positions.values()) {
+            if (p.x < minX) minX = p.x;
+            if (p.x > maxX) maxX = p.x;
+        }
+        assert.ok(
+            (maxX - minX) <= 1400,
+            'wrapped row must fit the canvas width',
+        );
+    },
+);

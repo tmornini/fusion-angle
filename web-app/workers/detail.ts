@@ -35,10 +35,10 @@ import {
     getAIWorker,
     getAIWorkerRow,
     putAIWorker,
+    postAIWorkerStateChange,
     subscribeAIWorkerChanges,
     HumanWorker,
     AIWorker,
-    type Worker,
     type WorkerState,
 } from '../app/adapters/index.ts';
 
@@ -113,7 +113,7 @@ function rerender(): void {
 
 async function loadWorkerByEitherKind(
     workerId: string,
-): Promise<Worker | null> {
+): Promise<HumanWorker | AIWorker | null> {
     const ctx = createRequestContext();
     try {
         return await getHumanWorker(
@@ -188,7 +188,7 @@ export async function init(
 
 export function reduceRefresh(
     current: PageState,
-    fresh: Worker | null,
+    fresh: HumanWorker | AIWorker | null,
 ): PageState {
     if (current.kind === 'editing') return current;
     if (fresh === null) return current;
@@ -382,6 +382,18 @@ function onInput(e: Event): void {
         return;
     }
     if (!isAIWorkerFieldKey(field)) return;
+    if (field === 'state') {
+        state = {
+            ...state,
+            draft: {
+                ...state.draft,
+                state:
+                    target.value as
+                        WorkerState,
+            },
+        };
+        return;
+    }
     state = {
         ...state,
         draft: {
@@ -514,11 +526,18 @@ async function saveAIWorker(
         aiWorkerPatchFromDraft(s.draft),
     );
     const { id: _id, ...rest } = row;
+    const stateChanged =
+        s.draft.state !== s.worker.stateValue();
     try {
         await putAIWorker(
             ctx, workerId,
             { ...rest, ...patch },
         );
+        if (stateChanged) {
+            await postAIWorkerStateChange(
+                ctx, workerId, s.draft.state,
+            );
+        }
     } catch (err) {
         log.error(
             'putAIWorker failed',

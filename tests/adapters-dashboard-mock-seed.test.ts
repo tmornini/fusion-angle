@@ -18,13 +18,14 @@ import { getObjectiveAggregates } from
 test('mock seed produces portfolio Impact baseline +50',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         await populateMockData(db);
         const ctx = createRequestContext(db);
         const gauges = await getDashboardGauges(ctx);
         const impact = gauges.find(
-            g => g.title === 'Portfolio Impact',
+            g => g.title === 'Impact',
         );
-        assert.ok(impact, 'Portfolio Impact gauge present');
+        assert.ok(impact, 'Impact gauge present');
         assert.equal(impact.kind, 'bipolar');
         assert.equal(impact.outer.value, 50);
     });
@@ -32,6 +33,7 @@ test('mock seed produces portfolio Impact baseline +50',
 test('mock seed produces per-objective baseline means',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         await populateMockData(db);
         const ctx = createRequestContext(db);
         const aggs = await getObjectiveAggregates(ctx);

@@ -8,6 +8,7 @@ import {
     postProjectActualMeasurement,
 } from
     '../web-app/app/adapters/project-scoring.ts';
+import { seedHumanWorker } from './worker-fixtures.ts';
 
 const AT = '2026-05-20T00:00:00.000Z';
 const VALID: ReadonlyArray<number> = [-100, 0, 100];
@@ -17,12 +18,13 @@ const RANGE_MSG = /expected integer in \[-100, \+100\]/;
 test('baseline store.put accepts valid boundary scores',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         for (const score of VALID) {
             await db.projectObjectiveBaselineScores.put(
                 `p:o:${score}`,
                 {
                     project_id: 'p', objective_id: 'o',
-                    score, at: AT,
+                    score, worker_id: 'w1', at: AT,
                 },
             );
         }
@@ -34,6 +36,7 @@ test('baseline store.put accepts valid boundary scores',
 test('baseline store.put rejects out-of-range scores',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         for (const score of INVALID) {
             await assert.rejects(
                 () => db.projectObjectiveBaselineScores
@@ -42,7 +45,7 @@ test('baseline store.put rejects out-of-range scores',
                         {
                             project_id: 'p',
                             objective_id: 'o',
-                            score, at: AT,
+                            score, worker_id: 'w1', at: AT,
                         },
                     ),
                 RANGE_MSG,
@@ -56,12 +59,13 @@ test('baseline store.put rejects out-of-range scores',
 test('actual store.put accepts valid boundary scores',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         for (const score of VALID) {
             await db.projectObjectiveActualScores.put(
                 `p:o:${score}`,
                 {
                     project_id: 'p', objective_id: 'o',
-                    score, at: AT,
+                    score, worker_id: 'w1', at: AT,
                 },
             );
         }
@@ -73,6 +77,7 @@ test('actual store.put accepts valid boundary scores',
 test('actual store.put rejects out-of-range scores',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         for (const score of INVALID) {
             await assert.rejects(
                 () => db.projectObjectiveActualScores
@@ -81,7 +86,7 @@ test('actual store.put rejects out-of-range scores',
                         {
                             project_id: 'p',
                             objective_id: 'o',
-                            score, at: AT,
+                            score, worker_id: 'w1', at: AT,
                         },
                     ),
                 RANGE_MSG,
@@ -92,6 +97,7 @@ test('actual store.put rejects out-of-range scores',
 test('ctx.PUT rejects out-of-range baseline scores',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         const ctx = createRequestContext(db);
         for (const score of INVALID) {
             await assert.rejects(
@@ -101,7 +107,7 @@ test('ctx.PUT rejects out-of-range baseline scores',
                     {
                         project_id: 'p',
                         objective_id: 'o',
-                        score, at: AT,
+                        score, worker_id: 'w1', at: AT,
                     },
                 ),
             );
@@ -111,6 +117,7 @@ test('ctx.PUT rejects out-of-range baseline scores',
 test('ctx.commit rejects out-of-range baseline scores',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         const ctx = createRequestContext(db);
         for (const score of INVALID) {
             await assert.rejects(
@@ -124,7 +131,7 @@ test('ctx.commit rejects out-of-range baseline scores',
                         body: {
                             project_id: 'p',
                             objective_id: 'o',
-                            score, at: AT,
+                            score, worker_id: 'w1', at: AT,
                         },
                     }],
                 }),
@@ -138,6 +145,7 @@ test('ctx.commit rejects out-of-range baseline scores',
 test('ctx.commit rejects out-of-range actual scores',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         const ctx = createRequestContext(db);
         for (const score of INVALID) {
             await assert.rejects(
@@ -151,7 +159,7 @@ test('ctx.commit rejects out-of-range actual scores',
                         body: {
                             project_id: 'p',
                             objective_id: 'o',
-                            score, at: AT,
+                            score, worker_id: 'w1', at: AT,
                         },
                     }],
                 }),
@@ -162,6 +170,8 @@ test('ctx.commit rejects out-of-range actual scores',
 test('postProjectBaselineScoring rejects bad scores',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
+        await seedHumanWorker(db, 'current', 'Demo User');
         const ctx = createRequestContext(db);
         for (const score of INVALID) {
             await assert.rejects(
@@ -180,6 +190,8 @@ test('postProjectBaselineScoring rejects bad scores',
 test('postProjectActualMeasurement rejects bad scores',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
+        await seedHumanWorker(db, 'current', 'Demo User');
         const ctx = createRequestContext(db);
         for (const score of INVALID) {
             await assert.rejects(
@@ -198,6 +210,8 @@ test('postProjectActualMeasurement rejects bad scores',
 test('postProjectBaselineScoring accepts valid scores',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
+        await seedHumanWorker(db, 'current', 'Demo User');
         const ctx = createRequestContext(db);
         await postProjectBaselineScoring(
             ctx, 'p', VALID.map(score => ({

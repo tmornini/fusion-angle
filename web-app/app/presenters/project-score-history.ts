@@ -1,5 +1,6 @@
 import { html, type SafeHtml } from '../safe-html.ts';
 import type {
+    Id,
     ObjectiveId,
     ObjectiveRevision,
     ProjectObjectiveBaselineScore,
@@ -20,14 +21,18 @@ export type DefinitionResolver = (
     atTime: string,
 ) => { name: string; description: string } | undefined;
 
+export type WorkerNameResolver = (
+    workerId: Id,
+) => string;
+
 type Event =
-    | { kind: 'baseline'; at: string;
+    | { kind: 'baseline'; at: string; workerId: Id;
         objectiveId: ObjectiveId; score: number }
-    | { kind: 'actual'; at: string;
+    | { kind: 'actual'; at: string; workerId: Id;
         objectiveId: ObjectiveId; score: number }
-    | { kind: 'revision'; at: string;
+    | { kind: 'revision'; at: string; workerId: Id;
         objectiveId: ObjectiveId; name: string }
-    | { kind: 'archival'; at: string;
+    | { kind: 'archival'; at: string; workerId: Id;
         objectiveId: ObjectiveId };
 
 export class ProjectScoreHistoryPresenter {
@@ -36,6 +41,7 @@ export class ProjectScoreHistoryPresenter {
     readonly #revisions: ObjectiveRevision[];
     readonly #archivations: ObjectiveArchivalEvent[];
     readonly #resolver: DefinitionResolver;
+    readonly #workerName: WorkerNameResolver;
 
     constructor(
         baselines: ProjectObjectiveBaselineScore[],
@@ -43,12 +49,14 @@ export class ProjectScoreHistoryPresenter {
         revisions: ObjectiveRevision[],
         archivations: ObjectiveArchivalEvent[],
         resolver: DefinitionResolver,
+        workerName: WorkerNameResolver,
     ) {
         this.#baselines = baselines;
         this.#actuals = actuals;
         this.#revisions = revisions;
         this.#archivations = archivations;
         this.#resolver = resolver;
+        this.#workerName = workerName;
     }
 
     buildBody(): SafeHtml {
@@ -60,6 +68,7 @@ export class ProjectScoreHistoryPresenter {
                     <thead>
                         <tr>
                             <th>Date</th>
+                            <th>Who</th>
                             <th>Event</th>
                             <th>Objective</th>
                             <th>Detail</th>
@@ -79,6 +88,7 @@ export class ProjectScoreHistoryPresenter {
             events.push({
                 kind: 'baseline',
                 at: b.at,
+                workerId: b.worker_id,
                 objectiveId: b.objective_id,
                 score: b.score,
             });
@@ -87,6 +97,7 @@ export class ProjectScoreHistoryPresenter {
             events.push({
                 kind: 'actual',
                 at: a.at,
+                workerId: a.worker_id,
                 objectiveId: a.objective_id,
                 score: a.score,
             });
@@ -95,6 +106,7 @@ export class ProjectScoreHistoryPresenter {
             events.push({
                 kind: 'revision',
                 at: r.at,
+                workerId: r.worker_id,
                 objectiveId: r.objective_id,
                 name: r.name,
             });
@@ -103,6 +115,7 @@ export class ProjectScoreHistoryPresenter {
             events.push({
                 kind: 'archival',
                 at: d.at,
+                workerId: d.workerId,
                 objectiveId: d.objectiveId,
             });
         }
@@ -115,6 +128,9 @@ export class ProjectScoreHistoryPresenter {
         const dateCell = html`<td>
             <time datetime="${e.at}">${dateLabel}</time>
         </td>`;
+        const whoCell = html`<td>${
+            this.#workerName(e.workerId)
+        }</td>`;
         switch (e.kind) {
             case 'baseline': {
                 const def = this.#resolver(
@@ -129,6 +145,7 @@ export class ProjectScoreHistoryPresenter {
                 }
                 return html`<tr>
                     ${dateCell}
+                    ${whoCell}
                     <td>Baseline scored</td>
                     <td>${def.name}</td>
                     <td data-tone="${toneForScore(e.score)}">${
@@ -149,6 +166,7 @@ export class ProjectScoreHistoryPresenter {
                 }
                 return html`<tr>
                     ${dateCell}
+                    ${whoCell}
                     <td>Actual measured</td>
                     <td>${def.name}</td>
                     <td data-tone="${toneForScore(e.score)}">${
@@ -159,6 +177,7 @@ export class ProjectScoreHistoryPresenter {
             case 'revision':
                 return html`<tr>
                     ${dateCell}
+                    ${whoCell}
                     <td>Objective revised</td>
                     <td>${e.name}</td>
                     <td>renamed/edited</td>
@@ -169,6 +188,7 @@ export class ProjectScoreHistoryPresenter {
                 );
                 return html`<tr>
                     ${dateCell}
+                    ${whoCell}
                     <td>Objective archived</td>
                     <td>${def?.name ?? DISPLAY_ABSENT}</td>
                     <td>${DISPLAY_ABSENT}</td>

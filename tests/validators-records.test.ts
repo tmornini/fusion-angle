@@ -4,6 +4,7 @@ import {
     validateRecordEntity,
     validateRecordAttributeEntity,
     validateFlowRecordEntity,
+    validateRecordMultiPutBody,
 } from '../api/validators.ts';
 import { jsonArrayField } from '../api/types.ts';
 
@@ -313,6 +314,213 @@ test(
                 flow_id: 'f',
                 record_id: 7,
                 at: 'now',
+            } as never),
+        );
+    },
+);
+
+// validateRecordMultiPutBody — create variant
+
+test(
+    'validateRecordMultiPutBody accepts a valid'
+    + ' create body',
+    () => {
+        const out = validateRecordMultiPutBody({
+            kind: 'create',
+            id: 'rec-1',
+            record: {
+                name: 'R',
+                description: 'd',
+                position: 1,
+            },
+            attributes: [
+                {
+                    id: 'a-1',
+                    record_id: 'rec-1',
+                    name: 'X',
+                    attribute_type: 'text',
+                    sort_order: 0,
+                    options: jsonArrayField([]),
+                    constraints: jsonArrayField(
+                        [],
+                    ),
+                },
+            ],
+            initialState: 'active',
+            initialStateEventId: 'ev-1',
+        });
+        assert.equal(out.kind, 'create');
+        assert.equal(out.id, 'rec-1');
+        if (out.kind === 'create') {
+            assert.equal(
+                out.initialState, 'active',
+            );
+            assert.equal(
+                out.initialStateEventId, 'ev-1',
+            );
+        }
+    },
+);
+
+test(
+    'validateRecordMultiPutBody rejects an'
+    + ' attribute whose record_id does not match'
+    + ' the top-level id',
+    () => {
+        assert.throws(
+            () => validateRecordMultiPutBody({
+                kind: 'create',
+                id: 'rec-1',
+                record: {
+                    name: 'R', description: '',
+                    position: 1,
+                },
+                attributes: [
+                    {
+                        id: 'a-1',
+                        record_id: 'rec-other',
+                        name: 'X',
+                        attribute_type: 'text',
+                        sort_order: 0,
+                        options: jsonArrayField(
+                            [],
+                        ),
+                        constraints: jsonArrayField(
+                            [],
+                        ),
+                    },
+                ],
+                initialState: 'active',
+                initialStateEventId: 'ev-1',
+            }),
+            /record_id must match top-level id/,
+        );
+    },
+);
+
+test(
+    'validateRecordMultiPutBody rejects an'
+    + ' invalid initialState value',
+    () => {
+        assert.throws(
+            () => validateRecordMultiPutBody({
+                kind: 'create',
+                id: 'rec-1',
+                record: {
+                    name: 'R', description: '',
+                    position: 1,
+                },
+                attributes: [],
+                initialState: 'in-progress',
+                initialStateEventId: 'ev-1',
+            }),
+            /expected RecordState/,
+        );
+    },
+);
+
+test(
+    'validateRecordMultiPutBody create rejects a'
+    + ' missing initialStateEventId',
+    () => {
+        assert.throws(
+            () => validateRecordMultiPutBody({
+                kind: 'create',
+                id: 'rec-1',
+                record: {
+                    name: 'R', description: '',
+                    position: 1,
+                },
+                attributes: [],
+                initialState: 'active',
+            } as never),
+            /missing required key/,
+        );
+    },
+);
+
+// validateRecordMultiPutBody — edit variant
+
+test(
+    'validateRecordMultiPutBody accepts a valid'
+    + ' edit body',
+    () => {
+        const out = validateRecordMultiPutBody({
+            kind: 'edit',
+            id: 'rec-1',
+            record: {
+                name: 'R',
+                description: '',
+                position: 1,
+            },
+            attributes: [],
+            removedAttributeIds: ['old-1'],
+        });
+        assert.equal(out.kind, 'edit');
+        if (out.kind === 'edit') {
+            assert.deepEqual(
+                out.removedAttributeIds,
+                ['old-1'],
+            );
+        }
+    },
+);
+
+test(
+    'validateRecordMultiPutBody edit rejects a'
+    + ' body that carries initialState (kind'
+    + ' discriminator vs key set)',
+    () => {
+        assert.throws(
+            () => validateRecordMultiPutBody({
+                kind: 'edit',
+                id: 'rec-1',
+                record: {
+                    name: 'R', description: '',
+                    position: 1,
+                },
+                attributes: [],
+                removedAttributeIds: [],
+                initialState: 'active',
+            } as never),
+            /unexpected key/,
+        );
+    },
+);
+
+// validateRecordMultiPutBody — discriminator
+
+test(
+    'validateRecordMultiPutBody rejects an'
+    + ' unknown kind discriminator',
+    () => {
+        assert.throws(
+            () => validateRecordMultiPutBody({
+                kind: 'destroy',
+                id: 'rec-1',
+                record: {
+                    name: 'R', description: '',
+                    position: 1,
+                },
+                attributes: [],
+            } as never),
+            /RecordMultiPutBody kind/,
+        );
+    },
+);
+
+test(
+    'validateRecordMultiPutBody rejects a body'
+    + ' missing the kind field',
+    () => {
+        assert.throws(
+            () => validateRecordMultiPutBody({
+                id: 'rec-1',
+                record: {
+                    name: 'R', description: '',
+                    position: 1,
+                },
+                attributes: [],
             } as never),
         );
     },

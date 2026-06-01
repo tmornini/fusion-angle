@@ -44,23 +44,18 @@ let projectListEl: HTMLElement | null = null;
 let projectBadgesEl: HTMLElement | null = null;
 let projectSortControlsEl: HTMLElement | null = null;
 
-async function loadProjectsAndEntities(
+async function loadProjectMaps(
     ctx: ReturnType<typeof createRequestContext>,
 ): Promise<{
-    projects: Awaited<
-        ReturnType<typeof getProjects>
-    >;
     entities: Map<string, ProjectEntity>;
     scores: Map<string, ScoreRow>;
 }> {
-    const [rows, projects, scoreColumn] =
+    const [rows, scoreColumn] =
         await Promise.all([
             getProjectRows(ctx),
-            getProjects(ctx),
             getProjectsScoreColumn(ctx),
         ]);
     return {
-        projects,
         entities: new Map(
             rows.map(r => [r.id, r]),
         ),
@@ -79,10 +74,10 @@ export async function init(): Promise<void> {
     if (!listEl) return;
 
     const ctx = createRequestContext();
-    const loaded = await withLoadingState(
+    const projects = await withLoadingState(
         listEl,
         buildSkeleton('card-list', 4),
-        () => loadProjectsAndEntities(ctx),
+        () => getProjects(ctx),
         init,
         {
             icon: iconFolderKanban(24, ''),
@@ -97,14 +92,14 @@ export async function init(): Promise<void> {
             },
         },
     );
-    if (!loaded) return;
+    if (!projects) return;
+
+    const maps = await loadProjectMaps(ctx);
 
     projectState =
-        buildInitialProjectListState(
-            loaded.projects,
-        );
-    projectEntities = loaded.entities;
-    scoreMap = loaded.scores;
+        buildInitialProjectListState(projects);
+    projectEntities = maps.entities;
+    scoreMap = maps.scores;
     projectListEl = listEl;
     projectBadgesEl = $(
         '#status-badges', document,
@@ -136,15 +131,17 @@ export async function init(): Promise<void> {
         if (!projectState || !projectListEl) {
             return;
         }
-        const refreshed =
-            await loadProjectsAndEntities(
-                createRequestContext(),
-            );
+        const refreshCtx = createRequestContext();
+        const [refreshedProjects, maps] =
+            await Promise.all([
+                getProjects(refreshCtx),
+                loadProjectMaps(refreshCtx),
+            ]);
         projectState = applyProjectListUpdate(
-            projectState, refreshed.projects,
+            projectState, refreshedProjects,
         );
-        projectEntities = refreshed.entities;
-        scoreMap = refreshed.scores;
+        projectEntities = maps.entities;
+        scoreMap = maps.scores;
         rerenderProjects();
     });
 

@@ -10,45 +10,35 @@ import {
 import {
     postHumanWorkerCreation,
     postHumanWorkerStateChange,
+    type HumanWorkerDraft,
 } from '../web-app/app/adapters/workers.ts';
-import type {
-    HumanWorkerEntity,
-} from '../api/types.ts';
+import {
+    seedCurrentWorker,
+    seedHumanWorker,
+} from './worker-fixtures.ts';
 
 function buildHumanWorker(
-    first: string,
-): Omit<HumanWorkerEntity, 'id'> {
+    name: string,
+): HumanWorkerDraft {
     return {
-        first_name: first,
-        last_name: 'Test',
+        name,
         email:
-            `${first}@example.com`.toLowerCase(),
+            `${name}@example.com`.toLowerCase(),
         title: 'Engineer',
         department: 'Product',
-        strengths: '[]' as const,
-        team_dimensions: '{}' as const,
+        strengths: '[]' as never,
+        team_dimensions: '{}' as never,
         phone: '',
         bio: '',
     };
 }
 
-async function seedCurrentWorker(
-    db: MemoryDbAdapter,
-): Promise<void> {
-    await db.workers.put(
-        'current', buildHumanWorker('demo'),
-    );
-    await db.states.record(
-        'st-current', 'current',
-        'active', 'system',
-    );
-}
-
-function setupDb(): {
+async function setupDb(): Promise<{
     db: MemoryDbAdapter;
     ctx: RequestContext;
-} {
+}> {
     const db = new MemoryDbAdapter();
+    await db.createSchema();
     const ctx = createRequestContext(db);
     return { db, ctx };
 }
@@ -57,7 +47,7 @@ test(
     'postHumanWorkerCreation persists the row'
     + ' and records the initial state event',
     async () => {
-        const { db, ctx } = setupDb();
+        const { db, ctx } = await setupDb();
         await seedCurrentWorker(db);
 
         await postHumanWorkerCreation(
@@ -68,7 +58,8 @@ test(
         );
 
         const row = await db.workers.getById('w1');
-        assert.equal(row.first_name, 'Alice');
+        assert.equal(row.name, 'Alice');
+        assert.equal(row.type, 'human');
         const events = await db.states.allFor('w1');
         assert.equal(events.length, 1);
         assert.equal(events[0]?.state, 'active');
@@ -79,14 +70,9 @@ test(
     'postHumanWorkerStateChange records a state'
     + ' event without touching the worker row',
     async () => {
-        const { db, ctx } = setupDb();
+        const { db, ctx } = await setupDb();
         await seedCurrentWorker(db);
-        await db.workers.put(
-            'w1', buildHumanWorker('Original'),
-        );
-        await db.states.record(
-            'st-w1', 'w1', 'active', 'system',
-        );
+        await seedHumanWorker(db, 'w1', 'Original Name');
         const before = await db.workers.getById('w1');
 
         await postHumanWorkerStateChange(

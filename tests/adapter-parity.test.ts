@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import {
-    createLocalStorageAdapter,
+    LocalStorageDbAdapter,
 } from '../api/db-localstorage.ts';
 import { createRequestContext }
     from '../web-app/app/adapters/shared.ts';
@@ -14,6 +14,7 @@ import {
     getArchivedObjectiveIds,
 } from '../web-app/app/adapters/objectives.ts';
 import type { DbAdapter } from '../api/db.ts';
+import { seedHumanWorker } from './worker-fixtures.ts';
 
 function installLocalStorageShim(): void {
     const map = new Map<string, string>();
@@ -37,17 +38,7 @@ async function runReactivationScenario(db: DbAdapter): Promise<{
     deletedIds: Set<string>;
     archivedIds: Set<string>;
 }> {
-    await db.workers.put('current', {
-        first_name: 'Demo',
-        last_name: 'User',
-        email: 'demo@example.com',
-        phone: '',
-        title: 'Admin',
-        strengths: '[]' as never,
-        team_dimensions: '{}' as never,
-        bio: '',
-        department: 'Product',
-    });
+    await seedHumanWorker(db, 'current', 'Demo User');
     const ctx = createRequestContext(db);
     await postObjectiveCreation(
         ctx, 'o1', 'Rev', 'd', 0,
@@ -72,7 +63,8 @@ test('K5 reactivation parity across memory and localStorage',
     async () => {
         installLocalStorageShim();
         const memDb = new MemoryDbAdapter();
-        const lsDb = await createLocalStorageAdapter();
+        await memDb.createSchema();
+        const lsDb = new LocalStorageDbAdapter();
         await lsDb.createSchema();
 
         const mem = await runReactivationScenario(memDb);

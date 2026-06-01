@@ -32,7 +32,6 @@ function buildNode(
     return {
         id,
         name: id.toUpperCase(),
-        description: '',
         positionX: 0,
         positionY: 0,
         isCreate: false,
@@ -49,7 +48,7 @@ function buildEdge(
     to: string,
 ): GraphEdge {
     return {
-        id, name: '', description: '',
+        id, name: '',
         fromNodeId: from, toNodeId: to,
     };
 }
@@ -62,7 +61,6 @@ function buildFlowEntity(
     return {
         id,
         name: 'Flow ' + id,
-        description: '',
         is_locked: false,
         is_auto_layout: true,
         is_auto_fit: true,
@@ -208,6 +206,7 @@ test(
     + ' notReady flows',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         const goodGraph = readyGraph();
         const badGraph: StoredGraph = {
             nodes: [
@@ -251,6 +250,7 @@ test(
     + ' entirely (regardless of readiness)',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         const { id: _g, ...lockedReadyBody } =
             buildFlowEntity(
                 'locked-ready', readyGraph(),

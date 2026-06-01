@@ -54,7 +54,6 @@ export interface FlowCreationInput {
     linkId: string;
     projectId: string;
     name: string;
-    description: string;
 }
 
 export async function postFlowCreation(
@@ -77,8 +76,6 @@ export async function postFlowCreation(
                     `flows/${input.flowId}`,
                 body: {
                     name: input.name,
-                    description:
-                        input.description,
                     is_locked: false,
                     is_auto_layout: false,
                     is_auto_fit: false,
@@ -109,7 +106,6 @@ export async function postFlowCreation(
 
 export interface FlowSaveShape {
     name: string;
-    description: string;
     isLocked: boolean;
     isAutoLayout: boolean;
     isAutoFit: boolean;
@@ -125,7 +121,6 @@ export async function putFlow(
 ): Promise<void> {
     const entity: Omit<FlowEntity, 'id'> = {
         name: save.name,
-        description: save.description,
         is_locked: save.isLocked,
         is_auto_layout: save.isAutoLayout,
         is_auto_fit: save.isAutoFit,

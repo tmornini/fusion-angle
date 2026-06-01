@@ -38,6 +38,7 @@ for (const route of COLLECTION_ROUTES) {
         + ` db`,
         async () => {
             const db = new MemoryDbAdapter();
+            await db.createSchema();
             const rows =
                 await GET<unknown[]>(db, route);
             assert.ok(

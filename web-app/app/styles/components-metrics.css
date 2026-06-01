@@ -4,19 +4,24 @@
   padding: var(--space-4) var(--space-6) var(--space-6);
 }
 
+/* Borders carry 0.4 alpha, not 0.15: at 0.15 the blue
+   "primary" tint sits too close to the dark navy page
+   background, blurring the Cost card's edges so it reads
+   as shorter than its equal-height siblings. A crisper
+   edge defines every card regardless of fill contrast. */
 .gauge-card[data-tone="primary"] {
   background: hsl(var(--primary-soft));
-  border-color: hsl(var(--primary) / 0.15);
+  border-color: hsl(var(--primary) / 0.4);
 }
 
 .gauge-card[data-tone="success"] {
   background: hsl(var(--success-soft));
-  border-color: hsl(var(--success) / 0.15);
+  border-color: hsl(var(--success) / 0.4);
 }
 
 .gauge-card[data-tone="warning"] {
   background: hsl(var(--warning-soft));
-  border-color: hsl(var(--warning) / 0.15);
+  border-color: hsl(var(--warning) / 0.4);
 }
 
 .gauge-arc-container {
@@ -38,6 +43,12 @@
 .gauge-arc-bipolar-half {
   animation: gauge-draw var(--duration-pulse)
     ease-out;
+}
+
+/* Matches the hue the arc gradient carries at its
+ * center — the zero point. */
+.gauge-arc-zero-mark {
+  fill: hsl(var(--warning));
 }
 
 .gauge-arc-inner.overrun {
@@ -71,6 +82,13 @@
     grid-template-columns: 140px 110px 1fr;
 }
 
+/* Width of one top-row gauge column: the grid is
+   repeat(3, 1fr) with a --space-6 gap. Full-width on
+   mobile via responsive.css. */
+.objective-aggregates-card {
+    width: calc((100% - 2 * var(--space-6)) / 3);
+}
+
 .gauge-card.objective-aggregates-card {
     background: hsl(var(--blue-400) / 0.08);
     border-color: hsl(var(--blue-400) / 0.2);
@@ -88,9 +106,17 @@
     align-items: center;
 }
 
-.score-row-sparkline svg {
+.sparkline-wrap {
+    position: relative;
     width: 100%;
     height: 30px;
+}
+
+.sparkline-wrap .sparkline-svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
 }
 
 .sparkline-axis {
@@ -98,16 +124,101 @@
     stroke-width: 1;
 }
 
-.sparkline-line {
+.sparkline-seg {
     fill: none;
-    stroke: hsl(var(--blue-400));
     stroke-width: 1.5;
     stroke-linecap: round;
     stroke-linejoin: round;
 }
 
-.sparkline-dot {
-    fill: hsl(var(--blue-400));
+.sparkline-seg[data-direction='up'] {
+    stroke: hsl(var(--success));
+}
+
+.sparkline-seg[data-direction='down'] {
+    stroke: hsl(var(--destructive));
+}
+
+.sparkline-seg[data-direction='flat'] {
+    stroke: hsl(var(--blue-400));
+}
+
+/* Baseline dot is grey (the origin); measurement dots
+   take the colour of the segment that lands on them,
+   mirroring .sparkline-seg. */
+.spark-dot {
+    position: absolute;
+    left: var(--x);
+    top: var(--y);
+    width: 7px;
+    height: 7px;
+    margin: -3.5px 0 0 -3.5px;
+    border-radius: 50%;
+    background: hsl(var(--muted-foreground));
+    cursor: pointer;
+}
+
+.spark-dot[data-direction='up'] {
+    background: hsl(var(--success));
+}
+
+.spark-dot[data-direction='down'] {
+    background: hsl(var(--destructive));
+}
+
+.spark-dot[data-direction='flat'] {
+    background: hsl(var(--blue-400));
+}
+
+.spark-dot:focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 1px;
+}
+
+.spark-tip {
+    position: absolute;
+    bottom: calc(100% + 4px);
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: var(--space-1) var(--space-2);
+    border-radius: var(--radius);
+    background: hsl(var(--popover));
+    color: hsl(var(--popover-foreground));
+    border: 1px solid hsl(var(--border));
+    box-shadow: var(--shadow-card);
+    white-space: nowrap;
+    font-size: 0.72rem;
+    line-height: 1.2;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--duration-fast)
+        var(--ease-default);
+    z-index: 20;
+}
+
+.spark-dot:hover .spark-tip,
+.spark-dot:focus-visible .spark-tip {
+    opacity: 1;
+}
+
+.spark-tip-date {
+    color: hsl(var(--muted-foreground));
+}
+
+.spark-tip-change[data-tone='success'] {
+    color: hsl(var(--success));
+}
+
+.spark-tip-change[data-tone='error'] {
+    color: hsl(var(--destructive));
+}
+
+.spark-tip-base {
+    font-weight: var(--font-weight-medium);
 }
 
 .score-row-gauge {

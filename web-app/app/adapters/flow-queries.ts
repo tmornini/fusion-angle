@@ -24,7 +24,6 @@ export type {
 export interface FlowGraph {
     id: string;
     name: string;
-    description: string;
     isLocked: boolean;
     isAutoLayout: boolean;
     isAutoFit: boolean;
@@ -44,7 +43,6 @@ function parseGraph(
 export interface FlowSummary {
     readonly id: string;
     readonly name: string;
-    readonly description: string;
     readonly nodeCount: number;
     readonly edgeCount: number;
 }
@@ -52,7 +50,6 @@ export interface FlowSummary {
 export interface FlowListItem {
     id: string;
     name: string;
-    description: string;
     nodeCount: number;
     edgeCount: number;
 }
@@ -66,7 +63,6 @@ export async function getFlows(
         return {
             id: f.id,
             name: f.name,
-            description: f.description,
             nodeCount: g.nodes.length,
             edgeCount: g.edges.length,
         };
@@ -121,7 +117,6 @@ getFlowsWithProjectNames(
             summary: {
                 id: f.id,
                 name: f.name,
-                description: f.description,
                 nodeCount: g.nodes.length,
                 edgeCount: g.edges.length,
             },
@@ -169,7 +164,6 @@ export async function getFlowsByProject(
         result.push({
             id: f.id,
             name: f.name,
-            description: f.description,
             nodeCount: g.nodes.length,
             edgeCount: g.edges.length,
         });
@@ -189,7 +183,6 @@ export async function getFlowGraph(
     return withRenderableLayout({
         id: flow.id,
         name: flow.name,
-        description: flow.description,
         isLocked: asBoolean(
             flow.is_locked,
             'is_locked',

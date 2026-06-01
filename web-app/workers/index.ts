@@ -255,16 +255,13 @@ async function handleAddWorkerSubmit(
 }
 
 async function submitHumanForm(): Promise<void> {
-    const first = $input(
-        '#hw-first', document,
-    )!.value;
-    const last = $input(
-        '#hw-last', document,
+    const name = $input(
+        '#hw-name', document,
     )!.value;
     const email = $input(
         '#hw-email', document,
     )!.value;
-    if (!first || !last || !email) {
+    if (!name || !email) {
         showToast(
             'Name and email are required',
             'error',
@@ -289,8 +286,7 @@ async function submitHumanForm(): Promise<void> {
             createRequestContext(),
             id,
             trimStrings({
-                first_name: first,
-                last_name: last,
+                name,
                 email,
                 title,
                 department: dept,

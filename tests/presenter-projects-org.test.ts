@@ -105,7 +105,7 @@ function makeProject(overrides: {
     state?:
         | 'submitted' | 'under-review'
         | 'sent-back' | 'approved'
-        | 'declined' | 'completed' | 'deleted';
+        | 'declined' | 'archived' | 'deleted';
     progress?: number;
     estimatedCost?: number;
     position?: number;
@@ -130,15 +130,11 @@ function makeOrg() {
         id: 'org-1',
         name: 'Acme Innovations',
         domain: 'acme.example',
-        plan: 'Enterprise',
-        plan_status: 'active',
         next_billing: '2026-07-01',
         seats: 50,
         used_seats: 12,
         projects_limit: 100,
         ideas_limit: 200,
-        health_score: 92,
-        health_status: 'Healthy',
         last_activity: '2026-05-01',
     });
 }
@@ -160,14 +156,14 @@ test(
         const p = new ProjectPresenter(
             makeProject({
                 title: 'Gemini',
-                state: 'completed',
+                state: 'archived',
             }),
         );
         const out = p.buildCard('position', false)
             .toString();
         assert.match(out, /Gemini/);
-        assert.match(out, /Completed/);
-        // completed projects show 100% timeline
+        assert.match(out, /Archived/);
+        // archived projects show 100% timeline
         assert.match(out, /100%/);
         assert.match(
             out, /data-project-card="pr-1"/,
@@ -324,14 +320,12 @@ test(
             {
                 id: 'f-1',
                 name: 'Onboarding',
-                description: 'Welcome flow',
                 nodeCount: 5,
                 edgeCount: 4,
             },
         ]).renderShell(rec.container);
         const out = rec.allHtml();
         assert.match(out, /Onboarding/);
-        assert.match(out, /Welcome flow/);
         assert.match(out, /5 nodes/);
         assert.match(out, /4 edges/);
         assert.match(out, /data-flow-id="f-1"/);
@@ -381,15 +375,13 @@ test(
 
 test(
     'OrganizationPresenter.buildPage renders the'
-    + ' org name, domain, plan label and an Edit'
-    + ' action',
+    + ' org name, domain, and an Edit action',
     () => {
         const out = new OrganizationPresenter(
             makeOrg(), makeStats(),
         ).buildPage().toString();
         assert.match(out, /Acme Innovations/);
         assert.match(out, /acme\.example/);
-        assert.match(out, /Enterprise Plan/);
         assert.match(out, /data-org-action="edit"/);
         assert.equal(
             out.includes('Unknown'), false,
@@ -411,7 +403,6 @@ test(
         assert.match(out, /Usage Overview/);
         // a usage bar prints "current / limit"
         assert.match(out, /12 \/ 50/);
-        assert.match(out, /Health Score: 92%/);
     },
 );
 

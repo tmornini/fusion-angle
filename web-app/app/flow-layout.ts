@@ -84,7 +84,6 @@ const SIBLING_STEP =
     + SIBLING_NODE_GAP;
 const CROSSING_SWEEP_COUNT = 24;
 const COORD_ITERATIONS = 4;
-const MAX_ASPECT_STRETCH = 2.5;
 const MIN_SNAKE_NODES = 4;
 
 export function buildAdjacency(
@@ -163,7 +162,9 @@ export function computeLayout(
 
     const baseLayers = assignLayers(nodes, forwardEdges);
     const aug = insertDummies(baseLayers, forwardEdges);
-    const ordered = reduceCrossings(aug.layers, aug.edges);
+    const ordered = placeArchiveLast(
+        reduceCrossings(aug.layers, aug.edges), nodes,
+    );
     const topo = ordered
         .flat()
         .filter(id => !isDummy(id));
@@ -185,7 +186,6 @@ export function computeLayout(
             );
             const snakePos = computeTopoSnake(
                 topo, columnsPerRow, forwardEdges,
-                canvasWidth, canvasHeight,
             );
             const canvasAspect =
                 canvasWidth / canvasHeight;
@@ -205,7 +205,6 @@ export function computeLayout(
                     canvasWidth, canvasHeight,
                     nodes,
                 );
-                pinArchiveToBottomRight(positions, nodes);
                 return {
                     positions,
                     waypoints: new Map(),
@@ -250,54 +249,29 @@ function finalizeLayout(
             positions.set(id, p);
         }
     }
-    pinArchiveToBottomRight(positions, nodes);
     const waypoints = extractWaypoints(
         edges, dummyPositions, reversedIds,
     );
     return { positions, waypoints };
 }
 
-// Sugiyama places nodes by graph rank, not by absolute
-// position. When a branch makes Archive reachable from
-// Create in fewer hops than the longest path, Archive
-// settles at an interior column. The convention for a
-// workflow chart is that the terminal node reads at the
-// lower-right; this pass enforces that explicitly after
-// fitToCanvas has done its mirroring.
-function pinArchiveToBottomRight(
-    positions: Map<string, Position>,
+// Archive is terminal; ordering it last within its (last)
+// layer places it at the bottom of the rightmost column once
+// coordinates are assigned — the lower-right end a workflow
+// chart reads toward. This shapes the order the coordinate
+// pass consumes; it moves no final pixels.
+function placeArchiveLast(
+    layers: Layers,
     nodes: readonly LayoutInput[],
-): void {
+): Layers {
     const archive = nodes.find(n => n.isArchive);
-    if (!archive) return;
-    const archivePos = positions.get(archive.id);
-    if (!archivePos) return;
-
-    let otherMaxX = -Infinity;
-    for (const [id, p] of positions) {
-        if (id === archive.id) continue;
-        if (p.x > otherMaxX) otherMaxX = p.x;
-    }
-    if (otherMaxX === -Infinity) return;
-
-    const targetX = Math.max(archivePos.x, otherMaxX);
-
-    let maxYInCol = -Infinity;
-    for (const [id, p] of positions) {
-        if (id === archive.id) continue;
-        if (Math.abs(p.x - targetX) < 0.5) {
-            if (p.y > maxYInCol) maxYInCol = p.y;
-        }
-    }
-
-    let newY = archivePos.y;
-    if (maxYInCol > -Infinity && newY <= maxYInCol) {
-        newY = maxYInCol + SIBLING_STEP;
-    }
-
-    positions.set(archive.id, {
-        x: targetX,
-        y: newY,
+    if (!archive) return layers;
+    return layers.map(layer => {
+        if (!layer.includes(archive.id)) return layer;
+        return [
+            ...layer.filter(id => id !== archive.id),
+            archive.id,
+        ];
     });
 }
 
@@ -551,6 +525,15 @@ function assignLayers(
     let maxLayer = 0;
     for (const l of layerOf.values()) {
         if (l > maxLayer) maxLayer = l;
+    }
+
+    // Archive is terminal by convention; place it in the last
+    // layer so the chart reads to a lower-right end and a
+    // Create->Archive shortcut spans real layers — routing
+    // through bend-points instead of jumping the canvas.
+    const archive = nodes.find(n => n.isArchive);
+    if (archive && layerOf.get(archive.id)! < maxLayer) {
+        layerOf.set(archive.id, maxLayer);
     }
 
     const layers: string[][] = [];
@@ -992,20 +975,6 @@ function isCanvasSized(
     return canvasW > 0 && canvasH > 0;
 }
 
-function canScaleAxis(
-    target: number,
-    source: number,
-): boolean {
-    return target > 0 && source > 0;
-}
-
-function scalesAreFinite(
-    sX: number,
-    sY: number,
-): boolean {
-    return isFinite(sX) && isFinite(sY);
-}
-
 function needsAxisFlip(
     flipX: boolean,
     flipY: boolean,
@@ -1044,44 +1013,14 @@ function fitToCanvas(
         isCanvasSized(canvasW, canvasH)
         && graphLandscape !== canvasLandscape;
 
-    const rotatedWidth = rotate ? natH : natW;
-    const rotatedHeight = rotate ? natW : natH;
-
-    let scaleX = 1;
-    let scaleY = 1;
-    if (isCanvasSized(canvasW, canvasH)) {
-        const tW = canvasW - NODE_WIDTH;
-        const tH = canvasH - NODE_HEIGHT;
-        let sX = Infinity;
-        let sY = Infinity;
-        if (canScaleAxis(tW, rotatedWidth)) {
-            sX = tW / rotatedWidth;
-        }
-        if (canScaleAxis(tH, rotatedHeight)) {
-            sY = tH / rotatedHeight;
-        }
-        if (scalesAreFinite(sX, sY)) {
-            const sSmall = Math.min(sX, sY);
-            const sBig = Math.max(sX, sY);
-            const cappedBig = Math.min(
-                sBig,
-                sSmall * MAX_ASPECT_STRETCH,
-            );
-            const isXBigger = sX >= sY;
-            scaleX = isXBigger
-                ? cappedBig
-                : sSmall;
-            scaleY = isXBigger
-                ? sSmall
-                : cappedBig;
-            scaleX = Math.max(scaleX, 1);
-            scaleY = Math.max(scaleY, 0.4);
-        }
-    }
-
     const halfW = NODE_WIDTH / 2;
     const halfH = NODE_HEIGHT / 2;
 
+    // No scaling: the layout keeps its comfortable density and
+    // the camera (fitBoxToCanvas) fills the viewport. Scaling
+    // node spacing against a fixed node size would stretch
+    // sparse graphs or overlap dense ones — so fit only
+    // rotates, mirrors, and centers.
     const result = new Map<string, Position>();
     for (const [id, p] of positions) {
         const cx_p = p.x - posCx;
@@ -1089,8 +1028,8 @@ function fitToCanvas(
         const rotatedX = rotate ? -cy_p : cx_p;
         const rotatedY = rotate ? cx_p : cy_p;
         result.set(id, {
-            x: rotatedX * scaleX - halfW,
-            y: rotatedY * scaleY - halfH,
+            x: rotatedX - halfW,
+            y: rotatedY - halfH,
         });
     }
 
@@ -1159,13 +1098,13 @@ function fitToCanvas(
 // When the topology is mostly linear (no node with 3+
 // children), Sugiyama produces a tall narrow column. Snake
 // layout instead wraps the topo order into a grid of
-// columns × rows that fills the canvas more evenly. We
+// columns × rows with a better aspect for the canvas. We
 // compute both and pick whichever has the smaller aspect
-// mismatch with the canvas. columnsPerRow is derived from
-// available canvas height divided by per-row vertical span.
+// mismatch with the canvas. columnsPerRow fits the rows the
+// canvas height allows, capped so a row fits its width.
 function computeSnakeWrap(
     nodeCount: number,
-    _canvasW: number,
+    canvasW: number,
     canvasH: number,
 ): number {
     if (nodeCount < MIN_SNAKE_NODES) return 0;
@@ -1177,10 +1116,20 @@ function computeSnakeWrap(
     const numRows = Math.max(
         2, Math.floor(targetH / cellH),
     );
+    // Cap columns so a row fits the canvas width at the
+    // natural column step; wrapping to more rows beats a row
+    // wider than the canvas (the camera would zoom it out).
+    const widthCols = Math.max(
+        2,
+        Math.floor(
+            (canvasW - NODE_WIDTH) / MIN_LAYER_STEP,
+        ) + 1,
+    );
     const columnsPerRow = Math.max(
         2,
         Math.min(
             Math.ceil(nodeCount / numRows),
+            widthCols,
             nodeCount - 1,
         ),
     );
@@ -1231,8 +1180,6 @@ function computeTopoSnake(
     topo: readonly string[],
     columnsPerRow: number,
     forwardEdges: readonly LayoutEdge[],
-    canvasW: number,
-    canvasH: number,
 ): Map<string, Position> {
     const numRows = Math.ceil(topo.length / columnsPerRow);
 
@@ -1275,27 +1222,12 @@ function computeTopoSnake(
         colX[c] = colX[c - 1]! + step;
     }
 
-    const lastCol = colX[columnsPerRow - 1]!;
-    const targetW = canvasW - NODE_WIDTH;
-    if (
-        columnsPerRow > 1
-        && lastCol > 0
-        && targetW > lastCol
-    ) {
-        const scale = targetW / lastCol;
-        for (let c = 1; c < columnsPerRow; c++) {
-            colX[c] = colX[c]! * scale;
-        }
-    }
-
+    // Comfortable fixed row spacing — the camera fills the
+    // viewport, so rows need not stretch to span the canvas.
+    const rowStep = NODE_HEIGHT + VERTICAL_GAP;
     const rowY = new Array<number>(numRows);
-    rowY[0] = 0;
-    if (numRows > 1) {
-        const span = canvasH - NODE_HEIGHT;
-        const step = span / (numRows - 1);
-        for (let r = 1; r < numRows; r++) {
-            rowY[r] = r * step;
-        }
+    for (let r = 0; r < numRows; r++) {
+        rowY[r] = r * rowStep;
     }
 
     const positions = new Map<string, Position>();

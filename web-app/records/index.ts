@@ -6,7 +6,7 @@ import {
     withLoadingState,
 } from '../app/loading-states.ts';
 import {
-    iconPlus, iconFolderKanban,
+    iconPlus, iconDatabase,
 } from '../app/icons.ts';
 import { navigateTo } from '../app/core.ts';
 import {
@@ -48,7 +48,7 @@ export async function init(): Promise<void> {
         () => getRecords(ctx),
         init,
         {
-            icon: iconFolderKanban(24, ''),
+            icon: iconDatabase(24, ''),
             title: 'No Records Yet',
             description:
                 'Define a data shape to bind'

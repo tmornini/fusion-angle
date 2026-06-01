@@ -1,5 +1,5 @@
 import {
-    createLocalStorageAdapter,
+    LocalStorageDbAdapter,
 } from '../../../api/db-localstorage.ts';
 import type { DbAdapter } from '../../../api/db.ts';
 import { GET } from '../../../api/api.ts';
@@ -8,8 +8,7 @@ let adapter: DbAdapter | undefined;
 
 export async function initAdapter(
 ): Promise<boolean> {
-    adapter =
-        await createLocalStorageAdapter();
+    adapter = new LocalStorageDbAdapter();
     await adapter.initialize();
     const schema =
         await GET<string | null>(

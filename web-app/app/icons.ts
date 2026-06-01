@@ -39,6 +39,22 @@ export function iconSparkles(size: number, cssClass: string) {
     );
 }
 
+export function iconLogo(size: number, cssClass: string) {
+    return new SafeHtml(
+        '<svg xmlns="http://www.w3.org/2000/svg"'
+        + ` width="${size}" height="${size}"`
+        + ' viewBox="-12 -12 24 24" fill="none"'
+        + ` class="${cssClass}" aria-hidden="true">`
+        + '<g class="logo-orbital">'
+        + '<ellipse rx="11" ry="4.2"/>'
+        + '<ellipse rx="11" ry="4.2" transform="rotate(60)"/>'
+        + '<ellipse rx="11" ry="4.2" transform="rotate(120)"/>'
+        + '</g>'
+        + '<circle class="logo-nucleus" r="2.05"/>'
+        + '</svg>',
+    );
+}
+
 export function iconHome(size: number, cssClass: string) {
     return icon(
         '<path d="M15 21v-8a1 1 0 0 0-1-1h-4a1'

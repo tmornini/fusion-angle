@@ -187,3 +187,20 @@ test(
         assert.match(out, /variance-good/);
     },
 );
+
+test(
+    'metrics card heading reads Project Metrics',
+    () => {
+        const view = new ProjectView(
+            makeProject(),
+            objectives,
+            baselineFull,
+            [],
+        );
+        const rec = makeRecordingContainer();
+        new ProjectDetailPresenter(view, [])
+            .renderShell(rec.container);
+        const out = rec.allHtml();
+        assert.match(out, /Project Metrics/);
+    },
+);

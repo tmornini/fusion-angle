@@ -22,9 +22,11 @@ import type {
     RecordAttributeEntity,
     StateFieldValueEntity,
     WorkOrderEntity,
+    WorkerEntity,
 } from './types.ts';
 import {
     validateOrganizationEntity,
+    validateRecordMultiPutBody,
     validateStateEntity,
 } from './validators.ts';
 
@@ -115,6 +117,57 @@ function withoutId(
     return rest;
 }
 
+async function applyRecordMultiPut(
+    db: DbAdapter,
+    payload: Record<string, unknown>,
+): Promise<void> {
+    const body = validateRecordMultiPutBody(payload);
+    let opIndex = 0;
+    try {
+        await db.records.put(
+            body.id, body.record,
+        );
+        opIndex++;
+        if (body.kind === 'create') {
+            const worker =
+                await db.workers.getById('current');
+            await db.states.record(
+                body.initialStateEventId,
+                body.id,
+                body.initialState,
+                worker.id,
+            );
+            opIndex++;
+        } else {
+            for (
+                const removedId
+                of body.removedAttributeIds
+            ) {
+                await db.recordAttributes.delete(
+                    removedId,
+                );
+                opIndex++;
+            }
+        }
+        for (const attr of body.attributes) {
+            const { id, ...rest } = attr;
+            await db.recordAttributes.put(
+                id, rest,
+            );
+            opIndex++;
+        }
+    } catch (e) {
+        const cause =
+            e instanceof Error
+                ? e.message
+                : String(e);
+        throw new Error(
+            'records-multi-put failed at op['
+            + opIndex + ']: ' + cause,
+        );
+    }
+}
+
 
 const routes: Route[] = [
     route('workers', {
@@ -133,6 +186,22 @@ const routes: Route[] = [
                 param(p, 0),
                 withoutId(payload) as unknown as Omit<
                     AIWorkerEntity, 'id'
+                >,
+            ),
+    }),
+    route('human-workers', {
+        get: (db) => db.humanWorkers.getAll(),
+    }),
+    route('human-workers/:id', {
+        get: (db, p) =>
+            db.humanWorkers.getById(
+                param(p, 0),
+            ),
+        put: (db, p, payload) =>
+            db.humanWorkers.put(
+                param(p, 0),
+                withoutId(payload) as unknown as Omit<
+                    HumanWorkerEntity, 'id'
                 >,
             ),
     }),
@@ -308,6 +377,11 @@ const routes: Route[] = [
                 param(p, 0),
             ),
     }),
+    route('records-multi-put', {
+        post: async (db, _p, body) => {
+            await applyRecordMultiPut(db, body);
+        },
+    }),
 
     route('organization', {
         get: (db) => db.organization.get(),
@@ -330,7 +404,7 @@ const routes: Route[] = [
             db.workers.put(
                 param(p, 0),
                 withoutId(payload) as unknown as Omit<
-                    HumanWorkerEntity, 'id'
+                    WorkerEntity, 'id'
                 >,
             ),
     }),
@@ -585,10 +659,6 @@ export async function handleRequest(
         }
     }
 
-    // HTTP boundary handler: each case
-    // calls a single route handler; the
-    // catch translates domain exceptions
-    // to HTTP responses.
     try {
         switch (method) {
             case 'GET': {
@@ -746,6 +816,7 @@ export async function GET<T>(
     adapter: DbAdapter,
     resource: string,
 ): Promise<T> {
+    await adapter.simulateLatency();
     return unwrapResponse<T>(
         await handleRequest(
             adapter,
@@ -761,6 +832,7 @@ export async function PUT<T>(
     resource: string,
     payload: Record<string, unknown>,
 ): Promise<T> {
+    await adapter.simulateLatency();
     return unwrapResponse<T>(
         await handleRequest(
             adapter,
@@ -785,6 +857,7 @@ export async function DELETE(
     adapter: DbAdapter,
     resource: string,
 ): Promise<void> {
+    await adapter.simulateLatency();
     await unwrapResponse(
         await handleRequest(
             adapter,
@@ -801,6 +874,7 @@ export async function POST<T>(
     resource: string,
     payload: Record<string, unknown>,
 ): Promise<T> {
+    await adapter.simulateLatency();
     return unwrapResponse<T>(
         await handleRequest(
             adapter,

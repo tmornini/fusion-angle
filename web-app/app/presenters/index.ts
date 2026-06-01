@@ -14,7 +14,7 @@ export {
 } from './idea.ts';
 export {
     IdeaConversionPresenter,
-    buildInitialConversionFields,
+    buildInitialConversionDraft,
     conversionRequiredCount,
     conversionCompletedCount,
     conversionIsReady,
@@ -22,6 +22,8 @@ export {
     ALL_CONVERSION_FIELDS,
     type ConversionField,
     type ConversionFields,
+    type ConversionDraft,
+    type ObjectiveDefinition,
 } from './idea-conversion.ts';
 export {
     IdeaCreatePresenter,
@@ -116,12 +118,6 @@ export {
 export {
     ProjectActionBarPresenter,
 } from './project-action-bar.ts';
-export {
-    ScoreModalPresenter,
-} from './score-modal.ts';
-export {
-    MeasurementModalPresenter,
-} from './measurement-modal.ts';
 export {
     ProjectObjectivesPresenter,
 } from './project-objectives.ts';

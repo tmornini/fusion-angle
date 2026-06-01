@@ -23,7 +23,6 @@ function buildVersion(
         id,
         flowId: 'flow-1',
         name: 'name-' + id,
-        description: '',
         isLocked: false,
         isAutoLayout: false,
         isAutoFit: false,

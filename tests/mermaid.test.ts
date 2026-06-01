@@ -10,7 +10,6 @@ import {
 const minimalGraph = {
     id: 'f1',
     name: 'Flow',
-    description: '',
     isLocked: false,
     isAutoLayout: true,
     isAutoFit: true,
@@ -36,7 +35,6 @@ test('generateMermaid emits start with stadium brackets', () => {
             {
                 id: 'n1',
                 name: 'Begin',
-                description: '',
                 positionX: 0,
                 positionY: 0,
                 isCreate: true,
@@ -56,7 +54,6 @@ test('generateMermaid emits complete with triple parens', () => {
             {
                 id: 'n2',
                 name: 'Archive',
-                description: '',
                 positionX: 0,
                 positionY: 0,
                 isCreate: false,
@@ -76,7 +73,6 @@ test('generateMermaid sanitizes dashes in IDs', () => {
             {
                 id: 'a-b-c',
                 name: 'X',
-                description: '',
                 positionX: 0,
                 positionY: 0,
                 isCreate: false,
@@ -96,7 +92,6 @@ test('generateMermaid emits labeled edges', () => {
         nodes: [
             {
                 id: 'a', name: 'A',
-                description: '',
                 positionX: 0, positionY: 0,
                 isCreate: false,
                 isArchive: false,
@@ -105,7 +100,6 @@ test('generateMermaid emits labeled edges', () => {
             },
             {
                 id: 'b', name: 'B',
-                description: '',
                 positionX: 0, positionY: 0,
                 isCreate: false,
                 isArchive: false,
@@ -132,7 +126,6 @@ test('generateMermaid emits unlabeled edges', () => {
         nodes: [
             {
                 id: 'a', name: 'A',
-                description: '',
                 positionX: 0, positionY: 0,
                 isCreate: false,
                 isArchive: false,
@@ -141,7 +134,6 @@ test('generateMermaid emits unlabeled edges', () => {
             },
             {
                 id: 'b', name: 'B',
-                description: '',
                 positionX: 0, positionY: 0,
                 isCreate: false,
                 isArchive: false,
@@ -167,7 +159,6 @@ test('generateMermaid quotes labels with special chars', () => {
             {
                 id: 'n1',
                 name: 'Has [bracket]',
-                description: '',
                 positionX: 0, positionY: 0,
                 isCreate: false,
                 isArchive: false,
@@ -239,7 +230,6 @@ test('mermaid round-trip preserves structure', () => {
         nodes: [
             {
                 id: 's', name: 'Create',
-                description: '',
                 positionX: 0, positionY: 0,
                 isCreate: true,
                 isArchive: false,
@@ -248,7 +238,6 @@ test('mermaid round-trip preserves structure', () => {
             },
             {
                 id: 'm', name: 'Middle',
-                description: '',
                 positionX: 0, positionY: 0,
                 isCreate: false,
                 isArchive: false,
@@ -257,7 +246,6 @@ test('mermaid round-trip preserves structure', () => {
             },
             {
                 id: 'e', name: 'Archive',
-                description: '',
                 positionX: 0, positionY: 0,
                 isCreate: false,
                 isArchive: true,

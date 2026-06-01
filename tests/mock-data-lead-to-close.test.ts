@@ -24,6 +24,7 @@ const COLD_WORKING_NODE_HEAT_MAX = 0.25;
 
 async function seededLeadToClose() {
     const db = new MemoryDbAdapter();
+    await db.createSchema();
     await populateMockData(db);
     const flows = await db.flows.getAll();
     const flow = flows.find(

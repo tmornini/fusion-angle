@@ -29,7 +29,6 @@ import {
     DEFAULT_LOCK_TIMEOUT,
 } from '../api/types.ts';
 import type {
-    HumanWorkerEntity,
     FlowEntity,
     GraphNode,
     GraphEdge,
@@ -39,36 +38,11 @@ import type {
     WorkerId,
     Id,
 } from '../api/types.ts';
+import {
+    seedHumanWorker,
+} from './worker-fixtures.ts';
 
 // -- Fixtures ---------------------------------
-
-function buildHumanWorker(
-    name: string,
-): Omit<HumanWorkerEntity, 'id'> {
-    return {
-        first_name: name,
-        last_name: 'Test',
-        email: name.toLowerCase() + '@example.com',
-        phone: '',
-        title: 'product_manager',
-        strengths: '[]' as never,
-        team_dimensions: '{}' as never,
-        bio: '',
-        department: 'Product',
-    };
-}
-
-async function seedWorkerState(
-    db: MemoryDbAdapter,
-    workerId: WorkerId,
-): Promise<void> {
-    await db.states.record(
-        `st-${workerId}`,
-        workerId,
-        'active',
-        'system',
-    );
-}
 
 function buildNode(
     id: string,
@@ -78,7 +52,6 @@ function buildNode(
     return {
         id,
         name,
-        description: '',
         positionX: 0,
         positionY: 0,
         isCreate: false,
@@ -97,7 +70,6 @@ function buildEdge(
     return {
         id,
         name: '',
-        description: '',
         fromNodeId,
         toNodeId,
     };
@@ -108,7 +80,6 @@ function buildFlow(
 ): Omit<FlowEntity, 'id'> {
     return {
         name: 'Test flow',
-        description: 't',
         is_locked: false,
         is_auto_layout: true,
         is_auto_fit: true,
@@ -187,10 +158,8 @@ async function setupOneWorkOrder(): Promise<{
     tables: () => Promise<WoTables>;
 }> {
     const db = new MemoryDbAdapter();
-    await db.workers.put(
-        'current', buildHumanWorker('Demo'),
-    );
-    await seedWorkerState(db, 'current');
+    await db.createSchema();
+    await seedHumanWorker(db, 'current', 'Demo Test');
     const ctx = createRequestContext(db);
     await db.flows.put(
         'f1', buildFlow(buildLinearGraph()),
@@ -340,10 +309,10 @@ test(
     + ' values',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.workers.put(
-            'current', buildHumanWorker('Demo'),
+        await db.createSchema();
+        await seedHumanWorker(
+            db, 'current', 'Demo Test',
         );
-        await seedWorkerState(db, 'current');
         const ctx = createRequestContext(db);
         await db.flows.put(
             'f1', buildFlow(buildLinearGraph()),

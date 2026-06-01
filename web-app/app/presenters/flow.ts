@@ -61,13 +61,6 @@ export class FlowPresenter {
                 <h3 class="${
                     'font-semibold mb-1'
                 }">${f.name}</h3>
-                <p class="${
-                    'text-sm'
-                    + ' text-muted mb-2'
-                    + ' truncate'
-                }">${
-                    f.description
-                }</p>
                 <div class="${
                     'flex flex-wrap '
                     + 'items-center'

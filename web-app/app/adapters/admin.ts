@@ -43,22 +43,6 @@ export class Organization {
         };
     }
 
-    planLabel(): string {
-        return this.#entity.plan + ' Plan';
-    }
-
-    planStatusText(): string {
-        return this.#entity.plan_status;
-    }
-
-    healthScorePercent(): number {
-        return this.#entity.health_score;
-    }
-
-    healthStatusText(): string {
-        return this.#entity.health_status;
-    }
-
     seatsUsage(): {
         used: number;
         total: number;

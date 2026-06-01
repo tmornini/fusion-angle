@@ -382,7 +382,7 @@ test(
 // layer behavior — panel opens regardless of Auto
 // Fit, with the canvas re-fitting to the panel-aware
 // visible region when Auto Fit is on — is composed
-// in detail.ts via withPanelOpen + withFitReconciled.
+// in detail.ts via withPanelOpen + reconcileFitFromDom.
 // Not testable here.
 test(
     'double-click node opens panel; second tap'

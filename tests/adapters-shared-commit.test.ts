@@ -9,11 +9,10 @@ import {
     createChannel,
 } from '../web-app/app/channels.ts';
 
-function buildAIWorkerBody(name: string) {
+function buildAIWorkerBody(description: string) {
     return {
-        name,
         provider: 'Anthropic',
-        description: '',
+        description,
         auth_token: 'sk-test-XXXX',
     };
 }
@@ -22,6 +21,7 @@ test(
     'ctx.commit runs all ops in supplied order',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         const ctx = createRequestContext(db);
         await ctx.commit({
             ops: [
@@ -63,6 +63,7 @@ test(
     + ' exactly once after ops complete',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         const ctx = createRequestContext(db);
         const ch1 = createChannel<void>();
         const ch2 = createChannel<void>();
@@ -95,6 +96,7 @@ test(
     + ' notifyChannels',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         const ctx = createRequestContext(db);
         const ch = createChannel<void>();
         let count = 0;
@@ -112,6 +114,7 @@ test(
     + ' failed op and exposing applied prefix',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         const ctx = createRequestContext(db);
         const ch = createChannel<void>();
         let count = 0;
@@ -149,7 +152,8 @@ test(
         // No rollback: first op landed.
         const all = await db.aiWorkers.getAll();
         assert.equal(all.length, 1);
-        assert.equal(all[0]!.name, 'A');
+        assert.equal(all[0]!.id, 'ai_1');
+        assert.equal(all[0]!.description, 'A');
         // Channel did NOT fire.
         assert.equal(count, 0);
     },
@@ -160,6 +164,7 @@ test(
     + ' when first op fails',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         const ctx = createRequestContext(db);
         const bad = {
             method: 'put' as const,
@@ -186,6 +191,7 @@ test(
     + ' when final op fails',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         const ctx = createRequestContext(db);
         const goodA = {
             method: 'put' as const,

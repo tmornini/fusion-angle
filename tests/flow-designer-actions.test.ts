@@ -15,7 +15,6 @@ import {
 const node = (id: string, x = 0, y = 0) => ({
     id,
     name: id.toUpperCase(),
-    description: '',
     positionX: x,
     positionY: y,
     isCreate: false,
@@ -29,7 +28,6 @@ const edge = (
 ) => ({
     id,
     name: '',
-    description: '',
     fromNodeId: fromId,
     toNodeId: toId,
 });

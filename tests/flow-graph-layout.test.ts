@@ -25,7 +25,6 @@ function node(id: string, o: NodeOpts = {}): GraphNode {
     return {
         id,
         name: o.name ?? id,
-        description: '',
         positionX: o.positionX ?? 0,
         positionY: o.positionY ?? 0,
         isCreate: o.isCreate ?? false,
@@ -41,7 +40,6 @@ function edge(
     return {
         id: `${from}->${to}`,
         name,
-        description: '',
         fromNodeId: from,
         toNodeId: to,
     };
@@ -55,7 +53,6 @@ function flowGraph(o: {
     return {
         id: 'f1',
         name: 'F1',
-        description: '',
         isLocked: false,
         isAutoLayout: o.isAutoLayout ?? false,
         isAutoFit: true,

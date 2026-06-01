@@ -18,45 +18,53 @@ export class ProjectActionBarPresenter {
     readonly #projectId: Id;
     readonly #state: ProjectState;
     readonly #approvalCheck: Check;
-    readonly #completionCheck: Check;
+    readonly #archivalCheck: Check;
     readonly #objectiveNames: ObjectiveNames;
 
     constructor(
         projectId: Id,
         state: ProjectState,
         approvalCheck: Check,
-        completionCheck: Check,
+        archivalCheck: Check,
         objectiveNames: ObjectiveNames = new Map(),
     ) {
         this.#projectId = projectId;
         this.#state = state;
         this.#approvalCheck = approvalCheck;
-        this.#completionCheck = completionCheck;
+        this.#archivalCheck = archivalCheck;
         this.#objectiveNames = objectiveNames;
     }
 
-    buildBar(): SafeHtml {
+    buildReviewActions(): SafeHtml {
         const state = this.#state;
         const isReview = state === 'submitted'
             || state === 'under-review'
             || state === 'sent-back';
-
+        if (!isReview) return html``;
         return html`
             <div class="action-bar"
                 data-project-id="${this.#projectId}">
-                ${isReview
-                    ? this.#reviewActions()
-                    : html``}
+                ${this.#reviewActions()}
+            </div>
+        `;
+    }
+
+    buildLifecycleActions(): SafeHtml {
+        const state = this.#state;
+        if (state !== 'approved'
+            && state !== 'archived') {
+            return html``;
+        }
+        return html`
+            <div class="action-bar"
+                data-project-id="${this.#projectId}">
                 ${state === 'approved'
                     ? this.#approvedActions()
                     : html``}
-                ${state === 'approved'
-                    || state === 'completed'
-                    ? html`<button
-                        data-action="view-history">
-                        View history
-                      </button>`
-                    : html``}
+                <button data-action="view-history"
+                    class="btn btn-outline">
+                    View history
+                </button>
             </div>
         `;
     }
@@ -73,45 +81,40 @@ export class ProjectActionBarPresenter {
 
     #reviewActions(): SafeHtml {
         const check = this.#approvalCheck;
-        const state = this.#state;
         const tooltip = check.ready
             ? ''
-            : this.#namesFor(check.problems)
-                + ' unscored';
+            : 'Set a baseline score before '
+                + 'approving: '
+                + this.#namesFor(check.problems);
         return html`
-            ${state === 'under-review'
-                ? html`<button data-action="score">
-                    Score
-                  </button>`
-                : html``}
             <button data-action="approve" ${
                 check.ready ? '' : 'disabled'
-            } title="${tooltip}">
+            } class="btn btn-primary" title="${tooltip}">
                 Approve
             </button>
-            <button data-action="decline">
+            <button data-action="decline"
+                class="btn btn-outline">
                 Decline
             </button>
-            <button data-action="send-back">
+            <button data-action="send-back"
+                class="btn btn-outline">
                 Send back
             </button>
         `;
     }
 
     #approvedActions(): SafeHtml {
-        const check = this.#completionCheck;
+        const check = this.#archivalCheck;
         const tooltip = check.ready
             ? ''
-            : this.#namesFor(check.problems)
-                + ' lack actual measurements';
+            : 'Add an actual measurement before '
+                + 'archiving: '
+                + this.#namesFor(check.problems);
         return html`
-            <button data-action="log-measurement">
-                Log measurement
-            </button>
-            <button data-action="complete" ${
+            <button data-action="archive" ${
                 check.ready ? '' : 'disabled'
-            } title="${tooltip}">
-                Complete
+            } class="btn btn-outline" title="${tooltip}">
+                Archive
             </button>
         `;
     }

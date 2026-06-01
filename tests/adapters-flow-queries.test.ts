@@ -32,23 +32,17 @@ import {
 } from '../api/types.ts';
 import { populateMockData } from '../api/mock-data.ts';
 import { NODE_WIDTH } from '../web-app/app/flow-layout.ts';
+import {
+    seedHumanWorker,
+} from './worker-fixtures.ts';
 
 async function setupMemDb(): Promise<{
     db: MemoryDbAdapter;
     ctx: RequestContext;
 }> {
     const db = new MemoryDbAdapter();
-    await db.workers.put('current', {
-        first_name: 'Demo',
-        last_name: 'User',
-        email: 'demo@example.com',
-        phone: '',
-        title: 'Admin',
-        strengths: '[]' as never,
-        team_dimensions: '{}' as never,
-        bio: '',
-        department: 'Product',
-    });
+    await db.createSchema();
+    await seedHumanWorker(db, 'current', 'Demo User');
     const ctx = createRequestContext(db);
     return { db, ctx };
 }
@@ -60,7 +54,6 @@ function buildNode(
     return {
         id,
         name: id,
-        description: '',
         positionX: 0,
         positionY: 0,
         isCreate: false,
@@ -79,7 +72,6 @@ function buildEdge(
     return {
         id,
         name: 'Transition',
-        description: '',
         fromNodeId,
         toNodeId,
     };
@@ -95,7 +87,6 @@ async function createBaseFlow(
         linkId: flowId + '-link',
         projectId,
         name: 'Flow ' + flowId,
-        description: 'desc ' + flowId,
     });
 }
 
@@ -107,7 +98,6 @@ async function saveGraph(
 ): Promise<void> {
     await putFlow(ctx, flowId, {
         name: 'Flow ' + flowId,
-        description: 'desc ' + flowId,
         isLocked: false,
         isAutoLayout: false,
         isAutoFit: false,
@@ -165,9 +155,6 @@ test(
         );
         assert.equal(g.id, 'flow-1');
         assert.equal(g.name, 'Flow flow-1');
-        assert.equal(
-            g.description, 'desc flow-1',
-        );
         assert.equal(g.isLocked, false);
         assert.equal(g.isAutoLayout, false);
         assert.equal(g.isAutoFit, false);
@@ -198,7 +185,6 @@ test(
             createRequestContext(db), 'flow-1',
             {
                 name: 'Locked Flow',
-                description: 'd',
                 isLocked: true,
                 isAutoLayout: true,
                 isAutoFit: true,
@@ -495,6 +481,7 @@ test(
     + ' stored positions are placeholders',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         await populateMockData(db);
         const g = await getFlowGraph(
             createRequestContext(db),

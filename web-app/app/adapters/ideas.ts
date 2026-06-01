@@ -2,6 +2,7 @@ import type {
     IdeaEntity,
     IdeaState,
     IdeaSubmissionEntity,
+    ObjectiveId,
     ProjectEntity,
     ProjectState,
 } from '../../../api/types.ts';
@@ -20,6 +21,12 @@ import {
 import {
     notifyProjectChange,
 } from './projects.ts';
+import {
+    notifyProjectScoreChange,
+} from './project-scoring.ts';
+import {
+    generateCryptoSafeBase62,
+} from './crypto-safe-base62.ts';
 import {
     buildStateEventOp,
     getIdeaState,
@@ -244,14 +251,17 @@ export async function putIdeaSubmission(
 
 // Idempotent: retry recovers from partial failure.
 // Inlined writes (rather than delegating to the
-// putProject / putIdea helpers) so the project and
-// idea writes commit together as one logical
-// operation. Two state events land in the same
-// batch: the idea moves to 'promoted' and the new
-// project enters at its initial state — both
-// atomic with the row updates. The helpers stay —
-// they have other callers whose writes are
-// genuinely independent.
+// putProject / putIdea helpers) so the project, idea,
+// state events, and per-objective baseline scores
+// commit together as one logical operation. Two
+// state events land in the same batch: the idea
+// moves to 'promoted' and the new project enters at
+// its initial state — both atomic with the row
+// updates. The N baseline-score rows commit in the
+// same batch so a new project never exists without
+// its initial baselines (and vice versa). The
+// helpers stay — they have other callers whose
+// writes are genuinely independent.
 export async function postIdeaConversion(
     ctx: RequestContext,
     ideaId: string,
@@ -259,12 +269,18 @@ export async function postIdeaConversion(
     project: Omit<ProjectEntity, 'id'>,
     projectState: ProjectState,
     promotedIdea: Omit<IdeaEntity, 'id'>,
+    baselines: readonly {
+        objectiveId: ObjectiveId;
+        score: number;
+    }[],
 ): Promise<void> {
     type AnyBody = Record<string, unknown>;
     const projectBody =
         project as unknown as AnyBody;
     const ideaBody =
         promotedIdea as unknown as AnyBody;
+    const at = nowUtc();
+    const worker = await getCurrentHumanWorker(ctx);
     await ctx.commit({
         ops: [
             {
@@ -284,8 +300,23 @@ export async function postIdeaConversion(
             await buildStateEventOp(
                 ctx, projectId, projectState,
             ),
+            ...baselines.map(b => ({
+                method: 'put' as const,
+                resource:
+                    'project-objective'
+                    + '-baseline-scores/'
+                    + generateCryptoSafeBase62(),
+                body: {
+                    project_id: projectId,
+                    objective_id: b.objectiveId,
+                    score: b.score,
+                    worker_id: worker.id,
+                    at,
+                },
+            })),
         ],
     });
     notifyProjectChange();
+    notifyProjectScoreChange();
     ideaChanges.notify();
 }

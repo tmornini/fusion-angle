@@ -55,19 +55,21 @@ function buildHumanWorker(
     title = 'engineer',
     department = 'Eng',
 ): HumanWorker {
-    return new HumanWorker({
-        id,
-        first_name: first,
-        last_name: last,
-        email: first.toLowerCase()
-            + '@example.com',
-        title,
-        department,
-        strengths: jsonArrayField([]),
-        team_dimensions: jsonObjectField({}),
-        phone: '',
-        bio: '',
-    }, 'active');
+    return new HumanWorker(
+        { id, type: 'human', name: first + ' ' + last },
+        {
+            id,
+            email: first.toLowerCase()
+                + '@example.com',
+            title,
+            department,
+            strengths: jsonArrayField([]),
+            team_dimensions: jsonObjectField({}),
+            phone: '',
+            bio: '',
+        },
+        'active',
+    );
 }
 
 const sampleItems: SearchItem[] = [

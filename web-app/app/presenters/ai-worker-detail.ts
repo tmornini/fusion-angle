@@ -1,5 +1,5 @@
 import {
-    html, setHtml, SafeHtml,
+    html, setHtml, SafeHtml, trusted,
 } from '../safe-html.ts';
 import { $required } from '../dom.ts';
 import { DISPLAY_ABSENT } from '../format.ts';
@@ -14,13 +14,17 @@ import {
 } from '../icons.ts';
 import {
     AIWorker,
-    type AIWorkerEntity,
+    WORKER_STATE_CONFIG,
+    isWorkerState,
+    type AIWorkerDraft,
+    type WorkerState,
 } from '../adapters/index.ts';
 
 export interface AIWorkerDraftFields {
     name: string;
     provider: string;
     description: string;
+    state: WorkerState;
     // Empty string means "do not change the
     // stored token" — the existing value is
     // preserved at save time. The validator
@@ -35,12 +39,13 @@ export type AIWorkerFieldKey =
     | 'name'
     | 'provider'
     | 'description'
+    | 'state'
     | 'authTokenOverride';
 
 const FIELD_KEYS: ReadonlySet<AIWorkerFieldKey> =
     new Set([
         'name', 'provider', 'description',
-        'authTokenOverride',
+        'state', 'authTokenOverride',
     ]);
 
 export function isAIWorkerFieldKey(
@@ -59,6 +64,7 @@ export function aiWorkerDraftFromWorker(
         name: worker.nameText(),
         provider: worker.providerText(),
         description: worker.descriptionText(),
+        state: worker.stateValue(),
         authTokenOverride: '',
     };
 }
@@ -71,12 +77,8 @@ export function aiWorkerDraftFromWorker(
 // an empty token).
 export function aiWorkerPatchFromDraft(
     draft: AIWorkerDraftFields,
-): Partial<
-    Pick<AIWorkerEntity,
-        | 'name' | 'provider'
-        | 'description' | 'auth_token'>
-> {
-    const base: Partial<AIWorkerEntity> = {
+): Partial<AIWorkerDraft> {
+    const base: Partial<AIWorkerDraft> = {
         name: draft.name,
         provider: draft.provider,
         description: draft.description,
@@ -160,6 +162,13 @@ function buildReadonlyTitleSection(
                 'badge badge-default'
                 + ' text-xs'
             }">AI</span>
+            <span class="${
+                'badge '
+                + worker.stateClassName()
+                + ' text-xs'
+            }">
+                ${worker.stateLabel()}
+            </span>
         </div>
         <p class="text-sm text-muted">
             ${worker.providerText()}
@@ -186,6 +195,13 @@ function buildEditableTitleSection(
                 'badge badge-default'
                 + ' text-xs'
             }">AI</span>
+            <span class="${
+                'badge '
+                + worker.stateClassName()
+                + ' text-xs'
+            }">
+                ${worker.stateLabel()}
+            </span>
         </div>
         <p class="text-sm text-muted">
             ${draft.provider}
@@ -263,6 +279,38 @@ function buildEditableDescription(
                 id="ai-description"
                 data-worker-field="description"
             >${value}</textarea>
+        </div>`;
+}
+
+function buildEditableState(
+    value: WorkerState,
+): SafeHtml {
+    const options = (
+        Object.keys(
+            WORKER_STATE_CONFIG,
+        ) as WorkerState[]
+    ).filter(isWorkerState);
+    return html`
+        <div>
+            <label class="${
+                'label mb-2 block'
+            }" for="ai-state"
+            >State</label>
+            <select class="input"
+                id="ai-state"
+                data-worker-field="state"
+            >${options.map(s =>
+                html`<option
+                    value="${s}"
+                    ${trusted(
+                        value === s
+                            ? 'selected'
+                            : '',
+                    )}
+                >${
+                    WORKER_STATE_CONFIG[s].label
+                }</option>`)
+            }</select>
         </div>`;
 }
 
@@ -408,6 +456,11 @@ function buildEditableIdentityBody(
             ${buildEditableDescription(
                 draft.description,
             )}
+        </div>
+        <div class="${
+            'grid grid-cols-2 gap-4 mb-4'
+        }">
+            ${buildEditableState(draft.state)}
         </div>
         ${buildEditableTokenRow(draft)}`;
 }

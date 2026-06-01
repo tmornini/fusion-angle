@@ -1143,8 +1143,10 @@ export function buildGraphSvg(
             viewBoxX, viewBoxY,
             viewBoxW, viewBoxH,
         )
+        + '<g class="flow-content">'
         + edgeMarkup
         + nodeMarkup
+        + '</g>'
         + marqueeMarkup
         + '</svg>',
     );

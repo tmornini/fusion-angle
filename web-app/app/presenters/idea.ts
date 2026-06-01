@@ -155,7 +155,6 @@ function buildShell(
             'stack-lg idea-cards-slot'
         }"></div>
     </div>
-    <div class="idea-footer-slot"></div>
     <div class="idea-dialogs-slot"></div>
 </div>`);
 }
@@ -167,19 +166,6 @@ function mutateSlot(
 ): void {
     const slot = $required(cls, container);
     setHtml(slot, markup);
-}
-
-function updateWrapClass(
-    container: HTMLElement,
-    isReviewable: boolean,
-): void {
-    const wrap = $required(
-        '.entity', container,
-    );
-    wrap.classList.toggle(
-        'has-footer-actions',
-        isReviewable,
-    );
 }
 
 function buildSubmittedByLine(
@@ -361,49 +347,38 @@ function buildSubmitConvertButtons(
             </button>` : html``}`;
 }
 
-function buildApprovalFooter(): SafeHtml {
+function buildApprovalButtons(): SafeHtml {
     return html`
-    <div class="action-footer">
-        <div class="action-footer-inner">
-            <div class="${
-                'flex items-center'
-                + ' justify-end gap-4'
+        <button
+            class="${
+                'btn'
+                + ' btn-outline-error'
+                + ' gap-2'
+            }"
+            id="approval-send-back-btn"
+            data-dialog-open="${
+                'approval-send-back'
             }">
-                <div class="flex gap-3">
-                    <button
-                        class="${
-                            'btn'
-                            + ' btn-outline-error'
-                            + ' gap-2'
-                        }"
-                        id="approval-send-back-btn"
-                        data-dialog-open="${
-                            'approval-send-back'
-                        }">
-                        ${iconXCircle(16, '')}
-                        <span class="${
-                            'hidden-mobile'
-                        }">Send Back</span>
-                        <span class="${
-                            'visible-mobile'
-                        }">Send Back</span>
-                    </button>
-                    <button
-                        class="${
-                            'btn btn-success'
-                            + ' gap-2'
-                        }"
-                        id="approval-approve-btn"
-                        data-idea-action="${
-                            'approve'
-                        }">
-                        ${iconCheckCircle(16, '')}
-                        Approve
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>`;
+            ${iconXCircle(16, '')}
+            <span class="${
+                'hidden-mobile'
+            }">Send Back</span>
+            <span class="${
+                'visible-mobile'
+            }">Send Back</span>
+        </button>
+        <button
+            class="${
+                'btn btn-success'
+                + ' gap-2'
+            }"
+            id="approval-approve-btn"
+            data-idea-action="${
+                'approve'
+            }">
+            ${iconCheckCircle(16, '')}
+            Approve
+        </button>`;
 }
 
 function buildApprovalDialogs(): SafeHtml {
@@ -739,10 +714,6 @@ export class IdeaPresenter {
     renderUpdate(
         container: HTMLElement,
     ): void {
-        updateWrapClass(
-            container,
-            this.#idea.isReviewable(),
-        );
         mutateSlot(
             container,
             '.idea-title-slot',
@@ -766,13 +737,6 @@ export class IdeaPresenter {
         );
         mutateSlot(
             container,
-            '.idea-footer-slot',
-            this.#idea.isReviewable()
-                ? buildApprovalFooter()
-                : html``,
-        );
-        mutateSlot(
-            container,
             '.idea-dialogs-slot',
             this.#idea.isReviewable()
                 ? buildApprovalDialogs()
@@ -785,6 +749,9 @@ export class IdeaPresenter {
             ${buildSubmitConvertButtons(
                 this.#idea,
             )}
+            ${this.#idea.isReviewable()
+                ? buildApprovalButtons()
+                : html``}
             <button
                 class="${
                     'btn btn-outline gap-2'
@@ -832,10 +799,6 @@ export class IdeaEditPresenter {
     renderUpdate(
         container: HTMLElement,
     ): void {
-        updateWrapClass(
-            container,
-            this.#idea.isReviewable(),
-        );
         mutateSlot(
             container,
             '.idea-title-slot',
@@ -859,13 +822,6 @@ export class IdeaEditPresenter {
         );
         mutateSlot(
             container,
-            '.idea-footer-slot',
-            this.#idea.isReviewable()
-                ? buildApprovalFooter()
-                : html``,
-        );
-        mutateSlot(
-            container,
             '.idea-dialogs-slot',
             this.#idea.isReviewable()
                 ? buildApprovalDialogs()
@@ -875,9 +831,6 @@ export class IdeaEditPresenter {
 
     #buildActionButtons(): SafeHtml {
         return html`
-            ${buildSubmitConvertButtons(
-                this.#idea,
-            )}
             <div class="flex gap-2">
                 <button
                     class="${

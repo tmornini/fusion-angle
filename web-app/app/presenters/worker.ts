@@ -60,7 +60,7 @@ export class HumanWorkerRowPresenter {
                     + ' text-primary'
                 }">
                     ${initials(
-                        this.#worker.fullName(),
+                        this.#worker.name(),
                     )}
                 </span>
             </div>
@@ -68,7 +68,7 @@ export class HumanWorkerRowPresenter {
                 <p class="${
                     'font-medium truncate'
                 }">
-                    ${this.#worker.fullName()}
+                    ${this.#worker.name()}
                 </p>
                 <p class="${
                     'text-xs text-muted truncate'

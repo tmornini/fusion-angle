@@ -16,8 +16,7 @@ import {
     getFlowsForRecord,
     getWorkOrdersForRecord,
     putRecord,
-    putRecordAttribute,
-    deleteRecordAttribute,
+    postRecordChange,
     subscribeRecordChanges,
     generateCryptoSafeBase62,
     jsonArrayField,
@@ -33,6 +32,7 @@ import {
 } from '../app/presenters/index.ts';
 import type {
     FlowEntity,
+    RecordEntity,
     RecordAttributeEntity,
     Constraint,
 } from '../../api/types.ts';
@@ -45,7 +45,9 @@ type PageState =
     | {
         kind: 'editing';
         draft: RecordDetailDraft;
-        originalIds: Set<string>;
+        originalAttributes:
+            readonly RecordAttributeEntity[];
+        pendingAttributeName: string;
     };
 
 let pageState: PageState = { kind: 'reading' };
@@ -147,6 +149,7 @@ function render(root: HTMLElement): void {
     const presenter =
         new RecordDetailEditPresenter(
             pageState.draft,
+            pageState.pendingAttributeName,
         );
     setHtml(root, presenter.buildPage());
 }
@@ -167,6 +170,36 @@ function bindActions(root: HTMLElement): void {
         e => onInput(root, e),
         { signal },
     );
+    root.addEventListener(
+        'keydown',
+        e => onKeydown(root, e),
+        { signal },
+    );
+}
+
+function onKeydown(
+    root: HTMLElement, e: KeyboardEvent,
+): void {
+    if (pageState.kind !== 'editing') return;
+    if (e.key !== 'Enter') return;
+    const target = e.target;
+    if (!(target instanceof HTMLInputElement)) {
+        return;
+    }
+    if (
+        target.id
+            !== 'record-pending-attribute-name'
+    ) return;
+    e.preventDefault();
+    commitPendingAttribute();
+    render(root);
+    bindActions(root);
+    const next = root.querySelector(
+        '#record-pending-attribute-name',
+    );
+    if (next instanceof HTMLInputElement) {
+        next.focus();
+    }
 }
 
 function onClick(
@@ -215,9 +248,9 @@ function onClick(
         pageState = {
             kind: 'editing',
             draft,
-            originalIds: new Set(
-                draft.attributes.map(a => a.id),
-            ),
+            originalAttributes:
+                currentView.attributes,
+            pendingAttributeName: '',
         };
         render(root);
         bindActions(root);
@@ -233,7 +266,7 @@ function onClick(
         if (pageState.kind !== 'editing') {
             return;
         }
-        addAttribute();
+        commitPendingAttribute();
         render(root);
         bindActions(root);
         return;
@@ -354,6 +387,14 @@ function onInput(
             target.value;
         return;
     }
+    if (
+        target.id
+            === 'record-pending-attribute-name'
+    ) {
+        pageState.pendingAttributeName =
+            target.value;
+        return;
+    }
     const attrRow = target.closest(
         '[data-attribute-id]',
     );
@@ -398,17 +439,21 @@ function onInput(
     }
 }
 
-function addAttribute(): void {
+function commitPendingAttribute(): void {
     if (pageState.kind !== 'editing') return;
+    const name =
+        pageState.pendingAttributeName.trim();
+    if (name === '') return;
     pageState.draft.attributes.push({
         id: generateCryptoSafeBase62(),
-        name: '',
+        name,
         attribute_type: 'text',
         sort_order:
             pageState.draft.attributes.length,
         options: [],
         constraints: [],
     });
+    pageState.pendingAttributeName = '';
 }
 
 function removeAttribute(id: string): void {
@@ -513,8 +558,11 @@ async function handleSave(
 ): Promise<void> {
     if (pageState.kind !== 'editing') return;
     if (!recordId) return;
+    if (!currentView) return;
+    commitPendingAttribute();
     const draft = pageState.draft;
-    const original = pageState.originalIds;
+    const originalAttrs = pageState.originalAttributes;
+    const originalRecord = currentView.record;
     if (draft.name.trim() === '') {
         showToast(
             'Record name is required',
@@ -522,47 +570,53 @@ async function handleSave(
         );
         return;
     }
-    if (!currentView) return;
-    const entity = currentView.record;
+    const recordFields: Omit<
+        RecordEntity, 'id'
+    > = {
+        name: draft.name.trim(),
+        description: draft.description,
+        position: originalRecord.position,
+    };
+    const draftEntities = draftToEntities(
+        draft, recordId,
+    );
+    const removedAttributeIds = originalAttrs
+        .filter(a =>
+            !draftEntities.some(
+                d => d.id === a.id,
+            ),
+        )
+        .map(a => a.id);
+    const attributesChanged =
+        removedAttributeIds.length > 0
+        || draftAttributesDifferFromOriginal(
+            draftEntities, originalAttrs,
+        );
+    const recordChanged =
+        originalRecord.name !== recordFields.name
+        || originalRecord.description
+            !== recordFields.description;
+    if (!attributesChanged && !recordChanged) {
+        pageState = { kind: 'reading' };
+        render(root);
+        bindActions(root);
+        return;
+    }
     const ctx = createRequestContext();
     try {
-        await putRecord(ctx, recordId, {
-            name: draft.name.trim(),
-            description: draft.description,
-            position: entity.position,
-        });
-        const currentIds = new Set(
-            draft.attributes.map(a => a.id),
-        );
-        for (const oldId of original) {
-            if (!currentIds.has(oldId)) {
-                await deleteRecordAttribute(
-                    ctx, oldId,
-                );
-            }
-        }
-        for (
-            const [i, a]
-                of draft.attributes.entries()
-        ) {
-            const entity:
-                Omit<RecordAttributeEntity, 'id'> = {
-                record_id: recordId,
-                name: a.name.trim(),
-                attribute_type: a.attribute_type,
-                sort_order: i,
-                options: jsonArrayField(
-                    a.options,
-                ),
-                constraints: jsonArrayField(
-                    a.constraints
-                        .filter(
-                            isValidConstraint,
-                        ),
-                ),
-            };
-            await putRecordAttribute(
-                ctx, a.id, entity,
+        if (attributesChanged) {
+            await postRecordChange(
+                ctx, recordId,
+                {
+                    kind: 'edit',
+                    record: recordFields,
+                    attributes: draftEntities,
+                    removedAttributeIds,
+                },
+            );
+        } else {
+            await putRecord(
+                ctx, recordId, recordFields,
             );
         }
     } catch (err) {
@@ -575,6 +629,51 @@ async function handleSave(
     pageState = { kind: 'reading' };
     showToast('Record saved', 'success');
     await load(root);
+}
+
+function draftToEntities(
+    draft: RecordDetailDraft,
+    recordId: string,
+): RecordAttributeEntity[] {
+    return draft.attributes
+        .filter(a => a.name.trim() !== '')
+        .map((a, i) => ({
+            id: a.id,
+            record_id: recordId,
+            name: a.name.trim(),
+            attribute_type: a.attribute_type,
+            sort_order: i,
+            options: jsonArrayField(a.options),
+            constraints: jsonArrayField(
+                a.constraints
+                    .filter(isValidConstraint),
+            ),
+        }));
+}
+
+function draftAttributesDifferFromOriginal(
+    draftEntities: readonly RecordAttributeEntity[],
+    originalAttrs: readonly RecordAttributeEntity[],
+): boolean {
+    const originalById = new Map(
+        originalAttrs.map(
+            a => [a.id, a] as const,
+        ),
+    );
+    for (const d of draftEntities) {
+        const o = originalById.get(d.id);
+        if (
+            o === undefined
+            || o.name !== d.name
+            || o.attribute_type !== d.attribute_type
+            || o.sort_order !== d.sort_order
+            || o.options !== d.options
+            || o.constraints !== d.constraints
+        ) {
+            return true;
+        }
+    }
+    return false;
 }
 
 function isValidConstraint(

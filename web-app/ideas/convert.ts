@@ -21,13 +21,21 @@ import {
     generateCryptoSafeBase62,
     type IdeaEntity,
 } from '../app/adapters/index.ts';
+import {
+    getActiveObjectives,
+    getCurrentObjectiveDefinition,
+} from '../app/adapters/objectives.ts';
 import { MS_PER_DAY } from '../../api/types.ts';
+import type {
+    Objective,
+    ObjectiveId,
+} from '../../api/types.ts';
 import {
     nextPosition,
 } from '../app/drag-reorder-positions.ts';
 import {
     IdeaConversionPresenter,
-    buildInitialConversionFields,
+    buildInitialConversionDraft,
     conversionRequiredCount,
     conversionCompletedCount,
     conversionIsReady,
@@ -35,8 +43,8 @@ import {
     ALL_CONVERSION_FIELDS,
 } from '../app/presenters/index.ts';
 import type {
-    ConversionField,
-    ConversionFields,
+    ConversionDraft,
+    ObjectiveDefinition,
 } from '../app/presenters/index.ts';
 
 export async function init(
@@ -86,19 +94,61 @@ export async function init(
         );
         return;
     }
+    let activeObjectives: readonly Objective[];
+    let defs: ReadonlyMap<
+        ObjectiveId, ObjectiveDefinition
+    >;
+    try {
+        activeObjectives =
+            await getActiveObjectives(ctx);
+        const defEntries = await Promise.all(
+            activeObjectives.map(async (o) => {
+                const def =
+                    await getCurrentObjectiveDefinition(
+                        ctx, o.id,
+                    );
+                return [o.id, def] as const;
+            }),
+        );
+        defs = new Map(defEntries);
+    } catch (err) {
+        log.error(
+            'getActiveObjectives failed',
+            'ideas',
+            err,
+        );
+        setHtml(
+            root,
+            buildErrorState(
+                'Failed to load organization'
+                + ' objectives.',
+                'Try Again',
+            ),
+        );
+        root.querySelector(
+            '[data-retry-btn]',
+        )?.addEventListener(
+            'click',
+            () => init(),
+        );
+        return;
+    }
+
     const presenter:
         IdeaConversionPresenter =
         new IdeaConversionPresenter(
             tuple.idea,
-            buildInitialConversionFields(
+            buildInitialConversionDraft(
                 tuple.idea,
             ),
+            activeObjectives,
+            defs,
         );
 
-    function readFieldsFromDom(
-    ): ConversionFields {
+    function readDraftFromDom(
+    ): ConversionDraft {
         const next =
-            buildInitialConversionFields(
+            buildInitialConversionDraft(
                 tuple.idea,
             );
         for (
@@ -109,11 +159,38 @@ export async function init(
                 document,
             );
             if (isFormField(el)) {
-                next[field] =
+                next.fields[field] =
                     el.value.trim();
             }
         }
-        return next;
+        const baselines =
+            new Map<ObjectiveId, number>();
+        document.querySelectorAll<
+            HTMLInputElement
+        >(
+            '#convert-scores-section'
+            + ' .baseline-slider',
+        ).forEach(slider => {
+            const row = slider.closest(
+                '.convert-scores-row',
+            );
+            if (!row) return;
+            const objId =
+                slider.dataset['objectiveId'];
+            if (!objId) return;
+            const touched = row.getAttribute(
+                'data-touched',
+            );
+            if (touched !== 'true') return;
+            const v = Number(slider.value);
+            if (Number.isFinite(v)) {
+                baselines.set(objId, v);
+            }
+        });
+        return {
+            fields: next.fields,
+            baselines,
+        };
     }
 
     function renderPage(): void {
@@ -130,7 +207,7 @@ export async function init(
     }
 
     function mutateValidation(
-        fields: ConversionFields,
+        draft: ConversionDraft,
     ): void {
         for (
             const field of ALL_CONVERSION_FIELDS
@@ -142,17 +219,33 @@ export async function init(
                 chk.setAttribute(
                     'data-ready',
                     conversionFieldIsReady(
-                        fields, field,
+                        draft, field,
                     )
                         ? 'true'
                         : 'false',
                 );
             }
         }
+        for (const obj of activeObjectives) {
+            const chk = $(
+                `#check-baseline-${obj.id}`,
+                document,
+            );
+            if (chk) {
+                chk.setAttribute(
+                    'data-ready',
+                    draft.baselines.has(obj.id)
+                        ? 'true'
+                        : 'false',
+                );
+            }
+        }
         const count =
-            conversionCompletedCount(fields);
+            conversionCompletedCount(draft);
         const total =
-            conversionRequiredCount();
+            conversionRequiredCount(
+                activeObjectives.length,
+            );
         const pct =
             (count / total) * 100;
         const pText = $(
@@ -178,66 +271,29 @@ export async function init(
             );
         }
         const isReady =
-            conversionIsReady(fields);
+            conversionIsReady(
+                draft, activeObjectives,
+            );
         const remaining =
             total - count;
         const section = $(
             '#convert-confirm-section',
             document,
         );
-        if (
-            section instanceof
-            HTMLElement
-        ) {
-            section.style.border =
-                '2px solid '
-                + (isReady
-                    ? 'hsl(var('
-                        + '--success)'
-                        + ' / 0.3)'
-                    : 'transparent');
-            section.style.background =
-                isReady
-                    ? 'hsl(var('
-                        + '--success)'
-                        + ' / 0.05)'
-                    : '';
+        if (section) {
+            section.setAttribute(
+                'data-ready',
+                isReady ? 'true' : 'false',
+            );
         }
         const icon = $(
             '#convert-confirm-icon',
             document,
         );
-        if (
-            icon instanceof
-            HTMLElement
-        ) {
-            const bg = isReady
-                ? 'background:'
-                    + 'hsl(var('
-                    + '--success));'
-                    + 'color:'
-                    + 'hsl(var('
-                    + '--success-'
-                    + 'foreground))'
-                : 'background:'
-                    + 'hsl(var('
-                    + '--muted));'
-                    + 'color:'
-                    + 'hsl(var('
-                    + '--muted-'
-                    + 'foreground))';
+        if (icon) {
             icon.setAttribute(
-                'style',
-                'width:3rem;'
-                + 'height:3rem;'
-                + 'border-radius:'
-                + '0.75rem;'
-                + 'display:flex;'
-                + 'align-items:'
-                + 'center;'
-                + 'justify-content:'
-                + 'center;'
-                + bg,
+                'data-ready',
+                isReady ? 'true' : 'false',
             );
         }
         const heading = $(
@@ -299,7 +355,7 @@ export async function init(
             .forEach(el => {
                 const handler = () => {
                     mutateValidation(
-                        readFieldsFromDom(),
+                        readDraftFromDom(),
                     );
                 };
                 el.addEventListener(
@@ -322,8 +378,55 @@ export async function init(
         bindEnterToClick(
             '#convert-cost', submitSel,
         );
-        bindEnterToClick(
-            '#convert-impact', submitSel,
+
+        const scoresSection = $(
+            '#convert-scores-section',
+            document,
+        );
+        if (scoresSection) {
+            scoresSection.addEventListener(
+                'input',
+                (e) => {
+                    const target =
+                        e.target as HTMLElement;
+                    if (!target.matches(
+                        '.baseline-slider',
+                    )) return;
+                    const row = target.closest(
+                        '.convert-scores-row',
+                    );
+                    if (!row) return;
+                    const valueEl =
+                        row.querySelector(
+                            '.slider-value',
+                        );
+                    if (valueEl) {
+                        const v = Number(
+                            (target as
+                                HTMLInputElement)
+                                .value,
+                        );
+                        const sign =
+                            v > 0 ? '+' : '';
+                        valueEl.textContent =
+                            sign + String(v);
+                    }
+                    row.setAttribute(
+                        'data-touched', 'true',
+                    );
+                    mutateValidation(
+                        readDraftFromDom(),
+                    );
+                },
+            );
+        }
+
+        $(
+            '#convert-open-organization',
+            document,
+        )?.addEventListener(
+            'click',
+            () => navigateTo('organization'),
         );
 
         $(
@@ -333,10 +436,11 @@ export async function init(
             'click',
             async () => {
                 const submitted =
-                    readFieldsFromDom();
+                    readDraftFromDom();
                 if (
                     !conversionIsReady(
                         submitted,
+                        activeObjectives,
                     )
                 ) return;
                 const btn = $(
@@ -458,9 +562,10 @@ async function performConversion(
     ctx: ReturnType<typeof createRequestContext>,
     ideaId: string,
     projectId: string,
-    fields: ConversionFields,
+    draft: ConversionDraft,
     ideaEntity: IdeaEntity,
 ): Promise<void> {
+    const fields = draft.fields;
     const projects = await getProjectRows(ctx);
     const position = nextPosition(
         projects.map(p => p.position),
@@ -470,6 +575,12 @@ async function performConversion(
     );
     const startMs = Date.now();
     const endMs = startMs + days * MS_PER_DAY;
+    const baselines = Array.from(
+        draft.baselines.entries(),
+        ([objectiveId, score]) => ({
+            objectiveId, score,
+        }),
+    );
     await postIdeaConversion(
         ctx,
         ideaId,
@@ -491,5 +602,6 @@ async function performConversion(
         },
         'submitted',
         ideaEntity,
+        baselines,
     );
 }

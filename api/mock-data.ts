@@ -168,7 +168,6 @@ function isoFromMs(ms: number): string {
 interface FlowSeedSpec {
     readonly flowId: Id;
     readonly name: string;
-    readonly description: string;
     readonly nodes: readonly GraphNode[];
     readonly edges: readonly GraphEdge[];
     readonly creator: GraphNode;
@@ -232,7 +231,6 @@ function generateFlowWorkload(args: {
     const frozenFlowGraph = jsonObjectField({
         flowId: flow.flowId,
         name: flow.name,
-        description: flow.description,
         lockTimeout: DEFAULT_LOCK_TIMEOUT,
         nodes: flow.nodes,
         edges: flow.edges,
@@ -375,6 +373,7 @@ type SeedHumanWorker = Omit<
     HumanWorkerEntity,
     'strengths' | 'team_dimensions'
 > & {
+    name: string;
     strengths: string[];
     team_dimensions: Record<
         string, number
@@ -426,23 +425,8 @@ export async function populateMockData(
 ): Promise<void> {
     const workers: SeedHumanWorker[] = [
         {
-            id: SYSTEM_WORKER_ID,
-            first_name: 'System',
-            last_name: 'Worker',
-            email: 'system@fusion.local',
-            title: 'System',
-            department: 'System',
-            state: 'active',
-            strengths: [],
-            team_dimensions: {},
-            phone: '',
-            bio: 'Synthetic worker that owns'
-                + ' system-authored state events.',
-        },
-        {
             id: 'LhfaUUf4IumVsCSGB4xjdK',
-            first_name: 'Sarah',
-            last_name: 'Chen',
+            name: 'Sarah Chen',
             email: 'sarah.chen@company.com',
             title: 'Project Lead',
             department: 'Operations',
@@ -466,8 +450,7 @@ export async function populateMockData(
         },
         {
             id: 'bLP3X1hb1mSz8gY9neogU3',
-            first_name: 'Mike',
-            last_name: 'Thompson',
+            name: 'Mike Thompson',
             email: 'mike.thompson@company.com',
             title: 'ML Engineer',
             department: 'Engineering',
@@ -491,8 +474,7 @@ export async function populateMockData(
         },
         {
             id: 'zyTbfbjcGEfbpCsNTP0XjX',
-            first_name: 'Jessica',
-            last_name: 'Park',
+            name: 'Jessica Park',
             email: 'jessica.park@company.com',
             title: 'Data Scientist',
             department: 'Analytics',
@@ -516,8 +498,7 @@ export async function populateMockData(
         },
         {
             id: '6xBfK5If82JKfThXb1wlzS',
-            first_name: 'David',
-            last_name: 'Martinez',
+            name: 'David Martinez',
             email: 'david.martinez@company.com',
             title: 'Backend Developer',
             department: 'Engineering',
@@ -541,8 +522,7 @@ export async function populateMockData(
         },
         {
             id: '53J8h9dr76XFqCjYcNVwIR',
-            first_name: 'Emily',
-            last_name: 'Rodriguez',
+            name: 'Emily Rodriguez',
             email: 'emily.rodriguez@company.com',
             title: 'UX Designer',
             department: 'Design',
@@ -566,8 +546,7 @@ export async function populateMockData(
         },
         {
             id: 'I5ntELi16X3N3JYCCnxMjZ',
-            first_name: 'Alex',
-            last_name: 'Kim',
+            name: 'Alex Kim',
             email: 'alex.kim@company.com',
             title: 'Product Manager',
             department: 'Product',
@@ -591,8 +570,7 @@ export async function populateMockData(
         },
         {
             id: 'WxQn4LVWb76YkmqK5B0EPp',
-            first_name: 'Marcus',
-            last_name: 'Johnson',
+            name: 'Marcus Johnson',
             email: 'marcus@acmecorp.com',
             title: 'manager',
             department: 'Product',
@@ -615,8 +593,7 @@ export async function populateMockData(
         },
         {
             id: 'jBoWiyWxj7pp4sG3JgX5l2',
-            first_name: 'David',
-            last_name: 'Kim',
+            name: 'David Kim',
             email: 'david.kim@company.com',
             title: 'member',
             department: 'Engineering',
@@ -640,8 +617,7 @@ export async function populateMockData(
         },
         {
             id: 'Trf1Up2jMsPhEnjbW4Ji1n',
-            first_name: 'Lisa',
-            last_name: 'Wang',
+            name: 'Lisa Wang',
             email: 'lisa@acmecorp.com',
             title: 'viewer',
             department: 'Sales',
@@ -664,8 +640,7 @@ export async function populateMockData(
         },
         {
             id: 'oU0bIe0eUC33mTbZrxdogC',
-            first_name: 'James',
-            last_name: 'Miller',
+            name: 'James Miller',
             email: 'james@acmecorp.com',
             title: 'member',
             department: 'Engineering',
@@ -688,8 +663,7 @@ export async function populateMockData(
         },
         {
             id: 'current',
-            first_name: 'Tony',
-            last_name: 'Stark',
+            name: 'Tony Stark',
             email: 'demo@example.com',
             title: 'Admin',
             department: 'Product',
@@ -712,20 +686,34 @@ export async function populateMockData(
         },
     ];
 
-    await Promise.all(workers.map(worker => {
-        const {
-            id: _id, state: _state, ...rest
-        } = worker;
-        return adapter.workers.put(worker.id, {
-            ...rest,
-            strengths:
-                jsonArrayField(worker.strengths),
-            team_dimensions:
-                jsonObjectField(
-                    worker.team_dimensions,
-                ),
-        });
-    }));
+    await Promise.all([
+        ...workers.flatMap(worker => {
+            const {
+                id: _id, state: _state, name,
+                strengths, team_dimensions,
+                ...detail
+            } = worker;
+            return [
+                adapter.workers.put(worker.id, {
+                    type: 'human',
+                    name,
+                }),
+                adapter.humanWorkers.put(worker.id, {
+                    ...detail,
+                    strengths:
+                        jsonArrayField(strengths),
+                    team_dimensions:
+                        jsonObjectField(
+                            team_dimensions,
+                        ),
+                }),
+            ];
+        }),
+        adapter.workers.put(SYSTEM_WORKER_ID, {
+            type: 'system',
+            name: 'System Worker',
+        }),
+    ]);
 
     // Initial worker state events. Every seeded
     // worker — human or AI — gets one event at
@@ -739,6 +727,13 @@ export async function populateMockData(
             worker_id: SYSTEM_WORKER_ID,
             at: MOCK_SEED_TIMESTAMP,
         })),
+        {
+            id: `seed-worker-${SYSTEM_WORKER_ID}-active`,
+            entity_id: SYSTEM_WORKER_ID,
+            state: 'active',
+            worker_id: SYSTEM_WORKER_ID,
+            at: MOCK_SEED_TIMESTAMP,
+        },
     ];
 
     const ideas: IdeaEntity[] = [
@@ -1076,15 +1071,11 @@ export async function populateMockData(
         adapter.organization.put({
             name: 'Stark Industries',
             domain: 'acmecorp.com',
-            plan: 'Business',
-            plan_status: 'active',
             next_billing: dt(-300, 0, 0),
             seats: TIER_SEATS_LIMIT,
             used_seats: 18,
             projects_limit: TIER_PROJECTS_LIMIT,
             ideas_limit: TIER_IDEAS_LIMIT,
-            health_score: 92,
-            health_status: 'excellent',
             last_activity: dt(0, 16, 0),
         }),
     ]);
@@ -1343,6 +1334,23 @@ export async function populateMockData(
             actual_cost: 34000,
             position: 15,
         },
+        {
+            id: 'P16MktSent1mentXY01020',
+            title: 'Market Sentiment'
+                + ' Analyzer',
+            description:
+                'NLP pipeline that scores'
+                + ' brand sentiment across'
+                + ' social and news feeds,'
+                + ' freshly submitted for'
+                + ' review.',
+            progress: 0,
+            start_date: dt(5, 9, 0),
+            target_end_date: dt(-120, 9, 0),
+            estimated_cost: 42000,
+            actual_cost: 0,
+            position: 16,
+        },
     ];
 
     const wfTimestamp = dt(60, 9, 0);
@@ -1392,16 +1400,10 @@ export async function populateMockData(
     const workerLisa = 'Trf1Up2jMsPhEnjbW4Ji1n';
     const workerClaude = 'LdoTR1fnyYpS1jPzEs57ek';
 
-    const leadToCloseDescription =
-        'Sales pipeline: triage, discovery,'
-        + ' qualification, proposal,'
-        + ' negotiation, close.';
-
     const leadToCloseNodes: GraphNode[] = [
         {
             id: l2cCreateNodeId,
             name: 'Create',
-            description: '',
             positionX: 40,
             positionY: 30,
             isCreate: true,
@@ -1412,7 +1414,6 @@ export async function populateMockData(
         {
             id: l2cTriageNodeId,
             name: 'Inbound Triage',
-            description: '',
             positionX: 220,
             positionY: 100,
             isCreate: false,
@@ -1425,7 +1426,6 @@ export async function populateMockData(
         {
             id: l2cDiscoveryNodeId,
             name: 'Discovery Call',
-            description: '',
             positionX: 400,
             positionY: 180,
             isCreate: false,
@@ -1438,7 +1438,6 @@ export async function populateMockData(
         {
             id: l2cQualifNodeId,
             name: 'Qualification',
-            description: '',
             positionX: 580,
             positionY: 260,
             isCreate: false,
@@ -1451,7 +1450,6 @@ export async function populateMockData(
         {
             id: l2cProposalNodeId,
             name: 'Proposal Drafting',
-            description: '',
             positionX: 760,
             positionY: 340,
             isCreate: false,
@@ -1464,7 +1462,6 @@ export async function populateMockData(
         {
             id: l2cNegotNodeId,
             name: 'Negotiation',
-            description: '',
             positionX: 940,
             positionY: 420,
             isCreate: false,
@@ -1475,7 +1472,6 @@ export async function populateMockData(
         {
             id: l2cArchiveNodeId,
             name: 'Archive',
-            description: '',
             positionX: 1120,
             positionY: 500,
             isCreate: false,
@@ -1489,63 +1485,54 @@ export async function populateMockData(
         {
             id: l2cStartEdgeId,
             name: 'start',
-            description: '',
             fromNodeId: l2cCreateNodeId,
             toNodeId: l2cTriageNodeId,
         },
         {
             id: l2cQualifyEdgeId,
             name: 'qualify',
-            description: '',
             fromNodeId: l2cTriageNodeId,
             toNodeId: l2cDiscoveryNodeId,
         },
         {
             id: l2cDisqualifyEdgeId,
             name: 'disqualify',
-            description: '',
             fromNodeId: l2cTriageNodeId,
             toNodeId: l2cArchiveNodeId,
         },
         {
             id: l2cPromisingEdgeId,
             name: 'promising',
-            description: '',
             fromNodeId: l2cDiscoveryNodeId,
             toNodeId: l2cQualifNodeId,
         },
         {
             id: l2cGoEdgeId,
             name: 'go',
-            description: '',
             fromNodeId: l2cQualifNodeId,
             toNodeId: l2cProposalNodeId,
         },
         {
             id: l2cNeedsInfoEdgeId,
             name: 'needs info',
-            description: '',
             fromNodeId: l2cQualifNodeId,
             toNodeId: l2cDiscoveryNodeId,
         },
         {
             id: l2cSubmitEdgeId,
             name: 'submit',
-            description: '',
             fromNodeId: l2cProposalNodeId,
             toNodeId: l2cNegotNodeId,
         },
         {
             id: l2cWonEdgeId,
             name: 'won',
-            description: '',
             fromNodeId: l2cNegotNodeId,
             toNodeId: l2cArchiveNodeId,
         },
         {
             id: l2cReviseEdgeId,
             name: 'revise terms',
-            description: '',
             fromNodeId: l2cNegotNodeId,
             toNodeId: l2cProposalNodeId,
         },
@@ -1556,9 +1543,6 @@ export async function populateMockData(
         {
             id: 'h5mErVBQhwdMKwi1co30jB',
             name: 'Customer Onboarding',
-            description:
-                'Standard customer'
-                + ' onboarding process',
             is_locked: false,
             is_auto_layout: true,
             is_auto_fit: true,
@@ -1569,8 +1553,7 @@ export async function populateMockData(
                     {
                         id: 'lzkYvFNCEHARBQmZ4YHAn4',
                         name: 'Create',
-                        description: '',
-                        positionX: 40,
+                                    positionX: 40,
                         positionY: 30,
                         isCreate: true,
                         isArchive: false,
@@ -1581,8 +1564,7 @@ export async function populateMockData(
                         id: 'KoWNvvHG8d3TLAVN5nrWGX',
                         name:
                             'Data Capture',
-                        description: '',
-                        positionX: 260,
+                                    positionX: 260,
                         positionY: 140,
                         isCreate: false,
                         isArchive: false,
@@ -1668,8 +1650,7 @@ export async function populateMockData(
                     {
                         id: 'wDcQp0cIycrtWXEde6IsB1',
                         name: 'Review',
-                        description: '',
-                        positionX: 480,
+                                    positionX: 480,
                         positionY: 250,
                         isCreate: false,
                         isArchive: false,
@@ -1704,8 +1685,7 @@ export async function populateMockData(
                     {
                         id: '8jSnGiQ4Hedb2G75Y5aT7O',
                         name: 'Archive',
-                        description: '',
-                        positionX: 680,
+                                    positionX: 680,
                         positionY: 370,
                         isCreate: false,
                         isArchive: true,
@@ -1717,8 +1697,7 @@ export async function populateMockData(
                     {
                         id: 'QExPxoB0w8pQzQZYa0xuoI',
                         name: 'begin',
-                        description: '',
-                        fromNodeId:
+                                    fromNodeId:
                             'lzkYvFNCEHARBQmZ4YHAn4',
                         toNodeId:
                             'KoWNvvHG8d3TLAVN5nrWGX',
@@ -1726,8 +1705,7 @@ export async function populateMockData(
                     {
                         id: 'JOMWSa11urO1R4X2o7r6B9',
                         name: 'submit',
-                        description: '',
-                        fromNodeId:
+                                    fromNodeId:
                             'KoWNvvHG8d3TLAVN5nrWGX',
                         toNodeId:
                             'wDcQp0cIycrtWXEde6IsB1',
@@ -1736,8 +1714,7 @@ export async function populateMockData(
                         id: '7nRuNX7Hg9y6GFYWJrVBCH',
                         name:
                             'needs revision',
-                        description: '',
-                        fromNodeId:
+                                    fromNodeId:
                             'wDcQp0cIycrtWXEde6IsB1',
                         toNodeId:
                             'KoWNvvHG8d3TLAVN5nrWGX',
@@ -1745,8 +1722,7 @@ export async function populateMockData(
                     {
                         id: '3EET89t3L1FrCQe2kFJVl5',
                         name: 'approve',
-                        description: '',
-                        fromNodeId:
+                                    fromNodeId:
                             'wDcQp0cIycrtWXEde6IsB1',
                         toNodeId:
                             '8jSnGiQ4Hedb2G75Y5aT7O',
@@ -1757,7 +1733,6 @@ export async function populateMockData(
         {
             id: 'E2BnBlZyrriqsQYkmS4usb',
             name: 'Fusion Flow',
-            description: '',
             is_locked: false,
             is_auto_layout: true,
             is_auto_fit: true,
@@ -1768,8 +1743,7 @@ export async function populateMockData(
                     {
                         id: 'N8iGVHrr3iv0OCqICw2oWo',
                         name: 'Create',
-                        description: '',
-                        positionX: -702,
+                                    positionX: -702,
                         positionY: -236,
                         isCreate: true,
                         isArchive: false,
@@ -1779,8 +1753,7 @@ export async function populateMockData(
                     {
                         id: 'nKbwVydJZixw20nvP2XqfF',
                         name: 'Archive',
-                        description: '',
-                        positionX: 436,
+                                    positionX: 436,
                         positionY: 358,
                         isCreate: false,
                         isArchive: true,
@@ -1790,8 +1763,7 @@ export async function populateMockData(
                     {
                         id: 'aTGimTZZDvMb7iD9GuUbSG',
                         name: 'Ideas',
-                        description: '',
-                        positionX: -406,
+                                    positionX: -406,
                         positionY: -234,
                         isCreate: false,
                         isArchive: false,
@@ -1802,8 +1774,7 @@ export async function populateMockData(
                         id: '6KXcks9x9Tl54iNGWQoXNN',
                         name:
                             'Describe problem',
-                        description: '',
-                        positionX: -82,
+                                    positionX: -82,
                         positionY: -230,
                         isCreate: false,
                         isArchive: false,
@@ -1830,8 +1801,7 @@ export async function populateMockData(
                     {
                         id: 'HmpBNWHjANtDY4qtKZENOE',
                         name: 'Who Benefits',
-                        description: '',
-                        positionX: 187,
+                                    positionX: 187,
                         positionY: -232,
                         isCreate: false,
                         isArchive: false,
@@ -1841,8 +1811,7 @@ export async function populateMockData(
                     {
                         id: 'q1OZ85FQGwEbtIbFQo8H5o',
                         name: 'Solution',
-                        description: '',
-                        positionX: 527,
+                                    positionX: 527,
                         positionY: -231,
                         isCreate: false,
                         isArchive: false,
@@ -1869,8 +1838,7 @@ export async function populateMockData(
                     {
                         id: 'Yt5GGbxJqVG5Ws4NrGWzDD',
                         name: 'Outcome',
-                        description: '',
-                        positionX: 525,
+                                    positionX: 525,
                         positionY: -108,
                         isCreate: false,
                         isArchive: false,
@@ -1880,8 +1848,7 @@ export async function populateMockData(
                     {
                         id: 'm3sZ3Jk4ketOK9M9GD6qS1',
                         name: 'Edit Idea',
-                        description: '',
-                        positionX: 189,
+                                    positionX: 189,
                         positionY: -108,
                         isCreate: false,
                         isArchive: false,
@@ -1891,8 +1858,7 @@ export async function populateMockData(
                     {
                         id: 'D5DUyVr3Azc8zfbqgMovTr',
                         name: 'Cost',
-                        description: '',
-                        positionX: -409,
+                                    positionX: -409,
                         positionY: 22,
                         isCreate: false,
                         isArchive: false,
@@ -1902,8 +1868,7 @@ export async function populateMockData(
                     {
                         id: '1TKczWqL7gndPvMGFxYWGI',
                         name: 'Impact',
-                        description: '',
-                        positionX: -411,
+                                    positionX: -411,
                         positionY: 141,
                         isCreate: false,
                         isArchive: false,
@@ -1913,8 +1878,7 @@ export async function populateMockData(
                     {
                         id: 'Woly7CQBAkkGpe3A21lXoz',
                         name: 'Category',
-                        description: '',
-                        positionX: -143,
+                                    positionX: -143,
                         positionY: -108,
                         isCreate: false,
                         isArchive: false,
@@ -1924,8 +1888,7 @@ export async function populateMockData(
                     {
                         id: 'DOj4MO3NnhgCDKllZnxDWT',
                         name: 'Time',
-                        description: '',
-                        positionX: -408,
+                                    positionX: -408,
                         positionY: -108,
                         isCreate: false,
                         isArchive: false,
@@ -1935,8 +1898,7 @@ export async function populateMockData(
                     {
                         id: 'Liv4abswHyIMx4kJz6dTFo',
                         name: 'Idea',
-                        description: '',
-                        positionX: -412,
+                                    positionX: -412,
                         positionY: 278,
                         isCreate: false,
                         isArchive: false,
@@ -1946,8 +1908,7 @@ export async function populateMockData(
                     {
                         id: 'yFZAcQT3sWkhyH0zB80nzH',
                         name: 'Idea',
-                        description: '',
-                        positionX: -140,
+                                    positionX: -140,
                         positionY: -3,
                         isCreate: false,
                         isArchive: false,
@@ -1958,8 +1919,7 @@ export async function populateMockData(
                         id: '9bPFthPRyPtvfXKti5Qtfo',
                         name:
                             'Review Queue',
-                        description: '',
-                        positionX: 188,
+                                    positionX: 188,
                         positionY: -7,
                         isCreate: false,
                         isArchive: false,
@@ -1970,8 +1930,7 @@ export async function populateMockData(
                         id: 'bNGKd3eRcKynXWfJRLPlx1',
                         name:
                             'Approval Detail',
-                        description: '',
-                        positionX: 450,
+                                    positionX: 450,
                         positionY: 81,
                         isCreate: false,
                         isArchive: false,
@@ -1982,8 +1941,7 @@ export async function populateMockData(
                         id: 'Bxkqmeb8izINPj8fmDFh0s',
                         name:
                             'Ideas approve',
-                        description: '',
-                        positionX: 143,
+                                    positionX: 143,
                         positionY: 274,
                         isCreate: false,
                         isArchive: false,
@@ -1994,8 +1952,7 @@ export async function populateMockData(
                         id: 'IwXZhOjZKETjhF6g9OJmeQ',
                         name:
                             'Approval Detail',
-                        description: '',
-                        positionX: 448,
+                                    positionX: 448,
                         positionY: 214,
                         isCreate: false,
                         isArchive: false,
@@ -2007,8 +1964,7 @@ export async function populateMockData(
                     {
                         id: 'ZZScPB9Tsbybx2PZXhJjRi',
                         name: 'Create Idea',
-                        description: '',
-                        fromNodeId:
+                                    fromNodeId:
                             'N8iGVHrr3iv0OCqICw2oWo',
                         toNodeId:
                             'aTGimTZZDvMb7iD9GuUbSG',
@@ -2017,8 +1973,7 @@ export async function populateMockData(
                         id: '7XqroCtAynDGgi5Cm5VWae',
                         name:
                             'Create Title',
-                        description: '',
-                        fromNodeId:
+                                    fromNodeId:
                             'aTGimTZZDvMb7iD9GuUbSG',
                         toNodeId:
                             '6KXcks9x9Tl54iNGWQoXNN',
@@ -2026,8 +1981,7 @@ export async function populateMockData(
                     {
                         id: 'OB2L6yx8cOP91ulckc65md',
                         name: 'submit',
-                        description: '',
-                        fromNodeId:
+                                    fromNodeId:
                             '6KXcks9x9Tl54iNGWQoXNN',
                         toNodeId:
                             'HmpBNWHjANtDY4qtKZENOE',
@@ -2037,8 +1991,7 @@ export async function populateMockData(
                         name:
                             'describe'
                             + ' solution',
-                        description: '',
-                        fromNodeId:
+                                    fromNodeId:
                             'HmpBNWHjANtDY4qtKZENOE',
                         toNodeId:
                             'q1OZ85FQGwEbtIbFQo8H5o',
@@ -2046,8 +1999,7 @@ export async function populateMockData(
                     {
                         id: 'RqvW7TTPDBfupjFFxdeznR',
                         name: 'Describe',
-                        description: '',
-                        fromNodeId:
+                                    fromNodeId:
                             'q1OZ85FQGwEbtIbFQo8H5o',
                         toNodeId:
                             'Yt5GGbxJqVG5Ws4NrGWzDD',
@@ -2057,8 +2009,7 @@ export async function populateMockData(
                         name:
                             'Define'
                             + ' & Measure',
-                        description: '',
-                        fromNodeId:
+                                    fromNodeId:
                             'Yt5GGbxJqVG5Ws4NrGWzDD',
                         toNodeId:
                             'm3sZ3Jk4ketOK9M9GD6qS1',
@@ -2067,8 +2018,7 @@ export async function populateMockData(
                         id: 'UT7eoykdOetOZeCopKfefM',
                         name:
                             'Click on field',
-                        description: '',
-                        fromNodeId:
+                                    fromNodeId:
                             'm3sZ3Jk4ketOK9M9GD6qS1',
                         toNodeId:
                             'Woly7CQBAkkGpe3A21lXoz',
@@ -2076,8 +2026,7 @@ export async function populateMockData(
                     {
                         id: 'TTSKHNukJrKUYDvx5f1fsu',
                         name: 'Define',
-                        description: '',
-                        fromNodeId:
+                                    fromNodeId:
                             'Woly7CQBAkkGpe3A21lXoz',
                         toNodeId:
                             'DOj4MO3NnhgCDKllZnxDWT',
@@ -2085,8 +2034,7 @@ export async function populateMockData(
                     {
                         id: 'NmnbQwAHCgTmPKdWmI3Hfm',
                         name: 'Estimate',
-                        description: '',
-                        fromNodeId:
+                                    fromNodeId:
                             'DOj4MO3NnhgCDKllZnxDWT',
                         toNodeId:
                             'D5DUyVr3Azc8zfbqgMovTr',
@@ -2094,8 +2042,7 @@ export async function populateMockData(
                     {
                         id: 'K9anHKnA8oQnPxzcgocMmj',
                         name: 'Estimate',
-                        description: '',
-                        fromNodeId:
+                                    fromNodeId:
                             'D5DUyVr3Azc8zfbqgMovTr',
                         toNodeId:
                             '1TKczWqL7gndPvMGFxYWGI',
@@ -2103,8 +2050,7 @@ export async function populateMockData(
                     {
                         id: '9gfjcvJO0ZapJqovdeaKPX',
                         name: 'Estimate',
-                        description: '',
-                        fromNodeId:
+                                    fromNodeId:
                             '1TKczWqL7gndPvMGFxYWGI',
                         toNodeId:
                             'Liv4abswHyIMx4kJz6dTFo',
@@ -2112,8 +2058,7 @@ export async function populateMockData(
                     {
                         id: 'm3tfkY46Fa0pELrQ5h7IO2',
                         name: 'Submit',
-                        description: '',
-                        fromNodeId:
+                                    fromNodeId:
                             'Liv4abswHyIMx4kJz6dTFo',
                         toNodeId:
                             'yFZAcQT3sWkhyH0zB80nzH',
@@ -2121,8 +2066,7 @@ export async function populateMockData(
                     {
                         id: 'xHsuRI5N8KY0EFUVMPtSqo',
                         name: 'Review',
-                        description: '',
-                        fromNodeId:
+                                    fromNodeId:
                             'yFZAcQT3sWkhyH0zB80nzH',
                         toNodeId:
                             '9bPFthPRyPtvfXKti5Qtfo',
@@ -2130,8 +2074,7 @@ export async function populateMockData(
                     {
                         id: '483GMjR0CxRWqzmqeusZDi',
                         name: 'Select',
-                        description: '',
-                        fromNodeId:
+                                    fromNodeId:
                             '9bPFthPRyPtvfXKti5Qtfo',
                         toNodeId:
                             'bNGKd3eRcKynXWfJRLPlx1',
@@ -2139,8 +2082,7 @@ export async function populateMockData(
                     {
                         id: '1uOW9HWwpQ5UHz30pSE8sh',
                         name: 'Decline',
-                        description: '',
-                        fromNodeId:
+                                    fromNodeId:
                             'bNGKd3eRcKynXWfJRLPlx1',
                         toNodeId:
                             '9bPFthPRyPtvfXKti5Qtfo',
@@ -2148,8 +2090,7 @@ export async function populateMockData(
                     {
                         id: 'SOLWdDhsGPdfiYHzqIYneC',
                         name: 'Review',
-                        description: '',
-                        fromNodeId:
+                                    fromNodeId:
                             'bNGKd3eRcKynXWfJRLPlx1',
                         toNodeId:
                             'IwXZhOjZKETjhF6g9OJmeQ',
@@ -2157,8 +2098,7 @@ export async function populateMockData(
                     {
                         id: 'M9YyQWNFvu9mDWamXMvoRJ',
                         name: 'Approve',
-                        description: '',
-                        fromNodeId:
+                                    fromNodeId:
                             'IwXZhOjZKETjhF6g9OJmeQ',
                         toNodeId:
                             'Bxkqmeb8izINPj8fmDFh0s',
@@ -2166,8 +2106,7 @@ export async function populateMockData(
                     {
                         id: 'hniGGFLzDWLJDYi6Kvhbcz',
                         name: 'Released',
-                        description: '',
-                        fromNodeId:
+                                    fromNodeId:
                             'Bxkqmeb8izINPj8fmDFh0s',
                         toNodeId:
                             'nKbwVydJZixw20nvP2XqfF',
@@ -2179,10 +2118,6 @@ export async function populateMockData(
             id: '7COt7Kf4OaOBg6AjaNO04s',
             name:
                 'Layout Test: Proposal Review Cycle',
-            description:
-                'Exercises multi-exit fans, nested'
-                + ' decisions, convergence, and'
-                + ' cycles for Auto Layout testing',
             is_locked: false,
             is_auto_layout: true,
             is_auto_fit: true,
@@ -2192,8 +2127,7 @@ export async function populateMockData(
                     {
                         id: 'qfuFbfKwwlpKAewu3Uujb7',
                         name: 'Create',
-                        description: '',
-                        positionX: 0,
+                                    positionX: 0,
                         positionY: 0,
                         isCreate: true,
                         isArchive: false,
@@ -2203,8 +2137,7 @@ export async function populateMockData(
                     {
                         id: 'M3HcytVGj8JNjrFS0AyVfA',
                         name: 'Draft',
-                        description: '',
-                        positionX: 0,
+                                    positionX: 0,
                         positionY: 0,
                         isCreate: false,
                         isArchive: false,
@@ -2214,8 +2147,7 @@ export async function populateMockData(
                     {
                         id: 'T6I6dn4MKD50QZXlvxIm9I',
                         name: 'Submit',
-                        description: '',
-                        positionX: 0,
+                                    positionX: 0,
                         positionY: 0,
                         isCreate: false,
                         isArchive: false,
@@ -2225,8 +2157,7 @@ export async function populateMockData(
                     {
                         id: 'OHPERFEO1EMfDoGZnccF5F',
                         name: 'Triage',
-                        description: '',
-                        positionX: 0,
+                                    positionX: 0,
                         positionY: 0,
                         isCreate: false,
                         isArchive: false,
@@ -2236,8 +2167,7 @@ export async function populateMockData(
                     {
                         id: 'NHIpcNdKKV4gbT4QOkkXEO',
                         name: 'Quick Review',
-                        description: '',
-                        positionX: 0,
+                                    positionX: 0,
                         positionY: 0,
                         isCreate: false,
                         isArchive: false,
@@ -2247,8 +2177,7 @@ export async function populateMockData(
                     {
                         id: '4z9uXoChh9HjMTEHfZQhAk',
                         name: 'Standard Review',
-                        description: '',
-                        positionX: 0,
+                                    positionX: 0,
                         positionY: 0,
                         isCreate: false,
                         isArchive: false,
@@ -2258,8 +2187,7 @@ export async function populateMockData(
                     {
                         id: 'zO7tsd7ndwm2uQDwS30EzR',
                         name: 'Deep Review',
-                        description: '',
-                        positionX: 0,
+                                    positionX: 0,
                         positionY: 0,
                         isCreate: false,
                         isArchive: false,
@@ -2269,8 +2197,7 @@ export async function populateMockData(
                     {
                         id: '32hICE8mCh9Ch0CMYyjEXR',
                         name: 'Panel A',
-                        description: '',
-                        positionX: 0,
+                                    positionX: 0,
                         positionY: 0,
                         isCreate: false,
                         isArchive: false,
@@ -2280,8 +2207,7 @@ export async function populateMockData(
                     {
                         id: 'WwjEFe4v1am6etJDQqg0mi',
                         name: 'Panel B',
-                        description: '',
-                        positionX: 0,
+                                    positionX: 0,
                         positionY: 0,
                         isCreate: false,
                         isArchive: false,
@@ -2291,8 +2217,7 @@ export async function populateMockData(
                     {
                         id: 'PU9ueWLOmK247RFNDwuh4R',
                         name: 'Panel C',
-                        description: '',
-                        positionX: 0,
+                                    positionX: 0,
                         positionY: 0,
                         isCreate: false,
                         isArchive: false,
@@ -2302,8 +2227,7 @@ export async function populateMockData(
                     {
                         id: 'ybr0XraIXnlbOhYRmBnkz6',
                         name: 'Panel D',
-                        description: '',
-                        positionX: 0,
+                                    positionX: 0,
                         positionY: 0,
                         isCreate: false,
                         isArchive: false,
@@ -2313,8 +2237,7 @@ export async function populateMockData(
                     {
                         id: 'qSJo6DFKY52Y0815TFax01',
                         name: 'Consolidate',
-                        description: '',
-                        positionX: 0,
+                                    positionX: 0,
                         positionY: 0,
                         isCreate: false,
                         isArchive: false,
@@ -2324,8 +2247,7 @@ export async function populateMockData(
                     {
                         id: 'rWdJ5vz4hm9dLVhBYROSoK',
                         name: 'Decision',
-                        description: '',
-                        positionX: 0,
+                                    positionX: 0,
                         positionY: 0,
                         isCreate: false,
                         isArchive: false,
@@ -2335,8 +2257,7 @@ export async function populateMockData(
                     {
                         id: '4zi5yzNsiA89SzrcEityhr',
                         name: 'Approved',
-                        description: '',
-                        positionX: 0,
+                                    positionX: 0,
                         positionY: 0,
                         isCreate: false,
                         isArchive: false,
@@ -2346,8 +2267,7 @@ export async function populateMockData(
                     {
                         id: '8yXx35sqhjAb3lfkSWbsG2',
                         name: 'Revise',
-                        description: '',
-                        positionX: 0,
+                                    positionX: 0,
                         positionY: 0,
                         isCreate: false,
                         isArchive: false,
@@ -2357,8 +2277,7 @@ export async function populateMockData(
                     {
                         id: 'HJBEhUvJ4rA9x8y3s2iVKZ',
                         name: 'Rejected',
-                        description: '',
-                        positionX: 0,
+                                    positionX: 0,
                         positionY: 0,
                         isCreate: false,
                         isArchive: false,
@@ -2368,8 +2287,7 @@ export async function populateMockData(
                     {
                         id: '9r0eSQ4ndyaRoYbKTTDpW2',
                         name: 'Archive',
-                        description: '',
-                        positionX: 0,
+                                    positionX: 0,
                         positionY: 0,
                         isCreate: false,
                         isArchive: true,
@@ -2381,8 +2299,7 @@ export async function populateMockData(
                     {
                         id: 'd7PuQ9Zy29gFyzGPN4RpB3',
                         name: 'begin',
-                        description: '',
-                        fromNodeId:
+                                    fromNodeId:
                             'qfuFbfKwwlpKAewu3Uujb7',
                         toNodeId:
                             'M3HcytVGj8JNjrFS0AyVfA',
@@ -2390,8 +2307,7 @@ export async function populateMockData(
                     {
                         id: 'hsx6jDHfnhYjAyt38lhE55',
                         name: 'ready',
-                        description: '',
-                        fromNodeId:
+                                    fromNodeId:
                             'M3HcytVGj8JNjrFS0AyVfA',
                         toNodeId:
                             'T6I6dn4MKD50QZXlvxIm9I',
@@ -2399,8 +2315,7 @@ export async function populateMockData(
                     {
                         id: 'Ipx62MKIlQyFnGJ9QGYIFc',
                         name: 'submitted',
-                        description: '',
-                        fromNodeId:
+                                    fromNodeId:
                             'T6I6dn4MKD50QZXlvxIm9I',
                         toNodeId:
                             'OHPERFEO1EMfDoGZnccF5F',
@@ -2408,8 +2323,7 @@ export async function populateMockData(
                     {
                         id: 'tdwLKK3AkUQ7ktWGtrtFvN',
                         name: 'quick',
-                        description: '',
-                        fromNodeId:
+                                    fromNodeId:
                             'OHPERFEO1EMfDoGZnccF5F',
                         toNodeId:
                             'NHIpcNdKKV4gbT4QOkkXEO',
@@ -2417,8 +2331,7 @@ export async function populateMockData(
                     {
                         id: 'dD0IU0SRzeefvOwpCNralx',
                         name: 'standard',
-                        description: '',
-                        fromNodeId:
+                                    fromNodeId:
                             'OHPERFEO1EMfDoGZnccF5F',
                         toNodeId:
                             '4z9uXoChh9HjMTEHfZQhAk',
@@ -2426,8 +2339,7 @@ export async function populateMockData(
                     {
                         id: 'GeTN4gJRAjQMT7I8SiIBWm',
                         name: 'deep',
-                        description: '',
-                        fromNodeId:
+                                    fromNodeId:
                             'OHPERFEO1EMfDoGZnccF5F',
                         toNodeId:
                             'zO7tsd7ndwm2uQDwS30EzR',
@@ -2435,8 +2347,7 @@ export async function populateMockData(
                     {
                         id: 'fesMrzvcP7sjL4NukvoOgL',
                         name: 'panel A',
-                        description: '',
-                        fromNodeId:
+                                    fromNodeId:
                             'zO7tsd7ndwm2uQDwS30EzR',
                         toNodeId:
                             '32hICE8mCh9Ch0CMYyjEXR',
@@ -2444,8 +2355,7 @@ export async function populateMockData(
                     {
                         id: 'XbZxNKiFmWRM7958GGtzaQ',
                         name: 'panel B',
-                        description: '',
-                        fromNodeId:
+                                    fromNodeId:
                             'zO7tsd7ndwm2uQDwS30EzR',
                         toNodeId:
                             'WwjEFe4v1am6etJDQqg0mi',
@@ -2453,8 +2363,7 @@ export async function populateMockData(
                     {
                         id: 'VHwKGtKxu4SxHw7XeQa7QQ',
                         name: 'panel C',
-                        description: '',
-                        fromNodeId:
+                                    fromNodeId:
                             'zO7tsd7ndwm2uQDwS30EzR',
                         toNodeId:
                             'PU9ueWLOmK247RFNDwuh4R',
@@ -2462,8 +2371,7 @@ export async function populateMockData(
                     {
                         id: 'mHXz4czc4mmYXFDlAx6a6c',
                         name: 'panel D',
-                        description: '',
-                        fromNodeId:
+                                    fromNodeId:
                             'zO7tsd7ndwm2uQDwS30EzR',
                         toNodeId:
                             'ybr0XraIXnlbOhYRmBnkz6',
@@ -2471,8 +2379,7 @@ export async function populateMockData(
                     {
                         id: 'H3YmWhVQiXvOpkTGBGHZ3M',
                         name: 'A done',
-                        description: '',
-                        fromNodeId:
+                                    fromNodeId:
                             '32hICE8mCh9Ch0CMYyjEXR',
                         toNodeId:
                             'qSJo6DFKY52Y0815TFax01',
@@ -2480,8 +2387,7 @@ export async function populateMockData(
                     {
                         id: '6mi4SitxXSt2cqN4Fi6j9i',
                         name: 'B done',
-                        description: '',
-                        fromNodeId:
+                                    fromNodeId:
                             'WwjEFe4v1am6etJDQqg0mi',
                         toNodeId:
                             'qSJo6DFKY52Y0815TFax01',
@@ -2489,8 +2395,7 @@ export async function populateMockData(
                     {
                         id: 'vBNJ1EpY3GAnUli7yqgQuy',
                         name: 'C done',
-                        description: '',
-                        fromNodeId:
+                                    fromNodeId:
                             'PU9ueWLOmK247RFNDwuh4R',
                         toNodeId:
                             'qSJo6DFKY52Y0815TFax01',
@@ -2498,8 +2403,7 @@ export async function populateMockData(
                     {
                         id: 'v5zoVkTe9K1YfBbPmYiFwY',
                         name: 'D done',
-                        description: '',
-                        fromNodeId:
+                                    fromNodeId:
                             'ybr0XraIXnlbOhYRmBnkz6',
                         toNodeId:
                             'qSJo6DFKY52Y0815TFax01',
@@ -2507,8 +2411,7 @@ export async function populateMockData(
                     {
                         id: 'ycnonq2kyeYWBSyfbkJsw8',
                         name: 'to decision',
-                        description: '',
-                        fromNodeId:
+                                    fromNodeId:
                             'NHIpcNdKKV4gbT4QOkkXEO',
                         toNodeId:
                             'rWdJ5vz4hm9dLVhBYROSoK',
@@ -2516,8 +2419,7 @@ export async function populateMockData(
                     {
                         id: 'uYtL09fL3FAXnH5zk5wb3g',
                         name: 'to decision',
-                        description: '',
-                        fromNodeId:
+                                    fromNodeId:
                             '4z9uXoChh9HjMTEHfZQhAk',
                         toNodeId:
                             'rWdJ5vz4hm9dLVhBYROSoK',
@@ -2525,8 +2427,7 @@ export async function populateMockData(
                     {
                         id: 'R6kZDZixNfCpz0a3DfE8ti',
                         name: 'synthesized',
-                        description: '',
-                        fromNodeId:
+                                    fromNodeId:
                             'qSJo6DFKY52Y0815TFax01',
                         toNodeId:
                             'rWdJ5vz4hm9dLVhBYROSoK',
@@ -2534,8 +2435,7 @@ export async function populateMockData(
                     {
                         id: 'fUwITjW5uJkLFGZ4oPmVv0',
                         name: 'approve',
-                        description: '',
-                        fromNodeId:
+                                    fromNodeId:
                             'rWdJ5vz4hm9dLVhBYROSoK',
                         toNodeId:
                             '4zi5yzNsiA89SzrcEityhr',
@@ -2543,8 +2443,7 @@ export async function populateMockData(
                     {
                         id: 'iEsz7rc6GfplC6wWzHJvK2',
                         name: 'revise',
-                        description: '',
-                        fromNodeId:
+                                    fromNodeId:
                             'rWdJ5vz4hm9dLVhBYROSoK',
                         toNodeId:
                             '8yXx35sqhjAb3lfkSWbsG2',
@@ -2552,8 +2451,7 @@ export async function populateMockData(
                     {
                         id: '6iEoMDVIbOoniZ1bxgV3HA',
                         name: 'reject',
-                        description: '',
-                        fromNodeId:
+                                    fromNodeId:
                             'rWdJ5vz4hm9dLVhBYROSoK',
                         toNodeId:
                             'HJBEhUvJ4rA9x8y3s2iVKZ',
@@ -2561,8 +2459,7 @@ export async function populateMockData(
                     {
                         id: 'rrAD5jbsCqKxnrJXkROXKr',
                         name: 'done',
-                        description: '',
-                        fromNodeId:
+                                    fromNodeId:
                             '4zi5yzNsiA89SzrcEityhr',
                         toNodeId:
                             '9r0eSQ4ndyaRoYbKTTDpW2',
@@ -2570,8 +2467,7 @@ export async function populateMockData(
                     {
                         id: 'gS7JmZcHknZ06T41zSTtYt',
                         name: 'done',
-                        description: '',
-                        fromNodeId:
+                                    fromNodeId:
                             'HJBEhUvJ4rA9x8y3s2iVKZ',
                         toNodeId:
                             '9r0eSQ4ndyaRoYbKTTDpW2',
@@ -2579,8 +2475,7 @@ export async function populateMockData(
                     {
                         id: 'sfrAXlOXTtoqUuNQCwTbet',
                         name: 'back to draft',
-                        description: '',
-                        fromNodeId:
+                                    fromNodeId:
                             '8yXx35sqhjAb3lfkSWbsG2',
                         toNodeId:
                             'M3HcytVGj8JNjrFS0AyVfA',
@@ -2591,8 +2486,6 @@ export async function populateMockData(
         {
             id: l2cFlowId,
             name: 'Lead-to-Close',
-            description:
-                leadToCloseDescription,
             is_locked: false,
             is_auto_layout: true,
             is_auto_fit: true,
@@ -2888,10 +2781,6 @@ export async function populateMockData(
                 'h5mErVBQhwdMKwi1co30jB',
             name:
                 'Customer Onboarding',
-            description:
-                'Standard customer'
-                + ' onboarding'
-                + ' process',
             lockTimeout:
                 DEFAULT_LOCK_TIMEOUT,
             nodes: woGraphParsed.nodes,
@@ -2913,13 +2802,6 @@ export async function populateMockData(
             name:
                 'Layout Test: Proposal'
                 + ' Review Cycle',
-            description:
-                'Exercises multi-exit'
-                + ' fans, nested'
-                + ' decisions,'
-                + ' convergence, and'
-                + ' cycles for Auto'
-                + ' Layout testing',
             lockTimeout:
                 DEFAULT_LOCK_TIMEOUT,
             nodes: prcGraphParsed.nodes,
@@ -2972,10 +2854,6 @@ export async function populateMockData(
                     'h5mErVBQhwdMKwi1co30jB',
                 name:
                     'Customer Onboarding',
-                description:
-                    'Standard customer'
-                    + ' onboarding'
-                    + ' process',
                 lockTimeout:
                     DEFAULT_LOCK_TIMEOUT,
                 nodes: JSON.parse(
@@ -5643,7 +5521,6 @@ export async function populateMockData(
     const leadToCloseSpec: FlowSeedSpec = {
         flowId: l2cFlowId,
         name: 'Lead-to-Close',
-        description: leadToCloseDescription,
         nodes: leadToCloseNodes,
         edges: leadToCloseEdges,
         creator: leadToCloseNodes[0]!,
@@ -5837,7 +5714,7 @@ export async function populateMockData(
         {
             id: 'pSe02Aut0Rep0rtComp02',
             entity_id: 'jRE2Tj32NHsFGZIeEADp0p',
-            state: 'completed',
+            state: 'archived',
             worker_id: SYSTEM_WORKER_ID,
             at: dt(110, 9, 0),
         },
@@ -5858,7 +5735,7 @@ export async function populateMockData(
         {
             id: 'pSe05RtAna1ytComp05CD',
             entity_id: 'P05RtAna1ytcsXY010203Z',
-            state: 'completed',
+            state: 'archived',
             worker_id: SYSTEM_WORKER_ID,
             at: dt(95, 9, 0),
         },
@@ -5907,7 +5784,7 @@ export async function populateMockData(
         {
             id: 'pSe12CarbF00tCmp12RS',
             entity_id: 'P12CarbF00tprXY01K0L0M',
-            state: 'completed',
+            state: 'archived',
             worker_id: SYSTEM_WORKER_ID,
             at: dt(120, 9, 0),
         },
@@ -5931,6 +5808,13 @@ export async function populateMockData(
             state: 'approved',
             worker_id: SYSTEM_WORKER_ID,
             at: dt(58, 9, 0),
+        },
+        {
+            id: 'pSe16MktSentSubmt16BC',
+            entity_id: 'P16MktSent1mentXY01020',
+            state: 'submitted',
+            worker_id: SYSTEM_WORKER_ID,
+            at: dt(5, 9, 0),
         },
     ];
 
@@ -5974,7 +5858,7 @@ export async function populateMockData(
         },
     ];
 
-    const aiWorkers: AIWorkerEntity[] = [
+    const aiWorkers: (AIWorkerEntity & { name: string })[] = [
         {
             id: 'tuJwPxYtBur2KCLquScShB',
             name: 'Claude Opus 4.7 Max',
@@ -6092,9 +5976,16 @@ export async function populateMockData(
             adapter.stateFieldValues
                 .put(r.id, r),
         ),
-        ...aiWorkers.map(m =>
-            adapter.aiWorkers.put(m.id, m),
-        ),
+        ...aiWorkers.flatMap(m => {
+            const { id: _id, name, ...detail } = m;
+            return [
+                adapter.workers.put(m.id, {
+                    type: 'ai',
+                    name,
+                }),
+                adapter.aiWorkers.put(m.id, detail),
+            ];
+        }),
         ...leadToCloseData.workOrders.map(r =>
             adapter.workOrders.put(r.id, r),
         ),
@@ -6147,6 +6038,17 @@ export async function populateMockData(
         ),
     ]);
 
+    const humanWorkerIds =
+        (await adapter.workers.getAll())
+            .filter(w => w.type === 'human')
+            .map(w => w.id);
+    const workerFor = (seed: string): string =>
+        humanWorkerIds[
+            deterministicScore(
+                seed, 0, humanWorkerIds.length - 1,
+            )
+        ] ?? SYSTEM_WORKER_ID;
+
     for (const seed of OBJECTIVE_SEEDS) {
         await adapter.objectives.put(seed.id, {
             position: seed.position,
@@ -6157,6 +6059,9 @@ export async function populateMockData(
                 objective_id: seed.id,
                 name: seed.name,
                 description: seed.description,
+                worker_id: workerFor(
+                    `${seed.id}:revision`,
+                ),
                 at: MOCK_SEED_TIMESTAMP,
             },
         );
@@ -6201,7 +6106,7 @@ export async function populateMockData(
 
         const baselineCoverage =
             state === 'approved'
-            || state === 'completed'
+            || state === 'archived'
                 ? OBJECTIVE_SEEDS.length
                 : deterministicScore(
                     p.id + ':coverage',
@@ -6211,14 +6116,14 @@ export async function populateMockData(
 
         const baselineStart =
             new Date(p.start_date).getTime();
-        // Committed work (approved + completed) is
+        // Committed work (approved + archived) is
         // expected to advance objectives; baselines
         // skew positive. Drafts (under-review +
         // sent-back) can dip negative — a flagged
         // risk worth surfacing on the dashboard.
         const baselineMin =
             state === 'approved'
-            || state === 'completed'
+            || state === 'archived'
                 ? 0
                 : -100;
         for (let i = 0; i < baselineCoverage; i++) {
@@ -6239,6 +6144,9 @@ export async function populateMockData(
                         project_id: p.id,
                         objective_id: obj.id,
                         score,
+                        worker_id: workerFor(
+                            `${p.id}:${obj.id}:baseline`,
+                        ),
                         at: scoredAt,
                     },
                 );
@@ -6246,10 +6154,9 @@ export async function populateMockData(
 
         if (
             state === 'approved'
-            || state === 'completed'
+            || state === 'archived'
         ) {
-            const minActuals =
-                state === 'completed' ? 1 : 0;
+            const minActuals = 1;
             const baseActualTime =
                 baselineStart + MS_PER_DAY;
             for (
@@ -6281,6 +6188,9 @@ export async function populateMockData(
                                 project_id: p.id,
                                 objective_id: obj.id,
                                 score,
+                                worker_id: workerFor(
+                                    `${p.id}:${obj.id}:actual:${k}`,
+                                ),
                                 at: scoredAt,
                             },
                         );
@@ -6293,215 +6203,22 @@ export async function populateMockData(
 export async function populateBootstrapData(
     adapter: DbAdapter,
 ): Promise<void> {
-    // Bootstrap Records: the same two shapes
-    // seeded by populateMockData, so the empty-
-    // state app still has a coherent Records UI
-    // to browse. No flows exist in the bootstrap
-    // seed, so no flow_records bindings either —
-    // bindings appear when mock data is loaded.
-    const customerProfileRecordId =
-        'rec01CustProfRec0rdAB1';
-    const projectBriefRecordId =
-        'rec02Pr0jBriefRec0rd02';
-
-    const bootstrapRecords: RecordEntity[] = [
-        {
-            id: customerProfileRecordId,
-            name: 'Customer Profile',
-            description:
-                'Company-side facts captured'
-                + ' during onboarding and sales'
-                + ' pursuits.',
-            position: 1,
-        },
-        {
-            id: projectBriefRecordId,
-            name: 'Project Brief',
-            description:
-                'Lightweight scoping shape used'
-                + ' by the Fusion Flow.',
-            position: 2,
-        },
-    ];
-
-    const emailRegexConstraint: Constraint[] = [{
-        kind: 'regex',
-        pattern: '^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$',
-    }];
-    const revenueRangeMinConstraint:
-        Constraint[] = [{
-        kind: 'range_min',
-        min: '0',
-    }];
-    const foundedOnRangeMaxConstraint:
-        Constraint[] = [{
-        kind: 'range_max',
-        max: '2099-12-31',
-    }];
-
-    const bootstrapRecordAttributes:
-        RecordAttributeEntity[] = [
-        {
-            id: '5JZ0LeKdPCa4QMtg1RsF1M',
-            record_id: customerProfileRecordId,
-            name: 'Company Name',
-            attribute_type: 'text',
-            sort_order: 1,
-            options: jsonArrayField([]),
-            constraints: jsonArrayField([]),
-        },
-        {
-            id: 'nplTIh0qXNtAyoWSwRaBYe',
-            record_id: customerProfileRecordId,
-            name: 'Contact Email',
-            attribute_type: 'text',
-            sort_order: 2,
-            options: jsonArrayField([]),
-            constraints: jsonArrayField(
-                emailRegexConstraint,
-            ),
-        },
-        {
-            id: 'kzHpMw9f1thq79VoBYeIX3',
-            record_id: customerProfileRecordId,
-            name: 'Contact Phone',
-            attribute_type: 'text',
-            sort_order: 3,
-            options: jsonArrayField([]),
-            constraints: jsonArrayField([]),
-        },
-        {
-            id: 'QsmqiOmPtoMLGpSjHOqdHA',
-            record_id: customerProfileRecordId,
-            name: 'Industry',
-            attribute_type: 'select',
-            sort_order: 4,
-            options: jsonArrayField([
-                'Technology',
-                'Finance',
-                'Healthcare',
-                'Retail',
-                'Manufacturing',
-            ]),
-            constraints: jsonArrayField([]),
-        },
-        {
-            id: '0TyjQRcygn3DIyXTe6x1F6',
-            record_id: customerProfileRecordId,
-            name: 'Annual Revenue',
-            attribute_type: 'number',
-            sort_order: 5,
-            options: jsonArrayField([]),
-            constraints: jsonArrayField(
-                revenueRangeMinConstraint,
-            ),
-        },
-        {
-            id: '8Z62tcRHBpwCRH1kBffx0G',
-            record_id: customerProfileRecordId,
-            name: 'Number of Employees',
-            attribute_type: 'number',
-            sort_order: 6,
-            options: jsonArrayField([]),
-            constraints: jsonArrayField([]),
-        },
-        {
-            id: 'aR8nKpQ9wEzVxL3CmBdYTf',
-            record_id: customerProfileRecordId,
-            name: 'Founded On',
-            attribute_type: 'date',
-            sort_order: 7,
-            options: jsonArrayField([]),
-            constraints: jsonArrayField(
-                foundedOnRangeMaxConstraint,
-            ),
-        },
-        {
-            id: 'mBrOOvQtZTTKb5TTnXvzXo',
-            record_id: customerProfileRecordId,
-            name: 'Company Logo',
-            attribute_type: 'text',
-            sort_order: 8,
-            options: jsonArrayField([]),
-            constraints: jsonArrayField([]),
-        },
-        {
-            id: 'y9DiJ5QHNB5ho3K1n9myMc',
-            record_id: customerProfileRecordId,
-            name: 'Supporting Documents',
-            attribute_type: 'text',
-            sort_order: 9,
-            options: jsonArrayField([]),
-            constraints: jsonArrayField([]),
-        },
-        {
-            id: 'AdQlKf43JV6yrhQbyskDkR',
-            record_id: customerProfileRecordId,
-            name: 'Reviewer Notes',
-            attribute_type: 'text',
-            sort_order: 10,
-            options: jsonArrayField([]),
-            constraints: jsonArrayField([]),
-        },
-        {
-            id: 'pBA01Pr0j3ctBr13fNm3T1',
-            record_id: projectBriefRecordId,
-            name: 'Project Name',
-            attribute_type: 'text',
-            sort_order: 1,
-            options: jsonArrayField([]),
-            constraints: jsonArrayField([]),
-        },
-        {
-            id: 'pBA02Pr0j3ctBr13fDsc02',
-            record_id: projectBriefRecordId,
-            name: 'Description',
-            attribute_type: 'text',
-            sort_order: 2,
-            options: jsonArrayField([]),
-            constraints: jsonArrayField([]),
-        },
-        {
-            id: 'pBA03Pr0j3ctBr13fPry03',
-            record_id: projectBriefRecordId,
-            name: 'Priority',
-            attribute_type: 'select',
-            sort_order: 3,
-            options: jsonArrayField([
-                'Low',
-                'Medium',
-                'High',
-                'Critical',
-            ]),
-            constraints: jsonArrayField([]),
-        },
-        {
-            id: 'pBA04Pr0j3ctBr13fApr04',
-            record_id: projectBriefRecordId,
-            name: 'Approved',
-            attribute_type: 'checkbox',
-            sort_order: 4,
-            options: jsonArrayField([]),
-            constraints: jsonArrayField([]),
-        },
-    ];
-
+    // The pristine seed plants only what the app needs
+    // to render its shell: the system actor that authors
+    // state events, the current user, and the singleton
+    // organization. No Records — an empty Records page is
+    // the correct pristine state; sample Records are demo
+    // content loaded by populateMockData, not bootstrap.
     await Promise.all([
         adapter.workers.put(SYSTEM_WORKER_ID, {
-            first_name: 'System',
-            last_name: 'Worker',
-            email: 'system@fusion.local',
-            title: 'System',
-            department: 'System',
-            strengths: jsonArrayField([]),
-            team_dimensions: jsonObjectField({}),
-            phone: '',
-            bio: 'Synthetic worker that owns'
-                + ' system-authored state events.',
+            type: 'system',
+            name: 'System Worker',
         }),
         adapter.workers.put('current', {
-            first_name: 'Tony',
-            last_name: 'Stark',
+            type: 'human',
+            name: 'Tony Stark',
+        }),
+        adapter.humanWorkers.put('current', {
             email: 'demo@example.com',
             title: 'Admin',
             department: 'Product',
@@ -6536,46 +6253,12 @@ export async function populateBootstrapData(
         adapter.organization.put({
             name: 'Stark Industries',
             domain: 'acmecorp.com',
-            plan: 'Business',
-            plan_status: 'active',
             next_billing: dt(-300, 0, 0),
             seats: TIER_SEATS_LIMIT,
             used_seats: 18,
             projects_limit: TIER_PROJECTS_LIMIT,
             ideas_limit: TIER_IDEAS_LIMIT,
-            health_score: 92,
-            health_status: 'excellent',
             last_activity: dt(0, 16, 0),
         }),
-        ...bootstrapRecords.map(r =>
-            adapter.records.put(r.id, {
-                name: r.name,
-                description: r.description,
-                position: r.position,
-            }),
-        ),
-        ...bootstrapRecordAttributes.map(r =>
-            adapter.recordAttributes.put(r.id, {
-                record_id: r.record_id,
-                name: r.name,
-                attribute_type:
-                    r.attribute_type,
-                sort_order: r.sort_order,
-                options: r.options,
-                constraints: r.constraints,
-            }),
-        ),
-        adapter.states.record(
-            'bootstrap-cust-profile-active',
-            customerProfileRecordId,
-            'active',
-            SYSTEM_WORKER_ID,
-        ),
-        adapter.states.record(
-            'bootstrap-project-brief-active',
-            projectBriefRecordId,
-            'active',
-            SYSTEM_WORKER_ID,
-        ),
     ]);
 }

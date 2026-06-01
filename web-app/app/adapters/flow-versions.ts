@@ -22,7 +22,6 @@ export interface FlowVersion {
     id: string;
     flowId: string;
     name: string;
-    description: string;
     isLocked: boolean;
     isAutoLayout: boolean;
     isAutoFit: boolean;
@@ -44,7 +43,6 @@ function computeFlowVersion(
         id: row.id,
         flowId: row.flow_id,
         name: row.name,
-        description: row.description,
         isLocked: asBoolean(
             row.is_locked,
             'is_locked',
@@ -110,7 +108,6 @@ export async function postFlowVersion(
                 body: {
                     flow_id: flowId,
                     name: flow.name,
-                    description: flow.description,
                     is_locked: flow.is_locked,
                     is_auto_layout:
                         flow.is_auto_layout,

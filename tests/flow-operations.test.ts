@@ -58,6 +58,9 @@ import {
 import type {
     FlowGraph,
 } from '../web-app/app/adapters/flow-queries.ts';
+import {
+    seedHumanWorker,
+} from './worker-fixtures.ts';
 
 const FLOW_ID = 'flow-1';
 
@@ -70,7 +73,6 @@ function buildNode(
     return {
         id,
         name: id,
-        description: '',
         positionX: 0,
         positionY: 0,
         isCreate: false,
@@ -89,7 +91,6 @@ function buildEdge(
     return {
         id,
         name: 'Transition',
-        description: '',
         fromNodeId,
         toNodeId,
     };
@@ -114,7 +115,6 @@ function buildGraph(
     return {
         id: FLOW_ID,
         name: 'Test Flow',
-        description: '',
         isLocked: false,
         isAutoLayout: true,
         isAutoFit: true,
@@ -132,7 +132,6 @@ function buildFlowVersion(
         id: 'ver-1',
         flowId: FLOW_ID,
         name: 'Previous',
-        description: '',
         isLocked: false,
         isAutoLayout: true,
         isAutoFit: true,
@@ -200,24 +199,14 @@ async function setupFlow(): Promise<{
     ctx: RequestContext;
 }> {
     const db = new MemoryDbAdapter();
-    await db.workers.put('current', {
-        first_name: 'Demo',
-        last_name: 'User',
-        email: 'demo@example.com',
-        phone: '',
-        title: 'Admin',
-        strengths: '[]' as never,
-        team_dimensions: '{}' as never,
-        bio: '',
-        department: 'Product',
-    });
+    await db.createSchema();
+    await seedHumanWorker(db, 'current', 'Demo User');
     const ctx = createRequestContext(db);
     await postFlowCreation(ctx, {
         flowId: FLOW_ID,
         linkId: FLOW_ID + '-link',
         projectId: 'project-1',
         name: 'Test Flow',
-        description: '',
     });
     return { db, ctx };
 }
@@ -225,8 +214,10 @@ async function setupFlow(): Promise<{
 // A db with NO flow row: commitFlowMutation's
 // postFlowVersion does ctx.GET('flows/flow-1')
 // which 404s, driving the catch → failOp(...).
-function setupNoFlow(): MemoryDbAdapter {
-    return new MemoryDbAdapter();
+async function setupNoFlow(): Promise<MemoryDbAdapter> {
+    const db = new MemoryDbAdapter();
+    await db.createSchema();
+    return db;
 }
 
 async function persistedGraph(
@@ -427,7 +418,7 @@ test(
     'performAddEdge: a commit failure yields a'
     + ' fail result',
     async () => {
-        const db = setupNoFlow();
+        const db = await setupNoFlow();
         const snap = snapFrom(buildGraph([
             buildNode('a'), buildNode('b'),
         ]));
@@ -553,7 +544,7 @@ test(
     'performAddNodeAtPosition: a commit failure'
     + ' yields a fail result',
     async () => {
-        const db = setupNoFlow();
+        const db = await setupNoFlow();
         const snap = snapFrom(buildGraph([
             buildNode('a'),
         ]));
@@ -682,7 +673,7 @@ test(
     'performDeleteSelectedNodes: a commit'
     + ' failure yields a fail result',
     async () => {
-        const db = setupNoFlow();
+        const db = await setupNoFlow();
         const base = snapFrom(buildGraph([
             buildNode('a'),
         ]));
@@ -764,7 +755,7 @@ test(
     'performDeleteSelectedEdge: a commit failure'
     + ' yields a fail result',
     async () => {
-        const db = setupNoFlow();
+        const db = await setupNoFlow();
         const base = snapFrom(buildGraph(
             [buildNode('a'), buildNode('b')],
             [buildEdge('e1', 'a', 'b')],
@@ -868,7 +859,7 @@ test(
     'performAddAttributeRef: a commit failure'
     + ' yields a fail result',
     async () => {
-        const db = setupNoFlow();
+        const db = await setupNoFlow();
         const base = snapFrom(buildGraph([
             buildNode('a'),
         ]));
@@ -957,7 +948,7 @@ test(
     'performRemoveAttributeRef: a commit failure'
     + ' yields a fail result',
     async () => {
-        const db = setupNoFlow();
+        const db = await setupNoFlow();
         const base = snapFrom(buildGraph([
             buildNode('a', {
                 attributes: [
@@ -1176,7 +1167,6 @@ test(
                 body: {
                     flow_id: FLOW_ID,
                     name: 'Test Flow',
-                    description: '',
                     is_locked: false,
                     is_auto_layout: true,
                     is_auto_fit: true,
@@ -1310,7 +1300,7 @@ test(
     'performRedo: a commit failure yields a fail'
     + ' result',
     async () => {
-        const db = setupNoFlow();
+        const db = await setupNoFlow();
         const snap = snapFrom(buildGraph([
             buildNode('a'),
         ]));

@@ -5,6 +5,7 @@ import {
     type SafeHtml,
 } from '../app/safe-html.ts';
 import {
+    iconLogo,
     iconSparkles,
     iconArrowRight,
     iconMenu,
@@ -144,7 +145,7 @@ function buildNavbar(): SafeHtml {
                     class="navbar-logo">
                     <div class="${
                         'navbar-logo-icon'
-                    }">F</div>
+                    }">${iconLogo(28, '')}</div>
                     <span class="${
                         'navbar-logo-text'
                     }">Fusion AI</span>
@@ -490,7 +491,7 @@ function buildFooter(): SafeHtml {
                     }">
                         <div class="${
                             'navbar-logo-icon'
-                        }">F</div>
+                        }">${iconLogo(28, '')}</div>
                         <span class="${
                             'navbar-logo-text'
                         }">Fusion AI</span>

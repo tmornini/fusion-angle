@@ -125,9 +125,17 @@ function buildShell(
                 </div>
             </div>
             <div class="${
-                'flex gap-2'
-                + ' project-actions-slot'
-            }"></div>
+                'flex items-start gap-2'
+            }">
+                <div id="project-review-actions">
+                </div>
+                <div id="project-lifecycle-actions">
+                </div>
+                <div class="${
+                    'flex gap-2'
+                    + ' project-actions-slot'
+                }"></div>
+            </div>
         </div>
 
         <div class="${
@@ -141,6 +149,8 @@ function buildShell(
                 <div class="${
                     'project-metrics-slot'
                 }"></div>
+                <div id="project-objectives-section">
+                </div>
             </div>
             <div class="project-sidebar-slot"></div>
         </div>
@@ -619,7 +629,7 @@ function buildReadonlyMetrics(
                     'text-lg font-display'
                     + ' font-semibold'
                 }">
-                    Metrics
+                    Project Metrics
                 </h2>
                 <span class="${
                     'text-xs text-muted'
@@ -689,7 +699,7 @@ function buildEditableMetrics(
                     'text-lg font-display'
                     + ' font-semibold'
                 }">
-                    Metrics
+                    Project Metrics
                 </h2>
                 <span class="${
                     'text-xs text-muted'
@@ -732,13 +742,6 @@ function buildFlowCard(
                     <p class="${
                         'font-medium text-sm'
                     }">${flow.name}</p>
-                    ${flow.description
-                        ? html`<p class="${
-                            'text-xs text-muted'
-                        }">${
-                            flow.description
-                        }</p>`
-                        : html``}
                 </div>
                 <div class="flex gap-3">
                     <span class="${

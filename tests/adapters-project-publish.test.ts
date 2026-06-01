@@ -5,29 +5,17 @@ import { createRequestContext } from
     '../web-app/app/adapters/shared.ts';
 import {
     validateProjectForApproval,
-    validateProjectForCompletion,
+    validateProjectForArchival,
     postProjectApproval,
-    postProjectCompletion,
+    postProjectArchival,
 } from '../web-app/app/adapters/project-publish.ts';
 import {
     getProjectState,
 } from '../web-app/app/adapters/state-events.ts';
-
-async function seedCurrentWorker(
-    db: MemoryDbAdapter,
-): Promise<void> {
-    await db.workers.put('current', {
-        first_name: 'Demo',
-        last_name: 'User',
-        email: 'demo@example.com',
-        phone: '',
-        title: 'Admin',
-        strengths: '[]' as never,
-        team_dimensions: '{}' as never,
-        bio: '',
-        department: 'Product',
-    });
-}
+import {
+    seedCurrentWorker,
+    seedHumanWorker,
+} from './worker-fixtures.ts';
 
 const SAMPLE_PROJECT_BODY = {
     title: 't',
@@ -60,18 +48,20 @@ test('validator: ready when all scored', () => {
         [{ id: 'o1', position: 0 }],
         [{ id: 'b1', project_id: 'p1',
            objective_id: 'o1', score: 50,
+           worker_id: 'w1',
            at: '2026-05-14T00:00:00.000Z' }],
     );
     assert.equal(r.ready, true);
     assert.equal(r.problems.length, 0);
 });
 
-test('completion validator: not ready when actuals missing',
+test('archival validator: not ready when actuals missing',
     () => {
-        const r = validateProjectForCompletion(
+        const r = validateProjectForArchival(
             SAMPLE_PROJECT,
             [{ id: 'b1', project_id: 'p1',
                objective_id: 'o1', score: 50,
+               worker_id: 'w1',
                at: '2026-05-14T00:00:00.000Z' }],
             [],
         );
@@ -84,6 +74,7 @@ test('completion validator: not ready when actuals missing',
 test('postProjectApproval moves state to approved',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         await seedCurrentWorker(db);
         await db.projects.put('p1', SAMPLE_PROJECT_BODY);
         await db.states.record(
@@ -94,6 +85,7 @@ test('postProjectApproval moves state to approved',
             'b1',
             { project_id: 'p1', objective_id: 'o1',
               score: 50,
+              worker_id: 'w1',
               at: '2026-05-14T00:00:00.000Z' },
         );
         const ctx = createRequestContext(db);
@@ -105,6 +97,7 @@ test('postProjectApproval moves state to approved',
 test('postProjectApproval throws when not ready',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         await seedCurrentWorker(db);
         await db.projects.put('p1', SAMPLE_PROJECT_BODY);
         await db.objectives.put('o1', { position: 0 });
@@ -115,9 +108,10 @@ test('postProjectApproval throws when not ready',
         );
     });
 
-test('postProjectCompletion moves state to completed',
+test('postProjectArchival moves state to archived',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         await seedCurrentWorker(db);
         await db.projects.put('p1', SAMPLE_PROJECT_BODY);
         await db.states.record(
@@ -128,16 +122,18 @@ test('postProjectCompletion moves state to completed',
             'b1',
             { project_id: 'p1', objective_id: 'o1',
               score: 50,
+              worker_id: 'w1',
               at: '2026-05-14T00:00:00.000Z' },
         );
         await db.projectObjectiveActualScores.put(
             'a1',
             { project_id: 'p1', objective_id: 'o1',
               score: 40,
+              worker_id: 'w1',
               at: '2026-05-15T00:00:00.000Z' },
         );
         const ctx = createRequestContext(db);
-        await postProjectCompletion(ctx, 'p1');
+        await postProjectArchival(ctx, 'p1');
         const s = await getProjectState(ctx, 'p1');
-        assert.equal(s, 'completed');
+        assert.equal(s, 'archived');
     });

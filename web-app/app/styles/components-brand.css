@@ -1,0 +1,15 @@
+/* Brand atom mark: structure ships in the SVG; paint lives here. */
+.logo-orbital {
+  fill: none;
+  stroke: hsl(var(--primary));
+  stroke-width: 1.4;
+}
+
+.logo-nucleus {
+  fill: hsl(var(--accent));
+}
+
+/* The auth desktop panel is always blue; invert orbitals to read on it. */
+.auth-branding .logo-orbital {
+  stroke: hsl(var(--primary-foreground));
+}

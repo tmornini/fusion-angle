@@ -542,8 +542,6 @@ async function handleOverwrite(
         const ctx = createRequestContext();
         await putFlow(ctx, flowId, {
             name: stOw.backup.flow.name,
-            description:
-                stOw.backup.flow.description,
             isLocked: stOw.backup.flow.isLocked,
             isAutoLayout:
                 stOw.backup.flow.isAutoLayout,

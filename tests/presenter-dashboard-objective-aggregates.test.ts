@@ -2,6 +2,8 @@ import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { DashboardObjectiveAggregatesPresenter } from
     '../web-app/app/presenters/dashboard-objective-aggregates.ts';
+import type { TrendPoint } from
+    '../web-app/app/adapters/project-scoring.ts';
 
 const activeObjs = [
     { id: 'o1', position: 0 },
@@ -22,8 +24,12 @@ const aggregates = [
       projectsBaselineScored: 0,
       projectsActualScored: 0 },
 ];
-const trendlines = new Map<string, number[]>([
-    ['o1', [32, 28, 25]],
+const trendlines = new Map<string, TrendPoint[]>([
+    ['o1', [
+        { at: '2026-05-01T00:00:00.000Z', value: 20 },
+        { at: '2026-05-10T00:00:00.000Z', value: 40 },
+        { at: '2026-05-20T00:00:00.000Z', value: 25 },
+    ]],
     ['o2', []],
 ]);
 
@@ -155,7 +161,7 @@ test('row gauge omits fills for undefined means', () => {
     );
 });
 
-test('row renders a sparkline cell with polyline', () => {
+test('row renders colored segments and dots', () => {
     const p = new DashboardObjectiveAggregatesPresenter(
         activeObjs, defs, aggregates, trendlines,
     );
@@ -171,8 +177,51 @@ test('row renders a sparkline cell with polyline', () => {
         'sparkline cell class must be present',
     );
     assert.ok(
-        o1Row.includes('class="sparkline-line"'),
-        'sparkline polyline must be present',
+        o1Row.includes('class="sparkline-seg"'),
+        'per-segment lines must be present',
+    );
+    assert.ok(
+        o1Row.includes('data-direction="up"'),
+        '20 -> 40 segment reads up',
+    );
+    assert.ok(
+        o1Row.includes('data-direction="down"'),
+        '40 -> 25 segment reads down',
+    );
+    const dots = o1Row.match(/class="spark-dot"/g);
+    assert.equal(
+        dots?.length, 3, 'one dot per trend point',
+    );
+});
+
+test('points carry dated, signed-change tooltips', () => {
+    const p = new DashboardObjectiveAggregatesPresenter(
+        activeObjs, defs, aggregates, trendlines,
+    );
+    const html = p.buildCard().toString();
+    const o1RowStart =
+        html.indexOf('data-objective-id="o1"');
+    const o1Slice = html.slice(o1RowStart);
+    const o1Row = o1Slice.slice(
+        0, o1Slice.indexOf('</li>'),
+    );
+    assert.ok(
+        o1Row.includes('Baseline · 20'),
+        'baseline tip shows its label and value',
+    );
+    assert.ok(
+        o1Row.includes('May 1, 2026'),
+        'baseline tip shows its last-edited date',
+    );
+    assert.match(
+        o1Row,
+        /data-tone="success"[^>]*>\s*\+20/,
+        'rise tooltip is green and signed +20',
+    );
+    assert.match(
+        o1Row,
+        /data-tone="error"[^>]*>\s*−15/,
+        'drop tooltip is red and signed −15',
     );
 });
 
@@ -192,8 +241,64 @@ test('empty trendline renders only the axis line', () => {
         'sparkline axis must always be present',
     );
     assert.equal(
-        o2Row.includes('class="sparkline-line"'),
+        o2Row.includes('class="sparkline-seg"'),
         false,
-        'no polyline for empty trendline',
+        'no segments for empty trendline',
+    );
+    assert.equal(
+        o2Row.includes('class="spark-dot"'),
+        false,
+        'no dots for empty trendline',
+    );
+});
+
+test('origin line sits at the baseline value', () => {
+    const p = new DashboardObjectiveAggregatesPresenter(
+        activeObjs, defs, aggregates, trendlines,
+    );
+    const html = p.buildCard().toString();
+    const o1RowStart =
+        html.indexOf('data-objective-id="o1"');
+    const o1Slice = html.slice(o1RowStart);
+    const o1Row = o1Slice.slice(
+        0, o1Slice.indexOf('</li>'),
+    );
+    // o1 trend [20, 40, 25]: min 20 == baseline, so the
+    // axis sits at the bottom edge (SPARK_HEIGHT -
+    // SPARK_PAD = 26), not the geometric mid (15).
+    assert.match(
+        o1Row,
+        /class="sparkline-axis"[^>]*y1="26"/,
+        'grey axis tracks the baseline, not the mid',
+    );
+});
+
+test('baseline dot is grey; dots match their segment',
+    () => {
+    const p = new DashboardObjectiveAggregatesPresenter(
+        activeObjs, defs, aggregates, trendlines,
+    );
+    const html = p.buildCard().toString();
+    const o1RowStart =
+        html.indexOf('data-objective-id="o1"');
+    const o1Slice = html.slice(o1RowStart);
+    const o1Row = o1Slice.slice(
+        0, o1Slice.indexOf('</li>'),
+    );
+    const dots = o1Row.match(
+        /<span class="spark-dot"[^>]*>/g,
+    ) ?? [];
+    assert.equal(dots.length, 3, 'one dot per point');
+    assert.ok(
+        !dots[0]!.includes('data-direction'),
+        'baseline dot omits direction (grey default)',
+    );
+    assert.ok(
+        dots[1]!.includes('data-direction="up"'),
+        '20 -> 40 dot matches the up segment',
+    );
+    assert.ok(
+        dots[2]!.includes('data-direction="down"'),
+        '40 -> 25 dot matches the down segment',
     );
 });

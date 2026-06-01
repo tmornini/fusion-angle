@@ -13,26 +13,16 @@ import {
     putIdea,
     postIdeaCreation,
     postIdeaStateChange,
+    postIdeaConversion,
 } from '../web-app/app/adapters/ideas.ts';
 import type {
     IdeaEntity,
+    ProjectEntity,
+    ProjectObjectiveBaselineScore,
 } from '../api/types.ts';
-
-function buildPerson(id: string, name: string) {
-    return {
-        id,
-        first_name: name,
-        last_name: 'Test',
-        email: `${name}@example.com`
-            .toLowerCase(),
-        phone: '',
-        title: 'product_manager' as const,
-        strengths: '[]' as const,
-        team_dimensions: '{}' as const,
-        bio: '',
-        department: 'Product',
-    };
-}
+import {
+    seedHumanWorker,
+} from './worker-fixtures.ts';
 
 function buildIdea(
     id: string, title: string,
@@ -61,33 +51,19 @@ async function seedIdeaState(
     );
 }
 
-async function seedWorkerState(
-    db: MemoryDbAdapter,
-    workerId: string,
-): Promise<void> {
-    await db.states.record(
-        `stw-${workerId}`,
-        workerId,
-        'active',
-        'system',
-    );
-}
-
-function setupDb(): {
+async function setupDb(): Promise<{
     db: MemoryDbAdapter;
     ctx: RequestContext;
-} {
+}> {
     const db = new MemoryDbAdapter();
+    await db.createSchema();
     const ctx = createRequestContext(db);
     return { db, ctx };
 }
 
 test('getIdeas returns ideas with submitter', async () => {
-    const { db, ctx } = setupDb();
-    await db.workers.put(
-        'u1', buildPerson('u1', 'Alice'),
-    );
-    await seedWorkerState(db, 'u1');
+    const { db, ctx } = await setupDb();
+    await seedHumanWorker(db, 'u1', 'Alice Test');
     await db.ideas.put('i1', buildIdea(
         'i1', 'First idea',
     ));
@@ -114,11 +90,8 @@ test('getIdeas returns ideas with submitter', async () => {
 });
 
 test('getIdeas throws when idea has no submission', async () => {
-    const { db, ctx } = setupDb();
-    await db.workers.put(
-        'u1', buildPerson('u1', 'Alice'),
-    );
-    await seedWorkerState(db, 'u1');
+    const { db, ctx } = await setupDb();
+    await seedHumanWorker(db, 'u1', 'Alice Test');
     await db.ideas.put('i1', buildIdea(
         'i1', 'Orphan',
     ));
@@ -131,11 +104,8 @@ test('getIdeas throws when idea has no submission', async () => {
 });
 
 test('getIdea finds submission for one idea', async () => {
-    const { db, ctx } = setupDb();
-    await db.workers.put(
-        'u1', buildPerson('u1', 'Alice'),
-    );
-    await seedWorkerState(db, 'u1');
+    const { db, ctx } = await setupDb();
+    await seedHumanWorker(db, 'u1', 'Alice Test');
     await db.ideas.put('i1', buildIdea(
         'i1', 'A',
     ));
@@ -153,11 +123,8 @@ test('getIdea finds submission for one idea', async () => {
 });
 
 test('getIdea throws on missing submission', async () => {
-    const { db, ctx } = setupDb();
-    await db.workers.put(
-        'u1', buildPerson('u1', 'Alice'),
-    );
-    await seedWorkerState(db, 'u1');
+    const { db, ctx } = await setupDb();
+    await seedHumanWorker(db, 'u1', 'Alice Test');
     await db.ideas.put(
         'i1', buildIdea('i1', 'A'),
     );
@@ -169,7 +136,7 @@ test('getIdea throws on missing submission', async () => {
 });
 
 test('putIdea persists changes', async () => {
-    const { db, ctx } = setupDb();
+    const { db, ctx } = await setupDb();
     await db.ideas.put(
         'i1', buildIdea('i1', 'Original'),
     );
@@ -182,11 +149,8 @@ test('putIdea persists changes', async () => {
 });
 
 test('archived ideas are filtered from getIdeas', async () => {
-    const { db, ctx } = setupDb();
-    await db.workers.put(
-        'u1', buildPerson('u1', 'Alice'),
-    );
-    await seedWorkerState(db, 'u1');
+    const { db, ctx } = await setupDb();
+    await seedHumanWorker(db, 'u1', 'Alice Test');
     await db.ideas.put(
         'i1', buildIdea('i1', 'Keep'),
     );
@@ -216,12 +180,10 @@ test(
     'postIdeaCreation persists the row and'
     + ' records the initial state event',
     async () => {
-        const { db, ctx } = setupDb();
-        await db.workers.put(
-            'current',
-            buildPerson('current', 'Demo'),
+        const { db, ctx } = await setupDb();
+        await seedHumanWorker(
+            db, 'current', 'Demo User',
         );
-        await seedWorkerState(db, 'current');
 
         await postIdeaCreation(
             ctx,
@@ -247,12 +209,10 @@ test(
     'postIdeaStateChange records a state event'
     + ' without touching the idea row',
     async () => {
-        const { db, ctx } = setupDb();
-        await db.workers.put(
-            'current',
-            buildPerson('current', 'Demo'),
+        const { db, ctx } = await setupDb();
+        await seedHumanWorker(
+            db, 'current', 'Demo User',
         );
-        await seedWorkerState(db, 'current');
         await db.ideas.put(
             'i1', buildIdea('i1', 'Original'),
         );
@@ -276,12 +236,88 @@ test(
     },
 );
 
+test(
+    'postIdeaConversion commits project, idea,'
+    + ' two state events, and N baseline rows in'
+    + ' one atomic batch',
+    async () => {
+        const { db, ctx } = await setupDb();
+        await seedHumanWorker(
+            db, 'current', 'Demo User',
+        );
+        await db.ideas.put(
+            'i1', buildIdea('i1', 'First'),
+        );
+        await seedIdeaState(db, 'i1', 'approved');
+
+        const projectEntity:
+            Omit<ProjectEntity, 'id'> = {
+            title: 'P1',
+            description: 'done when X',
+            progress: 0,
+            start_date: '2026-04-01',
+            target_end_date: '2026-07-01',
+            estimated_cost: 100,
+            actual_cost: 0,
+            position: 1,
+        };
+        const promotedIdea =
+            buildIdea('i1', 'First');
+
+        await postIdeaConversion(
+            ctx,
+            'i1',
+            'p1',
+            projectEntity,
+            'submitted',
+            promotedIdea,
+            [
+                { objectiveId: 'obj-1', score: 50 },
+                { objectiveId: 'obj-2', score: -25 },
+            ],
+        );
+
+        const project =
+            await db.projects.getById('p1');
+        assert.equal(project.title, 'P1');
+
+        const ideaEvents =
+            await db.states.allFor('i1');
+        assert.equal(
+            ideaEvents.at(-1)?.state, 'promoted',
+        );
+
+        const projectEvents =
+            await db.states.allFor('p1');
+        assert.equal(projectEvents.length, 1);
+        assert.equal(
+            projectEvents[0]?.state, 'submitted',
+        );
+
+        const baselines =
+            await ctx.GET<
+                ProjectObjectiveBaselineScore[]
+            >(
+                'project-objective'
+                + '-baseline-scores',
+            );
+        const mine = baselines.filter(
+            b => b.project_id === 'p1',
+        );
+        assert.equal(mine.length, 2);
+        const byObj = new Map(
+            mine.map(b => [
+                b.objective_id, b.score,
+            ]),
+        );
+        assert.equal(byObj.get('obj-1'), 50);
+        assert.equal(byObj.get('obj-2'), -25);
+    },
+);
+
 test('deleted ideas are filtered from getIdeas', async () => {
-    const { db, ctx } = setupDb();
-    await db.workers.put(
-        'u1', buildPerson('u1', 'Alice'),
-    );
-    await seedWorkerState(db, 'u1');
+    const { db, ctx } = await setupDb();
+    await seedHumanWorker(db, 'u1', 'Alice Test');
     await db.ideas.put(
         'i1', buildIdea('i1', 'Keep'),
     );

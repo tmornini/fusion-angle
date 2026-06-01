@@ -57,13 +57,10 @@ html.sidebar-collapsed .sidebar {
 .sidebar-logo-icon {
   width: 2.25rem;
   height: 2.25rem;
-  border-radius: var(--radius-lg);
-  background: var(--gradient-hero);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  color: hsl(var(--primary-foreground));
 }
 
 .sidebar-logo-text {
@@ -155,10 +152,6 @@ html.sidebar-collapsed .sidebar {
 
 html.sidebar-collapsed .main-content {
   margin-left: var(--space-16);
-}
-
-html.sidebar-collapsed .action-footer {
-  left: var(--space-16);
 }
 
 /* Header */
@@ -319,7 +312,6 @@ html.sidebar-collapsed .action-footer {
   .main-content .page-content {
     padding: var(--space-4);
   }
-  .action-footer { left: 0; }
 }
 
 /* Sidebar sign-out link */
@@ -379,11 +371,6 @@ html.sidebar-collapsed .action-footer {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: var(--space-6);
-}
-.impact-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: var(--space-4);
 }
 .detail-grid {
     display: grid;

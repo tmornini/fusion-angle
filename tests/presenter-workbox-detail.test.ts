@@ -1,11 +1,9 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import {
-    HumanWorker,
     jsonArrayField,
     jsonObjectField,
     DEFAULT_LOCK_TIMEOUT,
-    type HumanWorkerEntity,
     type WorkOrderEntity,
     type StateFieldValueEntity,
     type WorkOrderFlowGraph,
@@ -20,11 +18,17 @@ import {
 import type {
     TransitionEvent,
 } from '../web-app/app/adapters/state-events.ts';
+import type {
+    ConstraintViolation,
+} from '../web-app/app/record-constraints.ts';
 import {
     WorkboxDetailPresenter,
     buildAttributeInputHtml,
 } from
 '../web-app/app/presenters/workbox-detail.ts';
+import {
+    makeHumanWorker,
+} from './worker-fixtures.ts';
 
 // WorkboxDetailPresenter is pure: the constructor
 // takes the work order, transition events, per-event
@@ -151,30 +155,12 @@ function makeTransition(
     };
 }
 
-function makeHumanWorkerEntity(
-    id: string,
-    first: string,
-): HumanWorkerEntity {
-    return {
-        id,
-        first_name: first,
-        last_name: 'Park',
-        email: first.toLowerCase() + '@example.com',
-        title: 'Reviewer',
-        department: 'Finance',
-        strengths: jsonArrayField([]),
-        team_dimensions: jsonObjectField({}),
-        phone: '',
-        bio: '',
-    };
-}
-
 function makeWorkerMap(
-    entities: HumanWorkerEntity[],
+    workers: Worker[],
 ): Map<Id, Worker> {
     return new Map(
-        entities.map(
-            e => [e.id, new HumanWorker(e, 'active')],
+        workers.map(
+            w => [w.idForLink(), w],
         ),
     );
 }
@@ -190,8 +176,8 @@ function makeAttributeMap(
 }
 
 const WORKER_MAP = makeWorkerMap([
-    makeHumanWorkerEntity('p-1', 'Ada'),
-    makeHumanWorkerEntity('p-2', 'Bo'),
+    makeHumanWorker('p-1', 'Ada Park'),
+    makeHumanWorker('p-2', 'Bo Park'),
 ]);
 
 function makePresenter(
@@ -674,6 +660,75 @@ test(
         });
         assert.equal(
             presenter.claimStatus().kind, 'unclaimed',
+        );
+    },
+);
+
+// buildViolations: the rejected-transition banner
+
+test(
+    'buildViolations names each failed attribute,'
+    + ' phrasing range bounds by attribute type',
+    () => {
+        const amount = makeAttribute({
+            id: 'a-amt', name: 'Amount',
+            attribute_type: 'number',
+        });
+        const due = makeAttribute({
+            id: 'a-when', name: 'Due date',
+            attribute_type: 'date',
+        });
+        const presenter = makePresenter({
+            attributes: [amount, due],
+        });
+        const violations: ConstraintViolation[] = [
+            {
+                kind: 'required',
+                attributeId: 'a-amt',
+                attributeName: 'Amount',
+            },
+            {
+                kind: 'range_min',
+                attributeId: 'a-when',
+                attributeName: 'Due date',
+                min: '2026-01-01',
+            },
+        ];
+        const out = presenter
+            .buildViolations(violations)
+            .toString();
+        assert.match(out, /violations-banner/);
+        assert.match(out, /role="alert"/);
+        assert.match(out, /Amount is required/);
+        // Date-aware phrasing proves the presenter
+        // resolved the attribute by id for its type.
+        assert.match(
+            out,
+            /Due date must be on or after 2026-01-01/,
+        );
+        assert.equal(
+            out.match(/<li>/g)?.length, 2,
+        );
+        assert.ok(!out.includes('undefined'));
+    },
+);
+
+test(
+    'buildViolations throws when a violation names'
+    + ' an attribute absent from the Record',
+    () => {
+        const presenter = makePresenter({
+            attributes: [],
+        });
+        assert.throws(
+            () => presenter.buildViolations([
+                {
+                    kind: 'required',
+                    attributeId: 'ghost',
+                    attributeName: 'Ghost',
+                },
+            ]),
+            /unknown attribute_id: ghost/,
         );
     },
 );

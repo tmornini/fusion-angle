@@ -26,16 +26,13 @@ async function seedSystemWorker(
     db: MemoryDbAdapter,
 ): Promise<void> {
     await db.workers.put(SYSTEM_WORKER_ID, {
-        first_name: 'System',
-        last_name: '',
-        email: 'system@example.com',
-        title: 'System',
-        department: '',
-        strengths: '[]' as never,
-        team_dimensions: '{}' as never,
-        phone: '',
-        bio: '',
+        type: 'system',
+        name: 'System Worker',
     });
+    await db.states.record(
+        'st-system', SYSTEM_WORKER_ID, 'active',
+        'system',
+    );
 }
 
 function buildNode(
@@ -149,6 +146,7 @@ test(
     + ' array for a flow with no record binding',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         await seedSystemWorker(db);
         const flowGraph = buildFlowGraph(
             'flow-1',
@@ -177,6 +175,7 @@ test(
     + ' required attribute with no stored value',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         await seedSystemWorker(db);
         const flowGraph = buildFlowGraph(
             'flow-1',
@@ -216,6 +215,7 @@ test(
     + ' stored value',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         await seedSystemWorker(db);
         const flowGraph = buildFlowGraph(
             'flow-1',
@@ -273,6 +273,7 @@ test(
     + ' required check',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         await seedSystemWorker(db);
         const flowGraph = buildFlowGraph(
             'flow-1',
@@ -309,6 +310,7 @@ test(
     + ' constraint violation from the runner',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         await seedSystemWorker(db);
         const flowGraph = buildFlowGraph(
             'flow-1',
@@ -353,6 +355,7 @@ test(
     + ' work order flow graph',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         await seedSystemWorker(db);
         const flowGraph = buildFlowGraph(
             'flow-1',

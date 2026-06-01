@@ -183,7 +183,6 @@ export async function postWorkOrderCreation(
         {
             flowId: flow.id,
             name: flow.name,
-            description: flow.description,
             lockTimeout: flow.lock_timeout,
             nodes: graph.nodes,
             edges: graph.edges,

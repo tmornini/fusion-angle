@@ -2,7 +2,7 @@ import {
     $, $required, getRequiredAttribute,
 } from '../app/dom.ts';
 import {
-    setHtml,
+    html, setHtml,
 } from '../app/safe-html.ts';
 import {
     WorkboxDetailPresenter,
@@ -29,6 +29,7 @@ import {
     validateWorkOrderFlowGraph,
     getRecordForFlow,
     getRecordAttributesByRecord,
+    RecordTransitionViolations,
 } from '../app/adapters/index.ts';
 import type {
     NodeAttribute,
@@ -121,6 +122,13 @@ function initTransitionButtons(
                     fieldValueIds[fid] =
                         generateCryptoSafeBase62();
                 }
+                const violationsEl = $(
+                    '#transition-violations',
+                    container,
+                );
+                if (violationsEl) {
+                    setHtml(violationsEl, html``);
+                }
                 try {
                     await postWorkOrderTransition(
                         ctx,
@@ -133,6 +141,21 @@ function initTransitionButtons(
                         },
                     );
                 } catch (err) {
+                    if (
+                        err instanceof
+                        RecordTransitionViolations
+                    ) {
+                        if (violationsEl) {
+                            setHtml(
+                                violationsEl,
+                                detail
+                                    .buildViolations(
+                                        err.violations,
+                                    ),
+                            );
+                        }
+                        return;
+                    }
                     log.error(
                         'work order'
                         + ' transition'

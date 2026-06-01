@@ -5,7 +5,7 @@ import {
 } from '../app/safe-html.ts';
 import { showToast } from '../app/toast.ts';
 import {
-    iconSparkles,
+    iconLogo,
     iconArrowRight,
     iconLoader,
 } from '../app/icons.ts';
@@ -63,7 +63,7 @@ export async function init(): Promise<void> {
                         <div class="${
                             'auth-brand-icon'
                         }">
-                            ${iconSparkles(24, '')}
+                            ${iconLogo(24, '')}
                         </div>
                         <span class="${
                             'text-3xl '
@@ -145,13 +145,11 @@ export async function init(): Promise<void> {
                     + 'mb-8 justify-center'
                 }" id="mobile-logo">
                     <div class="${
-                        'gradient-hero '
-                        + 'rounded-xl '
-                        + 'flex items-center '
+                        'flex items-center '
                         + 'justify-center '
                         + 'auth-mobile-logo'
                     }">
-                        ${iconSparkles(20, '')}
+                        ${iconLogo(20, '')}
                     </div>
                     <span class="${
                         'text-2xl font-display '

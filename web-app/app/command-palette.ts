@@ -218,7 +218,7 @@ export function humanWorkerToSearchItem(
 ): SearchItem {
     return {
         id: 'worker-' + worker.idForLink(),
-        title: worker.fullName(),
+        title: worker.name(),
         meta: worker.titleLabel()
             + ' · '
             + worker.departmentLabel(),

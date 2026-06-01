@@ -29,28 +29,38 @@ const { ProjectScoreHistoryPresenter } = await import(
 const baselines = [
     { id: 'b1',
       project_id: 'p1', objective_id: 'o1',
-      score: 50, at: '2026-03-01T14:23:00.000Z' },
+      score: 50, worker_id: 'w1',
+      at: '2026-03-01T14:23:00.000Z' },
     { id: 'b2',
       project_id: 'p1', objective_id: 'o1',
-      score: 40, at: '2026-03-05T09:10:00.000Z' },
+      score: 40, worker_id: 'w1',
+      at: '2026-03-05T09:10:00.000Z' },
 ];
 const actuals = [
     { id: 'a1',
       project_id: 'p1', objective_id: 'o1',
-      score: 45, at: '2026-04-01T16:45:00.000Z' },
+      score: 45, worker_id: 'w1',
+      at: '2026-04-01T16:45:00.000Z' },
 ];
 const revisions = [
     { id: 'r1',
       objective_id: 'o1', name: 'Increase Revenue',
-      description: 'd1',
+      description: 'd1', worker_id: 'w1',
       at: '2026-02-01T00:00:00.000Z' },
     { id: 'r2',
       objective_id: 'o1', name: 'Drive Growth',
-      description: 'd2',
+      description: 'd2', worker_id: 'w1',
       at: '2026-03-18T11:02:00.000Z' },
 ];
-const archivations: { objectiveId: string;
-    at: string }[] = [];
+const archivations: {
+    objectiveId: string; workerId: string;
+    at: string;
+}[] = [];
+
+const workerNames = new Map([['w1', 'Sarah Lee']]);
+function whoName(id: string): string {
+    return workerNames.get(id) ?? id;
+}
 
 function resolver(objId: string, atTime: string) {
     const eligible = revisions
@@ -67,7 +77,7 @@ function resolver(objId: string, atTime: string) {
 test('merges all four streams chronologically', () => {
     const p = new ProjectScoreHistoryPresenter(
         baselines, actuals, revisions, archivations,
-        resolver,
+        resolver, whoName,
     );
     const html = p.buildBody().toString();
     const positions = [
@@ -87,7 +97,7 @@ test('resolves historical objective name at each event',
     () => {
         const p = new ProjectScoreHistoryPresenter(
             baselines, actuals, revisions, archivations,
-            resolver,
+            resolver, whoName,
         );
         const html = p.buildBody().toString();
         const marchOnePos = html.indexOf('2026-03-01');
@@ -109,7 +119,7 @@ test('resolves historical objective name at each event',
 test('revision event row shows the new objective name',
     () => {
         const p = new ProjectScoreHistoryPresenter(
-            [], [], revisions, archivations, resolver,
+            [], [], revisions, archivations, resolver, whoName,
         );
         const html = p.buildBody().toString();
         const r1Pos = html.indexOf('2026-02-01');
@@ -129,9 +139,9 @@ test('revision event row shows the new objective name',
 test('positive score TD carries data-tone="success"', () => {
     const p = new ProjectScoreHistoryPresenter(
         [{ id: 'b1', project_id: 'p1', objective_id: 'o1',
-            score: 40,
+            score: 40, worker_id: 'w1',
             at: '2026-03-05T09:10:00.000Z' }],
-        [], revisions, archivations, resolver,
+        [], revisions, archivations, resolver, whoName,
     );
     const html = p.buildBody().toString();
     assert.match(html,
@@ -142,8 +152,9 @@ test('negative score TD carries data-tone="error"', () => {
     const p = new ProjectScoreHistoryPresenter(
         [], [{ id: 'a1', project_id: 'p1',
             objective_id: 'o1', score: -50,
+            worker_id: 'w1',
             at: '2026-04-01T16:45:00.000Z' }],
-        revisions, archivations, resolver,
+        revisions, archivations, resolver, whoName,
     );
     const html = p.buildBody().toString();
     assert.match(html,
@@ -153,9 +164,9 @@ test('negative score TD carries data-tone="error"', () => {
 test('zero score TD carries data-tone="muted"', () => {
     const p = new ProjectScoreHistoryPresenter(
         [{ id: 'b1', project_id: 'p1', objective_id: 'o1',
-            score: 0,
+            score: 0, worker_id: 'w1',
             at: '2026-03-05T09:10:00.000Z' }],
-        [], revisions, archivations, resolver,
+        [], revisions, archivations, resolver, whoName,
     );
     const html = p.buildBody().toString();
     assert.match(html, /<td data-tone="muted">0<\/td>/);
@@ -165,10 +176,11 @@ test('archival event row resolves the objective name '
     + 'from the event objectiveId', () => {
     const dep = [{
         objectiveId: 'o1',
+        workerId: 'w1',
         at: '2026-05-01T08:00:00.000Z',
     }];
     const p = new ProjectScoreHistoryPresenter(
-        [], [], revisions, dep, resolver,
+        [], [], revisions, dep, resolver, whoName,
     );
     const html = p.buildBody().toString();
     const depPos = html.indexOf('2026-05-01');
@@ -183,4 +195,20 @@ test('archival event row resolves the objective name '
     assert.ok(namePos > depPos,
         'resolver should resolve o1 → Drive Growth at '
             + '2026-05-01 (latest revision applies)');
+});
+
+test('Who column renders the actor name per row', () => {
+    const who = (id: string): string =>
+        id === 'w1' ? 'Sarah Lee' : id;
+    const p = new ProjectScoreHistoryPresenter(
+        [{ id: 'b1', project_id: 'p1',
+           objective_id: 'o1', score: 40,
+           worker_id: 'w1',
+           at: '2026-03-05T09:10:00.000Z' }],
+        [], [], [], resolver, who,
+    );
+    const html = p.buildBody().toString();
+    assert.match(html, /<th>Who<\/th>/);
+    assert.ok(html.includes('Sarah Lee'),
+        'Who cell should render the resolved name');
 });

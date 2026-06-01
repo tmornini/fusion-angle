@@ -23,7 +23,7 @@ import {
 import {
     getWorkOrderRows,
     getTransitionEventsByWorkOrder,
-    getWorkOrderActiveClaim,
+    getActiveClaimsByWorkOrder,
     getWorkerMap,
     getFlowsForCreation,
     postWorkOrderCreation,
@@ -36,9 +36,6 @@ import {
     type RequestContext,
     type WorkOrderEntity,
 } from '../app/adapters/index.ts';
-import type {
-    ActiveClaim,
-} from '../app/presenters/workbox-inbox.ts';
 import type { Id } from '../../api/types.ts';
 import {
     WorkboxInboxPresenter,
@@ -172,18 +169,18 @@ async function loadInboxItems(
     workOrderEntities = new Map(
         workOrders.map(w => [w.id, w]),
     );
-    const activeClaimsByWo = new Map<Id, ActiveClaim>();
-    for (const wo of workOrders) {
-        const fg = validateWorkOrderFlowGraph(
-            wo.flow_graph,
+    const lockTimeoutByWo = new Map<Id, number>(
+        workOrders.map(wo => [
+            wo.id,
+            validateWorkOrderFlowGraph(
+                wo.flow_graph,
+            ).lockTimeout,
+        ]),
+    );
+    const activeClaimsByWo =
+        await getActiveClaimsByWorkOrder(
+            ctx, lockTimeoutByWo,
         );
-        const claim = await getWorkOrderActiveClaim(
-            ctx, wo.id, fg.lockTimeout,
-        );
-        if (claim !== null) {
-            activeClaimsByWo.set(wo.id, claim);
-        }
-    }
     return buildInboxItems(
         workOrders, transitionsByWo,
         activeClaimsByWo, workerMap, mode,

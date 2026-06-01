@@ -190,8 +190,8 @@ class="text-xs text-muted"
     const lockAttr =
         trusted(isLocked ? ' disabled' : '');
     const sortedHumans = [...humans].sort(
-        (a, b) => a.fullName().localeCompare(
-            b.fullName(),
+        (a, b) => a.name().localeCompare(
+            b.name(),
         ),
     );
     const sortedAis = [...ais].sort(
@@ -203,7 +203,7 @@ class="text-xs text-muted"
     const humanCheckboxes = sortedHumans.map(
         h => buildWorkerCheckbox(
             h.idForLink(),
-            h.fullName(),
+            h.name(),
             assigned.has(h.idForLink()),
             isLocked,
         ),
@@ -249,15 +249,6 @@ ${aiCheckboxes}
     class="input input-sm"
     id="prop-node-name"
     value="${node.name}"${lockAttr} />
-</div>
-<div class="mb-2">
-<label class="text-xs text-muted"
-    >Description</label>
-<input type="text"
-    class="input input-sm"
-    id="prop-node-desc"
-    value="${node.description}"${
-    lockAttr} />
 </div>
 <fieldset class="flow-attribute-fieldset"
     id="prop-node-attributes">
@@ -340,15 +331,6 @@ class="flow-props-panel">
     class="input input-sm"
     id="prop-edge-name"
     value="${edge.name}"${lockAttr} />
-</div>
-<div class="mb-2">
-<label class="text-xs text-muted"
-    >Description</label>
-<input type="text"
-    class="input input-sm"
-    id="prop-edge-desc"
-    value="${edge.description}"${
-    lockAttr} />
 </div>
 <div class="mb-2">
 <label class="text-xs text-muted"

@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import {
-    zoomToFit,
+    fitBoxToCanvas,
+    nodeBoundsBox,
 } from '../web-app/app/flow-interactions.ts';
 import {
     NODE_WIDTH,
@@ -12,23 +13,36 @@ const CANVAS_W = 1200;
 const CANVAS_H = 800;
 const PANEL = 288;
 
-test('zoomToFit returns null for empty input', () => {
-    const r = zoomToFit(
-        [], CANVAS_W, CANVAS_H, 0,
-    );
-    assert.equal(r, null);
+test('nodeBoundsBox returns null for empty input', () => {
+    assert.equal(nodeBoundsBox([]), null);
 });
 
 test(
-    'zoomToFit with panelOffsetPx=0 reproduces'
-    + ' today\'s full-canvas centered fit',
+    'nodeBoundsBox spans every node rectangle'
+    + ' (position to position + node size)',
     () => {
-        const positions = [
+        const box = nodeBoundsBox([
             { x: -200, y: -100 },
             { x: 200, y: 100 },
-        ];
-        const r = zoomToFit(
-            positions, CANVAS_W, CANVAS_H, 0,
+        ]);
+        assert.ok(box);
+        assert.equal(box.minX, -200);
+        assert.equal(box.minY, -100);
+        assert.equal(box.maxX, 200 + NODE_WIDTH);
+        assert.equal(box.maxY, 100 + NODE_HEIGHT);
+    },
+);
+
+test(
+    'fitBoxToCanvas with panelOffsetPx=0 reproduces'
+    + ' today\'s full-canvas centered fit',
+    () => {
+        const box = nodeBoundsBox([
+            { x: -200, y: -100 },
+            { x: 200, y: 100 },
+        ])!;
+        const r = fitBoxToCanvas(
+            box, CANVAS_W, CANVAS_H, 0,
         );
         assert.ok(r);
         const cx =
@@ -54,16 +68,16 @@ test(
 );
 
 test(
-    'zoomToFit with panel offset centers content'
+    'fitBoxToCanvas with panel offset centers content'
     + ' in the right visible region (panel is'
     + ' on the left)',
     () => {
-        const positions = [
+        const box = nodeBoundsBox([
             { x: -300, y: -200 },
             { x: 300, y: 200 },
-        ];
-        const r = zoomToFit(
-            positions, CANVAS_W, CANVAS_H, PANEL,
+        ])!;
+        const r = fitBoxToCanvas(
+            box, CANVAS_W, CANVAS_H, PANEL,
         );
         assert.ok(r);
         const cx =
@@ -81,15 +95,15 @@ test(
 );
 
 test(
-    'zoomToFit with panel offset preserves'
+    'fitBoxToCanvas with panel offset preserves'
     + ' canvas aspect ratio in viewBox',
     () => {
-        const positions = [
+        const box = nodeBoundsBox([
             { x: 0, y: 0 },
             { x: 500, y: 100 },
-        ];
-        const r = zoomToFit(
-            positions, CANVAS_W, CANVAS_H, PANEL,
+        ])!;
+        const r = fitBoxToCanvas(
+            box, CANVAS_W, CANVAS_H, PANEL,
         );
         assert.ok(r);
         const vb = r.viewBox;
@@ -103,15 +117,15 @@ test(
 );
 
 test(
-    'zoomToFit with panel offset fits content'
+    'fitBoxToCanvas with panel offset fits content'
     + ' in effectiveW pixels (width-bound)',
     () => {
-        const positions = [
+        const box = nodeBoundsBox([
             { x: -400, y: -50 },
             { x: 400, y: 50 },
-        ];
-        const r = zoomToFit(
-            positions, CANVAS_W, CANVAS_H, PANEL,
+        ])!;
+        const r = fitBoxToCanvas(
+            box, CANVAS_W, CANVAS_H, PANEL,
         );
         assert.ok(r);
         const vb = r.viewBox;
@@ -132,14 +146,14 @@ test(
 );
 
 test(
-    'zoomToFit clamps zoom to MAX_ZOOM for'
+    'fitBoxToCanvas clamps zoom to MAX_ZOOM for'
     + ' tiny content with panel offset',
     () => {
-        const positions = [
+        const box = nodeBoundsBox([
             { x: 0, y: 0 },
-        ];
-        const r = zoomToFit(
-            positions, CANVAS_W, CANVAS_H, PANEL,
+        ])!;
+        const r = fitBoxToCanvas(
+            box, CANVAS_W, CANVAS_H, PANEL,
         );
         assert.ok(r);
         assert.ok(r.zoom <= 2.0 + 0.001);
@@ -147,19 +161,19 @@ test(
 );
 
 test(
-    'zoomToFit panel offset shifts content'
+    'fitBoxToCanvas panel offset shifts content'
     + ' pixel position from full-canvas center'
     + ' to right-visible center (panel on left)',
     () => {
-        const positions = [
+        const box = nodeBoundsBox([
             { x: -100, y: -100 },
             { x: 100, y: 100 },
-        ];
-        const r0 = zoomToFit(
-            positions, CANVAS_W, CANVAS_H, 0,
+        ])!;
+        const r0 = fitBoxToCanvas(
+            box, CANVAS_W, CANVAS_H, 0,
         );
-        const r1 = zoomToFit(
-            positions, CANVAS_W, CANVAS_H, PANEL,
+        const r1 = fitBoxToCanvas(
+            box, CANVAS_W, CANVAS_H, PANEL,
         );
         assert.ok(r0);
         assert.ok(r1);
@@ -181,5 +195,45 @@ test(
             ) < 0.5,
         );
         assert.ok(pixelX1 > pixelX0);
+    },
+);
+
+// The fix's contract: the fitted viewBox contains
+// the ENTIRE box it is given, even when that box
+// extends far past where nodes sit — i.e. when the
+// box carries edge/waypoint geometry that bows
+// below the lowest node. This is the property the
+// getBBox-measured bounds rely on.
+test(
+    'fitBoxToCanvas viewBox contains a box that'
+    + ' extends far beyond the node cluster',
+    () => {
+        const box = {
+            minX: 0,
+            minY: 0,
+            maxX: 400,
+            maxY: 900,
+        };
+        const r = fitBoxToCanvas(
+            box, CANVAS_W, CANVAS_H, 0,
+        );
+        assert.ok(r);
+        const vb = r.viewBox;
+        assert.ok(
+            vb.y <= box.minY + 0.001,
+            'viewBox top covers box top',
+        );
+        assert.ok(
+            vb.y + vb.h >= box.maxY - 0.001,
+            'viewBox bottom covers the low dip',
+        );
+        assert.ok(
+            vb.x <= box.minX + 0.001,
+            'viewBox left covers box left',
+        );
+        assert.ok(
+            vb.x + vb.w >= box.maxX - 0.001,
+            'viewBox right covers box right',
+        );
     },
 );

@@ -16,6 +16,7 @@ import {
     type HistoryEntry,
     type HistoryFieldValue,
     type ClaimStatus,
+    type ConstraintViolation,
 } from '../adapters/index.ts';
 import type { Worker } from '../adapters/index.ts';
 import type { Id } from '../../../api/types.ts';
@@ -23,6 +24,9 @@ import {
     iconArrowLeft,
     iconClock,
 } from '../icons.ts';
+import {
+    formatViolation,
+} from '../record-constraints.ts';
 
 const ATTRIBUTE_HTML_TYPE: Record<
     string,
@@ -193,6 +197,35 @@ export class WorkboxDetailPresenter {
         return this.#claim;
     }
 
+    // Banner for a rejected transition: one line per
+    // constraint the Record gate failed, named by its
+    // attribute. The violations carry their own data;
+    // formatViolation phrases each by kind, date-aware
+    // for range bounds.
+    buildViolations(
+        violations: readonly ConstraintViolation[],
+    ): SafeHtml {
+        return html`<div
+            class="violations-banner"
+            role="alert">
+            <p class="violations-banner-title">
+                This transition can't be saved yet:
+            </p>
+            <ul class="violations-banner-list">
+                ${violations.map(
+                    v => html`<li>${
+                        formatViolation(
+                            v,
+                            this.#requireAttributeById(
+                                v.attributeId,
+                            ),
+                        )
+                    }</li>`,
+                )}
+            </ul>
+        </div>`;
+    }
+
     buildPage(): SafeHtml {
         const complete = this.isArchive();
 
@@ -203,6 +236,11 @@ export class WorkboxDetailPresenter {
         const transitions = complete
             ? html``
             : this.#buildTransitionButtons();
+
+        const violationsSlot = complete
+            ? html``
+            : html`<div
+                id="transition-violations"></div>`;
 
         const unclaimBtn = complete
             ? html``
@@ -247,6 +285,7 @@ export class WorkboxDetailPresenter {
             </div>
 
             ${fields}
+            ${violationsSlot}
             ${transitions}
 
             <div class="flex gap-3 mb-6">
@@ -313,14 +352,22 @@ export class WorkboxDetailPresenter {
     #requireAttribute(
         ref: NodeAttribute,
     ): RecordAttributeEntity {
-        const attribute = this.#attributeMap.get(
+        return this.#requireAttributeById(
             ref.attribute_id,
+        );
+    }
+
+    #requireAttributeById(
+        attributeId: string,
+    ): RecordAttributeEntity {
+        const attribute = this.#attributeMap.get(
+            attributeId,
         );
         if (!attribute) {
             throw new Error(
-                'node attribute references'
+                'attribute reference points to'
                 + ' unknown attribute_id: '
-                + ref.attribute_id,
+                + attributeId,
             );
         }
         return attribute;

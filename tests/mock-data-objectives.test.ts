@@ -11,9 +11,26 @@ import { createRequestContext }
 import {
     getArchivedObjectiveIds,
 } from '../web-app/app/adapters/objectives.ts';
+import { getProjectStates } from
+    '../web-app/app/adapters/state-events.ts';
+import type { Id, ProjectState } from
+    '../api/types.ts';
+import type { RequestContext } from
+    '../web-app/app/adapters/shared.ts';
+
+async function projectIdsByState(
+    ctx: RequestContext,
+    wanted: ProjectState,
+): Promise<Id[]> {
+    const states = await getProjectStates(ctx);
+    return [...states]
+        .filter(([, state]) => state === wanted)
+        .map(([id]) => id);
+}
 
 test('populateMockData seeds 4 objectives', async () => {
     const db = new MemoryDbAdapter();
+    await db.createSchema();
     await populateMockData(db);
     const rows = await db.objectives.getAll();
     assert.equal(rows.length, 4);
@@ -26,6 +43,7 @@ test('populateMockData seeds 4 objectives', async () => {
 test('populateMockData seeds one revision per objective',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         await populateMockData(db);
         const revs =
             await db.objectiveRevisions.getAll();
@@ -45,6 +63,7 @@ test('populateMockData seeds one revision per objective',
 test('populateMockData seeds zero archived objectives',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         await populateMockData(db);
         const ctx = createRequestContext(db);
         const ids = await getArchivedObjectiveIds(ctx);
@@ -54,25 +73,30 @@ test('populateMockData seeds zero archived objectives',
 test('approved projects have full baseline coverage',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         await populateMockData(db);
-        const projects = await db.projects.getAll();
-        const approved = projects.filter(
-            p => p.status === 'approved',
+        const ctx = createRequestContext(db);
+        const approved = await projectIdsByState(
+            ctx, 'approved',
+        );
+        assert.ok(
+            approved.length > 0,
+            'seed has approved projects',
         );
         const objCount =
             (await db.objectives.getAll()).length;
         const allBaselines = await
             db.projectObjectiveBaselineScores.getAll();
-        for (const p of approved) {
+        for (const pid of approved) {
             const pairs = new Set(
                 allBaselines
-                    .filter(b => b.project_id === p.id)
+                    .filter(b => b.project_id === pid)
                     .map(b => b.objective_id),
             );
             assert.equal(
                 pairs.size,
                 objCount,
-                `project ${p.id} missing coverage`,
+                `project ${pid} missing coverage`,
             );
         }
     });
@@ -80,30 +104,73 @@ test('approved projects have full baseline coverage',
 test('completed projects have at least one actual per pair',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         await populateMockData(db);
-        const projects = await db.projects.getAll();
-        const completed = projects.filter(
-            p => p.status === 'completed',
+        const ctx = createRequestContext(db);
+        const completed = await projectIdsByState(
+            ctx, 'archived',
+        );
+        assert.ok(
+            completed.length > 0,
+            'seed has archived projects',
         );
         const allBaselines = await
             db.projectObjectiveBaselineScores.getAll();
         const allActuals = await
             db.projectObjectiveActualScores.getAll();
-        for (const p of completed) {
+        for (const pid of completed) {
             const pairs = new Set(
                 allBaselines
-                    .filter(b => b.project_id === p.id)
+                    .filter(b => b.project_id === pid)
                     .map(b => b.objective_id),
             );
             const actualPairs = new Set(
                 allActuals
-                    .filter(a => a.project_id === p.id)
+                    .filter(a => a.project_id === pid)
                     .map(a => a.objective_id),
             );
             for (const pair of pairs) {
                 assert.ok(
                     actualPairs.has(pair),
-                    `project ${p.id} missing `
+                    `project ${pid} missing `
+                        + `actual for ${pair}`,
+                );
+            }
+        }
+    });
+
+test('approved projects have an actual for every pair',
+    async () => {
+        const db = new MemoryDbAdapter();
+        await db.createSchema();
+        await populateMockData(db);
+        const ctx = createRequestContext(db);
+        const approved = await projectIdsByState(
+            ctx, 'approved',
+        );
+        assert.ok(
+            approved.length > 0,
+            'seed has approved projects',
+        );
+        const allBaselines = await
+            db.projectObjectiveBaselineScores.getAll();
+        const allActuals = await
+            db.projectObjectiveActualScores.getAll();
+        for (const pid of approved) {
+            const pairs = new Set(
+                allBaselines
+                    .filter(b => b.project_id === pid)
+                    .map(b => b.objective_id),
+            );
+            const actualPairs = new Set(
+                allActuals
+                    .filter(a => a.project_id === pid)
+                    .map(a => a.objective_id),
+            );
+            for (const pair of pairs) {
+                assert.ok(
+                    actualPairs.has(pair),
+                    `approved ${pid} missing `
                         + `actual for ${pair}`,
                 );
             }
@@ -112,16 +179,21 @@ test('completed projects have at least one actual per pair',
 
 test('submitted projects have zero scores', async () => {
     const db = new MemoryDbAdapter();
+    await db.createSchema();
     await populateMockData(db);
-    const projects = await db.projects.getAll();
-    const submitted = projects.filter(
-        p => p.status === 'submitted',
+    const ctx = createRequestContext(db);
+    const submitted = await projectIdsByState(
+        ctx, 'submitted',
+    );
+    assert.ok(
+        submitted.length > 0,
+        'seed has submitted projects',
     );
     const allBaselines = await
         db.projectObjectiveBaselineScores.getAll();
-    for (const p of submitted) {
+    for (const pid of submitted) {
         const baselines = allBaselines.filter(
-            b => b.project_id === p.id,
+            b => b.project_id === pid,
         );
         assert.equal(baselines.length, 0);
     }

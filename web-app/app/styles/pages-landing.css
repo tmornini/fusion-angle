@@ -35,14 +35,9 @@
 .navbar-logo-icon {
   width: 2rem;
   height: 2rem;
-  border-radius: var(--radius-lg);
-  background: var(--gradient-hero);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: hsl(var(--primary-foreground));
-  font-weight: var(--font-weight-bold);
-  font-size: var(--text-lg);
 }
 
 .navbar-logo-text {

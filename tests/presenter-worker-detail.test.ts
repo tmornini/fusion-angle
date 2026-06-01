@@ -33,6 +33,8 @@ const {
 
 const {
     AIWorkerDetailPresenter,
+    AIWorkerDetailEditPresenter,
+    aiWorkerDraftFromWorker,
 } = await import(
     '../web-app/app/presenters/ai-worker-detail.ts'
 );
@@ -89,31 +91,46 @@ function makeRecordingContainer(): {
 }
 
 function makeHumanWorker() {
-    return new HumanWorker({
-        id: 'hw_1',
-        first_name: 'Sarah',
-        last_name: 'Chen',
-        email: 'sarah@example.com',
-        title: 'Engineer',
-        department: 'Engineering',
-        strengths: jsonArrayField(['Leadership']),
-        team_dimensions: jsonObjectField({
-            driver: 60, analytical: 40,
-            expressive: 30, amiable: 50,
-        }),
-        phone: '555-0100',
-        bio: 'Builds things.',
-    }, 'active');
+    return new HumanWorker(
+        {
+            id: 'hw_1',
+            type: 'human',
+            name: 'Sarah Chen',
+        },
+        {
+            id: 'hw_1',
+            email: 'sarah@example.com',
+            title: 'Engineer',
+            department: 'Engineering',
+            strengths: jsonArrayField(['Leadership']),
+            team_dimensions: jsonObjectField({
+                driver: 60, analytical: 40,
+                expressive: 30, amiable: 50,
+            }),
+            phone: '555-0100',
+            bio: 'Builds things.',
+        },
+        'active',
+    );
 }
 
 function makeAIWorker() {
-    return new AIWorker({
-        id: 'ai_1',
-        name: 'Claude Opus 4.7 Max',
-        provider: 'Anthropic',
-        description: 'Long context, deep reasoning.',
-        auth_token: 'sk-PLACEHOLDER-DEMOTOKEN-XYZ4',
-    }, 'active');
+    return new AIWorker(
+        {
+            id: 'ai_1',
+            type: 'ai',
+            name: 'Claude Opus 4.7 Max',
+        },
+        {
+            id: 'ai_1',
+            provider: 'Anthropic',
+            description:
+                'Long context, deep reasoning.',
+            auth_token:
+                'sk-PLACEHOLDER-DEMOTOKEN-XYZ4',
+        },
+        'active',
+    );
 }
 
 test(
@@ -166,6 +183,34 @@ test(
         // Name and provider still surface
         assert.match(out, /Claude Opus 4\.7 Max/);
         assert.match(out, /Anthropic/);
+        // The lifecycle state badge surfaces.
+        assert.match(out, /Active/);
+    },
+);
+
+test(
+    'AIWorkerDetailEditPresenter renders a State'
+    + ' select hooked to the worker-field, with the'
+    + ' current state pre-selected',
+    () => {
+        const rec = makeRecordingContainer();
+        const worker = makeAIWorker();
+        new AIWorkerDetailEditPresenter(
+            worker,
+            aiWorkerDraftFromWorker(worker),
+        ).renderShell(rec.container);
+        const out = rec.allHtml();
+        assert.match(out, /id="ai-state"/);
+        assert.match(
+            out, /data-worker-field="state"/,
+        );
+        assert.match(
+            out, /value="active"[\s\S]*?selected/,
+        );
+        // Save affordance present in edit mode.
+        assert.match(
+            out, /data-worker-action="save"/,
+        );
     },
 );
 

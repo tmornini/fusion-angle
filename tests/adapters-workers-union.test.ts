@@ -18,74 +18,60 @@ import {
     isAIWorker,
 } from '../web-app/app/adapters/workers-union.ts';
 import type {
-    HumanWorkerEntity,
-    AIWorkerEntity,
     WorkerId,
     Worker,
 } from '../api/types.ts';
-
-function buildHumanWorkerEntity(
-    id: WorkerId,
-    first: string,
-): Omit<HumanWorkerEntity, 'id'> & { id: WorkerId } {
-    return {
-        id,
-        first_name: first,
-        last_name: 'Test',
-        email: first.toLowerCase() + '@example.com',
-        title: 'Engineer',
-        department: 'Eng',
-        strengths: '[]' as never,
-        team_dimensions: '{}' as never,
-        phone: '',
-        bio: '',
-    };
-}
-
-function buildAIWorkerEntity(
-    id: WorkerId,
-    name: string,
-): Omit<AIWorkerEntity, 'id'> & { id: WorkerId } {
-    return {
-        id,
-        name,
-        provider: 'Anthropic',
-        description: '',
-        auth_token: 'sk-test-XXXX',
-    };
-}
-
-async function seedWorkerState(
-    db: MemoryDbAdapter,
-    workerId: WorkerId,
-    state: string = 'active',
-): Promise<void> {
-    await db.states.record(
-        `st-${workerId}`,
-        workerId,
-        state,
-        'system',
-    );
-}
+import {
+    seedHumanWorker,
+    seedAIWorker,
+} from './worker-fixtures.ts';
 
 async function setupSeeded(): Promise<{
     db: MemoryDbAdapter;
 }> {
     const db = new MemoryDbAdapter();
-    const sarah = buildHumanWorkerEntity(
-        'hw_sarah_chen', 'Sarah',
+    await db.createSchema();
+    await seedHumanWorker(
+        db, 'hw_sarah_chen', 'Sarah Test',
     );
-    const opus = buildAIWorkerEntity(
-        'ai_claude_opus', 'Claude Opus',
+    await seedAIWorker(
+        db, 'ai_claude_opus', 'Claude Opus',
     );
-    const { id: _h, ...sarahBody } = sarah;
-    const { id: _a, ...opusBody } = opus;
-    await db.workers.put('hw_sarah_chen', sarahBody);
-    await db.aiWorkers.put('ai_claude_opus', opusBody);
-    await seedWorkerState(db, 'hw_sarah_chen');
-    await seedWorkerState(db, 'ai_claude_opus');
     return { db };
 }
+
+test(
+    'getWorkers omits system; getWorkerMap'
+    + ' resolves it as an author',
+    async () => {
+        const db = new MemoryDbAdapter();
+        await db.createSchema();
+        await seedHumanWorker(
+            db, 'hw_sarah', 'Sarah Chen',
+        );
+        await db.workers.put('system', {
+            type: 'system',
+            name: 'System Worker',
+        });
+        await db.states.record(
+            'st-system', 'system',
+            'active', 'system',
+        );
+        const ctx = createRequestContext(db);
+        const roster = await getWorkers(ctx);
+        assert.ok(
+            !roster.some(
+                w => w.idForLink() === 'system',
+            ),
+            'roster excludes the system worker',
+        );
+        const map = await getWorkerMap(ctx);
+        assert.equal(
+            workerName(map, 'system'),
+            'System Worker',
+        );
+    },
+);
 
 test(
     'getWorkers returns humans and AIs unioned'
@@ -176,6 +162,7 @@ test(
     + ' an empty array',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         const ctx = createRequestContext(db);
         const workers = await getWorkers(ctx);
         assert.deepEqual(workers, []);

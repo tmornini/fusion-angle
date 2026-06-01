@@ -73,7 +73,6 @@ function snapToSave(
 ): FlowSaveShape {
     return {
         name: snap.flowName,
-        description: snap.flowDescription,
         isLocked: snap.isLocked,
         isAutoLayout: snap.isAutoLayout,
         isAutoFit: snap.isAutoFit,
@@ -615,7 +614,6 @@ function applyServerGraph(
     snap: FlowSnapshot,
     graph: {
         name: string;
-        description: string;
         isLocked: boolean;
         isAutoLayout: boolean;
         isAutoFit: boolean;
@@ -627,7 +625,6 @@ function applyServerGraph(
     return {
         ...snap,
         flowName: graph.name,
-        flowDescription: graph.description,
         isLocked: graph.isLocked,
         isAutoLayout: graph.isAutoLayout,
         isAutoFit: graph.isAutoFit,
@@ -671,7 +668,6 @@ export async function performUndo(
                 id: generateCryptoSafeBase62(),
                 flowId: snap.flowId,
                 name: snap.flowName,
-                description: snap.flowDescription,
                 isLocked: snap.isLocked,
                 isAutoLayout: snap.isAutoLayout,
                 isAutoFit: snap.isAutoFit,
@@ -683,7 +679,6 @@ export async function performUndo(
         );
         await putFlow(ctx, snap.flowId, {
             name: version.name,
-            description: version.description,
             isLocked: version.isLocked,
             isAutoLayout: version.isAutoLayout,
             isAutoFit: version.isAutoFit,
@@ -742,7 +737,6 @@ export async function performRedo(
         const v = popped.version;
         await putFlow(ctx, snap.flowId, {
             name: v.name,
-            description: v.description,
             isLocked: v.isLocked,
             isAutoLayout: v.isAutoLayout,
             isAutoFit: v.isAutoFit,

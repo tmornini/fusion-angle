@@ -21,6 +21,7 @@ test('TABLE_NAMES includes the objective tables', () => {
 test('MemoryDbAdapter exposes objective stores',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         await db.objectives.put('o1', { position: 0 });
         const all = await db.objectives.getAll();
         assert.equal(all.length, 1);
@@ -30,6 +31,7 @@ test('MemoryDbAdapter exposes objective stores',
             objective_id: 'o1',
             name: 'Revenue',
             description: 'd',
+            worker_id: 'w1',
             at: '2026-05-14T00:00:00.000Z',
         });
         const revs =
@@ -41,6 +43,7 @@ test('MemoryDbAdapter exposes objective stores',
                 project_id: 'p1',
                 objective_id: 'o1',
                 score: 42,
+                worker_id: 'w1',
                 at: '2026-05-14T00:00:00.000Z',
             },
         );
@@ -53,6 +56,7 @@ test('MemoryDbAdapter exposes objective stores',
                 project_id: 'p1',
                 objective_id: 'o1',
                 score: -10,
+                worker_id: 'w1',
                 at: '2026-05-15T00:00:00.000Z',
             },
         );

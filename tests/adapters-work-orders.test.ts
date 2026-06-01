@@ -19,6 +19,7 @@ import {
 '../web-app/app/adapters/crypto-safe-base62.ts';
 import {
     getWorkOrderActiveClaim,
+    getActiveClaimsByWorkOrder,
     getWorkOrderCurrentNodeId,
     getWorkOrderTransitionEvents,
 } from
@@ -28,13 +29,15 @@ import {
     DEFAULT_LOCK_TIMEOUT,
 } from '../api/types.ts';
 import type {
-    HumanWorkerEntity,
     FlowEntity,
     GraphNode,
     GraphEdge,
     StoredGraph,
     StateEntity,
 } from '../api/types.ts';
+import {
+    seedHumanWorker,
+} from './worker-fixtures.ts';
 
 interface CreateIds {
     workOrderId: string;
@@ -59,23 +62,6 @@ async function createWorkOrder(
     return ids.workOrderId;
 }
 
-function buildHumanWorker(
-    name: string,
-): Omit<HumanWorkerEntity, 'id'> {
-    return {
-        first_name: name,
-        last_name: 'Test',
-        email: name.toLowerCase()
-            + '@example.com',
-        phone: '',
-        title: 'product_manager',
-        strengths: '[]' as never,
-        team_dimensions: '{}' as never,
-        bio: '',
-        department: 'Product',
-    };
-}
-
 function buildNode(
     id: string,
     name: string,
@@ -84,7 +70,6 @@ function buildNode(
     return {
         id,
         name,
-        description: '',
         positionX: 0,
         positionY: 0,
         isCreate: false,
@@ -103,7 +88,6 @@ function buildEdge(
     return {
         id,
         name: '',
-        description: '',
         fromNodeId,
         toNodeId,
     };
@@ -114,7 +98,6 @@ function buildFlow(
 ): Omit<FlowEntity, 'id'> {
     return {
         name: 'Test flow',
-        description: 't',
         is_locked: false,
         is_auto_layout: true,
         is_auto_fit: true,
@@ -167,9 +150,8 @@ async function setupDb(): Promise<{
     ctx: RequestContext;
 }> {
     const db = new MemoryDbAdapter();
-    await db.workers.put(
-        'current', buildHumanWorker('Demo'),
-    );
+    await db.createSchema();
+    await seedHumanWorker(db, 'current', 'Demo Test');
     const ctx = createRequestContext(db);
     return { db, ctx };
 }
@@ -619,6 +601,7 @@ test(
     + 'flow-work-order rows',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         await db.flowWorkOrders.put(
             'fwo1',
             {
@@ -661,8 +644,9 @@ test(
     + 'claimed event as implicitly expired',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.workers.put(
-            'current', buildHumanWorker('Demo'),
+        await db.createSchema();
+        await seedHumanWorker(
+            db, 'current', 'Demo Test',
         );
         const ctx = createRequestContext(db);
         const woId = generateCryptoSafeBase62();
@@ -692,8 +676,9 @@ test(
     + 'claim when within the lock window',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.workers.put(
-            'current', buildHumanWorker('Demo'),
+        await db.createSchema();
+        await seedHumanWorker(
+            db, 'current', 'Demo Test',
         );
         const ctx = createRequestContext(db);
         const woId = generateCryptoSafeBase62();
@@ -711,5 +696,72 @@ test(
         );
         assert.ok(claim !== null);
         assert.equal(claim.workerId, 'current');
+    },
+);
+
+// ── bulk getActiveClaimsByWorkOrder ────
+
+test(
+    'getActiveClaimsByWorkOrder resolves every '
+    + 'order claim in one read, honoring per-order '
+    + 'lockTimeout and the work-order set',
+    async () => {
+        const db = new MemoryDbAdapter();
+        await db.createSchema();
+        await seedHumanWorker(
+            db, 'current', 'Demo Test',
+        );
+        const ctx = createRequestContext(db);
+        const fresh1 = generateCryptoSafeBase62();
+        const fresh2 = generateCryptoSafeBase62();
+        const stale = generateCryptoSafeBase62();
+        const released = generateCryptoSafeBase62();
+        const orphan = generateCryptoSafeBase62();
+        const now = new Date().toISOString();
+        const longAgo = new Date(
+            Date.now() - 10_000,
+        ).toISOString();
+        const claimed = (entityId: string, at: string) =>
+            db.states.put(generateCryptoSafeBase62(), {
+                entity_id: entityId,
+                state: 'claimed',
+                worker_id: 'current',
+                at,
+            });
+        await claimed(fresh1, now);
+        await claimed(fresh2, now);
+        await claimed(stale, longAgo);
+        await claimed(orphan, now);
+        await db.states.put(
+            generateCryptoSafeBase62(),
+            {
+                entity_id: released,
+                state: 'claim_released',
+                worker_id: 'current',
+                at: now,
+            },
+        );
+        const timeouts = new Map<string, number>([
+            [fresh1, DEFAULT_LOCK_TIMEOUT],
+            [fresh2, DEFAULT_LOCK_TIMEOUT],
+            [stale, 1],
+            [released, DEFAULT_LOCK_TIMEOUT],
+        ]);
+        const claims =
+            await getActiveClaimsByWorkOrder(
+                ctx, timeouts,
+            );
+        assert.equal(claims.size, 2);
+        assert.equal(
+            claims.get(fresh1)!.workerId, 'current',
+        );
+        assert.ok(claims.has(fresh2));
+        // Stale claim past its lockTimeout: excluded.
+        assert.equal(claims.has(stale), false);
+        // Released claim: excluded.
+        assert.equal(claims.has(released), false);
+        // Claimed but outside the work-order set:
+        // excluded (no timeout entry).
+        assert.equal(claims.has(orphan), false);
     },
 );

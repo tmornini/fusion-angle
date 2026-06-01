@@ -323,7 +323,7 @@ async function handleAddEdge(
     commit(next, {
         advanceHistory: op.advanceHistory,
     });
-    commit(
+    commitAndFit(
         pageState.presenter().withLayoutReconciled(),
     );
 }
@@ -342,7 +342,6 @@ async function reportOpFailure(
     commit({
         ...current,
         flowName: g.name,
-        flowDescription: g.description,
         isLocked: g.isLocked,
         lockTimeout: g.lockTimeout,
         nodes: g.nodes,
@@ -361,7 +360,7 @@ async function handleUndo(): Promise<void> {
     }
     pageState.setHistory(op.newHistory);
     commit(op.freshSnap);
-    commit(
+    commitAndFit(
         pageState.presenter().withLayoutReconciled(),
     );
 }
@@ -377,7 +376,7 @@ async function handleRedo(): Promise<void> {
     }
     pageState.setHistory(op.newHistory);
     commit(op.freshSnap);
-    commit(
+    commitAndFit(
         pageState.presenter().withLayoutReconciled(),
     );
 }
@@ -418,7 +417,7 @@ async function handleDeleteSelectedNodes(
     commit(next, {
         advanceHistory: op.advanceHistory,
     });
-    commit(
+    commitAndFit(
         pageState.presenter().withLayoutReconciled(),
     );
 }
@@ -450,7 +449,7 @@ async function handleDeleteSelectedEdge(
     commit(next, {
         advanceHistory: op.advanceHistory,
     });
-    commit(
+    commitAndFit(
         pageState.presenter().withLayoutReconciled(),
     );
 }
@@ -599,7 +598,7 @@ async function handleAddNodeAtPosition(
     commit(next, {
         advanceHistory: op.advanceHistory,
     });
-    commit(
+    commitAndFit(
         pageState.presenter().withLayoutReconciled(),
     );
 }
@@ -614,6 +613,50 @@ function update(
         presenter.buildGestureContext(),
     );
     pageState.setHistory(presenter.history());
+}
+
+// Re-fit the camera to the geometry actually
+// rendered — curves, waypoints, labels, markers —
+// not merely the node rectangles. getBBox reports
+// the content group's extent in content
+// coordinates (independent of the current viewBox),
+// so the provisional node-bounds fit that already
+// painted is corrected to include everything that
+// bows past the nodes. No-op unless Auto-Fit is on.
+function reconcileFitFromDom(): void {
+    const snap = pageState.presenter().snapshot();
+    if (!snap.isAutoFit) return;
+    const content = pageState.container()
+        .querySelector('.flow-content');
+    if (
+        !(content instanceof SVGGraphicsElement)
+    ) {
+        return;
+    }
+    const bbox = content.getBBox();
+    if (bbox.width <= 0 || bbox.height <= 0) {
+        return;
+    }
+    commit(
+        pageState.presenter().withFitToBox({
+            minX: bbox.x,
+            minY: bbox.y,
+            maxX: bbox.x + bbox.width,
+            maxY: bbox.y + bbox.height,
+        }),
+    );
+}
+
+// Commit a change that can alter the drawn graph,
+// then re-fit the camera to the measured render —
+// the correction the provisional node-fit cannot
+// make. The re-fit no-ops when Auto Fit is off.
+function commitAndFit(
+    next: FlowSnapshot,
+    opts?: { advanceHistory?: boolean },
+): void {
+    commit(next, opts);
+    reconcileFitFromDom();
 }
 
 function bindFlowNameEdit(
@@ -754,7 +797,7 @@ function bindSwitches(
     )?.addEventListener(
         'click',
         () => {
-            commit(
+            commitAndFit(
                 pageState.presenter()
                     .withAutoFitToggled(),
             );
@@ -836,10 +879,7 @@ function bindCanvasInteractions(
                 pageState.presenter()
                     .withInteractionState(next),
             );
-            commit(
-                pageState.presenter()
-                    .withFitReconciled(),
-            );
+            reconcileFitFromDom();
             const nowSelected = pageState
                 .presenter().selectedNodeId();
             const isPanelOpen = pageState
@@ -862,13 +902,10 @@ function bindCanvasInteractions(
                 pageState.presenter()
                     .withPanelOpen(open),
             );
-            commit(
-                pageState.presenter()
-                    .withFitReconciled(),
-            );
+            reconcileFitFromDom();
         },
         (updates) => {
-            commit(
+            commitAndFit(
                 pageState.presenter()
                     .withNodesMoved(updates),
                 { advanceHistory: true },
@@ -1164,10 +1201,7 @@ function bindPanelActions(
                     pageState.presenter()
                         .withPanelOpen(false),
                 );
-                commit(
-                    pageState.presenter()
-                        .withFitReconciled(),
-                );
+                reconcileFitFromDom();
             } else if (
                 action === 'remove-attribute-ref'
             ) {
@@ -1208,36 +1242,12 @@ function bindPanelActions(
                     ),
                 );
             } else if (
-                id === 'prop-node-desc'
-            ) {
-                pageState.saveDebouncer().schedule(
-                    () => commit(
-                        pageState.presenter()
-                            .withNodeDescribed(
-                                value,
-                            ),
-                        { advanceHistory: true },
-                    ),
-                );
-            } else if (
                 id === 'prop-edge-name'
             ) {
                 pageState.saveDebouncer().schedule(
                     () => commit(
                         pageState.presenter()
                             .withEdgeNamed(value),
-                        { advanceHistory: true },
-                    ),
-                );
-            } else if (
-                id === 'prop-edge-desc'
-            ) {
-                pageState.saveDebouncer().schedule(
-                    () => commit(
-                        pageState.presenter()
-                            .withEdgeDescribed(
-                                value,
-                            ),
                         { advanceHistory: true },
                     ),
                 );
@@ -1496,6 +1506,7 @@ export async function init(
                 pageState.presenter()
                     .withLayoutReconciled(),
             );
+            reconcileFitFromDom();
         }
     }
     subscribeResize(container, () => {
@@ -1515,6 +1526,7 @@ export async function init(
             update(
                 container, pageState.presenter(),
             );
+            reconcileFitFromDom();
         }
     });
 }
@@ -1537,10 +1549,7 @@ function bindKeyboardShortcuts(
                     pageState.presenter()
                         .withPanelOpen(false),
                 );
-                commit(
-                    pageState.presenter()
-                        .withFitReconciled(),
-                );
+                reconcileFitFromDom();
                 return;
             }
             if (

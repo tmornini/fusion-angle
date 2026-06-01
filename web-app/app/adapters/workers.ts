@@ -1,5 +1,6 @@
 import type {
     WorkerId,
+    WorkerEntity,
     HumanWorkerEntity,
     WorkerState,
 } from '../../../api/types.ts';
@@ -39,40 +40,63 @@ export function notifyHumanWorkerChange(): void {
     humanWorkerChanges.notify();
 }
 
-export async function getHumanWorkerRows(
-    ctx: RequestContext,
-): Promise<HumanWorkerEntity[]> {
-    return ctx.GET<HumanWorkerEntity[]>('workers');
+// A human worker draft: the parent display name plus
+// the detail fields, as the Add Worker dialog and the
+// edit form supply them. Split into the two table rows
+// at the write seam below.
+export type HumanWorkerDraft =
+    Omit<HumanWorkerEntity, 'id'> & { name: string };
+
+// A human worker composed for the editor: parent name
+// merged onto the detail row. Lifecycle state is read
+// separately from the states log.
+export interface HumanWorkerRow extends HumanWorkerEntity {
+    name: string;
 }
 
 export async function getHumanWorkerMap(
     ctx: RequestContext,
 ): Promise<Map<WorkerId, HumanWorker>> {
-    const [rows, stateMap] = await Promise.all([
-        getHumanWorkerRows(ctx),
-        getWorkerStates(ctx),
-    ]);
-    return new Map(
-        rows.map(entity => {
-            const state = stateMap.get(entity.id);
-            if (state === undefined) {
-                throw new Error(
-                    'no state event for human worker '
-                    + entity.id,
-                );
-            }
-            return [
-                entity.id,
-                new HumanWorker(entity, state),
-            ];
-        }),
+    const [parents, details, stateMap] =
+        await Promise.all([
+            ctx.GET<WorkerEntity[]>('workers'),
+            ctx.GET<HumanWorkerEntity[]>(
+                'human-workers',
+            ),
+            getWorkerStates(ctx),
+        ]);
+    const detailById = new Map(
+        details.map(d => [d.id, d]),
     );
+    const map = new Map<WorkerId, HumanWorker>();
+    for (const parent of parents) {
+        if (parent.type !== 'human') continue;
+        const detail = detailById.get(parent.id);
+        if (detail === undefined) {
+            throw new Error(
+                'no human detail for worker '
+                + parent.id,
+            );
+        }
+        const state = stateMap.get(parent.id);
+        if (state === undefined) {
+            throw new Error(
+                'no state event for human worker '
+                + parent.id,
+            );
+        }
+        map.set(
+            parent.id,
+            new HumanWorker(parent, detail, state),
+        );
+    }
+    return map;
 }
 
 export async function getCurrentHumanWorker(
     ctx: RequestContext,
-): Promise<HumanWorkerEntity> {
-    return ctx.GET<HumanWorkerEntity>(
+): Promise<WorkerEntity> {
+    return ctx.GET<WorkerEntity>(
         'current-worker',
     );
 }
@@ -98,49 +122,80 @@ export async function getHumanWorker(
     ctx: RequestContext,
     id: string,
 ): Promise<HumanWorker> {
-    const [row, state] = await Promise.all([
-        ctx.GET<HumanWorkerEntity>(`workers/${id}`),
-        getWorkerState(ctx, id),
-    ]);
-    return new HumanWorker(row, state);
+    const [parent, detail, state] =
+        await Promise.all([
+            ctx.GET<WorkerEntity>(`workers/${id}`),
+            ctx.GET<HumanWorkerEntity>(
+                `human-workers/${id}`,
+            ),
+            getWorkerState(ctx, id),
+        ]);
+    return new HumanWorker(parent, detail, state);
 }
 
 export async function getHumanWorkerRow(
     ctx: RequestContext,
     id: string,
-): Promise<HumanWorkerEntity> {
-    return ctx.GET<HumanWorkerEntity>(
-        `workers/${id}`,
-    );
+): Promise<HumanWorkerRow> {
+    const [parent, detail] = await Promise.all([
+        ctx.GET<WorkerEntity>(`workers/${id}`),
+        ctx.GET<HumanWorkerEntity>(
+            `human-workers/${id}`,
+        ),
+    ]);
+    return { ...detail, name: parent.name };
 }
 
+// Split a human-worker write across the parent (type +
+// name) and detail rows. Used by edits; creation goes
+// through postHumanWorkerCreation.
 export async function putHumanWorker(
     ctx: RequestContext,
     id: string,
-    entity: Omit<HumanWorkerEntity, 'id'>,
+    input: HumanWorkerDraft,
 ): Promise<void> {
-    await ctx.PUT(`workers/${id}`, entity);
-    humanWorkerChanges.notify();
-}
-
-// Human-worker creation: row + initial state event
-// in one ctx.commit batch. Use only at the Add
-// Worker call site; transitions of an existing
-// worker go through postHumanWorkerStateChange.
-export async function postHumanWorkerCreation(
-    ctx: RequestContext,
-    id: string,
-    entity: Omit<HumanWorkerEntity, 'id'>,
-    initialState: WorkerState,
-): Promise<void> {
-    const workerBody =
-        entity as unknown as Record<string, unknown>;
+    const { name, ...detail } = input;
     await ctx.commit({
         ops: [
             {
                 method: 'put',
                 resource: `workers/${id}`,
-                body: workerBody,
+                body: { type: 'human', name },
+            },
+            {
+                method: 'put',
+                resource: `human-workers/${id}`,
+                body: detail as unknown as
+                    Record<string, unknown>,
+            },
+        ],
+    });
+    humanWorkerChanges.notify();
+}
+
+// Human-worker creation: parent row + detail row +
+// initial state event in one ctx.commit batch. Use only
+// at the Add Worker call site; transitions of an
+// existing worker go through postHumanWorkerStateChange.
+export async function postHumanWorkerCreation(
+    ctx: RequestContext,
+    id: string,
+    input: HumanWorkerDraft,
+    initialState: WorkerState,
+): Promise<void> {
+    const { name, ...detail } = input;
+    await ctx.commit({
+        ops: [
+            {
+                method: 'put',
+                resource: `workers/${id}`,
+                body: { type: 'human', name },
+            },
+            {
+                method: 'put',
+                resource: `human-workers/${id}`,
+                body: detail as unknown as
+                    Record<string, unknown>,
             },
             await buildStateEventOp(
                 ctx, id, initialState,
@@ -158,20 +213,6 @@ export async function postHumanWorkerStateChange(
     await ctx.commit({
         ops: [
             await buildStateEventOp(ctx, id, state),
-        ],
-    });
-    humanWorkerChanges.notify();
-}
-
-export async function archiveHumanWorker(
-    ctx: RequestContext,
-    id: WorkerId,
-): Promise<void> {
-    await ctx.commit({
-        ops: [
-            await buildStateEventOp(
-                ctx, id, 'archived',
-            ),
         ],
     });
     humanWorkerChanges.notify();

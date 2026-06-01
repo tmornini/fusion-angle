@@ -28,23 +28,17 @@ import type {
 import {
     DEFAULT_LOCK_TIMEOUT,
 } from '../api/types.ts';
+import {
+    seedHumanWorker,
+} from './worker-fixtures.ts';
 
 async function setupMemDb(): Promise<{
     db: MemoryDbAdapter;
     ctx: RequestContext;
 }> {
     const db = new MemoryDbAdapter();
-    await db.workers.put('current', {
-        first_name: 'Demo',
-        last_name: 'User',
-        email: 'demo@example.com',
-        phone: '',
-        title: 'Admin',
-        strengths: '[]' as never,
-        team_dimensions: '{}' as never,
-        bio: '',
-        department: 'Product',
-    });
+    await db.createSchema();
+    await seedHumanWorker(db, 'current', 'Demo User');
     const ctx = createRequestContext(db);
     return { db, ctx };
 }
@@ -56,7 +50,6 @@ function buildNode(
     return {
         id,
         name: id,
-        description: '',
         positionX: 0,
         positionY: 0,
         isCreate: false,
@@ -75,7 +68,6 @@ function buildEdge(
     return {
         id,
         name: 'Transition',
-        description: '',
         fromNodeId,
         toNodeId,
     };
@@ -90,7 +82,6 @@ async function createBaseFlow(
         linkId: flowId + '-link',
         projectId: 'project-1',
         name: 'Test Flow',
-        description: 'desc',
     });
 }
 
@@ -102,7 +93,6 @@ async function saveGraph(
 ): Promise<void> {
     await putFlow(ctx, flowId, {
         name: 'Test Flow',
-        description: 'desc',
         isLocked: false,
         isAutoLayout: false,
         isAutoFit: false,
@@ -185,7 +175,6 @@ test(
             createRequestContext(db), 'flow-1',
             {
                 name: 'Renamed',
-                description: 'New desc',
                 isLocked: true,
                 isAutoLayout: true,
                 isAutoFit: true,
@@ -203,7 +192,6 @@ test(
         );
         const v = versions[0]!;
         assert.equal(v.name, 'Renamed');
-        assert.equal(v.description, 'New desc');
         assert.equal(v.isLocked, true);
         assert.equal(v.isAutoLayout, true);
         assert.equal(v.isAutoFit, true);

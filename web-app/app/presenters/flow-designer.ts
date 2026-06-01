@@ -43,11 +43,13 @@ import {
     buildInteractionState,
     zoomIn as zoomInState,
     zoomOut as zoomOutState,
-    zoomToFit as zoomToFitState,
+    fitBoxToCanvas,
+    nodeBoundsBox,
 } from '../flow-interactions.ts';
 import type {
     InteractionState,
     FlowGestureContext,
+    FitBox,
 } from '../flow-interactions.ts';
 import {
     canUndoFlowEdits,
@@ -86,7 +88,6 @@ import {
 interface DesignerState {
     flowId: string;
     flowName: string;
-    flowDescription: string;
     isLocked: boolean;
     isAutoLayout: boolean;
     isAutoFit: boolean;
@@ -125,7 +126,6 @@ export function buildInitialFlowSnapshot(
     return {
         flowId: graph.id,
         flowName: graph.name,
-        flowDescription: graph.description,
         isLocked: graph.isLocked,
         isAutoLayout: graph.isAutoLayout,
         isAutoFit: graph.isAutoFit,
@@ -181,7 +181,6 @@ export class FlowDesignerPresenter {
     ): FlowSaveShape {
         return {
             name: snap.flowName,
-            description: snap.flowDescription,
             isLocked: snap.isLocked,
             isAutoLayout: snap.isAutoLayout,
             isAutoFit: snap.isAutoFit,
@@ -628,9 +627,7 @@ Auto Fit</label>
                 '.flow-name-header-slot',
                 container,
             ),
-            html`${nameHtml}
-<p class="text-sm text-muted"
-    >${this.#snapshot.flowDescription}</p>`,
+            nameHtml,
         );
     }
 
@@ -700,11 +697,8 @@ Auto Fit</label>
         );
     }
 
-    withFitReconciled(): FlowSnapshot {
-        if (!this.#snapshot.isAutoFit) {
-            return this.#snapshot;
-        }
-        this.#applyZoomToFit(this.#snapshot);
+    withFitToBox(box: FitBox): FlowSnapshot {
+        this.#applyFitToBox(this.#snapshot, box);
         return this.#snapshot;
     }
 
@@ -774,28 +768,6 @@ Auto Fit</label>
         return next;
     }
 
-    withNodeDescribed(
-        desc: string,
-    ): FlowSnapshot {
-        if (this.#guardLocked()) {
-            return this.#snapshot;
-        }
-        const nodeId = this
-            .#singleSelectedNodeId();
-        if (!nodeId) return this.#snapshot;
-        const next: FlowSnapshot = {
-            ...this.#snapshot,
-            nodes: applyUpdateNode(
-                this.#snapshot.nodes,
-                nodeId,
-                { description: desc.trim() },
-            ),
-        };
-        void this.#saveFlow(true, next);
-        this.#noteMutation();
-        return next;
-    }
-
     withNodeWorkerIds(
         workerIds: WorkerId[],
     ): FlowSnapshot {
@@ -836,31 +808,6 @@ Auto Fit</label>
                 this.#snapshot.edges,
                 sel.edgeId,
                 { name: name.trim() },
-            ),
-        };
-        void this.#saveFlow(true, next);
-        this.#noteMutation();
-        return next;
-    }
-
-    withEdgeDescribed(
-        desc: string,
-    ): FlowSnapshot {
-        if (this.#guardLocked()) {
-            return this.#snapshot;
-        }
-        const sel =
-            this.#snapshot.interaction
-                .selection;
-        if (sel.kind !== 'edge') {
-            return this.#snapshot;
-        }
-        const next: FlowSnapshot = {
-            ...this.#snapshot,
-            edges: applyUpdateEdge(
-                this.#snapshot.edges,
-                sel.edgeId,
-                { description: desc.trim() },
             ),
         };
         void this.#saveFlow(true, next);
@@ -999,21 +946,27 @@ Auto Fit</label>
     }
 
     #applyZoomToFit(snap: FlowSnapshot): void {
-        const positions = snap.nodes.map(
-            n => ({
+        const box = nodeBoundsBox(
+            snap.nodes.map(n => ({
                 x: n.positionX,
                 y: n.positionY,
-            }),
+            })),
         );
+        if (!box) return;
+        this.#applyFitToBox(snap, box);
+    }
+
+    #applyFitToBox(
+        snap: FlowSnapshot, box: FitBox,
+    ): void {
         const panelOffset = snap.isPanelOpen
             ? PANEL_WIDTH_PX : 0;
-        const result = zoomToFitState(
-            positions,
+        const result = fitBoxToCanvas(
+            box,
             this.#canvasW,
             this.#canvasH,
             panelOffset,
         );
-        if (!result) return;
         snap.interaction.zoom = result.zoom;
         snap.interaction.viewBox =
             { ...result.viewBox };

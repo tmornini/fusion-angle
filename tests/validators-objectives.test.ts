@@ -30,6 +30,7 @@ test('validateObjectiveRevisionEntity accepts valid', () => {
         objective_id: 'o1',
         name: 'Revenue',
         description: 'Top line',
+        worker_id: 'w1',
         at: '2026-05-14T00:00:00.000Z',
     });
     assert.equal(v.name, 'Revenue');
@@ -42,6 +43,7 @@ test('validateObjectiveRevisionEntity rejects empty name',
                 objective_id: 'o1',
                 name: '',
                 description: 'd',
+                worker_id: 'w1',
                 at: '2026-05-14T00:00:00.000Z',
             }),
             /ObjectiveRevision\.name must be non-empty/,
@@ -53,6 +55,7 @@ test('validateBaselineScoreEntity accepts 0', () => {
         project_id: 'p1',
         objective_id: 'o1',
         score: 0,
+        worker_id: 'w1',
         at: '2026-05-14T00:00:00.000Z',
     });
     assert.equal(v.score, 0);
@@ -64,6 +67,7 @@ test('validateBaselineScoreEntity accepts -100 and +100',
             validateBaselineScoreEntity({
                 project_id: 'p1', objective_id: 'o1',
                 score: -100,
+                worker_id: 'w1',
                 at: '2026-05-14T00:00:00.000Z',
             }).score,
             -100,
@@ -72,6 +76,7 @@ test('validateBaselineScoreEntity accepts -100 and +100',
             validateBaselineScoreEntity({
                 project_id: 'p1', objective_id: 'o1',
                 score: 100,
+                worker_id: 'w1',
                 at: '2026-05-14T00:00:00.000Z',
             }).score,
             100,
@@ -84,6 +89,7 @@ test('validateBaselineScoreEntity rejects out-of-range',
             () => validateBaselineScoreEntity({
                 project_id: 'p1', objective_id: 'o1',
                 score: 101,
+                worker_id: 'w1',
                 at: '2026-05-14T00:00:00.000Z',
             }),
             /\[-100, \+100\]/,
@@ -92,6 +98,7 @@ test('validateBaselineScoreEntity rejects out-of-range',
             () => validateBaselineScoreEntity({
                 project_id: 'p1', objective_id: 'o1',
                 score: -101,
+                worker_id: 'w1',
                 at: '2026-05-14T00:00:00.000Z',
             }),
             /\[-100, \+100\]/,
@@ -104,6 +111,7 @@ test('validateBaselineScoreEntity rejects non-integer',
             () => validateBaselineScoreEntity({
                 project_id: 'p1', objective_id: 'o1',
                 score: 12.5,
+                worker_id: 'w1',
                 at: '2026-05-14T00:00:00.000Z',
             }),
             /\[-100, \+100\]/,
@@ -114,6 +122,7 @@ test('validateActualScoreEntity accepts -50', () => {
     const v = validateActualScoreEntity({
         project_id: 'p1', objective_id: 'o1',
         score: -50,
+        worker_id: 'w1',
         at: '2026-05-14T00:00:00.000Z',
     });
     assert.equal(v.score, -50);
@@ -125,6 +134,7 @@ test('validateActualScoreEntity rejects out-of-range',
             () => validateActualScoreEntity({
                 project_id: 'p1', objective_id: 'o1',
                 score: 200,
+                worker_id: 'w1',
                 at: '2026-05-14T00:00:00.000Z',
             }),
             /\[-100, \+100\]/,

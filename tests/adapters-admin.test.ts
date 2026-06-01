@@ -12,15 +12,16 @@ import {
 } from '../web-app/app/adapters/admin.ts';
 import type {
     ProjectEntity, IdeaEntity,
-    HumanWorkerEntity,
-    JsonArrayField, JsonObjectField,
+    WorkerState,
 } from '../api/types.ts';
+import { seedHumanWorker } from './worker-fixtures.ts';
 
-function setupDb(): {
+async function setupDb(): Promise<{
     db: MemoryDbAdapter;
     ctx: RequestContext;
-} {
+}> {
     const db = new MemoryDbAdapter();
+    await db.createSchema();
     const ctx = createRequestContext(db);
     return { db, ctx };
 }
@@ -54,23 +55,6 @@ function buildIdea(
     };
 }
 
-function buildWorker(
-    id: string,
-): Omit<HumanWorkerEntity, 'id'> {
-    return {
-        first_name: 'F-' + id,
-        last_name: 'L',
-        email: id + '@x.test',
-        title: 'product_manager',
-        department: 'Product',
-        strengths: '[]' as JsonArrayField,
-        team_dimensions:
-            '{}' as JsonObjectField,
-        phone: '',
-        bio: '',
-    };
-}
-
 async function seedProject(
     db: MemoryDbAdapter,
     id: string, state: string,
@@ -99,11 +83,10 @@ async function seedIdea(
 
 async function seedWorker(
     db: MemoryDbAdapter,
-    id: string, state: string,
+    id: string, state: WorkerState,
 ): Promise<void> {
-    await db.workers.put(id, buildWorker(id));
-    await db.states.record(
-        'sw-' + id, id, state, 'system',
+    await seedHumanWorker(
+        db, id, 'Worker ' + id, state,
     );
 }
 
@@ -111,13 +94,13 @@ test(
     'getOrganizationStats counts projects that'
     + ' are not deleted or declined',
     async () => {
-        const { db, ctx } = setupDb();
+        const { db, ctx } = await setupDb();
         await seedProject(db, 'p1', 'submitted');
         await seedProject(
             db, 'p2', 'under-review',
         );
         await seedProject(db, 'p3', 'approved');
-        await seedProject(db, 'p4', 'completed');
+        await seedProject(db, 'p4', 'archived');
         await seedProject(db, 'p5', 'declined');
         await seedProject(db, 'p6', 'deleted');
         const stats =
@@ -130,7 +113,7 @@ test(
     'getOrganizationStats counts ideas that are'
     + ' not archived or deleted',
     async () => {
-        const { db, ctx } = setupDb();
+        const { db, ctx } = await setupDb();
         await seedWorker(db, 'u1', 'active');
         await seedIdea(
             db, 'i1', 'active', 'u1',
@@ -152,7 +135,7 @@ test(
     'getOrganizationStats counts only active'
     + ' human workers',
     async () => {
-        const { db, ctx } = setupDb();
+        const { db, ctx } = await setupDb();
         await seedWorker(db, 'u1', 'active');
         await seedWorker(db, 'u2', 'active');
         await seedWorker(db, 'u3', 'pending');
@@ -167,7 +150,7 @@ test(
     'getOrganizationStats reflects latest state'
     + ' event when entities transition',
     async () => {
-        const { db, ctx } = setupDb();
+        const { db, ctx } = await setupDb();
         await seedWorker(db, 'u1', 'active');
         await seedProject(db, 'p1', 'approved');
         await seedIdea(

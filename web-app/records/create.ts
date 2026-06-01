@@ -6,7 +6,7 @@ import { navigateTo } from '../app/core.ts';
 import {
     createRequestContext,
     getRecordRows,
-    postRecordCreation,
+    postRecordChange,
     generateCryptoSafeBase62,
 } from '../app/adapters/index.ts';
 import {
@@ -56,12 +56,12 @@ async function handleSubmit(): Promise<void> {
     );
     const id = generateCryptoSafeBase62();
     try {
-        await postRecordCreation(
-            ctx,
-            id,
-            { name, description, position },
-            'active',
-        );
+        await postRecordChange(ctx, id, {
+            kind: 'create',
+            record: { name, description, position },
+            attributes: [],
+            initialState: 'active',
+        });
     } catch (err) {
         showToast(
             'Failed to create Record',

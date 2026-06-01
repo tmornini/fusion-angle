@@ -232,9 +232,15 @@ export function recordDraftFromView(
 
 export class RecordDetailEditPresenter {
     readonly #draft: RecordDetailDraft;
+    readonly #pendingAttributeName: string;
 
-    constructor(draft: RecordDetailDraft) {
+    constructor(
+        draft: RecordDetailDraft,
+        pendingAttributeName: string,
+    ) {
         this.#draft = draft;
+        this.#pendingAttributeName =
+            pendingAttributeName;
     }
 
     buildPage(): SafeHtml {
@@ -303,12 +309,29 @@ export class RecordDetailEditPresenter {
                             ),
                     )}
             </div>
-            <button
-                id="record-add-attribute-btn"
-                class="btn btn-ghost btn-sm mt-2">
-                ${iconPlus(14, '')}
-                Add Attribute
-            </button>
+            <div class="${
+                'record-attribute-pending-row'
+                + ' mt-2'
+            }">
+                <input type="text"
+                    id="${
+                        'record-pending-'
+                        + 'attribute-name'
+                    }"
+                    class="input input-sm"
+                    placeholder="Attribute name"
+                    value="${
+                        this.#pendingAttributeName
+                    }" />
+                <button
+                    id="record-add-attribute-btn"
+                    class="${
+                        'btn btn-ghost btn-sm'
+                    }">
+                    ${iconPlus(14, '')}
+                    Add Attribute
+                </button>
+            </div>
         </div>`;
     }
 

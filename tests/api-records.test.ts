@@ -15,6 +15,7 @@ test(
     + ' empty db',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         const out =
             await GET<unknown[]>(db, 'records');
         assert.deepEqual(out, []);
@@ -25,6 +26,7 @@ test(
     'PUT records/:id then GET round-trips a record',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         await PUT(db, 'records/rec-1', {
             id: 'rec-1',
             name: 'Customer',
@@ -47,6 +49,7 @@ test(
     'DELETE records/:id removes the record',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         await PUT(db, 'records/rec-1', {
             id: 'rec-1',
             name: 'X',
@@ -66,6 +69,7 @@ test(
     'GET record-attributes returns an empty array',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         const out = await GET<unknown[]>(
             db, 'record-attributes',
         );
@@ -78,6 +82,7 @@ test(
     + ' round-trips an attribute',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         await PUT(db, 'record-attributes/a-1', {
             id: 'a-1',
             record_id: 'rec-1',
@@ -104,6 +109,7 @@ test(
     'DELETE record-attributes/:id removes the row',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         await PUT(db, 'record-attributes/a-1', {
             id: 'a-1',
             record_id: 'rec-1',
@@ -128,6 +134,7 @@ test(
     'GET flow-records returns an empty array',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         const out = await GET<unknown[]>(
             db, 'flow-records',
         );
@@ -140,6 +147,7 @@ test(
     + ' binding',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         await PUT(db, 'flow-records/fr-1', {
             id: 'fr-1',
             flow_id: 'flow-1',
@@ -160,6 +168,7 @@ test(
     'DELETE flow-records/:id removes the binding',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         await PUT(db, 'flow-records/fr-1', {
             id: 'fr-1',
             flow_id: 'flow-1',

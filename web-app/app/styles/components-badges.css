@@ -196,12 +196,6 @@
   background: hsl(var(--muted) / 0.3);
 }
 
-/* Health badge — status-badge with extra padding */
-.health-badge {
-  padding: var(--space-2) var(--space-4);
-  align-self: flex-start;
-}
-
 /* Progress bar with usage level tint */
 .progress-bar[data-level="danger"] {
   background-color: hsl(var(--error));

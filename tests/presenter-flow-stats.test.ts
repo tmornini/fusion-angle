@@ -39,9 +39,9 @@ function model(): FlowStatsModel {
                    positionX:400, positionY:0 }),
         ],
         edges: [
-            { id:'e1', name:'', description:'',
+            { id:'e1', name:'',
               fromNodeId:'c', toNodeId:'a' },
-            { id:'e2', name:'', description:'',
+            { id:'e2', name:'',
               fromNodeId:'a', toNodeId:'z' },
         ],
         pathEntries: [],
@@ -156,7 +156,7 @@ test('a back-edge gets data-cycle; forward edges do not', () => {
         ...m,
         edges: [
             ...m.edges,
-            { id: 'e3', name: '', description: '',
+            { id: 'e3', name: '',
               fromNodeId: 'z', toNodeId: 'a' },
         ],
     };

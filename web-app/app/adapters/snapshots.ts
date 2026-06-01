@@ -41,7 +41,8 @@ export class SnapshotTooLargeError extends Error {
 // user back to re-snapshot from current state.
 export const RETIRED_KEYS_PER_TABLE:
     Record<string, readonly string[]> = {
-    ai_workers: ['created_at'],
+    workers: ['first_name', 'last_name'],
+    ai_workers: ['created_at', 'name'],
     flows: ['created_at', 'updated_at'],
     work_orders: ['created_at'],
     flow_versions: ['created_at'],

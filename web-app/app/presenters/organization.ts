@@ -3,8 +3,7 @@ import {
 } from '../safe-html.ts';
 import {
     iconBuilding,
-    iconCrown, iconCheckCircle2,
-    iconActivity, iconPeople,
+    iconPeople,
     iconFolderKanban, iconLightbulb,
     iconCalendar, iconTrendingUp,
     iconEdit, iconSave, iconX,
@@ -133,73 +132,13 @@ function buildOverviewCard(
             <div
                 class="${
                     'flex items-center'
-                    + ' justify-between gap-4'
-                    + ' mb-6 flex-wrap'
+                    + ' gap-4 mb-6'
                 }"
             >
-                <div
-                    class="${
-                        'flex items-center'
-                        + ' gap-4 flex-1'
-                    }"
-                >
-                    <div class="icon-box-lg"
-                        data-tone="primary"
-                    >${iconBuilding(28, '')}</div>
-                    <div>
-                        ${identity}
-                        <div
-                            class="flex
-                                   items-center
-                                   gap-2 mt-1"
-                        >
-                            <span
-                                class="badge
-                                       badge-default
-                                       text-xs"
-                            >
-                                ${iconCrown(
-                                    12, '',
-                                )}
-                                ${org.planLabel()}
-                            </span>
-                            <span class="${
-                                'status-badge'
-                                + '-success'
-                            }">
-                                ${iconCheckCircle2(
-                                    12, '',
-                                )}
-                                Active
-                            </span>
-                        </div>
-                    </div>
-                </div>
-                <div
-                    class="${
-                        'status-badge-success'
-                        + ' health-badge'
-                    }"
-                >
-                    <div
-                        class="flex items-center
-                               gap-2"
-                    >
-                        ${iconActivity(16, '')}
-                        <span class="${
-                            'text-sm font-medium'
-                        }">
-                            ${org
-                                .healthStatusText()}
-                        </span>
-                    </div>
-                    <p class="text-xs mt-1">
-                        ${'Health Score: '
-                            + org
-                                .healthScorePercent()
-                            + '%'}
-                    </p>
-                </div>
+                <div class="icon-box-lg"
+                    data-tone="primary"
+                >${iconBuilding(28, '')}</div>
+                <div>${identity}</div>
             </div>
 
             <div

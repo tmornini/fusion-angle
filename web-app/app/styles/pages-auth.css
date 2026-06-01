@@ -46,8 +46,6 @@
 .auth-brand-icon {
   width: 3rem;
   height: 3rem;
-  border-radius: var(--radius-xl);
-  background: hsl(var(--accent));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -91,32 +89,5 @@
   background: none;
   border: none;
   cursor: pointer;
-}
-
-
-.action-footer {
-  position: fixed;
-  bottom: 0;
-  left: 16rem;
-  right: 0;
-  background: hsl(var(--background) / 0.95);
-  backdrop-filter: blur(8px);
-  border-top: 1px solid hsl(var(--border));
-  z-index: 20;
-}
-
-.action-footer-inner {
-  max-width: 60rem;
-  margin: 0 auto;
-  padding: var(--space-3) var(--space-6);
-}
-
-.btn-outline-error {
-  border: 1px solid hsl(var(--error) / 0.3);
-  background-color: transparent;
-  color: hsl(var(--error));
-}
-.btn-outline-error:hover {
-  background-color: hsl(var(--error-soft));
 }
 

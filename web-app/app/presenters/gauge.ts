@@ -55,6 +55,10 @@ const INNER_HALF_LEFT_D =
     'M 90 40 A 45 45 0 0 0 45 85';
 const INNER_HALF_RIGHT_D =
     'M 90 40 A 45 45 0 0 1 135 85';
+const ARC_APEX_X = 90;
+const OUTER_APEX_Y = 20;
+const INNER_APEX_Y = 40;
+const ZERO_MARK_R = 4;
 
 interface SvgDims {
     readonly width: number;
@@ -70,7 +74,7 @@ const SVG_DIMS: Record<
 };
 
 interface BipolarFill {
-    readonly half: 'left' | 'right' | 'none';
+    readonly half: 'left' | 'right' | 'zero' | 'none';
     readonly offset: number;
 }
 
@@ -78,8 +82,11 @@ function bipolarFill(
     value: number | undefined,
     halfArc: number,
 ): BipolarFill {
-    if (value === undefined || value === 0) {
+    if (value === undefined) {
         return { half: 'none', offset: 0 };
+    }
+    if (value === 0) {
+        return { half: 'zero', offset: 0 };
     }
     const mag = Math.min(
         100, Math.abs(value),
@@ -122,8 +129,15 @@ function buildBipolarFillPath(
     leftGradId: string,
     rightGradId: string,
     halfArc: number,
+    apexY: number,
 ): SafeHtml {
     if (fill.half === 'none') return html``;
+    if (fill.half === 'zero') {
+        return html`
+            <circle class="gauge-arc-zero-mark"
+                cx="${ARC_APEX_X}" cy="${apexY}"
+                r="${ZERO_MARK_R}"/>`;
+    }
     const d = fill.half === 'left'
         ? leftPathD
         : rightPathD;
@@ -187,6 +201,7 @@ export function buildBipolarGaugeSvg(
                 OUTER_HALF_LEFT_D,
                 OUTER_HALF_RIGHT_D,
                 ol, or, ARC_OUTER_HALF,
+                OUTER_APEX_Y,
             )}
             <path class="gauge-arc-track"
                 d="${INNER_PATH_D}"
@@ -201,6 +216,7 @@ export function buildBipolarGaugeSvg(
                 INNER_HALF_LEFT_D,
                 INNER_HALF_RIGHT_D,
                 il, ir, ARC_INNER_HALF,
+                INNER_APEX_Y,
             )}
         </svg>`;
 }

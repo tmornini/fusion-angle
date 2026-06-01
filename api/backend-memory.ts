@@ -1,4 +1,10 @@
-import type { StorageBackend } from './db.ts';
+import {
+    MissingTableError,
+    type StorageBackend,
+} from './db.ts';
+import {
+    serializeRecord,
+} from './storage-serialize.ts';
 
 export class MemoryStorageBackend
     implements StorageBackend
@@ -10,28 +16,32 @@ export class MemoryStorageBackend
         this.#tables = new Map();
     }
 
-    // Lenient on missing: returns [] rather than
-    // throwing MissingTableError. Memory adapters
-    // historically allow read-before-createSchema;
-    // this preserves that affordance and keeps
-    // existing tests passing.
     async read<T extends { id: string }>(
         table: string,
     ): Promise<T[]> {
         const rows = this.#tables.get(table);
-        return rows === undefined
-            ? []
-            : ([...rows] as T[]);
+        if (rows === undefined) {
+            throw new MissingTableError(table);
+        }
+        return [...rows] as T[];
     }
 
     async write<T extends { id: string }>(
         table: string,
         rows: T[],
     ): Promise<void> {
+        const serialized = rows.map(
+            row => ({
+                ...serializeRecord(
+                    row as Record<string, unknown>,
+                    table,
+                ),
+                id: row.id,
+            }),
+        );
         this.#tables.set(
             table,
-            rows.map(r => ({ ...r })) as
-                { id: string }[],
+            serialized as { id: string }[],
         );
     }
 

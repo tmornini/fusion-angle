@@ -11,17 +11,27 @@ import {
     iconTarget,
     iconRocket,
     iconClock,
-    iconPeople,
-    iconTrendingUp,
     iconCheckCircle2,
+    iconTrendingUp,
 } from '../icons.ts';
 import { type Idea } from '../adapters/index.ts';
+import type {
+    Objective,
+    ObjectiveId,
+} from '../../../api/types.ts';
+import {
+    formatSigned,
+} from '../scoring-format.ts';
+
+export interface ObjectiveDefinition {
+    name: string;
+    description: string;
+}
 
 export type ConversionField =
     | 'project-name'
     | 'time-days'
     | 'cost'
-    | 'impact'
     | 'success-criteria';
 
 const REQUIRED_FIELDS:
@@ -29,7 +39,7 @@ const REQUIRED_FIELDS:
     'project-name',
     'time-days',
     'cost',
-    'impact',
+    'success-criteria',
 ];
 
 export const ALL_CONVERSION_FIELDS:
@@ -37,7 +47,6 @@ export const ALL_CONVERSION_FIELDS:
     'project-name',
     'time-days',
     'cost',
-    'impact',
     'success-criteria',
 ];
 
@@ -45,44 +54,60 @@ export type ConversionFields = Record<
     ConversionField, string
 >;
 
-export function buildInitialConversionFields(
+export interface ConversionDraft {
+    readonly fields: ConversionFields;
+    readonly baselines:
+        ReadonlyMap<ObjectiveId, number>;
+}
+
+export function buildInitialConversionDraft(
     idea: Idea,
-): ConversionFields {
+): ConversionDraft {
     return {
-        'project-name': idea.titleText(),
-        'time-days': '',
-        'cost': '',
-        'impact': '',
-        'success-criteria': '',
+        fields: {
+            'project-name': idea.titleText(),
+            'time-days': '',
+            'cost': '',
+            'success-criteria': '',
+        },
+        baselines: new Map(),
     };
 }
 
 export function conversionRequiredCount(
+    activeObjectiveCount: number,
 ): number {
-    return REQUIRED_FIELDS.length;
+    return REQUIRED_FIELDS.length
+        + activeObjectiveCount;
 }
 
 export function conversionCompletedCount(
-    fields: ConversionFields,
+    draft: ConversionDraft,
 ): number {
-    return REQUIRED_FIELDS.filter(
-        f => fields[f] !== '',
+    const filledFields = REQUIRED_FIELDS.filter(
+        f => draft.fields[f] !== '',
     ).length;
+    return filledFields + draft.baselines.size;
 }
 
 export function conversionIsReady(
-    fields: ConversionFields,
+    draft: ConversionDraft,
+    activeObjectives: readonly Objective[],
 ): boolean {
-    return REQUIRED_FIELDS.every(
-        f => fields[f] !== '',
+    const allFieldsFilled = REQUIRED_FIELDS.every(
+        f => draft.fields[f] !== '',
+    );
+    if (!allFieldsFilled) return false;
+    return activeObjectives.every(
+        o => draft.baselines.has(o.id),
     );
 }
 
 export function conversionFieldIsReady(
-    fields: ConversionFields,
+    draft: ConversionDraft,
     field: ConversionField,
 ): boolean {
-    return fields[field] !== '';
+    return draft.fields[field] !== '';
 }
 
 export class IdeaConversionPresenter {
@@ -92,11 +117,20 @@ export class IdeaConversionPresenter {
     readonly #proposedSolution: string;
     readonly #expectedOutcome: string;
     readonly #successMetrics: string;
-    readonly #fields: ConversionFields;
+    readonly #draft: ConversionDraft;
+    readonly #activeObjectives:
+        readonly Objective[];
+    readonly #defs: ReadonlyMap<
+        ObjectiveId, ObjectiveDefinition
+    >;
 
     constructor(
         idea: Idea,
-        fields: ConversionFields,
+        draft: ConversionDraft,
+        activeObjectives: readonly Objective[],
+        defs: ReadonlyMap<
+            ObjectiveId, ObjectiveDefinition
+        >,
     ) {
         this.#title = idea.titleText();
         this.#problemStatement =
@@ -109,7 +143,9 @@ export class IdeaConversionPresenter {
             idea.expectedOutcomeText();
         this.#successMetrics =
             idea.successMetricsText();
-        this.#fields = fields;
+        this.#draft = draft;
+        this.#activeObjectives = activeObjectives;
+        this.#defs = defs;
     }
 
     #fieldCheck(
@@ -117,7 +153,7 @@ export class IdeaConversionPresenter {
     ): SafeHtml {
         const isSet =
             conversionFieldIsReady(
-                this.#fields, field,
+                this.#draft, field,
             );
         return html`<span
             id="check-${field}"
@@ -129,13 +165,30 @@ export class IdeaConversionPresenter {
         </span>`;
     }
 
+    #baselineCheck(
+        objectiveId: ObjectiveId,
+    ): SafeHtml {
+        const isSet = this.#draft.baselines
+            .has(objectiveId);
+        return html`<span
+            id="check-baseline-${objectiveId}"
+            class="field-check"
+            data-ready="${
+                isSet ? 'true' : 'false'
+            }">
+            ${iconCheckCircle2(16, '')}
+        </span>`;
+    }
+
     render(): SafeHtml {
         const completed =
             conversionCompletedCount(
-                this.#fields,
+                this.#draft,
             );
         const required =
-            conversionRequiredCount();
+            conversionRequiredCount(
+                this.#activeObjectives.length,
+            );
         const percent =
             (completed / required)
             * 100;
@@ -354,13 +407,13 @@ export class IdeaConversionPresenter {
         return html`
             <div class="stack-lg">
                 ${this.#buildRequired()}
-                ${this.#buildOptional()}
+                ${this.#buildScores()}
                 ${this.#buildConfirm()}
             </div>`;
     }
 
     #buildRequired(): SafeHtml {
-        const fields = this.#fields;
+        const fields = this.#draft.fields;
         return html`
             <div class="card p-6">
                 <div class="flex
@@ -512,81 +565,10 @@ export class IdeaConversionPresenter {
                             + ' items-center'
                             + ' gap-2'
                         }">
-                            ${iconTrendingUp(
-                                16,
-                                'text-muted',
-                            )}
-                            Impact
+                            Success Criteria
                             ${this.#fieldCheck(
-                                'impact',
+                                'success-criteria',
                             )}
-                        </label>
-                        <div class="${
-                            'input-prefix-wrap'
-                        }">
-                            <span class="${
-                                'input-suffix-symbol'
-                            }">pts</span>
-                            <input
-                                class="${
-                                    'input'
-                                    + ' input-with'
-                                    + '-suffix'
-                                }"
-                                type="text"
-                                inputmode="${
-                                    'numeric'
-                                }"
-                                id="${
-                                    'convert'
-                                    + '-impact'
-                                }"
-                                placeholder="${
-                                    'Enter'
-                                    + ' impact'
-                                    + ' points'
-                                }"
-                                value="${
-                                    fields['impact']
-                                }" />
-                        </div>
-                    </div>
-                </div>
-            </div>`;
-    }
-
-    #buildOptional(): SafeHtml {
-        const fields = this.#fields;
-        return html`
-            <div class="card p-6">
-                <div class="flex
-                    items-center
-                    gap-2 mb-6">
-                    ${iconPeople(
-                        20,
-                        'text-primary',
-                    )}
-                    <span class="${
-                        'font-medium'
-                    }">
-                        ${'Additional'
-                            + ' Details'}
-                    </span>
-                    <span class="${
-                        'text-xs'
-                        + ' text-muted'
-                    }">
-                        (Optional)
-                    </span>
-                </div>
-                <div class="stack-lg">
-                    <div>
-                        <label class="${
-                            'label mb-2'
-                            + ' font-medium'
-                        }">
-                            ${'Success'
-                                + ' Criteria'}
                         </label>
                         <textarea
                             class="${
@@ -615,14 +597,131 @@ export class IdeaConversionPresenter {
             </div>`;
     }
 
+    #buildScores(): SafeHtml {
+        if (
+            this.#activeObjectives.length === 0
+        ) {
+            return this.#buildScoresEmpty();
+        }
+        return html`
+            <div class="card p-6"
+                id="convert-scores-section">
+                <div class="flex
+                    items-center
+                    gap-2 mb-6">
+                    ${iconTrendingUp(
+                        20,
+                        'text-primary',
+                    )}
+                    <span class="${
+                        'font-medium'
+                    }">
+                        Scores
+                    </span>
+                </div>
+                ${this.#activeObjectives.map(
+                    o => this.#baselineRow(o),
+                )}
+            </div>`;
+    }
+
+    #buildScoresEmpty(): SafeHtml {
+        return html`
+            <div class="card p-6"
+                id="convert-scores-section">
+                <div class="flex
+                    items-center
+                    gap-2 mb-6">
+                    ${iconTrendingUp(
+                        20,
+                        'text-primary',
+                    )}
+                    <span class="${
+                        'font-medium'
+                    }">
+                        Scores
+                    </span>
+                </div>
+                <div class="empty-banner">
+                    ${'No active objectives yet.'
+                        + ' Convert this idea now'
+                        + ' and it will not be'
+                        + ' baseline-scored;'
+                        + ' add objectives in the'
+                        + ' Organization page and'
+                        + ' reviewers can score'
+                        + ' this project later'
+                        + ' from project detail.'}
+                </div>
+                <div class="flex gap-3 mt-4">
+                    <button
+                        class="${
+                            'btn btn-ghost gap-2'
+                        }"
+                        id="convert-open-organization">
+                        Open Organization
+                    </button>
+                </div>
+            </div>`;
+    }
+
+    #baselineRow(obj: Objective): SafeHtml {
+        const def = this.#defs.get(obj.id);
+        if (!def) {
+            throw new Error(
+                `objective definition missing`
+                + ` for ${obj.id}`,
+            );
+        }
+        const stored = this.#draft.baselines
+            .get(obj.id);
+        const isSet = stored !== undefined;
+        const value = stored ?? 0;
+        const display = isSet
+            ? formatSigned(stored)
+            : '—';
+        return html`
+            <div class="convert-scores-row"
+                data-objective-id="${obj.id}"
+                data-touched="${
+                    isSet ? 'true' : 'false'
+                }">
+                <label class="${
+                    'label'
+                    + ' font-medium'
+                    + ' flex'
+                    + ' items-center'
+                    + ' gap-2'
+                }">
+                    ${def.name}
+                    ${this.#baselineCheck(
+                        obj.id,
+                    )}
+                </label>
+                <input type="range"
+                    min="-100" max="100"
+                    step="1"
+                    value="${value}"
+                    data-initial-value="${value}"
+                    data-objective-id="${obj.id}"
+                    class="baseline-slider">
+                <span class="slider-value">
+                    ${display}
+                </span>
+            </div>`;
+    }
+
     #buildConfirm(): SafeHtml {
         const isReady = conversionIsReady(
-            this.#fields,
+            this.#draft,
+            this.#activeObjectives,
         );
         const remaining =
-            conversionRequiredCount()
+            conversionRequiredCount(
+                this.#activeObjectives.length,
+            )
             - conversionCompletedCount(
-                this.#fields,
+                this.#draft,
             );
         return html`
             <div class="${

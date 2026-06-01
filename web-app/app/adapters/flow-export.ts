@@ -71,7 +71,6 @@ export async function getFlowMermaid(
 interface SidecarNode {
     mermaidId: string;
     name: string;
-    description: string;
     positionX: number;
     positionY: number;
     isCreate: boolean;
@@ -82,7 +81,6 @@ interface SidecarEdge {
     mermaidFrom: string;
     mermaidTo: string;
     name: string;
-    description: string;
 }
 
 function sanitizeId(id: string): string {
@@ -96,7 +94,6 @@ function buildSidecar(
         graph.nodes.map(n => ({
             mermaidId: sanitizeId(n.id),
             name: n.name,
-            description: n.description,
             positionX: n.positionX,
             positionY: n.positionY,
             isCreate: n.isCreate,
@@ -109,12 +106,10 @@ function buildSidecar(
             mermaidTo:
                 sanitizeId(e.toNodeId),
             name: e.name,
-            description: e.description,
         }));
     return JSON.stringify({
         version: 1,
         name: graph.name,
-        description: graph.description,
         nodes,
         edges,
     }, null, 2);
@@ -147,7 +142,6 @@ export interface Backup {
     flow: {
         id: string;
         name: string;
-        description: string;
         isLocked: boolean;
         isAutoLayout: boolean;
         isAutoFit: boolean;
@@ -180,10 +174,10 @@ function buildDialogConfig(
     if (projectName && flowExists) {
         return {
             description:
-                '\u2018' + flowName
-                + '\u2019 already exists'
-                + ' in \u2018'
-                + projectName + '\u2019.',
+                '‘' + flowName
+                + '’ already exists'
+                + ' in ‘'
+                + projectName + '’.',
             showProject: false,
             showOverwrite: true,
             showCreateNew: true,
@@ -194,11 +188,11 @@ function buildDialogConfig(
     if (projectName) {
         return {
             description:
-                'Project \u2018'
+                'Project ‘'
                 + projectName
-                + '\u2019 found. \u2018'
+                + '’ found. ‘'
                 + flowName
-                + '\u2019 will be'
+                + '’ will be'
                 + ' created.',
             showProject: false,
             showOverwrite: false,
@@ -210,8 +204,8 @@ function buildDialogConfig(
     if (flowExists) {
         return {
             description:
-                '\u2018' + flowName
-                + '\u2019 exists but its'
+                '‘' + flowName
+                + '’ exists but its'
                 + ' project does not.',
             showProject: false,
             showOverwrite: true,
@@ -222,8 +216,8 @@ function buildDialogConfig(
     }
     return {
         description:
-            'Neither \u2018' + flowName
-            + '\u2019 nor its project'
+            'Neither ‘' + flowName
+            + '’ nor its project'
             + ' exist. Select a'
             + ' project.',
         showProject: true,
@@ -272,8 +266,6 @@ function buildBackupJson(
         flow: {
             id: flow.id,
             name: flow.name,
-            description:
-                flow.description,
             isLocked: asBoolean(
                 flow.is_locked,
                 'is_locked',
@@ -313,7 +305,6 @@ export async function getFlowZip(
     const mermaidGraph: FlowGraph = {
         id: flow.id,
         name: flow.name,
-        description: flow.description,
         isLocked: asBoolean(
             flow.is_locked,
             'is_locked',
@@ -341,11 +332,15 @@ export async function getFlowZip(
     const txt = enc.encode(
         buildFlowTxt(flowId),
     );
+    const sidecar = enc.encode(
+        buildSidecar(mermaidGraph),
+    );
 
     const data = buildZip([
         { name: 'flow.txt', data: txt },
         { name: 'flow.mmd', data: mmd },
         { name: 'flow.json', data: json },
+        { name: 'sidecar.json', data: sidecar },
     ]);
 
     const safeName = flow.name
@@ -399,11 +394,6 @@ function validateBackupJson(
             name: asString(
                 flowObj['name'],
                 label + '.flow.name',
-            ),
-            description: asString(
-                flowObj['description'],
-                label
-                    + '.flow.description',
             ),
             isLocked:
                 flowObj['isLocked']
@@ -508,7 +498,6 @@ export async function postFlowFromBackup(
         nodes.push({
             id: newId,
             name: n.name,
-            description: n.description,
             positionX: n.positionX,
             positionY: n.positionY,
             isCreate: n.isCreate,
@@ -536,7 +525,6 @@ export async function postFlowFromBackup(
             return {
                 id: generateCryptoSafeBase62(),
                 name: e.name,
-                description: e.description,
                 fromNodeId,
                 toNodeId,
             };
@@ -550,8 +538,6 @@ export async function postFlowFromBackup(
                 resource: `flows/${flowId}`,
                 body: {
                     name: backup.flow.name,
-                    description:
-                        backup.flow.description,
                     is_locked:
                         backup.flow.isLocked,
                     is_auto_layout:
@@ -662,9 +648,6 @@ function layoutImportedGraph(
 function buildImportedEdges(
     parsedEdges: ParsedEdge[],
     idMap: Map<string, string>,
-    sidecarEdgeMap?: Map<
-        string, SidecarEdge
-    >,
 ): GraphEdge[] {
     const edges: GraphEdge[] = [];
     const seen = new Set<string>();
@@ -686,15 +669,9 @@ function buildImportedEdges(
             + toId + ':' + e.name;
         if (seen.has(key)) continue;
         seen.add(key);
-        const sc = sidecarEdgeMap?.get(
-            e.fromId + '->' + e.toId,
-        );
         edges.push({
             id: generateCryptoSafeBase62(),
             name: e.name,
-            description: sc
-                ? sc.description
-                : '',
             fromNodeId: fromId,
             toNodeId: toId,
         });
@@ -724,7 +701,6 @@ function autoWireDefaults(
                 extras.push({
                     id: generateCryptoSafeBase62(),
                     name: '',
-                    description: '',
                     fromNodeId: startId,
                     toNodeId: id,
                 });
@@ -737,7 +713,6 @@ function autoWireDefaults(
                 extras.push({
                     id: generateCryptoSafeBase62(),
                     name: '',
-                    description: '',
                     fromNodeId: id,
                     toNodeId: completeId,
                 });
@@ -849,7 +824,6 @@ export async function postFlowFromMermaid(
                 return {
                     id: newId,
                     name: p.name,
-                    description: p.name,
                     positionX: pos.x,
                     positionY: pos.y,
                     isCreate: false,
@@ -888,7 +862,6 @@ export async function postFlowFromMermaid(
                 body: {
                     name: firstNode.name
                         + ' (import)',
-                    description: '',
                     is_locked: false,
                     is_auto_layout: true,
                     is_auto_fit: true,
@@ -923,7 +896,6 @@ export async function postFlowFromMermaid(
 interface SidecarData {
     version: number;
     name: string;
-    description: string;
     nodes: SidecarNode[];
     edges: SidecarEdge[];
 }
@@ -940,10 +912,6 @@ function asSidecarNode(
         ),
         name: asString(
             obj['name'], label + '.name',
-        ),
-        description: asString(
-            obj['description'],
-            label + '.description',
         ),
         positionX: asNumber(
             obj['positionX'],
@@ -981,10 +949,6 @@ function asSidecarEdge(
         name: asString(
             obj['name'], label + '.name',
         ),
-        description: asString(
-            obj['description'],
-            label + '.description',
-        ),
     };
 }
 
@@ -1007,10 +971,6 @@ function validateSidecarDataJson(
         ),
         name: asString(
             obj['name'], label + '.name',
-        ),
-        description: asString(
-            obj['description'],
-            label + '.description',
         ),
         nodes: nodesArr.map((n, i) =>
             asSidecarNode(
@@ -1035,7 +995,6 @@ function applySidecarToDefault(
 ): void {
     if (!sc) return;
     node.name = sc.name;
-    node.description = sc.description;
     node.positionX = sc.positionX;
     node.positionY = sc.positionY;
 }
@@ -1102,25 +1061,6 @@ export async function postFlowFromZip(
         }
     }
 
-    const sidecarEdgeKey = (
-        from: string, to: string,
-    ): string => from + '->' + to;
-
-    const sidecarEdgeMap = new Map<
-        string, SidecarEdge
-    >();
-    if (sidecar) {
-        for (const se of sidecar.edges) {
-            sidecarEdgeMap.set(
-                sidecarEdgeKey(
-                    se.mermaidFrom,
-                    se.mermaidTo,
-                ),
-                se,
-            );
-        }
-    }
-
     const { start, complete } =
         buildStartAndCompleteNodes();
 
@@ -1155,7 +1095,6 @@ export async function postFlowFromZip(
     const rewiredEdges = buildImportedEdges(
         parsed.edges,
         idMap,
-        sidecarEdgeMap,
     );
     const edges = autoWireDefaults(
         start.id,
@@ -1224,9 +1163,6 @@ export async function postFlowFromZip(
                     name: sc
                         ? sc.name
                         : p.name,
-                    description: sc
-                        ? sc.description
-                        : p.name,
                     positionX: pos.x,
                     positionY: pos.y,
                     isCreate: false,
@@ -1261,9 +1197,6 @@ export async function postFlowFromZip(
     const flowName = sidecar
         ? sidecar.name
         : firstNode!.name + ' (import)';
-    const flowDesc = sidecar
-        ? sidecar.description
-        : firstNode!.name;
 
     const linkId = generateCryptoSafeBase62();
     await ctx.commit({
@@ -1273,7 +1206,6 @@ export async function postFlowFromZip(
                 resource: `flows/${flowId}`,
                 body: {
                     name: flowName,
-                    description: flowDesc,
                     is_locked: false,
                     is_auto_layout: true,
                     is_auto_fit: true,

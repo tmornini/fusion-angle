@@ -25,8 +25,6 @@ test('barrel exports all new presenters', async () => {
     const expected = [
         'OrganizationObjectivesPresenter',
         'ProjectActionBarPresenter',
-        'ScoreModalPresenter',
-        'MeasurementModalPresenter',
         'ProjectObjectivesPresenter',
         'ProjectScoreHistoryPresenter',
         'DashboardObjectiveAggregatesPresenter',

@@ -1,5 +1,6 @@
 import type {
     Id,
+    WorkerEntity,
     HumanWorkerEntity,
     AIWorkerEntity,
     IdeaEntity,
@@ -130,7 +131,11 @@ export interface DbAdapter {
         json: string,
     ): Promise<void>;
 
+    simulateLatency(): Promise<void>;
+
     workers:
+        EntityStore<WorkerEntity>;
+    humanWorkers:
         EntityStore<HumanWorkerEntity>;
     aiWorkers:
         EntityStore<AIWorkerEntity>;
@@ -187,6 +192,7 @@ export interface DbAdapter {
 
 export const TABLE_NAMES = [
     'workers',
+    'human_workers',
     'ai_workers',
     'ideas',
     'projects',

@@ -27,11 +27,13 @@ import {
     SnapshotIncompatibleError,
 } from '../web-app/app/adapters/snapshots.ts';
 
-function buildWorker(id: string, first: string) {
+// A human_workers detail row in the post-normalization
+// shape (no name — that lives on the parent workers row).
+// The snapshot round-trip carries the human_workers table,
+// so these import / export tests exercise it directly.
+function buildHumanDetail(id: string, first: string) {
     return {
         id,
-        first_name: first,
-        last_name: 'User',
         email: `${first}@example.com`.toLowerCase(),
         phone: '',
         title: 'product_manager',
@@ -42,16 +44,17 @@ function buildWorker(id: string, first: string) {
     };
 }
 
-function setup(): {
+async function setup(): Promise<{
     db: MemoryDbAdapter;
     ctx: RequestContext;
-} {
+}> {
     const db = new MemoryDbAdapter();
+    await db.createSchema();
     return { db, ctx: createRequestContext(db) };
 }
 
 test('getSnapshot returns a JSON object of tables', async () => {
-    const { ctx } = setup();
+    const { ctx } = await setup();
     const json = await getSnapshot(ctx);
     const parsed = JSON.parse(json);
     assert.ok(Array.isArray(parsed.workers));
@@ -62,7 +65,7 @@ test(
     'getSnapshot reflects rows written before the'
     + ' export',
     async () => {
-        const { db, ctx } = setup();
+        const { db, ctx } = await setup();
         await db.ideas.put('i1', {
             id: 'i1',
             title: 'Seeded idea',
@@ -86,28 +89,34 @@ test(
     'putSnapshot round-trips written rows back'
     + ' into the database',
     async () => {
-        const { db, ctx } = setup();
+        const { db, ctx } = await setup();
         await putSnapshot(ctx, JSON.stringify({
-            workers: [buildWorker('u1', 'Alice')],
+            human_workers: [
+                buildHumanDetail('u1', 'Alice'),
+            ],
         }));
-        const rows = await db.workers.getAll();
+        const rows = await db.humanWorkers.getAll();
         assert.equal(rows.length, 1);
-        assert.equal(rows[0]?.first_name, 'Alice');
+        assert.equal(
+            rows[0]?.email, 'alice@example.com',
+        );
     },
 );
 
 test(
     'putSnapshot result is visible via getSnapshot',
     async () => {
-        const { ctx } = setup();
+        const { ctx } = await setup();
         await putSnapshot(ctx, JSON.stringify({
-            workers: [buildWorker('u1', 'Alice')],
+            human_workers: [
+                buildHumanDetail('u1', 'Alice'),
+            ],
         }));
         const parsed =
             JSON.parse(await getSnapshot(ctx));
-        assert.equal(parsed.workers.length, 1);
+        assert.equal(parsed.human_workers.length, 1);
         assert.equal(
-            parsed.workers[0].id, 'u1',
+            parsed.human_workers[0].id, 'u1',
         );
     },
 );
@@ -116,17 +125,21 @@ test(
     'putSnapshot replaces, not merges, the prior'
     + ' table contents',
     async () => {
-        const { db, ctx } = setup();
+        const { db, ctx } = await setup();
         await putSnapshot(ctx, JSON.stringify({
-            workers: [buildWorker('u1', 'Alice')],
+            human_workers: [
+                buildHumanDetail('u1', 'Alice'),
+            ],
         }));
         await putSnapshot(ctx, JSON.stringify({
-            workers: [buildWorker('u2', 'Bob')],
+            human_workers: [
+                buildHumanDetail('u2', 'Bob'),
+            ],
         }));
-        const rows = await db.workers.getAll();
+        const rows = await db.humanWorkers.getAll();
         assert.equal(rows.length, 1);
         assert.equal(rows[0]?.id, 'u2');
-        assert.equal(rows[0]?.first_name, 'Bob');
+        assert.equal(rows[0]?.email, 'bob@example.com');
     },
 );
 
@@ -134,18 +147,22 @@ test(
     'putSnapshotFromFile reads the file and'
     + ' imports it',
     async () => {
-        const { db, ctx } = setup();
+        const { db, ctx } = await setup();
         const file = new File(
             [JSON.stringify({
-                workers: [buildWorker('u1', 'Alice')],
+                human_workers: [
+                    buildHumanDetail('u1', 'Alice'),
+                ],
             })],
             'snapshot.json',
             { type: 'application/json' },
         );
         await putSnapshotFromFile(ctx, file);
-        const rows = await db.workers.getAll();
+        const rows = await db.humanWorkers.getAll();
         assert.equal(rows.length, 1);
-        assert.equal(rows[0]?.first_name, 'Alice');
+        assert.equal(
+            rows[0]?.email, 'alice@example.com',
+        );
     },
 );
 
@@ -153,7 +170,7 @@ test(
     'putSnapshotFromFile rejects a file over the'
     + ' size cap',
     async () => {
-        const { ctx } = setup();
+        const { ctx } = await setup();
         const big = new File(
             ['x'.repeat(2_600_000)],
             'big.json',
@@ -170,7 +187,7 @@ test(
     'SnapshotTooLargeError exposes file size and'
     + ' available cap',
     async () => {
-        const { ctx } = setup();
+        const { ctx } = await setup();
         const big = new File(
             ['x'.repeat(2_600_000)],
             'big.json',
@@ -189,29 +206,28 @@ test(
 );
 
 test('postSchemaCreation keeps existing data', async () => {
-    const { db, ctx } = setup();
-    await db.workers.put(
-        'u1', buildWorker('u1', 'Alice'),
-    );
+    const { db, ctx } = await setup();
+    await db.workers.put('u1', {
+        type: 'human', name: 'Alice Adams',
+    });
     await postSchemaCreation(ctx);
     const rows = await db.workers.getAll();
     assert.equal(rows.length, 1);
 });
 
 test('deleteSchema clears all table contents', async () => {
-    const { db, ctx } = setup();
-    await db.workers.put(
-        'u1', buildWorker('u1', 'Alice'),
-    );
+    const { db, ctx } = await setup();
+    await db.workers.put('u1', {
+        type: 'human', name: 'Alice Adams',
+    });
     await deleteSchema(ctx);
-    const rows = await db.workers.getAll();
-    assert.equal(rows.length, 0);
+    assert.equal(await db.hasSchema(), false);
 });
 
 test(
     'postMockDataLoad populates the workers table',
     async () => {
-        const { db, ctx } = setup();
+        const { db, ctx } = await setup();
         await postMockDataLoad(ctx);
         const rows = await db.workers.getAll();
         assert.ok(
@@ -224,7 +240,7 @@ test(
 test(
     'putSnapshot rejects retired activities table',
     async () => {
-        const { ctx } = setup();
+        const { ctx } = await setup();
         const json = JSON.stringify({
             activities: [
                 { id: 'x', type: 'idea_created' },
@@ -240,7 +256,7 @@ test(
 test(
     'putSnapshot rejects retired projects fields',
     async () => {
-        const { ctx } = setup();
+        const { ctx } = await setup();
         const json = JSON.stringify({
             projects: [{
                 id: 'p1',
@@ -258,7 +274,7 @@ test(
 test(
     'putSnapshot rejects retired flows.updated_at',
     async () => {
-        const { ctx } = setup();
+        const { ctx } = await setup();
         const json = JSON.stringify({
             flows: [{
                 id: 'f1',
@@ -276,7 +292,7 @@ test(
 test(
     'putSnapshot accepts current-shape snapshot',
     async () => {
-        const { ctx } = setup();
+        const { ctx } = await setup();
         const json = JSON.stringify({ workers: [] });
         await putSnapshot(ctx, json);
     },
@@ -287,7 +303,7 @@ test(
     + ' enumerated in RETIRED_TABLES',
     async () => {
         for (const table of RETIRED_TABLES) {
-            const { ctx } = setup();
+            const { ctx } = await setup();
             const json = JSON.stringify({
                 [table]: [{ id: 'x' }],
             });
@@ -312,7 +328,7 @@ test(
             RETIRED_KEYS_PER_TABLE,
         )) {
             for (const key of keys) {
-                const { ctx } = setup();
+                const { ctx } = await setup();
                 const json = JSON.stringify({
                     [table]: [{
                         id: 'x', [key]: 1,
@@ -343,7 +359,7 @@ test(
             RETIRED_STATE_VALUES_PER_ENTITY,
         )) {
             for (const value of values) {
-                const { ctx } = setup();
+                const { ctx } = await setup();
                 const json = JSON.stringify({
                     states: [{
                         id: 's1',

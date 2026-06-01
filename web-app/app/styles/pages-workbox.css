@@ -62,3 +62,25 @@
   color: hsl(var(--muted-foreground));
 }
 
+/* Rejected-transition banner: the Record gate's
+   constraint violations, one line per failed attribute. */
+.violations-banner {
+  margin-bottom: var(--space-6);
+  padding: var(--space-4) 1.25rem;
+  background: hsl(var(--error-soft));
+  border: 1px solid hsl(var(--error-border));
+  border-radius: var(--radius-lg);
+  color: hsl(var(--error-text));
+}
+
+.violations-banner-title {
+  font-weight: 600;
+  margin-bottom: var(--space-2);
+}
+
+.violations-banner-list {
+  margin: 0;
+  padding-left: 1.25rem;
+  list-style: disc;
+}
+

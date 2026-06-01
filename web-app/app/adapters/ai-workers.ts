@@ -1,6 +1,8 @@
 import type {
     WorkerId,
+    WorkerEntity,
     AIWorkerEntity,
+    WorkerState,
 } from '../../../api/types.ts';
 import { AIWorker } from '../../../api/types.ts';
 import type { RequestContext } from './shared.ts';
@@ -33,34 +35,47 @@ export function notifyAIWorkerChange(): void {
     aiWorkerChanges.notify();
 }
 
-export async function getAIWorkerRows(
-    ctx: RequestContext,
-): Promise<AIWorkerEntity[]> {
-    return ctx.GET<AIWorkerEntity[]>('ai-workers');
+export type AIWorkerDraft =
+    Omit<AIWorkerEntity, 'id'> & { name: string };
+
+export interface AIWorkerRow extends AIWorkerEntity {
+    name: string;
 }
 
 export async function getAIWorkerMap(
     ctx: RequestContext,
 ): Promise<Map<WorkerId, AIWorker>> {
-    const [rows, stateMap] = await Promise.all([
-        getAIWorkerRows(ctx),
-        getWorkerStates(ctx),
-    ]);
-    return new Map(
-        rows.map(entity => {
-            const state = stateMap.get(entity.id);
-            if (state === undefined) {
-                throw new Error(
-                    'no state event for AI worker '
-                    + entity.id,
-                );
-            }
-            return [
-                entity.id,
-                new AIWorker(entity, state),
-            ];
-        }),
+    const [parents, details, stateMap] =
+        await Promise.all([
+            ctx.GET<WorkerEntity[]>('workers'),
+            ctx.GET<AIWorkerEntity[]>('ai-workers'),
+            getWorkerStates(ctx),
+        ]);
+    const detailById = new Map(
+        details.map(d => [d.id, d]),
     );
+    const map = new Map<WorkerId, AIWorker>();
+    for (const parent of parents) {
+        if (parent.type !== 'ai') continue;
+        const detail = detailById.get(parent.id);
+        if (detail === undefined) {
+            throw new Error(
+                'no AI detail for worker ' + parent.id,
+            );
+        }
+        const state = stateMap.get(parent.id);
+        if (state === undefined) {
+            throw new Error(
+                'no state event for AI worker '
+                + parent.id,
+            );
+        }
+        map.set(
+            parent.id,
+            new AIWorker(parent, detail, state),
+        );
+    }
+    return map;
 }
 
 export async function getAIWorkers(
@@ -74,53 +89,78 @@ export async function getAIWorker(
     ctx: RequestContext,
     id: WorkerId,
 ): Promise<AIWorker> {
-    const [row, state] = await Promise.all([
-        getAIWorkerRow(ctx, id),
-        getWorkerState(ctx, id),
-    ]);
-    return new AIWorker(row, state);
+    const [parent, detail, state] =
+        await Promise.all([
+            ctx.GET<WorkerEntity>(`workers/${id}`),
+            ctx.GET<AIWorkerEntity>(
+                `ai-workers/${id}`,
+            ),
+            getWorkerState(ctx, id),
+        ]);
+    return new AIWorker(parent, detail, state);
 }
 
 export async function getAIWorkerRow(
     ctx: RequestContext,
     id: WorkerId,
-): Promise<AIWorkerEntity> {
-    return ctx.GET<AIWorkerEntity>(
-        `ai-workers/${id}`,
-    );
+): Promise<AIWorkerRow> {
+    const [parent, detail] = await Promise.all([
+        ctx.GET<WorkerEntity>(`workers/${id}`),
+        ctx.GET<AIWorkerEntity>(`ai-workers/${id}`),
+    ]);
+    return { ...detail, name: parent.name };
 }
 
+// Split an AI-worker edit across the parent (type +
+// name) and detail rows. Creation goes through
+// postAIWorkerCreation.
 export async function putAIWorker(
     ctx: RequestContext,
     id: WorkerId,
-    entity: Omit<AIWorkerEntity, 'id'>,
+    input: AIWorkerDraft,
 ): Promise<void> {
-    await ctx.PUT(`ai-workers/${id}`, entity);
-    aiWorkerChanges.notify();
-}
-
-// AI-worker row write paired with a states-log
-// event in one ctx.commit batch. Use at every site
-// that creates an AI worker. The AI worker row
-// carries no state column — its lifecycle on the
-// log begins at 'active' here and terminates at
-// 'archived' via archiveAIWorker. putAIWorker
-// remains for pure edits (name, provider,
-// auth_token) that do not change the lifecycle
-// stage.
-export async function postAIWorkerCreation(
-    ctx: RequestContext,
-    id: WorkerId,
-    entity: Omit<AIWorkerEntity, 'id'>,
-): Promise<void> {
-    const workerBody =
-        entity as unknown as Record<string, unknown>;
+    const { name, ...detail } = input;
     await ctx.commit({
         ops: [
             {
                 method: 'put',
+                resource: `workers/${id}`,
+                body: { type: 'ai', name },
+            },
+            {
+                method: 'put',
                 resource: `ai-workers/${id}`,
-                body: workerBody,
+                body: detail as unknown as
+                    Record<string, unknown>,
+            },
+        ],
+    });
+    aiWorkerChanges.notify();
+}
+
+// AI-worker creation: parent row + detail row + initial
+// 'active' state event in one ctx.commit batch. Use at
+// every site that creates an AI worker. putAIWorker
+// remains for pure edits (name, provider, auth_token)
+// that do not change the lifecycle stage.
+export async function postAIWorkerCreation(
+    ctx: RequestContext,
+    id: WorkerId,
+    input: AIWorkerDraft,
+): Promise<void> {
+    const { name, ...detail } = input;
+    await ctx.commit({
+        ops: [
+            {
+                method: 'put',
+                resource: `workers/${id}`,
+                body: { type: 'ai', name },
+            },
+            {
+                method: 'put',
+                resource: `ai-workers/${id}`,
+                body: detail as unknown as
+                    Record<string, unknown>,
             },
             await buildStateEventOp(ctx, id, 'active'),
         ],
@@ -128,15 +168,14 @@ export async function postAIWorkerCreation(
     aiWorkerChanges.notify();
 }
 
-export async function archiveAIWorker(
+export async function postAIWorkerStateChange(
     ctx: RequestContext,
     id: WorkerId,
+    state: WorkerState,
 ): Promise<void> {
     await ctx.commit({
         ops: [
-            await buildStateEventOp(
-                ctx, id, 'archived',
-            ),
+            await buildStateEventOp(ctx, id, state),
         ],
     });
     aiWorkerChanges.notify();

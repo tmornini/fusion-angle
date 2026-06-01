@@ -15,7 +15,6 @@ import type {
 const emptyGraph = {
     id: 'flow-1',
     name: 'Test Flow',
-    description: '',
     isLocked: false,
     isAutoLayout: false,
     isAutoFit: false,
@@ -120,7 +119,6 @@ const node = (
 ) => ({
     id,
     name: id.toUpperCase(),
-    description: '',
     positionX: x,
     positionY: y,
     isCreate: false,
@@ -150,38 +148,8 @@ function buildPresenterWithNodes(
 }
 
 test(
-    'withFitReconciled when isAutoFit is false'
-    + ' returns snapshot with viewBox unchanged',
-    () => {
-        const presenter =
-            buildPresenterWithNodes(false);
-        const before =
-            presenter.snapshot()
-                .interaction.viewBox;
-        const beforeX = before.x;
-        const beforeY = before.y;
-        const beforeW = before.w;
-        const beforeH = before.h;
-        const next =
-            presenter.withFitReconciled();
-        assert.equal(
-            next.interaction.viewBox.x, beforeX,
-        );
-        assert.equal(
-            next.interaction.viewBox.y, beforeY,
-        );
-        assert.equal(
-            next.interaction.viewBox.w, beforeW,
-        );
-        assert.equal(
-            next.interaction.viewBox.h, beforeH,
-        );
-    },
-);
-
-test(
-    'withFitReconciled when isAutoFit is true'
-    + ' updates viewBox to fit content',
+    'withFitToBox updates the viewBox to frame'
+    + ' the given content box',
     () => {
         const presenter =
             buildPresenterWithNodes(true);
@@ -190,83 +158,49 @@ test(
                 .interaction.viewBox;
         const beforeX = before.x;
         const beforeW = before.w;
-        const next =
-            presenter.withFitReconciled();
-        const after =
-            next.interaction.viewBox;
+        const next = presenter.withFitToBox({
+            minX: -500, minY: -400,
+            maxX: 500, maxY: 400,
+        });
+        const after = next.interaction.viewBox;
         const xChanged =
             Math.abs(after.x - beforeX) > 0.001;
         const wChanged =
             Math.abs(after.w - beforeW) > 0.001;
         assert.ok(
             xChanged || wChanged,
-            'viewBox should change when'
-            + ' isAutoFit is true and nodes'
-            + ' exist',
+            'viewBox should change to frame the'
+            + ' given box',
         );
     },
 );
 
 test(
-    'withFitReconciled does NOT re-run auto'
-    + '-layout when isAutoLayout is true and'
-    + ' isAutoFit is false (Bug 2 contract)',
+    'withFitToBox frames a box that extends far'
+    + ' below the nodes (edge/waypoint geometry)',
     () => {
-        const graph = {
-            ...emptyGraph,
-            isAutoLayout: true,
-            isAutoFit: false,
-            nodes: [
-                node('n1', -250, -50),
-                node('n2', 250, 50),
-            ],
-        };
-        const snap = buildInitialFlowSnapshot(
-            graph, 1200, 800, new Map(),
-        );
         const presenter =
-            new FlowDesignerPresenter(
-                snap, 1200, 800,
-                buildFlowHistorySnapshot(false),
-            );
-        const before = presenter.snapshot().nodes;
-        const beforeN1 = before.find(
-            n => n.id === 'n1',
-        )!;
-        const beforeN2 = before.find(
-            n => n.id === 'n2',
-        )!;
-        const next =
-            presenter.withFitReconciled();
-        const afterN1 = next.nodes.find(
-            n => n.id === 'n1',
-        )!;
-        const afterN2 = next.nodes.find(
-            n => n.id === 'n2',
-        )!;
-        assert.equal(
-            afterN1.positionX,
-            beforeN1.positionX,
+            buildPresenterWithNodes(true);
+        const box = {
+            minX: -100, minY: -100,
+            maxX: 100, maxY: 1000,
+        };
+        const next = presenter.withFitToBox(box);
+        const vb = next.interaction.viewBox;
+        assert.ok(
+            vb.y + vb.h >= box.maxY - 0.001,
+            'viewBox bottom covers the low dip',
         );
-        assert.equal(
-            afterN1.positionY,
-            beforeN1.positionY,
-        );
-        assert.equal(
-            afterN2.positionX,
-            beforeN2.positionX,
-        );
-        assert.equal(
-            afterN2.positionY,
-            beforeN2.positionY,
+        assert.ok(
+            vb.y <= box.minY + 0.001,
+            'viewBox top covers the box top',
         );
     },
 );
 
 test(
-    'withFitReconciled re-fits viewBox but does'
-    + ' NOT move nodes when isAutoLayout and'
-    + ' isAutoFit are both true',
+    'withFitToBox re-fits the viewBox but does'
+    + ' NOT move nodes (viewport op contract)',
     () => {
         const graph = {
             ...emptyGraph,
@@ -293,8 +227,10 @@ test(
             n => n.id === 'n2',
         )!;
         const beforeVb = before.interaction.viewBox;
-        const next =
-            presenter.withFitReconciled();
+        const next = presenter.withFitToBox({
+            minX: -300, minY: -100,
+            maxX: 300, maxY: 100,
+        });
         const afterN1 = next.nodes.find(
             n => n.id === 'n1',
         )!;
@@ -320,7 +256,7 @@ test(
             Math.abs(after.w - beforeVb.w) > 0.001;
         assert.ok(
             xChanged || wChanged,
-            'viewBox should change (auto-fit ran)',
+            'viewBox should change (fit ran)',
         );
     },
 );

@@ -130,10 +130,14 @@ is HTTP-only.
   schema exists, non-entry pages redirect to snapshots.
 
   The `'system'` worker (`SYSTEM_WORKER_ID = 'system'` in
-  `api/types.ts`) is the well-known actor seeded as a real
-  `HumanWorkerEntity` row by both `populateMockData` and
-  `populateBootstrapData`. State events without a specific
-  user actor reference this worker.
+  `api/types.ts`) is the well-known actor referenced by
+  state events with no specific user actor. It is a
+  `workers` parent row with `type = 'system'` and no
+  detail row, seeded by both `populateMockData` and
+  `populateBootstrapData`. It is a pure event-author:
+  `getWorkerMap` resolves it for authorship display, but
+  the `getWorkers` roster — and every list, picker, and
+  detail view — omits it.
 - **State.** Module-level vars + pub-sub for theme, mobile, auth,
   sidebar.
 - **Read-only siblings of editable pages.** `flow-stats.html` is a
@@ -169,7 +173,7 @@ not stored in the states log; `Idea.readinessValue()` /
 
 **Projects** (7 values, single-dimension):
 - `submitted`, `under-review`, `sent-back`, `approved`,
-  `declined`, `completed`, `deleted`
+  `declined`, `archived`, `deleted`
 
 **Workers** (3 values, shared between humans and AIs):
 - `active`, `pending`, `archived`
@@ -182,16 +186,18 @@ content-change marker):
 - `active`, `archived`, `deleted`
 
 The flow lifecycle's `'updated'` event records every
-content mutation (graph edits, name/description/lock
-changes, auto-layout). Creation emits `'active'` —
+content mutation (graph edits, name/lock changes,
+auto-layout). Creation emits `'active'` —
 the first event records the initial lifecycle state,
 not a content edit. The retired `flows.created_at` /
 `flows.updated_at` columns are now derived from the
 head and tail of the entity's event sequence.
 
 The terminal state for both human and AI workers is
-`'archived'`. AI workers retire via `archiveAIWorker`; humans
-via `archiveHumanWorker`.
+`'archived'`. Both kinds change lifecycle through the
+worker-detail State select, which records the chosen
+state via `postHumanWorkerStateChange` /
+`postAIWorkerStateChange` — one voice across kinds.
 
 **Work orders** (open-ended transitions + closed claim
 alphabet):
@@ -448,14 +454,16 @@ copy says "Work orders using this Record" rather than
 ### API Layer (`/api`)
 
 `api/types.ts` (row types + shared aliases — `WorkerId`,
-`Worker` discriminated union, `HumanWorker` /
-`AIWorker` classes, `GraphNode.workerIds: WorkerId[]`,
+`WorkerEntity` parent + `Worker` union (`HumanWorker` /
+`AIWorker` / `SystemWorker`),
+`GraphNode.workerIds: WorkerId[]`,
 `GraphNode.attributes: NodeAttribute[]`, `RecordEntity` /
 `RecordAttributeEntity` / `FlowRecordEntity`, `Constraint`
 discriminated union, `StateEntity`, the five state
 alphabets, and `SYSTEM_WORKER_ID`), `api/db.ts`
 (`DbAdapter` interface + `TABLE_NAMES` array listing every
-storage table — `workers`, `ai_workers`, `ideas`,
+storage table — `workers`, `human_workers`,
+`ai_workers`, `ideas`,
 `projects`, `flows`, `flow_versions`, `records`,
 `record_attributes`, `flow_records`, `states`,
 `state_field_values`, etc.),
@@ -467,9 +475,11 @@ impl), `api/db-memory.ts` (test impl), `api/api.ts` (pure
 HTTP routing — `GET/PUT/DELETE/POST` helpers, **no
 module-level adapter; threaded explicitly** — plus the
 state routes for the unified states log),
-`api/mock-data.ts` (seeds the `'system'` worker, 6 humans
-in `workers`, and 4 AIs in `ai_workers`), `api/validators.ts`
-(`validateHumanWorkerEntity` / `validateAIWorkerEntity` /
+`api/mock-data.ts` (seeds parent `workers` rows plus
+`human_workers` / `ai_workers` detail — the `'system'`
+worker plus the human and AI rosters), `api/validators.ts`
+(`validateWorkerEntity` /
+`validateHumanWorkerEntity` / `validateAIWorkerEntity` /
 `validateStateEntity`, where the AI validator rejects empty
 `auth_token` per the no-defaults doctrine). The `DbAdapter`
 interface is the migration seam to Postgres.
@@ -539,7 +549,7 @@ pure `build*` helpers (`buildShell`, `buildStepperBar`,
 `buildLegend`, `buildCard`) returning `SafeHtml` for testability,
 plus DOM-touching `renderShell` / `renderUpdate` / `renderCard`.
 It is flow-name-agnostic by design — the page module writes the
-flow name and description into the header after `renderShell`,
+flow name into the header after `renderShell`,
 keeping `buildFlowStats` independent of presentation strings.
 
 ### Import Conventions
@@ -583,14 +593,20 @@ layer directly.
 
 ### Adapter Conventions
 
-- **Worker domain split.** `adapters/workers.ts` is humans-
-  only (`getHumanWorker` etc., backed by `workers`).
-  `adapters/ai-workers.ts` is AIs-only (backed by
-  `ai_workers`, owns `maskAuthToken`).
-  `adapters/workers-union.ts` is the union seam (`getWorkers`,
-  `workerName`, `isHumanWorker` / `isAIWorker`). Import the
-  union for kind-agnostic display; per-kind modules for
-  status mutations and AI auth-token storage.
+- **Worker domain split.** Workers are one parent table
+  (`workers`: id, type, name) plus per-kind detail tables
+  sharing the id (`human_workers`, `ai_workers`).
+  `adapters/workers.ts` composes humans (parent +
+  `human_workers` detail); `adapters/ai-workers.ts`
+  composes AIs (parent + `ai_workers` detail, owns
+  `maskAuthToken`). `adapters/workers-union.ts` is the
+  union seam: `getWorkers` is the roster (humans + AIs,
+  never `'system'`); `getWorkerMap` additionally resolves
+  the system worker so a system-authored event's author
+  has a name; plus `workerName` and `isHumanWorker` /
+  `isAIWorker` / `isSystemWorker`. Import the union for
+  kind-agnostic display; per-kind modules for status
+  mutations and AI auth-token storage.
 - **`workerName(workerMap, workerId)`.** Throws on missing
   and unknown ids. Optional worker references branch at the
   call site (`row.worker_id ? workerName(...) : ''`); do not
@@ -839,6 +855,19 @@ meaningless. Report the failure, stop, await fix.
   `state_field_values`) is the seam — read
   `api/store-entity.ts` and `api/store-state.ts` together to
   see both halves.
+- **Cross-tab writes to the states log can lose updates.**
+  Each browser tab builds its own `LocalStorageDbAdapter`, so
+  the per-store serializer (`createSerializer`) only orders
+  writes *within* one tab. Two tabs — or parallel browser
+  agents — writing the shared `fusion-ai:states` key
+  concurrently both read v0; the second `setItem` overwrites
+  the first. Within one tab there is no race (proven by the
+  green `concurrent puts to same store` test in
+  `db-localstorage-compression.test.ts`). An in-memory mutex
+  cannot fix this — the tabs share no heap — so only a
+  browser-mediated lock (Web Locks) or the Postgres tier can.
+  Parallel test agents must treat the states log as a
+  shared-write hazard. Real atomicity arrives with Postgres.
 - **`state_field_values.field_id` references
   `record_attributes.id`.** the column name predates Records
   and stays until a second non-Record consumer arrives. The

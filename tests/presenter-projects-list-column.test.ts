@@ -207,7 +207,9 @@ test(
     + ' aria-pressed state',
     () => {
         const state =
-            buildInitialProjectListState([]);
+            buildInitialProjectListState(
+                [makeProject('p1')],
+            );
         const sortEl = {
             innerHTML: '',
         } as unknown as HTMLElement;
@@ -224,6 +226,24 @@ test(
                 'Sort by projected impact',
             ),
             'default label should prompt sort',
+        );
+    },
+);
+
+test(
+    'sort toggle renders nothing on an empty'
+    + ' project list',
+    () => {
+        const state =
+            buildInitialProjectListState([]);
+        const sortEl = {
+            innerHTML: 'placeholder',
+        } as unknown as HTMLElement;
+        new ProjectListPresenter(state, new Map())
+            .renderSortControls(sortEl);
+        assert.equal(
+            sortEl.innerHTML, '',
+            'empty list should erase the sort chip',
         );
     },
 );

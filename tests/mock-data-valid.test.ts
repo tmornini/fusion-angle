@@ -3,6 +3,7 @@ import { strict as assert } from 'node:assert';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import { populateMockData } from '../api/mock-data.ts';
 import {
+    validateWorkerEntity,
     validateHumanWorkerEntity,
     validateAIWorkerEntity,
     validateIdeaEntity,
@@ -31,6 +32,7 @@ type Validator = (b: Record<string, unknown>) => unknown;
 
 async function seededDb(): Promise<MemoryDbAdapter> {
     const db = new MemoryDbAdapter();
+    await db.createSchema();
     await populateMockData(db);
     return db;
 }
@@ -42,6 +44,8 @@ const TABLES: ReadonlyArray<[
     Validator,
 ]> = [
     ['workers', d => d.workers.getAll(),
+        validateWorkerEntity],
+    ['humanWorkers', d => d.humanWorkers.getAll(),
         validateHumanWorkerEntity],
     ['aiWorkers', d => d.aiWorkers.getAll(),
         validateAIWorkerEntity],

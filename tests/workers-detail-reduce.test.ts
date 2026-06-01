@@ -20,65 +20,36 @@ globalThis.document = { addEventListener: () => {} };
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 
-const {
-    HumanWorker, AIWorker,
-    jsonArrayField, jsonObjectField,
-} = await import('../api/types.ts');
+const { makeHumanWorker, makeAIWorker } = await import(
+    './worker-fixtures.ts'
+);
 
 const { reduceRefresh } = await import(
     '../web-app/workers/detail.ts'
 );
 
-function makeHumanWorker() {
-    return new HumanWorker({
-        id: 'hw_1',
-        first_name: 'Sarah',
-        last_name: 'Chen',
-        email: 'sarah@example.com',
-        title: 'Engineer',
-        department: 'Engineering',
-        strengths: jsonArrayField(['Leadership']),
-        team_dimensions: jsonObjectField({
-            driver: 60, analytical: 40,
-            expressive: 30, amiable: 50,
-        }),
-        phone: '555-0100',
-        bio: 'Builds things.',
-    }, 'active');
-}
-
-function makeAIWorker() {
-    return new AIWorker({
-        id: 'ai_1',
-        name: 'Claude Opus 4.7 Max',
-        provider: 'Anthropic',
-        description: 'Long context, deep reasoning.',
-        auth_token: 'sk-PLACEHOLDER-DEMOTOKEN-XYZ4',
-    }, 'active');
-}
+const HUMAN_DRAFT = {
+    name: 'Sarah-edited Chen',
+    email: 'sarah@example.com',
+    title: 'Engineer',
+    department: 'Engineering',
+    phone: '555-0100',
+    bio: 'Builds things.',
+    strengths: ['Leadership'],
+    state: 'active' as const,
+};
 
 test(
     'editing state is preserved when fresh data'
     + ' arrives (sibling worker mutated)',
     () => {
-        const worker = makeHumanWorker();
         const current = {
             kind: 'editing' as const,
             variant: 'human' as const,
-            worker,
-            draft: {
-                first_name: 'Sarah-edited',
-                last_name: 'Chen',
-                email: 'sarah@example.com',
-                title: 'Engineer',
-                department: 'Engineering',
-                phone: '555-0100',
-                bio: 'Builds things.',
-                strengths: ['Leadership'],
-                state: 'active' as const,
-            },
+            worker: makeHumanWorker('hw_1', 'Sarah Chen'),
+            draft: HUMAN_DRAFT,
         };
-        const fresh = makeHumanWorker();
+        const fresh = makeHumanWorker('hw_1', 'Sarah Chen');
         const next = reduceRefresh(current, fresh);
         // Same reference: the draft is sacred.
         assert.equal(next, current);
@@ -91,9 +62,9 @@ test(
         const current = {
             kind: 'reading' as const,
             variant: 'human' as const,
-            worker: makeHumanWorker(),
+            worker: makeHumanWorker('hw_1', 'Sarah Chen'),
         };
-        const fresh = makeHumanWorker();
+        const fresh = makeHumanWorker('hw_1', 'Sarah Chen');
         const next = reduceRefresh(current, fresh);
         assert.equal(next.kind, 'reading');
         assert.equal(next.variant, 'human');
@@ -107,9 +78,9 @@ test(
         const current = {
             kind: 'reading' as const,
             variant: 'ai' as const,
-            worker: makeAIWorker(),
+            worker: makeAIWorker('ai_1', 'Claude Opus'),
         };
-        const fresh = makeAIWorker();
+        const fresh = makeAIWorker('ai_1', 'Claude Opus');
         const next = reduceRefresh(current, fresh);
         assert.equal(next.kind, 'reading');
         assert.equal(next.variant, 'ai');
@@ -124,7 +95,7 @@ test(
         const current = {
             kind: 'reading' as const,
             variant: 'human' as const,
-            worker: makeHumanWorker(),
+            worker: makeHumanWorker('hw_1', 'Sarah Chen'),
         };
         const next = reduceRefresh(current, null);
         assert.equal(next, current);
@@ -134,22 +105,11 @@ test(
 test(
     'editing + fresh null → editing preserved',
     () => {
-        const worker = makeHumanWorker();
         const current = {
             kind: 'editing' as const,
             variant: 'human' as const,
-            worker,
-            draft: {
-                first_name: 'Sarah-edited',
-                last_name: 'Chen',
-                email: 'sarah@example.com',
-                title: 'Engineer',
-                department: 'Engineering',
-                phone: '555-0100',
-                bio: 'Builds things.',
-                strengths: ['Leadership'],
-                state: 'active' as const,
-            },
+            worker: makeHumanWorker('hw_1', 'Sarah Chen'),
+            draft: HUMAN_DRAFT,
         };
         const next = reduceRefresh(current, null);
         assert.equal(next, current);
@@ -162,9 +122,9 @@ test(
         const current = {
             kind: 'reading' as const,
             variant: 'human' as const,
-            worker: makeHumanWorker(),
+            worker: makeHumanWorker('hw_1', 'Sarah Chen'),
         };
-        const fresh = makeAIWorker();
+        const fresh = makeAIWorker('ai_1', 'Claude Opus');
         const next = reduceRefresh(current, fresh);
         assert.equal(next.kind, 'reading');
         assert.equal(next.variant, 'ai');

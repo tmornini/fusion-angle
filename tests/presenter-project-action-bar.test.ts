@@ -18,8 +18,7 @@ test('under-review with no scores: Approve disabled',
             },
             { ready: true, problems: [] },
         );
-        const html = p.buildBar().toString();
-        assert.ok(html.includes('data-action="score"'));
+        const html = p.buildReviewActions().toString();
         assert.ok(
             html.includes(
                 'data-action="approve" disabled',
@@ -34,14 +33,14 @@ test('under-review with full scoring: Approve enabled',
             { ready: true, problems: [] },
             { ready: true, problems: [] },
         );
-        const html = p.buildBar().toString();
+        const html = p.buildReviewActions().toString();
         const approveDisabled = html.includes(
             'data-action="approve" disabled',
         );
         assert.equal(approveDisabled, false);
     });
 
-test('approved project: Log measurement + Complete shown',
+test('approved project: Archive shown',
     () => {
         const p = new ProjectActionBarPresenter(
             PROJECT_ID, 'approved',
@@ -54,27 +53,26 @@ test('approved project: Log measurement + Complete shown',
                 ],
             },
         );
-        const html = p.buildBar().toString();
+        const html =
+            p.buildLifecycleActions().toString();
         assert.ok(html.includes(
-            'data-action="log-measurement"',
-        ));
-        assert.ok(html.includes(
-            'data-action="complete"',
+            'data-action="archive"',
         ));
     });
 
-test('approved with full actuals: Complete enabled',
+test('approved with full actuals: Archive enabled',
     () => {
         const p = new ProjectActionBarPresenter(
             PROJECT_ID, 'approved',
             { ready: true, problems: [] },
             { ready: true, problems: [] },
         );
-        const html = p.buildBar().toString();
-        const completeDisabled = html.includes(
-            'data-action="complete" disabled',
+        const html =
+            p.buildLifecycleActions().toString();
+        const archiveDisabled = html.includes(
+            'data-action="archive" disabled',
         );
-        assert.equal(completeDisabled, false);
+        assert.equal(archiveDisabled, false);
     });
 
 test('submitted project: Score button hidden, other review actions shown',
@@ -84,7 +82,7 @@ test('submitted project: Score button hidden, other review actions shown',
             { ready: true, problems: [] },
             { ready: true, problems: [] },
         );
-        const html = p.buildBar().toString();
+        const html = p.buildReviewActions().toString();
         assert.equal(
             html.includes('data-action="score"'),
             false,
@@ -111,7 +109,7 @@ test('sent-back project: Score button hidden, other review actions shown',
             { ready: true, problems: [] },
             { ready: true, problems: [] },
         );
-        const html = p.buildBar().toString();
+        const html = p.buildReviewActions().toString();
         assert.equal(
             html.includes('data-action="score"'),
             false,
@@ -143,18 +141,19 @@ test('Approve tooltip enumerates unscored objective names',
             { ready: true, problems: [] },
             names,
         );
-        const html = p.buildBar().toString();
+        const html = p.buildReviewActions().toString();
         assert.ok(
             html.includes(
-                'title="Increase incomes, '
-                + 'Raise customer NPS unscored"',
+                'title="Set a baseline score before '
+                + 'approving: Increase incomes, '
+                + 'Raise customer NPS"',
             ),
             'Approve tooltip should enumerate'
             + ' unscored objective names',
         );
     });
 
-test('Complete tooltip enumerates objectives lacking actuals',
+test('Archive tooltip enumerates objectives lacking actuals',
     () => {
         const names = new Map([
             ['o1', 'Improve employee morale'],
@@ -171,13 +170,43 @@ test('Complete tooltip enumerates objectives lacking actuals',
             },
             names,
         );
-        const html = p.buildBar().toString();
+        const html =
+            p.buildLifecycleActions().toString();
         assert.ok(
             html.includes(
-                'title="Improve employee morale'
-                + ' lack actual measurements"',
+                'title="Add an actual measurement '
+                + 'before archiving: '
+                + 'Improve employee morale"',
             ),
-            'Complete tooltip should enumerate'
+            'Archive tooltip should enumerate'
             + ' objectives lacking actuals',
         );
+        assert.equal(
+            html.includes('action-bar-caption'),
+            false,
+            'reason lives in the tooltip, not a caption',
+        );
+    });
+
+test('review actions empty on approved (lifecycle in header)',
+    () => {
+        const p = new ProjectActionBarPresenter(
+            PROJECT_ID, 'approved',
+            { ready: true, problems: [] },
+            { ready: true, problems: [] },
+        );
+        const html = p.buildReviewActions().toString();
+        assert.equal(html.trim(), '');
+    });
+
+test('lifecycle actions empty on under-review',
+    () => {
+        const p = new ProjectActionBarPresenter(
+            PROJECT_ID, 'under-review',
+            { ready: true, problems: [] },
+            { ready: true, problems: [] },
+        );
+        const html =
+            p.buildLifecycleActions().toString();
+        assert.equal(html.trim(), '');
     });

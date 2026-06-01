@@ -57,7 +57,7 @@ export function validateProjectForApproval(
     };
 }
 
-export function validateProjectForCompletion(
+export function validateProjectForArchival(
     project: ProjectEntity,
     baselineScores: ProjectObjectiveBaselineScore[],
     actualScores: ProjectObjectiveActualScore[],
@@ -111,7 +111,7 @@ export async function postProjectApproval(
     );
 }
 
-export async function postProjectCompletion(
+export async function postProjectArchival(
     ctx: RequestContext,
     projectId: Id,
 ): Promise<void> {
@@ -121,13 +121,13 @@ export async function postProjectCompletion(
     const scoring = await getProjectScoring(
         ctx, projectId,
     );
-    const v = validateProjectForCompletion(
+    const v = validateProjectForArchival(
         project, scoring.baseline, scoring.actual,
     );
     if (!v.ready) {
         throw new ProjectNotReadyError(v.problems);
     }
     await postProjectStateChange(
-        ctx, projectId, 'completed',
+        ctx, projectId, 'archived',
     );
 }

@@ -130,3 +130,33 @@
   max-width: 28rem;
 }
 
+.convert-scores-row {
+  display: grid;
+  grid-template-columns:
+    minmax(8rem, 14rem) 1fr auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+}
+
+.convert-scores-row + .convert-scores-row {
+  border-top: 1px solid hsl(var(--border));
+}
+
+.convert-scores-row input[type="range"] {
+  width: 100%;
+}
+
+.convert-scores-row .slider-value {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  min-width: 3ch;
+  text-align: right;
+}
+
+@media (max-width: 768px) {
+  .convert-scores-row {
+    grid-template-columns: 1fr;
+  }
+}
+

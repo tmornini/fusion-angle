@@ -18,6 +18,7 @@ test(
     + ' round-trips the row',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         const ctx = createRequestContext(db);
         await putRecordAttribute(ctx, 'attr-1', {
             record_id: 'rec-1',
@@ -43,6 +44,7 @@ test(
     + ' attributes for the given record_id',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         const ctx = createRequestContext(db);
         await putRecordAttribute(ctx, 'a-1', {
             record_id: 'rec-1',
@@ -82,6 +84,7 @@ test(
     + ' sort_order ascending',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         const ctx = createRequestContext(db);
         await putRecordAttribute(ctx, 'a-mid', {
             record_id: 'rec-1',
@@ -122,6 +125,7 @@ test(
     'deleteRecordAttribute removes the row',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         const ctx = createRequestContext(db);
         await putRecordAttribute(ctx, 'a-1', {
             record_id: 'rec-1',
@@ -143,6 +147,7 @@ test(
     + ' constraint on a number attribute_type',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         const ctx = createRequestContext(db);
         await assert.rejects(
             () => putRecordAttribute(ctx, 'a-1', {
@@ -166,6 +171,7 @@ test(
     + ' text attribute_type',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         const ctx = createRequestContext(db);
         await assert.rejects(
             () => putRecordAttribute(ctx, 'a-1', {
@@ -188,6 +194,7 @@ test(
     + ' constraint on a date attribute_type',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         const ctx = createRequestContext(db);
         await putRecordAttribute(ctx, 'a-1', {
             record_id: 'rec-1',
@@ -212,6 +219,7 @@ test(
     + ' on a text attribute_type',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         const ctx = createRequestContext(db);
         await putRecordAttribute(ctx, 'a-1', {
             record_id: 'rec-1',

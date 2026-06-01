@@ -9,6 +9,7 @@ import type {
     WorkerId,
     JsonArrayField,
     JsonObjectField,
+    WorkerEntity,
     HumanWorkerEntity,
     AIWorkerEntity,
     IdeaEntity,
@@ -23,6 +24,8 @@ import type {
     ProjectFlowEntity,
     RecordEntity,
     RecordAttributeEntity,
+    RecordId,
+    RecordState,
     FlowRecordEntity,
     Objective,
     ObjectiveRevision,
@@ -33,6 +36,7 @@ import type {
 import {
     assertAttributeType,
     assertConstraintAppliesTo,
+    assertRecordState,
 } from './types.ts';
 
 export function parseOrThrow(
@@ -313,10 +317,6 @@ function asGraphNode(
         name: asString(
             obj['name'], label + '.name',
         ),
-        description: asString(
-            obj['description'],
-            label + '.description',
-        ),
         positionX: asNumber(
             obj['positionX'],
             label + '.positionX',
@@ -355,10 +355,6 @@ function asGraphEdge(
         ),
         name: asString(
             obj['name'], label + '.name',
-        ),
-        description: asString(
-            obj['description'],
-            label + '.description',
         ),
         fromNodeId: asString(
             obj['fromNodeId'],
@@ -432,10 +428,6 @@ validateWorkOrderFlowGraphJson(
         ),
         name: asString(
             obj['name'], label + '.name',
-        ),
-        description: asString(
-            obj['description'],
-            label + '.description',
         ),
         lockTimeout: asNumber(
             obj['lockTimeout'],
@@ -572,9 +564,36 @@ export function assertOnlyKeys(
 
 // ── Entity validators ────────────────
 
+const WORKER_BODY_KEYS: readonly string[] = [
+    'type', 'name',
+];
+
+export function validateWorkerEntity(
+    body: Record<string, unknown>,
+): Omit<WorkerEntity, 'id'> {
+    assertOnlyKeys(
+        body, WORKER_BODY_KEYS, 'WorkerEntity',
+    );
+    const type = pickString(body, 'type');
+    if (
+        type !== 'human'
+        && type !== 'ai'
+        && type !== 'system'
+    ) {
+        throw new Error(
+            'invalid worker type "' + type
+            + '" on WorkerEntity',
+        );
+    }
+    return {
+        type,
+        name: pickString(body, 'name'),
+    };
+}
+
 const HUMAN_WORKER_BODY_KEYS:
     readonly string[] = [
-    'first_name', 'last_name', 'email',
+    'email',
     'title', 'department',
     'strengths', 'team_dimensions',
     'phone', 'bio',
@@ -589,12 +608,6 @@ export function validateHumanWorkerEntity(
         'HumanWorkerEntity',
     );
     return {
-        first_name: pickString(
-            body, 'first_name',
-        ),
-        last_name: pickString(
-            body, 'last_name',
-        ),
         email: pickString(
             body, 'email',
         ),
@@ -621,7 +634,7 @@ export function validateHumanWorkerEntity(
 
 const AI_WORKER_BODY_KEYS:
     readonly string[] = [
-    'name', 'provider', 'description',
+    'provider', 'description',
     'auth_token',
 ];
 
@@ -649,9 +662,6 @@ export function validateAIWorkerEntity(
         );
     }
     return {
-        name: pickString(
-            body, 'name',
-        ),
         provider: pickString(
             body, 'provider',
         ),
@@ -745,7 +755,7 @@ export function validateProjectEntity(
 
 
 const FLOW_BODY_KEYS: readonly string[] = [
-    'name', 'description', 'is_locked',
+    'name', 'is_locked',
     'is_auto_layout', 'is_auto_fit',
     'lock_timeout', 'graph',
 ];
@@ -759,9 +769,6 @@ export function validateFlowEntity(
     return {
         name: pickString(
             body, 'name',
-        ),
-        description: pickString(
-            body, 'description',
         ),
         is_locked: pickBoolean(
             body, 'is_locked',
@@ -783,7 +790,7 @@ export function validateFlowEntity(
 
 const FLOW_VERSION_BODY_KEYS:
     readonly string[] = [
-    'flow_id', 'name', 'description',
+    'flow_id', 'name',
     'is_locked', 'is_auto_layout',
     'is_auto_fit', 'lock_timeout',
     'graph', 'at',
@@ -803,9 +810,6 @@ export function validateFlowVersionEntity(
         ),
         name: pickString(
             body, 'name',
-        ),
-        description: pickString(
-            body, 'description',
         ),
         is_locked: pickBoolean(
             body, 'is_locked',
@@ -910,11 +914,9 @@ validateStateFieldValueEntity(
 
 const ORGANIZATION_BODY_KEYS:
     readonly string[] = [
-    'name', 'domain',
-    'plan', 'plan_status', 'next_billing',
+    'name', 'domain', 'next_billing',
     'seats', 'used_seats', 'projects_limit',
-    'ideas_limit', 'health_score',
-    'health_status', 'last_activity',
+    'ideas_limit', 'last_activity',
 ];
 
 export function validateOrganizationEntity(
@@ -932,12 +934,6 @@ export function validateOrganizationEntity(
         domain: pickString(
             body, 'domain',
         ),
-        plan: pickString(
-            body, 'plan',
-        ),
-        plan_status: pickString(
-            body, 'plan_status',
-        ),
         next_billing: pickString(
             body, 'next_billing',
         ),
@@ -952,12 +948,6 @@ export function validateOrganizationEntity(
         ),
         ideas_limit: pickNumber(
             body, 'ideas_limit',
-        ),
-        health_score: pickNumber(
-            body, 'health_score',
-        ),
-        health_status: pickString(
-            body, 'health_status',
         ),
         last_activity: pickString(
             body, 'last_activity',
@@ -1035,7 +1025,7 @@ export function validateObjectiveEntity(
 const OBJECTIVE_REVISION_BODY_KEYS:
     readonly string[] = [
     'objective_id', 'name',
-    'description', 'at',
+    'description', 'worker_id', 'at',
 ];
 
 export function validateObjectiveRevisionEntity(
@@ -1060,6 +1050,9 @@ export function validateObjectiveRevisionEntity(
         description: pickString(
             body, 'description',
         ),
+        worker_id: pickString(
+            body, 'worker_id',
+        ),
         at: pickString(
             body, 'at',
         ),
@@ -1069,7 +1062,7 @@ export function validateObjectiveRevisionEntity(
 const BASELINE_SCORE_BODY_KEYS:
     readonly string[] = [
     'project_id', 'objective_id',
-    'score', 'at',
+    'score', 'worker_id', 'at',
 ];
 
 export function validateBaselineScoreEntity(
@@ -1090,6 +1083,9 @@ export function validateBaselineScoreEntity(
         score: asScore(
             body.score, 'BaselineScore.score',
         ),
+        worker_id: pickString(
+            body, 'worker_id',
+        ),
         at: pickString(
             body, 'at',
         ),
@@ -1099,7 +1095,7 @@ export function validateBaselineScoreEntity(
 const ACTUAL_SCORE_BODY_KEYS:
     readonly string[] = [
     'project_id', 'objective_id',
-    'score', 'at',
+    'score', 'worker_id', 'at',
 ];
 
 export function validateActualScoreEntity(
@@ -1119,6 +1115,9 @@ export function validateActualScoreEntity(
         ),
         score: asScore(
             body.score, 'ActualScore.score',
+        ),
+        worker_id: pickString(
+            body, 'worker_id',
         ),
         at: pickString(
             body, 'at',
@@ -1261,5 +1260,149 @@ export function validateFlowRecordEntity(
         ),
         at: pickString(body, 'at'),
     };
+}
+
+export interface RecordMultiPutCreateBody {
+    readonly kind: 'create';
+    readonly id: RecordId;
+    readonly record: Omit<RecordEntity, 'id'>;
+    readonly attributes: readonly RecordAttributeEntity[];
+    readonly initialState: RecordState;
+    readonly initialStateEventId: string;
+}
+
+export interface RecordMultiPutEditBody {
+    readonly kind: 'edit';
+    readonly id: RecordId;
+    readonly record: Omit<RecordEntity, 'id'>;
+    readonly attributes: readonly RecordAttributeEntity[];
+    readonly removedAttributeIds: readonly string[];
+}
+
+export type RecordMultiPutBody =
+    | RecordMultiPutCreateBody
+    | RecordMultiPutEditBody;
+
+const RECORD_MULTI_PUT_CREATE_KEYS:
+    readonly string[] = [
+    'kind', 'id', 'record',
+    'attributes', 'initialState',
+    'initialStateEventId',
+];
+
+const RECORD_MULTI_PUT_EDIT_KEYS:
+    readonly string[] = [
+    'kind', 'id', 'record',
+    'attributes', 'removedAttributeIds',
+];
+
+function validateMultiPutAttribute(
+    value: unknown,
+    recordId: string,
+    label: string,
+): RecordAttributeEntity {
+    const obj = asObject(value, label);
+    const id = asString(obj['id'], label + '.id');
+    const { id: _id, ...rest } = obj;
+    const validated =
+        validateRecordAttributeEntity(rest);
+    if (validated.record_id !== recordId) {
+        throw new Error(
+            label + '.record_id must match'
+            + ' top-level id; got '
+            + validated.record_id
+            + ', expected ' + recordId,
+        );
+    }
+    return { id, ...validated };
+}
+
+export function validateRecordMultiPutBody(
+    body: Record<string, unknown>,
+): RecordMultiPutBody {
+    const kind = pickString(body, 'kind');
+    if (kind === 'create') {
+        assertOnlyKeys(
+            body,
+            RECORD_MULTI_PUT_CREATE_KEYS,
+            'RecordMultiPutCreateBody',
+        );
+        const id = pickString(body, 'id');
+        const record = validateRecordEntity(
+            asObject(
+                body['record'],
+                'RecordMultiPutCreateBody.record',
+            ),
+        );
+        const attrsRaw = asArray(
+            body['attributes'],
+            'RecordMultiPutCreateBody.attributes',
+        );
+        const attributes = attrsRaw.map((a, i) =>
+            validateMultiPutAttribute(
+                a, id,
+                'RecordMultiPutCreateBody'
+                + '.attributes[' + i + ']',
+            ),
+        );
+        const initialState = assertRecordState(
+            pickString(body, 'initialState'),
+            'RecordMultiPutCreateBody.initialState',
+        );
+        const initialStateEventId = pickString(
+            body, 'initialStateEventId',
+        );
+        return {
+            kind: 'create',
+            id, record, attributes,
+            initialState, initialStateEventId,
+        };
+    }
+    if (kind === 'edit') {
+        assertOnlyKeys(
+            body,
+            RECORD_MULTI_PUT_EDIT_KEYS,
+            'RecordMultiPutEditBody',
+        );
+        const id = pickString(body, 'id');
+        const record = validateRecordEntity(
+            asObject(
+                body['record'],
+                'RecordMultiPutEditBody.record',
+            ),
+        );
+        const attrsRaw = asArray(
+            body['attributes'],
+            'RecordMultiPutEditBody.attributes',
+        );
+        const attributes = attrsRaw.map((a, i) =>
+            validateMultiPutAttribute(
+                a, id,
+                'RecordMultiPutEditBody'
+                + '.attributes[' + i + ']',
+            ),
+        );
+        const removedRaw = asArray(
+            body['removedAttributeIds'],
+            'RecordMultiPutEditBody'
+            + '.removedAttributeIds',
+        );
+        const removedAttributeIds = removedRaw
+            .map((r, i) => asString(
+                r,
+                'RecordMultiPutEditBody'
+                + '.removedAttributeIds['
+                + i + ']',
+            ));
+        return {
+            kind: 'edit',
+            id, record, attributes,
+            removedAttributeIds,
+        };
+    }
+    throw new Error(
+        "expected RecordMultiPutBody kind"
+        + " 'create' or 'edit', got " + kind,
+    );
 }
 

@@ -10,42 +10,36 @@ import {
     putRecord,
     deleteRecord,
     getRecordState,
-    postRecordCreation,
+    postRecordChange,
     postRecordStateChange,
     archiveRecord,
 } from '../web-app/app/adapters/records.ts';
-async function seedCurrentWorker(
-    db: MemoryDbAdapter,
-): Promise<void> {
-    await db.workers.put('current', {
-        first_name: 'Demo',
-        last_name: 'User',
-        email: 'demo@example.com',
-        title: 'Admin',
-        department: 'Product',
-        strengths: '[]' as never,
-        team_dimensions: '{}' as never,
-        phone: '',
-        bio: '',
-    });
-}
+import {
+    jsonArrayField,
+} from '../api/types.ts';
+import {
+    seedCurrentWorker,
+    seedHumanWorker,
+} from './worker-fixtures.ts';
 
 test(
-    'postRecordCreation writes the row and the'
-    + ' initial state event',
+    'postRecordChange create writes the row and'
+    + ' the initial state event',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         await seedCurrentWorker(db);
         const ctx = createRequestContext(db);
-        await postRecordCreation(
-            ctx, 'rec-1',
-            {
+        await postRecordChange(ctx, 'rec-1', {
+            kind: 'create',
+            record: {
                 name: 'Customer',
                 description: 'A customer record',
                 position: 1,
             },
-            'active',
-        );
+            attributes: [],
+            initialState: 'active',
+        });
         const stored = await getRecord(ctx, 'rec-1');
         assert.equal(stored.id, 'rec-1');
         assert.equal(stored.name, 'Customer');
@@ -57,20 +51,58 @@ test(
 );
 
 test(
+    'postRecordChange create writes attributes'
+    + ' alongside the record',
+    async () => {
+        const db = new MemoryDbAdapter();
+        await db.createSchema();
+        await seedCurrentWorker(db);
+        const ctx = createRequestContext(db);
+        await postRecordChange(ctx, 'rec-1', {
+            kind: 'create',
+            record: {
+                name: 'Q',
+                description: '',
+                position: 1,
+            },
+            attributes: [
+                {
+                    id: 'a-1',
+                    record_id: 'rec-1',
+                    name: 'Fee',
+                    attribute_type: 'number',
+                    sort_order: 0,
+                    options: jsonArrayField([]),
+                    constraints: jsonArrayField([]),
+                },
+            ],
+            initialState: 'active',
+        });
+        const attrs = await ctx.GET<
+            { id: string; name: string }[]
+        >('record-attributes');
+        assert.equal(attrs.length, 1);
+        assert.equal(attrs[0]!.name, 'Fee');
+    },
+);
+
+test(
     'putRecord overwrites an existing row',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         await seedCurrentWorker(db);
         const ctx = createRequestContext(db);
-        await postRecordCreation(
-            ctx, 'rec-1',
-            {
+        await postRecordChange(ctx, 'rec-1', {
+            kind: 'create',
+            record: {
                 name: 'A',
                 description: 'first',
                 position: 1,
             },
-            'active',
-        );
+            attributes: [],
+            initialState: 'active',
+        });
         await putRecord(ctx, 'rec-1', {
             name: 'B',
             description: 'second',
@@ -83,30 +115,87 @@ test(
 );
 
 test(
+    'postRecordChange edit replaces removed'
+    + ' attributes with new ones',
+    async () => {
+        const db = new MemoryDbAdapter();
+        await db.createSchema();
+        await seedCurrentWorker(db);
+        const ctx = createRequestContext(db);
+        await postRecordChange(ctx, 'rec-1', {
+            kind: 'create',
+            record: {
+                name: 'R', description: '',
+                position: 1,
+            },
+            attributes: [
+                {
+                    id: 'a-old',
+                    record_id: 'rec-1',
+                    name: 'Old',
+                    attribute_type: 'text',
+                    sort_order: 0,
+                    options: jsonArrayField([]),
+                    constraints: jsonArrayField([]),
+                },
+            ],
+            initialState: 'active',
+        });
+        await postRecordChange(ctx, 'rec-1', {
+            kind: 'edit',
+            record: {
+                name: 'R', description: '',
+                position: 1,
+            },
+            attributes: [
+                {
+                    id: 'a-new',
+                    record_id: 'rec-1',
+                    name: 'New',
+                    attribute_type: 'text',
+                    sort_order: 0,
+                    options: jsonArrayField([]),
+                    constraints: jsonArrayField([]),
+                },
+            ],
+            removedAttributeIds: ['a-old'],
+        });
+        const attrs = await ctx.GET<
+            { id: string }[]
+        >('record-attributes');
+        assert.equal(attrs.length, 1);
+        assert.equal(attrs[0]!.id, 'a-new');
+    },
+);
+
+test(
     'getRecords excludes records whose latest'
     + ' state event is deleted',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         await seedCurrentWorker(db);
         const ctx = createRequestContext(db);
-        await postRecordCreation(
-            ctx, 'rec-1',
-            {
+        await postRecordChange(ctx, 'rec-1', {
+            kind: 'create',
+            record: {
                 name: 'Keep',
                 description: '',
                 position: 1,
             },
-            'active',
-        );
-        await postRecordCreation(
-            ctx, 'rec-2',
-            {
+            attributes: [],
+            initialState: 'active',
+        });
+        await postRecordChange(ctx, 'rec-2', {
+            kind: 'create',
+            record: {
                 name: 'Drop',
                 description: '',
                 position: 2,
             },
-            'active',
-        );
+            attributes: [],
+            initialState: 'active',
+        });
         await postRecordStateChange(
             ctx, 'rec-2', 'deleted',
         );
@@ -123,17 +212,19 @@ test(
     + ' archived',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         await seedCurrentWorker(db);
         const ctx = createRequestContext(db);
-        await postRecordCreation(
-            ctx, 'rec-1',
-            {
+        await postRecordChange(ctx, 'rec-1', {
+            kind: 'create',
+            record: {
                 name: 'X',
                 description: '',
                 position: 1,
             },
-            'active',
-        );
+            attributes: [],
+            initialState: 'active',
+        });
         await archiveRecord(ctx, 'rec-1');
         const state = await getRecordState(
             ctx, 'rec-1',
@@ -147,17 +238,19 @@ test(
     + ' without touching the entity row',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         await seedCurrentWorker(db);
         const ctx = createRequestContext(db);
-        await postRecordCreation(
-            ctx, 'rec-1',
-            {
+        await postRecordChange(ctx, 'rec-1', {
+            kind: 'create',
+            record: {
                 name: 'X',
                 description: 'orig',
                 position: 1,
             },
-            'active',
-        );
+            attributes: [],
+            initialState: 'active',
+        });
         await postRecordStateChange(
             ctx, 'rec-1', 'archived',
         );
@@ -174,17 +267,19 @@ test(
     'deleteRecord hard-splices the row',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         await seedCurrentWorker(db);
         const ctx = createRequestContext(db);
-        await postRecordCreation(
-            ctx, 'rec-1',
-            {
+        await postRecordChange(ctx, 'rec-1', {
+            kind: 'create',
+            record: {
                 name: 'X',
                 description: '',
                 position: 1,
             },
-            'active',
-        );
+            attributes: [],
+            initialState: 'active',
+        });
         await deleteRecord(ctx, 'rec-1');
         await assert.rejects(
             () => getRecord(ctx, 'rec-1'),
@@ -197,6 +292,7 @@ test(
     + ' exists for the record',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         const ctx = createRequestContext(db);
         await assert.rejects(
             () => getRecordState(ctx, 'rec-missing'),
@@ -210,17 +306,19 @@ test(
     + ' states log',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         await seedCurrentWorker(db);
         const ctx = createRequestContext(db);
-        await postRecordCreation(
-            ctx, 'rec-1',
-            {
+        await postRecordChange(ctx, 'rec-1', {
+            kind: 'create',
+            record: {
                 name: 'X',
                 description: '',
                 position: 1,
             },
-            'active',
-        );
+            attributes: [],
+            initialState: 'active',
+        });
         await postRecordStateChange(
             ctx, 'rec-1', 'archived',
         );

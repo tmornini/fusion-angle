@@ -3,6 +3,10 @@ import {
     TABLE_NAMES,
     type StorageBackend,
 } from './db.ts';
+import {
+    isRowShaped,
+    serializeRecord,
+} from './storage-serialize.ts';
 
 const KEY_PREFIX = 'fusion-ai:';
 
@@ -12,17 +16,6 @@ const COMPRESSED_TABLES: ReadonlySet<string> = new Set([
 ]);
 
 const COMPRESSION_PREFIX = 'gz1:';
-
-function isRowShaped(
-    row: unknown,
-): row is { id: string } {
-    return typeof row === 'object'
-        && row !== null
-        && 'id' in row
-        && typeof (
-            row as { id: unknown }
-        ).id === 'string';
-}
 
 async function compressJson(
     json: string,
@@ -56,37 +49,6 @@ async function decompressJson(
         new DecompressionStream('gzip'),
     );
     return new Response(stream).text();
-}
-
-function serializeValue(
-    value: unknown,
-    key: string,
-    tableName: string,
-): unknown {
-    if (value === null || value === undefined) {
-        throw new Error(
-            `NOT NULL violation: "${key}"`
-            + ` in "${tableName}" is`
-            + ` ${String(value)}.`,
-        );
-    }
-    return value;
-}
-
-function serializeRecord(
-    record: Record<string, unknown>,
-    tableName: string,
-): Record<string, unknown> {
-    const result: Record<string, unknown> = {};
-    for (
-        const [key, value]
-        of Object.entries(record)
-    ) {
-        result[key] = serializeValue(
-            value, key, tableName,
-        );
-    }
-    return result;
 }
 
 export class LocalStorageBackend

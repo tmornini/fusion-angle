@@ -13,6 +13,7 @@ import {
     getTransitionEventsByWorkOrder,
     getWorkOrderTransitionEvents,
     getWorkOrderActiveClaim,
+    getActiveClaimsByWorkOrder,
     getWorkOrderCurrentNodeId,
     type TransitionEvent,
 } from './state-events.ts';
@@ -30,6 +31,7 @@ export type { TransitionEvent } from './state-events.ts';
 
 export {
     getWorkOrderActiveClaim,
+    getActiveClaimsByWorkOrder,
     getWorkOrderCurrentNodeId,
     getWorkOrderTransitionEvents,
     getTransitionEventsByWorkOrder,

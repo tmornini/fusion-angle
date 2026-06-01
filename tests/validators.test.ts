@@ -19,8 +19,6 @@ import {
 // --- HumanWorkerEntity ---
 
 const validHumanWorker = {
-    first_name: 'Ada',
-    last_name: 'Lovelace',
     email: 'ada@example.com',
     title: 'Engineer',
     department: 'R&D',
@@ -36,7 +34,7 @@ test(
         const result = validateHumanWorkerEntity(
             validHumanWorker,
         );
-        assert.equal(result.first_name, 'Ada');
+        assert.equal(result.email, 'ada@example.com');
     },
 );
 
@@ -88,10 +86,10 @@ test(
         const body = { ...validHumanWorker };
         delete (
             body as Record<string, unknown>
-        )['last_name'];
+        )['department'];
         assert.throws(
             () => validateHumanWorkerEntity(body),
-            /missing required key "last_name"/,
+            /missing required key "department"/,
         );
     },
 );
@@ -99,7 +97,6 @@ test(
 // --- AIWorkerEntity ---
 
 const validAIWorker = {
-    name: 'Claude Opus 4.7 Max',
     provider: 'Anthropic',
     description: 'Long context, deep reasoning.',
     auth_token: 'sk-PLACEHOLDER-DEMOTOKEN-XXXX',
@@ -111,10 +108,11 @@ test(
         const result = validateAIWorkerEntity(
             validAIWorker,
         );
-        assert.equal(
-            result.name, 'Claude Opus 4.7 Max',
-        );
         assert.equal(result.provider, 'Anthropic');
+        assert.equal(
+            result.description,
+            'Long context, deep reasoning.',
+        );
         assert.equal(
             result.auth_token,
             'sk-PLACEHOLDER-DEMOTOKEN-XXXX',
@@ -149,13 +147,13 @@ test(
 );
 
 test(
-    'validateAIWorkerEntity rejects missing name',
+    'validateAIWorkerEntity rejects missing provider',
     () => {
-        const { name: _omit, ...rest } =
+        const { provider: _omit, ...rest } =
             validAIWorker;
         assert.throws(
             () => validateAIWorkerEntity(rest),
-            /missing required key "name"/,
+            /missing required key "provider"/,
         );
     },
 );
@@ -274,7 +272,6 @@ test('validateProjectEntity rejects unknown key', () => {
 
 const validFlow = {
     name: 'Flow A',
-    description: 'Desc',
     is_locked: false,
     is_auto_layout: true,
     is_auto_fit: true,
@@ -330,7 +327,6 @@ test(
 const validFlowVersion = {
     flow_id: 'f-1',
     name: 'v1',
-    description: '',
     is_locked: false,
     is_auto_layout: true,
     is_auto_fit: true,
@@ -365,7 +361,6 @@ test(
 const minimalWoGraph = JSON.stringify({
     flowId: 'f-1',
     name: 'WO Flow',
-    description: '',
     lockTimeout: 28800,
     nodes: [],
     edges: [],
@@ -466,15 +461,11 @@ test(
 const validOrg = {
     name: 'Acme Corp',
     domain: 'acme.com',
-    plan: 'pro',
-    plan_status: 'active',
     next_billing: '2025-01-01',
     seats: 10,
     used_seats: 5,
     projects_limit: 50,
     ideas_limit: 200,
-    health_score: 85,
-    health_status: 'healthy',
     last_activity: '2024-01-01T00:00:00Z',
 };
 
@@ -483,7 +474,7 @@ test(
     () => {
     const result =
         validateOrganizationEntity(validOrg);
-    assert.equal(result.plan, 'pro');
+    assert.equal(result.name, 'Acme Corp');
     assert.equal(result.seats, 10);
 });
 
@@ -595,7 +586,6 @@ test(
 const baseNode = {
     id: 'n1',
     name: 'N',
-    description: '',
     positionX: 0,
     positionY: 0,
     isCreate: false,

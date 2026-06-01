@@ -6,6 +6,7 @@ import type {
     StateStore as IStateStore,
 } from './db.ts';
 import type {
+    WorkerEntity,
     HumanWorkerEntity,
     AIWorkerEntity,
     IdeaEntity,
@@ -28,6 +29,9 @@ import type {
 } from './types.ts';
 import { MemoryStorageBackend }
     from './backend-memory.ts';
+import {
+    parseAndValidateSnapshot,
+} from './snapshot-validator.ts';
 import { EntityStore } from './store-entity.ts';
 import { HistoryEntityStore }
     from './store-history-entity.ts';
@@ -36,6 +40,7 @@ import { StateStore } from './store-state.ts';
 import {
     validateBaselineScoreEntity,
     validateActualScoreEntity,
+    validateWorkerEntity,
     validateHumanWorkerEntity,
     validateAIWorkerEntity,
     validateIdeaEntity,
@@ -57,7 +62,9 @@ import {
 export class MemoryDbAdapter implements DbAdapter {
     readonly #backend: MemoryStorageBackend;
 
-    readonly workers: IEntityStore<HumanWorkerEntity>;
+    readonly workers: IEntityStore<WorkerEntity>;
+    readonly humanWorkers:
+        IEntityStore<HumanWorkerEntity>;
     readonly aiWorkers: IEntityStore<AIWorkerEntity>;
     readonly ideas: IEntityStore<IdeaEntity>;
     readonly projects: IEntityStore<ProjectEntity>;
@@ -105,6 +112,11 @@ export class MemoryDbAdapter implements DbAdapter {
         this.workers =
             new EntityStore(
                 'workers', backend, stateStore,
+                validateWorkerEntity,
+            );
+        this.humanWorkers =
+            new EntityStore(
+                'human_workers', backend, stateStore,
                 validateHumanWorkerEntity,
             );
         this.aiWorkers =
@@ -204,12 +216,21 @@ export class MemoryDbAdapter implements DbAdapter {
     async initialize(): Promise<void> {}
     async close(): Promise<void> {}
     async flush(): Promise<void> {}
+    async simulateLatency(): Promise<void> {}
 
     async hasSchema(): Promise<boolean> {
-        return true;
+        return (await this.#backend.list()).length > 0;
     }
 
     async createSchema(): Promise<void> {
+        const existing = new Set(
+            await this.#backend.list(),
+        );
+        for (const table of TABLE_NAMES) {
+            if (!existing.has(table)) {
+                await this.#backend.write(table, []);
+            }
+        }
     }
 
     async deleteSchema(): Promise<void> {
@@ -221,18 +242,20 @@ export class MemoryDbAdapter implements DbAdapter {
         for (const table of TABLE_NAMES) {
             obj[table] = await this.#backend.read(table);
         }
-        return JSON.stringify(obj);
+        return JSON.stringify(obj, null, 2);
     }
 
     async importSnapshot(json: string): Promise<void> {
-        const obj = JSON.parse(json) as
-            Record<string, { id: string }[]>;
+        const validated =
+            parseAndValidateSnapshot(json);
         await this.#backend.clearAll();
-        for (const table of TABLE_NAMES) {
-            const rows = obj[table];
-            if (rows) {
+        try {
+            for (const [table, rows] of validated) {
                 await this.#backend.write(table, rows);
             }
+        } catch (err) {
+            await this.#backend.clearAll();
+            throw err;
         }
     }
 }

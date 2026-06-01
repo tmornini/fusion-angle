@@ -1,5 +1,10 @@
 import { TABLE_NAMES } from './db.ts';
-import type { DbAdapter } from './db.ts';
+import type {
+    DbAdapter,
+    SingletonStore as ISingletonStore,
+    EntityStore as IEntityStore,
+    StateStore as IStateStore,
+} from './db.ts';
 import { LocalStorageBackend } from
     './backend-localstorage.ts';
 import { EntityStore } from './store-entity.ts';
@@ -8,6 +13,7 @@ import { HistoryEntityStore }
 import { SingletonStore } from './store-singleton.ts';
 import { StateStore } from './store-state.ts';
 import type {
+    WorkerEntity,
     HumanWorkerEntity,
     AIWorkerEntity,
     IdeaEntity,
@@ -29,10 +35,11 @@ import type {
     ProjectObjectiveActualScore,
 } from './types.ts';
 import {
-    withSimulatedLatency,
+    simulateNetworkLatency,
     DEFAULT_LATENCY_CONFIG,
 } from './latency.ts';
 import {
+    validateWorkerEntity,
     validateHumanWorkerEntity,
     validateAIWorkerEntity,
     validateIdeaEntity,
@@ -48,348 +55,217 @@ import {
     validateFlowRecordEntity,
     validateOrganizationEntity,
     validateIdeaSubmissionEntity,
-    validateStateEntity,
     validateObjectiveEntity,
     validateObjectiveRevisionEntity,
     validateBaselineScoreEntity,
     validateActualScoreEntity,
 } from './validators.ts';
+import {
+    parseAndValidateSnapshot,
+} from './snapshot-validator.ts';
 
-const SIMULATE_LATENCY_PARAM = 'simulate-latency';
+export class LocalStorageDbAdapter implements DbAdapter {
+    readonly #backend: LocalStorageBackend;
 
-function simulateLatencyRequested(): boolean {
-    if (typeof window === 'undefined') {
-        return false;
-    }
-    const params = new URLSearchParams(
-        window.location.search,
-    );
-    return params.get(SIMULATE_LATENCY_PARAM)
-        === 'on';
-}
+    readonly workers: IEntityStore<WorkerEntity>;
+    readonly humanWorkers:
+        IEntityStore<HumanWorkerEntity>;
+    readonly aiWorkers: IEntityStore<AIWorkerEntity>;
+    readonly ideas: IEntityStore<IdeaEntity>;
+    readonly projects: IEntityStore<ProjectEntity>;
+    readonly flows: IEntityStore<FlowEntity>;
+    readonly flowVersions:
+        IEntityStore<FlowVersionEntity>;
+    readonly projectFlows:
+        IEntityStore<ProjectFlowEntity>;
+    readonly workOrders: IEntityStore<WorkOrderEntity>;
+    readonly flowWorkOrders:
+        IEntityStore<FlowWorkOrderEntity>;
+    readonly stateFieldValues:
+        IEntityStore<StateFieldValueEntity>;
+    readonly records:
+        IEntityStore<RecordEntity>;
+    readonly recordAttributes:
+        IEntityStore<RecordAttributeEntity>;
+    readonly flowRecords:
+        IEntityStore<FlowRecordEntity>;
+    readonly organization:
+        ISingletonStore<OrganizationEntity>;
+    readonly ideaSubmissions:
+        IEntityStore<IdeaSubmissionEntity>;
+    readonly objectives: IEntityStore<Objective>;
+    readonly objectiveRevisions:
+        IEntityStore<ObjectiveRevision>;
+    readonly projectObjectiveBaselineScores:
+        IEntityStore<ProjectObjectiveBaselineScore>;
+    readonly projectObjectiveActualScores:
+        IEntityStore<ProjectObjectiveActualScore>;
+    readonly states: IStateStore;
 
-// Map table name → entity validator. Stored rows
-// carry `id` as their storage key — strip it before
-// passing to each validator, which enforces an exact
-// body-key set.
-function validateSnapshotRow(
-    table: string,
-    row: Record<string, unknown>,
-    rowIndex: number,
-): void {
-    const label =
-        'snapshot.' + table
-        + '[' + rowIndex + ']';
-    const { id: _id, ...body } = row;
-    try {
-        switch (table) {
-            case 'workers':
-                validateHumanWorkerEntity(body);
-                break;
-            case 'ai_workers':
-                validateAIWorkerEntity(body);
-                break;
-            case 'ideas':
-                validateIdeaEntity(body);
-                break;
-            case 'projects':
-                validateProjectEntity(body);
-                break;
-            case 'flows':
-                validateFlowEntity(body);
-                break;
-            case 'flow_versions':
-                validateFlowVersionEntity(body);
-                break;
-            case 'project_flows':
-                validateProjectFlowEntity(body);
-                break;
-            case 'work_orders':
-                validateWorkOrderEntity(body);
-                break;
-            case 'flow_work_orders':
-                validateFlowWorkOrderEntity(body);
-                break;
-            case 'state_field_values':
-                validateStateFieldValueEntity(
-                    body,
-                );
-                break;
-            case 'records':
-                validateRecordEntity(body);
-                break;
-            case 'record_attributes':
-                validateRecordAttributeEntity(
-                    body,
-                );
-                break;
-            case 'flow_records':
-                validateFlowRecordEntity(body);
-                break;
-            case 'organization':
-                validateOrganizationEntity(body);
-                break;
-            case 'idea_submissions':
-                validateIdeaSubmissionEntity(body);
-                break;
-            case 'states':
-                validateStateEntity(body);
-                break;
-            case 'objectives':
-                validateObjectiveEntity(body);
-                break;
-            case 'objective_revisions':
-                validateObjectiveRevisionEntity(body);
-                break;
-            case 'project_objective_baseline_scores':
-                validateBaselineScoreEntity(body);
-                break;
-            case 'project_objective_actual_scores':
-                validateActualScoreEntity(body);
-                break;
-        }
-    } catch (err) {
-        const msg =
-            err instanceof Error
-                ? err.message
-                : String(err);
-        throw new Error(
-            'Invalid snapshot row in '
-            + label + ': ' + msg,
+    constructor() {
+        this.#backend = new LocalStorageBackend();
+        const backend = this.#backend;
+        const stateStore = new StateStore(
+            backend, 'states',
         );
-    }
-}
-
-// Parses + validates the snapshot JSON, returning
-// per-table parsed rows. Throws with a precise
-// message identifying which table or row failed.
-function parseAndValidateSnapshot(
-    json: string,
-): Map<string, { id: string }[]> {
-    let parsed: unknown;
-    try {
-        parsed = JSON.parse(json);
-    } catch {
-        throw new Error(
-            'Invalid snapshot: not valid JSON.',
-        );
-    }
-    if (
-        typeof parsed !== 'object'
-        || parsed === null
-        || Array.isArray(parsed)
-    ) {
-        throw new Error(
-            'Invalid snapshot: expected an object'
-            + ' with table keys.',
-        );
-    }
-    const record = parsed as Record<string, unknown>;
-    const result = new Map<string, { id: string }[]>();
-    for (const table of TABLE_NAMES) {
-        const rows = record[table];
-        if (
-            rows !== undefined
-            && !Array.isArray(rows)
-        ) {
-            throw new Error(
-                'Invalid snapshot: table "'
-                + table + '" is not an array.',
+        this.states = stateStore;
+        this.organization =
+            new SingletonStore<OrganizationEntity>(
+                'organization', backend,
             );
-        }
-        const rowArr =
-            Array.isArray(rows) ? rows : [];
-        const parsedRows: { id: string }[] = [];
-        for (let i = 0; i < rowArr.length; i++) {
-            const row = rowArr[i];
-            if (
-                typeof row !== 'object'
-                || row === null
-                || Array.isArray(row)
-            ) {
-                throw new Error(
-                    'Invalid snapshot: row '
-                    + i + ' in table "'
-                    + table + '" is not an object.',
-                );
-            }
-            const r = row as Record<string, unknown>;
-            validateSnapshotRow(table, r, i);
-            if (typeof r['id'] !== 'string') {
-                throw new Error(
-                    'Invalid snapshot: row '
-                    + i + ' in table "'
-                    + table
-                    + '" missing string id.',
-                );
-            }
-            parsedRows.push(r as { id: string });
-        }
-        result.set(table, parsedRows);
-    }
-    return result;
-}
 
-export async function createLocalStorageAdapter(
-): Promise<DbAdapter> {
-    const backend = new LocalStorageBackend();
-    const stateStore = new StateStore(backend, 'states');
-
-    const adapter: DbAdapter = {
-        async initialize(): Promise<void> {},
-        async close(): Promise<void> {},
-        async flush(): Promise<void> {},
-
-        async deleteSchema(): Promise<void> {
-            await backend.clearAll();
-        },
-
-        async hasSchema(): Promise<boolean> {
-            return (await backend.list()).length > 0;
-        },
-
-        async createSchema(): Promise<void> {
-            const existing = new Set(
-                await backend.list(),
+        this.workers =
+            new EntityStore(
+                'workers', backend, stateStore,
+                validateWorkerEntity,
             );
-            for (const table of TABLE_NAMES) {
-                if (!existing.has(table)) {
-                    await backend.write(table, []);
-                }
-            }
-        },
-
-        async exportSnapshot(): Promise<string> {
-            const obj: Record<string, unknown[]> = {};
-            for (const table of TABLE_NAMES) {
-                obj[table] = await backend.read(table);
-            }
-            return JSON.stringify(obj, null, 2);
-        },
-
-        async importSnapshot(
-            json: string,
-        ): Promise<void> {
-            const validated =
-                parseAndValidateSnapshot(json);
-            await backend.clearAll();
-            try {
-                for (const [
-                    table, rows,
-                ] of validated) {
-                    await backend.write(table, rows);
-                }
-            } catch (err) {
-                await backend.clearAll();
-                throw err;
-            }
-        },
-
-        workers: new EntityStore<HumanWorkerEntity>(
-            'workers', backend, stateStore,
-            validateHumanWorkerEntity,
-        ),
-        aiWorkers: new EntityStore<AIWorkerEntity>(
-            'ai_workers', backend, stateStore,
-            validateAIWorkerEntity,
-        ),
-        ideas: new EntityStore<IdeaEntity>(
-            'ideas', backend, stateStore,
-            validateIdeaEntity,
-        ),
-        projects: new EntityStore<ProjectEntity>(
-            'projects', backend, stateStore,
-            validateProjectEntity,
-        ),
-        flows: new EntityStore<FlowEntity>(
-            'flows', backend, stateStore,
-            validateFlowEntity,
-        ),
-        flowVersions:
-            new HistoryEntityStore<FlowVersionEntity>(
+        this.humanWorkers =
+            new EntityStore(
+                'human_workers', backend, stateStore,
+                validateHumanWorkerEntity,
+            );
+        this.aiWorkers =
+            new EntityStore(
+                'ai_workers', backend, stateStore,
+                validateAIWorkerEntity,
+            );
+        this.ideas =
+            new EntityStore(
+                'ideas', backend, stateStore,
+                validateIdeaEntity,
+            );
+        this.projects =
+            new EntityStore(
+                'projects', backend, stateStore,
+                validateProjectEntity,
+            );
+        this.flows =
+            new EntityStore(
+                'flows', backend, stateStore,
+                validateFlowEntity,
+            );
+        this.flowVersions =
+            new HistoryEntityStore(
                 'flow_versions', backend,
                 validateFlowVersionEntity,
-            ),
-        projectFlows:
-            new EntityStore<ProjectFlowEntity>(
+            );
+        this.projectFlows =
+            new EntityStore(
                 'project_flows', backend, stateStore,
                 validateProjectFlowEntity,
-            ),
-        workOrders: new EntityStore<WorkOrderEntity>(
-            'work_orders', backend, stateStore,
-            validateWorkOrderEntity,
-        ),
-        flowWorkOrders:
-            new EntityStore<FlowWorkOrderEntity>(
+            );
+        this.workOrders =
+            new EntityStore(
+                'work_orders', backend, stateStore,
+                validateWorkOrderEntity,
+            );
+        this.flowWorkOrders =
+            new EntityStore(
                 'flow_work_orders',
                 backend, stateStore,
                 validateFlowWorkOrderEntity,
-            ),
-        stateFieldValues:
-            new EntityStore<StateFieldValueEntity>(
+            );
+        this.stateFieldValues =
+            new EntityStore(
                 'state_field_values',
                 backend, stateStore,
                 validateStateFieldValueEntity,
-            ),
-        records:
-            new EntityStore<RecordEntity>(
+            );
+        this.records =
+            new EntityStore(
                 'records', backend, stateStore,
                 validateRecordEntity,
-            ),
-        recordAttributes:
-            new EntityStore<RecordAttributeEntity>(
+            );
+        this.recordAttributes =
+            new EntityStore(
                 'record_attributes',
                 backend, stateStore,
                 validateRecordAttributeEntity,
-            ),
-        flowRecords:
-            new EntityStore<FlowRecordEntity>(
+            );
+        this.flowRecords =
+            new EntityStore(
                 'flow_records',
                 backend, stateStore,
                 validateFlowRecordEntity,
-            ),
-        organization:
-            new SingletonStore<OrganizationEntity>(
-                'organization', backend,
-            ),
-        ideaSubmissions:
-            new EntityStore<IdeaSubmissionEntity>(
+            );
+        this.ideaSubmissions =
+            new EntityStore(
                 'idea_submissions',
                 backend, stateStore,
                 validateIdeaSubmissionEntity,
-            ),
-        objectives: new EntityStore<Objective>(
-            'objectives', backend, stateStore,
-            validateObjectiveEntity,
-        ),
-        objectiveRevisions:
-            new HistoryEntityStore<ObjectiveRevision>(
+            );
+        this.objectives =
+            new EntityStore(
+                'objectives', backend, stateStore,
+                validateObjectiveEntity,
+            );
+        this.objectiveRevisions =
+            new HistoryEntityStore(
                 'objective_revisions', backend,
                 validateObjectiveRevisionEntity,
-            ),
-        projectObjectiveBaselineScores:
-            new HistoryEntityStore<
-                ProjectObjectiveBaselineScore
-            >(
+            );
+        this.projectObjectiveBaselineScores =
+            new HistoryEntityStore(
                 'project_objective_baseline_scores',
                 backend,
                 validateBaselineScoreEntity,
-            ),
-        projectObjectiveActualScores:
-            new HistoryEntityStore<
-                ProjectObjectiveActualScore
-            >(
+            );
+        this.projectObjectiveActualScores =
+            new HistoryEntityStore(
                 'project_objective_actual_scores',
                 backend,
                 validateActualScoreEntity,
-            ),
-        states: stateStore,
-    };
+            );
+    }
 
-    return simulateLatencyRequested()
-        ? withSimulatedLatency(
-            adapter,
+    async initialize(): Promise<void> {}
+    async close(): Promise<void> {}
+    async flush(): Promise<void> {}
+
+    async simulateLatency(): Promise<void> {
+        await simulateNetworkLatency(
             DEFAULT_LATENCY_CONFIG,
-        )
-        : adapter;
+        );
+    }
+
+    async hasSchema(): Promise<boolean> {
+        return (await this.#backend.list()).length > 0;
+    }
+
+    async createSchema(): Promise<void> {
+        const existing = new Set(
+            await this.#backend.list(),
+        );
+        for (const table of TABLE_NAMES) {
+            if (!existing.has(table)) {
+                await this.#backend.write(table, []);
+            }
+        }
+    }
+
+    async deleteSchema(): Promise<void> {
+        await this.#backend.clearAll();
+    }
+
+    async exportSnapshot(): Promise<string> {
+        const obj: Record<string, unknown[]> = {};
+        for (const table of TABLE_NAMES) {
+            obj[table] = await this.#backend.read(table);
+        }
+        return JSON.stringify(obj, null, 2);
+    }
+
+    async importSnapshot(json: string): Promise<void> {
+        const validated =
+            parseAndValidateSnapshot(json);
+        await this.#backend.clearAll();
+        try {
+            for (const [table, rows] of validated) {
+                await this.#backend.write(table, rows);
+            }
+        } catch (err) {
+            await this.#backend.clearAll();
+            throw err;
+        }
+    }
 }

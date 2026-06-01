@@ -5,8 +5,6 @@ import type {
     RecordAttributeId,
 } from '../../api/types.ts';
 import {
-    DEFAULT_NODE_DESCRIPTION,
-    DEFAULT_EDGE_DESCRIPTION,
     DEFAULT_NODE_ATTRIBUTES,
     DEFAULT_NODE_WORKER_IDS,
 } from '../../api/types.ts';
@@ -120,8 +118,6 @@ export function applyAddNode(
         {
             id: nodeId,
             name,
-            description:
-                DEFAULT_NODE_DESCRIPTION,
             positionX,
             positionY,
             isCreate: false,
@@ -148,8 +144,6 @@ export function applyAddEdge(
         {
             id: edgeId,
             name,
-            description:
-                DEFAULT_EDGE_DESCRIPTION,
             fromNodeId,
             toNodeId,
         },

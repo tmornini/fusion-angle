@@ -3,10 +3,12 @@ import { strict as assert } from 'node:assert';
 import {
     HumanWorker,
     AIWorker,
-    type HumanWorkerEntity,
-    type AIWorkerEntity,
     type Worker,
 } from '../api/types.ts';
+import {
+    makeHumanWorker,
+    makeAIWorker,
+} from './worker-fixtures.ts';
 
 // The worker presenter transitively imports state.ts
 // (via core.ts), which reads from localStorage and
@@ -67,34 +69,14 @@ function makeHuman(
     first: string,
     last: string = 'Smith',
 ): HumanWorker {
-    const entity: HumanWorkerEntity = {
-        id,
-        first_name: first,
-        last_name: last,
-        email:
-            `${first}@example.com`.toLowerCase(),
-        title: 'Engineer',
-        department: 'Product',
-        strengths: '[]' as never,
-        team_dimensions: '{}' as never,
-        phone: '',
-        bio: '',
-    };
-    return new HumanWorker(entity, 'active');
+    return makeHumanWorker(id, `${first} ${last}`);
 }
 
 function makeAI(
     id: string,
     name: string,
 ): AIWorker {
-    const entity: AIWorkerEntity = {
-        id,
-        name,
-        provider: 'Anthropic',
-        description: 'test',
-        auth_token: 'sk-test-token-12345',
-    };
-    return new AIWorker(entity);
+    return makeAIWorker(id, name);
 }
 
 function htmlOf(

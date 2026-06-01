@@ -162,13 +162,32 @@ to every tab, cross-boundary assertions use `≥ N` or
 framing rather than frozen expected values. Agent-CH's dashboard
 count checks are non-zero + consistency, not numeric equality.
 
+**Shared states-log write hazard.** The mutation domains above
+partition the *entity* tables, but the append-only `states` log
+is written by several agents at once — Agent-D (idea lifecycle),
+Agent-E (project lifecycle), Agent-G (worker lifecycle), and
+Agent-F2 (work-order transitions and claims) all append to the
+one `fusion-ai:states` key. The per-tab store serializer orders
+writes only *within* one tab, so two agents appending
+concurrently can lose an event (both read the same version; the
+second `setItem` overwrites the first). Treat the states log as
+a shared-write hazard: serialize state-mutating steps across
+agents where it matters, and re-read tolerantly (`≥ N`) rather
+than asserting exact event counts. The structural fix (a
+browser-mediated lock, or the Postgres tier) is tracked in
+CLAUDE.md § Gotchas — "Cross-tab writes to the states log can
+lose updates".
+
 #### Known MCP limitations
 
 - **Flow designer gestures** (port drag, shift-drag to connect,
   marquee select): synthetic PointerEvents do not reliably
   drive the `flow-interactions.ts` state machines because they
   use pointer-capture semantics. Affected tests include
-  AA27–AA34, F15, F19–F23, D36, D37, E11. Work around by
+  AA27–AA34, F15, F19–F23, E11 (the idea-list drag-reorder,
+  D36/D37, uses native HTML5 drag-and-drop on the
+  `.drag-handle` — NOT pointer-capture — so it is driveable
+  and exempt from this limitation). Work around by
   validating end-state via direct JSON injection into
   `fusion-ai:flows`, then reloading and verifying render. When
   the injection succeeds and the SVG renders the expected end
@@ -179,6 +198,12 @@ count checks are non-zero + consistency, not numeric equality.
 - **`resize_window`** does not change the CSS viewport;
   responsive tests at specific widths (I10) cannot be driven.
   Inspect `responsive.css` manually to verify media queries.
+- **`prefers-reduced-motion`** cannot be emulated via the MCP;
+  the behavioral tier of the reduced-motion view-transition
+  test (I30) cannot be driven. Verify by source instead:
+  confirm the `::view-transition-*` neutralizing rule in
+  `base.css` / `responsive.css` (PASS = rule present). Observe
+  true suppression manually with OS reduced-motion enabled.
 - **File downloads** cannot write to disk from the MCP
   sandbox. Capture Blob content via `javascript_tool`
   intercepting `URL.createObjectURL` for validation.
@@ -253,10 +278,10 @@ last (they wipe the database). See `CLAUDE.md` section
 | FS. Flow Statistics | 9 |
 | G. Admin Pages | 27 |
 | H. Reference & System | 2 |
-| I. Cross-Cutting Concerns | 28 |
+| I. Cross-Cutting Concerns | 30 |
 | J. Teardown | 3 |
 | K. Objectives & Scoring | 30 |
-| **Total** | **324** |
+| **Total** | **326** |
 
 ### Combined Totals (CLI + Browser)
 
@@ -265,9 +290,9 @@ only. Combined with the CLI automated suite:
 
 | Layer                  | Cases    |
 |------------------------|---------:|
-| CLI automated tests    |      837 |
-| Browser regression     |      324 |
-| **Combined TOTAL**     | **1161** |
+| CLI automated tests    |      984 |
+| Browser regression     |      326 |
+| **Combined TOTAL**     | **1310** |
 
 CLI count = most recent `./validate` (AT2) report; the number
 grows as tests land in `tests/*.test.ts`. Browser count = the
@@ -287,8 +312,8 @@ Format` at the bottom of this file):
 | pending  | Default (`- [ ]`); not yet executed  |  n/a   |
 
 A fully green run reports:
-`PASS = 1161, FAIL = 0, BLOCKED ≤ k, DEFERRED ≤ j, DRIFT = 0`,
-where the six status counts sum to **Combined TOTAL** (1161).
+`PASS = 1310, FAIL = 0, BLOCKED ≤ k, DEFERRED ≤ j, DRIFT = 0`,
+where the six status counts sum to **Combined TOTAL** (1310).
 `BLOCKED ≠ FAIL` and `DRIFT ≠ FAIL` — only `FAIL` indicates a
 regression.
 
@@ -333,7 +358,7 @@ on. Run these in order.
 - [ ] **AA4** Navigate to Workers (sidebar). Click "+ Add
   Worker". PASS: dialog opens with a Kind toggle (Human /
   AI, Human selected by default), a Human form below
-  showing First Name, Last Name, Email, Title, Department,
+  showing Name, Email, Title, Department,
   Phone, Bio, and an AI form (hidden by default) with
   Name, Provider, Description, and a required Auth Token
   password input plus a yellow security warning beginning
@@ -365,8 +390,8 @@ on. Run these in order.
 - [ ] **AA8** On Workers, click the current user's row.
   PASS: navigates to `worker-detail` for that human. Read
   mode shows avatar, name, status badge, title ·
-  department subtitle, Personal Information card (First
-  Name, Last Name, Email, Phone, Title, Department, Bio),
+  department subtitle, Personal Information card (Name,
+  Email, Phone, Title, Department, Bio),
   Working Styles card, and Strengths card.
 - [ ] **AA8a** From the Workers list, click any AI
   worker's row. PASS: navigates to `worker-detail` for
@@ -421,14 +446,14 @@ on. Run these in order.
 - [ ] **AA18** On Ideas list, filter by "In Review". Click idea #1. PASS: navigates to idea detail with approval footer.
 - [ ] **AA19** Click "Approve". PASS: idea status changes to approved, confirmation shown.
 - [ ] **AA20** Approve idea #4 as well (it was submitted for review in AA16). Leave others in their current status. PASS: statuses match mock data (2 approved, rest in-review/active).
-- [ ] **AA21** Navigate to approved idea #1. Click "Convert". PASS: conversion form loads with 4 required fields (Project Name, Time (days), Cost, Impact) and an optional Success Criteria field.
-- [ ] **AA22** Fill all 4 required fields: Project Name, Time (days), Cost, Impact. Optionally fill Success Criteria. Click "Create Project". PASS: navigates to project detail for the new project.
-- [ ] **AA23** On project detail, click "Edit". Set fields (title, description, status, start date, end date, cost baseline, impact baseline) to match mock data. Save. PASS: project data persists.
+- [ ] **AA21** Navigate to approved idea #1. Click "Convert". PASS: conversion form loads with 4 required fields (Project Name, Time (days), Cost, Success Criteria) — there is no Impact field — plus a Scores box holding one required baseline slider per active objective.
+- [ ] **AA22** Fill the 4 required fields (Project Name, Time (days), Cost, Success Criteria) and drag every objective baseline slider in the Scores box. PASS: Create Project stays disabled until all required fields AND all baselines are set, then enables; clicking it navigates to project detail for the new project (the baselines commit atomically with project creation).
+- [ ] **AA23** On project detail, click "Edit". Set fields (title, description, status, start date, end date, cost baseline) to match mock data. Save. PASS: project data persists. (Impact is no longer a directly-editable field — it is derived read-only from the objective baseline scores.)
 - [ ] **AA24** Approve remaining ideas (7, 8, 9, 10) from Ideas list (filter by "In Review"), then convert all 6 approved ideas to projects. PASS: Projects list shows all 6 with correct status and progress.
 
 ### AA8. Score and Approve Projects
 
-- [ ] **AA24a** From the Projects list, click into project #1 (the first converted project, status `submitted`). Click Edit, change Status to `under-review`, Save. PASS: toast confirms; action bar re-renders with a Score button. Click Score. PASS: modal opens with one slider per active objective (4 sliders against the AA-Obj baseline). Drag every slider to a non-zero value; click Save baselines. PASS: modal closes; the read-only Objectives section shows 4 baseline-scored rows; the Approve button enables. Click Approve; confirm. PASS: status flips to `approved`; the action bar re-renders with `Log measurement` / `Complete` / `View history` buttons. The project is now eligible for the New Flow gate in AA25. (Codifies the post-commit `82f0d72 state-gate project scoring sliders` workflow that AA25 depends on; without scoring and approving, projects remain at `submitted` and the New Flow button stays hidden behind the `Approve to add flows` info badge.)
+- [ ] **AA24a** From the Projects list, click into project #1 (the first converted project, status `submitted`). Click Edit, change Status to `under-review`, Save. PASS: toast confirms. The objectives section's baseline sliders are now editable INLINE (no Score button, no modal); because this project was converted through the UI its baselines were committed at convert time, so the Approve button is already enabled. (To exercise the unscored→score flow, use a project created WITHOUT baselines: move each baseline slider off its initial value and click Save, watching Approve enable only once every objective is scored.) Click Approve; confirm. PASS: status flips to `approved`; the action bar re-renders with `Archive` / `View history`, and the per-objective actual sliders become editable. The project is now eligible for the New Flow gate in AA25. (Without approving, projects remain at `submitted` and the New Flow button stays hidden behind the `Approve to add flows` info badge.)
 
 ### AA9. Create Flows
 
@@ -630,9 +655,9 @@ on. Run these in order.
 
 - [ ] **C1** Navigate to `dashboard/`. PASS: page loads with sidebar, header, and main content area.
 - [ ] **C2** Sidebar shows flat navigation
-  links in this order: Dashboard, Ideas,
-  Projects, Flows, Records, Workbox,
-  Organization, Workers, Billing, Snapshots,
+  links in this order: Dashboard,
+  Organization, Ideas, Projects, Records,
+  Flows, Workbox, Workers, Billing, Snapshots,
   Design System. PASS: all 11 links present,
   in order, and styled. Source of truth:
   `PAGE_REGISTRY` (entries with
@@ -647,24 +672,30 @@ on. Run these in order.
 - [ ] **C3** Header shows search bar, greeting
   ("Good {morning/afternoon/evening}, Tony
   Stark" — varies by time of day), company
-  stats ("Stark Industries · 11 Ideas ·
-  6 Projects · 1 Flows"), and theme toggle.
-  PASS: elements visible and styled.
-- [ ] **C4** Dashboard renders 4 surfaces in order: Time
-  gauge, Cost gauge, Portfolio Impact card (bipolar arc,
-  post-b2c0684), Aggregate Objectives box (full-width row
-  below, post-b2c0684). PASS: all 4 render with baseline
-  and current values; the 2 gauges show concentric arcs;
-  the Portfolio Impact card shows its bipolar arc; the
-  Aggregates box shows per-objective rows.
+  stats ("Stark Industries · N Ideas ·
+  M Projects · K Flows" — the counts track the
+  current working data and change as you create
+  or convert, so don't assert exact numbers),
+  and theme toggle. PASS: elements visible and
+  styled.
+- [ ] **C4** Dashboard renders 4 surfaces in order: three
+  visually-equivalent arc-gauge cards (Time, Cost, Portfolio
+  Impact — each a bipolar arc; not "2 gauges + a distinct
+  card") and a full-width Aggregate Objectives box below.
+  PASS: all 4 render with baseline and current values; each
+  top card shows its bipolar arc; the Objectives box shows
+  one row per objective, each with a small bipolar arc gauge
+  and a sparkline trendline.
 - [ ] **C5** Sidebar navigation links all function correctly. PASS: clicking a sidebar link navigates to the expected page.
 - [ ] **C6** Scroll the page. PASS: sidebar stays fixed, main content scrolls independently.
 - [ ] **C7** Check that seed data populates all 4 dashboard
-  surfaces (2 gauges + Portfolio Impact card + Aggregate
-  Objectives box). PASS: no "No data" empty states on
-  initial load against the Phase 1 baseline (12 humans —
-  10 created + Tony Stark + System Worker bootstrap,
-  4 AIs, 11 ideas, 6 projects, 1 flow, 4 objectives).
+  surfaces (three arc-gauge cards + Aggregate Objectives
+  box). PASS: no "No data" empty states on a fresh
+  mock-data load against the Phase 1 baseline (11 humans —
+  10 created + Tony Stark; the System worker authors seed
+  events but is excluded from the roster — 4 AIs, 11
+  ideas, 6 projects, 1 flow, 4 objectives; these are the
+  fresh-load seed counts and grow as you create).
 
 ---
 
@@ -673,10 +704,7 @@ on. Run these in order.
 ### Ideas List (`ideas/`)
 
 - [ ] **D1** Navigate to `ideas/`. PASS: list shows 11 ideas as cards, each with a drag-handle grip, title, status badge, and (for approved ideas) a Convert button. Ideas represent the problem-and-proposed-solution shape and do not carry time/cost/impact estimates; those fields live on projects created by conversion.
-- [ ] **D2** Each idea row shows a status badge
-  (Active, In Review, Approved, Promoted, Sent
-  Back, or Archived). PASS: badges render with
-  distinct colors.
+- [ ] **D2** Each idea row shows a lifecycle status badge (Active, In Review, Approved, Promoted, Sent Back, or Archived) AND a separate readiness pill (Ready or Incomplete) derived from required-field presence. PASS: both render with distinct colors.
 - [ ] **D3** Click an idea row/title. PASS: navigates to the idea's detail or scoring page with the correct `ideaId` parameter.
 - [ ] **D4** "New Idea" or "Create Idea" button is visible. PASS: clicking it navigates to `ideas/create.html`.
 
@@ -690,9 +718,9 @@ on. Run these in order.
 - [ ] **D8** Click "Submit Idea". PASS: navigates to `ideas/index.html`.
 - [ ] **D9** Click "Cancel". PASS: navigates to `ideas/` list.
 
-### Idea Detail (`ideas/detail.html?ideaId=1`)
+### Idea Detail (`ideas/detail.html?ideaId=<id>`)
 
-- [ ] **D10** Navigate to `ideas/detail.html?ideaId=1`. PASS: page loads with idea title, status badge, and "Submitted by [name] @ [date/time]" in the header.
+- [ ] **D10** Navigate to `ideas/detail.html?ideaId=<id>` (a real base62 id from the Ideas list). PASS: page loads with idea title, status badge, and "Submitted by [name] @ [date/time]" in the header.
 - [ ] **D11** Page displays one card: Problem & Solution (Problem Statement,
   Target Users, Proposed Solution, Expected
   Outcome, Success Metrics). PASS: all fields populated. No Details or Estimates cards.
@@ -721,9 +749,9 @@ on. Run these in order.
 
 ### Idea Convert (`ideas/convert.html`)
 
-- [ ] **D22** Navigate to `ideas/convert.html?ideaId=<id>` for a convertible idea. PASS: page loads with conversion form showing 4 required fields: Project Name, Time (days), Cost, Impact. A 5th field "Success Criteria" is also present but optional (it maps to the project description). Sticky sidebar shows "Problem & Solution" with title, problem, solution, and expected outcome. Source of truth: `REQUIRED_FIELDS` in `web-app/app/presenters/idea-conversion.ts`.
-- [ ] **D23** With required fields empty, "Create Project" button is disabled and progress bar shows 0/4. Fill fields one at a time. PASS: progress bar increments with each required field, checkmarks appear next to completed fields, button enables only when all 4 required fields are filled. Typing in the optional "Success Criteria" field does NOT advance the progress bar or enable the button.
-- [ ] **D24** Fill all required fields (progress bar reaches 100%), click "Create Project". PASS: navigates to project detail page for the newly created project.
+- [ ] **D22** Navigate to `ideas/convert.html?ideaId=<id>` for a convertible idea. PASS: page loads with conversion form showing 4 required fields: Project Name, Time (days), Cost, Success Criteria (it maps to the project description). There is no Impact field. A Scores box renders one required baseline slider per active objective. Sticky sidebar shows the idea summary (Title, Problem Statement, Target Users, Proposed Solution, Expected Outcome, Success Metrics). Source of truth: `REQUIRED_FIELDS` in `web-app/app/presenters/idea-conversion.ts`.
+- [ ] **D23** With required fields empty, "Create Project" is disabled and the progress bar shows 0/N where N = 4 + one per active objective (e.g. 0/8 with 4 objectives). Fill fields and drag baseline sliders one at a time. PASS: the bar increments with each required field AND each baseline, checkmarks appear next to completed items, and the button enables only when all required fields AND all baselines are set. Success Criteria is required — filling it advances the bar.
+- [ ] **D24** Fill every required field and baseline (the progress bar reaches its max, e.g. 8/8), click "Create Project". PASS: navigates to project detail page for the newly created project.
 
 ### Idea Status Filtering (`ideas/index.html`)
 
@@ -734,7 +762,7 @@ on. Run these in order.
 
 ### Idea Detail — Approval Actions
 
-- [ ] **D29** Navigate to `ideas/detail.html?ideaId=7` (in-review idea). PASS: page loads with idea details and sticky approval footer showing Send Back / Approve.
+- [ ] **D29** Navigate to `ideas/detail.html?ideaId=<id>` for an in-review idea (entity ids are base62 tokens, not sequential integers — copy a real id from the Ideas list). PASS: page loads with idea details and sticky approval footer showing Send Back / Approve.
 - [ ] **D30** Click "Approve". PASS: success toast, navigates to ideas list, idea status is now "approved".
 - [ ] **D31** Click "Send Back". PASS: confirm dialog opens. Confirm. PASS: idea status changes to "sent-back", navigates to ideas list.
 - [ ] **D32** Navigate to idea detail for a non-in-review idea. PASS: no approval footer is shown.
@@ -813,11 +841,13 @@ on. Run these in order.
 ### Flow List (`flows/`)
 
 - [ ] **F1** Navigate to `flows/`. PASS: page shows
-  flow cards with name, description, project
-  name badge, and state/transition counts.
-- [ ] **F2** Type in the search input (if present).
-  PASS: filters flow cards by name or
-  description in real-time.
+  flow cards with name, project name badge, and
+  state/transition counts.
+- [ ] **F2** Type in the flow-list search input. PASS:
+  filters flow cards by name in real-time. NOTE:
+  `flows/index.html` currently renders no flow-list filter
+  input — this case is vacuously satisfied (N/A) until one
+  is added.
 - [ ] **F3** Click a flow card. PASS: navigates
   to `flows/detail.html?flowId=<id>`.
 
@@ -893,8 +923,8 @@ opens and renders.)
   the right (regular nodes only — Create/Archive
   nodes still show their kind title), then a
   Workers fieldset (HUMANS / AIs checkbox
-  groups), then state name, description, form
-  attributes list, and outgoing transitions.
+  groups), then state name, form attributes
+  list, and outgoing transitions.
   (Properties panel double-click is BLOCKED per the
   MCP pointer-capture limitation; validate end-state
   via direct JSON injection into `fusion-ai:flows`
@@ -1010,9 +1040,8 @@ opens and renders.)
   and required toggles plus a remove control.
 - [ ] **F26** Click an edge to select it (gold glow).
   Double-click to open properties panel. PASS:
-  panel shows transition name, description,
-  from/to state names. Edit the name. PASS: label
-  updates on the canvas.
+  panel shows transition name, from/to state names.
+  Edit the name. PASS: label updates on the canvas.
 - [ ] **F27** Select a non-start/non-complete node,
   click the Delete (trash) button in toolbar.
   PASS: node and all connected edges are removed.
@@ -1210,7 +1239,7 @@ states, and that the canvas re-renders after each step.)
 - [ ] **F67** Tick one checkbox in the Workers fieldset,
   then press Cmd+Z (Mac) / Ctrl+Z (Win/Linux). PASS: the
   checkbox unticks — `workerIds` changes are undoable
-  like name/description changes.
+  like name changes.
 
 ### Attribute Editor (Node Panel)
 
@@ -1273,6 +1302,7 @@ states, and that the canvas re-renders after each step.)
   read the *content-area* clientWidth, not the
   full viewport — the global sidebar does not
   steal canvas space.
+- [ ] **F75** Open a flow whose layout routes edges beyond the node bounding box — the seeded "Layout Test: Proposal Review Cycle" is one (its long back-edges arc above the top row and dip well below the bottom row) — with Auto Fit on. PASS: the whole graph, including the edge curves and waypoints that bow past the outermost nodes, sits inside the canvas with margin; nothing clips at any edge (the prior bug sliced the bottom routing). Then toggle Auto Fit off then on, add then delete an edge, and undo. PASS: every re-fit re-frames the full *drawn* content (curves included), never just the node rectangles — the camera measures the rendered SVG (`.flow-content` `getBBox`), not node positions.
 
 ---
 
@@ -1544,19 +1574,21 @@ the claude-in-chrome MCP.
   page wears the standard sidebar + top-bar layout. Shows
   the page header "Organization", a General Information
   card at the top with read-only Organization Name and
-  Domain plus an Edit button, then the overview card
-  (plan info, health badge, seats stats), the Usage
-  Overview card with progress bars, and the Security &
-  Administration card linking to Workers and Billing.
-  (Overview gauge values are hardcoded placeholders —
-  verify the page renders without error; numeric accuracy
-  will be addressed when wired to live tables.)
+  Domain plus an Edit button, then the Overview card (org
+  identity plus a four-cell stat grid: Active People,
+  Projects, Ideas, Next Billing — no health badge), and
+  the Usage Overview card with progress bars. There is no
+  longer a Security & Administration card — Workers and
+  Billing are reached from the sidebar. (Overview/usage
+  values are placeholders — verify the page renders
+  without error; numeric accuracy arrives when wired to
+  live tables.)
 - [ ] **G10** In the General Information card, click Edit.
   PASS: page header swaps Edit for Save/Cancel; the card
   body switches the read-only fields to two inputs
   prefilled with the current Organization Name and Domain.
-  Health score (92, "excellent") still renders in the
-  overview card below.
+  (There is no health score — the retired 92/"excellent"
+  badge has been removed.)
 
 ### Workers list (`workers/index.html`)
 
@@ -1603,14 +1635,14 @@ the claude-in-chrome MCP.
   worker's row. PASS: navigates to `worker-detail`. Read
   mode shows avatar (initials), name + status badge,
   title · department subtitle, Personal Information card
-  (First Name, Last Name, Email, Phone, Title, Department,
+  (Name, Email, Phone, Title, Department,
   Bio), Working Styles card (4-axis dimensions surfaced
   under presentation labels Mover / Shaker / Prover /
   Maker, backed by data keys `driver` / `analytical` /
   `expressive` / `amiable`), and Strengths card.
 - [ ] **G20** Click Edit. PASS: header swaps Edit for
   Cancel/Save; Personal Information card switches to
-  inputs (First/Last Name text, Email email-input, Phone
+  inputs (Name text, Email email-input, Phone
   text, Title text, Department select, State select with
   HTML id `worker-state` per the `WORKER_STATES`
   alphabet, Bio textarea); Strengths card switches to a
@@ -1671,15 +1703,17 @@ restored data.)
 - [ ] **G32** Click "Create Pristine Environment", confirm
   the dialog. PASS: redirects to `dashboard/index.html`.
   Dashboard renders with zeroed-out metrics (empty
-  database except for bootstrap seed). Every table in
-  `TABLE_NAMES` is present as an empty array EXCEPT
-  `fusion-ai:workers` (holds System Worker + Tony Stark),
-  `fusion-ai:organization` (holds Stark Industries),
-  `fusion-ai:records` (2 seeded shapes: Customer
-  Profile, Project Brief), `fusion-ai:record_attributes`
-  (14 bootstrap attributes across both record shapes),
-  and `fusion-ai:states` (bootstrap state events for the
-  seeded entities). Source of truth:
+  database except for the required bootstrap seed). Every
+  table in `TABLE_NAMES` is present as an empty array
+  EXCEPT `fusion-ai:workers` (parent rows for the System
+  worker, `type` 'system', and Tony Stark, `type`
+  'human'), `fusion-ai:human_workers` (Tony Stark's
+  detail row), `fusion-ai:organization` (Stark
+  Industries), and `fusion-ai:states` (bootstrap state
+  events for those rows). NOTE: pristine seeds NO Records
+  — `fusion-ai:records` and `fusion-ai:record_attributes`
+  are empty like every other non-essential table. Source
+  of truth:
   `populateBootstrapData` in `api/mock-data.ts`. Empty
   `flow_versions` and other tables appear as `gz1:H4sI…`
   sentinels
@@ -1691,7 +1725,7 @@ restored data.)
   `api/db.ts`;
   cross-check against that. No tables outside that list
   appear under any `fusion-ai:*` key.
-- [ ] **G33** Click "Wipe and Load Mock Data". PASS: redirects to `dashboard/index.html`. Navigate to `ideas/` — 11 ideas are back.
+- [ ] **G33** Click "Wipe and Load Mock Data". PASS: the wipe fires immediately — there is no confirmation dialog — then redirects to `dashboard/index.html`. Navigate to `ideas/` — 11 ideas are back.
 - [ ] **G34** Return to `snapshots/`, wipe data, then use "Upload Snapshot" file input and select the previously downloaded JSON file. PASS: redirects to `dashboard/index.html`. Data matches the snapshot.
 
 ### Snapshot & User Lifecycle — Error/Edge Cases
@@ -1711,18 +1745,20 @@ restored data.)
   `tests/snapshot-wipe-on-fail.test.ts` — this case verifies the
   error toast/inline-error surfaces in the UI.)
 - [ ] **G36** Worker lifecycle is recorded in the `states`
-  event log via `archiveHumanWorker` / `archiveAIWorker`,
-  which write a terminal `'archived'` state event for the
-  worker's `entity_id`. The unified terminal vocabulary is
-  shared across both worker kinds per Commandment III
-  (Uniformity). Verify by inspecting `fusion-ai:states` in
-  DevTools after the operation: a row appears with
-  `entity_id` = the worker's id, `state` = `'archived'`,
-  `worker_id` = the actor, and the worker row in
+  event log. On a worker detail page (human OR AI), click
+  Edit, change the State select (active / pending /
+  archived), and Save. PASS: the chosen state is written
+  via `postHumanWorkerStateChange` /
+  `postAIWorkerStateChange` — both kinds expose the same
+  State select and share the 3-value vocabulary per
+  Commandment III (Uniformity). Verify by inspecting
+  `fusion-ai:states` in DevTools: a row appears with
+  `entity_id` = the worker's id, `state` = the chosen
+  value, `worker_id` = the actor, and the worker row in
   `workers` / `ai_workers` itself is unchanged — the
   states log carries the lifecycle stage, not a column on
-  the entity. The Archived badge text ("Archived") and
-  reduced-opacity row styling reflect the state on render.
+  the entity. After reload the worker's badge text and
+  styling reflect the persisted state.
 
 ### Billing (`billing/`) — STUB
 
@@ -1833,6 +1869,11 @@ feature is implemented.
   reload (cross-tab sync via StorageEvent on
   `fusion-sidebar-collapsed`).
 
+### Accessibility
+
+- [ ] **I29 — Skip link & `<main>` landmark** From a fresh load of any sidebar-layout page, press `Tab` once. PASS: the first focusable element is a "Skip to content" link (visually hidden until focused via the `.sr-only` pattern in `components-feedback.css`); pressing `Enter` moves focus past the sidebar and top-bar into the page body. Then confirm via `read_page`/`javascript_tool` that the content wrapper is a `<main id="main-content">` landmark (not a bare `<div class="page-content">`) and that the composed shell (`web-app/app/components-layout.html`) contains exactly one `<main>`. `Tab`/keyboard is MCP-driveable (see I15), so this is a PASS/FAIL case — not BLOCKED. Guards WCAG 2.4.1 Bypass Blocks (Level A).
+- [ ] **I30 — Reduced-motion view-transition guard** (behavioral drive BLOCKED — `prefers-reduced-motion` cannot be emulated via the MCP, the same class of limit as `resize_window`/I10). Structural verification is authoritative and PASS-able: read the `@media (prefers-reduced-motion: reduce)` block in `responsive.css` and the `::view-transition-*` rules in `base.css`, and confirm a rule neutralizes the page-content transition under reduced motion (e.g. `::view-transition-group(*)` / `::view-transition-old/new(*)` set `animation: none`) — the universal `*, *::before, *::after` reset does NOT reach view-transition pseudo-elements, which live in a separate tree rooted at `::view-transition`. PASS = the neutralizing rule is present and well-formed. Behavioral tier (BLOCKED): confirming `fade-in-up`'s `translateY` slide (`utilities.css:271`) is actually suppressed on navigation requires a human with OS-level reduced-motion enabled. Guards WCAG 2.3.3 Animation from Interactions (AAA).
+
 ---
 
 ## K. Objectives & Scoring
@@ -1893,83 +1934,105 @@ to the Organization page. PASS if the empty-state copy
 existing missing-schema rule). Restore via mock data
 afterward.
 
-### K9–K18 — Project detail action bar + Score + Approve (Agent-E)
+### K9–K18 — Project detail: inline scoring + Approve (Agent-E)
 
-**K9.** Open a `submitted` project; confirm action bar shows
-the existing buttons (no Score yet — until status is
-under-review).
+The Score and Log-measurement MODALS are retired. Baseline
+and actual scores are edited INLINE in
+`#project-objectives-section`: each `.project-objective-row`
+carries a `.baseline-slider` and an `.actual-slider`,
+enabled/disabled by project state, with one shared `Save`
+(`data-action="save-objectives"`) button that enables only
+when a slider moves off its `data-initial-value`. Precondition
+note (TALLY.7): a project converted through the UI arrives at
+`submitted` ALREADY baseline-scored (convert requires a
+baseline per active objective), so to exercise the
+unscored→score→approve path you need a project created
+WITHOUT baselines (converted when no objectives existed, or
+seeded directly).
+
+**K9.** Open a `submitted` project; confirm the action bar
+shows Edit / View history and the objective rows' baseline
+sliders are disabled (not editable until under-review).
 
 **K10.** Transition status to `under-review` via the edit
-form. PASS if `Score` button appears in the action bar.
+form. PASS if the baseline sliders become editable inline —
+there is NO Score button and NO modal.
 
-**K11.** Click `Approve`; PASS if disabled with tooltip
-listing specific unscored objective names (e.g.
-"ObjName1, ObjName2 unscored"); count-only form
-("N objectives unscored") is also acceptable when names
-exceed readable length.
+**K11.** With baselines unscored, the `Approve` button is
+disabled with a tooltip listing specific unscored objective
+names ("ObjName1, ObjName2 unscored"); count-only form
+("N objectives unscored") is acceptable when names exceed
+readable length. The convert-time gating STILL HOLDS even
+though the modal is gone.
 
-**K12.** Click `Score`; PASS if modal opens with one slider
-per active objective, all rendering visibly unset with
-"Score required" hint.
+**K12.** Inspect the objective rows; PASS if each shows a
+baseline slider inline in the section (no modal opens), at
+its current or unset value.
 
-**K13.** Drag two of the sliders to non-zero values; click
-Save baselines. PASS if modal closes and the read-only
-Objectives section on the page shows two baseline-scored
-rows; Approve button **still** disabled because remaining
-objectives unscored.
+**K13.** Drag two baseline sliders to non-zero values; PASS
+if the shared `Save` button enables (dirty-tracked). Click
+Save. PASS if the rows show the saved baselines and Approve
+is **still** disabled because remaining objectives are
+unscored.
 
-**K14.** Reopen Score modal; PASS if previously-set sliders
-are pre-filled with their values; un-set sliders remain
-visibly unset.
+**K14.** After save, PASS if the moved sliders' `Save`
+button disables again (each slider's `data-initial-value`
+resets to the saved value) and saved values persist on
+re-render.
 
-**K15.** Drag remaining sliders; save. PASS if Approve
-button enables.
+**K15.** Drag the remaining baseline sliders; Save. PASS if
+the Approve button enables once every active objective has a
+baseline.
 
 **K16.** Click Approve; confirm dialog opens. Confirm. PASS
-if project status flips to `approved` and the action bar
-re-renders with `Log measurement` / `Complete` / `View
-history` buttons.
+if status flips to `approved` and the action bar re-renders
+with `Archive` / `View history`; the row `.actual-slider`s
+become editable inline.
 
-**K17.** Verify negative-score path: open a different
-under-review project; in Score modal, drag one slider to
-the far left (-100). Save. PASS if the project history
-modal (open via View history later, once approved) shows
-the negative score in red.
+**K17.** Negative-score path: on an under-review project,
+drag a baseline slider to the far left (-100). Save. PASS if
+the saved value renders in red and View history (once
+approved) shows the negative score.
 
-**K18.** Verify "no-payload" save: open Score modal on a
-fully-scored project; don't move any slider; click Save
-baselines. PASS if no new event rows are written (verify
-via console: `localStorage.getItem(
-'fusion-ai:project_objective_baseline_scores')` count
-unchanged).
+**K18.** "No-payload" save: with no slider moved off its
+`data-initial-value`, the `Save` button stays disabled and
+no new rows are written to
+`fusion-ai:project_objective_baseline_scores` (count
+unchanged via console).
 
-### K19–K23 — Log measurement + Complete (Agent-E)
+### K19–K23 — Inline actual measurement + Archive (Agent-E)
 
-**K19.** Open an `approved` project; click `Log measurement`;
-PASS if modal opens with sliders pre-filled with baseline
-values (no prior actuals) and a caption "Baseline: X · Last
-actual: none yet."
+**K19.** Open an `approved` project; PASS if the objective
+rows' `.actual-slider`s are editable inline (there is no Log
+measurement modal), pre-filled from the latest actual or
+from the baseline when no actual exists yet.
 
-**K20.** Drag one slider; click Save measurement. PASS if
-the modal closes and the read-only Objectives section's
-actual column updates for that objective.
+**K20.** Drag one actual slider; click `Save`. PASS if the
+row's actual value updates (persisted via
+`postProjectActualMeasurement`) and the Save button
+re-disables.
 
-**K21.** Click Log measurement again; PASS if the moved
-slider now pre-fills with its latest actual value, caption
-shows "Last actual: ... (date)."
+**K21.** Re-render the page; PASS if the moved actual slider
+pre-fills with its latest actual value.
 
-**K22.** Click Complete on an approved project that lacks
-actuals for some objectives; PASS if button is disabled
-with tooltip listing missing objectives.
+**K22.** The terminal action is `Archive`, not "Complete",
+and the terminal state is `archived`, not `completed` —
+there is no `completed` value in `PROJECT_STATES`. Click
+Archive; PASS if a confirmation dialog opens.
 
-**K23.** Log measurements for every objective; click
-Complete; confirm. PASS if status flips to `completed`.
+**K23.** Confirm the archive. PASS if status flips to
+`archived` and the action bar reflects the archived
+project.
 
 ### K24–K26 — Projects list Projected Impact column (Agent-E)
 
-**K24.** Open Projects list; PASS if new column "Projected
-Impact" renders for each row. Pre-approval projects with
-no scores show "—"; scored projects show signed value.
+**K24.** Open Projects list; PASS if the Projected Impact
+column renders a value for each row — unscored / pre-approval
+projects show "—"; scored projects show a signed value.
+NOTE: the column header carries no visible text label (the
+"Projected Impact" name is not rendered in the header row),
+so identify the column by its position/content, not header
+text.
 
 **K25.** Sort by Projected Impact descending; PASS if rows
 re-order accordingly (most-positive first).
@@ -1980,9 +2043,10 @@ ranked by impact" workflow we designed.
 
 ### K27–K29 — Dashboard Portfolio Impact + Aggregates (Agent-CH)
 
-**K27.** Open dashboard; PASS if four cards render: Time,
-Cost, Portfolio Impact (new bipolar arc), Aggregate
-Objectives box (new full-width row below).
+**K27.** Open dashboard; PASS if four surfaces render: three
+visually-equivalent bipolar arc-gauge cards (Time, Cost,
+Portfolio Impact) and an Aggregate Objectives box
+(full-width row below).
 
 **K28.** Inspect the Portfolio Impact gauge. PASS if:
 - The arc has muted background visible at all values
@@ -2038,8 +2102,9 @@ panel, and the property-test gate.
 - [ ] **R1** Sidebar shows a Records entry; click navigates
   to `records/`. PASS: list page renders ≥2 seeded Records
   (Customer Profile, Project Brief).
-- [ ] **R2** Click "+ Add Record" → dialog opens with Name
-  and Description fields. Type values, click Create.
+- [ ] **R2** Click "+ Add Record" → navigates to a create
+  page (`records/create.html`) with Name and Description
+  fields (not a dialog). Type values, click Create.
   PASS: new Record appears at the top of the list and the
   app navigates to its detail page.
 - [ ] **R3** Open Customer Profile detail. PASS: read mode
@@ -2078,9 +2143,13 @@ panel, and the property-test gate.
   lists unreferenced attributes only.
 - [ ] **R13** From workbox, open the gate-violation work
   order (`#gate0001`). PASS: current node is the Create
-  node; transition to Data Capture is blocked with a
-  violation message naming Company Name and Contact Email
-  as required.
+  node; the transition to Data Capture is blocked and a
+  violations banner appears below the attributes naming
+  Company Name and Contact Email as the required fields
+  that failed. (The banner is rendered by
+  `WorkboxDetailPresenter.buildViolations` from the typed
+  `RecordTransitionViolations` error — not a generic
+  toast.)
 - [ ] **R14** Fill the required values, transition. PASS:
   transition succeeds; the work order advances.
 - [ ] **R15** Archive a Record from its detail page (if a
@@ -2127,7 +2196,7 @@ Total: <N> cases — PASS X · BLOCKED Y · FAIL Z
 | Agent-F       | F1–F74 + FS1–FS9  |    X |       Y |    Z |
 | Agent-F2      | WB1–WB22 + subs   |   25 |       0 |    0 |
 | Agent-G       | G9–14,19–24,36–40 |    X |       0 |    0 |
-| Phase-3       | I1–I28            |    X |       Y |    Z |
+| Phase-3       | I1–I30            |    X |       Y |    Z |
 | Phase-4       | G30–G35           |    6 |       0 |    0 |
 | Teardown      | J1–J3             |    3 |       0 |    0 |
 

@@ -126,13 +126,6 @@ export async function init(
             if (nameEl) {
                 nameEl.textContent = graph.name;
             }
-            const descEl = host.querySelector(
-                '.flow-stats-flow-desc',
-            );
-            if (descEl) {
-                descEl.textContent =
-                    graph.description;
-            }
 
             const ui: FlowStatsUi = {
                 selectedPathIndex: 0,

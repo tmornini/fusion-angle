@@ -23,6 +23,7 @@ test('SnapshotTooLargeError carries sizes', () => {
 
 test('rejects file larger than half of available quota', async () => {
     const db = new MemoryDbAdapter();
+    await db.createSchema();
     const ctx = createRequestContext(db);
     const nav = navigator as unknown as {
         storage?: {

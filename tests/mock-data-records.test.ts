@@ -13,6 +13,7 @@ import {
 
 async function seeded(): Promise<MemoryDbAdapter> {
     const db = new MemoryDbAdapter();
+    await db.createSchema();
     await populateMockData(db);
     return db;
 }

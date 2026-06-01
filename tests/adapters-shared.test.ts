@@ -12,52 +12,22 @@ import {
     workerName,
 } from '../web-app/app/adapters/workers-union.ts';
 import {
-    HumanWorker,
     type Worker,
     type WorkerId,
 } from '../api/types.ts';
-
-function buildHumanWorkerRow(
-    id: string,
-    first: string,
-    last: string,
-) {
-    return {
-        id,
-        first_name: first,
-        last_name: last,
-        email: `${first}@example.com`.toLowerCase(),
-        phone: '',
-        title: 'product_manager',
-        strengths: '[]' as const,
-        team_dimensions: '{}' as const,
-        bio: '',
-        department: 'Product',
-    };
-}
-
-async function seedWorkerState(
-    db: MemoryDbAdapter,
-    workerId: string,
-): Promise<void> {
-    await db.states.record(
-        `st-${workerId}`,
-        workerId,
-        'active',
-        'system',
-    );
-}
+import {
+    makeHumanWorker,
+    seedHumanWorker,
+} from './worker-fixtures.ts';
 
 test(
-    'workerName returns fullName for known human id',
+    'workerName returns name for known human id',
     () => {
         const map = new Map<WorkerId, Worker>([
-            ['u1', new HumanWorker(
-                buildHumanWorkerRow(
-                    'u1', 'Alice', 'Adams',
-                ),
-                'active',
-            )],
+            [
+                'u1',
+                makeHumanWorker('u1', 'Alice Adams'),
+            ],
         ]);
         assert.equal(
             workerName(map, 'u1'),
@@ -78,39 +48,26 @@ test(
     'getHumanWorkerMap fetches workers via adapter',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.workers.put(
-            'u1', buildHumanWorkerRow(
-                'u1', 'Alice', 'Adams',
-            ),
-        );
-        await seedWorkerState(db, 'u1');
+        await db.createSchema();
+        await seedHumanWorker(db, 'u1', 'Alice Adams');
         const ctx = createRequestContext(db);
         const map = await getHumanWorkerMap(ctx);
         assert.equal(map.size, 1);
         assert.equal(
-            map.get('u1')?.fullName(),
+            map.get('u1')?.name(),
             'Alice Adams',
         );
     },
 );
 
-// Test removed: memoization is no longer guaranteed;
-// per-task atomicity flows from JavaScript's
-// single-threaded model.
-
 test('Fresh ctx re-fetches each call', async () => {
     const db = new MemoryDbAdapter();
-    await db.workers.put('u1', buildHumanWorkerRow(
-        'u1', 'Alice', 'Adams',
-    ));
-    await seedWorkerState(db, 'u1');
+    await db.createSchema();
+    await seedHumanWorker(db, 'u1', 'Alice Adams');
     const m1 = await getHumanWorkerMap(
         createRequestContext(db),
     );
-    await db.workers.put('u2', buildHumanWorkerRow(
-        'u2', 'Bob', 'Brown',
-    ));
-    await seedWorkerState(db, 'u2');
+    await seedHumanWorker(db, 'u2', 'Bob Brown');
     const m2 = await getHumanWorkerMap(
         createRequestContext(db),
     );
@@ -120,25 +77,20 @@ test('Fresh ctx re-fetches each call', async () => {
 });
 
 test(
-    'getCurrentHumanWorker returns HumanWorkerEntity',
+    'getCurrentHumanWorker returns the identity',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.workers.put('current', {
-            ...buildHumanWorkerRow(
-                'current', 'Alice', 'Adams',
-            ),
-        });
+        await db.createSchema();
+        await seedHumanWorker(
+            db, 'current', 'Alice Adams',
+        );
         const row = await getCurrentHumanWorker(
             createRequestContext(db),
         );
-        assert.equal(row.first_name, 'Alice');
-        assert.equal(row.last_name, 'Adams');
+        assert.equal(row.name, 'Alice Adams');
+        assert.equal(row.type, 'human');
     },
 );
-
-// Test removed: memoization is no longer guaranteed;
-// per-task atomicity flows from JavaScript's
-// single-threaded model.
 
 test(
     'RequestContext requestId is stable'
@@ -156,11 +108,3 @@ test(
         assert.ok(a.requestId.length > 0);
     },
 );
-
-// Test removed: memoization is no longer guaranteed;
-// per-task atomicity flows from JavaScript's
-// single-threaded model.
-
-// Tests removed: memoization is no longer guaranteed;
-// per-task atomicity flows from JavaScript's
-// single-threaded model.

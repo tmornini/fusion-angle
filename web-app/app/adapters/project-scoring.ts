@@ -15,6 +15,9 @@ import {
     getObjectives,
 } from './objectives.ts';
 import {
+    getCurrentHumanWorker,
+} from './workers.ts';
+import {
     getProjectStates,
 } from './state-events.ts';
 import {
@@ -258,9 +261,18 @@ export async function getObjectiveAggregates(
     return result;
 }
 
+export interface TrendPoint {
+    at: string;
+    value: number;
+}
+
+// Returns each objective's score trend: the first point
+// is its baseline (the starting reference mean, dated to
+// the last baseline edit); the rest are measured means,
+// one per distinct actual-score timestamp, in order.
 export async function getObjectiveTrendlines(
     ctx: RequestContext,
-): Promise<Map<ObjectiveId, number[]>> {
+): Promise<Map<ObjectiveId, TrendPoint[]>> {
     const [
         activeObjs,
         projectRows,
@@ -296,19 +308,25 @@ export async function getObjectiveTrendlines(
         a => approvedIds.has(a.project_id),
     );
 
-    const result = new Map<ObjectiveId, number[]>();
+    const result = new Map<ObjectiveId, TrendPoint[]>();
 
     for (const obj of activeObjs) {
+        const baselineRows = latestBaselineForApproved
+            .filter(r => r.objective_id === obj.id);
         const baselineMean = meanOrUndefined(
-            latestBaselineForApproved
-                .filter(r => r.objective_id === obj.id)
-                .map(r => r.score),
+            baselineRows.map(r => r.score),
         );
         if (baselineMean === undefined) {
             result.set(obj.id, []);
             continue;
         }
-        const points: number[] = [baselineMean];
+        const baselineAt = baselineRows.reduce(
+            (max, r) => (r.at > max ? r.at : max),
+            baselineRows[0]!.at,
+        );
+        const points: TrendPoint[] = [
+            { at: baselineAt, value: baselineMean },
+        ];
         const actualsForObj = approvedActuals
             .filter(r => r.objective_id === obj.id)
             .slice()
@@ -321,7 +339,9 @@ export async function getObjectiveTrendlines(
                 const m = meanOrUndefined(
                     Array.from(runningLatest.values()),
                 );
-                if (m !== undefined) points.push(m);
+                if (m !== undefined) {
+                    points.push({ at: pendingAt, value: m });
+                }
             }
             runningLatest.set(row.project_id, row.score);
             pendingAt = row.at;
@@ -330,7 +350,9 @@ export async function getObjectiveTrendlines(
             const m = meanOrUndefined(
                 Array.from(runningLatest.values()),
             );
-            if (m !== undefined) points.push(m);
+            if (m !== undefined) {
+                points.push({ at: pendingAt, value: m });
+            }
         }
         result.set(obj.id, points);
     }
@@ -346,6 +368,7 @@ export async function postProjectBaselineScoring(
     }>,
 ): Promise<void> {
     const at = nowUtc();
+    const worker = await getCurrentHumanWorker(ctx);
     const ops = scores.map(s => ({
         method: 'put' as const,
         resource:
@@ -355,6 +378,7 @@ export async function postProjectBaselineScoring(
             project_id: projectId,
             objective_id: s.objectiveId,
             score: s.score,
+            worker_id: worker.id,
             at,
         },
     }));
@@ -371,6 +395,7 @@ export async function postProjectActualMeasurement(
     }>,
 ): Promise<void> {
     const at = nowUtc();
+    const worker = await getCurrentHumanWorker(ctx);
     const ops = scores.map(s => ({
         method: 'put' as const,
         resource:
@@ -380,6 +405,7 @@ export async function postProjectActualMeasurement(
             project_id: projectId,
             objective_id: s.objectiveId,
             score: s.score,
+            worker_id: worker.id,
             at,
         },
     }));

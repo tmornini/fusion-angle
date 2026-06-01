@@ -725,20 +725,28 @@ function applyButtonZoom(
     };
 }
 
-export interface ZoomToFitResult {
+export interface FitBox {
+    readonly minX: number;
+    readonly minY: number;
+    readonly maxX: number;
+    readonly maxY: number;
+}
+
+export interface FitResult {
     readonly zoom: number;
     readonly viewBox: ViewBox;
 }
 
-export function zoomToFit(
+// The bounding box of every node rectangle, from
+// each node's top-left position out to + node size.
+// The first-paint provisional bounds, before the
+// rendered SVG can be measured for its true extent.
+export function nodeBoundsBox(
     nodePositions: readonly {
         x: number;
         y: number;
     }[],
-    canvasW: number,
-    canvasH: number,
-    panelOffsetPx: number,
-): ZoomToFitResult | null {
+): FitBox | null {
     if (nodePositions.length === 0) return null;
 
     let minX = Infinity;
@@ -757,14 +765,29 @@ export function zoomToFit(
         }
     }
 
+    return { minX, minY, maxX, maxY };
+}
+
+// Fit an arbitrary content box into the canvas,
+// returning the viewBox (canvas-aspect-ratio, so no
+// letterboxing) and zoom that frame it. The box is
+// whatever the content occupies — nodes alone for
+// the provisional, or the measured render for the
+// real fit. Padding absorbs stroke/marker overflow.
+export function fitBoxToCanvas(
+    box: FitBox,
+    canvasW: number,
+    canvasH: number,
+    panelOffsetPx: number,
+): FitResult {
     const contentW =
-        maxX - minX
+        box.maxX - box.minX
         + ZOOM_TO_FIT_PADDING_PX * 2;
     const contentH =
-        maxY - minY
+        box.maxY - box.minY
         + ZOOM_TO_FIT_PADDING_PX * 2;
-    const cx = (minX + maxX) / 2;
-    const cy = (minY + maxY) / 2;
+    const cx = (box.minX + box.maxX) / 2;
+    const cy = (box.minY + box.maxY) / 2;
 
     const effectiveW = canvasW - panelOffsetPx;
     const canvasAR = canvasW / canvasH;

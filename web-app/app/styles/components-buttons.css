@@ -80,6 +80,15 @@
   color: hsl(var(--secondary-foreground));
 }
 
+.btn-outline-error {
+  border: 1px solid hsl(var(--error) / 0.3);
+  background-color: transparent;
+  color: hsl(var(--error));
+}
+.btn-outline-error:hover {
+  background-color: hsl(var(--error-soft));
+}
+
 .btn-ghost {
   background-color: transparent;
   color: hsl(var(--foreground));

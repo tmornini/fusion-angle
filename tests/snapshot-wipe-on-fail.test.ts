@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import {
-    createLocalStorageAdapter,
+    LocalStorageDbAdapter,
 } from '../api/db-localstorage.ts';
 
 const KEY_PREFIX = 'fusion-ai:';
@@ -51,8 +51,7 @@ test(
         // a couple of tables have been written
         // and we want to confirm those get wiped.
         const shim = installFailingShim(3);
-        const adapter =
-            await createLocalStorageAdapter();
+        const adapter = new LocalStorageDbAdapter();
         await adapter.initialize();
 
         // Pre-populate one entry to confirm it

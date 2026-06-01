@@ -8,6 +8,7 @@ import {
     getObjectives,
     getArchivedObjectiveIds,
     getObjectiveRevisions,
+    getObjectiveArchivalEvents,
     getActiveObjectives,
     getCurrentObjectiveDefinition,
     getObjectiveDefinitionAt,
@@ -20,29 +21,18 @@ import {
 import {
     computeNewPosition,
 } from '../web-app/app/drag-reorder-positions.ts';
+import {
+    seedCurrentWorker,
+    seedHumanWorker,
+} from './worker-fixtures.ts';
 
 function ctxFor(db: MemoryDbAdapter) {
     return createRequestContext(db);
 }
 
-async function seedCurrentWorker(
-    db: MemoryDbAdapter,
-): Promise<void> {
-    await db.workers.put('current', {
-        first_name: 'Demo',
-        last_name: 'User',
-        email: 'demo@example.com',
-        phone: '',
-        title: 'Admin',
-        strengths: '[]' as never,
-        team_dimensions: '{}' as never,
-        bio: '',
-        department: 'Product',
-    });
-}
-
 test('getObjective returns a single row', async () => {
     const db = new MemoryDbAdapter();
+    await db.createSchema();
     await db.objectives.put('o1', { position: 0 });
     const ctx = ctxFor(db);
     const v = await getObjective(ctx, 'o1');
@@ -52,6 +42,7 @@ test('getObjective returns a single row', async () => {
 
 test('getObjectives returns all', async () => {
     const db = new MemoryDbAdapter();
+    await db.createSchema();
     await db.objectives.put('o1', { position: 0 });
     await db.objectives.put('o2', { position: 1 });
     const ctx = ctxFor(db);
@@ -61,6 +52,7 @@ test('getObjectives returns all', async () => {
 
 test('getArchivedObjectiveIds returns a Set', async () => {
     const db = new MemoryDbAdapter();
+    await db.createSchema();
     await db.objectives.put('o1', { position: 0 });
     await db.states.record(
         'e1', 'o1', 'archived', 'system',
@@ -71,15 +63,50 @@ test('getArchivedObjectiveIds returns a Set', async () => {
     assert.equal(ids.size, 1);
 });
 
+test('getArchivedObjectiveIds excludes an archived project',
+    async () => {
+        const db = new MemoryDbAdapter();
+        await db.createSchema();
+        await db.objectives.put('o1', { position: 0 });
+        await db.states.record(
+            'e-o1', 'o1', 'archived', 'system',
+        );
+        await db.states.record(
+            'e-p1', 'proj-1', 'archived', 'system',
+        );
+        const ctx = ctxFor(db);
+        const ids = await getArchivedObjectiveIds(ctx);
+        assert.ok(ids.has('o1'));
+        assert.ok(!ids.has('proj-1'));
+        assert.equal(ids.size, 1);
+    });
+
+test('getObjectiveArchivalEvents surfaces the actor',
+    async () => {
+        const db = new MemoryDbAdapter();
+        await db.createSchema();
+        await db.objectives.put('o1', { position: 0 });
+        await db.states.record(
+            'e1', 'o1', 'archived', 'w-sarah',
+        );
+        const ctx = ctxFor(db);
+        const events =
+            await getObjectiveArchivalEvents(ctx);
+        assert.equal(events.length, 1);
+        assert.equal(events[0]!.workerId, 'w-sarah');
+    });
+
 test('getObjectiveRevisions returns all for an objective',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         await db.objectiveRevisions.put(
             'o1:2026-05-14T00:00:00.000Z',
             {
                 objective_id: 'o1',
                 name: 'Income',
                 description: 'd',
+                worker_id: 'w1',
                 at: '2026-05-14T00:00:00.000Z',
             },
         );
@@ -89,6 +116,7 @@ test('getObjectiveRevisions returns all for an objective',
                 objective_id: 'o1',
                 name: 'Increase incomes',
                 description: 'd2',
+                worker_id: 'w1',
                 at: '2026-05-15T00:00:00.000Z',
             },
         );
@@ -98,6 +126,7 @@ test('getObjectiveRevisions returns all for an objective',
                 objective_id: 'o2',
                 name: 'Expense',
                 description: 'd',
+                worker_id: 'w1',
                 at: '2026-05-14T00:00:00.000Z',
             },
         );
@@ -112,6 +141,7 @@ test('getObjectiveRevisions returns all for an objective',
 test('getActiveObjectives filters archived',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         await db.objectives.put('o1', { position: 0 });
         await db.objectives.put('o2', { position: 1 });
         await db.states.record(
@@ -126,11 +156,13 @@ test('getActiveObjectives filters archived',
 test('getCurrentObjectiveDefinition returns latest revision',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         await db.objectiveRevisions.put(
             'o1:2026-05-14T00:00:00.000Z',
             {
                 objective_id: 'o1', name: 'Old',
                 description: 'd1',
+                worker_id: 'w1',
                 at: '2026-05-14T00:00:00.000Z',
             },
         );
@@ -139,6 +171,7 @@ test('getCurrentObjectiveDefinition returns latest revision',
             {
                 objective_id: 'o1', name: 'New',
                 description: 'd2',
+                worker_id: 'w1',
                 at: '2026-05-15T00:00:00.000Z',
             },
         );
@@ -153,11 +186,13 @@ test('getCurrentObjectiveDefinition returns latest revision',
 test('getObjectiveDefinitionAt returns historical name',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         await db.objectiveRevisions.put(
             'o1:2026-05-14T00:00:00.000Z',
             {
                 objective_id: 'o1', name: 'Old',
                 description: 'd1',
+                worker_id: 'w1',
                 at: '2026-05-14T00:00:00.000Z',
             },
         );
@@ -166,6 +201,7 @@ test('getObjectiveDefinitionAt returns historical name',
             {
                 objective_id: 'o1', name: 'New',
                 description: 'd2',
+                worker_id: 'w1',
                 at: '2026-05-15T00:00:00.000Z',
             },
         );
@@ -179,6 +215,8 @@ test('getObjectiveDefinitionAt returns historical name',
 test('postObjectiveCreation writes objective + revision',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
+        await seedCurrentWorker(db);
         const ctx = ctxFor(db);
         await postObjectiveCreation(
             ctx, 'o1', 'Income', 'Top line', 0,
@@ -188,11 +226,14 @@ test('postObjectiveCreation writes objective + revision',
         const revs = await db.objectiveRevisions.getAll();
         assert.equal(revs.length, 1);
         assert.equal(revs[0]!.name, 'Income');
+        assert.equal(revs[0]!.worker_id, 'current');
     });
 
 test('postObjectiveRevision appends a revision row',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
+        await seedCurrentWorker(db);
         const ctx = ctxFor(db);
         await postObjectiveCreation(
             ctx, 'o1', 'Income', 'd1', 0,
@@ -202,11 +243,15 @@ test('postObjectiveRevision appends a revision row',
         );
         const revs = await db.objectiveRevisions.getAll();
         assert.equal(revs.length, 2);
+        for (const r of revs) {
+            assert.equal(r.worker_id, 'current');
+        }
     });
 
 test('postObjectiveArchival archives an objective',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         await seedCurrentWorker(db);
         const ctx = ctxFor(db);
         await postObjectiveCreation(
@@ -221,6 +266,7 @@ test('postObjectiveArchival archives an objective',
 test('postObjectiveReactivation returns objective to active list',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         await seedCurrentWorker(db);
         const ctx = ctxFor(db);
         await postObjectiveCreation(
@@ -243,6 +289,7 @@ test('postObjectiveReactivation returns objective to active list',
 test('reactivation does not emit a deleted state event',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         await seedCurrentWorker(db);
         const ctx = ctxFor(db);
         await postObjectiveCreation(
@@ -261,6 +308,8 @@ test(
     + ' value without renumbering its peers',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
+        await seedCurrentWorker(db);
         const ctx = ctxFor(db);
         await postObjectiveCreation(
             ctx, 'o1', 'A', 'd', 1,
@@ -290,6 +339,8 @@ test(
     + ' renumbering anyone',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
+        await seedCurrentWorker(db);
         const ctx = ctxFor(db);
         await postObjectiveCreation(
             ctx, 'o1', 'A', 'd', 1,
@@ -329,6 +380,8 @@ test(
     + ' reorders',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
+        await seedCurrentWorker(db);
         const ctx = ctxFor(db);
         await postObjectiveCreation(
             ctx, 'o1', 'A', 'd', 1,

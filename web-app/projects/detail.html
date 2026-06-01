@@ -1,54 +1,51 @@
 <div id="project-detail-content">
 </div>
 
-<div id="project-action-bar"></div>
-<div id="project-objectives-section"></div>
-
-<!-- Score modal -->
-<div id="score-backdrop"
-    class="dialog-backdrop hidden"></div>
-<div id="score-dialog"
-    class="dialog hidden" aria-hidden="true">
-    <div id="score-modal-body"></div>
-</div>
-
-<!-- Log measurement modal -->
-<div id="measurement-backdrop"
-    class="dialog-backdrop hidden"></div>
-<div id="measurement-dialog"
-    class="dialog hidden" aria-hidden="true">
-    <div id="measurement-modal-body"></div>
-</div>
-
 <!-- Approve confirmation -->
 <div id="approve-backdrop"
     class="dialog-backdrop hidden"></div>
 <div id="approve-dialog"
-    class="dialog hidden" aria-hidden="true">
-    <h3>Confirm approval</h3>
-    <p id="approve-message"></p>
-    <div class="dialog-actions">
-        <button data-action="cancel-approve">
+    class="dialog hidden" aria-hidden="true"
+    role="dialog" aria-labelledby="approve-title">
+    <div class="dialog-header">
+        <h3 id="approve-title"
+            class="dialog-title">Confirm approval</h3>
+    </div>
+    <p id="approve-message"
+        class="text-sm text-muted"></p>
+    <div class="dialog-footer">
+        <button class="btn btn-outline"
+            data-action="cancel-approve">
             Cancel
         </button>
-        <button data-action="confirm-approve"
-            class="btn-primary">Approve</button>
+        <button class="btn btn-primary"
+            data-action="confirm-approve">
+            Approve
+        </button>
     </div>
 </div>
 
-<!-- Complete confirmation -->
-<div id="complete-backdrop"
+<!-- Archive confirmation -->
+<div id="archive-backdrop"
     class="dialog-backdrop hidden"></div>
-<div id="complete-dialog"
-    class="dialog hidden" aria-hidden="true">
-    <h3>Confirm completion</h3>
-    <p id="complete-message"></p>
-    <div class="dialog-actions">
-        <button data-action="cancel-complete">
+<div id="archive-dialog"
+    class="dialog hidden" aria-hidden="true"
+    role="dialog" aria-labelledby="archive-title">
+    <div class="dialog-header">
+        <h3 id="archive-title"
+            class="dialog-title">Confirm archival</h3>
+    </div>
+    <p id="archive-message"
+        class="text-sm text-muted"></p>
+    <div class="dialog-footer">
+        <button class="btn btn-outline"
+            data-action="cancel-archive">
             Cancel
         </button>
-        <button data-action="confirm-complete"
-            class="btn-primary">Complete</button>
+        <button class="btn btn-primary"
+            data-action="confirm-archive">
+            Archive
+        </button>
     </div>
 </div>
 
@@ -56,6 +53,6 @@
 <div id="history-backdrop"
     class="dialog-backdrop hidden"></div>
 <div id="history-dialog"
-    class="dialog hidden" aria-hidden="true">
+    class="dialog dialog-xwide hidden" aria-hidden="true">
     <div id="history-modal-body"></div>
 </div>

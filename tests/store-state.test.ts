@@ -7,6 +7,7 @@ test(
     'put round-trip writes and reads back the row',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         const written = await db.states.put('s1', {
             entity_id: 'e1',
             state: 'active',
@@ -26,6 +27,7 @@ test(
     'getById throws EntityNotFound for unknown id',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         await assert.rejects(
             () => db.states.getById('missing'),
             (err: unknown) =>
@@ -36,6 +38,7 @@ test(
 
 test('getAll returns every written row', async () => {
     const db = new MemoryDbAdapter();
+    await db.createSchema();
     await db.states.put('s1', {
         entity_id: 'e1',
         state: 'a',
@@ -58,6 +61,7 @@ test(
     'record writes nowUtc; later record has later at',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         await db.states.record('s1', 'e1', 'a', 'w1');
         // RFC-3339 timestamps from Date.now() share
         // millisecond resolution; pause to guarantee
@@ -81,6 +85,7 @@ test(
     'currentFor returns the latest of three events',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         await db.states.put('s1', {
             entity_id: 'e1',
             state: 'a',
@@ -111,6 +116,7 @@ test(
     'currentFor returns null for unknown entity_id',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         await db.states.put('s1', {
             entity_id: 'e1',
             state: 'a',
@@ -128,6 +134,7 @@ test(
         + 'ascending by at',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         await db.states.put('s1', {
             entity_id: 'e1',
             state: 'b',
@@ -173,6 +180,7 @@ test(
     'allFor returns empty array for unknown entity_id',
     async () => {
         const db = new MemoryDbAdapter();
+        await db.createSchema();
         await db.states.put('s1', {
             entity_id: 'e1',
             state: 'a',

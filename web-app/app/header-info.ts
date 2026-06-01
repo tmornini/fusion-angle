@@ -31,7 +31,7 @@ async function getHeaderData(
         ]);
     return {
         workerId: worker.idForLink(),
-        workerName: worker.fullName(),
+        workerName: worker.name(),
         organization: org.nameText(),
         greeting: getTimeOfDay(),
         stats,

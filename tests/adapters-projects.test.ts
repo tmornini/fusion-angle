@@ -23,6 +23,10 @@ import type {
     ProjectEntity,
     ProjectState,
 } from '../api/types.ts';
+import {
+    seedCurrentWorker,
+    seedHumanWorker,
+} from './worker-fixtures.ts';
 
 function buildProject(
     id: string,
@@ -60,11 +64,12 @@ async function seedProject(
     );
 }
 
-function setupDb(): {
+async function setupDb(): Promise<{
     db: MemoryDbAdapter;
     ctx: RequestContext;
-} {
+}> {
     const db = new MemoryDbAdapter();
+    await db.createSchema();
     const ctx = createRequestContext(db);
     return { db, ctx };
 }
@@ -72,7 +77,7 @@ function setupDb(): {
 test(
     'getProjectRow round-trips all fields',
     async () => {
-        const { db, ctx } = setupDb();
+        const { db, ctx } = await setupDb();
         await db.projects.put('p1', buildProject(
             'p1', 'Alpha', {
                 progress: 73,
@@ -97,7 +102,7 @@ test(
 test(
     'getProjectRow rejects for missing id',
     async () => {
-        const { ctx } = setupDb();
+        const { ctx } = await setupDb();
         await assert.rejects(
             () => getProjectRow(ctx, 'nope'),
             /Not found/,
@@ -108,7 +113,7 @@ test(
 test(
     'getProjectRows returns persisted rows',
     async () => {
-        const { db, ctx } = setupDb();
+        const { db, ctx } = await setupDb();
         await db.projects.put(
             'p1', buildProject('p1', 'Alpha'),
         );
@@ -127,7 +132,7 @@ test(
 test(
     'getProjectRows returns empty on empty db',
     async () => {
-        const { ctx } = setupDb();
+        const { ctx } = await setupDb();
         const rows = await getProjectRows(ctx);
         assert.deepEqual(rows, []);
     },
@@ -136,7 +141,7 @@ test(
 test(
     'getProjects wraps rows in Project objects',
     async () => {
-        const { db, ctx } = setupDb();
+        const { db, ctx } = await setupDb();
         await seedProject(db, 'p1', 'Alpha');
         const projects = await getProjects(ctx);
         assert.equal(projects.length, 1);
@@ -153,7 +158,7 @@ test(
 test(
     'getProjects excludes deleted-state rows',
     async () => {
-        const { db, ctx } = setupDb();
+        const { db, ctx } = await setupDb();
         await seedProject(db, 'keep', 'Keep');
         await seedProject(
             db, 'gone', 'Gone', 'deleted',
@@ -169,7 +174,7 @@ test(
 test(
     'getProjects excludes tombstoned rows',
     async () => {
-        const { db, ctx } = setupDb();
+        const { db, ctx } = await setupDb();
         await seedProject(db, 'keep', 'Keep');
         await seedProject(db, 'gone', 'Gone');
         await db.projects.delete('gone');
@@ -184,7 +189,7 @@ test(
 );
 
 test('putProject persists a new project', async () => {
-    const { db, ctx } = setupDb();
+    const { db, ctx } = await setupDb();
     await putProject(
         ctx, 'p1', buildProject('p1', 'Created'),
     );
@@ -193,7 +198,7 @@ test('putProject persists a new project', async () => {
 });
 
 test('putProject updates an existing project', async () => {
-    const { db, ctx } = setupDb();
+    const { db, ctx } = await setupDb();
     await db.projects.put(
         'p1', buildProject('p1', 'Before'),
     );
@@ -210,7 +215,7 @@ test('putProject updates an existing project', async () => {
 test(
     'putProject changes are visible to a fresh ctx',
     async () => {
-        const { db, ctx } = setupDb();
+        const { db, ctx } = await setupDb();
         await putProject(ctx, 'p1', buildProject(
             'p1', 'Persisted',
         ));
@@ -254,30 +259,11 @@ test(
     },
 );
 
-async function seedCurrentWorker(
-    db: MemoryDbAdapter,
-): Promise<void> {
-    await db.workers.put('current', {
-        first_name: 'Demo',
-        last_name: 'User',
-        email: 'demo@example.com',
-        title: 'Admin',
-        department: 'Product',
-        strengths: '[]' as const,
-        team_dimensions: '{}' as const,
-        phone: '',
-        bio: '',
-    });
-    await db.states.record(
-        'st-current', 'current', 'active', 'system',
-    );
-}
-
 test(
     'postProjectStateChange records a state event'
     + ' without touching the project row',
     async () => {
-        const { db, ctx } = setupDb();
+        const { db, ctx } = await setupDb();
         await seedCurrentWorker(db);
         await seedProject(
             db, 'p1', 'Original', 'approved',
@@ -286,7 +272,7 @@ test(
             await db.projects.getById('p1');
 
         await postProjectStateChange(
-            ctx, 'p1', 'completed',
+            ctx, 'p1', 'archived',
         );
 
         const after =
@@ -295,7 +281,7 @@ test(
         const events = await db.states.allFor('p1');
         assert.equal(events.length, 2);
         assert.equal(
-            events.at(-1)?.state, 'completed',
+            events.at(-1)?.state, 'archived',
         );
     },
 );
