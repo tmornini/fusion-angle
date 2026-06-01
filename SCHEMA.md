@@ -87,10 +87,9 @@ Human detail, keyed by the shared worker id.
 
 ### ai_workers
 
-AI detail, keyed by the shared worker id. Per Commandment
-III (Uniformity), all worker kinds share the
-`WORKER_STATES` alphabet (`active`, `pending`,
-`archived`), recorded in the `states` log.
+AI detail, keyed by the shared worker id. All worker
+kinds share the `WORKER_STATES` alphabet (`active`,
+`pending`, `archived`), recorded in the `states` log.
 
 | Column | Type |
 |--------|------|
@@ -451,8 +450,8 @@ entity-table op.
 
 Per-attribute values written when a state event records a
 work-order transition. Each row pins the payload to its
-parent event by `state_event_id` — Codd 1NF, a relation
-belongs in a table not a column on the event row.
+parent event by `state_event_id` — the values live in
+their own table, not as columns on the event row.
 
 | Column | Type | Notes |
 |--------|------|-------|

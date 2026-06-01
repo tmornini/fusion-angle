@@ -321,9 +321,8 @@ than disabled-option separators or custom dropdown
 components. The Crew dropdown on flow node panels
 is the introducing case — `<optgroup>` is the
 codebase's standard for grouped selects from this
-point forward (Commandment III: one codebase, one
-voice). Browser default styling (bold-italic group
-labels) is fine; no override needed.
+point forward. Browser default styling (bold-italic
+group labels) is fine; no override needed.
 
 ### Dark Mode
 
@@ -537,9 +536,9 @@ multiplexing.
 | Sidebar/header/main shell             | `layout.css`              |
 | Mobile-only override                  | `responsive.css` (`!important`) |
 
-Below the 3-page threshold (Commandment IX, Generality), keep
-selectors in a `pages-X.css` file or duplicate without shame.
-At the third instance, promote to `components-X.css`.
+Below the 3-page threshold, keep selectors in a
+`pages-X.css` file, or duplicate. At the third instance,
+promote to `components-X.css`.
 
 ### Adding a new page-scoped CSS file
 
