@@ -443,7 +443,7 @@ on. Run these in order.
 
 ### AA7. Approve Ideas & Convert to Projects
 
-- [ ] **AA18** On Ideas list, filter by "In Review". Click idea #1. PASS: navigates to idea detail with approval footer.
+- [ ] **AA18** On Ideas list, filter by "In Review". Click idea #1. PASS: navigates to idea detail with Send Back / Approve buttons in the header next to Edit.
 - [ ] **AA19** Click "Approve". PASS: idea status changes to approved, confirmation shown.
 - [ ] **AA20** Approve idea #4 as well (it was submitted for review in AA16). Leave others in their current status. PASS: statuses match mock data (2 approved, rest in-review/active).
 - [ ] **AA21** Navigate to approved idea #1. Click "Convert". PASS: conversion form loads with 4 required fields (Project Name, Time (days), Cost, Success Criteria) — there is no Impact field — plus a Scores box holding one required baseline slider per active objective.
@@ -732,8 +732,8 @@ on. Run these in order.
 - [ ] **D14** Click "Edit", then "Cancel". PASS: returns to view mode with original data unchanged.
 - [ ] **D15** For an idea in "in_review"
   status: clicking the card navigates to
-  `ideas/detail.html` page with approval
-  footer (Approve / Send Back).
+  `ideas/detail.html` with Send Back /
+  Approve buttons in the header next to Edit.
 - [ ] **D16** For a convertible idea: "Convert" action button is visible. PASS: clicking it navigates to `ideas/convert.html` page.
 - [ ] **D17** Navigate to `ideas/detail.html?ideaId=999` (non-existent). PASS: page handles gracefully — shows error state, no unhandled JS exception.
 
@@ -762,10 +762,11 @@ on. Run these in order.
 
 ### Idea Detail — Approval Actions
 
-- [ ] **D29** Navigate to `ideas/detail.html?ideaId=<id>` for an in-review idea (entity ids are base62 tokens, not sequential integers — copy a real id from the Ideas list). PASS: page loads with idea details and sticky approval footer showing Send Back / Approve.
+- [ ] **D29** Navigate to `ideas/detail.html?ideaId=<id>` for an in-review idea (entity ids are base62 tokens, not sequential integers — copy a real id from the Ideas list). PASS: page loads with idea details and Send Back / Approve buttons in the header next to Edit.
 - [ ] **D30** Click "Approve". PASS: success toast, navigates to ideas list, idea status is now "approved".
 - [ ] **D31** Click "Send Back". PASS: confirm dialog opens. Confirm. PASS: idea status changes to "sent-back", navigates to ideas list.
-- [ ] **D32** Navigate to idea detail for a non-in-review idea. PASS: no approval footer is shown.
+- [ ] **D32** Navigate to idea detail for a non-in-review idea. PASS: no Send Back / Approve buttons are shown.
+- [ ] **D32a** On an in-review idea, click "Edit". PASS: the header shows only Cancel / Save — no Send Back, Approve, Submit, or Convert. Click Cancel: the read header (Send Back / Approve / Edit) returns.
 
 ### Ideas Workflow Integration
 
@@ -826,6 +827,7 @@ on. Run these in order.
 - [ ] **E8** Click "Edit" button on project detail. PASS: fields become editable inputs/textareas, Save and Cancel buttons appear.
 - [ ] **E9** Modify a field, click "Save". PASS: project saves successfully, returns to view mode with updated data.
 - [ ] **E10** Click "Edit", then "Cancel". PASS: returns to view mode with original data unchanged.
+- [ ] **E10a** On a project whose state shows action-bar buttons (`submitted` → Approve / Decline / Send back, or `approved` → Archive / View history), click "Edit". PASS: those action-bar buttons are hidden; only the State select, editable fields, and Cancel / Save remain. Click Cancel: the action-bar buttons reappear.
 
 ### Projects List — Drag-reorder
 

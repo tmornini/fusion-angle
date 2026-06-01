@@ -360,12 +360,7 @@ function buildApprovalButtons(): SafeHtml {
                 'approval-send-back'
             }">
             ${iconXCircle(16, '')}
-            <span class="${
-                'hidden-mobile'
-            }">Send Back</span>
-            <span class="${
-                'visible-mobile'
-            }">Send Back</span>
+            Send Back
         </button>
         <button
             class="${

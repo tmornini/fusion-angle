@@ -159,6 +159,18 @@ function rerender(): void {
     if (!pageContainer) return;
     buildPresenter()
         .renderUpdate(pageContainer);
+    reconcileActionBarVisibility();
+}
+
+function reconcileActionBarVisibility(): void {
+    const editing = state?.kind === 'editing';
+    for (const sel of [
+        '#project-review-actions',
+        '#project-lifecycle-actions',
+    ]) {
+        const el = $(sel, document);
+        if (el) el.classList.toggle('hidden', editing);
+    }
 }
 
 export async function init(

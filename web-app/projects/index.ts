@@ -83,12 +83,10 @@ export async function init(): Promise<void> {
             icon: iconFolderKanban(24, ''),
             title: 'No Projects Yet',
             description:
-                'Convert approved ideas'
-                + ' into projects to start'
-                + ' tracking progress.',
+                'Ideas, when promoted, become a project.',
             action: {
-                label: 'View Ideas',
-                href: '../ideas/index.html',
+                label: 'Create Idea',
+                href: '../ideas/create.html',
             },
         },
     );
