@@ -2,6 +2,7 @@ import {
     EntityNotFound,
     type StateStore,
     type EntityStore as EntityStoreInterface,
+    type EntityPut,
     type EntityValidator,
     type StorageBackend,
 } from './db.ts';
@@ -87,6 +88,43 @@ export class EntityStore<T extends { id: string }>
                 this.#table, next,
             );
             return written;
+        });
+    }
+
+    async putMany(
+        entries: readonly EntityPut<T>[],
+        deleteIds: readonly string[],
+    ): Promise<void> {
+        const written = entries.map(entry => {
+            const { id: _id, ...body } =
+                entry.fields as unknown as
+                    Record<string, unknown>;
+            return {
+                ...this.#validate(body),
+                id: entry.id,
+            } as T;
+        });
+        const removing = new Set(deleteIds);
+        return this.#serialize(async () => {
+            const rows = await this.#backend.read<T>(
+                this.#table,
+            );
+            const next = rows.filter(
+                row => !removing.has(row.id),
+            );
+            for (const row of written) {
+                const idx = next.findIndex(
+                    e => e.id === row.id,
+                );
+                if (idx >= 0) {
+                    next[idx] = row;
+                } else {
+                    next.push(row);
+                }
+            }
+            await this.#backend.write(
+                this.#table, next,
+            );
         });
     }
 

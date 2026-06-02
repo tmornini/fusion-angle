@@ -24,3 +24,6 @@ if [ -n "$LONG_LINES" ]; then
   echo "$LONG_LINES" >&2
   exit 1
 fi
+
+# SCHEMA.svg is derived from the schema; fail if it has drifted.
+./generate-schema-svg --check

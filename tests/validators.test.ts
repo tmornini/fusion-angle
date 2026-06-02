@@ -13,8 +13,12 @@ import {
     validateOrganizationEntity,
     validateIdeaSubmissionEntity,
     validateProjectFlowEntity,
+    validateRecordAttributeEntity,
     asStoredGraph,
 } from '../api/validators.ts';
+import {
+    getProviderModels,
+} from '../api/provider-models.ts';
 
 // --- HumanWorkerEntity ---
 
@@ -97,9 +101,9 @@ test(
 // --- AIWorkerEntity ---
 
 const validAIWorker = {
-    provider: 'Anthropic',
     description: 'Long context, deep reasoning.',
-    auth_token: 'sk-PLACEHOLDER-DEMOTOKEN-XXXX',
+    skill_focus: 'Deep reasoning over long docs.',
+    model: getProviderModels()[0]!.id,
 };
 
 test(
@@ -108,27 +112,43 @@ test(
         const result = validateAIWorkerEntity(
             validAIWorker,
         );
-        assert.equal(result.provider, 'Anthropic');
         assert.equal(
             result.description,
             'Long context, deep reasoning.',
         );
         assert.equal(
-            result.auth_token,
-            'sk-PLACEHOLDER-DEMOTOKEN-XXXX',
+            result.skill_focus,
+            'Deep reasoning over long docs.',
+        );
+        assert.equal(
+            result.model,
+            getProviderModels()[0]!.id,
         );
     },
 );
 
 test(
-    'validateAIWorkerEntity rejects empty auth_token',
+    'validateAIWorkerEntity accepts empty'
+    + ' skill_focus',
+    () => {
+        const result = validateAIWorkerEntity({
+            ...validAIWorker,
+            skill_focus: '',
+        });
+        assert.equal(result.skill_focus, '');
+    },
+);
+
+test(
+    'validateAIWorkerEntity rejects unknown'
+    + ' model id',
     () => {
         assert.throws(
             () => validateAIWorkerEntity({
                 ...validAIWorker,
-                auth_token: '',
+                model: 'not-a-real-model-id',
             }),
-            /auth_token must be non-empty/,
+            /model must be a known provider/,
         );
     },
 );
@@ -147,27 +167,26 @@ test(
 );
 
 test(
-    'validateAIWorkerEntity rejects missing provider',
+    'validateAIWorkerEntity rejects missing model',
     () => {
-        const { provider: _omit, ...rest } =
+        const { model: _omit, ...rest } =
             validAIWorker;
         assert.throws(
             () => validateAIWorkerEntity(rest),
-            /missing required key "provider"/,
+            /missing required key "model"/,
         );
     },
 );
 
 test(
     'validateAIWorkerEntity rejects missing'
-    + ' auth_token',
+    + ' skill_focus',
     () => {
-        const {
-            auth_token: _omit, ...rest
-        } = validAIWorker;
+        const { skill_focus: _omit, ...rest } =
+            validAIWorker;
         assert.throws(
             () => validateAIWorkerEntity(rest),
-            /missing required key "auth_token"/,
+            /missing required key "skill_focus"/,
         );
     },
 );
@@ -591,6 +610,7 @@ const baseNode = {
     isCreate: false,
     isArchive: false,
     attributes: [],
+    taskInstructions: '',
 };
 
 test(
@@ -672,3 +692,148 @@ test(
         );
     },
 );
+
+// --- asStoredGraph (taskInstructions) ---
+
+test(
+    'asStoredGraph throws on missing'
+    + ' taskInstructions',
+    () => {
+        assert.throws(
+            () => asStoredGraph(
+                {
+                    nodes: [
+                        {
+                            id: 'n1',
+                            name: 'N',
+                            positionX: 0,
+                            positionY: 0,
+                            isCreate: false,
+                            isArchive: false,
+                            attributes: [],
+                            workerIds: [],
+                        },
+                    ],
+                    edges: [],
+                },
+                'graph',
+            ),
+        );
+    },
+);
+
+test(
+    'asStoredGraph round-trips an empty'
+    + ' taskInstructions',
+    () => {
+        const result = asStoredGraph(
+            {
+                nodes: [
+                    {
+                        ...baseNode,
+                        workerIds: [],
+                        taskInstructions: '',
+                    },
+                ],
+                edges: [],
+            },
+            'graph',
+        );
+        const n = result.nodes[0]!;
+        assert.equal(n.taskInstructions, '');
+    },
+);
+
+test(
+    'asStoredGraph round-trips multi-line'
+    + ' markdown taskInstructions byte-for-byte',
+    () => {
+        const md = '# Title\n\n- one\n- two\n';
+        const result = asStoredGraph(
+            {
+                nodes: [
+                    {
+                        ...baseNode,
+                        workerIds: [],
+                        taskInstructions: md,
+                    },
+                ],
+                edges: [],
+            },
+            'graph',
+        );
+        const n = result.nodes[0]!;
+        assert.equal(n.taskInstructions, md);
+    },
+);
+
+test(
+    'asStoredGraph rejects non-string'
+    + ' taskInstructions',
+    () => {
+        assert.throws(
+            () => asStoredGraph(
+                {
+                    nodes: [
+                        {
+                            ...baseNode,
+                            workerIds: [],
+                            taskInstructions: 123,
+                        },
+                    ],
+                    edges: [],
+                },
+                'graph',
+            ),
+        );
+    },
+);
+
+// --- RecordAttributeEntity ---
+
+const validSelectAttribute = {
+    record_id: 'r-1',
+    name: 'Priority',
+    attribute_type: 'select',
+    sort_order: 0,
+    options: '["High","Low"]',
+    constraints: '[]',
+};
+
+test(
+    'validateRecordAttributeEntity rejects a'
+    + ' select with zero options',
+    () => {
+    assert.throws(
+        () => validateRecordAttributeEntity({
+            ...validSelectAttribute,
+            options: '[]',
+        }),
+        /at least one option/,
+    );
+});
+
+test(
+    'validateRecordAttributeEntity accepts a'
+    + ' radio with options',
+    () => {
+    const result = validateRecordAttributeEntity({
+        ...validSelectAttribute,
+        attribute_type: 'radio',
+    });
+    assert.equal(result.attribute_type, 'radio');
+});
+
+test(
+    'validateRecordAttributeEntity rejects a'
+    + ' radio with zero options',
+    () => {
+    assert.throws(
+        () => validateRecordAttributeEntity({
+            ...validSelectAttribute,
+            attribute_type: 'radio',
+            options: '[]',
+        }),
+        /at least one option/,
+    );
+});

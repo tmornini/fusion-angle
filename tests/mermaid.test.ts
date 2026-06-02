@@ -280,3 +280,28 @@ test('mermaid round-trip preserves structure', () => {
         parsed.edges[1]?.name, 'done',
     );
 });
+
+// Mermaid is topology only: node task
+// instructions deliberately do NOT round-trip.
+// Pin it so a future reader does not "fix" it.
+test('mermaid drops node task instructions', () => {
+    const text = generateMermaid({
+        ...minimalGraph,
+        nodes: [
+            {
+                id: 's', name: 'Create',
+                positionX: 0, positionY: 0,
+                isCreate: true,
+                isArchive: false,
+                workerIds: [],
+                attributes: [],
+                taskInstructions:
+                    'SECRET INSTRUCTIONS',
+            },
+        ],
+        edges: [],
+    } as never);
+    assert.ok(
+        !text.includes('SECRET INSTRUCTIONS'),
+    );
+});

@@ -16,6 +16,17 @@ async function primedBackend(): Promise<MemoryStorageBackend> {
     return backend;
 }
 
+class CountingBackend extends MemoryStorageBackend {
+    writes = 0;
+    async write<T extends { id: string }>(
+        table: string,
+        rows: T[],
+    ): Promise<void> {
+        this.writes++;
+        await super.write(table, rows);
+    }
+}
+
 test('EntityStore.put invokes the validator', async () => {
     const backend = await primedBackend();
     const stateStore = new StateStore(backend, 'states');
@@ -127,3 +138,114 @@ test('HistoryEntityStore.put without validator passes',
         const written = await store.put('a', { n: 7 });
         assert.equal(written.n, 7);
     });
+
+test(
+    'EntityStore.putMany writes the table once for'
+    + ' many entries',
+    async () => {
+        const backend = new CountingBackend();
+        await backend.write('things', []);
+        await backend.write('states', []);
+        const stateStore =
+            new StateStore(backend, 'states');
+        const store = new EntityStore<Thing>(
+            'things', backend, stateStore,
+        );
+        backend.writes = 0;
+        await store.putMany(
+            [
+                { id: 'a', fields: { n: 1 } },
+                { id: 'b', fields: { n: 2 } },
+                { id: 'c', fields: { n: 3 } },
+            ],
+            [],
+        );
+        assert.equal(backend.writes, 1);
+        assert.equal(
+            (await store.getById('b')).n, 2,
+        );
+    },
+);
+
+test(
+    'EntityStore.putMany applies deletes and'
+    + ' upserts together',
+    async () => {
+        const backend = await primedBackend();
+        const stateStore =
+            new StateStore(backend, 'states');
+        const store = new EntityStore<Thing>(
+            'things', backend, stateStore,
+        );
+        await store.put('old', { n: 9 });
+        await store.putMany(
+            [{ id: 'fresh', fields: { n: 5 } }],
+            ['old'],
+        );
+        await assert.rejects(
+            () => store.getById('old'),
+        );
+        assert.equal(
+            (await store.getById('fresh')).n, 5,
+        );
+    },
+);
+
+test(
+    'EntityStore.putMany writes nothing when an'
+    + ' entry fails validation',
+    async () => {
+        const backend = new CountingBackend();
+        await backend.write('things', []);
+        await backend.write('states', []);
+        const stateStore =
+            new StateStore(backend, 'states');
+        const store = new EntityStore<Thing>(
+            'things', backend, stateStore,
+            (b) => {
+                if ((b['n'] as number) < 0) {
+                    throw new Error('negative');
+                }
+                return b as unknown as Omit<Thing, 'id'>;
+            },
+        );
+        backend.writes = 0;
+        await assert.rejects(
+            () => store.putMany(
+                [
+                    { id: 'a', fields: { n: 1 } },
+                    { id: 'b', fields: { n: -1 } },
+                ],
+                [],
+            ),
+            /negative/,
+        );
+        assert.equal(backend.writes, 0);
+        await assert.rejects(
+            () => store.getById('a'),
+        );
+    },
+);
+
+test(
+    'HistoryEntityStore.putMany upserts every entry',
+    async () => {
+        const backend = await primedBackend();
+        const store = new HistoryEntityStore<Thing>(
+            'things', backend,
+        );
+        await store.putMany(
+            [
+                { id: 'a', fields: { n: 1 } },
+                { id: 'b', fields: { n: 2 } },
+            ],
+            [],
+        );
+        assert.equal(
+            (await store.getById('a')).n, 1,
+        );
+        assert.equal(
+            (await store.getById('b')).n, 2,
+        );
+    },
+);

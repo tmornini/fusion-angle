@@ -118,6 +118,7 @@ function makeNode(
         isArchive: false,
         workerIds: [],
         attributes: [],
+        taskInstructions: '',
         ...over,
     };
 }

@@ -275,6 +275,7 @@ test(
                 { objectiveId: 'obj-1', score: 50 },
                 { objectiveId: 'obj-2', score: -25 },
             ],
+            ['obj-1', 'obj-2'],
         );
 
         const project =
@@ -312,6 +313,47 @@ test(
         );
         assert.equal(byObj.get('obj-1'), 50);
         assert.equal(byObj.get('obj-2'), -25);
+    },
+);
+
+test(
+    'postIdeaConversion rejects a conversion'
+    + ' missing a score for an active objective',
+    async () => {
+        const { db, ctx } = await setupDb();
+        await seedHumanWorker(
+            db, 'current', 'Demo User',
+        );
+        await db.ideas.put(
+            'i1', buildIdea('i1', 'First'),
+        );
+        await seedIdeaState(db, 'i1', 'approved');
+        const projectEntity:
+            Omit<ProjectEntity, 'id'> = {
+            title: 'P1',
+            description: 'done when X',
+            progress: 0,
+            start_date: '2026-04-01',
+            target_end_date: '2026-07-01',
+            estimated_cost: 100,
+            actual_cost: 0,
+            position: 1,
+        };
+        await assert.rejects(
+            () => postIdeaConversion(
+                ctx,
+                'i1',
+                'p1',
+                projectEntity,
+                'submitted',
+                buildIdea('i1', 'First'),
+                [
+                    { objectiveId: 'obj-1', score: 5 },
+                ],
+                ['obj-1', 'obj-2'],
+            ),
+            /every active objective/,
+        );
     },
 );
 

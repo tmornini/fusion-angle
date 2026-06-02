@@ -249,6 +249,23 @@ export async function putIdeaSubmission(
     );
 }
 
+function assertConversionFullyScored(
+    activeObjectiveIds: readonly ObjectiveId[],
+    scoredObjectiveIds: readonly ObjectiveId[],
+): void {
+    const scored = new Set(scoredObjectiveIds);
+    const missing = activeObjectiveIds.filter(
+        id => !scored.has(id),
+    );
+    if (missing.length > 0) {
+        throw new Error(
+            'idea conversion requires a baseline'
+            + ' score for every active objective;'
+            + ' ' + missing.length + ' missing',
+        );
+    }
+}
+
 // Idempotent: retry recovers from partial failure.
 // Inlined writes (rather than delegating to the
 // putProject / putIdea helpers) so the project, idea,
@@ -273,7 +290,12 @@ export async function postIdeaConversion(
         objectiveId: ObjectiveId;
         score: number;
     }[],
+    activeObjectiveIds: readonly ObjectiveId[],
 ): Promise<void> {
+    assertConversionFullyScored(
+        activeObjectiveIds,
+        baselines.map(b => b.objectiveId),
+    );
     type AnyBody = Record<string, unknown>;
     const projectBody =
         project as unknown as AnyBody;

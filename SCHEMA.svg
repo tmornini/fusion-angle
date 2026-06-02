@@ -1,383 +1,385 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" width="1200" height="900">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1504 1088" width="1504" height="1088">
   <defs>
     <style>
-      text {
-        font-family: -apple-system, BlinkMacSystemFont,
-          'Segoe UI', Helvetica, Arial, sans-serif;
-      }
-      .title {
-        font-size: 16px; font-weight: 700; fill: #333;
-      }
-      .subtitle {
-        font-size: 11px; fill: #777;
-      }
-      .group-label {
-        font-size: 12px; font-weight: 700;
-        letter-spacing: 0.5px;
-      }
-      .sub-label {
-        font-size: 9px; font-weight: 600; opacity: 0.6;
-      }
-      .tbl {
-        font-size: 10px; font-weight: 600; fill: #fff;
-      }
-      .tbl-rel {
-        font-size: 9px; font-weight: 500; fill: #fff;
-      }
-      .arrow {
-        stroke-width: 0.9; fill: none; opacity: 0.4;
-      }
-      .legend-text {
-        font-size: 10px; fill: #555;
-      }
-      .legend-label {
-        font-size: 11px; font-weight: 700; fill: #555;
-      }
-      .note {
-        font-size: 9.5px; fill: #999;
-      }
-      .col {
-        font-size: 8.5px; fill: #666;
-      }
+      text { font-family: ui-sans-serif, system-ui,
+        'Segoe UI', Helvetica, Arial, sans-serif; }
+      .box { fill: hsl(0 0% 100%);
+        stroke: hsl(217 30% 88%); stroke-width: 1; }
+      .head { fill: hsl(217 36% 46%); }
+      .thead { fill: hsl(0 0% 100%); font-size: 12px;
+        font-weight: 700; }
+      .col, .pk, .fk, .type { font-size: 11px; }
+      .col { fill: hsl(217 45% 15%); }
+      .pk { fill: hsl(217 45% 15%); font-weight: 700; }
+      .fk { fill: hsl(217 38% 38%);
+        font-style: italic; }
+      .type { fill: hsl(217 12% 55%);
+        text-anchor: end; }
+      .edge { fill: none; stroke: hsl(217 34% 60%);
+        stroke-width: 1.5; }
     </style>
-    <marker id="aCore" markerWidth="6" markerHeight="5"
-      refX="6" refY="2.5" orient="auto">
-      <polygon points="0 0,6 2.5,0 5" fill="#4B6CA1"
-        opacity="0.5"/>
-    </marker>
-    <marker id="aTools" markerWidth="6" markerHeight="5"
-      refX="6" refY="2.5" orient="auto">
-      <polygon points="0 0,6 2.5,0 5" fill="#6B8E23"
-        opacity="0.5"/>
-    </marker>
-    <marker id="aWorkbox" markerWidth="6" markerHeight="5"
-      refX="6" refY="2.5" orient="auto">
-      <polygon points="0 0,6 2.5,0 5" fill="#B45309"
-        opacity="0.5"/>
-    </marker>
-    <marker id="aPlatform" markerWidth="6" markerHeight="5"
-      refX="6" refY="2.5" orient="auto">
-      <polygon points="0 0,6 2.5,0 5" fill="#64748b"
-        opacity="0.5"/>
-    </marker>
   </defs>
-
-  <!-- Background -->
-  <rect width="1200" height="900" fill="#fff"/>
-
-  <!-- Title -->
-  <text x="600" y="26" text-anchor="middle" class="title">
-    Fusion AI Database Schema
-  </text>
-  <text x="600" y="44" text-anchor="middle" class="subtitle">
-    18 tables · localStorage-backed · all columns NOT NULL
-  </text>
-
-  <!-- ============================================ -->
-  <!-- CORE ENTITIES (4)                            -->
-  <!-- ============================================ -->
-  <rect x="16" y="64" width="340" height="128" rx="6"
-    fill="#EDF1F7" stroke="#4B6CA1"
-    stroke-width="1.2" opacity="0.55"/>
-  <text x="28" y="82" class="group-label" fill="#4B6CA1">
-    CORE ENTITIES (4)
-  </text>
-
-  <rect x="28" y="96" width="140" height="28" rx="4"
-    fill="#4B6CA1"/>
-  <text x="98" y="114" text-anchor="middle" class="tbl">
-    users</text>
-
-  <rect x="184" y="96" width="140" height="28" rx="4"
-    fill="#4B6CA1"/>
-  <text x="254" y="114" text-anchor="middle" class="tbl">
-    ideas</text>
-
-  <rect x="28" y="140" width="140" height="28" rx="4"
-    fill="#4B6CA1"/>
-  <text x="98" y="158" text-anchor="middle" class="tbl">
-    projects</text>
-
-  <rect x="184" y="140" width="140" height="28" rx="4"
-    fill="#4B6CA1"/>
-  <text x="254" y="158" text-anchor="middle" class="tbl">
-    team_memberships</text>
-
-  <text x="98" y="183" text-anchor="middle" class="sub-label">
-    15 cols</text>
-  <text x="254" y="183" text-anchor="middle" class="sub-label">
-    13 cols</text>
-  <text x="98" y="183" text-anchor="middle" class="sub-label"
-    transform="translate(0,44)">17 cols</text>
-  <text x="254" y="183" text-anchor="middle" class="sub-label"
-    transform="translate(0,44)">4 cols</text>
-
-  <!-- ============================================ -->
-  <!-- TOOLS (1)                                    -->
-  <!-- ============================================ -->
-  <rect x="372" y="64" width="140" height="128" rx="6"
-    fill="#F2F5EC" stroke="#6B8E23"
-    stroke-width="1.2" opacity="0.55"/>
-  <text x="384" y="82" class="group-label" fill="#6B8E23">
-    TOOLS (1)
-  </text>
-
-  <rect x="384" y="114" width="116" height="28" rx="4"
-    fill="#6B8E23"/>
-  <text x="442" y="132" text-anchor="middle" class="tbl">
-    flows</text>
-  <text x="442" y="156" text-anchor="middle" class="sub-label">
-    10 cols · graph JSON</text>
-
-  <!-- ============================================ -->
-  <!-- WORKBOX (1)                                  -->
-  <!-- ============================================ -->
-  <rect x="528" y="64" width="150" height="128" rx="6"
-    fill="#FCF0E4" stroke="#B45309"
-    stroke-width="1.2" opacity="0.55"/>
-  <text x="540" y="82" class="group-label" fill="#B45309">
-    WORKBOX (1)
-  </text>
-
-  <rect x="540" y="114" width="126" height="28" rx="4"
-    fill="#B45309"/>
-  <text x="603" y="132" text-anchor="middle" class="tbl">
-    work_orders</text>
-  <text x="603" y="156" text-anchor="middle" class="sub-label">
-    5 cols · flow_graph snapshot</text>
-
-  <!-- ============================================ -->
-  <!-- PLATFORM (1)                                 -->
-  <!-- ============================================ -->
-  <rect x="694" y="64" width="140" height="128" rx="6"
-    fill="#EFF2F5" stroke="#64748b"
-    stroke-width="1.2" opacity="0.55"/>
-  <text x="706" y="82" class="group-label" fill="#64748b">
-    PLATFORM (1)
-  </text>
-
-  <rect x="706" y="114" width="116" height="28" rx="4"
-    fill="#64748b"/>
-  <text x="764" y="132" text-anchor="middle" class="tbl">
-    activities</text>
-  <text x="764" y="156" text-anchor="middle" class="sub-label">
-    8 cols · audit log</text>
-
-  <!-- ============================================ -->
-  <!-- ADMIN SINGLETONS (2)                         -->
-  <!-- ============================================ -->
-  <rect x="850" y="64" width="334" height="128" rx="6"
-    fill="#EDEFF2" stroke="#475569"
-    stroke-width="1.2" opacity="0.55"/>
-  <text x="862" y="82" class="group-label" fill="#475569">
-    ADMIN SINGLETONS (2)
-  </text>
-
-  <rect x="862" y="96" width="180" height="28" rx="4"
-    fill="#475569"/>
-  <text x="952" y="114" text-anchor="middle" class="tbl">
-    company_settings</text>
-
-  <rect x="1056" y="96" width="116" height="28" rx="4"
-    fill="#475569"/>
-  <text x="1114" y="114" text-anchor="middle" class="tbl">
-    account</text>
-
-  <text x="862" y="145" class="col">name, domain</text>
-  <text x="1056" y="145" class="col">plan, seats, limits,
-    health (17 cols)</text>
-  <text x="1018" y="178" text-anchor="middle" class="sub-label">
-    single row each (id = '1')</text>
-
-  <!-- ============================================ -->
-  <!-- RELATIONSHIPS &amp; HISTORY (9)              -->
-  <!-- ============================================ -->
-  <rect x="16" y="232" width="1168" height="340" rx="6"
-    fill="#F5F6F8" stroke="#94a3b8"
-    stroke-width="1.2" opacity="0.55"/>
-  <text x="28" y="250" class="group-label" fill="#475569">
-    RELATIONSHIPS &amp; HISTORY (9)
-  </text>
-  <text x="200" y="250" class="sub-label">
-    junction tables + flow_versions (per-flow undo history,
-    cap 10)
-  </text>
-
-  <!-- Row 1 of junctions -->
-  <rect x="40" y="276" width="170" height="28" rx="4"
-    fill="#94a3b8"/>
-  <text x="125" y="294" text-anchor="middle" class="tbl-rel">
-    idea_submissions</text>
-  <text x="125" y="313" text-anchor="middle" class="col">
-    ideas × users</text>
-
-  <rect x="232" y="276" width="170" height="28" rx="4"
-    fill="#94a3b8"/>
-  <text x="317" y="294" text-anchor="middle" class="tbl-rel">
-    activity_actors</text>
-  <text x="317" y="313" text-anchor="middle" class="col">
-    activities × users</text>
-
-  <rect x="424" y="276" width="170" height="28" rx="4"
-    fill="#94a3b8"/>
-  <text x="509" y="294" text-anchor="middle" class="tbl-rel">
-    project_flows</text>
-  <text x="509" y="313" text-anchor="middle" class="col">
-    projects × flows</text>
-
-  <rect x="616" y="276" width="170" height="28" rx="4"
-    fill="#94a3b8"/>
-  <text x="701" y="294" text-anchor="middle" class="tbl-rel">
-    flow_work_orders</text>
-  <text x="701" y="313" text-anchor="middle" class="col">
-    flows × work_orders</text>
-
-  <rect x="808" y="276" width="170" height="28" rx="4"
-    fill="#94a3b8"/>
-  <text x="893" y="294" text-anchor="middle" class="tbl-rel">
-    flow_versions</text>
-  <text x="893" y="313" text-anchor="middle" class="col">
-    history of flows</text>
-
-  <rect x="1000" y="276" width="170" height="28" rx="4"
-    fill="#94a3b8"/>
-  <text x="1085" y="294" text-anchor="middle" class="tbl-rel">
-    work_order_claims</text>
-  <text x="1085" y="313" text-anchor="middle" class="col">
-    work_orders × users</text>
-
-  <!-- Row 2 of junctions -->
-  <rect x="40" y="370" width="210" height="28" rx="4"
-    fill="#94a3b8"/>
-  <text x="145" y="388" text-anchor="middle" class="tbl-rel">
-    work_order_transitions</text>
-  <text x="145" y="407" text-anchor="middle" class="col">
-    work_orders × users · events (append-only)</text>
-
-  <rect x="280" y="370" width="240" height="28" rx="4"
-    fill="#94a3b8"/>
-  <text x="400" y="388" text-anchor="middle" class="tbl-rel">
-    team_membership_projects</text>
-  <text x="400" y="407" text-anchor="middle" class="col">
-    team_memberships × projects</text>
-
-  <rect x="550" y="370" width="220" height="28" rx="4"
-    fill="#94a3b8"/>
-  <text x="660" y="388" text-anchor="middle" class="tbl-rel">
-    team_membership_users</text>
-  <text x="660" y="407" text-anchor="middle" class="col">
-    team_memberships × users</text>
-
-  <!-- ============================================ -->
-  <!-- ARROWS: junctions → parents                  -->
-  <!-- ============================================ -->
-
-  <!-- idea_submissions → ideas, users -->
-  <path d="M 105 276 Q 105 220 98 124" class="arrow"
-    stroke="#4B6CA1" marker-end="url(#aCore)"/>
-  <path d="M 145 276 Q 180 220 254 124" class="arrow"
-    stroke="#4B6CA1" marker-end="url(#aCore)"/>
-
-  <!-- activity_actors → activities, users -->
-  <path d="M 297 276 Q 200 220 98 124" class="arrow"
-    stroke="#4B6CA1" marker-end="url(#aCore)"/>
-  <path d="M 337 276 Q 500 220 764 142" class="arrow"
-    stroke="#64748b" marker-end="url(#aPlatform)"/>
-
-  <!-- project_flows → projects, flows -->
-  <path d="M 489 276 Q 300 230 98 168" class="arrow"
-    stroke="#4B6CA1" marker-end="url(#aCore)"/>
-  <path d="M 529 276 Q 480 220 442 142" class="arrow"
-    stroke="#6B8E23" marker-end="url(#aTools)"/>
-
-  <!-- flow_work_orders → flows, work_orders -->
-  <path d="M 681 276 Q 550 220 442 142" class="arrow"
-    stroke="#6B8E23" marker-end="url(#aTools)"/>
-  <path d="M 721 276 Q 660 220 603 142" class="arrow"
-    stroke="#B45309" marker-end="url(#aWorkbox)"/>
-
-  <!-- flow_versions → flows -->
-  <path d="M 893 276 Q 670 220 442 142" class="arrow"
-    stroke="#6B8E23" marker-end="url(#aTools)"/>
-
-  <!-- work_order_claims → work_orders, users -->
-  <path d="M 1065 276 Q 820 220 603 142" class="arrow"
-    stroke="#B45309" marker-end="url(#aWorkbox)"/>
-  <path d="M 1105 276 C 1130 180 500 140 98 124" class="arrow"
-    stroke="#4B6CA1" marker-end="url(#aCore)"/>
-
-  <!-- work_order_transitions → work_orders, users -->
-  <path d="M 125 370 C 100 260 400 200 603 142" class="arrow"
-    stroke="#B45309" marker-end="url(#aWorkbox)"/>
-  <path d="M 165 370 C 120 260 60 200 98 124" class="arrow"
-    stroke="#4B6CA1" marker-end="url(#aCore)"/>
-
-  <!-- team_membership_projects → team_memberships, projects -->
-  <path d="M 380 370 C 360 260 290 210 254 168" class="arrow"
-    stroke="#4B6CA1" marker-end="url(#aCore)"/>
-  <path d="M 420 370 C 320 260 140 210 98 168" class="arrow"
-    stroke="#4B6CA1" marker-end="url(#aCore)"/>
-
-  <!-- team_membership_users → team_memberships, users -->
-  <path d="M 640 370 C 560 260 330 200 254 168" class="arrow"
-    stroke="#4B6CA1" marker-end="url(#aCore)"/>
-  <path d="M 680 370 C 600 260 200 180 98 124" class="arrow"
-    stroke="#4B6CA1" marker-end="url(#aCore)"/>
-
-  <!-- ============================================ -->
-  <!-- LEGEND                                       -->
-  <!-- ============================================ -->
-  <rect x="16" y="604" width="1168" height="184" rx="6"
-    fill="#fcfcfd" stroke="#e5e7eb"
-    stroke-width="1" opacity="0.85"/>
-  <text x="28" y="626" class="legend-label">LEGEND</text>
-
-  <rect x="28" y="640" width="14" height="14" rx="2"
-    fill="#4B6CA1"/>
-  <text x="48" y="651" class="legend-text">
-    Core entities · the nouns of the domain</text>
-
-  <rect x="28" y="662" width="14" height="14" rx="2"
-    fill="#6B8E23"/>
-  <text x="48" y="673" class="legend-text">
-    Tools · flows store their graph as a JSON document</text>
-
-  <rect x="28" y="684" width="14" height="14" rx="2"
-    fill="#B45309"/>
-  <text x="48" y="695" class="legend-text">
-    Workbox · work_orders hold a frozen flow_graph
-    snapshot taken at creation time</text>
-
-  <rect x="620" y="640" width="14" height="14" rx="2"
-    fill="#64748b"/>
-  <text x="640" y="651" class="legend-text">
-    Platform · activities is the audit log</text>
-
-  <rect x="620" y="662" width="14" height="14" rx="2"
-    fill="#475569"/>
-  <text x="640" y="673" class="legend-text">
-    Admin singletons · single row, id = '1'
-    (SingletonStore)</text>
-
-  <rect x="620" y="684" width="14" height="14" rx="2"
-    fill="#94a3b8"/>
-  <text x="640" y="695" class="legend-text">
-    Relationships &amp; history · junction tables plus
-    flow_versions (per-flow undo)</text>
-
-  <text x="28" y="724" class="note">
-    Conventions: all columns NOT NULL · booleans stored
-    as INTEGER 0|1 · timestamps RFC-3339 Zulu · durations
-    in seconds · IDs are TEXT</text>
-  <text x="28" y="744" class="note">
-    Arrows point from a junction to the parent it
-    references · arrow color matches the parent's group</text>
-  <text x="28" y="764" class="note">
-    work_order_transitions is event-sourced (append-only,
-    no updates) · flow_versions is history-only (capped
-    at 10, oldest deleted on overflow)</text>
-
-  <text x="600" y="880" text-anchor="middle" class="note">
-    Generated from SCHEMA.md and api/types.ts
-  </text>
+  <rect x="0" y="0" width="1504" height="1088" fill="hsl(217 30% 97%)" />
+  <path class="edge" d="M 648 727 C 590.4 727, 609.6 208, 552 208" />
+  <path class="edge" d="M 648 89 C 590.4 89, 609.6 208, 552 208" />
+  <path class="edge" d="M 648 390 C 590.4 390, 305.6 116, 248 116" />
+  <path class="edge" d="M 952 253 C 894.4 253, 305.6 826, 248 826" />
+  <path class="edge" d="M 952 253 C 894.4 253, 305.6 116, 248 116" />
+  <path class="edge" d="M 648 563 C 590.4 563, 305.6 116, 248 116" />
+  <path class="edge" d="M 648 563 C 590.4 563, 609.6 89, 552 89" />
+  <path class="edge" d="M 1256 89 C 1198.4 89, 1217.6 900, 1160 900" />
+  <path class="edge" d="M 1256 89 C 1198.4 89, 1217.6 736, 1160 736" />
+  <path class="edge" d="M 952 736 C 894.4 736, 305.6 999, 248 999" />
+  <path class="edge" d="M 648 217 C 590.4 217, 305.6 116, 248 116" />
+  <path class="edge" d="M 648 217 C 590.4 217, 305.6 999, 248 999" />
+  <path class="edge" d="M 648 891 C 590.4 891, 305.6 307, 248 307" />
+  <path class="edge" d="M 648 891 C 590.4 891, 609.6 208, 552 208" />
+  <path class="edge" d="M 952 107 C 894.4 107, 305.6 453, 248 453" />
+  <path class="edge" d="M 952 107 C 894.4 107, 609.6 208, 552 208" />
+  <path class="edge" d="M 952 563 C 894.4 563, 305.6 826, 248 826" />
+  <path class="edge" d="M 952 563 C 894.4 563, 305.6 453, 248 453" />
+  <path class="edge" d="M 952 563 C 894.4 563, 609.6 208, 552 208" />
+  <path class="edge" d="M 952 399 C 894.4 399, 305.6 826, 248 826" />
+  <path class="edge" d="M 952 399 C 894.4 399, 305.6 453, 248 453" />
+  <path class="edge" d="M 952 399 C 894.4 399, 609.6 208, 552 208" />
+  <path class="edge" d="M 952 900 C 894.4 900, 609.6 208, 552 208" />
+  <g class="table">
+    <rect class="box" x="344" y="168" width="208" height="80" rx="6" />
+    <rect class="head" x="344" y="168" width="208" height="26" rx="6" />
+    <text class="thead" x="354" y="186">workers</text>
+    <text class="pk" x="354" y="207">id</text>
+    <text class="type" x="542" y="207">id</text>
+    <text class="col" x="354" y="225">type</text>
+    <text class="type" x="542" y="225">WorkerKind</text>
+    <text class="col" x="354" y="243">name</text>
+    <text class="type" x="542" y="243">text</text>
+  </g>
+  <g class="table">
+    <rect class="box" x="648" y="642" width="208" height="170" rx="6" />
+    <rect class="head" x="648" y="642" width="208" height="26" rx="6" />
+    <text class="thead" x="658" y="660">human_workers</text>
+    <text class="pk" x="658" y="681">id</text>
+    <text class="type" x="846" y="681">id</text>
+    <text class="col" x="658" y="699">email</text>
+    <text class="type" x="846" y="699">text</text>
+    <text class="col" x="658" y="717">title</text>
+    <text class="type" x="846" y="717">text</text>
+    <text class="col" x="658" y="735">department</text>
+    <text class="type" x="846" y="735">text</text>
+    <text class="col" x="658" y="753">strengths</text>
+    <text class="type" x="846" y="753">json</text>
+    <text class="col" x="658" y="771">team_dimensions</text>
+    <text class="type" x="846" y="771">json</text>
+    <text class="col" x="658" y="789">phone</text>
+    <text class="type" x="846" y="789">text</text>
+    <text class="col" x="658" y="807">bio</text>
+    <text class="type" x="846" y="807">text</text>
+  </g>
+  <g class="table">
+    <rect class="box" x="648" y="40" width="208" height="98" rx="6" />
+    <rect class="head" x="648" y="40" width="208" height="26" rx="6" />
+    <text class="thead" x="658" y="58">ai_workers</text>
+    <text class="pk" x="658" y="79">id</text>
+    <text class="type" x="846" y="79">id</text>
+    <text class="col" x="658" y="97">description</text>
+    <text class="type" x="846" y="97">text</text>
+    <text class="col" x="658" y="115">skill_focus</text>
+    <text class="type" x="846" y="115">text</text>
+    <text class="col" x="658" y="133">model</text>
+    <text class="type" x="846" y="133">id</text>
+  </g>
+  <g class="table">
+    <rect class="box" x="40" y="222" width="208" height="170" rx="6" />
+    <rect class="head" x="40" y="222" width="208" height="26" rx="6" />
+    <text class="thead" x="50" y="240">ideas</text>
+    <text class="pk" x="50" y="261">id</text>
+    <text class="type" x="238" y="261">id</text>
+    <text class="col" x="50" y="279">title</text>
+    <text class="type" x="238" y="279">text</text>
+    <text class="col" x="50" y="297">position</text>
+    <text class="type" x="238" y="297">num</text>
+    <text class="col" x="50" y="315">problem_statement</text>
+    <text class="type" x="238" y="315">text</text>
+    <text class="col" x="50" y="333">target_users</text>
+    <text class="type" x="238" y="333">text</text>
+    <text class="col" x="50" y="351">proposed_solution</text>
+    <text class="type" x="238" y="351">text</text>
+    <text class="col" x="50" y="369">expected_outcome</text>
+    <text class="type" x="238" y="369">text</text>
+    <text class="col" x="50" y="387">success_metrics</text>
+    <text class="type" x="238" y="387">text</text>
+  </g>
+  <g class="table">
+    <rect class="box" x="40" y="732" width="208" height="188" rx="6" />
+    <rect class="head" x="40" y="732" width="208" height="26" rx="6" />
+    <text class="thead" x="50" y="750">projects</text>
+    <text class="pk" x="50" y="771">id</text>
+    <text class="type" x="238" y="771">id</text>
+    <text class="col" x="50" y="789">title</text>
+    <text class="type" x="238" y="789">text</text>
+    <text class="col" x="50" y="807">description</text>
+    <text class="type" x="238" y="807">text</text>
+    <text class="col" x="50" y="825">progress</text>
+    <text class="type" x="238" y="825">num</text>
+    <text class="col" x="50" y="843">start_date</text>
+    <text class="type" x="238" y="843">text</text>
+    <text class="col" x="50" y="861">target_end_date</text>
+    <text class="type" x="238" y="861">text</text>
+    <text class="col" x="50" y="879">estimated_cost</text>
+    <text class="type" x="238" y="879">num</text>
+    <text class="col" x="50" y="897">actual_cost</text>
+    <text class="type" x="238" y="897">num</text>
+    <text class="col" x="50" y="915">position</text>
+    <text class="type" x="238" y="915">num</text>
+  </g>
+  <g class="table">
+    <rect class="box" x="40" y="40" width="208" height="152" rx="6" />
+    <rect class="head" x="40" y="40" width="208" height="26" rx="6" />
+    <text class="thead" x="50" y="58">flows</text>
+    <text class="pk" x="50" y="79">id</text>
+    <text class="type" x="238" y="79">id</text>
+    <text class="col" x="50" y="97">name</text>
+    <text class="type" x="238" y="97">text</text>
+    <text class="col" x="50" y="115">is_locked</text>
+    <text class="type" x="238" y="115">bool</text>
+    <text class="col" x="50" y="133">is_auto_layout</text>
+    <text class="type" x="238" y="133">bool</text>
+    <text class="col" x="50" y="151">is_auto_fit</text>
+    <text class="type" x="238" y="151">bool</text>
+    <text class="col" x="50" y="169">lock_timeout</text>
+    <text class="type" x="238" y="169">num</text>
+    <text class="col" x="50" y="187">graph</text>
+    <text class="type" x="238" y="187">json</text>
+  </g>
+  <g class="table">
+    <rect class="box" x="648" y="296" width="208" height="188" rx="6" />
+    <rect class="head" x="648" y="296" width="208" height="26" rx="6" />
+    <text class="thead" x="658" y="314">flow_versions</text>
+    <text class="pk" x="658" y="335">id</text>
+    <text class="type" x="846" y="335">id</text>
+    <text class="fk" x="658" y="353">flow_id</text>
+    <text class="type" x="846" y="353">id</text>
+    <text class="col" x="658" y="371">name</text>
+    <text class="type" x="846" y="371">text</text>
+    <text class="col" x="658" y="389">is_locked</text>
+    <text class="type" x="846" y="389">bool</text>
+    <text class="col" x="658" y="407">is_auto_layout</text>
+    <text class="type" x="846" y="407">bool</text>
+    <text class="col" x="658" y="425">is_auto_fit</text>
+    <text class="type" x="846" y="425">bool</text>
+    <text class="col" x="658" y="443">lock_timeout</text>
+    <text class="type" x="846" y="443">num</text>
+    <text class="col" x="658" y="461">graph</text>
+    <text class="type" x="846" y="461">json</text>
+    <text class="col" x="658" y="479">at</text>
+    <text class="type" x="846" y="479">text</text>
+  </g>
+  <g class="table">
+    <rect class="box" x="952" y="204" width="208" height="98" rx="6" />
+    <rect class="head" x="952" y="204" width="208" height="26" rx="6" />
+    <text class="thead" x="962" y="222">project_flows</text>
+    <text class="pk" x="962" y="243">id</text>
+    <text class="type" x="1150" y="243">id</text>
+    <text class="fk" x="962" y="261">project_id</text>
+    <text class="type" x="1150" y="261">id</text>
+    <text class="fk" x="962" y="279">flow_id</text>
+    <text class="type" x="1150" y="279">id</text>
+    <text class="col" x="962" y="297">at</text>
+    <text class="type" x="1150" y="297">text</text>
+  </g>
+  <g class="table">
+    <rect class="box" x="344" y="40" width="208" height="98" rx="6" />
+    <rect class="head" x="344" y="40" width="208" height="26" rx="6" />
+    <text class="thead" x="354" y="58">work_orders</text>
+    <text class="pk" x="354" y="79">id</text>
+    <text class="type" x="542" y="79">id</text>
+    <text class="col" x="354" y="97">display_id</text>
+    <text class="type" x="542" y="97">text</text>
+    <text class="col" x="354" y="115">flow_graph</text>
+    <text class="type" x="542" y="115">json</text>
+    <text class="col" x="354" y="133">position</text>
+    <text class="type" x="542" y="133">num</text>
+  </g>
+  <g class="table">
+    <rect class="box" x="648" y="514" width="208" height="98" rx="6" />
+    <rect class="head" x="648" y="514" width="208" height="26" rx="6" />
+    <text class="thead" x="658" y="532">flow_work_orders</text>
+    <text class="pk" x="658" y="553">id</text>
+    <text class="type" x="846" y="553">id</text>
+    <text class="fk" x="658" y="571">flow_id</text>
+    <text class="type" x="846" y="571">id</text>
+    <text class="fk" x="658" y="589">work_order_id</text>
+    <text class="type" x="846" y="589">id</text>
+    <text class="col" x="658" y="607">at</text>
+    <text class="type" x="846" y="607">text</text>
+  </g>
+  <g class="table">
+    <rect class="box" x="1256" y="40" width="208" height="98" rx="6" />
+    <rect class="head" x="1256" y="40" width="208" height="26" rx="6" />
+    <text class="thead" x="1266" y="58">state_field_values</text>
+    <text class="pk" x="1266" y="79">id</text>
+    <text class="type" x="1454" y="79">id</text>
+    <text class="fk" x="1266" y="97">state_event_id</text>
+    <text class="type" x="1454" y="97">id</text>
+    <text class="fk" x="1266" y="115">field_id</text>
+    <text class="type" x="1454" y="115">id</text>
+    <text class="col" x="1266" y="133">value</text>
+    <text class="type" x="1454" y="133">text</text>
+  </g>
+  <g class="table">
+    <rect class="box" x="40" y="950" width="208" height="98" rx="6" />
+    <rect class="head" x="40" y="950" width="208" height="26" rx="6" />
+    <text class="thead" x="50" y="968">records</text>
+    <text class="pk" x="50" y="989">id</text>
+    <text class="type" x="238" y="989">id</text>
+    <text class="col" x="50" y="1007">name</text>
+    <text class="type" x="238" y="1007">text</text>
+    <text class="col" x="50" y="1025">description</text>
+    <text class="type" x="238" y="1025">text</text>
+    <text class="col" x="50" y="1043">position</text>
+    <text class="type" x="238" y="1043">num</text>
+  </g>
+  <g class="table">
+    <rect class="box" x="952" y="660" width="208" height="152" rx="6" />
+    <rect class="head" x="952" y="660" width="208" height="26" rx="6" />
+    <text class="thead" x="962" y="678">record_attributes</text>
+    <text class="pk" x="962" y="699">id</text>
+    <text class="type" x="1150" y="699">id</text>
+    <text class="fk" x="962" y="717">record_id</text>
+    <text class="type" x="1150" y="717">id</text>
+    <text class="col" x="962" y="735">name</text>
+    <text class="type" x="1150" y="735">text</text>
+    <text class="col" x="962" y="753">attribute_type</text>
+    <text class="type" x="1150" y="753">AttributeType</text>
+    <text class="col" x="962" y="771">sort_order</text>
+    <text class="type" x="1150" y="771">num</text>
+    <text class="col" x="962" y="789">options</text>
+    <text class="type" x="1150" y="789">json</text>
+    <text class="col" x="962" y="807">constraints</text>
+    <text class="type" x="1150" y="807">json</text>
+  </g>
+  <g class="table">
+    <rect class="box" x="648" y="168" width="208" height="98" rx="6" />
+    <rect class="head" x="648" y="168" width="208" height="26" rx="6" />
+    <text class="thead" x="658" y="186">flow_records</text>
+    <text class="pk" x="658" y="207">id</text>
+    <text class="type" x="846" y="207">id</text>
+    <text class="fk" x="658" y="225">flow_id</text>
+    <text class="type" x="846" y="225">id</text>
+    <text class="fk" x="658" y="243">record_id</text>
+    <text class="type" x="846" y="243">id</text>
+    <text class="col" x="658" y="261">at</text>
+    <text class="type" x="846" y="261">text</text>
+  </g>
+  <g class="table">
+    <rect class="box" x="40" y="514" width="208" height="188" rx="6" />
+    <rect class="head" x="40" y="514" width="208" height="26" rx="6" />
+    <text class="thead" x="50" y="532">organization</text>
+    <text class="pk" x="50" y="553">id</text>
+    <text class="type" x="238" y="553">id</text>
+    <text class="col" x="50" y="571">name</text>
+    <text class="type" x="238" y="571">text</text>
+    <text class="col" x="50" y="589">domain</text>
+    <text class="type" x="238" y="589">text</text>
+    <text class="col" x="50" y="607">next_billing</text>
+    <text class="type" x="238" y="607">text</text>
+    <text class="col" x="50" y="625">seats</text>
+    <text class="type" x="238" y="625">num</text>
+    <text class="col" x="50" y="643">used_seats</text>
+    <text class="type" x="238" y="643">num</text>
+    <text class="col" x="50" y="661">projects_limit</text>
+    <text class="type" x="238" y="661">num</text>
+    <text class="col" x="50" y="679">ideas_limit</text>
+    <text class="type" x="238" y="679">num</text>
+    <text class="col" x="50" y="697">last_activity</text>
+    <text class="type" x="238" y="697">text</text>
+  </g>
+  <g class="table">
+    <rect class="box" x="648" y="842" width="208" height="98" rx="6" />
+    <rect class="head" x="648" y="842" width="208" height="26" rx="6" />
+    <text class="thead" x="658" y="860">idea_submissions</text>
+    <text class="pk" x="658" y="881">id</text>
+    <text class="type" x="846" y="881">id</text>
+    <text class="fk" x="658" y="899">idea_id</text>
+    <text class="type" x="846" y="899">id</text>
+    <text class="fk" x="658" y="917">worker_id</text>
+    <text class="type" x="846" y="917">id</text>
+    <text class="col" x="658" y="935">at</text>
+    <text class="type" x="846" y="935">text</text>
+  </g>
+  <g class="table">
+    <rect class="box" x="40" y="422" width="208" height="62" rx="6" />
+    <rect class="head" x="40" y="422" width="208" height="26" rx="6" />
+    <text class="thead" x="50" y="440">objectives</text>
+    <text class="pk" x="50" y="461">id</text>
+    <text class="type" x="238" y="461">id</text>
+    <text class="col" x="50" y="479">position</text>
+    <text class="type" x="238" y="479">num</text>
+  </g>
+  <g class="table">
+    <rect class="box" x="952" y="40" width="208" height="134" rx="6" />
+    <rect class="head" x="952" y="40" width="208" height="26" rx="6" />
+    <text class="thead" x="962" y="58">objective_revisions</text>
+    <text class="pk" x="962" y="79">id</text>
+    <text class="type" x="1150" y="79">text</text>
+    <text class="fk" x="962" y="97">objective_id</text>
+    <text class="type" x="1150" y="97">id</text>
+    <text class="col" x="962" y="115">name</text>
+    <text class="type" x="1150" y="115">text</text>
+    <text class="col" x="962" y="133">description</text>
+    <text class="type" x="1150" y="133">text</text>
+    <text class="fk" x="962" y="151">worker_id</text>
+    <text class="type" x="1150" y="151">id</text>
+    <text class="col" x="962" y="169">at</text>
+    <text class="type" x="1150" y="169">text</text>
+  </g>
+  <g class="table">
+    <rect class="box" x="952" y="496" width="208" height="134" rx="6" />
+    <rect class="head" x="952" y="496" width="208" height="26" rx="6" />
+    <text class="thead" x="962" y="514">project_objective_baseline_scores</text>
+    <text class="pk" x="962" y="535">id</text>
+    <text class="type" x="1150" y="535">text</text>
+    <text class="fk" x="962" y="553">project_id</text>
+    <text class="type" x="1150" y="553">id</text>
+    <text class="fk" x="962" y="571">objective_id</text>
+    <text class="type" x="1150" y="571">id</text>
+    <text class="col" x="962" y="589">score</text>
+    <text class="type" x="1150" y="589">num</text>
+    <text class="fk" x="962" y="607">worker_id</text>
+    <text class="type" x="1150" y="607">id</text>
+    <text class="col" x="962" y="625">at</text>
+    <text class="type" x="1150" y="625">text</text>
+  </g>
+  <g class="table">
+    <rect class="box" x="952" y="332" width="208" height="134" rx="6" />
+    <rect class="head" x="952" y="332" width="208" height="26" rx="6" />
+    <text class="thead" x="962" y="350">project_objective_actual_scores</text>
+    <text class="pk" x="962" y="371">id</text>
+    <text class="type" x="1150" y="371">text</text>
+    <text class="fk" x="962" y="389">project_id</text>
+    <text class="type" x="1150" y="389">id</text>
+    <text class="fk" x="962" y="407">objective_id</text>
+    <text class="type" x="1150" y="407">id</text>
+    <text class="col" x="962" y="425">score</text>
+    <text class="type" x="1150" y="425">num</text>
+    <text class="fk" x="962" y="443">worker_id</text>
+    <text class="type" x="1150" y="443">id</text>
+    <text class="col" x="962" y="461">at</text>
+    <text class="type" x="1150" y="461">text</text>
+  </g>
+  <g class="table">
+    <rect class="box" x="952" y="842" width="208" height="116" rx="6" />
+    <rect class="head" x="952" y="842" width="208" height="26" rx="6" />
+    <text class="thead" x="962" y="860">states</text>
+    <text class="pk" x="962" y="881">id</text>
+    <text class="type" x="1150" y="881">id</text>
+    <text class="col" x="962" y="899">entity_id</text>
+    <text class="type" x="1150" y="899">id</text>
+    <text class="col" x="962" y="917">state</text>
+    <text class="type" x="1150" y="917">text</text>
+    <text class="fk" x="962" y="935">worker_id</text>
+    <text class="type" x="1150" y="935">id</text>
+    <text class="col" x="962" y="953">at</text>
+    <text class="type" x="1150" y="953">text</text>
+  </g>
 </svg>

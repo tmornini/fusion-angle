@@ -125,6 +125,7 @@ const node = (
     isArchive: false,
     workerIds: [] as string[],
     attributes: [],
+    taskInstructions: '',
 });
 
 function buildPresenterWithNodes(

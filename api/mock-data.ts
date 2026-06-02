@@ -1410,6 +1410,7 @@ export async function populateMockData(
             isArchive: false,
             workerIds: [],
             attributes: [],
+            taskInstructions: '',
         },
         {
             id: l2cTriageNodeId,
@@ -1422,6 +1423,7 @@ export async function populateMockData(
                 workerLisa, workerClaude,
             ],
             attributes: [],
+            taskInstructions: '',
         },
         {
             id: l2cDiscoveryNodeId,
@@ -1434,6 +1436,7 @@ export async function populateMockData(
                 workerSarah, workerMarcus,
             ],
             attributes: [],
+            taskInstructions: '',
         },
         {
             id: l2cQualifNodeId,
@@ -1446,6 +1449,7 @@ export async function populateMockData(
                 workerSarah, workerMarcus,
             ],
             attributes: [],
+            taskInstructions: '',
         },
         {
             id: l2cProposalNodeId,
@@ -1458,6 +1462,7 @@ export async function populateMockData(
                 workerMike, workerSarah,
             ],
             attributes: [],
+            taskInstructions: '',
         },
         {
             id: l2cNegotNodeId,
@@ -1468,6 +1473,7 @@ export async function populateMockData(
             isArchive: false,
             workerIds: [workerSarah],
             attributes: [],
+            taskInstructions: '',
         },
         {
             id: l2cArchiveNodeId,
@@ -1478,6 +1484,7 @@ export async function populateMockData(
             isArchive: true,
             workerIds: [],
             attributes: [],
+            taskInstructions: '',
         },
     ];
 
@@ -1557,6 +1564,7 @@ export async function populateMockData(
                         positionY: 30,
                         isCreate: true,
                         isArchive: false,
+                        taskInstructions: '',
                         workerIds: [],
                         attributes: [],
                     },
@@ -1568,6 +1576,7 @@ export async function populateMockData(
                         positionY: 140,
                         isCreate: false,
                         isArchive: false,
+                        taskInstructions: '',
                         workerIds: [
                             'WxQn4LVWb76YkmqK5B0EPp',
                             'current',
@@ -1654,6 +1663,7 @@ export async function populateMockData(
                         positionY: 250,
                         isCreate: false,
                         isArchive: false,
+                        taskInstructions: '',
                         workerIds: [],
                         attributes: [
                             {
@@ -1689,6 +1699,7 @@ export async function populateMockData(
                         positionY: 370,
                         isCreate: false,
                         isArchive: true,
+                        taskInstructions: '',
                         workerIds: [],
                         attributes: [],
                     },
@@ -1747,6 +1758,7 @@ export async function populateMockData(
                         positionY: -236,
                         isCreate: true,
                         isArchive: false,
+                        taskInstructions: '',
                         workerIds: [],
                         attributes: [],
                     },
@@ -1757,6 +1769,7 @@ export async function populateMockData(
                         positionY: 358,
                         isCreate: false,
                         isArchive: true,
+                        taskInstructions: '',
                         workerIds: [],
                         attributes: [],
                     },
@@ -1767,6 +1780,7 @@ export async function populateMockData(
                         positionY: -234,
                         isCreate: false,
                         isArchive: false,
+                        taskInstructions: '',
                         workerIds: [],
                         attributes: [],
                     },
@@ -1778,6 +1792,7 @@ export async function populateMockData(
                         positionY: -230,
                         isCreate: false,
                         isArchive: false,
+                        taskInstructions: '',
                         workerIds: [],
                         attributes: [
                             {
@@ -1805,6 +1820,7 @@ export async function populateMockData(
                         positionY: -232,
                         isCreate: false,
                         isArchive: false,
+                        taskInstructions: '',
                         workerIds: [],
                         attributes: [],
                     },
@@ -1815,6 +1831,7 @@ export async function populateMockData(
                         positionY: -231,
                         isCreate: false,
                         isArchive: false,
+                        taskInstructions: '',
                         workerIds: [],
                         attributes: [
                             {
@@ -1842,6 +1859,7 @@ export async function populateMockData(
                         positionY: -108,
                         isCreate: false,
                         isArchive: false,
+                        taskInstructions: '',
                         workerIds: [],
                         attributes: [],
                     },
@@ -1852,6 +1870,7 @@ export async function populateMockData(
                         positionY: -108,
                         isCreate: false,
                         isArchive: false,
+                        taskInstructions: '',
                         workerIds: [],
                         attributes: [],
                     },
@@ -1862,6 +1881,7 @@ export async function populateMockData(
                         positionY: 22,
                         isCreate: false,
                         isArchive: false,
+                        taskInstructions: '',
                         workerIds: [],
                         attributes: [],
                     },
@@ -1872,6 +1892,7 @@ export async function populateMockData(
                         positionY: 141,
                         isCreate: false,
                         isArchive: false,
+                        taskInstructions: '',
                         workerIds: [],
                         attributes: [],
                     },
@@ -1882,6 +1903,7 @@ export async function populateMockData(
                         positionY: -108,
                         isCreate: false,
                         isArchive: false,
+                        taskInstructions: '',
                         workerIds: [],
                         attributes: [],
                     },
@@ -1892,6 +1914,7 @@ export async function populateMockData(
                         positionY: -108,
                         isCreate: false,
                         isArchive: false,
+                        taskInstructions: '',
                         workerIds: [],
                         attributes: [],
                     },
@@ -1902,6 +1925,7 @@ export async function populateMockData(
                         positionY: 278,
                         isCreate: false,
                         isArchive: false,
+                        taskInstructions: '',
                         workerIds: [],
                         attributes: [],
                     },
@@ -1912,6 +1936,7 @@ export async function populateMockData(
                         positionY: -3,
                         isCreate: false,
                         isArchive: false,
+                        taskInstructions: '',
                         workerIds: [],
                         attributes: [],
                     },
@@ -1923,6 +1948,7 @@ export async function populateMockData(
                         positionY: -7,
                         isCreate: false,
                         isArchive: false,
+                        taskInstructions: '',
                         workerIds: [],
                         attributes: [],
                     },
@@ -1934,6 +1960,7 @@ export async function populateMockData(
                         positionY: 81,
                         isCreate: false,
                         isArchive: false,
+                        taskInstructions: '',
                         workerIds: [],
                         attributes: [],
                     },
@@ -1945,6 +1972,7 @@ export async function populateMockData(
                         positionY: 274,
                         isCreate: false,
                         isArchive: false,
+                        taskInstructions: '',
                         workerIds: [],
                         attributes: [],
                     },
@@ -1956,6 +1984,7 @@ export async function populateMockData(
                         positionY: 214,
                         isCreate: false,
                         isArchive: false,
+                        taskInstructions: '',
                         workerIds: [],
                         attributes: [],
                     },
@@ -2131,6 +2160,7 @@ export async function populateMockData(
                         positionY: 0,
                         isCreate: true,
                         isArchive: false,
+                        taskInstructions: '',
                         workerIds: [],
                         attributes: [],
                     },
@@ -2141,6 +2171,7 @@ export async function populateMockData(
                         positionY: 0,
                         isCreate: false,
                         isArchive: false,
+                        taskInstructions: '',
                         workerIds: [],
                         attributes: [],
                     },
@@ -2151,6 +2182,7 @@ export async function populateMockData(
                         positionY: 0,
                         isCreate: false,
                         isArchive: false,
+                        taskInstructions: '',
                         workerIds: [],
                         attributes: [],
                     },
@@ -2161,6 +2193,7 @@ export async function populateMockData(
                         positionY: 0,
                         isCreate: false,
                         isArchive: false,
+                        taskInstructions: '',
                         workerIds: [],
                         attributes: [],
                     },
@@ -2171,6 +2204,7 @@ export async function populateMockData(
                         positionY: 0,
                         isCreate: false,
                         isArchive: false,
+                        taskInstructions: '',
                         workerIds: [],
                         attributes: [],
                     },
@@ -2181,6 +2215,7 @@ export async function populateMockData(
                         positionY: 0,
                         isCreate: false,
                         isArchive: false,
+                        taskInstructions: '',
                         workerIds: [],
                         attributes: [],
                     },
@@ -2191,6 +2226,7 @@ export async function populateMockData(
                         positionY: 0,
                         isCreate: false,
                         isArchive: false,
+                        taskInstructions: '',
                         workerIds: [],
                         attributes: [],
                     },
@@ -2201,6 +2237,7 @@ export async function populateMockData(
                         positionY: 0,
                         isCreate: false,
                         isArchive: false,
+                        taskInstructions: '',
                         workerIds: [],
                         attributes: [],
                     },
@@ -2211,6 +2248,7 @@ export async function populateMockData(
                         positionY: 0,
                         isCreate: false,
                         isArchive: false,
+                        taskInstructions: '',
                         workerIds: [],
                         attributes: [],
                     },
@@ -2221,6 +2259,7 @@ export async function populateMockData(
                         positionY: 0,
                         isCreate: false,
                         isArchive: false,
+                        taskInstructions: '',
                         workerIds: [],
                         attributes: [],
                     },
@@ -2231,6 +2270,7 @@ export async function populateMockData(
                         positionY: 0,
                         isCreate: false,
                         isArchive: false,
+                        taskInstructions: '',
                         workerIds: [],
                         attributes: [],
                     },
@@ -2241,6 +2281,7 @@ export async function populateMockData(
                         positionY: 0,
                         isCreate: false,
                         isArchive: false,
+                        taskInstructions: '',
                         workerIds: [],
                         attributes: [],
                     },
@@ -2251,6 +2292,7 @@ export async function populateMockData(
                         positionY: 0,
                         isCreate: false,
                         isArchive: false,
+                        taskInstructions: '',
                         workerIds: [],
                         attributes: [],
                     },
@@ -2261,6 +2303,7 @@ export async function populateMockData(
                         positionY: 0,
                         isCreate: false,
                         isArchive: false,
+                        taskInstructions: '',
                         workerIds: [],
                         attributes: [],
                     },
@@ -2271,6 +2314,7 @@ export async function populateMockData(
                         positionY: 0,
                         isCreate: false,
                         isArchive: false,
+                        taskInstructions: '',
                         workerIds: [],
                         attributes: [],
                     },
@@ -2281,6 +2325,7 @@ export async function populateMockData(
                         positionY: 0,
                         isCreate: false,
                         isArchive: false,
+                        taskInstructions: '',
                         workerIds: [],
                         attributes: [],
                     },
@@ -2291,6 +2336,7 @@ export async function populateMockData(
                         positionY: 0,
                         isCreate: false,
                         isArchive: true,
+                        taskInstructions: '',
                         workerIds: [],
                         attributes: [],
                     },
@@ -5861,41 +5907,45 @@ export async function populateMockData(
     const aiWorkers: (AIWorkerEntity & { name: string })[] = [
         {
             id: 'tuJwPxYtBur2KCLquScShB',
-            name: 'Claude Opus 4.7 Max',
-            provider: 'Anthropic',
+            name: 'Claude Opus 4.8',
             description:
                 'Anthropic flagship — long'
                 + ' context, deep reasoning.',
-            auth_token:
-                'sk-PLACEHOLDER-DEMOTOKEN-XXXX',
+            skill_focus:
+                'Long-context analysis and'
+                + ' multi-step reasoning.',
+            model: 'mnte677fU2G1V2B9vJp9z7',
         },
         {
             id: 'LdoTR1fnyYpS1jPzEs57ek',
             name: 'Claude Sonnet 4.6',
-            provider: 'Anthropic',
             description:
                 'Anthropic mid-tier — fast'
                 + ' and capable.',
-            auth_token:
-                'sk-PLACEHOLDER-DEMOTOKEN-XXXX',
+            skill_focus:
+                'Fast drafting and everyday'
+                + ' task execution.',
+            model: 'VIdXPkkC1H1xjav2aTKW3u',
         },
         {
             id: 'Xv89xOCXR6awwoXcPvEY9Y',
-            name: 'GPT-5.4 Pro',
-            provider: 'OpenAI',
+            name: 'GPT-5.5',
             description:
                 'OpenAI multimodal flagship.',
-            auth_token:
-                'sk-PLACEHOLDER-DEMOTOKEN-XXXX',
+            skill_focus:
+                'Multimodal synthesis across'
+                + ' text and images.',
+            model: 'B3yjKd4NnpGhVRrY6plL0o',
         },
         {
             id: '42vHYDCvtkaO3sTnoqg7aJ',
-            name: 'Grok 4.20 Heavy',
-            provider: 'xAI',
+            name: 'Grok 4.3',
             description:
                 'xAI heavy-compute model.',
-            auth_token:
-                'sk-PLACEHOLDER-DEMOTOKEN-XXXX',
+            skill_focus:
+                'High-compute exploration of'
+                + ' open-ended problems.',
+            model: 'GI19ucwHLOy7ecnQOtD27v',
         },
     ];
 

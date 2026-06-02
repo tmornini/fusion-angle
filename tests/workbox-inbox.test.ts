@@ -58,6 +58,7 @@ function buildNode(
         isArchive: false,
         workerIds: [],
         attributes: [],
+        taskInstructions: '',
         ...overrides,
     };
 }
@@ -366,6 +367,81 @@ test(
                 new Map(), workerMap, 'active',
             ),
             /no transitions/,
+        );
+    },
+);
+
+test(
+    'buildInboxItems carries the current'
+    + " node's task instructions",
+    async () => {
+        const db = new MemoryDbAdapter();
+        await db.createSchema();
+        await seedHumanWorker(
+            db, 'current', 'Demo Test',
+        );
+        const ctx = createRequestContext(db);
+        await db.flows.put('f1', buildFlow({
+            nodes: [
+                buildNode('n-start', 'Start', {
+                    isCreate: true,
+                }),
+                buildNode(
+                    'n-middle', 'Doing work', {
+                        workerIds: ['current'],
+                        taskInstructions:
+                            '# Verify totals',
+                    },
+                ),
+                buildNode('n-finish', 'Done', {
+                    isArchive: true,
+                }),
+            ],
+            edges: [
+                buildEdge(
+                    'e1', 'n-start', 'n-middle',
+                ),
+                buildEdge(
+                    'e2', 'n-middle', 'n-finish',
+                ),
+            ],
+        }));
+        await postWorkOrderCreation(ctx, {
+            workOrderId:
+                generateCryptoSafeBase62(),
+            flowLinkId:
+                generateCryptoSafeBase62(),
+            flowId: 'f1',
+        });
+        const {
+            workOrders, transitionsByWo, workerMap,
+        } = await collectTables(db);
+        const items = buildInboxItems(
+            workOrders, transitionsByWo,
+            new Map(), workerMap, 'active',
+        );
+        assert.equal(
+            items[0]!.taskInstructions,
+            '# Verify totals',
+        );
+    },
+);
+
+test(
+    'buildInboxItems leaves taskInstructions'
+    + ' empty when the node has none',
+    async () => {
+        const { tables } =
+            await setupOneWorkOrder();
+        const {
+            workOrders, transitionsByWo, workerMap,
+        } = await tables();
+        const items = buildInboxItems(
+            workOrders, transitionsByWo,
+            new Map(), workerMap, 'active',
+        );
+        assert.equal(
+            items[0]!.taskInstructions, '',
         );
     },
 );

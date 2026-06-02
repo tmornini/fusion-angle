@@ -122,48 +122,28 @@ async function applyRecordMultiPut(
     payload: Record<string, unknown>,
 ): Promise<void> {
     const body = validateRecordMultiPutBody(payload);
-    let opIndex = 0;
-    try {
-        await db.records.put(
-            body.id, body.record,
+    const entries = body.attributes.map(attr => {
+        const { id, ...fields } = attr;
+        return { id, fields };
+    });
+    const removedIds =
+        body.kind === 'edit'
+            ? body.removedAttributeIds
+            : [];
+    await db.records.put(body.id, body.record);
+    if (body.kind === 'create') {
+        const worker =
+            await db.workers.getById('current');
+        await db.states.record(
+            body.initialStateEventId,
+            body.id,
+            body.initialState,
+            worker.id,
         );
-        opIndex++;
-        if (body.kind === 'create') {
-            const worker =
-                await db.workers.getById('current');
-            await db.states.record(
-                body.initialStateEventId,
-                body.id,
-                body.initialState,
-                worker.id,
-            );
-            opIndex++;
-        } else {
-            for (
-                const removedId
-                of body.removedAttributeIds
-            ) {
-                await db.recordAttributes.delete(
-                    removedId,
-                );
-                opIndex++;
-            }
-        }
-        for (const attr of body.attributes) {
-            const { id, ...rest } = attr;
-            await db.recordAttributes.put(
-                id, rest,
-            );
-            opIndex++;
-        }
-    } catch (e) {
-        const cause =
-            e instanceof Error
-                ? e.message
-                : String(e);
-        throw new Error(
-            'records-multi-put failed at op['
-            + opIndex + ']: ' + cause,
+    }
+    if (entries.length > 0 || removedIds.length > 0) {
+        await db.recordAttributes.putMany(
+            entries, removedIds,
         );
     }
 }

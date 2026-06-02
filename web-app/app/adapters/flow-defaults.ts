@@ -2,6 +2,7 @@ import type { GraphNode } from '../../../api/types.ts';
 import {
     DEFAULT_NODE_ATTRIBUTES,
     DEFAULT_NODE_WORKER_IDS,
+    DEFAULT_NODE_TASK_INSTRUCTIONS,
 } from '../../../api/types.ts';
 import {
     generateCryptoSafeBase62,
@@ -30,6 +31,7 @@ export function buildStartAndCompleteNodes(): {
             attributes: [
                 ...DEFAULT_NODE_ATTRIBUTES,
             ],
+            taskInstructions: DEFAULT_NODE_TASK_INSTRUCTIONS,
         },
         complete: {
             id: generateCryptoSafeBase62(),
@@ -44,6 +46,7 @@ export function buildStartAndCompleteNodes(): {
             attributes: [
                 ...DEFAULT_NODE_ATTRIBUTES,
             ],
+            taskInstructions: DEFAULT_NODE_TASK_INSTRUCTIONS,
         },
     };
 }

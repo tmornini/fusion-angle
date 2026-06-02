@@ -3,6 +3,7 @@ import {
     jsonObjectField,
     DEFAULT_LOCK_TIMEOUT,
     DEFAULT_NODE_WORKER_IDS,
+    DEFAULT_NODE_TASK_INSTRUCTIONS,
     projectStateIsNotDeleted,
 } from '../../../api/types.ts';
 import {
@@ -115,7 +116,7 @@ function buildSidecar(
     }, null, 2);
 }
 
-function minuteUtc(
+function fileStamp(
     timeSep: string,
 ): string {
     const iso = new Date()
@@ -131,7 +132,7 @@ function buildFlowTxt(
 ): string {
     return 'flowId: ' + flowId + '\n'
         + 'exportedAt: '
-        + minuteUtc(':') + '\n';
+        + nowUtc() + '\n';
 }
 
 /* ── backup format ──────────────── */
@@ -261,7 +262,7 @@ function buildBackupJson(
         flow.graph, 'flow.graph',
     );
     const backup: Backup = {
-        exportedAt: minuteUtc(':'),
+        exportedAt: nowUtc(),
         projectId,
         flow: {
             id: flow.id,
@@ -352,7 +353,7 @@ export async function getFlowZip(
     return {
         data,
         name: safeName
-            + '-' + minuteUtc('-')
+            + '-' + fileStamp('-')
             + '.zip',
     };
 }
@@ -504,6 +505,7 @@ export async function postFlowFromBackup(
             isArchive: n.isArchive,
             workerIds: n.workerIds,
             attributes: [],
+            taskInstructions: n.taskInstructions,
         });
     }
 
@@ -832,6 +834,7 @@ export async function postFlowFromMermaid(
                         ...DEFAULT_NODE_WORKER_IDS,
                     ],
                     attributes: [],
+                    taskInstructions: DEFAULT_NODE_TASK_INSTRUCTIONS,
                 };
             },
         );
@@ -1171,6 +1174,7 @@ export async function postFlowFromZip(
                         ...DEFAULT_NODE_WORKER_IDS,
                     ],
                     attributes: [],
+                    taskInstructions: DEFAULT_NODE_TASK_INSTRUCTIONS,
                 };
             },
         );

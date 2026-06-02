@@ -53,7 +53,11 @@ function collectAttributeValues(
         const attributeId = getRequiredAttribute(
             input, 'data-attribute-id',
         );
-        if (input.type === 'checkbox') {
+        if (input.type === 'radio') {
+            if ((input as HTMLInputElement).checked) {
+                values[attributeId] = input.value;
+            }
+        } else if (input.type === 'checkbox') {
             values[attributeId] = (
                 input as HTMLInputElement
             ).checked

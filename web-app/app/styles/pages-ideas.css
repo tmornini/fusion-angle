@@ -154,6 +154,19 @@
   text-align: right;
 }
 
+/* Unscored is genuine absence, not a measured 0:
+   render the row as pending until the user scores. */
+.convert-scores-row[data-touched="false"]
+  input[type="range"] {
+  opacity: 0.5;
+}
+
+.convert-scores-row[data-touched="false"]
+  .slider-value {
+  color: hsl(var(--muted-foreground));
+  font-weight: 400;
+}
+
 @media (max-width: 768px) {
   .convert-scores-row {
     grid-template-columns: 1fr;

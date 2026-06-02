@@ -87,6 +87,7 @@ export {
     aiWorkerDraftFromWorker,
     aiWorkerPatchFromDraft,
     isAIWorkerFieldKey,
+    buildModelOptgroups,
     type AIWorkerDraftFields,
     type AIWorkerFieldKey,
 } from './ai-worker-detail.ts';

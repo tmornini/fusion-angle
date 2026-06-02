@@ -6,6 +6,7 @@ import type {
 } from '../../api/types.ts';
 import {
     MS_PER_DAY,
+    MS_PER_SECOND,
 } from '../../api/types.ts';
 import type { TransitionEvent }
     from './adapters/state-events.ts';
@@ -583,5 +584,5 @@ export function clipInterval(
     const end   = Math.min(endMs,   hiMs);
     return end <= start
         ? 0
-        : Math.round((end - start) / 1000);
+        : Math.round((end - start) / MS_PER_SECOND);
 }

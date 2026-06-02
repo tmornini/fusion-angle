@@ -516,12 +516,9 @@ async function saveAIWorker(
         );
         return;
     }
-    // The validator forbids an empty
-    // auth_token; the patch includes one
-    // only when the user typed an override.
-    // We merge patch on top of the existing
-    // row so the prior token is preserved
-    // by default.
+    // putAIWorker writes the whole row, so
+    // merge the edited fields onto the stored
+    // row to form the complete entity.
     const patch = trimStrings(
         aiWorkerPatchFromDraft(s.draft),
     );

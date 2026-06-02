@@ -119,8 +119,8 @@ state routes for the unified states log),
 worker plus the human and AI rosters), `api/validators.ts`
 (`validateWorkerEntity` /
 `validateHumanWorkerEntity` / `validateAIWorkerEntity` /
-`validateStateEntity`, where the AI validator rejects empty
-`auth_token`). The `DbAdapter`
+`validateStateEntity`, where the AI validator verifies
+`model` is a known catalog id). The `DbAdapter`
 interface is the migration seam to Postgres.
 
 `web-app/app/adapters/init.ts` wires the production LocalStorage
@@ -179,9 +179,8 @@ the appropriate one per render. This pattern applies to `Idea`,
 to the right pair: `HumanWorkerDetailPresenter` /
 `HumanWorkerDetailEditPresenter` for humans,
 `AIWorkerDetailPresenter` / `AIWorkerDetailEditPresenter` for
-AIs (the AI edit presenter renders the auth-token input as
-`type="password"` and emits the security warning copy from
-`buildSecurityWarning()`).
+AIs (the AI edit presenter renders a provider-grouped model
+pulldown and a skill-focus textarea; no token field).
 
 `presenters/index.ts` is the barrel; page modules import from
 `'../app/presenters'`. `WorkboxDetailPresenter` uses a public
@@ -243,15 +242,15 @@ layer directly.
   sharing the id (`human_workers`, `ai_workers`).
   `adapters/workers.ts` composes humans (parent +
   `human_workers` detail); `adapters/ai-workers.ts`
-  composes AIs (parent + `ai_workers` detail, owns
-  `maskAuthToken`). `adapters/workers-union.ts` is the
+  composes AIs (parent + `ai_workers` detail).
+  `adapters/workers-union.ts` is the
   union seam: `getWorkers` is the roster (humans + AIs,
   never `'system'`); `getWorkerMap` additionally resolves
   the system worker so a system-authored event's author
   has a name; plus `workerName` and `isHumanWorker` /
   `isAIWorker` / `isSystemWorker`. Import the union for
   kind-agnostic display; per-kind modules for status
-  mutations and AI auth-token storage.
+  mutations and AI model/skill-focus storage.
 - **`workerName(workerMap, workerId)`.** Throws on missing
   and unknown ids. Optional worker references branch at the
   call site (`row.worker_id ? workerName(...) : ''`); do not

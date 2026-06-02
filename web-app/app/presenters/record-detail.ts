@@ -373,7 +373,10 @@ export class RecordDetailEditPresenter {
     #buildOptionsField(
         a: AttributeDraft,
     ): SafeHtml {
-        if (a.attribute_type !== 'select') {
+        if (
+            a.attribute_type !== 'select'
+            && a.attribute_type !== 'radio'
+        ) {
             return html``;
         }
         return html`<textarea

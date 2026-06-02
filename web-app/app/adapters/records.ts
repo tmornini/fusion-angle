@@ -232,7 +232,7 @@ export async function postRecordStateChange(
     recordChanges.notify();
 }
 
-export async function archiveRecord(
+export async function postRecordArchival(
     ctx: RequestContext,
     id: RecordId,
 ): Promise<void> {

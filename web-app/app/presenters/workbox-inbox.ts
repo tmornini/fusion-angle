@@ -1,5 +1,6 @@
 import {
     html, setHtml, SafeHtml,
+    trusted, escapeForHtml,
 } from '../safe-html.ts';
 import { iconGripVertical } from '../icons.ts';
 import { DISPLAY_ABSENT } from '../format.ts';
@@ -56,6 +57,7 @@ export interface InboxItem {
     lastTransitionedAt: string | null;
     completed: boolean;
     position: number;
+    taskInstructions: string;
 }
 
 export type InboxMode = 'active' | 'archived';
@@ -93,12 +95,20 @@ export class WorkboxInboxPresenter {
     #buildRow(
         item: InboxItem,
     ): SafeHtml {
+        const titleAttr = item.taskInstructions
+            ? trusted(' title="'
+                + escapeForHtml(
+                    item.taskInstructions,
+                )
+                + '"')
+            : trusted('');
         const badge = item.completed
             ? html`<span
                 class="badge badge-success"
                 >Complete</span>`
             : html`<span
-                class="badge badge-info"
+                class="badge badge-info"${
+                titleAttr}
                 >${item.stateName}</span>`;
         const from = item.transitionerName
             ?? DISPLAY_ABSENT;
@@ -226,6 +236,8 @@ export function buildInboxItems(
                 lastTransition.at,
             completed,
             position: wo.position,
+            taskInstructions:
+                curNode.taskInstructions,
         });
     }
 

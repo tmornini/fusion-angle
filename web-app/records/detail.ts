@@ -53,6 +53,7 @@ type PageState =
 let pageState: PageState = { kind: 'reading' };
 let currentView: RecordDetailView | null = null;
 let recordId: string | null = null;
+let saveInProgress = false;
 
 export async function init(
     params?: Record<string, string>,
@@ -559,6 +560,7 @@ async function handleSave(
     if (pageState.kind !== 'editing') return;
     if (!recordId) return;
     if (!currentView) return;
+    if (saveInProgress) return;
     commitPendingAttribute();
     const draft = pageState.draft;
     const originalAttrs = pageState.originalAttributes;
@@ -603,6 +605,7 @@ async function handleSave(
         return;
     }
     const ctx = createRequestContext();
+    saveInProgress = true;
     try {
         if (attributesChanged) {
             await postRecordChange(
@@ -625,6 +628,8 @@ async function handleSave(
             'error',
         );
         return;
+    } finally {
+        saveInProgress = false;
     }
     pageState = { kind: 'reading' };
     showToast('Record saved', 'success');

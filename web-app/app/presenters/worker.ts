@@ -15,6 +15,10 @@ import {
     isHumanWorker,
     isAIWorker,
 } from '../adapters/index.ts';
+import { DISPLAY_ABSENT } from '../format.ts';
+import {
+    findProviderModel,
+} from '../../../api/provider-models.ts';
 
 export type WorkerKindFilter =
     | 'all'
@@ -186,15 +190,9 @@ export class AIWorkerRowPresenter {
                     <span class="${
                         'badge badge-secondary'
                     }">
-                        ${this.#worker
-                            .providerText()}
-                    </span>
-                    <span class="${
-                        'text-xs text-muted'
-                        + ' font-mono'
-                    }">
-                        ${this.#worker
-                            .maskedToken()}
+                        ${findProviderModel(
+                            this.#worker.modelId(),
+                        )?.name ?? DISPLAY_ABSENT}
                     </span>
                 </div>
             </div>

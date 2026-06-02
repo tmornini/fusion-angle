@@ -26,6 +26,10 @@ const {
 } = await import('../api/types.ts');
 
 const {
+    getProviderModels,
+} = await import('../api/provider-models.ts');
+
+const {
     HumanWorkerDetailPresenter,
 } = await import(
     '../web-app/app/presenters/human-worker-detail.ts'
@@ -119,15 +123,15 @@ function makeAIWorker() {
         {
             id: 'ai_1',
             type: 'ai',
-            name: 'Claude Opus 4.7 Max',
+            name: 'Claude Opus 4.8',
         },
         {
             id: 'ai_1',
-            provider: 'Anthropic',
             description:
                 'Long context, deep reasoning.',
-            auth_token:
-                'sk-PLACEHOLDER-DEMOTOKEN-XYZ4',
+            skill_focus:
+                'Deep reasoning over long docs.',
+            model: getProviderModels()[0]!.id,
         },
         'active',
     );
@@ -161,28 +165,27 @@ test(
 );
 
 test(
-    'AIWorkerDetailPresenter masks the auth token'
-    + ' in the rendered output',
+    'AIWorkerDetailPresenter renders the model'
+    + ' name, provider, and skill focus',
     () => {
         const rec = makeRecordingContainer();
         new AIWorkerDetailPresenter(
             makeAIWorker(),
         ).renderShell(rec.container);
         const out = rec.allHtml();
-        // The masked form ends with the last 4
-        // chars; the raw full token must not leak.
-        assert.equal(
-            out.includes(
-                'sk-PLACEHOLDER-DEMOTOKEN-XYZ4',
-            ),
-            false,
-            'raw auth token must not appear',
+        const model = getProviderModels()[0]!;
+        assert.match(out, new RegExp(model.name));
+        assert.match(
+            out, new RegExp(model.provider),
         );
-        // The masked output retains last-4 chars
-        assert.match(out, /XYZ4/);
-        // Name and provider still surface
-        assert.match(out, /Claude Opus 4\.7 Max/);
-        assert.match(out, /Anthropic/);
+        assert.match(
+            out,
+            /Deep reasoning over long docs\./,
+        );
+        // No auth-token affordance remains.
+        assert.equal(
+            out.includes('Auth Token'), false,
+        );
         // The lifecycle state badge surfaces.
         assert.match(out, /Active/);
     },
@@ -211,21 +214,17 @@ test(
         assert.match(
             out, /data-worker-action="save"/,
         );
-    },
-);
-
-test(
-    'AIWorker.maskedToken returns a masked form'
-    + ' that omits the middle of the token',
-    () => {
-        const masked =
-            makeAIWorker().maskedToken();
-        assert.equal(
-            masked.includes(
-                'sk-PLACEHOLDER-DEMOTOKEN-XYZ4',
+        // Model select with optgroups and the
+        // current model pre-selected.
+        assert.match(out, /id="ai-model"/);
+        assert.match(out, /<optgroup/);
+        assert.match(
+            out,
+            new RegExp(
+                'value="'
+                + getProviderModels()[0]!.id
+                + '"[\\s\\S]*?selected',
             ),
-            false,
         );
-        assert.ok(masked.endsWith('XYZ4'));
     },
 );

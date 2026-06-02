@@ -250,6 +250,15 @@ ${aiCheckboxes}
     id="prop-node-name"
     value="${node.name}"${lockAttr} />
 </div>
+<div class="mb-2">
+<label class="text-xs text-muted"
+    >Task Instructions</label>
+<textarea
+    class="textarea"
+    id="prop-node-instructions"
+    rows="4"${lockAttr}
+    >${node.taskInstructions}</textarea>
+</div>
 <fieldset class="flow-attribute-fieldset"
     id="prop-node-attributes">
 <legend class="text-xs text-muted"

@@ -1242,6 +1242,16 @@ function bindPanelActions(
                     ),
                 );
             } else if (
+                id === 'prop-node-instructions'
+            ) {
+                pageState.saveDebouncer().schedule(
+                    () => commit(
+                        pageState.presenter()
+                            .withNodeTaskInstructions(value),
+                        { advanceHistory: true },
+                    ),
+                );
+            } else if (
                 id === 'prop-edge-name'
             ) {
                 pageState.saveDebouncer().schedule(

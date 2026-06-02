@@ -2,6 +2,9 @@ import {
     $, $input, $select, $textarea,
     populateIcons,
 } from '../app/dom.ts';
+import {
+    html, setHtml,
+} from '../app/safe-html.ts';
 import { showToast } from '../app/toast.ts';
 import {
     buildSkeleton, withLoadingState,
@@ -9,7 +12,7 @@ import {
 import { log } from '../app/logger.ts';
 import {
     iconPersonPlus, iconSearch,
-    iconSend, iconBrain,
+    iconSend,
 } from '../app/icons.ts';
 import {
     initDialog, closeDialog,
@@ -32,6 +35,7 @@ import {
     buildInitialManagedWorkersState,
     applyManagedWorkersSearch,
     applyManagedWorkersKind,
+    buildModelOptgroups,
     type ManagedWorkersState,
     type WorkerKindFilter,
 } from '../app/presenters/index.ts';
@@ -53,11 +57,20 @@ export async function init(): Promise<void> {
         ['#add-worker-btn-icon', iconPersonPlus(16, '')],
         ['#worker-search-icon', iconSearch(16, '')],
         ['#add-worker-dialog-icon', iconPersonPlus(20, '')],
-        ['#ai-token-icon', iconBrain(16, '')],
         ['#add-worker-submit-icon', iconSend(16, '')],
     ]);
     initWorkerListFilters();
     bindAddWorkerDialog();
+    const modelSelect = $select('#ai-model', document);
+    if (modelSelect) {
+        setHtml(
+            modelSelect,
+            html`<option value="" disabled selected
+                >Select a model…</option>${
+                buildModelOptgroups('')
+            }`,
+        );
+    }
 
     const ctx = createRequestContext();
     const loaded = await withLoadingState(
@@ -329,14 +342,14 @@ async function submitAIForm(): Promise<void> {
     const name = $input(
         '#ai-name', document,
     )!.value;
-    const provider = $input(
-        '#ai-provider', document,
-    )!.value;
     const description = $textarea(
         '#ai-description', document,
     )!.value;
-    const authToken = $input(
-        '#ai-auth-token', document,
+    const skillFocus = $textarea(
+        '#ai-skill-focus', document,
+    )!.value;
+    const model = $select(
+        '#ai-model', document,
     )!.value;
     if (!name) {
         showToast(
@@ -345,9 +358,9 @@ async function submitAIForm(): Promise<void> {
         );
         return;
     }
-    if (!authToken) {
+    if (!model) {
         showToast(
-            'Auth token is required',
+            'Model is required',
             'error',
         );
         return;
@@ -359,9 +372,9 @@ async function submitAIForm(): Promise<void> {
             id,
             trimStrings({
                 name,
-                provider,
                 description,
-                auth_token: authToken,
+                skill_focus: skillFocus,
+                model,
             }),
         );
     } catch (err) {

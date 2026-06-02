@@ -4,6 +4,9 @@ import {
     AIWorker,
     type WorkerState,
 } from '../api/types.ts';
+import {
+    getProviderModels,
+} from '../api/provider-models.ts';
 
 // Build/seed workers in the post-normalization shape: a
 // parent row (type + name) plus a kind-specific detail
@@ -24,9 +27,9 @@ function humanDetail(id: string) {
 
 function aiDetail() {
     return {
-        provider: 'Anthropic',
         description: '',
-        auth_token: 'sk-test-token',
+        skill_focus: '',
+        model: getProviderModels()[0]!.id,
     };
 }
 

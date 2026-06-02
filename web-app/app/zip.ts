@@ -77,6 +77,12 @@ const VERSION = 20;
 const STORE = 0;
 const DEFLATE = 8;
 
+// The End Of Central Directory record sits at the very end of the
+// archive, but a trailing comment of up to 65535 bytes can push it
+// back. locateEocd scans at most this far from the end to find it.
+const MAX_ZIP_COMMENT_LEN = 65535;
+const MAX_EOCD_SCAN = MAX_ZIP_COMMENT_LEN + END_RECORD;
+
 export function buildZip(
     files: ZipEntry[],
 ): Uint8Array {
@@ -261,7 +267,7 @@ function locateEocd(
     length: number,
 ): number {
     const minOff = Math.max(
-        0, length - 65557,
+        0, length - MAX_EOCD_SCAN,
     );
     for (
         let i = length - END_RECORD;

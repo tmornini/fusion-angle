@@ -152,7 +152,8 @@ export class IdeaCreatePresenter {
     <div class="flex flex-col gap-6">
         <div>
             <label class="label mb-2
-                block font-medium">
+                block font-medium"
+                for="idea-create-field-title">
                 Give your idea a clear title
             </label>
             <input class="${
@@ -175,7 +176,8 @@ export class IdeaCreatePresenter {
         </div>
         <div>
             <label class="label mb-2
-                block font-medium">
+                block font-medium"
+                for="idea-create-field-problem">
                 ${'What problem does'
                     + ' this solve?'}
             </label>
@@ -206,7 +208,8 @@ export class IdeaCreatePresenter {
         </div>
         <div>
             <label class="label mb-2
-                block font-medium">
+                block font-medium"
+                for="idea-create-field-target">
                 ${'Who will benefit'
                     + ' from this?'}
             </label>
@@ -231,7 +234,8 @@ export class IdeaCreatePresenter {
         </div>
         <div>
             <label class="label mb-2
-                block font-medium">
+                block font-medium"
+                for="idea-create-field-solution">
                 How would you solve this?
             </label>
             <textarea class="${
@@ -261,7 +265,8 @@ export class IdeaCreatePresenter {
         </div>
         <div>
             <label class="label mb-2
-                block font-medium">
+                block font-medium"
+                for="idea-create-field-outcome">
                 ${'What outcome do'
                     + ' you expect?'}
             </label>
@@ -292,7 +297,8 @@ export class IdeaCreatePresenter {
         </div>
         <div>
             <label class="label mb-2
-                block font-medium">
+                block font-medium"
+                for="idea-create-field-metrics">
                 ${'How would you'
                     + ' measure success?'}
             </label>

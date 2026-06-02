@@ -360,9 +360,9 @@ on. Run these in order.
   AI, Human selected by default), a Human form below
   showing Name, Email, Title, Department,
   Phone, Bio, and an AI form (hidden by default) with
-  Name, Provider, Description, and a required Auth Token
-  password input plus a yellow security warning beginning
-  "⚠ Auth tokens are stored unencrypted...".
+  Name, a Model pulldown (grouped by provider, no
+  default selection), Description, and a Skill Focus
+  textarea — no Auth Token field or security warning.
 - [ ] **AA5** With Human selected, fill all fields for
   "Sarah Chen" (Title: Engineering Manager, Department:
   Engineering). Click Create. PASS: toast confirms
@@ -379,11 +379,12 @@ on. Run these in order.
   badge.
 - [ ] **AA7a** Click "+ Add Worker", switch the Kind
   toggle to AI. PASS: the Human form hides and the AI
-  form appears. Fill Name, Provider, Description, and
-  Auth Token. Click Create. PASS: toast confirms, the
-  new AI appears in the AIs group. Repeat for 4 AIs
-  matching mock data (Claude Opus 4.7 Max, Claude
-  Sonnet 4.6, GPT-5.4 Pro, Grok 4.20 Heavy).
+  form appears. Fill Name, pick a Model, fill
+  Description and Skill Focus. PASS: Create is blocked
+  until a Model is chosen; once chosen, click Create →
+  toast confirms, the new AI appears in the AIs group.
+  Repeat for 4 AIs matching mock data (Claude Opus 4.8,
+  Claude Sonnet 4.6, GPT-5.5, Grok 4.3).
 
 ### AA3. Worker Detail & Organization
 
@@ -396,21 +397,20 @@ on. Run these in order.
 - [ ] **AA8a** From the Workers list, click any AI
   worker's row. PASS: navigates to `worker-detail` for
   that AI. Read mode shows the AI identity card (Name,
-  Provider, Description) and a separate Auth Token row
-  showing the masked token (last 4 chars only,
-  e.g. `sk-...XXXX`).
+  Model as "{name} — {provider}", Description) and a
+  Skill Focus row; there is no Auth Token row.
 - [ ] **AA9** From the human worker detail, click Edit,
   change Phone and Bio, toggle one strength on and one
   off, click Save. PASS: toast "Worker saved" appears.
   Navigate away and return to detail. PASS: edited
   Phone, Bio, and strengths persist.
 - [ ] **AA9a** From an AI worker detail, click Edit,
-  change Description, leave Auth Token blank (placeholder
-  reads "Leave blank to keep current token"), click Save.
+  change Description and Skill Focus, and pick a
+  different Model from the pulldown (grouped by
+  provider, current model pre-selected), click Save.
   PASS: toast "AI worker saved" fires; on reopen the
-  masked token is unchanged. Click Edit again, type a new
-  token, Save. PASS: on reopen the masked-token last 4
-  chars reflect the new value.
+  edited Description, Skill Focus, and Model persist.
+  There is no Auth Token field.
 - [ ] **AA10** Navigate to Organization. Click the
   page-level Edit button (a single button at the page
   header, not per-card), change Domain (e.g.
@@ -448,6 +448,7 @@ on. Run these in order.
 - [ ] **AA20** Approve idea #4 as well (it was submitted for review in AA16). Leave others in their current status. PASS: statuses match mock data (2 approved, rest in-review/active).
 - [ ] **AA21** Navigate to approved idea #1. Click "Convert". PASS: conversion form loads with 4 required fields (Project Name, Time (days), Cost, Success Criteria) — there is no Impact field — plus a Scores box holding one required baseline slider per active objective.
 - [ ] **AA22** Fill the 4 required fields (Project Name, Time (days), Cost, Success Criteria) and drag every objective baseline slider in the Scores box. PASS: Create Project stays disabled until all required fields AND all baselines are set, then enables; clicking it navigates to project detail for the new project (the baselines commit atomically with project creation).
+- [ ] **AA22a** On the Convert form before scoring, every baseline slider in the Scores box reads as pending, not zero: the slider is dimmed (~50% opacity) and its value shows an em-dash "—" in muted text (unscored is genuine absence — no score row is written — not a measured 0). PASS: dragging a slider clears only that row's pending styling (full opacity, a signed value such as "+51", a green check by the label) while untouched rows stay dimmed, and Create Project stays disabled until all four objectives are scored.
 - [ ] **AA23** On project detail, click "Edit". Set fields (title, description, status, start date, end date, cost baseline) to match mock data. Save. PASS: project data persists. (Impact is no longer a directly-editable field — it is derived read-only from the objective baseline scores.)
 - [ ] **AA24** Approve remaining ideas (7, 8, 9, 10) from Ideas list (filter by "In Review"), then convert all 6 approved ideas to projects. PASS: Projects list shows all 6 with correct status and progress.
 
@@ -1604,9 +1605,9 @@ the claude-in-chrome MCP.
   header sit a search input and three filter chips (All /
   Humans / AIs, with All pressed by default). The list
   table groups workers under HUMANS first then AIs, each
-  group showing avatar/name, title (humans) or provider
-  (AIs), department (humans) or masked auth token (AIs),
-  and a status badge (humans only).
+  group showing avatar/name, title (humans) or the
+  model name (AIs), department (humans only), and a
+  status badge (humans only).
 - [ ] **G12** Click the sidebar account chip (lower-left).
   PASS: navigates to the current human worker's
   `worker-detail` page (`?workerId=<id>`). Click the
@@ -1614,22 +1615,23 @@ the claude-in-chrome MCP.
   also navigates to the current human's `worker-detail`
   page.
 - [ ] **G13** Type in the search input. PASS: filters the
-  list by name (humans) or name + provider (AIs) in
-  real-time. Click the Humans filter chip. PASS: only the
+  list by name (and description) in real-time; AI
+  workers no longer match on provider/model (accepted
+  regression). Click the Humans filter chip. PASS: only the
   HUMANS group is visible. Click AIs. PASS: only the AIs
   group is visible. Click All. PASS: both groups return.
 - [ ] **G14** Click `+ Add Worker`. PASS: dialog opens with
   the Kind toggle defaulting to Human, the Human form
   visible, and the AI form hidden. Switch the toggle to
   AI. PASS: the Human form hides, the AI form appears
-  with the security warning (yellow text starting "⚠ Auth
-  tokens are stored unencrypted...").
-- [ ] **G14a** With Kind=AI selected, leave the Auth Token
-  field empty and click Create. PASS: the form is rejected
-  client-side (the input is `required`/`aria-required`); no
-  POST fires. Fill all four AI fields with valid values and
-  click Create. PASS: toast confirms; the new AI appears in
-  the AIs group.
+  with a Model pulldown and a Skill Focus textarea; no
+  Auth Token field or security warning.
+- [ ] **G14a** With Kind=AI selected, leave the Model
+  pulldown on its placeholder and click Create. PASS: a
+  toast "Model is required" fires and no POST happens.
+  Pick a Model, fill the other AI fields, click Create.
+  PASS: toast confirms; the new AI appears in the AIs
+  group.
 
 ### Worker detail — Human (`workers/detail.html?workerId=<hw_*>`)
 
@@ -1667,20 +1669,20 @@ the claude-in-chrome MCP.
 
 - [ ] **G24** From `workers/index.html`, click any AI
   worker's row. PASS: navigates to `worker-detail`. Read
-  mode shows the AI Worker card (Name, Provider,
-  Description) with an inline Auth Token section showing
-  the masked token (last 4 chars only, e.g. `sk-...XXXX`)
-  rendered in monospace.
+  mode shows the AI Worker card (Name, Model as
+  "{name} — {provider}", Description, Skill Focus);
+  there is no Auth Token section.
 - [ ] **G24a** Click Edit. PASS: identity fields become
-  inputs (Name text, Provider text, Description textarea);
-  the Auth Token field becomes a `type="password"` input
-  with placeholder "Leave blank to keep current token" and
-  the security-warning paragraph below. Save with the token
-  field blank. PASS: toast "AI worker saved"; on reopen the
-  masked token is unchanged.
-- [ ] **G24b** Click Edit again, type a new token, click
-  Save. PASS: toast "AI worker saved"; on reopen the
-  masked token's last 4 chars match the new value.
+  inputs (Name text, Model pulldown grouped by provider
+  with the current model pre-selected, Description
+  textarea, Skill Focus textarea); there is no Auth Token
+  field. Change Description and Skill Focus, click Save.
+  PASS: toast "AI worker saved"; on reopen the edits
+  persist.
+- [ ] **G24b** Click Edit again, pick a different Model
+  from the pulldown, click Save. PASS: toast "AI worker
+  saved"; on reopen the read view shows the new model as
+  "{name} — {provider}".
 
 ### Snapshots (`snapshots/`) — Phase 4 (Run These Last)
 
@@ -2123,6 +2125,8 @@ panel, and the property-test gate.
   options textarea appears; the constraint picker offers
   only kinds applicable to `select` (i.e. nothing in the
   toy).
+- [ ] **R6a** Add an attribute and change its type to `radio`. PASS: the type picker offers `radio` alongside text/number/select/date/checkbox, and selecting it reveals the same "Options (one per line)" textarea that `select` shows; `checkbox` and the scalar types show no options field.
+- [ ] **R6b** Give a `select` or `radio` attribute zero options and click Save. PASS: the save is rejected — a "Failed to save Record" toast appears and the editor stays open, because the API validator requires at least one option for choice fields (the gate, not merely a disabled button). Add one or more options and Save; PASS: it persists and read mode shows the attribute's type.
 - [ ] **R7** Add a `regex` constraint on a text attribute,
   set the pattern. PASS: constraint row appears with the
   pattern editable; the picker no longer offers `regex`
@@ -2136,6 +2140,7 @@ panel, and the property-test gate.
 - [ ] **R10** Click Save. PASS: returns to read mode; the
   list reflects the new attribute set and constraint
   summaries.
+- [ ] **R10a** Save a Record edit and watch the toast. PASS: exactly one "Record saved" toast appears — never a stack — and re-entrant saves are guarded (clicking Save repeatedly does not fire multiple saves or stack toasts). NOTE: the original 5-stacked-toast defect needed a slow save to open the race; the multi-attribute write is now a single batched table write, so the window is effectively closed and exercising the race deterministically may require artificially throttling storage.
 - [ ] **R11** Open a flow (Customer Onboarding). PASS: flow
   header shows `Record: Customer Profile` dropdown
   selected.
@@ -2154,6 +2159,7 @@ panel, and the property-test gate.
   toast.)
 - [ ] **R14** Fill the required values, transition. PASS:
   transition succeeds; the work order advances.
+- [ ] **R14a** When a node references a `radio`-typed Record attribute, the workbox work-order detail renders it as a radio group — one `<input type="radio">` per option, all sharing the attribute name so only one is selectable — rather than a dropdown; selecting an option and transitioning records that value. NOTE: seeded mock data predates `radio`, so add a radio attribute, reference it Editable on a working node, and create a work order to exercise this.
 - [ ] **R15** Archive a Record from its detail page (if a
   control exists in the toy) or via the snapshot wipe.
   PASS: lifecycle state reads `archived`; the list page

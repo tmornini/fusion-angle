@@ -221,12 +221,12 @@
                 <div>
                     <label
                         class="label mb-1 block"
-                    >Provider</label>
-                    <input
+                        for="ai-model"
+                    >Model</label>
+                    <select
                         class="input"
-                        id="ai-provider"
-                        placeholder="e.g. Anthropic"
-                    />
+                        id="ai-model"
+                    ></select>
                 </div>
                 <div>
                     <label
@@ -241,34 +241,15 @@
                 </div>
                 <div>
                     <label
-                        class="label mb-1 flex
-                            items-center gap-2"
-                    >
-                        <span
-                            id="ai-token-icon"
-                        ></span>
-                        Auth Token
-                    </label>
-                    <input
-                        class="input"
-                        type="password"
-                        id="ai-auth-token"
-                        required
-                        aria-required="true"
-                        placeholder="sk-..."
-                    />
-                    <p
-                        class="text-xs text-warning
-                            mt-2"
-                    >
-                        Auth tokens are stored
-                        unencrypted in this
-                        browser's local storage. Do
-                        not enter production keys
-                        today; secure storage
-                        arrives with the
-                        AI-invocation feature.
-                    </p>
+                        class="label mb-1 block"
+                        for="ai-skill-focus"
+                    >Skill Focus</label>
+                    <textarea
+                        class="textarea"
+                        rows="2"
+                        id="ai-skill-focus"
+                        placeholder="Skill focus…"
+                    ></textarea>
                 </div>
             </div>
         </div>

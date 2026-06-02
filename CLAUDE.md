@@ -221,8 +221,9 @@ api routing, navigation, mock-data validity, the two-tier
 hazard predicate (`tests/flow-graph-hazard.test.ts` covers
 `shouldShowWorkerHazard`), and the SafeHtml output of the
 presenters (`presenter-worker-detail.test.ts` checks the AI
-variant masks its auth token); the automated suite also
-covers `flow-stats-aggregate` (pure heat / sojourn / path /
+variant renders its model and skill focus); the
+automated suite also covers `flow-stats-aggregate`
+(pure heat / sojourn / path /
 clan math), `adapters-flow-stats` (the read-only adapter
 via `MemoryDbAdapter`), `presenter-flow-stats` (the SafeHtml
 shape — including the *absence* of editor affordances), and

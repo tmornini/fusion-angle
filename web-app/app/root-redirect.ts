@@ -11,11 +11,14 @@
 import {
     STORAGE_KEY_PREFIX,
 } from './storage-keys.ts';
+import {
+    setLocation,
+} from './adapters/location.ts';
 
 (function redirectRoot(): void {
     const hasSchema = Object.keys(localStorage)
         .some(k => k.startsWith(STORAGE_KEY_PREFIX));
-    window.location.href = hasSchema
+    setLocation(hasSchema
         ? 'landing/index.html'
-        : 'snapshots/index.html';
+        : 'snapshots/index.html');
 })();

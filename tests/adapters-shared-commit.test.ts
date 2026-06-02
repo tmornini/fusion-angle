@@ -8,12 +8,15 @@ import {
 import {
     createChannel,
 } from '../web-app/app/channels.ts';
+import {
+    getProviderModels,
+} from '../api/provider-models.ts';
 
 function buildAIWorkerBody(description: string) {
     return {
-        provider: 'Anthropic',
         description,
-        auth_token: 'sk-test-XXXX',
+        skill_focus: '',
+        model: getProviderModels()[0]!.id,
     };
 }
 

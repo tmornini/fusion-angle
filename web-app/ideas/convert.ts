@@ -470,6 +470,7 @@ export async function init(
                         projectId,
                         submitted,
                         tuple.entity,
+                        activeObjectives,
                     );
                 } catch (err) {
                     log.error(
@@ -564,6 +565,7 @@ async function performConversion(
     projectId: string,
     draft: ConversionDraft,
     ideaEntity: IdeaEntity,
+    activeObjectives: readonly Objective[],
 ): Promise<void> {
     const fields = draft.fields;
     const projects = await getProjectRows(ctx);
@@ -603,5 +605,6 @@ async function performConversion(
         'submitted',
         ideaEntity,
         baselines,
+        activeObjectives.map(o => o.id),
     );
 }

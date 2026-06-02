@@ -916,8 +916,7 @@ export class ProjectDetailPresenter {
     }
 
     isApproved(): boolean {
-        return this.#view.stateValue()
-            === 'approved';
+        return this.#view.isApproved();
     }
 
     renderShell(
@@ -985,8 +984,7 @@ export class ProjectDetailEditPresenter {
     }
 
     isApproved(): boolean {
-        return this.#view.stateValue()
-            === 'approved';
+        return this.#view.isApproved();
     }
 
     draft(): ProjectDraftFields {

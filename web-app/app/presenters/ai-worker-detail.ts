@@ -9,8 +9,6 @@ import {
     iconSave,
     iconX,
     iconBrain,
-    iconShield,
-    iconAlertTriangle,
 } from '../icons.ts';
 import {
     AIWorker,
@@ -19,33 +17,30 @@ import {
     type AIWorkerDraft,
     type WorkerState,
 } from '../adapters/index.ts';
+import {
+    findProviderModel,
+    getModelsByProvider,
+} from '../../../api/provider-models.ts';
 
 export interface AIWorkerDraftFields {
     name: string;
-    provider: string;
     description: string;
+    skillFocus: string;
+    model: string;
     state: WorkerState;
-    // Empty string means "do not change the
-    // stored token" — the existing value is
-    // preserved at save time. The validator
-    // forbids persisting an empty token, so
-    // the page module merges this draft into
-    // the existing row before calling
-    // putAIWorker.
-    authTokenOverride: string;
 }
 
 export type AIWorkerFieldKey =
     | 'name'
-    | 'provider'
     | 'description'
-    | 'state'
-    | 'authTokenOverride';
+    | 'skillFocus'
+    | 'model'
+    | 'state';
 
 const FIELD_KEYS: ReadonlySet<AIWorkerFieldKey> =
     new Set([
-        'name', 'provider', 'description',
-        'state', 'authTokenOverride',
+        'name', 'description', 'skillFocus',
+        'model', 'state',
     ]);
 
 export function isAIWorkerFieldKey(
@@ -62,33 +57,22 @@ export function aiWorkerDraftFromWorker(
 ): AIWorkerDraftFields {
     return {
         name: worker.nameText(),
-        provider: worker.providerText(),
         description: worker.descriptionText(),
+        skillFocus: worker.skillFocusText(),
+        model: worker.modelId(),
         state: worker.stateValue(),
-        authTokenOverride: '',
     };
 }
 
-// Returns the patch to merge into the
-// existing entity. If authTokenOverride is
-// empty (after trim), omit the auth_token
-// field so the caller preserves the prior
-// value (the validator forbids persisting
-// an empty token).
 export function aiWorkerPatchFromDraft(
     draft: AIWorkerDraftFields,
 ): Partial<AIWorkerDraft> {
-    const base: Partial<AIWorkerDraft> = {
+    return {
         name: draft.name,
-        provider: draft.provider,
         description: draft.description,
+        skill_focus: draft.skillFocus,
+        model: draft.model,
     };
-    const trimmedOverride =
-        draft.authTokenOverride.trim();
-    if (trimmedOverride !== '') {
-        base.auth_token = trimmedOverride;
-    }
-    return base;
 }
 
 function buildShell(
@@ -171,7 +155,9 @@ function buildReadonlyTitleSection(
             </span>
         </div>
         <p class="text-sm text-muted">
-            ${worker.providerText()}
+            ${findProviderModel(
+                worker.modelId(),
+            )?.provider ?? DISPLAY_ABSENT}
         </p>`;
 }
 
@@ -204,7 +190,9 @@ function buildEditableTitleSection(
             </span>
         </div>
         <p class="text-sm text-muted">
-            ${draft.provider}
+            ${findProviderModel(
+                draft.model,
+            )?.provider ?? DISPLAY_ABSENT}
         </p>`;
 }
 
@@ -314,70 +302,87 @@ function buildEditableState(
         </div>`;
 }
 
-function buildReadonlyTokenRow(
-    worker: AIWorker,
+function buildReadonlySkillFocus(
+    value: string,
 ): SafeHtml {
     return html`
         <div>
             <p class="${
-                'label mb-2 flex'
-                + ' items-center gap-2'
-            }">${
-                iconShield(16, '')
-            } Auth Token</p>
-            <p class="${
-                'text-sm font-mono'
-            }">
-                ${worker.maskedToken()}
+                'label mb-2 block'
+            }">Skill Focus</p>
+            <p class="text-sm">
+                ${value === '' ? DISPLAY_ABSENT : value}
             </p>
         </div>`;
 }
 
-function buildEditableTokenRow(
-    draft: AIWorkerDraftFields,
+function buildEditableSkillFocus(
+    value: string,
 ): SafeHtml {
     return html`
         <div>
             <label class="${
-                'label mb-2 flex'
-                + ' items-center gap-2'
-            }" for="ai-auth-token">${
-                iconShield(16, '')
-            } Auth Token</label>
-            <input class="input"
-                id="ai-auth-token"
-                type="password"
-                placeholder="${
-                    'Leave blank to keep'
-                    + ' current token'
-                }"
-                data-worker-field="${
-                    'authTokenOverride'
-                }"
-                value="${
-                    draft.authTokenOverride
-                }" />
-            ${buildSecurityWarning()}
+                'label mb-2 block'
+            }" for="ai-skill-focus"
+            >Skill Focus</label>
+            <textarea class="textarea"
+                rows="3"
+                id="ai-skill-focus"
+                data-worker-field="skillFocus"
+            >${value}</textarea>
         </div>`;
 }
 
-function buildSecurityWarning(): SafeHtml {
+function buildReadonlyModel(
+    modelId: string,
+): SafeHtml {
+    const model = findProviderModel(modelId);
+    const label = model
+        ? model.name + ' — ' + model.provider
+        : DISPLAY_ABSENT;
     return html`
-        <p class="${
-            'text-xs text-warning mt-2'
-            + ' flex items-start gap-1'
-        }">
-            ${iconAlertTriangle(14, '')}
-            <span>${
-                'Auth tokens are stored'
-                + ' unencrypted in this'
-                + " browser's local storage."
-                + ' Do not enter production'
-                + ' keys today; secure'
-                + ' storage arrives with the'
-                + ' AI-invocation feature.'
-            }</span>
-        </p>`;
+        <div>
+            <p class="${
+                'label mb-2 block'
+            }">Model</p>
+            <p class="text-sm">${label}</p>
+        </div>`;
+}
+
+export function buildModelOptgroups(
+    selectedId: string,
+): SafeHtml {
+    return html`${[...getModelsByProvider()].map(
+        ([provider, models]) => html`<optgroup
+            label="${provider}">${models.map(
+            m => html`<option
+                value="${m.id}"
+                ${trusted(
+                    selectedId === m.id
+                        ? 'selected'
+                        : '',
+                )}
+            >${m.name}</option>`)
+        }</optgroup>`)
+    }`;
+}
+
+function buildEditableModel(
+    selectedId: string,
+): SafeHtml {
+    return html`
+        <div>
+            <label class="${
+                'label mb-2 block'
+            }" for="ai-model"
+            >Model</label>
+            <select class="input"
+                id="ai-model"
+                data-worker-field="model"
+            >${
+                buildModelOptgroups(selectedId)
+            }</select>
+        </div>`;
 }
 
 function buildIdentityCard(
@@ -408,9 +413,8 @@ function buildReadonlyIdentityBody(
                     'Name',
                     worker.nameText(),
                 )}
-                ${buildReadonlyField(
-                    'Provider',
-                    worker.providerText(),
+                ${buildReadonlyModel(
+                    worker.modelId(),
                 )}
             </div>
         </div>
@@ -421,7 +425,9 @@ function buildReadonlyIdentityBody(
                 worker.descriptionText(),
             )}
         </div>
-        ${buildReadonlyTokenRow(worker)}`;
+        ${buildReadonlySkillFocus(
+            worker.skillFocusText(),
+        )}`;
 }
 
 function buildEditableIdentityBody(
@@ -443,12 +449,8 @@ function buildEditableIdentityBody(
                     draft.name,
                     'text',
                 )}
-                ${buildEditableField(
-                    'ai-provider',
-                    'provider',
-                    'Provider',
-                    draft.provider,
-                    'text',
+                ${buildEditableModel(
+                    draft.model,
                 )}
             </div>
         </div>
@@ -462,7 +464,9 @@ function buildEditableIdentityBody(
         }">
             ${buildEditableState(draft.state)}
         </div>
-        ${buildEditableTokenRow(draft)}`;
+        ${buildEditableSkillFocus(
+            draft.skillFocus,
+        )}`;
 }
 
 function buildReadonlyActionButtons(

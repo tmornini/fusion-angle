@@ -768,6 +768,28 @@ Auto Fit</label>
         return next;
     }
 
+    withNodeTaskInstructions(
+        text: string,
+    ): FlowSnapshot {
+        if (this.#guardLocked()) {
+            return this.#snapshot;
+        }
+        const nodeId = this
+            .#singleSelectedNodeId();
+        if (!nodeId) return this.#snapshot;
+        const next: FlowSnapshot = {
+            ...this.#snapshot,
+            nodes: applyUpdateNode(
+                this.#snapshot.nodes,
+                nodeId,
+                { taskInstructions: text },
+            ),
+        };
+        void this.#saveFlow(true, next);
+        this.#noteMutation();
+        return next;
+    }
+
     withNodeWorkerIds(
         workerIds: WorkerId[],
     ): FlowSnapshot {

@@ -156,6 +156,11 @@ export class ProjectView {
             .stateValue();
     }
 
+    isApproved(): boolean {
+        return this.#project
+            .isApproved();
+    }
+
     progressPercent(): number {
         return this.#project
             .timelineProgress();

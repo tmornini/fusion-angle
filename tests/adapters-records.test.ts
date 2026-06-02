@@ -12,7 +12,7 @@ import {
     getRecordState,
     postRecordChange,
     postRecordStateChange,
-    archiveRecord,
+    postRecordArchival,
 } from '../web-app/app/adapters/records.ts';
 import {
     jsonArrayField,
@@ -208,7 +208,7 @@ test(
 );
 
 test(
-    'archiveRecord transitions the record to'
+    'postRecordArchival transitions the record to'
     + ' archived',
     async () => {
         const db = new MemoryDbAdapter();
@@ -225,7 +225,7 @@ test(
             attributes: [],
             initialState: 'active',
         });
-        await archiveRecord(ctx, 'rec-1');
+        await postRecordArchival(ctx, 'rec-1');
         const state = await getRecordState(
             ctx, 'rec-1',
         );
