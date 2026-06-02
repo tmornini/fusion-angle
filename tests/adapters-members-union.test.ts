@@ -11,78 +11,78 @@ import {
     createRequestContext,
 } from '../web-app/app/adapters/shared.ts';
 import {
-    getWorkers,
-    getWorkerMap,
-    workerName,
-    isHumanWorker,
-    isAIWorker,
-} from '../web-app/app/adapters/workers-union.ts';
+    getMembers,
+    getMemberMap,
+    memberName,
+    isHumanMember,
+    isAIMember,
+} from '../web-app/app/adapters/members-union.ts';
 import type {
-    WorkerId,
-    Worker,
+    MemberId,
+    Member,
 } from '../api/types.ts';
 import {
-    seedHumanWorker,
-    seedAIWorker,
-} from './worker-fixtures.ts';
+    seedHumanMember,
+    seedAIMember,
+} from './member-fixtures.ts';
 
 async function setupSeeded(): Promise<{
     db: MemoryDbAdapter;
 }> {
     const db = new MemoryDbAdapter();
     await db.createSchema();
-    await seedHumanWorker(
+    await seedHumanMember(
         db, 'hw_sarah_chen', 'Sarah Test',
     );
-    await seedAIWorker(
+    await seedAIMember(
         db, 'ai_claude_opus', 'Claude Opus',
     );
     return { db };
 }
 
 test(
-    'getWorkers omits system; getWorkerMap'
+    'getMembers omits system; getMemberMap'
     + ' resolves it as an author',
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
-        await seedHumanWorker(
+        await seedHumanMember(
             db, 'hw_sarah', 'Sarah Chen',
         );
-        await db.workers.put('system', {
+        await db.members.put('system', {
             type: 'system',
-            name: 'System Worker',
+            name: 'System Member',
         });
         await db.states.record(
             'st-system', 'system',
             'active', 'system',
         );
         const ctx = createRequestContext(db);
-        const roster = await getWorkers(ctx);
+        const roster = await getMembers(ctx);
         assert.ok(
             !roster.some(
                 w => w.idForLink() === 'system',
             ),
-            'roster excludes the system worker',
+            'roster excludes the system member',
         );
-        const map = await getWorkerMap(ctx);
+        const map = await getMemberMap(ctx);
         assert.equal(
-            workerName(map, 'system'),
-            'System Worker',
+            memberName(map, 'system'),
+            'System Member',
         );
     },
 );
 
 test(
-    'getWorkers returns humans and AIs unioned'
+    'getMembers returns humans and AIs unioned'
     + ' with correct kind discriminator',
     async () => {
         const { db } = await setupSeeded();
         const ctx = createRequestContext(db);
-        const workers = await getWorkers(ctx);
-        assert.equal(workers.length, 2);
-        const human = workers.find(isHumanWorker)!;
-        const ai = workers.find(isAIWorker)!;
+        const members = await getMembers(ctx);
+        assert.equal(members.length, 2);
+        const human = members.find(isHumanMember)!;
+        const ai = members.find(isAIMember)!;
         assert.ok(human);
         assert.ok(ai);
         assert.equal(human.kind, 'human');
@@ -97,12 +97,12 @@ test(
 );
 
 test(
-    'getWorkerMap keys by id with both kinds'
+    'getMemberMap keys by id with both kinds'
     + ' present',
     async () => {
         const { db } = await setupSeeded();
         const ctx = createRequestContext(db);
-        const map = await getWorkerMap(ctx);
+        const map = await getMemberMap(ctx);
         assert.equal(map.size, 2);
         const human = map.get('hw_sarah_chen')!;
         const ai = map.get('ai_claude_opus')!;
@@ -114,30 +114,30 @@ test(
 );
 
 test(
-    'workerName returns the display name for'
+    'memberName returns the display name for'
     + ' both human and AI kinds',
     async () => {
         const { db } = await setupSeeded();
         const ctx = createRequestContext(db);
-        const map = await getWorkerMap(ctx);
+        const map = await getMemberMap(ctx);
         assert.equal(
-            workerName(map, 'hw_sarah_chen'),
+            memberName(map, 'hw_sarah_chen'),
             'Sarah Test',
         );
         assert.equal(
-            workerName(map, 'ai_claude_opus'),
+            memberName(map, 'ai_claude_opus'),
             'Claude Opus',
         );
     },
 );
 
 test(
-    'worker.name() is polymorphic across human'
+    'member.name() is polymorphic across human'
     + ' and AI kinds',
     async () => {
         const { db } = await setupSeeded();
         const ctx = createRequestContext(db);
-        const map = await getWorkerMap(ctx);
+        const map = await getMemberMap(ctx);
         const human = map.get('hw_sarah_chen')!;
         const ai = map.get('ai_claude_opus')!;
         assert.equal(human.name(), 'Sarah Test');
@@ -146,25 +146,25 @@ test(
 );
 
 test(
-    'workerName throws on missing id (matches'
+    'memberName throws on missing id (matches'
     + ' personName contract)',
     async () => {
-        const map = new Map<WorkerId, Worker>();
+        const map = new Map<MemberId, Member>();
         assert.throws(
-            () => workerName(map, 'hw_missing'),
-            /unknown worker/,
+            () => memberName(map, 'hw_missing'),
+            /unknown member/,
         );
     },
 );
 
 test(
-    'getWorkers on an empty database returns'
+    'getMembers on an empty database returns'
     + ' an empty array',
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
         const ctx = createRequestContext(db);
-        const workers = await getWorkers(ctx);
-        assert.deepEqual(workers, []);
+        const members = await getMembers(ctx);
+        assert.deepEqual(members, []);
     },
 );

@@ -9,8 +9,8 @@ import {
     createRequestContext,
     putFlow,
     postFlowVersion,
-    HumanWorker,
-    AIWorker,
+    HumanMember,
+    AIMember,
 } from '../adapters/index.ts';
 import type {
     GraphNode,
@@ -20,7 +20,7 @@ import type {
     FlowSaveShape,
 } from '../adapters/flows.ts';
 import type {
-    WorkerId,
+    MemberId,
     RecordAttributeEntity,
 } from '../../../api/types.ts';
 import {
@@ -99,8 +99,8 @@ interface DesignerState {
     isPanelOpen: boolean;
     interaction: InteractionState;
     savedViewBox: SavedViewBox;
-    humanWorkers: HumanWorker[];
-    aiWorkers: AIWorker[];
+    humanMembers: HumanMember[];
+    aiMembers: AIMember[];
     recordAttributes: RecordAttributeEntity[];
 }
 
@@ -115,8 +115,8 @@ export function buildInitialFlowSnapshot(
     graph: FlowGraph,
     canvasW: number,
     canvasH: number,
-    humanWorkers: HumanWorker[],
-    aiWorkers: AIWorker[],
+    humanMembers: HumanMember[],
+    aiMembers: AIMember[],
     recordAttributes:
         RecordAttributeEntity[],
 ): FlowSnapshot {
@@ -137,8 +137,8 @@ export function buildInitialFlowSnapshot(
         isPanelOpen: false,
         interaction,
         savedViewBox: { kind: 'none' },
-        humanWorkers,
-        aiWorkers,
+        humanMembers,
+        aiMembers,
         recordAttributes,
     };
 }
@@ -790,8 +790,8 @@ Auto Fit</label>
         return next;
     }
 
-    withNodeWorkerIds(
-        workerIds: WorkerId[],
+    withNodeMemberIds(
+        memberIds: MemberId[],
     ): FlowSnapshot {
         if (this.#guardLocked()) {
             return this.#snapshot;
@@ -804,7 +804,7 @@ Auto Fit</label>
             nodes: applyUpdateNode(
                 this.#snapshot.nodes,
                 nodeId,
-                { workerIds },
+                { memberIds },
             ),
         };
         void this.#saveFlow(true, next);
@@ -1065,8 +1065,8 @@ Auto Fit</label>
             return buildNodePanel(
                 node, outgoing,
                 this.#snapshot.isLocked,
-                this.#snapshot.humanWorkers,
-                this.#snapshot.aiWorkers,
+                this.#snapshot.humanMembers,
+                this.#snapshot.aiMembers,
                 this.#snapshot.recordAttributes,
             );
         }

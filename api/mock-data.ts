@@ -1,13 +1,13 @@
 import type { DbAdapter } from './db.ts';
 import type {
-    HumanWorkerEntity,
-    WorkerState,
+    HumanMemberEntity,
+    MemberState,
     IdeaEntity,
     ProjectEntity,
     IdeaSubmissionEntity,
     FlowEntity,
     ProjectFlowEntity,
-    AIWorkerEntity,
+    AIMemberEntity,
     WorkOrderEntity,
     FlowWorkOrderEntity,
     StateEntity,
@@ -28,7 +28,7 @@ import {
     SECONDS_PER_HOUR,
     MS_PER_SECOND,
     MS_PER_DAY,
-    SYSTEM_WORKER_ID,
+    SYSTEM_MEMBER_ID,
 } from './types.ts';
 
 const now = new Date();
@@ -187,8 +187,8 @@ interface SojournProfile {
         ReadonlyMap<Id, number>;
 }
 
-interface WorkerSkill {
-    readonly byWorkerAndNode:
+interface MemberSkill {
+    readonly byMemberAndNode:
         ReadonlyMap<
             Id,
             ReadonlyMap<Id, number>
@@ -209,7 +209,7 @@ function generateFlowWorkload(args: {
     readonly flow: FlowSeedSpec;
     readonly paths: readonly PathProfile[];
     readonly sojourn: SojournProfile;
-    readonly skill: WorkerSkill;
+    readonly skill: MemberSkill;
     readonly totalWorkOrders: number;
     readonly oldestDaysAgo: number;
     readonly newestDaysAgo: number;
@@ -258,18 +258,18 @@ function generateFlowWorkload(args: {
             nowMs - createdAtDaysAgo * MS_PER_DAY;
         let cursorMs = createdAtMs;
 
-        const stepWorker: (Id | null)[] = [];
+        const stepMember: (Id | null)[] = [];
         for (const nid of path.nodeIds) {
             if (
                 nid === creatorId
                 || nid === archiveId
             ) {
-                stepWorker.push(null);
+                stepMember.push(null);
                 continue;
             }
             const node = nodeById.get(nid)!;
-            stepWorker.push(pickWeighted(
-                rng, node.workerIds, () => 1,
+            stepMember.push(pickWeighted(
+                rng, node.memberIds, () => 1,
             ));
         }
 
@@ -289,9 +289,9 @@ function generateFlowWorkload(args: {
             const sigma =
                 sojourn.sigmaByNodeId
                     .get(nid)!;
-            const worker = stepWorker[j]!;
-            const sk = skill.byWorkerAndNode
-                .get(worker)!.get(nid)!;
+            const member = stepMember[j]!;
+            const sk = skill.byMemberAndNode
+                .get(member)!.get(nid)!;
             const jit = sampleUniform(
                 rng,
                 1 - skill.jitterPct,
@@ -305,17 +305,17 @@ function generateFlowWorkload(args: {
             );
         }
 
-        // The worker who takes the WO into the
+        // The member who takes the WO into the
         // first working node also stamps the
         // Create-entry and Create-exit state
         // events.
-        const creatorPerson = stepWorker[1]!;
+        const creatorPerson = stepMember[1]!;
 
         stateEvents.push({
             id: b62Id(rng, 22),
             entity_id: woId,
             state: path.nodeIds[0]!,
-            worker_id: creatorPerson,
+            member_id: creatorPerson,
             at: isoFromMs(cursorMs),
         });
 
@@ -325,7 +325,7 @@ function generateFlowWorkload(args: {
                 id: b62Id(rng, 22),
                 entity_id: woId,
                 state: path.nodeIds[1]!,
-                worker_id: creatorPerson,
+                member_id: creatorPerson,
                 at: isoFromMs(cursorMs),
             });
         }
@@ -342,7 +342,7 @@ function generateFlowWorkload(args: {
                 id: b62Id(rng, 22),
                 entity_id: woId,
                 state: path.nodeIds[j]!,
-                worker_id: stepWorker[j - 1]!,
+                member_id: stepMember[j - 1]!,
                 at: isoFromMs(cursorMs),
             });
         }
@@ -369,8 +369,8 @@ function generateFlowWorkload(args: {
     };
 }
 
-type SeedHumanWorker = Omit<
-    HumanWorkerEntity,
+type SeedHumanMember = Omit<
+    HumanMemberEntity,
     'strengths' | 'team_dimensions'
 > & {
     name: string;
@@ -378,11 +378,11 @@ type SeedHumanWorker = Omit<
     team_dimensions: Record<
         string, number
     >;
-    // The initial worker state seeded into the
+    // The initial member state seeded into the
     // states log alongside the row. Lives on the
     // seed (not the entity) because the entity
     // carries no state column.
-    state: WorkerState;
+    state: MemberState;
 };
 
 const MOCK_SEED_TIMESTAMP =
@@ -423,7 +423,7 @@ export const OBJECTIVE_SEEDS: Array<{
 export async function populateMockData(
     adapter: DbAdapter,
 ): Promise<void> {
-    const workers: SeedHumanWorker[] = [
+    const members: SeedHumanMember[] = [
         {
             id: 'LhfaUUf4IumVsCSGB4xjdK',
             name: 'Sarah Chen',
@@ -687,18 +687,18 @@ export async function populateMockData(
     ];
 
     await Promise.all([
-        ...workers.flatMap(worker => {
+        ...members.flatMap(member => {
             const {
                 id: _id, state: _state, name,
                 strengths, team_dimensions,
                 ...detail
-            } = worker;
+            } = member;
             return [
-                adapter.workers.put(worker.id, {
+                adapter.members.put(member.id, {
                     type: 'human',
                     name,
                 }),
-                adapter.humanWorkers.put(worker.id, {
+                adapter.humanMembers.put(member.id, {
                     ...detail,
                     strengths:
                         jsonArrayField(strengths),
@@ -709,29 +709,29 @@ export async function populateMockData(
                 }),
             ];
         }),
-        adapter.workers.put(SYSTEM_WORKER_ID, {
+        adapter.members.put(SYSTEM_MEMBER_ID, {
             type: 'system',
-            name: 'System Worker',
+            name: 'System Member',
         }),
     ]);
 
-    // Initial worker state events. Every seeded
-    // worker — human or AI — gets one event at
+    // Initial member state events. Every seeded
+    // member — human or AI — gets one event at
     // creation. The states log is the sole source
-    // of worker state; the row carries no column.
-    const workerStateEvents: StateEntity[] = [
-        ...workers.map(w => ({
-            id: `seed-worker-${w.id}-${w.state}`,
+    // of member state; the row carries no column.
+    const memberStateEvents: StateEntity[] = [
+        ...members.map(w => ({
+            id: `seed-member-${w.id}-${w.state}`,
             entity_id: w.id,
             state: w.state,
-            worker_id: SYSTEM_WORKER_ID,
+            member_id: SYSTEM_MEMBER_ID,
             at: MOCK_SEED_TIMESTAMP,
         })),
         {
-            id: `seed-worker-${SYSTEM_WORKER_ID}-active`,
-            entity_id: SYSTEM_WORKER_ID,
+            id: `seed-member-${SYSTEM_MEMBER_ID}-active`,
+            entity_id: SYSTEM_MEMBER_ID,
             state: 'active',
-            worker_id: SYSTEM_WORKER_ID,
+            member_id: SYSTEM_MEMBER_ID,
             at: MOCK_SEED_TIMESTAMP,
         },
     ];
@@ -1393,12 +1393,12 @@ export async function populateMockData(
     const l2cReviseEdgeId =
         'L2cE09N3g0tPr0psL2cR09';
 
-    const workerSarah = 'LhfaUUf4IumVsCSGB4xjdK';
-    const workerMarcus =
+    const memberSarah = 'LhfaUUf4IumVsCSGB4xjdK';
+    const memberMarcus =
         'WxQn4LVWb76YkmqK5B0EPp';
-    const workerMike = 'bLP3X1hb1mSz8gY9neogU3';
-    const workerLisa = 'Trf1Up2jMsPhEnjbW4Ji1n';
-    const workerClaude = 'LdoTR1fnyYpS1jPzEs57ek';
+    const memberMike = 'bLP3X1hb1mSz8gY9neogU3';
+    const memberLisa = 'Trf1Up2jMsPhEnjbW4Ji1n';
+    const memberClaude = 'LdoTR1fnyYpS1jPzEs57ek';
 
     const leadToCloseNodes: GraphNode[] = [
         {
@@ -1408,7 +1408,7 @@ export async function populateMockData(
             positionY: 30,
             isCreate: true,
             isArchive: false,
-            workerIds: [],
+            memberIds: [],
             attributes: [],
             taskInstructions: '',
         },
@@ -1419,8 +1419,8 @@ export async function populateMockData(
             positionY: 100,
             isCreate: false,
             isArchive: false,
-            workerIds: [
-                workerLisa, workerClaude,
+            memberIds: [
+                memberLisa, memberClaude,
             ],
             attributes: [],
             taskInstructions: '',
@@ -1432,8 +1432,8 @@ export async function populateMockData(
             positionY: 180,
             isCreate: false,
             isArchive: false,
-            workerIds: [
-                workerSarah, workerMarcus,
+            memberIds: [
+                memberSarah, memberMarcus,
             ],
             attributes: [],
             taskInstructions: '',
@@ -1445,8 +1445,8 @@ export async function populateMockData(
             positionY: 260,
             isCreate: false,
             isArchive: false,
-            workerIds: [
-                workerSarah, workerMarcus,
+            memberIds: [
+                memberSarah, memberMarcus,
             ],
             attributes: [],
             taskInstructions: '',
@@ -1458,8 +1458,8 @@ export async function populateMockData(
             positionY: 340,
             isCreate: false,
             isArchive: false,
-            workerIds: [
-                workerMike, workerSarah,
+            memberIds: [
+                memberMike, memberSarah,
             ],
             attributes: [],
             taskInstructions: '',
@@ -1471,7 +1471,7 @@ export async function populateMockData(
             positionY: 420,
             isCreate: false,
             isArchive: false,
-            workerIds: [workerSarah],
+            memberIds: [memberSarah],
             attributes: [],
             taskInstructions: '',
         },
@@ -1482,7 +1482,7 @@ export async function populateMockData(
             positionY: 500,
             isCreate: false,
             isArchive: true,
-            workerIds: [],
+            memberIds: [],
             attributes: [],
             taskInstructions: '',
         },
@@ -1565,7 +1565,7 @@ export async function populateMockData(
                         isCreate: true,
                         isArchive: false,
                         taskInstructions: '',
-                        workerIds: [],
+                        memberIds: [],
                         attributes: [],
                     },
                     {
@@ -1577,7 +1577,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         taskInstructions: '',
-                        workerIds: [
+                        memberIds: [
                             'WxQn4LVWb76YkmqK5B0EPp',
                             'current',
                         ],
@@ -1664,7 +1664,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         taskInstructions: '',
-                        workerIds: [],
+                        memberIds: [],
                         attributes: [
                             {
                                 attribute_id:
@@ -1700,7 +1700,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: true,
                         taskInstructions: '',
-                        workerIds: [],
+                        memberIds: [],
                         attributes: [],
                     },
                 ],
@@ -1759,7 +1759,7 @@ export async function populateMockData(
                         isCreate: true,
                         isArchive: false,
                         taskInstructions: '',
-                        workerIds: [],
+                        memberIds: [],
                         attributes: [],
                     },
                     {
@@ -1770,7 +1770,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: true,
                         taskInstructions: '',
-                        workerIds: [],
+                        memberIds: [],
                         attributes: [],
                     },
                     {
@@ -1781,7 +1781,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         taskInstructions: '',
-                        workerIds: [],
+                        memberIds: [],
                         attributes: [],
                     },
                     {
@@ -1793,7 +1793,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         taskInstructions: '',
-                        workerIds: [],
+                        memberIds: [],
                         attributes: [
                             {
                                 attribute_id:
@@ -1821,7 +1821,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         taskInstructions: '',
-                        workerIds: [],
+                        memberIds: [],
                         attributes: [],
                     },
                     {
@@ -1832,7 +1832,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         taskInstructions: '',
-                        workerIds: [],
+                        memberIds: [],
                         attributes: [
                             {
                                 attribute_id:
@@ -1860,7 +1860,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         taskInstructions: '',
-                        workerIds: [],
+                        memberIds: [],
                         attributes: [],
                     },
                     {
@@ -1871,7 +1871,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         taskInstructions: '',
-                        workerIds: [],
+                        memberIds: [],
                         attributes: [],
                     },
                     {
@@ -1882,7 +1882,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         taskInstructions: '',
-                        workerIds: [],
+                        memberIds: [],
                         attributes: [],
                     },
                     {
@@ -1893,7 +1893,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         taskInstructions: '',
-                        workerIds: [],
+                        memberIds: [],
                         attributes: [],
                     },
                     {
@@ -1904,7 +1904,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         taskInstructions: '',
-                        workerIds: [],
+                        memberIds: [],
                         attributes: [],
                     },
                     {
@@ -1915,7 +1915,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         taskInstructions: '',
-                        workerIds: [],
+                        memberIds: [],
                         attributes: [],
                     },
                     {
@@ -1926,7 +1926,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         taskInstructions: '',
-                        workerIds: [],
+                        memberIds: [],
                         attributes: [],
                     },
                     {
@@ -1937,7 +1937,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         taskInstructions: '',
-                        workerIds: [],
+                        memberIds: [],
                         attributes: [],
                     },
                     {
@@ -1949,7 +1949,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         taskInstructions: '',
-                        workerIds: [],
+                        memberIds: [],
                         attributes: [],
                     },
                     {
@@ -1961,7 +1961,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         taskInstructions: '',
-                        workerIds: [],
+                        memberIds: [],
                         attributes: [],
                     },
                     {
@@ -1973,7 +1973,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         taskInstructions: '',
-                        workerIds: [],
+                        memberIds: [],
                         attributes: [],
                     },
                     {
@@ -1985,7 +1985,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         taskInstructions: '',
-                        workerIds: [],
+                        memberIds: [],
                         attributes: [],
                     },
                 ],
@@ -2161,7 +2161,7 @@ export async function populateMockData(
                         isCreate: true,
                         isArchive: false,
                         taskInstructions: '',
-                        workerIds: [],
+                        memberIds: [],
                         attributes: [],
                     },
                     {
@@ -2172,7 +2172,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         taskInstructions: '',
-                        workerIds: [],
+                        memberIds: [],
                         attributes: [],
                     },
                     {
@@ -2183,7 +2183,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         taskInstructions: '',
-                        workerIds: [],
+                        memberIds: [],
                         attributes: [],
                     },
                     {
@@ -2194,7 +2194,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         taskInstructions: '',
-                        workerIds: [],
+                        memberIds: [],
                         attributes: [],
                     },
                     {
@@ -2205,7 +2205,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         taskInstructions: '',
-                        workerIds: [],
+                        memberIds: [],
                         attributes: [],
                     },
                     {
@@ -2216,7 +2216,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         taskInstructions: '',
-                        workerIds: [],
+                        memberIds: [],
                         attributes: [],
                     },
                     {
@@ -2227,7 +2227,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         taskInstructions: '',
-                        workerIds: [],
+                        memberIds: [],
                         attributes: [],
                     },
                     {
@@ -2238,7 +2238,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         taskInstructions: '',
-                        workerIds: [],
+                        memberIds: [],
                         attributes: [],
                     },
                     {
@@ -2249,7 +2249,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         taskInstructions: '',
-                        workerIds: [],
+                        memberIds: [],
                         attributes: [],
                     },
                     {
@@ -2260,7 +2260,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         taskInstructions: '',
-                        workerIds: [],
+                        memberIds: [],
                         attributes: [],
                     },
                     {
@@ -2271,7 +2271,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         taskInstructions: '',
-                        workerIds: [],
+                        memberIds: [],
                         attributes: [],
                     },
                     {
@@ -2282,7 +2282,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         taskInstructions: '',
-                        workerIds: [],
+                        memberIds: [],
                         attributes: [],
                     },
                     {
@@ -2293,7 +2293,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         taskInstructions: '',
-                        workerIds: [],
+                        memberIds: [],
                         attributes: [],
                     },
                     {
@@ -2304,7 +2304,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         taskInstructions: '',
-                        workerIds: [],
+                        memberIds: [],
                         attributes: [],
                     },
                     {
@@ -2315,7 +2315,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         taskInstructions: '',
-                        workerIds: [],
+                        memberIds: [],
                         attributes: [],
                     },
                     {
@@ -2326,7 +2326,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: false,
                         taskInstructions: '',
-                        workerIds: [],
+                        memberIds: [],
                         attributes: [],
                     },
                     {
@@ -2337,7 +2337,7 @@ export async function populateMockData(
                         isCreate: false,
                         isArchive: true,
                         taskInstructions: '',
-                        workerIds: [],
+                        memberIds: [],
                         attributes: [],
                     },
                 ],
@@ -2781,14 +2781,14 @@ export async function populateMockData(
             id: 'rSe01CustPr0fact1ve01A',
             entity_id: customerProfileRecordId,
             state: 'active',
-            worker_id: SYSTEM_WORKER_ID,
+            member_id: SYSTEM_MEMBER_ID,
             at: wfTimestamp,
         },
         {
             id: 'rSe02Pr0jBri3fact1ve02',
             entity_id: projectBriefRecordId,
             state: 'active',
-            worker_id: SYSTEM_WORKER_ID,
+            member_id: SYSTEM_MEMBER_ID,
             at: wfTimestamp,
         },
     ];
@@ -2810,8 +2810,8 @@ export async function populateMockData(
         'LhfaUUf4IumVsCSGB4xjdK';
     const woPersonMike =
         'bLP3X1hb1mSz8gY9neogU3';
-    // Data Capture node workers: Marcus and the
-    // current user (the in-clan workers)
+    // Data Capture node members: Marcus and the
+    // current user (the in-clan members)
     const woPersonMarcus =
         'WxQn4LVWb76YkmqK5B0EPp';
     const woPersonCurrent = 'current';
@@ -3125,7 +3125,7 @@ export async function populateMockData(
         // ── out-of-clan runs (WO35-WO36) ─────────
         // OUT-transition from Data Capture is by
         // Sarah or Mike — neither is among that
-        // node's workers, so topProducer.inCurrentClan
+        // node's members, so topProducer.inCurrentClan
         // is false.
         {
             id: 'IyrpZrIl2hbmmnCtiifEGm',
@@ -3586,7 +3586,7 @@ export async function populateMockData(
             id: '9nP0K7FVlCFps3eqMnbnMU',
             entity_id: woId,
             state: woNodeNew,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at:
                 woCreated,
         },
@@ -3594,7 +3594,7 @@ export async function populateMockData(
             id: 'MbiHcJxVA5Tde3oBh3Ka8p',
             entity_id: woId,
             state: woNodeCapture,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at:
                 woCreated,
         },
@@ -3602,7 +3602,7 @@ export async function populateMockData(
             id: 'eJEybxfXaf3sjwFilZnunU',
             entity_id: woId,
             state: woNodeReview,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at:
                 dt(13, 14, 30),
         },
@@ -3611,7 +3611,7 @@ export async function populateMockData(
             entity_id: woId,
             state:
                 woNodeComplete,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at:
                 dt(12, 9, 15),
         },
@@ -3621,7 +3621,7 @@ export async function populateMockData(
             entity_id:
                 'kKtX2W0iVTWFPEoPrJmIHW',
             state: woNodeNew,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(88, 9, 0),
         },
         {
@@ -3629,7 +3629,7 @@ export async function populateMockData(
             entity_id:
                 'kKtX2W0iVTWFPEoPrJmIHW',
             state: woNodeCapture,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(88, 9, 5),
         },
         {
@@ -3637,7 +3637,7 @@ export async function populateMockData(
             entity_id:
                 'kKtX2W0iVTWFPEoPrJmIHW',
             state: woNodeReview,
-            worker_id: woPersonMarcus,
+            member_id: woPersonMarcus,
             at: dt(87, 10, 0),
         },
         {
@@ -3645,7 +3645,7 @@ export async function populateMockData(
             entity_id:
                 'kKtX2W0iVTWFPEoPrJmIHW',
             state: woNodeComplete,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(85, 14, 0),
         },
         // happy-path WO03: DC sojourn 2 days
@@ -3654,7 +3654,7 @@ export async function populateMockData(
             entity_id:
                 'taUp8y0cuMhzf0UOk6Ev8Y',
             state: woNodeNew,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(82, 10, 0),
         },
         {
@@ -3662,7 +3662,7 @@ export async function populateMockData(
             entity_id:
                 'taUp8y0cuMhzf0UOk6Ev8Y',
             state: woNodeCapture,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(82, 10, 8),
         },
         {
@@ -3670,7 +3670,7 @@ export async function populateMockData(
             entity_id:
                 'taUp8y0cuMhzf0UOk6Ev8Y',
             state: woNodeReview,
-            worker_id: woPersonMarcus,
+            member_id: woPersonMarcus,
             at: dt(80, 11, 0),
         },
         {
@@ -3678,7 +3678,7 @@ export async function populateMockData(
             entity_id:
                 'taUp8y0cuMhzf0UOk6Ev8Y',
             state: woNodeComplete,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(79, 9, 0),
         },
         // happy-path WO04: DC sojourn 3 days
@@ -3687,7 +3687,7 @@ export async function populateMockData(
             entity_id:
                 'KD2WFTEwzJFvxZ6cpCwpvc',
             state: woNodeNew,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(76, 8, 30),
         },
         {
@@ -3695,7 +3695,7 @@ export async function populateMockData(
             entity_id:
                 'KD2WFTEwzJFvxZ6cpCwpvc',
             state: woNodeCapture,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(76, 8, 40),
         },
         {
@@ -3703,7 +3703,7 @@ export async function populateMockData(
             entity_id:
                 'KD2WFTEwzJFvxZ6cpCwpvc',
             state: woNodeReview,
-            worker_id: woPersonCurrent,
+            member_id: woPersonCurrent,
             at: dt(73, 10, 0),
         },
         {
@@ -3711,7 +3711,7 @@ export async function populateMockData(
             entity_id:
                 'KD2WFTEwzJFvxZ6cpCwpvc',
             state: woNodeComplete,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(71, 15, 0),
         },
         // happy-path WO05: DC sojourn 1 day
@@ -3720,7 +3720,7 @@ export async function populateMockData(
             entity_id:
                 'b6YNHrFyi6V9dJNXyCXu1K',
             state: woNodeNew,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(71, 9, 0),
         },
         {
@@ -3728,7 +3728,7 @@ export async function populateMockData(
             entity_id:
                 'b6YNHrFyi6V9dJNXyCXu1K',
             state: woNodeCapture,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(71, 9, 10),
         },
         {
@@ -3736,7 +3736,7 @@ export async function populateMockData(
             entity_id:
                 'b6YNHrFyi6V9dJNXyCXu1K',
             state: woNodeReview,
-            worker_id: woPersonMarcus,
+            member_id: woPersonMarcus,
             at: dt(70, 14, 0),
         },
         {
@@ -3744,7 +3744,7 @@ export async function populateMockData(
             entity_id:
                 'b6YNHrFyi6V9dJNXyCXu1K',
             state: woNodeComplete,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(68, 10, 0),
         },
         // happy-path WO06: DC sojourn 5 days
@@ -3753,7 +3753,7 @@ export async function populateMockData(
             entity_id:
                 'V3AXXlSjJwDQAmkNiRA8aP',
             state: woNodeNew,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(66, 11, 0),
         },
         {
@@ -3761,7 +3761,7 @@ export async function populateMockData(
             entity_id:
                 'V3AXXlSjJwDQAmkNiRA8aP',
             state: woNodeCapture,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(66, 11, 12),
         },
         {
@@ -3769,7 +3769,7 @@ export async function populateMockData(
             entity_id:
                 'V3AXXlSjJwDQAmkNiRA8aP',
             state: woNodeReview,
-            worker_id: woPersonMarcus,
+            member_id: woPersonMarcus,
             at: dt(61, 9, 0),
         },
         {
@@ -3777,7 +3777,7 @@ export async function populateMockData(
             entity_id:
                 'V3AXXlSjJwDQAmkNiRA8aP',
             state: woNodeComplete,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(59, 14, 0),
         },
         // happy-path WO07: DC sojourn 2 days
@@ -3786,7 +3786,7 @@ export async function populateMockData(
             entity_id:
                 '9ooK5olzSsEnpgP8ASzBQi',
             state: woNodeNew,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(61, 9, 30),
         },
         {
@@ -3794,7 +3794,7 @@ export async function populateMockData(
             entity_id:
                 '9ooK5olzSsEnpgP8ASzBQi',
             state: woNodeCapture,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(61, 9, 45),
         },
         {
@@ -3802,7 +3802,7 @@ export async function populateMockData(
             entity_id:
                 '9ooK5olzSsEnpgP8ASzBQi',
             state: woNodeReview,
-            worker_id: woPersonCurrent,
+            member_id: woPersonCurrent,
             at: dt(59, 11, 0),
         },
         {
@@ -3810,7 +3810,7 @@ export async function populateMockData(
             entity_id:
                 '9ooK5olzSsEnpgP8ASzBQi',
             state: woNodeComplete,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(58, 9, 0),
         },
         // happy-path WO08: DC sojourn 4 days
@@ -3819,7 +3819,7 @@ export async function populateMockData(
             entity_id:
                 'cnXN4DZx9dUVIZL4OZnyw0',
             state: woNodeNew,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(57, 8, 0),
         },
         {
@@ -3827,7 +3827,7 @@ export async function populateMockData(
             entity_id:
                 'cnXN4DZx9dUVIZL4OZnyw0',
             state: woNodeCapture,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(57, 8, 15),
         },
         {
@@ -3835,7 +3835,7 @@ export async function populateMockData(
             entity_id:
                 'cnXN4DZx9dUVIZL4OZnyw0',
             state: woNodeReview,
-            worker_id: woPersonMarcus,
+            member_id: woPersonMarcus,
             at: dt(53, 10, 0),
         },
         {
@@ -3843,7 +3843,7 @@ export async function populateMockData(
             entity_id:
                 'cnXN4DZx9dUVIZL4OZnyw0',
             state: woNodeComplete,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(51, 14, 0),
         },
         // happy-path WO09: DC sojourn 7 days (fat tail)
@@ -3852,7 +3852,7 @@ export async function populateMockData(
             entity_id:
                 'kKw82RQDHRfgg5xQnw1lPk',
             state: woNodeNew,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(52, 10, 0),
         },
         {
@@ -3860,7 +3860,7 @@ export async function populateMockData(
             entity_id:
                 'kKw82RQDHRfgg5xQnw1lPk',
             state: woNodeCapture,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(52, 10, 20),
         },
         {
@@ -3868,7 +3868,7 @@ export async function populateMockData(
             entity_id:
                 'kKw82RQDHRfgg5xQnw1lPk',
             state: woNodeReview,
-            worker_id: woPersonMarcus,
+            member_id: woPersonMarcus,
             at: dt(45, 9, 0),
         },
         {
@@ -3876,7 +3876,7 @@ export async function populateMockData(
             entity_id:
                 'kKw82RQDHRfgg5xQnw1lPk',
             state: woNodeComplete,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(43, 11, 0),
         },
         // happy-path WO10: DC sojourn 3 days
@@ -3885,7 +3885,7 @@ export async function populateMockData(
             entity_id:
                 'ec0n7Ab6pJYLFDF6H0nyvV',
             state: woNodeNew,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(48, 9, 0),
         },
         {
@@ -3893,7 +3893,7 @@ export async function populateMockData(
             entity_id:
                 'ec0n7Ab6pJYLFDF6H0nyvV',
             state: woNodeCapture,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(48, 9, 10),
         },
         {
@@ -3901,7 +3901,7 @@ export async function populateMockData(
             entity_id:
                 'ec0n7Ab6pJYLFDF6H0nyvV',
             state: woNodeReview,
-            worker_id: woPersonCurrent,
+            member_id: woPersonCurrent,
             at: dt(45, 14, 0),
         },
         {
@@ -3909,7 +3909,7 @@ export async function populateMockData(
             entity_id:
                 'ec0n7Ab6pJYLFDF6H0nyvV',
             state: woNodeComplete,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(43, 10, 0),
         },
         // happy-path WO11: DC sojourn 2 days
@@ -3918,7 +3918,7 @@ export async function populateMockData(
             entity_id:
                 'gAjJnjirIrIgcFDMJyNsPa',
             state: woNodeNew,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(44, 10, 30),
         },
         {
@@ -3926,7 +3926,7 @@ export async function populateMockData(
             entity_id:
                 'gAjJnjirIrIgcFDMJyNsPa',
             state: woNodeCapture,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(44, 10, 45),
         },
         {
@@ -3934,7 +3934,7 @@ export async function populateMockData(
             entity_id:
                 'gAjJnjirIrIgcFDMJyNsPa',
             state: woNodeReview,
-            worker_id: woPersonMarcus,
+            member_id: woPersonMarcus,
             at: dt(42, 11, 0),
         },
         {
@@ -3942,7 +3942,7 @@ export async function populateMockData(
             entity_id:
                 'gAjJnjirIrIgcFDMJyNsPa',
             state: woNodeComplete,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(41, 14, 0),
         },
         // happy-path WO12: DC sojourn 6 days (fat tail)
@@ -3951,7 +3951,7 @@ export async function populateMockData(
             entity_id:
                 'kyWtMAZPazKqAfIwPzACsL',
             state: woNodeNew,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(40, 9, 0),
         },
         {
@@ -3959,7 +3959,7 @@ export async function populateMockData(
             entity_id:
                 'kyWtMAZPazKqAfIwPzACsL',
             state: woNodeCapture,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(40, 9, 15),
         },
         {
@@ -3967,7 +3967,7 @@ export async function populateMockData(
             entity_id:
                 'kyWtMAZPazKqAfIwPzACsL',
             state: woNodeReview,
-            worker_id: woPersonMarcus,
+            member_id: woPersonMarcus,
             at: dt(34, 10, 0),
         },
         {
@@ -3975,7 +3975,7 @@ export async function populateMockData(
             entity_id:
                 'kyWtMAZPazKqAfIwPzACsL',
             state: woNodeComplete,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(32, 9, 0),
         },
         // happy-path WO13: DC sojourn 1 day
@@ -3984,7 +3984,7 @@ export async function populateMockData(
             entity_id:
                 'C41Hni5pMxp8xMQFEGNaib',
             state: woNodeNew,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(37, 8, 0),
         },
         {
@@ -3992,7 +3992,7 @@ export async function populateMockData(
             entity_id:
                 'C41Hni5pMxp8xMQFEGNaib',
             state: woNodeCapture,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(37, 8, 10),
         },
         {
@@ -4000,7 +4000,7 @@ export async function populateMockData(
             entity_id:
                 'C41Hni5pMxp8xMQFEGNaib',
             state: woNodeReview,
-            worker_id: woPersonCurrent,
+            member_id: woPersonCurrent,
             at: dt(36, 11, 0),
         },
         {
@@ -4008,7 +4008,7 @@ export async function populateMockData(
             entity_id:
                 'C41Hni5pMxp8xMQFEGNaib',
             state: woNodeComplete,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(35, 14, 0),
         },
         // happy-path WO14: DC sojourn 9 days (fat tail)
@@ -4017,7 +4017,7 @@ export async function populateMockData(
             entity_id:
                 'FGAZYYwoS9To1tNb24DfLc',
             state: woNodeNew,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(33, 9, 30),
         },
         {
@@ -4025,7 +4025,7 @@ export async function populateMockData(
             entity_id:
                 'FGAZYYwoS9To1tNb24DfLc',
             state: woNodeCapture,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(33, 9, 45),
         },
         {
@@ -4033,7 +4033,7 @@ export async function populateMockData(
             entity_id:
                 'FGAZYYwoS9To1tNb24DfLc',
             state: woNodeReview,
-            worker_id: woPersonMarcus,
+            member_id: woPersonMarcus,
             at: dt(24, 10, 0),
         },
         {
@@ -4041,7 +4041,7 @@ export async function populateMockData(
             entity_id:
                 'FGAZYYwoS9To1tNb24DfLc',
             state: woNodeComplete,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(22, 9, 0),
         },
         // happy-path WO15: DC sojourn 2 days
@@ -4050,7 +4050,7 @@ export async function populateMockData(
             entity_id:
                 '0zgLwuyPgtreVYjg4TScJR',
             state: woNodeNew,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(29, 10, 0),
         },
         {
@@ -4058,7 +4058,7 @@ export async function populateMockData(
             entity_id:
                 '0zgLwuyPgtreVYjg4TScJR',
             state: woNodeCapture,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(29, 10, 15),
         },
         {
@@ -4066,7 +4066,7 @@ export async function populateMockData(
             entity_id:
                 '0zgLwuyPgtreVYjg4TScJR',
             state: woNodeReview,
-            worker_id: woPersonMarcus,
+            member_id: woPersonMarcus,
             at: dt(27, 14, 0),
         },
         {
@@ -4074,7 +4074,7 @@ export async function populateMockData(
             entity_id:
                 '0zgLwuyPgtreVYjg4TScJR',
             state: woNodeComplete,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(25, 10, 0),
         },
         // happy-path WO16: DC sojourn 3 days
@@ -4083,7 +4083,7 @@ export async function populateMockData(
             entity_id:
                 'XGJklKFO4aUtjSAEHEE8Zn',
             state: woNodeNew,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(26, 9, 0),
         },
         {
@@ -4091,7 +4091,7 @@ export async function populateMockData(
             entity_id:
                 'XGJklKFO4aUtjSAEHEE8Zn',
             state: woNodeCapture,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(26, 9, 12),
         },
         {
@@ -4099,7 +4099,7 @@ export async function populateMockData(
             entity_id:
                 'XGJklKFO4aUtjSAEHEE8Zn',
             state: woNodeReview,
-            worker_id: woPersonCurrent,
+            member_id: woPersonCurrent,
             at: dt(23, 11, 0),
         },
         {
@@ -4107,7 +4107,7 @@ export async function populateMockData(
             entity_id:
                 'XGJklKFO4aUtjSAEHEE8Zn',
             state: woNodeComplete,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(21, 14, 0),
         },
         // happy-path WO17: DC sojourn 1 day
@@ -4116,7 +4116,7 @@ export async function populateMockData(
             entity_id:
                 'rtuFD9uWn5zguEHyT3fh8s',
             state: woNodeNew,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(23, 8, 30),
         },
         {
@@ -4124,7 +4124,7 @@ export async function populateMockData(
             entity_id:
                 'rtuFD9uWn5zguEHyT3fh8s',
             state: woNodeCapture,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(23, 8, 42),
         },
         {
@@ -4132,7 +4132,7 @@ export async function populateMockData(
             entity_id:
                 'rtuFD9uWn5zguEHyT3fh8s',
             state: woNodeReview,
-            worker_id: woPersonMarcus,
+            member_id: woPersonMarcus,
             at: dt(22, 10, 0),
         },
         {
@@ -4140,7 +4140,7 @@ export async function populateMockData(
             entity_id:
                 'rtuFD9uWn5zguEHyT3fh8s',
             state: woNodeComplete,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(21, 9, 0),
         },
         // happy-path WO18: DC sojourn 4 days
@@ -4149,7 +4149,7 @@ export async function populateMockData(
             entity_id:
                 'XrO05MeyqldO8qm0O4VPdq',
             state: woNodeNew,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(20, 10, 0),
         },
         {
@@ -4157,7 +4157,7 @@ export async function populateMockData(
             entity_id:
                 'XrO05MeyqldO8qm0O4VPdq',
             state: woNodeCapture,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(20, 10, 18),
         },
         {
@@ -4165,7 +4165,7 @@ export async function populateMockData(
             entity_id:
                 'XrO05MeyqldO8qm0O4VPdq',
             state: woNodeReview,
-            worker_id: woPersonMarcus,
+            member_id: woPersonMarcus,
             at: dt(16, 9, 0),
         },
         {
@@ -4173,7 +4173,7 @@ export async function populateMockData(
             entity_id:
                 'XrO05MeyqldO8qm0O4VPdq',
             state: woNodeComplete,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(14, 14, 0),
         },
         // happy-path WO19: DC sojourn 8 days (fat tail)
@@ -4182,7 +4182,7 @@ export async function populateMockData(
             entity_id:
                 'S74N7CPA2dsMESryJNrFAC',
             state: woNodeNew,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(17, 9, 0),
         },
         {
@@ -4190,7 +4190,7 @@ export async function populateMockData(
             entity_id:
                 'S74N7CPA2dsMESryJNrFAC',
             state: woNodeCapture,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(17, 9, 20),
         },
         {
@@ -4198,7 +4198,7 @@ export async function populateMockData(
             entity_id:
                 'S74N7CPA2dsMESryJNrFAC',
             state: woNodeReview,
-            worker_id: woPersonCurrent,
+            member_id: woPersonCurrent,
             at: dt(9, 10, 0),
         },
         {
@@ -4206,7 +4206,7 @@ export async function populateMockData(
             entity_id:
                 'S74N7CPA2dsMESryJNrFAC',
             state: woNodeComplete,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(7, 14, 0),
         },
         // happy-path WO20: DC sojourn 2 days
@@ -4215,7 +4215,7 @@ export async function populateMockData(
             entity_id:
                 'Cr8KZH5Q2j5n8Q8Yw3qdMw',
             state: woNodeNew,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(14, 8, 0),
         },
         {
@@ -4223,7 +4223,7 @@ export async function populateMockData(
             entity_id:
                 'Cr8KZH5Q2j5n8Q8Yw3qdMw',
             state: woNodeCapture,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(14, 8, 15),
         },
         {
@@ -4231,7 +4231,7 @@ export async function populateMockData(
             entity_id:
                 'Cr8KZH5Q2j5n8Q8Yw3qdMw',
             state: woNodeReview,
-            worker_id: woPersonMarcus,
+            member_id: woPersonMarcus,
             at: dt(12, 11, 0),
         },
         {
@@ -4239,7 +4239,7 @@ export async function populateMockData(
             entity_id:
                 'Cr8KZH5Q2j5n8Q8Yw3qdMw',
             state: woNodeComplete,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(10, 9, 0),
         },
         // happy-path WO21: DC sojourn 3 days
@@ -4248,7 +4248,7 @@ export async function populateMockData(
             entity_id:
                 '4T56gYme7ae4Ya7AMA0hpW',
             state: woNodeNew,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(11, 10, 30),
         },
         {
@@ -4256,7 +4256,7 @@ export async function populateMockData(
             entity_id:
                 '4T56gYme7ae4Ya7AMA0hpW',
             state: woNodeCapture,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(11, 10, 48),
         },
         {
@@ -4264,7 +4264,7 @@ export async function populateMockData(
             entity_id:
                 '4T56gYme7ae4Ya7AMA0hpW',
             state: woNodeReview,
-            worker_id: woPersonCurrent,
+            member_id: woPersonCurrent,
             at: dt(8, 14, 0),
         },
         {
@@ -4272,7 +4272,7 @@ export async function populateMockData(
             entity_id:
                 '4T56gYme7ae4Ya7AMA0hpW',
             state: woNodeComplete,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(6, 10, 0),
         },
         // happy-path WO22: DC sojourn 1 day
@@ -4281,7 +4281,7 @@ export async function populateMockData(
             entity_id:
                 'aFCyJrvokoJM5iINwO3WCf',
             state: woNodeNew,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(9, 9, 0),
         },
         {
@@ -4289,7 +4289,7 @@ export async function populateMockData(
             entity_id:
                 'aFCyJrvokoJM5iINwO3WCf',
             state: woNodeCapture,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(9, 9, 10),
         },
         {
@@ -4297,7 +4297,7 @@ export async function populateMockData(
             entity_id:
                 'aFCyJrvokoJM5iINwO3WCf',
             state: woNodeReview,
-            worker_id: woPersonMarcus,
+            member_id: woPersonMarcus,
             at: dt(8, 10, 0),
         },
         {
@@ -4305,7 +4305,7 @@ export async function populateMockData(
             entity_id:
                 'aFCyJrvokoJM5iINwO3WCf',
             state: woNodeComplete,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(7, 9, 0),
         },
         // happy-path WO23: DC sojourn 2 days
@@ -4314,7 +4314,7 @@ export async function populateMockData(
             entity_id:
                 'Sr4k75y6vuKODCA9zlSUjk',
             state: woNodeNew,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(6, 11, 0),
         },
         {
@@ -4322,7 +4322,7 @@ export async function populateMockData(
             entity_id:
                 'Sr4k75y6vuKODCA9zlSUjk',
             state: woNodeCapture,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(6, 11, 15),
         },
         {
@@ -4330,7 +4330,7 @@ export async function populateMockData(
             entity_id:
                 'Sr4k75y6vuKODCA9zlSUjk',
             state: woNodeReview,
-            worker_id: woPersonMarcus,
+            member_id: woPersonMarcus,
             at: dt(4, 9, 0),
         },
         {
@@ -4338,7 +4338,7 @@ export async function populateMockData(
             entity_id:
                 'Sr4k75y6vuKODCA9zlSUjk',
             state: woNodeComplete,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(2, 14, 0),
         },
         // needs-revision WO24: double loop DC->Review->DC
@@ -4348,7 +4348,7 @@ export async function populateMockData(
             entity_id:
                 'Mm6KUpykGSwjD7YofI6zpb',
             state: woNodeNew,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(77, 9, 0),
         },
         {
@@ -4356,7 +4356,7 @@ export async function populateMockData(
             entity_id:
                 'Mm6KUpykGSwjD7YofI6zpb',
             state: woNodeCapture,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(77, 9, 10),
         },
         {
@@ -4364,7 +4364,7 @@ export async function populateMockData(
             entity_id:
                 'Mm6KUpykGSwjD7YofI6zpb',
             state: woNodeReview,
-            worker_id: woPersonMarcus,
+            member_id: woPersonMarcus,
             at: dt(75, 11, 0),
         },
         {
@@ -4372,7 +4372,7 @@ export async function populateMockData(
             entity_id:
                 'Mm6KUpykGSwjD7YofI6zpb',
             state: woNodeCapture,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(74, 14, 0),
         },
         {
@@ -4380,7 +4380,7 @@ export async function populateMockData(
             entity_id:
                 'Mm6KUpykGSwjD7YofI6zpb',
             state: woNodeReview,
-            worker_id: woPersonMarcus,
+            member_id: woPersonMarcus,
             at: dt(73, 10, 0),
         },
         {
@@ -4388,7 +4388,7 @@ export async function populateMockData(
             entity_id:
                 'Mm6KUpykGSwjD7YofI6zpb',
             state: woNodeCapture,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(72, 14, 0),
         },
         {
@@ -4396,7 +4396,7 @@ export async function populateMockData(
             entity_id:
                 'Mm6KUpykGSwjD7YofI6zpb',
             state: woNodeReview,
-            worker_id: woPersonCurrent,
+            member_id: woPersonCurrent,
             at: dt(71, 10, 0),
         },
         {
@@ -4404,7 +4404,7 @@ export async function populateMockData(
             entity_id:
                 'Mm6KUpykGSwjD7YofI6zpb',
             state: woNodeComplete,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(70, 9, 0),
         },
         // needs-revision WO25: loops DC->Review->DC
@@ -4413,7 +4413,7 @@ export async function populateMockData(
             entity_id:
                 'BbZ3Z7OZnFmdF5MBgVIYzI',
             state: woNodeNew,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(63, 10, 0),
         },
         {
@@ -4421,7 +4421,7 @@ export async function populateMockData(
             entity_id:
                 'BbZ3Z7OZnFmdF5MBgVIYzI',
             state: woNodeCapture,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(63, 10, 15),
         },
         {
@@ -4429,7 +4429,7 @@ export async function populateMockData(
             entity_id:
                 'BbZ3Z7OZnFmdF5MBgVIYzI',
             state: woNodeReview,
-            worker_id: woPersonCurrent,
+            member_id: woPersonCurrent,
             at: dt(61, 14, 0),
         },
         {
@@ -4437,7 +4437,7 @@ export async function populateMockData(
             entity_id:
                 'BbZ3Z7OZnFmdF5MBgVIYzI',
             state: woNodeCapture,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(60, 22, 0),
         },
         {
@@ -4445,7 +4445,7 @@ export async function populateMockData(
             entity_id:
                 'BbZ3Z7OZnFmdF5MBgVIYzI',
             state: woNodeReview,
-            worker_id: woPersonMarcus,
+            member_id: woPersonMarcus,
             at: dt(59, 14, 0),
         },
         {
@@ -4453,7 +4453,7 @@ export async function populateMockData(
             entity_id:
                 'BbZ3Z7OZnFmdF5MBgVIYzI',
             state: woNodeComplete,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(58, 9, 0),
         },
         // needs-revision WO26: loops DC->Review->DC
@@ -4462,7 +4462,7 @@ export async function populateMockData(
             entity_id:
                 'NydsTqMmCgEKI7R9xxp36g',
             state: woNodeNew,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(50, 8, 30),
         },
         {
@@ -4470,7 +4470,7 @@ export async function populateMockData(
             entity_id:
                 'NydsTqMmCgEKI7R9xxp36g',
             state: woNodeCapture,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(50, 8, 45),
         },
         {
@@ -4478,7 +4478,7 @@ export async function populateMockData(
             entity_id:
                 'NydsTqMmCgEKI7R9xxp36g',
             state: woNodeReview,
-            worker_id: woPersonMarcus,
+            member_id: woPersonMarcus,
             at: dt(48, 11, 0),
         },
         {
@@ -4486,7 +4486,7 @@ export async function populateMockData(
             entity_id:
                 'NydsTqMmCgEKI7R9xxp36g',
             state: woNodeCapture,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(47, 14, 0),
         },
         {
@@ -4494,7 +4494,7 @@ export async function populateMockData(
             entity_id:
                 'NydsTqMmCgEKI7R9xxp36g',
             state: woNodeReview,
-            worker_id: woPersonCurrent,
+            member_id: woPersonCurrent,
             at: dt(46, 10, 0),
         },
         {
@@ -4502,7 +4502,7 @@ export async function populateMockData(
             entity_id:
                 'NydsTqMmCgEKI7R9xxp36g',
             state: woNodeComplete,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(44, 14, 0),
         },
         // needs-revision WO27: loops DC->Review->DC
@@ -4511,7 +4511,7 @@ export async function populateMockData(
             entity_id:
                 'x2uQev3HutthrUWRFkXSkH',
             state: woNodeNew,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(38, 9, 0),
         },
         {
@@ -4519,7 +4519,7 @@ export async function populateMockData(
             entity_id:
                 'x2uQev3HutthrUWRFkXSkH',
             state: woNodeCapture,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(38, 9, 18),
         },
         {
@@ -4527,7 +4527,7 @@ export async function populateMockData(
             entity_id:
                 'x2uQev3HutthrUWRFkXSkH',
             state: woNodeReview,
-            worker_id: woPersonMarcus,
+            member_id: woPersonMarcus,
             at: dt(36, 14, 0),
         },
         {
@@ -4535,7 +4535,7 @@ export async function populateMockData(
             entity_id:
                 'x2uQev3HutthrUWRFkXSkH',
             state: woNodeCapture,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(35, 22, 0),
         },
         {
@@ -4543,7 +4543,7 @@ export async function populateMockData(
             entity_id:
                 'x2uQev3HutthrUWRFkXSkH',
             state: woNodeReview,
-            worker_id: woPersonMarcus,
+            member_id: woPersonMarcus,
             at: dt(34, 14, 0),
         },
         {
@@ -4551,7 +4551,7 @@ export async function populateMockData(
             entity_id:
                 'x2uQev3HutthrUWRFkXSkH',
             state: woNodeComplete,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(33, 9, 0),
         },
         // needs-revision WO28: loops DC->Review->DC
@@ -4560,7 +4560,7 @@ export async function populateMockData(
             entity_id:
                 'w7XA9UnuYI7e46RTQL1xGW',
             state: woNodeNew,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(25, 10, 0),
         },
         {
@@ -4568,7 +4568,7 @@ export async function populateMockData(
             entity_id:
                 'w7XA9UnuYI7e46RTQL1xGW',
             state: woNodeCapture,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(25, 10, 20),
         },
         {
@@ -4576,7 +4576,7 @@ export async function populateMockData(
             entity_id:
                 'w7XA9UnuYI7e46RTQL1xGW',
             state: woNodeReview,
-            worker_id: woPersonCurrent,
+            member_id: woPersonCurrent,
             at: dt(23, 14, 0),
         },
         {
@@ -4584,7 +4584,7 @@ export async function populateMockData(
             entity_id:
                 'w7XA9UnuYI7e46RTQL1xGW',
             state: woNodeCapture,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(22, 14, 0),
         },
         {
@@ -4592,7 +4592,7 @@ export async function populateMockData(
             entity_id:
                 'w7XA9UnuYI7e46RTQL1xGW',
             state: woNodeReview,
-            worker_id: woPersonMarcus,
+            member_id: woPersonMarcus,
             at: dt(21, 10, 0),
         },
         {
@@ -4600,7 +4600,7 @@ export async function populateMockData(
             entity_id:
                 'w7XA9UnuYI7e46RTQL1xGW',
             state: woNodeComplete,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(19, 14, 0),
         },
         // needs-revision WO29: loops DC->Review->DC
@@ -4609,7 +4609,7 @@ export async function populateMockData(
             entity_id:
                 '3H3XeeNE4rS2wbANs3JvYz',
             state: woNodeNew,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(12, 9, 30),
         },
         {
@@ -4617,7 +4617,7 @@ export async function populateMockData(
             entity_id:
                 '3H3XeeNE4rS2wbANs3JvYz',
             state: woNodeCapture,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(12, 9, 45),
         },
         {
@@ -4625,7 +4625,7 @@ export async function populateMockData(
             entity_id:
                 '3H3XeeNE4rS2wbANs3JvYz',
             state: woNodeReview,
-            worker_id: woPersonMarcus,
+            member_id: woPersonMarcus,
             at: dt(11, 11, 0),
         },
         {
@@ -4633,7 +4633,7 @@ export async function populateMockData(
             entity_id:
                 '3H3XeeNE4rS2wbANs3JvYz',
             state: woNodeCapture,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(10, 14, 0),
         },
         {
@@ -4641,7 +4641,7 @@ export async function populateMockData(
             entity_id:
                 '3H3XeeNE4rS2wbANs3JvYz',
             state: woNodeReview,
-            worker_id: woPersonCurrent,
+            member_id: woPersonCurrent,
             at: dt(9, 11, 0),
         },
         {
@@ -4649,7 +4649,7 @@ export async function populateMockData(
             entity_id:
                 '3H3XeeNE4rS2wbANs3JvYz',
             state: woNodeComplete,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(8, 9, 0),
         },
         // in-flight WO30: sitting in Data Capture
@@ -4658,7 +4658,7 @@ export async function populateMockData(
             entity_id:
                 'i7YYgKN3ZUlrkulQ2aWdIE',
             state: woNodeNew,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(18, 9, 0),
         },
         {
@@ -4666,7 +4666,7 @@ export async function populateMockData(
             entity_id:
                 'i7YYgKN3ZUlrkulQ2aWdIE',
             state: woNodeCapture,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(18, 9, 15),
         },
         // in-flight WO31: sitting in Data Capture
@@ -4675,7 +4675,7 @@ export async function populateMockData(
             entity_id:
                 '0brjvcoPEVBwMkUQ3tKHWc',
             state: woNodeNew,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(10, 10, 0),
         },
         {
@@ -4683,7 +4683,7 @@ export async function populateMockData(
             entity_id:
                 '0brjvcoPEVBwMkUQ3tKHWc',
             state: woNodeCapture,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(10, 10, 20),
         },
         // in-flight WO32: sitting in Data Capture
@@ -4692,7 +4692,7 @@ export async function populateMockData(
             entity_id:
                 'mTdhglHhl7pM0mKt0M2IjF',
             state: woNodeNew,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(7, 8, 0),
         },
         {
@@ -4700,7 +4700,7 @@ export async function populateMockData(
             entity_id:
                 'mTdhglHhl7pM0mKt0M2IjF',
             state: woNodeCapture,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(7, 8, 12),
         },
         // in-flight WO33: sitting in Review
@@ -4709,7 +4709,7 @@ export async function populateMockData(
             entity_id:
                 'GMhfH8lMQJXzE4vkjnSH1u',
             state: woNodeNew,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(4, 9, 0),
         },
         {
@@ -4717,7 +4717,7 @@ export async function populateMockData(
             entity_id:
                 'GMhfH8lMQJXzE4vkjnSH1u',
             state: woNodeCapture,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(4, 9, 18),
         },
         {
@@ -4725,7 +4725,7 @@ export async function populateMockData(
             entity_id:
                 'GMhfH8lMQJXzE4vkjnSH1u',
             state: woNodeReview,
-            worker_id: woPersonMarcus,
+            member_id: woPersonMarcus,
             at: dt(3, 14, 0),
         },
         // in-flight WO34: sitting in Review
@@ -4734,7 +4734,7 @@ export async function populateMockData(
             entity_id:
                 'pLxCFGOINXVaXmrS0VG0vC',
             state: woNodeNew,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(2, 11, 0),
         },
         {
@@ -4742,7 +4742,7 @@ export async function populateMockData(
             entity_id:
                 'pLxCFGOINXVaXmrS0VG0vC',
             state: woNodeCapture,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(2, 11, 20),
         },
         {
@@ -4750,17 +4750,17 @@ export async function populateMockData(
             entity_id:
                 'pLxCFGOINXVaXmrS0VG0vC',
             state: woNodeReview,
-            worker_id: woPersonCurrent,
+            member_id: woPersonCurrent,
             at: dt(1, 10, 0),
         },
-        // out-of-clan WO35: Sarah (not in DC workers)
+        // out-of-clan WO35: Sarah (not in DC members)
         // transitions DC out
         {
             id: 'uGXz0fPBwWaBQcviQP5ZsV',
             entity_id:
                 'IyrpZrIl2hbmmnCtiifEGm',
             state: woNodeNew,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(35, 9, 0),
         },
         {
@@ -4768,7 +4768,7 @@ export async function populateMockData(
             entity_id:
                 'IyrpZrIl2hbmmnCtiifEGm',
             state: woNodeCapture,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(35, 9, 12),
         },
         {
@@ -4776,7 +4776,7 @@ export async function populateMockData(
             entity_id:
                 'IyrpZrIl2hbmmnCtiifEGm',
             state: woNodeReview,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(33, 10, 0),
         },
         {
@@ -4784,17 +4784,17 @@ export async function populateMockData(
             entity_id:
                 'IyrpZrIl2hbmmnCtiifEGm',
             state: woNodeComplete,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(31, 14, 0),
         },
-        // out-of-clan WO36: Mike (not in DC workers)
+        // out-of-clan WO36: Mike (not in DC members)
         // transitions DC out
         {
             id: 'VrxyiUJqWcdd3hBdMyoTBt',
             entity_id:
                 'zYnDWBV4VP5guzW5fDWtHN',
             state: woNodeNew,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(22, 10, 30),
         },
         {
@@ -4802,7 +4802,7 @@ export async function populateMockData(
             entity_id:
                 'zYnDWBV4VP5guzW5fDWtHN',
             state: woNodeCapture,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(22, 10, 45),
         },
         {
@@ -4810,7 +4810,7 @@ export async function populateMockData(
             entity_id:
                 'zYnDWBV4VP5guzW5fDWtHN',
             state: woNodeReview,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(20, 11, 0),
         },
         {
@@ -4818,7 +4818,7 @@ export async function populateMockData(
             entity_id:
                 'zYnDWBV4VP5guzW5fDWtHN',
             state: woNodeComplete,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(18, 14, 0),
         },
         // old WO37: straddles window edge; Create+DC
@@ -4830,7 +4830,7 @@ export async function populateMockData(
             entity_id:
                 '7HX7RPwlYopHWfD7I0QAPs',
             state: woNodeNew,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(108, 9, 0),
         },
         {
@@ -4838,7 +4838,7 @@ export async function populateMockData(
             entity_id:
                 '7HX7RPwlYopHWfD7I0QAPs',
             state: woNodeCapture,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(108, 9, 15),
         },
         {
@@ -4846,7 +4846,7 @@ export async function populateMockData(
             entity_id:
                 '7HX7RPwlYopHWfD7I0QAPs',
             state: woNodeReview,
-            worker_id: woPersonMarcus,
+            member_id: woPersonMarcus,
             at: dt(8, 10, 0),
         },
         {
@@ -4854,7 +4854,7 @@ export async function populateMockData(
             entity_id:
                 '7HX7RPwlYopHWfD7I0QAPs',
             state: woNodeComplete,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(5, 14, 0),
         },
         // old WO38: all transitions ~100-103 days ago,
@@ -4865,7 +4865,7 @@ export async function populateMockData(
             entity_id:
                 'EXphSopBU1Is2TH4QZo4nO',
             state: woNodeNew,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(103, 10, 0),
         },
         {
@@ -4873,7 +4873,7 @@ export async function populateMockData(
             entity_id:
                 'EXphSopBU1Is2TH4QZo4nO',
             state: woNodeCapture,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(103, 10, 18),
         },
         {
@@ -4881,7 +4881,7 @@ export async function populateMockData(
             entity_id:
                 'EXphSopBU1Is2TH4QZo4nO',
             state: woNodeReview,
-            worker_id: woPersonMarcus,
+            member_id: woPersonMarcus,
             at: dt(101, 11, 0),
         },
         {
@@ -4889,7 +4889,7 @@ export async function populateMockData(
             entity_id:
                 'EXphSopBU1Is2TH4QZo4nO',
             state: woNodeComplete,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(100, 9, 0),
         },
         // prc01: happy path, ~3 day draft sojourn
@@ -4898,7 +4898,7 @@ export async function populateMockData(
             entity_id:
                 'hRPNkjrYBTQqzzFe1t8FH6',
             state: prcNodeStart,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(60, 9, 0),
         },
         {
@@ -4906,7 +4906,7 @@ export async function populateMockData(
             entity_id:
                 'hRPNkjrYBTQqzzFe1t8FH6',
             state: prcNodeDraft,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(60, 9, 5),
         },
         {
@@ -4914,7 +4914,7 @@ export async function populateMockData(
             entity_id:
                 'hRPNkjrYBTQqzzFe1t8FH6',
             state: prcNodeSubmit,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(57, 10, 0),
         },
         {
@@ -4922,7 +4922,7 @@ export async function populateMockData(
             entity_id:
                 'hRPNkjrYBTQqzzFe1t8FH6',
             state: prcNodeTriage,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(57, 10, 30),
         },
         {
@@ -4930,7 +4930,7 @@ export async function populateMockData(
             entity_id:
                 'hRPNkjrYBTQqzzFe1t8FH6',
             state: prcNodeQuickRev,
-            worker_id: woPersonMarcus,
+            member_id: woPersonMarcus,
             at: dt(57, 11, 0),
         },
         {
@@ -4938,7 +4938,7 @@ export async function populateMockData(
             entity_id:
                 'hRPNkjrYBTQqzzFe1t8FH6',
             state: prcNodeDecision,
-            worker_id: woPersonMarcus,
+            member_id: woPersonMarcus,
             at: dt(56, 14, 0),
         },
         {
@@ -4946,7 +4946,7 @@ export async function populateMockData(
             entity_id:
                 'hRPNkjrYBTQqzzFe1t8FH6',
             state: prcNodeApproved,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(56, 15, 0),
         },
         {
@@ -4954,7 +4954,7 @@ export async function populateMockData(
             entity_id:
                 'hRPNkjrYBTQqzzFe1t8FH6',
             state: prcNodeArchive,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(55, 9, 0),
         },
         // prc02: happy path, ~2 day draft sojourn
@@ -4963,7 +4963,7 @@ export async function populateMockData(
             entity_id:
                 'L3UhOvrAGluk4kNnN6J8NT',
             state: prcNodeStart,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(45, 10, 0),
         },
         {
@@ -4971,7 +4971,7 @@ export async function populateMockData(
             entity_id:
                 'L3UhOvrAGluk4kNnN6J8NT',
             state: prcNodeDraft,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(45, 10, 10),
         },
         {
@@ -4979,7 +4979,7 @@ export async function populateMockData(
             entity_id:
                 'L3UhOvrAGluk4kNnN6J8NT',
             state: prcNodeSubmit,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(43, 9, 0),
         },
         {
@@ -4987,7 +4987,7 @@ export async function populateMockData(
             entity_id:
                 'L3UhOvrAGluk4kNnN6J8NT',
             state: prcNodeTriage,
-            worker_id: woPersonMarcus,
+            member_id: woPersonMarcus,
             at: dt(43, 9, 20),
         },
         {
@@ -4995,7 +4995,7 @@ export async function populateMockData(
             entity_id:
                 'L3UhOvrAGluk4kNnN6J8NT',
             state: prcNodeQuickRev,
-            worker_id: woPersonMarcus,
+            member_id: woPersonMarcus,
             at: dt(43, 10, 0),
         },
         {
@@ -5003,7 +5003,7 @@ export async function populateMockData(
             entity_id:
                 'L3UhOvrAGluk4kNnN6J8NT',
             state: prcNodeDecision,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(42, 14, 0),
         },
         {
@@ -5011,7 +5011,7 @@ export async function populateMockData(
             entity_id:
                 'L3UhOvrAGluk4kNnN6J8NT',
             state: prcNodeApproved,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(42, 15, 0),
         },
         {
@@ -5019,7 +5019,7 @@ export async function populateMockData(
             entity_id:
                 'L3UhOvrAGluk4kNnN6J8NT',
             state: prcNodeArchive,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(41, 10, 0),
         },
         // prc03: happy path, ~1 day draft sojourn
@@ -5028,7 +5028,7 @@ export async function populateMockData(
             entity_id:
                 'oTscblsEOjZDkvkW3vs7rU',
             state: prcNodeStart,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(30, 8, 0),
         },
         {
@@ -5036,7 +5036,7 @@ export async function populateMockData(
             entity_id:
                 'oTscblsEOjZDkvkW3vs7rU',
             state: prcNodeDraft,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(30, 8, 10),
         },
         {
@@ -5044,7 +5044,7 @@ export async function populateMockData(
             entity_id:
                 'oTscblsEOjZDkvkW3vs7rU',
             state: prcNodeSubmit,
-            worker_id: woPersonCurrent,
+            member_id: woPersonCurrent,
             at: dt(29, 9, 0),
         },
         {
@@ -5052,7 +5052,7 @@ export async function populateMockData(
             entity_id:
                 'oTscblsEOjZDkvkW3vs7rU',
             state: prcNodeTriage,
-            worker_id: woPersonCurrent,
+            member_id: woPersonCurrent,
             at: dt(29, 9, 15),
         },
         {
@@ -5060,7 +5060,7 @@ export async function populateMockData(
             entity_id:
                 'oTscblsEOjZDkvkW3vs7rU',
             state: prcNodeQuickRev,
-            worker_id: woPersonMarcus,
+            member_id: woPersonMarcus,
             at: dt(29, 10, 0),
         },
         {
@@ -5068,7 +5068,7 @@ export async function populateMockData(
             entity_id:
                 'oTscblsEOjZDkvkW3vs7rU',
             state: prcNodeDecision,
-            worker_id: woPersonMarcus,
+            member_id: woPersonMarcus,
             at: dt(28, 15, 0),
         },
         {
@@ -5076,7 +5076,7 @@ export async function populateMockData(
             entity_id:
                 'oTscblsEOjZDkvkW3vs7rU',
             state: prcNodeApproved,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(28, 16, 0),
         },
         {
@@ -5084,7 +5084,7 @@ export async function populateMockData(
             entity_id:
                 'oTscblsEOjZDkvkW3vs7rU',
             state: prcNodeArchive,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(27, 9, 0),
         },
         // prc04: happy path, ~4 day draft sojourn
@@ -5093,7 +5093,7 @@ export async function populateMockData(
             entity_id:
                 'Xpw9VGpZ6RyevuInSr8yze',
             state: prcNodeStart,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(20, 11, 0),
         },
         {
@@ -5101,7 +5101,7 @@ export async function populateMockData(
             entity_id:
                 'Xpw9VGpZ6RyevuInSr8yze',
             state: prcNodeDraft,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(20, 11, 5),
         },
         {
@@ -5109,7 +5109,7 @@ export async function populateMockData(
             entity_id:
                 'Xpw9VGpZ6RyevuInSr8yze',
             state: prcNodeSubmit,
-            worker_id: woPersonMarcus,
+            member_id: woPersonMarcus,
             at: dt(16, 10, 0),
         },
         {
@@ -5117,7 +5117,7 @@ export async function populateMockData(
             entity_id:
                 'Xpw9VGpZ6RyevuInSr8yze',
             state: prcNodeTriage,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(16, 10, 20),
         },
         {
@@ -5125,7 +5125,7 @@ export async function populateMockData(
             entity_id:
                 'Xpw9VGpZ6RyevuInSr8yze',
             state: prcNodeQuickRev,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(16, 11, 0),
         },
         {
@@ -5133,7 +5133,7 @@ export async function populateMockData(
             entity_id:
                 'Xpw9VGpZ6RyevuInSr8yze',
             state: prcNodeDecision,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(15, 14, 0),
         },
         {
@@ -5141,7 +5141,7 @@ export async function populateMockData(
             entity_id:
                 'Xpw9VGpZ6RyevuInSr8yze',
             state: prcNodeApproved,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(15, 15, 30),
         },
         {
@@ -5149,7 +5149,7 @@ export async function populateMockData(
             entity_id:
                 'Xpw9VGpZ6RyevuInSr8yze',
             state: prcNodeArchive,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(14, 9, 0),
         },
         // prc05: revisit -- Decision sends to
@@ -5159,7 +5159,7 @@ export async function populateMockData(
             entity_id:
                 'yqPpJb0NoQDgx8DoZ183Nx',
             state: prcNodeStart,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(15, 9, 0),
         },
         {
@@ -5167,7 +5167,7 @@ export async function populateMockData(
             entity_id:
                 'yqPpJb0NoQDgx8DoZ183Nx',
             state: prcNodeDraft,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(15, 9, 10),
         },
         {
@@ -5175,7 +5175,7 @@ export async function populateMockData(
             entity_id:
                 'yqPpJb0NoQDgx8DoZ183Nx',
             state: prcNodeSubmit,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(14, 10, 0),
         },
         {
@@ -5183,7 +5183,7 @@ export async function populateMockData(
             entity_id:
                 'yqPpJb0NoQDgx8DoZ183Nx',
             state: prcNodeTriage,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(14, 10, 15),
         },
         {
@@ -5191,7 +5191,7 @@ export async function populateMockData(
             entity_id:
                 'yqPpJb0NoQDgx8DoZ183Nx',
             state: prcNodeQuickRev,
-            worker_id: woPersonMarcus,
+            member_id: woPersonMarcus,
             at: dt(14, 11, 0),
         },
         {
@@ -5199,7 +5199,7 @@ export async function populateMockData(
             entity_id:
                 'yqPpJb0NoQDgx8DoZ183Nx',
             state: prcNodeDecision,
-            worker_id: woPersonMarcus,
+            member_id: woPersonMarcus,
             at: dt(13, 14, 0),
         },
         // Decision routes to Revise (revisit)
@@ -5208,7 +5208,7 @@ export async function populateMockData(
             entity_id:
                 'yqPpJb0NoQDgx8DoZ183Nx',
             state: prcNodeRevise,
-            worker_id: woPersonCurrent,
+            member_id: woPersonCurrent,
             at: dt(13, 15, 0),
         },
         // Revise sends back to Draft
@@ -5217,7 +5217,7 @@ export async function populateMockData(
             entity_id:
                 'yqPpJb0NoQDgx8DoZ183Nx',
             state: prcNodeDraft,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(12, 9, 0),
         },
         {
@@ -5225,7 +5225,7 @@ export async function populateMockData(
             entity_id:
                 'yqPpJb0NoQDgx8DoZ183Nx',
             state: prcNodeSubmit,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(11, 10, 0),
         },
         {
@@ -5233,7 +5233,7 @@ export async function populateMockData(
             entity_id:
                 'yqPpJb0NoQDgx8DoZ183Nx',
             state: prcNodeTriage,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(11, 10, 20),
         },
         {
@@ -5241,7 +5241,7 @@ export async function populateMockData(
             entity_id:
                 'yqPpJb0NoQDgx8DoZ183Nx',
             state: prcNodeQuickRev,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(11, 11, 0),
         },
         {
@@ -5249,7 +5249,7 @@ export async function populateMockData(
             entity_id:
                 'yqPpJb0NoQDgx8DoZ183Nx',
             state: prcNodeDecision,
-            worker_id: woPersonMarcus,
+            member_id: woPersonMarcus,
             at: dt(10, 14, 0),
         },
         {
@@ -5257,7 +5257,7 @@ export async function populateMockData(
             entity_id:
                 'yqPpJb0NoQDgx8DoZ183Nx',
             state: prcNodeApproved,
-            worker_id: woPersonMarcus,
+            member_id: woPersonMarcus,
             at: dt(10, 15, 0),
         },
         {
@@ -5265,7 +5265,7 @@ export async function populateMockData(
             entity_id:
                 'yqPpJb0NoQDgx8DoZ183Nx',
             state: prcNodeArchive,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(9, 9, 0),
         },
         // prc06: in-flight -- stuck at Decision
@@ -5274,7 +5274,7 @@ export async function populateMockData(
             entity_id:
                 'BUrGEVDMF6FeU35WUHUY5E',
             state: prcNodeStart,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(5, 10, 0),
         },
         {
@@ -5282,7 +5282,7 @@ export async function populateMockData(
             entity_id:
                 'BUrGEVDMF6FeU35WUHUY5E',
             state: prcNodeDraft,
-            worker_id: woPersonMike,
+            member_id: woPersonMike,
             at: dt(5, 10, 8),
         },
         {
@@ -5290,7 +5290,7 @@ export async function populateMockData(
             entity_id:
                 'BUrGEVDMF6FeU35WUHUY5E',
             state: prcNodeSubmit,
-            worker_id: woPersonCurrent,
+            member_id: woPersonCurrent,
             at: dt(4, 11, 0),
         },
         {
@@ -5298,7 +5298,7 @@ export async function populateMockData(
             entity_id:
                 'BUrGEVDMF6FeU35WUHUY5E',
             state: prcNodeTriage,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(4, 11, 20),
         },
         {
@@ -5306,7 +5306,7 @@ export async function populateMockData(
             entity_id:
                 'BUrGEVDMF6FeU35WUHUY5E',
             state: prcNodeQuickRev,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(4, 12, 0),
         },
         {
@@ -5314,7 +5314,7 @@ export async function populateMockData(
             entity_id:
                 'BUrGEVDMF6FeU35WUHUY5E',
             state: prcNodeDecision,
-            worker_id: woPersonMarcus,
+            member_id: woPersonMarcus,
             at: dt(3, 14, 0),
         },
         // stays at Decision -- no more transitions
@@ -5326,7 +5326,7 @@ export async function populateMockData(
             entity_id:
                 'gateV101W0rkOrd3rXY0a1',
             state: woNodeNew,
-            worker_id: woPersonSarah,
+            member_id: woPersonSarah,
             at: dt(1, 9, 0),
         },
     ];
@@ -5527,11 +5527,11 @@ export async function populateMockData(
             ]),
     };
 
-    const leadToCloseSkill: WorkerSkill = {
-        byWorkerAndNode: new Map<
+    const leadToCloseSkill: MemberSkill = {
+        byMemberAndNode: new Map<
             Id, ReadonlyMap<Id, number>
         >([
-            [workerSarah, new Map<
+            [memberSarah, new Map<
                 Id, number
             >([
                 [l2cDiscoveryNodeId, 0.75],
@@ -5539,23 +5539,23 @@ export async function populateMockData(
                 [l2cProposalNodeId, 0.80],
                 [l2cNegotNodeId, 0.70],
             ])],
-            [workerMarcus, new Map<
+            [memberMarcus, new Map<
                 Id, number
             >([
                 [l2cDiscoveryNodeId, 1.10],
                 [l2cQualifNodeId, 1.10],
             ])],
-            [workerMike, new Map<
+            [memberMike, new Map<
                 Id, number
             >([
                 [l2cProposalNodeId, 0.85],
             ])],
-            [workerLisa, new Map<
+            [memberLisa, new Map<
                 Id, number
             >([
                 [l2cTriageNodeId, 0.90],
             ])],
-            [workerClaude, new Map<
+            [memberClaude, new Map<
                 Id, number
             >([
                 [l2cTriageNodeId, 0.60],
@@ -5604,67 +5604,67 @@ export async function populateMockData(
         {
             id: 'k4dY2dPq90mQVwwCkhWIo3',
             idea_id: 'eT5xdKjzLDmuRn3r7XMX4R',
-            worker_id: 'LhfaUUf4IumVsCSGB4xjdK',
+            member_id: 'LhfaUUf4IumVsCSGB4xjdK',
             at: dt(75, 9, 30),
         },
         {
             id: 'XC7hsfNJueKQ8q0UfCuC7o',
             idea_id: 'cbTuSs0Ex84PeFGSvoAEFZ',
-            worker_id: 'bLP3X1hb1mSz8gY9neogU3',
+            member_id: 'bLP3X1hb1mSz8gY9neogU3',
             at: dt(70, 9, 0),
         },
         {
             id: 'YmzT46BbGVFALpiXFDnlVd',
             idea_id: 'wuCMQqo4IkEksx7MYmu8g2',
-            worker_id: '53J8h9dr76XFqCjYcNVwIR',
+            member_id: '53J8h9dr76XFqCjYcNVwIR',
             at: dt(65, 9, 0),
         },
         {
             id: 'cmoTu4GRGmO8y5QrfPIHSm',
             idea_id: 'ojOEXtdzdtTZtpM81TxVca',
-            worker_id: 'jBoWiyWxj7pp4sG3JgX5l2',
+            member_id: 'jBoWiyWxj7pp4sG3JgX5l2',
             at: dt(55, 9, 0),
         },
         {
             id: 'kIUtvgTOLPjsSmAEVOhPb1',
             idea_id: 'T2vAafLDcshDONlYxpzPLc',
-            worker_id: 'Trf1Up2jMsPhEnjbW4Ji1n',
+            member_id: 'Trf1Up2jMsPhEnjbW4Ji1n',
             at: dt(50, 9, 0),
         },
         {
             id: 'r04u9qpJKSyNjP9Owxr5Be',
             idea_id: 'HRYrImq1rBJ5ZRe1T9TAVk',
-            worker_id: 'zyTbfbjcGEfbpCsNTP0XjX',
+            member_id: 'zyTbfbjcGEfbpCsNTP0XjX',
             at: dt(45, 9, 0),
         },
         {
             id: '2mPJTlujj1RF6gexFwbDqJ',
             idea_id: 'MCxK0hzT9CPjJx1ZV5unfr',
-            worker_id: 'LhfaUUf4IumVsCSGB4xjdK',
+            member_id: 'LhfaUUf4IumVsCSGB4xjdK',
             at: dt(75, 10, 0),
         },
         {
             id: 'caBSqTgzDnvP8joamAG9OG',
             idea_id: 'SUb4gKXsZ1OsEauzqszg0t',
-            worker_id: 'WxQn4LVWb76YkmqK5B0EPp',
+            member_id: 'WxQn4LVWb76YkmqK5B0EPp',
             at: dt(35, 9, 0),
         },
         {
             id: 'UfsCp7WYUybhwxD170okb4',
             idea_id: 'gxa84W9KvEgD0wT1F4TOM9',
-            worker_id: '53J8h9dr76XFqCjYcNVwIR',
+            member_id: '53J8h9dr76XFqCjYcNVwIR',
             at: dt(30, 9, 0),
         },
         {
             id: 'mbTZAQbC5cJSEIzhEEFpyq',
             idea_id: '1Z68gROMrlTAfPEGiyJJAY',
-            worker_id: 'jBoWiyWxj7pp4sG3JgX5l2',
+            member_id: 'jBoWiyWxj7pp4sG3JgX5l2',
             at: dt(25, 9, 0),
         },
         {
             id: '0LjTHFflWNaDZkKDqxmwJi',
             idea_id: 'Q2On2xwMpFdzOklBQJXrni',
-            worker_id: 'Trf1Up2jMsPhEnjbW4Ji1n',
+            member_id: 'Trf1Up2jMsPhEnjbW4Ji1n',
             at: dt(20, 9, 0),
         },
     ];
@@ -5674,77 +5674,77 @@ export async function populateMockData(
             id: 'qJoFXyzUUaq0vEpHL5e34l',
             entity_id: 'eT5xdKjzLDmuRn3r7XMX4R',
             state: 'in-review',
-            worker_id: 'LhfaUUf4IumVsCSGB4xjdK',
+            member_id: 'LhfaUUf4IumVsCSGB4xjdK',
             at: dt(75, 9, 30),
         },
         {
             id: 'tIcL6f8KJoyG2YN9NofOMo',
             entity_id: 'cbTuSs0Ex84PeFGSvoAEFZ',
             state: 'approved',
-            worker_id: 'bLP3X1hb1mSz8gY9neogU3',
+            member_id: 'bLP3X1hb1mSz8gY9neogU3',
             at: dt(70, 9, 0),
         },
         {
             id: 'mGfBLqA7lScpEKxc5w0Yt2',
             entity_id: 'wuCMQqo4IkEksx7MYmu8g2',
             state: 'active',
-            worker_id: '53J8h9dr76XFqCjYcNVwIR',
+            member_id: '53J8h9dr76XFqCjYcNVwIR',
             at: dt(65, 9, 0),
         },
         {
             id: 'BvBRvDQ8b5l5Tg7iZSGyHF',
             entity_id: 'ojOEXtdzdtTZtpM81TxVca',
             state: 'in-review',
-            worker_id: 'jBoWiyWxj7pp4sG3JgX5l2',
+            member_id: 'jBoWiyWxj7pp4sG3JgX5l2',
             at: dt(55, 9, 0),
         },
         {
             id: 'BMS9TmTKR0DZ41vTUSpvxX',
             entity_id: 'T2vAafLDcshDONlYxpzPLc',
             state: 'active',
-            worker_id: 'Trf1Up2jMsPhEnjbW4Ji1n',
+            member_id: 'Trf1Up2jMsPhEnjbW4Ji1n',
             at: dt(50, 9, 0),
         },
         {
             id: 'XX2EXrIUcQVTnzGo0YO2Iw',
             entity_id: 'HRYrImq1rBJ5ZRe1T9TAVk',
             state: 'sent-back',
-            worker_id: 'zyTbfbjcGEfbpCsNTP0XjX',
+            member_id: 'zyTbfbjcGEfbpCsNTP0XjX',
             at: dt(45, 9, 0),
         },
         {
             id: 'fxlbcnsAmCWp4j8B2NkDKM',
             entity_id: 'MCxK0hzT9CPjJx1ZV5unfr',
             state: 'in-review',
-            worker_id: 'LhfaUUf4IumVsCSGB4xjdK',
+            member_id: 'LhfaUUf4IumVsCSGB4xjdK',
             at: dt(75, 10, 0),
         },
         {
             id: 'JjkkkkrZw4FvOWBpJYE2J7',
             entity_id: 'SUb4gKXsZ1OsEauzqszg0t',
             state: 'in-review',
-            worker_id: 'WxQn4LVWb76YkmqK5B0EPp',
+            member_id: 'WxQn4LVWb76YkmqK5B0EPp',
             at: dt(35, 9, 0),
         },
         {
             id: '4nzdNB97hgD1GZ7CjA2EwS',
             entity_id: 'gxa84W9KvEgD0wT1F4TOM9',
             state: 'in-review',
-            worker_id: '53J8h9dr76XFqCjYcNVwIR',
+            member_id: '53J8h9dr76XFqCjYcNVwIR',
             at: dt(30, 9, 0),
         },
         {
             id: 'wmCY9xZdrk0XlydyABZqXY',
             entity_id: '1Z68gROMrlTAfPEGiyJJAY',
             state: 'in-review',
-            worker_id: 'jBoWiyWxj7pp4sG3JgX5l2',
+            member_id: 'jBoWiyWxj7pp4sG3JgX5l2',
             at: dt(25, 9, 0),
         },
         {
             id: 'OWGsZqEi1bnWUetzS2sURr',
             entity_id: 'Q2On2xwMpFdzOklBQJXrni',
             state: 'in-review',
-            worker_id: 'Trf1Up2jMsPhEnjbW4Ji1n',
+            member_id: 'Trf1Up2jMsPhEnjbW4Ji1n',
             at: dt(20, 9, 0),
         },
     ];
@@ -5754,112 +5754,112 @@ export async function populateMockData(
             id: 'pSe01Cu5tSegmAi5pEv01',
             entity_id: 'u6YkHhlGc91oDMkr3x0isa',
             state: 'approved',
-            worker_id: SYSTEM_WORKER_ID,
+            member_id: SYSTEM_MEMBER_ID,
             at: dt(60, 9, 0),
         },
         {
             id: 'pSe02Aut0Rep0rtComp02',
             entity_id: 'jRE2Tj32NHsFGZIeEADp0p',
             state: 'archived',
-            worker_id: SYSTEM_WORKER_ID,
+            member_id: SYSTEM_MEMBER_ID,
             at: dt(110, 9, 0),
         },
         {
             id: 'pSe03SalesP1p3App03Z',
             entity_id: l2cProjectId,
             state: 'approved',
-            worker_id: SYSTEM_WORKER_ID,
+            member_id: SYSTEM_MEMBER_ID,
             at: dt(55, 9, 0),
         },
         {
             id: 'pSe04PredMa1ntRev04AB',
             entity_id: 'P04PredMa1ntzyXY010203',
             state: 'under-review',
-            worker_id: SYSTEM_WORKER_ID,
+            member_id: SYSTEM_MEMBER_ID,
             at: dt(18, 9, 0),
         },
         {
             id: 'pSe05RtAna1ytComp05CD',
             entity_id: 'P05RtAna1ytcsXY010203Z',
             state: 'archived',
-            worker_id: SYSTEM_WORKER_ID,
+            member_id: SYSTEM_MEMBER_ID,
             at: dt(95, 9, 0),
         },
         {
             id: 'pSe06SmInvOptSnt06EF',
             entity_id: 'P06SmInvOptZyXY010203A',
             state: 'sent-back',
-            worker_id: SYSTEM_WORKER_ID,
+            member_id: SYSTEM_MEMBER_ID,
             at: dt(38, 9, 0),
         },
         {
             id: 'pSe07Empl0yTraRev07GH',
             entity_id: 'P07Empl0yTrainZyXY00B0',
             state: 'under-review',
-            worker_id: SYSTEM_WORKER_ID,
+            member_id: SYSTEM_MEMBER_ID,
             at: dt(12, 9, 0),
         },
         {
             id: 'pSe08CustSuppApp08IJ',
             entity_id: 'P08CustSuppKn0wXY01C0D',
             state: 'approved',
-            worker_id: SYSTEM_WORKER_ID,
+            member_id: SYSTEM_MEMBER_ID,
             at: dt(48, 9, 0),
         },
         {
             id: 'pSe09C0mp1AudApp09KL',
             entity_id: 'P09C0mp1AudAut0mXY01E0',
             state: 'approved',
-            worker_id: SYSTEM_WORKER_ID,
+            member_id: SYSTEM_MEMBER_ID,
             at: dt(72, 9, 0),
         },
         {
             id: 'pSe10MlRgD1s4App10MN',
             entity_id: 'P10MlRgD1s4stRc1XY01FG',
             state: 'approved',
-            worker_id: SYSTEM_WORKER_ID,
+            member_id: SYSTEM_MEMBER_ID,
             at: dt(82, 9, 0),
         },
         {
             id: 'pSe11V0iceField11OPQ',
             entity_id: 'P11V0iceField0psXY01HJ',
             state: 'approved',
-            worker_id: SYSTEM_WORKER_ID,
+            member_id: SYSTEM_MEMBER_ID,
             at: dt(40, 9, 0),
         },
         {
             id: 'pSe12CarbF00tCmp12RS',
             entity_id: 'P12CarbF00tprXY01K0L0M',
             state: 'archived',
-            worker_id: SYSTEM_WORKER_ID,
+            member_id: SYSTEM_MEMBER_ID,
             at: dt(120, 9, 0),
         },
         {
             id: 'pSe13W0rk4rcRev13TU',
             entity_id: 'P13W0rk4rcF0r3castsXY1',
             state: 'under-review',
-            worker_id: SYSTEM_WORKER_ID,
+            member_id: SYSTEM_MEMBER_ID,
             at: dt(22, 9, 0),
         },
         {
             id: 'pSe14SmartD0cAp14VWX',
             entity_id: 'P14SmartD0cumtR0utngX1',
             state: 'approved',
-            worker_id: SYSTEM_WORKER_ID,
+            member_id: SYSTEM_MEMBER_ID,
             at: dt(65, 9, 0),
         },
         {
             id: 'pSe15Inv3st0rAp15YZA',
             entity_id: 'P15Inv3st0rRep0rtP1Y00',
             state: 'approved',
-            worker_id: SYSTEM_WORKER_ID,
+            member_id: SYSTEM_MEMBER_ID,
             at: dt(58, 9, 0),
         },
         {
             id: 'pSe16MktSentSubmt16BC',
             entity_id: 'P16MktSent1mentXY01020',
             state: 'submitted',
-            worker_id: SYSTEM_WORKER_ID,
+            member_id: SYSTEM_MEMBER_ID,
             at: dt(5, 9, 0),
         },
     ];
@@ -5868,7 +5868,7 @@ export async function populateMockData(
     // creation moment of each flow on the states
     // log. Tier 2.3 retires FlowEntity.created_at
     // / updated_at; the log IS the truth. Events
-    // are authored by SYSTEM_WORKER_ID at the
+    // are authored by SYSTEM_MEMBER_ID at the
     // shared wfTimestamp moment.
     const flowStateEvents: StateEntity[] = [
         {
@@ -5876,7 +5876,7 @@ export async function populateMockData(
             entity_id:
                 'h5mErVBQhwdMKwi1co30jB',
             state: 'active',
-            worker_id: SYSTEM_WORKER_ID,
+            member_id: SYSTEM_MEMBER_ID,
             at: wfTimestamp,
         },
         {
@@ -5884,7 +5884,7 @@ export async function populateMockData(
             entity_id:
                 'E2BnBlZyrriqsQYkmS4usb',
             state: 'active',
-            worker_id: SYSTEM_WORKER_ID,
+            member_id: SYSTEM_MEMBER_ID,
             at: wfTimestamp,
         },
         {
@@ -5892,19 +5892,19 @@ export async function populateMockData(
             entity_id:
                 '7COt7Kf4OaOBg6AjaNO04s',
             state: 'active',
-            worker_id: SYSTEM_WORKER_ID,
+            member_id: SYSTEM_MEMBER_ID,
             at: wfTimestamp,
         },
         {
             id: 'fSe04L3adt0Cl0se0aActiv',
             entity_id: l2cFlowId,
             state: 'active',
-            worker_id: SYSTEM_WORKER_ID,
+            member_id: SYSTEM_MEMBER_ID,
             at: wfTimestamp,
         },
     ];
 
-    const aiWorkers: (AIWorkerEntity & { name: string })[] = [
+    const aiMembers: (AIMemberEntity & { name: string })[] = [
         {
             id: 'tuJwPxYtBur2KCLquScShB',
             name: 'Claude Opus 4.8',
@@ -5949,14 +5949,14 @@ export async function populateMockData(
         },
     ];
 
-    // AI workers start at 'active' on creation.
+    // AI members start at 'active' on creation.
     // Same single-event seeding as humans.
-    for (const ai of aiWorkers) {
-        workerStateEvents.push({
-            id: `seed-worker-${ai.id}-active`,
+    for (const ai of aiMembers) {
+        memberStateEvents.push({
+            id: `seed-member-${ai.id}-active`,
             entity_id: ai.id,
             state: 'active',
-            worker_id: SYSTEM_WORKER_ID,
+            member_id: SYSTEM_MEMBER_ID,
             at: MOCK_SEED_TIMESTAMP,
         });
     }
@@ -5986,7 +5986,7 @@ export async function populateMockData(
             adapter.states.put(r.id, {
                 entity_id: r.entity_id,
                 state: r.state,
-                worker_id: r.worker_id,
+                member_id: r.member_id,
                 at: r.at,
             }),
         ),
@@ -5994,7 +5994,7 @@ export async function populateMockData(
             adapter.states.put(r.id, {
                 entity_id: r.entity_id,
                 state: r.state,
-                worker_id: r.worker_id,
+                member_id: r.member_id,
                 at: r.at,
             }),
         ),
@@ -6002,7 +6002,7 @@ export async function populateMockData(
             adapter.states.put(r.id, {
                 entity_id: r.entity_id,
                 state: r.state,
-                worker_id: r.worker_id,
+                member_id: r.member_id,
                 at: r.at,
             }),
         ),
@@ -6010,15 +6010,15 @@ export async function populateMockData(
             adapter.states.put(r.id, {
                 entity_id: r.entity_id,
                 state: r.state,
-                worker_id: r.worker_id,
+                member_id: r.member_id,
                 at: r.at,
             }),
         ),
-        ...workerStateEvents.map(r =>
+        ...memberStateEvents.map(r =>
             adapter.states.put(r.id, {
                 entity_id: r.entity_id,
                 state: r.state,
-                worker_id: r.worker_id,
+                member_id: r.member_id,
                 at: r.at,
             }),
         ),
@@ -6026,14 +6026,14 @@ export async function populateMockData(
             adapter.stateFieldValues
                 .put(r.id, r),
         ),
-        ...aiWorkers.flatMap(m => {
+        ...aiMembers.flatMap(m => {
             const { id: _id, name, ...detail } = m;
             return [
-                adapter.workers.put(m.id, {
+                adapter.members.put(m.id, {
                     type: 'ai',
                     name,
                 }),
-                adapter.aiWorkers.put(m.id, detail),
+                adapter.aiMembers.put(m.id, detail),
             ];
         }),
         ...leadToCloseData.workOrders.map(r =>
@@ -6049,7 +6049,7 @@ export async function populateMockData(
             adapter.states.put(r.id, {
                 entity_id: r.entity_id,
                 state: r.state,
-                worker_id: r.worker_id,
+                member_id: r.member_id,
                 at: r.at,
             }),
         ),
@@ -6082,22 +6082,22 @@ export async function populateMockData(
             adapter.states.put(r.id, {
                 entity_id: r.entity_id,
                 state: r.state,
-                worker_id: r.worker_id,
+                member_id: r.member_id,
                 at: r.at,
             }),
         ),
     ]);
 
-    const humanWorkerIds =
-        (await adapter.workers.getAll())
+    const humanMemberIds =
+        (await adapter.members.getAll())
             .filter(w => w.type === 'human')
             .map(w => w.id);
-    const workerFor = (seed: string): string =>
-        humanWorkerIds[
+    const memberFor = (seed: string): string =>
+        humanMemberIds[
             deterministicScore(
-                seed, 0, humanWorkerIds.length - 1,
+                seed, 0, humanMemberIds.length - 1,
             )
-        ] ?? SYSTEM_WORKER_ID;
+        ] ?? SYSTEM_MEMBER_ID;
 
     for (const seed of OBJECTIVE_SEEDS) {
         await adapter.objectives.put(seed.id, {
@@ -6109,7 +6109,7 @@ export async function populateMockData(
                 objective_id: seed.id,
                 name: seed.name,
                 description: seed.description,
-                worker_id: workerFor(
+                member_id: memberFor(
                     `${seed.id}:revision`,
                 ),
                 at: MOCK_SEED_TIMESTAMP,
@@ -6194,7 +6194,7 @@ export async function populateMockData(
                         project_id: p.id,
                         objective_id: obj.id,
                         score,
-                        worker_id: workerFor(
+                        member_id: memberFor(
                             `${p.id}:${obj.id}:baseline`,
                         ),
                         at: scoredAt,
@@ -6238,7 +6238,7 @@ export async function populateMockData(
                                 project_id: p.id,
                                 objective_id: obj.id,
                                 score,
-                                worker_id: workerFor(
+                                member_id: memberFor(
                                     `${p.id}:${obj.id}:actual:${k}`,
                                 ),
                                 at: scoredAt,
@@ -6260,15 +6260,15 @@ export async function populateBootstrapData(
     // the correct pristine state; sample Records are demo
     // content loaded by populateMockData, not bootstrap.
     await Promise.all([
-        adapter.workers.put(SYSTEM_WORKER_ID, {
+        adapter.members.put(SYSTEM_MEMBER_ID, {
             type: 'system',
-            name: 'System Worker',
+            name: 'System Member',
         }),
-        adapter.workers.put('current', {
+        adapter.members.put('current', {
             type: 'human',
             name: 'Tony Stark',
         }),
-        adapter.humanWorkers.put('current', {
+        adapter.humanMembers.put('current', {
             email: 'demo@example.com',
             title: 'Admin',
             department: 'Product',
@@ -6290,15 +6290,15 @@ export async function populateBootstrapData(
         }),
         adapter.states.record(
             'bootstrap-system-active',
-            SYSTEM_WORKER_ID,
+            SYSTEM_MEMBER_ID,
             'active',
-            SYSTEM_WORKER_ID,
+            SYSTEM_MEMBER_ID,
         ),
         adapter.states.record(
             'bootstrap-current-active',
             'current',
             'active',
-            SYSTEM_WORKER_ID,
+            SYSTEM_MEMBER_ID,
         ),
         adapter.organization.put({
             name: 'Stark Industries',

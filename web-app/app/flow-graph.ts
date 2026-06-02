@@ -426,19 +426,19 @@ export function computeEdgeLabelWidth(
     );
 }
 
-export type WorkerHazardLevel = 'warning' | 'danger';
+export type MemberHazardLevel = 'warning' | 'danger';
 
-export function shouldShowWorkerHazard(
+export function shouldShowMemberHazard(
     node: GraphNode,
     allEdges: readonly GraphEdge[],
-): WorkerHazardLevel | null {
+): MemberHazardLevel | null {
     if (node.isCreate || node.isArchive) return null;
     const outCount = allEdges
         .filter(e => e.fromNodeId === node.id)
         .length;
-    if (node.workerIds.length === 0) return 'danger';
+    if (node.memberIds.length === 0) return 'danger';
     if (outCount === 0) return 'danger';
-    if (node.workerIds.length === 1) return 'warning';
+    if (node.memberIds.length === 1) return 'warning';
     return null;
 }
 
@@ -544,21 +544,21 @@ function buildNode(
     }
 
     const hazardLevel =
-        shouldShowWorkerHazard(node, edges);
+        shouldShowMemberHazard(node, edges);
     if (hazardLevel === 'warning') {
         inner += '<g'
             + ' class="flow-node-warning"'
             + ' transform="translate(6, 42)">'
             + '<title>'
-            + 'Single worker assigned (no backup)'
+            + 'Single member assigned (no backup)'
             + '</title>'
             + iconAlertTriangle(16, '')
                 .toString()
             + '</g>';
     } else if (hazardLevel === 'danger') {
         const dangerTitle =
-            node.workerIds.length === 0
-                ? 'Workers required'
+            node.memberIds.length === 0
+                ? 'Members required'
                 : 'Dead end (no outgoing edges)';
         inner += '<g'
             + ' class="flow-node-danger"'

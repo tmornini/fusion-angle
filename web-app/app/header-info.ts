@@ -2,8 +2,8 @@ import { $ } from './dom.ts';
 import { navigateTo } from './navigation.ts';
 
 interface HeaderData {
-    workerId: string;
-    workerName: string;
+    memberId: string;
+    memberName: string;
     organization: string;
     greeting: string;
     stats: ReadonlyArray<{
@@ -16,22 +16,22 @@ async function getHeaderData(
 ): Promise<HeaderData> {
     const {
         createRequestContext,
-        getHumanWorker,
+        getHumanMember,
         getOrganization,
         getDashboardStats,
     } = await import('./adapters');
     const { getTimeOfDay } =
         await import('./format');
     const ctx = createRequestContext();
-    const [worker, org, stats] =
+    const [member, org, stats] =
         await Promise.all([
-            getHumanWorker(ctx, 'current'),
+            getHumanMember(ctx, 'current'),
             getOrganization(ctx),
             getDashboardStats(ctx),
         ]);
     return {
-        workerId: worker.idForLink(),
-        workerName: worker.name(),
+        memberId: member.idForLink(),
+        memberName: member.name(),
         organization: org.nameText(),
         greeting: getTimeOfDay(),
         stats,
@@ -51,19 +51,19 @@ export async function mutateHeaderInfo(
             html`<span
 class="font-normal">Good ${
 headerInfo.greeting},</span> ${
-headerInfo.workerName}`,
+headerInfo.memberName}`,
         );
         greetingEl.setAttribute('role', 'button');
         greetingEl.setAttribute('tabindex', '0');
         greetingEl.setAttribute(
             'aria-label',
-            'Open your worker profile',
+            'Open your member profile',
         );
         greetingEl.classList.add('cursor-pointer');
         const goToProfile = (): void => {
             navigateTo(
-                'worker-detail',
-                { workerId: headerInfo.workerId },
+                'member-detail',
+                { memberId: headerInfo.memberId },
             );
         };
         greetingEl.addEventListener(

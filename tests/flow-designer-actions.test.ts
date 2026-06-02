@@ -19,7 +19,7 @@ const node = (id: string, x = 0, y = 0) => ({
     positionY: y,
     isCreate: false,
     isArchive: false,
-    workerIds: [] as string[],
+    memberIds: [] as string[],
     attributes: [],
 });
 
@@ -222,7 +222,7 @@ test('applyUpdateNode patches matching id', () => {
 });
 
 test(
-    'applyUpdateNode patches workerIds',
+    'applyUpdateNode patches memberIds',
     () => {
         const nodes = [
             node('a', 0, 0),
@@ -230,14 +230,14 @@ test(
         ];
         const result = applyUpdateNode(
             nodes, 'a',
-            { workerIds: ['hw_1', 'ai_1'] },
+            { memberIds: ['hw_1', 'ai_1'] },
         );
         assert.deepEqual(
-            result[0]?.workerIds,
+            result[0]?.memberIds,
             ['hw_1', 'ai_1'],
         );
         assert.deepEqual(
-            result[1]?.workerIds, [],
+            result[1]?.memberIds, [],
         );
     },
 );

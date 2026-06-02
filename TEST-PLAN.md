@@ -110,7 +110,7 @@ time budgets while keeping per-entity mutation domains disjoint:
    produce the distribution ZIP, `./build --no-zip` for the test
    server, start HTTP server, open tab 0. Covers A1–A5.
 2. **Phase 1 — Data setup** (one agent, serial): AA1–AA43 in
-   tab 0. Creates pristine environment, workers (humans + AIs),
+   tab 0. Creates pristine environment, members (humans + AIs),
    ideas, projects, one flow. Populates the shared database
    that Phase 2 verifies.
 3. **Phase 2 — Parallel verification** (7 agents concurrent,
@@ -123,7 +123,7 @@ time budgets while keeping per-entity mutation domains disjoint:
      gate)
    - Agent-F2 — Workbox (includes Create-Work-Order picker
      READY / NOT READY split)
-   - Agent-G — Admin (Workers page, Worker detail (human + AI),
+   - Agent-G — Admin (Members page, Member detail (human + AI),
      Organization, Snapshots, Billing). The retired Teams /
      Roles / Crews / Activity Feed pages have no cases.
 4. **Phase 3 — Cross-cutting** (one agent, alone): I1–I28.
@@ -143,12 +143,12 @@ subset of tables:
 
 | Agent | Mutation domain |
 |---|---|
-| Agent-B | creates one human worker via signup |
+| Agent-B | creates one human member via signup |
 | Agent-D | `ideas` |
 | Agent-E | `projects` (plus one flow via the project-detail New Flow path) |
 | Agent-F | `flows`, `flow_versions` |
 | Agent-F2 | `work_orders`, `flow_work_orders`, `states` (work-order entity_ids), `state_field_values`, plus its own private flow in `flows`/`flow_versions` |
-| Agent-G | `workers`, `ai_workers`, `organization` |
+| Agent-G | `members`, `ai_members`, `organization` |
 | Agent-CH | none (read-only) |
 
 Agent-F2 owns its source flow because `postWorkOrderCreation`
@@ -165,7 +165,7 @@ count checks are non-zero + consistency, not numeric equality.
 **Shared states-log write hazard.** The mutation domains above
 partition the *entity* tables, but the append-only `states` log
 is written by several agents at once — Agent-D (idea lifecycle),
-Agent-E (project lifecycle), Agent-G (worker lifecycle), and
+Agent-E (project lifecycle), Agent-G (member lifecycle), and
 Agent-F2 (work-order transitions and claims) all append to the
 one `fusion-ai:states` key. The per-tab store serializer orders
 writes only *within* one tab, so two agents appending
@@ -334,7 +334,7 @@ run before A1's build. The single canonical invocation is
 ## A. Build & Setup
 
 - [ ] **A1** Run `./build` from a clean working directory. PASS: exits 0, prints no errors, creates `~/Desktop/fusion-ai-<sha>.zip`.
-- [ ] **A2** Run `./build --no-zip /tmp/fusion-test/`. PASS: `/tmp/fusion-test/` contains `assets/app.js`, `assets/styles.css`, `assets/` (*.woff2 fonts), 14 page directories (`auth`, `billing`, `dashboard`, `design-system`, `flows`, `ideas`, `landing`, `not-found`, `organization`, `projects`, `records`, `snapshots`, `workbox`, `workers`) with 24 HTML page files (including `flows/stats.html` and `records/detail.html`), plus root `index.html`.
+- [ ] **A2** Run `./build --no-zip /tmp/fusion-test/`. PASS: `/tmp/fusion-test/` contains `assets/app.js`, `assets/styles.css`, `assets/` (*.woff2 fonts), 14 page directories (`auth`, `billing`, `dashboard`, `design-system`, `flows`, `ideas`, `landing`, `members`, `not-found`, `organization`, `projects`, `records`, `snapshots`, `workbox`) with 24 HTML page files (including `flows/stats.html` and `records/detail.html`), plus root `index.html`.
 - [ ] **A3** Start an HTTP server from the build directory (`cd /tmp/fusion-test/ && python3 -m http.server 8080`). PASS: server starts without errors.
 - [ ] **A4** Open `http://localhost:8080/` in the test browser. PASS: redirects to `snapshots/index.html` when no data exists, or `landing/index.html` (which auto-redirects to `dashboard/index.html` after ~2 seconds) when data has been loaded.
 - [ ] **A5** Open DevTools Console and confirm no JavaScript errors on initial load. PASS: console is clean (warnings from browser extensions are acceptable).
@@ -350,13 +350,13 @@ on. Run these in order.
 ### AA1. Create Pristine Environment
 
 - [ ] **AA1** Navigate to `snapshots/`. Click "Create Pristine Environment" and confirm the wipe dialog. PASS: redirects to dashboard. Dashboard shows empty/minimal state.
-- [ ] **AA2** Open DevTools, verify localStorage has a `fusion-ai:*` key for every table listed in `TABLE_NAMES` (`api/db.ts`) — empty arrays plus bootstrap data, including the `states` event log (with the seeded `'system'`-worker and `'current'`-user 'active' bootstrap events).
+- [ ] **AA2** Open DevTools, verify localStorage has a `fusion-ai:*` key for every table listed in `TABLE_NAMES` (`api/db.ts`) — empty arrays plus bootstrap data, including the `states` event log (with the seeded `'system'`-member and `'current'`-user 'active' bootstrap events).
 - [ ] **AA3** Verify bootstrap data exists: user "Tony Stark" (id: `current`), organization "Stark Industries" (domain `acmecorp.com`) on the "Business" plan.
 
-### AA2. Create Workers
+### AA2. Create Members
 
-- [ ] **AA4** Navigate to Workers (sidebar). Click "+ Add
-  Worker". PASS: dialog opens with a Kind toggle (Human /
+- [ ] **AA4** Navigate to Members (sidebar). Click "+ Add
+  Member". PASS: dialog opens with a Kind toggle (Human /
   AI, Human selected by default), a Human form below
   showing Name, Email, Title, Department,
   Phone, Bio, and an AI form (hidden by default) with
@@ -366,7 +366,7 @@ on. Run these in order.
 - [ ] **AA5** With Human selected, fill all fields for
   "Sarah Chen" (Title: Engineering Manager, Department:
   Engineering). Click Create. PASS: toast confirms
-  creation, the new worker appears in the Humans group
+  creation, the new member appears in the Humans group
   on the list.
 - [ ] **AA6** Repeat for all 10 humans: Sarah Chen, Mike
   Thompson, Jessica Park, David Martinez, Emily Rodriguez
@@ -374,10 +374,10 @@ on. Run these in order.
   Wang, James Miller (archived). PASS: all 10 appear
   in the Humans group with correct name, email, title,
   and status badge (Active / Pending / Archived).
-- [ ] **AA7** Reload the Workers page. PASS: every human
+- [ ] **AA7** Reload the Members page. PASS: every human
   re-renders in the Humans group with the correct status
   badge.
-- [ ] **AA7a** Click "+ Add Worker", switch the Kind
+- [ ] **AA7a** Click "+ Add Member", switch the Kind
   toggle to AI. PASS: the Human form hides and the AI
   form appears. Fill Name, pick a Model, fill
   Description and Skill Focus. PASS: Create is blocked
@@ -386,29 +386,29 @@ on. Run these in order.
   Repeat for 4 AIs matching mock data (Claude Opus 4.8,
   Claude Sonnet 4.6, GPT-5.5, Grok 4.3).
 
-### AA3. Worker Detail & Organization
+### AA3. Member Detail & Organization
 
-- [ ] **AA8** On Workers, click the current user's row.
-  PASS: navigates to `worker-detail` for that human. Read
+- [ ] **AA8** On Members, click the current user's row.
+  PASS: navigates to `member-detail` for that human. Read
   mode shows avatar, name, status badge, title ·
   department subtitle, Personal Information card (Name,
   Email, Phone, Title, Department, Bio),
   Working Styles card, and Strengths card.
-- [ ] **AA8a** From the Workers list, click any AI
-  worker's row. PASS: navigates to `worker-detail` for
+- [ ] **AA8a** From the Members list, click any AI
+  member's row. PASS: navigates to `member-detail` for
   that AI. Read mode shows the AI identity card (Name,
   Model as "{name} — {provider}", Description) and a
   Skill Focus row; there is no Auth Token row.
-- [ ] **AA9** From the human worker detail, click Edit,
+- [ ] **AA9** From the human member detail, click Edit,
   change Phone and Bio, toggle one strength on and one
-  off, click Save. PASS: toast "Worker saved" appears.
+  off, click Save. PASS: toast "Member saved" appears.
   Navigate away and return to detail. PASS: edited
   Phone, Bio, and strengths persist.
-- [ ] **AA9a** From an AI worker detail, click Edit,
+- [ ] **AA9a** From an AI member detail, click Edit,
   change Description and Skill Focus, and pick a
   different Model from the pulldown (grouped by
   provider, current model pre-selected), click Save.
-  PASS: toast "AI worker saved" fires; on reopen the
+  PASS: toast "AI member saved" fires; on reopen the
   edited Description, Skill Focus, and Model persist.
   There is no Auth Token field.
 - [ ] **AA10** Navigate to Organization. Click the
@@ -496,9 +496,9 @@ on. Run these in order.
 - [ ] **AA28** Double-click the new blue-bordered
   node. PASS: properties panel appears with a
   "State Properties" title and close button on
-  the right, then a `<fieldset>` labeled "Workers"
+  the right, then a `<fieldset>` labeled "Members"
   containing two groups — HUMANS and AIs — each
-  with a labeled checkbox per worker (no checkbox
+  with a labeled checkbox per member (no checkbox
   ticked yet), then State Name input, Description
   input, empty Attributes list, and outgoing
   transitions. The node gets a gold glow selection
@@ -592,8 +592,8 @@ on. Run these in order.
 - [ ] **AA40** Edit flow: navigate to flow
   designer, rename a state (auto-saves). Navigate
   away, return. PASS: changed state name persists.
-- [ ] **AA41** Edit human worker: navigate to a human
-  worker's detail page, click Edit, change phone number,
+- [ ] **AA41** Edit human member: navigate to a human
+  member's detail page, click Edit, change phone number,
   Save. Navigate away, return. PASS: changed phone
   persists.
 - [ ] **AA42** Edit organization: in the General
@@ -658,7 +658,7 @@ on. Run these in order.
 - [ ] **C2** Sidebar shows flat navigation
   links in this order: Dashboard,
   Organization, Ideas, Projects, Records,
-  Flows, Workbox, Workers, Billing, Snapshots,
+  Flows, Workbox, Members, Billing, Snapshots,
   Design System. PASS: all 11 links present,
   in order, and styled. Source of truth:
   `PAGE_REGISTRY` (entries with
@@ -669,7 +669,7 @@ on. Run these in order.
   have been retired — the current user's
   detail is reachable via the sidebar account
   chip and the header greeting; humans and AIs
-  both live on the Workers page.)
+  both live on the Members page.)
 - [ ] **C3** Header shows search bar, greeting
   ("Good {morning/afternoon/evening}, Tony
   Stark" — varies by time of day), company
@@ -693,7 +693,7 @@ on. Run these in order.
   surfaces (three arc-gauge cards + Aggregate Objectives
   box). PASS: no "No data" empty states on a fresh
   mock-data load against the Phase 1 baseline (11 humans —
-  10 created + Tony Stark; the System worker authors seed
+  10 created + Tony Stark; the System member authors seed
   events but is excluded from the roster — 4 AIs, 11
   ideas, 6 projects, 1 flow, 4 objectives; these are the
   fresh-load seed counts and grow as you create).
@@ -925,7 +925,7 @@ opens and renders.)
   "State Properties" title and close button on
   the right (regular nodes only — Create/Archive
   nodes still show their kind title), then a
-  Workers fieldset (HUMANS / AIs checkbox
+  Members fieldset (HUMANS / AIs checkbox
   groups), then state name, form attributes
   list, and outgoing transitions.
   (Properties panel double-click is BLOCKED per the
@@ -1110,7 +1110,7 @@ states, and that the canvas re-renders after each step.)
   PASS: connection ports disappear from all middle nodes, the
   Delete toolbar button becomes disabled, and opening a properties
   panel shows panel controls as read-only (inputs `disabled`, every
-  checkbox in the Workers fieldset also `disabled` and
+  checkbox in the Members fieldset also `disabled` and
   unresponsive to clicks). Auto Layout remains enabled because
   it only repositions nodes without changing structure. Visual
   confirmation: nodes render with gold strokes regardless of
@@ -1119,7 +1119,7 @@ states, and that the canvas re-renders after each step.)
   gold strokes, and the dot-grid background renders unchanged
   from its unlocked appearance. Untoggle Locked: ports return,
   the Delete button re-enables, panel controls become editable, the
-  Workers checkboxes become interactive again, and per-type
+  Members checkboxes become interactive again, and per-type
   colors return (Create green, Archive red, Regular blue,
   Cycle amber).
 - [ ] **F41** With a non-trivial flow loaded, click "Copy Mermaid"
@@ -1199,14 +1199,14 @@ states, and that the canvas re-renders after each step.)
   Tap the spacebar. PASS: a literal space character is inserted
   into the input; pan mode state is unchanged.
 
-### Workers Selector (Node Panel)
+### Members Selector (Node Panel)
 
 - [ ] **F58** Open a regular-node properties panel. PASS:
-  the Workers fieldset is the first body block, with a
-  "Workers" legend, a HUMANS group containing one
-  labeled `<input type="checkbox" data-worker-id="<id>">`
+  the Members fieldset is the first body block, with a
+  "Members" legend, a HUMANS group containing one
+  labeled `<input type="checkbox" data-member-id="<id>">`
   per active human (alphabetized by full name), and an
-  AIs group containing one checkbox per AI worker
+  AIs group containing one checkbox per AI member
   (alphabetized by name). When the checkbox list overflows
   the panel height, the fieldset scrolls inside its own
   region.
@@ -1214,34 +1214,34 @@ states, and that the canvas re-renders after each step.)
   Reload the page and reopen the same node panel. PASS:
   the same two checkboxes are still ticked. Inspect
   `localStorage['fusion-ai:flows']` — the node carries
-  `workerIds: [<humanId>, <aiId>]`.
+  `memberIds: [<humanId>, <aiId>]`.
 - [ ] **F60** Untick one of the two checkboxes. Reload the
   page and reopen the panel. PASS: only the remaining
-  ticked worker persists in `workerIds`.
-- [ ] **F61** Untick all checkboxes so `workerIds` is `[]`.
+  ticked member persists in `memberIds`.
+- [ ] **F61** Untick all checkboxes so `memberIds` is `[]`.
   Reload the page. PASS: every checkbox in the panel is
   unticked. The node now displays the danger badge per
   F73.
 - [ ] **F62** Lock the flow via the toolbar Locked switch.
   Open a regular-node panel. PASS: every checkbox in the
-  Workers fieldset is rendered with the `disabled`
+  Members fieldset is rendered with the `disabled`
   attribute; clicking does nothing.
 - [ ] **F63** Open a Start-node panel. PASS: the header
   shows the "Create" title and close button — no
-  Workers fieldset (Create nodes never assign workers).
+  Members fieldset (Create nodes never assign members).
 - [ ] **F64** Open an End-node panel. PASS: the header
   shows the "Archive" title and close button — no
-  Workers fieldset.
+  Members fieldset.
 - [ ] **F65** Open an edge panel. PASS: the header shows
   "Transition Properties" title and close button — no
-  Workers fieldset.
+  Members fieldset.
 - [ ] **F66** Inspect `localStorage['fusion-ai:flow_versions']`
-  before and after a `workerIds` change. PASS: a new
+  before and after a `memberIds` change. PASS: a new
   version row appears for the flow after the change
-  (worker assignment participates in versioning).
-- [ ] **F67** Tick one checkbox in the Workers fieldset,
+  (member assignment participates in versioning).
+- [ ] **F67** Tick one checkbox in the Members fieldset,
   then press Cmd+Z (Mac) / Ctrl+Z (Win/Linux). PASS: the
-  checkbox unticks — `workerIds` changes are undoable
+  checkbox unticks — `memberIds` changes are undoable
   like name changes.
 
 ### Attribute Editor (Node Panel)
@@ -1272,28 +1272,28 @@ states, and that the canvas re-renders after each step.)
   no toast, no attribute row appended (a disabled
   `<select>` does not fire `change`).
 - [ ] **F72** Single-select a regular node. Tick one
-  worker checkbox in the Workers fieldset. Click the
+  member checkbox in the Members fieldset. Click the
   "+ Add Attribute…" dropdown in the same panel. PASS:
   the dropdown remains functional and lists available
-  attributes. (Regression: a `workerIds` commit
+  attributes. (Regression: a `memberIds` commit
   replaces the presenter, so a click handler that
   captured a stale presenter would have acted on the
   pre-commit snapshot — this case proves the handler
   reads the current presenter at click time.)
 - [ ] **F73 — Hazard severity rendering.** On a regular
-  (non-start, non-complete) node, vary the worker count
+  (non-start, non-complete) node, vary the member count
   and outgoing-edge count and confirm the bottom-left
   badge:
-    - **0 workers** → red octagon (`iconNoEntry`,
+    - **0 members** → red octagon (`iconNoEntry`,
       `.flow-node-danger`). Hover → tooltip
-      "Workers required".
-    - **0 outgoing edges** (regardless of worker count) →
+      "Members required".
+    - **0 outgoing edges** (regardless of member count) →
       red octagon, tooltip "Dead end (no outgoing edges)"
-      when `workerIds.length > 0`.
-    - **1 worker AND ≥1 outgoing edge** → yellow triangle
+      when `memberIds.length > 0`.
+    - **1 member AND ≥1 outgoing edge** → yellow triangle
       (`iconAlertTriangle`, `.flow-node-warning`). Hover →
-      tooltip "Single worker assigned (no backup)".
-    - **≥2 workers AND ≥1 outgoing edge** → no badge.
+      tooltip "Single member assigned (no backup)".
+    - **≥2 members AND ≥1 outgoing edge** → no badge.
   Confirm the start node and the complete node never
   display a badge regardless of state.
 - [ ] **F74** With the Properties panel closed,
@@ -1335,7 +1335,7 @@ states, and that the canvas re-renders after each step.)
   sections — `READY` (clickable rows, one per
   publishable flow including `WB Test Flow`) and
   `NOT READY` (disabled rows for any flow with
-  zero-worker or dead-end nodes; each carries a
+  zero-member or dead-end nodes; each carries a
   red octagon icon and a subtitle "1 node needs
   attention" or "N nodes need attention"). Hover
   a `NOT READY` row. PASS: cursor stays default
@@ -1425,7 +1425,7 @@ states, and that the canvas re-renders after each step.)
   and `flow_graph` JSON. The `states` table has
   one row per transition with `entity_id` =
   work-order id, `state` = the target node id (a
-  base62 token), `worker_id` = the actor, and
+  base62 token), `member_id` = the actor, and
   `at` = RFC-3339 Zulu. Per-field values written
   by the transition land in `state_field_values`
   rows referencing the state event by
@@ -1448,7 +1448,7 @@ states, and that the canvas re-renders after each step.)
   least two states, read `fusion-ai:states` from DevTools and
   filter to `entity_id` = this work order's id. PASS: each
   non-claim event has the immutable shape `{id, entity_id,
-  state, worker_id, at}`, with `state` carrying the target
+  state, member_id, at}`, with `state` carrying the target
   node's base62 id — the field values themselves live in the
   `state_field_values` join table per Codd 1NF, referencing
   the parent event by `state_event_id`. Verify no app code
@@ -1464,16 +1464,16 @@ per-user visibility filter.
 - [ ] **WB20** As the demo user, navigate to `workbox/`.
   Active tab. PASS: every active (non-completed,
   non-claimed-by-other) work order is listed regardless
-  of its current node's `workerIds` — including nodes
-  assigned only to AI workers and nodes with zero
-  workers (which carry the danger badge in the designer
+  of its current node's `memberIds` — including nodes
+  assigned only to AI members and nodes with zero
+  members (which carry the danger badge in the designer
   but are still visible in the inbox).
 - [ ] **WB21** Switch to the Archive tab. PASS: every
   completed work order is listed regardless of which
-  worker(s) the final transition referenced.
+  member(s) the final transition referenced.
 - [ ] **WB22** Inspect `web-app/app/presenters/workbox-
   inbox.ts`. PASS: `buildInboxItems` takes
-  `(workOrders, transitions, claims, workerMap, mode)`
+  `(workOrders, transitions, claims, memberMap, mode)`
   with no scope parameter. The presenter exports nothing
   related to per-user visibility — the workbox shows all
   work orders to all users by construction.
@@ -1525,20 +1525,20 @@ the claude-in-chrome MCP.
   mouse-out). Click empty canvas → unpins. Click another
   node → re-pins to it.
 - [ ] **FS6 — Hazard severity rendering on the stats
-  canvas.** The stats renderer reads `n.workerHazard`
+  canvas.** The stats renderer reads `n.memberHazard`
   emitted by `flow-stats-aggregate.ts`. Confirm:
-    - **Zero workers** → red octagon (`iconNoEntry`,
-      `.flow-stats-node-danger`); tooltip "Workers
+    - **Zero members** → red octagon (`iconNoEntry`,
+      `.flow-stats-node-danger`); tooltip "Members
       required".
     - **Zero outgoing edges** (non-Archive node) → red octagon;
       tooltip "Dead end (no outgoing edges)".
-    - **One worker AND ≥1 outgoing edge** → yellow triangle
+    - **One member AND ≥1 outgoing edge** → yellow triangle
       (`iconAlertTriangle`, `.flow-stats-node-warning`);
-      tooltip "Single worker assigned (no backup)".
-    - **≥2 workers AND ≥1 outgoing edge** → no badge.
+      tooltip "Single member assigned (no backup)".
+    - **≥2 members AND ≥1 outgoing edge** → no badge.
   Create and Archive never display a badge. The
-  card subtitle shows the assigned workers' names joined
-  by ", " (or "Unassigned" if `workerIds` is empty).
+  card subtitle shows the assigned members' names joined
+  by ", " (or "Unassigned" if `memberIds` is empty).
 - [ ] **FS7** Path stepper: `Path 1 of M, X% of N work
   orders` with prev/next controls. Clicking next advances;
   the selected path's nodes + edges get an accent stroke and
@@ -1566,8 +1566,8 @@ the claude-in-chrome MCP.
 
 > The standalone Teams, People, Roles, Crews, Profile,
 > Company, and Activity Feed pages have all been removed.
-> Worker administration (humans + AI workers) now lives on
-> the unified Workers page — see G11 onward. Cases G1–G8,
+> Member administration (humans + AI members) now lives on
+> the unified Members page — see G11 onward. Cases G1–G8,
 > G15–G18, G25–G29 and the former K/L sections (Roles,
 > Crews) are no longer part of the plan.
 
@@ -1581,7 +1581,7 @@ the claude-in-chrome MCP.
   identity plus a four-cell stat grid: Active People,
   Projects, Ideas, Next Billing — no health badge), and
   the Usage Overview card with progress bars. There is no
-  longer a Security & Administration card — Workers and
+  longer a Security & Administration card — Members and
   Billing are reached from the sidebar. (Overview/usage
   values are placeholders — verify the page renders
   without error; numeric accuracy arrives when wired to
@@ -1593,34 +1593,34 @@ the claude-in-chrome MCP.
   (There is no health score — the retired 92/"excellent"
   badge has been removed.)
 
-### Workers list (`workers/index.html`)
+### Members list (`members/index.html`)
 
-- [ ] **G11** Navigate to `workers/index.html` (reachable
-  via the "Workers" sidebar entry). PASS: page header reads
-  "Workers" with a static subtitle "Manage humans and AIs
+- [ ] **G11** Navigate to `members/index.html` (reachable
+  via the "Members" sidebar entry). PASS: page header reads
+  "Members" with a static subtitle "Manage humans and AIs
   in your organization" (no count display — header text is
   static, populated counts live in the sidebar header and
-  the table grouping). A `+ Add Worker` button
+  the table grouping). A `+ Add Member` button
   on the right opens the kind-picker dialog. Below the
   header sit a search input and three filter chips (All /
   Humans / AIs, with All pressed by default). The list
-  table groups workers under HUMANS first then AIs, each
+  table groups members under HUMANS first then AIs, each
   group showing avatar/name, title (humans) or the
   model name (AIs), department (humans only), and a
   status badge (humans only).
 - [ ] **G12** Click the sidebar account chip (lower-left).
-  PASS: navigates to the current human worker's
-  `worker-detail` page (`?workerId=<id>`). Click the
+  PASS: navigates to the current human member's
+  `member-detail` page (`?memberId=<id>`). Click the
   header greeting ("Good {time-of-day}, {name}"). PASS:
-  also navigates to the current human's `worker-detail`
+  also navigates to the current human's `member-detail`
   page.
 - [ ] **G13** Type in the search input. PASS: filters the
   list by name (and description) in real-time; AI
-  workers no longer match on provider/model (accepted
+  members no longer match on provider/model (accepted
   regression). Click the Humans filter chip. PASS: only the
   HUMANS group is visible. Click AIs. PASS: only the AIs
   group is visible. Click All. PASS: both groups return.
-- [ ] **G14** Click `+ Add Worker`. PASS: dialog opens with
+- [ ] **G14** Click `+ Add Member`. PASS: dialog opens with
   the Kind toggle defaulting to Human, the Human form
   visible, and the AI form hidden. Switch the toggle to
   AI. PASS: the Human form hides, the AI form appears
@@ -1633,10 +1633,10 @@ the claude-in-chrome MCP.
   PASS: toast confirms; the new AI appears in the AIs
   group.
 
-### Worker detail — Human (`workers/detail.html?workerId=<hw_*>`)
+### Member detail — Human (`members/detail.html?memberId=<hw_*>`)
 
-- [ ] **G19** From `workers/index.html`, click any human
-  worker's row. PASS: navigates to `worker-detail`. Read
+- [ ] **G19** From `members/index.html`, click any human
+  member's row. PASS: navigates to `member-detail`. Read
   mode shows avatar (initials), name + status badge,
   title · department subtitle, Personal Information card
   (Name, Email, Phone, Title, Department,
@@ -1648,28 +1648,28 @@ the claude-in-chrome MCP.
   Cancel/Save; Personal Information card switches to
   inputs (Name text, Email email-input, Phone
   text, Title text, Department select, State select with
-  HTML id `worker-state` per the `WORKER_STATES`
+  HTML id `member-state` per the `MEMBER_STATES`
   alphabet, Bio textarea); Strengths card switches to a
   tag picker. Working Styles card stays read-only.
 - [ ] **G21** Edit Phone and Bio, toggle one strength on
   and one off, change State from Active to Pending,
-  click Save. PASS: toast "Worker saved" appears. Navigate
+  click Save. PASS: toast "Member saved" appears. Navigate
   away (e.g. to Dashboard) and return. PASS: all edits
-  persist; the row on `workers/index.html` reflects the new
+  persist; the row on `members/index.html` reflects the new
   state badge.
 - [ ] **G22** Click Edit, change a field, press `Escape`.
   PASS: edits discarded, view returns to read mode.
 - [ ] **G23** Click Edit, change a text field, press
   `Enter` while focused on the input. PASS: save fires
-  (toast "Worker saved").
-- [ ] **G23a** From `worker-detail`, click the back button.
-  PASS: returns to `workers/index.html`.
+  (toast "Member saved").
+- [ ] **G23a** From `member-detail`, click the back button.
+  PASS: returns to `members/index.html`.
 
-### Worker detail — AI (`workers/detail.html?workerId=<ai_*>`)
+### Member detail — AI (`members/detail.html?memberId=<ai_*>`)
 
-- [ ] **G24** From `workers/index.html`, click any AI
-  worker's row. PASS: navigates to `worker-detail`. Read
-  mode shows the AI Worker card (Name, Model as
+- [ ] **G24** From `members/index.html`, click any AI
+  member's row. PASS: navigates to `member-detail`. Read
+  mode shows the AI Member card (Name, Model as
   "{name} — {provider}", Description, Skill Focus);
   there is no Auth Token section.
 - [ ] **G24a** Click Edit. PASS: identity fields become
@@ -1677,10 +1677,10 @@ the claude-in-chrome MCP.
   with the current model pre-selected, Description
   textarea, Skill Focus textarea); there is no Auth Token
   field. Change Description and Skill Focus, click Save.
-  PASS: toast "AI worker saved"; on reopen the edits
+  PASS: toast "AI member saved"; on reopen the edits
   persist.
 - [ ] **G24b** Click Edit again, pick a different Model
-  from the pulldown, click Save. PASS: toast "AI worker
+  from the pulldown, click Save. PASS: toast "AI member
   saved"; on reopen the read view shows the new model as
   "{name} — {provider}".
 
@@ -1709,9 +1709,9 @@ restored data.)
   Dashboard renders with zeroed-out metrics (empty
   database except for the required bootstrap seed). Every
   table in `TABLE_NAMES` is present as an empty array
-  EXCEPT `fusion-ai:workers` (parent rows for the System
-  worker, `type` 'system', and Tony Stark, `type`
-  'human'), `fusion-ai:human_workers` (Tony Stark's
+  EXCEPT `fusion-ai:members` (parent rows for the System
+  member, `type` 'system', and Tony Stark, `type`
+  'human'), `fusion-ai:human_members` (Tony Stark's
   detail row), `fusion-ai:organization` (Stark
   Industries), and `fusion-ai:states` (bootstrap state
   events for those rows). NOTE: pristine seeds NO Records
@@ -1748,20 +1748,20 @@ restored data.)
   by `tests/snapshot-import-validation.test.ts` and
   `tests/snapshot-wipe-on-fail.test.ts` — this case verifies the
   error toast/inline-error surfaces in the UI.)
-- [ ] **G36** Worker lifecycle is recorded in the `states`
-  event log. On a worker detail page (human OR AI), click
+- [ ] **G36** Member lifecycle is recorded in the `states`
+  event log. On a member detail page (human OR AI), click
   Edit, change the State select (active / pending /
   archived), and Save. PASS: the chosen state is written
-  via `postHumanWorkerStateChange` /
-  `postAIWorkerStateChange` — both kinds expose the same
+  via `postHumanMemberStateChange` /
+  `postAIMemberStateChange` — both kinds expose the same
   State select and share the 3-value vocabulary per
   Commandment III (Uniformity). Verify by inspecting
   `fusion-ai:states` in DevTools: a row appears with
-  `entity_id` = the worker's id, `state` = the chosen
-  value, `worker_id` = the actor, and the worker row in
-  `workers` / `ai_workers` itself is unchanged — the
+  `entity_id` = the member's id, `state` = the chosen
+  value, `member_id` = the actor, and the member row in
+  `members` / `ai_members` itself is unchanged — the
   states log carries the lifecycle stage, not a column on
-  the entity. After reload the worker's badge text and
+  the entity. After reload the member's badge text and
   styling reflect the persisted state.
 
 ### Billing (`billing/`) — STUB
@@ -1789,7 +1789,7 @@ feature is implemented.
   Press `Escape`. PASS: card returns to read mode,
   Domain shows the original value (Escape behaves
   identically to Cancel; same code path as the
-  Worker Detail edit cycle).
+  Member Detail edit cycle).
 - [ ] **G40** Click Edit. Modify both Organization
   Name and Domain. Click Save. PASS: toast
   "Organization saved" fires at top-center,
@@ -1845,7 +1845,7 @@ feature is implemented.
 - [ ] **I17** Type a search term (e.g. "ideas"). PASS: filtered results appear. Select a result — navigates to the corresponding page.
 - [ ] **I18** Press `Escape`. PASS: command palette closes.
 - [ ] **I19** Open command palette, type a search term. Use `Down Arrow` and `Up Arrow` to navigate results. PASS: active result highlight moves with arrow keys. Press `Enter`. PASS: navigates to the highlighted result.
-- [ ] **I20** Open command palette with an empty search field. PASS: results list shows up to 12 items from the combined index, grouped by category (Pages, Ideas, Projects, Workers) with category headers — when the dataset is sparse enough for multiple categories to fit in 12 items, multiple groups appear; otherwise a single group is shown. Type a multi-category term (e.g. "a", which matches across Pages / Ideas / Projects / Workers) that matches across groups. PASS: results regroup under multiple category headers. Type a term that matches no results. PASS: result list is empty or shows a no-results message.
+- [ ] **I20** Open command palette with an empty search field. PASS: results list shows up to 12 items from the combined index, grouped by category (Pages, Ideas, Projects, Members) with category headers — when the dataset is sparse enough for multiple categories to fit in 12 items, multiple groups appear; otherwise a single group is shown. Type a multi-category term (e.g. "a", which matches across Pages / Ideas / Projects / Members) that matches across groups. PASS: results regroup under multiple category headers. Type a term that matches no results. PASS: result list is empty or shows a no-results message.
 
 ### Loading States
 

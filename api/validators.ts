@@ -6,12 +6,12 @@ import type {
     WorkOrderFlowGraph,
     AttributeType,
     Constraint,
-    WorkerId,
+    MemberId,
     JsonArrayField,
     JsonObjectField,
-    WorkerEntity,
-    HumanWorkerEntity,
-    AIWorkerEntity,
+    MemberEntity,
+    HumanMemberEntity,
+    AIMemberEntity,
     IdeaEntity,
     ProjectEntity,
     FlowEntity,
@@ -287,10 +287,10 @@ export function asConstraint(
     );
 }
 
-export function asWorkerIds(
+export function asMemberIds(
     value: unknown,
     label: string,
-): WorkerId[] {
+): MemberId[] {
     const arr = asArray(value, label);
     return arr.map((v, i) =>
         asString(
@@ -309,9 +309,9 @@ function asGraphNode(
         obj['attributes'],
         label + '.attributes',
     );
-    const workerIds = asWorkerIds(
-        obj['workerIds'],
-        label + '.workerIds',
+    const memberIds = asMemberIds(
+        obj['memberIds'],
+        label + '.memberIds',
     );
     return {
         id: asString(
@@ -336,7 +336,7 @@ function asGraphNode(
             obj['isArchive'],
             label + '.isArchive',
         ),
-        workerIds,
+        memberIds,
         attributes: attrsArr.map((a, i) =>
             asNodeAttribute(
                 a,
@@ -571,15 +571,15 @@ export function assertOnlyKeys(
 
 // ── Entity validators ────────────────
 
-const WORKER_BODY_KEYS: readonly string[] = [
+const MEMBER_BODY_KEYS: readonly string[] = [
     'type', 'name',
 ];
 
-export function validateWorkerEntity(
+export function validateMemberEntity(
     body: Record<string, unknown>,
-): Omit<WorkerEntity, 'id'> {
+): Omit<MemberEntity, 'id'> {
     assertOnlyKeys(
-        body, WORKER_BODY_KEYS, 'WorkerEntity',
+        body, MEMBER_BODY_KEYS, 'MemberEntity',
     );
     const type = pickString(body, 'type');
     if (
@@ -588,8 +588,8 @@ export function validateWorkerEntity(
         && type !== 'system'
     ) {
         throw new Error(
-            'invalid worker type "' + type
-            + '" on WorkerEntity',
+            'invalid member type "' + type
+            + '" on MemberEntity',
         );
     }
     return {
@@ -598,7 +598,7 @@ export function validateWorkerEntity(
     };
 }
 
-const HUMAN_WORKER_BODY_KEYS:
+const HUMAN_MEMBER_BODY_KEYS:
     readonly string[] = [
     'email',
     'title', 'department',
@@ -606,13 +606,13 @@ const HUMAN_WORKER_BODY_KEYS:
     'phone', 'bio',
 ];
 
-export function validateHumanWorkerEntity(
+export function validateHumanMemberEntity(
     body: Record<string, unknown>,
-): Omit<HumanWorkerEntity, 'id'> {
+): Omit<HumanMemberEntity, 'id'> {
     assertOnlyKeys(
         body,
-        HUMAN_WORKER_BODY_KEYS,
-        'HumanWorkerEntity',
+        HUMAN_MEMBER_BODY_KEYS,
+        'HumanMemberEntity',
     );
     return {
         email: pickString(
@@ -639,7 +639,7 @@ export function validateHumanWorkerEntity(
     };
 }
 
-const AI_WORKER_BODY_KEYS:
+const AI_MEMBER_BODY_KEYS:
     readonly string[] = [
     'description', 'model', 'skill_focus',
 ];
@@ -648,19 +648,19 @@ const AI_WORKER_BODY_KEYS:
 // the gate, not mere non-emptiness, so a stale or
 // forged id cannot enter storage. skill_focus is
 // free text but never null: the column is NOT NULL.
-export function validateAIWorkerEntity(
+export function validateAIMemberEntity(
     body: Record<string, unknown>,
-): Omit<AIWorkerEntity, 'id'> {
+): Omit<AIMemberEntity, 'id'> {
     assertOnlyKeys(
         body,
-        AI_WORKER_BODY_KEYS,
-        'AIWorkerEntity',
+        AI_MEMBER_BODY_KEYS,
+        'AIMemberEntity',
     );
     const model = pickString(body, 'model');
     if (!isProviderModelId(model)) {
         throw new Error(
             'model must be a known provider'
-            + ' model id on AIWorkerEntity',
+            + ' model id on AIMemberEntity',
         );
     }
     return {
@@ -959,7 +959,7 @@ export function validateOrganizationEntity(
 
 const IDEA_SUBMISSION_BODY_KEYS:
     readonly string[] = [
-    'idea_id', 'worker_id', 'at',
+    'idea_id', 'member_id', 'at',
 ];
 
 export function validateIdeaSubmissionEntity(
@@ -974,8 +974,8 @@ export function validateIdeaSubmissionEntity(
         idea_id: pickString(
             body, 'idea_id',
         ),
-        worker_id: pickString(
-            body, 'worker_id',
+        member_id: pickString(
+            body, 'member_id',
         ),
         at: pickString(
             body, 'at',
@@ -1027,7 +1027,7 @@ export function validateObjectiveEntity(
 const OBJECTIVE_REVISION_BODY_KEYS:
     readonly string[] = [
     'objective_id', 'name',
-    'description', 'worker_id', 'at',
+    'description', 'member_id', 'at',
 ];
 
 export function validateObjectiveRevisionEntity(
@@ -1052,8 +1052,8 @@ export function validateObjectiveRevisionEntity(
         description: pickString(
             body, 'description',
         ),
-        worker_id: pickString(
-            body, 'worker_id',
+        member_id: pickString(
+            body, 'member_id',
         ),
         at: pickString(
             body, 'at',
@@ -1064,7 +1064,7 @@ export function validateObjectiveRevisionEntity(
 const BASELINE_SCORE_BODY_KEYS:
     readonly string[] = [
     'project_id', 'objective_id',
-    'score', 'worker_id', 'at',
+    'score', 'member_id', 'at',
 ];
 
 export function validateBaselineScoreEntity(
@@ -1085,8 +1085,8 @@ export function validateBaselineScoreEntity(
         score: asScore(
             body.score, 'BaselineScore.score',
         ),
-        worker_id: pickString(
-            body, 'worker_id',
+        member_id: pickString(
+            body, 'member_id',
         ),
         at: pickString(
             body, 'at',
@@ -1097,7 +1097,7 @@ export function validateBaselineScoreEntity(
 const ACTUAL_SCORE_BODY_KEYS:
     readonly string[] = [
     'project_id', 'objective_id',
-    'score', 'worker_id', 'at',
+    'score', 'member_id', 'at',
 ];
 
 export function validateActualScoreEntity(
@@ -1118,8 +1118,8 @@ export function validateActualScoreEntity(
         score: asScore(
             body.score, 'ActualScore.score',
         ),
-        worker_id: pickString(
-            body, 'worker_id',
+        member_id: pickString(
+            body, 'member_id',
         ),
         at: pickString(
             body, 'at',
@@ -1128,7 +1128,7 @@ export function validateActualScoreEntity(
 }
 
 const STATE_BODY_KEYS: readonly string[] = [
-    'entity_id', 'state', 'worker_id', 'at',
+    'entity_id', 'state', 'member_id', 'at',
 ];
 
 export function validateStateEntity(
@@ -1142,8 +1142,8 @@ export function validateStateEntity(
             body, 'entity_id',
         ),
         state: pickString(body, 'state'),
-        worker_id: pickString(
-            body, 'worker_id',
+        member_id: pickString(
+            body, 'member_id',
         ),
         at: pickString(body, 'at'),
     };

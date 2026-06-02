@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import {
-    validateHumanWorkerEntity,
-    validateAIWorkerEntity,
+    validateHumanMemberEntity,
+    validateAIMemberEntity,
     validateIdeaEntity,
     validateProjectEntity,
     validateFlowEntity,
@@ -20,9 +20,9 @@ import {
     getProviderModels,
 } from '../api/provider-models.ts';
 
-// --- HumanWorkerEntity ---
+// --- HumanMemberEntity ---
 
-const validHumanWorker = {
+const validHumanMember = {
     email: 'ada@example.com',
     title: 'Engineer',
     department: 'R&D',
@@ -33,22 +33,22 @@ const validHumanWorker = {
 };
 
 test(
-    'validateHumanWorkerEntity accepts valid payload',
+    'validateHumanMemberEntity accepts valid payload',
     () => {
-        const result = validateHumanWorkerEntity(
-            validHumanWorker,
+        const result = validateHumanMemberEntity(
+            validHumanMember,
         );
         assert.equal(result.email, 'ada@example.com');
     },
 );
 
 test(
-    'validateHumanWorkerEntity rejects status key '
+    'validateHumanMemberEntity rejects status key '
     + '(retired by Stage 10b+c)',
     () => {
         assert.throws(
-            () => validateHumanWorkerEntity({
-                ...validHumanWorker,
+            () => validateHumanMemberEntity({
+                ...validHumanMember,
                 status: 'active',
             }),
             /unexpected key "status"/,
@@ -57,25 +57,25 @@ test(
 );
 
 test(
-    'validateHumanWorkerEntity rejects missing email',
+    'validateHumanMemberEntity rejects missing email',
     () => {
-        const body = { ...validHumanWorker };
+        const body = { ...validHumanMember };
         delete (
             body as Record<string, unknown>
         )['email'];
         assert.throws(
-            () => validateHumanWorkerEntity(body),
+            () => validateHumanMemberEntity(body),
             /missing required key "email"/,
         );
     },
 );
 
 test(
-    'validateHumanWorkerEntity rejects unexpected key',
+    'validateHumanMemberEntity rejects unexpected key',
     () => {
         assert.throws(
-            () => validateHumanWorkerEntity({
-                ...validHumanWorker,
+            () => validateHumanMemberEntity({
+                ...validHumanMember,
                 admin: true,
             }),
             /unexpected key "admin"/,
@@ -84,33 +84,33 @@ test(
 );
 
 test(
-    'validateHumanWorkerEntity rejects missing'
+    'validateHumanMemberEntity rejects missing'
     + ' required key',
     () => {
-        const body = { ...validHumanWorker };
+        const body = { ...validHumanMember };
         delete (
             body as Record<string, unknown>
         )['department'];
         assert.throws(
-            () => validateHumanWorkerEntity(body),
+            () => validateHumanMemberEntity(body),
             /missing required key "department"/,
         );
     },
 );
 
-// --- AIWorkerEntity ---
+// --- AIMemberEntity ---
 
-const validAIWorker = {
+const validAIMember = {
     description: 'Long context, deep reasoning.',
     skill_focus: 'Deep reasoning over long docs.',
     model: getProviderModels()[0]!.id,
 };
 
 test(
-    'validateAIWorkerEntity accepts valid payload',
+    'validateAIMemberEntity accepts valid payload',
     () => {
-        const result = validateAIWorkerEntity(
-            validAIWorker,
+        const result = validateAIMemberEntity(
+            validAIMember,
         );
         assert.equal(
             result.description,
@@ -128,11 +128,11 @@ test(
 );
 
 test(
-    'validateAIWorkerEntity accepts empty'
+    'validateAIMemberEntity accepts empty'
     + ' skill_focus',
     () => {
-        const result = validateAIWorkerEntity({
-            ...validAIWorker,
+        const result = validateAIMemberEntity({
+            ...validAIMember,
             skill_focus: '',
         });
         assert.equal(result.skill_focus, '');
@@ -140,12 +140,12 @@ test(
 );
 
 test(
-    'validateAIWorkerEntity rejects unknown'
+    'validateAIMemberEntity rejects unknown'
     + ' model id',
     () => {
         assert.throws(
-            () => validateAIWorkerEntity({
-                ...validAIWorker,
+            () => validateAIMemberEntity({
+                ...validAIMember,
                 model: 'not-a-real-model-id',
             }),
             /model must be a known provider/,
@@ -154,11 +154,11 @@ test(
 );
 
 test(
-    'validateAIWorkerEntity rejects unexpected key',
+    'validateAIMemberEntity rejects unexpected key',
     () => {
         assert.throws(
-            () => validateAIWorkerEntity({
-                ...validAIWorker,
+            () => validateAIMemberEntity({
+                ...validAIMember,
                 surprise: 'oops',
             }),
             /unexpected key "surprise"/,
@@ -167,25 +167,25 @@ test(
 );
 
 test(
-    'validateAIWorkerEntity rejects missing model',
+    'validateAIMemberEntity rejects missing model',
     () => {
         const { model: _omit, ...rest } =
-            validAIWorker;
+            validAIMember;
         assert.throws(
-            () => validateAIWorkerEntity(rest),
+            () => validateAIMemberEntity(rest),
             /missing required key "model"/,
         );
     },
 );
 
 test(
-    'validateAIWorkerEntity rejects missing'
+    'validateAIMemberEntity rejects missing'
     + ' skill_focus',
     () => {
         const { skill_focus: _omit, ...rest } =
-            validAIWorker;
+            validAIMember;
         assert.throws(
-            () => validateAIWorkerEntity(rest),
+            () => validateAIMemberEntity(rest),
             /missing required key "skill_focus"/,
         );
     },
@@ -541,7 +541,7 @@ test(
 
 const validIdeaSubmission = {
     idea_id: 'i-1',
-    worker_id: 'u-1',
+    member_id: 'u-1',
     at: '2024-01-01T00:00:00Z',
 };
 
@@ -562,7 +562,7 @@ test(
     () => {
     assert.throws(
         () => validateIdeaSubmissionEntity({
-            worker_id: 'u-1',
+            member_id: 'u-1',
             at: '2024-01-01T00:00:00Z',
         }),
         /missing required key "idea_id"/,
@@ -600,7 +600,7 @@ test(
     );
 });
 
-// --- asStoredGraph (workerIds shape) ---
+// --- asStoredGraph (memberIds shape) ---
 
 const baseNode = {
     id: 'n1',
@@ -614,7 +614,7 @@ const baseNode = {
 };
 
 test(
-    'asStoredGraph throws on missing workerIds',
+    'asStoredGraph throws on missing memberIds',
     () => {
         assert.throws(
             () => asStoredGraph(
@@ -626,14 +626,14 @@ test(
 );
 
 test(
-    'asStoredGraph round-trips an empty workerIds',
+    'asStoredGraph round-trips an empty memberIds',
     () => {
         const result = asStoredGraph(
             {
                 nodes: [
                     {
                         ...baseNode,
-                        workerIds: [],
+                        memberIds: [],
                     },
                 ],
                 edges: [],
@@ -641,20 +641,20 @@ test(
             'graph',
         );
         const n = result.nodes[0]!;
-        assert.deepEqual(n.workerIds, []);
+        assert.deepEqual(n.memberIds, []);
     },
 );
 
 test(
     'asStoredGraph round-trips a populated'
-    + ' workerIds list',
+    + ' memberIds list',
     () => {
         const result = asStoredGraph(
             {
                 nodes: [
                     {
                         ...baseNode,
-                        workerIds: [
+                        memberIds: [
                             'hw_sarah_chen',
                             'ai_claude_opus',
                         ],
@@ -666,7 +666,7 @@ test(
         );
         const n = result.nodes[0]!;
         assert.deepEqual(
-            n.workerIds,
+            n.memberIds,
             ['hw_sarah_chen', 'ai_claude_opus'],
         );
     },
@@ -674,7 +674,7 @@ test(
 
 test(
     'asStoredGraph rejects non-string entries in'
-    + ' workerIds',
+    + ' memberIds',
     () => {
         assert.throws(
             () => asStoredGraph(
@@ -682,7 +682,7 @@ test(
                     nodes: [
                         {
                             ...baseNode,
-                            workerIds: [123],
+                            memberIds: [123],
                         },
                     ],
                     edges: [],
@@ -711,7 +711,7 @@ test(
                             isCreate: false,
                             isArchive: false,
                             attributes: [],
-                            workerIds: [],
+                            memberIds: [],
                         },
                     ],
                     edges: [],
@@ -731,7 +731,7 @@ test(
                 nodes: [
                     {
                         ...baseNode,
-                        workerIds: [],
+                        memberIds: [],
                         taskInstructions: '',
                     },
                 ],
@@ -754,7 +754,7 @@ test(
                 nodes: [
                     {
                         ...baseNode,
-                        workerIds: [],
+                        memberIds: [],
                         taskInstructions: md,
                     },
                 ],
@@ -777,7 +777,7 @@ test(
                     nodes: [
                         {
                             ...baseNode,
-                            workerIds: [],
+                            memberIds: [],
                             taskInstructions: 123,
                         },
                     ],

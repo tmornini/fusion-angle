@@ -17,8 +17,8 @@ import {
     getFlowMermaid,
     getFlowZip,
     getFlowVersions,
-    getHumanWorkers,
-    getAIWorkers,
+    getHumanMembers,
+    getAIMembers,
     getRecordRows,
     getRecordForFlow,
     getRecordAttributesByRecord,
@@ -31,7 +31,7 @@ import {
 } from '../app/adapters/index.ts';
 import { getDbAdapter } from '../app/adapters/init.ts';
 import type {
-    WorkerId,
+    MemberId,
     RecordAttributeEntity,
     RecordAttributeId,
     RecordEntity,
@@ -1064,13 +1064,13 @@ async function handleExportZip(
     );
 }
 
-function parseWorkerIdsFromPanel(
+function parseMemberIdsFromPanel(
     panelEl: HTMLElement,
-): WorkerId[] {
+): MemberId[] {
     const inputs = panelEl.querySelectorAll(
-        'input[type="checkbox"][data-worker-id]',
+        'input[type="checkbox"][data-member-id]',
     );
-    const ids: WorkerId[] = [];
+    const ids: MemberId[] = [];
     for (const input of inputs) {
         if (
             !(input instanceof
@@ -1078,7 +1078,7 @@ function parseWorkerIdsFromPanel(
         ) continue;
         if (!input.checked) continue;
         const id = input.getAttribute(
-            'data-worker-id',
+            'data-member-id',
         );
         if (id) ids.push(id);
     }
@@ -1103,23 +1103,23 @@ function bindPanelActions(
                     HTMLInputElement
                 && target.type === 'checkbox'
                 && target.hasAttribute(
-                    'data-worker-id',
+                    'data-member-id',
                 )
             ) {
                 const panel = target.closest(
-                    '#prop-node-workers',
+                    '#prop-node-members',
                 );
                 if (
                     !(panel instanceof HTMLElement)
                 ) return;
-                const workerIds =
-                    parseWorkerIdsFromPanel(
+                const memberIds =
+                    parseMemberIdsFromPanel(
                         panel,
                     );
                 commit(
                     pageState.presenter()
-                        .withNodeWorkerIds(
-                            workerIds,
+                        .withNodeMemberIds(
+                            memberIds,
                         ),
                     { advanceHistory: true },
                 );
@@ -1416,13 +1416,13 @@ export async function init(
             const ctx = createRequestContext();
             const [
                 graph, versions,
-                humanWorkers, aiWorkers,
+                humanMembers, aiMembers,
                 records, boundRecordId,
             ] = await Promise.all([
                 getFlowGraph(ctx, flowId),
                 getFlowVersions(ctx, flowId),
-                getHumanWorkers(ctx),
-                getAIWorkers(ctx),
+                getHumanMembers(ctx),
+                getAIMembers(ctx),
                 getRecordRows(ctx),
                 getRecordForFlow(ctx, flowId),
             ]);
@@ -1435,7 +1435,7 @@ export async function init(
                     : [];
             return {
                 graph, versions,
-                humanWorkers, aiWorkers,
+                humanMembers, aiMembers,
                 records, boundRecordId,
                 recordAttributes,
             };
@@ -1456,8 +1456,8 @@ export async function init(
             loaded.graph,
             FALLBACK_W,
             FALLBACK_H,
-            loaded.humanWorkers,
-            loaded.aiWorkers,
+            loaded.humanMembers,
+            loaded.aiMembers,
             loaded.recordAttributes,
         );
     const presenter =

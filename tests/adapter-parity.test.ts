@@ -14,7 +14,7 @@ import {
     getArchivedObjectiveIds,
 } from '../web-app/app/adapters/objectives.ts';
 import type { DbAdapter } from '../api/db.ts';
-import { seedHumanWorker } from './worker-fixtures.ts';
+import { seedHumanMember } from './member-fixtures.ts';
 
 function installLocalStorageShim(): void {
     const map = new Map<string, string>();
@@ -38,7 +38,7 @@ async function runReactivationScenario(db: DbAdapter): Promise<{
     deletedIds: Set<string>;
     archivedIds: Set<string>;
 }> {
-    await seedHumanWorker(db, 'current', 'Demo User');
+    await seedHumanMember(db, 'current', 'Demo User');
     const ctx = createRequestContext(db);
     await postObjectiveCreation(
         ctx, 'o1', 'Rev', 'd', 0,

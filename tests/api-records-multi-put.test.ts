@@ -8,9 +8,9 @@ import {
     jsonArrayField,
 } from '../api/types.ts';
 import {
-    seedCurrentWorker,
-    seedHumanWorker,
-} from './worker-fixtures.ts';
+    seedCurrentMember,
+    seedHumanMember,
+} from './member-fixtures.ts';
 
 // ── Create variant ──────
 
@@ -21,7 +21,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
-        await seedCurrentWorker(db);
+        await seedCurrentMember(db);
         await POST(db, 'records-multi-put', {
             kind: 'create',
             id: 'rec-1',
@@ -69,7 +69,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
-        await seedCurrentWorker(db);
+        await seedCurrentMember(db);
         await POST(db, 'records-multi-put', {
             kind: 'create',
             id: 'rec-2',
@@ -88,11 +88,11 @@ test(
         assert.equal(record.name, 'Empty');
         const current = await GET<{
             state: string;
-            worker_id: string;
+            member_id: string;
         }>(db, 'entity-states/rec-2');
         assert.equal(current.state, 'active');
         assert.equal(
-            current.worker_id, 'current',
+            current.member_id, 'current',
         );
     },
 );
@@ -105,7 +105,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
-        await seedCurrentWorker(db);
+        await seedCurrentMember(db);
         await POST(db, 'records-multi-put', {
             kind: 'create',
             id: 'rec-1',
@@ -153,7 +153,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
-        await seedCurrentWorker(db);
+        await seedCurrentMember(db);
         await POST(db, 'records-multi-put', {
             kind: 'create',
             id: 'rec-1',
@@ -217,7 +217,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
-        await seedCurrentWorker(db);
+        await seedCurrentMember(db);
         await POST(db, 'records-multi-put', {
             kind: 'create',
             id: 'rec-1',
@@ -282,7 +282,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
-        await seedCurrentWorker(db);
+        await seedCurrentMember(db);
         await assert.rejects(
             () => POST(db, 'records-multi-put', {
                 kind: 'create',
@@ -321,7 +321,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
-        await seedCurrentWorker(db);
+        await seedCurrentMember(db);
         await assert.rejects(
             () => POST(db, 'records-multi-put', {
                 kind: 'create',
@@ -359,7 +359,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
-        await seedCurrentWorker(db);
+        await seedCurrentMember(db);
         await assert.rejects(
             () => POST(db, 'records-multi-put', {
                 kind: 'destroy',
@@ -381,7 +381,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
-        await seedCurrentWorker(db);
+        await seedCurrentMember(db);
         await assert.rejects(
             () => POST(db, 'records-multi-put', {
                 kind: 'create',
@@ -405,7 +405,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
-        await seedCurrentWorker(db);
+        await seedCurrentMember(db);
         await assert.rejects(
             () => POST(db, 'records-multi-put', {
                 kind: 'create',
@@ -430,7 +430,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
-        await seedCurrentWorker(db);
+        await seedCurrentMember(db);
         await assert.rejects(
             () => POST(db, 'records-multi-put', {
                 kind: 'edit',

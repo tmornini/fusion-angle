@@ -1,8 +1,8 @@
 import type {
     Id,
-    WorkerEntity,
-    HumanWorkerEntity,
-    AIWorkerEntity,
+    MemberEntity,
+    HumanMemberEntity,
+    AIMemberEntity,
     IdeaEntity,
     ProjectEntity,
     FlowEntity,
@@ -103,7 +103,7 @@ export interface StateStore {
         id: Id,
         entityId: Id,
         state: string,
-        workerId: Id,
+        memberId: Id,
     ): Promise<void>;
     currentFor(
         entityId: Id,
@@ -144,12 +144,12 @@ export interface DbAdapter {
 
     simulateLatency(): Promise<void>;
 
-    workers:
-        EntityStore<WorkerEntity>;
-    humanWorkers:
-        EntityStore<HumanWorkerEntity>;
-    aiWorkers:
-        EntityStore<AIWorkerEntity>;
+    members:
+        EntityStore<MemberEntity>;
+    humanMembers:
+        EntityStore<HumanMemberEntity>;
+    aiMembers:
+        EntityStore<AIMemberEntity>;
     ideas:
         EntityStore<IdeaEntity>;
     projects:
@@ -202,9 +202,9 @@ export interface DbAdapter {
 }
 
 export const TABLE_NAMES = [
-    'workers',
-    'human_workers',
-    'ai_workers',
+    'members',
+    'human_members',
+    'ai_members',
     'ideas',
     'projects',
     'flows',

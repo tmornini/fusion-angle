@@ -101,11 +101,11 @@ test(
         const adapter =
             new LocalStorageDbAdapter();
         const json = JSON.stringify({
-            workers: { not: 'an array' },
+            members: { not: 'an array' },
         });
         await assert.rejects(
             () => adapter.importSnapshot(json),
-            /table "workers" is not an array/,
+            /table "members" is not an array/,
         );
     },
 );
@@ -117,11 +117,11 @@ test(
         const adapter =
             new LocalStorageDbAdapter();
         const json = JSON.stringify({
-            workers: ['not an object'],
+            members: ['not an object'],
         });
         await assert.rejects(
             () => adapter.importSnapshot(json),
-            /row 0 in table "workers" is not an object/,
+            /row 0 in table "members" is not an object/,
         );
     },
 );
@@ -133,11 +133,11 @@ test(
         const adapter =
             new LocalStorageDbAdapter();
         const json = JSON.stringify({
-            workers: [null],
+            members: [null],
         });
         await assert.rejects(
             () => adapter.importSnapshot(json),
-            /row 0 in table "workers" is not an object/,
+            /row 0 in table "members" is not an object/,
         );
     },
 );
@@ -149,11 +149,11 @@ test(
         const adapter =
             new LocalStorageDbAdapter();
         const json = JSON.stringify({
-            workers: [['not', 'an', 'object']],
+            members: [['not', 'an', 'object']],
         });
         await assert.rejects(
             () => adapter.importSnapshot(json),
-            /row 0 in table "workers" is not an object/,
+            /row 0 in table "members" is not an object/,
         );
     },
 );
@@ -165,7 +165,7 @@ test(
         const adapter =
             new LocalStorageDbAdapter();
         const json = JSON.stringify({
-            workers: [
+            members: [
                 {
                     id: 'u1',
                     type: 'human',
@@ -176,7 +176,7 @@ test(
         });
         await assert.rejects(
             () => adapter.importSnapshot(json),
-            /snapshot\.workers\[0\]/,
+            /snapshot\.members\[0\]/,
         );
     },
 );
@@ -226,7 +226,7 @@ test(
         const adapter =
             new LocalStorageDbAdapter();
         const json = JSON.stringify({
-            human_workers: [
+            human_members: [
                 {
                     id: 'u1',
                     email: 'a@example.com',
@@ -241,7 +241,7 @@ test(
         });
         await adapter.importSnapshot(json);
         const stored = map.get(
-            KEY_PREFIX + 'human_workers',
+            KEY_PREFIX + 'human_members',
         );
         assert.ok(stored, 'humans should persist');
     },
@@ -297,18 +297,18 @@ test(
         const adapter =
             new LocalStorageDbAdapter();
         await adapter.createSchema();
-        await adapter.workers.put('u1', {
+        await adapter.members.put('u1', {
             type: 'human',
             name: 'Alice Adams',
         });
         await adapter.createSchema();
-        const workers = await adapter.workers.getAll();
+        const members = await adapter.members.getAll();
         assert.equal(
-            workers.length, 1,
+            members.length, 1,
             'second createSchema preserves data',
         );
         assert.ok(
-            map.get(KEY_PREFIX + 'workers'),
+            map.get(KEY_PREFIX + 'members'),
         );
     },
 );

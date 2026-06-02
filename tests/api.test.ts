@@ -8,9 +8,9 @@ import {
     MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import {
-    seedHumanWorker,
-    seedAIWorker,
-} from './worker-fixtures.ts';
+    seedHumanMember,
+    seedAIMember,
+} from './member-fixtures.ts';
 
 test('GET on unknown route throws', async () => {
     const db = new MemoryDbAdapter();
@@ -68,36 +68,36 @@ test('GET ideas/ normalizes to collection', async () => {
 });
 
 test(
-    'GET workers returns the persisted humans',
+    'GET members returns the persisted humans',
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
-        await seedHumanWorker(db, 'hw_1', 'Sarah Chen');
-        const workers =
-            await GET<unknown[]>(db, 'workers');
-        assert.equal(workers.length, 1);
+        await seedHumanMember(db, 'hw_1', 'Sarah Chen');
+        const members =
+            await GET<unknown[]>(db, 'members');
+        assert.equal(members.length, 1);
     },
 );
 
 test(
-    'GET ai-workers returns persisted AIs',
+    'GET ai-members returns persisted AIs',
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
-        await seedAIWorker(db, 'ai_1', 'Opus');
+        await seedAIMember(db, 'ai_1', 'Opus');
         const ais =
-            await GET<unknown[]>(db, 'ai-workers');
+            await GET<unknown[]>(db, 'ai-members');
         assert.equal(ais.length, 1);
     },
 );
 
 test(
-    'PUT ai-workers/:id validates body',
+    'PUT ai-members/:id validates body',
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
         await assert.rejects(
-            () => PUT(db, 'ai-workers/ai_1', {
+            () => PUT(db, 'ai-members/ai_1', {
                 rogue_field: 'extra',
             }),
             /unexpected key|missing/,
@@ -114,9 +114,9 @@ test(
         await POST(
             db, 'snapshots/mock-data', {},
         );
-        const workers =
-            await GET<unknown[]>(db, 'workers');
-        assert.ok(workers.length > 0);
+        const members =
+            await GET<unknown[]>(db, 'members');
+        assert.ok(members.length > 0);
     },
 );
 
@@ -154,7 +154,7 @@ test(
         const db = new MemoryDbAdapter();
         await db.createSchema();
         await assert.rejects(
-            () => GET(db, 'workers/w-1/extra'),
+            () => GET(db, 'members/w-1/extra'),
             /not found|404/i,
         );
     },

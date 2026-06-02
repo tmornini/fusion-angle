@@ -4,13 +4,13 @@ import {
     searchItems,
     ideaToSearchItem,
     projectToSearchItem,
-    humanWorkerToSearchItem,
+    humanMemberToSearchItem,
 } from '../web-app/app/command-palette.ts';
 import type {
     SearchItem,
 } from '../web-app/app/command-palette.ts';
 import {
-    Idea, Project, HumanWorker,
+    Idea, Project, HumanMember,
     jsonArrayField,
     jsonObjectField,
     type IdeaState,
@@ -49,13 +49,13 @@ function buildProject(
     }, 'approved');
 }
 
-function buildHumanWorker(
+function buildHumanMember(
     id: string,
     first: string, last: string,
     title = 'engineer',
     department = 'Eng',
-): HumanWorker {
-    return new HumanWorker(
+): HumanMember {
+    return new HumanMember(
         { id, type: 'human', name: first + ' ' + last },
         {
             id,
@@ -243,17 +243,17 @@ test(
 );
 
 test(
-    'humanWorkerToSearchItem builds correct shape',
+    'humanMemberToSearchItem builds correct shape',
     () => {
-        const out = humanWorkerToSearchItem(
-            buildHumanWorker(
+        const out = humanMemberToSearchItem(
+            buildHumanMember(
                 'u1', 'Carol', 'Smith',
                 'pm', 'Product',
             ),
         );
-        assert.equal(out.id, 'worker-u1');
+        assert.equal(out.id, 'member-u1');
         assert.equal(out.title, 'Carol Smith');
-        assert.equal(out.category, 'workers');
+        assert.equal(out.category, 'members');
         assert.ok(
             out.keywords.includes('pm'),
             'title in keywords',
@@ -272,15 +272,15 @@ test(
 );
 
 test(
-    'searchItems search by worker email works',
+    'searchItems search by member email works',
     () => {
-        const workerItem = humanWorkerToSearchItem(
-            buildHumanWorker(
+        const memberItem = humanMemberToSearchItem(
+            buildHumanMember(
                 'u1', 'Carol', 'Smith',
             ),
         );
         const out = searchItems(
-            [workerItem], 'carol@',
+            [memberItem], 'carol@',
         );
         assert.equal(out.length, 1);
     },

@@ -21,8 +21,8 @@ import type {
     ProjectObjectiveBaselineScore,
 } from '../api/types.ts';
 import {
-    seedHumanWorker,
-} from './worker-fixtures.ts';
+    seedHumanMember,
+} from './member-fixtures.ts';
 
 function buildIdea(
     id: string, title: string,
@@ -63,14 +63,14 @@ async function setupDb(): Promise<{
 
 test('getIdeas returns ideas with submitter', async () => {
     const { db, ctx } = await setupDb();
-    await seedHumanWorker(db, 'u1', 'Alice Test');
+    await seedHumanMember(db, 'u1', 'Alice Test');
     await db.ideas.put('i1', buildIdea(
         'i1', 'First idea',
     ));
     await seedIdeaState(db, 'i1', 'active');
     await db.ideaSubmissions.put('s1', {
         idea_id: 'i1',
-        worker_id: 'u1',
+        member_id: 'u1',
         at: '2026-04-01T00:00:00Z',
     });
     const result = await getIdeas(ctx);
@@ -91,7 +91,7 @@ test('getIdeas returns ideas with submitter', async () => {
 
 test('getIdeas throws when idea has no submission', async () => {
     const { db, ctx } = await setupDb();
-    await seedHumanWorker(db, 'u1', 'Alice Test');
+    await seedHumanMember(db, 'u1', 'Alice Test');
     await db.ideas.put('i1', buildIdea(
         'i1', 'Orphan',
     ));
@@ -105,14 +105,14 @@ test('getIdeas throws when idea has no submission', async () => {
 
 test('getIdea finds submission for one idea', async () => {
     const { db, ctx } = await setupDb();
-    await seedHumanWorker(db, 'u1', 'Alice Test');
+    await seedHumanMember(db, 'u1', 'Alice Test');
     await db.ideas.put('i1', buildIdea(
         'i1', 'A',
     ));
     await seedIdeaState(db, 'i1', 'active');
     await db.ideaSubmissions.put('s1', {
         idea_id: 'i1',
-        worker_id: 'u1',
+        member_id: 'u1',
         at: '2026-04-01T00:00:00Z',
     });
     const result = await getIdea(ctx, 'i1');
@@ -124,7 +124,7 @@ test('getIdea finds submission for one idea', async () => {
 
 test('getIdea throws on missing submission', async () => {
     const { db, ctx } = await setupDb();
-    await seedHumanWorker(db, 'u1', 'Alice Test');
+    await seedHumanMember(db, 'u1', 'Alice Test');
     await db.ideas.put(
         'i1', buildIdea('i1', 'A'),
     );
@@ -150,14 +150,14 @@ test('putIdea persists changes', async () => {
 
 test('archived ideas are filtered from getIdeas', async () => {
     const { db, ctx } = await setupDb();
-    await seedHumanWorker(db, 'u1', 'Alice Test');
+    await seedHumanMember(db, 'u1', 'Alice Test');
     await db.ideas.put(
         'i1', buildIdea('i1', 'Keep'),
     );
     await seedIdeaState(db, 'i1', 'active');
     await db.ideaSubmissions.put('s1', {
         idea_id: 'i1',
-        worker_id: 'u1',
+        member_id: 'u1',
         at: '2026-04-01T00:00:00Z',
     });
     await db.ideas.put(
@@ -166,7 +166,7 @@ test('archived ideas are filtered from getIdeas', async () => {
     await seedIdeaState(db, 'i2', 'archived');
     await db.ideaSubmissions.put('s2', {
         idea_id: 'i2',
-        worker_id: 'u1',
+        member_id: 'u1',
         at: '2026-04-01T00:00:00Z',
     });
     const result = await getIdeas(ctx);
@@ -181,7 +181,7 @@ test(
     + ' records the initial state event',
     async () => {
         const { db, ctx } = await setupDb();
-        await seedHumanWorker(
+        await seedHumanMember(
             db, 'current', 'Demo User',
         );
 
@@ -210,7 +210,7 @@ test(
     + ' without touching the idea row',
     async () => {
         const { db, ctx } = await setupDb();
-        await seedHumanWorker(
+        await seedHumanMember(
             db, 'current', 'Demo User',
         );
         await db.ideas.put(
@@ -242,7 +242,7 @@ test(
     + ' one atomic batch',
     async () => {
         const { db, ctx } = await setupDb();
-        await seedHumanWorker(
+        await seedHumanMember(
             db, 'current', 'Demo User',
         );
         await db.ideas.put(
@@ -321,7 +321,7 @@ test(
     + ' missing a score for an active objective',
     async () => {
         const { db, ctx } = await setupDb();
-        await seedHumanWorker(
+        await seedHumanMember(
             db, 'current', 'Demo User',
         );
         await db.ideas.put(
@@ -359,14 +359,14 @@ test(
 
 test('deleted ideas are filtered from getIdeas', async () => {
     const { db, ctx } = await setupDb();
-    await seedHumanWorker(db, 'u1', 'Alice Test');
+    await seedHumanMember(db, 'u1', 'Alice Test');
     await db.ideas.put(
         'i1', buildIdea('i1', 'Keep'),
     );
     await seedIdeaState(db, 'i1', 'active');
     await db.ideaSubmissions.put('s1', {
         idea_id: 'i1',
-        worker_id: 'u1',
+        member_id: 'u1',
         at: '2026-04-01T00:00:00Z',
     });
     await db.ideas.put(
@@ -375,7 +375,7 @@ test('deleted ideas are filtered from getIdeas', async () => {
     await seedIdeaState(db, 'i2', 'active');
     await db.ideaSubmissions.put('s2', {
         idea_id: 'i2',
-        worker_id: 'u1',
+        member_id: 'u1',
         at: '2026-04-01T00:00:00Z',
     });
     await db.ideas.delete('i2');

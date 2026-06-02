@@ -1,7 +1,7 @@
 import type { GraphNode } from '../../../api/types.ts';
 import {
     DEFAULT_NODE_ATTRIBUTES,
-    DEFAULT_NODE_WORKER_IDS,
+    DEFAULT_NODE_MEMBER_IDS,
     DEFAULT_NODE_TASK_INSTRUCTIONS,
 } from '../../../api/types.ts';
 import {
@@ -25,8 +25,8 @@ export function buildStartAndCompleteNodes(): {
             positionY: DEFAULT_START_Y,
             isCreate: true,
             isArchive: false,
-            workerIds: [
-                ...DEFAULT_NODE_WORKER_IDS,
+            memberIds: [
+                ...DEFAULT_NODE_MEMBER_IDS,
             ],
             attributes: [
                 ...DEFAULT_NODE_ATTRIBUTES,
@@ -40,8 +40,8 @@ export function buildStartAndCompleteNodes(): {
             positionY: DEFAULT_COMPLETE_Y,
             isCreate: false,
             isArchive: true,
-            workerIds: [
-                ...DEFAULT_NODE_WORKER_IDS,
+            memberIds: [
+                ...DEFAULT_NODE_MEMBER_IDS,
             ],
             attributes: [
                 ...DEFAULT_NODE_ATTRIBUTES,

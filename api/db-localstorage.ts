@@ -13,9 +13,9 @@ import { HistoryEntityStore }
 import { SingletonStore } from './store-singleton.ts';
 import { StateStore } from './store-state.ts';
 import type {
-    WorkerEntity,
-    HumanWorkerEntity,
-    AIWorkerEntity,
+    MemberEntity,
+    HumanMemberEntity,
+    AIMemberEntity,
     IdeaEntity,
     ProjectEntity,
     FlowEntity,
@@ -39,9 +39,9 @@ import {
     DEFAULT_LATENCY_CONFIG,
 } from './latency.ts';
 import {
-    validateWorkerEntity,
-    validateHumanWorkerEntity,
-    validateAIWorkerEntity,
+    validateMemberEntity,
+    validateHumanMemberEntity,
+    validateAIMemberEntity,
     validateIdeaEntity,
     validateProjectEntity,
     validateFlowEntity,
@@ -67,10 +67,10 @@ import {
 export class LocalStorageDbAdapter implements DbAdapter {
     readonly #backend: LocalStorageBackend;
 
-    readonly workers: IEntityStore<WorkerEntity>;
-    readonly humanWorkers:
-        IEntityStore<HumanWorkerEntity>;
-    readonly aiWorkers: IEntityStore<AIWorkerEntity>;
+    readonly members: IEntityStore<MemberEntity>;
+    readonly humanMembers:
+        IEntityStore<HumanMemberEntity>;
+    readonly aiMembers: IEntityStore<AIMemberEntity>;
     readonly ideas: IEntityStore<IdeaEntity>;
     readonly projects: IEntityStore<ProjectEntity>;
     readonly flows: IEntityStore<FlowEntity>;
@@ -114,20 +114,20 @@ export class LocalStorageDbAdapter implements DbAdapter {
                 'organization', backend,
             );
 
-        this.workers =
+        this.members =
             new EntityStore(
-                'workers', backend, stateStore,
-                validateWorkerEntity,
+                'members', backend, stateStore,
+                validateMemberEntity,
             );
-        this.humanWorkers =
+        this.humanMembers =
             new EntityStore(
-                'human_workers', backend, stateStore,
-                validateHumanWorkerEntity,
+                'human_members', backend, stateStore,
+                validateHumanMemberEntity,
             );
-        this.aiWorkers =
+        this.aiMembers =
             new EntityStore(
-                'ai_workers', backend, stateStore,
-                validateAIWorkerEntity,
+                'ai_members', backend, stateStore,
+                validateAIMemberEntity,
             );
         this.ideas =
             new EntityStore(

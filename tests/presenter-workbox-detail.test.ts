@@ -13,7 +13,7 @@ import {
     type RecordAttributeEntity,
     type AttributeType,
     type Id,
-    type Worker,
+    type Member,
 } from '../api/types.ts';
 import type {
     TransitionEvent,
@@ -27,13 +27,13 @@ import {
 } from
 '../web-app/app/presenters/workbox-detail.ts';
 import {
-    makeHumanWorker,
-} from './worker-fixtures.ts';
+    makeHumanMember,
+} from './member-fixtures.ts';
 
 // WorkboxDetailPresenter is pure: the constructor
 // takes the work order, transition events, per-event
 // field values, the active claim (or null), a
-// workerMap, the current worker id, and the
+// memberMap, the current member id, and the
 // attribute map; buildPage() returns SafeHtml.
 // The work order's flow_graph is a JsonObjectField
 // (a JSON string) that the presenter re-validates,
@@ -78,7 +78,7 @@ function makeNode(
         positionY: 0,
         isCreate: false,
         isArchive: false,
-        workerIds: [],
+        memberIds: [],
         attributes: [],
         taskInstructions: '',
         ...overrides,
@@ -150,17 +150,17 @@ function makeTransition(
         work_order_id: 'wo-1',
         from_node_id: '',
         to_node_id: 'n-1',
-        worker_id: 'p-1',
+        member_id: 'p-1',
         at: '2026-04-01T12:00:00.000Z',
         ...overrides,
     };
 }
 
-function makeWorkerMap(
-    workers: Worker[],
-): Map<Id, Worker> {
+function makeMemberMap(
+    members: Member[],
+): Map<Id, Member> {
     return new Map(
-        workers.map(
+        members.map(
             w => [w.idForLink(), w],
         ),
     );
@@ -176,9 +176,9 @@ function makeAttributeMap(
     );
 }
 
-const WORKER_MAP = makeWorkerMap([
-    makeHumanWorker('p-1', 'Ada Park'),
-    makeHumanWorker('p-2', 'Bo Park'),
+const MEMBER_MAP = makeMemberMap([
+    makeHumanMember('p-1', 'Ada Park'),
+    makeHumanMember('p-2', 'Bo Park'),
 ]);
 
 function makePresenter(
@@ -189,8 +189,8 @@ function makePresenter(
         fieldValues?:
             Map<Id, StateFieldValueEntity[]>;
         activeClaim?:
-            { workerId: Id; at: string } | null;
-        currentWorkerId?: string;
+            { memberId: Id; at: string } | null;
+        currentMemberId?: string;
         attributes?: RecordAttributeEntity[];
     } = {},
 ): WorkboxDetailPresenter {
@@ -206,8 +206,8 @@ function makePresenter(
         transitions,
         args.fieldValues ?? new Map(),
         args.activeClaim ?? null,
-        WORKER_MAP,
-        args.currentWorkerId ?? 'p-1',
+        MEMBER_MAP,
+        args.currentMemberId ?? 'p-1',
         makeAttributeMap(attributes),
     );
 }
@@ -603,14 +603,14 @@ test(
                 makeTransition({
                     id: 't-1', from_node_id: '',
                     to_node_id: 'n-1',
-                    worker_id: 'p-1',
+                    member_id: 'p-1',
                     at:
                         '2026-04-01T12:00:00.000Z',
                 }),
                 makeTransition({
                     id: 't-2', from_node_id: 'n-1',
                     to_node_id: 'n-2',
-                    worker_id: 'p-2',
+                    member_id: 'p-2',
                     at:
                         '2026-04-03T08:00:00.000Z',
                 }),
@@ -633,42 +633,42 @@ test(
 );
 
 test(
-    'an active claim by the current worker is'
-    + ' reported as claimed with byCurrentWorker',
+    'an active claim by the current member is'
+    + ' reported as claimed with byCurrentMember',
     () => {
         const presenter = makePresenter({
             activeClaim: {
-                workerId: 'p-1',
+                memberId: 'p-1',
                 at: new Date().toISOString(),
             },
-            currentWorkerId: 'p-1',
+            currentMemberId: 'p-1',
         });
         const status = presenter.claimStatus();
         assert.equal(status.kind, 'claimed');
         if (status.kind === 'claimed') {
             assert.equal(
-                status.byCurrentWorker, true,
+                status.byCurrentMember, true,
             );
         }
     },
 );
 
 test(
-    'an active claim by another worker is claimed'
-    + ' but not by the current worker',
+    'an active claim by another member is claimed'
+    + ' but not by the current member',
     () => {
         const presenter = makePresenter({
             activeClaim: {
-                workerId: 'p-2',
+                memberId: 'p-2',
                 at: new Date().toISOString(),
             },
-            currentWorkerId: 'p-1',
+            currentMemberId: 'p-1',
         });
         const status = presenter.claimStatus();
         assert.equal(status.kind, 'claimed');
         if (status.kind === 'claimed') {
             assert.equal(
-                status.byCurrentWorker, false,
+                status.byCurrentMember, false,
             );
         }
     },

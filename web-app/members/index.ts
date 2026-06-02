@@ -20,24 +20,24 @@ import {
 } from '../app/core.ts';
 import {
     createRequestContext,
-    getWorkers,
-    postHumanWorkerCreation,
-    postAIWorkerCreation,
-    getCurrentHumanWorker,
+    getMembers,
+    postHumanMemberCreation,
+    postAIMemberCreation,
+    getCurrentHumanMember,
     jsonArrayField,
     jsonObjectField,
     generateCryptoSafeBase62,
-    subscribeHumanWorkerChanges,
-    subscribeAIWorkerChanges,
+    subscribeHumanMemberChanges,
+    subscribeAIMemberChanges,
 } from '../app/adapters/index.ts';
 import {
-    ManagedWorkersPresenter,
-    buildInitialManagedWorkersState,
-    applyManagedWorkersSearch,
-    applyManagedWorkersKind,
+    ManagedMembersPresenter,
+    buildInitialManagedMembersState,
+    applyManagedMembersSearch,
+    applyManagedMembersKind,
     buildModelOptgroups,
-    type ManagedWorkersState,
-    type WorkerKindFilter,
+    type ManagedMembersState,
+    type MemberKindFilter,
 } from '../app/presenters/index.ts';
 
 const DEFAULT_DIM = 50;
@@ -45,22 +45,22 @@ const DEFAULT_DIM = 50;
 const pageAbort = new AbortController();
 const signal = pageAbort.signal;
 
-let workersState:
-    ManagedWorkersState | null = null;
-let workerListEl: HTMLElement | null = null;
+let membersState:
+    ManagedMembersState | null = null;
+let memberListEl: HTMLElement | null = null;
 
 export async function init(): Promise<void> {
-    const workerList = $('#worker-list', document);
-    if (!workerList) return;
+    const memberList = $('#member-list', document);
+    if (!memberList) return;
 
     populateIcons([
-        ['#add-worker-btn-icon', iconPersonPlus(16, '')],
-        ['#worker-search-icon', iconSearch(16, '')],
-        ['#add-worker-dialog-icon', iconPersonPlus(20, '')],
-        ['#add-worker-submit-icon', iconSend(16, '')],
+        ['#add-member-btn-icon', iconPersonPlus(16, '')],
+        ['#member-search-icon', iconSearch(16, '')],
+        ['#add-member-dialog-icon', iconPersonPlus(20, '')],
+        ['#add-member-submit-icon', iconSend(16, '')],
     ]);
-    initWorkerListFilters();
-    bindAddWorkerDialog();
+    initMemberListFilters();
+    bindAddMemberDialog();
     const modelSelect = $select('#ai-model', document);
     if (modelSelect) {
         setHtml(
@@ -74,61 +74,61 @@ export async function init(): Promise<void> {
 
     const ctx = createRequestContext();
     const loaded = await withLoadingState(
-        workerList,
+        memberList,
         buildSkeleton('table', 5),
         async () => {
-            const [workers, currentRow] =
+            const [members, currentRow] =
                 await Promise.all([
-                    getWorkers(ctx),
-                    getCurrentHumanWorker(ctx),
+                    getMembers(ctx),
+                    getCurrentHumanMember(ctx),
                 ]);
-            return { workers, currentRow };
+            return { members, currentRow };
         },
         init,
     );
     if (!loaded) return;
 
-    workersState =
-        buildInitialManagedWorkersState(
-            loaded.workers, loaded.currentRow.id,
+    membersState =
+        buildInitialManagedMembersState(
+            loaded.members, loaded.currentRow.id,
         );
 
-    workerListEl = workerList;
-    rerenderWorkers();
-    workerListEl.addEventListener(
-        'click', onWorkerListClick,
+    memberListEl = memberList;
+    rerenderMembers();
+    memberListEl.addEventListener(
+        'click', onMemberListClick,
         { signal },
     );
 
-    subscribeHumanWorkerChanges(
+    subscribeHumanMemberChanges(
         () => void refresh(),
     );
-    subscribeAIWorkerChanges(
+    subscribeAIMemberChanges(
         () => void refresh(),
     );
 }
 
 async function refresh(): Promise<void> {
-    if (!workersState || !workerListEl) return;
-    const fresh = await getWorkers(
+    if (!membersState || !memberListEl) return;
+    const fresh = await getMembers(
         createRequestContext(),
     );
-    workersState =
-        buildInitialManagedWorkersState(
+    membersState =
+        buildInitialManagedMembersState(
             fresh,
-            workersState.currentWorkerId,
+            membersState.currentMemberId,
         );
-    rerenderWorkers();
+    rerenderMembers();
 }
 
-function rerenderWorkers(): void {
-    if (!workersState || !workerListEl) return;
-    new ManagedWorkersPresenter(workersState)
-        .renderList(workerListEl);
+function rerenderMembers(): void {
+    if (!membersState || !memberListEl) return;
+    new ManagedMembersPresenter(membersState)
+        .renderList(memberListEl);
 }
 
-function initWorkerListFilters(): void {
-    $input('#worker-search', document)
+function initMemberListFilters(): void {
+    $input('#member-search', document)
         ?.addEventListener(
             'input', onSearchInput,
             { signal },
@@ -144,17 +144,17 @@ function initWorkerListFilters(): void {
 }
 
 function onSearchInput(e: Event): void {
-    if (!workersState || !workerListEl) return;
+    if (!membersState || !memberListEl) return;
     const target =
         e.target as HTMLInputElement;
-    workersState = applyManagedWorkersSearch(
-        workersState, target.value,
+    membersState = applyManagedMembersSearch(
+        membersState, target.value,
     );
-    rerenderWorkers();
+    rerenderMembers();
 }
 
 function onKindChipClick(e: Event): void {
-    if (!workersState || !workerListEl) return;
+    if (!membersState || !memberListEl) return;
     const target = e.currentTarget;
     if (!(target instanceof HTMLElement)) return;
     const kind = target.getAttribute(
@@ -165,8 +165,8 @@ function onKindChipClick(e: Event): void {
         && kind !== 'human'
         && kind !== 'ai'
     ) return;
-    workersState = applyManagedWorkersKind(
-        workersState, kind as WorkerKindFilter,
+    membersState = applyManagedMembersKind(
+        membersState, kind as MemberKindFilter,
     );
     document.querySelectorAll<HTMLElement>(
         '[data-kind-chip]',
@@ -177,41 +177,41 @@ function onKindChipClick(e: Event): void {
                 === kind ? 'true' : 'false',
         );
     });
-    rerenderWorkers();
+    rerenderMembers();
 }
 
-function onWorkerListClick(e: MouseEvent): void {
+function onMemberListClick(e: MouseEvent): void {
     const target = e.target;
     if (!(target instanceof Element)) return;
     const row = target.closest(
-        '[data-worker-id]',
+        '[data-member-id]',
     );
     if (!row) return;
-    const workerId = row.getAttribute(
-        'data-worker-id',
+    const memberId = row.getAttribute(
+        'data-member-id',
     );
-    if (workerId) {
+    if (memberId) {
         navigateTo(
-            'worker-detail', { workerId },
+            'member-detail', { memberId },
         );
     }
 }
 
-function bindAddWorkerDialog(): void {
+function bindAddMemberDialog(): void {
     initDialog(
-        'add-worker',
-        'add-worker-btn',
-        handleAddWorkerSubmit,
+        'add-member',
+        'add-member-btn',
+        handleAddMemberSubmit,
     );
     document.querySelectorAll<HTMLInputElement>(
-        '#add-worker-kind-toggle input',
+        '#add-member-kind-toggle input',
     ).forEach(input => {
         input.addEventListener(
             'change', onKindRadioChange,
             { signal },
         );
     });
-    $('#add-worker-dialog', document)
+    $('#add-member-dialog', document)
         ?.addEventListener(
             'keydown', onDialogKeydown,
             { signal },
@@ -222,10 +222,10 @@ function onKindRadioChange(e: Event): void {
     const target = e.target as HTMLInputElement;
     const kind = target.value;
     const humanForm = $(
-        '#add-worker-human-form', document,
+        '#add-member-human-form', document,
     );
     const aiForm = $(
-        '#add-worker-ai-form', document,
+        '#add-member-ai-form', document,
     );
     if (!humanForm || !aiForm) return;
     if (kind === 'human') {
@@ -243,21 +243,21 @@ function onDialogKeydown(e: KeyboardEvent): void {
     if (!target.matches('input.input')) return;
     e.preventDefault();
     e.stopPropagation();
-    $('#add-worker-submit', document)?.click();
+    $('#add-member-submit', document)?.click();
 }
 
 function selectedKind(): 'human' | 'ai' {
     const checked = document.querySelector<
         HTMLInputElement
-    >('#add-worker-kind-toggle'
-        + ' input[name="worker-kind"]:checked');
+    >('#add-member-kind-toggle'
+        + ' input[name="member-kind"]:checked');
     if (checked && checked.value === 'ai') {
         return 'ai';
     }
     return 'human';
 }
 
-async function handleAddWorkerSubmit(
+async function handleAddMemberSubmit(
 ): Promise<void> {
     const kind = selectedKind();
     if (kind === 'human') {
@@ -295,7 +295,7 @@ async function submitHumanForm(): Promise<void> {
     )!.value;
     const id = generateCryptoSafeBase62();
     try {
-        await postHumanWorkerCreation(
+        await postHumanMemberCreation(
             createRequestContext(),
             id,
             trimStrings({
@@ -324,18 +324,18 @@ async function submitHumanForm(): Promise<void> {
             ? err.message
             : String(err);
         log.error(
-            'postHumanWorkerCreation failed',
-            'workers', err,
+            'postHumanMemberCreation failed',
+            'members', err,
         );
         showToast(
-            `Failed to add worker: ${detail}`,
+            `Failed to add member: ${detail}`,
             'error',
         );
         return;
     }
-    showToast('Worker added', 'success');
-    closeDialog('add-worker');
-    navigateTo('workers');
+    showToast('Member added', 'success');
+    closeDialog('add-member');
+    navigateTo('members');
 }
 
 async function submitAIForm(): Promise<void> {
@@ -367,7 +367,7 @@ async function submitAIForm(): Promise<void> {
     }
     const id = generateCryptoSafeBase62();
     try {
-        await postAIWorkerCreation(
+        await postAIMemberCreation(
             createRequestContext(),
             id,
             trimStrings({
@@ -379,16 +379,16 @@ async function submitAIForm(): Promise<void> {
         );
     } catch (err) {
         log.error(
-            'postAIWorkerCreation failed',
-            'workers', err,
+            'postAIMemberCreation failed',
+            'members', err,
         );
         showToast(
-            'Failed to add AI worker',
+            'Failed to add AI member',
             'error',
         );
         return;
     }
-    showToast('AI worker added', 'success');
-    closeDialog('add-worker');
-    navigateTo('workers');
+    showToast('AI member added', 'success');
+    closeDialog('add-member');
+    navigateTo('members');
 }

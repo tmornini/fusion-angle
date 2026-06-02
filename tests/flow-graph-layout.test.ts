@@ -29,7 +29,7 @@ function node(id: string, o: NodeOpts = {}): GraphNode {
         positionY: o.positionY ?? 0,
         isCreate: o.isCreate ?? false,
         isArchive: o.isArchive ?? false,
-        workerIds: [],
+        memberIds: [],
         attributes: [],
     };
 }

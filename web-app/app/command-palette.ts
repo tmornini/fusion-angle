@@ -18,14 +18,14 @@ import {
 import {
     getIdeas,
     getProjects,
-    getHumanWorkers,
-    featuredHumanWorkers,
+    getHumanMembers,
+    featuredHumanMembers,
     createRequestContext,
     setLocation,
     subscribeSchemaChanges,
     type IdeaWithSubmitter,
     Project,
-    HumanWorker,
+    HumanMember,
 } from './adapters/index.ts';
 // init.ts is the composition root —
 // intentionally outside the adapter barrel.
@@ -46,7 +46,7 @@ export interface SearchItem {
     category:
         | 'ideas'
         | 'projects'
-        | 'workers'
+        | 'members'
         | 'pages';
     icon: SafeHtml;
     href: string;
@@ -153,14 +153,14 @@ const categoryOrder:
     SearchItem['category'][] = [
         'ideas',
         'projects',
-        'workers',
+        'members',
         'pages',
     ];
 const categoryLabels:
     Record<string, string> = {
         ideas: 'Ideas',
         projects: 'Projects',
-        workers: 'Workers',
+        members: 'Members',
         pages: 'Pages',
     };
 
@@ -213,23 +213,23 @@ export function projectToSearchItem(
     };
 }
 
-export function humanWorkerToSearchItem(
-    worker: HumanWorker,
+export function humanMemberToSearchItem(
+    member: HumanMember,
 ): SearchItem {
     return {
-        id: 'worker-' + worker.idForLink(),
-        title: worker.name(),
-        meta: worker.titleLabel()
+        id: 'member-' + member.idForLink(),
+        title: member.name(),
+        meta: member.titleLabel()
             + ' · '
-            + worker.departmentLabel(),
-        category: 'workers',
+            + member.departmentLabel(),
+        category: 'members',
         icon: iconPerson(
             PALETTE_ICON_SIZE_SM, '',
         ),
-        href: buildPageUrl('workers'),
-        keywords: worker.titleLabel()
-            + ' ' + worker.departmentLabel()
-            + ' ' + worker.emailAddress(),
+        href: buildPageUrl('members'),
+        keywords: member.titleLabel()
+            + ' ' + member.departmentLabel()
+            + ' ' + member.emailAddress(),
     };
 }
 
@@ -299,10 +299,10 @@ export function initCommandPalette(
             await Promise.all([
                 getIdeas(ctx),
                 getProjects(ctx),
-                getHumanWorkers(ctx),
+                getHumanMembers(ctx),
             ]);
         const featured =
-            featuredHumanWorkers(humans);
+            featuredHumanMembers(humans);
 
         state.allItems = [
             ...ideas.map(ideaToSearchItem),
@@ -310,7 +310,7 @@ export function initCommandPalette(
                 projectToSearchItem,
             ),
             ...featured.map(
-                humanWorkerToSearchItem,
+                humanMemberToSearchItem,
             ),
             ...pages.map(pageToSearchItem),
         ];
@@ -599,7 +599,7 @@ posIndex === state.activeIndex
             class="command-palette-input"
             placeholder="${
                 'Search ideas, projects,'
-                + ' workers, pages…'
+                + ' members, pages…'
             }"
             type="text"
             role="combobox"

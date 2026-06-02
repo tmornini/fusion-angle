@@ -11,13 +11,13 @@ test(
         const written = await db.states.put('s1', {
             entity_id: 'e1',
             state: 'active',
-            worker_id: 'w1',
+            member_id: 'w1',
             at: '2026-01-01T00:00:00.000Z',
         });
         assert.equal(written.id, 's1');
         assert.equal(written.entity_id, 'e1');
         assert.equal(written.state, 'active');
-        assert.equal(written.worker_id, 'w1');
+        assert.equal(written.member_id, 'w1');
         const read = await db.states.getById('s1');
         assert.deepEqual(read, written);
     },
@@ -42,13 +42,13 @@ test('getAll returns every written row', async () => {
     await db.states.put('s1', {
         entity_id: 'e1',
         state: 'a',
-        worker_id: 'w1',
+        member_id: 'w1',
         at: '2026-01-01T00:00:00.000Z',
     });
     await db.states.put('s2', {
         entity_id: 'e2',
         state: 'b',
-        worker_id: 'w1',
+        member_id: 'w1',
         at: '2026-01-02T00:00:00.000Z',
     });
     const all = await db.states.getAll();
@@ -77,7 +77,7 @@ test(
         assert.equal(second.entity_id, 'e1');
         assert.equal(first.state, 'a');
         assert.equal(second.state, 'b');
-        assert.equal(first.worker_id, 'w1');
+        assert.equal(first.member_id, 'w1');
     },
 );
 
@@ -89,19 +89,19 @@ test(
         await db.states.put('s1', {
             entity_id: 'e1',
             state: 'a',
-            worker_id: 'w1',
+            member_id: 'w1',
             at: '2026-01-01T00:00:00.000Z',
         });
         await db.states.put('s2', {
             entity_id: 'e1',
             state: 'b',
-            worker_id: 'w1',
+            member_id: 'w1',
             at: '2026-01-03T00:00:00.000Z',
         });
         await db.states.put('s3', {
             entity_id: 'e1',
             state: 'c',
-            worker_id: 'w1',
+            member_id: 'w1',
             at: '2026-01-02T00:00:00.000Z',
         });
         const current =
@@ -120,7 +120,7 @@ test(
         await db.states.put('s1', {
             entity_id: 'e1',
             state: 'a',
-            worker_id: 'w1',
+            member_id: 'w1',
             at: '2026-01-01T00:00:00.000Z',
         });
         const current =
@@ -138,25 +138,25 @@ test(
         await db.states.put('s1', {
             entity_id: 'e1',
             state: 'b',
-            worker_id: 'w1',
+            member_id: 'w1',
             at: '2026-01-02T00:00:00.000Z',
         });
         await db.states.put('s2', {
             entity_id: 'e2',
             state: 'x',
-            worker_id: 'w1',
+            member_id: 'w1',
             at: '2026-01-01T00:00:00.000Z',
         });
         await db.states.put('s3', {
             entity_id: 'e1',
             state: 'a',
-            worker_id: 'w1',
+            member_id: 'w1',
             at: '2026-01-01T00:00:00.000Z',
         });
         await db.states.put('s4', {
             entity_id: 'e1',
             state: 'c',
-            worker_id: 'w1',
+            member_id: 'w1',
             at: '2026-01-03T00:00:00.000Z',
         });
         const events = await db.states.allFor('e1');
@@ -184,7 +184,7 @@ test(
         await db.states.put('s1', {
             entity_id: 'e1',
             state: 'a',
-            worker_id: 'w1',
+            member_id: 'w1',
             at: '2026-01-01T00:00:00.000Z',
         });
         const events =

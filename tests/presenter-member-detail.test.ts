@@ -21,7 +21,7 @@ import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 
 const {
-    HumanWorker, AIWorker,
+    HumanMember, AIMember,
     jsonArrayField, jsonObjectField,
 } = await import('../api/types.ts');
 
@@ -30,17 +30,17 @@ const {
 } = await import('../api/provider-models.ts');
 
 const {
-    HumanWorkerDetailPresenter,
+    HumanMemberDetailPresenter,
 } = await import(
-    '../web-app/app/presenters/human-worker-detail.ts'
+    '../web-app/app/presenters/human-member-detail.ts'
 );
 
 const {
-    AIWorkerDetailPresenter,
-    AIWorkerDetailEditPresenter,
-    aiWorkerDraftFromWorker,
+    AIMemberDetailPresenter,
+    AIMemberDetailEditPresenter,
+    aiMemberDraftFromMember,
 } = await import(
-    '../web-app/app/presenters/ai-worker-detail.ts'
+    '../web-app/app/presenters/ai-member-detail.ts'
 );
 
 // Recording stub: presenters write into a container
@@ -94,8 +94,8 @@ function makeRecordingContainer(): {
     };
 }
 
-function makeHumanWorker() {
-    return new HumanWorker(
+function makeHumanMember() {
+    return new HumanMember(
         {
             id: 'hw_1',
             type: 'human',
@@ -118,8 +118,8 @@ function makeHumanWorker() {
     );
 }
 
-function makeAIWorker() {
-    return new AIWorker(
+function makeAIMember() {
+    return new AIMember(
         {
             id: 'ai_1',
             type: 'ai',
@@ -138,13 +138,13 @@ function makeAIWorker() {
 }
 
 test(
-    'HumanWorkerDetailPresenter renders the'
+    'HumanMemberDetailPresenter renders the'
     + ' name, title, department, and'
     + ' personal-info card',
     () => {
         const rec = makeRecordingContainer();
-        new HumanWorkerDetailPresenter(
-            makeHumanWorker(),
+        new HumanMemberDetailPresenter(
+            makeHumanMember(),
         ).renderShell(rec.container);
         const out = rec.allHtml();
         assert.match(out, /Sarah Chen/);
@@ -155,7 +155,7 @@ test(
         assert.match(out, /Leadership/);
         // Edit affordance present in read mode
         assert.match(
-            out, /data-worker-action="edit"/,
+            out, /data-member-action="edit"/,
         );
         // No raw "Unknown" magic string anywhere
         assert.equal(
@@ -165,12 +165,12 @@ test(
 );
 
 test(
-    'AIWorkerDetailPresenter renders the model'
+    'AIMemberDetailPresenter renders the model'
     + ' name, provider, and skill focus',
     () => {
         const rec = makeRecordingContainer();
-        new AIWorkerDetailPresenter(
-            makeAIWorker(),
+        new AIMemberDetailPresenter(
+            makeAIMember(),
         ).renderShell(rec.container);
         const out = rec.allHtml();
         const model = getProviderModels()[0]!;
@@ -192,27 +192,27 @@ test(
 );
 
 test(
-    'AIWorkerDetailEditPresenter renders a State'
-    + ' select hooked to the worker-field, with the'
+    'AIMemberDetailEditPresenter renders a State'
+    + ' select hooked to the member-field, with the'
     + ' current state pre-selected',
     () => {
         const rec = makeRecordingContainer();
-        const worker = makeAIWorker();
-        new AIWorkerDetailEditPresenter(
-            worker,
-            aiWorkerDraftFromWorker(worker),
+        const member = makeAIMember();
+        new AIMemberDetailEditPresenter(
+            member,
+            aiMemberDraftFromMember(member),
         ).renderShell(rec.container);
         const out = rec.allHtml();
         assert.match(out, /id="ai-state"/);
         assert.match(
-            out, /data-worker-field="state"/,
+            out, /data-member-field="state"/,
         );
         assert.match(
             out, /value="active"[\s\S]*?selected/,
         );
         // Save affordance present in edit mode.
         assert.match(
-            out, /data-worker-action="save"/,
+            out, /data-member-action="save"/,
         );
         // Model select with optgroups and the
         // current model pre-selected.

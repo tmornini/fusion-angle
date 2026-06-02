@@ -4,12 +4,12 @@ import {
     MissingTableError,
 } from './db.ts';
 import type {
-    AIWorkerEntity,
+    AIMemberEntity,
     FlowEntity,
     FlowVersionEntity,
     FlowWorkOrderEntity,
     FlowRecordEntity,
-    HumanWorkerEntity,
+    HumanMemberEntity,
     IdeaEntity,
     IdeaSubmissionEntity,
     Objective,
@@ -22,7 +22,7 @@ import type {
     RecordAttributeEntity,
     StateFieldValueEntity,
     WorkOrderEntity,
-    WorkerEntity,
+    MemberEntity,
 } from './types.ts';
 import {
     validateOrganizationEntity,
@@ -132,13 +132,13 @@ async function applyRecordMultiPut(
             : [];
     await db.records.put(body.id, body.record);
     if (body.kind === 'create') {
-        const worker =
-            await db.workers.getById('current');
+        const member =
+            await db.members.getById('current');
         await db.states.record(
             body.initialStateEventId,
             body.id,
             body.initialState,
-            worker.id,
+            member.id,
         );
     }
     if (entries.length > 0 || removedIds.length > 0) {
@@ -150,38 +150,38 @@ async function applyRecordMultiPut(
 
 
 const routes: Route[] = [
-    route('workers', {
-        get: (db) => db.workers.getAll(),
+    route('members', {
+        get: (db) => db.members.getAll(),
     }),
-    route('ai-workers', {
-        get: (db) => db.aiWorkers.getAll(),
+    route('ai-members', {
+        get: (db) => db.aiMembers.getAll(),
     }),
-    route('ai-workers/:id', {
+    route('ai-members/:id', {
         get: (db, p) =>
-            db.aiWorkers.getById(
+            db.aiMembers.getById(
                 param(p, 0),
             ),
         put: (db, p, payload) =>
-            db.aiWorkers.put(
+            db.aiMembers.put(
                 param(p, 0),
                 withoutId(payload) as unknown as Omit<
-                    AIWorkerEntity, 'id'
+                    AIMemberEntity, 'id'
                 >,
             ),
     }),
-    route('human-workers', {
-        get: (db) => db.humanWorkers.getAll(),
+    route('human-members', {
+        get: (db) => db.humanMembers.getAll(),
     }),
-    route('human-workers/:id', {
+    route('human-members/:id', {
         get: (db, p) =>
-            db.humanWorkers.getById(
+            db.humanMembers.getById(
                 param(p, 0),
             ),
         put: (db, p, payload) =>
-            db.humanWorkers.put(
+            db.humanMembers.put(
                 param(p, 0),
                 withoutId(payload) as unknown as Omit<
-                    HumanWorkerEntity, 'id'
+                    HumanMemberEntity, 'id'
                 >,
             ),
     }),
@@ -372,19 +372,19 @@ const routes: Route[] = [
                 ),
             ),
     }),
-    route('current-worker', {
+    route('current-member', {
         get: (db) =>
-            db.workers.getById('current'),
+            db.members.getById('current'),
     }),
 
-    route('workers/:id', {
+    route('members/:id', {
         get: (db, p) =>
-            db.workers.getById(param(p, 0)),
+            db.members.getById(param(p, 0)),
         put: (db, p, payload) =>
-            db.workers.put(
+            db.members.put(
                 param(p, 0),
                 withoutId(payload) as unknown as Omit<
-                    WorkerEntity, 'id'
+                    MemberEntity, 'id'
                 >,
             ),
     }),

@@ -7,31 +7,31 @@ import {
     createRequestContext,
 } from '../web-app/app/adapters/shared.ts';
 import {
-    postAIWorkerStateChange,
-} from '../web-app/app/adapters/ai-workers.ts';
+    postAIMemberStateChange,
+} from '../web-app/app/adapters/ai-members.ts';
 import {
-    seedHumanWorker,
-    seedAIWorker,
-} from './worker-fixtures.ts';
+    seedHumanMember,
+    seedAIMember,
+} from './member-fixtures.ts';
 
 test(
-    'postAIWorkerStateChange records a state event'
-    + ' without touching the AI worker row',
+    'postAIMemberStateChange records a state event'
+    + ' without touching the AI member row',
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
-        await seedHumanWorker(db, 'current', 'Demo User');
-        await seedAIWorker(db, 'ai1', 'Claude');
+        await seedHumanMember(db, 'current', 'Demo User');
+        await seedAIMember(db, 'ai1', 'Claude');
         const before =
-            await db.aiWorkers.getById('ai1');
+            await db.aiMembers.getById('ai1');
         const ctx = createRequestContext(db);
 
-        await postAIWorkerStateChange(
+        await postAIMemberStateChange(
             ctx, 'ai1', 'archived',
         );
 
         const after =
-            await db.aiWorkers.getById('ai1');
+            await db.aiMembers.getById('ai1');
         assert.deepEqual(after, before);
         const events = await db.states.allFor('ai1');
         assert.equal(events.length, 2);

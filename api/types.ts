@@ -5,7 +5,7 @@ import {
 
 export type Id = string;
 
-export type WorkerId = Id;
+export type MemberId = Id;
 
 export type ModelId = Id;
 
@@ -17,7 +17,7 @@ export interface ProviderModel {
     api_name: string;
 }
 
-export type WorkerKind = 'human' | 'ai' | 'system';
+export type MemberKind = 'human' | 'ai' | 'system';
 
 export type ConfidenceLevel = 'high' | 'medium' | 'low';
 
@@ -49,13 +49,13 @@ export interface NodeAttribute {
     isRequired: boolean;
 }
 
-export const WORKER_STATES = [
+export const MEMBER_STATES = [
     'active',
     'pending',
     'archived',
 ] as const;
 
-export type WorkerState = typeof WORKER_STATES[number];
+export type MemberState = typeof MEMBER_STATES[number];
 
 export const IDEA_STATES = [
     'active',
@@ -274,21 +274,21 @@ export function assertIdeaState(
     return v;
 }
 
-export function isWorkerState(
+export function isMemberState(
     v: string,
-): v is WorkerState {
+): v is MemberState {
     return includes(
-        WORKER_STATES, v,
+        MEMBER_STATES, v,
     );
 }
 
-export function assertWorkerState(
+export function assertMemberState(
     v: string,
     label: string,
-): WorkerState {
-    if (!includes(WORKER_STATES, v)) {
+): MemberState {
+    if (!includes(MEMBER_STATES, v)) {
         throw new Error(
-            'expected WorkerState for '
+            'expected MemberState for '
                 + label + ', got ' + v,
         );
     }
@@ -388,36 +388,31 @@ export function msSinceUtc(
         - new Date(iso).getTime();
 }
 
-export interface Deleted {
-    id: Id;
-    deleted_at: string;
-}
-
 export interface StateEntity {
     id: Id;
     entity_id: Id;
     state: string;
-    worker_id: Id;
+    member_id: Id;
     at: string;
 }
 
-export const SYSTEM_WORKER_ID: Id = 'system';
+export const SYSTEM_MEMBER_ID: Id = 'system';
 
-// Parent row: a worker's shared identity. The kind
+// Parent row: a member's shared identity. The kind
 // discriminant and display name live here; kind-specific
-// detail lives in human_workers / ai_workers keyed by the
-// same id. A 'system' worker is a parent row with no
+// detail lives in human_members / ai_members keyed by the
+// same id. A 'system' member is a parent row with no
 // detail row — absence of a detail row models "no kind-
 // specific attributes".
-export interface WorkerEntity {
-    id: WorkerId;
-    type: WorkerKind;
+export interface MemberEntity {
+    id: MemberId;
+    type: MemberKind;
     name: string;
 }
 
-// human_workers detail row, keyed by the shared worker id.
-export interface HumanWorkerEntity {
-    id: WorkerId;
+// human_members detail row, keyed by the shared member id.
+export interface HumanMemberEntity {
+    id: MemberId;
     email: string;
     title: string;
     department: string;
@@ -427,23 +422,23 @@ export interface HumanWorkerEntity {
     bio: string;
 }
 
-export class HumanWorker {
+export class HumanMember {
     readonly kind = 'human' as const;
-    readonly #id: WorkerId;
+    readonly #id: MemberId;
     readonly #name: string;
     readonly #email: string;
     readonly #title: string;
     readonly #department: string;
-    readonly #state: WorkerState;
+    readonly #state: MemberState;
     readonly #strengths: string;
     readonly #teamDimensions: string;
     readonly #phone: string;
     readonly #bio: string;
 
     constructor(
-        parent: WorkerEntity,
-        detail: HumanWorkerEntity,
-        state: WorkerState,
+        parent: MemberEntity,
+        detail: HumanMemberEntity,
+        state: MemberState,
     ) {
         this.#id = parent.id;
         this.#name = parent.name;
@@ -502,13 +497,13 @@ export class HumanWorker {
 
     stateLabel(): string {
         return (
-            WORKER_STATE_CONFIG[this.#state]
+            MEMBER_STATE_CONFIG[this.#state]
         )!.label;
     }
 
     stateClassName(): string {
         return (
-            WORKER_STATE_CONFIG[this.#state]
+            MEMBER_STATE_CONFIG[this.#state]
         )!.className;
     }
 
@@ -516,14 +511,14 @@ export class HumanWorker {
         return this.#department !== '';
     }
 
-    stateValue(): WorkerState {
+    stateValue(): MemberState {
         return this.#state;
     }
 
     parsedStrengths(): string[] {
         return validateStringArrayJson(
             this.#strengths,
-            'humanWorker.strengths',
+            'humanMember.strengths',
         );
     }
 
@@ -532,7 +527,7 @@ export class HumanWorker {
         return (
             validateStringNumberRecordJson(
                 this.#teamDimensions,
-                'humanWorker.teamDimensions',
+                'humanMember.teamDimensions',
             )
         );
     }
@@ -557,27 +552,27 @@ export class HumanWorker {
 
 }
 
-// ai_workers detail row, keyed by the shared worker id.
-export interface AIWorkerEntity {
-    id: WorkerId;
+// ai_members detail row, keyed by the shared member id.
+export interface AIMemberEntity {
+    id: MemberId;
     description: string;
     skill_focus: string;
     model: ModelId;
 }
 
-export class AIWorker {
+export class AIMember {
     readonly kind = 'ai' as const;
-    readonly #id: WorkerId;
+    readonly #id: MemberId;
     readonly #name: string;
     readonly #description: string;
     readonly #skillFocus: string;
     readonly #model: ModelId;
-    readonly #state: WorkerState;
+    readonly #state: MemberState;
 
     constructor(
-        parent: WorkerEntity,
-        detail: AIWorkerEntity,
-        state: WorkerState,
+        parent: MemberEntity,
+        detail: AIMemberEntity,
+        state: MemberState,
     ) {
         this.#id = parent.id;
         this.#name = parent.name;
@@ -627,17 +622,17 @@ export class AIWorker {
 
     stateLabel(): string {
         return (
-            WORKER_STATE_CONFIG[this.#state]
+            MEMBER_STATE_CONFIG[this.#state]
         )!.label;
     }
 
     stateClassName(): string {
         return (
-            WORKER_STATE_CONFIG[this.#state]
+            MEMBER_STATE_CONFIG[this.#state]
         )!.className;
     }
 
-    stateValue(): WorkerState {
+    stateValue(): MemberState {
         return this.#state;
     }
 
@@ -654,20 +649,20 @@ export class AIWorker {
     }
 }
 
-// System worker: a synthetic, read-only actor — the
+// System member: a synthetic, read-only actor — the
 // platform itself as the author of seed-time state
 // events. Exactly one exists; it has a parent row
 // (type 'system') and no detail row, and no lifecycle
 // a user manages, so it carries only identity + state.
-export class SystemWorker {
+export class SystemMember {
     readonly kind = 'system' as const;
-    readonly #id: WorkerId;
+    readonly #id: MemberId;
     readonly #name: string;
-    readonly #state: WorkerState;
+    readonly #state: MemberState;
 
     constructor(
-        parent: WorkerEntity,
-        state: WorkerState,
+        parent: MemberEntity,
+        state: MemberState,
     ) {
         this.#id = parent.id;
         this.#name = parent.name;
@@ -682,19 +677,19 @@ export class SystemWorker {
         return this.#name;
     }
 
-    stateValue(): WorkerState {
+    stateValue(): MemberState {
         return this.#state;
     }
 
     stateLabel(): string {
         return (
-            WORKER_STATE_CONFIG[this.#state]
+            MEMBER_STATE_CONFIG[this.#state]
         )!.label;
     }
 
     stateClassName(): string {
         return (
-            WORKER_STATE_CONFIG[this.#state]
+            MEMBER_STATE_CONFIG[this.#state]
         )!.className;
     }
 
@@ -705,26 +700,26 @@ export class SystemWorker {
     }
 }
 
-export type Worker =
-    | HumanWorker
-    | AIWorker
-    | SystemWorker;
+export type Member =
+    | HumanMember
+    | AIMember
+    | SystemMember;
 
-export function isHumanWorker(
-    w: Worker,
-): w is HumanWorker {
+export function isHumanMember(
+    w: Member,
+): w is HumanMember {
     return w.kind === 'human';
 }
 
-export function isAIWorker(
-    w: Worker,
-): w is AIWorker {
+export function isAIMember(
+    w: Member,
+): w is AIMember {
     return w.kind === 'ai';
 }
 
-export function isSystemWorker(
-    w: Worker,
-): w is SystemWorker {
+export function isSystemMember(
+    w: Member,
+): w is SystemMember {
     return w.kind === 'system';
 }
 
@@ -751,7 +746,7 @@ export interface ObjectiveRevision {
     objective_id: ObjectiveId;
     name: string;
     description: string;
-    worker_id: Id;
+    member_id: Id;
     at: string;
 }
 
@@ -760,7 +755,7 @@ export interface ProjectObjectiveBaselineScore {
     project_id: Id;
     objective_id: ObjectiveId;
     score: number;
-    worker_id: Id;
+    member_id: Id;
     at: string;
 }
 
@@ -769,7 +764,7 @@ export interface ProjectObjectiveActualScore {
     project_id: Id;
     objective_id: ObjectiveId;
     score: number;
-    worker_id: Id;
+    member_id: Id;
     at: string;
 }
 
@@ -792,7 +787,7 @@ export interface GraphNode {
     positionY: number;
     isCreate: boolean;
     isArchive: boolean;
-    workerIds: WorkerId[];
+    memberIds: MemberId[];
     attributes: NodeAttribute[];
     taskInstructions: string;
 }
@@ -817,8 +812,8 @@ export const DEFAULT_NEW_STATE_NAME =
     'New State';
 export const DEFAULT_TRANSITION_NAME =
     'Transition';
-export const DEFAULT_NODE_WORKER_IDS:
-    readonly WorkerId[] = [];
+export const DEFAULT_NODE_MEMBER_IDS:
+    readonly MemberId[] = [];
 export const DEFAULT_NODE_TASK_INSTRUCTIONS = '';
 
 export interface FlowEntity {
@@ -916,7 +911,7 @@ export interface OrganizationEntity {
 export interface IdeaSubmissionEntity {
     id: Id;
     idea_id: Id;
-    worker_id: Id;
+    member_id: Id;
     at: string;
 }
 
@@ -932,8 +927,8 @@ export interface StatusDisplay {
     className: string;
 }
 
-export const WORKER_STATE_CONFIG: Record<
-    WorkerState,
+export const MEMBER_STATE_CONFIG: Record<
+    MemberState,
     StatusDisplay
 > = {
     active: {

@@ -1,7 +1,7 @@
 <div class="workspace">
     <div class="page-header">
         <div>
-            <h1 class="page-title">Workers</h1>
+            <h1 class="page-title">Members</h1>
             <p class="text-sm text-muted">
                 Manage humans and AIs in your
                 organization
@@ -9,10 +9,10 @@
         </div>
         <button
             class="btn btn-primary gap-2"
-            id="add-worker-btn"
+            id="add-member-btn"
         >
-            <span id="add-worker-btn-icon"></span>
-            Add Worker
+            <span id="add-member-btn-icon"></span>
+            Add Member
         </button>
     </div>
 
@@ -23,13 +23,13 @@
         >
             <span
                 class="search-icon"
-                id="worker-search-icon"
+                id="member-search-icon"
             ></span>
             <input
                 class="input search-input"
-                placeholder="Search workers..."
-                id="worker-search"
-                aria-label="Search workers"
+                placeholder="Search members..."
+                id="member-search"
+                aria-label="Search members"
             />
         </div>
         <div
@@ -56,16 +56,16 @@
     </div>
 
     <div
-        id="worker-list"
+        id="member-list"
         class="flex flex-col gap-3"
     ></div>
 
     <div
-        id="add-worker-backdrop"
+        id="add-member-backdrop"
         class="dialog-backdrop hidden"
     ></div>
     <div
-        id="add-worker-dialog"
+        id="add-member-dialog"
         class="dialog dialog-wide hidden"
         aria-hidden="true"
         role="dialog"
@@ -77,9 +77,9 @@
                     items-center gap-2"
             >
                 <span
-                    id="add-worker-dialog-icon"
+                    id="add-member-dialog-icon"
                 ></span>
-                Add Worker
+                Add Member
             </h3>
         </div>
         <div
@@ -88,7 +88,7 @@
         >
             <fieldset
                 class="flex items-center gap-4"
-                id="add-worker-kind-toggle"
+                id="add-member-kind-toggle"
             >
                 <legend class="label mr-2"
                 >Kind</legend>
@@ -97,7 +97,7 @@
                 >
                     <input
                         type="radio"
-                        name="worker-kind"
+                        name="member-kind"
                         value="human"
                         checked
                     />
@@ -108,7 +108,7 @@
                 >
                     <input
                         type="radio"
-                        name="worker-kind"
+                        name="member-kind"
                         value="ai"
                     />
                     AI
@@ -116,7 +116,7 @@
             </fieldset>
 
             <div
-                id="add-worker-human-form"
+                id="add-member-human-form"
                 class="flex flex-col gap-3"
             >
                 <div>
@@ -205,7 +205,7 @@
             </div>
 
             <div
-                id="add-worker-ai-form"
+                id="add-member-ai-form"
                 class="flex flex-col gap-3 hidden"
             >
                 <div>
@@ -256,14 +256,14 @@
         <div class="dialog-footer">
             <button
                 class="btn btn-outline"
-                id="add-worker-cancel"
+                id="add-member-cancel"
             >Cancel</button>
             <button
                 class="btn btn-primary gap-2"
-                id="add-worker-submit"
+                id="add-member-submit"
             >
                 <span
-                    id="add-worker-submit-icon"
+                    id="add-member-submit-icon"
                 ></span>
                 Create
             </button>

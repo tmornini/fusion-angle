@@ -50,16 +50,16 @@ mermaid parser does not translate either: a legacy `.mmd`
 file that names its special nodes `[Start]` / `[End]`
 imports with those literal names, surfacing the staleness
 rather than masking it via a shim. Regular
-nodes (not start/end) carry a `workerIds: WorkerId[]` field
+nodes (not start/end) carry a `memberIds: MemberId[]` field
 (zero or more) persisted on the node and rendered in the
 panel body as a `<fieldset>` with two `<div class=
-"worker-group">` children — HUMANS and AIs — each holding a
-labeled `<input type="checkbox">` per worker carrying
-`data-worker-id="<id>"`. The fieldset respects `isLocked`
+"member-group">` children — HUMANS and AIs — each holding a
+labeled `<input type="checkbox">` per member carrying
+`data-member-id="<id>"`. The fieldset respects `isLocked`
 (every checkbox `disabled` when locked). On change, the
-panel collects every checked value into a `WorkerId[]`
+panel collects every checked value into a `MemberId[]`
 and dispatches the node-property-update action via the
-pure helper `parseWorkerIdsFromPanel(panelEl)` in
+pure helper `parseMemberIdsFromPanel(panelEl)` in
 `flows/detail.ts`.
 
 Regular nodes also carry `attributes: NodeAttribute[]`
@@ -74,26 +74,26 @@ carries a Record-binding `<select>` driven by
 
 Hazards are two-tier and shared across the designer +
 stats canvases via the pure predicate
-`shouldShowWorkerHazard(node, allEdges)` in
+`shouldShowMemberHazard(node, allEdges)` in
 `web-app/app/flow-graph.ts`. Precedence: `isCreate` /
-`isArchive` → no hazard ever; zero workers → `'danger'`
+`isArchive` → no hazard ever; zero members → `'danger'`
 (red `iconNoEntry`, class `.flow-node-danger` /
 `.flow-stats-node-danger`); zero outgoing edges (strict
-dead-end) → `'danger'`; exactly one worker → `'warning'`
+dead-end) → `'danger'`; exactly one member → `'warning'`
 (yellow `iconAlertTriangle`, class `.flow-node-warning` /
-`.flow-stats-node-warning`); two-or-more workers AND at
+`.flow-stats-node-warning`); two-or-more members AND at
 least one outgoing edge → no hazard. Both badges sit in
 the bottom-left of the node, mutually exclusive at the
 slot. The aggregate model emitted by
 `flow-stats-aggregate.ts` carries the resolved level on
-each node as `workerHazard: 'warning' | 'danger' | null`;
+each node as `memberHazard: 'warning' | 'danger' | null`;
 the stats renderer reads it directly.
 
 The flow-publish gate is the third call site of the same
 predicate. `validateFlowForCreation(flow)` in
 `web-app/app/adapters/flow-publish.ts` returns
 `{ ready: boolean, problems: FlowProblem[] }` —
-`zero_workers(nodeId)` and `dead_end(nodeId)` variants —
+`zero_members(nodeId)` and `dead_end(nodeId)` variants —
 and `getFlowsForCreation(ctx)` partitions all flows into
 `{ ready, notReady }` for the workbox "Create Work Order"
 dropdown. The picker renders two sections: READY

@@ -6,7 +6,7 @@ import type {
 } from '../../api/types.ts';
 import {
     DEFAULT_NODE_ATTRIBUTES,
-    DEFAULT_NODE_WORKER_IDS,
+    DEFAULT_NODE_MEMBER_IDS,
     DEFAULT_NODE_TASK_INSTRUCTIONS,
 } from '../../api/types.ts';
 import {
@@ -123,8 +123,8 @@ export function applyAddNode(
             positionY,
             isCreate: false,
             isArchive: false,
-            workerIds: [
-                ...DEFAULT_NODE_WORKER_IDS,
+            memberIds: [
+                ...DEFAULT_NODE_MEMBER_IDS,
             ],
             attributes: [
                 ...DEFAULT_NODE_ATTRIBUTES,

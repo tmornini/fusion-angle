@@ -3,9 +3,9 @@ import { strict as assert } from 'node:assert';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import { populateMockData } from '../api/mock-data.ts';
 import {
-    validateWorkerEntity,
-    validateHumanWorkerEntity,
-    validateAIWorkerEntity,
+    validateMemberEntity,
+    validateHumanMemberEntity,
+    validateAIMemberEntity,
     validateIdeaEntity,
     validateProjectEntity,
     validateFlowEntity,
@@ -43,12 +43,12 @@ const TABLES: ReadonlyArray<[
     (db: MemoryDbAdapter) => Promise<{ id: string }[]>,
     Validator,
 ]> = [
-    ['workers', d => d.workers.getAll(),
-        validateWorkerEntity],
-    ['humanWorkers', d => d.humanWorkers.getAll(),
-        validateHumanWorkerEntity],
-    ['aiWorkers', d => d.aiWorkers.getAll(),
-        validateAIWorkerEntity],
+    ['members', d => d.members.getAll(),
+        validateMemberEntity],
+    ['humanMembers', d => d.humanMembers.getAll(),
+        validateHumanMemberEntity],
+    ['aiMembers', d => d.aiMembers.getAll(),
+        validateAIMemberEntity],
     ['ideas', d => d.ideas.getAll(),
         validateIdeaEntity],
     ['projects', d => d.projects.getAll(),

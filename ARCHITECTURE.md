@@ -8,8 +8,8 @@ in [SCHEMA.md](SCHEMA.md).
 ## Domain objects
 
 Domain classes wrap entity + state: `Idea(entity, state)`,
-`Project(entity, state)`, `HumanWorker(entity, state)`,
-`AIWorker(entity, state)` all expose `stateValue()`,
+`Project(entity, state)`, `HumanMember(entity, state)`,
+`AIMember(entity, state)` all expose `stateValue()`,
 `stateLabel()`, and `stateClassName()` — the lifecycle
 stage is part of the domain object, not a separate fetch
 the presenter has to reconcile. `Idea` additionally
@@ -27,11 +27,11 @@ not stored in the states log; `Idea.readinessValue()` /
 `canBeSubmittedForReview()` gates on lifecycle
 (`active` or `sent-back`) AND `isReady()`.
 
-The terminal state for both human and AI workers is
+The terminal state for both human and AI members is
 `'archived'`. Both kinds change lifecycle through the
-worker-detail State select, which records the chosen
-state via `postHumanWorkerStateChange` /
-`postAIWorkerStateChange` — one voice across kinds.
+member-detail State select, which records the chosen
+state via `postHumanMemberStateChange` /
+`postAIMemberStateChange` — one voice across kinds.
 
 ## Flow Canvas
 
@@ -92,17 +92,17 @@ copy says "Work orders using this Record" rather than
 
 ## API Layer (`/api`)
 
-`api/types.ts` (row types + shared aliases — `WorkerId`,
-`WorkerEntity` parent + `Worker` union (`HumanWorker` /
-`AIWorker` / `SystemWorker`),
-`GraphNode.workerIds: WorkerId[]`,
+`api/types.ts` (row types + shared aliases — `MemberId`,
+`MemberEntity` parent + `Member` union (`HumanMember` /
+`AIMember` / `SystemMember`),
+`GraphNode.memberIds: MemberId[]`,
 `GraphNode.attributes: NodeAttribute[]`, `RecordEntity` /
 `RecordAttributeEntity` / `FlowRecordEntity`, `Constraint`
 discriminated union, `StateEntity`, the five state
-alphabets, and `SYSTEM_WORKER_ID`), `api/db.ts`
+alphabets, and `SYSTEM_MEMBER_ID`), `api/db.ts`
 (`DbAdapter` interface + `TABLE_NAMES` array listing every
-storage table — `workers`, `human_workers`,
-`ai_workers`, `ideas`,
+storage table — `members`, `human_members`,
+`ai_members`, `ideas`,
 `projects`, `flows`, `flow_versions`, `records`,
 `record_attributes`, `flow_records`, `states`,
 `state_field_values`, etc.),
@@ -114,11 +114,11 @@ impl), `api/db-memory.ts` (test impl), `api/api.ts` (pure
 HTTP routing — `GET/PUT/DELETE/POST` helpers, **no
 module-level adapter; threaded explicitly** — plus the
 state routes for the unified states log),
-`api/mock-data.ts` (seeds parent `workers` rows plus
-`human_workers` / `ai_workers` detail — the `'system'`
-worker plus the human and AI rosters), `api/validators.ts`
-(`validateWorkerEntity` /
-`validateHumanWorkerEntity` / `validateAIWorkerEntity` /
+`api/mock-data.ts` (seeds parent `members` rows plus
+`human_members` / `ai_members` detail — the `'system'`
+member plus the human and AI rosters), `api/validators.ts`
+(`validateMemberEntity` /
+`validateHumanMemberEntity` / `validateAIMemberEntity` /
 `validateStateEntity`, where the AI validator verifies
 `model` is a known catalog id). The `DbAdapter`
 interface is the migration seam to Postgres.
@@ -154,11 +154,11 @@ Notable registry entries:
 - `flow-stats` → `web-app/flows/stats.ts` + `stats.html`
   (read-only flow heat map; sidebar layout;
   `searchable: false`).
-- `workers` → `web-app/workers/index.ts` + `index.html`
+- `members` → `web-app/members/index.ts` + `index.html`
   (single list grouped Humans / AIs; filter chips, search,
-  `+ Add Worker` dialog with a Human/AI kind picker).
-- `worker-detail` → `web-app/workers/detail.ts` +
-  `detail.html` (dispatches by `worker.kind` to the human
+  `+ Add Member` dialog with a Human/AI kind picker).
+- `member-detail` → `web-app/members/detail.ts` +
+  `detail.html` (dispatches by `member.kind` to the human
   or AI detail presenter; `searchable: false`).
 
 ## Presenter Pattern
@@ -174,11 +174,11 @@ Editable detail views split into two presenters: a read presenter
 shape). The page module owns a `PageState` discriminated union
 (`{kind: 'reading'} | {kind: 'editing', draft}`) and constructs
 the appropriate one per render. This pattern applies to `Idea`,
-`HumanWorker`, `AIWorker`, and `ProjectDetail`. The
-`worker-detail` page module reads `worker.kind` and dispatches
-to the right pair: `HumanWorkerDetailPresenter` /
-`HumanWorkerDetailEditPresenter` for humans,
-`AIWorkerDetailPresenter` / `AIWorkerDetailEditPresenter` for
+`HumanMember`, `AIMember`, and `ProjectDetail`. The
+`member-detail` page module reads `member.kind` and dispatches
+to the right pair: `HumanMemberDetailPresenter` /
+`HumanMemberDetailEditPresenter` for humans,
+`AIMemberDetailPresenter` / `AIMemberDetailEditPresenter` for
 AIs (the AI edit presenter renders a provider-grouped model
 pulldown and a skill-focus textarea; no token field).
 
@@ -237,23 +237,23 @@ layer directly.
 
 ## Adapter Conventions
 
-- **Worker domain split.** Workers are one parent table
-  (`workers`: id, type, name) plus per-kind detail tables
-  sharing the id (`human_workers`, `ai_workers`).
-  `adapters/workers.ts` composes humans (parent +
-  `human_workers` detail); `adapters/ai-workers.ts`
-  composes AIs (parent + `ai_workers` detail).
-  `adapters/workers-union.ts` is the
-  union seam: `getWorkers` is the roster (humans + AIs,
-  never `'system'`); `getWorkerMap` additionally resolves
-  the system worker so a system-authored event's author
-  has a name; plus `workerName` and `isHumanWorker` /
-  `isAIWorker` / `isSystemWorker`. Import the union for
+- **Member domain split.** Members are one parent table
+  (`members`: id, type, name) plus per-kind detail tables
+  sharing the id (`human_members`, `ai_members`).
+  `adapters/members.ts` composes humans (parent +
+  `human_members` detail); `adapters/ai-members.ts`
+  composes AIs (parent + `ai_members` detail).
+  `adapters/members-union.ts` is the
+  union seam: `getMembers` is the roster (humans + AIs,
+  never `'system'`); `getMemberMap` additionally resolves
+  the system member so a system-authored event's author
+  has a name; plus `memberName` and `isHumanMember` /
+  `isAIMember` / `isSystemMember`. Import the union for
   kind-agnostic display; per-kind modules for status
   mutations and AI model/skill-focus storage.
-- **`workerName(workerMap, workerId)`.** Throws on missing
-  and unknown ids. Optional worker references branch at the
-  call site (`row.worker_id ? workerName(...) : ''`); do not
+- **`memberName(memberMap, memberId)`.** Throws on missing
+  and unknown ids. Optional member references branch at the
+  call site (`row.member_id ? memberName(...) : ''`); do not
   overload with a fallback. UI renders `'—'` via
   `DISPLAY_ABSENT`. Do not use magic strings like `'Unknown'`.
 - **`RequestContext` is the only I/O surface.** Every data-

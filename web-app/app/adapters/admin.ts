@@ -7,7 +7,7 @@ import {
 import type { RequestContext } from './shared.ts';
 import { getProjects } from './projects.ts';
 import { getIdeas } from './ideas.ts';
-import { getHumanWorkers } from './workers.ts';
+import { getHumanMembers } from './members.ts';
 
 export type {
     OrganizationEntity,
@@ -102,7 +102,7 @@ export interface OrganizationStats {
 
 // Live counts computed from the source tables. The
 // state-log filters in getProjects / getIdeas /
-// getHumanWorkers already drop deleted rows; we
+// getHumanMembers already drop deleted rows; we
 // further narrow projects to exclude 'declined',
 // ideas to exclude 'archived', and people to keep
 // only 'active'. The log is the truth — no stale
@@ -115,7 +115,7 @@ export async function getOrganizationStats(
         await Promise.all([
             getProjects(ctx),
             getIdeas(ctx),
-            getHumanWorkers(ctx),
+            getHumanMembers(ctx),
         ]);
     const projectsCurrent = projects.filter(
         p => p.stateValue() !== 'declined',

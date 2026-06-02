@@ -3,7 +3,7 @@ import {
 } from '../safe-html.ts';
 import type { SafeHtml } from '../safe-html.ts';
 import {
-    workerName,
+    memberName,
     validateWorkOrderFlowGraph,
     type WorkOrderEntity,
     type TransitionEvent,
@@ -18,7 +18,7 @@ import {
     type ClaimStatus,
     type ConstraintViolation,
 } from '../adapters/index.ts';
-import type { Worker } from '../adapters/index.ts';
+import type { Member } from '../adapters/index.ts';
 import type { Id } from '../../../api/types.ts';
 import {
     iconArrowLeft,
@@ -138,9 +138,9 @@ export class WorkboxDetailPresenter {
                 readonly StateFieldValueEntity[]
             >,
         activeClaim:
-            { workerId: Id; at: string } | null,
-        workerMap: Map<Id, Worker>,
-        currentWorkerId: string,
+            { memberId: Id; at: string } | null,
+        memberMap: Map<Id, Member>,
+        currentMemberId: string,
         attributeMap: ReadonlyMap<
             string, RecordAttributeEntity
         >,
@@ -172,7 +172,7 @@ export class WorkboxDetailPresenter {
             sorted,
             fieldValuesByEvent,
             this.#flowGraph.nodes,
-            workerMap,
+            memberMap,
             attributeMap,
         );
 
@@ -180,9 +180,9 @@ export class WorkboxDetailPresenter {
             ? {
                 kind: 'claimed',
                 at: activeClaim.at,
-                byCurrentWorker:
-                    activeClaim.workerId
-                        === currentWorkerId,
+                byCurrentMember:
+                    activeClaim.memberId
+                        === currentMemberId,
             }
             : { kind: 'unclaimed' };
     }
@@ -443,7 +443,7 @@ export class WorkboxDetailPresenter {
                 <span
                     class="text-muted
                         ml-auto"
-                >${entry.workerName}</span>
+                >${entry.memberName}</span>
                 <span
                     class="text-muted
                         text-sm"
@@ -558,7 +558,7 @@ function buildHistory(
             readonly StateFieldValueEntity[]
         >,
     nodes: readonly GraphNode[],
-    workerMap: Map<Id, Worker>,
+    memberMap: Map<Id, Member>,
     attributeMap: ReadonlyMap<
         string, RecordAttributeEntity
     >,
@@ -594,8 +594,8 @@ function buildHistory(
             toNodeName: nodeNameById(
                 nodes, t.to_node_id,
             ),
-            workerName: workerName(
-                workerMap, t.worker_id,
+            memberName: memberName(
+                memberMap, t.member_id,
             ),
             transitionedAt:
                 t.at,

@@ -34,7 +34,7 @@ function buildNode(
         positionY: 0,
         isCreate: false,
         isArchive: false,
-        workerIds: [],
+        memberIds: [],
         attributes: [],
         taskInstructions: '',
         ...overrides,
@@ -149,19 +149,19 @@ test(
         await db.states.put('t1a', {
             entity_id: 'wo1',
             state: 'c',
-            worker_id: 'p1',
+            member_id: 'p1',
             at: daysAgo(40),
         });
         await db.states.put('t1b', {
             entity_id: 'wo1',
             state: 'a',
-            worker_id: 'p1',
+            member_id: 'p1',
             at: daysAgo(40),
         });
         await db.states.put('t1c', {
             entity_id: 'wo1',
             state: 'z',
-            worker_id: 'p1',
+            member_id: 'p1',
             at: daysAgo(5),
         });
 
@@ -170,7 +170,7 @@ test(
         await db.states.put('t2a', {
             entity_id: 'wo2',
             state: 'c',
-            worker_id: 'p1',
+            member_id: 'p1',
             at: daysAgo(40),
         });
 
@@ -236,7 +236,7 @@ test(
         await db.states.put('t1', {
             entity_id: 'wo1',
             state: 'c',
-            worker_id: 'p1',
+            member_id: 'p1',
             at: daysAgo(10),
         });
         const ctx = createRequestContext(db);

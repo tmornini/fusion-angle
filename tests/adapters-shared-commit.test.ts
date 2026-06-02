@@ -12,7 +12,7 @@ import {
     getProviderModels,
 } from '../api/provider-models.ts';
 
-function buildAIWorkerBody(description: string) {
+function buildAIMemberBody(description: string) {
     return {
         description,
         skill_focus: '',
@@ -78,13 +78,13 @@ test(
             ops: [
                 {
                     method: 'put',
-                    resource: 'ai-workers/ai_1',
-                    body: buildAIWorkerBody('A'),
+                    resource: 'ai-members/ai_1',
+                    body: buildAIMemberBody('A'),
                 },
                 {
                     method: 'put',
-                    resource: 'ai-workers/ai_2',
-                    body: buildAIWorkerBody('B'),
+                    resource: 'ai-members/ai_2',
+                    body: buildAIMemberBody('B'),
                 },
             ],
             notifyChannels: [ch1, ch2],
@@ -124,18 +124,18 @@ test(
         ch.subscribe(() => { count++; });
         const goodA = {
             method: 'put' as const,
-            resource: 'ai-workers/ai_1',
-            body: buildAIWorkerBody('A'),
+            resource: 'ai-members/ai_1',
+            body: buildAIMemberBody('A'),
         };
         const bad = {
             method: 'put' as const,
-            resource: 'ai-workers/ai_2',
+            resource: 'ai-members/ai_2',
             body: { rogue_field: 'oops' },
         };
         const goodC = {
             method: 'put' as const,
-            resource: 'ai-workers/ai_3',
-            body: buildAIWorkerBody('C'),
+            resource: 'ai-members/ai_3',
+            body: buildAIMemberBody('C'),
         };
         let caught: unknown;
         try {
@@ -153,7 +153,7 @@ test(
         assert.equal(err.applied[0], goodA);
         assert.ok(err.cause instanceof Error);
         // No rollback: first op landed.
-        const all = await db.aiWorkers.getAll();
+        const all = await db.aiMembers.getAll();
         assert.equal(all.length, 1);
         assert.equal(all[0]!.id, 'ai_1');
         assert.equal(all[0]!.description, 'A');
@@ -171,7 +171,7 @@ test(
         const ctx = createRequestContext(db);
         const bad = {
             method: 'put' as const,
-            resource: 'ai-workers/ai_1',
+            resource: 'ai-members/ai_1',
             body: { rogue_field: 'oops' },
         };
         let caught: unknown;
@@ -198,17 +198,17 @@ test(
         const ctx = createRequestContext(db);
         const goodA = {
             method: 'put' as const,
-            resource: 'ai-workers/ai_1',
-            body: buildAIWorkerBody('A'),
+            resource: 'ai-members/ai_1',
+            body: buildAIMemberBody('A'),
         };
         const goodB = {
             method: 'put' as const,
-            resource: 'ai-workers/ai_2',
-            body: buildAIWorkerBody('B'),
+            resource: 'ai-members/ai_2',
+            body: buildAIMemberBody('B'),
         };
         const bad = {
             method: 'put' as const,
-            resource: 'ai-workers/ai_3',
+            resource: 'ai-members/ai_3',
             body: { rogue_field: 'oops' },
         };
         let caught: unknown;

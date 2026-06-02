@@ -11,8 +11,8 @@ import { MemoryDbAdapter } from '../api/db-memory.ts';
 // store to exist too — the GET round-trips end
 // to end.
 const COLLECTION_ROUTES: readonly string[] = [
-    'workers',
-    'ai-workers',
+    'members',
+    'ai-members',
     'ideas',
     'projects',
     'flows',

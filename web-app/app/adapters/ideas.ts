@@ -12,12 +12,12 @@ import {
 } from '../../../api/types.ts';
 import type { RequestContext } from './shared.ts';
 import {
-    getCurrentHumanWorker,
-} from './workers.ts';
+    getCurrentHumanMember,
+} from './members.ts';
 import {
-    getWorkerMap,
-    workerName,
-} from './workers-union.ts';
+    getMemberMap,
+    memberName,
+} from './members-union.ts';
 import {
     notifyProjectChange,
 } from './projects.ts';
@@ -114,10 +114,10 @@ export async function getIdeas(
     ctx: RequestContext,
 ): Promise<IdeaWithSubmitter[]> {
     const [
-        rows, workerMap, submissions, stateMap,
+        rows, memberMap, submissions, stateMap,
     ] = await Promise.all([
         getIdeaRows(ctx),
-        getWorkerMap(ctx),
+        getMemberMap(ctx),
         getIdeaSubmissionRows(ctx),
         getIdeaStates(ctx),
     ]);
@@ -148,9 +148,9 @@ export async function getIdeas(
             return {
                 idea: new Idea(row, state),
                 entity: row,
-                submitterName: workerName(
-                    workerMap,
-                    submission.worker_id,
+                submitterName: memberName(
+                    memberMap,
+                    submission.member_id,
                 ),
                 submittedAt:
                     submission.at,
@@ -163,18 +163,18 @@ export async function getIdea(
     ideaId: string,
 ): Promise<IdeaWithSubmitter> {
     const [
-        row, submission, workerMap, state,
+        row, submission, memberMap, state,
     ] = await Promise.all([
         getIdeaRow(ctx, ideaId),
         getIdeaSubmissionRow(ctx, ideaId),
-        getWorkerMap(ctx),
+        getMemberMap(ctx),
         getIdeaState(ctx, ideaId),
     ]);
     return {
         idea: new Idea(row, state),
         entity: row,
-        submitterName: workerName(
-            workerMap, submission.worker_id,
+        submitterName: memberName(
+            memberMap, submission.member_id,
         ),
         submittedAt: submission.at,
     };
@@ -237,13 +237,13 @@ export async function putIdeaSubmission(
     submissionId: string,
     ideaId: string,
 ): Promise<void> {
-    const worker = await getCurrentHumanWorker(ctx);
+    const member = await getCurrentHumanMember(ctx);
     await ctx.PUT(
         'idea-submissions/'
             + submissionId,
         {
             idea_id: ideaId,
-            worker_id: worker.id,
+            member_id: member.id,
             at: nowUtc(),
         },
     );
@@ -302,7 +302,7 @@ export async function postIdeaConversion(
     const ideaBody =
         promotedIdea as unknown as AnyBody;
     const at = nowUtc();
-    const worker = await getCurrentHumanWorker(ctx);
+    const member = await getCurrentHumanMember(ctx);
     await ctx.commit({
         ops: [
             {
@@ -332,7 +332,7 @@ export async function postIdeaConversion(
                     project_id: projectId,
                     objective_id: b.objectiveId,
                     score: b.score,
-                    worker_id: worker.id,
+                    member_id: member.id,
                     at,
                 },
             })),

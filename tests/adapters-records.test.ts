@@ -18,9 +18,9 @@ import {
     jsonArrayField,
 } from '../api/types.ts';
 import {
-    seedCurrentWorker,
-    seedHumanWorker,
-} from './worker-fixtures.ts';
+    seedCurrentMember,
+    seedHumanMember,
+} from './member-fixtures.ts';
 
 test(
     'postRecordChange create writes the row and'
@@ -28,7 +28,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
-        await seedCurrentWorker(db);
+        await seedCurrentMember(db);
         const ctx = createRequestContext(db);
         await postRecordChange(ctx, 'rec-1', {
             kind: 'create',
@@ -56,7 +56,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
-        await seedCurrentWorker(db);
+        await seedCurrentMember(db);
         const ctx = createRequestContext(db);
         await postRecordChange(ctx, 'rec-1', {
             kind: 'create',
@@ -91,7 +91,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
-        await seedCurrentWorker(db);
+        await seedCurrentMember(db);
         const ctx = createRequestContext(db);
         await postRecordChange(ctx, 'rec-1', {
             kind: 'create',
@@ -120,7 +120,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
-        await seedCurrentWorker(db);
+        await seedCurrentMember(db);
         const ctx = createRequestContext(db);
         await postRecordChange(ctx, 'rec-1', {
             kind: 'create',
@@ -174,7 +174,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
-        await seedCurrentWorker(db);
+        await seedCurrentMember(db);
         const ctx = createRequestContext(db);
         await postRecordChange(ctx, 'rec-1', {
             kind: 'create',
@@ -213,7 +213,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
-        await seedCurrentWorker(db);
+        await seedCurrentMember(db);
         const ctx = createRequestContext(db);
         await postRecordChange(ctx, 'rec-1', {
             kind: 'create',
@@ -239,7 +239,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
-        await seedCurrentWorker(db);
+        await seedCurrentMember(db);
         const ctx = createRequestContext(db);
         await postRecordChange(ctx, 'rec-1', {
             kind: 'create',
@@ -268,7 +268,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
-        await seedCurrentWorker(db);
+        await seedCurrentMember(db);
         const ctx = createRequestContext(db);
         await postRecordChange(ctx, 'rec-1', {
             kind: 'create',
@@ -307,7 +307,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
-        await seedCurrentWorker(db);
+        await seedCurrentMember(db);
         const ctx = createRequestContext(db);
         await postRecordChange(ctx, 'rec-1', {
             kind: 'create',

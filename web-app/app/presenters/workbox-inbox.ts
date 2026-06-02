@@ -5,12 +5,12 @@ import {
 import { iconGripVertical } from '../icons.ts';
 import { DISPLAY_ABSENT } from '../format.ts';
 import {
-    workerName,
+    memberName,
     validateWorkOrderFlowGraph,
     type WorkOrderEntity,
     type TransitionEvent,
 } from '../adapters/index.ts';
-import type { Worker } from '../adapters/index.ts';
+import type { Member } from '../adapters/index.ts';
 import {
     SECONDS_PER_DAY,
     MS_PER_SECOND,
@@ -63,10 +63,10 @@ export interface InboxItem {
 export type InboxMode = 'active' | 'archived';
 
 // An active claim resolved from the states log for one
-// work order. The inbox does not care which worker
+// work order. The inbox does not care which member
 // holds it — only whether one is held.
 export interface ActiveClaim {
-    workerId: Id;
+    memberId: Id;
     at: string;
 }
 
@@ -176,7 +176,7 @@ export function buildInboxItems(
         ReadonlyMap<Id, readonly TransitionEvent[]>,
     activeClaimsByWo:
         ReadonlyMap<Id, ActiveClaim>,
-    workerMap: Map<Id, Worker>,
+    memberMap: Map<Id, Member>,
     mode: InboxMode,
 ): InboxItem[] {
     const items: InboxItem[] = [];
@@ -229,8 +229,8 @@ export function buildInboxItems(
             displayId: wo.display_id,
             flowName: fg.name,
             stateName: curNode.name,
-            transitionerName: workerName(
-                workerMap, lastTransition.worker_id,
+            transitionerName: memberName(
+                memberMap, lastTransition.member_id,
             ),
             lastTransitionedAt:
                 lastTransition.at,

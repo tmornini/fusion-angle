@@ -8,12 +8,12 @@ import {
     getIdeaStates,
     getProjectStates,
     getRecordStates,
-    getWorkerStates,
+    getMemberStates,
 } from '../web-app/app/adapters/state-events.ts';
 import {
-    seedAIWorker,
-    seedHumanWorker,
-} from './worker-fixtures.ts';
+    seedAIMember,
+    seedHumanMember,
+} from './member-fixtures.ts';
 import type {
     IdeaEntity, ProjectEntity, RecordEntity,
 } from '../api/types.ts';
@@ -118,23 +118,23 @@ test('getRecordStates excludes a same-valued idea',
         );
     });
 
-test('getWorkerStates spans kinds and excludes an idea',
+test('getMemberStates spans kinds and excludes an idea',
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
-        await seedHumanWorker(db, 'wh', 'Human');
-        await seedAIWorker(db, 'wa', 'Ai');
+        await seedHumanMember(db, 'wh', 'Human');
+        await seedAIMember(db, 'wa', 'Ai');
         await db.ideas.put('i1', ideaBody('I'));
         await db.states.record(
             'ev-i1', 'i1', 'active', 'system',
         );
         const ctx = createRequestContext(db);
-        const states = await getWorkerStates(ctx);
+        const states = await getMemberStates(ctx);
         assert.equal(states.get('wh'), 'active');
         assert.equal(states.get('wa'), 'active');
         assert.ok(
             !states.has('i1'),
-            'idea must not leak into worker states',
+            'idea must not leak into member states',
         );
     });
 
@@ -147,13 +147,13 @@ test('getProjectStates keeps the later event on a tie',
         await db.states.put('ev-1', {
             entity_id: 'p1',
             state: 'under-review',
-            worker_id: 'system',
+            member_id: 'system',
             at,
         });
         await db.states.put('ev-2', {
             entity_id: 'p1',
             state: 'approved',
-            worker_id: 'system',
+            member_id: 'system',
             at,
         });
         const ctx = createRequestContext(db);

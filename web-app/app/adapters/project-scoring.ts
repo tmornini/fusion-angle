@@ -15,8 +15,8 @@ import {
     getObjectives,
 } from './objectives.ts';
 import {
-    getCurrentHumanWorker,
-} from './workers.ts';
+    getCurrentHumanMember,
+} from './members.ts';
 import {
     getProjectStates,
 } from './state-events.ts';
@@ -368,7 +368,7 @@ export async function postProjectBaselineScoring(
     }>,
 ): Promise<void> {
     const at = nowUtc();
-    const worker = await getCurrentHumanWorker(ctx);
+    const member = await getCurrentHumanMember(ctx);
     const ops = scores.map(s => ({
         method: 'put' as const,
         resource:
@@ -378,7 +378,7 @@ export async function postProjectBaselineScoring(
             project_id: projectId,
             objective_id: s.objectiveId,
             score: s.score,
-            worker_id: worker.id,
+            member_id: member.id,
             at,
         },
     }));
@@ -395,7 +395,7 @@ export async function postProjectActualMeasurement(
     }>,
 ): Promise<void> {
     const at = nowUtc();
-    const worker = await getCurrentHumanWorker(ctx);
+    const member = await getCurrentHumanMember(ctx);
     const ops = scores.map(s => ({
         method: 'put' as const,
         resource:
@@ -405,7 +405,7 @@ export async function postProjectActualMeasurement(
             project_id: projectId,
             objective_id: s.objectiveId,
             score: s.score,
-            worker_id: worker.id,
+            member_id: member.id,
             at,
         },
     }));

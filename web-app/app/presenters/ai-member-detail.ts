@@ -11,62 +11,62 @@ import {
     iconBrain,
 } from '../icons.ts';
 import {
-    AIWorker,
-    WORKER_STATE_CONFIG,
-    isWorkerState,
-    type AIWorkerDraft,
-    type WorkerState,
+    AIMember,
+    MEMBER_STATE_CONFIG,
+    isMemberState,
+    type AIMemberDraft,
+    type MemberState,
 } from '../adapters/index.ts';
 import {
     findProviderModel,
     getModelsByProvider,
 } from '../../../api/provider-models.ts';
 
-export interface AIWorkerDraftFields {
+export interface AIMemberDraftFields {
     name: string;
     description: string;
     skillFocus: string;
     model: string;
-    state: WorkerState;
+    state: MemberState;
 }
 
-export type AIWorkerFieldKey =
+export type AIMemberFieldKey =
     | 'name'
     | 'description'
     | 'skillFocus'
     | 'model'
     | 'state';
 
-const FIELD_KEYS: ReadonlySet<AIWorkerFieldKey> =
+const FIELD_KEYS: ReadonlySet<AIMemberFieldKey> =
     new Set([
         'name', 'description', 'skillFocus',
         'model', 'state',
     ]);
 
-export function isAIWorkerFieldKey(
+export function isAIMemberFieldKey(
     s: string | null,
-): s is AIWorkerFieldKey {
+): s is AIMemberFieldKey {
     return s !== null
         && FIELD_KEYS.has(
-            s as AIWorkerFieldKey,
+            s as AIMemberFieldKey,
         );
 }
 
-export function aiWorkerDraftFromWorker(
-    worker: AIWorker,
-): AIWorkerDraftFields {
+export function aiMemberDraftFromMember(
+    member: AIMember,
+): AIMemberDraftFields {
     return {
-        name: worker.nameText(),
-        description: worker.descriptionText(),
-        skillFocus: worker.skillFocusText(),
-        model: worker.modelId(),
-        state: worker.stateValue(),
+        name: member.nameText(),
+        description: member.descriptionText(),
+        skillFocus: member.skillFocusText(),
+        model: member.modelId(),
+        state: member.stateValue(),
     };
 }
 
-export function aiWorkerPatchFromDraft(
-    draft: AIWorkerDraftFields,
-): Partial<AIWorkerDraft> {
+export function aiMemberPatchFromDraft(
+    draft: AIMemberDraftFields,
+): Partial<AIMemberDraft> {
     return {
         name: draft.name,
         description: draft.description,
@@ -79,7 +79,7 @@ function buildShell(
     container: HTMLElement,
 ): void {
     setHtml(container, html`
-<div class="worker-detail-host">
+<div class="member-detail-host">
     <div class="entity">
         <div class="${
             'flex items-start'
@@ -92,21 +92,21 @@ function buildShell(
                     class="${
                         'btn btn-ghost btn-icon'
                     }"
-                    id="worker-back-btn"
-                    data-worker-action="back"
+                    id="member-back-btn"
+                    data-member-action="back"
                     aria-label="Back">
                     ${iconArrowLeft(20, '')}
                 </button>
-                <div class="worker-title-slot">
+                <div class="member-title-slot">
                 </div>
             </div>
             <div class="${
                 'flex items-center gap-2'
-                + ' worker-actions-slot'
+                + ' member-actions-slot'
             }"></div>
         </div>
         <div class="${
-            'stack-lg worker-cards-slot'
+            'stack-lg member-cards-slot'
         }"></div>
     </div>
 </div>`);
@@ -122,13 +122,13 @@ function mutateSlot(
 
 function buildAvatar(): SafeHtml {
     return html`
-        <div class="worker-avatar">
+        <div class="member-avatar">
             ${iconBrain(40, 'text-primary')}
         </div>`;
 }
 
 function buildReadonlyTitleSection(
-    worker: AIWorker,
+    member: AIMember,
 ): SafeHtml {
     return html`
         <div class="${
@@ -140,7 +140,7 @@ function buildReadonlyTitleSection(
                 + ' font-display'
                 + ' font-bold'
             }">
-                ${worker.nameText()}
+                ${member.nameText()}
             </h1>
             <span class="${
                 'badge badge-default'
@@ -148,22 +148,22 @@ function buildReadonlyTitleSection(
             }">AI</span>
             <span class="${
                 'badge '
-                + worker.stateClassName()
+                + member.stateClassName()
                 + ' text-xs'
             }">
-                ${worker.stateLabel()}
+                ${member.stateLabel()}
             </span>
         </div>
         <p class="text-sm text-muted">
             ${findProviderModel(
-                worker.modelId(),
+                member.modelId(),
             )?.provider ?? DISPLAY_ABSENT}
         </p>`;
 }
 
 function buildEditableTitleSection(
-    worker: AIWorker,
-    draft: AIWorkerDraftFields,
+    member: AIMember,
+    draft: AIMemberDraftFields,
 ): SafeHtml {
     return html`
         <div class="${
@@ -175,7 +175,7 @@ function buildEditableTitleSection(
                 + ' font-display'
                 + ' font-bold'
             }">
-                ${worker.nameText()}
+                ${member.nameText()}
             </h1>
             <span class="${
                 'badge badge-default'
@@ -183,10 +183,10 @@ function buildEditableTitleSection(
             }">AI</span>
             <span class="${
                 'badge '
-                + worker.stateClassName()
+                + member.stateClassName()
                 + ' text-xs'
             }">
-                ${worker.stateLabel()}
+                ${member.stateLabel()}
             </span>
         </div>
         <p class="text-sm text-muted">
@@ -217,7 +217,7 @@ function buildReadonlyField(
 
 function buildEditableField(
     id: string,
-    field: AIWorkerFieldKey,
+    field: AIMemberFieldKey,
     label: string,
     value: string,
     inputType: string,
@@ -234,7 +234,7 @@ function buildEditableField(
             <input class="input"
                 id="${id}"
                 type="${inputType}"
-                data-worker-field="${field}"
+                data-member-field="${field}"
                 value="${value}" />
         </div>`;
 }
@@ -265,19 +265,19 @@ function buildEditableDescription(
             <textarea class="textarea"
                 rows="3"
                 id="ai-description"
-                data-worker-field="description"
+                data-member-field="description"
             >${value}</textarea>
         </div>`;
 }
 
 function buildEditableState(
-    value: WorkerState,
+    value: MemberState,
 ): SafeHtml {
     const options = (
         Object.keys(
-            WORKER_STATE_CONFIG,
-        ) as WorkerState[]
-    ).filter(isWorkerState);
+            MEMBER_STATE_CONFIG,
+        ) as MemberState[]
+    ).filter(isMemberState);
     return html`
         <div>
             <label class="${
@@ -286,7 +286,7 @@ function buildEditableState(
             >State</label>
             <select class="input"
                 id="ai-state"
-                data-worker-field="state"
+                data-member-field="state"
             >${options.map(s =>
                 html`<option
                     value="${s}"
@@ -296,7 +296,7 @@ function buildEditableState(
                             : '',
                     )}
                 >${
-                    WORKER_STATE_CONFIG[s].label
+                    MEMBER_STATE_CONFIG[s].label
                 }</option>`)
             }</select>
         </div>`;
@@ -328,7 +328,7 @@ function buildEditableSkillFocus(
             <textarea class="textarea"
                 rows="3"
                 id="ai-skill-focus"
-                data-worker-field="skillFocus"
+                data-member-field="skillFocus"
             >${value}</textarea>
         </div>`;
 }
@@ -378,7 +378,7 @@ function buildEditableModel(
             >Model</label>
             <select class="input"
                 id="ai-model"
-                data-worker-field="model"
+                data-member-field="model"
             >${
                 buildModelOptgroups(selectedId)
             }</select>
@@ -393,13 +393,13 @@ function buildIdentityCard(
             <h3 class="${
                 'font-display'
                 + ' font-semibold mb-4'
-            }">AI Worker</h3>
+            }">AI Member</h3>
             ${body}
         </div>`;
 }
 
 function buildReadonlyIdentityBody(
-    worker: AIWorker,
+    member: AIMember,
 ): SafeHtml {
     return html`
         <div class="${
@@ -411,10 +411,10 @@ function buildReadonlyIdentityBody(
             }">
                 ${buildReadonlyField(
                     'Name',
-                    worker.nameText(),
+                    member.nameText(),
                 )}
                 ${buildReadonlyModel(
-                    worker.modelId(),
+                    member.modelId(),
                 )}
             </div>
         </div>
@@ -422,17 +422,17 @@ function buildReadonlyIdentityBody(
             'mb-4'
         }">
             ${buildReadonlyDescription(
-                worker.descriptionText(),
+                member.descriptionText(),
             )}
         </div>
         ${buildReadonlySkillFocus(
-            worker.skillFocusText(),
+            member.skillFocusText(),
         )}`;
 }
 
 function buildEditableIdentityBody(
-    worker: AIWorker,
-    draft: AIWorkerDraftFields,
+    member: AIMember,
+    draft: AIMemberDraftFields,
 ): SafeHtml {
     return html`
         <div class="${
@@ -476,8 +476,8 @@ function buildReadonlyActionButtons(
             class="${
                 'btn btn-outline gap-2'
             }"
-            id="worker-edit-btn"
-            data-worker-action="edit">
+            id="member-edit-btn"
+            data-member-action="edit">
             ${iconEdit(16, '')} Edit
         </button>`;
 }
@@ -489,29 +489,29 @@ function buildEditableActionButtons(
             class="${
                 'btn btn-outline gap-2'
             }"
-            id="worker-cancel-btn"
-            data-worker-action="cancel">
+            id="member-cancel-btn"
+            data-member-action="cancel">
             ${iconX(16, '')} Cancel
         </button>
         <button
             class="${
                 'btn btn-primary gap-2'
             }"
-            id="worker-save-btn"
-            data-worker-action="save">
+            id="member-save-btn"
+            data-member-action="save">
             ${iconSave(16, '')} Save
         </button>`;
 }
 
-export class AIWorkerDetailPresenter {
-    readonly #worker: AIWorker;
+export class AIMemberDetailPresenter {
+    readonly #member: AIMember;
 
-    constructor(worker: AIWorker) {
-        this.#worker = worker;
+    constructor(member: AIMember) {
+        this.#member = member;
     }
 
     idForLink(): string {
-        return this.#worker.idForLink();
+        return this.#member.idForLink();
     }
 
     renderShell(
@@ -526,45 +526,45 @@ export class AIWorkerDetailPresenter {
     ): void {
         mutateSlot(
             container,
-            '.worker-title-slot',
+            '.member-title-slot',
             buildReadonlyTitleSection(
-                this.#worker,
+                this.#member,
             ),
         );
         mutateSlot(
             container,
-            '.worker-actions-slot',
+            '.member-actions-slot',
             buildReadonlyActionButtons(),
         );
         mutateSlot(
             container,
-            '.worker-cards-slot',
+            '.member-cards-slot',
             buildIdentityCard(
                 buildReadonlyIdentityBody(
-                    this.#worker,
+                    this.#member,
                 ),
             ),
         );
     }
 }
 
-export class AIWorkerDetailEditPresenter {
-    readonly #worker: AIWorker;
-    readonly #draft: AIWorkerDraftFields;
+export class AIMemberDetailEditPresenter {
+    readonly #member: AIMember;
+    readonly #draft: AIMemberDraftFields;
 
     constructor(
-        worker: AIWorker,
-        draft: AIWorkerDraftFields,
+        member: AIMember,
+        draft: AIMemberDraftFields,
     ) {
-        this.#worker = worker;
+        this.#member = member;
         this.#draft = draft;
     }
 
     idForLink(): string {
-        return this.#worker.idForLink();
+        return this.#member.idForLink();
     }
 
-    draft(): AIWorkerDraftFields {
+    draft(): AIMemberDraftFields {
         return this.#draft;
     }
 
@@ -580,22 +580,22 @@ export class AIWorkerDetailEditPresenter {
     ): void {
         mutateSlot(
             container,
-            '.worker-title-slot',
+            '.member-title-slot',
             buildEditableTitleSection(
-                this.#worker, this.#draft,
+                this.#member, this.#draft,
             ),
         );
         mutateSlot(
             container,
-            '.worker-actions-slot',
+            '.member-actions-slot',
             buildEditableActionButtons(),
         );
         mutateSlot(
             container,
-            '.worker-cards-slot',
+            '.member-cards-slot',
             buildIdentityCard(
                 buildEditableIdentityBody(
-                    this.#worker,
+                    this.#member,
                     this.#draft,
                 ),
             ),

@@ -1,179 +1,179 @@
 import type {
-    WorkerId,
-    WorkerEntity,
-    AIWorkerEntity,
-    WorkerState,
+    MemberId,
+    MemberEntity,
+    AIMemberEntity,
+    MemberState,
 } from '../../../api/types.ts';
-import { AIWorker } from '../../../api/types.ts';
+import { AIMember } from '../../../api/types.ts';
 import type { RequestContext } from './shared.ts';
 import {
     createSubscriptionChannel,
 } from '../channels.ts';
 import {
     buildStateEventOp,
-    getWorkerState,
-    getWorkerStates,
+    getMemberState,
+    getMemberStates,
 } from './state-events.ts';
 
 export {
-    AIWorker,
+    AIMember,
 } from '../../../api/types.ts';
 export type {
-    AIWorkerEntity,
+    AIMemberEntity,
 } from '../../../api/types.ts';
 
-const aiWorkerChanges =
-    createSubscriptionChannel(['ai_workers', 'states']);
+const aiMemberChanges =
+    createSubscriptionChannel(['ai_members', 'states']);
 
-export function subscribeAIWorkerChanges(
+export function subscribeAIMemberChanges(
     fn: () => void,
 ): () => void {
-    return aiWorkerChanges.subscribe(fn);
+    return aiMemberChanges.subscribe(fn);
 }
 
-export function notifyAIWorkerChange(): void {
-    aiWorkerChanges.notify();
+export function notifyAIMemberChange(): void {
+    aiMemberChanges.notify();
 }
 
-export type AIWorkerDraft =
-    Omit<AIWorkerEntity, 'id'> & { name: string };
+export type AIMemberDraft =
+    Omit<AIMemberEntity, 'id'> & { name: string };
 
-export interface AIWorkerRow extends AIWorkerEntity {
+export interface AIMemberRow extends AIMemberEntity {
     name: string;
 }
 
-export async function getAIWorkerMap(
+export async function getAIMemberMap(
     ctx: RequestContext,
-): Promise<Map<WorkerId, AIWorker>> {
+): Promise<Map<MemberId, AIMember>> {
     const [parents, details, stateMap] =
         await Promise.all([
-            ctx.GET<WorkerEntity[]>('workers'),
-            ctx.GET<AIWorkerEntity[]>('ai-workers'),
-            getWorkerStates(ctx),
+            ctx.GET<MemberEntity[]>('members'),
+            ctx.GET<AIMemberEntity[]>('ai-members'),
+            getMemberStates(ctx),
         ]);
     const detailById = new Map(
         details.map(d => [d.id, d]),
     );
-    const map = new Map<WorkerId, AIWorker>();
+    const map = new Map<MemberId, AIMember>();
     for (const parent of parents) {
         if (parent.type !== 'ai') continue;
         const detail = detailById.get(parent.id);
         if (detail === undefined) {
             throw new Error(
-                'no AI detail for worker ' + parent.id,
+                'no AI detail for member ' + parent.id,
             );
         }
         const state = stateMap.get(parent.id);
         if (state === undefined) {
             throw new Error(
-                'no state event for AI worker '
+                'no state event for AI member '
                 + parent.id,
             );
         }
         map.set(
             parent.id,
-            new AIWorker(parent, detail, state),
+            new AIMember(parent, detail, state),
         );
     }
     return map;
 }
 
-export async function getAIWorkers(
+export async function getAIMembers(
     ctx: RequestContext,
-): Promise<AIWorker[]> {
-    const map = await getAIWorkerMap(ctx);
+): Promise<AIMember[]> {
+    const map = await getAIMemberMap(ctx);
     return Array.from(map.values());
 }
 
-export async function getAIWorker(
+export async function getAIMember(
     ctx: RequestContext,
-    id: WorkerId,
-): Promise<AIWorker> {
+    id: MemberId,
+): Promise<AIMember> {
     const [parent, detail, state] =
         await Promise.all([
-            ctx.GET<WorkerEntity>(`workers/${id}`),
-            ctx.GET<AIWorkerEntity>(
-                `ai-workers/${id}`,
+            ctx.GET<MemberEntity>(`members/${id}`),
+            ctx.GET<AIMemberEntity>(
+                `ai-members/${id}`,
             ),
-            getWorkerState(ctx, id),
+            getMemberState(ctx, id),
         ]);
-    return new AIWorker(parent, detail, state);
+    return new AIMember(parent, detail, state);
 }
 
-export async function getAIWorkerRow(
+export async function getAIMemberRow(
     ctx: RequestContext,
-    id: WorkerId,
-): Promise<AIWorkerRow> {
+    id: MemberId,
+): Promise<AIMemberRow> {
     const [parent, detail] = await Promise.all([
-        ctx.GET<WorkerEntity>(`workers/${id}`),
-        ctx.GET<AIWorkerEntity>(`ai-workers/${id}`),
+        ctx.GET<MemberEntity>(`members/${id}`),
+        ctx.GET<AIMemberEntity>(`ai-members/${id}`),
     ]);
     return { ...detail, name: parent.name };
 }
 
 // Edits only; creation goes through
-// postAIWorkerCreation.
-export async function putAIWorker(
+// postAIMemberCreation.
+export async function putAIMember(
     ctx: RequestContext,
-    id: WorkerId,
-    input: AIWorkerDraft,
+    id: MemberId,
+    input: AIMemberDraft,
 ): Promise<void> {
     const { name, ...detail } = input;
     await ctx.commit({
         ops: [
             {
                 method: 'put',
-                resource: `workers/${id}`,
+                resource: `members/${id}`,
                 body: { type: 'ai', name },
             },
             {
                 method: 'put',
-                resource: `ai-workers/${id}`,
+                resource: `ai-members/${id}`,
                 body: detail as unknown as
                     Record<string, unknown>,
             },
         ],
     });
-    aiWorkerChanges.notify();
+    aiMemberChanges.notify();
 }
 
 // Creation also emits the initial 'active' state
-// event, so it cannot reuse putAIWorker (edits only).
-// Use at every site that creates an AI worker.
-export async function postAIWorkerCreation(
+// event, so it cannot reuse putAIMember (edits only).
+// Use at every site that creates an AI member.
+export async function postAIMemberCreation(
     ctx: RequestContext,
-    id: WorkerId,
-    input: AIWorkerDraft,
+    id: MemberId,
+    input: AIMemberDraft,
 ): Promise<void> {
     const { name, ...detail } = input;
     await ctx.commit({
         ops: [
             {
                 method: 'put',
-                resource: `workers/${id}`,
+                resource: `members/${id}`,
                 body: { type: 'ai', name },
             },
             {
                 method: 'put',
-                resource: `ai-workers/${id}`,
+                resource: `ai-members/${id}`,
                 body: detail as unknown as
                     Record<string, unknown>,
             },
             await buildStateEventOp(ctx, id, 'active'),
         ],
     });
-    aiWorkerChanges.notify();
+    aiMemberChanges.notify();
 }
 
-export async function postAIWorkerStateChange(
+export async function postAIMemberStateChange(
     ctx: RequestContext,
-    id: WorkerId,
-    state: WorkerState,
+    id: MemberId,
+    state: MemberState,
 ): Promise<void> {
     await ctx.commit({
         ops: [
             await buildStateEventOp(ctx, id, state),
         ],
     });
-    aiWorkerChanges.notify();
+    aiMemberChanges.notify();
 }

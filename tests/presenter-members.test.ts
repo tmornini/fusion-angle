@@ -1,16 +1,16 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import {
-    HumanWorker,
-    AIWorker,
-    type Worker,
+    HumanMember,
+    AIMember,
+    type Member,
 } from '../api/types.ts';
 import {
-    makeHumanWorker,
-    makeAIWorker,
-} from './worker-fixtures.ts';
+    makeHumanMember,
+    makeAIMember,
+} from './member-fixtures.ts';
 
-// The worker presenter transitively imports state.ts
+// The member presenter transitively imports state.ts
 // (via core.ts), which reads from localStorage and
 // addEventListener at module init. Stub the browser
 // globals here and dynamic-import after they land.
@@ -54,53 +54,53 @@ g['document'] = {
     addEventListener: () => {},
 };
 
-const workerMod = await import(
-    '../web-app/app/presenters/worker.ts'
+const memberMod = await import(
+    '../web-app/app/presenters/member.ts'
 );
 const {
-    ManagedWorkersPresenter,
-    buildInitialManagedWorkersState,
-    applyManagedWorkersSearch,
-    applyManagedWorkersKind,
-} = workerMod;
+    ManagedMembersPresenter,
+    buildInitialManagedMembersState,
+    applyManagedMembersSearch,
+    applyManagedMembersKind,
+} = memberMod;
 
 function makeHuman(
     id: string,
     first: string,
     last: string = 'Smith',
-): HumanWorker {
-    return makeHumanWorker(id, `${first} ${last}`);
+): HumanMember {
+    return makeHumanMember(id, `${first} ${last}`);
 }
 
 function makeAI(
     id: string,
     name: string,
-): AIWorker {
-    return makeAIWorker(id, name);
+): AIMember {
+    return makeAIMember(id, name);
 }
 
 function htmlOf(
-    workers: Worker[],
+    members: Member[],
     currentId: string,
     transform: (s: ReturnType<
-        typeof buildInitialManagedWorkersState
+        typeof buildInitialManagedMembersState
     >) => ReturnType<
-        typeof buildInitialManagedWorkersState
+        typeof buildInitialManagedMembersState
     > = s => s,
 ): string {
     const state = transform(
-        buildInitialManagedWorkersState(
-            workers, currentId,
+        buildInitialManagedMembersState(
+            members, currentId,
         ),
     );
     const el = makeStubEl();
-    new ManagedWorkersPresenter(state)
+    new ManagedMembersPresenter(state)
         .renderList(el as unknown as HTMLElement);
     return el.captured;
 }
 
 test(
-    'ManagedWorkersPresenter renders three sections'
+    'ManagedMembersPresenter renders three sections'
     + ' with YOU above HUMANS above AIs',
     () => {
         const html = htmlOf(
@@ -130,7 +130,7 @@ test(
 );
 
 test(
-    'YOU section contains only the current worker',
+    'YOU section contains only the current member',
     () => {
         const html = htmlOf(
             [
@@ -155,7 +155,7 @@ test(
 );
 
 test(
-    'HUMANS section excludes the current worker',
+    'HUMANS section excludes the current member',
     () => {
         const html = htmlOf(
             [
@@ -213,7 +213,7 @@ test(
                 makeAI('ai1', 'Claude'),
             ],
             'self',
-            s => applyManagedWorkersKind(s, 'ai'),
+            s => applyManagedMembersKind(s, 'ai'),
         );
         assert.ok(
             !html.includes('YOU'),
@@ -244,7 +244,7 @@ test(
             ],
             'self',
             s =>
-                applyManagedWorkersKind(s, 'human'),
+                applyManagedMembersKind(s, 'human'),
         );
         assert.ok(
             html.includes('YOU'),
@@ -268,7 +268,7 @@ test(
             ],
             'self',
             s =>
-                applyManagedWorkersSearch(
+                applyManagedMembersSearch(
                     s, 'alice',
                 ),
         );

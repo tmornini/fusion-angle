@@ -36,8 +36,8 @@ import type {
     StateEntity,
 } from '../api/types.ts';
 import {
-    seedHumanWorker,
-} from './worker-fixtures.ts';
+    seedHumanMember,
+} from './member-fixtures.ts';
 
 interface CreateIds {
     workOrderId: string;
@@ -74,7 +74,7 @@ function buildNode(
         positionY: 0,
         isCreate: false,
         isArchive: false,
-        workerIds: [],
+        memberIds: [],
         attributes: [],
         taskInstructions: '',
         ...overrides,
@@ -123,7 +123,7 @@ function buildLinearGraph(): StoredGraph {
             buildNode(
                 'n-middle',
                 'Doing work',
-                { workerIds: ['current'] },
+                { memberIds: ['current'] },
             ),
             buildNode(
                 'n-finish',
@@ -152,7 +152,7 @@ async function setupDb(): Promise<{
 }> {
     const db = new MemoryDbAdapter();
     await db.createSchema();
-    await seedHumanWorker(db, 'current', 'Demo Test');
+    await seedHumanMember(db, 'current', 'Demo Test');
     const ctx = createRequestContext(db);
     return { db, ctx };
 }
@@ -224,7 +224,7 @@ test(
         );
         assert.equal(claims.length, 1);
         assert.equal(
-            claims[0]!.worker_id, 'current',
+            claims[0]!.member_id, 'current',
         );
     },
 );
@@ -267,7 +267,7 @@ test(
         const graph: StoredGraph = {
             nodes: [
                 buildNode('a', 'A', {
-                    workerIds: ['current'],
+                    memberIds: ['current'],
                 }),
                 buildNode('b', 'B', {
                     isArchive: true,
@@ -303,11 +303,11 @@ test(
                     { isCreate: true },
                 ),
                 buildNode('a', 'A', {
-                    workerIds: ['current'],
+                    memberIds: ['current'],
                     isArchive: true,
                 }),
                 buildNode('b', 'B', {
-                    workerIds: ['current'],
+                    memberIds: ['current'],
                     isArchive: true,
                 }),
             ],
@@ -458,7 +458,7 @@ test(
             {
                 entity_id: woId,
                 state: 'claim_released',
-                worker_id: 'current',
+                member_id: 'current',
                 at: new Date().toISOString(),
             },
         );
@@ -528,7 +528,7 @@ test(
             {
                 entity_id: woId,
                 state: 'claim_released',
-                worker_id: 'current',
+                member_id: 'current',
                 at: new Date().toISOString(),
             },
         );
@@ -540,7 +540,7 @@ test(
                 ctx, woId, DEFAULT_LOCK_TIMEOUT,
             );
         assert.ok(claim !== null);
-        assert.equal(claim.workerId, 'current');
+        assert.equal(claim.memberId, 'current');
     },
 );
 
@@ -566,7 +566,7 @@ test(
             {
                 entity_id: woId,
                 state: 'claim_released',
-                worker_id: 'current',
+                member_id: 'current',
                 at: new Date().toISOString(),
             },
         );
@@ -646,7 +646,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
-        await seedHumanWorker(
+        await seedHumanMember(
             db, 'current', 'Demo Test',
         );
         const ctx = createRequestContext(db);
@@ -661,7 +661,7 @@ test(
             {
                 entity_id: woId,
                 state: 'claimed',
-                worker_id: 'current',
+                member_id: 'current',
                 at: longAgo,
             },
         );
@@ -678,7 +678,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
-        await seedHumanWorker(
+        await seedHumanMember(
             db, 'current', 'Demo Test',
         );
         const ctx = createRequestContext(db);
@@ -688,7 +688,7 @@ test(
             {
                 entity_id: woId,
                 state: 'claimed',
-                worker_id: 'current',
+                member_id: 'current',
                 at: new Date().toISOString(),
             },
         );
@@ -696,7 +696,7 @@ test(
             ctx, woId, DEFAULT_LOCK_TIMEOUT,
         );
         assert.ok(claim !== null);
-        assert.equal(claim.workerId, 'current');
+        assert.equal(claim.memberId, 'current');
     },
 );
 
@@ -709,7 +709,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
-        await seedHumanWorker(
+        await seedHumanMember(
             db, 'current', 'Demo Test',
         );
         const ctx = createRequestContext(db);
@@ -726,7 +726,7 @@ test(
             db.states.put(generateCryptoSafeBase62(), {
                 entity_id: entityId,
                 state: 'claimed',
-                worker_id: 'current',
+                member_id: 'current',
                 at,
             });
         await claimed(fresh1, now);
@@ -738,7 +738,7 @@ test(
             {
                 entity_id: released,
                 state: 'claim_released',
-                worker_id: 'current',
+                member_id: 'current',
                 at: now,
             },
         );
@@ -754,7 +754,7 @@ test(
             );
         assert.equal(claims.size, 2);
         assert.equal(
-            claims.get(fresh1)!.workerId, 'current',
+            claims.get(fresh1)!.memberId, 'current',
         );
         assert.ok(claims.has(fresh2));
         // Stale claim past its lockTimeout: excluded.

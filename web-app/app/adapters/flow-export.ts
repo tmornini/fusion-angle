@@ -2,7 +2,7 @@ import {
     nowUtc,
     jsonObjectField,
     DEFAULT_LOCK_TIMEOUT,
-    DEFAULT_NODE_WORKER_IDS,
+    DEFAULT_NODE_MEMBER_IDS,
     DEFAULT_NODE_TASK_INSTRUCTIONS,
     projectStateIsNotDeleted,
 } from '../../../api/types.ts';
@@ -503,7 +503,7 @@ export async function postFlowFromBackup(
             positionY: n.positionY,
             isCreate: n.isCreate,
             isArchive: n.isArchive,
-            workerIds: n.workerIds,
+            memberIds: n.memberIds,
             attributes: [],
             taskInstructions: n.taskInstructions,
         });
@@ -830,8 +830,8 @@ export async function postFlowFromMermaid(
                     positionY: pos.y,
                     isCreate: false,
                     isArchive: false,
-                    workerIds: [
-                        ...DEFAULT_NODE_WORKER_IDS,
+                    memberIds: [
+                        ...DEFAULT_NODE_MEMBER_IDS,
                     ],
                     attributes: [],
                     taskInstructions: DEFAULT_NODE_TASK_INSTRUCTIONS,
@@ -1170,8 +1170,8 @@ export async function postFlowFromZip(
                     positionY: pos.y,
                     isCreate: false,
                     isArchive: false,
-                    workerIds: [
-                        ...DEFAULT_NODE_WORKER_IDS,
+                    memberIds: [
+                        ...DEFAULT_NODE_MEMBER_IDS,
                     ],
                     attributes: [],
                     taskInstructions: DEFAULT_NODE_TASK_INSTRUCTIONS,

@@ -22,22 +22,22 @@ export function makeFixture(): FlowStatsInput {
             { id: 'c', name: 'Create',
               positionX: 0,   positionY: 0,
               isCreate: true,  isArchive: false,
-              workerIds: [],
+              memberIds: [],
               attributes: [] },
             { id: 'a', name: 'Data Capture',
               positionX: 200, positionY: 0,
               isCreate: false, isArchive: false,
-              workerIds: [],
+              memberIds: [],
               attributes: [] },
             { id: 'b', name: 'Review',
               positionX: 400, positionY: 0,
               isCreate: false, isArchive: false,
-              workerIds: [],
+              memberIds: [],
               attributes: [] },
             { id: 'z', name: 'Archive',
               positionX: 600, positionY: 0,
               isCreate: false, isArchive: true,
-              workerIds: [],
+              memberIds: [],
               attributes: [] },
         ],
         edges: [
@@ -56,7 +56,7 @@ export function makeFixture(): FlowStatsInput {
             '2026-05-10T00:00:00.000Z',
         ),
         windowDays: 90,
-        workerNameById: new Map(),
+        memberNameById: new Map(),
     };
 }
 
@@ -138,19 +138,19 @@ test(
             transitions: [
                 { id: 't0', work_order_id: 'w1',
                   from_node_id: '',
-                  to_node_id: 'c', worker_id: 'p1',
+                  to_node_id: 'c', member_id: 'p1',
                   at: tCreated },
                 { id: 't1', work_order_id: 'w1',
                   from_node_id: 'c',
-                  to_node_id: 'a', worker_id: 'p1',
+                  to_node_id: 'a', member_id: 'p1',
                   at: tCreated },
                 { id: 't2', work_order_id: 'w1',
                   from_node_id: 'a',
-                  to_node_id: 'b', worker_id: 'p2',
+                  to_node_id: 'b', member_id: 'p2',
                   at: tEnterB },
                 { id: 't3', work_order_id: 'w1',
                   from_node_id: 'b',
-                  to_node_id: 'z', worker_id: 'p1',
+                  to_node_id: 'z', member_id: 'p1',
                   at: tEnterZ },
             ],
         };
@@ -196,12 +196,12 @@ test(
             transitions: [
                 { id: 't0', work_order_id: 'w1',
                   from_node_id: '',
-                  to_node_id: 'c', worker_id: 'p1',
+                  to_node_id: 'c', member_id: 'p1',
                   at: tCreated },
                 { id: 't1', work_order_id: 'w1',
                   from_node_id: 'c',
                   to_node_id: 'GHOST',
-                  worker_id: 'p1',
+                  member_id: 'p1',
                   at:
                       tBefore(f, 30_000) },
             ],
@@ -227,15 +227,15 @@ test(
             transitions: [
                 { id: 't0', work_order_id: 'w1',
                   from_node_id: '',
-                  to_node_id: 'c', worker_id: 'p1',
+                  to_node_id: 'c', member_id: 'p1',
                   at: t100d },
                 { id: 't1', work_order_id: 'w1',
                   from_node_id: 'c',
-                  to_node_id: 'a', worker_id: 'p1',
+                  to_node_id: 'a', member_id: 'p1',
                   at: t100d },
                 { id: 't2', work_order_id: 'w1',
                   from_node_id: 'a',
-                  to_node_id: 'z', worker_id: 'p1',
+                  to_node_id: 'z', member_id: 'p1',
                   at: t10d },
             ],
         };
@@ -261,11 +261,11 @@ test(
             transitions: [
                 { id: 't0', work_order_id: 'w1',
                   from_node_id: '',
-                  to_node_id: 'c', worker_id: 'p1',
+                  to_node_id: 'c', member_id: 'p1',
                   at: t },
                 { id: 't1', work_order_id: 'w1',
                   from_node_id: 'c',
-                  to_node_id: 'a', worker_id: 'p1',
+                  to_node_id: 'a', member_id: 'p1',
                   at: t },
             ],
         };
@@ -299,51 +299,51 @@ test(
             transitions: [
                 { id: '1a', work_order_id: 'w1',
                   from_node_id: '',
-                  to_node_id: 'c', worker_id: 'p1',
+                  to_node_id: 'c', member_id: 'p1',
                   at: t(3 * H) },
                 { id: '1b', work_order_id: 'w1',
                   from_node_id: 'c',
-                  to_node_id: 'a', worker_id: 'p1',
+                  to_node_id: 'a', member_id: 'p1',
                   at: t(3 * H) },
                 { id: '1c', work_order_id: 'w1',
                   from_node_id: 'a',
-                  to_node_id: 'b', worker_id: 'p1',
+                  to_node_id: 'b', member_id: 'p1',
                   at: t(1 * H) },
                 { id: '1d', work_order_id: 'w1',
                   from_node_id: 'b',
-                  to_node_id: 'z', worker_id: 'p1',
+                  to_node_id: 'z', member_id: 'p1',
                   at: t(0) },
                 { id: '2a', work_order_id: 'w2',
                   from_node_id: '',
-                  to_node_id: 'c', worker_id: 'p2',
+                  to_node_id: 'c', member_id: 'p2',
                   at: t(6 * H) },
                 { id: '2b', work_order_id: 'w2',
                   from_node_id: 'c',
-                  to_node_id: 'a', worker_id: 'p2',
+                  to_node_id: 'a', member_id: 'p2',
                   at: t(6 * H) },
                 { id: '2c', work_order_id: 'w2',
                   from_node_id: 'a',
-                  to_node_id: 'b', worker_id: 'p2',
+                  to_node_id: 'b', member_id: 'p2',
                   at: t(2 * H) },
                 { id: '2d', work_order_id: 'w2',
                   from_node_id: 'b',
-                  to_node_id: 'a', worker_id: 'p2',
+                  to_node_id: 'a', member_id: 'p2',
                   at: t(2 * H) },
                 { id: '2e', work_order_id: 'w2',
                   from_node_id: 'a',
-                  to_node_id: 'b', worker_id: 'p2',
+                  to_node_id: 'b', member_id: 'p2',
                   at: t(1 * H) },
                 { id: '2f', work_order_id: 'w2',
                   from_node_id: 'b',
-                  to_node_id: 'z', worker_id: 'p2',
+                  to_node_id: 'z', member_id: 'p2',
                   at: t(0) },
                 { id: '3a', work_order_id: 'w3',
                   from_node_id: '',
-                  to_node_id: 'c', worker_id: 'p3',
+                  to_node_id: 'c', member_id: 'p3',
                   at: t(1 * H) },
                 { id: '3b', work_order_id: 'w3',
                   from_node_id: 'c',
-                  to_node_id: 'a', worker_id: 'p3',
+                  to_node_id: 'a', member_id: 'p3',
                   at: t(1 * H) },
             ],
         };
@@ -373,7 +373,7 @@ test(
 );
 
 test(
-    'resolves clan from workerIds, identifies'
+    'resolves clan from memberIds, identifies'
     + ' top producer + vsClanAvg + share',
     () => {
         const f = makeFixture();
@@ -381,7 +381,7 @@ test(
             n.id === 'a'
                 ? {
                     ...n,
-                    workerIds: ['p1', 'p2', 'p3'],
+                    memberIds: ['p1', 'p2', 'p3'],
                 }
                 : n);
         const t = (msAgo: number) => tBefore(f, msAgo);
@@ -393,46 +393,46 @@ test(
             transitions: [
                 { id: 'in0', work_order_id: 'w',
                   from_node_id: '',
-                  to_node_id: 'c', worker_id: 'p1',
+                  to_node_id: 'c', member_id: 'p1',
                   at: t(10 * H) },
                 { id: 'in1', work_order_id: 'w',
                   from_node_id: 'c',
-                  to_node_id: 'a', worker_id: 'p1',
+                  to_node_id: 'a', member_id: 'p1',
                   at: t(10 * H) },
                 { id: 'o1', work_order_id: 'w',
                   from_node_id: 'a',
-                  to_node_id: 'b', worker_id: 'p1',
+                  to_node_id: 'b', member_id: 'p1',
                   at: t(9 * H) },
                 { id: 'r1', work_order_id: 'w',
                   from_node_id: 'b',
-                  to_node_id: 'a', worker_id: 'p1',
+                  to_node_id: 'a', member_id: 'p1',
                   at: t(8 * H) },
                 { id: 'o2', work_order_id: 'w',
                   from_node_id: 'a',
-                  to_node_id: 'b', worker_id: 'p1',
+                  to_node_id: 'b', member_id: 'p1',
                   at: t(7 * H) },
                 { id: 'r2', work_order_id: 'w',
                   from_node_id: 'b',
-                  to_node_id: 'a', worker_id: 'p1',
+                  to_node_id: 'a', member_id: 'p1',
                   at: t(6 * H) },
                 { id: 'o3', work_order_id: 'w',
                   from_node_id: 'a',
-                  to_node_id: 'b', worker_id: 'p1',
+                  to_node_id: 'b', member_id: 'p1',
                   at: t(5 * H) },
                 { id: 'r3', work_order_id: 'w',
                   from_node_id: 'b',
-                  to_node_id: 'a', worker_id: 'p2',
+                  to_node_id: 'a', member_id: 'p2',
                   at: t(4 * H) },
                 { id: 'o4', work_order_id: 'w',
                   from_node_id: 'a',
-                  to_node_id: 'b', worker_id: 'p2',
+                  to_node_id: 'b', member_id: 'p2',
                   at: t(3 * H) },
                 { id: 'fin', work_order_id: 'w',
                   from_node_id: 'b',
-                  to_node_id: 'z', worker_id: 'p2',
+                  to_node_id: 'z', member_id: 'p2',
                   at: t(0) },
             ],
-            workerNameById: new Map([
+            memberNameById: new Map([
                 ['p1', 'Alex'],
                 ['p2', 'Bea'],
                 ['p3', 'Cy'],
@@ -460,7 +460,7 @@ test(
         const f = makeFixture();
         const nodes = f.nodes.map(n =>
             n.id === 'a'
-                ? { ...n, workerIds: ['p1'] }
+                ? { ...n, memberIds: ['p1'] }
                 : n);
         const t = (msAgo: number) => tBefore(f, msAgo);
         const H = 3600 * 1000;
@@ -469,18 +469,18 @@ test(
             transitions: [
                 { id: '1', work_order_id: 'w',
                   from_node_id: '',
-                  to_node_id: 'c', worker_id: 'p1',
+                  to_node_id: 'c', member_id: 'p1',
                   at: t(2 * H) },
                 { id: '2', work_order_id: 'w',
                   from_node_id: 'c',
-                  to_node_id: 'a', worker_id: 'p1',
+                  to_node_id: 'a', member_id: 'p1',
                   at: t(2 * H) },
                 { id: '3', work_order_id: 'w',
                   from_node_id: 'a',
-                  to_node_id: 'z', worker_id: 'p9',
+                  to_node_id: 'z', member_id: 'p9',
                   at: t(0) },
             ],
-            workerNameById: new Map([
+            memberNameById: new Map([
                 ['p1', 'Alex'],
                 ['p9', 'Zed'],
             ]),
@@ -519,42 +519,42 @@ test(
             (_, i) => ({
                 id:'in'+i, work_order_id:'w'+i,
                 from_node_id:'a', to_node_id:'b',
-                worker_id:'p1',
+                member_id:'p1',
                 at:t((20-i) * H),
             }),
         );
         const outs = [
             { id:'o1', work_order_id:'w0',
               from_node_id:'b',
-              to_node_id:'z', worker_id:'p1',
+              to_node_id:'z', member_id:'p1',
               at:t(0) },
             { id:'o2', work_order_id:'w1',
               from_node_id:'b',
-              to_node_id:'z', worker_id:'p1',
+              to_node_id:'z', member_id:'p1',
               at:t(1*H) },
             { id:'o3', work_order_id:'w2',
               from_node_id:'b',
-              to_node_id:'z', worker_id:'p1',
+              to_node_id:'z', member_id:'p1',
               at:t(2*H) },
             { id:'o4', work_order_id:'w3',
               from_node_id:'b',
-              to_node_id:'z', worker_id:'p1',
+              to_node_id:'z', member_id:'p1',
               at:t(3*H) },
             { id:'o5', work_order_id:'w4',
               from_node_id:'b',
-              to_node_id:'z', worker_id:'p1',
+              to_node_id:'z', member_id:'p1',
               at:t(4*H) },
             { id:'o6', work_order_id:'w5',
               from_node_id:'b',
-              to_node_id:'z', worker_id:'p1',
+              to_node_id:'z', member_id:'p1',
               at:t(5*H) },
             { id:'o7', work_order_id:'w6',
               from_node_id:'b',
-              to_node_id:'a', worker_id:'p1',
+              to_node_id:'a', member_id:'p1',
               at:t(6*H) },
             { id:'o8', work_order_id:'w7',
               from_node_id:'b',
-              to_node_id:'a', worker_id:'p1',
+              to_node_id:'a', member_id:'p1',
               at:t(7*H) },
         ];
         const input: FlowStatsInput = { ...f,
@@ -591,59 +591,59 @@ test(
 );
 
 test(
-    'workerHazard is danger on zero-worker'
-    + ' regular nodes (per shouldShowWorkerHazard)',
+    'memberHazard is danger on zero-member'
+    + ' regular nodes (per shouldShowMemberHazard)',
     () => {
         const m = buildFlowStats(makeFixture());
         assert.equal(
             m.nodes.find(n => n.id === 'a')!
-                .workerHazard,
+                .memberHazard,
             'danger',
         );
         assert.equal(
             m.nodes.find(n => n.id === 'b')!
-                .workerHazard,
+                .memberHazard,
             'danger',
         );
         // start and complete nodes never hazard
         assert.equal(
             m.nodes.find(n => n.id === 'c')!
-                .workerHazard,
+                .memberHazard,
             null,
         );
         assert.equal(
             m.nodes.find(n => n.id === 'z')!
-                .workerHazard,
+                .memberHazard,
             null,
         );
     },
 );
 
 test(
-    'workerHazard is warning on single-worker'
+    'memberHazard is warning on single-member'
     + ' regular nodes with outgoing edges',
     () => {
         const f = makeFixture();
         const nodes = f.nodes.map(n =>
             n.id === 'a' || n.id === 'b'
-                ? { ...n, workerIds: ['hw_1'] }
+                ? { ...n, memberIds: ['hw_1'] }
                 : n);
         const m = buildFlowStats({ ...f, nodes });
         assert.equal(
             m.nodes.find(n => n.id === 'a')!
-                .workerHazard,
+                .memberHazard,
             'warning',
         );
         assert.equal(
             m.nodes.find(n => n.id === 'b')!
-                .workerHazard,
+                .memberHazard,
             'warning',
         );
     },
 );
 
 test(
-    'workerHazard is null on multi-worker regular'
+    'memberHazard is null on multi-member regular'
     + ' nodes with outgoing edges',
     () => {
         const f = makeFixture();
@@ -651,18 +651,18 @@ test(
             n.id === 'a' || n.id === 'b'
                 ? {
                     ...n,
-                    workerIds: ['hw_1', 'hw_2'],
+                    memberIds: ['hw_1', 'hw_2'],
                 }
                 : n);
         const m = buildFlowStats({ ...f, nodes });
         assert.equal(
             m.nodes.find(n => n.id === 'a')!
-                .workerHazard,
+                .memberHazard,
             null,
         );
         assert.equal(
             m.nodes.find(n => n.id === 'b')!
-                .workerHazard,
+                .memberHazard,
             null,
         );
     },
@@ -681,46 +681,46 @@ test(
             return [
                 { id:woId+'A', work_order_id:woId,
                   from_node_id:'',
-                  to_node_id:'c', worker_id:'p1',
+                  to_node_id:'c', member_id:'p1',
                   at:t(startMs) },
                 { id:woId+'B', work_order_id:woId,
                   from_node_id:'c',
-                  to_node_id:'a', worker_id:'p1',
+                  to_node_id:'a', member_id:'p1',
                   at:t(startMs) },
                 { id:woId+'C', work_order_id:woId,
                   from_node_id:'a',
-                  to_node_id:'b', worker_id:'p1',
+                  to_node_id:'b', member_id:'p1',
                   at:t(startMs - 1*H) },
                 { id:woId+'D', work_order_id:woId,
                   from_node_id:'b',
-                  to_node_id:'z', worker_id:'p1',
+                  to_node_id:'z', member_id:'p1',
                   at:t(startMs - 2*H) },
             ];
         }
         const loopTrans = [
             { id:'lA', work_order_id:'wl',
               from_node_id:'',
-              to_node_id:'c', worker_id:'p1',
+              to_node_id:'c', member_id:'p1',
               at:t(10*H) },
             { id:'lB', work_order_id:'wl',
               from_node_id:'c',
-              to_node_id:'a', worker_id:'p1',
+              to_node_id:'a', member_id:'p1',
               at:t(10*H) },
             { id:'lC', work_order_id:'wl',
               from_node_id:'a',
-              to_node_id:'b', worker_id:'p1',
+              to_node_id:'b', member_id:'p1',
               at:t(9*H) },
             { id:'lD', work_order_id:'wl',
               from_node_id:'b',
-              to_node_id:'a', worker_id:'p1',
+              to_node_id:'a', member_id:'p1',
               at:t(8*H) },
             { id:'lE', work_order_id:'wl',
               from_node_id:'a',
-              to_node_id:'b', worker_id:'p1',
+              to_node_id:'b', member_id:'p1',
               at:t(7*H) },
             { id:'lF', work_order_id:'wl',
               from_node_id:'b',
-              to_node_id:'z', worker_id:'p1',
+              to_node_id:'z', member_id:'p1',
               at:t(6*H) },
         ];
         const input: FlowStatsInput = { ...f,
@@ -776,7 +776,7 @@ test('collapses long tail into a rest bucket', () => {
                 id: woId + '-' + (step++),
                 work_order_id: woId,
                 from_node_id: from, to_node_id: to,
-                worker_id: 'p1',
+                member_id: 'p1',
                 at: t(nowAgoH-- * H),
             });
         push('', 'c');

@@ -241,7 +241,7 @@ svg.flow-canvas.flow-canvas-locked .flow-edge rect {
   justify-content: space-between;
 }
 
-.worker-select-fieldset {
+.member-select-fieldset {
   border: 1px solid hsl(var(--border));
   border-radius: var(--radius-sm);
   padding: var(--space-2) var(--space-3);
@@ -250,22 +250,22 @@ svg.flow-canvas.flow-canvas-locked .flow-edge rect {
   overflow-y: auto;
 }
 
-.worker-select-fieldset legend {
+.member-select-fieldset legend {
   padding: 0 var(--space-1);
 }
 
-.worker-group {
+.member-group {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
   margin-bottom: var(--space-2);
 }
 
-.worker-group:last-child {
+.member-group:last-child {
   margin-bottom: 0;
 }
 
-.worker-group-label {
+.member-group-label {
   font-size: 0.625rem;
   font-weight: var(--font-weight-bold);
   letter-spacing: 0.05em;
@@ -273,7 +273,7 @@ svg.flow-canvas.flow-canvas-locked .flow-edge rect {
   margin-bottom: var(--space-1);
 }
 
-.worker-checkbox-label {
+.member-checkbox-label {
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -283,15 +283,15 @@ svg.flow-canvas.flow-canvas-locked .flow-edge rect {
   border-radius: var(--radius-sm);
 }
 
-.worker-checkbox-label:hover {
+.member-checkbox-label:hover {
   background-color: hsl(var(--muted));
 }
 
-.worker-checkbox-label input[disabled] {
+.member-checkbox-label input[disabled] {
   cursor: not-allowed;
 }
 
-.worker-checkbox-label:has(
+.member-checkbox-label:has(
     input[disabled]) {
   cursor: not-allowed;
   opacity: 0.6;

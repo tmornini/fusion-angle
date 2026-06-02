@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import { populateBootstrapData } from '../api/mock-data.ts';
-import { SYSTEM_WORKER_ID } from '../api/types.ts';
+import { SYSTEM_MEMBER_ID } from '../api/types.ts';
 
 // A pristine environment seeds only the infrastructure the
 // app requires to render its shell — the system actor (event
@@ -29,11 +29,11 @@ test(
     'pristine bootstrap seeds required infrastructure',
     async () => {
         const db = await bootstrappedDb();
-        const ids = (await db.workers.getAll())
+        const ids = (await db.members.getAll())
             .map(w => w.id);
         assert.ok(
-            ids.includes(SYSTEM_WORKER_ID),
-            'system worker seeded',
+            ids.includes(SYSTEM_MEMBER_ID),
+            'system member seeded',
         );
         assert.ok(
             ids.includes('current'),

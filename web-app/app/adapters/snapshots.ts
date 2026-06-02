@@ -1,6 +1,6 @@
 import { MissingTableError } from '../../../api/db.ts';
 import type {
-    HumanWorkerEntity,
+    HumanMemberEntity,
 } from '../../../api/types.ts';
 import type { RequestContext } from './shared.ts';
 
@@ -41,8 +41,8 @@ export class SnapshotTooLargeError extends Error {
 // user back to re-snapshot from current state.
 export const RETIRED_KEYS_PER_TABLE:
     Record<string, readonly string[]> = {
-    workers: ['first_name', 'last_name'],
-    ai_workers: ['created_at', 'name', 'auth_token', 'provider'],
+    members: ['first_name', 'last_name'],
+    ai_members: ['created_at', 'name', 'auth_token', 'provider'],
     flows: ['created_at', 'updated_at'],
     work_orders: ['created_at'],
     flow_versions: ['created_at'],
@@ -253,15 +253,15 @@ export async function getSnapshot(
 // is the expected non-error path here, and a
 // higher-level accessor could obscure the error
 // type for any later caller sharing this ctx.
-export async function getHasAnyHumanWorkers(
+export async function getHasAnyHumanMembers(
     ctx: RequestContext,
 ): Promise<boolean> {
     try {
-        const workers =
-            await ctx.GET<HumanWorkerEntity[]>(
-                'workers',
+        const members =
+            await ctx.GET<HumanMemberEntity[]>(
+                'members',
             );
-        return workers.length > 0;
+        return members.length > 0;
     } catch (err) {
         if (err instanceof MissingTableError) {
             return false;

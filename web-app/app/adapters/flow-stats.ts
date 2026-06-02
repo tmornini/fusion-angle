@@ -17,7 +17,7 @@ import {
     getTransitionEventsByWorkOrder,
     type TransitionEvent,
 } from './state-events.ts';
-import { getWorkerMap } from './workers-union.ts';
+import { getMemberMap } from './members-union.ts';
 
 export async function getFlowStats(
     ctx: RequestContext,
@@ -31,13 +31,13 @@ export async function getFlowStats(
         allWorkOrders,
         eventsByWo,
         fwoRows,
-        workerMap,
+        memberMap,
     ] = await Promise.all([
         getFlowGraph(ctx, flowId),
         getWorkOrderRows(ctx),
         getTransitionEventsByWorkOrder(ctx),
         getFlowWorkOrderRows(ctx),
-        getWorkerMap(ctx),
+        getMemberMap(ctx),
     ]);
 
     const woIds = new Set(
@@ -55,9 +55,9 @@ export async function getFlowStats(
         }
     }
 
-    const workerNameById = new Map<Id, string>();
-    for (const [id, w] of workerMap) {
-        workerNameById.set(id, w.name());
+    const memberNameById = new Map<Id, string>();
+    for (const [id, w] of memberMap) {
+        memberNameById.set(id, w.name());
     }
 
     const input: FlowStatsInput = {
@@ -67,7 +67,7 @@ export async function getFlowStats(
         transitions,
         nowMs: Date.now(),
         windowDays: 90,
-        workerNameById,
+        memberNameById,
     };
     return { model: buildFlowStats(input), graph };
 }

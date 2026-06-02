@@ -12,9 +12,9 @@ import {
 } from '../web-app/app/adapters/admin.ts';
 import type {
     ProjectEntity, IdeaEntity,
-    WorkerState,
+    MemberState,
 } from '../api/types.ts';
-import { seedHumanWorker } from './worker-fixtures.ts';
+import { seedHumanMember } from './member-fixtures.ts';
 
 async function setupDb(): Promise<{
     db: MemoryDbAdapter;
@@ -76,17 +76,17 @@ async function seedIdea(
     );
     await db.ideaSubmissions.put('sub-' + id, {
         idea_id: id,
-        worker_id: submitter,
+        member_id: submitter,
         at: '2026-04-01T00:00:00Z',
     });
 }
 
-async function seedWorker(
+async function seedMember(
     db: MemoryDbAdapter,
-    id: string, state: WorkerState,
+    id: string, state: MemberState,
 ): Promise<void> {
-    await seedHumanWorker(
-        db, id, 'Worker ' + id, state,
+    await seedHumanMember(
+        db, id, 'Member ' + id, state,
     );
 }
 
@@ -114,7 +114,7 @@ test(
     + ' not archived or deleted',
     async () => {
         const { db, ctx } = await setupDb();
-        await seedWorker(db, 'u1', 'active');
+        await seedMember(db, 'u1', 'active');
         await seedIdea(
             db, 'i1', 'active', 'u1',
         );
@@ -133,13 +133,13 @@ test(
 
 test(
     'getOrganizationStats counts only active'
-    + ' human workers',
+    + ' human members',
     async () => {
         const { db, ctx } = await setupDb();
-        await seedWorker(db, 'u1', 'active');
-        await seedWorker(db, 'u2', 'active');
-        await seedWorker(db, 'u3', 'pending');
-        await seedWorker(db, 'u4', 'archived');
+        await seedMember(db, 'u1', 'active');
+        await seedMember(db, 'u2', 'active');
+        await seedMember(db, 'u3', 'pending');
+        await seedMember(db, 'u4', 'archived');
         const stats =
             await getOrganizationStats(ctx);
         assert.equal(stats.activePeopleCount, 2);
@@ -151,7 +151,7 @@ test(
     + ' event when entities transition',
     async () => {
         const { db, ctx } = await setupDb();
-        await seedWorker(db, 'u1', 'active');
+        await seedMember(db, 'u1', 'active');
         await seedProject(db, 'p1', 'approved');
         await seedIdea(
             db, 'i1', 'active', 'u1',

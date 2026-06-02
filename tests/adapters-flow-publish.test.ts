@@ -36,7 +36,7 @@ function buildNode(
         positionY: 0,
         isCreate: false,
         isArchive: false,
-        workerIds: [],
+        memberIds: [],
         attributes: [],
         taskInstructions: '',
         ...overrides,
@@ -80,7 +80,7 @@ function readyGraph(): StoredGraph {
         nodes: [
             buildNode('start', { isCreate: true }),
             buildNode('mid', {
-                workerIds: ['hw_1'],
+                memberIds: ['hw_1'],
             }),
             buildNode('done', { isArchive: true }),
         ],
@@ -93,7 +93,7 @@ function readyGraph(): StoredGraph {
 
 test(
     'validateFlowForCreation reports ready when'
-    + ' every regular node has a worker and an'
+    + ' every regular node has a member and an'
     + ' outgoing edge',
     () => {
         const flow = buildFlowEntity(
@@ -106,8 +106,8 @@ test(
 );
 
 test(
-    'validateFlowForCreation flags zero_workers'
-    + ' on regular nodes with empty workerIds',
+    'validateFlowForCreation flags zero_members'
+    + ' on regular nodes with empty memberIds',
     () => {
         const graph: StoredGraph = {
             nodes: [
@@ -129,7 +129,7 @@ test(
         assert.equal(r.ready, false);
         assert.equal(r.problems.length, 1);
         assert.equal(
-            r.problems[0]!.kind, 'zero_workers',
+            r.problems[0]!.kind, 'zero_members',
         );
         assert.equal(
             r.problems[0]!.nodeId, 'mid',
@@ -147,10 +147,10 @@ test(
                     isCreate: true,
                 }),
                 buildNode('mid', {
-                    workerIds: ['hw_1'],
+                    memberIds: ['hw_1'],
                 }),
                 buildNode('orphan', {
-                    workerIds: ['hw_1'],
+                    memberIds: ['hw_1'],
                 }),
                 buildNode('done', {
                     isArchive: true,
@@ -184,7 +184,7 @@ test(
                     // intentionally empty
                 }),
                 buildNode('mid', {
-                    workerIds: ['hw_1'],
+                    memberIds: ['hw_1'],
                 }),
                 buildNode('done', {
                     isArchive: true,

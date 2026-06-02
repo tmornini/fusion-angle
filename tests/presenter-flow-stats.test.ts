@@ -22,7 +22,7 @@ function model(): FlowStatsModel {
             currentlyHere: 0, throughputPerWeek: 0, revisitRatePct: 0,
             clanSize: 0, activeProducerCount: 0, topProducer: null,
             assignmentLabel: 'Unassigned',
-            workerHazard: null, branchSplit: [],
+            memberHazard: null, branchSplit: [],
             ...over,
         });
     return {
@@ -34,7 +34,7 @@ function model(): FlowStatsModel {
                    heatT:0.32, heatPct:32,
                    avgSeconds: 510,
                    outgoingEdgeIds: ['e2'],
-                   workerHazard: 'danger' }),
+                   memberHazard: 'danger' }),
             node({ id:'z', displayName:'Archive', isArchive:true,
                    positionX:400, positionY:0 }),
         ],
@@ -98,7 +98,7 @@ test('regular nodes show avg-sojourn face; special nodes show —',
     ));
 });
 
-test('danger hazard glyph appears when workerHazard is danger',
+test('danger hazard glyph appears when memberHazard is danger',
     () => {
     const html = buildStatsGraphSvg(model(), VB, null).toString();
     assert.match(nodeGroup(html, 'a'),
@@ -107,14 +107,14 @@ test('danger hazard glyph appears when workerHazard is danger',
         /flow-stats-node-warning|flow-stats-node-danger/);
 });
 
-test('warning hazard glyph appears when workerHazard is warning',
+test('warning hazard glyph appears when memberHazard is warning',
     () => {
     const m = model();
     const warned: FlowStatsModel = {
         ...m,
         nodes: m.nodes.map(n =>
             n.id === 'a'
-                ? { ...n, workerHazard: 'warning' }
+                ? { ...n, memberHazard: 'warning' }
                 : n,
         ),
     };
@@ -345,7 +345,7 @@ function nodeStat(
         topProducer: over.topProducer ?? null,
         assignmentLabel:
             over.assignmentLabel ?? 'Unassigned',
-        workerHazard: over.workerHazard ?? null,
+        memberHazard: over.memberHazard ?? null,
         branchSplit: over.branchSplit ?? [],
     };
 }

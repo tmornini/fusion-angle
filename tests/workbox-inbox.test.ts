@@ -10,7 +10,7 @@ import {
 } from
 '../web-app/app/adapters/work-orders-mutations.ts';
 import {
-    getWorkerMap,
+    getMemberMap,
     generateCryptoSafeBase62,
     getTransitionEventsByWorkOrder,
     getWorkOrderActiveClaim,
@@ -34,13 +34,13 @@ import type {
     GraphEdge,
     StoredGraph,
     WorkOrderEntity,
-    Worker,
-    WorkerId,
+    Member,
+    MemberId,
     Id,
 } from '../api/types.ts';
 import {
-    seedHumanWorker,
-} from './worker-fixtures.ts';
+    seedHumanMember,
+} from './member-fixtures.ts';
 
 // -- Fixtures ---------------------------------
 
@@ -56,7 +56,7 @@ function buildNode(
         positionY: 0,
         isCreate: false,
         isArchive: false,
-        workerIds: [],
+        memberIds: [],
         attributes: [],
         taskInstructions: '',
         ...overrides,
@@ -94,8 +94,8 @@ function buildFlow(
 }
 
 function buildLinearGraph(): StoredGraph {
-    // n-middle carries one worker so the flow
-    // passes the publish gate (zero-worker nodes
+    // n-middle carries one member so the flow
+    // passes the publish gate (zero-member nodes
     // would mark the flow Not Ready).
     return {
         nodes: [
@@ -103,7 +103,7 @@ function buildLinearGraph(): StoredGraph {
                 isCreate: true,
             }),
             buildNode('n-middle', 'Doing work', {
-                workerIds: ['current'],
+                memberIds: ['current'],
             }),
             buildNode('n-finish', 'Done', {
                 isArchive: true,
@@ -121,7 +121,7 @@ interface WoTables {
     transitionsByWo:
         Map<Id, readonly TransitionEvent[]>;
     activeClaimsByWo: Map<Id, ActiveClaim>;
-    workerMap: Map<WorkerId, Worker>;
+    memberMap: Map<MemberId, Member>;
 }
 
 async function collectTables(
@@ -148,7 +148,7 @@ async function collectTables(
         workOrders,
         transitionsByWo,
         activeClaimsByWo,
-        workerMap: await getWorkerMap(ctx),
+        memberMap: await getMemberMap(ctx),
     };
 }
 
@@ -160,7 +160,7 @@ async function setupOneWorkOrder(): Promise<{
 }> {
     const db = new MemoryDbAdapter();
     await db.createSchema();
-    await seedHumanWorker(db, 'current', 'Demo Test');
+    await seedHumanMember(db, 'current', 'Demo Test');
     const ctx = createRequestContext(db);
     await db.flows.put(
         'f1', buildFlow(buildLinearGraph()),
@@ -208,11 +208,11 @@ test(
         const { tables } =
             await setupOneWorkOrder();
         const {
-            workOrders, transitionsByWo, workerMap,
+            workOrders, transitionsByWo, memberMap,
         } = await tables();
         const items = buildInboxItems(
             workOrders, transitionsByWo,
-            new Map(), workerMap, 'active',
+            new Map(), memberMap, 'active',
         );
         assert.equal(items.length, 1);
         const item = items[0]!;
@@ -240,11 +240,11 @@ test(
         const { tables } =
             await setupOneWorkOrder();
         const {
-            workOrders, transitionsByWo, workerMap,
+            workOrders, transitionsByWo, memberMap,
         } = await tables();
         const items = buildInboxItems(
             workOrders, transitionsByWo,
-            new Map(), workerMap, 'archived',
+            new Map(), memberMap, 'archived',
         );
         assert.deepEqual(items, []);
     },
@@ -258,14 +258,14 @@ test(
             await setupOneWorkOrder();
         const {
             workOrders, transitionsByWo,
-            activeClaimsByWo, workerMap,
+            activeClaimsByWo, memberMap,
         } = await tables();
         // postWorkOrderCreation already minted a
         // fresh claim event, so it is active.
         assert.equal(activeClaimsByWo.size, 1);
         const items = buildInboxItems(
             workOrders, transitionsByWo,
-            activeClaimsByWo, workerMap, 'active',
+            activeClaimsByWo, memberMap, 'active',
         );
         assert.deepEqual(items, []);
     },
@@ -282,22 +282,22 @@ test(
         await db.states.put('extra', {
             entity_id: woId,
             state: 'n-finish',
-            worker_id: 'current',
+            member_id: 'current',
             at: '2030-01-01T00:00:00.000Z',
         });
         const {
-            workOrders, transitionsByWo, workerMap,
+            workOrders, transitionsByWo, memberMap,
         } = await tables();
         assert.deepEqual(
             buildInboxItems(
                 workOrders, transitionsByWo,
-                new Map(), workerMap, 'active',
+                new Map(), memberMap, 'active',
             ),
             [],
         );
         const archived = buildInboxItems(
             workOrders, transitionsByWo,
-            new Map(), workerMap, 'archived',
+            new Map(), memberMap, 'archived',
         );
         assert.equal(archived.length, 1);
         assert.equal(archived[0]!.completed, true);
@@ -311,7 +311,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
-        await seedHumanWorker(
+        await seedHumanMember(
             db, 'current', 'Demo Test',
         );
         const ctx = createRequestContext(db);
@@ -343,7 +343,7 @@ test(
             tables.workOrders,
             tables.transitionsByWo,
             new Map(),
-            tables.workerMap,
+            tables.memberMap,
             'active',
         );
         assert.deepEqual(
@@ -359,12 +359,12 @@ test(
     async () => {
         const { tables } =
             await setupOneWorkOrder();
-        const { workOrders, workerMap } =
+        const { workOrders, memberMap } =
             await tables();
         assert.throws(
             () => buildInboxItems(
                 workOrders, new Map(),
-                new Map(), workerMap, 'active',
+                new Map(), memberMap, 'active',
             ),
             /no transitions/,
         );
@@ -377,7 +377,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
-        await seedHumanWorker(
+        await seedHumanMember(
             db, 'current', 'Demo Test',
         );
         const ctx = createRequestContext(db);
@@ -388,7 +388,7 @@ test(
                 }),
                 buildNode(
                     'n-middle', 'Doing work', {
-                        workerIds: ['current'],
+                        memberIds: ['current'],
                         taskInstructions:
                             '# Verify totals',
                     },
@@ -414,11 +414,11 @@ test(
             flowId: 'f1',
         });
         const {
-            workOrders, transitionsByWo, workerMap,
+            workOrders, transitionsByWo, memberMap,
         } = await collectTables(db);
         const items = buildInboxItems(
             workOrders, transitionsByWo,
-            new Map(), workerMap, 'active',
+            new Map(), memberMap, 'active',
         );
         assert.equal(
             items[0]!.taskInstructions,
@@ -434,11 +434,11 @@ test(
         const { tables } =
             await setupOneWorkOrder();
         const {
-            workOrders, transitionsByWo, workerMap,
+            workOrders, transitionsByWo, memberMap,
         } = await tables();
         const items = buildInboxItems(
             workOrders, transitionsByWo,
-            new Map(), workerMap, 'active',
+            new Map(), memberMap, 'active',
         );
         assert.equal(
             items[0]!.taskInstructions, '',

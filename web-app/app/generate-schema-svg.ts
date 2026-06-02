@@ -38,9 +38,9 @@ const FK_SPECIAL: Record<string, string> = {
 
 // Branded id types that name their home table. A detail row whose
 // own `id` carries one of these is a shared-primary-key reference
-// to that parent (human_workers.id: WorkerId -> workers).
+// to that parent (human_members.id: MemberId -> members).
 const BRAND_TABLE: Record<string, string> = {
-    WorkerId: 'workers',
+    MemberId: 'members',
     RecordId: 'records',
     RecordAttributeId: 'record_attributes',
     FlowRecordId: 'flow_records',

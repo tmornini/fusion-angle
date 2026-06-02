@@ -13,8 +13,8 @@ import {
     initThemeAndDropdowns,
 } from './theme-toggle.ts';
 import {
-    mutateSidebarWorker,
-} from './sidebar-worker.ts';
+    mutateSidebarMember,
+} from './sidebar-member.ts';
 import {
     initMobileDrawer,
 } from './mobile-drawer.ts';
@@ -64,7 +64,7 @@ async function initSidebarLayout(
     mutateThemeToggleIcon();
     if (hasSchema) {
         await Promise.all([
-            mutateSidebarWorker(),
+            mutateSidebarMember(),
             mutateHeaderInfo(),
         ]);
     }

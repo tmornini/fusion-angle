@@ -1,12 +1,12 @@
 import type {
     Id, IdeaEntity, IdeaState, ProjectEntity,
     ProjectState, RecordEntity, RecordState,
-    StateEntity, WorkerEntity, WorkerState,
+    StateEntity, MemberEntity, MemberState,
 } from '../../../api/types.ts';
 import {
     assertIdeaState,
     assertProjectState,
-    assertWorkerState,
+    assertMemberState,
     msSinceUtc,
     MS_PER_SECOND,
     nowUtc,
@@ -16,23 +16,23 @@ import {
     generateCryptoSafeBase62,
 } from './crypto-safe-base62.ts';
 import {
-    getCurrentHumanWorker,
-} from './workers.ts';
+    getCurrentHumanMember,
+} from './members.ts';
 
 // Constructs a single PUT op against the states table —
 // the atomic seam between an entity-lifecycle adapter and
 // the append-only event log. Composed at the call site
 // with sibling ops inside one ctx.commit batch — every op
-// lands as one transaction. The current human worker is
+// lands as one transaction. The current human member is
 // the actor; nowUtc the moment. Caller does NOT pre-
-// resolve the worker — the helper owns that read so every
+// resolve the member — the helper owns that read so every
 // site speaks the same vocabulary.
 export async function buildStateEventOp(
     ctx: RequestContext,
     entityId: Id,
     state: string,
 ): Promise<WriteOp> {
-    const worker = await getCurrentHumanWorker(ctx);
+    const member = await getCurrentHumanMember(ctx);
     const eventId = generateCryptoSafeBase62();
     return {
         method: 'put',
@@ -40,7 +40,7 @@ export async function buildStateEventOp(
         body: {
             entity_id: entityId,
             state,
-            worker_id: worker.id,
+            member_id: member.id,
             at: nowUtc(),
         },
     };
@@ -116,7 +116,7 @@ export interface TransitionEvent {
     work_order_id: Id;
     from_node_id: Id;
     to_node_id: Id;
-    worker_id: Id;
+    member_id: Id;
     at: string;
 }
 
@@ -138,7 +138,7 @@ export async function getWorkOrderCurrentNodeId(
     return latest === null ? null : latest.state;
 }
 
-// Returns the worker holding the active claim and
+// Returns the member holding the active claim and
 // the moment they took it — or null if no claim is
 // live. A 'claimed' event older than lockTimeout is
 // implicitly expired and reads as null even if no
@@ -152,7 +152,7 @@ export async function getWorkOrderActiveClaim(
     ctx: RequestContext,
     workOrderId: Id,
     lockTimeout: number,
-): Promise<{ workerId: Id; at: string } | null> {
+): Promise<{ memberId: Id; at: string } | null> {
     const events = await ctx.GET<StateEntity[]>(
         `entity-states/${workOrderId}/history`,
     );
@@ -167,7 +167,7 @@ export async function getWorkOrderActiveClaim(
     if (elapsedMs >= lockTimeout * MS_PER_SECOND) {
         return null;
     }
-    return { workerId: latest.worker_id, at: latest.at };
+    return { memberId: latest.member_id, at: latest.at };
 }
 
 // Bulk variant of getWorkOrderActiveClaim for the
@@ -182,7 +182,7 @@ export async function getWorkOrderActiveClaim(
 export async function getActiveClaimsByWorkOrder(
     ctx: RequestContext,
     lockTimeoutByWorkOrder: ReadonlyMap<Id, number>,
-): Promise<Map<Id, { workerId: Id; at: string }>> {
+): Promise<Map<Id, { memberId: Id; at: string }>> {
     const all = await ctx.GET<StateEntity[]>('states');
     const latestClaim = new Map<Id, StateEntity>();
     for (const ev of all) {
@@ -193,7 +193,7 @@ export async function getActiveClaimsByWorkOrder(
         }
     }
     const out = new Map<
-        Id, { workerId: Id; at: string }
+        Id, { memberId: Id; at: string }
     >();
     for (const [entityId, ev] of latestClaim) {
         const lockTimeout =
@@ -207,7 +207,7 @@ export async function getActiveClaimsByWorkOrder(
             continue;
         }
         out.set(entityId, {
-            workerId: ev.worker_id,
+            memberId: ev.member_id,
             at: ev.at,
         });
     }
@@ -235,7 +235,7 @@ function projectTransitions(
             work_order_id: workOrderId,
             from_node_id: prior,
             to_node_id: ev.state,
-            worker_id: ev.worker_id,
+            member_id: ev.member_id,
             at: ev.at,
         });
         prior = ev.state;
@@ -374,43 +374,43 @@ export async function getRecordStates(
     return latestStatesForIds<RecordState>(events, ids);
 }
 
-// Read the current state for one worker from the
-// states log. Returns the validated WorkerState.
+// Read the current state for one member from the
+// states log. Returns the validated MemberState.
 // Throws when no event has been recorded — every
-// worker created through the supported paths gets
+// member created through the supported paths gets
 // an initial state event, so absence is a bug,
-// not a missing default. The worker id is unique
+// not a missing default. The member id is unique
 // across the human and AI tables — both produce
 // base62 ids from the same generator — so this
 // reader serves both kinds without discrimination.
-export async function getWorkerState(
+export async function getMemberState(
     ctx: RequestContext,
-    workerId: Id,
-): Promise<WorkerState> {
+    memberId: Id,
+): Promise<MemberState> {
     const events = await ctx.GET<StateEntity[]>(
-        `entity-states/${workerId}/history`,
+        `entity-states/${memberId}/history`,
     );
     const latest = latestByAt(events);
     if (latest === null) {
         throw new Error(
-            'no state event for worker ' + workerId,
+            'no state event for member ' + memberId,
         );
     }
-    return assertWorkerState(
-        latest.state, 'worker ' + workerId,
+    return assertMemberState(
+        latest.state, 'member ' + memberId,
     );
 }
 
-// Bulk variant for the human/ai/system worker maps, which
-// call this — so it reads the parent workers table
+// Bulk variant for the human/ai/system member maps, which
+// call this — so it reads the parent members table
 // directly (covering all three kinds) to avoid recursing.
-export async function getWorkerStates(
+export async function getMemberStates(
     ctx: RequestContext,
-): Promise<Map<Id, WorkerState>> {
+): Promise<Map<Id, MemberState>> {
     const [events, rows] = await Promise.all([
         ctx.GET<StateEntity[]>('states'),
-        ctx.GET<WorkerEntity[]>('workers'),
+        ctx.GET<MemberEntity[]>('members'),
     ]);
     const ids = new Set<Id>(rows.map(r => r.id));
-    return latestStatesForIds<WorkerState>(events, ids);
+    return latestStatesForIds<MemberState>(events, ids);
 }

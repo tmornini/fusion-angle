@@ -21,8 +21,8 @@ import type {
     RecordAttributeEntity,
 } from '../adapters/index.ts';
 import {
-    HumanWorker,
-    AIWorker,
+    HumanMember,
+    AIMember,
 } from '../adapters/index.ts';
 
 export function buildAttributeRefRow(
@@ -118,8 +118,8 @@ export function buildNodePanel(
     node: GraphNode,
     outgoing: GraphEdge[],
     isLocked: boolean,
-    humans: HumanWorker[],
-    ais: AIWorker[],
+    humans: HumanMember[],
+    ais: AIMember[],
     attributes: readonly RecordAttributeEntity[],
 ): SafeHtml {
     const isSpecial =
@@ -199,9 +199,9 @@ class="text-xs text-muted"
             b.nameText(),
         ),
     );
-    const assigned = new Set(node.workerIds);
+    const assigned = new Set(node.memberIds);
     const humanCheckboxes = sortedHumans.map(
-        h => buildWorkerCheckbox(
+        h => buildMemberCheckbox(
             h.idForLink(),
             h.name(),
             assigned.has(h.idForLink()),
@@ -209,7 +209,7 @@ class="text-xs text-muted"
         ),
     );
     const aiCheckboxes = sortedAis.map(
-        a => buildWorkerCheckbox(
+        a => buildMemberCheckbox(
             a.idForLink(),
             a.nameText(),
             assigned.has(a.idForLink()),
@@ -227,17 +227,17 @@ class="flow-props-panel">
     aria-label="Close"
     >${iconX(14, '')}</button>
 </div>
-<fieldset class="worker-select-fieldset"
-    id="prop-node-workers">
+<fieldset class="member-select-fieldset"
+    id="prop-node-members">
 <legend class="text-xs text-muted"
-    >Workers</legend>
-<div class="worker-group">
-<div class="worker-group-label"
+    >Members</legend>
+<div class="member-group">
+<div class="member-group-label"
     >HUMANS</div>
 ${humanCheckboxes}
 </div>
-<div class="worker-group">
-<div class="worker-group-label"
+<div class="member-group">
+<div class="member-group-label"
     >AIs</div>
 ${aiCheckboxes}
 </div>
@@ -291,8 +291,8 @@ class="text-sm text-muted"
 </div>`;
 }
 
-function buildWorkerCheckbox(
-    workerId: string,
+function buildMemberCheckbox(
+    memberId: string,
     name: string,
     checked: boolean,
     isLocked: boolean,
@@ -304,9 +304,9 @@ function buildWorkerCheckbox(
         isLocked ? ' disabled' : '',
     );
     return html`<label
-class="worker-checkbox-label">
+class="member-checkbox-label">
 <input type="checkbox"
-    data-worker-id="${workerId}"${
+    data-member-id="${memberId}"${
     checkedAttr}${disabledAttr} />
 <span>${name}</span>
 </label>`;

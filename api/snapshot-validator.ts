@@ -1,8 +1,8 @@
 import { TABLE_NAMES } from './db.ts';
 import {
-    validateWorkerEntity,
-    validateHumanWorkerEntity,
-    validateAIWorkerEntity,
+    validateMemberEntity,
+    validateHumanMemberEntity,
+    validateAIMemberEntity,
     validateIdeaEntity,
     validateProjectEntity,
     validateFlowEntity,
@@ -38,14 +38,14 @@ function validateSnapshotRow(
     const { id: _id, ...body } = row;
     try {
         switch (table) {
-            case 'workers':
-                validateWorkerEntity(body);
+            case 'members':
+                validateMemberEntity(body);
                 break;
-            case 'human_workers':
-                validateHumanWorkerEntity(body);
+            case 'human_members':
+                validateHumanMemberEntity(body);
                 break;
-            case 'ai_workers':
-                validateAIWorkerEntity(body);
+            case 'ai_members':
+                validateAIMemberEntity(body);
                 break;
             case 'ideas':
                 validateIdeaEntity(body);

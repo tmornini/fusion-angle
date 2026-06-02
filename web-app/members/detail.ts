@@ -2,18 +2,18 @@ import {
     $, isFormField,
 } from '../app/dom.ts';
 import {
-    HumanWorkerDetailPresenter,
-    HumanWorkerDetailEditPresenter,
-    humanWorkerDraftFromWorker,
-    humanWorkerPatchFromDraft,
-    isHumanWorkerFieldKey,
-    type HumanWorkerDraftFields,
-    AIWorkerDetailPresenter,
-    AIWorkerDetailEditPresenter,
-    aiWorkerDraftFromWorker,
-    aiWorkerPatchFromDraft,
-    isAIWorkerFieldKey,
-    type AIWorkerDraftFields,
+    HumanMemberDetailPresenter,
+    HumanMemberDetailEditPresenter,
+    humanMemberDraftFromMember,
+    humanMemberPatchFromDraft,
+    isHumanMemberFieldKey,
+    type HumanMemberDraftFields,
+    AIMemberDetailPresenter,
+    AIMemberDetailEditPresenter,
+    aiMemberDraftFromMember,
+    aiMemberPatchFromDraft,
+    isAIMemberFieldKey,
+    type AIMemberDraftFields,
 } from '../app/presenters/index.ts';
 import { showToast } from '../app/toast.ts';
 import { log } from '../app/logger.ts';
@@ -27,19 +27,19 @@ import {
 } from '../app/core.ts';
 import {
     createRequestContext,
-    getHumanWorker,
-    getHumanWorkerRow,
-    putHumanWorker,
-    postHumanWorkerStateChange,
-    subscribeHumanWorkerChanges,
-    getAIWorker,
-    getAIWorkerRow,
-    putAIWorker,
-    postAIWorkerStateChange,
-    subscribeAIWorkerChanges,
-    HumanWorker,
-    AIWorker,
-    type WorkerState,
+    getHumanMember,
+    getHumanMemberRow,
+    putHumanMember,
+    postHumanMemberStateChange,
+    subscribeHumanMemberChanges,
+    getAIMember,
+    getAIMemberRow,
+    putAIMember,
+    postAIMemberStateChange,
+    subscribeAIMemberChanges,
+    HumanMember,
+    AIMember,
+    type MemberState,
 } from '../app/adapters/index.ts';
 
 const pageAbort = new AbortController();
@@ -49,26 +49,26 @@ type HumanState =
     | {
         kind: 'reading';
         variant: 'human';
-        worker: HumanWorker;
+        member: HumanMember;
     }
     | {
         kind: 'editing';
         variant: 'human';
-        worker: HumanWorker;
-        draft: HumanWorkerDraftFields;
+        member: HumanMember;
+        draft: HumanMemberDraftFields;
     };
 
 type AIState =
     | {
         kind: 'reading';
         variant: 'ai';
-        worker: AIWorker;
+        member: AIMember;
     }
     | {
         kind: 'editing';
         variant: 'ai';
-        worker: AIWorker;
-        draft: AIWorkerDraftFields;
+        member: AIMember;
+        draft: AIMemberDraftFields;
     };
 
 type PageState = HumanState | AIState;
@@ -77,10 +77,10 @@ let state: PageState | null = null;
 let pageContainer: HTMLElement | null = null;
 
 function buildPresenter():
-    | HumanWorkerDetailPresenter
-    | HumanWorkerDetailEditPresenter
-    | AIWorkerDetailPresenter
-    | AIWorkerDetailEditPresenter
+    | HumanMemberDetailPresenter
+    | HumanMemberDetailEditPresenter
+    | AIMemberDetailPresenter
+    | AIMemberDetailEditPresenter
 {
     if (state === null) {
         throw new Error(
@@ -89,19 +89,19 @@ function buildPresenter():
     }
     if (state.variant === 'human') {
         return state.kind === 'reading'
-            ? new HumanWorkerDetailPresenter(
-                state.worker,
+            ? new HumanMemberDetailPresenter(
+                state.member,
             )
-            : new HumanWorkerDetailEditPresenter(
-                state.worker, state.draft,
+            : new HumanMemberDetailEditPresenter(
+                state.member, state.draft,
             );
     }
     return state.kind === 'reading'
-        ? new AIWorkerDetailPresenter(
-            state.worker,
+        ? new AIMemberDetailPresenter(
+            state.member,
         )
-        : new AIWorkerDetailEditPresenter(
-            state.worker, state.draft,
+        : new AIMemberDetailEditPresenter(
+            state.member, state.draft,
         );
 }
 
@@ -111,24 +111,24 @@ function rerender(): void {
         .renderUpdate(pageContainer);
 }
 
-async function loadWorkerByEitherKind(
-    workerId: string,
-): Promise<HumanWorker | AIWorker | null> {
+async function loadMemberByEitherKind(
+    memberId: string,
+): Promise<HumanMember | AIMember | null> {
     const ctx = createRequestContext();
     try {
-        return await getHumanWorker(
-            ctx, workerId,
+        return await getHumanMember(
+            ctx, memberId,
         );
     } catch (errHuman) {
         try {
-            return await getAIWorker(
-                ctx, workerId,
+            return await getAIMember(
+                ctx, memberId,
             );
         } catch (errAi) {
             log.error(
-                'worker lookup failed'
+                'member lookup failed'
                 + ' for both kinds',
-                'workers',
+                'members',
                 { errHuman, errAi },
             );
             return null;
@@ -139,56 +139,56 @@ async function loadWorkerByEitherKind(
 export async function init(
     params?: Record<string, string>,
 ): Promise<void> {
-    const workerId = params?.workerId;
-    if (!workerId) {
-        navigateTo('workers');
+    const memberId = params?.memberId;
+    if (!memberId) {
+        navigateTo('members');
         return;
     }
 
     const container = $(
-        '#worker-detail-content', document,
+        '#member-detail-content', document,
     );
     if (!container) return;
     pageContainer = container;
 
-    const worker = await withLoadingState(
+    const member = await withLoadingState(
         container,
         buildSkeleton('detail', 4),
-        () => loadWorkerByEitherKind(workerId),
+        () => loadMemberByEitherKind(memberId),
         () => init(params),
     );
-    if (!worker) {
-        navigateTo('workers');
+    if (!member) {
+        navigateTo('members');
         return;
     }
 
-    if (worker.kind === 'human') {
+    if (member.kind === 'human') {
         state = {
             kind: 'reading',
             variant: 'human',
-            worker,
+            member,
         };
     } else {
         state = {
             kind: 'reading',
             variant: 'ai',
-            worker,
+            member,
         };
     }
     buildPresenter().renderShell(container);
     bindStableListeners(container);
 
-    subscribeHumanWorkerChanges(
-        () => void refresh(workerId),
+    subscribeHumanMemberChanges(
+        () => void refresh(memberId),
     );
-    subscribeAIWorkerChanges(
-        () => void refresh(workerId),
+    subscribeAIMemberChanges(
+        () => void refresh(memberId),
     );
 }
 
 export function reduceRefresh(
     current: PageState,
-    fresh: HumanWorker | AIWorker | null,
+    fresh: HumanMember | AIMember | null,
 ): PageState {
     if (current.kind === 'editing') return current;
     if (fresh === null) return current;
@@ -196,22 +196,22 @@ export function reduceRefresh(
         return {
             kind: 'reading',
             variant: 'human',
-            worker: fresh,
+            member: fresh,
         };
     }
     return {
         kind: 'reading',
         variant: 'ai',
-        worker: fresh,
+        member: fresh,
     };
 }
 
 async function refresh(
-    workerId: string,
+    memberId: string,
 ): Promise<void> {
     if (!pageContainer || !state) return;
-    const fresh = await loadWorkerByEitherKind(
-        workerId,
+    const fresh = await loadMemberByEitherKind(
+        memberId,
     );
     state = reduceRefresh(state, fresh);
     rerender();
@@ -249,13 +249,13 @@ function onClick(e: MouseEvent): void {
     if (!target) return;
 
     const actionEl = target.closest(
-        '[data-worker-action]',
+        '[data-member-action]',
     );
     const action = actionEl?.getAttribute(
-        'data-worker-action',
+        'data-member-action',
     );
     if (action === 'back') {
-        navigateTo('workers');
+        navigateTo('members');
         return;
     }
     if (action === 'edit') {
@@ -311,18 +311,18 @@ function beginEdit(): void {
         state = {
             kind: 'editing',
             variant: 'human',
-            worker: state.worker,
-            draft: humanWorkerDraftFromWorker(
-                state.worker,
+            member: state.member,
+            draft: humanMemberDraftFromMember(
+                state.member,
             ),
         };
     } else {
         state = {
             kind: 'editing',
             variant: 'ai',
-            worker: state.worker,
-            draft: aiWorkerDraftFromWorker(
-                state.worker,
+            member: state.member,
+            draft: aiMemberDraftFromMember(
+                state.member,
             ),
         };
     }
@@ -337,13 +337,13 @@ function cancelEdit(): void {
         state = {
             kind: 'reading',
             variant: 'human',
-            worker: state.worker,
+            member: state.member,
         };
     } else {
         state = {
             kind: 'reading',
             variant: 'ai',
-            worker: state.worker,
+            member: state.member,
         };
     }
     rerender();
@@ -356,10 +356,10 @@ function onInput(e: Event): void {
     const target = e.target;
     if (!isFormField(target)) return;
     const field = target.getAttribute(
-        'data-worker-field',
+        'data-member-field',
     );
     if (state.variant === 'human') {
-        if (!isHumanWorkerFieldKey(field)) return;
+        if (!isHumanMemberFieldKey(field)) return;
         if (field === 'state') {
             state = {
                 ...state,
@@ -367,7 +367,7 @@ function onInput(e: Event): void {
                     ...state.draft,
                     state:
                         target.value as
-                            WorkerState,
+                            MemberState,
                 },
             };
             return;
@@ -381,7 +381,7 @@ function onInput(e: Event): void {
         };
         return;
     }
-    if (!isAIWorkerFieldKey(field)) return;
+    if (!isAIMemberFieldKey(field)) return;
     if (field === 'state') {
         state = {
             ...state,
@@ -389,7 +389,7 @@ function onInput(e: Event): void {
                 ...state.draft,
                 state:
                     target.value as
-                        WorkerState,
+                        MemberState,
             },
         };
         return;
@@ -430,49 +430,49 @@ async function handleSave(): Promise<void> {
         return;
     }
     if (state.variant === 'human') {
-        await saveHumanWorker(state);
+        await saveHumanMember(state);
     } else {
-        await saveAIWorker(state);
+        await saveAIMember(state);
     }
 }
 
-async function saveHumanWorker(
+async function saveHumanMember(
     s: Extract<
         HumanState,
         { kind: 'editing' }
     >,
 ): Promise<void> {
-    const workerId = s.worker.idForLink();
+    const memberId = s.member.idForLink();
     const ctx = createRequestContext();
     let row;
     try {
-        row = await getHumanWorkerRow(
-            ctx, workerId,
+        row = await getHumanMemberRow(
+            ctx, memberId,
         );
     } catch (err) {
         log.error(
-            'getHumanWorkerRow failed',
-            'workers', err,
+            'getHumanMemberRow failed',
+            'members', err,
         );
         showToast(
-            'Failed to save worker', 'error',
+            'Failed to save member', 'error',
         );
         return;
     }
     const patch = trimStrings(
-        humanWorkerPatchFromDraft(s.draft),
+        humanMemberPatchFromDraft(s.draft),
     );
     const { id: _id, ...rest } = row;
     const next = { ...rest, ...patch };
     const stateChanged =
-        s.draft.state !== s.worker.stateValue();
+        s.draft.state !== s.member.stateValue();
     try {
-        await putHumanWorker(
-            ctx, workerId, next,
+        await putHumanMember(
+            ctx, memberId, next,
         );
         if (stateChanged) {
-            await postHumanWorkerStateChange(
-                ctx, workerId, s.draft.state,
+            await postHumanMemberStateChange(
+                ctx, memberId, s.draft.state,
             );
         }
     } catch (err) {
@@ -480,73 +480,73 @@ async function saveHumanWorker(
             ? err.message
             : String(err);
         log.error(
-            'human worker save failed',
-            'workers', err,
+            'human member save failed',
+            'members', err,
         );
         showToast(
-            `Failed to save worker: ${detail}`,
+            `Failed to save member: ${detail}`,
             'error',
         );
         return;
     }
-    showToast('Worker saved', 'success');
+    showToast('Member saved', 'success');
 }
 
-async function saveAIWorker(
+async function saveAIMember(
     s: Extract<
         AIState,
         { kind: 'editing' }
     >,
 ): Promise<void> {
-    const workerId = s.worker.idForLink();
+    const memberId = s.member.idForLink();
     const ctx = createRequestContext();
     let row;
     try {
-        row = await getAIWorkerRow(
-            ctx, workerId,
+        row = await getAIMemberRow(
+            ctx, memberId,
         );
     } catch (err) {
         log.error(
-            'getAIWorkerRow failed',
-            'workers', err,
+            'getAIMemberRow failed',
+            'members', err,
         );
         showToast(
-            'Failed to save AI worker',
+            'Failed to save AI member',
             'error',
         );
         return;
     }
-    // putAIWorker writes the whole row, so
+    // putAIMember writes the whole row, so
     // merge the edited fields onto the stored
     // row to form the complete entity.
     const patch = trimStrings(
-        aiWorkerPatchFromDraft(s.draft),
+        aiMemberPatchFromDraft(s.draft),
     );
     const { id: _id, ...rest } = row;
     const stateChanged =
-        s.draft.state !== s.worker.stateValue();
+        s.draft.state !== s.member.stateValue();
     try {
-        await putAIWorker(
-            ctx, workerId,
+        await putAIMember(
+            ctx, memberId,
             { ...rest, ...patch },
         );
         if (stateChanged) {
-            await postAIWorkerStateChange(
-                ctx, workerId, s.draft.state,
+            await postAIMemberStateChange(
+                ctx, memberId, s.draft.state,
             );
         }
     } catch (err) {
         log.error(
-            'putAIWorker failed',
-            'workers', err,
+            'putAIMember failed',
+            'members', err,
         );
         showToast(
-            'Failed to save AI worker',
+            'Failed to save AI member',
             'error',
         );
         return;
     }
     showToast(
-        'AI worker saved', 'success',
+        'AI member saved', 'success',
     );
 }

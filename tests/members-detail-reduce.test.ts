@@ -3,7 +3,7 @@
 // document at module-eval time, which Node lacks.
 // Stub before any import, then load the page-module
 // reducer with dynamic import() so the stubs are in
-// place. Same pattern as presenter-worker-detail.
+// place. Same pattern as presenter-member-detail.
 // @ts-expect-error - Node global stub
 globalThis.localStorage = {
     getItem: () => null,
@@ -20,12 +20,12 @@ globalThis.document = { addEventListener: () => {} };
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 
-const { makeHumanWorker, makeAIWorker } = await import(
-    './worker-fixtures.ts'
+const { makeHumanMember, makeAIMember } = await import(
+    './member-fixtures.ts'
 );
 
 const { reduceRefresh } = await import(
-    '../web-app/workers/detail.ts'
+    '../web-app/members/detail.ts'
 );
 
 const HUMAN_DRAFT = {
@@ -41,15 +41,15 @@ const HUMAN_DRAFT = {
 
 test(
     'editing state is preserved when fresh data'
-    + ' arrives (sibling worker mutated)',
+    + ' arrives (sibling member mutated)',
     () => {
         const current = {
             kind: 'editing' as const,
             variant: 'human' as const,
-            worker: makeHumanWorker('hw_1', 'Sarah Chen'),
+            member: makeHumanMember('hw_1', 'Sarah Chen'),
             draft: HUMAN_DRAFT,
         };
-        const fresh = makeHumanWorker('hw_1', 'Sarah Chen');
+        const fresh = makeHumanMember('hw_1', 'Sarah Chen');
         const next = reduceRefresh(current, fresh);
         // Same reference: the draft is sacred.
         assert.equal(next, current);
@@ -62,13 +62,13 @@ test(
         const current = {
             kind: 'reading' as const,
             variant: 'human' as const,
-            worker: makeHumanWorker('hw_1', 'Sarah Chen'),
+            member: makeHumanMember('hw_1', 'Sarah Chen'),
         };
-        const fresh = makeHumanWorker('hw_1', 'Sarah Chen');
+        const fresh = makeHumanMember('hw_1', 'Sarah Chen');
         const next = reduceRefresh(current, fresh);
         assert.equal(next.kind, 'reading');
         assert.equal(next.variant, 'human');
-        assert.equal(next.worker, fresh);
+        assert.equal(next.member, fresh);
     },
 );
 
@@ -78,24 +78,24 @@ test(
         const current = {
             kind: 'reading' as const,
             variant: 'ai' as const,
-            worker: makeAIWorker('ai_1', 'Claude Opus'),
+            member: makeAIMember('ai_1', 'Claude Opus'),
         };
-        const fresh = makeAIWorker('ai_1', 'Claude Opus');
+        const fresh = makeAIMember('ai_1', 'Claude Opus');
         const next = reduceRefresh(current, fresh);
         assert.equal(next.kind, 'reading');
         assert.equal(next.variant, 'ai');
-        assert.equal(next.worker, fresh);
+        assert.equal(next.member, fresh);
     },
 );
 
 test(
     'reading + fresh null → current preserved'
-    + ' (worker vanished mid-session)',
+    + ' (member vanished mid-session)',
     () => {
         const current = {
             kind: 'reading' as const,
             variant: 'human' as const,
-            worker: makeHumanWorker('hw_1', 'Sarah Chen'),
+            member: makeHumanMember('hw_1', 'Sarah Chen'),
         };
         const next = reduceRefresh(current, null);
         assert.equal(next, current);
@@ -108,7 +108,7 @@ test(
         const current = {
             kind: 'editing' as const,
             variant: 'human' as const,
-            worker: makeHumanWorker('hw_1', 'Sarah Chen'),
+            member: makeHumanMember('hw_1', 'Sarah Chen'),
             draft: HUMAN_DRAFT,
         };
         const next = reduceRefresh(current, null);
@@ -122,12 +122,12 @@ test(
         const current = {
             kind: 'reading' as const,
             variant: 'human' as const,
-            worker: makeHumanWorker('hw_1', 'Sarah Chen'),
+            member: makeHumanMember('hw_1', 'Sarah Chen'),
         };
-        const fresh = makeAIWorker('ai_1', 'Claude Opus');
+        const fresh = makeAIMember('ai_1', 'Claude Opus');
         const next = reduceRefresh(current, fresh);
         assert.equal(next.kind, 'reading');
         assert.equal(next.variant, 'ai');
-        assert.equal(next.worker, fresh);
+        assert.equal(next.member, fresh);
     },
 );

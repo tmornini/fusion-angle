@@ -1,17 +1,17 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import {
-    shouldShowWorkerHazard,
+    shouldShowMemberHazard,
 } from '../web-app/app/flow-graph.ts';
 import type {
     GraphEdge,
     GraphNode,
-    WorkerId,
+    MemberId,
 } from '../api/types.ts';
 
 function buildNode(
     id: string,
-    workerIds: WorkerId[],
+    memberIds: MemberId[],
     overrides: Partial<GraphNode> = {},
 ): GraphNode {
     return {
@@ -21,7 +21,7 @@ function buildNode(
         positionY: 0,
         isCreate: false,
         isArchive: false,
-        workerIds,
+        memberIds,
         attributes: [],
         taskInstructions: '',
         ...overrides,
@@ -42,11 +42,11 @@ function edge(
 }
 
 test(
-    'zero workers on a regular node renders danger',
+    'zero members on a regular node renders danger',
     () => {
         const n = buildNode('n1', []);
         assert.equal(
-            shouldShowWorkerHazard(
+            shouldShowMemberHazard(
                 n,
                 [edge('e1', 'n1', 'next')],
             ),
@@ -56,12 +56,12 @@ test(
 );
 
 test(
-    'one worker on a regular node with outgoing'
+    'one member on a regular node with outgoing'
     + ' edges renders warning',
     () => {
         const n = buildNode('n1', ['hw_1']);
         assert.equal(
-            shouldShowWorkerHazard(
+            shouldShowMemberHazard(
                 n,
                 [edge('e1', 'n1', 'next')],
             ),
@@ -71,14 +71,14 @@ test(
 );
 
 test(
-    'two or more workers with outgoing edges'
+    'two or more members with outgoing edges'
     + ' renders no hazard',
     () => {
         const n = buildNode(
             'n1', ['hw_1', 'hw_2'],
         );
         assert.equal(
-            shouldShowWorkerHazard(
+            shouldShowMemberHazard(
                 n,
                 [edge('e1', 'n1', 'next')],
             ),
@@ -88,12 +88,12 @@ test(
 );
 
 test(
-    'one worker with no outgoing edges (dead-end)'
+    'one member with no outgoing edges (dead-end)'
     + ' renders danger (precedence over warning)',
     () => {
         const n = buildNode('n1', ['hw_1']);
         assert.equal(
-            shouldShowWorkerHazard(n, []),
+            shouldShowMemberHazard(n, []),
             'danger',
         );
     },
@@ -101,13 +101,13 @@ test(
 
 test(
     'a start node never renders hazard regardless'
-    + ' of worker count',
+    + ' of member count',
     () => {
         const n = buildNode('n1', [], {
             isCreate: true,
         });
         assert.equal(
-            shouldShowWorkerHazard(n, []),
+            shouldShowMemberHazard(n, []),
             null,
         );
     },
@@ -115,27 +115,27 @@ test(
 
 test(
     'a complete node never renders hazard'
-    + ' regardless of worker count',
+    + ' regardless of member count',
     () => {
         const n = buildNode('n1', [], {
             isArchive: true,
         });
         assert.equal(
-            shouldShowWorkerHazard(n, []),
+            shouldShowMemberHazard(n, []),
             null,
         );
     },
 );
 
 test(
-    'multiple workers but no outgoing edges still'
+    'multiple members but no outgoing edges still'
     + ' renders danger (dead-end takes precedence)',
     () => {
         const n = buildNode(
             'n1', ['hw_1', 'hw_2', 'hw_3'],
         );
         assert.equal(
-            shouldShowWorkerHazard(n, []),
+            shouldShowMemberHazard(n, []),
             'danger',
         );
     },

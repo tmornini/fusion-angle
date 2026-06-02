@@ -8,18 +8,18 @@ import {
     type RequestContext,
 } from '../web-app/app/adapters/shared.ts';
 import {
-    postHumanWorkerCreation,
-    postHumanWorkerStateChange,
-    type HumanWorkerDraft,
-} from '../web-app/app/adapters/workers.ts';
+    postHumanMemberCreation,
+    postHumanMemberStateChange,
+    type HumanMemberDraft,
+} from '../web-app/app/adapters/members.ts';
 import {
-    seedCurrentWorker,
-    seedHumanWorker,
-} from './worker-fixtures.ts';
+    seedCurrentMember,
+    seedHumanMember,
+} from './member-fixtures.ts';
 
-function buildHumanWorker(
+function buildHumanMember(
     name: string,
-): HumanWorkerDraft {
+): HumanMemberDraft {
     return {
         name,
         email:
@@ -44,20 +44,20 @@ async function setupDb(): Promise<{
 }
 
 test(
-    'postHumanWorkerCreation persists the row'
+    'postHumanMemberCreation persists the row'
     + ' and records the initial state event',
     async () => {
         const { db, ctx } = await setupDb();
-        await seedCurrentWorker(db);
+        await seedCurrentMember(db);
 
-        await postHumanWorkerCreation(
+        await postHumanMemberCreation(
             ctx,
             'w1',
-            buildHumanWorker('Alice'),
+            buildHumanMember('Alice'),
             'active',
         );
 
-        const row = await db.workers.getById('w1');
+        const row = await db.members.getById('w1');
         assert.equal(row.name, 'Alice');
         assert.equal(row.type, 'human');
         const events = await db.states.allFor('w1');
@@ -67,19 +67,19 @@ test(
 );
 
 test(
-    'postHumanWorkerStateChange records a state'
-    + ' event without touching the worker row',
+    'postHumanMemberStateChange records a state'
+    + ' event without touching the member row',
     async () => {
         const { db, ctx } = await setupDb();
-        await seedCurrentWorker(db);
-        await seedHumanWorker(db, 'w1', 'Original Name');
-        const before = await db.workers.getById('w1');
+        await seedCurrentMember(db);
+        await seedHumanMember(db, 'w1', 'Original Name');
+        const before = await db.members.getById('w1');
 
-        await postHumanWorkerStateChange(
+        await postHumanMemberStateChange(
             ctx, 'w1', 'archived',
         );
 
-        const after = await db.workers.getById('w1');
+        const after = await db.members.getById('w1');
         assert.deepEqual(after, before);
         const events = await db.states.allFor('w1');
         assert.equal(events.length, 2);

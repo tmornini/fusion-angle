@@ -72,7 +72,7 @@ is excluded from type checking (it runs in Node).
 
 **Vanilla TypeScript** with zero runtime dependencies.
 Enterprise innovation management platform with modules for
-ideas, projects, workers, flows, workbox, and analytics.
+ideas, projects, members, flows, workbox, and analytics.
 Every page is a standalone HTML file served via HTTP. The
 code also supports `file:///` protocol locally, but testing
 is HTTP-only.
@@ -186,7 +186,7 @@ subdirectories `adapters/` (data-access + platform shims, both
 kinds share the folder), `presenters/` (presenter classes
 producing `SafeHtml`), and `styles/` (cascade-ordered CSS
 modules).
-`web-app/{dashboard,workbox,ideas,projects,flows,workers,...}/`
+`web-app/{dashboard,workbox,ideas,projects,flows,members,...}/`
 — page directories registered in `PAGE_REGISTRY` (sidebar-layout
 + standalone). `billing/` is a stub.
 
@@ -212,15 +212,15 @@ no devDependencies. Tests cover
 pure modules, flow-edit business logic and the connection-
 validation rules (`tests/flow-operations.test.ts`), the flow
 version/query adapters, every data adapter (including
-`adapters-workers-union.test.ts` for the worker union seam
+`adapters-members-union.test.ts` for the member union seam
 and `adapters-flow-publish.test.ts` for
 `validateFlowForCreation` / `getFlowsForCreation`), the
 workbox inbox aggregation, the mermaid round-trip,
 in-browser ZIP, snapshot import-validation/quota/wipe-on-fail,
 api routing, navigation, mock-data validity, the two-tier
 hazard predicate (`tests/flow-graph-hazard.test.ts` covers
-`shouldShowWorkerHazard`), and the SafeHtml output of the
-presenters (`presenter-worker-detail.test.ts` checks the AI
+`shouldShowMemberHazard`), and the SafeHtml output of the
+presenters (`presenter-member-detail.test.ts` checks the AI
 variant renders its model and skill focus); the
 automated suite also covers `flow-stats-aggregate`
 (pure heat / sojourn / path /

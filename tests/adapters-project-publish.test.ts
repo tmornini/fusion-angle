@@ -13,9 +13,9 @@ import {
     getProjectState,
 } from '../web-app/app/adapters/state-events.ts';
 import {
-    seedCurrentWorker,
-    seedHumanWorker,
-} from './worker-fixtures.ts';
+    seedCurrentMember,
+    seedHumanMember,
+} from './member-fixtures.ts';
 
 const SAMPLE_PROJECT_BODY = {
     title: 't',
@@ -48,7 +48,7 @@ test('validator: ready when all scored', () => {
         [{ id: 'o1', position: 0 }],
         [{ id: 'b1', project_id: 'p1',
            objective_id: 'o1', score: 50,
-           worker_id: 'w1',
+           member_id: 'w1',
            at: '2026-05-14T00:00:00.000Z' }],
     );
     assert.equal(r.ready, true);
@@ -61,7 +61,7 @@ test('archival validator: not ready when actuals missing',
             SAMPLE_PROJECT,
             [{ id: 'b1', project_id: 'p1',
                objective_id: 'o1', score: 50,
-               worker_id: 'w1',
+               member_id: 'w1',
                at: '2026-05-14T00:00:00.000Z' }],
             [],
         );
@@ -75,7 +75,7 @@ test('postProjectApproval moves state to approved',
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
-        await seedCurrentWorker(db);
+        await seedCurrentMember(db);
         await db.projects.put('p1', SAMPLE_PROJECT_BODY);
         await db.states.record(
             'st-init', 'p1', 'under-review', 'current',
@@ -85,7 +85,7 @@ test('postProjectApproval moves state to approved',
             'b1',
             { project_id: 'p1', objective_id: 'o1',
               score: 50,
-              worker_id: 'w1',
+              member_id: 'w1',
               at: '2026-05-14T00:00:00.000Z' },
         );
         const ctx = createRequestContext(db);
@@ -98,7 +98,7 @@ test('postProjectApproval throws when not ready',
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
-        await seedCurrentWorker(db);
+        await seedCurrentMember(db);
         await db.projects.put('p1', SAMPLE_PROJECT_BODY);
         await db.objectives.put('o1', { position: 0 });
         const ctx = createRequestContext(db);
@@ -112,7 +112,7 @@ test('postProjectArchival moves state to archived',
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
-        await seedCurrentWorker(db);
+        await seedCurrentMember(db);
         await db.projects.put('p1', SAMPLE_PROJECT_BODY);
         await db.states.record(
             'st-init', 'p1', 'approved', 'current',
@@ -122,14 +122,14 @@ test('postProjectArchival moves state to archived',
             'b1',
             { project_id: 'p1', objective_id: 'o1',
               score: 50,
-              worker_id: 'w1',
+              member_id: 'w1',
               at: '2026-05-14T00:00:00.000Z' },
         );
         await db.projectObjectiveActualScores.put(
             'a1',
             { project_id: 'p1', objective_id: 'o1',
               score: 40,
-              worker_id: 'w1',
+              member_id: 'w1',
               at: '2026-05-15T00:00:00.000Z' },
         );
         const ctx = createRequestContext(db);

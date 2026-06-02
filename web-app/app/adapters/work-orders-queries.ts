@@ -47,7 +47,7 @@ export interface HistoryFieldValue {
 export interface HistoryEntry {
     fromNodeName: string;
     toNodeName: string;
-    workerName: string;
+    memberName: string;
     transitionedAt: string;
     fieldValues: HistoryFieldValue[];
 }
@@ -56,7 +56,7 @@ export type ClaimStatus =
     | { kind: 'unclaimed' }
     | {
         kind: 'claimed';
-        byCurrentWorker: boolean;
+        byCurrentMember: boolean;
         at: string;
     };
 

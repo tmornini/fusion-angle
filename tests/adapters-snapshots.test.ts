@@ -27,9 +27,9 @@ import {
     SnapshotIncompatibleError,
 } from '../web-app/app/adapters/snapshots.ts';
 
-// A human_workers detail row in the post-normalization
-// shape (no name — that lives on the parent workers row).
-// The snapshot round-trip carries the human_workers table,
+// A human_members detail row in the post-normalization
+// shape (no name — that lives on the parent members row).
+// The snapshot round-trip carries the human_members table,
 // so these import / export tests exercise it directly.
 function buildHumanDetail(id: string, first: string) {
     return {
@@ -57,7 +57,7 @@ test('getSnapshot returns a JSON object of tables', async () => {
     const { ctx } = await setup();
     const json = await getSnapshot(ctx);
     const parsed = JSON.parse(json);
-    assert.ok(Array.isArray(parsed.workers));
+    assert.ok(Array.isArray(parsed.members));
     assert.ok(Array.isArray(parsed.states));
 });
 
@@ -91,11 +91,11 @@ test(
     async () => {
         const { db, ctx } = await setup();
         await putSnapshot(ctx, JSON.stringify({
-            human_workers: [
+            human_members: [
                 buildHumanDetail('u1', 'Alice'),
             ],
         }));
-        const rows = await db.humanWorkers.getAll();
+        const rows = await db.humanMembers.getAll();
         assert.equal(rows.length, 1);
         assert.equal(
             rows[0]?.email, 'alice@example.com',
@@ -108,15 +108,15 @@ test(
     async () => {
         const { ctx } = await setup();
         await putSnapshot(ctx, JSON.stringify({
-            human_workers: [
+            human_members: [
                 buildHumanDetail('u1', 'Alice'),
             ],
         }));
         const parsed =
             JSON.parse(await getSnapshot(ctx));
-        assert.equal(parsed.human_workers.length, 1);
+        assert.equal(parsed.human_members.length, 1);
         assert.equal(
-            parsed.human_workers[0].id, 'u1',
+            parsed.human_members[0].id, 'u1',
         );
     },
 );
@@ -127,16 +127,16 @@ test(
     async () => {
         const { db, ctx } = await setup();
         await putSnapshot(ctx, JSON.stringify({
-            human_workers: [
+            human_members: [
                 buildHumanDetail('u1', 'Alice'),
             ],
         }));
         await putSnapshot(ctx, JSON.stringify({
-            human_workers: [
+            human_members: [
                 buildHumanDetail('u2', 'Bob'),
             ],
         }));
-        const rows = await db.humanWorkers.getAll();
+        const rows = await db.humanMembers.getAll();
         assert.equal(rows.length, 1);
         assert.equal(rows[0]?.id, 'u2');
         assert.equal(rows[0]?.email, 'bob@example.com');
@@ -150,7 +150,7 @@ test(
         const { db, ctx } = await setup();
         const file = new File(
             [JSON.stringify({
-                human_workers: [
+                human_members: [
                     buildHumanDetail('u1', 'Alice'),
                 ],
             })],
@@ -158,7 +158,7 @@ test(
             { type: 'application/json' },
         );
         await putSnapshotFromFile(ctx, file);
-        const rows = await db.humanWorkers.getAll();
+        const rows = await db.humanMembers.getAll();
         assert.equal(rows.length, 1);
         assert.equal(
             rows[0]?.email, 'alice@example.com',
@@ -207,17 +207,17 @@ test(
 
 test('postSchemaCreation keeps existing data', async () => {
     const { db, ctx } = await setup();
-    await db.workers.put('u1', {
+    await db.members.put('u1', {
         type: 'human', name: 'Alice Adams',
     });
     await postSchemaCreation(ctx);
-    const rows = await db.workers.getAll();
+    const rows = await db.members.getAll();
     assert.equal(rows.length, 1);
 });
 
 test('deleteSchema clears all table contents', async () => {
     const { db, ctx } = await setup();
-    await db.workers.put('u1', {
+    await db.members.put('u1', {
         type: 'human', name: 'Alice Adams',
     });
     await deleteSchema(ctx);
@@ -225,14 +225,14 @@ test('deleteSchema clears all table contents', async () => {
 });
 
 test(
-    'postMockDataLoad populates the workers table',
+    'postMockDataLoad populates the members table',
     async () => {
         const { db, ctx } = await setup();
         await postMockDataLoad(ctx);
-        const rows = await db.workers.getAll();
+        const rows = await db.members.getAll();
         assert.ok(
             rows.length > 0,
-            'mock data should seed workers',
+            'mock data should seed members',
         );
     },
 );
@@ -293,7 +293,7 @@ test(
     'putSnapshot accepts current-shape snapshot',
     async () => {
         const { ctx } = await setup();
-        const json = JSON.stringify({ workers: [] });
+        const json = JSON.stringify({ members: [] });
         await putSnapshot(ctx, json);
     },
 );
@@ -365,7 +365,7 @@ test(
                         id: 's1',
                         entity_id: 'e1',
                         state: value,
-                        worker_id: 'w1',
+                        member_id: 'w1',
                         at: '2026-01-01T00:00:00Z',
                     }],
                 });

@@ -1,17 +1,17 @@
 import { $ } from './dom.ts';
 import { navigateTo } from './navigation.ts';
 
-const SIDEBAR_WORKER_NAME_IDS = [
-    'sidebar-worker-name',
-    'mobile-sidebar-worker-name',
+const SIDEBAR_MEMBER_NAME_IDS = [
+    'sidebar-member-name',
+    'mobile-sidebar-member-name',
 ] as const;
 
-const SIDEBAR_WORKER_ORG_IDS = [
-    'sidebar-worker-org',
-    'mobile-sidebar-worker-org',
+const SIDEBAR_MEMBER_ORG_IDS = [
+    'sidebar-member-org',
+    'mobile-sidebar-member-org',
 ] as const;
 
-async function getSidebarWorker(
+async function getSidebarMember(
 ): Promise<{
     id: string;
     name: string;
@@ -19,52 +19,52 @@ async function getSidebarWorker(
 }> {
     const {
         createRequestContext,
-        getHumanWorker,
+        getHumanMember,
         getOrganization,
     } = await import('./adapters');
     const ctx = createRequestContext();
-    const [worker, org] =
+    const [member, org] =
         await Promise.all([
-            getHumanWorker(ctx, 'current'),
+            getHumanMember(ctx, 'current'),
             getOrganization(ctx),
         ]);
     return {
-        id: worker.idForLink(),
-        name: worker.name(),
+        id: member.idForLink(),
+        name: member.name(),
         organization: org.nameText(),
     };
 }
 
-export async function mutateSidebarWorker(
+export async function mutateSidebarMember(
 ): Promise<void> {
-    const sidebarWorker =
-        await getSidebarWorker();
+    const sidebarMember =
+        await getSidebarMember();
     for (const id of
-        SIDEBAR_WORKER_NAME_IDS
+        SIDEBAR_MEMBER_NAME_IDS
     ) {
         const el =
             $(`#${id}`, document);
         if (el)
-            el.textContent = sidebarWorker.name;
+            el.textContent = sidebarMember.name;
     }
     for (const id of
-        SIDEBAR_WORKER_ORG_IDS
+        SIDEBAR_MEMBER_ORG_IDS
     ) {
         const el =
             $(`#${id}`, document);
         if (el)
             el.textContent =
-                sidebarWorker.organization;
+                sidebarMember.organization;
     }
     const chips = document.querySelectorAll<
         HTMLElement
-    >('.sidebar-worker');
+    >('.sidebar-member');
     for (const chip of chips) {
         chip.addEventListener(
             'click',
             () => navigateTo(
-                'worker-detail',
-                { workerId: sidebarWorker.id },
+                'member-detail',
+                { memberId: sidebarMember.id },
             ),
         );
     }

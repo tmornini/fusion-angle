@@ -7,11 +7,11 @@ import {
     validateStoredGraphJson,
 } from '../../../api/validators.ts';
 import type { RequestContext } from './shared.ts';
-import { shouldShowWorkerHazard } from '../flow-graph.ts';
+import { shouldShowMemberHazard } from '../flow-graph.ts';
 import type { ValidationResult } from './validation.ts';
 
 export type FlowProblem =
-    | { kind: 'zero_workers'; nodeId: Id }
+    | { kind: 'zero_members'; nodeId: Id }
     | { kind: 'dead_end'; nodeId: Id };
 
 export type FlowReadiness = ValidationResult<FlowProblem>;
@@ -27,13 +27,13 @@ export function validateFlowForCreation(
         if (node.isCreate || node.isArchive) {
             continue;
         }
-        const level = shouldShowWorkerHazard(
+        const level = shouldShowMemberHazard(
             node, graph.edges,
         );
         if (level !== 'danger') continue;
-        if (node.workerIds.length === 0) {
+        if (node.memberIds.length === 0) {
             problems.push({
-                kind: 'zero_workers',
+                kind: 'zero_members',
                 nodeId: node.id,
             });
             continue;
@@ -52,8 +52,8 @@ export function validateFlowForCreation(
 export function formatFlowProblem(
     problem: FlowProblem,
 ): string {
-    if (problem.kind === 'zero_workers') {
-        return 'zero workers on node '
+    if (problem.kind === 'zero_members') {
+        return 'zero members on node '
             + problem.nodeId;
     }
     return 'dead end at node ' + problem.nodeId;

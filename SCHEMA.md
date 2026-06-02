@@ -43,23 +43,23 @@ relationship dissolution = splice." History tables
 (`flow_versions`) are exempt and hard-delete via row
 removal.
 
-**The `'system'` worker:** `SYSTEM_WORKER_ID = 'system'`
-in `api/types.ts` is a `workers` parent row with
+**The `'system'` member:** `SYSTEM_MEMBER_ID = 'system'`
+in `api/types.ts` is a `members` parent row with
 `type = 'system'` and no detail row, seeded by both
 `populateMockData` and `populateBootstrapData`. State
 events with no specific user actor reference it. It is a
-pure event-author: `getWorkerMap` resolves it for
-authorship display, but the `getWorkers` roster — and
+pure event-author: `getMemberMap` resolves it for
+authorship display, but the `getMembers` roster — and
 every list, picker, and detail view — omits it.
 
 ## Core
 
-### workers
+### members
 
-The parent worker table: one row per worker holding the
+The parent member table: one row per member holding the
 shared identity, the `type` discriminant, and the display
-`name`. Kind-specific detail lives in `human_workers` /
-`ai_workers`, keyed by the same id; a `'system'` worker
+`name`. Kind-specific detail lives in `human_members` /
+`ai_members`, keyed by the same id; a `'system'` member
 is a parent row with no detail row. The terminal
 lifecycle state is `'archived'`, recorded in the `states`
 log.
@@ -70,9 +70,9 @@ log.
 | type | TEXT (`human` \| `ai` \| `system`) |
 | name | TEXT |
 
-### human_workers
+### human_members
 
-Human detail, keyed by the shared worker id.
+Human detail, keyed by the shared member id.
 
 | Column | Type |
 |--------|------|
@@ -85,10 +85,10 @@ Human detail, keyed by the shared worker id.
 | phone | TEXT |
 | bio | TEXT |
 
-### ai_workers
+### ai_members
 
-AI detail, keyed by the shared worker id. All worker
-kinds share the `WORKER_STATES` alphabet (`active`,
+AI detail, keyed by the shared member id. All member
+kinds share the `MEMBER_STATES` alphabet (`active`,
 `pending`, `archived`), recorded in the `states` log.
 
 `model` is a foreign key into the code-resident
@@ -178,7 +178,7 @@ JSON document:
     "positionY": 0,
     "isCreate": false,
     "isArchive": false,
-    "workerIds": ["..."],
+    "memberIds": ["..."],
     "attributes": [{
       "attribute_id": "...",
       "mode": "editable",
@@ -199,10 +199,10 @@ state values: they identify the special start/end nodes of
 the flow. A work order's *state* at a node is recorded as
 that node's id (a base62 token) in the `states` log.
 
-`workerIds` is the set of WorkerId values that may operate
+`memberIds` is the set of MemberId values that may operate
 on the node — zero or more, drawn from the human and AI
-workers (a unified WorkerId space rooted in the `workers`
-parent table; see `adapters/workers-union.ts`).
+members (a unified MemberId space rooted in the `members`
+parent table; see `adapters/members-union.ts`).
 
 `attributes` is the per-node attribute reference list. Each
 entry points at a `record_attributes.id`; absence from the
@@ -322,7 +322,7 @@ Singleton table (single row, `id = '1'`).
 |--------|------|
 | id | TEXT |
 | idea_id | TEXT (FK → ideas) |
-| worker_id | TEXT (FK → workers) |
+| member_id | TEXT (FK → members) |
 | at | TEXT |
 
 ### project_flows
@@ -381,7 +381,7 @@ identity whose human-facing text evolves over time.
 | objective_id | TEXT | References objectives |
 | name | TEXT | Human-facing name at this revision |
 | description | TEXT | Human-facing description |
-| worker_id | TEXT | FK → workers (author) |
+| member_id | TEXT | FK → members (author) |
 | at | TEXT | RFC-3339 Zulu |
 
 The latest row per `objective_id` by `at` is the
@@ -395,7 +395,7 @@ current text.
 | project_id | TEXT | References projects |
 | objective_id | TEXT | References objectives |
 | score | INTEGER | |
-| worker_id | TEXT | FK → workers (scorer) |
+| member_id | TEXT | FK → members (scorer) |
 | at | TEXT | RFC-3339 Zulu |
 
 ### project_objective_actual_scores
@@ -406,7 +406,7 @@ current text.
 | project_id | TEXT | References projects |
 | objective_id | TEXT | References objectives |
 | score | INTEGER | |
-| worker_id | TEXT | FK → workers (scorer) |
+| member_id | TEXT | FK → members (scorer) |
 | at | TEXT | RFC-3339 Zulu |
 
 ## State Event Log
@@ -421,7 +421,7 @@ lifecycle change in the system. One row, one fact.
 | id | TEXT | PRIMARY KEY (base62 token) |
 | entity_id | TEXT | Id of the entity this event concerns |
 | state | TEXT | A value from the entity's state alphabet |
-| worker_id | TEXT | FK → workers (actor) |
+| member_id | TEXT | FK → members (actor) |
 | at | TEXT | RFC-3339 Zulu — moment of the event |
 
 The latest event on `entity_id` by `at` (with `>=`
@@ -439,8 +439,8 @@ State alphabets by entity kind:
 - **projects** — `PROJECT_STATES` (7 values):
   `submitted`, `under-review`, `sent-back`, `approved`,
   `declined`, `archived`, `deleted`
-- **workers** (all kinds share one alphabet) —
-  `WORKER_STATES` (3 values): `active`, `pending`,
+- **members** (all kinds share one alphabet) —
+  `MEMBER_STATES` (3 values): `active`, `pending`,
   `archived`
 - **records** — `RECORD_STATES` (3 values): `active`,
   `archived`, `deleted`

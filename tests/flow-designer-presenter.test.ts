@@ -123,7 +123,7 @@ const node = (
     positionY: y,
     isCreate: false,
     isArchive: false,
-    workerIds: [] as string[],
+    memberIds: [] as string[],
     attributes: [],
     taskInstructions: '',
 });
@@ -262,7 +262,7 @@ test(
     },
 );
 
-// Successful-mutation coverage of withNodeWorkerIds
+// Successful-mutation coverage of withNodeMemberIds
 // lives in flow-designer-actions.test.ts as a
 // direct applyUpdateNode test. The presenter
 // wrapping triggers #saveFlow which calls
@@ -271,14 +271,14 @@ test(
 // node:test. Same reason no other withNode*
 // mutation test exists in this file.
 //
-// Locked-state coverage of withNodeWorkerIds is
+// Locked-state coverage of withNodeMemberIds is
 // manual (TEST-PLAN F51). The presenter's
 // #guardLocked() invokes showToast(), which
 // depends on document — no DOM under
 // node:test.
 
 test(
-    'withNodeWorkerIds is a no-op when no node'
+    'withNodeMemberIds is a no-op when no node'
     + ' is selected',
     () => {
         const graph = {
@@ -293,13 +293,13 @@ test(
                 snap, 800, 600,
                 buildFlowHistorySnapshot(false),
             );
-        const next = presenter.withNodeWorkerIds(
+        const next = presenter.withNodeMemberIds(
             ['hw_1'],
         );
         const n = next.nodes.find(
             x => x.id === 'n1',
         )!;
-        assert.deepEqual(n.workerIds, []);
+        assert.deepEqual(n.memberIds, []);
     },
 );
 

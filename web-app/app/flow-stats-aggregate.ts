@@ -10,8 +10,8 @@ import {
 } from '../../api/types.ts';
 import type { TransitionEvent }
     from './adapters/state-events.ts';
-import { shouldShowWorkerHazard } from './flow-graph.ts';
-import type { WorkerHazardLevel } from './flow-graph.ts';
+import { shouldShowMemberHazard } from './flow-graph.ts';
+import type { MemberHazardLevel } from './flow-graph.ts';
 
 export interface FlowStatsInput {
     readonly nodes: readonly GraphNode[];
@@ -22,7 +22,7 @@ export interface FlowStatsInput {
         readonly TransitionEvent[];
     readonly nowMs: number;
     readonly windowDays: number;
-    readonly workerNameById:
+    readonly memberNameById:
         ReadonlyMap<Id, string>;
 }
 
@@ -53,7 +53,7 @@ export interface NodeStat {
         readonly inCurrentClan: boolean;
     } | null;
     readonly assignmentLabel: string;
-    readonly workerHazard: WorkerHazardLevel | null;
+    readonly memberHazard: MemberHazardLevel | null;
     readonly branchSplit: readonly {
         readonly edgeId: string;
         readonly label: string;
@@ -112,7 +112,7 @@ function emptyNodeStat(n: GraphNode): NodeStat {
         activeProducerCount: 0,
         topProducer: null,
         assignmentLabel: 'Unassigned',
-        workerHazard: null,
+        memberHazard: null,
         branchSplit: [],
     };
 }
@@ -121,7 +121,7 @@ interface Sojourn {
     readonly nodeId: string;
     readonly enterMs: number;
     readonly exitMs: number;
-    readonly workerId: string;
+    readonly memberId: string;
 }
 
 interface WoRun {
@@ -179,7 +179,7 @@ function reconstructRuns(
                 sojourns.push({
                     nodeId: node.id,
                     enterMs, exitMs,
-                    workerId: t.worker_id,
+                    memberId: t.member_id,
                 });
             }
             if (node.isArchive) completed = true;
@@ -195,25 +195,25 @@ function reconstructRuns(
     return { runs, droppedNodeIds: dropped };
 }
 
-// A node's clan IS its workerIds directly.
-// The label lists the workers' display names,
+// A node's clan IS its memberIds directly.
+// The label lists the members' display names,
 // or "Unassigned" if the list is empty.
 function resolveClan(
     n: GraphNode,
     input: FlowStatsInput,
 ): { ids: ReadonlySet<string>;
      label: string } {
-    if (n.workerIds.length === 0) {
+    if (n.memberIds.length === 0) {
         return {
             ids: new Set(),
             label: 'Unassigned',
         };
     }
-    const names = n.workerIds.map(id =>
-        input.workerNameById.get(id) ?? id,
+    const names = n.memberIds.map(id =>
+        input.memberNameById.get(id) ?? id,
     );
     return {
-        ids: new Set(n.workerIds),
+        ids: new Set(n.memberIds),
         label: names.join(', '),
     };
 }
@@ -312,7 +312,7 @@ export function buildFlowStats(
 
     const weeks = input.windowDays / 7;
 
-    // Count OUT-transitions per (node, worker) within
+    // Count OUT-transitions per (node, member) within
     // the window.  Transitions with from_node_id='' are
     // creation events and carry no producer signal.
     const outByNode =
@@ -326,8 +326,8 @@ export function buildFlowStats(
             outByNode.get(t.from_node_id)
             ?? new Map<string, number>();
         inner.set(
-            t.worker_id,
-            (inner.get(t.worker_id) ?? 0) + 1,
+            t.member_id,
+            (inner.get(t.member_id) ?? 0) + 1,
         );
         outByNode.set(t.from_node_id, inner);
     }
@@ -374,10 +374,10 @@ export function buildFlowStats(
                     if (b[1] !== a[1])
                         return b[1] - a[1];
                     const na =
-                        input.workerNameById.get(a[0])
+                        input.memberNameById.get(a[0])
                         ?? a[0];
                     const nb =
-                        input.workerNameById.get(b[0])
+                        input.memberNameById.get(b[0])
                         ?? b[0];
                     if (na !== nb)
                         return na.localeCompare(nb);
@@ -386,7 +386,7 @@ export function buildFlowStats(
             const [pid, count] = sorted[0]!;
             topProducer = {
                 name:
-                    input.workerNameById.get(pid)
+                    input.memberNameById.get(pid)
                     ?? pid,
                 sharePct: Math.round(
                     (count / totalOut) * 100,
@@ -437,11 +437,11 @@ export function buildFlowStats(
         }
 
         // Two-tier hazard rendering — see
-        // shouldShowWorkerHazard in flow-graph.ts.
+        // shouldShowMemberHazard in flow-graph.ts.
         // Shared with the designer canvas so both
         // surfaces escalate identically.
-        const workerHazard =
-            shouldShowWorkerHazard(n, input.edges);
+        const memberHazard =
+            shouldShowMemberHazard(n, input.edges);
 
         return { ...emptyNodeStat(n),
             heatPct, heatT,
@@ -480,7 +480,7 @@ export function buildFlowStats(
             assignmentLabel: clan.label,
             outgoingEdgeIds: outEdges.map(e => e.id),
             branchSplit,
-            workerHazard,
+            memberHazard,
         };
     });
 

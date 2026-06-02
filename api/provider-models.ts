@@ -4,7 +4,7 @@ import type {
 } from './types.ts';
 
 // Code-resident, not a DB table: the single source
-// of truth the AI-worker validation gate checks
+// of truth the AI-member validation gate checks
 // `model` membership against.
 const PROVIDER_MODELS: readonly ProviderModel[] = [
     {

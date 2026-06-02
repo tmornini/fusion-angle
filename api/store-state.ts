@@ -82,12 +82,12 @@ export class StateStore
         id: Id,
         entityId: Id,
         state: string,
-        workerId: Id,
+        memberId: Id,
     ): Promise<void> {
         await this.put(id, {
             entity_id: entityId,
             state,
-            worker_id: workerId,
+            member_id: memberId,
             at: nowUtc(),
         });
     }

@@ -11,7 +11,7 @@ import {
 import {
     jsonObjectField,
     jsonArrayField,
-    SYSTEM_WORKER_ID,
+    SYSTEM_MEMBER_ID,
     DEFAULT_LOCK_TIMEOUT,
     type GraphNode,
     type GraphEdge,
@@ -22,15 +22,15 @@ import {
 const AT_CREATED = '2026-05-01T10:00:00.000Z';
 const AT_FIRST = '2026-05-01T11:00:00.000Z';
 
-async function seedSystemWorker(
+async function seedSystemMember(
     db: MemoryDbAdapter,
 ): Promise<void> {
-    await db.workers.put(SYSTEM_WORKER_ID, {
+    await db.members.put(SYSTEM_MEMBER_ID, {
         type: 'system',
-        name: 'System Worker',
+        name: 'System Member',
     });
     await db.states.record(
-        'st-system', SYSTEM_WORKER_ID, 'active',
+        'st-system', SYSTEM_MEMBER_ID, 'active',
         'system',
     );
 }
@@ -48,7 +48,7 @@ function buildNode(
         positionY: 0,
         isCreate: false,
         isArchive: false,
-        workerIds: [],
+        memberIds: [],
         attributes,
         taskInstructions: '',
         ...overrides,
@@ -100,7 +100,7 @@ async function seedWorkOrder(
     await db.states.put('t-create-' + id, {
         entity_id: id,
         state: currentNodeId,
-        worker_id: SYSTEM_WORKER_ID,
+        member_id: SYSTEM_MEMBER_ID,
         at: AT_CREATED,
     });
 }
@@ -148,7 +148,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
-        await seedSystemWorker(db);
+        await seedSystemMember(db);
         const flowGraph = buildFlowGraph(
             'flow-1',
             [
@@ -177,7 +177,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
-        await seedSystemWorker(db);
+        await seedSystemMember(db);
         const flowGraph = buildFlowGraph(
             'flow-1',
             [
@@ -217,7 +217,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
-        await seedSystemWorker(db);
+        await seedSystemMember(db);
         const flowGraph = buildFlowGraph(
             'flow-1',
             [
@@ -248,7 +248,7 @@ test(
         await db.states.put('t-step', {
             entity_id: 'wo-1',
             state: 'n-step',
-            worker_id: SYSTEM_WORKER_ID,
+            member_id: SYSTEM_MEMBER_ID,
             at: AT_FIRST,
         });
         await db.stateFieldValues.put('fv-1', {
@@ -275,7 +275,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
-        await seedSystemWorker(db);
+        await seedSystemMember(db);
         const flowGraph = buildFlowGraph(
             'flow-1',
             [
@@ -312,7 +312,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
-        await seedSystemWorker(db);
+        await seedSystemMember(db);
         const flowGraph = buildFlowGraph(
             'flow-1',
             [
@@ -357,7 +357,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
-        await seedSystemWorker(db);
+        await seedSystemMember(db);
         const flowGraph = buildFlowGraph(
             'flow-1',
             [

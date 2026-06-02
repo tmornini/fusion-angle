@@ -58,12 +58,12 @@ test(
         // also gets wiped as part of the failure
         // recovery.
         shim.map.set(
-            KEY_PREFIX + 'workers',
+            KEY_PREFIX + 'members',
             '[]',
         );
 
         const snapshot = JSON.stringify({
-            workers: [],
+            members: [],
             ideas: [],
             projects: [],
             flows: [],

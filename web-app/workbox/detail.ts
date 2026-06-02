@@ -19,11 +19,11 @@ import {
     getWorkOrderTransitionEvents,
     getStateFieldValuesByEvent,
     getWorkOrderActiveClaim,
-    getWorkerMap,
+    getMemberMap,
     postWorkOrderTransition,
     postWorkOrderClaim,
     deleteWorkOrderClaim,
-    getCurrentHumanWorker,
+    getCurrentHumanMember,
     createRequestContext,
     generateCryptoSafeBase62,
     validateWorkOrderFlowGraph,
@@ -228,7 +228,7 @@ function initUnclaimButton(
 
 async function loadPresenter(
     workOrderId: string,
-    currentWorkerId: string,
+    currentMemberId: string,
     ctx: ReturnType<typeof createRequestContext>,
 ): Promise<WorkboxDetailPresenter> {
     const workOrder =
@@ -240,7 +240,7 @@ async function loadPresenter(
         transitions,
         fieldValuesByEvent,
         activeClaim,
-        workerMap,
+        memberMap,
         recordId,
     ] = await Promise.all([
         getWorkOrderTransitionEvents(
@@ -250,7 +250,7 @@ async function loadPresenter(
         getWorkOrderActiveClaim(
             ctx, workOrderId, fg.lockTimeout,
         ),
-        getWorkerMap(ctx),
+        getMemberMap(ctx),
         getRecordForFlow(ctx, fg.flowId),
     ]);
     const attributes: RecordAttributeEntity[] =
@@ -269,8 +269,8 @@ async function loadPresenter(
         transitions,
         fieldValuesByEvent,
         activeClaim,
-        workerMap,
-        currentWorkerId,
+        memberMap,
+        currentMemberId,
         attributeMap,
     );
 }
@@ -292,9 +292,9 @@ export async function init(
     if (!container) return;
 
     const ctx = createRequestContext();
-    const workerRow =
-        await getCurrentHumanWorker(ctx);
-    const workerId = workerRow.id;
+    const memberRow =
+        await getCurrentHumanMember(ctx);
+    const memberId = memberRow.id;
 
     const detail = await withLoadingState(
         container,
@@ -303,14 +303,14 @@ export async function init(
             let presenter =
                 await loadPresenter(
                     id,
-                    workerId,
+                    memberId,
                     ctx,
                 );
             const claim =
                 presenter.claimStatus();
             if (
                 (claim.kind !== 'claimed'
-                    || !claim.byCurrentWorker)
+                    || !claim.byCurrentMember)
                 && !presenter.isArchive()
             ) {
                 await postWorkOrderClaim(
@@ -320,7 +320,7 @@ export async function init(
                 presenter =
                     await loadPresenter(
                         id,
-                        workerId,
+                        memberId,
                         ctx,
                     );
             }

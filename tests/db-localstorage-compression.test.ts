@@ -39,7 +39,7 @@ const baseVersion = {
                 name: 'Start',
                 isCreate: true,
                 isArchive: false,
-                workerIds: [],
+                memberIds: [],
                 attributes: [],
                 positionX: 0,
                 positionY: 0,
@@ -121,12 +121,12 @@ test(
             (_, i) => `u-${i}`,
         );
         await Promise.all(
-            ids.map(id => adapter.workers.put(id, {
+            ids.map(id => adapter.members.put(id, {
                 type: 'human',
-                name: 'Worker ' + id,
+                name: 'Member ' + id,
             })),
         );
-        const all = await adapter.workers.getAll();
+        const all = await adapter.members.getAll();
         assert.equal(
             all.length, 11,
             'all 11 concurrent puts must persist',
@@ -152,7 +152,7 @@ test(
             {
                 entity_id: 'wo-1',
                 state: 'n-to',
-                worker_id: 'u-1',
+                member_id: 'u-1',
                 at:
                     '2026-01-01T00:00:00.000Z',
             },
@@ -170,16 +170,16 @@ test(
 );
 
 test(
-    'workers table is not compressed (raw JSON in storage)',
+    'members table is not compressed (raw JSON in storage)',
     async () => {
         const map = installShim();
         const adapter = new LocalStorageDbAdapter();
         await adapter.createSchema();
-        await adapter.workers.put('u1', {
+        await adapter.members.put('u1', {
             type: 'human',
             name: 'Alice Adams',
         });
-        const stored = map.get(KEY_PREFIX + 'workers');
+        const stored = map.get(KEY_PREFIX + 'members');
         assert.ok(stored, 'expected stored people value');
         assert.ok(
             stored.startsWith('['),

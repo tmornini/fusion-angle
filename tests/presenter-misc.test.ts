@@ -25,15 +25,15 @@ import { toggleStatusFilter } from
 import { orderedKeys } from
     '../web-app/app/presenters/ordered-keys.ts';
 import {
-    HumanWorker, AIWorker, nowUtc,
+    HumanMember, AIMember, nowUtc,
 } from '../api/types.ts';
 import type {
     GraphNode, GraphEdge,
 } from '../api/types.ts';
 import {
-    makeHumanWorker as buildHumanWorker,
-    makeAIWorker as buildAIWorker,
-} from './worker-fixtures.ts';
+    makeHumanMember as buildHumanMember,
+    makeAIMember as buildAIMember,
+} from './member-fixtures.ts';
 
 // helpers
 
@@ -116,7 +116,7 @@ function makeNode(
         positionY: 0,
         isCreate: false,
         isArchive: false,
-        workerIds: [],
+        memberIds: [],
         attributes: [],
         taskInstructions: '',
         ...over,
@@ -135,14 +135,14 @@ function makeEdge(
     };
 }
 
-function makeHumanWorker(
+function makeHumanMember(
     id: string, first: string, last: string,
-): HumanWorker {
-    return buildHumanWorker(id, `${first} ${last}`);
+): HumanMember {
+    return buildHumanMember(id, `${first} ${last}`);
 }
 
-function makeAIWorker(id: string, name: string): AIWorker {
-    return buildAIWorker(id, name);
+function makeAIMember(id: string, name: string): AIMember {
+    return buildAIMember(id, name);
 }
 
 function noUnknownMagic(s: string): void {
@@ -670,24 +670,24 @@ test(
 
 test(
     'buildNodePanel for a regular node lists the'
-    + ' worker checkboxes grouped Humans / AIs',
+    + ' member checkboxes grouped Humans / AIs',
     () => {
         const humans = [
-            makeHumanWorker('hw_1', 'Ada', 'L'),
+            makeHumanMember('hw_1', 'Ada', 'L'),
         ];
         const ais = [
-            makeAIWorker('ai_1', 'Sonnet'),
+            makeAIMember('ai_1', 'Sonnet'),
         ];
         const out = buildNodePanel(
             makeNode(), [], false,
             humans, ais, [],
         ).toString();
         assert.match(out, /State Properties/);
-        assert.match(out, /id="prop-node-workers"/);
-        assert.match(out, /worker-group-label[^>]*>HUMANS</);
-        assert.match(out, /worker-group-label[^>]*>AIs</);
-        assert.match(out, /data-worker-id="hw_1"/);
-        assert.match(out, /data-worker-id="ai_1"/);
+        assert.match(out, /id="prop-node-members"/);
+        assert.match(out, /member-group-label[^>]*>HUMANS</);
+        assert.match(out, /member-group-label[^>]*>AIs</);
+        assert.match(out, /data-member-id="hw_1"/);
+        assert.match(out, /data-member-id="ai_1"/);
         assert.match(out, /Ada L/);
         assert.match(out, /Sonnet/);
     },
@@ -695,23 +695,23 @@ test(
 
 test(
     'buildNodePanel marks currently assigned'
-    + ' worker checkboxes as checked',
+    + ' member checkboxes as checked',
     () => {
         const humans = [
-            makeHumanWorker('hw_1', 'Ada', 'L'),
-            makeHumanWorker('hw_2', 'Bea', 'M'),
+            makeHumanMember('hw_1', 'Ada', 'L'),
+            makeHumanMember('hw_2', 'Bea', 'M'),
         ];
         const out = buildNodePanel(
-            makeNode({ workerIds: ['hw_1'] }),
+            makeNode({ memberIds: ['hw_1'] }),
             [], false, humans, [], [],
         ).toString();
         assert.match(
             out,
-            /data-worker-id="hw_1"[^>]*checked/,
+            /data-member-id="hw_1"[^>]*checked/,
         );
         assert.doesNotMatch(
             out,
-            /data-worker-id="hw_2"[^>]*checked/,
+            /data-member-id="hw_2"[^>]*checked/,
         );
     },
 );
@@ -721,7 +721,7 @@ test(
     + ' is locked',
     () => {
         const humans = [
-            makeHumanWorker('hw_1', 'Ada', 'L'),
+            makeHumanMember('hw_1', 'Ada', 'L'),
         ];
         const out = buildNodePanel(
             makeNode(), [], true,
@@ -732,7 +732,7 @@ test(
         );
         assert.match(
             out,
-            /data-worker-id="hw_1"[^>]*disabled/,
+            /data-member-id="hw_1"[^>]*disabled/,
         );
     },
 );

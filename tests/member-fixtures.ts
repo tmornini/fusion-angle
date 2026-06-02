@@ -1,17 +1,17 @@
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import {
-    HumanWorker,
-    AIWorker,
-    type WorkerState,
+    HumanMember,
+    AIMember,
+    type MemberState,
 } from '../api/types.ts';
 import {
     getProviderModels,
 } from '../api/provider-models.ts';
 
-// Build/seed workers in the post-normalization shape: a
+// Build/seed members in the post-normalization shape: a
 // parent row (type + name) plus a kind-specific detail
 // row, sharing one id. Fixtures use these so the two-
-// table worker shape lives in exactly one place.
+// table member shape lives in exactly one place.
 
 function humanDetail(id: string) {
     return {
@@ -33,58 +33,58 @@ function aiDetail() {
     };
 }
 
-export function makeHumanWorker(
+export function makeHumanMember(
     id: string,
     name: string,
-    state: WorkerState = 'active',
-): HumanWorker {
-    return new HumanWorker(
+    state: MemberState = 'active',
+): HumanMember {
+    return new HumanMember(
         { id, type: 'human', name },
         { id, ...humanDetail(id) },
         state,
     );
 }
 
-export function makeAIWorker(
+export function makeAIMember(
     id: string,
     name: string,
-    state: WorkerState = 'active',
-): AIWorker {
-    return new AIWorker(
+    state: MemberState = 'active',
+): AIMember {
+    return new AIMember(
         { id, type: 'ai', name },
         { id, ...aiDetail() },
         state,
     );
 }
 
-export async function seedHumanWorker(
+export async function seedHumanMember(
     db: MemoryDbAdapter,
     id: string,
     name: string,
-    state: WorkerState = 'active',
+    state: MemberState = 'active',
 ): Promise<void> {
-    await db.workers.put(id, { type: 'human', name });
-    await db.humanWorkers.put(id, humanDetail(id));
+    await db.members.put(id, { type: 'human', name });
+    await db.humanMembers.put(id, humanDetail(id));
     await db.states.record(
         `st-${id}`, id, state, 'system',
     );
 }
 
-export async function seedAIWorker(
+export async function seedAIMember(
     db: MemoryDbAdapter,
     id: string,
     name: string,
-    state: WorkerState = 'active',
+    state: MemberState = 'active',
 ): Promise<void> {
-    await db.workers.put(id, { type: 'ai', name });
-    await db.aiWorkers.put(id, aiDetail());
+    await db.members.put(id, { type: 'ai', name });
+    await db.aiMembers.put(id, aiDetail());
     await db.states.record(
         `st-${id}`, id, state, 'system',
     );
 }
 
-export async function seedCurrentWorker(
+export async function seedCurrentMember(
     db: MemoryDbAdapter,
 ): Promise<void> {
-    await seedHumanWorker(db, 'current', 'Demo User');
+    await seedHumanMember(db, 'current', 'Demo User');
 }

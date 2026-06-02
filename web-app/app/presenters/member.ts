@@ -9,36 +9,36 @@ import {
     iconBrain,
 } from '../icons.ts';
 import {
-    HumanWorker,
-    AIWorker,
-    type Worker,
-    isHumanWorker,
-    isAIWorker,
+    HumanMember,
+    AIMember,
+    type Member,
+    isHumanMember,
+    isAIMember,
 } from '../adapters/index.ts';
 import { DISPLAY_ABSENT } from '../format.ts';
 import {
     findProviderModel,
 } from '../../../api/provider-models.ts';
 
-export type WorkerKindFilter =
+export type MemberKindFilter =
     | 'all'
     | 'human'
     | 'ai';
 
-export class HumanWorkerRowPresenter {
-    readonly #worker: HumanWorker;
+export class HumanMemberRowPresenter {
+    readonly #member: HumanMember;
 
-    constructor(worker: HumanWorker) {
-        this.#worker = worker;
+    constructor(member: HumanMember) {
+        this.#member = member;
     }
 
     idForLink(): string {
-        return this.#worker.idForLink();
+        return this.#member.idForLink();
     }
 
     matchesSearch(query: string): boolean {
         if (query === '') return true;
-        return this.#worker
+        return this.#member
             .matchesSearch(query);
     }
 
@@ -47,14 +47,14 @@ export class HumanWorkerRowPresenter {
         <div class="${
             'card card-hover p-4 cursor-pointer'
             + ' flex items-center gap-4'
-            + (this.#worker.isArchived()
+            + (this.#member.isArchived()
                 ? ' opacity-50' : '')
         }"
             data-self="${
                 isSelf ? 'true' : 'false'
             }"
-            data-worker-id="${
-                this.#worker.idForLink()
+            data-member-id="${
+                this.#member.idForLink()
             }">
             <div class="${
                 'avatar avatar-tinted'
@@ -64,7 +64,7 @@ export class HumanWorkerRowPresenter {
                     + ' text-primary'
                 }">
                     ${initials(
-                        this.#worker.name(),
+                        this.#member.name(),
                     )}
                 </span>
             </div>
@@ -72,12 +72,12 @@ export class HumanWorkerRowPresenter {
                 <p class="${
                     'font-medium truncate'
                 }">
-                    ${this.#worker.name()}
+                    ${this.#member.name()}
                 </p>
                 <p class="${
                     'text-xs text-muted truncate'
                 }">
-                    ${this.#worker.emailAddress()}
+                    ${this.#member.emailAddress()}
                 </p>
                 <div class="${
                     'flex items-center gap-2 mt-1'
@@ -86,7 +86,7 @@ export class HumanWorkerRowPresenter {
                     <span class="${
                         'text-xs text-muted'
                     }">
-                        ${this.#worker
+                        ${this.#member
                             .departmentLabel()}
                     </span>
                 </div>
@@ -101,7 +101,7 @@ export class HumanWorkerRowPresenter {
     }
 
     #buildStatusBadge(): SafeHtml {
-        if (this.#worker.isActive())
+        if (this.#member.isActive())
             return html`<span
                 class="${
                     'status-badge-success'
@@ -109,7 +109,7 @@ export class HumanWorkerRowPresenter {
                 ${iconCheckCircle2(14, '')}
                 Active
             </span>`;
-        if (this.#worker.isPending())
+        if (this.#member.isPending())
             return html`<span
                 class="${
                     'status-badge-warning'
@@ -131,25 +131,25 @@ export class HumanWorkerRowPresenter {
             class="${
                 'badge badge-secondary'
             }">
-            ${this.#worker.titleLabel()}
+            ${this.#member.titleLabel()}
         </span>`;
     }
 }
 
-export class AIWorkerRowPresenter {
-    readonly #worker: AIWorker;
+export class AIMemberRowPresenter {
+    readonly #member: AIMember;
 
-    constructor(worker: AIWorker) {
-        this.#worker = worker;
+    constructor(member: AIMember) {
+        this.#member = member;
     }
 
     idForLink(): string {
-        return this.#worker.idForLink();
+        return this.#member.idForLink();
     }
 
     matchesSearch(query: string): boolean {
         if (query === '') return true;
-        return this.#worker
+        return this.#member
             .matchesSearch(query);
     }
 
@@ -159,8 +159,8 @@ export class AIWorkerRowPresenter {
             'card card-hover p-4 cursor-pointer'
             + ' flex items-center gap-4'
         }"
-            data-worker-id="${
-                this.#worker.idForLink()
+            data-member-id="${
+                this.#member.idForLink()
             }">
             <div class="${
                 'avatar avatar-tinted'
@@ -174,13 +174,13 @@ export class AIWorkerRowPresenter {
                 <p class="${
                     'font-medium truncate'
                 }">
-                    ${this.#worker.nameText()}
+                    ${this.#member.nameText()}
                 </p>
                 <p class="${
                     'text-xs text-muted truncate'
                 }">
                     ${
-                        this.#worker
+                        this.#member
                             .descriptionText()
                     }
                 </p>
@@ -191,7 +191,7 @@ export class AIWorkerRowPresenter {
                         'badge badge-secondary'
                     }">
                         ${findProviderModel(
-                            this.#worker.modelId(),
+                            this.#member.modelId(),
                         )?.name ?? DISPLAY_ABSENT}
                     </span>
                 </div>
@@ -200,62 +200,62 @@ export class AIWorkerRowPresenter {
     }
 }
 
-export type ManagedWorkersState = {
-    workers: Worker[];
-    currentWorkerId: string;
+export type ManagedMembersState = {
+    members: Member[];
+    currentMemberId: string;
     search: string;
-    kind: WorkerKindFilter;
+    kind: MemberKindFilter;
 };
 
-export function buildInitialManagedWorkersState(
-    workers: Worker[],
-    currentWorkerId: string,
-): ManagedWorkersState {
+export function buildInitialManagedMembersState(
+    members: Member[],
+    currentMemberId: string,
+): ManagedMembersState {
     return {
-        workers,
-        currentWorkerId,
+        members,
+        currentMemberId,
         search: '',
         kind: 'all',
     };
 }
 
-export function applyManagedWorkersSearch(
-    state: ManagedWorkersState,
+export function applyManagedMembersSearch(
+    state: ManagedMembersState,
     query: string,
-): ManagedWorkersState {
+): ManagedMembersState {
     return {
         ...state,
         search: query.toLowerCase(),
     };
 }
 
-export function applyManagedWorkersKind(
-    state: ManagedWorkersState,
-    kind: WorkerKindFilter,
-): ManagedWorkersState {
+export function applyManagedMembersKind(
+    state: ManagedMembersState,
+    kind: MemberKindFilter,
+): ManagedMembersState {
     return { ...state, kind };
 }
 
-export class ManagedWorkersPresenter {
-    readonly #humans: HumanWorkerRowPresenter[];
-    readonly #ais: AIWorkerRowPresenter[];
-    readonly #currentWorkerId: string;
+export class ManagedMembersPresenter {
+    readonly #humans: HumanMemberRowPresenter[];
+    readonly #ais: AIMemberRowPresenter[];
+    readonly #currentMemberId: string;
     readonly #search: string;
-    readonly #kind: WorkerKindFilter;
+    readonly #kind: MemberKindFilter;
 
-    constructor(state: ManagedWorkersState) {
-        this.#humans = state.workers
-            .filter(isHumanWorker)
+    constructor(state: ManagedMembersState) {
+        this.#humans = state.members
+            .filter(isHumanMember)
             .map(
-                w => new HumanWorkerRowPresenter(w),
+                w => new HumanMemberRowPresenter(w),
             );
-        this.#ais = state.workers
-            .filter(isAIWorker)
+        this.#ais = state.members
+            .filter(isAIMember)
             .map(
-                w => new AIWorkerRowPresenter(w),
+                w => new AIMemberRowPresenter(w),
             );
-        this.#currentWorkerId =
-            state.currentWorkerId;
+        this.#currentMemberId =
+            state.currentMemberId;
         this.#search = state.search;
         this.#kind = state.kind;
     }
@@ -288,7 +288,7 @@ export class ManagedWorkersPresenter {
         if (this.#kind === 'ai') return html``;
         const self = this.#humans.find(
             p => p.idForLink()
-                === this.#currentWorkerId,
+                === this.#currentMemberId,
         );
         if (!self) return html``;
         if (!self.matchesSearch(this.#search)) {
@@ -296,7 +296,7 @@ export class ManagedWorkersPresenter {
         }
         return html`
             <div class="${
-                'worker-section-header'
+                'member-section-header'
                 + ' text-xs font-semibold'
                 + ' text-muted'
             }">YOU</div>
@@ -307,14 +307,14 @@ export class ManagedWorkersPresenter {
         const others = this.#humans
             .filter(
                 p => p.idForLink()
-                    !== this.#currentWorkerId,
+                    !== this.#currentMemberId,
             )
             .filter(
                 p => p.matchesSearch(this.#search),
             );
         return html`
             <div class="${
-                'worker-section-header'
+                'member-section-header'
                 + ' text-xs font-semibold'
                 + ' text-muted mt-4'
             }">HUMANS</div>
@@ -336,7 +336,7 @@ export class ManagedWorkersPresenter {
         );
         return html`
             <div class="${
-                'worker-section-header'
+                'member-section-header'
                 + ' text-xs font-semibold'
                 + ' text-muted mt-4'
             }">AIs</div>

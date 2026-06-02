@@ -243,28 +243,28 @@ function buildNode(
         + ' y="' + String(NODE_FACE_Y) + '">'
         + faceEsc + '</text>';
 
-    if (n.workerHazard === 'warning') {
+    if (n.memberHazard === 'warning') {
         inner += '<g'
             + ' class="flow-stats-node-warning"'
             + ' transform="translate('
             + String(HAZARD_X) + ', '
             + String(HAZARD_Y) + ')">'
             + '<title>'
-            + 'Single worker assigned (no backup)'
+            + 'Single member assigned (no backup)'
             + '</title>'
             + iconAlertTriangle(HAZARD_ICON_SIZE, '')
                 .toString()
             + '</g>';
-    } else if (n.workerHazard === 'danger') {
+    } else if (n.memberHazard === 'danger') {
         // Dead-end is the only danger variant the
         // stats canvas can self-disambiguate
         // (NodeStat carries outgoingEdgeIds but
-        // not workerIds); zero-workers falls
+        // not memberIds); zero-members falls
         // through to the same generic title.
         const dangerTitle =
             n.outgoingEdgeIds.length === 0
                 ? 'Dead end (no outgoing edges)'
-                : 'Workers required';
+                : 'Members required';
         inner += '<g'
             + ' class="flow-stats-node-danger"'
             + ' transform="translate('

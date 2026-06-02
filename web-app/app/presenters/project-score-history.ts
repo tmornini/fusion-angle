@@ -21,18 +21,18 @@ export type DefinitionResolver = (
     atTime: string,
 ) => { name: string; description: string } | undefined;
 
-export type WorkerNameResolver = (
-    workerId: Id,
+export type MemberNameResolver = (
+    memberId: Id,
 ) => string;
 
 type Event =
-    | { kind: 'baseline'; at: string; workerId: Id;
+    | { kind: 'baseline'; at: string; memberId: Id;
         objectiveId: ObjectiveId; score: number }
-    | { kind: 'actual'; at: string; workerId: Id;
+    | { kind: 'actual'; at: string; memberId: Id;
         objectiveId: ObjectiveId; score: number }
-    | { kind: 'revision'; at: string; workerId: Id;
+    | { kind: 'revision'; at: string; memberId: Id;
         objectiveId: ObjectiveId; name: string }
-    | { kind: 'archival'; at: string; workerId: Id;
+    | { kind: 'archival'; at: string; memberId: Id;
         objectiveId: ObjectiveId };
 
 export class ProjectScoreHistoryPresenter {
@@ -41,7 +41,7 @@ export class ProjectScoreHistoryPresenter {
     readonly #revisions: ObjectiveRevision[];
     readonly #archivations: ObjectiveArchivalEvent[];
     readonly #resolver: DefinitionResolver;
-    readonly #workerName: WorkerNameResolver;
+    readonly #memberName: MemberNameResolver;
 
     constructor(
         baselines: ProjectObjectiveBaselineScore[],
@@ -49,14 +49,14 @@ export class ProjectScoreHistoryPresenter {
         revisions: ObjectiveRevision[],
         archivations: ObjectiveArchivalEvent[],
         resolver: DefinitionResolver,
-        workerName: WorkerNameResolver,
+        memberName: MemberNameResolver,
     ) {
         this.#baselines = baselines;
         this.#actuals = actuals;
         this.#revisions = revisions;
         this.#archivations = archivations;
         this.#resolver = resolver;
-        this.#workerName = workerName;
+        this.#memberName = memberName;
     }
 
     buildBody(): SafeHtml {
@@ -88,7 +88,7 @@ export class ProjectScoreHistoryPresenter {
             events.push({
                 kind: 'baseline',
                 at: b.at,
-                workerId: b.worker_id,
+                memberId: b.member_id,
                 objectiveId: b.objective_id,
                 score: b.score,
             });
@@ -97,7 +97,7 @@ export class ProjectScoreHistoryPresenter {
             events.push({
                 kind: 'actual',
                 at: a.at,
-                workerId: a.worker_id,
+                memberId: a.member_id,
                 objectiveId: a.objective_id,
                 score: a.score,
             });
@@ -106,7 +106,7 @@ export class ProjectScoreHistoryPresenter {
             events.push({
                 kind: 'revision',
                 at: r.at,
-                workerId: r.worker_id,
+                memberId: r.member_id,
                 objectiveId: r.objective_id,
                 name: r.name,
             });
@@ -115,7 +115,7 @@ export class ProjectScoreHistoryPresenter {
             events.push({
                 kind: 'archival',
                 at: d.at,
-                workerId: d.workerId,
+                memberId: d.memberId,
                 objectiveId: d.objectiveId,
             });
         }
@@ -129,7 +129,7 @@ export class ProjectScoreHistoryPresenter {
             <time datetime="${e.at}">${dateLabel}</time>
         </td>`;
         const whoCell = html`<td>${
-            this.#workerName(e.workerId)
+            this.#memberName(e.memberId)
         }</td>`;
         switch (e.kind) {
             case 'baseline': {

@@ -273,7 +273,7 @@ ${this.buildLegend()}${footnote}</div>`;
         const special =
             s.isCreate || s.isArchive;
 
-        // Workers block: suppressed for special
+        // Members block: suppressed for special
         // nodes; regular nodes show clan + producer.
         const peopleBlock: SafeHtml =
             special

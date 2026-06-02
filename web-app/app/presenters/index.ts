@@ -46,15 +46,15 @@ export {
     GaugePresenter,
 } from './gauge.ts';
 export {
-    HumanWorkerRowPresenter,
-    AIWorkerRowPresenter,
-    ManagedWorkersPresenter,
-    buildInitialManagedWorkersState,
-    applyManagedWorkersSearch,
-    applyManagedWorkersKind,
-    type ManagedWorkersState,
-    type WorkerKindFilter,
-} from './worker.ts';
+    HumanMemberRowPresenter,
+    AIMemberRowPresenter,
+    ManagedMembersPresenter,
+    buildInitialManagedMembersState,
+    applyManagedMembersSearch,
+    applyManagedMembersKind,
+    type ManagedMembersState,
+    type MemberKindFilter,
+} from './member.ts';
 export {
     FlowPresenter,
 } from './flow.ts';
@@ -73,24 +73,24 @@ export {
     type GeneralInfoFieldKey,
 } from './organization.ts';
 export {
-    HumanWorkerDetailPresenter,
-    HumanWorkerDetailEditPresenter,
-    humanWorkerDraftFromWorker,
-    humanWorkerPatchFromDraft,
-    isHumanWorkerFieldKey,
-    type HumanWorkerDraftFields,
-    type HumanWorkerFieldKey,
-} from './human-worker-detail.ts';
+    HumanMemberDetailPresenter,
+    HumanMemberDetailEditPresenter,
+    humanMemberDraftFromMember,
+    humanMemberPatchFromDraft,
+    isHumanMemberFieldKey,
+    type HumanMemberDraftFields,
+    type HumanMemberFieldKey,
+} from './human-member-detail.ts';
 export {
-    AIWorkerDetailPresenter,
-    AIWorkerDetailEditPresenter,
-    aiWorkerDraftFromWorker,
-    aiWorkerPatchFromDraft,
-    isAIWorkerFieldKey,
+    AIMemberDetailPresenter,
+    AIMemberDetailEditPresenter,
+    aiMemberDraftFromMember,
+    aiMemberPatchFromDraft,
+    isAIMemberFieldKey,
     buildModelOptgroups,
-    type AIWorkerDraftFields,
-    type AIWorkerFieldKey,
-} from './ai-worker-detail.ts';
+    type AIMemberDraftFields,
+    type AIMemberFieldKey,
+} from './ai-member-detail.ts';
 export {
     FlowDesignerPresenter,
     buildInitialFlowSnapshot,

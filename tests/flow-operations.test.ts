@@ -59,8 +59,8 @@ import type {
     FlowGraph,
 } from '../web-app/app/adapters/flow-queries.ts';
 import {
-    seedHumanWorker,
-} from './worker-fixtures.ts';
+    seedHumanMember,
+} from './member-fixtures.ts';
 
 const FLOW_ID = 'flow-1';
 
@@ -77,7 +77,7 @@ function buildNode(
         positionY: 0,
         isCreate: false,
         isArchive: false,
-        workerIds: [],
+        memberIds: [],
         attributes: [],
         taskInstructions: '',
         ...overrides,
@@ -201,7 +201,7 @@ async function setupFlow(): Promise<{
 }> {
     const db = new MemoryDbAdapter();
     await db.createSchema();
-    await seedHumanWorker(db, 'current', 'Demo User');
+    await seedHumanMember(db, 'current', 'Demo User');
     const ctx = createRequestContext(db);
     await postFlowCreation(ctx, {
         flowId: FLOW_ID,
