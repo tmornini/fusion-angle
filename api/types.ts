@@ -452,6 +452,18 @@ export interface IdentityCredentialEntity {
     at: string;
 }
 
+// A log-out-everywhere event: every access token for this
+// identity issued before `at` is revoked. Append-only — a
+// new logout is a NEW row; the effective revoked-before
+// stamp is the LATEST `at` per identity (derive from the
+// ledger, never a mutable column). Mirrors
+// identity_credentials' revoke-to-retain discipline.
+export interface IdentityTokenRevocationEntity {
+    id: Id;
+    identity_id: Id;
+    at: string;
+}
+
 // The person-PII display facet as a tagged union, so the
 // ABSENCE of the row (erased PII) is represented without
 // null and DECIDED AT THE CALL SITE. Presenters switch on

@@ -13,6 +13,7 @@ import type {
     IdentityEntity,
     IdentityPiiEntity,
     IdentityCredentialEntity,
+    IdentityTokenRevocationEntity,
     IdeaEntity,
     IdeaSubmissionEntity,
     Objective,
@@ -230,6 +231,25 @@ const routes: Route[] = [
                 withoutId(payload) as unknown as
                     Omit<
                         IdentityCredentialEntity, 'id'
+                    >,
+            ),
+    }),
+    route('identity-token-revocations', {
+        get: (db) =>
+            db.identityTokenRevocations.getAll(),
+    }),
+    route('identity-token-revocations/:id', {
+        get: (db, p) =>
+            db.identityTokenRevocations.getById(
+                param(p, 0),
+            ),
+        put: (db, p, payload) =>
+            db.identityTokenRevocations.put(
+                param(p, 0),
+                withoutId(payload) as unknown as
+                    Omit<
+                        IdentityTokenRevocationEntity,
+                        'id'
                     >,
             ),
     }),

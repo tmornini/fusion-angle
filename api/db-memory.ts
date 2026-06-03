@@ -12,6 +12,7 @@ import type {
     IdentityEntity,
     IdentityPiiEntity,
     IdentityCredentialEntity,
+    IdentityTokenRevocationEntity,
     IdeaEntity,
     ProjectEntity,
     FlowEntity,
@@ -49,6 +50,7 @@ import {
     validateIdentityEntity,
     validateIdentityPiiEntity,
     validateIdentityCredentialEntity,
+    validateIdentityTokenRevocationEntity,
     validateIdeaEntity,
     validateProjectEntity,
     validateFlowEntity,
@@ -78,6 +80,8 @@ export class MemoryDbAdapter implements DbAdapter {
         IEntityStore<IdentityPiiEntity>;
     readonly identityCredentials:
         IEntityStore<IdentityCredentialEntity>;
+    readonly identityTokenRevocations:
+        IEntityStore<IdentityTokenRevocationEntity>;
     readonly ideas: IEntityStore<IdeaEntity>;
     readonly projects: IEntityStore<ProjectEntity>;
     readonly flows: IEntityStore<FlowEntity>;
@@ -150,6 +154,11 @@ export class MemoryDbAdapter implements DbAdapter {
             new HistoryEntityStore(
                 'identity_credentials', backend,
                 validateIdentityCredentialEntity,
+            );
+        this.identityTokenRevocations =
+            new HistoryEntityStore(
+                'identity_token_revocations', backend,
+                validateIdentityTokenRevocationEntity,
             );
         this.ideas =
             new EntityStore(

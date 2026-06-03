@@ -12,6 +12,7 @@ import type {
     IdentityEntity,
     IdentityPiiEntity,
     IdentityCredentialEntity,
+    IdentityTokenRevocationEntity,
     MemberEntity,
     HumanMemberEntity,
     AIMemberEntity,
@@ -678,6 +679,26 @@ export function validateIdentityCredentialEntity(
         kind,
         status,
         secret: pickString(body, 'secret'),
+        at: pickString(body, 'at'),
+    };
+}
+
+const IDENTITY_TOKEN_REVOCATION_BODY_KEYS:
+    readonly string[] = ['identity_id', 'at'];
+
+export function
+validateIdentityTokenRevocationEntity(
+    body: Record<string, unknown>,
+): Omit<IdentityTokenRevocationEntity, 'id'> {
+    assertOnlyKeys(
+        body,
+        IDENTITY_TOKEN_REVOCATION_BODY_KEYS,
+        'IdentityTokenRevocationEntity',
+    );
+    return {
+        identity_id: pickString(
+            body, 'identity_id',
+        ),
         at: pickString(body, 'at'),
     };
 }
