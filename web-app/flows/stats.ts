@@ -7,7 +7,7 @@ import {
     withLoadingState,
 } from '../app/loading-states.ts';
 import {
-    createRequestContext,
+    sessionContext,
     getFlowStats,
 } from '../app/adapters/index.ts';
 import {
@@ -105,7 +105,7 @@ export async function init(
         host,
         buildSkeleton('detail', 1),
         async () => {
-            const ctx = createRequestContext();
+            const ctx = sessionContext();
             const { model, graph } =
                 await getFlowStats(ctx, flowId);
             const viewBox = boundingViewBox(

@@ -7,6 +7,7 @@ import {
     MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import { jsonArrayField } from '../api/types.ts';
+import { devToken } from './token-fixtures.ts';
 
 // records
 
@@ -17,7 +18,7 @@ test(
         const db = new MemoryDbAdapter();
         await db.createSchema();
         const out =
-            await GET<unknown[]>(db, 'records');
+            await GET<unknown[]>(db, 'records', devToken());
         assert.deepEqual(out, []);
     },
 );
@@ -32,13 +33,13 @@ test(
             name: 'Customer',
             description: 'A customer record',
             position: 1,
-        });
+        }, devToken());
         const stored = await GET<{
             id: string;
             name: string;
             description: string;
             position: number;
-        }>(db, 'records/rec-1');
+        }>(db, 'records/rec-1', devToken());
         assert.equal(stored.id, 'rec-1');
         assert.equal(stored.name, 'Customer');
         assert.equal(stored.position, 1);
@@ -55,10 +56,10 @@ test(
             name: 'X',
             description: '',
             position: 1,
-        });
-        await DELETE(db, 'records/rec-1');
+        }, devToken());
+        await DELETE(db, 'records/rec-1', devToken());
         await assert.rejects(
-            () => GET(db, 'records/rec-1'),
+            () => GET(db, 'records/rec-1', devToken()),
         );
     },
 );
@@ -71,7 +72,7 @@ test(
         const db = new MemoryDbAdapter();
         await db.createSchema();
         const out = await GET<unknown[]>(
-            db, 'record-attributes',
+            db, 'record-attributes', devToken(),
         );
         assert.deepEqual(out, []);
     },
@@ -91,12 +92,12 @@ test(
             sort_order: 1,
             options: jsonArrayField([]),
             constraints: jsonArrayField([]),
-        });
+        }, devToken());
         const stored = await GET<{
             id: string;
             record_id: string;
             attribute_type: string;
-        }>(db, 'record-attributes/a-1');
+        }>(db, 'record-attributes/a-1', devToken());
         assert.equal(stored.id, 'a-1');
         assert.equal(stored.record_id, 'rec-1');
         assert.equal(
@@ -118,12 +119,13 @@ test(
             sort_order: 1,
             options: jsonArrayField([]),
             constraints: jsonArrayField([]),
-        });
+        }, devToken());
         await DELETE(
-            db, 'record-attributes/a-1',
+            db, 'record-attributes/a-1', devToken(),
         );
         await assert.rejects(
-            () => GET(db, 'record-attributes/a-1'),
+            () => GET(
+                db, 'record-attributes/a-1', devToken()),
         );
     },
 );
@@ -136,7 +138,7 @@ test(
         const db = new MemoryDbAdapter();
         await db.createSchema();
         const out = await GET<unknown[]>(
-            db, 'flow-records',
+            db, 'flow-records', devToken(),
         );
         assert.deepEqual(out, []);
     },
@@ -153,12 +155,12 @@ test(
             flow_id: 'flow-1',
             record_id: 'rec-1',
             at: '2026-05-01T00:00:00.000Z',
-        });
+        }, devToken());
         const stored = await GET<{
             id: string;
             flow_id: string;
             record_id: string;
-        }>(db, 'flow-records/fr-1');
+        }>(db, 'flow-records/fr-1', devToken());
         assert.equal(stored.flow_id, 'flow-1');
         assert.equal(stored.record_id, 'rec-1');
     },
@@ -174,10 +176,10 @@ test(
             flow_id: 'flow-1',
             record_id: 'rec-1',
             at: '2026-05-01T00:00:00.000Z',
-        });
-        await DELETE(db, 'flow-records/fr-1');
+        }, devToken());
+        await DELETE(db, 'flow-records/fr-1', devToken());
         await assert.rejects(
-            () => GET(db, 'flow-records/fr-1'),
+            () => GET(db, 'flow-records/fr-1', devToken()),
         );
     },
 );

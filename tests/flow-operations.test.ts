@@ -15,6 +15,7 @@ import {
     createRequestContext,
     type RequestContext,
 } from '../web-app/app/adapters/shared.ts';
+import { devToken } from './token-fixtures.ts';
 import {
     postFlowCreation,
 } from
@@ -202,7 +203,7 @@ async function setupFlow(): Promise<{
     const db = new MemoryDbAdapter();
     await db.createSchema();
     await seedHumanMember(db, 'current', 'Demo User');
-    const ctx = createRequestContext(db);
+    const ctx = createRequestContext(db, devToken());
     await postFlowCreation(ctx, {
         flowId: FLOW_ID,
         linkId: FLOW_ID + '-link',
@@ -224,7 +225,7 @@ async function setupNoFlow(): Promise<MemoryDbAdapter> {
 async function persistedGraph(
     db: MemoryDbAdapter,
 ): Promise<StoredGraph> {
-    const flow = await createRequestContext(db)
+    const flow = await createRequestContext(db, devToken())
         .GET<{ graph: string }>(
             'flows/' + FLOW_ID,
         );
@@ -234,7 +235,7 @@ async function persistedGraph(
 async function flowVersionCount(
     db: MemoryDbAdapter,
 ): Promise<number> {
-    const rows = await createRequestContext(db)
+    const rows = await createRequestContext(db, devToken())
         .GET<unknown[]>('flow-versions');
     return rows.length;
 }
@@ -262,7 +263,7 @@ test(
             buildNode('a'), buildNode('b'),
         ]));
         const op = await performAddEdge(
-            db, snap, 'a', 'b',
+            createRequestContext(db, devToken()), snap, 'a', 'b',
         );
         assert.equal(op.kind, 'ok');
         if (op.kind !== 'ok') return;
@@ -287,7 +288,7 @@ test(
             buildNode('a'),
         ]));
         const op = await performAddEdge(
-            db, snap, 's', 'a',
+            createRequestContext(db, devToken()), snap, 's', 'a',
         );
         assert.equal(op.kind, 'ok');
     },
@@ -301,7 +302,7 @@ test(
             buildNode('a'), buildNode('b'),
         ])));
         const op = await performAddEdge(
-            db, snap, 'a', 'b',
+            createRequestContext(db, devToken()), snap, 'a', 'b',
         );
         assert.equal(op.kind, 'fail');
         if (op.kind !== 'fail') return;
@@ -318,7 +319,7 @@ test(
         ]));
         await assert.rejects(
             () => performAddEdge(
-                db, snap, 'missing', 'b',
+                createRequestContext(db, devToken()), snap, 'missing', 'b',
             ),
             /unknown fromId missing/,
         );
@@ -334,7 +335,7 @@ test(
         ]));
         await assert.rejects(
             () => performAddEdge(
-                db, snap, 'a', 'missing',
+                createRequestContext(db, devToken()), snap, 'a', 'missing',
             ),
             /unknown toId missing/,
         );
@@ -350,7 +351,7 @@ test(
             buildNode('a'),
         ]));
         const op = await performAddEdge(
-            db, snap, 'e', 'a',
+            createRequestContext(db, devToken()), snap, 'e', 'a',
         );
         assert.equal(op.kind, 'fail');
         if (op.kind !== 'fail') return;
@@ -367,7 +368,7 @@ test(
             buildNode('s', { isCreate: true }),
         ]));
         const op = await performAddEdge(
-            db, snap, 'a', 's',
+            createRequestContext(db, devToken()), snap, 'a', 's',
         );
         assert.equal(op.kind, 'fail');
         if (op.kind !== 'fail') return;
@@ -384,7 +385,7 @@ test(
             [buildEdge('e1', 'a', 'b')],
         ));
         const op = await performAddEdge(
-            db, snap, 'a', 'b',
+            createRequestContext(db, devToken()), snap, 'a', 'b',
         );
         assert.equal(op.kind, 'fail');
         if (op.kind !== 'fail') return;
@@ -405,7 +406,7 @@ test(
             [buildEdge('e1', 's', 'a')],
         ));
         const op = await performAddEdge(
-            db, snap, 's', 'b',
+            createRequestContext(db, devToken()), snap, 's', 'b',
         );
         assert.equal(op.kind, 'fail');
         if (op.kind !== 'fail') return;
@@ -424,7 +425,10 @@ test(
             buildNode('a'), buildNode('b'),
         ]));
         const op = await silenceConsoleError(
-            () => performAddEdge(db, snap, 'a', 'b'),
+            () => performAddEdge(
+                createRequestContext(db, devToken()),
+                snap, 'a', 'b',
+            ),
         );
         assert.equal(
             (await op).kind, 'fail',
@@ -448,7 +452,7 @@ test(
             buildNode('a'),
         ]));
         const op = await performAddNodeAtPosition(
-            db, snap, 'a', 300, 200,
+            createRequestContext(db, devToken()), snap, 'a', 300, 200,
         );
         assert.equal(op.kind, 'ok');
         if (op.kind !== 'ok') return;
@@ -480,7 +484,7 @@ test(
             buildNode('a'),
         ])));
         const op = await performAddNodeAtPosition(
-            db, snap, 'a', 0, 0,
+            createRequestContext(db, devToken()), snap, 'a', 0, 0,
         );
         assert.equal(op.kind, 'fail');
     },
@@ -494,7 +498,7 @@ test(
         const snap = snapFrom(buildGraph([]));
         await assert.rejects(
             () => performAddNodeAtPosition(
-                db, snap, 'missing', 0, 0,
+                createRequestContext(db, devToken()), snap, 'missing', 0, 0,
             ),
             /unknown fromNodeId missing/,
         );
@@ -510,7 +514,7 @@ test(
             buildNode('e', { isArchive: true }),
         ]));
         const op = await performAddNodeAtPosition(
-            db, snap, 'e', 0, 0,
+            createRequestContext(db, devToken()), snap, 'e', 0, 0,
         );
         assert.equal(op.kind, 'fail');
         if (op.kind !== 'fail') return;
@@ -531,7 +535,7 @@ test(
             [buildEdge('e1', 's', 'a')],
         ));
         const op = await performAddNodeAtPosition(
-            db, snap, 's', 0, 0,
+            createRequestContext(db, devToken()), snap, 's', 0, 0,
         );
         assert.equal(op.kind, 'fail');
         if (op.kind !== 'fail') return;
@@ -551,7 +555,7 @@ test(
         ]));
         const op = await silenceConsoleError(
             () => performAddNodeAtPosition(
-                db, snap, 'a', 0, 0,
+                createRequestContext(db, devToken()), snap, 'a', 0, 0,
             ),
         );
         const settled = await op;
@@ -577,7 +581,8 @@ test(
         ]));
         const op =
             await performDeleteSelectedNodes(
-                db, withNodeSelection(base, 'a'),
+                createRequestContext(db, devToken()),
+                withNodeSelection(base, 'a'),
             );
         assert.equal(op.kind, 'ok');
         if (op.kind !== 'ok') return;
@@ -604,7 +609,7 @@ test(
         ]));
         const op =
             await performDeleteSelectedNodes(
-                db,
+                createRequestContext(db, devToken()),
                 withNodeSelection(
                     base, 's', 'a', 'e',
                 ),
@@ -626,7 +631,7 @@ test(
         ]));
         const op =
             await performDeleteSelectedNodes(
-                db,
+                createRequestContext(db, devToken()),
                 locked(
                     withNodeSelection(base, 'a'),
                 ),
@@ -646,7 +651,8 @@ test(
         ));
         const op =
             await performDeleteSelectedNodes(
-                db, withEdgeSelection(base, 'e1'),
+                createRequestContext(db, devToken()),
+                withEdgeSelection(base, 'e1'),
             );
         assert.equal(op.kind, 'noop');
     },
@@ -663,7 +669,7 @@ test(
         ]));
         const op =
             await performDeleteSelectedNodes(
-                db,
+                createRequestContext(db, devToken()),
                 withNodeSelection(base, 's', 'e'),
             );
         assert.equal(op.kind, 'noop');
@@ -680,7 +686,8 @@ test(
         ]));
         const op = await silenceConsoleError(
             () => performDeleteSelectedNodes(
-                db, withNodeSelection(base, 'a'),
+                createRequestContext(db, devToken()),
+                withNodeSelection(base, 'a'),
             ),
         );
         const settled = await op;
@@ -705,7 +712,8 @@ test(
         ));
         const op =
             await performDeleteSelectedEdge(
-                db, withEdgeSelection(base, 'e1'),
+                createRequestContext(db, devToken()),
+                withEdgeSelection(base, 'e1'),
             );
         assert.equal(op.kind, 'ok');
         if (op.kind !== 'ok') return;
@@ -727,7 +735,7 @@ test(
         ));
         const op =
             await performDeleteSelectedEdge(
-                db,
+                createRequestContext(db, devToken()),
                 locked(
                     withEdgeSelection(base, 'e1'),
                 ),
@@ -746,7 +754,8 @@ test(
         ]));
         const op =
             await performDeleteSelectedEdge(
-                db, withNodeSelection(base, 'a'),
+                createRequestContext(db, devToken()),
+                withNodeSelection(base, 'a'),
             );
         assert.equal(op.kind, 'noop');
     },
@@ -763,7 +772,8 @@ test(
         ));
         const op = await silenceConsoleError(
             () => performDeleteSelectedEdge(
-                db, withEdgeSelection(base, 'e1'),
+                createRequestContext(db, devToken()),
+                withEdgeSelection(base, 'e1'),
             ),
         );
         const settled = await op;
@@ -787,7 +797,8 @@ test(
             buildNode('a'),
         ]));
         const op = await performAddAttributeRef(
-            db, withNodeSelection(base, 'a'),
+            createRequestContext(db, devToken()),
+            withNodeSelection(base, 'a'),
             'attr-1', 'editable', true,
         );
         assert.equal(op.kind, 'ok');
@@ -810,7 +821,7 @@ test(
             buildNode('a'),
         ]));
         const op = await performAddAttributeRef(
-            db,
+            createRequestContext(db, devToken()),
             locked(withNodeSelection(base, 'a')),
             'attr-1', 'editable', false,
         );
@@ -827,12 +838,12 @@ test(
             buildNode('a'), buildNode('b'),
         ]));
         const noneOp = await performAddAttributeRef(
-            db, withNoSelection(base),
+            createRequestContext(db, devToken()), withNoSelection(base),
             'attr-1', 'editable', false,
         );
         assert.equal(noneOp.kind, 'noop');
         const manyOp = await performAddAttributeRef(
-            db,
+            createRequestContext(db, devToken()),
             withNodeSelection(base, 'a', 'b'),
             'attr-1', 'editable', false,
         );
@@ -849,7 +860,8 @@ test(
             buildNode('a'),
         ]));
         const op = await performAddAttributeRef(
-            db, withNodeSelection(base, 'ghost'),
+            createRequestContext(db, devToken()),
+            withNodeSelection(base, 'ghost'),
             'attr-1', 'editable', false,
         );
         assert.equal(op.kind, 'noop');
@@ -866,7 +878,8 @@ test(
         ]));
         const op = await silenceConsoleError(
             () => performAddAttributeRef(
-                db, withNodeSelection(base, 'a'),
+                createRequestContext(db, devToken()),
+                withNodeSelection(base, 'a'),
                 'attr-1', 'editable', false,
             ),
         );
@@ -895,7 +908,8 @@ test(
             }),
         ]));
         const op = await performRemoveAttributeRef(
-            db, withNodeSelection(base, 'a'),
+            createRequestContext(db, devToken()),
+            withNodeSelection(base, 'a'),
             'attr-1',
         );
         assert.equal(op.kind, 'ok');
@@ -918,7 +932,7 @@ test(
             }),
         ]));
         const op = await performRemoveAttributeRef(
-            db,
+            createRequestContext(db, devToken()),
             locked(withNodeSelection(base, 'a')),
             'attr-1',
         );
@@ -939,7 +953,8 @@ test(
             }),
         ]));
         const op = await performRemoveAttributeRef(
-            db, withNoSelection(base), 'attr-1',
+            createRequestContext(db, devToken()),
+            withNoSelection(base), 'attr-1',
         );
         assert.equal(op.kind, 'noop');
     },
@@ -959,7 +974,8 @@ test(
         ]));
         const op = await silenceConsoleError(
             () => performRemoveAttributeRef(
-                db, withNodeSelection(base, 'a'),
+                createRequestContext(db, devToken()),
+                withNodeSelection(base, 'a'),
                 'attr-1',
             ),
         );
@@ -990,7 +1006,8 @@ test(
             }),
         ]));
         const op = await performUpdateAttributeMode(
-            db, withNodeSelection(base, 'a'),
+            createRequestContext(db, devToken()),
+            withNodeSelection(base, 'a'),
             'attr-1', 'readonly',
         );
         assert.equal(op.kind, 'ok');
@@ -1014,7 +1031,7 @@ test(
             }),
         ]));
         const op = await performUpdateAttributeMode(
-            db,
+            createRequestContext(db, devToken()),
             locked(withNodeSelection(base, 'a')),
             'attr-1', 'readonly',
         );
@@ -1035,7 +1052,7 @@ test(
             }),
         ]));
         const op = await performUpdateAttributeMode(
-            db, withNoSelection(base),
+            createRequestContext(db, devToken()), withNoSelection(base),
             'attr-1', 'readonly',
         );
         assert.equal(op.kind, 'noop');
@@ -1060,7 +1077,8 @@ test(
         ]));
         const op =
             await performUpdateAttributeRequired(
-                db, withNodeSelection(base, 'a'),
+                createRequestContext(db, devToken()),
+                withNodeSelection(base, 'a'),
                 'attr-1', true,
             );
         assert.equal(op.kind, 'ok');
@@ -1086,7 +1104,7 @@ test(
         ]));
         const op =
             await performUpdateAttributeRequired(
-                db,
+                createRequestContext(db, devToken()),
                 locked(
                     withNodeSelection(base, 'a'),
                 ),
@@ -1110,7 +1128,7 @@ test(
         ]));
         const op =
             await performUpdateAttributeRequired(
-                db, withNoSelection(base),
+                createRequestContext(db, devToken()), withNoSelection(base),
                 'attr-1', true,
             );
         assert.equal(op.kind, 'noop');
@@ -1128,7 +1146,7 @@ test(
             buildNode('a'), buildNode('b'),
         ]));
         const op = await performUndo(
-            db, snap,
+            createRequestContext(db, devToken()), snap,
             buildFlowHistorySnapshot(true),
         );
         assert.equal(op.kind, 'ok');
@@ -1148,7 +1166,7 @@ test(
             buildNode('a'),
         ])));
         const op = await performUndo(
-            db, snap,
+            createRequestContext(db, devToken()), snap,
             buildFlowHistorySnapshot(true),
         );
         assert.equal(op.kind, 'fail');
@@ -1192,7 +1210,7 @@ test(
             buildNode('c'),
         ]));
         const op = await performUndo(
-            db, snap,
+            createRequestContext(db, devToken()), snap,
             buildFlowHistorySnapshot(true),
         );
         assert.equal(op.kind, 'ok');
@@ -1230,7 +1248,7 @@ test(
             buildNode('a'), buildNode('b'),
         ]));
         const op = await performRedo(
-            db, snap,
+            createRequestContext(db, devToken()), snap,
             buildFlowHistorySnapshot(false),
         );
         assert.equal(op.kind, 'ok');
@@ -1247,7 +1265,7 @@ test(
             buildNode('a'),
         ])));
         const op = await performRedo(
-            db, snap,
+            createRequestContext(db, devToken()), snap,
             appendToRedoStack(
                 buildFlowHistorySnapshot(false),
                 buildFlowVersion(),
@@ -1276,7 +1294,7 @@ test(
             }),
         );
         const op = await performRedo(
-            db, snap, history,
+            createRequestContext(db, devToken()), snap, history,
         );
         assert.equal(op.kind, 'ok');
         if (op.kind !== 'ok') return;
@@ -1310,7 +1328,10 @@ test(
             buildFlowVersion(),
         );
         const op = await silenceConsoleError(
-            () => performRedo(db, snap, history),
+            () => performRedo(
+                createRequestContext(db, devToken()),
+                snap, history,
+            ),
         );
         const settled = await op;
         assert.equal(settled.kind, 'fail');

@@ -13,7 +13,7 @@ import {
     getOrganization,
     getOrganizationStats,
     putOrganizationGeneralInfo,
-    createRequestContext,
+    sessionContext,
     Organization,
     type OrganizationStats,
     type GeneralInfoDraft,
@@ -101,7 +101,7 @@ async function rerender(): Promise<void> {
 }
 
 async function renderObjectives(): Promise<void> {
-    const ctx = createRequestContext();
+    const ctx = sessionContext();
     const [active, allObjs, archivedIds] =
         await Promise.all([
             getActiveObjectives(ctx),
@@ -139,7 +139,7 @@ async function renderObjectives(): Promise<void> {
         '[data-objective-id]',
         'data-objective-id',
         async (id, newPosition) => {
-            const dragCtx = createRequestContext();
+            const dragCtx = sessionContext();
             await putObjectivePosition(
                 dragCtx, id, newPosition,
             );
@@ -158,7 +158,7 @@ async function onObjectiveAction(
     const objectiveId = target
         .closest('[data-objective-id]')
         ?.getAttribute('data-objective-id');
-    const ctx = createRequestContext();
+    const ctx = sessionContext();
     if (action === 'add-objective') {
         openDialog('add-objective');
     } else if (
@@ -216,7 +216,7 @@ export async function init(): Promise<void> {
     let org: Organization;
     let stats: OrganizationStats;
     try {
-        const ctx = createRequestContext();
+        const ctx = sessionContext();
         [org, stats] = await Promise.all([
             getOrganization(ctx),
             getOrganizationStats(ctx),
@@ -265,7 +265,7 @@ export async function init(): Promise<void> {
         const desc = ($(
             '#add-obj-description', document,
         ) as HTMLTextAreaElement).value;
-        const ctx = createRequestContext();
+        const ctx = sessionContext();
         const objs = await getObjectives(ctx);
         const position = nextPosition(
             objs.map(o => o.position),
@@ -297,7 +297,7 @@ export async function init(): Promise<void> {
         const desc = ($(
             '#edit-obj-description', document,
         ) as HTMLTextAreaElement).value;
-        const ctx = createRequestContext();
+        const ctx = sessionContext();
         await postObjectiveRevision(
             ctx, id, name, desc,
         );
@@ -318,7 +318,7 @@ export async function init(): Promise<void> {
         const id = ($(
             '#confirm-archive-id', document,
         ) as HTMLInputElement).value;
-        const ctx = createRequestContext();
+        const ctx = sessionContext();
         await postObjectiveArchival(ctx, id);
         closeDialog('confirm-archive');
     }, { signal });
@@ -438,7 +438,7 @@ async function handleSave(): Promise<void> {
         return;
     }
     const trimmed = trimStrings(state.draft);
-    const ctx = createRequestContext();
+    const ctx = sessionContext();
     try {
         await putOrganizationGeneralInfo(
             ctx, trimmed,
@@ -456,7 +456,7 @@ async function handleSave(): Promise<void> {
         return;
     }
     showToast('Organization saved', 'success');
-    const freshCtx = createRequestContext();
+    const freshCtx = sessionContext();
     const [freshOrg, freshStats] =
         await Promise.all([
             getOrganization(freshCtx),

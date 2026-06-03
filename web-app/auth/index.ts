@@ -11,6 +11,7 @@ import {
 } from '../app/icons.ts';
 import { navigateTo } from '../app/core.ts';
 import { getViewportWidth } from '../app/adapters/index.ts';
+import { establishSession } from '../app/adapters/init.ts';
 
 function validateEmail(
     email: string,
@@ -507,6 +508,7 @@ export async function init(): Promise<void> {
         );
 
         setTimeout(() => {
+            establishSession('current', 'Demo User');
             if (isLogin) {
                 navigateTo('dashboard');
             } else {

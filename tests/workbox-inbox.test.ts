@@ -5,6 +5,7 @@ import {
     createRequestContext,
     type RequestContext,
 } from '../web-app/app/adapters/shared.ts';
+import { devToken } from './token-fixtures.ts';
 import {
     postWorkOrderCreation,
 } from
@@ -127,7 +128,7 @@ interface WoTables {
 async function collectTables(
     db: MemoryDbAdapter,
 ): Promise<WoTables> {
-    const ctx = createRequestContext(db);
+    const ctx = createRequestContext(db, devToken());
     const workOrders = await db.workOrders.getAll();
     const transitionsByWo =
         await getTransitionEventsByWorkOrder(ctx);
@@ -161,7 +162,7 @@ async function setupOneWorkOrder(): Promise<{
     const db = new MemoryDbAdapter();
     await db.createSchema();
     await seedHumanMember(db, 'current', 'Demo Test');
-    const ctx = createRequestContext(db);
+    const ctx = createRequestContext(db, devToken());
     await db.flows.put(
         'f1', buildFlow(buildLinearGraph()),
     );
@@ -314,7 +315,7 @@ test(
         await seedHumanMember(
             db, 'current', 'Demo Test',
         );
-        const ctx = createRequestContext(db);
+        const ctx = createRequestContext(db, devToken());
         await db.flows.put(
             'f1', buildFlow(buildLinearGraph()),
         );
@@ -380,7 +381,7 @@ test(
         await seedHumanMember(
             db, 'current', 'Demo Test',
         );
-        const ctx = createRequestContext(db);
+        const ctx = createRequestContext(db, devToken());
         await db.flows.put('f1', buildFlow({
             nodes: [
                 buildNode('n-start', 'Start', {

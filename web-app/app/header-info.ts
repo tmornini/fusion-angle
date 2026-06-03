@@ -15,7 +15,7 @@ interface HeaderData {
 async function getHeaderData(
 ): Promise<HeaderData> {
     const {
-        createRequestContext,
+        sessionContext,
         getHumanMember,
         getOrganization,
         getDashboardStats,
@@ -23,7 +23,7 @@ async function getHeaderData(
     } = await import('./adapters');
     const { getTimeOfDay } =
         await import('./format');
-    const ctx = createRequestContext();
+    const ctx = sessionContext();
     const [member, org, stats] =
         await Promise.all([
             getHumanMember(ctx, 'current'),

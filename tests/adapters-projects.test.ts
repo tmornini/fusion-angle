@@ -7,6 +7,7 @@ import {
     createRequestContext,
     type RequestContext,
 } from '../web-app/app/adapters/shared.ts';
+import { devToken } from './token-fixtures.ts';
 import {
     getProjectRows,
     getProjects,
@@ -70,7 +71,7 @@ async function setupDb(): Promise<{
 }> {
     const db = new MemoryDbAdapter();
     await db.createSchema();
-    const ctx = createRequestContext(db);
+    const ctx = createRequestContext(db, devToken());
     return { db, ctx };
 }
 
@@ -219,7 +220,7 @@ test(
         await putProject(ctx, 'p1', buildProject(
             'p1', 'Persisted',
         ));
-        const fresh = createRequestContext(db);
+        const fresh = createRequestContext(db, devToken());
         const row = await getProjectRow(fresh, 'p1');
         assert.equal(row.title, 'Persisted');
     },

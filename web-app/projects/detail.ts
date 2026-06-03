@@ -24,7 +24,7 @@ import {
     postFlowCreation,
     subscribeProjectChanges,
     generateCryptoSafeBase62,
-    createRequestContext,
+    sessionContext,
     type RequestContext,
     type ProjectEntity,
     getProjectScoring,
@@ -199,7 +199,7 @@ export async function init(
     };
     let flows: FlowListItem[];
     try {
-        const ctx = createRequestContext();
+        const ctx = sessionContext();
         [project, flows] = await Promise.all([
             loadProjectView(projectId, ctx),
             getFlowsByProject(ctx, projectId),
@@ -240,7 +240,7 @@ export async function init(
         if (!state || !pageContainer) {
             return;
         }
-        const ctx = createRequestContext();
+        const ctx = sessionContext();
         const [upd, updFlows] =
             await Promise.all([
                 loadProjectView(projectId, ctx),
@@ -258,7 +258,7 @@ export async function init(
 
     subscribeProjectScoreChanges(async () => {
         if (!state || !pageContainer) return;
-        const ctx = createRequestContext();
+        const ctx = sessionContext();
         const [upd, updFlows] =
             await Promise.all([
                 loadProjectView(projectId, ctx),
@@ -275,7 +275,7 @@ export async function init(
     });
     subscribeObjectiveChanges(async () => {
         if (!state || !pageContainer) return;
-        const ctx = createRequestContext();
+        const ctx = sessionContext();
         const [upd, updFlows] =
             await Promise.all([
                 loadProjectView(projectId, ctx),
@@ -300,7 +300,7 @@ export async function init(
             (e.target as HTMLElement)
                 .closest('[data-action]')
                 ?.getAttribute('data-action');
-        const ctx = createRequestContext();
+        const ctx = sessionContext();
         if (action === 'approve') {
             openApproveConfirmation();
         } else if (action === 'archive') {
@@ -334,7 +334,7 @@ export async function init(
             } else if (
                 action === 'confirm-approve'
             ) {
-                const ctx = createRequestContext();
+                const ctx = sessionContext();
                 try {
                     await postProjectApproval(
                         ctx, projectId,
@@ -367,7 +367,7 @@ export async function init(
             } else if (
                 action === 'confirm-archive'
             ) {
-                const ctx = createRequestContext();
+                const ctx = sessionContext();
                 try {
                     await postProjectArchival(
                         ctx, projectId,
@@ -687,7 +687,7 @@ async function handleSave(): Promise<void> {
         state.draft,
     );
     const patchEntity = trimStrings(patch.entity);
-    const ctx = createRequestContext();
+    const ctx = sessionContext();
     const next = { ...entity, ...patchEntity };
     const stateChanged =
         patch.state !== state.view.stateValue();
@@ -731,7 +731,7 @@ async function handleNewFlowSubmit(
     const linkId = generateCryptoSafeBase62();
     try {
         await postFlowCreation(
-            createRequestContext(),
+            sessionContext(),
             {
                 flowId,
                 linkId,
@@ -759,7 +759,7 @@ async function renderActionBarAndObjectives(
 ): Promise<void> {
     const pid = currentProjectId;
     if (!pid) return;
-    const ctx = createRequestContext();
+    const ctx = sessionContext();
     const [project, entity, active, scoring] =
         await Promise.all([
             getProject(ctx, pid),
@@ -882,7 +882,7 @@ async function handleSaveObjectives(
             }
         }
     });
-    const ctx = createRequestContext();
+    const ctx = sessionContext();
     if (baselineMoves.length > 0) {
         await postProjectBaselineScoring(
             ctx, projectId, baselineMoves,

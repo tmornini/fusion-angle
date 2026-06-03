@@ -6,6 +6,7 @@ import {
 import {
     createRequestContext,
 } from '../web-app/app/adapters/shared.ts';
+import { devToken } from './token-fixtures.ts';
 import {
     postAIMemberStateChange,
 } from '../web-app/app/adapters/ai-members.ts';
@@ -24,7 +25,7 @@ test(
         await seedAIMember(db, 'ai1', 'Claude');
         const before =
             await db.aiMembers.getById('ai1');
-        const ctx = createRequestContext(db);
+        const ctx = createRequestContext(db, devToken());
 
         await postAIMemberStateChange(
             ctx, 'ai1', 'archived',

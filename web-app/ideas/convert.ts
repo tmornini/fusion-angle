@@ -18,6 +18,7 @@ import {
     getProjectRows,
     postIdeaConversion,
     createRequestContext,
+    sessionContext,
     generateCryptoSafeBase62,
     type IdeaEntity,
 } from '../app/adapters/index.ts';
@@ -66,7 +67,7 @@ export async function init(
         buildSkeleton('detail', 4),
     );
 
-    const ctx = createRequestContext();
+    const ctx = sessionContext();
     let tuple: Awaited<
         ReturnType<typeof getIdea>
     >;

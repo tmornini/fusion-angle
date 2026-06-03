@@ -695,11 +695,16 @@ validateIdentityTokenRevocationEntity(
         IDENTITY_TOKEN_REVOCATION_BODY_KEYS,
         'IdentityTokenRevocationEntity',
     );
+    const at = pickString(body, 'at');
+    if (Number.isNaN(Date.parse(at))) {
+        throw new Error(
+            'invalid timestamp "' + at + '" on '
+            + 'IdentityTokenRevocationEntity',
+        );
+    }
     return {
-        identity_id: pickString(
-            body, 'identity_id',
-        ),
-        at: pickString(body, 'at'),
+        identity_id: pickString(body, 'identity_id'),
+        at,
     };
 }
 

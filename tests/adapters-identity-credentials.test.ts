@@ -4,6 +4,7 @@ import { MemoryDbAdapter } from '../api/db-memory.ts';
 import {
     createRequestContext,
 } from '../web-app/app/adapters/shared.ts';
+import { devToken } from './token-fixtures.ts';
 import {
     postIdentityCredentialSet,
     postIdentityCredentialRotation,
@@ -15,7 +16,7 @@ import {
 async function setup() {
     const db = new MemoryDbAdapter();
     await db.createSchema();
-    return { db, ctx: createRequestContext(db) };
+    return { db, ctx: createRequestContext(db, devToken()) };
 }
 
 test('set marks the kind active', async () => {

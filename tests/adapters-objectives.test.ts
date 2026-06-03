@@ -3,6 +3,7 @@ import { strict as assert } from 'node:assert';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import { createRequestContext } from
     '../web-app/app/adapters/shared.ts';
+import { devToken } from './token-fixtures.ts';
 import {
     getObjective,
     getObjectives,
@@ -27,7 +28,7 @@ import {
 } from './member-fixtures.ts';
 
 function ctxFor(db: MemoryDbAdapter) {
-    return createRequestContext(db);
+    return createRequestContext(db, devToken());
 }
 
 test('getObjective returns a single row', async () => {

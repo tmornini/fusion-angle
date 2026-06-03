@@ -4,6 +4,7 @@ import { MemoryDbAdapter } from '../api/db-memory.ts';
 import {
     createRequestContext,
 } from '../web-app/app/adapters/shared.ts';
+import { devToken } from './token-fixtures.ts';
 import {
     putSnapshotFromFile,
     SnapshotTooLargeError,
@@ -24,7 +25,7 @@ test('SnapshotTooLargeError carries sizes', () => {
 test('rejects file larger than half of available quota', async () => {
     const db = new MemoryDbAdapter();
     await db.createSchema();
-    const ctx = createRequestContext(db);
+    const ctx = createRequestContext(db, devToken());
     const nav = navigator as unknown as {
         storage?: {
             estimate(): Promise<{

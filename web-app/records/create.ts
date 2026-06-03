@@ -4,7 +4,7 @@ import {
 import { showToast } from '../app/toast.ts';
 import { navigateTo } from '../app/core.ts';
 import {
-    createRequestContext,
+    sessionContext,
     getRecordRows,
     postRecordChange,
     generateCryptoSafeBase62,
@@ -49,7 +49,7 @@ async function handleSubmit(): Promise<void> {
         );
         return;
     }
-    const ctx = createRequestContext();
+    const ctx = sessionContext();
     const existing = await getRecordRows(ctx);
     const position = nextPosition(
         existing.map(r => r.position),

@@ -18,7 +18,7 @@ import {
     closeDialog,
 } from '../app/core.ts';
 import {
-    createRequestContext,
+    sessionContext,
     getProjects,
     getFlowsWithProjectNames,
     putFlow,
@@ -86,7 +86,7 @@ export async function init(
         listEl,
         buildSkeleton('card-list', 4),
         () => getFlowsWithProjectNames(
-            createRequestContext(),
+            sessionContext(),
         ),
         init,
         {
@@ -177,7 +177,7 @@ async function rerenderFlowList(
 ): Promise<void> {
     const items =
         await getFlowsWithProjectNames(
-            createRequestContext(),
+            sessionContext(),
         );
     const rendered = items.map(
         ({ summary, projectName }) =>
@@ -275,7 +275,7 @@ async function openImportDialog(
     importStore.reset();
 
     const projects = await getProjects(
-        createRequestContext(),
+        sessionContext(),
     );
     if (projects.length === 0) {
         showToast(
@@ -353,7 +353,7 @@ async function handleFileSelect(
         );
         try {
             result = await postFlowFromZip(
-                createRequestContext(),
+                sessionContext(),
                 uuid, bytes, projectId,
             );
         } catch (err) {
@@ -368,7 +368,7 @@ async function handleFileSelect(
         const text = await file.text();
         try {
             result = await postFlowFromMermaid(
-                createRequestContext(),
+                sessionContext(),
                 uuid, text, projectId,
             );
         } catch (err) {
@@ -413,7 +413,7 @@ async function handleBackupZip(
     try {
         resolution =
             await computeFlowBackupResolution(
-                createRequestContext(), backup,
+                sessionContext(), backup,
             );
     } catch (err) {
         log.error(
@@ -539,7 +539,7 @@ async function handleOverwrite(
     resetImportDialog();
     const flowId = stOw.backup.flow.id;
     try {
-        const ctx = createRequestContext();
+        const ctx = sessionContext();
         await putFlow(ctx, flowId, {
             name: stOw.backup.flow.name,
             isLocked: stOw.backup.flow.isLocked,
@@ -582,7 +582,7 @@ async function handleCreateNew(
     let flowId: string;
     try {
         flowId = await postFlowFromBackup(
-            createRequestContext(),
+            sessionContext(),
             generateCryptoSafeBase62(),
             stRe.backup, projectId,
         );
@@ -621,7 +621,7 @@ async function handleCreate(
     let flowId: string;
     try {
         flowId = await postFlowFromBackup(
-            createRequestContext(),
+            sessionContext(),
             generateCryptoSafeBase62(),
             stNw.backup, projectId,
         );

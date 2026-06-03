@@ -33,6 +33,11 @@ import {
     validateRecordMultiPutBody,
     validateStateEntity,
 } from './validators.ts';
+import {
+    verifyAccessToken,
+    ANONYMOUS_ID,
+    revokedBeforeSeconds,
+} from './access-token.ts';
 
 export class ApiError {
     readonly message: string;
@@ -50,6 +55,28 @@ export class ApiError {
 const HTTP_BAD_REQUEST = 400;
 const HTTP_NOT_FOUND = 404;
 const HTTP_INTERNAL_ERROR = 500;
+const HTTP_UNAUTHORIZED = 401;
+
+// Authenticate in-tree requests at the one chokepoint. The
+// gate runs AFTER matchRoute (which already 404'd anything
+// OUTSIDE our URL tree — honest: no resource, nothing to
+// authenticate to) and BEFORE the handler — so an
+// unauthenticated caller never reaches an instance lookup,
+// and resource-instance existence is never disclosed to it.
+// A 401 states only "no valid credentials," never that a
+// resource exists. The snapshot/bootstrap plane is EXEMPT
+// from the Bearer gate because it is infrastructure BELOW
+// the auth tier (it installs the datastore before any
+// identity can exist). Exempt-from-the-gate is NOT the same
+// as unauthenticated — it is a single audited surface; any
+// addition here is security-sensitive.
+const BEARER_EXEMPT_ROUTES: ReadonlySet<string> =
+    new Set([
+        'snapshots/schema',
+        'snapshots/mock-data',
+        'snapshots/bootstrap',
+        'snapshots/import',
+    ]);
 
 type GetHandler = (
     adapter: DbAdapter,
@@ -659,6 +686,37 @@ function matchRoute(
 
 const BASE_URL = 'http://localhost';
 
+async function authenticateRequest(
+    adapter: DbAdapter,
+    request: Request,
+): Promise<string | null> {
+    const header =
+        request.headers.get('authorization');
+    if (header === null
+        || !header.startsWith('Bearer ')) {
+        return 'missing bearer token';
+    }
+    const token = header.slice('Bearer '.length);
+    const now = Math.floor(Date.now() / 1000);
+    const result = verifyAccessToken(token, now);
+    if (!result.valid) {
+        return result.reason;
+    }
+    if (result.claims.sub === ANONYMOUS_ID) {
+        return 'anonymous principal not authenticated';
+    }
+    const rows =
+        await adapter.identityTokenRevocations.getAll();
+    const revokedBefore = revokedBeforeSeconds(
+        rows, result.claims.sub,
+    );
+    if (revokedBefore !== null
+        && result.claims.iat < revokedBefore) {
+        return 'token revoked';
+    }
+    return null;
+}
+
 export async function handleRequest(
     adapter: DbAdapter,
     request: Request,
@@ -681,6 +739,18 @@ export async function handleRequest(
 
     const { route: matched, params } = match;
     const method = request.method;
+
+    const routePattern = matched.segments.join('/');
+    if (!BEARER_EXEMPT_ROUTES.has(routePattern)) {
+        const authFailure =
+            await authenticateRequest(adapter, request);
+        if (authFailure !== null) {
+            return Response.json(
+                { error: authFailure },
+                { status: HTTP_UNAUTHORIZED },
+            );
+        }
+    }
 
     // Parse the request body when the method
     // has one. Malformed JSON is a client
@@ -863,6 +933,7 @@ async function unwrapResponse<T>(
 export async function GET<T>(
     adapter: DbAdapter,
     resource: string,
+    token: string,
 ): Promise<T> {
     await adapter.simulateLatency();
     return unwrapResponse<T>(
@@ -870,6 +941,11 @@ export async function GET<T>(
             adapter,
             new Request(
                 `${BASE_URL}/${resource}`,
+                {
+                    headers: {
+                        'Authorization': 'Bearer ' + token,
+                    },
+                },
             ),
         ),
     );
@@ -879,6 +955,7 @@ export async function PUT<T>(
     adapter: DbAdapter,
     resource: string,
     payload: Record<string, unknown>,
+    token: string,
 ): Promise<T> {
     await adapter.simulateLatency();
     return unwrapResponse<T>(
@@ -891,10 +968,9 @@ export async function PUT<T>(
                     headers: {
                         'Content-Type':
                             'application/json',
+                        'Authorization': 'Bearer ' + token,
                     },
-                    body: JSON.stringify(
-                        payload,
-                    ),
+                    body: JSON.stringify(payload),
                 },
             ),
         ),
@@ -904,6 +980,7 @@ export async function PUT<T>(
 export async function DELETE(
     adapter: DbAdapter,
     resource: string,
+    token: string,
 ): Promise<void> {
     await adapter.simulateLatency();
     await unwrapResponse(
@@ -911,7 +988,12 @@ export async function DELETE(
             adapter,
             new Request(
                 `${BASE_URL}/${resource}`,
-                { method: 'DELETE' },
+                {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': 'Bearer ' + token,
+                    },
+                },
             ),
         ),
     );
@@ -921,6 +1003,7 @@ export async function POST<T>(
     adapter: DbAdapter,
     resource: string,
     payload: Record<string, unknown>,
+    token: string,
 ): Promise<T> {
     await adapter.simulateLatency();
     return unwrapResponse<T>(
@@ -933,10 +1016,9 @@ export async function POST<T>(
                     headers: {
                         'Content-Type':
                             'application/json',
+                        'Authorization': 'Bearer ' + token,
                     },
-                    body: JSON.stringify(
-                        payload,
-                    ),
+                    body: JSON.stringify(payload),
                 },
             ),
         ),

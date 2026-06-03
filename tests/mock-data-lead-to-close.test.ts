@@ -9,6 +9,7 @@ import {
 import {
     createRequestContext,
 } from '../web-app/app/adapters/shared.ts';
+import { devToken } from './token-fixtures.ts';
 import {
     getFlowStats,
 } from '../web-app/app/adapters/flow-stats.ts';
@@ -34,7 +35,7 @@ async function seededLeadToClose() {
         flow,
         `flow "${FLOW_NAME}" not seeded`,
     );
-    const ctx = createRequestContext(db);
+    const ctx = createRequestContext(db, devToken());
     return await getFlowStats(ctx, flow!.id);
 }
 

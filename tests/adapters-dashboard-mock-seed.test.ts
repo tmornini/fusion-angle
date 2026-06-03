@@ -4,6 +4,7 @@ import { MemoryDbAdapter } from '../api/db-memory.ts';
 import { populateMockData } from '../api/mock-data.ts';
 import { createRequestContext } from
     '../web-app/app/adapters/shared.ts';
+import { devToken } from './token-fixtures.ts';
 import { getDashboardGauges } from
     '../web-app/app/adapters/dashboard.ts';
 import { getObjectiveAggregates } from
@@ -20,7 +21,7 @@ test('mock seed produces portfolio Impact baseline +50',
         const db = new MemoryDbAdapter();
         await db.createSchema();
         await populateMockData(db);
-        const ctx = createRequestContext(db);
+        const ctx = createRequestContext(db, devToken());
         const gauges = await getDashboardGauges(ctx);
         const impact = gauges.find(
             g => g.title === 'Impact',
@@ -35,7 +36,7 @@ test('mock seed produces per-objective baseline means',
         const db = new MemoryDbAdapter();
         await db.createSchema();
         await populateMockData(db);
-        const ctx = createRequestContext(db);
+        const ctx = createRequestContext(db, devToken());
         const aggs = await getObjectiveAggregates(ctx);
         const expected: ReadonlyArray<
             [string, number]

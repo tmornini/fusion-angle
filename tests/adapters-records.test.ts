@@ -4,6 +4,7 @@ import { MemoryDbAdapter } from '../api/db-memory.ts';
 import {
     createRequestContext,
 } from '../web-app/app/adapters/shared.ts';
+import { devToken } from './token-fixtures.ts';
 import {
     getRecord,
     getRecords,
@@ -29,7 +30,7 @@ test(
         const db = new MemoryDbAdapter();
         await db.createSchema();
         await seedCurrentMember(db);
-        const ctx = createRequestContext(db);
+        const ctx = createRequestContext(db, devToken());
         await postRecordChange(ctx, 'rec-1', {
             kind: 'create',
             record: {
@@ -57,7 +58,7 @@ test(
         const db = new MemoryDbAdapter();
         await db.createSchema();
         await seedCurrentMember(db);
-        const ctx = createRequestContext(db);
+        const ctx = createRequestContext(db, devToken());
         await postRecordChange(ctx, 'rec-1', {
             kind: 'create',
             record: {
@@ -92,7 +93,7 @@ test(
         const db = new MemoryDbAdapter();
         await db.createSchema();
         await seedCurrentMember(db);
-        const ctx = createRequestContext(db);
+        const ctx = createRequestContext(db, devToken());
         await postRecordChange(ctx, 'rec-1', {
             kind: 'create',
             record: {
@@ -121,7 +122,7 @@ test(
         const db = new MemoryDbAdapter();
         await db.createSchema();
         await seedCurrentMember(db);
-        const ctx = createRequestContext(db);
+        const ctx = createRequestContext(db, devToken());
         await postRecordChange(ctx, 'rec-1', {
             kind: 'create',
             record: {
@@ -175,7 +176,7 @@ test(
         const db = new MemoryDbAdapter();
         await db.createSchema();
         await seedCurrentMember(db);
-        const ctx = createRequestContext(db);
+        const ctx = createRequestContext(db, devToken());
         await postRecordChange(ctx, 'rec-1', {
             kind: 'create',
             record: {
@@ -214,7 +215,7 @@ test(
         const db = new MemoryDbAdapter();
         await db.createSchema();
         await seedCurrentMember(db);
-        const ctx = createRequestContext(db);
+        const ctx = createRequestContext(db, devToken());
         await postRecordChange(ctx, 'rec-1', {
             kind: 'create',
             record: {
@@ -240,7 +241,7 @@ test(
         const db = new MemoryDbAdapter();
         await db.createSchema();
         await seedCurrentMember(db);
-        const ctx = createRequestContext(db);
+        const ctx = createRequestContext(db, devToken());
         await postRecordChange(ctx, 'rec-1', {
             kind: 'create',
             record: {
@@ -269,7 +270,7 @@ test(
         const db = new MemoryDbAdapter();
         await db.createSchema();
         await seedCurrentMember(db);
-        const ctx = createRequestContext(db);
+        const ctx = createRequestContext(db, devToken());
         await postRecordChange(ctx, 'rec-1', {
             kind: 'create',
             record: {
@@ -293,7 +294,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
-        const ctx = createRequestContext(db);
+        const ctx = createRequestContext(db, devToken());
         await assert.rejects(
             () => getRecordState(ctx, 'rec-missing'),
             /no state event/,
@@ -308,7 +309,7 @@ test(
         const db = new MemoryDbAdapter();
         await db.createSchema();
         await seedCurrentMember(db);
-        const ctx = createRequestContext(db);
+        const ctx = createRequestContext(db, devToken());
         await postRecordChange(ctx, 'rec-1', {
             kind: 'create',
             record: {

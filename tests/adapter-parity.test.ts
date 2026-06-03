@@ -6,6 +6,7 @@ import {
 } from '../api/db-localstorage.ts';
 import { createRequestContext }
     from '../web-app/app/adapters/shared.ts';
+import { devToken } from './token-fixtures.ts';
 import {
     postObjectiveCreation,
     postObjectiveArchival,
@@ -39,7 +40,7 @@ async function runReactivationScenario(db: DbAdapter): Promise<{
     archivedIds: Set<string>;
 }> {
     await seedHumanMember(db, 'current', 'Demo User');
-    const ctx = createRequestContext(db);
+    const ctx = createRequestContext(db, devToken());
     await postObjectiveCreation(
         ctx, 'o1', 'Rev', 'd', 0,
     );

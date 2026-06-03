@@ -12,7 +12,7 @@ import {
     navigateTo,
 } from '../app/core.ts';
 import {
-    createRequestContext,
+    sessionContext,
     getFlowGraph,
     getFlowMermaid,
     getFlowZip,
@@ -29,7 +29,6 @@ import {
     postClipboardCopy,
     subscribeResize,
 } from '../app/adapters/index.ts';
-import { getDbAdapter } from '../app/adapters/init.ts';
 import type {
     MemberId,
     RecordAttributeEntity,
@@ -306,7 +305,7 @@ async function handleAddEdge(
 ): Promise<void> {
     const snap = pageState.presenter().snapshot();
     const op = await performAddEdge(
-        getDbAdapter(), snap, fromId, toId,
+        sessionContext(), snap, fromId, toId,
     );
     if (op.kind === 'fail') {
         await reportOpFailure(
@@ -336,7 +335,7 @@ async function reportOpFailure(
 ): Promise<void> {
     showToast(toast, toastVariant);
     const g = await getFlowGraph(
-        createRequestContext(), flowId,
+        sessionContext(), flowId,
     );
     const current = pageState.presenter().snapshot();
     commit({
@@ -352,7 +351,7 @@ async function reportOpFailure(
 async function handleUndo(): Promise<void> {
     const snap = pageState.presenter().snapshot();
     const op = await performUndo(
-        getDbAdapter(), snap, pageState.history(),
+        sessionContext(), snap, pageState.history(),
     );
     if (op.kind === 'fail') {
         showToast(op.toast, op.toastVariant);
@@ -368,7 +367,7 @@ async function handleUndo(): Promise<void> {
 async function handleRedo(): Promise<void> {
     const snap = pageState.presenter().snapshot();
     const op = await performRedo(
-        getDbAdapter(), snap, pageState.history(),
+        sessionContext(), snap, pageState.history(),
     );
     if (op.kind === 'fail') {
         showToast(op.toast, op.toastVariant);
@@ -395,7 +394,7 @@ async function handleDeleteSelectedNodes(
 ): Promise<void> {
     const snap = pageState.presenter().snapshot();
     const op = await performDeleteSelectedNodes(
-        getDbAdapter(), snap,
+        sessionContext(), snap,
     );
     if (op.kind === 'noop') return;
     if (op.kind === 'fail') {
@@ -426,7 +425,7 @@ async function handleDeleteSelectedEdge(
 ): Promise<void> {
     const snap = pageState.presenter().snapshot();
     const op = await performDeleteSelectedEdge(
-        getDbAdapter(), snap,
+        sessionContext(), snap,
     );
     if (op.kind === 'noop') return;
     if (op.kind === 'fail') {
@@ -459,7 +458,7 @@ async function handleAddAttributeRef(
 ): Promise<void> {
     const snap = pageState.presenter().snapshot();
     const op = await performAddAttributeRef(
-        getDbAdapter(), snap, attributeId,
+        sessionContext(), snap, attributeId,
         'editable', false,
     );
     if (op.kind === 'noop') return;
@@ -486,7 +485,7 @@ async function handleRemoveAttributeRef(
 ): Promise<void> {
     const snap = pageState.presenter().snapshot();
     const op = await performRemoveAttributeRef(
-        getDbAdapter(), snap, attributeId,
+        sessionContext(), snap, attributeId,
     );
     if (op.kind === 'noop') return;
     if (op.kind === 'fail') {
@@ -514,7 +513,7 @@ async function handleUpdateAttributeMode(
 ): Promise<void> {
     const snap = pageState.presenter().snapshot();
     const op = await performUpdateAttributeMode(
-        getDbAdapter(), snap, attributeId, mode,
+        sessionContext(), snap, attributeId, mode,
     );
     if (op.kind === 'noop') return;
     if (op.kind === 'fail') {
@@ -542,7 +541,7 @@ async function handleUpdateAttributeRequired(
 ): Promise<void> {
     const snap = pageState.presenter().snapshot();
     const op = await performUpdateAttributeRequired(
-        getDbAdapter(), snap, attributeId,
+        sessionContext(), snap, attributeId,
         isRequired,
     );
     if (op.kind === 'noop') return;
@@ -572,7 +571,7 @@ async function handleAddNodeAtPosition(
 ): Promise<void> {
     const snap = pageState.presenter().snapshot();
     const op = await performAddNodeAtPosition(
-        getDbAdapter(), snap, fromId, x, y,
+        sessionContext(), snap, fromId, x, y,
     );
     if (op.kind === 'fail') {
         await reportOpFailure(
@@ -994,7 +993,7 @@ async function handleCopyMermaid(
     try {
         text =
             await getFlowMermaid(
-                createRequestContext(), flowId,
+                sessionContext(), flowId,
             );
     } catch (err) {
         log.error(
@@ -1038,7 +1037,7 @@ async function handleExportZip(
     try {
         result =
             await getFlowZip(
-                createRequestContext(), flowId,
+                sessionContext(), flowId,
             );
     } catch (err) {
         log.error(
@@ -1327,7 +1326,7 @@ async function handleBindRecord(
     flowId: string,
     recordId: RecordId | null,
 ): Promise<void> {
-    const ctx = createRequestContext();
+    const ctx = sessionContext();
     try {
         const existing = await
             getRecordForFlow(ctx, flowId);
@@ -1378,7 +1377,7 @@ async function handleBindRecord(
 async function deleteExistingFlowRecord(
     flowId: string,
 ): Promise<void> {
-    const ctx = createRequestContext();
+    const ctx = sessionContext();
     const all = await ctx.GET<
         Array<{ id: string; flow_id: string }>
     >('flow-records');
@@ -1413,7 +1412,7 @@ export async function init(
         container,
         buildSkeleton('detail', 1),
         async () => {
-            const ctx = createRequestContext();
+            const ctx = sessionContext();
             const [
                 graph, versions,
                 humanMembers, aiMembers,

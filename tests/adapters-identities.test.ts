@@ -4,6 +4,7 @@ import { MemoryDbAdapter } from '../api/db-memory.ts';
 import {
     createRequestContext,
 } from '../web-app/app/adapters/shared.ts';
+import { devToken } from './token-fixtures.ts';
 import {
     getIdentity,
     getMemberPii,
@@ -14,7 +15,7 @@ import { seedPersonIdentity } from './identity-fixtures.ts';
 async function setup() {
     const db = new MemoryDbAdapter();
     await db.createSchema();
-    return { db, ctx: createRequestContext(db) };
+    return { db, ctx: createRequestContext(db, devToken()) };
 }
 
 test('getIdentity reads kind', async () => {

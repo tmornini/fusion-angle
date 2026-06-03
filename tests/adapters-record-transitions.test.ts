@@ -4,6 +4,7 @@ import { MemoryDbAdapter } from '../api/db-memory.ts';
 import {
     createRequestContext,
 } from '../web-app/app/adapters/shared.ts';
+import { devToken } from './token-fixtures.ts';
 import {
     validateRecordTransition,
 } from
@@ -161,7 +162,7 @@ test(
         await seedWorkOrder(
             db, 'wo-1', flowGraph, 'n-create',
         );
-        const ctx = createRequestContext(db);
+        const ctx = createRequestContext(db, devToken());
         const out = await validateRecordTransition(
             ctx, 'wo-1', 'n-target',
         );
@@ -198,7 +199,7 @@ test(
         await seedAttribute(db, 'a-1', 'rec-1', {
             name: 'Email',
         });
-        const ctx = createRequestContext(db);
+        const ctx = createRequestContext(db, devToken());
         const out = await validateRecordTransition(
             ctx, 'wo-1', 'n-target',
         );
@@ -259,7 +260,7 @@ test(
         await seedAttribute(db, 'a-1', 'rec-1', {
             name: 'Email',
         });
-        const ctx = createRequestContext(db);
+        const ctx = createRequestContext(db, devToken());
         const out = await validateRecordTransition(
             ctx, 'wo-1', 'n-target',
         );
@@ -296,7 +297,7 @@ test(
         await seedAttribute(db, 'a-1', 'rec-1', {
             name: 'Code',
         });
-        const ctx = createRequestContext(db);
+        const ctx = createRequestContext(db, devToken());
         const out = await validateRecordTransition(
             ctx, 'wo-1', 'n-target',
             new Map([['a-1', 'ABC']]),
@@ -339,7 +340,7 @@ test(
                     '^[^@]+@[^@]+\\.[^@]+$',
             }],
         });
-        const ctx = createRequestContext(db);
+        const ctx = createRequestContext(db, devToken());
         const out = await validateRecordTransition(
             ctx, 'wo-1', 'n-target',
             new Map([['a-1', 'not-an-email']]),
@@ -370,7 +371,7 @@ test(
         await seedWorkOrder(
             db, 'wo-1', flowGraph, 'n-create',
         );
-        const ctx = createRequestContext(db);
+        const ctx = createRequestContext(db, devToken());
         await assert.rejects(
             () => validateRecordTransition(
                 ctx, 'wo-1', 'n-ghost',

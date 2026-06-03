@@ -4,6 +4,7 @@ import { MemoryDbAdapter } from '../api/db-memory.ts';
 import {
     createRequestContext,
 } from '../web-app/app/adapters/shared.ts';
+import { devToken } from './token-fixtures.ts';
 import {
     putFlowRecord,
     getFlowRecord,
@@ -53,7 +54,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
-        const ctx = createRequestContext(db);
+        const ctx = createRequestContext(db, devToken());
         await putFlowRecord(ctx, 'fr-1', {
             flow_id: 'flow-1',
             record_id: 'rec-1',
@@ -74,7 +75,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
-        const ctx = createRequestContext(db);
+        const ctx = createRequestContext(db, devToken());
         await putFlowRecord(ctx, 'fr-1', {
             flow_id: 'flow-1',
             record_id: 'rec-1',
@@ -99,7 +100,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
-        const ctx = createRequestContext(db);
+        const ctx = createRequestContext(db, devToken());
         await putFlowRecord(ctx, 'fr-1', {
             flow_id: 'flow-a',
             record_id: 'rec-1',
@@ -133,7 +134,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
-        const ctx = createRequestContext(db);
+        const ctx = createRequestContext(db, devToken());
         // Bind rec-1 to two flows.
         await putFlowRecord(ctx, 'fr-1', {
             flow_id: 'flow-a',
@@ -175,7 +176,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
-        const ctx = createRequestContext(db);
+        const ctx = createRequestContext(db, devToken());
         const workOrders =
             await getWorkOrdersForRecord(
                 ctx, 'rec-unknown',
@@ -189,7 +190,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
-        const ctx = createRequestContext(db);
+        const ctx = createRequestContext(db, devToken());
         await putFlowRecord(ctx, 'fr-1', {
             flow_id: 'flow-1',
             record_id: 'rec-1',

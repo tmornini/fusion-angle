@@ -10,7 +10,7 @@ import {
 } from '../app/icons.ts';
 import { navigateTo } from '../app/core.ts';
 import {
-    createRequestContext,
+    sessionContext,
     getRecords,
     getRecord,
     putRecord,
@@ -41,7 +41,7 @@ export async function init(): Promise<void> {
     );
     if (!recordsListEl) return;
 
-    const ctx = createRequestContext();
+    const ctx = sessionContext();
     const records = await withLoadingState(
         recordsListEl,
         buildSkeleton('card-list', 4),
@@ -99,7 +99,7 @@ export async function init(): Promise<void> {
     subscribeRecordChanges(async () => {
         if (!recordState || !listEl) return;
         const updated = await getRecords(
-            createRequestContext(),
+            sessionContext(),
         );
         recordState = applyRecordListUpdate(
             recordState, updated,
@@ -118,7 +118,7 @@ export async function init(): Promise<void> {
                     r => r.entity.id === id,
                 );
             if (!found) return;
-            const ctx = createRequestContext();
+            const ctx = sessionContext();
             const fresh = await getRecord(
                 ctx, id,
             );

@@ -26,7 +26,7 @@ import {
     trimStrings,
 } from '../app/core.ts';
 import {
-    createRequestContext,
+    sessionContext,
     getHumanMember,
     getHumanMemberRow,
     putHumanMember,
@@ -114,7 +114,7 @@ function rerender(): void {
 async function loadMemberByEitherKind(
     memberId: string,
 ): Promise<HumanMember | AIMember | null> {
-    const ctx = createRequestContext();
+    const ctx = sessionContext();
     try {
         return await getHumanMember(
             ctx, memberId,
@@ -443,7 +443,7 @@ async function saveHumanMember(
     >,
 ): Promise<void> {
     const memberId = s.member.idForLink();
-    const ctx = createRequestContext();
+    const ctx = sessionContext();
     let row;
     try {
         row = await getHumanMemberRow(
@@ -499,7 +499,7 @@ async function saveAIMember(
     >,
 ): Promise<void> {
     const memberId = s.member.idForLink();
-    const ctx = createRequestContext();
+    const ctx = sessionContext();
     let row;
     try {
         row = await getAIMemberRow(

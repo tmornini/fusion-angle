@@ -10,6 +10,7 @@ import { MemoryDbAdapter } from '../api/db-memory.ts';
 import {
     createRequestContext,
 } from '../web-app/app/adapters/shared.ts';
+import { devToken } from './token-fixtures.ts';
 import {
     validateFlowForCreation,
     getFlowsForCreation,
@@ -230,7 +231,7 @@ test(
             buildFlowEntity('bad', badGraph);
         await db.flows.put('good', goodBody);
         await db.flows.put('bad', badBody);
-        const ctx = createRequestContext(db);
+        const ctx = createRequestContext(db, devToken());
         const result = await getFlowsForCreation(
             ctx,
         );
@@ -267,7 +268,7 @@ test(
         await db.flows.put(
             'open-ready', openReadyBody,
         );
-        const ctx = createRequestContext(db);
+        const ctx = createRequestContext(db, devToken());
         const result = await getFlowsForCreation(
             ctx,
         );

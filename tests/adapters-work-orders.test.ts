@@ -7,6 +7,7 @@ import {
     createRequestContext,
     type RequestContext,
 } from '../web-app/app/adapters/shared.ts';
+import { devToken } from './token-fixtures.ts';
 import {
     postWorkOrderCreation,
     postWorkOrderTransition,
@@ -153,7 +154,7 @@ async function setupDb(): Promise<{
     const db = new MemoryDbAdapter();
     await db.createSchema();
     await seedHumanMember(db, 'current', 'Demo Test');
-    const ctx = createRequestContext(db);
+    const ctx = createRequestContext(db, devToken());
     return { db, ctx };
 }
 
@@ -621,7 +622,7 @@ test(
                     '2024-01-01T00:00:00Z',
             },
         );
-        const ctx = createRequestContext(db);
+        const ctx = createRequestContext(db, devToken());
         const rows =
             await getFlowWorkOrderRows(ctx);
         assert.equal(rows.length, 2);
@@ -649,7 +650,7 @@ test(
         await seedHumanMember(
             db, 'current', 'Demo Test',
         );
-        const ctx = createRequestContext(db);
+        const ctx = createRequestContext(db, devToken());
         const woId = generateCryptoSafeBase62();
         // Backdate ten seconds; lockTimeout=1s
         // means this is past the live window.
@@ -681,7 +682,7 @@ test(
         await seedHumanMember(
             db, 'current', 'Demo Test',
         );
-        const ctx = createRequestContext(db);
+        const ctx = createRequestContext(db, devToken());
         const woId = generateCryptoSafeBase62();
         await db.states.put(
             generateCryptoSafeBase62(),
@@ -712,7 +713,7 @@ test(
         await seedHumanMember(
             db, 'current', 'Demo Test',
         );
-        const ctx = createRequestContext(db);
+        const ctx = createRequestContext(db, devToken());
         const fresh1 = generateCryptoSafeBase62();
         const fresh2 = generateCryptoSafeBase62();
         const stale = generateCryptoSafeBase62();

@@ -13,7 +13,7 @@ import {
     putIdea,
     subscribeIdeaChanges,
     isIdeaState,
-    createRequestContext,
+    sessionContext,
 } from '../app/adapters/index.ts';
 import {
     IdeaListPresenter,
@@ -39,7 +39,7 @@ export async function init(): Promise<void> {
     );
     if (!teamListEl) return;
 
-    const ctx = createRequestContext();
+    const ctx = sessionContext();
     const ideas = await withLoadingState(
         teamListEl,
         buildSkeleton('card-list', 4),
@@ -98,7 +98,7 @@ export async function init(): Promise<void> {
     subscribeIdeaChanges(async () => {
         if (!ideaState || !listEl) return;
         const updated = await getIdeas(
-            createRequestContext(),
+            sessionContext(),
         );
         ideaState = applyIdeaListUpdate(
             ideaState, updated,
@@ -116,7 +116,7 @@ export async function init(): Promise<void> {
                 .find(t => t.entity.id === id);
             if (!tuple) return;
             await putIdea(
-                createRequestContext(), id,
+                sessionContext(), id,
                 {
                     ...tuple.entity,
                     position: newPosition,

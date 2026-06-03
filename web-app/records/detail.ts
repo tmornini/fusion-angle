@@ -10,6 +10,7 @@ import {
 } from '../app/core.ts';
 import {
     createRequestContext,
+    sessionContext,
     getRecord,
     getRecordState,
     getRecordAttributesByRecord,
@@ -84,7 +85,7 @@ async function load(
         root,
         buildSkeleton('detail', 1),
         async () => {
-            const ctx = createRequestContext();
+            const ctx = sessionContext();
             const [record, state,
                 attributes, flowIds,
                 workOrders] = await Promise.all([
@@ -604,7 +605,7 @@ async function handleSave(
         bindActions(root);
         return;
     }
-    const ctx = createRequestContext();
+    const ctx = sessionContext();
     saveInProgress = true;
     try {
         if (attributesChanged) {

@@ -7,6 +7,7 @@ import {
     createRequestContext,
     type RequestContext,
 } from '../web-app/app/adapters/shared.ts';
+import { devToken } from './token-fixtures.ts';
 import {
     getOrganizationStats,
 } from '../web-app/app/adapters/admin.ts';
@@ -22,7 +23,7 @@ async function setupDb(): Promise<{
 }> {
     const db = new MemoryDbAdapter();
     await db.createSchema();
-    const ctx = createRequestContext(db);
+    const ctx = createRequestContext(db, devToken());
     return { db, ctx };
 }
 

@@ -8,7 +8,7 @@ import {
     withLoadingState,
 } from '../app/loading-states.ts';
 import {
-    createRequestContext,
+    sessionContext,
     getDashboardGauges,
     getObjectiveAggregates,
     getObjectiveTrendlines,
@@ -25,7 +25,7 @@ import {
 
 async function renderObjectiveAggregates(
 ): Promise<void> {
-    const ctx = createRequestContext();
+    const ctx = sessionContext();
     const [active, aggregates, trendlines] =
         await Promise.all([
             getActiveObjectives(ctx),
@@ -54,7 +54,7 @@ export async function init(
         $('#gauge-container', document);
     if (!container) return;
 
-    const ctx = createRequestContext();
+    const ctx = sessionContext();
     const gauges =
         await withLoadingState(
             container,

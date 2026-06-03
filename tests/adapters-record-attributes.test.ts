@@ -4,6 +4,7 @@ import { MemoryDbAdapter } from '../api/db-memory.ts';
 import {
     createRequestContext,
 } from '../web-app/app/adapters/shared.ts';
+import { devToken } from './token-fixtures.ts';
 import {
     putRecordAttribute,
     getRecordAttribute,
@@ -19,7 +20,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
-        const ctx = createRequestContext(db);
+        const ctx = createRequestContext(db, devToken());
         await putRecordAttribute(ctx, 'attr-1', {
             record_id: 'rec-1',
             name: 'Email',
@@ -45,7 +46,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
-        const ctx = createRequestContext(db);
+        const ctx = createRequestContext(db, devToken());
         await putRecordAttribute(ctx, 'a-1', {
             record_id: 'rec-1',
             name: 'A1',
@@ -85,7 +86,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
-        const ctx = createRequestContext(db);
+        const ctx = createRequestContext(db, devToken());
         await putRecordAttribute(ctx, 'a-mid', {
             record_id: 'rec-1',
             name: 'middle',
@@ -126,7 +127,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
-        const ctx = createRequestContext(db);
+        const ctx = createRequestContext(db, devToken());
         await putRecordAttribute(ctx, 'a-1', {
             record_id: 'rec-1',
             name: 'A1',
@@ -148,7 +149,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
-        const ctx = createRequestContext(db);
+        const ctx = createRequestContext(db, devToken());
         await assert.rejects(
             () => putRecordAttribute(ctx, 'a-1', {
                 record_id: 'rec-1',
@@ -172,7 +173,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
-        const ctx = createRequestContext(db);
+        const ctx = createRequestContext(db, devToken());
         await assert.rejects(
             () => putRecordAttribute(ctx, 'a-1', {
                 record_id: 'rec-1',
@@ -195,7 +196,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
-        const ctx = createRequestContext(db);
+        const ctx = createRequestContext(db, devToken());
         await putRecordAttribute(ctx, 'a-1', {
             record_id: 'rec-1',
             name: 'When',
@@ -220,7 +221,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
-        const ctx = createRequestContext(db);
+        const ctx = createRequestContext(db, devToken());
         await putRecordAttribute(ctx, 'a-1', {
             record_id: 'rec-1',
             name: 'Email',

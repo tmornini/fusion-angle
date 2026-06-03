@@ -13,6 +13,7 @@ import {
     createRequestContext,
     type RequestContext,
 } from '../web-app/app/adapters/shared.ts';
+import { devToken } from './token-fixtures.ts';
 import {
     getSnapshot,
     putSnapshot,
@@ -48,7 +49,7 @@ async function setup(): Promise<{
 }> {
     const db = new MemoryDbAdapter();
     await db.createSchema();
-    return { db, ctx: createRequestContext(db) };
+    return { db, ctx: createRequestContext(db, devToken()) };
 }
 
 test('getSnapshot returns a JSON object of tables', async () => {

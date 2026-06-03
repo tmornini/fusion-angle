@@ -28,7 +28,7 @@ import {
     getFlowsForCreation,
     postWorkOrderCreation,
     putWorkOrder,
-    createRequestContext,
+    sessionContext,
     generateCryptoSafeBase62,
     subscribeWorkOrderChanges,
     validateWorkOrderFlowGraph,
@@ -68,7 +68,7 @@ export async function init(
     const archiveEl =
         $('#archive-list', document);
 
-    const ctx = createRequestContext();
+    const ctx = sessionContext();
     if (activeEl) {
         await initActiveList(activeEl, ctx);
     }

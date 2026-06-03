@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { GET } from '../api/api.ts';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
+import { devToken } from './token-fixtures.ts';
 
 // Pin the collection routes that handleRequest
 // must serve. A new top-level resource is added
@@ -40,7 +41,8 @@ for (const route of COLLECTION_ROUTES) {
             const db = new MemoryDbAdapter();
             await db.createSchema();
             const rows =
-                await GET<unknown[]>(db, route);
+                await GET<unknown[]>(
+                    db, route, devToken());
             assert.ok(
                 Array.isArray(rows),
                 route + ' should return an array',

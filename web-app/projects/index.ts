@@ -7,6 +7,7 @@ import { iconFolderKanban } from '../app/icons.ts';
 import { navigateTo } from '../app/core.ts';
 import {
     createRequestContext,
+    sessionContext,
     getProjectRows,
     getProjects,
     getProjectsScoreColumn,
@@ -73,7 +74,7 @@ export async function init(): Promise<void> {
     );
     if (!listEl) return;
 
-    const ctx = createRequestContext();
+    const ctx = sessionContext();
     const projects = await withLoadingState(
         listEl,
         buildSkeleton('card-list', 4),
@@ -129,7 +130,7 @@ export async function init(): Promise<void> {
         if (!projectState || !projectListEl) {
             return;
         }
-        const refreshCtx = createRequestContext();
+        const refreshCtx = sessionContext();
         const [refreshedProjects, maps] =
             await Promise.all([
                 getProjects(refreshCtx),
@@ -146,7 +147,7 @@ export async function init(): Promise<void> {
     subscribeProjectScoreChanges(async () => {
         if (!projectListEl) return;
         const col = await getProjectsScoreColumn(
-            createRequestContext(),
+            sessionContext(),
         );
         scoreMap = new Map(
             col.map(s => [s.projectId, s]),
@@ -157,7 +158,7 @@ export async function init(): Promise<void> {
     subscribeObjectiveChanges(async () => {
         if (!projectListEl) return;
         const col = await getProjectsScoreColumn(
-            createRequestContext(),
+            sessionContext(),
         );
         scoreMap = new Map(
             col.map(s => [s.projectId, s]),
@@ -174,7 +175,7 @@ export async function init(): Promise<void> {
                 projectEntities.get(id);
             if (!entity) return;
             await putProject(
-                createRequestContext(), id,
+                sessionContext(), id,
                 {
                     ...entity,
                     position: newPosition,

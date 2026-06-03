@@ -25,6 +25,7 @@ import {
     deleteWorkOrderClaim,
     getCurrentHumanMember,
     createRequestContext,
+    sessionContext,
     generateCryptoSafeBase62,
     validateWorkOrderFlowGraph,
     getRecordForFlow,
@@ -291,7 +292,7 @@ export async function init(
     );
     if (!container) return;
 
-    const ctx = createRequestContext();
+    const ctx = sessionContext();
     const memberRow =
         await getCurrentHumanMember(ctx);
     const memberId = memberRow.id;

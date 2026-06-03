@@ -4,6 +4,7 @@ import { MemoryDbAdapter } from '../api/db-memory.ts';
 import {
     createRequestContext,
 } from '../web-app/app/adapters/shared.ts';
+import { devToken } from './token-fixtures.ts';
 import {
     getHumanMemberMap,
     getCurrentHumanMember,
@@ -50,7 +51,7 @@ test(
         const db = new MemoryDbAdapter();
         await db.createSchema();
         await seedHumanMember(db, 'u1', 'Alice Adams');
-        const ctx = createRequestContext(db);
+        const ctx = createRequestContext(db, devToken());
         const map = await getHumanMemberMap(ctx);
         assert.equal(map.size, 1);
         const pii = map.get('u1')?.pii();
@@ -68,11 +69,11 @@ test('Fresh ctx re-fetches each call', async () => {
     await db.createSchema();
     await seedHumanMember(db, 'u1', 'Alice Adams');
     const m1 = await getHumanMemberMap(
-        createRequestContext(db),
+        createRequestContext(db, devToken()),
     );
     await seedHumanMember(db, 'u2', 'Bob Brown');
     const m2 = await getHumanMemberMap(
-        createRequestContext(db),
+        createRequestContext(db, devToken()),
     );
     assert.notEqual(m1, m2);
     assert.equal(m1.size, 1);
@@ -88,7 +89,7 @@ test(
             db, 'current', 'Alice Adams',
         );
         const row = await getCurrentHumanMember(
-            createRequestContext(db),
+            createRequestContext(db, devToken()),
         );
         assert.equal(row.id, 'current');
         assert.equal(row.type, 'human');
@@ -100,8 +101,8 @@ test(
     + ' and unique',
     () => {
         const db = new MemoryDbAdapter();
-        const a = createRequestContext(db);
-        const b = createRequestContext(db);
+        const a = createRequestContext(db, devToken());
+        const b = createRequestContext(db, devToken());
         assert.equal(
             a.requestId, a.requestId,
         );

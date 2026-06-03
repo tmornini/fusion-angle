@@ -15,9 +15,11 @@ export interface Principal {
 }
 
 // The JWT claim contract. `aud` names the origin the token is
-// for; `cnf` is the DPoP confirmation (SP-5 binds the key —
-// present in the contract, unenforced now); `jti` is the
-// unique token id (reuse-detection: SP-5).
+// for — verifyAccessToken now ENFORCES the single audience
+// (TOKEN_AUDIENCE); per-client multi-audience validation via
+// the clients registry is SP-5. `cnf` is the DPoP confirmation
+// (SP-5 binds the key — present in the contract, unenforced
+// now); `jti` is the unique token id (reuse-detection: SP-5).
 export interface AccessTokenClaims {
     readonly sub: Id;
     readonly roles: readonly string[];
@@ -114,6 +116,7 @@ function hasClaimShape(
     return typeof c.sub === 'string'
         && Array.isArray(c.roles)
         && typeof c.name === 'string'
+        && typeof c.aud === 'string'
         && typeof c.iat === 'number'
         && typeof c.nbf === 'number'
         && typeof c.exp === 'number'
@@ -179,6 +182,9 @@ export function verifyAccessToken(
     } catch {
         return { valid: false, reason: 'unparseable claims' };
     }
+    if (claims.aud !== TOKEN_AUDIENCE) {
+        return { valid: false, reason: 'wrong audience' };
+    }
     if (nowSeconds < claims.nbf) {
         return { valid: false, reason: 'not yet valid' };
     }
@@ -188,15 +194,14 @@ export function verifyAccessToken(
     return { valid: true, claims };
 }
 
-// Derive the revoked-before stamp from the ledger rows for one
-// identity: the LATEST event wins (RFC-3339 zulu sorts
-// lexically = chronologically). Returns epoch seconds or null
-// (no revocation). Shared by the gate (server) and any client
-// reducer so the derivation has ONE home.
-export function revokedBeforeSeconds(
+// The single home of the latest-`at`-wins revocation reduce.
+// RFC-3339 zulu sorts lexically = chronologically, so the
+// lexically-greatest `at` is the most recent. Returns the
+// stamp string or null (no revocation for this identity).
+export function latestRevocationAt(
     rows: readonly { identity_id: Id; at: string }[],
     identityId: Id,
-): number | null {
+): string | null {
     let latest: string | null = null;
     for (const row of rows) {
         if (row.identity_id !== identityId) continue;
@@ -204,7 +209,17 @@ export function revokedBeforeSeconds(
             latest = row.at;
         }
     }
-    return latest === null
-        ? null
-        : Math.floor(Date.parse(latest) / 1000);
+    return latest;
+}
+
+// Convert the shared latest-wins reduce to epoch seconds for
+// the gate's `iat < revokedBefore` comparison. Returns null
+// when the identity has no revocation. The reduce itself lives
+// in latestRevocationAt — this only does the epoch conversion.
+export function revokedBeforeSeconds(
+    rows: readonly { identity_id: Id; at: string }[],
+    identityId: Id,
+): number | null {
+    const at = latestRevocationAt(rows, identityId);
+    return at === null ? null : Math.floor(Date.parse(at) / 1000);
 }

@@ -1,5 +1,6 @@
 import {
     createRequestContext,
+    sessionContext,
     deleteSchema,
     postSchemaCreation,
     postBootstrap,
@@ -71,7 +72,7 @@ export async function init(
     );
     if (!root) return;
 
-    const ctx = createRequestContext();
+    const ctx = sessionContext();
     let pending: PendingState =
         { kind: 'idle' };
 

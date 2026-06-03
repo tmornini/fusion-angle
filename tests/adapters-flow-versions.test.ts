@@ -7,6 +7,7 @@ import {
     createRequestContext,
     type RequestContext,
 } from '../web-app/app/adapters/shared.ts';
+import { devToken } from './token-fixtures.ts';
 import {
     postFlowCreation,
     putFlow,
@@ -39,7 +40,7 @@ async function setupMemDb(): Promise<{
     const db = new MemoryDbAdapter();
     await db.createSchema();
     await seedHumanMember(db, 'current', 'Demo User');
-    const ctx = createRequestContext(db);
+    const ctx = createRequestContext(db, devToken());
     return { db, ctx };
 }
 
@@ -108,10 +109,10 @@ test(
     async () => {
         const { db } = await setupMemDb();
         await createBaseFlow(
-            createRequestContext(db), 'flow-1',
+            createRequestContext(db, devToken()), 'flow-1',
         );
         await postFlowVersion(
-            createRequestContext(db),
+            createRequestContext(db, devToken()),
             'ver-1', 'flow-1',
         );
         const rows = await db.flowVersions
@@ -130,7 +131,7 @@ test(
     async () => {
         const { db } = await setupMemDb();
         await createBaseFlow(
-            createRequestContext(db), 'flow-1',
+            createRequestContext(db, devToken()), 'flow-1',
         );
         const start = buildNode('start', {
             isCreate: true,
@@ -143,15 +144,15 @@ test(
             'e1', 'start', 'mid',
         );
         await saveGraph(
-            createRequestContext(db), 'flow-1',
+            createRequestContext(db, devToken()), 'flow-1',
             [start, mid, end], [edge],
         );
         await postFlowVersion(
-            createRequestContext(db),
+            createRequestContext(db, devToken()),
             'ver-1', 'flow-1',
         );
         const versions = await getFlowVersions(
-            createRequestContext(db), 'flow-1',
+            createRequestContext(db, devToken()), 'flow-1',
         );
         assert.equal(versions.length, 1);
         const v = versions[0]!;
@@ -170,10 +171,10 @@ test(
     async () => {
         const { db } = await setupMemDb();
         await createBaseFlow(
-            createRequestContext(db), 'flow-1',
+            createRequestContext(db, devToken()), 'flow-1',
         );
         await putFlow(
-            createRequestContext(db), 'flow-1',
+            createRequestContext(db, devToken()), 'flow-1',
             {
                 name: 'Renamed',
                 isLocked: true,
@@ -185,11 +186,11 @@ test(
             },
         );
         await postFlowVersion(
-            createRequestContext(db),
+            createRequestContext(db, devToken()),
             'ver-1', 'flow-1',
         );
         const versions = await getFlowVersions(
-            createRequestContext(db), 'flow-1',
+            createRequestContext(db, devToken()), 'flow-1',
         );
         const v = versions[0]!;
         assert.equal(v.name, 'Renamed');
@@ -206,10 +207,10 @@ test(
     async () => {
         const { db } = await setupMemDb();
         await createBaseFlow(
-            createRequestContext(db), 'flow-1',
+            createRequestContext(db, devToken()), 'flow-1',
         );
         await postFlowVersion(
-            createRequestContext(db),
+            createRequestContext(db, devToken()),
             'ver-1', 'flow-1',
         );
         const rows = await db.flowVersions
@@ -228,10 +229,10 @@ test(
     async () => {
         const { db } = await setupMemDb();
         await createBaseFlow(
-            createRequestContext(db), 'flow-1',
+            createRequestContext(db, devToken()), 'flow-1',
         );
         const versions = await getFlowVersions(
-            createRequestContext(db), 'flow-1',
+            createRequestContext(db, devToken()), 'flow-1',
         );
         assert.deepEqual(versions, []);
     },
@@ -242,26 +243,26 @@ test(
     + ' the asked flow only',
     async () => {
         const { db } = await setupMemDb();
-        const c1 = createRequestContext(db);
+        const c1 = createRequestContext(db, devToken());
         await createBaseFlow(c1, 'flow-1');
         await createBaseFlow(c1, 'flow-2');
         await postFlowVersion(
-            createRequestContext(db),
+            createRequestContext(db, devToken()),
             'a1', 'flow-1',
         );
         await postFlowVersion(
-            createRequestContext(db),
+            createRequestContext(db, devToken()),
             'a2', 'flow-1',
         );
         await postFlowVersion(
-            createRequestContext(db),
+            createRequestContext(db, devToken()),
             'b1', 'flow-2',
         );
         const v1 = await getFlowVersions(
-            createRequestContext(db), 'flow-1',
+            createRequestContext(db, devToken()), 'flow-1',
         );
         const v2 = await getFlowVersions(
-            createRequestContext(db), 'flow-2',
+            createRequestContext(db, devToken()), 'flow-2',
         );
         assert.equal(v1.length, 2);
         assert.ok(v1.every(
@@ -277,22 +278,22 @@ test(
     async () => {
         const { db } = await setupMemDb();
         await createBaseFlow(
-            createRequestContext(db), 'flow-1',
+            createRequestContext(db, devToken()), 'flow-1',
         );
         await postFlowVersion(
-            createRequestContext(db),
+            createRequestContext(db, devToken()),
             'ver-1', 'flow-1',
         );
         await postFlowVersion(
-            createRequestContext(db),
+            createRequestContext(db, devToken()),
             'ver-2', 'flow-1',
         );
         await postFlowVersion(
-            createRequestContext(db),
+            createRequestContext(db, devToken()),
             'ver-3', 'flow-1',
         );
         const versions = await getFlowVersions(
-            createRequestContext(db), 'flow-1',
+            createRequestContext(db, devToken()), 'flow-1',
         );
         const ids = versions.map(v => v.id);
         assert.deepEqual(
@@ -306,21 +307,21 @@ test(
     async () => {
         const { db } = await setupMemDb();
         await createBaseFlow(
-            createRequestContext(db), 'flow-1',
+            createRequestContext(db, devToken()), 'flow-1',
         );
         await postFlowVersion(
-            createRequestContext(db),
+            createRequestContext(db, devToken()),
             'ver-1', 'flow-1',
         );
         await postFlowVersion(
-            createRequestContext(db),
+            createRequestContext(db, devToken()),
             'ver-2', 'flow-1',
         );
         await deleteFlowVersion(
-            createRequestContext(db), 'ver-1',
+            createRequestContext(db, devToken()), 'ver-1',
         );
         const versions = await getFlowVersions(
-            createRequestContext(db), 'flow-1',
+            createRequestContext(db, devToken()), 'flow-1',
         );
         assert.equal(versions.length, 1);
         assert.equal(versions[0]!.id, 'ver-2');
@@ -343,7 +344,7 @@ test(
     async () => {
         const { db } = await setupMemDb();
         await createBaseFlow(
-            createRequestContext(db), 'flow-1',
+            createRequestContext(db, devToken()), 'flow-1',
         );
         for (
             let i = 1;
@@ -351,12 +352,12 @@ test(
             i++
         ) {
             await postFlowVersion(
-                createRequestContext(db),
+                createRequestContext(db, devToken()),
                 'ver-' + i, 'flow-1',
             );
         }
         const versions = await getFlowVersions(
-            createRequestContext(db), 'flow-1',
+            createRequestContext(db, devToken()), 'flow-1',
         );
         assert.equal(
             versions.length, FLOW_VERSION_CAP,
@@ -370,7 +371,7 @@ test(
     async () => {
         const { db } = await setupMemDb();
         await createBaseFlow(
-            createRequestContext(db), 'flow-1',
+            createRequestContext(db, devToken()), 'flow-1',
         );
         for (
             let i = 1;
@@ -378,7 +379,7 @@ test(
             i++
         ) {
             await postFlowVersion(
-                createRequestContext(db),
+                createRequestContext(db, devToken()),
                 'ver-' + i, 'flow-1',
             );
         }
@@ -399,11 +400,11 @@ test(
     + ' belonging to another flow',
     async () => {
         const { db } = await setupMemDb();
-        const c1 = createRequestContext(db);
+        const c1 = createRequestContext(db, devToken());
         await createBaseFlow(c1, 'flow-1');
         await createBaseFlow(c1, 'flow-2');
         await postFlowVersion(
-            createRequestContext(db),
+            createRequestContext(db, devToken()),
             'other-1', 'flow-2',
         );
         for (
@@ -412,17 +413,17 @@ test(
             i++
         ) {
             await postFlowVersion(
-                createRequestContext(db),
+                createRequestContext(db, devToken()),
                 'ver-' + i, 'flow-1',
             );
         }
         const v2 = await getFlowVersions(
-            createRequestContext(db), 'flow-2',
+            createRequestContext(db, devToken()), 'flow-2',
         );
         assert.equal(v2.length, 1);
         assert.equal(v2[0]!.id, 'other-1');
         const v1 = await getFlowVersions(
-            createRequestContext(db), 'flow-1',
+            createRequestContext(db, devToken()), 'flow-1',
         );
         assert.equal(
             v1.length, FLOW_VERSION_CAP,
@@ -436,13 +437,13 @@ test(
     async () => {
         const { db } = await setupMemDb();
         await createBaseFlow(
-            createRequestContext(db), 'flow-1',
+            createRequestContext(db, devToken()), 'flow-1',
         );
         await postFlowVersion(
-            createRequestContext(db),
+            createRequestContext(db, devToken()),
             'ver-1', 'flow-1',
         );
-        const raw = await createRequestContext(db)
+        const raw = await createRequestContext(db, devToken())
             .GET<FlowVersionEntity[]>(
                 'flow-versions',
             );
@@ -450,7 +451,7 @@ test(
         assert.equal(raw[0]!.id, 'ver-1');
         const versions: FlowVersion[] =
             await getFlowVersions(
-                createRequestContext(db),
+                createRequestContext(db, devToken()),
                 'flow-1',
             );
         assert.equal(versions.length, 1);

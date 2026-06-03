@@ -26,7 +26,7 @@ import {
     postIdeaStateChange,
     putIdea,
     subscribeIdeaChanges,
-    createRequestContext,
+    sessionContext,
     type IdeaWithSubmitter,
 } from '../app/adapters/index.ts';
 
@@ -99,7 +99,7 @@ async function transitionIdea(
     toState: IdeaTransition,
 ): Promise<void> {
     if (!state) return;
-    const ctx = createRequestContext();
+    const ctx = sessionContext();
     const cfg = TRANSITION_CONFIG[toState]!;
     try {
         await postIdeaStateChange(
@@ -169,7 +169,7 @@ export async function init(
     if (!container) return;
     pageContainer = container;
 
-    const ctx = createRequestContext();
+    const ctx = sessionContext();
     const view = await withLoadingState(
         container,
         buildSkeleton('detail', 4),
@@ -185,7 +185,7 @@ export async function init(
     subscribeIdeaChanges(async () => {
         if (!pageContainer || !state) return;
         const fresh = await getIdea(
-            createRequestContext(), ideaId,
+            sessionContext(), ideaId,
         );
         state = {
             kind: 'reading', view: fresh,
@@ -394,7 +394,7 @@ async function handleSave(): Promise<void> {
     );
     const ideaId = state.view.idea.idForLink();
     const entity = state.view.entity;
-    const ctx = createRequestContext();
+    const ctx = sessionContext();
     try {
         await putIdea(ctx, ideaId, {
             ...entity,

@@ -6,7 +6,7 @@ import { $, $required } from '../dom.ts';
 import { log } from '../logger.ts';
 import { showToast } from '../toast.ts';
 import {
-    createRequestContext,
+    sessionContext,
     putFlow,
     postFlowVersion,
     HumanMember,
@@ -194,7 +194,7 @@ export class FlowDesignerPresenter {
         versioned: boolean,
         snap: FlowSnapshot,
     ): Promise<void> {
-        const ctx = createRequestContext();
+        const ctx = sessionContext();
         if (versioned) {
             await postFlowVersion(
                 ctx,

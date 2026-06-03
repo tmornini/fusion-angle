@@ -19,7 +19,7 @@ import {
     navigateTo, trimStrings,
 } from '../app/core.ts';
 import {
-    createRequestContext,
+    sessionContext,
     getMembers,
     postHumanMemberCreation,
     postAIMemberCreation,
@@ -72,7 +72,7 @@ export async function init(): Promise<void> {
         );
     }
 
-    const ctx = createRequestContext();
+    const ctx = sessionContext();
     const loaded = await withLoadingState(
         memberList,
         buildSkeleton('table', 5),
@@ -111,7 +111,7 @@ export async function init(): Promise<void> {
 async function refresh(): Promise<void> {
     if (!membersState || !memberListEl) return;
     const fresh = await getMembers(
-        createRequestContext(),
+        sessionContext(),
     );
     membersState =
         buildInitialManagedMembersState(
@@ -296,7 +296,7 @@ async function submitHumanForm(): Promise<void> {
     const id = generateCryptoSafeBase62();
     try {
         await postHumanMemberCreation(
-            createRequestContext(),
+            sessionContext(),
             id,
             trimStrings({
                 name,
@@ -368,7 +368,7 @@ async function submitAIForm(): Promise<void> {
     const id = generateCryptoSafeBase62();
     try {
         await postAIMemberCreation(
-            createRequestContext(),
+            sessionContext(),
             id,
             trimStrings({
                 name,

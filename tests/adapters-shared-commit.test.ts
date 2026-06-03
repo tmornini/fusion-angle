@@ -5,6 +5,7 @@ import {
     createRequestContext,
     CommitError,
 } from '../web-app/app/adapters/shared.ts';
+import { devToken } from './token-fixtures.ts';
 import {
     createChannel,
 } from '../web-app/app/channels.ts';
@@ -26,7 +27,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
-        const ctx = createRequestContext(db);
+        const ctx = createRequestContext(db, devToken());
         await ctx.commit({
             ops: [
                 {
@@ -68,7 +69,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
-        const ctx = createRequestContext(db);
+        const ctx = createRequestContext(db, devToken());
         const ch1 = createChannel<void>();
         const ch2 = createChannel<void>();
         let count1 = 0;
@@ -101,7 +102,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
-        const ctx = createRequestContext(db);
+        const ctx = createRequestContext(db, devToken());
         const ch = createChannel<void>();
         let count = 0;
         ch.subscribe(() => { count++; });
@@ -119,7 +120,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
-        const ctx = createRequestContext(db);
+        const ctx = createRequestContext(db, devToken());
         const ch = createChannel<void>();
         let count = 0;
         ch.subscribe(() => { count++; });
@@ -169,7 +170,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
-        const ctx = createRequestContext(db);
+        const ctx = createRequestContext(db, devToken());
         const bad = {
             method: 'put' as const,
             resource: 'ai-members/ai_1',
@@ -196,7 +197,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
-        const ctx = createRequestContext(db);
+        const ctx = createRequestContext(db, devToken());
         const goodA = {
             method: 'put' as const,
             resource: 'ai-members/ai_1',

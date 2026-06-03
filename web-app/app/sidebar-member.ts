@@ -18,12 +18,12 @@ async function getSidebarMember(
     organization: string;
 }> {
     const {
-        createRequestContext,
+        sessionContext,
         getHumanMember,
         getOrganization,
         ERASED_MEMBER_NAME,
     } = await import('./adapters');
-    const ctx = createRequestContext();
+    const ctx = sessionContext();
     const [member, org] =
         await Promise.all([
             getHumanMember(ctx, 'current'),

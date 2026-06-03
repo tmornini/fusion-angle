@@ -8,6 +8,7 @@ import {
 } from '../api/validators.ts';
 import { createRequestContext }
     from '../web-app/app/adapters/shared.ts';
+import { devToken } from './token-fixtures.ts';
 import {
     getArchivedObjectiveIds,
 } from '../web-app/app/adapters/objectives.ts';
@@ -65,7 +66,7 @@ test('populateMockData seeds zero archived objectives',
         const db = new MemoryDbAdapter();
         await db.createSchema();
         await populateMockData(db);
-        const ctx = createRequestContext(db);
+        const ctx = createRequestContext(db, devToken());
         const ids = await getArchivedObjectiveIds(ctx);
         assert.equal(ids.size, 0);
     });
@@ -75,7 +76,7 @@ test('approved projects have full baseline coverage',
         const db = new MemoryDbAdapter();
         await db.createSchema();
         await populateMockData(db);
-        const ctx = createRequestContext(db);
+        const ctx = createRequestContext(db, devToken());
         const approved = await projectIdsByState(
             ctx, 'approved',
         );
@@ -106,7 +107,7 @@ test('completed projects have at least one actual per pair',
         const db = new MemoryDbAdapter();
         await db.createSchema();
         await populateMockData(db);
-        const ctx = createRequestContext(db);
+        const ctx = createRequestContext(db, devToken());
         const completed = await projectIdsByState(
             ctx, 'archived',
         );
@@ -144,7 +145,7 @@ test('approved projects have an actual for every pair',
         const db = new MemoryDbAdapter();
         await db.createSchema();
         await populateMockData(db);
-        const ctx = createRequestContext(db);
+        const ctx = createRequestContext(db, devToken());
         const approved = await projectIdsByState(
             ctx, 'approved',
         );
@@ -181,7 +182,7 @@ test('submitted projects have zero scores', async () => {
     const db = new MemoryDbAdapter();
     await db.createSchema();
     await populateMockData(db);
-    const ctx = createRequestContext(db);
+    const ctx = createRequestContext(db, devToken());
     const submitted = await projectIdsByState(
         ctx, 'submitted',
     );

@@ -17,6 +17,9 @@ import {
 } from './page-loader.ts';
 import { log } from './logger.ts';
 import { MissingTableError } from './adapters/index.ts';
+import {
+    establishSession,
+} from './adapters/init.ts';
 import { navigateTo } from './navigation.ts';
 import { PAGE_REGISTRY } from './page-registry.ts';
 
@@ -84,6 +87,10 @@ document.addEventListener(
         } catch (err) {
             handleDatabaseError(err);
             return;
+        }
+
+        if (hasSchema) {
+            establishSession('current', 'Demo User');
         }
 
         const pageName = getPageName();

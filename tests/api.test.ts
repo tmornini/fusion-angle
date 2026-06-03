@@ -11,12 +11,13 @@ import {
     seedHumanMember,
     seedAIMember,
 } from './member-fixtures.ts';
+import { devToken } from './token-fixtures.ts';
 
 test('GET on unknown route throws', async () => {
     const db = new MemoryDbAdapter();
     await db.createSchema();
     await assert.rejects(
-        () => GET(db, 'nonexistent-table'),
+        () => GET(db, 'nonexistent-table', devToken()),
         /Route not found|404|not found/i,
     );
 });
@@ -25,7 +26,7 @@ test('GET ideas returns array', async () => {
     const db = new MemoryDbAdapter();
     await db.createSchema();
     const ideas =
-        await GET<unknown[]>(db, 'ideas');
+        await GET<unknown[]>(db, 'ideas', devToken());
     assert.deepEqual(ideas, []);
 });
 
@@ -33,7 +34,7 @@ test('GET ideas/:id throws on missing', async () => {
     const db = new MemoryDbAdapter();
     await db.createSchema();
     await assert.rejects(
-        () => GET(db, 'ideas/missing-id'),
+        () => GET(db, 'ideas/missing-id', devToken()),
         /Not found|404/,
     );
 });
@@ -51,10 +52,10 @@ test('PUT then GET round-trips an entity', async () => {
         expected_outcome: 'o',
         success_metrics: 'm',
     };
-    await PUT(db, 'ideas/i1', payload);
+    await PUT(db, 'ideas/i1', payload, devToken());
     const fetched =
         await GET<{ title: string }>(
-            db, 'ideas/i1',
+            db, 'ideas/i1', devToken(),
         );
     assert.equal(fetched.title, 'Test');
 });
@@ -63,7 +64,7 @@ test('GET ideas/ normalizes to collection', async () => {
     const db = new MemoryDbAdapter();
     await db.createSchema();
     const result =
-        await GET<unknown[]>(db, 'ideas/');
+        await GET<unknown[]>(db, 'ideas/', devToken());
     assert.deepEqual(result, []);
 });
 
@@ -74,7 +75,7 @@ test(
         await db.createSchema();
         await seedHumanMember(db, 'hw_1', 'Sarah Chen');
         const members =
-            await GET<unknown[]>(db, 'members');
+            await GET<unknown[]>(db, 'members', devToken());
         assert.equal(members.length, 1);
     },
 );
@@ -86,7 +87,8 @@ test(
         await db.createSchema();
         await seedAIMember(db, 'ai_1', 'Opus');
         const ais =
-            await GET<unknown[]>(db, 'ai-members');
+            await GET<unknown[]>(
+                db, 'ai-members', devToken());
         assert.equal(ais.length, 1);
     },
 );
@@ -99,7 +101,7 @@ test(
         await assert.rejects(
             () => PUT(db, 'ai-members/ai_1', {
                 rogue_field: 'extra',
-            }),
+            }, devToken()),
             /unexpected key|missing/,
         );
     },
@@ -112,10 +114,10 @@ test(
         const db = new MemoryDbAdapter();
         await db.createSchema();
         await POST(
-            db, 'snapshots/mock-data', {},
+            db, 'snapshots/mock-data', {}, devToken(),
         );
         const members =
-            await GET<unknown[]>(db, 'members');
+            await GET<unknown[]>(db, 'members', devToken());
         assert.ok(members.length > 0);
     },
 );
@@ -127,7 +129,7 @@ test(
         const db = new MemoryDbAdapter();
         await db.createSchema();
         await assert.rejects(
-            () => POST(db, 'ideas', {}),
+            () => POST(db, 'ideas', {}, devToken()),
             /not allowed/i,
         );
     },
@@ -140,7 +142,7 @@ test(
         await db.createSchema();
         await assert.rejects(
             () => POST(
-                db, 'no-such-resource', {},
+                db, 'no-such-resource', {}, devToken(),
             ),
             /not found|404/i,
         );
@@ -154,7 +156,7 @@ test(
         const db = new MemoryDbAdapter();
         await db.createSchema();
         await assert.rejects(
-            () => GET(db, 'members/w-1/extra'),
+            () => GET(db, 'members/w-1/extra', devToken()),
             /not found|404/i,
         );
     },
@@ -175,6 +177,8 @@ test(
                     headers: {
                         'Content-Type':
                             'application/json',
+                        'Authorization':
+                            'Bearer ' + devToken(),
                     },
                     body: '{not valid json',
                 },
