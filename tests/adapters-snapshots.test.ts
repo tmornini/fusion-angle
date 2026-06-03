@@ -15,6 +15,12 @@ import {
 } from '../web-app/app/adapters/shared.ts';
 import { devToken } from './token-fixtures.ts';
 import {
+    mintAccessToken,
+    ANONYMOUS_ID,
+} from '../api/access-token.ts';
+import { seedHumanMember } from './member-fixtures.ts';
+import {
+    getHasAnyHumanMembers,
     getSnapshot,
     putSnapshot,
     putSnapshotFromFile,
@@ -380,5 +386,41 @@ test(
                 );
             }
         }
+    },
+);
+
+function anonToken(): string {
+    return mintAccessToken({
+        sub: ANONYMOUS_ID, roles: [], name: 'Anonymous',
+        iat: 1_700_000_000, ttlSeconds: 10_000_000_000,
+        jti: 'anon',
+    });
+}
+
+// The snapshots page reads data-existence via the PUBLIC
+// snapshot plane, so an anonymous (pre-session) viewer gets a
+// correct answer without a 401 at the gate.
+test(
+    'getHasAnyHumanMembers is false for an anonymous viewer'
+    + ' with no members',
+    async () => {
+        const db = new MemoryDbAdapter();
+        await db.createSchema();
+        const ctx = createRequestContext(db, anonToken());
+        assert.equal(
+            await getHasAnyHumanMembers(ctx), false);
+    },
+);
+
+test(
+    'getHasAnyHumanMembers is true for an anonymous viewer'
+    + ' when a member exists',
+    async () => {
+        const db = new MemoryDbAdapter();
+        await db.createSchema();
+        await seedHumanMember(db, 'current', 'Demo');
+        const ctx = createRequestContext(db, anonToken());
+        assert.equal(
+            await getHasAnyHumanMembers(ctx), true);
     },
 );

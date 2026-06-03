@@ -66,6 +66,19 @@ const HEADER: AccessTokenHeader = {
 // stored the credential secret unhashed and deferred
 // verification to where it lives. The gate's REAL teeth are
 // structure + exp/nbf + revoked-before + anonymous-rejection.
+//
+// !!! DEPLOYMENT CONSTRAINT — token forgery is TRIVIAL until
+// this seam is real crypto: the signing key is a constant
+// shipped in client JS, so any party can mint a valid token.
+// This is safe ONLY because the entire store is client-side
+// localStorage today — there is no trust boundary to cross
+// (the page-runner already owns their own data, so a forged
+// token grants nothing). DO NOT enable this gate in a
+// networked / multi-user / untrusted-client-reachable context
+// until signAccessToken/verifyTokenSignature are backed by a
+// real signature (HMAC-SHA256 or asymmetric) over a secret
+// held server-side. That is SP-5's work and arrives WITH the
+// server tier; the two are inseparable.
 function signAccessToken(_signingInput: string): string {
     return base64UrlEncode(SIGNING_KEY_ID);
 }

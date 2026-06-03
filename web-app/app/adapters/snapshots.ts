@@ -1,7 +1,3 @@
-import { MissingTableError } from '../../../api/db.ts';
-import type {
-    HumanMemberEntity,
-} from '../../../api/types.ts';
 import type { RequestContext } from './shared.ts';
 
 // Fallback when navigator.storage.estimate() is
@@ -256,16 +252,20 @@ export async function getSnapshot(
 export async function getHasAnyHumanMembers(
     ctx: RequestContext,
 ): Promise<boolean> {
-    try {
-        const members =
-            await ctx.GET<HumanMemberEntity[]>(
-                'members',
-            );
-        return members.length > 0;
-    } catch (err) {
-        if (err instanceof MissingTableError) {
-            return false;
-        }
-        throw err;
+    // The snapshots page is infrastructure-tier — it runs
+    // before any session exists (it installs the datastore).
+    // Derive data-existence from the PUBLIC snapshot plane
+    // (`snapshots/schema`, exempt from the Bearer gate),
+    // never the protected `members` route, so the page works
+    // without authentication. `null` = no schema = no data.
+    const snapshot =
+        await ctx.GET<string | null>('snapshots/schema');
+    if (snapshot === null) {
+        return false;
     }
+    const tables = JSON.parse(snapshot) as {
+        members?: unknown[];
+    };
+    return Array.isArray(tables.members)
+        && tables.members.length > 0;
 }

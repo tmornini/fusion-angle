@@ -7,7 +7,7 @@
 > Regenerate with `./generate-schema-svg` after a schema
 > change.
 
-24 tables stored in localStorage as JSON arrays, listed in
+25 tables stored in localStorage as JSON arrays, listed in
 `api/db.ts` as `TABLE_NAMES`. Each table is keyed as
 `fusion-ai:tableName`. All rows have a text `id` primary
 key. Column types: TEXT (string), INTEGER (number), REAL
@@ -170,6 +170,34 @@ SP-5. SP-1 enforces non-leakage on read.
 | kind | TEXT (`password` \| `client_secret`) |
 | status | TEXT (`set` \| `rotated` \| `revoked`) |
 | secret | TEXT |
+| at | TEXT |
+
+### identity_token_revocations
+
+Append-only "log-out-everywhere" ledger
+(`HistoryEntityStore`). Each row records a moment
+after which every access token for that identity is
+revoked. The effective revoked-before stamp is the
+LATEST `at` per `identity_id` (derive from the
+ledger — `latestRevocationAt` in
+`api/access-token.ts` is its single home). The token
+gate (`handleRequest`) rejects a Bearer whose `iat`
+precedes that stamp. A logout is a NEW row — never a
+mutated column; append-and-max-reduce is commutative,
+so a concurrent cross-tab append can only DELAY a
+logout, never un-revoke. `at` is validated as a
+well-formed RFC-3339 Zulu timestamp at the storage
+gate (the revoked-before reduce trusts it parses).
+
+Logging an identity out everywhere also revokes the
+ACTOR's own in-flight token (its `iat` predates the
+new stamp) — a caller must re-establish a session
+before any further write.
+
+| Column | Type |
+|--------|------|
+| id | TEXT |
+| identity_id | TEXT (FK → identities) |
 | at | TEXT |
 
 ### ideas

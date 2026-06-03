@@ -132,8 +132,68 @@ Six independently-shippable sub-projects. **Critical path
     `./generate-schema-svg --check`; any schema change must regenerate
     + commit it, and the sandbox gate is `TMPDIR=/tmp/claude
     ./validate`.
-- **SP-3, 4, 5, 2, 6 — not started.** Next on the critical path:
-  **SP-3 (Token gate)**.
+- **SP-3 Token gate — ✅ DONE** (executed 2026-06; commits
+  `c595126..HEAD` on `master`, `./validate` green at every step, 1078
+  tests). Landed: the JWT access-token claim contract
+  (`api/access-token.ts`: `sub`/`roles`/`name`/`aud`/`cnf` +
+  `iat`/`nbf`/`exp`/`jti`, short-lived) over a co-located base64url codec
+  (`api/base64url.ts`); the authentication gate at `handleRequest`
+  (verify structure + `aud` + `exp`/`nbf` + per-identity revoked-before +
+  reject the anonymous principal on protected routes); the append-only
+  `identity_token_revocations` ledger (revoked-before = latest `at`, one
+  home `latestRevocationAt`); `RequestContext.identity` set exactly once
+  (a `Principal` value); the token carried on the vessel via an explicit
+  required param + a per-tab session holder (`init.ts`) +
+  `sessionContext()`; mint-at-login/boot for the seeded `current`
+  identity. Detailed plan + execution record:
+  `docs/superpowers/plans/2026-06-03-sp3-token-gate.md`.
+  - **Deviations recorded during execution:** (a) the token contract +
+    verify live in `api/` (not `web-app/`) because the gate is in `api/`
+    and cannot import upward; (b) the signature is a DEFERRED structural
+    seam (`verifyTokenSignature` accepts a placeholder) — real HS256/DPoP
+    verification is SP-5, exactly as SP-1 deferred credential hashing; the
+    gate's real teeth are structure + `aud` + `exp`/`nbf` +
+    revoked-before + anonymous-rejection. **Deployment constraint**
+    (automated security review flagged this CRITICAL): the signing key is
+    a client-shipped constant, so a token is trivially forgeable — the
+    gate MUST NOT be enabled in a networked / multi-user / untrusted-
+    client-reachable context until SP-5 supplies a real server-side
+    signature. Safe today ONLY because the whole store is client-side
+    localStorage (no trust boundary; the page-runner already owns their
+    data). The gate and real signing are inseparable — they arrive
+    together with the server tier; (c) STRICT deny-by-default
+    (user-ratified): the token param is required, no fallback token; the
+    logged-out state is a named `ANONYMOUS_PRINCIPAL` the gate rejects on
+    protected routes (authentication teeth, distinct from SP-4 role
+    authorization); (d) the exempt set is `BEARER_EXEMPT_ROUTES` (the
+    snapshot/bootstrap plane) — exempt-from-the-Bearer-gate is NOT
+    "unauthenticated"; (e) the sweep surfaced and fixed a pre-existing
+    wart — `flow-operations.ts` now threads the `ctx` vessel, not a raw
+    `db` adapter (Generality: one voice).
+  - **Corrected the 401-vs-404 reasoning:** the gate runs AFTER
+    `matchRoute`, so a path OUTSIDE our URL tree → 404 (honest: no
+    resource to authenticate to) and an IN-tree unauthenticated request →
+    401 (which asserts only "no valid credentials," never existence — per
+    RFC 9110). Because the gate runs BEFORE the handler, an
+    unauthenticated caller never reaches an instance lookup, so
+    RESOURCE-INSTANCE enumeration is STRUCTURALLY prevented (not an oracle
+    to defer); only the route-SHAPE table — the public API contract — is
+    observable, which is acceptable. Both codes are honest; no protective
+    lie is being deferred.
+  - **Grant-first principle for SP-5:** the `/authentication/*` front
+    doors will be in `BEARER_EXEMPT_ROUTES` (you cannot require a Bearer
+    to obtain one), but they are NOT unauthenticated — they MUST
+    authenticate the presented grant immediately, before any side effect,
+    and a failed grant is a clean no-op (no token minted, no session
+    written). Authenticate-then-act; validate at the gate + atomicity.
+  - **Self-revocation note (for SP-4/SP-6):** "log out everywhere" stamps
+    `revoked_before = now`, which also revokes the actor's own in-flight
+    token; a caller must re-establish a session before any further write.
+  - **`aud` enforced now, multi-audience later:** a single
+    `TOKEN_AUDIENCE` is enforced in `verifyAccessToken`; per-client
+    multi-audience validation (via the SP-5 clients registry) is deferred.
+- **SP-4, 5, 2, 6 — not started.** Next on the critical path:
+  **{SP-4 Authorization, SP-5 Authentication}** (the `3 → {4,5}` fork).
 
 ## Sub-project 1 — Identity core (detailed; build first)
 
