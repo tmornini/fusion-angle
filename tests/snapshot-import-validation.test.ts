@@ -169,7 +169,6 @@ test(
                 {
                     id: 'u1',
                     type: 'human',
-                    name: 'Alice Adams',
                     rogue_field: 'invalid',
                 },
             ],
@@ -229,12 +228,9 @@ test(
             human_members: [
                 {
                     id: 'u1',
-                    email: 'a@example.com',
-                    phone: '',
                     title: 'product_manager',
                     strengths: '[]',
                     team_dimensions: '{}',
-                    bio: '',
                     department: 'Product',
                 },
             ],
@@ -299,7 +295,6 @@ test(
         await adapter.createSchema();
         await adapter.members.put('u1', {
             type: 'human',
-            name: 'Alice Adams',
         });
         await adapter.createSchema();
         const members = await adapter.members.getAll();

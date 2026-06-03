@@ -398,51 +398,140 @@ export interface StateEntity {
 
 export const SYSTEM_MEMBER_ID: Id = 'system';
 
-// Parent row: a member's shared identity. The kind
-// discriminant and display name live here; kind-specific
-// detail lives in human_members / ai_members keyed by the
-// same id. A 'system' member is a parent row with no
-// detail row — absence of a detail row models "no kind-
-// specific attributes".
+export const SYSTEM_MEMBER_NAME = 'System';
+
+// A principal that spans the whole platform. `kind` is the
+// NATURE of the principal — a person (a human being) or a
+// service (an automated agent / API client / the platform
+// itself) — NOT a statement about whether it has sensitive
+// data. Both kinds carry sensitive facets: persons an
+// identity_pii row, services credentials (SP-5). The id is
+// the universal key: member.id === identity.id, always.
+export type IdentityKind = 'person' | 'service';
+
+export interface IdentityEntity {
+    id: Id;
+    kind: IdentityKind;
+}
+
+// The person-PII facet, keyed by the shared identity id. A
+// separately-erasable row: erasing PII splices THIS row;
+// the identity, the member, and every member_id reference
+// survive. Services have no row here (their secrets live in
+// identity_credentials). All fields NOT NULL — absence of
+// the row, not a null column, models erased PII.
+export interface IdentityPiiEntity {
+    id: Id;
+    name: string;
+    email: string;
+    phone: string;
+    bio: string;
+}
+
+export type IdentityCredentialKind =
+    | 'password'        // person: interactive secret
+    | 'client_secret';  // service: shared secret
+
+export type IdentityCredentialStatus =
+    | 'set' | 'rotated' | 'revoked';
+
+// Append-only credential lifecycle event. One row per
+// event; current validity = the latest event per
+// (identity_id, kind). `secret` is OPAQUE material that
+// never escapes the adapter boundary — never rendered.
+// Revocation is a NEW 'revoked' event, never a splice
+// (contrast identity_pii). Real crypto and the OAuth
+// stores (clients, identity_tokens, identity_providers)
+// are SP-5; this is only the seam.
+export interface IdentityCredentialEntity {
+    id: Id;
+    identity_id: Id;
+    kind: IdentityCredentialKind;
+    status: IdentityCredentialStatus;
+    secret: string;
+    at: string;
+}
+
+// The person-PII display facet as a tagged union, so the
+// ABSENCE of the row (erased PII) is represented without
+// null and DECIDED AT THE CALL SITE. Presenters switch on
+// `erased` and supply their own fallback constant.
+export type MemberPii =
+    | {
+        readonly erased: false;
+        readonly name: string;
+        readonly email: string;
+        readonly phone: string;
+        readonly bio: string;
+    }
+    | { readonly erased: true };
+
+export class Identity {
+    readonly #id: Id;
+    readonly #kind: IdentityKind;
+
+    constructor(entity: IdentityEntity) {
+        this.#id = entity.id;
+        this.#kind = entity.kind;
+    }
+
+    idForLink(): string {
+        return this.#id;
+    }
+
+    kindValue(): IdentityKind {
+        return this.#kind;
+    }
+
+    isPerson(): boolean {
+        return this.#kind === 'person';
+    }
+
+    isService(): boolean {
+        return this.#kind === 'service';
+    }
+}
+
+// Parent row: a member's shared identity. Only the kind
+// discriminant lives here; the display name lives with the
+// kind (ai_members.name, identity_pii.name) or as the
+// SYSTEM_MEMBER_NAME constant. Kind-specific detail lives in
+// human_members / ai_members keyed by the same id. A
+// 'system' member is a parent row with no detail row.
 export interface MemberEntity {
     id: MemberId;
     type: MemberKind;
-    name: string;
 }
 
 // human_members detail row, keyed by the shared member id.
+// Contact PII (name/email/phone/bio) lives in identity_pii;
+// this row carries only the org profile.
 export interface HumanMemberEntity {
     id: MemberId;
-    email: string;
     title: string;
     department: string;
     strengths: JsonArrayField;
     team_dimensions: JsonObjectField;
-    phone: string;
-    bio: string;
 }
 
 export class HumanMember {
     readonly kind = 'human' as const;
     readonly #id: MemberId;
-    readonly #name: string;
-    readonly #email: string;
+    readonly #pii: MemberPii;
     readonly #title: string;
     readonly #department: string;
     readonly #state: MemberState;
     readonly #strengths: string;
     readonly #teamDimensions: string;
-    readonly #phone: string;
-    readonly #bio: string;
 
     constructor(
         parent: MemberEntity,
         detail: HumanMemberEntity,
+        pii: MemberPii,
         state: MemberState,
     ) {
         this.#id = parent.id;
-        this.#name = parent.name;
-        this.#email = detail.email;
+        this.#pii = pii;
         this.#title = detail.title;
         this.#department =
             detail.department;
@@ -451,16 +540,14 @@ export class HumanMember {
             detail.strengths;
         this.#teamDimensions =
             detail.team_dimensions;
-        this.#phone = detail.phone;
-        this.#bio = detail.bio;
     }
 
     idForLink(): string {
         return this.#id;
     }
 
-    name(): string {
-        return this.#name;
+    pii(): MemberPii {
+        return this.#pii;
     }
 
     titleLabel(): string {
@@ -469,18 +556,6 @@ export class HumanMember {
 
     departmentLabel(): string {
         return this.#department;
-    }
-
-    emailAddress(): string {
-        return this.#email;
-    }
-
-    phoneNumber(): string {
-        return this.#phone;
-    }
-
-    bioText(): string {
-        return this.#bio;
     }
 
     isActive(): boolean {
@@ -533,28 +608,29 @@ export class HumanMember {
     }
 
     matchesSearch(term: string): boolean {
-        const lowerTerm = term.toLowerCase();
-        return (
-            this.#name
-                .toLowerCase()
-                .includes(lowerTerm)
-            || this.#email
-                .toLowerCase()
-                .includes(lowerTerm)
-            || this.#title
-                .toLowerCase()
-                .includes(lowerTerm)
+        const t = term.toLowerCase();
+        if (
+            this.#title
+                .toLowerCase().includes(t)
             || this.#department
-                .toLowerCase()
-                .includes(lowerTerm)
+                .toLowerCase().includes(t)
+        ) {
+            return true;
+        }
+        if (this.#pii.erased) return false;
+        return (
+            this.#pii.name
+                .toLowerCase().includes(t)
+            || this.#pii.email
+                .toLowerCase().includes(t)
         );
     }
-
 }
 
 // ai_members detail row, keyed by the shared member id.
 export interface AIMemberEntity {
     id: MemberId;
+    name: string;
     description: string;
     skill_focus: string;
     model: ModelId;
@@ -575,7 +651,7 @@ export class AIMember {
         state: MemberState,
     ) {
         this.#id = parent.id;
-        this.#name = parent.name;
+        this.#name = detail.name;
         this.#description =
             detail.description;
         this.#skillFocus =
@@ -665,7 +741,7 @@ export class SystemMember {
         state: MemberState,
     ) {
         this.#id = parent.id;
-        this.#name = parent.name;
+        this.#name = SYSTEM_MEMBER_NAME;
         this.#state = state;
     }
 

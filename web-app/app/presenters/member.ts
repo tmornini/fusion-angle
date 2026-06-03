@@ -14,6 +14,7 @@ import {
     type Member,
     isHumanMember,
     isAIMember,
+    ERASED_MEMBER_NAME,
 } from '../adapters/index.ts';
 import { DISPLAY_ABSENT } from '../format.ts';
 import {
@@ -43,6 +44,13 @@ export class HumanMemberRowPresenter {
     }
 
     buildRow(isSelf: boolean = false): SafeHtml {
+        const pii = this.#member.pii();
+        const name = pii.erased
+            ? ERASED_MEMBER_NAME
+            : pii.name;
+        const email = pii.erased
+            ? DISPLAY_ABSENT
+            : pii.email;
         return html`
         <div class="${
             'card card-hover p-4 cursor-pointer'
@@ -63,21 +71,19 @@ export class HumanMemberRowPresenter {
                     'text-sm font-bold'
                     + ' text-primary'
                 }">
-                    ${initials(
-                        this.#member.name(),
-                    )}
+                    ${initials(name)}
                 </span>
             </div>
             <div class="flex-fill min-w-0">
                 <p class="${
                     'font-medium truncate'
                 }">
-                    ${this.#member.name()}
+                    ${name}
                 </p>
                 <p class="${
                     'text-xs text-muted truncate'
                 }">
-                    ${this.#member.emailAddress()}
+                    ${email}
                 </p>
                 <div class="${
                     'flex items-center gap-2 mt-1'

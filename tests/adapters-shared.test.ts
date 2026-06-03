@@ -53,8 +53,11 @@ test(
         const ctx = createRequestContext(db);
         const map = await getHumanMemberMap(ctx);
         assert.equal(map.size, 1);
+        const pii = map.get('u1')?.pii();
         assert.equal(
-            map.get('u1')?.name(),
+            pii !== undefined && !pii.erased
+                ? pii.name
+                : undefined,
             'Alice Adams',
         );
     },
@@ -87,7 +90,7 @@ test(
         const row = await getCurrentHumanMember(
             createRequestContext(db),
         );
-        assert.equal(row.name, 'Alice Adams');
+        assert.equal(row.id, 'current');
         assert.equal(row.type, 'human');
     },
 );

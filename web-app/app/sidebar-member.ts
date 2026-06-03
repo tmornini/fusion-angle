@@ -21,6 +21,7 @@ async function getSidebarMember(
         createRequestContext,
         getHumanMember,
         getOrganization,
+        ERASED_MEMBER_NAME,
     } = await import('./adapters');
     const ctx = createRequestContext();
     const [member, org] =
@@ -28,9 +29,12 @@ async function getSidebarMember(
             getHumanMember(ctx, 'current'),
             getOrganization(ctx),
         ]);
+    const pii = member.pii();
     return {
         id: member.idForLink(),
-        name: member.name(),
+        name: pii.erased
+            ? ERASED_MEMBER_NAME
+            : pii.name,
         organization: org.nameText(),
     };
 }

@@ -22,6 +22,7 @@ import {
     type HumanMemberDraft,
     isMemberState,
     jsonArrayField,
+    ERASED_MEMBER_NAME,
 } from '../adapters/index.ts';
 import {
     WorkingStylesPresenter,
@@ -89,14 +90,15 @@ export function isHumanMemberFieldKey(
 export function humanMemberDraftFromMember(
     member: HumanMember,
 ): HumanMemberDraftFields {
+    const pii = member.pii();
     return {
-        name: member.name(),
-        email: member.emailAddress(),
-        phone: member.phoneNumber(),
+        name: pii.erased ? '' : pii.name,
+        email: pii.erased ? '' : pii.email,
+        phone: pii.erased ? '' : pii.phone,
         title: member.titleLabel(),
         department: member.departmentLabel(),
         state: member.stateValue(),
-        bio: member.bioText(),
+        bio: pii.erased ? '' : pii.bio,
         strengths: member.parsedStrengths(),
     };
 }
@@ -177,6 +179,10 @@ function buildAvatar(
 function buildReadonlyTitleSection(
     member: HumanMember,
 ): SafeHtml {
+    const pii = member.pii();
+    const name = pii.erased
+        ? ERASED_MEMBER_NAME
+        : pii.name;
     return html`
         <div class="${
             'flex flex-wrap items-center'
@@ -187,7 +193,7 @@ function buildReadonlyTitleSection(
                 + ' font-display'
                 + ' font-bold'
             }">
-                ${member.name()}
+                ${name}
             </h1>
             <span class="${
                 'badge '
@@ -208,6 +214,10 @@ function buildEditableTitleSection(
     member: HumanMember,
     draft: HumanMemberDraftFields,
 ): SafeHtml {
+    const pii = member.pii();
+    const name = pii.erased
+        ? ERASED_MEMBER_NAME
+        : pii.name;
     return html`
         <div class="${
             'flex flex-wrap items-center'
@@ -218,7 +228,7 @@ function buildEditableTitleSection(
                 + ' font-display'
                 + ' font-bold'
             }">
-                ${member.name()}
+                ${name}
             </h1>
             <span class="${
                 'badge '
@@ -380,17 +390,24 @@ function buildPersonalInfoCard(
 function buildReadonlyPersonalInfoBody(
     member: HumanMember,
 ): SafeHtml {
+    const pii = member.pii();
+    const name = pii.erased
+        ? ERASED_MEMBER_NAME
+        : pii.name;
+    const email = pii.erased ? '' : pii.email;
+    const phone = pii.erased ? '' : pii.phone;
+    const bio = pii.erased ? '' : pii.bio;
     return html`
         <div class="${
             'flex items-start gap-6 mb-6'
         }">
             ${buildAvatar(
-                initials(member.name()),
+                initials(name),
             )}
             <div class="flex-1">
                 ${buildReadonlyField(
                     'Name',
-                    member.name(),
+                    name,
                 )}
             </div>
         </div>
@@ -399,12 +416,12 @@ function buildReadonlyPersonalInfoBody(
         }">
             ${buildReadonlyField(
                 'Email',
-                member.emailAddress(),
+                email,
                 iconMail(16, ''),
             )}
             ${buildReadonlyField(
                 'Phone',
-                member.phoneNumber(),
+                phone,
                 iconPhone(16, ''),
             )}
         </div>
@@ -421,19 +438,23 @@ function buildReadonlyPersonalInfoBody(
                 member.departmentLabel(),
             )}
         </div>
-        ${buildReadonlyBio(member.bioText())}`;
+        ${buildReadonlyBio(bio)}`;
 }
 
 function buildEditablePersonalInfoBody(
     member: HumanMember,
     draft: HumanMemberDraftFields,
 ): SafeHtml {
+    const pii = member.pii();
+    const name = pii.erased
+        ? ERASED_MEMBER_NAME
+        : pii.name;
     return html`
         <div class="${
             'flex items-start gap-6 mb-6'
         }">
             ${buildAvatar(
-                initials(member.name()),
+                initials(name),
             )}
             <div class="flex-1">
                 ${buildEditableField(

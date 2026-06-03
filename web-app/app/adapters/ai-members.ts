@@ -36,11 +36,7 @@ export function notifyAIMemberChange(): void {
 }
 
 export type AIMemberDraft =
-    Omit<AIMemberEntity, 'id'> & { name: string };
-
-export interface AIMemberRow extends AIMemberEntity {
-    name: string;
-}
+    Omit<AIMemberEntity, 'id'>;
 
 export async function getAIMemberMap(
     ctx: RequestContext,
@@ -103,12 +99,10 @@ export async function getAIMember(
 export async function getAIMemberRow(
     ctx: RequestContext,
     id: MemberId,
-): Promise<AIMemberRow> {
-    const [parent, detail] = await Promise.all([
-        ctx.GET<MemberEntity>(`members/${id}`),
-        ctx.GET<AIMemberEntity>(`ai-members/${id}`),
-    ]);
-    return { ...detail, name: parent.name };
+): Promise<AIMemberEntity> {
+    return ctx.GET<AIMemberEntity>(
+        `ai-members/${id}`,
+    );
 }
 
 // Edits only; creation goes through
@@ -118,18 +112,17 @@ export async function putAIMember(
     id: MemberId,
     input: AIMemberDraft,
 ): Promise<void> {
-    const { name, ...detail } = input;
     await ctx.commit({
         ops: [
             {
                 method: 'put',
                 resource: `members/${id}`,
-                body: { type: 'ai', name },
+                body: { type: 'ai' },
             },
             {
                 method: 'put',
                 resource: `ai-members/${id}`,
-                body: detail as unknown as
+                body: input as unknown as
                     Record<string, unknown>,
             },
         ],
@@ -145,18 +138,17 @@ export async function postAIMemberCreation(
     id: MemberId,
     input: AIMemberDraft,
 ): Promise<void> {
-    const { name, ...detail } = input;
     await ctx.commit({
         ops: [
             {
                 method: 'put',
                 resource: `members/${id}`,
-                body: { type: 'ai', name },
+                body: { type: 'ai' },
             },
             {
                 method: 'put',
                 resource: `ai-members/${id}`,
-                body: detail as unknown as
+                body: input as unknown as
                     Record<string, unknown>,
             },
             await buildStateEventOp(ctx, id, 'active'),

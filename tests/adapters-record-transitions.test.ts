@@ -27,7 +27,6 @@ async function seedSystemMember(
 ): Promise<void> {
     await db.members.put(SYSTEM_MEMBER_ID, {
         type: 'system',
-        name: 'System Member',
     });
     await db.states.record(
         'st-system', SYSTEM_MEMBER_ID, 'active',

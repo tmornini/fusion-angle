@@ -17,7 +17,10 @@ import {
     getTransitionEventsByWorkOrder,
     type TransitionEvent,
 } from './state-events.ts';
-import { getMemberMap } from './members-union.ts';
+import {
+    getMemberMap,
+    memberName,
+} from './members-union.ts';
 
 export async function getFlowStats(
     ctx: RequestContext,
@@ -56,8 +59,10 @@ export async function getFlowStats(
     }
 
     const memberNameById = new Map<Id, string>();
-    for (const [id, w] of memberMap) {
-        memberNameById.set(id, w.name());
+    for (const id of memberMap.keys()) {
+        memberNameById.set(
+            id, memberName(memberMap, id),
+        );
     }
 
     const input: FlowStatsInput = {

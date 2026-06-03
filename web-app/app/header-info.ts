@@ -19,6 +19,7 @@ async function getHeaderData(
         getHumanMember,
         getOrganization,
         getDashboardStats,
+        ERASED_MEMBER_NAME,
     } = await import('./adapters');
     const { getTimeOfDay } =
         await import('./format');
@@ -29,9 +30,12 @@ async function getHeaderData(
             getOrganization(ctx),
             getDashboardStats(ctx),
         ]);
+    const pii = member.pii();
     return {
         memberId: member.idForLink(),
-        memberName: member.name(),
+        memberName: pii.erased
+            ? ERASED_MEMBER_NAME
+            : pii.name,
         organization: org.nameText(),
         greeting: getTimeOfDay(),
         stats,

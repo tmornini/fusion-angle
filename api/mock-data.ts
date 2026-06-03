@@ -373,7 +373,13 @@ type SeedHumanMember = Omit<
     HumanMemberEntity,
     'strengths' | 'team_dimensions'
 > & {
+    // Contact PII lives in identity_pii, not the
+    // human_members detail row. The seed carries it
+    // here and the writer routes it into the PII row.
     name: string;
+    email: string;
+    phone: string;
+    bio: string;
     strengths: string[];
     team_dimensions: Record<
         string, number
@@ -387,6 +393,8 @@ type SeedHumanMember = Omit<
 
 const MOCK_SEED_TIMESTAMP =
     '2026-01-01T00:00:00.000Z';
+const SEED_PLACEHOLDER_SECRET =
+    'placeholder-not-a-real-secret';
 
 export const OBJECTIVE_SEEDS: Array<{
     id: string;
@@ -690,13 +698,13 @@ export async function populateMockData(
         ...members.flatMap(member => {
             const {
                 id: _id, state: _state, name,
+                email, phone, bio,
                 strengths, team_dimensions,
                 ...detail
             } = member;
             return [
                 adapter.members.put(member.id, {
                     type: 'human',
-                    name,
                 }),
                 adapter.humanMembers.put(member.id, {
                     ...detail,
@@ -707,12 +715,41 @@ export async function populateMockData(
                             team_dimensions,
                         ),
                 }),
+                adapter.identities.put(member.id, {
+                    kind: 'person',
+                }),
+                adapter.identityPii.put(member.id, {
+                    name,
+                    email,
+                    phone,
+                    bio,
+                }),
             ];
         }),
         adapter.members.put(SYSTEM_MEMBER_ID, {
             type: 'system',
-            name: 'System Member',
         }),
+        adapter.identities.put(SYSTEM_MEMBER_ID, {
+            kind: 'service',
+        }),
+        adapter.identityCredentials.put(
+            'seed-cred-current-password', {
+                identity_id: 'current',
+                kind: 'password',
+                status: 'set',
+                secret: SEED_PLACEHOLDER_SECRET,
+                at: MOCK_SEED_TIMESTAMP,
+            },
+        ),
+        adapter.identityCredentials.put(
+            'seed-cred-system-client-secret', {
+                identity_id: SYSTEM_MEMBER_ID,
+                kind: 'client_secret',
+                status: 'set',
+                secret: SEED_PLACEHOLDER_SECRET,
+                at: MOCK_SEED_TIMESTAMP,
+            },
+        ),
     ]);
 
     // Initial member state events. Every seeded
@@ -5904,7 +5941,7 @@ export async function populateMockData(
         },
     ];
 
-    const aiMembers: (AIMemberEntity & { name: string })[] = [
+    const aiMembers: AIMemberEntity[] = [
         {
             id: 'tuJwPxYtBur2KCLquScShB',
             name: 'Claude Opus 4.8',
@@ -6027,13 +6064,15 @@ export async function populateMockData(
                 .put(r.id, r),
         ),
         ...aiMembers.flatMap(m => {
-            const { id: _id, name, ...detail } = m;
+            const { id: _id, ...detail } = m;
             return [
                 adapter.members.put(m.id, {
                     type: 'ai',
-                    name,
                 }),
                 adapter.aiMembers.put(m.id, detail),
+                adapter.identities.put(m.id, {
+                    kind: 'service',
+                }),
             ];
         }),
         ...leadToCloseData.workOrders.map(r =>
@@ -6262,14 +6301,25 @@ export async function populateBootstrapData(
     await Promise.all([
         adapter.members.put(SYSTEM_MEMBER_ID, {
             type: 'system',
-            name: 'System Member',
+        }),
+        adapter.identities.put(SYSTEM_MEMBER_ID, {
+            kind: 'service',
         }),
         adapter.members.put('current', {
             type: 'human',
+        }),
+        adapter.identities.put('current', {
+            kind: 'person',
+        }),
+        adapter.identityPii.put('current', {
             name: 'Tony Stark',
+            email: 'demo@example.com',
+            phone: '+1 (555) 123-4567',
+            bio: 'Passionate about building'
+                + ' products that solve'
+                + ' real problems.',
         }),
         adapter.humanMembers.put('current', {
-            email: 'demo@example.com',
             title: 'Admin',
             department: 'Product',
             strengths: jsonArrayField([
@@ -6283,10 +6333,6 @@ export async function populateBootstrapData(
                 expressive: 80,
                 amiable: 80,
             }),
-            phone: '+1 (555) 123-4567',
-            bio: 'Passionate about building'
-                + ' products that solve'
-                + ' real problems.',
         }),
         adapter.states.record(
             'bootstrap-system-active',
@@ -6310,5 +6356,23 @@ export async function populateBootstrapData(
             ideas_limit: TIER_IDEAS_LIMIT,
             last_activity: dt(0, 16, 0),
         }),
+        adapter.identityCredentials.put(
+            'seed-cred-current-password', {
+                identity_id: 'current',
+                kind: 'password',
+                status: 'set',
+                secret: SEED_PLACEHOLDER_SECRET,
+                at: MOCK_SEED_TIMESTAMP,
+            },
+        ),
+        adapter.identityCredentials.put(
+            'seed-cred-system-client-secret', {
+                identity_id: SYSTEM_MEMBER_ID,
+                kind: 'client_secret',
+                status: 'set',
+                secret: SEED_PLACEHOLDER_SECRET,
+                at: MOCK_SEED_TIMESTAMP,
+            },
+        ),
     ]);
 }

@@ -56,15 +56,19 @@ function buildHumanMember(
     department = 'Eng',
 ): HumanMember {
     return new HumanMember(
-        { id, type: 'human', name: first + ' ' + last },
+        { id, type: 'human' },
         {
             id,
-            email: first.toLowerCase()
-                + '@example.com',
             title,
             department,
             strengths: jsonArrayField([]),
             team_dimensions: jsonObjectField({}),
+        },
+        {
+            erased: false,
+            name: first + ' ' + last,
+            email: first.toLowerCase()
+                + '@example.com',
             phone: '',
             bio: '',
         },

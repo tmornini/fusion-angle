@@ -23,13 +23,10 @@ import {
 // --- HumanMemberEntity ---
 
 const validHumanMember = {
-    email: 'ada@example.com',
     title: 'Engineer',
     department: 'R&D',
     strengths: '["analytical"]',
     team_dimensions: '{"driver":0.5}',
-    phone: '555-1234',
-    bio: 'Pioneer',
 };
 
 test(
@@ -38,7 +35,7 @@ test(
         const result = validateHumanMemberEntity(
             validHumanMember,
         );
-        assert.equal(result.email, 'ada@example.com');
+        assert.equal(result.title, 'Engineer');
     },
 );
 
@@ -57,15 +54,15 @@ test(
 );
 
 test(
-    'validateHumanMemberEntity rejects missing email',
+    'validateHumanMemberEntity rejects contact PII'
+    + ' (now in identity_pii)',
     () => {
-        const body = { ...validHumanMember };
-        delete (
-            body as Record<string, unknown>
-        )['email'];
         assert.throws(
-            () => validateHumanMemberEntity(body),
-            /missing required key "email"/,
+            () => validateHumanMemberEntity({
+                ...validHumanMember,
+                email: 'ada@example.com',
+            }),
+            /unexpected key "email"/,
         );
     },
 );
@@ -101,6 +98,7 @@ test(
 // --- AIMemberEntity ---
 
 const validAIMember = {
+    name: 'Claude Opus 4.8',
     description: 'Long context, deep reasoning.',
     skill_focus: 'Deep reasoning over long docs.',
     model: getProviderModels()[0]!.id,

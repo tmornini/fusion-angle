@@ -79,6 +79,8 @@ export async function getMemberMap(
     );
 }
 
+export const ERASED_MEMBER_NAME = 'Unknown member';
+
 export function memberName(
     memberMap: Map<MemberId, Member>,
     memberId: MemberId,
@@ -89,6 +91,12 @@ export function memberName(
             'memberName: unknown member '
             + memberId,
         );
+    }
+    if (member.kind === 'human') {
+        const pii = member.pii();
+        return pii.erased
+            ? ERASED_MEMBER_NAME
+            : pii.name;
     }
     return member.name();
 }

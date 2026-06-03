@@ -123,7 +123,6 @@ test(
         await Promise.all(
             ids.map(id => adapter.members.put(id, {
                 type: 'human',
-                name: 'Member ' + id,
             })),
         );
         const all = await adapter.members.getAll();
@@ -177,7 +176,6 @@ test(
         await adapter.createSchema();
         await adapter.members.put('u1', {
             type: 'human',
-            name: 'Alice Adams',
         });
         const stored = map.get(KEY_PREFIX + 'members');
         assert.ok(stored, 'expected stored people value');

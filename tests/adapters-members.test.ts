@@ -58,8 +58,10 @@ test(
         );
 
         const row = await db.members.getById('w1');
-        assert.equal(row.name, 'Alice');
         assert.equal(row.type, 'human');
+        const pii =
+            await db.identityPii.getById('w1');
+        assert.equal(pii.name, 'Alice');
         const events = await db.states.allFor('w1');
         assert.equal(events.length, 1);
         assert.equal(events[0]?.state, 'active');

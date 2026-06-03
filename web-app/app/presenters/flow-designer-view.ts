@@ -23,6 +23,7 @@ import type {
 import {
     HumanMember,
     AIMember,
+    ERASED_MEMBER_NAME,
 } from '../adapters/index.ts';
 
 export function buildAttributeRefRow(
@@ -189,9 +190,15 @@ class="text-xs text-muted"
     );
     const lockAttr =
         trusted(isLocked ? ' disabled' : '');
+    const humanName = (h: HumanMember): string => {
+        const p = h.pii();
+        return p.erased
+            ? ERASED_MEMBER_NAME
+            : p.name;
+    };
     const sortedHumans = [...humans].sort(
-        (a, b) => a.name().localeCompare(
-            b.name(),
+        (a, b) => humanName(a).localeCompare(
+            humanName(b),
         ),
     );
     const sortedAis = [...ais].sort(
@@ -203,7 +210,7 @@ class="text-xs text-muted"
     const humanCheckboxes = sortedHumans.map(
         h => buildMemberCheckbox(
             h.idForLink(),
-            h.name(),
+            humanName(h),
             assigned.has(h.idForLink()),
             isLocked,
         ),

@@ -99,11 +99,9 @@ function makeHumanMember() {
         {
             id: 'hw_1',
             type: 'human',
-            name: 'Sarah Chen',
         },
         {
             id: 'hw_1',
-            email: 'sarah@example.com',
             title: 'Engineer',
             department: 'Engineering',
             strengths: jsonArrayField(['Leadership']),
@@ -111,6 +109,11 @@ function makeHumanMember() {
                 driver: 60, analytical: 40,
                 expressive: 30, amiable: 50,
             }),
+        },
+        {
+            erased: false,
+            name: 'Sarah Chen',
+            email: 'sarah@example.com',
             phone: '555-0100',
             bio: 'Builds things.',
         },
@@ -123,10 +126,10 @@ function makeAIMember() {
         {
             id: 'ai_1',
             type: 'ai',
-            name: 'Claude Opus 4.8',
         },
         {
             id: 'ai_1',
+            name: 'Claude Opus 4.8',
             description:
                 'Long context, deep reasoning.',
             skill_focus:

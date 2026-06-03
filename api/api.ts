@@ -10,6 +10,9 @@ import type {
     FlowWorkOrderEntity,
     FlowRecordEntity,
     HumanMemberEntity,
+    IdentityEntity,
+    IdentityPiiEntity,
+    IdentityCredentialEntity,
     IdeaEntity,
     IdeaSubmissionEntity,
     Objective,
@@ -183,6 +186,51 @@ const routes: Route[] = [
                 withoutId(payload) as unknown as Omit<
                     HumanMemberEntity, 'id'
                 >,
+            ),
+    }),
+    route('identities', {
+        get: (db) => db.identities.getAll(),
+    }),
+    route('identities/:id', {
+        get: (db, p) =>
+            db.identities.getById(param(p, 0)),
+        put: (db, p, payload) =>
+            db.identities.put(
+                param(p, 0),
+                withoutId(payload) as unknown as
+                    Omit<IdentityEntity, 'id'>,
+            ),
+    }),
+    route('identity-pii', {
+        get: (db) => db.identityPii.getAll(),
+    }),
+    route('identity-pii/:id', {
+        get: (db, p) =>
+            db.identityPii.getById(param(p, 0)),
+        put: (db, p, payload) =>
+            db.identityPii.put(
+                param(p, 0),
+                withoutId(payload) as unknown as
+                    Omit<IdentityPiiEntity, 'id'>,
+            ),
+        delete: (db, p) =>
+            db.identityPii.delete(param(p, 0)),
+    }),
+    route('identity-credentials', {
+        get: (db) => db.identityCredentials.getAll(),
+    }),
+    route('identity-credentials/:id', {
+        get: (db, p) =>
+            db.identityCredentials.getById(
+                param(p, 0),
+            ),
+        put: (db, p, payload) =>
+            db.identityCredentials.put(
+                param(p, 0),
+                withoutId(payload) as unknown as
+                    Omit<
+                        IdentityCredentialEntity, 'id'
+                    >,
             ),
     }),
     route('ideas', {

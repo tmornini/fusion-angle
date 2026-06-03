@@ -26,6 +26,7 @@ import {
     type IdeaWithSubmitter,
     Project,
     HumanMember,
+    ERASED_MEMBER_NAME,
 } from './adapters/index.ts';
 // init.ts is the composition root —
 // intentionally outside the adapter barrel.
@@ -216,9 +217,16 @@ export function projectToSearchItem(
 export function humanMemberToSearchItem(
     member: HumanMember,
 ): SearchItem {
+    const pii = member.pii();
+    const title = pii.erased
+        ? ERASED_MEMBER_NAME
+        : pii.name;
+    const emailKeyword = pii.erased
+        ? ''
+        : ' ' + pii.email;
     return {
         id: 'member-' + member.idForLink(),
-        title: member.name(),
+        title,
         meta: member.titleLabel()
             + ' · '
             + member.departmentLabel(),
@@ -229,7 +237,7 @@ export function humanMemberToSearchItem(
         href: buildPageUrl('members'),
         keywords: member.titleLabel()
             + ' ' + member.departmentLabel()
-            + ' ' + member.emailAddress(),
+            + emailKeyword,
     };
 }
 

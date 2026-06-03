@@ -14,6 +14,7 @@ import {
 
 function buildAIMemberBody(description: string) {
     return {
+        name: 'AI ' + description,
         description,
         skill_focus: '',
         model: getProviderModels()[0]!.id,

@@ -9,6 +9,9 @@ import type {
     MemberId,
     JsonArrayField,
     JsonObjectField,
+    IdentityEntity,
+    IdentityPiiEntity,
+    IdentityCredentialEntity,
     MemberEntity,
     HumanMemberEntity,
     AIMemberEntity,
@@ -572,7 +575,7 @@ export function assertOnlyKeys(
 // ── Entity validators ────────────────
 
 const MEMBER_BODY_KEYS: readonly string[] = [
-    'type', 'name',
+    'type',
 ];
 
 export function validateMemberEntity(
@@ -594,16 +597,95 @@ export function validateMemberEntity(
     }
     return {
         type,
+    };
+}
+
+const IDENTITY_BODY_KEYS: readonly string[] = ['kind'];
+
+export function validateIdentityEntity(
+    body: Record<string, unknown>,
+): Omit<IdentityEntity, 'id'> {
+    assertOnlyKeys(
+        body, IDENTITY_BODY_KEYS, 'IdentityEntity',
+    );
+    const kind = pickString(body, 'kind');
+    if (kind !== 'person' && kind !== 'service') {
+        throw new Error(
+            'invalid identity kind "' + kind
+            + '" on IdentityEntity',
+        );
+    }
+    return { kind };
+}
+
+const IDENTITY_PII_BODY_KEYS: readonly string[] = [
+    'name', 'email', 'phone', 'bio',
+];
+
+export function validateIdentityPiiEntity(
+    body: Record<string, unknown>,
+): Omit<IdentityPiiEntity, 'id'> {
+    assertOnlyKeys(
+        body, IDENTITY_PII_BODY_KEYS, 'IdentityPiiEntity',
+    );
+    return {
         name: pickString(body, 'name'),
+        email: pickString(body, 'email'),
+        phone: pickString(body, 'phone'),
+        bio: pickString(body, 'bio'),
+    };
+}
+
+const IDENTITY_CREDENTIAL_BODY_KEYS:
+    readonly string[] = [
+    'identity_id', 'kind', 'status',
+    'secret', 'at',
+];
+
+export function validateIdentityCredentialEntity(
+    body: Record<string, unknown>,
+): Omit<IdentityCredentialEntity, 'id'> {
+    assertOnlyKeys(
+        body,
+        IDENTITY_CREDENTIAL_BODY_KEYS,
+        'IdentityCredentialEntity',
+    );
+    const kind = pickString(body, 'kind');
+    if (
+        kind !== 'password'
+        && kind !== 'client_secret'
+    ) {
+        throw new Error(
+            'invalid credential kind "' + kind
+            + '" on IdentityCredentialEntity',
+        );
+    }
+    const status = pickString(body, 'status');
+    if (
+        status !== 'set'
+        && status !== 'rotated'
+        && status !== 'revoked'
+    ) {
+        throw new Error(
+            'invalid credential status "' + status
+            + '" on IdentityCredentialEntity',
+        );
+    }
+    return {
+        identity_id: pickString(
+            body, 'identity_id',
+        ),
+        kind,
+        status,
+        secret: pickString(body, 'secret'),
+        at: pickString(body, 'at'),
     };
 }
 
 const HUMAN_MEMBER_BODY_KEYS:
     readonly string[] = [
-    'email',
     'title', 'department',
     'strengths', 'team_dimensions',
-    'phone', 'bio',
 ];
 
 export function validateHumanMemberEntity(
@@ -615,9 +697,6 @@ export function validateHumanMemberEntity(
         'HumanMemberEntity',
     );
     return {
-        email: pickString(
-            body, 'email',
-        ),
         title: pickString(
             body, 'title',
         ),
@@ -630,18 +709,12 @@ export function validateHumanMemberEntity(
         team_dimensions: pickJsonObjectField(
             body, 'team_dimensions',
         ),
-        phone: pickString(
-            body, 'phone',
-        ),
-        bio: pickString(
-            body, 'bio',
-        ),
     };
 }
 
 const AI_MEMBER_BODY_KEYS:
     readonly string[] = [
-    'description', 'model', 'skill_focus',
+    'name', 'description', 'model', 'skill_focus',
 ];
 
 // model must be a known catalog id — membership at
@@ -664,6 +737,7 @@ export function validateAIMemberEntity(
         );
     }
     return {
+        name: pickString(body, 'name'),
         description: pickString(
             body, 'description',
         ),

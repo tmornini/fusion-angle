@@ -28,18 +28,16 @@ import {
 } from '../web-app/app/adapters/snapshots.ts';
 
 // A human_members detail row in the post-normalization
-// shape (no name — that lives on the parent members row).
-// The snapshot round-trip carries the human_members table,
-// so these import / export tests exercise it directly.
-function buildHumanDetail(id: string, first: string) {
+// shape (no name or contact PII — name lives on the parent
+// members row, contact PII in identity_pii). The snapshot
+// round-trip carries the human_members table, so these
+// import / export tests exercise it directly.
+function buildHumanDetail(id: string) {
     return {
         id,
-        email: `${first}@example.com`.toLowerCase(),
-        phone: '',
         title: 'product_manager',
         strengths: '[]',
         team_dimensions: '{}',
-        bio: '',
         department: 'Product',
     };
 }
@@ -92,14 +90,12 @@ test(
         const { db, ctx } = await setup();
         await putSnapshot(ctx, JSON.stringify({
             human_members: [
-                buildHumanDetail('u1', 'Alice'),
+                buildHumanDetail('u1'),
             ],
         }));
         const rows = await db.humanMembers.getAll();
         assert.equal(rows.length, 1);
-        assert.equal(
-            rows[0]?.email, 'alice@example.com',
-        );
+        assert.equal(rows[0]?.id, 'u1');
     },
 );
 
@@ -109,7 +105,7 @@ test(
         const { ctx } = await setup();
         await putSnapshot(ctx, JSON.stringify({
             human_members: [
-                buildHumanDetail('u1', 'Alice'),
+                buildHumanDetail('u1'),
             ],
         }));
         const parsed =
@@ -128,18 +124,20 @@ test(
         const { db, ctx } = await setup();
         await putSnapshot(ctx, JSON.stringify({
             human_members: [
-                buildHumanDetail('u1', 'Alice'),
+                buildHumanDetail('u1'),
             ],
         }));
         await putSnapshot(ctx, JSON.stringify({
             human_members: [
-                buildHumanDetail('u2', 'Bob'),
+                buildHumanDetail('u2'),
             ],
         }));
         const rows = await db.humanMembers.getAll();
         assert.equal(rows.length, 1);
         assert.equal(rows[0]?.id, 'u2');
-        assert.equal(rows[0]?.email, 'bob@example.com');
+        assert.equal(
+            rows[0]?.title, 'product_manager',
+        );
     },
 );
 
@@ -151,7 +149,7 @@ test(
         const file = new File(
             [JSON.stringify({
                 human_members: [
-                    buildHumanDetail('u1', 'Alice'),
+                    buildHumanDetail('u1'),
                 ],
             })],
             'snapshot.json',
@@ -160,9 +158,7 @@ test(
         await putSnapshotFromFile(ctx, file);
         const rows = await db.humanMembers.getAll();
         assert.equal(rows.length, 1);
-        assert.equal(
-            rows[0]?.email, 'alice@example.com',
-        );
+        assert.equal(rows[0]?.id, 'u1');
     },
 );
 
@@ -208,7 +204,7 @@ test(
 test('postSchemaCreation keeps existing data', async () => {
     const { db, ctx } = await setup();
     await db.members.put('u1', {
-        type: 'human', name: 'Alice Adams',
+        type: 'human',
     });
     await postSchemaCreation(ctx);
     const rows = await db.members.getAll();
@@ -218,7 +214,7 @@ test('postSchemaCreation keeps existing data', async () => {
 test('deleteSchema clears all table contents', async () => {
     const { db, ctx } = await setup();
     await db.members.put('u1', {
-        type: 'human', name: 'Alice Adams',
+        type: 'human',
     });
     await deleteSchema(ctx);
     assert.equal(await db.hasSchema(), false);

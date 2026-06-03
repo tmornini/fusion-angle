@@ -3,6 +3,9 @@ import type {
     MemberEntity,
     HumanMemberEntity,
     AIMemberEntity,
+    IdentityEntity,
+    IdentityPiiEntity,
+    IdentityCredentialEntity,
     IdeaEntity,
     ProjectEntity,
     FlowEntity,
@@ -150,6 +153,12 @@ export interface DbAdapter {
         EntityStore<HumanMemberEntity>;
     aiMembers:
         EntityStore<AIMemberEntity>;
+    identities:
+        EntityStore<IdentityEntity>;
+    identityPii:
+        EntityStore<IdentityPiiEntity>;
+    identityCredentials:
+        EntityStore<IdentityCredentialEntity>;
     ideas:
         EntityStore<IdeaEntity>;
     projects:
@@ -205,6 +214,9 @@ export const TABLE_NAMES = [
     'members',
     'human_members',
     'ai_members',
+    'identities',
+    'identity_pii',
+    'identity_credentials',
     'ideas',
     'projects',
     'flows',
