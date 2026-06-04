@@ -39,6 +39,26 @@ test('roles are isolated per identity', () => {
     assert.deepEqual(currentRolesFor(rows, 'other'), []);
 });
 
+test('a same-instant revoke beats the grant', () => {
+    const at = '2026-03-01T00:00:00.000Z';
+    assert.deepEqual(
+        currentRolesFor([
+            grant('1', 'current', 'admin', 'granted', at),
+            grant('2', 'current', 'admin', 'revoked', at),
+        ], 'current'),
+        []);
+});
+
+test('a same-instant re-grant beats the revoke', () => {
+    const at = '2026-03-01T00:00:00.000Z';
+    assert.deepEqual(
+        currentRolesFor([
+            grant('1', 'current', 'admin', 'revoked', at),
+            grant('2', 'current', 'admin', 'granted', at),
+        ], 'current'),
+        ['admin']);
+});
+
 test('admin is permitted on every verb at root', () => {
     for (const verb of ['GET', 'PUT', 'POST', 'DELETE']) {
         assert.equal(

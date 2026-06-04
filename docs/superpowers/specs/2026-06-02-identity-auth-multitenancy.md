@@ -192,8 +192,62 @@ Six independently-shippable sub-projects. **Critical path
   - **`aud` enforced now, multi-audience later:** a single
     `TOKEN_AUDIENCE` is enforced in `verifyAccessToken`; per-client
     multi-audience validation (via the SP-5 clients registry) is deferred.
-- **SP-4, 5, 2, 6 — not started.** Next on the critical path:
-  **{SP-4 Authorization, SP-5 Authentication}** (the `3 → {4,5}` fork).
+- **SP-4 Authorization — ✅ DONE** (executed 2026-06; commits
+  `ec88791..fa7a535` on `master`, `./validate` green at every step,
+  1101 tests). Landed: the `role_grants` append-only ledger as its
+  own `HistoryEntityStore` table (joins `identity_credentials` /
+  `identity_token_revocations`), with `role-grants` + `role-grants/:id`
+  routes; deny-by-default authorization gate — an ordered
+  `(verb, pathPrefix) → roles` policy matched by
+  `method === verb && pathname.startsWith(prefix)`, permitted iff a
+  held role matches, else 403 (`admin` allowed at `/` for all four
+  verbs — four honest lines, no implicit-superuser special case); two
+  DISTINCT gate stages: `authenticateRequest → Principal | string`
+  (401) then `authorizeRequest → string | null` (403), authentication
+  first; roles derived FRESH from the `role_grants` ledger every
+  request (the token's `roles` claim stays `[]` and is never
+  consulted — a revoke takes effect on the next request); `current`
+  seeded `admin` in both `populateMockData` and
+  `populateBootstrapData`; vessel adapter
+  `web-app/app/adapters/role-grants.ts` (`postRoleGrant` /
+  `postRoleRevocation` / `getRolesFor`). Detailed plan:
+  `docs/superpowers/plans/2026-06-03-sp4-authorization.md`.
+  - **Deviations recorded during execution:** (a) **User-directed
+    simpler model:** deny-by-default per `(verb, path-prefix)` via
+    `startsWith`, NOT the richer allow/deny IAM rule engine (explicitly
+    descoped this session); (b) **Own-table decision:** `role_grants`
+    is its own `HistoryEntityStore` table, NOT riding the `states`
+    log — this RESOLVES the open question the spec deferred to SP-4
+    (see Deferred section below, now updated); (c) **Roles
+    ledger-derived fresh** at the gate; the token `roles` claim is
+    unused; (d) **Fixture migration:** the plan listed 43 candidate
+    gate-traversing test files; 41 were seeded and 2
+    (`adapters-shared-identity`, `flow-designer-presenter`) were
+    verified PURE (identity-resolution and presenter tests that never
+    cross the HTTP gate) and correctly left unseeded; the api-layer
+    trio (`api`, `api-records`, `api-records-multi-put`) refactored to
+    a local `freshDb()` helper; (e) **Same-instant tie-break fix:**
+    `currentRolesFor` changed `>` → `>=` (its own commit) — a security
+    correctness fix: `nowUtc()` is millisecond-resolution, so a grant
+    and an immediate revoke can share an `at`; `>=` lets the
+    later-appended event (the revoke) win — the secure direction;
+    (f) **DEFERRED to SP-5:** credential surfacing after wipe-and-load
+    (show the admin username + password on the snapshots page) AND
+    switching the seeded admin password from the fixed placeholder to a
+    crypto-grade UUID — both land with SP-5's real password
+    verification (a random seed password is non-deterministic and
+    unknowable until a surfacing path displays it);
+    (g) **same-instant ledger ordering relies on append order** —
+    correct now (single-writer; `getAll()` returns insertion order)
+    but implicit; explicit `ORDER BY (at, monotonic-key)` deferred to
+    the Postgres tier — see the Deferred/open section.
+  - **Deployment constraint:** the HS256 signature is a placeholder
+    shipped in client JS (inherited from SP-3), so the gate MUST NOT be
+    enabled in any networked / multi-user context until SP-5 supplies
+    real crypto — the gate and real signing arrive together with the
+    server tier.
+- **SP-5, 2, 6 — not started.** Next on the critical path:
+  **SP-5 Authentication** (the `3 → {4,5}` fork; SP-4 is done).
 
 ## Sub-project 1 — Identity core (detailed; build first)
 
@@ -393,21 +447,44 @@ migrations arrive with Postgres.
 - Per-org *profile* divergence (different title per org) — YAGNI;
   would move the varying field onto a per-org row if a second org ever
   needs it.
-- `role_grants` ledger as its own table vs. riding the unified `states`
-  log — decide in SP-4's spec.
+- ~~`role_grants` ledger as its own table vs. riding the unified
+  `states` log — decide in SP-4's spec.~~ **RESOLVED (SP-4):** own
+  `HistoryEntityStore` table — see SP-4 execution entry, deviation (b).
+- **Same-instant ledger ordering relies on append order (implicit;
+  fragile at Postgres).** `currentRolesFor` (`api/authorization.ts`)
+  and `latestRevocationAt` (`api/access-token.ts`) break a same-`at`
+  tie by iteration order of `getAll()`. `nowUtc()` is
+  millisecond-resolution, so two events can share an `at`; the later-
+  appended row wins because `getAll()` returns insertion order on the
+  single-writer memory/localStorage tier. This is correct today and
+  pinned by the "same-instant" tie-break tests in
+  `tests/authorization.test.ts` — but the ordering is implicit: a
+  multi-writer Postgres tier whose `getAll()` has no guaranteed row
+  order could break the tie wrongly, leaving a revoked role held (a
+  security risk). The robust fix is an explicit
+  `ORDER BY (at, <monotonic-key>)` on every ledger read, where the
+  secondary key is a sortable sequence or ULID — NOT a content-hash
+  ETag (a content ETag orders deterministically but not chronologically,
+  so a revoke could lose to a grant). Apply ledger-wide
+  (`role_grants`, `identity_credentials`,
+  `identity_token_revocations`) for one consistent voice. Lands with
+  the Postgres tier.
 
-## Next step (SP-1 executed)
+## Next step (SP-4 executed)
 
-SP-1 is done (see Execution status). The next sub-project on the
-critical path is **SP-3 (Token gate)**. Invoke the writing-plans skill
-to produce its detailed implementation plan from the SP-3 sketch above
-— JWT claim contract (`sub`/`roles`/`name`/`aud`/`cnf` + `iat`/`exp`/
-`nbf`/`jti`), short-lived access tokens; auth middleware at
-`handleRequest` (`api/api.ts`) verifying the token + a per-identity
-`revoked-before` stamp; `RequestContext.identity` populated once (the
-Office of the Context); Bearer required on every request — then execute
-it TDD-first against `TMPDIR=/tmp/claude ./validate`. SP-1's seams to
-build on: the `identity` store, `member.id === identity.id`, and the
-`identity_credentials` ledger (the possessed-secret facet a
-`password` / `client_secret` grant verifies against — and where SP-5's
-real hashing/verification lands).
+SP-1, SP-3, and SP-4 are done (see Execution status). The next
+sub-project on the critical path is **SP-5 (Authentication)**. Invoke
+the writing-plans skill to produce its detailed implementation plan
+from the SP-5 sketch above — `clients` registry; single
+`/authentication/token` endpoint (grant_type dispatch:
+`authorization_code`, `client_credentials` via `private_key_jwt`,
+RFC 8693 `token-exchange`, `refresh`); interactive
+`/authentication/authorize` front door; `identity_providers` +
+`identity_tokens` stores; short access token + rotating refresh token
++ reuse-detection; per-identity `revoked-before` stamp; real HS256
+signing key (resolving the deployment constraint carried by SP-3 and
+SP-4); credential surfacing after wipe-and-load + crypto-grade seed
+password (the two items deferred from SP-4, deviation (f)) — then
+execute it TDD-first against `TMPDIR=/tmp/claude ./validate`. SP-4's
+seams to build on: the `role_grants` ledger, the deny-by-default
+authorization gate, and the `identity_credentials` ledger.
