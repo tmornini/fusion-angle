@@ -750,6 +750,15 @@ export async function populateMockData(
                 at: MOCK_SEED_TIMESTAMP,
             },
         ),
+        adapter.roleGrants.put(
+            'seed-role-current-admin', {
+                identity_id: 'current',
+                role: 'admin',
+                action: 'granted',
+                by_member_id: SYSTEM_MEMBER_ID,
+                at: MOCK_SEED_TIMESTAMP,
+            },
+        ),
     ]);
 
     // Initial member state events. Every seeded
@@ -6371,6 +6380,15 @@ export async function populateBootstrapData(
                 kind: 'client_secret',
                 status: 'set',
                 secret: SEED_PLACEHOLDER_SECRET,
+                at: MOCK_SEED_TIMESTAMP,
+            },
+        ),
+        adapter.roleGrants.put(
+            'bootstrap-role-current-admin', {
+                identity_id: 'current',
+                role: 'admin',
+                action: 'granted',
+                by_member_id: SYSTEM_MEMBER_ID,
                 at: MOCK_SEED_TIMESTAMP,
             },
         ),

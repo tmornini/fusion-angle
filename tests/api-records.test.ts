@@ -8,6 +8,16 @@ import {
 } from '../api/db-memory.ts';
 import { jsonArrayField } from '../api/types.ts';
 import { devToken } from './token-fixtures.ts';
+import {
+    seedRootAdmin,
+} from './root-admin-fixture.ts';
+
+async function freshDb() {
+    const db = new MemoryDbAdapter();
+    await db.createSchema();
+    await seedRootAdmin(db);
+    return db;
+}
 
 // records
 
@@ -15,8 +25,7 @@ test(
     'GET records returns an empty array on an'
     + ' empty db',
     async () => {
-        const db = new MemoryDbAdapter();
-        await db.createSchema();
+        const db = await freshDb();
         const out =
             await GET<unknown[]>(db, 'records', devToken());
         assert.deepEqual(out, []);
@@ -26,8 +35,7 @@ test(
 test(
     'PUT records/:id then GET round-trips a record',
     async () => {
-        const db = new MemoryDbAdapter();
-        await db.createSchema();
+        const db = await freshDb();
         await PUT(db, 'records/rec-1', {
             id: 'rec-1',
             name: 'Customer',
@@ -49,8 +57,7 @@ test(
 test(
     'DELETE records/:id removes the record',
     async () => {
-        const db = new MemoryDbAdapter();
-        await db.createSchema();
+        const db = await freshDb();
         await PUT(db, 'records/rec-1', {
             id: 'rec-1',
             name: 'X',
@@ -69,8 +76,7 @@ test(
 test(
     'GET record-attributes returns an empty array',
     async () => {
-        const db = new MemoryDbAdapter();
-        await db.createSchema();
+        const db = await freshDb();
         const out = await GET<unknown[]>(
             db, 'record-attributes', devToken(),
         );
@@ -82,8 +88,7 @@ test(
     'PUT record-attributes/:id then GET'
     + ' round-trips an attribute',
     async () => {
-        const db = new MemoryDbAdapter();
-        await db.createSchema();
+        const db = await freshDb();
         await PUT(db, 'record-attributes/a-1', {
             id: 'a-1',
             record_id: 'rec-1',
@@ -109,8 +114,7 @@ test(
 test(
     'DELETE record-attributes/:id removes the row',
     async () => {
-        const db = new MemoryDbAdapter();
-        await db.createSchema();
+        const db = await freshDb();
         await PUT(db, 'record-attributes/a-1', {
             id: 'a-1',
             record_id: 'rec-1',
@@ -135,8 +139,7 @@ test(
 test(
     'GET flow-records returns an empty array',
     async () => {
-        const db = new MemoryDbAdapter();
-        await db.createSchema();
+        const db = await freshDb();
         const out = await GET<unknown[]>(
             db, 'flow-records', devToken(),
         );
@@ -148,8 +151,7 @@ test(
     'PUT flow-records/:id then GET round-trips a'
     + ' binding',
     async () => {
-        const db = new MemoryDbAdapter();
-        await db.createSchema();
+        const db = await freshDb();
         await PUT(db, 'flow-records/fr-1', {
             id: 'fr-1',
             flow_id: 'flow-1',
@@ -169,8 +171,7 @@ test(
 test(
     'DELETE flow-records/:id removes the binding',
     async () => {
-        const db = new MemoryDbAdapter();
-        await db.createSchema();
+        const db = await freshDb();
         await PUT(db, 'flow-records/fr-1', {
             id: 'fr-1',
             flow_id: 'flow-1',

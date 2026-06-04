@@ -7,6 +7,9 @@ import {
 } from '../web-app/app/adapters/shared.ts';
 import { devToken } from './token-fixtures.ts';
 import {
+    seedRootAdmin,
+} from './root-admin-fixture.ts';
+import {
     createChannel,
 } from '../web-app/app/channels.ts';
 import {
@@ -27,6 +30,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         const ctx = createRequestContext(db, devToken());
         await ctx.commit({
             ops: [
@@ -69,6 +73,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         const ctx = createRequestContext(db, devToken());
         const ch1 = createChannel<void>();
         const ch2 = createChannel<void>();
@@ -102,6 +107,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         const ctx = createRequestContext(db, devToken());
         const ch = createChannel<void>();
         let count = 0;
@@ -120,6 +126,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         const ctx = createRequestContext(db, devToken());
         const ch = createChannel<void>();
         let count = 0;
@@ -170,6 +177,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         const ctx = createRequestContext(db, devToken());
         const bad = {
             method: 'put' as const,
@@ -197,6 +205,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         const ctx = createRequestContext(db, devToken());
         const goodA = {
             method: 'put' as const,

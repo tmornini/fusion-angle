@@ -14,6 +14,9 @@ import {
     seedHumanMember,
     seedAIMember,
 } from './member-fixtures.ts';
+import {
+    seedRootAdmin,
+} from './root-admin-fixture.ts';
 
 test(
     'postAIMemberStateChange records a state event'
@@ -21,6 +24,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         await seedHumanMember(db, 'current', 'Demo User');
         await seedAIMember(db, 'ai1', 'Claude');
         const before =

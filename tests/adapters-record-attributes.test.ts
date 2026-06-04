@@ -6,6 +6,9 @@ import {
 } from '../web-app/app/adapters/shared.ts';
 import { devToken } from './token-fixtures.ts';
 import {
+    seedRootAdmin,
+} from './root-admin-fixture.ts';
+import {
     putRecordAttribute,
     getRecordAttribute,
     getRecordAttributesByRecord,
@@ -20,6 +23,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         const ctx = createRequestContext(db, devToken());
         await putRecordAttribute(ctx, 'attr-1', {
             record_id: 'rec-1',
@@ -46,6 +50,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         const ctx = createRequestContext(db, devToken());
         await putRecordAttribute(ctx, 'a-1', {
             record_id: 'rec-1',
@@ -86,6 +91,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         const ctx = createRequestContext(db, devToken());
         await putRecordAttribute(ctx, 'a-mid', {
             record_id: 'rec-1',
@@ -127,6 +133,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         const ctx = createRequestContext(db, devToken());
         await putRecordAttribute(ctx, 'a-1', {
             record_id: 'rec-1',
@@ -149,6 +156,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         const ctx = createRequestContext(db, devToken());
         await assert.rejects(
             () => putRecordAttribute(ctx, 'a-1', {
@@ -173,6 +181,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         const ctx = createRequestContext(db, devToken());
         await assert.rejects(
             () => putRecordAttribute(ctx, 'a-1', {
@@ -196,6 +205,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         const ctx = createRequestContext(db, devToken());
         await putRecordAttribute(ctx, 'a-1', {
             record_id: 'rec-1',
@@ -221,6 +231,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         const ctx = createRequestContext(db, devToken());
         await putRecordAttribute(ctx, 'a-1', {
             record_id: 'rec-1',

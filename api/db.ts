@@ -7,6 +7,7 @@ import type {
     IdentityPiiEntity,
     IdentityCredentialEntity,
     IdentityTokenRevocationEntity,
+    RoleGrantEntity,
     IdeaEntity,
     ProjectEntity,
     FlowEntity,
@@ -162,6 +163,8 @@ export interface DbAdapter {
         EntityStore<IdentityCredentialEntity>;
     identityTokenRevocations:
         EntityStore<IdentityTokenRevocationEntity>;
+    roleGrants:
+        EntityStore<RoleGrantEntity>;
     ideas:
         EntityStore<IdeaEntity>;
     projects:
@@ -221,6 +224,7 @@ export const TABLE_NAMES = [
     'identity_pii',
     'identity_credentials',
     'identity_token_revocations',
+    'role_grants',
     'ideas',
     'projects',
     'flows',

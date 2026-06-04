@@ -11,10 +11,14 @@ import {
     deleteIdentityPii,
 } from '../web-app/app/adapters/identities.ts';
 import { seedPersonIdentity } from './identity-fixtures.ts';
+import {
+    seedRootAdmin,
+} from './root-admin-fixture.ts';
 
 async function setup() {
     const db = new MemoryDbAdapter();
     await db.createSchema();
+    await seedRootAdmin(db);
     return { db, ctx: createRequestContext(db, devToken()) };
 }
 

@@ -10,6 +10,9 @@ import {
 } from
     '../web-app/app/adapters/project-scoring.ts';
 import { seedHumanMember } from './member-fixtures.ts';
+import {
+    seedRootAdmin,
+} from './root-admin-fixture.ts';
 
 const AT = '2026-05-20T00:00:00.000Z';
 const VALID: ReadonlyArray<number> = [-100, 0, 100];
@@ -20,6 +23,7 @@ test('baseline store.put accepts valid boundary scores',
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         for (const score of VALID) {
             await db.projectObjectiveBaselineScores.put(
                 `p:o:${score}`,
@@ -38,6 +42,7 @@ test('baseline store.put rejects out-of-range scores',
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         for (const score of INVALID) {
             await assert.rejects(
                 () => db.projectObjectiveBaselineScores
@@ -61,6 +66,7 @@ test('actual store.put accepts valid boundary scores',
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         for (const score of VALID) {
             await db.projectObjectiveActualScores.put(
                 `p:o:${score}`,
@@ -79,6 +85,7 @@ test('actual store.put rejects out-of-range scores',
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         for (const score of INVALID) {
             await assert.rejects(
                 () => db.projectObjectiveActualScores
@@ -99,6 +106,7 @@ test('ctx.PUT rejects out-of-range baseline scores',
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         const ctx = createRequestContext(db, devToken());
         for (const score of INVALID) {
             await assert.rejects(
@@ -119,6 +127,7 @@ test('ctx.commit rejects out-of-range baseline scores',
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         const ctx = createRequestContext(db, devToken());
         for (const score of INVALID) {
             await assert.rejects(
@@ -147,6 +156,7 @@ test('ctx.commit rejects out-of-range actual scores',
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         const ctx = createRequestContext(db, devToken());
         for (const score of INVALID) {
             await assert.rejects(
@@ -172,6 +182,7 @@ test('postProjectBaselineScoring rejects bad scores',
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         await seedHumanMember(db, 'current', 'Demo User');
         const ctx = createRequestContext(db, devToken());
         for (const score of INVALID) {
@@ -192,6 +203,7 @@ test('postProjectActualMeasurement rejects bad scores',
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         await seedHumanMember(db, 'current', 'Demo User');
         const ctx = createRequestContext(db, devToken());
         for (const score of INVALID) {
@@ -212,6 +224,7 @@ test('postProjectBaselineScoring accepts valid scores',
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         await seedHumanMember(db, 'current', 'Demo User');
         const ctx = createRequestContext(db, devToken());
         await postProjectBaselineScoring(

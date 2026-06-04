@@ -9,6 +9,7 @@ import {
     putSnapshotFromFile,
     SnapshotTooLargeError,
 } from '../web-app/app/adapters/snapshots.ts';
+import { seedRootAdmin } from './root-admin-fixture.ts';
 
 test('SnapshotTooLargeError carries sizes', () => {
     const err = new SnapshotTooLargeError(100, 50);
@@ -25,6 +26,7 @@ test('SnapshotTooLargeError carries sizes', () => {
 test('rejects file larger than half of available quota', async () => {
     const db = new MemoryDbAdapter();
     await db.createSchema();
+    await seedRootAdmin(db);
     const ctx = createRequestContext(db, devToken());
     const nav = navigator as unknown as {
         storage?: {

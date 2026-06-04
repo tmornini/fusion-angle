@@ -8,6 +8,7 @@ import {
     type RequestContext,
 } from '../web-app/app/adapters/shared.ts';
 import { devToken } from './token-fixtures.ts';
+import { seedRootAdmin } from './root-admin-fixture.ts';
 import {
     getDashboardStats,
     getDashboardGauges,
@@ -26,6 +27,7 @@ async function setupDb(): Promise<{
 }> {
     const db = new MemoryDbAdapter();
     await db.createSchema();
+    await seedRootAdmin(db);
     const ctx = createRequestContext(db, devToken());
     return { db, ctx };
 }
@@ -267,6 +269,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         const ctx = createRequestContext(db, devToken());
         const gauges = await getDashboardGauges(ctx);
         assert.equal(gauges.length, 3);

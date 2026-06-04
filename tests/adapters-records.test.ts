@@ -22,6 +22,9 @@ import {
     seedCurrentMember,
     seedHumanMember,
 } from './member-fixtures.ts';
+import {
+    seedRootAdmin,
+} from './root-admin-fixture.ts';
 
 test(
     'postRecordChange create writes the row and'
@@ -29,6 +32,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         await seedCurrentMember(db);
         const ctx = createRequestContext(db, devToken());
         await postRecordChange(ctx, 'rec-1', {
@@ -57,6 +61,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         await seedCurrentMember(db);
         const ctx = createRequestContext(db, devToken());
         await postRecordChange(ctx, 'rec-1', {
@@ -92,6 +97,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         await seedCurrentMember(db);
         const ctx = createRequestContext(db, devToken());
         await postRecordChange(ctx, 'rec-1', {
@@ -121,6 +127,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         await seedCurrentMember(db);
         const ctx = createRequestContext(db, devToken());
         await postRecordChange(ctx, 'rec-1', {
@@ -175,6 +182,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         await seedCurrentMember(db);
         const ctx = createRequestContext(db, devToken());
         await postRecordChange(ctx, 'rec-1', {
@@ -214,6 +222,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         await seedCurrentMember(db);
         const ctx = createRequestContext(db, devToken());
         await postRecordChange(ctx, 'rec-1', {
@@ -240,6 +249,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         await seedCurrentMember(db);
         const ctx = createRequestContext(db, devToken());
         await postRecordChange(ctx, 'rec-1', {
@@ -269,6 +279,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         await seedCurrentMember(db);
         const ctx = createRequestContext(db, devToken());
         await postRecordChange(ctx, 'rec-1', {
@@ -294,6 +305,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         const ctx = createRequestContext(db, devToken());
         await assert.rejects(
             () => getRecordState(ctx, 'rec-missing'),
@@ -308,6 +320,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         await seedCurrentMember(db);
         const ctx = createRequestContext(db, devToken());
         await postRecordChange(ctx, 'rec-1', {

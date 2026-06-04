@@ -36,6 +36,9 @@ import { NODE_WIDTH } from '../web-app/app/flow-layout.ts';
 import {
     seedHumanMember,
 } from './member-fixtures.ts';
+import {
+    seedRootAdmin,
+} from './root-admin-fixture.ts';
 
 async function setupMemDb(): Promise<{
     db: MemoryDbAdapter;
@@ -43,6 +46,7 @@ async function setupMemDb(): Promise<{
 }> {
     const db = new MemoryDbAdapter();
     await db.createSchema();
+    await seedRootAdmin(db);
     await seedHumanMember(db, 'current', 'Demo User');
     const ctx = createRequestContext(db, devToken());
     return { db, ctx };
@@ -484,6 +488,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         await populateMockData(db);
         const g = await getFlowGraph(
             createRequestContext(db, devToken()),

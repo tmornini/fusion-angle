@@ -8,6 +8,7 @@ import {
     createRequestContext,
 } from '../web-app/app/adapters/shared.ts';
 import { devToken } from './token-fixtures.ts';
+import { seedRootAdmin } from './root-admin-fixture.ts';
 import {
     postIdentityLogoutEverywhere,
     getRevokedBefore,
@@ -44,6 +45,7 @@ test('rejects an unparseable timestamp', () => {
 async function setup() {
     const db = new MemoryDbAdapter();
     await db.createSchema();
+    await seedRootAdmin(db);
     return { db, ctx: createRequestContext(db, devToken()) };
 }
 

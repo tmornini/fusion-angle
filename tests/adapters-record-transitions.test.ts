@@ -6,6 +6,9 @@ import {
 } from '../web-app/app/adapters/shared.ts';
 import { devToken } from './token-fixtures.ts';
 import {
+    seedRootAdmin,
+} from './root-admin-fixture.ts';
+import {
     validateRecordTransition,
 } from
 '../web-app/app/adapters/record-transitions.ts';
@@ -148,6 +151,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         await seedSystemMember(db);
         const flowGraph = buildFlowGraph(
             'flow-1',
@@ -177,6 +181,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         await seedSystemMember(db);
         const flowGraph = buildFlowGraph(
             'flow-1',
@@ -217,6 +222,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         await seedSystemMember(db);
         const flowGraph = buildFlowGraph(
             'flow-1',
@@ -275,6 +281,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         await seedSystemMember(db);
         const flowGraph = buildFlowGraph(
             'flow-1',
@@ -312,6 +319,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         await seedSystemMember(db);
         const flowGraph = buildFlowGraph(
             'flow-1',
@@ -357,6 +365,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         await seedSystemMember(db);
         const flowGraph = buildFlowGraph(
             'flow-1',

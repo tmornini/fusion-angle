@@ -200,6 +200,30 @@ before any further write.
 | identity_id | TEXT (FK → identities) |
 | at | TEXT |
 
+### role_grants
+
+Append-only role-assignment ledger
+(`HistoryEntityStore`). One row per grant or revoke;
+the roles an identity CURRENTLY holds = the latest
+action per `(identity_id, role)` — a `granted` with
+no later `revoked`. Append-only: a revoke is a NEW
+`revoked` row, never a splice. `by_member_id` is the
+actor (== their identity id). Authorization derives
+roles from THIS ledger fresh at the gate
+(`isPermitted` in `api/authorization.ts`) — never
+from a token claim, so a revoke takes effect on the
+next request. `at` is the RFC-3339 zulu moment,
+validated at the storage gate.
+
+| Column | Type |
+|--------|------|
+| id | TEXT |
+| identity_id | TEXT (FK → identities) |
+| role | TEXT |
+| action | TEXT (`granted` \| `revoked`) |
+| by_member_id | TEXT (FK → members) |
+| at | TEXT |
+
 ### ideas
 
 | Column | Type |

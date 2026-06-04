@@ -3,6 +3,9 @@ import { strict as assert } from 'node:assert';
 import { GET } from '../api/api.ts';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import { devToken } from './token-fixtures.ts';
+import {
+    seedRootAdmin,
+} from './root-admin-fixture.ts';
 
 // Pin the collection routes that handleRequest
 // must serve. A new top-level resource is added
@@ -14,6 +17,7 @@ import { devToken } from './token-fixtures.ts';
 const COLLECTION_ROUTES: readonly string[] = [
     'members',
     'ai-members',
+    'role-grants',
     'ideas',
     'projects',
     'flows',
@@ -40,6 +44,7 @@ for (const route of COLLECTION_ROUTES) {
         async () => {
             const db = new MemoryDbAdapter();
             await db.createSchema();
+            await seedRootAdmin(db);
             const rows =
                 await GET<unknown[]>(
                     db, route, devToken());

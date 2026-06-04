@@ -13,6 +13,7 @@ import type {
     IdentityPiiEntity,
     IdentityCredentialEntity,
     IdentityTokenRevocationEntity,
+    RoleGrantEntity,
     MemberEntity,
     HumanMemberEntity,
     AIMemberEntity,
@@ -704,6 +705,39 @@ validateIdentityTokenRevocationEntity(
     }
     return {
         identity_id: pickString(body, 'identity_id'),
+        at,
+    };
+}
+
+const ROLE_GRANT_BODY_KEYS: readonly string[] = [
+    'identity_id', 'role', 'action', 'by_member_id', 'at',
+];
+
+export function validateRoleGrantEntity(
+    body: Record<string, unknown>,
+): Omit<RoleGrantEntity, 'id'> {
+    assertOnlyKeys(
+        body, ROLE_GRANT_BODY_KEYS, 'RoleGrantEntity',
+    );
+    const action = pickString(body, 'action');
+    if (action !== 'granted' && action !== 'revoked') {
+        throw new Error(
+            'invalid role action "' + action
+            + '" on RoleGrantEntity',
+        );
+    }
+    const at = pickString(body, 'at');
+    if (Number.isNaN(Date.parse(at))) {
+        throw new Error(
+            'invalid timestamp "' + at + '" on '
+            + 'RoleGrantEntity',
+        );
+    }
+    return {
+        identity_id: pickString(body, 'identity_id'),
+        role: pickString(body, 'role'),
+        action,
+        by_member_id: pickString(body, 'by_member_id'),
         at,
     };
 }

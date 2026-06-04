@@ -20,6 +20,9 @@ import {
 } from '../api/access-token.ts';
 import { seedHumanMember } from './member-fixtures.ts';
 import {
+    seedRootAdmin,
+} from './root-admin-fixture.ts';
+import {
     getHasAnyHumanMembers,
     getSnapshot,
     putSnapshot,
@@ -55,6 +58,7 @@ async function setup(): Promise<{
 }> {
     const db = new MemoryDbAdapter();
     await db.createSchema();
+    await seedRootAdmin(db);
     return { db, ctx: createRequestContext(db, devToken()) };
 }
 
@@ -406,6 +410,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         const ctx = createRequestContext(db, anonToken());
         assert.equal(
             await getHasAnyHumanMembers(ctx), false);
@@ -418,6 +423,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         await seedHumanMember(db, 'current', 'Demo');
         const ctx = createRequestContext(db, anonToken());
         assert.equal(

@@ -42,6 +42,9 @@ import type {
 import {
     seedHumanMember,
 } from './member-fixtures.ts';
+import {
+    seedRootAdmin,
+} from './root-admin-fixture.ts';
 
 // -- Fixtures ---------------------------------
 
@@ -161,6 +164,7 @@ async function setupOneWorkOrder(): Promise<{
 }> {
     const db = new MemoryDbAdapter();
     await db.createSchema();
+    await seedRootAdmin(db);
     await seedHumanMember(db, 'current', 'Demo Test');
     const ctx = createRequestContext(db, devToken());
     await db.flows.put(
@@ -312,6 +316,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         await seedHumanMember(
             db, 'current', 'Demo Test',
         );
@@ -378,6 +383,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         await seedHumanMember(
             db, 'current', 'Demo Test',
         );

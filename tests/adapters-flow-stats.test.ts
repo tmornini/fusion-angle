@@ -20,6 +20,9 @@ import type {
     GraphEdge,
     StoredGraph,
 } from '../api/types.ts';
+import {
+    seedRootAdmin,
+} from './root-admin-fixture.ts';
 
 // -- Fixture helpers --------------------------
 
@@ -108,6 +111,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
 
         // Flow f1 with an Onboarding graph
         await db.flows.put(
@@ -205,6 +209,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         const ctx = createRequestContext(db, devToken());
         await assert.rejects(
             () => getFlowStats(ctx, 'nope'),
@@ -218,6 +223,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         // buildFlow is is_auto_layout; buildTestGraph
         // seeds c→a→z all at (0,0).
         await db.flows.put(

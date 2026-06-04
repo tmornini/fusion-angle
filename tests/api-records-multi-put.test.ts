@@ -12,6 +12,16 @@ import {
     seedHumanMember,
 } from './member-fixtures.ts';
 import { devToken } from './token-fixtures.ts';
+import {
+    seedRootAdmin,
+} from './root-admin-fixture.ts';
+
+async function freshDb() {
+    const db = new MemoryDbAdapter();
+    await db.createSchema();
+    await seedRootAdmin(db);
+    return db;
+}
 
 // ── Create variant ──────
 
@@ -20,8 +30,7 @@ test(
     + ' record, initial state event, and'
     + ' attributes in one operation',
     async () => {
-        const db = new MemoryDbAdapter();
-        await db.createSchema();
+        const db = await freshDb();
         await seedCurrentMember(db);
         await POST(db, 'records-multi-put', {
             kind: 'create',
@@ -68,8 +77,7 @@ test(
     + ' attributes still writes the record and'
     + ' state event',
     async () => {
-        const db = new MemoryDbAdapter();
-        await db.createSchema();
+        const db = await freshDb();
         await seedCurrentMember(db);
         await POST(db, 'records-multi-put', {
             kind: 'create',
@@ -104,8 +112,7 @@ test(
     'POST records-multi-put edit updates the'
     + ' record fields without touching state',
     async () => {
-        const db = new MemoryDbAdapter();
-        await db.createSchema();
+        const db = await freshDb();
         await seedCurrentMember(db);
         await POST(db, 'records-multi-put', {
             kind: 'create',
@@ -152,8 +159,7 @@ test(
     'POST records-multi-put edit removes'
     + ' attributes by id and adds new ones',
     async () => {
-        const db = new MemoryDbAdapter();
-        await db.createSchema();
+        const db = await freshDb();
         await seedCurrentMember(db);
         await POST(db, 'records-multi-put', {
             kind: 'create',
@@ -216,8 +222,7 @@ test(
     'POST records-multi-put edit updates an'
     + ' existing attribute by upsert',
     async () => {
-        const db = new MemoryDbAdapter();
-        await db.createSchema();
+        const db = await freshDb();
         await seedCurrentMember(db);
         await POST(db, 'records-multi-put', {
             kind: 'create',
@@ -281,8 +286,7 @@ test(
     'POST records-multi-put rejects an empty'
     + ' attribute name',
     async () => {
-        const db = new MemoryDbAdapter();
-        await db.createSchema();
+        const db = await freshDb();
         await seedCurrentMember(db);
         await assert.rejects(
             () => POST(db, 'records-multi-put', {
@@ -320,8 +324,7 @@ test(
     + ' attribute whose record_id does not'
     + ' match the top-level id',
     async () => {
-        const db = new MemoryDbAdapter();
-        await db.createSchema();
+        const db = await freshDb();
         await seedCurrentMember(db);
         await assert.rejects(
             () => POST(db, 'records-multi-put', {
@@ -358,8 +361,7 @@ test(
     'POST records-multi-put rejects an unknown'
     + ' kind discriminator',
     async () => {
-        const db = new MemoryDbAdapter();
-        await db.createSchema();
+        const db = await freshDb();
         await seedCurrentMember(db);
         await assert.rejects(
             () => POST(db, 'records-multi-put', {
@@ -380,8 +382,7 @@ test(
     'POST records-multi-put rejects an invalid'
     + ' initialState',
     async () => {
-        const db = new MemoryDbAdapter();
-        await db.createSchema();
+        const db = await freshDb();
         await seedCurrentMember(db);
         await assert.rejects(
             () => POST(db, 'records-multi-put', {
@@ -404,8 +405,7 @@ test(
     'POST records-multi-put rejects a body with'
     + ' an unexpected key',
     async () => {
-        const db = new MemoryDbAdapter();
-        await db.createSchema();
+        const db = await freshDb();
         await seedCurrentMember(db);
         await assert.rejects(
             () => POST(db, 'records-multi-put', {
@@ -429,8 +429,7 @@ test(
     'POST records-multi-put rejects a body with'
     + ' a missing required key',
     async () => {
-        const db = new MemoryDbAdapter();
-        await db.createSchema();
+        const db = await freshDb();
         await seedCurrentMember(db);
         await assert.rejects(
             () => POST(db, 'records-multi-put', {

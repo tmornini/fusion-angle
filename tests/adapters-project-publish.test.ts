@@ -17,6 +17,9 @@ import {
     seedCurrentMember,
     seedHumanMember,
 } from './member-fixtures.ts';
+import {
+    seedRootAdmin,
+} from './root-admin-fixture.ts';
 
 const SAMPLE_PROJECT_BODY = {
     title: 't',
@@ -76,6 +79,7 @@ test('postProjectApproval moves state to approved',
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         await seedCurrentMember(db);
         await db.projects.put('p1', SAMPLE_PROJECT_BODY);
         await db.states.record(
@@ -99,6 +103,7 @@ test('postProjectApproval throws when not ready',
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         await seedCurrentMember(db);
         await db.projects.put('p1', SAMPLE_PROJECT_BODY);
         await db.objectives.put('o1', { position: 0 });
@@ -113,6 +118,7 @@ test('postProjectArchival moves state to archived',
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         await seedCurrentMember(db);
         await db.projects.put('p1', SAMPLE_PROJECT_BODY);
         await db.states.record(

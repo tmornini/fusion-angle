@@ -8,12 +8,16 @@ import {
 import {
     mintAccessToken, ANONYMOUS_ID,
 } from '../api/access-token.ts';
+import {
+    seedRootAdmin,
+} from './root-admin-fixture.ts';
 
 const BASE = 'http://localhost';
 
 async function freshDb() {
     const db = new MemoryDbAdapter();
     await db.createSchema();
+    await seedRootAdmin(db);
     return db;
 }
 

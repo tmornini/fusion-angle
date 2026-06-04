@@ -24,6 +24,7 @@ import type {
     ProjectObjectiveActualScore,
     RecordEntity,
     RecordAttributeEntity,
+    RoleGrantEntity,
     StateFieldValueEntity,
     WorkOrderEntity,
     MemberEntity,
@@ -35,9 +36,15 @@ import {
 } from './validators.ts';
 import {
     verifyAccessToken,
+    principalFromToken,
     ANONYMOUS_ID,
     revokedBeforeSeconds,
+    type Principal,
 } from './access-token.ts';
+import {
+    currentRolesFor,
+    isPermitted,
+} from './authorization.ts';
 
 export class ApiError {
     readonly message: string;
@@ -56,6 +63,7 @@ const HTTP_BAD_REQUEST = 400;
 const HTTP_NOT_FOUND = 404;
 const HTTP_INTERNAL_ERROR = 500;
 const HTTP_UNAUTHORIZED = 401;
+const HTTP_FORBIDDEN = 403;
 
 // Authenticate in-tree requests at the one chokepoint. The
 // gate runs AFTER matchRoute (which already 404'd anything
@@ -278,6 +286,19 @@ const routes: Route[] = [
                         IdentityTokenRevocationEntity,
                         'id'
                     >,
+            ),
+    }),
+    route('role-grants', {
+        get: (db) => db.roleGrants.getAll(),
+    }),
+    route('role-grants/:id', {
+        get: (db, p) =>
+            db.roleGrants.getById(param(p, 0)),
+        put: (db, p, payload) =>
+            db.roleGrants.put(
+                param(p, 0),
+                withoutId(payload) as unknown as
+                    Omit<RoleGrantEntity, 'id'>,
             ),
     }),
     route('ideas', {
@@ -689,7 +710,7 @@ const BASE_URL = 'http://localhost';
 async function authenticateRequest(
     adapter: DbAdapter,
     request: Request,
-): Promise<string | null> {
+): Promise<Principal | string> {
     const header =
         request.headers.get('authorization');
     if (header === null
@@ -714,7 +735,22 @@ async function authenticateRequest(
         && result.claims.iat < revokedBefore) {
         return 'token revoked';
     }
-    return null;
+    return principalFromToken(token);
+}
+
+async function authorizeRequest(
+    adapter: DbAdapter,
+    principal: Principal,
+    method: string,
+    pathname: string,
+): Promise<string | null> {
+    const rows = await adapter.roleGrants.getAll();
+    const roles = currentRolesFor(rows, principal.id);
+    if (isPermitted(method, pathname, roles)) {
+        return null;
+    }
+    return 'forbidden: ' + method + ' ' + pathname
+        + ' requires a role this principal lacks';
 }
 
 export async function handleRequest(
@@ -742,12 +778,21 @@ export async function handleRequest(
 
     const routePattern = matched.segments.join('/');
     if (!BEARER_EXEMPT_ROUTES.has(routePattern)) {
-        const authFailure =
+        const authResult =
             await authenticateRequest(adapter, request);
-        if (authFailure !== null) {
+        if (typeof authResult === 'string') {
             return Response.json(
-                { error: authFailure },
+                { error: authResult },
                 { status: HTTP_UNAUTHORIZED },
+            );
+        }
+        const authzFailure = await authorizeRequest(
+            adapter, authResult, method, pathname,
+        );
+        if (authzFailure !== null) {
+            return Response.json(
+                { error: authzFailure },
+                { status: HTTP_FORBIDDEN },
             );
         }
     }

@@ -464,6 +464,27 @@ export interface IdentityTokenRevocationEntity {
     at: string;
 }
 
+export type RoleGrantAction = 'granted' | 'revoked';
+
+// Append-only role-assignment ledger event. One row per
+// grant or revoke; the roles an identity CURRENTLY holds =
+// the latest action per (identity_id, role) — a 'granted'
+// with no later 'revoked'. Append-only: a revoke is a NEW
+// 'revoked' row, never a splice (mirrors
+// identity_credentials / identity_token_revocations).
+// `by_member_id` is the actor (== their identity id, per
+// member.id === identity.id). `at` is the RFC-3339 zulu
+// moment. Authorization derives roles from THIS ledger
+// fresh at the gate — never from a token claim.
+export interface RoleGrantEntity {
+    id: Id;
+    identity_id: Id;
+    role: string;
+    action: RoleGrantAction;
+    by_member_id: Id;
+    at: string;
+}
+
 // The person-PII display facet as a tagged union, so the
 // ABSENCE of the row (erased PII) is represented without
 // null and DECIDED AT THE CALL SITE. Presenters switch on

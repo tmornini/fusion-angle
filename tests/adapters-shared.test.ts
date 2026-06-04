@@ -20,6 +20,9 @@ import {
     makeHumanMember,
     seedHumanMember,
 } from './member-fixtures.ts';
+import {
+    seedRootAdmin,
+} from './root-admin-fixture.ts';
 
 test(
     'memberName returns name for known human id',
@@ -50,6 +53,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         await seedHumanMember(db, 'u1', 'Alice Adams');
         const ctx = createRequestContext(db, devToken());
         const map = await getHumanMemberMap(ctx);
@@ -67,6 +71,7 @@ test(
 test('Fresh ctx re-fetches each call', async () => {
     const db = new MemoryDbAdapter();
     await db.createSchema();
+    await seedRootAdmin(db);
     await seedHumanMember(db, 'u1', 'Alice Adams');
     const m1 = await getHumanMemberMap(
         createRequestContext(db, devToken()),
@@ -85,6 +90,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         await seedHumanMember(
             db, 'current', 'Alice Adams',
         );

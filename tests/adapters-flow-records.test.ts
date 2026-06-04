@@ -6,6 +6,9 @@ import {
 } from '../web-app/app/adapters/shared.ts';
 import { devToken } from './token-fixtures.ts';
 import {
+    seedRootAdmin,
+} from './root-admin-fixture.ts';
+import {
     putFlowRecord,
     getFlowRecord,
     deleteFlowRecord,
@@ -54,6 +57,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         const ctx = createRequestContext(db, devToken());
         await putFlowRecord(ctx, 'fr-1', {
             flow_id: 'flow-1',
@@ -75,6 +79,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         const ctx = createRequestContext(db, devToken());
         await putFlowRecord(ctx, 'fr-1', {
             flow_id: 'flow-1',
@@ -100,6 +105,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         const ctx = createRequestContext(db, devToken());
         await putFlowRecord(ctx, 'fr-1', {
             flow_id: 'flow-a',
@@ -134,6 +140,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         const ctx = createRequestContext(db, devToken());
         // Bind rec-1 to two flows.
         await putFlowRecord(ctx, 'fr-1', {
@@ -176,6 +183,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         const ctx = createRequestContext(db, devToken());
         const workOrders =
             await getWorkOrdersForRecord(
@@ -190,6 +198,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         const ctx = createRequestContext(db, devToken());
         await putFlowRecord(ctx, 'fr-1', {
             flow_id: 'flow-1',

@@ -12,10 +12,19 @@ import {
     seedAIMember,
 } from './member-fixtures.ts';
 import { devToken } from './token-fixtures.ts';
+import {
+    seedRootAdmin,
+} from './root-admin-fixture.ts';
 
-test('GET on unknown route throws', async () => {
+async function freshDb() {
     const db = new MemoryDbAdapter();
     await db.createSchema();
+    await seedRootAdmin(db);
+    return db;
+}
+
+test('GET on unknown route throws', async () => {
+    const db = await freshDb();
     await assert.rejects(
         () => GET(db, 'nonexistent-table', devToken()),
         /Route not found|404|not found/i,
@@ -23,16 +32,14 @@ test('GET on unknown route throws', async () => {
 });
 
 test('GET ideas returns array', async () => {
-    const db = new MemoryDbAdapter();
-    await db.createSchema();
+    const db = await freshDb();
     const ideas =
         await GET<unknown[]>(db, 'ideas', devToken());
     assert.deepEqual(ideas, []);
 });
 
 test('GET ideas/:id throws on missing', async () => {
-    const db = new MemoryDbAdapter();
-    await db.createSchema();
+    const db = await freshDb();
     await assert.rejects(
         () => GET(db, 'ideas/missing-id', devToken()),
         /Not found|404/,
@@ -40,8 +47,7 @@ test('GET ideas/:id throws on missing', async () => {
 });
 
 test('PUT then GET round-trips an entity', async () => {
-    const db = new MemoryDbAdapter();
-    await db.createSchema();
+    const db = await freshDb();
     const payload = {
         id: 'i1',
         title: 'Test',
@@ -61,8 +67,7 @@ test('PUT then GET round-trips an entity', async () => {
 });
 
 test('GET ideas/ normalizes to collection', async () => {
-    const db = new MemoryDbAdapter();
-    await db.createSchema();
+    const db = await freshDb();
     const result =
         await GET<unknown[]>(db, 'ideas/', devToken());
     assert.deepEqual(result, []);
@@ -71,8 +76,7 @@ test('GET ideas/ normalizes to collection', async () => {
 test(
     'GET members returns the persisted humans',
     async () => {
-        const db = new MemoryDbAdapter();
-        await db.createSchema();
+        const db = await freshDb();
         await seedHumanMember(db, 'hw_1', 'Sarah Chen');
         const members =
             await GET<unknown[]>(db, 'members', devToken());
@@ -83,8 +87,7 @@ test(
 test(
     'GET ai-members returns persisted AIs',
     async () => {
-        const db = new MemoryDbAdapter();
-        await db.createSchema();
+        const db = await freshDb();
         await seedAIMember(db, 'ai_1', 'Opus');
         const ais =
             await GET<unknown[]>(
@@ -96,8 +99,7 @@ test(
 test(
     'PUT ai-members/:id validates body',
     async () => {
-        const db = new MemoryDbAdapter();
-        await db.createSchema();
+        const db = await freshDb();
         await assert.rejects(
             () => PUT(db, 'ai-members/ai_1', {
                 rogue_field: 'extra',
@@ -111,8 +113,7 @@ test(
     'POST snapshots/mock-data populates the'
     + ' tables',
     async () => {
-        const db = new MemoryDbAdapter();
-        await db.createSchema();
+        const db = await freshDb();
         await POST(
             db, 'snapshots/mock-data', {}, devToken(),
         );
@@ -126,8 +127,7 @@ test(
     'POST on a route with no post handler is'
     + ' 405 Method Not Allowed',
     async () => {
-        const db = new MemoryDbAdapter();
-        await db.createSchema();
+        const db = await freshDb();
         await assert.rejects(
             () => POST(db, 'ideas', {}, devToken()),
             /not allowed/i,
@@ -138,8 +138,7 @@ test(
 test(
     'POST on an unknown route is 404',
     async () => {
-        const db = new MemoryDbAdapter();
-        await db.createSchema();
+        const db = await freshDb();
         await assert.rejects(
             () => POST(
                 db, 'no-such-resource', {}, devToken(),
@@ -153,8 +152,7 @@ test(
     'a path with the wrong number of segments'
     + ' matches no route and is 404',
     async () => {
-        const db = new MemoryDbAdapter();
-        await db.createSchema();
+        const db = await freshDb();
         await assert.rejects(
             () => GET(db, 'members/w-1/extra', devToken()),
             /not found|404/i,
@@ -166,8 +164,7 @@ test(
     'PUT with a malformed JSON body is 400 Bad'
     + ' Request, not 500',
     async () => {
-        const db = new MemoryDbAdapter();
-        await db.createSchema();
+        const db = await freshDb();
         const response = await handleRequest(
             db,
             new Request(
@@ -198,8 +195,7 @@ test(
     'POST with a malformed JSON body is 400 Bad'
     + ' Request, not 500',
     async () => {
-        const db = new MemoryDbAdapter();
-        await db.createSchema();
+        const db = await freshDb();
         const response = await handleRequest(
             db,
             new Request(

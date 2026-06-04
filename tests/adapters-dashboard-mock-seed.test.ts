@@ -9,6 +9,7 @@ import { getDashboardGauges } from
     '../web-app/app/adapters/dashboard.ts';
 import { getObjectiveAggregates } from
     '../web-app/app/adapters/project-scoring.ts';
+import { seedRootAdmin } from './root-admin-fixture.ts';
 
 // The mock seeder is deterministic; these values
 // are computed from the same hash the seeder runs.
@@ -20,6 +21,7 @@ test('mock seed produces portfolio Impact baseline +50',
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         await populateMockData(db);
         const ctx = createRequestContext(db, devToken());
         const gauges = await getDashboardGauges(ctx);
@@ -35,6 +37,7 @@ test('mock seed produces per-objective baseline means',
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         await populateMockData(db);
         const ctx = createRequestContext(db, devToken());
         const aggs = await getObjectiveAggregates(ctx);

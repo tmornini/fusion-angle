@@ -29,12 +29,16 @@ import {
     seedHumanMember,
     seedAIMember,
 } from './member-fixtures.ts';
+import {
+    seedRootAdmin,
+} from './root-admin-fixture.ts';
 
 async function setupSeeded(): Promise<{
     db: MemoryDbAdapter;
 }> {
     const db = new MemoryDbAdapter();
     await db.createSchema();
+    await seedRootAdmin(db);
     await seedHumanMember(
         db, 'hw_sarah_chen', 'Sarah Test',
     );
@@ -50,6 +54,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         await seedHumanMember(
             db, 'hw_sarah', 'Sarah Chen',
         );
@@ -170,6 +175,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         const ctx = createRequestContext(db, devToken());
         const members = await getMembers(ctx);
         assert.deepEqual(members, []);
@@ -182,6 +188,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
+        await seedRootAdmin(db);
         await db.members.put('hw_erased', {
             type: 'human',
         });

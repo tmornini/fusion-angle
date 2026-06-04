@@ -17,6 +17,7 @@ import {
     seedCurrentMember,
     seedHumanMember,
 } from './member-fixtures.ts';
+import { seedRootAdmin } from './root-admin-fixture.ts';
 
 function buildHumanMember(
     name: string,
@@ -40,6 +41,7 @@ async function setupDb(): Promise<{
 }> {
     const db = new MemoryDbAdapter();
     await db.createSchema();
+    await seedRootAdmin(db);
     const ctx = createRequestContext(db, devToken());
     return { db, ctx };
 }
