@@ -38,7 +38,7 @@ async function setupMemDb(): Promise<{
     await db.createSchema();
     await seedRootAdmin(db);
     await seedHumanMember(db, 'current', 'Demo User');
-    const ctx = createRequestContext(db, devToken());
+    const ctx = createRequestContext(db, await devToken());
     return { db, ctx };
 }
 

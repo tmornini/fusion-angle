@@ -72,7 +72,7 @@ test('populateMockData seeds zero archived objectives',
         await db.createSchema();
         await seedRootAdmin(db);
         await populateMockData(db);
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         const ids = await getArchivedObjectiveIds(ctx);
         assert.equal(ids.size, 0);
     });
@@ -83,7 +83,7 @@ test('approved projects have full baseline coverage',
         await db.createSchema();
         await seedRootAdmin(db);
         await populateMockData(db);
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         const approved = await projectIdsByState(
             ctx, 'approved',
         );
@@ -115,7 +115,7 @@ test('completed projects have at least one actual per pair',
         await db.createSchema();
         await seedRootAdmin(db);
         await populateMockData(db);
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         const completed = await projectIdsByState(
             ctx, 'archived',
         );
@@ -154,7 +154,7 @@ test('approved projects have an actual for every pair',
         await db.createSchema();
         await seedRootAdmin(db);
         await populateMockData(db);
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         const approved = await projectIdsByState(
             ctx, 'approved',
         );
@@ -192,7 +192,7 @@ test('submitted projects have zero scores', async () => {
     await db.createSchema();
     await seedRootAdmin(db);
     await populateMockData(db);
-    const ctx = createRequestContext(db, devToken());
+    const ctx = createRequestContext(db, await devToken());
     const submitted = await projectIdsByState(
         ctx, 'submitted',
     );

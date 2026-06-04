@@ -25,6 +25,10 @@ import type {
     RecordEntity,
     RecordAttributeEntity,
     RoleGrantEntity,
+    IdentityTokenEntity,
+    ClientEntity,
+    IdentityProviderEntity,
+    AuthorizationCodeEntity,
     StateFieldValueEntity,
     WorkOrderEntity,
     MemberEntity,
@@ -45,6 +49,11 @@ import {
     currentRolesFor,
     isPermitted,
 } from './authorization.ts';
+import { isTokenRevoked } from './identity-tokens.ts';
+import {
+    postToken,
+    postAuthorize,
+} from './authentication.ts';
 
 export class ApiError {
     readonly message: string;
@@ -84,6 +93,8 @@ const BEARER_EXEMPT_ROUTES: ReadonlySet<string> =
         'snapshots/mock-data',
         'snapshots/bootstrap',
         'snapshots/import',
+        'authentication/token',
+        'authentication/authorize',
     ]);
 
 type GetHandler = (
@@ -300,6 +311,82 @@ const routes: Route[] = [
                 withoutId(payload) as unknown as
                     Omit<RoleGrantEntity, 'id'>,
             ),
+    }),
+    route('identity-tokens', {
+        get: (db) => db.identityTokens.getAll(),
+    }),
+    route('identity-tokens/:id', {
+        get: (db, p) =>
+            db.identityTokens.getById(param(p, 0)),
+        put: (db, p, payload) =>
+            db.identityTokens.put(
+                param(p, 0),
+                withoutId(payload) as unknown as
+                    Omit<IdentityTokenEntity, 'id'>,
+            ),
+    }),
+    route('clients', {
+        get: (db) => db.clients.getAll(),
+    }),
+    route('clients/:id', {
+        get: (db, p) =>
+            db.clients.getById(param(p, 0)),
+        put: (db, p, payload) =>
+            db.clients.put(
+                param(p, 0),
+                withoutId(payload) as unknown as
+                    Omit<ClientEntity, 'id'>,
+            ),
+        delete: (db, p) =>
+            db.clients.delete(param(p, 0)),
+    }),
+    route('identity-providers', {
+        get: (db) => db.identityProviders.getAll(),
+    }),
+    route('identity-providers/:id', {
+        get: (db, p) =>
+            db.identityProviders.getById(param(p, 0)),
+        put: (db, p, payload) =>
+            db.identityProviders.put(
+                param(p, 0),
+                withoutId(payload) as unknown as
+                    Omit<IdentityProviderEntity, 'id'>,
+            ),
+    }),
+    route('authorization-codes', {
+        get: (db) => db.authorizationCodes.getAll(),
+    }),
+    route('authorization-codes/:id', {
+        get: (db, p) =>
+            db.authorizationCodes.getById(param(p, 0)),
+        put: (db, p, payload) =>
+            db.authorizationCodes.put(
+                param(p, 0),
+                withoutId(payload) as unknown as
+                    Omit<AuthorizationCodeEntity, 'id'>,
+            ),
+    }),
+    route('authentication/token', {
+        post: async (db, _p, body) => {
+            const result = await postToken(db, body);
+            if (!result.ok) {
+                throw new ApiError(
+                    result.error, result.status,
+                );
+            }
+            return result.response;
+        },
+    }),
+    route('authentication/authorize', {
+        post: async (db, _p, body) => {
+            const result = await postAuthorize(db, body);
+            if (!result.ok) {
+                throw new ApiError(
+                    result.error, result.status,
+                );
+            }
+            return result.response;
+        },
     }),
     route('ideas', {
         get: (db) => db.ideas.getAll(),
@@ -627,7 +714,7 @@ const routes: Route[] = [
         post: async (db) => {
             const { populateMockData } =
                 await import('./mock-data.ts');
-            await populateMockData(db);
+            return populateMockData(db);
         },
     }),
     route('snapshots/bootstrap', {
@@ -635,7 +722,7 @@ const routes: Route[] = [
             const {
                 populateBootstrapData,
             } = await import('./mock-data.ts');
-            await populateBootstrapData(db);
+            return populateBootstrapData(db);
         },
     }),
     route('snapshots/import', {
@@ -719,7 +806,7 @@ async function authenticateRequest(
     }
     const token = header.slice('Bearer '.length);
     const now = Math.floor(Date.now() / 1000);
-    const result = verifyAccessToken(token, now);
+    const result = await verifyAccessToken(token, now);
     if (!result.valid) {
         return result.reason;
     }
@@ -734,6 +821,11 @@ async function authenticateRequest(
     if (revokedBefore !== null
         && result.claims.iat < revokedBefore) {
         return 'token revoked';
+    }
+    const tokenLedger =
+        await adapter.identityTokens.getAll();
+    if (isTokenRevoked(tokenLedger, result.claims.jti)) {
+        return 'token chain revoked';
     }
     return principalFromToken(token);
 }

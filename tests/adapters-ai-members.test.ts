@@ -29,7 +29,7 @@ test(
         await seedAIMember(db, 'ai1', 'Claude');
         const before =
             await db.aiMembers.getById('ai1');
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
 
         await postAIMemberStateChange(
             ctx, 'ai1', 'archived',

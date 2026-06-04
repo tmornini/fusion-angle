@@ -48,7 +48,7 @@ async function setupMemDb(): Promise<{
     await db.createSchema();
     await seedRootAdmin(db);
     await seedHumanMember(db, 'current', 'Demo User');
-    const ctx = createRequestContext(db, devToken());
+    const ctx = createRequestContext(db, await devToken());
     return { db, ctx };
 }
 
@@ -136,7 +136,7 @@ test(
     async () => {
         const { db } = await setupMemDb();
         await createBaseFlow(
-            createRequestContext(db, devToken()),
+            createRequestContext(db, await devToken()),
             'flow-1', 'p1',
         );
         const start = buildNode('start', {
@@ -153,11 +153,11 @@ test(
             'e2', 'mid', 'end',
         );
         await saveGraph(
-            createRequestContext(db, devToken()), 'flow-1',
+            createRequestContext(db, await devToken()), 'flow-1',
             [start, mid, end], [e1, e2],
         );
         const g: FlowGraph = await getFlowGraph(
-            createRequestContext(db, devToken()), 'flow-1',
+            createRequestContext(db, await devToken()), 'flow-1',
         );
         assert.equal(g.id, 'flow-1');
         assert.equal(g.name, 'Flow flow-1');
@@ -184,11 +184,11 @@ test(
     async () => {
         const { db } = await setupMemDb();
         await createBaseFlow(
-            createRequestContext(db, devToken()),
+            createRequestContext(db, await devToken()),
             'flow-1', 'p1',
         );
         await putFlow(
-            createRequestContext(db, devToken()), 'flow-1',
+            createRequestContext(db, await devToken()), 'flow-1',
             {
                 name: 'Locked Flow',
                 isLocked: true,
@@ -200,7 +200,7 @@ test(
             },
         );
         const g = await getFlowGraph(
-            createRequestContext(db, devToken()), 'flow-1',
+            createRequestContext(db, await devToken()), 'flow-1',
         );
         assert.equal(g.name, 'Locked Flow');
         assert.equal(g.isLocked, true);
@@ -215,11 +215,11 @@ test(
     + ' node and edge counts',
     async () => {
         const { db } = await setupMemDb();
-        const c1 = createRequestContext(db, devToken());
+        const c1 = createRequestContext(db, await devToken());
         await createBaseFlow(c1, 'flow-1', 'p1');
         await createBaseFlow(c1, 'flow-2', 'p1');
         await saveGraph(
-            createRequestContext(db, devToken()), 'flow-1',
+            createRequestContext(db, await devToken()), 'flow-1',
             [
                 buildNode('a'), buildNode('b'),
                 buildNode('c'),
@@ -227,11 +227,11 @@ test(
             [buildEdge('ab', 'a', 'b')],
         );
         await saveGraph(
-            createRequestContext(db, devToken()), 'flow-2',
+            createRequestContext(db, await devToken()), 'flow-2',
             [buildNode('x')], [],
         );
         const flows = await getFlows(
-            createRequestContext(db, devToken()),
+            createRequestContext(db, await devToken()),
         );
         assert.equal(flows.length, 2);
         const f1 = flows.find(
@@ -254,11 +254,11 @@ test(
     async () => {
         const { db } = await setupMemDb();
         await createBaseFlow(
-            createRequestContext(db, devToken()),
+            createRequestContext(db, await devToken()),
             'flow-1', 'p1',
         );
         const flows = await getFlows(
-            createRequestContext(db, devToken()),
+            createRequestContext(db, await devToken()),
         );
         assert.equal(flows.length, 1);
         assert.equal(flows[0]!.nodeCount, 2);
@@ -271,17 +271,17 @@ test(
     + ' linked to the given project',
     async () => {
         const { db } = await setupMemDb();
-        const c1 = createRequestContext(db, devToken());
+        const c1 = createRequestContext(db, await devToken());
         await putProject(db, 'p1', 'Project One');
         await putProject(db, 'p2', 'Project Two');
         await createBaseFlow(c1, 'flow-1', 'p1');
         await createBaseFlow(c1, 'flow-2', 'p1');
         await createBaseFlow(c1, 'flow-3', 'p2');
         const p1Flows = await getFlowsByProject(
-            createRequestContext(db, devToken()), 'p1',
+            createRequestContext(db, await devToken()), 'p1',
         );
         const p2Flows = await getFlowsByProject(
-            createRequestContext(db, devToken()), 'p2',
+            createRequestContext(db, await devToken()), 'p2',
         );
         const p1Ids = p1Flows
             .map(f => f.id).sort();
@@ -300,11 +300,11 @@ test(
         const { db } = await setupMemDb();
         await putProject(db, 'p1', 'Project One');
         await createBaseFlow(
-            createRequestContext(db, devToken()),
+            createRequestContext(db, await devToken()),
             'flow-1', 'p1',
         );
         const rows = await getFlowsByProject(
-            createRequestContext(db, devToken()), 'p-empty',
+            createRequestContext(db, await devToken()), 'p-empty',
         );
         assert.deepEqual(rows, []);
     },
@@ -317,18 +317,18 @@ test(
         const { db } = await setupMemDb();
         await putProject(db, 'p1', 'Project One');
         await createBaseFlow(
-            createRequestContext(db, devToken()),
+            createRequestContext(db, await devToken()),
             'flow-1', 'p1',
         );
         await saveGraph(
-            createRequestContext(db, devToken()), 'flow-1',
+            createRequestContext(db, await devToken()), 'flow-1',
             [
                 buildNode('a'), buildNode('b'),
             ],
             [buildEdge('ab', 'a', 'b')],
         );
         const rows = await getFlowsByProject(
-            createRequestContext(db, devToken()), 'p1',
+            createRequestContext(db, await devToken()), 'p1',
         );
         assert.equal(rows.length, 1);
         assert.equal(rows[0]!.nodeCount, 2);
@@ -341,13 +341,13 @@ test(
     + ' flow with its project name',
     async () => {
         const { db } = await setupMemDb();
-        const c1 = createRequestContext(db, devToken());
+        const c1 = createRequestContext(db, await devToken());
         await putProject(db, 'p1', 'Project One');
         await putProject(db, 'p2', 'Project Two');
         await createBaseFlow(c1, 'flow-1', 'p1');
         await createBaseFlow(c1, 'flow-2', 'p2');
         const pairs = await getFlowsWithProjectNames(
-            createRequestContext(db, devToken()),
+            createRequestContext(db, await devToken()),
         );
         assert.equal(pairs.length, 2);
         const byFlow = new Map(
@@ -370,11 +370,11 @@ test(
     async () => {
         const { db } = await setupMemDb();
         await createBaseFlow(
-            createRequestContext(db, devToken()),
+            createRequestContext(db, await devToken()),
             'flow-1', 'ghost-project',
         );
         const pairs = await getFlowsWithProjectNames(
-            createRequestContext(db, devToken()),
+            createRequestContext(db, await devToken()),
         );
         assert.equal(pairs.length, 1);
         assert.equal(pairs[0]!.summary.id, 'flow-1');
@@ -391,11 +391,11 @@ test(
         const { db } = await setupMemDb();
         await putProject(db, 'p1', 'Project One');
         await createBaseFlow(
-            createRequestContext(db, devToken()),
+            createRequestContext(db, await devToken()),
             'flow-1', 'p1',
         );
         await saveGraph(
-            createRequestContext(db, devToken()), 'flow-1',
+            createRequestContext(db, await devToken()), 'flow-1',
             [
                 buildNode('a'), buildNode('b'),
                 buildNode('c'),
@@ -406,7 +406,7 @@ test(
             ],
         );
         const pairs = await getFlowsWithProjectNames(
-            createRequestContext(db, devToken()),
+            createRequestContext(db, await devToken()),
         );
         assert.equal(pairs.length, 1);
         assert.equal(
@@ -422,12 +422,12 @@ test(
     'getProjectFlowRows returns the link rows',
     async () => {
         const { db } = await setupMemDb();
-        const c1 = createRequestContext(db, devToken());
+        const c1 = createRequestContext(db, await devToken());
         await createBaseFlow(c1, 'flow-1', 'p1');
         await createBaseFlow(c1, 'flow-2', 'p2');
         const rows: ProjectFlowEntity[] =
             await getProjectFlowRows(
-                createRequestContext(db, devToken()),
+                createRequestContext(db, await devToken()),
             );
         assert.equal(rows.length, 2);
         const link1 = rows.find(
@@ -447,7 +447,7 @@ test(
     async () => {
         const { db } = await setupMemDb();
         const rows = await getProjectFlowRows(
-            createRequestContext(db, devToken()),
+            createRequestContext(db, await devToken()),
         );
         assert.deepEqual(rows, []);
     },
@@ -460,7 +460,7 @@ test(
         const { db } = await setupMemDb();
         await putProject(db, 'p9', 'Project Nine');
         await createBaseFlow(
-            createRequestContext(db, devToken()),
+            createRequestContext(db, await devToken()),
             'flow-1', 'p1',
         );
         await db.projectFlows.put('extra-link', {
@@ -469,7 +469,7 @@ test(
             at: '2026-01-01T00:00:00.000Z',
         });
         const rows = await getFlowsByProject(
-            createRequestContext(db, devToken()), 'p9',
+            createRequestContext(db, await devToken()), 'p9',
         );
         assert.equal(rows.length, 1);
         assert.equal(rows[0]!.id, 'flow-1');
@@ -491,7 +491,7 @@ test(
         await seedRootAdmin(db);
         await populateMockData(db);
         const g = await getFlowGraph(
-            createRequestContext(db, devToken()),
+            createRequestContext(db, await devToken()),
             LAYOUT_TEST_FLOW_ID,
         );
         const xs = g.nodes.map(n => n.positionX);

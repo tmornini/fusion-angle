@@ -19,7 +19,7 @@ async function setup() {
     const db = new MemoryDbAdapter();
     await db.createSchema();
     await seedRootAdmin(db);
-    return { db, ctx: createRequestContext(db, devToken()) };
+    return { db, ctx: createRequestContext(db, await devToken()) };
 }
 
 test('getIdentity reads kind', async () => {

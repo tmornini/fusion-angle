@@ -32,6 +32,12 @@ import {
     closeDialog,
 } from '../app/core.ts';
 import {
+    credentialRevealPanel,
+} from '../app/presenters/credential-reveal.ts';
+import type {
+    SeededAdmin,
+} from '../../api/mock-data.ts';
+import {
     iconTrash,
     iconDownload,
     iconUpload,
@@ -60,7 +66,7 @@ type PendingState =
     | { kind: 'idle' }
     | {
         kind: 'pending';
-        action: () => Promise<void>;
+        action: () => Promise<SeededAdmin>;
         button: HTMLButtonElement;
         label: string;
     };
@@ -114,8 +120,9 @@ export async function init(
         // error toast names this
         // explicitly so the half-state
         // isn't a silent surprise.
+        let admin: SeededAdmin;
         try {
-            await action();
+            admin = await action();
         } catch (err) {
             log.error(
                 label
@@ -139,13 +146,35 @@ export async function init(
                 originalText;
             return;
         }
-        navigateTo('dashboard');
+        revealThenNavigate(admin);
+    }
+
+    // After wipe-and-load the seeded admin password exists only
+    // in this response — surface it once, then navigate only
+    // when the user acknowledges they have saved it.
+    function revealThenNavigate(
+        admin: SeededAdmin,
+    ): void {
+        const panel = $('#snapshots-content', document);
+        if (!panel) return;
+        setHtml(panel, html`
+            ${credentialRevealPanel(admin)}
+            <button class="btn btn-primary"
+                id="credential-continue-btn">
+                I have saved it — continue
+            </button>`);
+        $button(
+            '#credential-continue-btn', document,
+        )?.addEventListener(
+            'click',
+            () => navigateTo('dashboard'),
+        );
     }
 
     function confirmAction(
         button: HTMLButtonElement,
         label: string,
-        action: () => Promise<void>,
+        action: () => Promise<SeededAdmin>,
         message?: string,
     ): void {
         pending = {
@@ -309,7 +338,7 @@ export async function init(
                     + ' environment',
                     async () => {
                         await postSchemaCreation(ctx);
-                        await postBootstrap(ctx);
+                        return postBootstrap(ctx);
                     },
                     'Are you sure you'
                     + ' want to create a'
@@ -335,7 +364,7 @@ export async function init(
                     'Load mock data',
                     async () => {
                         await postSchemaCreation(ctx);
-                        await postMockDataLoad(ctx);
+                        return postMockDataLoad(ctx);
                     },
                 ),
         );

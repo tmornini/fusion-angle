@@ -27,7 +27,7 @@ test('rejects file larger than half of available quota', async () => {
     const db = new MemoryDbAdapter();
     await db.createSchema();
     await seedRootAdmin(db);
-    const ctx = createRequestContext(db, devToken());
+    const ctx = createRequestContext(db, await devToken());
     const nav = navigator as unknown as {
         storage?: {
             estimate(): Promise<{

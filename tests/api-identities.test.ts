@@ -6,7 +6,7 @@ import {
 } from '../api/validators.ts';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import { PUT, GET, DELETE } from '../api/api.ts';
-import { devToken } from './token-fixtures.ts';
+import { DEV_TOKEN } from './token-fixtures.ts';
 import {
     seedRootAdmin,
 } from './root-admin-fixture.ts';
@@ -66,9 +66,9 @@ async function freshDb() {
 test('PUT then GET an identity round-trips', async () => {
     const db = await freshDb();
     await PUT(
-        db, 'identities/abc', { kind: 'person' }, devToken());
+        db, 'identities/abc', { kind: 'person' }, DEV_TOKEN);
     const got = await GET<{ id: string; kind: string }>(
-        db, 'identities/abc', devToken(),
+        db, 'identities/abc', DEV_TOKEN,
     );
     assert.deepEqual(got, { id: 'abc', kind: 'person' });
 });
@@ -77,15 +77,15 @@ test('DELETE identity-pii splices only the pii row',
 async () => {
     const db = await freshDb();
     await PUT(
-        db, 'identities/abc', { kind: 'person' }, devToken());
+        db, 'identities/abc', { kind: 'person' }, DEV_TOKEN);
     await PUT(db, 'identity-pii/abc', {
         name: 'A', email: 'a@x.io', phone: 'p', bio: 'b',
-    }, devToken());
-    await DELETE(db, 'identity-pii/abc', devToken());
+    }, DEV_TOKEN);
+    await DELETE(db, 'identity-pii/abc', DEV_TOKEN);
     await assert.rejects(
-        () => GET(db, 'identity-pii/abc', devToken()));
+        () => GET(db, 'identity-pii/abc', DEV_TOKEN));
     const id = await GET<{ id: string }>(
-        db, 'identities/abc', devToken());
+        db, 'identities/abc', DEV_TOKEN);
     assert.equal(id.id, 'abc');
 });
 
@@ -96,9 +96,9 @@ async () => {
         await import('../api/mock-data.ts');
     await populateBootstrapData(db);
     const sys = await GET<{ kind: string }>(
-        db, 'identities/system', devToken());
+        db, 'identities/system', DEV_TOKEN);
     assert.equal(sys.kind, 'service');
     const cur = await GET<{ kind: string }>(
-        db, 'identities/current', devToken());
+        db, 'identities/current', DEV_TOKEN);
     assert.equal(cur.kind, 'person');
 });

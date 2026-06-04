@@ -30,6 +30,10 @@ import {
     MS_PER_DAY,
     SYSTEM_MEMBER_ID,
 } from './types.ts';
+import {
+    generateCryptoSafeBase62,
+} from './crypto-safe-base62.ts';
+import { hashPassword } from './password-hash.ts';
 
 const now = new Date();
 
@@ -393,8 +397,53 @@ type SeedHumanMember = Omit<
 
 const MOCK_SEED_TIMESTAMP =
     '2026-01-01T00:00:00.000Z';
-const SEED_PLACEHOLDER_SECRET =
-    'placeholder-not-a-real-secret';
+const ADMIN_USERNAME = 'demo@example.com';
+
+// The seeded admin credential set, returned to the caller so a
+// one-time reveal can surface the plaintext password. The
+// plaintext is never stored — only its PBKDF2 hash lands in the
+// identity_credentials.secret column.
+export interface SeededAdmin {
+    readonly adminUsername: string;
+    readonly adminPassword: string;
+}
+
+// Seed the demo admin's password and the system client_secret
+// as real PBKDF2 hashes (a placeholder string would not verify
+// through the real /authentication/authorize loop). The admin
+// password is generated crypto-grade and RETURNED in plaintext
+// for one-time surfacing; the system secret is generated,
+// hashed, and discarded. Both seed paths call this.
+async function seedAdminCredentials(
+    adapter: DbAdapter,
+): Promise<SeededAdmin> {
+    const adminPassword = generateCryptoSafeBase62();
+    const adminSecret = await hashPassword(adminPassword);
+    const systemSecret = await hashPassword(
+        generateCryptoSafeBase62(),
+    );
+    await Promise.all([
+        adapter.identityCredentials.put(
+            'seed-cred-current-password', {
+                identity_id: 'current',
+                kind: 'password',
+                status: 'set',
+                secret: adminSecret,
+                at: MOCK_SEED_TIMESTAMP,
+            },
+        ),
+        adapter.identityCredentials.put(
+            'seed-cred-system-client-secret', {
+                identity_id: SYSTEM_MEMBER_ID,
+                kind: 'client_secret',
+                status: 'set',
+                secret: systemSecret,
+                at: MOCK_SEED_TIMESTAMP,
+            },
+        ),
+    ]);
+    return { adminUsername: ADMIN_USERNAME, adminPassword };
+}
 
 export const OBJECTIVE_SEEDS: Array<{
     id: string;
@@ -430,7 +479,7 @@ export const OBJECTIVE_SEEDS: Array<{
 
 export async function populateMockData(
     adapter: DbAdapter,
-): Promise<void> {
+): Promise<SeededAdmin> {
     const members: SeedHumanMember[] = [
         {
             id: 'LhfaUUf4IumVsCSGB4xjdK',
@@ -732,24 +781,6 @@ export async function populateMockData(
         adapter.identities.put(SYSTEM_MEMBER_ID, {
             kind: 'service',
         }),
-        adapter.identityCredentials.put(
-            'seed-cred-current-password', {
-                identity_id: 'current',
-                kind: 'password',
-                status: 'set',
-                secret: SEED_PLACEHOLDER_SECRET,
-                at: MOCK_SEED_TIMESTAMP,
-            },
-        ),
-        adapter.identityCredentials.put(
-            'seed-cred-system-client-secret', {
-                identity_id: SYSTEM_MEMBER_ID,
-                kind: 'client_secret',
-                status: 'set',
-                secret: SEED_PLACEHOLDER_SECRET,
-                at: MOCK_SEED_TIMESTAMP,
-            },
-        ),
         adapter.roleGrants.put(
             'seed-role-current-admin', {
                 identity_id: 'current',
@@ -6296,11 +6327,13 @@ export async function populateMockData(
             }
         }
     }
+
+    return seedAdminCredentials(adapter);
 }
 
 export async function populateBootstrapData(
     adapter: DbAdapter,
-): Promise<void> {
+): Promise<SeededAdmin> {
     // The pristine seed plants only what the app needs
     // to render its shell: the system actor that authors
     // state events, the current user, and the singleton
@@ -6365,24 +6398,6 @@ export async function populateBootstrapData(
             ideas_limit: TIER_IDEAS_LIMIT,
             last_activity: dt(0, 16, 0),
         }),
-        adapter.identityCredentials.put(
-            'seed-cred-current-password', {
-                identity_id: 'current',
-                kind: 'password',
-                status: 'set',
-                secret: SEED_PLACEHOLDER_SECRET,
-                at: MOCK_SEED_TIMESTAMP,
-            },
-        ),
-        adapter.identityCredentials.put(
-            'seed-cred-system-client-secret', {
-                identity_id: SYSTEM_MEMBER_ID,
-                kind: 'client_secret',
-                status: 'set',
-                secret: SEED_PLACEHOLDER_SECRET,
-                at: MOCK_SEED_TIMESTAMP,
-            },
-        ),
         adapter.roleGrants.put(
             'bootstrap-role-current-admin', {
                 identity_id: 'current',
@@ -6393,4 +6408,6 @@ export async function populateBootstrapData(
             },
         ),
     ]);
+
+    return seedAdminCredentials(adapter);
 }

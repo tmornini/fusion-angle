@@ -34,7 +34,7 @@ import {
 } from './state-events.ts';
 import {
     generateCryptoSafeBase62,
-} from './crypto-safe-base62.ts';
+} from '../../../api/crypto-safe-base62.ts';
 import {
     nextPosition,
 } from '../drag-reorder-positions.ts';

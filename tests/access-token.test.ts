@@ -10,9 +10,9 @@ import {
 } from '../api/access-token.ts';
 import { base64UrlEncode } from '../api/base64url.ts';
 
-function token(over: Partial<{
+async function token(over: Partial<{
     sub: string; iat: number; ttlSeconds: number;
-}> = {}): string {
+}> = {}): Promise<string> {
     return mintAccessToken({
         sub: over.sub ?? 'current',
         roles: [],
@@ -23,37 +23,59 @@ function token(over: Partial<{
     });
 }
 
-test('verifies a well-formed unexpired token', () => {
-    const r = verifyAccessToken(token(), 1_700_000_100);
+test('verifies a well-formed unexpired token', async () => {
+    const r = await verifyAccessToken(
+        await token(), 1_700_000_100);
     assert.equal(r.valid, true);
     assert.equal(r.valid && r.claims.sub, 'current');
 });
 
-test('rejects an expired token', () => {
-    const t = token({ iat: 1_600_000_000, ttlSeconds: 1 });
-    const r = verifyAccessToken(t, 1_700_000_000);
+test('rejects an expired token', async () => {
+    const t = await token({ iat: 1_600_000_000, ttlSeconds: 1 });
+    const r = await verifyAccessToken(t, 1_700_000_000);
     assert.equal(r.valid, false);
 });
 
-test('rejects a not-yet-valid token', () => {
-    const t = token({ iat: 4_000_000_000 });
-    const r = verifyAccessToken(t, 1_700_000_000);
+test('rejects a not-yet-valid token', async () => {
+    const t = await token({ iat: 4_000_000_000 });
+    const r = await verifyAccessToken(t, 1_700_000_000);
     assert.equal(r.valid, false);
 });
 
-test('rejects a malformed token', () => {
+test('rejects a malformed token', async () => {
     assert.equal(
-        verifyAccessToken('a.b', 1_700_000_000).valid, false);
+        (await verifyAccessToken('a.b', 1_700_000_000)).valid,
+        false);
 });
 
-test('rejects a tampered signature', () => {
-    const t = token();
+test('rejects a tampered signature', async () => {
+    const t = await token();
     const bad = t.slice(0, t.lastIndexOf('.') + 1) + 'XXXX';
     assert.equal(
-        verifyAccessToken(bad, 1_700_000_100).valid, false);
+        (await verifyAccessToken(bad, 1_700_000_100)).valid,
+        false);
 });
 
-test('rejects a token minted for a different audience', () => {
+test('rejects a tampered body — the real MAC binds it',
+async () => {
+    const t = await token();
+    const [head, , sig] = t.split('.');
+    // Re-encode escalated claims but reuse the original
+    // signature: a real HMAC over the original body no longer
+    // matches the forged body, so verification fails on the
+    // signature (a placeholder ignoring the body would pass).
+    const forgedBody = base64UrlEncode(JSON.stringify({
+        sub: 'attacker', roles: ['admin'], name: 'X',
+        aud: 'fusion-ai-web', iat: 1_700_000_000,
+        nbf: 1_700_000_000, exp: 9_999_999_999, jti: 'x',
+    }));
+    const forged = head + '.' + forgedBody + '.' + sig;
+    const r = await verifyAccessToken(forged, 1_700_000_100);
+    assert.equal(r.valid, false);
+    assert.equal(!r.valid && r.reason, 'bad signature');
+});
+
+test('rejects a token minted for a different audience', async () => {
     const header = base64UrlEncode(JSON.stringify(
         { alg: 'HS256', typ: 'JWT', kid: 'dev-co-located' }));
     const claims = base64UrlEncode(JSON.stringify({
@@ -65,11 +87,12 @@ test('rejects a token minted for a different audience', () => {
     const sig = base64UrlEncode('dev-co-located');
     const token = header + '.' + claims + '.' + sig;
     assert.equal(
-        verifyAccessToken(token, 1_700_000_100).valid, false);
+        (await verifyAccessToken(token, 1_700_000_100)).valid,
+        false);
 });
 
-test('principalFromToken reads sub/roles/name', () => {
-    const p = principalFromToken(token());
+test('principalFromToken reads sub/roles/name', async () => {
+    const p = principalFromToken(await token());
     assert.equal(p.id, 'current');
     assert.deepEqual(p.roles, []);
 });

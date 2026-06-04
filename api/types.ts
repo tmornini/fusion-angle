@@ -485,6 +485,79 @@ export interface RoleGrantEntity {
     at: string;
 }
 
+export type IdentityTokenAction =
+    'issued' | 'rotated' | 'revoked';
+
+// Append-only token-lifecycle ledger. One row per jti event; a
+// token's current validity = the latest action for its jti.
+// `chain_id` groups a refresh-rotation lineage: an issue creates
+// a root (parent_jti = '' — a self-disclosing empty, never
+// null); each rotation appends 'rotated' for the old jti and
+// 'issued' for the new, sharing the chain_id. Presenting a
+// rotated-away (or revoked) jti is replay → the whole chain is
+// revoked. Distinct from identity_token_revocations (coarse
+// per-identity log-out-everywhere); this is per-jti / per-chain.
+export interface IdentityTokenEntity {
+    id: Id;
+    jti: string;
+    identity_id: Id;
+    action: IdentityTokenAction;
+    chain_id: string;
+    parent_jti: string;
+    at: string;
+}
+
+export type ClientStatus = 'active' | 'disabled';
+
+// An OAuth client registry row — the "websites built by us and
+// others". Mutable config of record (EntityStore): redirect URIs
+// change, JWKS rotate, a client is disabled. `grant_types` and
+// `redirect_uris` are space-delimited (OAuth convention); `jwks`
+// is the client's JSON Web Key Set as a JSON string (used to
+// verify private_key_jwt assertions — real JWS verify is a
+// server-tier seam); `aud` is the origin a token is minted for.
+export interface ClientEntity {
+    id: Id;
+    grant_types: string;
+    redirect_uris: string;
+    jwks: string;
+    aud: string;
+    status: ClientStatus;
+}
+
+export type IdentityProviderAction = 'linked' | 'unlinked';
+
+// Append-only ledger of external-IdP links for an identity. One
+// row per link/unlink; a link is current = its latest action is
+// 'linked'. `provider` names the IdP (e.g. 'google'),
+// `provider_subject` is the identity's id AT that provider. An
+// unlink is a NEW 'unlinked' row, never a splice.
+export interface IdentityProviderEntity {
+    id: Id;
+    identity_id: Id;
+    provider: string;
+    provider_subject: string;
+    action: IdentityProviderAction;
+    at: string;
+}
+
+export type AuthorizationCodeStatus = 'issued' | 'consumed';
+
+// Append-only ledger of authorization-code lifecycle. One row
+// per issue/consume; a code's current status = the latest event
+// for its `code`. The row `id` is a generated event id; `code`
+// is the opaque single-use value bound to (identity, client). A
+// consume is a NEW 'consumed' row — re-presenting a code whose
+// latest status is already 'consumed' (or unknown) is replay.
+export interface AuthorizationCodeEntity {
+    id: Id;
+    code: string;
+    identity_id: Id;
+    client_id: Id;
+    status: AuthorizationCodeStatus;
+    at: string;
+}
+
 // The person-PII display facet as a tagged union, so the
 // ABSENCE of the row (erased PII) is represented without
 // null and DECIDED AT THE CALL SITE. Presenters switch on

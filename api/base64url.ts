@@ -1,10 +1,12 @@
-// URL-safe base64 for the JWT-shaped access token. btoa/atob
-// operate on Latin-1 binary strings, so route bytes through
-// TextEncoder / TextDecoder to stay UTF-8 correct. Platform
-// primitives only — zero runtime dependencies.
+// URL-safe base64 in two layers. The byte codec
+// (bytesToBase64Url / base64UrlToBytes) is the primitive — HMAC
+// signatures are raw bytes, not text. The text codec
+// (base64UrlEncode / base64UrlDecode) is a UTF-8 adapter on top,
+// for the JWT JSON header/claims segments. btoa/atob operate on
+// Latin-1 binary strings, so the byte codec maps each byte to one
+// char and back. Platform primitives only — zero runtime deps.
 
-export function base64UrlEncode(text: string): string {
-    const bytes = new TextEncoder().encode(text);
+export function bytesToBase64Url(bytes: Uint8Array): string {
     let binary = '';
     for (const byte of bytes) {
         binary += String.fromCharCode(byte);
@@ -15,7 +17,9 @@ export function base64UrlEncode(text: string): string {
         .replace(/=+$/, '');
 }
 
-export function base64UrlDecode(encoded: string): string {
+export function base64UrlToBytes(
+    encoded: string,
+): Uint8Array<ArrayBuffer> {
     const restored = encoded
         .replace(/-/g, '+')
         .replace(/_/g, '/');
@@ -28,5 +32,15 @@ export function base64UrlDecode(encoded: string): string {
     for (let i = 0; i < binary.length; i++) {
         bytes[i] = binary.charCodeAt(i);
     }
-    return new TextDecoder().decode(bytes);
+    return bytes;
+}
+
+export function base64UrlEncode(text: string): string {
+    return bytesToBase64Url(new TextEncoder().encode(text));
+}
+
+export function base64UrlDecode(encoded: string): string {
+    return new TextDecoder().decode(
+        base64UrlToBytes(encoded),
+    );
 }

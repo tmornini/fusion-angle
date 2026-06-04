@@ -65,7 +65,7 @@ test(
             'st-system', 'system',
             'active', 'system',
         );
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         const roster = await getMembers(ctx);
         assert.ok(
             !roster.some(
@@ -86,7 +86,7 @@ test(
     + ' with correct kind discriminator',
     async () => {
         const { db } = await setupSeeded();
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         const members = await getMembers(ctx);
         assert.equal(members.length, 2);
         const human = members.find(isHumanMember)!;
@@ -109,7 +109,7 @@ test(
     + ' present',
     async () => {
         const { db } = await setupSeeded();
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         const map = await getMemberMap(ctx);
         assert.equal(map.size, 2);
         const human = map.get('hw_sarah_chen')!;
@@ -126,7 +126,7 @@ test(
     + ' both human and AI kinds',
     async () => {
         const { db } = await setupSeeded();
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         const map = await getMemberMap(ctx);
         assert.equal(
             memberName(map, 'hw_sarah_chen'),
@@ -144,7 +144,7 @@ test(
     + ' and AI kinds',
     async () => {
         const { db } = await setupSeeded();
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         const map = await getMemberMap(ctx);
         assert.equal(
             memberName(map, 'hw_sarah_chen'),
@@ -176,7 +176,7 @@ test(
         const db = new MemoryDbAdapter();
         await db.createSchema();
         await seedRootAdmin(db);
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         const members = await getMembers(ctx);
         assert.deepEqual(members, []);
     },
@@ -205,7 +205,7 @@ test(
             'st-hw_erased', 'hw_erased',
             'active', 'system',
         );
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         const map = await getMemberMap(ctx);
         assert.equal(
             memberName(map, 'hw_erased'),

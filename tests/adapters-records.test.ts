@@ -34,7 +34,7 @@ test(
         await db.createSchema();
         await seedRootAdmin(db);
         await seedCurrentMember(db);
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         await postRecordChange(ctx, 'rec-1', {
             kind: 'create',
             record: {
@@ -63,7 +63,7 @@ test(
         await db.createSchema();
         await seedRootAdmin(db);
         await seedCurrentMember(db);
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         await postRecordChange(ctx, 'rec-1', {
             kind: 'create',
             record: {
@@ -99,7 +99,7 @@ test(
         await db.createSchema();
         await seedRootAdmin(db);
         await seedCurrentMember(db);
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         await postRecordChange(ctx, 'rec-1', {
             kind: 'create',
             record: {
@@ -129,7 +129,7 @@ test(
         await db.createSchema();
         await seedRootAdmin(db);
         await seedCurrentMember(db);
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         await postRecordChange(ctx, 'rec-1', {
             kind: 'create',
             record: {
@@ -184,7 +184,7 @@ test(
         await db.createSchema();
         await seedRootAdmin(db);
         await seedCurrentMember(db);
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         await postRecordChange(ctx, 'rec-1', {
             kind: 'create',
             record: {
@@ -224,7 +224,7 @@ test(
         await db.createSchema();
         await seedRootAdmin(db);
         await seedCurrentMember(db);
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         await postRecordChange(ctx, 'rec-1', {
             kind: 'create',
             record: {
@@ -251,7 +251,7 @@ test(
         await db.createSchema();
         await seedRootAdmin(db);
         await seedCurrentMember(db);
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         await postRecordChange(ctx, 'rec-1', {
             kind: 'create',
             record: {
@@ -281,7 +281,7 @@ test(
         await db.createSchema();
         await seedRootAdmin(db);
         await seedCurrentMember(db);
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         await postRecordChange(ctx, 'rec-1', {
             kind: 'create',
             record: {
@@ -306,7 +306,7 @@ test(
         const db = new MemoryDbAdapter();
         await db.createSchema();
         await seedRootAdmin(db);
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         await assert.rejects(
             () => getRecordState(ctx, 'rec-missing'),
             /no state event/,
@@ -322,7 +322,7 @@ test(
         await db.createSchema();
         await seedRootAdmin(db);
         await seedCurrentMember(db);
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         await postRecordChange(ctx, 'rec-1', {
             kind: 'create',
             record: {

@@ -31,7 +31,7 @@ test(
         const db = new MemoryDbAdapter();
         await db.createSchema();
         await seedRootAdmin(db);
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         await ctx.commit({
             ops: [
                 {
@@ -74,7 +74,7 @@ test(
         const db = new MemoryDbAdapter();
         await db.createSchema();
         await seedRootAdmin(db);
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         const ch1 = createChannel<void>();
         const ch2 = createChannel<void>();
         let count1 = 0;
@@ -108,7 +108,7 @@ test(
         const db = new MemoryDbAdapter();
         await db.createSchema();
         await seedRootAdmin(db);
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         const ch = createChannel<void>();
         let count = 0;
         ch.subscribe(() => { count++; });
@@ -127,7 +127,7 @@ test(
         const db = new MemoryDbAdapter();
         await db.createSchema();
         await seedRootAdmin(db);
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         const ch = createChannel<void>();
         let count = 0;
         ch.subscribe(() => { count++; });
@@ -178,7 +178,7 @@ test(
         const db = new MemoryDbAdapter();
         await db.createSchema();
         await seedRootAdmin(db);
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         const bad = {
             method: 'put' as const,
             resource: 'ai-members/ai_1',
@@ -206,7 +206,7 @@ test(
         const db = new MemoryDbAdapter();
         await db.createSchema();
         await seedRootAdmin(db);
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         const goodA = {
             method: 'put' as const,
             resource: 'ai-members/ai_1',

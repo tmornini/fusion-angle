@@ -2,6 +2,7 @@ import { $, $input } from '../app/dom.ts';
 import {
     html,
     setHtml,
+    trusted,
 } from '../app/safe-html.ts';
 import { showToast } from '../app/toast.ts';
 import {
@@ -11,7 +12,16 @@ import {
 } from '../app/icons.ts';
 import { navigateTo } from '../app/core.ts';
 import { getViewportWidth } from '../app/adapters/index.ts';
-import { establishSession } from '../app/adapters/init.ts';
+import {
+    establishSession,
+    setSessionToken,
+} from '../app/adapters/init.ts';
+import {
+    sessionContext,
+} from '../app/adapters/shared.ts';
+import {
+    loginViaPassword,
+} from '../app/adapters/authentication.ts';
 
 function validateEmail(
     email: string,
@@ -495,6 +505,7 @@ export async function init(): Promise<void> {
 
         if (emailErr || passErr) return;
 
+        const savedBtn = submitBtn.innerHTML;
         setHtml(
             submitBtn,
             iconLoader(
@@ -507,21 +518,41 @@ export async function init(): Promise<void> {
             '',
         );
 
-        setTimeout(() => {
-            establishSession('current', 'Demo User');
+        setTimeout(async () => {
             if (isLogin) {
-                navigateTo('dashboard');
-            } else {
-                showToast(
-                    'Welcome to Fusion AI!'
-                    + ' Your account has'
-                    + ' been created.',
-                    'success',
+                const token = await loginViaPassword(
+                    sessionContext(), email, password,
                 );
-                setTimeout(() => {
-                    navigateTo('dashboard');
-                }, 1500);
+                if (token === null) {
+                    setHtml(submitBtn, trusted(savedBtn));
+                    submitBtn.removeAttribute('disabled');
+                    passwordError.textContent =
+                        'Invalid email or password.';
+                    passwordError.classList.remove(
+                        'hidden',
+                    );
+                    passwordInput.classList.add(
+                        'input-error',
+                    );
+                    return;
+                }
+                setSessionToken(token);
+                navigateTo('dashboard');
+                return;
             }
+            // Sign-up creating a real identity + credential is
+            // SP-6 scope; the demo mock-establishes a session so
+            // the new-account path still lands on the dashboard.
+            await establishSession('current', 'Demo User');
+            showToast(
+                'Welcome to Fusion AI!'
+                + ' Your account has'
+                + ' been created.',
+                'success',
+            );
+            setTimeout(() => {
+                navigateTo('dashboard');
+            }, 1500);
         }, 800);
     });
 }

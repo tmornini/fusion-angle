@@ -6,7 +6,7 @@ import {
 } from '../../../api/types.ts';
 import {
     generateCryptoSafeBase62,
-} from './crypto-safe-base62.ts';
+} from '../../../api/crypto-safe-base62.ts';
 
 const DEFAULT_START_X = -300;
 const DEFAULT_START_Y = 0;

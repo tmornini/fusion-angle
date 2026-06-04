@@ -47,7 +47,7 @@ for (const route of COLLECTION_ROUTES) {
             await seedRootAdmin(db);
             const rows =
                 await GET<unknown[]>(
-                    db, route, devToken());
+                    db, route, await devToken());
             assert.ok(
                 Array.isArray(rows),
                 route + ' should return an array',

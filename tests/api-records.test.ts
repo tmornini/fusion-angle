@@ -7,7 +7,7 @@ import {
     MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import { jsonArrayField } from '../api/types.ts';
-import { devToken } from './token-fixtures.ts';
+import { DEV_TOKEN } from './token-fixtures.ts';
 import {
     seedRootAdmin,
 } from './root-admin-fixture.ts';
@@ -27,7 +27,7 @@ test(
     async () => {
         const db = await freshDb();
         const out =
-            await GET<unknown[]>(db, 'records', devToken());
+            await GET<unknown[]>(db, 'records', DEV_TOKEN);
         assert.deepEqual(out, []);
     },
 );
@@ -41,13 +41,13 @@ test(
             name: 'Customer',
             description: 'A customer record',
             position: 1,
-        }, devToken());
+        }, DEV_TOKEN);
         const stored = await GET<{
             id: string;
             name: string;
             description: string;
             position: number;
-        }>(db, 'records/rec-1', devToken());
+        }>(db, 'records/rec-1', DEV_TOKEN);
         assert.equal(stored.id, 'rec-1');
         assert.equal(stored.name, 'Customer');
         assert.equal(stored.position, 1);
@@ -63,10 +63,10 @@ test(
             name: 'X',
             description: '',
             position: 1,
-        }, devToken());
-        await DELETE(db, 'records/rec-1', devToken());
+        }, DEV_TOKEN);
+        await DELETE(db, 'records/rec-1', DEV_TOKEN);
         await assert.rejects(
-            () => GET(db, 'records/rec-1', devToken()),
+            () => GET(db, 'records/rec-1', DEV_TOKEN),
         );
     },
 );
@@ -78,7 +78,7 @@ test(
     async () => {
         const db = await freshDb();
         const out = await GET<unknown[]>(
-            db, 'record-attributes', devToken(),
+            db, 'record-attributes', DEV_TOKEN,
         );
         assert.deepEqual(out, []);
     },
@@ -97,12 +97,12 @@ test(
             sort_order: 1,
             options: jsonArrayField([]),
             constraints: jsonArrayField([]),
-        }, devToken());
+        }, DEV_TOKEN);
         const stored = await GET<{
             id: string;
             record_id: string;
             attribute_type: string;
-        }>(db, 'record-attributes/a-1', devToken());
+        }>(db, 'record-attributes/a-1', DEV_TOKEN);
         assert.equal(stored.id, 'a-1');
         assert.equal(stored.record_id, 'rec-1');
         assert.equal(
@@ -123,13 +123,13 @@ test(
             sort_order: 1,
             options: jsonArrayField([]),
             constraints: jsonArrayField([]),
-        }, devToken());
+        }, DEV_TOKEN);
         await DELETE(
-            db, 'record-attributes/a-1', devToken(),
+            db, 'record-attributes/a-1', DEV_TOKEN,
         );
         await assert.rejects(
             () => GET(
-                db, 'record-attributes/a-1', devToken()),
+                db, 'record-attributes/a-1', DEV_TOKEN),
         );
     },
 );
@@ -141,7 +141,7 @@ test(
     async () => {
         const db = await freshDb();
         const out = await GET<unknown[]>(
-            db, 'flow-records', devToken(),
+            db, 'flow-records', DEV_TOKEN,
         );
         assert.deepEqual(out, []);
     },
@@ -157,12 +157,12 @@ test(
             flow_id: 'flow-1',
             record_id: 'rec-1',
             at: '2026-05-01T00:00:00.000Z',
-        }, devToken());
+        }, DEV_TOKEN);
         const stored = await GET<{
             id: string;
             flow_id: string;
             record_id: string;
-        }>(db, 'flow-records/fr-1', devToken());
+        }>(db, 'flow-records/fr-1', DEV_TOKEN);
         assert.equal(stored.flow_id, 'flow-1');
         assert.equal(stored.record_id, 'rec-1');
     },
@@ -177,10 +177,10 @@ test(
             flow_id: 'flow-1',
             record_id: 'rec-1',
             at: '2026-05-01T00:00:00.000Z',
-        }, devToken());
-        await DELETE(db, 'flow-records/fr-1', devToken());
+        }, DEV_TOKEN);
+        await DELETE(db, 'flow-records/fr-1', DEV_TOKEN);
         await assert.rejects(
-            () => GET(db, 'flow-records/fr-1', devToken()),
+            () => GET(db, 'flow-records/fr-1', DEV_TOKEN),
         );
     },
 );

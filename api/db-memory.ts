@@ -14,6 +14,10 @@ import type {
     IdentityCredentialEntity,
     IdentityTokenRevocationEntity,
     RoleGrantEntity,
+    IdentityTokenEntity,
+    ClientEntity,
+    IdentityProviderEntity,
+    AuthorizationCodeEntity,
     IdeaEntity,
     ProjectEntity,
     FlowEntity,
@@ -53,6 +57,10 @@ import {
     validateIdentityCredentialEntity,
     validateIdentityTokenRevocationEntity,
     validateRoleGrantEntity,
+    validateIdentityTokenEntity,
+    validateClientEntity,
+    validateIdentityProviderEntity,
+    validateAuthorizationCodeEntity,
     validateIdeaEntity,
     validateProjectEntity,
     validateFlowEntity,
@@ -85,6 +93,13 @@ export class MemoryDbAdapter implements DbAdapter {
     readonly identityTokenRevocations:
         IEntityStore<IdentityTokenRevocationEntity>;
     readonly roleGrants: IEntityStore<RoleGrantEntity>;
+    readonly identityTokens:
+        IEntityStore<IdentityTokenEntity>;
+    readonly clients: IEntityStore<ClientEntity>;
+    readonly identityProviders:
+        IEntityStore<IdentityProviderEntity>;
+    readonly authorizationCodes:
+        IEntityStore<AuthorizationCodeEntity>;
     readonly ideas: IEntityStore<IdeaEntity>;
     readonly projects: IEntityStore<ProjectEntity>;
     readonly flows: IEntityStore<FlowEntity>;
@@ -167,6 +182,26 @@ export class MemoryDbAdapter implements DbAdapter {
             new HistoryEntityStore(
                 'role_grants', backend,
                 validateRoleGrantEntity,
+            );
+        this.identityTokens =
+            new HistoryEntityStore(
+                'identity_tokens', backend,
+                validateIdentityTokenEntity,
+            );
+        this.clients =
+            new EntityStore(
+                'clients', backend, stateStore,
+                validateClientEntity,
+            );
+        this.identityProviders =
+            new HistoryEntityStore(
+                'identity_providers', backend,
+                validateIdentityProviderEntity,
+            );
+        this.authorizationCodes =
+            new HistoryEntityStore(
+                'authorization_codes', backend,
+                validateAuthorizationCodeEntity,
             );
         this.ideas =
             new EntityStore(

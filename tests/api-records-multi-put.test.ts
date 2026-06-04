@@ -11,7 +11,7 @@ import {
     seedCurrentMember,
     seedHumanMember,
 } from './member-fixtures.ts';
-import { devToken } from './token-fixtures.ts';
+import { DEV_TOKEN } from './token-fixtures.ts';
 import {
     seedRootAdmin,
 } from './root-admin-fixture.ts';
@@ -55,18 +55,18 @@ test(
             ],
             initialState: 'active',
             initialStateEventId: 'ev-1',
-        }, devToken());
+        }, DEV_TOKEN);
         const record = await GET<{
             id: string;
             name: string;
-        }>(db, 'records/rec-1', devToken());
+        }>(db, 'records/rec-1', DEV_TOKEN);
         assert.equal(record.name, 'Quarterly Renewals');
         const current = await GET<{
             state: string;
-        }>(db, 'entity-states/rec-1', devToken());
+        }>(db, 'entity-states/rec-1', DEV_TOKEN);
         assert.equal(current.state, 'active');
         const attrs = await GET<unknown[]>(
-            db, 'record-attributes', devToken(),
+            db, 'record-attributes', DEV_TOKEN,
         );
         assert.equal(attrs.length, 1);
     },
@@ -90,15 +90,15 @@ test(
             attributes: [],
             initialState: 'active',
             initialStateEventId: 'ev-2',
-        }, devToken());
+        }, DEV_TOKEN);
         const record = await GET<{ name: string }>(
-            db, 'records/rec-2', devToken(),
+            db, 'records/rec-2', DEV_TOKEN,
         );
         assert.equal(record.name, 'Empty');
         const current = await GET<{
             state: string;
             member_id: string;
-        }>(db, 'entity-states/rec-2', devToken());
+        }>(db, 'entity-states/rec-2', DEV_TOKEN);
         assert.equal(current.state, 'active');
         assert.equal(
             current.member_id, 'current',
@@ -125,7 +125,7 @@ test(
             attributes: [],
             initialState: 'active',
             initialStateEventId: 'ev-1',
-        }, devToken());
+        }, DEV_TOKEN);
         await POST(db, 'records-multi-put', {
             kind: 'edit',
             id: 'rec-1',
@@ -136,17 +136,17 @@ test(
             },
             attributes: [],
             removedAttributeIds: [],
-        }, devToken());
+        }, DEV_TOKEN);
         const record = await GET<{
             name: string;
             description: string;
-        }>(db, 'records/rec-1', devToken());
+        }>(db, 'records/rec-1', DEV_TOKEN);
         assert.equal(record.name, 'After');
         assert.equal(
             record.description, 'updated',
         );
         const history = await GET<unknown[]>(
-            db, 'entity-states/rec-1/history', devToken(),
+            db, 'entity-states/rec-1/history', DEV_TOKEN,
         );
         assert.equal(
             history.length, 1,
@@ -184,7 +184,7 @@ test(
             ],
             initialState: 'active',
             initialStateEventId: 'ev-1',
-        }, devToken());
+        }, DEV_TOKEN);
         await POST(db, 'records-multi-put', {
             kind: 'edit',
             id: 'rec-1',
@@ -207,11 +207,11 @@ test(
                 },
             ],
             removedAttributeIds: ['a-old'],
-        }, devToken());
+        }, DEV_TOKEN);
         const all = await GET<{
             id: string;
             name: string;
-        }[]>(db, 'record-attributes', devToken());
+        }[]>(db, 'record-attributes', DEV_TOKEN);
         assert.equal(all.length, 1);
         assert.equal(all[0]!.id, 'a-new');
         assert.equal(all[0]!.name, 'New');
@@ -246,7 +246,7 @@ test(
             ],
             initialState: 'active',
             initialStateEventId: 'ev-1',
-        }, devToken());
+        }, DEV_TOKEN);
         await POST(db, 'records-multi-put', {
             kind: 'edit',
             id: 'rec-1',
@@ -268,11 +268,11 @@ test(
                 },
             ],
             removedAttributeIds: [],
-        }, devToken());
+        }, DEV_TOKEN);
         const stored = await GET<{
             name: string;
             attribute_type: string;
-        }>(db, 'record-attributes/a-1', devToken());
+        }>(db, 'record-attributes/a-1', DEV_TOKEN);
         assert.equal(stored.name, 'Renamed');
         assert.equal(
             stored.attribute_type, 'number',
@@ -313,7 +313,7 @@ test(
                 ],
                 initialState: 'active',
                 initialStateEventId: 'ev-1',
-            }, devToken()),
+            }, DEV_TOKEN),
             /must be non-empty/,
         );
     },
@@ -351,7 +351,7 @@ test(
                 ],
                 initialState: 'active',
                 initialStateEventId: 'ev-1',
-            }, devToken()),
+            }, DEV_TOKEN),
             /record_id must match top-level id/,
         );
     },
@@ -372,7 +372,7 @@ test(
                     position: 1,
                 },
                 attributes: [],
-            }, devToken()),
+            }, DEV_TOKEN),
             /RecordMultiPutBody kind/,
         );
     },
@@ -395,7 +395,7 @@ test(
                 attributes: [],
                 initialState: 'pending',
                 initialStateEventId: 'ev-1',
-            }, devToken()),
+            }, DEV_TOKEN),
             /expected RecordState/,
         );
     },
@@ -419,7 +419,7 @@ test(
                 initialState: 'active',
                 initialStateEventId: 'ev-1',
                 extra: 'forbidden',
-            }, devToken()),
+            }, DEV_TOKEN),
             /unexpected key/,
         );
     },
@@ -440,7 +440,7 @@ test(
                     position: 1,
                 },
                 attributes: [],
-            }, devToken()),
+            }, DEV_TOKEN),
             /missing required key/,
         );
     },

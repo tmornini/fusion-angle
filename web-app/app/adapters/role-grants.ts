@@ -1,6 +1,6 @@
 import {
     generateCryptoSafeBase62,
-} from './crypto-safe-base62.ts';
+} from '../../../api/crypto-safe-base62.ts';
 import {
     nowUtc,
     type Id,

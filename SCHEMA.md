@@ -224,6 +224,94 @@ validated at the storage gate.
 | by_member_id | TEXT (FK → members) |
 | at | TEXT |
 
+### identity_tokens
+
+Append-only token-lifecycle ledger
+(`HistoryEntityStore`). One row per jti event; a
+token's current validity = the latest action for its
+`jti`. `chain_id` groups a refresh-rotation lineage:
+an issue creates a root (`parent_jti` = `''`, a
+self-disclosing empty); each rotation appends
+`rotated` for the old jti and `issued` for the new,
+sharing the `chain_id`. Presenting a rotated-away or
+`revoked` jti is replay → the whole chain is revoked.
+Distinct from `identity_token_revocations` (coarse
+per-identity log-out-everywhere); this is per-jti and
+per-chain, checked at the gate. `at` is the RFC-3339
+zulu moment, validated at the storage gate.
+
+| Column | Type |
+|--------|------|
+| id | TEXT |
+| jti | TEXT |
+| identity_id | TEXT (FK → identities) |
+| action | TEXT (`issued` \| `rotated` \| `revoked`) |
+| chain_id | TEXT |
+| parent_jti | TEXT |
+| at | TEXT |
+
+### clients
+
+OAuth client registry (`EntityStore`) — the websites
+built by us and others. Mutable config of record:
+redirect URIs change, JWKS rotate, a client is
+disabled. `grant_types` and `redirect_uris` are
+space-delimited (OAuth convention); `jwks` is the
+client's JSON Web Key Set as a JSON string, used to
+verify `private_key_jwt` assertions (real JWS verify
+is a server-tier seam); `aud` is the origin a token
+is minted for.
+
+| Column | Type |
+|--------|------|
+| id | TEXT |
+| grant_types | TEXT |
+| redirect_uris | TEXT |
+| jwks | TEXT |
+| aud | TEXT |
+| status | TEXT (`active` \| `disabled`) |
+
+### identity_providers
+
+Append-only ledger of external-IdP links
+(`HistoryEntityStore`). One row per link/unlink; a link
+is current = its latest action per
+`(identity_id, provider)` is `linked`. `provider` names
+the IdP; `provider_subject` is the identity's id at that
+IdP. An unlink is a NEW `unlinked` row, never a splice.
+`at` is the RFC-3339 zulu moment, validated at the
+storage gate.
+
+| Column | Type |
+|--------|------|
+| id | TEXT |
+| identity_id | TEXT (FK → identities) |
+| provider | TEXT |
+| provider_subject | TEXT |
+| action | TEXT (`linked` \| `unlinked`) |
+| at | TEXT |
+
+### authorization_codes
+
+Append-only ledger of authorization-code lifecycle
+(`HistoryEntityStore`). One row per issue/consume; a
+code's current status = the latest event for its
+`code`. The row `id` is a generated event id; `code` is
+the opaque single-use value bound to (identity, client).
+A consume is a NEW `consumed` row; re-presenting a code
+whose latest status is `consumed` (or unknown) is
+replay. `at` is the RFC-3339 zulu moment, validated at
+the storage gate.
+
+| Column | Type |
+|--------|------|
+| id | TEXT |
+| code | TEXT |
+| identity_id | TEXT (FK → identities) |
+| client_id | TEXT (FK → clients) |
+| status | TEXT (`issued` \| `consumed`) |
+| at | TEXT |
+
 ### ideas
 
 | Column | Type |

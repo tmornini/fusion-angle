@@ -41,7 +41,7 @@ async function runReactivationScenario(db: DbAdapter): Promise<{
     archivedIds: Set<string>;
 }> {
     await seedHumanMember(db, 'current', 'Demo User');
-    const ctx = createRequestContext(db, devToken());
+    const ctx = createRequestContext(db, await devToken());
     await postObjectiveCreation(
         ctx, 'o1', 'Rev', 'd', 0,
     );

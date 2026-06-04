@@ -14,7 +14,7 @@ import {
 import type { RequestContext, WriteOp } from './shared.ts';
 import {
     generateCryptoSafeBase62,
-} from './crypto-safe-base62.ts';
+} from '../../../api/crypto-safe-base62.ts';
 import {
     getCurrentHumanMember,
 } from './members.ts';

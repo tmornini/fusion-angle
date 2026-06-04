@@ -179,7 +179,7 @@ test(
             at: daysAgo(40),
         });
 
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         const { model, graph } =
             await getFlowStats(ctx, 'f1');
 
@@ -210,7 +210,7 @@ test(
         const db = new MemoryDbAdapter();
         await db.createSchema();
         await seedRootAdmin(db);
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         await assert.rejects(
             () => getFlowStats(ctx, 'nope'),
         );
@@ -246,7 +246,7 @@ test(
             member_id: 'p1',
             at: daysAgo(10),
         });
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         const { model, graph } =
             await getFlowStats(ctx, 'f1');
         const graphPos = new Set(

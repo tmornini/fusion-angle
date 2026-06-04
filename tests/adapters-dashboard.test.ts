@@ -28,7 +28,7 @@ async function setupDb(): Promise<{
     const db = new MemoryDbAdapter();
     await db.createSchema();
     await seedRootAdmin(db);
-    const ctx = createRequestContext(db, devToken());
+    const ctx = createRequestContext(db, await devToken());
     return { db, ctx };
 }
 
@@ -270,7 +270,7 @@ test(
         const db = new MemoryDbAdapter();
         await db.createSchema();
         await seedRootAdmin(db);
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         const gauges = await getDashboardGauges(ctx);
         assert.equal(gauges.length, 3);
         const titles = gauges.map(

@@ -90,7 +90,7 @@ document.addEventListener(
         }
 
         if (hasSchema) {
-            establishSession('current', 'Demo User');
+            await establishSession('current', 'Demo User');
         }
 
         const pageName = getPageName();

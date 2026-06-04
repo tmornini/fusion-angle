@@ -70,7 +70,7 @@ test('getProjectStates excludes a same-valued idea',
         await db.states.record(
             'ev-i1', 'i1', 'approved', 'system',
         );
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         const states = await getProjectStates(ctx);
         assert.equal(states.get('p1'), 'approved');
         assert.ok(
@@ -92,7 +92,7 @@ test('getIdeaStates excludes a same-valued project',
         await db.states.record(
             'ev-p1', 'p1', 'approved', 'system',
         );
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         const states = await getIdeaStates(ctx);
         assert.equal(states.get('i1'), 'active');
         assert.ok(
@@ -114,7 +114,7 @@ test('getRecordStates excludes a same-valued idea',
         await db.states.record(
             'ev-i1', 'i1', 'archived', 'system',
         );
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         const states = await getRecordStates(ctx);
         assert.equal(states.get('r1'), 'active');
         assert.ok(
@@ -134,7 +134,7 @@ test('getMemberStates spans kinds and excludes an idea',
         await db.states.record(
             'ev-i1', 'i1', 'active', 'system',
         );
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         const states = await getMemberStates(ctx);
         assert.equal(states.get('wh'), 'active');
         assert.equal(states.get('wa'), 'active');
@@ -163,7 +163,7 @@ test('getProjectStates keeps the later event on a tie',
             member_id: 'system',
             at,
         });
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         const states = await getProjectStates(ctx);
         assert.equal(states.get('p1'), 'approved');
     });

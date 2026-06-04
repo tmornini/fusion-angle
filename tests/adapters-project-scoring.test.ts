@@ -41,7 +41,7 @@ test('getBaselineScoresForProject returns project rows',
                 at: '2026-05-14T00:00:00.000Z',
             },
         );
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         const rows = await getBaselineScoresForProject(
             ctx, 'p1',
         );
@@ -63,7 +63,7 @@ test('getActualScoresForProject returns project rows',
                 at: '2026-05-14T00:00:00.000Z',
             },
         );
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         const rows = await getActualScoresForProject(
             ctx, 'p1',
         );
@@ -94,7 +94,7 @@ test('getProjectScoring returns both lists',
                 at: '2026-05-15T00:00:00.000Z',
             },
         );
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         const r = await getProjectScoring(ctx, 'p1');
         assert.equal(r.baseline.length, 1);
         assert.equal(r.actual.length, 1);
@@ -157,7 +157,7 @@ test('getPortfolioImpactSummary averages project averages',
         await db.createSchema();
         await seedRootAdmin(db);
         await seedTwoApprovedProjects(db);
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         const r = await getPortfolioImpactSummary(ctx);
         assert.equal(r.projectCount, 2);
         assert.equal(r.baselineMean, 20); // (60 + -20) / 2
@@ -169,7 +169,7 @@ test('getObjectiveAggregates returns per-objective rows',
         await db.createSchema();
         await seedRootAdmin(db);
         await seedTwoApprovedProjects(db);
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         const rows = await getObjectiveAggregates(ctx);
         assert.equal(rows.length, 1);
         assert.equal(rows[0]!.objectiveId, 'o1');
@@ -183,7 +183,7 @@ test('getProjectsScoreColumn returns per-project rollup',
         await db.createSchema();
         await seedRootAdmin(db);
         await seedTwoApprovedProjects(db);
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         const rows = await getProjectsScoreColumn(ctx);
         const byId = new Map(
             rows.map(r => [r.projectId, r]),
@@ -217,7 +217,7 @@ test(
                 at: '2026-05-16T00:00:00.000Z',
             },
         );
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         const trendlines = await getObjectiveTrendlines(
             ctx,
         );
@@ -257,7 +257,7 @@ test(
                 at: '2026-05-15T00:00:00.000Z',
             },
         );
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         const trendlines = await getObjectiveTrendlines(
             ctx,
         );
@@ -297,7 +297,7 @@ test(
                 at: '2026-05-15T00:00:00.000Z',
             },
         );
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         const trendlines = await getObjectiveTrendlines(
             ctx,
         );
@@ -325,7 +325,7 @@ test(
             member_id: 'w1',
             at: '2026-05-14T00:00:00.000Z',
         });
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         const trendlines = await getObjectiveTrendlines(
             ctx,
         );
@@ -339,7 +339,7 @@ test('postProjectBaselineScoring appends event rows',
         await db.createSchema();
         await seedRootAdmin(db);
         await seedHumanMember(db, 'current', 'Demo User');
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         await postProjectBaselineScoring(ctx, 'p1', [
             { objectiveId: 'o1', score: 50 },
             { objectiveId: 'o2', score: -30 },
@@ -358,7 +358,7 @@ test('postProjectActualMeasurement appends actual rows',
         await db.createSchema();
         await seedRootAdmin(db);
         await seedHumanMember(db, 'current', 'Demo User');
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         await postProjectActualMeasurement(ctx, 'p1', [
             { objectiveId: 'o1', score: 33 },
         ]);

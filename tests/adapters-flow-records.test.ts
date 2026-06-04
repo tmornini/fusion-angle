@@ -58,7 +58,7 @@ test(
         const db = new MemoryDbAdapter();
         await db.createSchema();
         await seedRootAdmin(db);
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         await putFlowRecord(ctx, 'fr-1', {
             flow_id: 'flow-1',
             record_id: 'rec-1',
@@ -80,7 +80,7 @@ test(
         const db = new MemoryDbAdapter();
         await db.createSchema();
         await seedRootAdmin(db);
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         await putFlowRecord(ctx, 'fr-1', {
             flow_id: 'flow-1',
             record_id: 'rec-1',
@@ -106,7 +106,7 @@ test(
         const db = new MemoryDbAdapter();
         await db.createSchema();
         await seedRootAdmin(db);
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         await putFlowRecord(ctx, 'fr-1', {
             flow_id: 'flow-a',
             record_id: 'rec-1',
@@ -141,7 +141,7 @@ test(
         const db = new MemoryDbAdapter();
         await db.createSchema();
         await seedRootAdmin(db);
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         // Bind rec-1 to two flows.
         await putFlowRecord(ctx, 'fr-1', {
             flow_id: 'flow-a',
@@ -184,7 +184,7 @@ test(
         const db = new MemoryDbAdapter();
         await db.createSchema();
         await seedRootAdmin(db);
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         const workOrders =
             await getWorkOrdersForRecord(
                 ctx, 'rec-unknown',
@@ -199,7 +199,7 @@ test(
         const db = new MemoryDbAdapter();
         await db.createSchema();
         await seedRootAdmin(db);
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         await putFlowRecord(ctx, 'fr-1', {
             flow_id: 'flow-1',
             record_id: 'rec-1',

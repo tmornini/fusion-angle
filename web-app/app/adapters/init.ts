@@ -9,12 +9,13 @@ import {
 } from '../../../api/access-token.ts';
 import {
     generateCryptoSafeBase62,
-} from './crypto-safe-base62.ts';
+} from '../../../api/crypto-safe-base62.ts';
 
 let adapter: DbAdapter | undefined;
 
 export async function initAdapter(
 ): Promise<boolean> {
+    await ensureSessionToken();
     adapter = new LocalStorageDbAdapter();
     await adapter.initialize();
     const schema =
@@ -42,10 +43,10 @@ function nowSeconds(): number {
     return Math.floor(Date.now() / 1000);
 }
 
-function mintSessionToken(
+async function mintSessionToken(
     sub: string,
     name: string,
-): string {
+): Promise<string> {
     return mintAccessToken({
         sub,
         roles: [],
@@ -64,20 +65,42 @@ export function clearSessionToken(): void {
     sessionToken = undefined;
 }
 
+// Pre-seed the per-tab holder with the anonymous default.
+// Minting is async (real HMAC signing), so a sync getter
+// cannot mint lazily; the boot path awaits this before any
+// getSessionToken() call. Idempotent: a holder already set
+// (anonymous or an established subject) is left untouched.
+export async function ensureSessionToken(): Promise<void> {
+    if (sessionToken === undefined) {
+        sessionToken = await mintSessionToken(
+            ANONYMOUS_ID, 'Anonymous',
+        );
+    }
+}
+
+// Returns the already-minted per-tab token. ensureSessionToken
+// (boot) or establishSession (login) must have seeded it; an
+// unseeded holder is a boot-order bug, not a state to mask —
+// crash with a clear message rather than return a wrong token.
 export function getSessionToken(): string {
     if (sessionToken === undefined) {
-        sessionToken = mintSessionToken(
-            ANONYMOUS_ID, 'Anonymous',
+        throw new Error(
+            'session token uninitialized;'
+            + ' await ensureSessionToken() first',
         );
     }
     return sessionToken;
 }
 
-// Mint and install a real (signature-deferred) session token
-// for an authenticated subject. Login and app-boot call this.
-export function establishSession(
+// Mint and install a session token DIRECTLY for `sub` — the
+// mock-auth convenience for app-boot and demo sign-up. The REAL
+// password flow (verify a credential through the OAuth front
+// doors) is loginViaPassword in adapters/authentication.ts; boot
+// keeps this direct mint because the seed admin password is
+// random and surfaced once, so none is available at boot time.
+export async function establishSession(
     sub: string,
     name: string,
-): void {
-    setSessionToken(mintSessionToken(sub, name));
+): Promise<void> {
+    setSessionToken(await mintSessionToken(sub, name));
 }

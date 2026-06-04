@@ -11,7 +11,7 @@ import {
     seedHumanMember,
     seedAIMember,
 } from './member-fixtures.ts';
-import { devToken } from './token-fixtures.ts';
+import { DEV_TOKEN } from './token-fixtures.ts';
 import {
     seedRootAdmin,
 } from './root-admin-fixture.ts';
@@ -26,7 +26,7 @@ async function freshDb() {
 test('GET on unknown route throws', async () => {
     const db = await freshDb();
     await assert.rejects(
-        () => GET(db, 'nonexistent-table', devToken()),
+        () => GET(db, 'nonexistent-table', DEV_TOKEN),
         /Route not found|404|not found/i,
     );
 });
@@ -34,14 +34,14 @@ test('GET on unknown route throws', async () => {
 test('GET ideas returns array', async () => {
     const db = await freshDb();
     const ideas =
-        await GET<unknown[]>(db, 'ideas', devToken());
+        await GET<unknown[]>(db, 'ideas', DEV_TOKEN);
     assert.deepEqual(ideas, []);
 });
 
 test('GET ideas/:id throws on missing', async () => {
     const db = await freshDb();
     await assert.rejects(
-        () => GET(db, 'ideas/missing-id', devToken()),
+        () => GET(db, 'ideas/missing-id', DEV_TOKEN),
         /Not found|404/,
     );
 });
@@ -58,10 +58,10 @@ test('PUT then GET round-trips an entity', async () => {
         expected_outcome: 'o',
         success_metrics: 'm',
     };
-    await PUT(db, 'ideas/i1', payload, devToken());
+    await PUT(db, 'ideas/i1', payload, DEV_TOKEN);
     const fetched =
         await GET<{ title: string }>(
-            db, 'ideas/i1', devToken(),
+            db, 'ideas/i1', DEV_TOKEN,
         );
     assert.equal(fetched.title, 'Test');
 });
@@ -69,7 +69,7 @@ test('PUT then GET round-trips an entity', async () => {
 test('GET ideas/ normalizes to collection', async () => {
     const db = await freshDb();
     const result =
-        await GET<unknown[]>(db, 'ideas/', devToken());
+        await GET<unknown[]>(db, 'ideas/', DEV_TOKEN);
     assert.deepEqual(result, []);
 });
 
@@ -79,7 +79,7 @@ test(
         const db = await freshDb();
         await seedHumanMember(db, 'hw_1', 'Sarah Chen');
         const members =
-            await GET<unknown[]>(db, 'members', devToken());
+            await GET<unknown[]>(db, 'members', DEV_TOKEN);
         assert.equal(members.length, 1);
     },
 );
@@ -91,7 +91,7 @@ test(
         await seedAIMember(db, 'ai_1', 'Opus');
         const ais =
             await GET<unknown[]>(
-                db, 'ai-members', devToken());
+                db, 'ai-members', DEV_TOKEN);
         assert.equal(ais.length, 1);
     },
 );
@@ -103,7 +103,7 @@ test(
         await assert.rejects(
             () => PUT(db, 'ai-members/ai_1', {
                 rogue_field: 'extra',
-            }, devToken()),
+            }, DEV_TOKEN),
             /unexpected key|missing/,
         );
     },
@@ -115,10 +115,10 @@ test(
     async () => {
         const db = await freshDb();
         await POST(
-            db, 'snapshots/mock-data', {}, devToken(),
+            db, 'snapshots/mock-data', {}, DEV_TOKEN,
         );
         const members =
-            await GET<unknown[]>(db, 'members', devToken());
+            await GET<unknown[]>(db, 'members', DEV_TOKEN);
         assert.ok(members.length > 0);
     },
 );
@@ -129,7 +129,7 @@ test(
     async () => {
         const db = await freshDb();
         await assert.rejects(
-            () => POST(db, 'ideas', {}, devToken()),
+            () => POST(db, 'ideas', {}, DEV_TOKEN),
             /not allowed/i,
         );
     },
@@ -141,7 +141,7 @@ test(
         const db = await freshDb();
         await assert.rejects(
             () => POST(
-                db, 'no-such-resource', {}, devToken(),
+                db, 'no-such-resource', {}, DEV_TOKEN,
             ),
             /not found|404/i,
         );
@@ -154,7 +154,7 @@ test(
     async () => {
         const db = await freshDb();
         await assert.rejects(
-            () => GET(db, 'members/w-1/extra', devToken()),
+            () => GET(db, 'members/w-1/extra', DEV_TOKEN),
             /not found|404/i,
         );
     },
@@ -175,7 +175,7 @@ test(
                         'Content-Type':
                             'application/json',
                         'Authorization':
-                            'Bearer ' + devToken(),
+                            'Bearer ' + DEV_TOKEN,
                     },
                     body: '{not valid json',
                 },

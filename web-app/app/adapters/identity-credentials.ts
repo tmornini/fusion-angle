@@ -1,6 +1,6 @@
 import {
     generateCryptoSafeBase62,
-} from './crypto-safe-base62.ts';
+} from '../../../api/crypto-safe-base62.ts';
 import {
     nowUtc,
     type Id,
@@ -8,6 +8,7 @@ import {
     type IdentityCredentialKind,
     type IdentityCredentialStatus,
 } from '../../../api/types.ts';
+import { hashPassword } from '../../../api/password-hash.ts';
 import type { RequestContext } from './shared.ts';
 
 async function appendCredentialEvent(
@@ -34,7 +35,8 @@ export async function postIdentityCredentialSet(
     secret: string,
 ): Promise<void> {
     await appendCredentialEvent(
-        ctx, identityId, kind, 'set', secret,
+        ctx, identityId, kind, 'set',
+        await hashPassword(secret),
     );
 }
 
@@ -45,7 +47,8 @@ export async function postIdentityCredentialRotation(
     secret: string,
 ): Promise<void> {
     await appendCredentialEvent(
-        ctx, identityId, kind, 'rotated', secret,
+        ctx, identityId, kind, 'rotated',
+        await hashPassword(secret),
     );
 }
 

@@ -9,7 +9,7 @@ import {
     ANONYMOUS_ID,
 } from '../api/access-token.ts';
 
-function tokenFor(sub: string): string {
+async function tokenFor(sub: string): Promise<string> {
     return mintAccessToken({
         sub, roles: [], name: 'Demo',
         iat: 1_700_000_000, ttlSeconds: 10_000_000_000,
@@ -17,15 +17,16 @@ function tokenFor(sub: string): string {
     });
 }
 
-test('identity is resolved once from the token', () => {
+test('identity is resolved once from the token', async () => {
     const ctx = createRequestContext(
-        new MemoryDbAdapter(), tokenFor('current'));
+        new MemoryDbAdapter(), await tokenFor('current'));
     assert.equal(ctx.identity.id, 'current');
     assert.equal(ctx.identity, ctx.identity);
 });
 
-test('an anonymous token yields the anonymous principal', () => {
+test('an anonymous token yields the anonymous principal',
+async () => {
     const ctx = createRequestContext(
-        new MemoryDbAdapter(), tokenFor(ANONYMOUS_ID));
+        new MemoryDbAdapter(), await tokenFor(ANONYMOUS_ID));
     assert.equal(ctx.identity.id, ANONYMOUS_ID);
 });

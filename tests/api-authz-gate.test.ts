@@ -19,7 +19,7 @@ async () => {
     const res = await handleRequest(db, new Request(
         `${BASE}/members`, {
             headers: {
-                'Authorization': 'Bearer ' + devToken(),
+                'Authorization': 'Bearer ' + await devToken(),
             },
         }));
     assert.equal(res.status, 403);
@@ -30,7 +30,7 @@ async () => {
 test('an admin is permitted', async () => {
     const db = await freshDb();
     await seedRootAdmin(db);
-    const rows = await GET(db, 'members', devToken());
+    const rows = await GET(db, 'members', await devToken());
     assert.ok(Array.isArray(rows));   // 200, not 403
 });
 
@@ -42,7 +42,7 @@ test('admin may write a role grant', async () => {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': 'Bearer ' + devToken(),
+                'Authorization': 'Bearer ' + await devToken(),
             },
             body: JSON.stringify({
                 identity_id: 'p2', role: 'viewer',
@@ -61,7 +61,7 @@ test('a non-admin may not write a role grant', async () => {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': 'Bearer ' + devToken(),
+                'Authorization': 'Bearer ' + await devToken(),
             },
             body: JSON.stringify({
                 identity_id: 'p2', role: 'viewer',

@@ -82,7 +82,7 @@ async function adminCtx() {
     const db = new MemoryDbAdapter();
     await db.createSchema();
     await seedRootAdmin(db);   // current may write grants
-    return { db, ctx: createRequestContext(db, devToken()) };
+    return { db, ctx: createRequestContext(db, await devToken()) };
 }
 
 test('grant then read reflects the role', async () => {

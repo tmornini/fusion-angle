@@ -62,7 +62,7 @@ async function setupDb(): Promise<{
     const db = new MemoryDbAdapter();
     await db.createSchema();
     await seedRootAdmin(db);
-    const ctx = createRequestContext(db, devToken());
+    const ctx = createRequestContext(db, await devToken());
     return { db, ctx };
 }
 

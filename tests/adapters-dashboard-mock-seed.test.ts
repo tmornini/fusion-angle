@@ -23,7 +23,7 @@ test('mock seed produces portfolio Impact baseline +50',
         await db.createSchema();
         await seedRootAdmin(db);
         await populateMockData(db);
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         const gauges = await getDashboardGauges(ctx);
         const impact = gauges.find(
             g => g.title === 'Impact',
@@ -39,7 +39,7 @@ test('mock seed produces per-objective baseline means',
         await db.createSchema();
         await seedRootAdmin(db);
         await populateMockData(db);
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         const aggs = await getObjectiveAggregates(ctx);
         const expected: ReadonlyArray<
             [string, number]

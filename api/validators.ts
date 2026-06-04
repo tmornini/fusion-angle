@@ -13,6 +13,10 @@ import type {
     IdentityPiiEntity,
     IdentityCredentialEntity,
     IdentityTokenRevocationEntity,
+    IdentityTokenEntity,
+    ClientEntity,
+    IdentityProviderEntity,
+    AuthorizationCodeEntity,
     RoleGrantEntity,
     MemberEntity,
     HumanMemberEntity,
@@ -738,6 +742,137 @@ export function validateRoleGrantEntity(
         role: pickString(body, 'role'),
         action,
         by_member_id: pickString(body, 'by_member_id'),
+        at,
+    };
+}
+
+const IDENTITY_TOKEN_BODY_KEYS: readonly string[] = [
+    'jti', 'identity_id', 'action', 'chain_id',
+    'parent_jti', 'at',
+];
+
+export function validateIdentityTokenEntity(
+    body: Record<string, unknown>,
+): Omit<IdentityTokenEntity, 'id'> {
+    assertOnlyKeys(
+        body, IDENTITY_TOKEN_BODY_KEYS,
+        'IdentityTokenEntity',
+    );
+    const action = pickString(body, 'action');
+    if (action !== 'issued' && action !== 'rotated'
+        && action !== 'revoked') {
+        throw new Error(
+            'invalid token action "' + action
+            + '" on IdentityTokenEntity',
+        );
+    }
+    const at = pickString(body, 'at');
+    if (Number.isNaN(Date.parse(at))) {
+        throw new Error(
+            'invalid timestamp "' + at + '" on '
+            + 'IdentityTokenEntity',
+        );
+    }
+    return {
+        jti: pickString(body, 'jti'),
+        identity_id: pickString(body, 'identity_id'),
+        action,
+        chain_id: pickString(body, 'chain_id'),
+        parent_jti: pickString(body, 'parent_jti'),
+        at,
+    };
+}
+
+const CLIENT_BODY_KEYS: readonly string[] = [
+    'grant_types', 'redirect_uris', 'jwks', 'aud', 'status',
+];
+
+export function validateClientEntity(
+    body: Record<string, unknown>,
+): Omit<ClientEntity, 'id'> {
+    assertOnlyKeys(body, CLIENT_BODY_KEYS, 'ClientEntity');
+    const status = pickString(body, 'status');
+    if (status !== 'active' && status !== 'disabled') {
+        throw new Error(
+            'invalid client status "' + status
+            + '" on ClientEntity',
+        );
+    }
+    return {
+        grant_types: pickString(body, 'grant_types'),
+        redirect_uris: pickString(body, 'redirect_uris'),
+        jwks: pickString(body, 'jwks'),
+        aud: pickString(body, 'aud'),
+        status,
+    };
+}
+
+const IDENTITY_PROVIDER_BODY_KEYS: readonly string[] = [
+    'identity_id', 'provider', 'provider_subject',
+    'action', 'at',
+];
+
+export function validateIdentityProviderEntity(
+    body: Record<string, unknown>,
+): Omit<IdentityProviderEntity, 'id'> {
+    assertOnlyKeys(
+        body, IDENTITY_PROVIDER_BODY_KEYS,
+        'IdentityProviderEntity',
+    );
+    const action = pickString(body, 'action');
+    if (action !== 'linked' && action !== 'unlinked') {
+        throw new Error(
+            'invalid provider action "' + action
+            + '" on IdentityProviderEntity',
+        );
+    }
+    const at = pickString(body, 'at');
+    if (Number.isNaN(Date.parse(at))) {
+        throw new Error(
+            'invalid timestamp "' + at + '" on '
+            + 'IdentityProviderEntity',
+        );
+    }
+    return {
+        identity_id: pickString(body, 'identity_id'),
+        provider: pickString(body, 'provider'),
+        provider_subject:
+            pickString(body, 'provider_subject'),
+        action,
+        at,
+    };
+}
+
+const AUTHORIZATION_CODE_BODY_KEYS: readonly string[] = [
+    'code', 'identity_id', 'client_id', 'status', 'at',
+];
+
+export function validateAuthorizationCodeEntity(
+    body: Record<string, unknown>,
+): Omit<AuthorizationCodeEntity, 'id'> {
+    assertOnlyKeys(
+        body, AUTHORIZATION_CODE_BODY_KEYS,
+        'AuthorizationCodeEntity',
+    );
+    const status = pickString(body, 'status');
+    if (status !== 'issued' && status !== 'consumed') {
+        throw new Error(
+            'invalid code status "' + status
+            + '" on AuthorizationCodeEntity',
+        );
+    }
+    const at = pickString(body, 'at');
+    if (Number.isNaN(Date.parse(at))) {
+        throw new Error(
+            'invalid timestamp "' + at + '" on '
+            + 'AuthorizationCodeEntity',
+        );
+    }
+    return {
+        code: pickString(body, 'code'),
+        identity_id: pickString(body, 'identity_id'),
+        client_id: pickString(body, 'client_id'),
+        status,
         at,
     };
 }

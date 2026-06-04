@@ -246,8 +246,64 @@ Six independently-shippable sub-projects. **Critical path
     enabled in any networked / multi-user context until SP-5 supplies
     real crypto — the gate and real signing arrive together with the
     server tier.
-- **SP-5, 2, 6 — not started.** Next on the critical path:
-  **SP-5 Authentication** (the `3 → {4,5}` fork; SP-4 is done).
+- **SP-5 Authentication — ✅ DONE** (executed 2026-06; commits
+  `6f7d61c..1a5f7af` on `master`, `./validate` green at every step,
+  1183 tests). Landed: real **HMAC-SHA256** token signing via WebCrypto
+  (`api/access-token.ts`; sign/verify/mint now async) over the frozen
+  three-segment JWT; real **PBKDF2-HMAC-SHA256** credential hashing in a
+  self-describing PHC string in the existing
+  `identity_credentials.secret` column (`api/password-hash.ts`: a
+  registry of deletable per-algo verifiers + one
+  `CURRENT_PASSWORD_HASH`); credential surfacing after wipe-and-load +
+  a crypto-grade seed admin password (the two SP-4 deferrals); the
+  `identity_tokens` lifecycle ledger (issued/rotated/revoked per jti,
+  pure chain reduce + reuse-detection, gate denies revoked jtis); the
+  `clients`, `identity_providers`, `authorization_codes` registries;
+  the OAuth 2.1 `/authentication/token` dispatcher (`authorization_code`,
+  `refresh` with reuse-detection → chain revoke, RFC 8693
+  `token-exchange` with the `act` claim, `client_credentials` via the
+  `private_key_jwt` structural seam) + the interactive
+  `/authentication/authorize` front door (real password loop;
+  passkey/provider/oidc as 501 seams); and the real session flow —
+  login drives `/authorize` → `/token` for a signed pair
+  (`web-app/app/adapters/authentication.ts`). Detailed plan + execution
+  record: `docs/superpowers/plans/2026-06-03-sp5-authentication.md`.
+  - **Deviations recorded during execution:**
+    (a) **Both crypto seams made real now via WebCrypto** (user
+    directive) — HMAC-SHA256 + PBKDF2-HMAC-SHA256 are zero-dependency
+    platform primitives, so SP-1's "no zero-dep KDF" reason for
+    deferring credential hashing is satisfied without the server.
+    PBKDF2 is TRANSITIONAL: the server tier flips
+    `CURRENT_PASSWORD_HASH` to scrypt and DELETES the PBKDF2 verifier
+    (one registry edit + one file removal) — never coexistence.
+    (b) **Deployment constraint REDUCED, not resolved.** Real HMAC with
+    a client-shipped key remains forgeable; the constraint is carried
+    forward, now "key location only" — restated in the
+    `api/access-token.ts` seam comment and the login facade. The gate
+    still MUST NOT be enabled in a networked context until the key
+    lives server-side.
+    (c) **`authorization_codes.id` is a generated event id with `code`
+    as a field** (not "id = the opaque code"): an append-only,
+    multi-row-per-code ledger (issue then consume) needs the code as a
+    logical key, like `identity_tokens`' jti — honoring the append-only
+    ledger discipline (Immutability).
+    (d) **token-exchange VERIFIES both subject_token and actor_token**
+    (signature/exp/aud, like the refresh grant) — an automated security
+    review flagged decode-without-verify; the remaining seam is the
+    DELEGATION POLICY (may actor act-as subject), deferred to the
+    server tier (resolves the open delegation-policy question below).
+    (e) **Boot keeps a mock direct-mint session; the LOGIN FORM drives
+    the real OAuth flow.** The seed admin password is random and
+    surfaced once, so none exists at boot — `establishSession` stays a
+    documented mock convenience for app-boot / demo sign-up, while
+    `loginViaPassword` is the real path (what the browser regression
+    exercises).
+  - **Codebase finding:** TS 5.7+ made `Uint8Array` generic over its
+    buffer; WebCrypto's `BufferSource` requires `Uint8Array<ArrayBuffer>`
+    (not the default `<ArrayBufferLike>`), so `base64UrlToBytes` and the
+    PBKDF2 salt are typed `Uint8Array<ArrayBuffer>`.
+- **SP-2, 6 — not started.** SP-5 is done; next on the critical path:
+  **SP-2 Tenancy** (the `5 → {2-facades, 6}` fork).
 
 ## Sub-project 1 — Identity core (detailed; build first)
 
@@ -427,7 +483,12 @@ migrations arrive with Postgres.
   non-leakage now: `getIdentityCredentialState` returns only the
   active kinds, never the secret. Flagged by automated security
   review of the E1 commit; deferred per this scope, recorded so the
-  gap cannot hide.
+  gap cannot hide. **RESOLVED (SP-5):** hashed now with
+  PBKDF2-HMAC-SHA256 (a zero-dep WebCrypto primitive) in a
+  self-describing PHC string; verification lives in the
+  `/authentication/authorize` password loop. The server tier swaps
+  PBKDF2 → scrypt and deletes the verifier. See SP-5 entry,
+  deviation (a).
 - Token revocation *propagation* across independently-deployed
   resource servers, and atomic `identity_tokens` writes (the cross-tab
   shared-write hazard) — server-fulfilled. The model now: short access
@@ -438,10 +499,11 @@ migrations arrive with Postgres.
   `/authorize`); **GNAP (RFC 9635)** is the strategic end-state that
   natively unifies browser/api on one negotiated endpoint — revisit
   if/when its tooling matures.
-- Computer-use agent acting for a person: own `service` identity via
-  `token-exchange` (`act`=agent, `sub`=person) vs. completing the
-  person's own interactive session — a delegation-policy choice,
-  machinery already present (decide in SP-5's spec).
+- Computer-use agent acting for a person: `token-exchange` shapes
+  `act`=agent, `sub`=person (BUILT in SP-5, both tokens verified). The
+  DELEGATION POLICY — which actor may act-as which subject — is NOT yet
+  enforced (the remaining seam); it lands with the server tier. See
+  SP-5 entry, deviation (d).
 - In-place migration tier — arrives with Postgres; backfill rides the
   snapshot/bootstrap path until then.
 - Per-org *profile* divergence (different title per org) — YAGNI;
@@ -470,21 +532,18 @@ migrations arrive with Postgres.
   `identity_token_revocations`) for one consistent voice. Lands with
   the Postgres tier.
 
-## Next step (SP-4 executed)
+## Next step (SP-5 executed)
 
-SP-1, SP-3, and SP-4 are done (see Execution status). The next
-sub-project on the critical path is **SP-5 (Authentication)**. Invoke
-the writing-plans skill to produce its detailed implementation plan
-from the SP-5 sketch above — `clients` registry; single
-`/authentication/token` endpoint (grant_type dispatch:
-`authorization_code`, `client_credentials` via `private_key_jwt`,
-RFC 8693 `token-exchange`, `refresh`); interactive
-`/authentication/authorize` front door; `identity_providers` +
-`identity_tokens` stores; short access token + rotating refresh token
-+ reuse-detection; per-identity `revoked-before` stamp; real HS256
-signing key (resolving the deployment constraint carried by SP-3 and
-SP-4); credential surfacing after wipe-and-load + crypto-grade seed
-password (the two items deferred from SP-4, deviation (f)) — then
-execute it TDD-first against `TMPDIR=/tmp/claude ./validate`. SP-4's
-seams to build on: the `role_grants` ledger, the deny-by-default
-authorization gate, and the `identity_credentials` ledger.
+SP-1, SP-3, SP-4, and SP-5 are done (see Execution status). The next
+sub-project on the critical path is **SP-2 (Tenancy)**: promote the
+`organization` singleton to a tenant root; add NOT-NULL
+`organization_id` to org-scoped entities (backfill to a default org so
+the single-org present keeps working); add `/organizations/:id/
+<entity>/` facade routes that token-exchange an internal sub-request
+to the flat root store + the `organization_id` leakage guard. SP-5's
+seams to build on: the `clients` registry, the `/authentication/token`
+`token-exchange` grant (the org facade issues the internal RFC 8693
+sub-request), and the real signed tokens now flowing through the gate.
+Invoke the writing-plans skill to produce the detailed SP-2 plan from
+the sketch above, then execute it TDD-first against
+`TMPDIR=/tmp/claude ./validate`.

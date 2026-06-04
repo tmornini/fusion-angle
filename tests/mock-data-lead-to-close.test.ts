@@ -37,7 +37,7 @@ async function seededLeadToClose() {
         flow,
         `flow "${FLOW_NAME}" not seeded`,
     );
-    const ctx = createRequestContext(db, devToken());
+    const ctx = createRequestContext(db, await devToken());
     return await getFlowStats(ctx, flow!.id);
 }
 

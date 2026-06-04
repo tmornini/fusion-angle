@@ -93,7 +93,7 @@ test('postProjectApproval moves state to approved',
               member_id: 'w1',
               at: '2026-05-14T00:00:00.000Z' },
         );
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         await postProjectApproval(ctx, 'p1');
         const s = await getProjectState(ctx, 'p1');
         assert.equal(s, 'approved');
@@ -107,7 +107,7 @@ test('postProjectApproval throws when not ready',
         await seedCurrentMember(db);
         await db.projects.put('p1', SAMPLE_PROJECT_BODY);
         await db.objectives.put('o1', { position: 0 });
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         await assert.rejects(
             () => postProjectApproval(ctx, 'p1'),
             /not ready|unscored/i,
@@ -139,7 +139,7 @@ test('postProjectArchival moves state to archived',
               member_id: 'w1',
               at: '2026-05-15T00:00:00.000Z' },
         );
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         await postProjectArchival(ctx, 'p1');
         const s = await getProjectState(ctx, 'p1');
         assert.equal(s, 'archived');

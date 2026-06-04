@@ -17,7 +17,7 @@ import {
 import {
     generateCryptoSafeBase62,
 } from
-'../web-app/app/adapters/crypto-safe-base62.ts';
+'../api/crypto-safe-base62.ts';
 import {
     getWorkOrderActiveClaim,
     getActiveClaimsByWorkOrder,
@@ -158,7 +158,7 @@ async function setupDb(): Promise<{
     await db.createSchema();
     await seedRootAdmin(db);
     await seedHumanMember(db, 'current', 'Demo Test');
-    const ctx = createRequestContext(db, devToken());
+    const ctx = createRequestContext(db, await devToken());
     return { db, ctx };
 }
 
@@ -627,7 +627,7 @@ test(
                     '2024-01-01T00:00:00Z',
             },
         );
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         const rows =
             await getFlowWorkOrderRows(ctx);
         assert.equal(rows.length, 2);
@@ -656,7 +656,7 @@ test(
         await seedHumanMember(
             db, 'current', 'Demo Test',
         );
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         const woId = generateCryptoSafeBase62();
         // Backdate ten seconds; lockTimeout=1s
         // means this is past the live window.
@@ -689,7 +689,7 @@ test(
         await seedHumanMember(
             db, 'current', 'Demo Test',
         );
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         const woId = generateCryptoSafeBase62();
         await db.states.put(
             generateCryptoSafeBase62(),
@@ -721,7 +721,7 @@ test(
         await seedHumanMember(
             db, 'current', 'Demo Test',
         );
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         const fresh1 = generateCryptoSafeBase62();
         const fresh2 = generateCryptoSafeBase62();
         const stale = generateCryptoSafeBase62();

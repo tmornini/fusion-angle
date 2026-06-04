@@ -59,7 +59,7 @@ async function setup(): Promise<{
     const db = new MemoryDbAdapter();
     await db.createSchema();
     await seedRootAdmin(db);
-    return { db, ctx: createRequestContext(db, devToken()) };
+    return { db, ctx: createRequestContext(db, await devToken()) };
 }
 
 test('getSnapshot returns a JSON object of tables', async () => {
@@ -393,7 +393,7 @@ test(
     },
 );
 
-function anonToken(): string {
+async function anonToken(): Promise<string> {
     return mintAccessToken({
         sub: ANONYMOUS_ID, roles: [], name: 'Anonymous',
         iat: 1_700_000_000, ttlSeconds: 10_000_000_000,
@@ -411,7 +411,7 @@ test(
         const db = new MemoryDbAdapter();
         await db.createSchema();
         await seedRootAdmin(db);
-        const ctx = createRequestContext(db, anonToken());
+        const ctx = createRequestContext(db, await anonToken());
         assert.equal(
             await getHasAnyHumanMembers(ctx), false);
     },
@@ -425,7 +425,7 @@ test(
         await db.createSchema();
         await seedRootAdmin(db);
         await seedHumanMember(db, 'current', 'Demo');
-        const ctx = createRequestContext(db, anonToken());
+        const ctx = createRequestContext(db, await anonToken());
         assert.equal(
             await getHasAnyHumanMembers(ctx), true);
     },

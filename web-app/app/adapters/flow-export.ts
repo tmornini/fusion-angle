@@ -20,7 +20,7 @@ import type {
 } from '../../../api/types.ts';
 import {
     generateCryptoSafeBase62,
-} from './crypto-safe-base62.ts';
+} from '../../../api/crypto-safe-base62.ts';
 import {
     notifyFlowChange,
 } from './flow-mutations.ts';

@@ -131,7 +131,7 @@ interface WoTables {
 async function collectTables(
     db: MemoryDbAdapter,
 ): Promise<WoTables> {
-    const ctx = createRequestContext(db, devToken());
+    const ctx = createRequestContext(db, await devToken());
     const workOrders = await db.workOrders.getAll();
     const transitionsByWo =
         await getTransitionEventsByWorkOrder(ctx);
@@ -166,7 +166,7 @@ async function setupOneWorkOrder(): Promise<{
     await db.createSchema();
     await seedRootAdmin(db);
     await seedHumanMember(db, 'current', 'Demo Test');
-    const ctx = createRequestContext(db, devToken());
+    const ctx = createRequestContext(db, await devToken());
     await db.flows.put(
         'f1', buildFlow(buildLinearGraph()),
     );
@@ -320,7 +320,7 @@ test(
         await seedHumanMember(
             db, 'current', 'Demo Test',
         );
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         await db.flows.put(
             'f1', buildFlow(buildLinearGraph()),
         );
@@ -387,7 +387,7 @@ test(
         await seedHumanMember(
             db, 'current', 'Demo Test',
         );
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         await db.flows.put('f1', buildFlow({
             nodes: [
                 buildNode('n-start', 'Start', {

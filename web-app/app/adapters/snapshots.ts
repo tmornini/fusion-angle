@@ -1,4 +1,5 @@
 import type { RequestContext } from './shared.ts';
+import type { SeededAdmin } from '../../../api/mock-data.ts';
 
 // Fallback when navigator.storage.estimate() is
 // unavailable (older browsers, Node test runtime).
@@ -194,16 +195,16 @@ export async function postSchemaCreation(
 
 export async function postMockDataLoad(
     ctx: RequestContext,
-): Promise<void> {
-    await ctx.POST(
+): Promise<SeededAdmin> {
+    return ctx.POST<SeededAdmin>(
         'snapshots/mock-data', {},
     );
 }
 
 export async function postBootstrap(
     ctx: RequestContext,
-): Promise<void> {
-    await ctx.POST(
+): Promise<SeededAdmin> {
+    return ctx.POST<SeededAdmin>(
         'snapshots/bootstrap', {},
     );
 }

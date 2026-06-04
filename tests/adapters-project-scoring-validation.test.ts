@@ -107,7 +107,7 @@ test('ctx.PUT rejects out-of-range baseline scores',
         const db = new MemoryDbAdapter();
         await db.createSchema();
         await seedRootAdmin(db);
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         for (const score of INVALID) {
             await assert.rejects(
                 () => ctx.PUT(
@@ -128,7 +128,7 @@ test('ctx.commit rejects out-of-range baseline scores',
         const db = new MemoryDbAdapter();
         await db.createSchema();
         await seedRootAdmin(db);
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         for (const score of INVALID) {
             await assert.rejects(
                 () => ctx.commit({
@@ -157,7 +157,7 @@ test('ctx.commit rejects out-of-range actual scores',
         const db = new MemoryDbAdapter();
         await db.createSchema();
         await seedRootAdmin(db);
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         for (const score of INVALID) {
             await assert.rejects(
                 () => ctx.commit({
@@ -184,7 +184,7 @@ test('postProjectBaselineScoring rejects bad scores',
         await db.createSchema();
         await seedRootAdmin(db);
         await seedHumanMember(db, 'current', 'Demo User');
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         for (const score of INVALID) {
             await assert.rejects(
                 () => postProjectBaselineScoring(
@@ -205,7 +205,7 @@ test('postProjectActualMeasurement rejects bad scores',
         await db.createSchema();
         await seedRootAdmin(db);
         await seedHumanMember(db, 'current', 'Demo User');
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         for (const score of INVALID) {
             await assert.rejects(
                 () => postProjectActualMeasurement(
@@ -226,7 +226,7 @@ test('postProjectBaselineScoring accepts valid scores',
         await db.createSchema();
         await seedRootAdmin(db);
         await seedHumanMember(db, 'current', 'Demo User');
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         await postProjectBaselineScoring(
             ctx, 'p', VALID.map(score => ({
                 objectiveId: `o:${score}`, score,

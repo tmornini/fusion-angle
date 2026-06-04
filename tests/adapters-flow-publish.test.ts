@@ -235,7 +235,7 @@ test(
             buildFlowEntity('bad', badGraph);
         await db.flows.put('good', goodBody);
         await db.flows.put('bad', badBody);
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         const result = await getFlowsForCreation(
             ctx,
         );
@@ -273,7 +273,7 @@ test(
         await db.flows.put(
             'open-ready', openReadyBody,
         );
-        const ctx = createRequestContext(db, devToken());
+        const ctx = createRequestContext(db, await devToken());
         const result = await getFlowsForCreation(
             ctx,
         );
