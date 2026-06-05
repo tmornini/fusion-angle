@@ -12,7 +12,6 @@ import {
     getOrganizationStats,
 } from '../web-app/app/adapters/admin.ts';
 import {
-    DEFAULT_ORG,
     type ProjectEntity, type IdeaEntity,
     type MemberState,
 } from '../api/types.ts';
@@ -36,7 +35,7 @@ function buildProject(
     id: string,
 ): Omit<ProjectEntity, 'id'> {
     return {
-        organization_id: DEFAULT_ORG,
+        organization_id: '1',
         title: 'P-' + id,
         description: 'desc',
         progress: 25,
@@ -52,7 +51,7 @@ function buildIdea(
     id: string,
 ): Omit<IdeaEntity, 'id'> {
     return {
-        organization_id: DEFAULT_ORG,
+        organization_id: '1',
         title: 'I-' + id,
         position: 1,
         problem_statement: 'p',

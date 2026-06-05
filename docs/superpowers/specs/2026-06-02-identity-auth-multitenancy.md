@@ -55,7 +55,11 @@ is "server-fulfilled later" — it slots into the auth middleware and
    (org-prefixed or not). Authorization = (token valid + DPoP proof)
    AND (a role authorizes this endpoint) AND (if org-scoped, a member
    exists for `sub` in that org). Capability = role; locus = member
-   existence.
+   existence. [SUPERSEDED by SP-6: roles are PER-ORG. `role_grants`
+   carries `organization_id` and `currentRolesForInOrg` resolves the
+   latest action per `(organization_id, identity_id, role)`, fenced
+   to the request's org — a grant in one org does not authorize in
+   another. See Execution status.]
 
 5. **Flat root stores + org facades.** Each entity type lives in one
    flat root store `/<entity>/:id` (single source of truth).
@@ -346,8 +350,54 @@ Six independently-shippable sub-projects. **Critical path
     (`currentRolesForInOrg`). Tenant isolation MUST NOT be relied on
     in a networked/multi-user context until the HMAC signing key lives
     server-side (inherited SP-3/5 constraint).
-- **SP-6 — not started.** SP-2 is done; SP-6 (identity surface +
-  org-switcher console) is next on the critical path.
+- **SP-6 Identity surface + multi-org completion — ✅ DONE**
+  (executed 2026-06-04; 17 commits `3cc3a9d..7e39e55` on `master`,
+  `./validate` green at every step). Landed: the identity-surface
+  UI (pages `identities` / `identity-detail` / `identity-providers`
+  / `identity-tokens` under one `identities` nav item, mirroring
+  the member pages + presenters; adapters `getIdentities` /
+  `getIdentityRoster` / `postIdentityCreation` on the GLOBAL spine,
+  client-minted id + idempotent PUT, OFF the facade; PII erase
+  targets `identity_pii` only); per-org roles (`currentRolesForInOrg`
+  reads `role_grants.organization_id` — the column SP-2 wrote but
+  nothing read — closing the cross-org privilege leak); the
+  always-org-scoped request (`handleRequest` wraps `effective =
+  orgScopedAdapter(adapter, org)` for every authenticated route);
+  the member-list-by-membership derivation in the `members` route
+  handler; the full facade migration (every org-owned web-app write
+  adapter stops stamping `DEFAULT_ORG`; the server stamps from the
+  verified token — `grep -rn DEFAULT_ORG web-app/` is empty); the
+  honest header org-switcher (`org-switcher.ts` + `org-session.ts`,
+  boot-always-scope in `core.ts`, shown only at ≥2 orgs, re-scopes
+  via full reload); the two-org demo seed (`'1'` Stark Industries,
+  `'2'` Wayne Enterprises) with per-human one-time credentials
+  surfaced once on the snapshots page (the copy-all credential-
+  reveal panel); empty bootstrap seeds org `'1'` only. Detailed
+  plan + execution record:
+  `docs/superpowers/plans/2026-06-04-sp6-identity-surface.md`.
+  - **Deviations recorded during execution:** (a) the multi-org
+    migration shipped as **always-scope `effective`** in
+    `handleRequest` (every authenticated request is org-scoped, flat
+    tokens via the `DEFAULT_ORG` bridge), NOT as a `shared.ts`
+    facade-prefix seam that org-prefixes write resources — scoping
+    at the one gate is uniform and leaves handlers unchanged; (b)
+    per-org roles via `currentRolesForInOrg` (replaced
+    `currentRolesFor` at all three call sites — one voice), reading
+    the previously-written-but-unread `role_grants.organization_id`;
+    (c) seed records cross-org coherence: the org-`'2'` Project Brief
+    record was rebound from an org-`'1'` flow to the org-`'2'`
+    `seed-flow-org2` so `flowOrg === recordOrg` and the binding stays
+    visible behind the org fence; (d) two HIGH-severity security
+    fixes landed during the final audit — `token-exchange` /
+    `refresh` now honor token revocation before minting (a revoked-
+    but-unexpired token could otherwise be laundered into a fresh
+    pair), and `OrgScopedEntityStore` gained a **write-side** fence
+    (`#assertWritable` 404s a write to a foreign-owned id, the
+    write-side twin of the read fence).
+- **All six sub-projects (SP-1..SP-6) are done.** The remaining
+  work — real server-side HMAC signing, atomicity / Web Locks, the
+  delegation policy, credential-mutation UI — is the server/Postgres
+  tier (see Deferred / open).
 
 ## Sub-project 1 — Identity core (detailed; build first)
 
@@ -515,6 +565,19 @@ migrations arrive with Postgres.
 
 ## Deferred / open (named so they don't hide)
 
+- **Settable per-identity default org** (replaces the global
+  `DEFAULT_ORG` fallback — deferred to the END of the master plan,
+  per direction). The shared global `DEFAULT_ORG` ('1') that a flat
+  (un-exchanged) token bridges to is the smell: a privileged default
+  every identity shares. Replace it with a default each identity can
+  SET — an append-only `identity_default_orgs` ledger (latest-wins;
+  the chosen org must be one of the identity's memberships). The gate
+  and boot resolve a flat token's org to that set default → else the
+  identity's primary (earliest) membership → else deny. On UI login
+  the user is taken to their chosen default org. Removes the
+  `DEFAULT_ORG` constant and every `?? DEFAULT_ORG` fallback (~12
+  production sites; the ~180 test/seed literals become a local
+  org-id name); the org-switcher gains a "set as default" control.
 - Real cryptographic ceremony (passkey assertion, DPoP verify,
   PAR/JAR/RAR) — server-fulfilled; seam designed now.
 - Credential **secret hashing + verification** — the SP-1
@@ -576,19 +639,18 @@ migrations arrive with Postgres.
   `identity_token_revocations`) for one consistent voice. Lands with
   the Postgres tier.
 
-## Next step (SP-2 executed)
+## Next step (all sub-projects executed)
 
-SP-1, SP-2, SP-3, SP-4, and SP-5 are done (see Execution status). The
-next sub-project on the critical path is **SP-6 (Identity surface)**:
-the `/identities` CRUD + `/identity-pii` + `/identity-providers` +
-`/identity-tokens` management UI and the org-switcher console (the
-multi-org token machinery — `org`/`orgs` claims, the `memberships`
-join, the `GET /organizations` enumerate — is already built in SP-2
-for it to consume). SP-2 also left two follow-ons SP-6 (or a later
-sub-project) should pick up: per-org member profiles + the
-member-list-by-membership derivation, and migrating the remaining
-web-app write adapters from flat routes onto the
-`/organizations/:org/...` facade (today only `admin.ts` is migrated;
-the rest stamp `DEFAULT_ORG` directly). Invoke the writing-plans skill
-to produce the detailed SP-6 plan, then execute it TDD-first against
-`TMPDIR=/tmp/claude ./validate`.
+SP-1 through SP-6 are all done (see Execution status). The forward-
+modeled HTTP contract — global identity, real OAuth 2.1
+auth/authz, the identity surface, and org-scoped multitenancy — is
+in place over the client-side localStorage tier. SP-6 also closed
+the two SP-2 follow-ons (member-list-by-membership derivation and
+the full facade migration off `DEFAULT_ORG`). The remaining work is
+the server/Postgres tier (see Deferred / open): server-side HMAC
+signing (the only thing standing between demo-grade and production
+isolation), real atomicity / Web Locks for the cross-tab shared-
+write hazard, the delegation policy for `token-exchange`, the
+explicit ledger `ORDER BY (at, <monotonic-key>)`, and in-place
+migrations. Per-org member-profile divergence stays YAGNI until a
+second org needs a differing field.

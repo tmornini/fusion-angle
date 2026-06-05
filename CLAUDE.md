@@ -92,7 +92,22 @@ is HTTP-only.
   `navigateTo()` resolve output as
   `{sourceDir}/{sourceFile}.html` — the file you edit is the
   file the browser loads.
-- **Auth.** Mock, returns `demo@example.com`.
+- **Auth.** Real OAuth 2.1 spine. `/authentication/token`
+  (grant dispatch) + `/authentication/authorize` (password
+  loop) mint/verify HMAC-SHA256 JWTs (`api/access-token.ts`);
+  a Bearer gate in `handleRequest` enforces them, backed by
+  token-lifecycle + revocation ledgers and PBKDF2 password
+  hashing. The HMAC key is client-shipped, so isolation is
+  demo-grade until the server tier.
+- **Tenancy.** Every authenticated request runs org-scoped:
+  `handleRequest` wraps the adapter in `orgScopedAdapter`
+  bound to the org from the VERIFIED token claim (never the
+  path), falling back to the explicit `DEFAULT_ORG` ('1')
+  bridge for a flat token. `organizations` is the tenant
+  root; `memberships` joins identity↔org; the members roster
+  is derived from that ledger. Per-org roles via
+  `currentRolesForInOrg`. See [SCHEMA.md](SCHEMA.md) /
+  [ARCHITECTURE.md](ARCHITECTURE.md).
 - **Data.** REST-style API (`api/`) over localStorage. Adapters
   in `web-app/app/adapters/` shape rows for pages.
 - **Presentation.** Presenters in `web-app/app/presenters/` emit
@@ -181,14 +196,22 @@ Breakpoints: sm 640px, md 768px, lg 1024px, xl 1280px.
 ## Project Structure
 
 `api/` — REST routing, DB adapter interface, mock data,
-validators. `web-app/app/` — all source (TypeScript + CSS), with
+validators, plus the auth/authz/tenancy spine:
+`authentication.ts` (OAuth grants), `access-token.ts` (JWT
+mint/verify), `authorization.ts` (per-org roles),
+`db-org-scoped.ts` / `store-org-scoped.ts` (the org fence),
+and the identity/organizations/memberships stores.
+`web-app/app/` — all source (TypeScript + CSS), with
 subdirectories `adapters/` (data-access + platform shims, both
 kinds share the folder), `presenters/` (presenter classes
 producing `SafeHtml`), and `styles/` (cascade-ordered CSS
-modules).
-`web-app/{dashboard,workbox,ideas,projects,flows,members,...}/`
-— page directories registered in `PAGE_REGISTRY` (sidebar-layout
-+ standalone). `billing/` is a stub.
+modules); `org-switcher.ts` is the header org `<select>` and
+`core.ts` scopes boot to the active org.
+`web-app/{dashboard,organization,ideas,projects,flows,members,`
+`identities,...}/` — page directories registered in
+`PAGE_REGISTRY` (sidebar-layout + standalone). The
+`identities` surface (list, detail, providers, tokens) shares
+the `identities` sidebar key. `billing/` is a stub.
 
 The composition root is `web-app/app/adapters/init.ts`. Run `ls`
 or read file headers — both are more current than this document

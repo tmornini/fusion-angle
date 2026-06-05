@@ -90,6 +90,87 @@ term `entity` never appears in user-facing strings. UI
 copy says "Work orders using this Record" rather than
 "instances."
 
+## Auth, Org-scoping & Identity
+
+### Org-scoping at the gate
+
+Every authenticated request runs org-scoped. After
+`matchRoute` and the Bearer/role checks, `handleRequest`
+sets `effective = orgScopedAdapter(adapter,
+authResult.organization ?? DEFAULT_ORG)` and every handler
+runs against `effective`. The org rides the VERIFIED token
+claim, never the path; a flat (un-exchanged) token has none
+and falls back to the EXPLICIT named `DEFAULT_ORG` ('1')
+bridge — a documented seam, not an honest "unscoped default".
+
+`OrgScopedEntityStore` (`api/store-org-scoped.ts`) is an
+`EntityStore` decorator bound to one org: it filters reads,
+stamps the org onto writes, and 404s a foreign id — NEVER
+403, which would confirm a foreign row exists. The write
+fence (`#assertWritable`) rejects a write that targets an id
+another tenant owns, the write-side twin of the read fence.
+`orgScopedAdapter` (`api/db-org-scoped.ts`) wraps ONLY the
+org-owned stores (ideas, projects, flows, work_orders,
+records, record_attributes, objectives, role_grants,
+memberships); the global identity/auth spine and the
+junction/ledger tables pass straight through. The HMAC
+signing key is client-shipped, so this is demo-grade
+isolation until the server tier.
+
+### Multitenancy model
+
+`organizations` is the tenant root; `memberships` (id,
+organization_id, identity_id, at) is the identity↔org join.
+The members roster is DERIVED from the org-scoped membership
+ledger in the `members` route handler — it filters the
+global members directory to ids present in `effective
+.memberships` (the system member rides along
+unconditionally) — so there is no `organization_id` column
+on `members` and an org switch re-scopes the roster with no
+denormalized column to sync. Per-org roles resolve via
+`currentRolesForInOrg` (`api/authorization.ts`): the latest
+action per `(organization_id, identity_id, role)`, fenced to
+the request's org.
+
+### Facade + enumeration
+
+`/organizations/:org/:entity[/:id]` is a facade:
+`facadeRequest` exchanges the caller's bearer for a token
+scoped to `:org` (RFC 8693 self-delegation, membership-
+fenced — a non-member exchange is a 403 minting nothing),
+then re-enters the flat gate with the scoped token so the
+existing handler is org-fenced automatically. `GET
+/organizations` (`enumerateMyOrgs`) returns the caller's
+reachable orgs, derived fresh from the membership ledger
+(never the possibly-stale token claim).
+
+### Boot + org-switcher
+
+`core.ts::scopeBootToActiveOrg` always scopes the session
+before first render: enumerate reachable orgs →
+`resolveActiveOrg` (the persisted `fusion.active-org`, else
+`DEFAULT_ORG` if reachable, else the sole org) →
+`postOrgSessionExchange` → install the scoped token. The
+header org-switcher (`web-app/app/org-switcher.ts`) renders
+its `<select>` only at ≥2 reachable orgs and re-scopes via a
+FULL reload (boot re-exchanges from the persisted id, so no
+mixed-org view survives the switch).
+
+### Identity surface
+
+Pages `identities` (list, `inSidebarNav`), `identity-detail`,
+`identity-providers`, `identity-tokens` share `sidebarKey:
+'identities'`. Adapters (`adapters/identities.ts` etc.):
+`getIdentities`, `getIdentityRoster` (single-pass join of
+identities + identity_pii), `postIdentityCreation` (person →
+identity + PII; service → identity + hashed `client_secret`).
+The identity stores are the GLOBAL spine — creation is a
+client-minted id + idempotent PUT, OFF the org facade.
+Presenters mirror the member ones (PII via the `MemberPii`
+tagged union, erased fallback at the call site). Erasure
+splices `identity_pii` only; the identity, the member, and
+every `member_id` reference survive.
+
 ## API Layer (`/api`)
 
 `api/types.ts` (row types + shared aliases — `MemberId`,
@@ -101,11 +182,12 @@ copy says "Work orders using this Record" rather than
 discriminated union, `StateEntity`, the five state
 alphabets, and `SYSTEM_MEMBER_ID`), `api/db.ts`
 (`DbAdapter` interface + `TABLE_NAMES` array listing every
-storage table — `members`, `human_members`,
-`ai_members`, `ideas`,
-`projects`, `flows`, `flow_versions`, `records`,
-`record_attributes`, `flow_records`, `states`,
-`state_field_values`, etc.),
+storage table — the entity tables plus the identity/auth
+spine (`identities`, `identity_pii`, `identity_credentials`,
+`identity_tokens`, `clients`, `identity_providers`,
+`authorization_codes`, `role_grants`, …) and the tenancy
+stores (`organizations`, `memberships`); [SCHEMA.md](SCHEMA.md)
+is the authoritative list and per-column reference),
 `api/store-state.ts` (the `StateStore` class — `record`,
 `currentFor`, `allFor`, `deletedIds`, `isDeleted`),
 `api/store-entity.ts` (`EntityStore` — consults `StateStore`

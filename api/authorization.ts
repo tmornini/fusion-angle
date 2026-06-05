@@ -1,4 +1,8 @@
-import type { Id, RoleGrantEntity } from './types.ts';
+import type {
+    Id,
+    RoleGrantEntity,
+    IdentityDefaultOrgEntity,
+} from './types.ts';
 
 // Roles an identity currently holds IN A GIVEN ORG: the
 // latest action per role within that org — a 'granted' with
@@ -37,6 +41,24 @@ export function currentRolesForInOrg(
         if (last.action === 'granted') held.push(role);
     }
     return held;
+}
+
+// The org an identity has CURRENTLY chosen as its default: the
+// latest event in its append-only default-org ledger, null when
+// it has none. Same secure `>=` tie-break as currentRolesForInOrg
+// — a same-`at` tie resolves to the later-appended row.
+export function currentDefaultOrgFor(
+    rows: readonly IdentityDefaultOrgEntity[],
+    identityId: Id,
+): Id | null {
+    let chosen: { org: Id; at: string } | null = null;
+    for (const row of rows) {
+        if (row.identity_id !== identityId) continue;
+        if (chosen === null || row.at >= chosen.at) {
+            chosen = { org: row.organization_id, at: row.at };
+        }
+    }
+    return chosen === null ? null : chosen.org;
 }
 
 // A policy entry: the roles permitted to use `verb` on any

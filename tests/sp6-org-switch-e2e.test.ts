@@ -84,6 +84,6 @@ async () => {
     const tokA = await postOrgSessionExchange(ctx, flat, '1');
     const org1Ideas = idsOf(
         await GET<{ id: string }[]>(db, 'ideas', tokA));
-    // the flat bridge fences to DEFAULT_ORG ('1') — same view
+    // a flat token resolves to its primary org '1' (same view)
     assert.deepEqual(flatIdeas, org1Ideas);
 });

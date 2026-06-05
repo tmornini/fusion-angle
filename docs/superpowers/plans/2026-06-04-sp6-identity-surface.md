@@ -365,3 +365,42 @@ the migration). `./validate` (tsc + tests + 78-char lint +
   degrades visibly), no greedy catch, no entangled nouns (org rides
   the token, not a foreign key on `identities`), no foreign tongues
   across the adapter wall.
+
+## Deviations during execution
+
+Executed 2026-06-04 (17 commits `3cc3a9d..7e39e55` on `master`,
+`./validate` green at every step). The plan held; these are the
+deviations worth recording (mirrors the SP-1..SP-5 style):
+
+1. **The migration shipped as always-org-scope `effective` in
+   `handleRequest`, not the `shared.ts` org-prefix seam.** Phase 6
+   (C) planned a client-side seam that org-prefixes each write
+   resource (`organizations/${activeOrg}/...`) so the facade fences
+   the write. Execution instead made EVERY authenticated request
+   org-scoped at the one gate: `handleRequest` wraps `effective =
+   orgScopedAdapter(adapter, authResult.organization ??
+   DEFAULT_ORG)` and all handlers run against it. Org-owned web-app
+   write adapters simply stop stamping `DEFAULT_ORG`; the server
+   stamps from the verified token. This is more uniform than a
+   per-adapter prefix (one fence, not 8 call-site prefixes) and
+   needs no `shared.ts` org-prefix branch — `grep -rn DEFAULT_ORG
+   web-app/` is still the end-state invariant, reached this way.
+2. **Records cross-org coherence via flow_record retargeting.** The
+   two-org seed put the Project Brief record in org `'2'`; its
+   seeded `flow_records` binding still pointed at an org-`'1'` flow,
+   so the binding was invisible behind the org fence. Fixed by
+   rebinding it to the org-`'2'` `seed-flow-org2` so `flowOrg ===
+   recordOrg`; work orders + `flow_work_orders` + parent flows stay
+   in org `'1'` as planned.
+3. **Two HIGH-severity security fixes landed during the final
+   audit.** (a) `token-exchange` and `refresh` now call
+   `tokenRevocationReason` and refuse to mint when the presented
+   token is revoked — without it a revoked-but-unexpired token could
+   be laundered into a fresh valid pair the gate then accepts. (b)
+   `OrgScopedEntityStore` gained a **write-side** fence
+   (`#assertWritable`): a `put`/`putMany`/`delete` targeting an id
+   owned by another tenant 404s exactly as a foreign read does — the
+   read fence alone left a write able to clobber a foreign-owned row.
+   Both shipped with tests
+   (`tests/api-token-exchange-revocation.test.ts`,
+   `tests/store-org-scoped-write-fence.test.ts`).

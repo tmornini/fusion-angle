@@ -1,7 +1,6 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
-import { DEFAULT_ORG } from '../api/types.ts';
 import { createRequestContext } from
     '../web-app/app/adapters/shared.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
@@ -34,7 +33,7 @@ function ctxFor(db: MemoryDbAdapter) {
 }
 
 function objective(position: number) {
-    return { organization_id: DEFAULT_ORG, position };
+    return { organization_id: '1', position };
 }
 
 test('getObjective returns a single row', async () => {

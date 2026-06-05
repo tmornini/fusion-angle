@@ -7,7 +7,7 @@ import {
 // Snapshot import is a second validation edge: the
 // per-request write path is fenced at store
 // construction, but importing a snapshot routes each
-// row through validateSnapshotRow. Nine identity/auth
+// row through validateSnapshotRow. Ten identity/auth
 // tables silently no-op'd there — they imported
 // unvalidated. These tests pin the closed gate:
 // malformed identity/auth rows reject; valid rows pass.
@@ -65,6 +65,10 @@ const VALID_ROWS: Record<
     identity_token_revocations: {
         id: 'r1', identity_id: 'i1', at: AT,
     },
+    identity_default_orgs: {
+        id: 'd1', identity_id: 'i1',
+        organization_id: '1', at: AT,
+    },
     role_grants: {
         id: 'g1', organization_id: '1',
         identity_id: 'i1', role: 'admin',
@@ -101,6 +105,7 @@ const BAD_OVERRIDE: Record<
     identity_pii: { rogue_field: 'x' },
     identity_credentials: { status: 'pending' },
     identity_token_revocations: { at: 'not-a-date' },
+    identity_default_orgs: { at: 'not-a-date' },
     role_grants: { action: 'maybe' },
     identity_tokens: { action: 'minted' },
     clients: { status: 'paused' },

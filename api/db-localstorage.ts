@@ -18,6 +18,7 @@ import type {
     IdentityPiiEntity,
     IdentityCredentialEntity,
     IdentityTokenRevocationEntity,
+    IdentityDefaultOrgEntity,
     RoleGrantEntity,
     IdentityTokenEntity,
     ClientEntity,
@@ -54,6 +55,7 @@ import {
     validateIdentityPiiEntity,
     validateIdentityCredentialEntity,
     validateIdentityTokenRevocationEntity,
+    validateIdentityDefaultOrgEntity,
     validateRoleGrantEntity,
     validateIdentityTokenEntity,
     validateClientEntity,
@@ -97,6 +99,8 @@ export class LocalStorageDbAdapter implements DbAdapter {
         IEntityStore<IdentityCredentialEntity>;
     readonly identityTokenRevocations:
         IEntityStore<IdentityTokenRevocationEntity>;
+    readonly identityDefaultOrgs:
+        IEntityStore<IdentityDefaultOrgEntity>;
     readonly roleGrants: IEntityStore<RoleGrantEntity>;
     readonly identityTokens:
         IEntityStore<IdentityTokenEntity>;
@@ -190,6 +194,11 @@ export class LocalStorageDbAdapter implements DbAdapter {
             new HistoryEntityStore(
                 'identity_token_revocations', backend,
                 validateIdentityTokenRevocationEntity,
+            );
+        this.identityDefaultOrgs =
+            new HistoryEntityStore(
+                'identity_default_orgs', backend,
+                validateIdentityDefaultOrgEntity,
             );
         this.roleGrants =
             new HistoryEntityStore(

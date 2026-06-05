@@ -21,6 +21,9 @@ import {
     isTokenRevoked,
 } from './identity-tokens.ts';
 import { verifyPassword } from './password-hash.ts';
+import {
+    currentDefaultOrgFor,
+} from './authorization.ts';
 
 // The OAuth 2.1 token + authorize logic, kept out of the route
 // table. Each function returns a RESULT (success | failure) — an
@@ -68,7 +71,7 @@ async function nameFor(
 // derived fresh from the membership ledger (never cached). The
 // source of the token's `orgs` claim and the exchange's
 // member-check.
-async function subjectOrgs(
+export async function subjectOrgs(
     adapter: DbAdapter,
     identityId: Id,
 ): Promise<Id[]> {
@@ -76,6 +79,41 @@ async function subjectOrgs(
     return rows
         .filter(m => m.identity_id === identityId)
         .map(m => m.organization_id);
+}
+
+// The org a flat (un-exchanged) token resolves to, server-side:
+// the identity's SET default, else its PRIMARY membership, else
+// null. The gate denies a null — there is no global default left
+// to fall back on.
+export async function identityDefaultOrg(
+    adapter: DbAdapter,
+    identityId: Id,
+): Promise<Id | null> {
+    const events = await adapter.identityDefaultOrgs.getAll();
+    const chosen = currentDefaultOrgFor(events, identityId);
+    if (chosen !== null) return chosen;
+    return await primaryMembershipOrg(adapter, identityId);
+}
+
+// The earliest org an identity joined. Equal join moments
+// tie-break to the lexically lowest org id, so resolution is
+// deterministic.
+async function primaryMembershipOrg(
+    adapter: DbAdapter,
+    identityId: Id,
+): Promise<Id | null> {
+    const rows = await adapter.memberships.getAll();
+    let best: { org: Id; at: string } | null = null;
+    for (const row of rows) {
+        if (row.identity_id !== identityId) continue;
+        if (best === null
+            || row.at < best.at
+            || (row.at === best.at
+                && row.organization_id < best.org)) {
+            best = { org: row.organization_id, at: row.at };
+        }
+    }
+    return best === null ? null : best.org;
 }
 
 // Mint an access + refresh JWT pair. The access token gets a

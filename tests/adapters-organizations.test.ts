@@ -1,7 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
-import { DEFAULT_ORG } from '../api/types.ts';
 import { devToken } from './token-fixtures.ts';
 import { seedRootAdmin } from './root-admin-fixture.ts';
 import {
@@ -34,22 +33,22 @@ async function ctxFor() {
 test('putOrganization then getOrganization round-trips',
 async () => {
     const { ctx } = await ctxFor();
-    await putOrganization(ctx, DEFAULT_ORG, orgRow('Acme'));
-    const org = await getOrganization(ctx, DEFAULT_ORG);
+    await putOrganization(ctx, '1', orgRow('Acme'));
+    const org = await getOrganization(ctx, '1');
     assert.equal(org.name, 'Acme');
-    assert.equal(org.id, DEFAULT_ORG);
+    assert.equal(org.id, '1');
 });
 
 test('getOrganizations returns only the caller member orgs',
 async () => {
     const { db, ctx } = await ctxFor();
-    await putOrganization(ctx, DEFAULT_ORG, orgRow('Acme'));
+    await putOrganization(ctx, '1', orgRow('Acme'));
     await putOrganization(ctx, '7', orgRow('Beta'));
     await db.memberships.put('m', {
-        organization_id: DEFAULT_ORG,
+        organization_id: '1',
         identity_id: 'current',
         at: '2026-06-04T00:00:00.000Z',
     });
     const orgs = await getOrganizations(ctx);
-    assert.deepEqual(orgs.map(o => o.id), [DEFAULT_ORG]);
+    assert.deepEqual(orgs.map(o => o.id), ['1']);
 });

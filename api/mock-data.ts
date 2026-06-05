@@ -29,7 +29,6 @@ import {
     MS_PER_SECOND,
     MS_PER_DAY,
     SYSTEM_MEMBER_ID,
-    DEFAULT_ORG,
 } from './types.ts';
 import {
     generateCryptoSafeBase62,
@@ -354,7 +353,7 @@ function generateFlowWorkload(args: {
 
         workOrders.push({
             id: woId,
-            organization_id: DEFAULT_ORG,
+            organization_id: STARK_ORG,
             display_id: displayId,
             flow_graph: frozenFlowGraph,
             position: i + 1,
@@ -404,13 +403,17 @@ const ADMIN_USERNAME = 'demo@example.com';
 // The demo's second organization. org '2' is a new ROW, not
 // a new table — generate-schema-svg derives FK targets from
 // *_id pluralization, so a new table would shift the schema.
+// The seed's root org id (Stark Industries). Local to the
+// seed — there is no global default org any more.
+const STARK_ORG = '1';
+
 const ORG_TWO = '2';
 
 // Deterministic org partition for non-admin seeds: even
 // index → org '1', odd → org '2'. ~half/half; the seed test
 // pins per-org invariants, not the exact assignments.
 function assignOrg(index: number): string {
-    return index % 2 === 0 ? DEFAULT_ORG : ORG_TWO;
+    return index % 2 === 0 ? STARK_ORG : ORG_TWO;
 }
 
 // The seeded admin credential set, returned to the caller so a
@@ -786,7 +789,7 @@ export async function populateMockData(
             // 'current' (the admin) joins BOTH orgs; every
             // other human is single-org via assignOrg.
             const orgs = member.id === 'current'
-                ? [DEFAULT_ORG, ORG_TWO]
+                ? [STARK_ORG, ORG_TWO]
                 : [assignOrg(index)];
             return [
                 adapter.members.put(member.id, {
@@ -800,6 +803,12 @@ export async function populateMockData(
                             identity_id: member.id,
                             at: MOCK_SEED_TIMESTAMP,
                         })),
+                adapter.identityDefaultOrgs.put(
+                    'seed-default-org-' + member.id, {
+                        identity_id: member.id,
+                        organization_id: orgs[0]!,
+                        at: MOCK_SEED_TIMESTAMP,
+                    }),
                 adapter.humanMembers.put(member.id, {
                     ...detail,
                     strengths:
@@ -828,7 +837,7 @@ export async function populateMockData(
         }),
         adapter.roleGrants.put(
             'seed-role-current-admin', {
-                organization_id: DEFAULT_ORG,
+                organization_id: STARK_ORG,
                 identity_id: 'current',
                 role: 'admin',
                 action: 'granted',
@@ -1203,7 +1212,7 @@ export async function populateMockData(
                 ...idea, organization_id: assignOrg(i),
             }),
         ),
-        adapter.organizations.put(DEFAULT_ORG, {
+        adapter.organizations.put(STARK_ORG, {
             name: 'Stark Industries',
             domain: 'acmecorp.com',
             next_billing: dt(-300, 0, 0),
@@ -5739,12 +5748,12 @@ export async function populateMockData(
     await Promise.all([
         ...projects.map(project =>
             adapter.projects.put(project.id, {
-                ...project, organization_id: DEFAULT_ORG,
+                ...project, organization_id: STARK_ORG,
             }),
         ),
         ...mockFlows.map(flow =>
             adapter.flows.put(flow.id, {
-                ...flow, organization_id: DEFAULT_ORG,
+                ...flow, organization_id: STARK_ORG,
             }),
         ),
         // Org '2' owns a small, self-contained slice so each
@@ -6167,7 +6176,7 @@ export async function populateMockData(
         ),
         ...mockWorkOrders.map(r =>
             adapter.workOrders.put(r.id, {
-                ...r, organization_id: DEFAULT_ORG,
+                ...r, organization_id: STARK_ORG,
             }),
         ),
         ...mockFlowWorkOrders.map(r =>
@@ -6227,7 +6236,7 @@ export async function populateMockData(
                 }),
                 adapter.memberships.put(
                     'seed-membership-' + m.id, {
-                        organization_id: DEFAULT_ORG,
+                        organization_id: STARK_ORG,
                         identity_id: m.id,
                         at: MOCK_SEED_TIMESTAMP,
                     }),
@@ -6305,7 +6314,7 @@ export async function populateMockData(
 
     for (const seed of OBJECTIVE_SEEDS) {
         await adapter.objectives.put(seed.id, {
-            organization_id: DEFAULT_ORG,
+            organization_id: STARK_ORG,
             position: seed.position,
         });
         await adapter.objectiveRevisions.put(
@@ -6493,8 +6502,14 @@ export async function populateBootstrapData(
         }),
         adapter.memberships.put(
             'bootstrap-membership-current', {
-                organization_id: DEFAULT_ORG,
+                organization_id: STARK_ORG,
                 identity_id: 'current',
+                at: MOCK_SEED_TIMESTAMP,
+            }),
+        adapter.identityDefaultOrgs.put(
+            'bootstrap-default-org-current', {
+                identity_id: 'current',
+                organization_id: STARK_ORG,
                 at: MOCK_SEED_TIMESTAMP,
             }),
         adapter.identities.put('current', {
@@ -6535,7 +6550,7 @@ export async function populateBootstrapData(
             'active',
             SYSTEM_MEMBER_ID,
         ),
-        adapter.organizations.put(DEFAULT_ORG, {
+        adapter.organizations.put(STARK_ORG, {
             name: 'Stark Industries',
             domain: 'acmecorp.com',
             next_billing: dt(-300, 0, 0),
@@ -6547,7 +6562,7 @@ export async function populateBootstrapData(
         }),
         adapter.roleGrants.put(
             'bootstrap-role-current-admin', {
-                organization_id: DEFAULT_ORG,
+                organization_id: STARK_ORG,
                 identity_id: 'current',
                 role: 'admin',
                 action: 'granted',

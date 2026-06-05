@@ -18,7 +18,6 @@ import {
 import {
     jsonObjectField,
     DEFAULT_LOCK_TIMEOUT,
-    DEFAULT_ORG,
 } from '../api/types.ts';
 import {
     seedRootAdmin,
@@ -66,7 +65,7 @@ function buildFlowEntity(
 ): FlowEntity {
     return {
         id,
-        organization_id: DEFAULT_ORG,
+        organization_id: '1',
         name: 'Flow ' + id,
         is_locked: false,
         is_auto_layout: true,

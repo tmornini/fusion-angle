@@ -19,7 +19,6 @@ import {
 import {
     getProviderModels,
 } from '../api/provider-models.ts';
-import { DEFAULT_ORG } from '../api/types.ts';
 
 // --- HumanMemberEntity ---
 
@@ -193,7 +192,7 @@ test(
 // --- IdeaEntity ---
 
 const validIdea = {
-    organization_id: DEFAULT_ORG,
+    organization_id: '1',
     title: 'Idea One',
     position: 1,
     problem_statement: 'A problem',
@@ -261,7 +260,7 @@ test(
 // --- ProjectEntity ---
 
 const validProject = {
-    organization_id: DEFAULT_ORG,
+    organization_id: '1',
     title: 'Proj',
     description: 'Desc',
     progress: 0,
@@ -291,7 +290,7 @@ test('validateProjectEntity rejects unknown key', () => {
 // --- FlowEntity ---
 
 const validFlow = {
-    organization_id: DEFAULT_ORG,
+    organization_id: '1',
     name: 'Flow A',
     is_locked: false,
     is_auto_layout: true,
@@ -388,7 +387,7 @@ const minimalWoGraph = JSON.stringify({
 });
 
 const validWorkOrder = {
-    organization_id: DEFAULT_ORG,
+    organization_id: '1',
     display_id: 'WO-001',
     flow_graph: minimalWoGraph,
     position: 1,
@@ -795,7 +794,7 @@ test(
 // --- RecordAttributeEntity ---
 
 const validSelectAttribute = {
-    organization_id: DEFAULT_ORG,
+    organization_id: '1',
     record_id: 'r-1',
     name: 'Priority',
     attribute_type: 'select',

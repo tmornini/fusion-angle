@@ -17,3 +17,32 @@
   outline: 2px solid hsl(var(--ring, var(--border)));
   outline-offset: 2px;
 }
+
+/* The select + "Set as default" button cluster. */
+.org-switcher-group {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* "Set as default" — a quiet button beside the switcher. */
+.org-set-default {
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  background-color: hsl(var(--secondary));
+  color: hsl(var(--foreground));
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+}
+
+.org-set-default:hover {
+  background-color: hsl(var(--secondary-hover));
+}
+
+.org-set-default:focus-visible {
+  outline: 2px solid hsl(var(--ring, var(--border)));
+  outline-offset: 2px;
+}

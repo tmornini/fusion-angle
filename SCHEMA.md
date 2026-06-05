@@ -7,8 +7,9 @@
 > Regenerate with `./generate-schema-svg` after a schema
 > change.
 
-25 tables stored in localStorage as JSON arrays, listed in
-`api/db.ts` as `TABLE_NAMES`. Each table is keyed as
+The tables stored in localStorage as JSON arrays are listed
+in `api/db.ts` as `TABLE_NAMES` (the authoritative count).
+Each table is keyed as
 `fusion-ai:tableName`. All rows have a text `id` primary
 key. Column types: TEXT (string), INTEGER (number), REAL
 (float), BOOLEAN (see below). JSON columns store stringified
@@ -203,21 +204,25 @@ before any further write.
 ### role_grants
 
 Append-only role-assignment ledger
-(`HistoryEntityStore`). One row per grant or revoke;
-the roles an identity CURRENTLY holds = the latest
-action per `(identity_id, role)` — a `granted` with
-no later `revoked`. Append-only: a revoke is a NEW
-`revoked` row, never a splice. `by_member_id` is the
-actor (== their identity id). Authorization derives
-roles from THIS ledger fresh at the gate
-(`isPermitted` in `api/authorization.ts`) — never
-from a token claim, so a revoke takes effect on the
-next request. `at` is the RFC-3339 zulu moment,
-validated at the storage gate.
+(`HistoryEntityStore`). Roles are PER-ORG: the roles
+an identity CURRENTLY holds in an org = the latest
+action per `(organization_id, identity_id, role)` — a
+`granted` with no later `revoked`, fenced to that org.
+Append-only: a revoke is a NEW `revoked` row, never a
+splice. `by_member_id` is the actor (== their identity
+id). Authorization derives roles from THIS ledger fresh
+at the gate (`currentRolesForInOrg` in
+`api/authorization.ts`, filtered to the request's org)
+— never from a token claim, so a revoke takes effect on
+the next request. `at` is the RFC-3339 zulu moment,
+validated at the storage gate. The store is org-fenced
+(`db-org-scoped.ts`), so the gate's own reads see only
+the request org's grants.
 
 | Column | Type |
 |--------|------|
 | id | TEXT |
+| organization_id | TEXT (FK → organizations) |
 | identity_id | TEXT (FK → identities) |
 | role | TEXT |
 | action | TEXT (`granted` \| `revoked`) |
@@ -314,9 +319,14 @@ the storage gate.
 
 ### ideas
 
+Org-owned (org-fenced via `db-org-scoped.ts`): carries a
+NOT-NULL `organization_id` the gate stamps on write and
+filters on read.
+
 | Column | Type |
 |--------|------|
 | id | TEXT |
+| organization_id | TEXT (FK → organizations) |
 | title | TEXT |
 | position | REAL |
 | problem_statement | TEXT |
@@ -335,9 +345,13 @@ object instantiation, not stored.
 
 ### projects
 
+Org-owned (org-fenced): NOT-NULL `organization_id`,
+stamped on write and filtered on read by the gate.
+
 | Column | Type |
 |--------|------|
 | id | TEXT |
+| organization_id | TEXT (FK → organizations) |
 | title | TEXT |
 | description | TEXT |
 | progress | INTEGER |
@@ -356,9 +370,13 @@ Lifecycle state lives in `states` (alphabet
 
 ### flows
 
+Org-owned (org-fenced): NOT-NULL `organization_id`, stamped
+on write and filtered on read by the gate.
+
 | Column | Type | Notes |
 |--------|------|-------|
 | id | TEXT | PRIMARY KEY |
+| organization_id | TEXT | FK → organizations |
 | name | TEXT | |
 | is_locked | BOOLEAN | Default false |
 | is_auto_layout | BOOLEAN | Default true |
@@ -427,10 +445,12 @@ A Record is a named data shape. Attributes belong to one
 Record; flows bind to a Record via `flow_records`.
 Lifecycle state lives in `states` (alphabet
 `RECORD_STATES`: `active`, `archived`, `deleted`).
+Org-owned (org-fenced): NOT-NULL `organization_id`.
 
 | Column | Type | Notes |
 |--------|------|-------|
 | id | TEXT | PRIMARY KEY |
+| organization_id | TEXT | FK → organizations |
 | name | TEXT | non-empty |
 | description | TEXT | empty string allowed |
 | position | REAL | Display order, ascending |
@@ -440,10 +460,12 @@ Lifecycle state lives in `states` (alphabet
 One row per attribute of a Record. The `field_id` column
 on `state_field_values` references this `id` once the flow
 the work order belongs to is bound to the parent Record.
+Org-owned (org-fenced): NOT-NULL `organization_id`.
 
 | Column | Type | Notes |
 |--------|------|-------|
 | id | TEXT | PRIMARY KEY |
+| organization_id | TEXT | FK → organizations |
 | record_id | TEXT | FK → records |
 | name | TEXT | non-empty; unique within record_id |
 | attribute_type | TEXT | one of text, number, select, date, checkbox |
@@ -475,9 +497,13 @@ back many flows.
 
 ### work_orders
 
+Org-owned (org-fenced): NOT-NULL `organization_id`, stamped
+on write and filtered on read by the gate.
+
 | Column | Type | Notes |
 |--------|------|-------|
 | id | TEXT | PRIMARY KEY (UUID) |
+| organization_id | TEXT | FK → organizations |
 | display_id | TEXT | 8-char hex SHA-256 |
 | flow_graph | TEXT | JSON (WorkOrderFlowGraph) |
 | position | REAL | Display order, ascending |
@@ -509,9 +535,12 @@ partitions them.
 
 ### organizations
 
-Tenant-root table — one row per organization. The SP-2 seed
-plants a single default org (`id = '1'`, the `DEFAULT_ORG`
-constant). Every org-owned entity carries a NOT-NULL
+Tenant-root table — one row per organization. The empty
+bootstrap (`populateBootstrapData`) seeds only the default
+org (`id = '1'`, Stark Industries, the `DEFAULT_ORG`
+constant); the demo mock-data seed (`populateMockData`)
+plants TWO orgs — `'1'` Stark Industries and `'2'` Wayne
+Enterprises. Every org-owned entity carries a NOT-NULL
 `organization_id` FK to this table; pure join tables derive
 org from their parent, and the identity/auth spine stays
 global.
@@ -527,6 +556,27 @@ global.
 | projects_limit | INTEGER |
 | ideas_limit | INTEGER |
 | last_activity | TEXT |
+
+### memberships
+
+The covenant binding an identity to an organization, with
+the moment of union — the source of "which orgs can this
+identity reach". A person in N orgs has N membership rows;
+`member.id === identity.id` stays GLOBAL (one profile, many
+memberships, no `organization_id` column on `members`). The
+members roster is DERIVED from this ledger (the `members`
+route handler filters the global directory by the org-scoped
+memberships); `GET /organizations` enumerates a caller's
+reachable orgs from it; the `token-exchange` membership
+check fences org access against it. Org-fenced
+(`db-org-scoped.ts`).
+
+| Column | Type |
+|--------|------|
+| id | TEXT |
+| organization_id | TEXT (FK → organizations) |
+| identity_id | TEXT (FK → identities) |
+| at | TEXT |
 
 ## Relationships
 
@@ -578,9 +628,12 @@ persistent undo on the flows/detail page.
 
 ### objectives
 
+Org-owned (org-fenced): NOT-NULL `organization_id`.
+
 | Column | Type | Notes |
 |--------|------|-------|
 | id | TEXT | PRIMARY KEY |
+| organization_id | TEXT | FK → organizations |
 | position | REAL | Display order |
 
 The objective's name and description live in

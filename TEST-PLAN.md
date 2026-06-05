@@ -124,6 +124,7 @@ time budgets while keeping per-entity mutation domains disjoint:
    - Agent-F2 — Workbox (includes Create-Work-Order picker
      READY / NOT READY split)
    - Agent-G — Admin (Members page, Member detail (human + AI),
+     Identities (list + detail + providers + tokens),
      Organization, Snapshots, Billing). The retired Teams /
      Roles / Crews / Activity Feed pages have no cases.
 4. **Phase 3 — Cross-cutting** (one agent, alone): I1–I28.
@@ -148,7 +149,7 @@ subset of tables:
 | Agent-E | `projects` (plus one flow via the project-detail New Flow path) |
 | Agent-F | `flows`, `flow_versions` |
 | Agent-F2 | `work_orders`, `flow_work_orders`, `states` (work-order entity_ids), `state_field_values`, plus its own private flow in `flows`/`flow_versions` |
-| Agent-G | `members`, `ai_members`, `organization` |
+| Agent-G | `members`, `ai_members`, `organization`, `identities`, `identity_pii`, `identity_credentials` (the global identity spine — disjoint from every other agent's domain; creating/erasing identities and PII does not touch the org-owned entity tables, so no write-domain collision) |
 | Agent-CH | none (read-only) |
 
 Agent-F2 owns its source flow because `postWorkOrderCreation`
@@ -334,7 +335,7 @@ run before A1's build. The single canonical invocation is
 ## A. Build & Setup
 
 - [ ] **A1** Run `./build` from a clean working directory. PASS: exits 0, prints no errors, creates `~/Desktop/fusion-ai-<sha>.zip`.
-- [ ] **A2** Run `./build --no-zip /tmp/fusion-test/`. PASS: `/tmp/fusion-test/` contains `assets/app.js`, `assets/styles.css`, `assets/` (*.woff2 fonts), 14 page directories (`auth`, `billing`, `dashboard`, `design-system`, `flows`, `ideas`, `landing`, `members`, `not-found`, `organization`, `projects`, `records`, `snapshots`, `workbox`) with 24 HTML page files (including `flows/stats.html` and `records/detail.html`), plus root `index.html`.
+- [ ] **A2** Run `./build --no-zip /tmp/fusion-test/`. PASS: `/tmp/fusion-test/` contains `assets/app.js`, `assets/styles.css`, `assets/` (*.woff2 fonts), 17 page directories (`auth`, `billing`, `dashboard`, `design-system`, `flows`, `ideas`, `identities`, `identity-providers`, `identity-tokens`, `landing`, `members`, `not-found`, `organization`, `projects`, `records`, `snapshots`, `workbox`) with 28 HTML page files (including `flows/stats.html`, `records/detail.html`, `identities/index.html`, `identities/detail.html`, `identity-providers/index.html`, and `identity-tokens/index.html`), plus root `index.html`.
 - [ ] **A3** Start an HTTP server from the build directory (`cd /tmp/fusion-test/ && python3 -m http.server 8080`). PASS: server starts without errors.
 - [ ] **A4** Open `http://localhost:8080/` in the test browser. PASS: redirects to `snapshots/index.html` when no data exists, or `landing/index.html` (which auto-redirects to `dashboard/index.html` after ~2 seconds) when data has been loaded.
 - [ ] **A5** Open DevTools Console and confirm no JavaScript errors on initial load. PASS: console is clean (warnings from browser extensions are acceptable).
@@ -658,8 +659,8 @@ on. Run these in order.
 - [ ] **C2** Sidebar shows flat navigation
   links in this order: Dashboard,
   Organization, Ideas, Projects, Records,
-  Flows, Workbox, Members, Billing, Snapshots,
-  Design System. PASS: all 11 links present,
+  Flows, Workbox, Members, Identities, Billing,
+  Snapshots, Design System. PASS: all 12 links present,
   in order, and styled. Source of truth:
   `PAGE_REGISTRY` (entries with
   `inSidebarNav: true`) in
@@ -1705,9 +1706,18 @@ restored data.)
 - [ ] **G30** Navigate to `snapshots/`. PASS: shows 4 operation cards (Create Pristine Environment, Wipe and Load Mock Data, Download Snapshot, Upload Snapshot). The Upload Snapshot card hosts a hidden `<input type="file" id="upload-input">` wrapped by a `<label>` styled as a button — the platform-primitive affordance for triggering a hidden file input (no JS click-forwarder).
 - [ ] **G31** Click "Download Snapshot". PASS: browser downloads `fusion-ai-snapshot-YYYY-MM-DD.json`. File contains valid JSON with entity data.
 - [ ] **G32** Click "Create Pristine Environment", confirm
-  the dialog. PASS: redirects to `dashboard/index.html`.
+  the dialog. PASS: the page does NOT navigate immediately — it
+  first renders the one-time demo-credentials reveal panel (a
+  `.credential-reveal` warning panel titled "Save your demo
+  sign-ins", listing the seeded sign-in(s) — for the empty
+  bootstrap only Tony Stark / `current` — in a monospace
+  `.credential-reveal-box`, with a "Copy all" button and an "I
+  have saved it — continue" button). Clicking "Copy all" copies
+  the credentials and toasts "Credentials copied". Click "I have
+  saved it — continue" → redirects to `dashboard/index.html`.
   Dashboard renders with zeroed-out metrics (empty
-  database except for the required bootstrap seed). Every
+  database except for the required bootstrap seed). Empty
+  bootstrap seeds only org `'1'` (Stark Industries). Every
   table in `TABLE_NAMES` is present as an empty array
   EXCEPT `fusion-ai:members` (parent rows for the System
   member, `type` 'system', and Tony Stark, `type`
@@ -1729,8 +1739,9 @@ restored data.)
   `api/db.ts`;
   cross-check against that. No tables outside that list
   appear under any `fusion-ai:*` key.
-- [ ] **G33** Click "Wipe and Load Mock Data". PASS: the wipe fires immediately — there is no confirmation dialog — then redirects to `dashboard/index.html`. Navigate to `ideas/` — 11 ideas are back.
+- [ ] **G33** Click "Wipe and Load Mock Data". PASS: the wipe fires immediately — there is no confirmation dialog — then the page renders the one-time demo-credentials reveal panel (`.credential-reveal`, titled "Save your demo sign-ins") listing EVERY login-capable seeded identity's email + fresh password in the monospace `.credential-reveal-box`, one credential per line, with a "Copy all" button. (Mock data seeds two orgs — `'1'` Stark Industries and `'2'` Wayne Enterprises — so the list spans both orgs' seeded humans; Tony Stark / `current` is the multi-org admin.) The page does NOT navigate until "I have saved it — continue" is clicked; clicking it redirects to `dashboard/index.html`. Navigate to `ideas/` — 11 ideas are back.
 - [ ] **G34** Return to `snapshots/`, wipe data, then use "Upload Snapshot" file input and select the previously downloaded JSON file. PASS: redirects to `dashboard/index.html`. Data matches the snapshot.
+- [ ] **G36 — Header org-switcher (multi-org user)** After "Wipe and Load Mock Data" (G33) seeds two orgs and boot signs in as the multi-org admin Tony Stark (`current`), the header greeting shows an org `<select>` (`.org-switcher`) next to the name — it appears ONLY because the user can reach ≥2 orgs (`shouldShowOrgSwitcher`). PASS: the select lists "Stark Industries" and "Wayne Enterprises" with Stark active. Note the Members and Ideas lists for Stark. Select "Wayne Enterprises" → the page does a FULL reload and re-scopes: Members shows Wayne's roster and Ideas shows Wayne's ideas (org-fenced — Stark's rows are no longer visible). Reload the page again WITHOUT changing the select → the selection persists (Wayne stays active; the choice is stored under `fusion.active-org` and boot re-exchanges a scoped token from it). A single-org seeded user, by contrast, sees NO org `<select>` in the header. Source of truth: `web-app/app/org-switcher.ts`, `web-app/app/adapters/org-session.ts`, `web-app/app/core.ts::scopeBootToActiveOrg`. (This case requires the two-org mock-data seed, so it runs in Phase 4 alongside G30–G35 — never concurrently with Phase 2 agents.)
 
 ### Snapshot & User Lifecycle — Error/Edge Cases
 

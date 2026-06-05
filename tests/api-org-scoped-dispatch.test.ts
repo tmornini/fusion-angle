@@ -4,7 +4,6 @@ import { MemoryDbAdapter } from '../api/db-memory.ts';
 import { GET } from '../api/api.ts';
 import { mintAccessToken } from '../api/access-token.ts';
 import { seedRootAdmin } from './root-admin-fixture.ts';
-import { DEFAULT_ORG } from '../api/types.ts';
 
 function ideaBody(org: string, title: string) {
     return {
@@ -31,7 +30,7 @@ async function twoOrgIdeas(): Promise<MemoryDbAdapter> {
     const db = new MemoryDbAdapter();
     await db.createSchema();
     await seedRootAdmin(db);   // current = admin (global)
-    await db.ideas.put('a1', ideaBody(DEFAULT_ORG, 'mine'));
+    await db.ideas.put('a1', ideaBody('1', 'mine'));
     await db.ideas.put('b1', ideaBody('7', 'theirs'));
     return db;
 }
@@ -40,7 +39,7 @@ test('an org-scoped token fences GET to its tenant',
 async () => {
     const db = await twoOrgIdeas();
     const rows = await GET<{ id: string }[]>(
-        db, 'ideas', await orgToken(DEFAULT_ORG));
+        db, 'ideas', await orgToken('1'));
     assert.deepEqual(rows.map(r => r.id), ['a1']);
 });
 
@@ -49,8 +48,7 @@ async () => {
     const db = await twoOrgIdeas();
     const rows = await GET<{ id: string }[]>(
         db, 'ideas', await orgToken(''));
-    // No honest unscoped default since SP-6: a flat
-    // (un-exchanged) token fences to DEFAULT_ORG, so the org
-    // '7' idea stays hidden.
+    // No honest unscoped default since SP-6: the token
+    // resolves to org '1', so the org '7' idea stays hidden.
     assert.deepEqual(rows.map(r => r.id), ['a1']);
 });

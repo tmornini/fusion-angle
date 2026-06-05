@@ -3,7 +3,7 @@ import { strict as assert } from 'node:assert';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import { populateBootstrapData } from '../api/mock-data.ts';
 import {
-    SYSTEM_MEMBER_ID, DEFAULT_ORG,
+    SYSTEM_MEMBER_ID,
 } from '../api/types.ts';
 
 // A pristine environment seeds only the infrastructure the
@@ -42,7 +42,7 @@ test(
             'current user seeded',
         );
         const org = await db.organizations.getById(
-            DEFAULT_ORG,
+            '1',
         );
         assert.ok(
             org.id.length > 0,

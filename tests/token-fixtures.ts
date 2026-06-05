@@ -12,6 +12,19 @@ export async function devToken(sub = 'current'): Promise<string> {
     });
 }
 
+// An org-scoped dev token: the org-exchanged session a web-app
+// adapter sees post-boot, carrying the `org` claim activeOrg
+// reads. Defaults to `current` in org '1'.
+export async function orgToken(
+    sub = 'current', org = '1',
+): Promise<string> {
+    return mintAccessToken({
+        sub, roles: [], name: 'Demo', org,
+        iat: 1_700_000_000, ttlSeconds: 10_000_000_000,
+        jti: 'org-' + sub + '-' + org,
+    });
+}
+
 export async function expiredToken(sub = 'current'): Promise<string> {
     return mintAccessToken({
         sub, roles: [], name: 'Demo',

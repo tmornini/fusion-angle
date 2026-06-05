@@ -55,16 +55,26 @@ test('shouldShowOrgSwitcher only at two or more orgs', () => {
 
 test('resolveActiveOrg prefers a reachable persisted choice',
 () => {
-    assert.equal(resolveActiveOrg(['1', '2'], '2'), '2');
+    assert.equal(
+        resolveActiveOrg(['1', '2'], '2', null), '2');
 });
 
-test('resolveActiveOrg bridges to the default org', () => {
-    assert.equal(resolveActiveOrg(['1', '2'], null), '1');
-    assert.equal(resolveActiveOrg(['1', '2'], 'stale'), '1');
+test('resolveActiveOrg prefers a reachable identity default',
+() => {
+    assert.equal(
+        resolveActiveOrg(['1', '2'], null, '2'), '2');
+});
+
+test('resolveActiveOrg falls back to the first reachable',
+() => {
+    assert.equal(
+        resolveActiveOrg(['1', '2'], null, null), '1');
+    assert.equal(
+        resolveActiveOrg(['1', '2'], 'stale', '9'), '1');
 });
 
 test('resolveActiveOrg returns a single membership directly',
 () => {
-    assert.equal(resolveActiveOrg(['2'], null), '2');
-    assert.equal(resolveActiveOrg(['2'], '1'), '2');
+    assert.equal(resolveActiveOrg(['2'], null, null), '2');
+    assert.equal(resolveActiveOrg(['2'], '1', null), '2');
 });

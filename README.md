@@ -10,9 +10,17 @@ and execution.
 - **Flow** — process documentation, flow management, and per-node
   throughput heat map (`flows/stats`)
 - **Projects** — track approved ideas through execution
+- **Identities** — people and service identities, their external
+  provider links, and access tokens
 - **Account** — organization settings, users, and billing
 - **DB Admin** — database management
   (wipe, reload, upload/download snapshots)
+
+The demo is multi-organization: loading mock data seeds two
+orgs (Stark Industries and Wayne Enterprises) with a header
+org-switcher for the multi-org user, and surfaces one-time
+demo sign-in credentials on the Snapshots page after a
+wipe-and-load.
 
 ## Getting Started
 

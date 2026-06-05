@@ -24,8 +24,8 @@ async function getHeaderData(
     } = await import('./adapters');
     const { getOrganizations } =
         await import('./adapters/organizations.ts');
-    const { DEFAULT_ORG } =
-        await import('../../api/types.ts');
+    const { activeOrg } =
+        await import('./adapters/shared.ts');
     const { getTimeOfDay } =
         await import('./format');
     const ctx = sessionContext();
@@ -36,8 +36,7 @@ async function getHeaderData(
             getDashboardStats(ctx),
         ]);
     const pii = member.pii();
-    const activeOrgId =
-        ctx.identity.organization ?? DEFAULT_ORG;
+    const activeOrgId = activeOrg(ctx);
     const active =
         orgs.find(o => o.id === activeOrgId);
     return {

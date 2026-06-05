@@ -8,7 +8,6 @@ import {
 import {
     currentRolesForInOrg,
 } from '../api/authorization.ts';
-import { DEFAULT_ORG } from '../api/types.ts';
 
 test('bootstrap seeds current as admin', async () => {
     const db = new MemoryDbAdapter();
@@ -16,7 +15,7 @@ test('bootstrap seeds current as admin', async () => {
     await populateBootstrapData(db);
     const rows = await db.roleGrants.getAll();
     assert.ok(
-        currentRolesForInOrg(rows, 'current', DEFAULT_ORG)
+        currentRolesForInOrg(rows, 'current', '1')
             .includes('admin'));
 });
 
@@ -26,6 +25,6 @@ test('mock data seeds current as admin', async () => {
     await populateMockData(db);
     const rows = await db.roleGrants.getAll();
     assert.ok(
-        currentRolesForInOrg(rows, 'current', DEFAULT_ORG)
+        currentRolesForInOrg(rows, 'current', '1')
             .includes('admin'));
 });

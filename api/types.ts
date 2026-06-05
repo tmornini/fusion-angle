@@ -9,13 +9,6 @@ export type MemberId = Id;
 
 export type ModelId = Id;
 
-// The single tenant every pre-multitenancy entity belongs
-// to. Seeds and the single-org web-app writers stamp it
-// explicitly; once a writer moves to an /organizations
-// facade route, the org-guard decorator stamps instead. A
-// real per-tenant value arrives with a second organization.
-export const DEFAULT_ORG: Id = '1';
-
 export interface ProviderModel {
     id: ModelId;
     provider: string;
@@ -468,6 +461,18 @@ export interface IdentityCredentialEntity {
 export interface IdentityTokenRevocationEntity {
     id: Id;
     identity_id: Id;
+    at: string;
+}
+
+// An identity's chosen default org. Append-only: a change is
+// a NEW row; the current default is the LATEST `at` per
+// identity, and no row means unset (never a nullable column —
+// an identity is born org-less). The chosen org must be one
+// of the identity's memberships, fenced at the write.
+export interface IdentityDefaultOrgEntity {
+    id: Id;
+    identity_id: Id;
+    organization_id: Id;
     at: string;
 }
 

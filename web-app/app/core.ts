@@ -32,6 +32,9 @@ import {
     ACTIVE_ORG_KEY,
 } from './adapters/org-session.ts';
 import {
+    getIdentityDefaultOrg,
+} from './adapters/identity-default-org.ts';
+import {
     getPreference,
     writePreference,
 } from './adapters/preferences.ts';
@@ -92,16 +95,19 @@ function redirectIfMissingTable(
 
 // Boot always scopes the session to an active org: enumerate
 // the member's reachable orgs, resolve the active one (the
-// persisted choice, else DEFAULT_ORG, else the sole org), and
-// install an org-scoped token BEFORE first render so every read
-// is fenced to one tenant.
+// persisted choice, else the identity's default, else the first
+// reachable), and install an org-scoped token BEFORE first
+// render so every read is fenced to one tenant.
 async function scopeBootToActiveOrg(): Promise<void> {
     const ctx = sessionContext();
     const reachable =
         (await getOrganizations(ctx)).map(o => o.id);
     if (reachable.length === 0) return;
     const active = resolveActiveOrg(
-        reachable, getPreference(ACTIVE_ORG_KEY));
+        reachable,
+        getPreference(ACTIVE_ORG_KEY),
+        await getIdentityDefaultOrg(ctx),
+    );
     setSessionToken(
         await postOrgSessionExchange(
             ctx, getSessionToken(), active));

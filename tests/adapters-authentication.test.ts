@@ -1,7 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
-import { DEFAULT_ORG } from '../api/types.ts';
 import { GET } from '../api/api.ts';
 import { hashPassword } from '../api/password-hash.ts';
 import {
@@ -16,9 +15,14 @@ async function passwordUserCtx() {
     const db = new MemoryDbAdapter();
     await db.createSchema();
     await db.roleGrants.put('rg', {
-        organization_id: DEFAULT_ORG,
+        organization_id: '1',
         identity_id: 'current', role: 'admin',
         action: 'granted', by_member_id: 'system',
+        at: '2020-01-01T00:00:00.000Z',
+    });
+    await db.memberships.put('m', {
+        organization_id: '1',
+        identity_id: 'current',
         at: '2020-01-01T00:00:00.000Z',
     });
     await db.identityPii.put('current', {

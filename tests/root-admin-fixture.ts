@@ -1,21 +1,26 @@
 import type { DbAdapter } from '../api/db.ts';
-import { DEFAULT_ORG } from '../api/types.ts';
 
-// Grant the demo `current` identity the `admin` role directly
-// at the storage layer (below the gate), so a test that
-// drives the HTTP gate as `current` (devToken) is authorized
-// under deny-by-default. Writing the ledger row directly
-// mirrors how the bootstrap/mock-data seeds plant the root
-// admin before any auth exists.
+// Seed the demo `current` identity as a root admin directly at
+// the storage layer (below the gate): the admin role grant AND
+// the org membership the gate now resolves the request's org
+// from. Both are needed — an admin of an org is a member of it —
+// so a test driving the gate as `current` (devToken) resolves
+// to an org and passes deny-by-default. Mirrors how the
+// bootstrap/mock-data seeds plant the root admin.
 export async function seedRootAdmin(
     db: DbAdapter,
 ): Promise<void> {
     await db.roleGrants.put('test-role-current-admin', {
-        organization_id: DEFAULT_ORG,
+        organization_id: '1',
         identity_id: 'current',
         role: 'admin',
         action: 'granted',
         by_member_id: 'system',
+        at: '2020-01-01T00:00:00.000Z',
+    });
+    await db.memberships.put('test-membership-current', {
+        organization_id: '1',
+        identity_id: 'current',
         at: '2020-01-01T00:00:00.000Z',
     });
 }

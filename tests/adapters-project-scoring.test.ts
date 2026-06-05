@@ -17,7 +17,6 @@ import {
 } from '../web-app/app/adapters/project-scoring.ts';
 import { seedHumanMember } from './member-fixtures.ts';
 import { seedRootAdmin } from './root-admin-fixture.ts';
-import { DEFAULT_ORG } from '../api/types.ts';
 
 test('getBaselineScoresForProject returns project rows',
     async () => {
@@ -107,7 +106,7 @@ async function seedTwoApprovedProjects(
     db: MemoryDbAdapter,
 ): Promise<void> {
     const projectBody = {
-        organization_id: DEFAULT_ORG,
+        organization_id: '1',
         description: 'd', progress: 0,
         start_date: '2026-05-14T00:00:00.000Z',
         target_end_date: '2026-05-14T00:00:00.000Z',
@@ -128,7 +127,7 @@ async function seedTwoApprovedProjects(
         'st-p2', 'p2', 'approved', 'system',
     );
     await db.objectives.put('o1', {
-        organization_id: DEFAULT_ORG,
+        organization_id: '1',
         position: 0,
     });
     await db.objectiveRevisions.put('o1:t0', {
@@ -324,7 +323,7 @@ test(
         await db.createSchema();
         await seedRootAdmin(db);
         await db.objectives.put('o1', {
-            organization_id: DEFAULT_ORG,
+            organization_id: '1',
             position: 0,
         });
         await db.objectiveRevisions.put('o1:t0', {

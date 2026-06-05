@@ -1,4 +1,5 @@
 import type { DbAdapter } from '../../../api/db.ts';
+import type { Id } from '../../../api/types.ts';
 import {
     GET as httpGet,
     PUT as httpPut,
@@ -143,5 +144,20 @@ export function sessionContext(): RequestContext {
     return createRequestContext(
         getDbAdapter(), getSessionToken(),
     );
+}
+
+// The active org the session is scoped to. Post-boot the
+// session token always carries it; its absence is an impossible
+// state — boot scopes the token before any org-bound request —
+// so we crash rather than invent a default.
+export function activeOrg(ctx: RequestContext): Id {
+    const org = ctx.identity.organization;
+    if (org === undefined) {
+        throw new Error(
+            'no active org on the session: boot must scope'
+            + ' the token before an org-bound request',
+        );
+    }
+    return org;
 }
 

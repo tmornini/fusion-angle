@@ -1,4 +1,3 @@
-import { DEFAULT_ORG } from '../../../api/types.ts';
 import type { RequestContext } from './shared.ts';
 
 // The persisted active-org key — the CLIENT-side org vessel.
@@ -38,20 +37,22 @@ export function shouldShowOrgSwitcher(
 }
 
 // Boot ALWAYS resolves an active org from the reachable set:
-// the persisted choice if still reachable, else DEFAULT_ORG if
-// reachable (an EXPLICIT named bridge, not a silent default),
-// else the first reachable. A single-org member always lands
-// in their org.
+// the persisted per-tab choice if still reachable, else the
+// identity's default (its set choice, else primary membership —
+// resolved server-side), else the first reachable. A single-org
+// member always lands in their org.
 export function resolveActiveOrg(
     reachable: readonly string[],
     persisted: string | null,
+    identityDefault: string | null,
 ): string {
     if (persisted !== null
         && reachable.includes(persisted)) {
         return persisted;
     }
-    if (reachable.includes(DEFAULT_ORG)) {
-        return DEFAULT_ORG;
+    if (identityDefault !== null
+        && reachable.includes(identityDefault)) {
+        return identityDefault;
     }
     return reachable[0]!;
 }

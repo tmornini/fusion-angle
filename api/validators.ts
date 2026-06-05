@@ -13,6 +13,7 @@ import type {
     IdentityPiiEntity,
     IdentityCredentialEntity,
     IdentityTokenRevocationEntity,
+    IdentityDefaultOrgEntity,
     IdentityTokenEntity,
     ClientEntity,
     IdentityProviderEntity,
@@ -710,6 +711,35 @@ validateIdentityTokenRevocationEntity(
     }
     return {
         identity_id: pickString(body, 'identity_id'),
+        at,
+    };
+}
+
+const IDENTITY_DEFAULT_ORG_BODY_KEYS:
+    readonly string[] = [
+    'identity_id', 'organization_id', 'at',
+];
+
+export function validateIdentityDefaultOrgEntity(
+    body: Record<string, unknown>,
+): Omit<IdentityDefaultOrgEntity, 'id'> {
+    assertOnlyKeys(
+        body,
+        IDENTITY_DEFAULT_ORG_BODY_KEYS,
+        'IdentityDefaultOrgEntity',
+    );
+    const at = pickString(body, 'at');
+    if (Number.isNaN(Date.parse(at))) {
+        throw new Error(
+            'invalid timestamp "' + at + '" on '
+            + 'IdentityDefaultOrgEntity',
+        );
+    }
+    return {
+        identity_id: pickString(body, 'identity_id'),
+        organization_id: pickString(
+            body, 'organization_id',
+        ),
         at,
     };
 }

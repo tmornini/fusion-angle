@@ -7,11 +7,10 @@ import {
     validateActualScoreEntity,
     validateProjectEntity,
 } from '../api/validators.ts';
-import { DEFAULT_ORG } from '../api/types.ts';
 
 test('validateObjectiveEntity accepts valid', () => {
     const v = validateObjectiveEntity({
-        organization_id: DEFAULT_ORG, position: 0,
+        organization_id: '1', position: 0,
     });
     assert.equal(v.position, 0);
 });
@@ -19,7 +18,7 @@ test('validateObjectiveEntity accepts valid', () => {
 test('validateObjectiveEntity accepts fractional position',
     () => {
         const v = validateObjectiveEntity({
-            organization_id: DEFAULT_ORG, position: 1.5,
+            organization_id: '1', position: 1.5,
         });
         assert.equal(v.position, 1.5);
     });
@@ -27,7 +26,7 @@ test('validateObjectiveEntity accepts fractional position',
 test('validateObjectiveEntity accepts negative position',
     () => {
         const v = validateObjectiveEntity({
-            organization_id: DEFAULT_ORG, position: -1,
+            organization_id: '1', position: -1,
         });
         assert.equal(v.position, -1);
     });
@@ -151,7 +150,7 @@ test('validateActualScoreEntity rejects out-of-range',
 test('validateProjectEntity ignores legacy impact fields',
     () => {
         const baseValid = {
-            organization_id: DEFAULT_ORG,
+            organization_id: '1',
             title: 't',
             description: 'd',
             progress: 0,

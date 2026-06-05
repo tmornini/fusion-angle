@@ -3,7 +3,6 @@ import {
 } from '../../../api/crypto-safe-base62.ts';
 import {
     nowUtc,
-    DEFAULT_ORG,
     type Id,
     type RoleGrantAction,
     type RoleGrantEntity,
@@ -11,7 +10,10 @@ import {
 import {
     currentRolesForInOrg,
 } from '../../../api/authorization.ts';
-import type { RequestContext } from './shared.ts';
+import {
+    activeOrg,
+    type RequestContext,
+} from './shared.ts';
 
 async function appendRoleEvent(
     ctx: RequestContext,
@@ -53,7 +55,6 @@ export async function getRolesFor(
         'role-grants',
     );
     return currentRolesForInOrg(
-        all, identityId,
-        ctx.identity.organization ?? DEFAULT_ORG,
+        all, identityId, activeOrg(ctx),
     );
 }

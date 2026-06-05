@@ -34,7 +34,10 @@ import type {
     WorkOrderEntity,
     MemberEntity,
 } from './types.ts';
-import { DEFAULT_ORG } from './types.ts';
+import { nowUtc, type Id } from './types.ts';
+import {
+    generateCryptoSafeBase62,
+} from './crypto-safe-base62.ts';
 import {
     validateOrganizationEntity,
     validateRecordMultiPutBody,
@@ -49,6 +52,7 @@ import {
 import { orgScopedAdapter } from './db-org-scoped.ts';
 import {
     currentRolesForInOrg,
+    currentDefaultOrgFor,
     isPermitted,
 } from './authorization.ts';
 import {
@@ -56,6 +60,8 @@ import {
     postAuthorize,
     exchangeBearerForOrg,
     tokenRevocationReason,
+    subjectOrgs,
+    identityDefaultOrg,
 } from './authentication.ts';
 
 export class ApiError {
@@ -871,17 +877,14 @@ async function authenticateRequest(
 async function authorizeRequest(
     adapter: DbAdapter,
     principal: Principal,
+    org: Id,
     method: string,
     pathname: string,
 ): Promise<string | null> {
     const rows = await adapter.roleGrants.getAll();
-    // Roles are per-org. The verified token claim — never the
-    // path — names the org; a flat (un-exchanged) token has
-    // none and falls back to DEFAULT_ORG, an EXPLICIT named
-    // bridge for the legacy un-scoped caller, not a silent
-    // helper default. After the facade migration every session
-    // token carries an org and this bridge goes unused.
-    const org = principal.organization ?? DEFAULT_ORG;
+    // Roles are per-org. The caller resolves the org once and
+    // passes it here; authz filters the global role_grants
+    // ledger to it — identity is global, roles are per-org.
     const roles = currentRolesForInOrg(
         rows, principal.id, org,
     );
@@ -957,6 +960,89 @@ async function enumerateMyOrgs(
     );
 }
 
+// PUT/GET /identities/:id/default-org — the read/write face of
+// the identity_default_orgs ledger. Authorized by tree ownership
+// (caller === :id), not the admin role policy: an identity owns
+// its own subtree. PUT appends a NEW event only when the org
+// changes (an idempotent repeat writes nothing), and only if the
+// org is one of the identity's memberships (no dangling default).
+async function identityDefaultOrgRequest(
+    adapter: DbAdapter,
+    request: Request,
+    segments: readonly string[],
+): Promise<Response> {
+    const authResult =
+        await authenticateRequest(adapter, request);
+    if (typeof authResult === 'string') {
+        return Response.json(
+            { error: authResult },
+            { status: HTTP_UNAUTHORIZED },
+        );
+    }
+    const identityId = segments[1]!;
+    if (authResult.id !== identityId) {
+        return Response.json(
+            {
+                error: 'forbidden: an identity may act only'
+                    + ' within its own tree',
+            },
+            { status: HTTP_FORBIDDEN },
+        );
+    }
+    if (request.method === 'GET') {
+        return Response.json({
+            organization_id:
+                await identityDefaultOrg(adapter, identityId),
+        });
+    }
+    if (request.method === 'PUT') {
+        let body: Record<string, unknown>;
+        try {
+            body = (await request.json()) as Record<
+                string, unknown
+            >;
+        } catch {
+            return Response.json(
+                { error: 'Invalid JSON body' },
+                { status: HTTP_BAD_REQUEST },
+            );
+        }
+        const org = typeof body.organization_id === 'string'
+            ? body.organization_id
+            : '';
+        const memberOrgs =
+            await subjectOrgs(adapter, identityId);
+        if (!memberOrgs.includes(org)) {
+            return Response.json(
+                {
+                    error: 'forbidden: org is not one of the'
+                        + " identity's memberships",
+                },
+                { status: HTTP_FORBIDDEN },
+            );
+        }
+        const rows =
+            await adapter.identityDefaultOrgs.getAll();
+        if (currentDefaultOrgFor(rows, identityId) === org) {
+            return new Response(null, { status: 204 });
+        }
+        await adapter.identityDefaultOrgs.put(
+            generateCryptoSafeBase62(), {
+                identity_id: identityId,
+                organization_id: org,
+                at: nowUtc(),
+            });
+        return new Response(null, { status: 204 });
+    }
+    return Response.json(
+        {
+            error: 'Method ' + request.method
+                + ' not allowed',
+        },
+        { status: 405 },
+    );
+}
+
 export async function handleRequest(
     adapter: DbAdapter,
     request: Request,
@@ -974,6 +1060,13 @@ export async function handleRequest(
         && pathSegments.length >= 3) {
         return facadeRequest(adapter, request, pathSegments);
     }
+    if (pathSegments[0] === 'identities'
+        && pathSegments.length === 3
+        && pathSegments[2] === 'default-org') {
+        return identityDefaultOrgRequest(
+            adapter, request, pathSegments,
+        );
+    }
     const match = matchRoute(pathSegments);
 
     if (!match) {
@@ -990,15 +1083,14 @@ export async function handleRequest(
     const method = request.method;
 
     const routePattern = matched.segments.join('/');
-    // Every authenticated request runs org-scoped: the verified
-    // org claim names the tenant; a flat (un-exchanged) token
-    // falls back to DEFAULT_ORG — an EXPLICIT named bridge, so
-    // there is no honest "unscoped default" and a write always
-    // lands in a real org. Org-owned stores fence to that org
-    // server-side; the global identity/auth spine passes
-    // through. Authz reads the global role_grants ledger but
-    // filters it to the same org (see authorizeRequest):
-    // identity is global, roles and org data are per-org.
+    // Every authenticated request runs org-scoped. The org is
+    // resolved ONCE here — the verified token claim, else the
+    // identity's default (its set choice, else primary
+    // membership) — and shared by authz and the scoped adapter.
+    // A flat token whose identity resolves to no org is DENIED:
+    // there is no global default to fall back on. Org-owned
+    // stores fence to the org; the global identity/auth spine
+    // passes through.
     let effective: DbAdapter = adapter;
     if (!BEARER_EXEMPT_ROUTES.has(routePattern)) {
         const authResult =
@@ -1009,8 +1101,21 @@ export async function handleRequest(
                 { status: HTTP_UNAUTHORIZED },
             );
         }
+        const org = authResult.organization
+            ?? await identityDefaultOrg(
+                adapter, authResult.id,
+            );
+        if (org === null) {
+            return Response.json(
+                {
+                    error: 'forbidden: identity has no'
+                        + ' organization',
+                },
+                { status: HTTP_FORBIDDEN },
+            );
+        }
         const authzFailure = await authorizeRequest(
-            adapter, authResult, method, pathname,
+            adapter, authResult, org, method, pathname,
         );
         if (authzFailure !== null) {
             return Response.json(
@@ -1022,10 +1127,7 @@ export async function handleRequest(
             && routePattern === 'organizations') {
             return enumerateMyOrgs(adapter, authResult);
         }
-        effective = orgScopedAdapter(
-            adapter,
-            authResult.organization ?? DEFAULT_ORG,
-        );
+        effective = orgScopedAdapter(adapter, org);
     }
 
     // Parse the request body when the method

@@ -97,6 +97,17 @@ Applied to: `.pill`, `.icon-box`, `.status-dot`,
 **`[data-level]` values**: `normal`, `warning`, `danger`.
 Applied to: `.progress-bar`, `.gauge` fill regions.
 
+**Exception — the credential-reveal panel.** The snapshots-
+page demo-credentials panel (`.credential-reveal`,
+`credential-reveal.ts` + `pages-snapshots.css`) carries a
+`data-tone="warning"` attribute for semantics, but its
+warning border color is applied by the `.credential-reveal`
+class itself (`border: 1px solid hsl(var(--warning))`), NOT
+by a `[data-tone]` selector binding — `.credential-reveal`
+is not in the applied-to list above. The monospace
+`.credential-reveal-box` (one credential per line) and the
+copy-all button complete the one-time, post-wipe reveal.
+
 Helper naming: `toneFor*(status)` returns a `[data-tone]`
 value, `levelFor*(value)` returns a `[data-level]` value.
 Replaces the older `styleFor*` pattern that returned
@@ -324,6 +335,13 @@ codebase's standard for grouped selects from this
 point forward. Browser default styling (bold-italic
 group labels) is fine; no override needed.
 
+The header org-switcher `<select>` is the documented
+exception to the `.input` select standard: it is a
+compact in-header control styled by `.org-switcher`
+(`components-org-switcher.css`), not `.input`, to fit
+the header greeting line. It renders only when the
+member can reach two or more orgs.
+
 ### Dark Mode
 
 CSS custom properties on `:root` define light theme values.
@@ -469,7 +487,7 @@ applies:
 6. `components-*.css` — reusable component families
    (avatar, badges, buttons, cards, controls, dialog,
    feedback, inputs, layout-helpers, menus, metrics,
-   page-placeholder, tables, tabs, toast)
+   org-switcher, page-placeholder, tables, tabs, toast)
 7. `layout.css` — sidebar, header, main-content shell
 8. `utilities.css` — single-property primitives plus
    container widths and hover-link

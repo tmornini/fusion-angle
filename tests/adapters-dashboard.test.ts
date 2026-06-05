@@ -14,7 +14,6 @@ import {
     getDashboardGauges,
 } from '../web-app/app/adapters/dashboard.ts';
 import {
-    DEFAULT_ORG,
     type IdeaEntity,
     type ProjectEntity,
     type ProjectState,
@@ -37,7 +36,7 @@ function buildIdea(
     id: string,
 ): Omit<IdeaEntity, 'id'> {
     return {
-        organization_id: DEFAULT_ORG,
+        organization_id: '1',
         title: 'Idea ' + id,
         position: 1,
         problem_statement: 'p',
@@ -64,7 +63,7 @@ function buildProject(
     overrides?: Partial<ProjectEntity>,
 ): Omit<ProjectEntity, 'id'> {
     const base: Omit<ProjectEntity, 'id'> = {
-        organization_id: DEFAULT_ORG,
+        organization_id: '1',
         title: 'Project ' + id,
         description: 'd',
         progress: 0,
@@ -101,7 +100,7 @@ function buildFlow(
     id: string,
 ): Omit<FlowEntity, 'id'> {
     return {
-        organization_id: DEFAULT_ORG,
+        organization_id: '1',
         name: 'Flow ' + id,
         is_locked: false,
         is_auto_layout: true,

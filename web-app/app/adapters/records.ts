@@ -9,9 +9,11 @@ import type {
 import {
     RecordModel,
     assertRecordState,
-    DEFAULT_ORG,
 } from '../../../api/types.ts';
-import type { RequestContext } from './shared.ts';
+import {
+    activeOrg,
+    type RequestContext,
+} from './shared.ts';
 import {
     buildStateEventOp,
     getRecordStates,
@@ -205,7 +207,7 @@ export async function postRecordChange(
     // The server stamps organization_id from the verified
     // token; this present-and-valid value only satisfies the
     // multi-put body validator, which requires the column.
-    const org = ctx.identity.organization ?? DEFAULT_ORG;
+    const org = activeOrg(ctx);
     const record = {
         ...change.record, organization_id: org,
     };

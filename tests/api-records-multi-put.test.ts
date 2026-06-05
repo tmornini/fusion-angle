@@ -6,7 +6,6 @@ import {
 } from '../api/db-memory.ts';
 import {
     jsonArrayField,
-    DEFAULT_ORG,
 } from '../api/types.ts';
 import {
     seedCurrentMember,
@@ -37,7 +36,7 @@ test(
             kind: 'create',
             id: 'rec-1',
             record: {
-                organization_id: DEFAULT_ORG,
+                organization_id: '1',
                 name: 'Quarterly Renewals',
                 description: 'Customer pricing',
                 position: 1,
@@ -45,7 +44,7 @@ test(
             attributes: [
                 {
                     id: 'a-1',
-                    organization_id: DEFAULT_ORG,
+                    organization_id: '1',
                     record_id: 'rec-1',
                     name: 'Monthly Fee',
                     attribute_type: 'number',
@@ -86,7 +85,7 @@ test(
             kind: 'create',
             id: 'rec-2',
             record: {
-                organization_id: DEFAULT_ORG,
+                organization_id: '1',
                 name: 'Empty',
                 description: '',
                 position: 2,
@@ -122,7 +121,7 @@ test(
             kind: 'create',
             id: 'rec-1',
             record: {
-                organization_id: DEFAULT_ORG,
+                organization_id: '1',
                 name: 'Before',
                 description: '',
                 position: 1,
@@ -135,7 +134,7 @@ test(
             kind: 'edit',
             id: 'rec-1',
             record: {
-                organization_id: DEFAULT_ORG,
+                organization_id: '1',
                 name: 'After',
                 description: 'updated',
                 position: 1,
@@ -171,7 +170,7 @@ test(
             kind: 'create',
             id: 'rec-1',
             record: {
-                organization_id: DEFAULT_ORG,
+                organization_id: '1',
                 name: 'R',
                 description: '',
                 position: 1,
@@ -179,7 +178,7 @@ test(
             attributes: [
                 {
                     id: 'a-old',
-                    organization_id: DEFAULT_ORG,
+                    organization_id: '1',
                     record_id: 'rec-1',
                     name: 'Old',
                     attribute_type: 'text',
@@ -197,7 +196,7 @@ test(
             kind: 'edit',
             id: 'rec-1',
             record: {
-                organization_id: DEFAULT_ORG,
+                organization_id: '1',
                 name: 'R',
                 description: '',
                 position: 1,
@@ -205,7 +204,7 @@ test(
             attributes: [
                 {
                     id: 'a-new',
-                    organization_id: DEFAULT_ORG,
+                    organization_id: '1',
                     record_id: 'rec-1',
                     name: 'New',
                     attribute_type: 'text',
@@ -238,14 +237,14 @@ test(
             kind: 'create',
             id: 'rec-1',
             record: {
-                organization_id: DEFAULT_ORG,
+                organization_id: '1',
                 name: 'R', description: '',
                 position: 1,
             },
             attributes: [
                 {
                     id: 'a-1',
-                    organization_id: DEFAULT_ORG,
+                    organization_id: '1',
                     record_id: 'rec-1',
                     name: 'Initial',
                     attribute_type: 'text',
@@ -263,14 +262,14 @@ test(
             kind: 'edit',
             id: 'rec-1',
             record: {
-                organization_id: DEFAULT_ORG,
+                organization_id: '1',
                 name: 'R', description: '',
                 position: 1,
             },
             attributes: [
                 {
                     id: 'a-1',
-                    organization_id: DEFAULT_ORG,
+                    organization_id: '1',
                     record_id: 'rec-1',
                     name: 'Renamed',
                     attribute_type: 'number',
@@ -307,14 +306,14 @@ test(
                 kind: 'create',
                 id: 'rec-1',
                 record: {
-                    organization_id: DEFAULT_ORG,
+                    organization_id: '1',
                     name: 'R', description: '',
                     position: 1,
                 },
                 attributes: [
                     {
                         id: 'a-1',
-                        organization_id: DEFAULT_ORG,
+                        organization_id: '1',
                         record_id: 'rec-1',
                         name: '',
                         attribute_type: 'text',
@@ -347,14 +346,14 @@ test(
                 kind: 'create',
                 id: 'rec-1',
                 record: {
-                    organization_id: DEFAULT_ORG,
+                    organization_id: '1',
                     name: 'R', description: '',
                     position: 1,
                 },
                 attributes: [
                     {
                         id: 'a-1',
-                        organization_id: DEFAULT_ORG,
+                        organization_id: '1',
                         record_id: 'rec-other',
                         name: 'X',
                         attribute_type: 'text',
@@ -386,7 +385,7 @@ test(
                 kind: 'destroy',
                 id: 'rec-1',
                 record: {
-                    organization_id: DEFAULT_ORG,
+                    organization_id: '1',
                     name: 'R', description: '',
                     position: 1,
                 },
@@ -408,7 +407,7 @@ test(
                 kind: 'create',
                 id: 'rec-1',
                 record: {
-                    organization_id: DEFAULT_ORG,
+                    organization_id: '1',
                     name: 'R', description: '',
                     position: 1,
                 },
@@ -432,7 +431,7 @@ test(
                 kind: 'create',
                 id: 'rec-1',
                 record: {
-                    organization_id: DEFAULT_ORG,
+                    organization_id: '1',
                     name: 'R', description: '',
                     position: 1,
                 },
@@ -457,7 +456,7 @@ test(
                 kind: 'edit',
                 id: 'rec-1',
                 record: {
-                    organization_id: DEFAULT_ORG,
+                    organization_id: '1',
                     name: 'R', description: '',
                     position: 1,
                 },

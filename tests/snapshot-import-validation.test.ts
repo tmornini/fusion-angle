@@ -9,7 +9,6 @@ import {
 import {
     jsonObjectField,
 } from '../api/types.ts';
-import { DEFAULT_ORG } from '../api/types.ts';
 
 const KEY_PREFIX = 'fusion-ai:';
 
@@ -190,7 +189,7 @@ test(
         const json = JSON.stringify({
             objectives: [{
                 id: 'o1',
-                organization_id: DEFAULT_ORG,
+                organization_id: '1',
                 position: 1,
                 rogue_field: 'invalid',
             }],
@@ -211,7 +210,7 @@ test(
             new LocalStorageDbAdapter();
         const json = JSON.stringify({
             objectives: [{
-                id: 'o1', organization_id: DEFAULT_ORG,
+                id: 'o1', organization_id: '1',
                 position: 1,
             }],
         });

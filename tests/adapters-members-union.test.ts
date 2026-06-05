@@ -24,7 +24,6 @@ import type {
 } from '../api/types.ts';
 import {
     SYSTEM_MEMBER_NAME,
-    DEFAULT_ORG,
 } from '../api/types.ts';
 import {
     seedHumanMember,
@@ -205,7 +204,7 @@ test(
         // Erasure removes PII, not the membership — the member
         // still belongs to the org, so the join still finds it.
         await db.memberships.put('mb-hw_erased', {
-            organization_id: DEFAULT_ORG,
+            organization_id: '1',
             identity_id: 'hw_erased',
             at: '2020-01-01T00:00:00.000Z',
         });

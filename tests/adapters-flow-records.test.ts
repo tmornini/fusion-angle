@@ -19,7 +19,6 @@ import {
 import {
     jsonObjectField,
     DEFAULT_LOCK_TIMEOUT,
-    DEFAULT_ORG,
 } from '../api/types.ts';
 
 const AT = '2026-05-01T00:00:00.000Z';
@@ -39,7 +38,7 @@ async function seedWorkOrder(
         edges: [],
     });
     await db.workOrders.put(id, {
-        organization_id: DEFAULT_ORG,
+        organization_id: '1',
         display_id: displayId,
         flow_graph: flowGraph,
         position,

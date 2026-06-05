@@ -1,7 +1,6 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
-import { DEFAULT_ORG } from '../api/types.ts';
 import { populateMockData } from '../api/mock-data.ts';
 import {
     validateMemberEntity,
@@ -106,13 +105,13 @@ for (const [name, getAll, validate] of TABLES) {
 
 test('mock-data seeds the organizations table', async () => {
     const db = await seededDb();
-    const org = await db.organizations.getById(DEFAULT_ORG);
+    const org = await db.organizations.getById('1');
     assert.ok(org.id.length > 0);
 });
 
 test('mock-data organization row passes the validator', async () => {
     const db = await seededDb();
-    const org = await db.organizations.getById(DEFAULT_ORG);
+    const org = await db.organizations.getById('1');
     assert.doesNotThrow(
         () => validateOrganizationEntity(withoutId(org)),
     );

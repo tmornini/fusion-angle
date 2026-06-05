@@ -7,7 +7,6 @@ import {
 import {
     MemoryDbAdapter,
 } from '../api/db-memory.ts';
-import { DEFAULT_ORG } from '../api/types.ts';
 import {
     seedHumanMember,
     seedAIMember,
@@ -51,7 +50,7 @@ test('PUT then GET round-trips an entity', async () => {
     const db = await freshDb();
     const payload = {
         id: 'i1',
-        organization_id: DEFAULT_ORG,
+        organization_id: '1',
         title: 'Test',
         position: 1,
         problem_statement: 'p',
