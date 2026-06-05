@@ -83,3 +83,28 @@ async () => {
         await verifyPassword('super-secret', row.secret),
         true);
 });
+
+test('credential state is latest by at, not array order',
+async () => {
+    const { db, ctx } = await setup();
+    // Appended in REVERSE chronological order: the later
+    // 'set' precedes the earlier 'revoked' in the array,
+    // so array-order "last wins" would wrongly revoke.
+    await db.identityCredentials.put('c1', {
+        identity_id: 'p1',
+        kind: 'password',
+        status: 'set',
+        secret: '',
+        at: '2026-02-01T00:00:00.000Z',
+    });
+    await db.identityCredentials.put('c2', {
+        identity_id: 'p1',
+        kind: 'password',
+        status: 'revoked',
+        secret: '',
+        at: '2026-01-01T00:00:00.000Z',
+    });
+    const state =
+        await getIdentityCredentialState(ctx, 'p1');
+    assert.deepEqual(state.active, ['password']);
+});

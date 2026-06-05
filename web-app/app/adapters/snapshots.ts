@@ -39,7 +39,7 @@ export class SnapshotTooLargeError extends Error {
 export const RETIRED_KEYS_PER_TABLE:
     Record<string, readonly string[]> = {
     members: ['first_name', 'last_name'],
-    ai_members: ['created_at', 'name', 'auth_token', 'provider'],
+    ai_members: ['created_at', 'auth_token', 'provider'],
     flows: ['created_at', 'updated_at'],
     work_orders: ['created_at'],
     flow_versions: ['created_at'],

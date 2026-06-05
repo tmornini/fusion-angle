@@ -85,16 +85,24 @@ export async function getIdentityCredentialState(
     >('identity-credentials');
     const latestByKind = new Map<
         IdentityCredentialKind,
-        IdentityCredentialStatus
+        { status: IdentityCredentialStatus; at: string }
     >();
     for (const ev of all) {
         if (ev.identity_id !== identityId) continue;
-        // append order is chronological → last wins
-        latestByKind.set(ev.kind, ev.status);
+        // Latest by `at`, not array order — a snapshot
+        // reimport or concurrent write can reorder rows.
+        // Same secure `>=` tie-break as currentRolesForInOrg.
+        const prev = latestByKind.get(ev.kind);
+        if (prev === undefined || ev.at >= prev.at) {
+            latestByKind.set(
+                ev.kind,
+                { status: ev.status, at: ev.at },
+            );
+        }
     }
     const active: IdentityCredentialKind[] = [];
-    for (const [kind, status] of latestByKind) {
-        if (status !== 'revoked') {
+    for (const [kind, last] of latestByKind) {
+        if (last.status !== 'revoked') {
             active.push(kind);
         }
     }

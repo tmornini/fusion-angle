@@ -87,3 +87,21 @@ async () => {
         db, await devToken('anonymous'));
     await assert.rejects(() => getProvidersFor(anon, 'p2'));
 });
+
+test('linked providers are latest by at, not array order',
+async () => {
+    const { db, ctx } = await adminCtx();
+    // Appended in REVERSE chronological order: the later
+    // 'linked' precedes the earlier 'unlinked', so
+    // array-order "last wins" would wrongly drop it.
+    await db.identityProviders.put('pl', {
+        ...goodRow, identity_id: 'p2', action: 'linked',
+        at: '2026-02-01T00:00:00.000Z',
+    });
+    await db.identityProviders.put('pe', {
+        ...goodRow, identity_id: 'p2', action: 'unlinked',
+        at: '2026-01-01T00:00:00.000Z',
+    });
+    assert.deepEqual(
+        await getProvidersFor(ctx, 'p2'), ['google']);
+});

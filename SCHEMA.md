@@ -111,7 +111,7 @@ is free text, NOT NULL — empty is `''`, never null.
 | skill_focus | TEXT |
 | model | TEXT |
 
-### identity
+### identities
 
 One row per principal in the system. The `id` is the
 universal key: `member.id === identity.id`, always —
@@ -199,6 +199,27 @@ before any further write.
 |--------|------|
 | id | TEXT |
 | identity_id | TEXT (FK → identities) |
+| at | TEXT |
+
+### identity_default_orgs
+
+Append-only set-default-org ledger
+(`HistoryEntityStore`). Each row records a moment an
+identity chose its default organization — the org a
+flat (un-exchanged) token lands in. The current
+default is the LATEST `at` per `identity_id`
+(`currentDefaultOrgFor` in `api/authentication.ts` is
+its single home); `identityDefaultOrg` falls through
+to the PRIMARY membership org when the ledger is
+empty, else a 403. A re-choice is a NEW row — never a
+mutated column. `at` is validated as a well-formed
+RFC-3339 Zulu timestamp at the storage gate.
+
+| Column | Type |
+|--------|------|
+| id | TEXT |
+| identity_id | TEXT (FK → identities) |
+| organization_id | TEXT (FK → organizations) |
 | at | TEXT |
 
 ### role_grants
@@ -537,8 +558,8 @@ partitions them.
 
 Tenant-root table — one row per organization. The empty
 bootstrap (`populateBootstrapData`) seeds only the default
-org (`id = '1'`, Stark Industries, the `DEFAULT_ORG`
-constant); the demo mock-data seed (`populateMockData`)
+org (`id = '1'`, Stark Industries); the demo mock-data
+seed (`populateMockData`)
 plants TWO orgs — `'1'` Stark Industries and `'2'` Wayne
 Enterprises. Every org-owned entity carries a NOT-NULL
 `organization_id` FK to this table; pure join tables derive

@@ -77,14 +77,25 @@ export async function getProvidersFor(
     const all = await ctx.GET<IdentityProviderEntity[]>(
         'identity-providers',
     );
-    const latest = new Map<string, IdentityProviderAction>();
+    const latest = new Map<
+        string,
+        { action: IdentityProviderAction; at: string }
+    >();
     for (const ev of all) {
         if (ev.identity_id !== identityId) continue;
-        latest.set(ev.provider, ev.action);
+        // Latest by `at`, not array order — same secure
+        // `>=` tie-break the sibling ledgers reduce by.
+        const prev = latest.get(ev.provider);
+        if (prev === undefined || ev.at >= prev.at) {
+            latest.set(
+                ev.provider,
+                { action: ev.action, at: ev.at },
+            );
+        }
     }
     const linked: string[] = [];
-    for (const [provider, action] of latest) {
-        if (action === 'linked') linked.push(provider);
+    for (const [provider, last] of latest) {
+        if (last.action === 'linked') linked.push(provider);
     }
     return linked;
 }

@@ -96,12 +96,16 @@ copy says "Work orders using this Record" rather than
 
 Every authenticated request runs org-scoped. After
 `matchRoute` and the Bearer/role checks, `handleRequest`
-sets `effective = orgScopedAdapter(adapter,
-authResult.organization ?? DEFAULT_ORG)` and every handler
-runs against `effective`. The org rides the VERIFIED token
-claim, never the path; a flat (un-exchanged) token has none
-and falls back to the EXPLICIT named `DEFAULT_ORG` ('1')
-bridge — a documented seam, not an honest "unscoped default".
+resolves `org = authResult.organization ??
+identityDefaultOrg(adapter, authResult.id)`, 403s a null
+org, then sets `effective = orgScopedAdapter(adapter, org)`
+and every handler runs against `effective`. The org rides
+the VERIFIED token claim, never the path; a flat
+(un-exchanged) token has none and resolves via
+`identityDefaultOrg`: the identity's SET default org
+(`identity_default_orgs` ledger, latest wins), else its
+PRIMARY membership org, else a 403 — there is no global
+default to fall back on.
 
 `OrgScopedEntityStore` (`api/store-org-scoped.ts`) is an
 `EntityStore` decorator bound to one org: it filters reads,
@@ -149,8 +153,9 @@ reachable orgs, derived fresh from the membership ledger
 `core.ts::scopeBootToActiveOrg` always scopes the session
 before first render: enumerate reachable orgs →
 `resolveActiveOrg` (the persisted `fusion.active-org`, else
-`DEFAULT_ORG` if reachable, else the sole org) →
-`postOrgSessionExchange` → install the scoped token. The
+the identity's default org if reachable, else the first
+reachable) → `postOrgSessionExchange` → install the scoped
+token. The
 header org-switcher (`web-app/app/org-switcher.ts`) renders
 its `<select>` only at ≥2 reachable orgs and re-scopes via a
 FULL reload (boot re-exchanges from the persisted id, so no

@@ -102,11 +102,14 @@ is HTTP-only.
 - **Tenancy.** Every authenticated request runs org-scoped:
   `handleRequest` wraps the adapter in `orgScopedAdapter`
   bound to the org from the VERIFIED token claim (never the
-  path), falling back to the explicit `DEFAULT_ORG` ('1')
-  bridge for a flat token. `organizations` is the tenant
-  root; `memberships` joins identity↔org; the members roster
-  is derived from that ledger. Per-org roles via
-  `currentRolesForInOrg`. See [SCHEMA.md](SCHEMA.md) /
+  path). A flat (un-exchanged) token resolves its org via
+  `identityDefaultOrg`: the identity's SET default org
+  (`identity_default_orgs` ledger, latest wins), else its
+  PRIMARY membership org, else a 403 — there is no global
+  default. `organizations` is the tenant root; `memberships`
+  joins identity↔org; the members roster is derived from that
+  ledger. Per-org roles via `currentRolesForInOrg`. See
+  [SCHEMA.md](SCHEMA.md) /
   [ARCHITECTURE.md](ARCHITECTURE.md).
 - **Data.** REST-style API (`api/`) over localStorage. Adapters
   in `web-app/app/adapters/` shape rows for pages.

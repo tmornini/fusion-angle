@@ -124,8 +124,18 @@ document.addEventListener(
             hasSchema =
                 await initDatabase();
         } catch (err) {
-            handleDatabaseError(err);
-            return;
+            // A missing/incompatible table routes to the
+            // snapshots recovery page; when boot already
+            // landed there, render it with hasSchema=false
+            // so its seed/import controls show. Any other
+            // init fault is a genuine dead-end.
+            if (redirectIfMissingTable(err)) return;
+            if (err instanceof MissingTableError) {
+                hasSchema = false;
+            } else {
+                handleDatabaseError(err);
+                return;
+            }
         }
 
         if (hasSchema) {
