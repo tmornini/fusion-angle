@@ -7,21 +7,22 @@
 > Regenerate with `./generate-schema-svg` after a schema
 > change.
 
-The tables stored in localStorage as JSON arrays are listed
-in `api/db.ts` as `TABLE_NAMES` (the authoritative count).
-Each table is keyed as
-`fusion-ai:tableName`. All rows have a text `id` primary
-key. Column types: TEXT (string), INTEGER (number), REAL
-(float), BOOLEAN (see below). JSON columns store stringified
+The tables are listed in `api/db.ts` as `TABLE_NAMES` (the
+authoritative count). Each table is an IndexedDB object store
+(`keyPath: 'id'`) in the `fusion-ai` database; the simulated
+backends key the same tables as `fusion-ai:tableName`. All
+rows have a text `id` primary key. Column types: TEXT
+(string), INTEGER (number), REAL (float), BOOLEAN (see
+below). JSON columns store stringified
 arrays or objects. All columns are NOT NULL — entity
 validation on creation ensures every field is present.
 
 **Boolean storage:** BOOLEAN columns are typed as `boolean`
-in TypeScript (`api/types.ts`) but persisted as INTEGER
-`0`|`1` by `db-localstorage.ts::serializeValue` on write and
-deserialized back on read. The in-memory and API-boundary
-shape is always a real boolean; the `0`|`1` form never
-escapes the storage layer.
+in TypeScript (`api/types.ts`) and persist NATIVELY — there
+is no `0`|`1` transform. The one storage-edge transform is
+the NOT-NULL gate in `api/storage-serialize.ts`
+(`serializeValue`), which every backend applies so a write
+with a null/undefined field throws rather than persisting.
 
 **Timestamp convention:** TEXT columns storing timestamps
 use RFC-3339 Zulu format (e.g.,
@@ -732,6 +733,8 @@ State alphabets by entity kind:
   `archived`
 - **records** — `RECORD_STATES` (3 values): `active`,
   `archived`, `deleted`
+- **objectives** — `OBJECTIVE_STATES` (2 values): `active`,
+  `archived`
 - **work orders** — open-ended transitions (state = any
   graph node id, a base62 token) plus the closed claim
   alphabet (`'claimed'`, `'claim_released'`,

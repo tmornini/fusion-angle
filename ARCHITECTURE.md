@@ -196,8 +196,9 @@ is the authoritative list and per-column reference),
 `api/store-state.ts` (the `StateStore` class — `record`,
 `currentFor`, `allFor`, `deletedIds`, `isDeleted`),
 `api/store-entity.ts` (`EntityStore` — consults `StateStore`
-for delete filtering), `api/db-localstorage.ts` (production
-impl), `api/db-memory.ts` (test impl), `api/api.ts` (pure
+for delete filtering), `api/db-indexeddb.ts` (production
+persistence tier), `api/db-localstorage.ts` (demo tier),
+`api/db-memory.ts` (test impl), `api/api.ts` (pure
 HTTP routing — `GET/PUT/DELETE/POST` helpers, **no
 module-level adapter; threaded explicitly** — plus the
 state routes for the unified states log),
@@ -210,17 +211,53 @@ member plus the human and AI rosters), `api/validators.ts`
 `model` is a known catalog id). The `DbAdapter`
 interface is the migration seam to Postgres.
 
-`web-app/app/adapters/init.ts` wires the production LocalStorage
-adapter singleton (`initAdapter()` / `getDbAdapter()`).
+`web-app/app/adapters/init.ts` wires the production IndexedDB
+adapter singleton (`initAdapter()` / `getDbAdapter()`); the
+IDB connection opens in `initialize()`, which boot awaits.
 `web-app/app/adapters/shared.ts` defines the `RequestContext`
-interface and `createRequestContext(adapter?)`, defaulting to
-that singleton; tests pass it a `MemoryDbAdapter`.
+interface and `createRequestContext(adapter, token)` — both
+args are required; `sessionContext()` is the no-arg
+convenience that defaults to the singleton adapter and
+session token. Tests pass `createRequestContext` a
+`MemoryDbAdapter`.
 
-The `StateStore` class defines four route definitions
-covering five HTTP operations: `GET/PUT states/:id`,
-`GET states`, `GET entity-states/:id` (current), and
-`GET entity-states/:id/history` (ordered). When no schema
-exists, non-entry pages redirect to snapshots.
+`api/api.ts` defines four state-route patterns covering
+five HTTP operations — `GET/PUT states/:id`, `GET states`,
+`GET entity-states/:id` (current), and
+`GET entity-states/:id/history` (ordered) — each dispatching
+to a `StateStore` method (`record`, `currentFor`, `allFor`).
+When no schema exists, non-entry pages redirect to snapshots.
+
+## Storage tiers
+
+`StorageBackend` (`api/db.ts`) is the byte-level seam:
+`transaction(tables, mode, fn)` is the primitive every row op
+crosses, and `ensureTables` / `hasSchema` / `createSchema` /
+`deleteSchema` are schema lifecycle. Stores own semantics
+(tombstones, splices, singletons); backends own persistence
+and encoding. `BackedDbAdapter` (`api/db-backed.ts`) composes
+one backend into the full `DbStores` bundle.
+
+Three backends implement the seam:
+
+- `backend-indexeddb.ts` — the production tier, wired by
+  `db-indexeddb.ts`. It is the ONLY file that names
+  `indexedDB.*` (the divorce point). `transaction` runs a real
+  `IDBTransaction` that commits on `oncomplete` and aborts on a
+  thrown body, so a batch applies whole or not at all; schema
+  presence is a `__schema__` marker store.
+- `backend-localstorage.ts` — the demo tier, wired by
+  `db-localstorage.ts`. It SIMULATES the transaction via
+  `backend-buffer-tx.ts` (buffer touched tables, flush on
+  success, discard on throw); schema presence is table
+  existence.
+- `backend-memory.ts` — the test tier, wired by `db-memory.ts`,
+  simulating the same buffer transaction in process.
+
+The simulated tiers share the buffer-then-flush helper so the
+test backend cannot lie about what the production gate
+enforces. The one property only IndexedDB provides is OS-atomic
+multi-key commit — see the snapshot-import note in CLAUDE.md.
 
 ## Page Module Pattern
 

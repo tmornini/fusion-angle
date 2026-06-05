@@ -139,8 +139,8 @@ time budgets while keeping per-entity mutation domains disjoint:
 
 #### Entity mutation domain scoping
 
-Phase 2 agents share one localStorage but each owns a disjoint
-subset of tables:
+Phase 2 agents share one IndexedDB database but each owns a
+disjoint subset of tables:
 
 | Agent | Mutation domain |
 |---|---|
@@ -157,27 +157,24 @@ freezes `flow_graph` at creation time. If Agent-F edits the
 shared flow concurrently, the captured snapshot reflects
 mid-edit state, not a clean baseline.
 
-Because `StorageEvent` propagation makes sibling changes visible
-to every tab, cross-boundary assertions use `≥ N` or
-"displayed-count matches current localStorage at read time"
-framing rather than frozen expected values. Agent-CH's dashboard
-count checks are non-zero + consistency, not numeric equality.
+Because a sibling tab's commit broadcasts its touched tables
+(BroadcastChannel) and triggers a refresh, cross-boundary
+assertions use `≥ N` or "displayed-count matches the current
+database at read time" framing rather than frozen expected
+values. Agent-CH's dashboard count checks are non-zero +
+consistency, not numeric equality.
 
-**Shared states-log write hazard.** The mutation domains above
-partition the *entity* tables, but the append-only `states` log
-is written by several agents at once — Agent-D (idea lifecycle),
-Agent-E (project lifecycle), Agent-G (member lifecycle), and
-Agent-F2 (work-order transitions and claims) all append to the
-one `fusion-ai:states` key. The per-tab store serializer orders
-writes only *within* one tab, so two agents appending
-concurrently can lose an event (both read the same version; the
-second `setItem` overwrites the first). Treat the states log as
-a shared-write hazard: serialize state-mutating steps across
-agents where it matters, and re-read tolerantly (`≥ N`) rather
-than asserting exact event counts. The structural fix (a
-browser-mediated lock, or the Postgres tier) is tracked in
-CLAUDE.md § Gotchas — "Cross-tab writes to the states log can
-lose updates".
+**Shared states-log writes are now safe.** The mutation domains
+above partition the *entity* tables, and the append-only
+`states` log is written by several agents at once — Agent-D
+(idea lifecycle), Agent-E (project lifecycle), Agent-G (member
+lifecycle), and Agent-F2 (work-order transitions and claims) all
+append to it. On IndexedDB an append is an O(1) per-row
+`objectStore.put`, not a whole-table rewrite, so concurrent
+appends from sibling tabs both survive — the lost-update hazard
+the localStorage tier could not close is gone (CLAUDE.md §
+Gotchas — "Cross-tab writes are safe"). Re-read tolerantly
+(`≥ N`) for timing rather than asserting exact event counts.
 
 #### Known MCP limitations
 
@@ -189,8 +186,9 @@ lose updates".
   D36/D37, uses native HTML5 drag-and-drop on the
   `.drag-handle` — NOT pointer-capture — so it is driveable
   and exempt from this limitation). Work around by
-  validating end-state via direct JSON injection into
-  `fusion-ai:flows`, then reloading and verifying render. When
+  validating end-state via direct injection into the
+  `flows` object store (IndexedDB), then reloading and
+  verifying render. When
   the injection succeeds and the SVG renders the expected end
   state, the case is **PASS** with the note `verified via JSON
   injection` — NOT BLOCKED. `BLOCKED` is reserved for cases
@@ -351,7 +349,7 @@ on. Run these in order.
 ### AA1. Create Pristine Environment
 
 - [ ] **AA1** Navigate to `snapshots/`. Click "Create Pristine Environment" and confirm the wipe dialog. PASS: redirects to dashboard. Dashboard shows empty/minimal state.
-- [ ] **AA2** Open DevTools, verify localStorage has a `fusion-ai:*` key for every table listed in `TABLE_NAMES` (`api/db.ts`) — empty arrays plus bootstrap data, including the `states` event log (with the seeded `'system'`-member and `'current'`-user 'active' bootstrap events).
+- [ ] **AA2** Open DevTools → Application → IndexedDB → `fusion-ai`, verify an object store for every table listed in `TABLE_NAMES` (`api/db.ts`) plus the `__schema__` marker — empty stores plus bootstrap data, including the `states` event log (with the seeded `'system'`-member and `'current'`-user 'active' bootstrap events).
 - [ ] **AA3** Verify bootstrap data exists: user "Tony Stark" (id: `current`), organization "Stark Industries" (domain `acmecorp.com`) on the "Business" plan.
 
 ### AA2. Create Members
@@ -506,8 +504,8 @@ on. Run these in order.
   effect on the canvas.
   (Properties panel double-click is BLOCKED per the
   MCP pointer-capture limitation; validate end-state
-  via direct JSON injection into `fusion-ai:flows`
-  per the CLAUDE.md workaround.)
+  via direct injection into the `flows` object store
+  (IndexedDB) per the CLAUDE.md workaround.)
 - [ ] **AA29** Edit the state name in the
   properties panel to "Data Capture". PASS: the
   node label updates on the canvas immediately
@@ -931,8 +929,8 @@ opens and renders.)
   list, and outgoing transitions.
   (Properties panel double-click is BLOCKED per the
   MCP pointer-capture limitation; validate end-state
-  via direct JSON injection into `fusion-ai:flows`
-  per the CLAUDE.md workaround.)
+  via direct injection into the `flows` object store
+  (IndexedDB) per the CLAUDE.md workaround.)
 - [ ] **F12** Pan so a node sits near the right
   edge of the canvas, then double-click it. PASS:
   the properties panel slides out from the
@@ -941,8 +939,8 @@ opens and renders.)
   of the canvas region not covered by the panel.
   (Properties panel double-click is BLOCKED per the
   MCP pointer-capture limitation; validate end-state
-  via direct JSON injection into `fusion-ai:flows`
-  per the CLAUDE.md workaround.)
+  via direct injection into the `flows` object store
+  (IndexedDB) per the CLAUDE.md workaround.)
 - [ ] **F13** While the panel is open, double-click
   a different node. PASS: panel content updates to
   the new selection and the canvas re-centers on
@@ -1150,7 +1148,7 @@ states, and that the canvas re-renders after each step.)
 - [ ] **F45** Make 11 edits in the flow designer (e.g. rename 11
   nodes one at a time, waiting for each auto-save). PASS: the
   persistent undo history retains at most 10 versions (inspect
-  `fusion-ai:flow_versions` in DevTools — at most 10 rows for this
+  the `flow_versions` store in DevTools — at most 10 rows for this
   `flow_id`; the oldest has been hard-deleted). (The
   `FLOW_VERSION_CAP` trimming logic itself is covered by
   `tests/adapters-flow-versions.test.ts`; this case verifies it
@@ -1213,8 +1211,9 @@ states, and that the canvas re-renders after each step.)
   region.
 - [ ] **F59** Tick one human checkbox and one AI checkbox.
   Reload the page and reopen the same node panel. PASS:
-  the same two checkboxes are still ticked. Inspect
-  `localStorage['fusion-ai:flows']` — the node carries
+  the same two checkboxes are still ticked. Inspect the
+  `flows` object store (DevTools → Application → IndexedDB →
+  `fusion-ai`) — the node carries
   `memberIds: [<humanId>, <aiId>]`.
 - [ ] **F60** Untick one of the two checkboxes. Reload the
   page and reopen the panel. PASS: only the remaining
@@ -1236,8 +1235,8 @@ states, and that the canvas re-renders after each step.)
 - [ ] **F65** Open an edge panel. PASS: the header shows
   "Transition Properties" title and close button — no
   Members fieldset.
-- [ ] **F66** Inspect `localStorage['fusion-ai:flow_versions']`
-  before and after a `memberIds` change. PASS: a new
+- [ ] **F66** Inspect the `flow_versions` object store
+  (IndexedDB) before and after a `memberIds` change. PASS: a new
   version row appears for the flow after the change
   (member assignment participates in versioning).
 - [ ] **F67** Tick one checkbox in the Members fieldset,
@@ -1421,8 +1420,8 @@ states, and that the canvas re-renders after each step.)
 ### Workbox — Data Integrity
 
 - [ ] **WB16** After creating and transitioning
-  a work order, check localStorage. PASS:
-  `work_orders` table has 1 row with `display_id`
+  a work order, check the IndexedDB stores. PASS: the
+  `work_orders` store has 1 row with `display_id`
   and `flow_graph` JSON. The `states` table has
   one row per transition with `entity_id` =
   work-order id, `state` = the target node id (a
@@ -1440,13 +1439,13 @@ states, and that the canvas re-renders after each step.)
 - [ ] **WB18** Open the same unclaimed work order in two browser
   tabs. In tab 1, click the row to claim it. In tab 2, attempt the
   same. PASS: tab 2 either navigates to a read-only/already-claimed
-  view or the claim is rejected — and the `fusion-ai:states` log
+  view or the claim is rejected — and the `states` store
   contains at most one live `'claimed'` event for this work
   order's `entity_id` (a stale prior claim is superseded by a
   materialized `'claim_expired'` event, never overwritten in
   place).
 - [ ] **WB19** After transitioning a work order through at
-  least two states, read `fusion-ai:states` from DevTools and
+  least two states, read the `states` store from DevTools and
   filter to `entity_id` = this work order's id. PASS: each
   non-claim event has the immutable shape `{id, entity_id,
   state, member_id, at}`, with `state` carrying the target
@@ -1693,17 +1692,18 @@ the claude-in-chrome MCP.
 ### Snapshots (`snapshots/`) — Phase 4 (Run These Last)
 
 **Phase 4 — Snapshot lifecycle & objective wipe.** Cases
-G30–G35 (snapshot lifecycle) and K8 (DevTools localStorage
+G30–G35 (snapshot lifecycle) and K8 (DevTools IndexedDB
 wipe → Organization empty-state check → mock-data restore)
 all destroy and restore the shared database. They MUST run
 alone in tab 0 after Phase 3 completes — never concurrent
 with Phase 2.
 
 (Snapshot serialization, per-row import-validation, the quota
-pre-flight, column-level compression, and wipe-on-fail are
-covered by `tests/snapshot-import-validation.test.ts`,
-`tests/snapshot-quota.test.ts`, `tests/snapshot-wipe-on-fail.test.ts`,
-and `tests/db-localstorage-compression.test.ts`. The cases below
+pre-flight, the localStorage tier's column compression, and
+atomic import are covered by `tests/snapshot-import-validation.test.ts`,
+`tests/snapshot-quota.test.ts`, `tests/snapshot-wipe-on-fail.test.ts`
+(now atomic-rollback, not wipe-on-fail), and
+`tests/db-localstorage-compression.test.ts`. The cases below
 verify the four operation cards, the file-picker affordance, the
 post-operation redirect, and that pages render against the
 restored data.)
@@ -1723,27 +1723,20 @@ restored data.)
   Dashboard renders with zeroed-out metrics (empty
   database except for the required bootstrap seed). Empty
   bootstrap seeds only org `'1'` (Stark Industries). Every
-  table in `TABLE_NAMES` is present as an empty array
-  EXCEPT `fusion-ai:members` (parent rows for the System
-  member, `type` 'system', and Tony Stark, `type`
-  'human'), `fusion-ai:human_members` (Tony Stark's
-  detail row), `fusion-ai:organization` (Stark
-  Industries), and `fusion-ai:states` (bootstrap state
-  events for those rows). NOTE: pristine seeds NO Records
-  — `fusion-ai:records` and `fusion-ai:record_attributes`
-  are empty like every other non-essential table. Source
-  of truth:
-  `populateBootstrapData` in `api/mock-data.ts`. Empty
-  `flow_versions` and other tables appear as `gz1:H4sI…`
-  sentinels
-  (column-compression is scoped to those two tables);
-  the other empty tables persist as the literal `[]`
-  string. The `db-localstorage` adapter decodes both
-  shapes transparently.
-  The full table set is the constant `TABLE_NAMES` in
-  `api/db.ts`;
-  cross-check against that. No tables outside that list
-  appear under any `fusion-ai:*` key.
+  object store maps to a table in `TABLE_NAMES` and is empty
+  EXCEPT `members` (parent rows for the System member,
+  `type` 'system', and Tony Stark, `type` 'human'),
+  `human_members` (Tony Stark's detail row), `organizations`
+  (Stark Industries), and `states` (bootstrap state events
+  for those rows). NOTE: pristine seeds NO Records —
+  `records` and `record_attributes` are empty like every
+  other non-essential table. Source of truth:
+  `populateBootstrapData` in `api/mock-data.ts`. IndexedDB
+  stores each row as an object — no `gz1` compression, which
+  was the localStorage tier — and the `__schema__` marker
+  store holds one row. The full table set is the constant
+  `TABLE_NAMES` in `api/db.ts`; cross-check against that. No
+  object stores outside that list (plus `__schema__`) appear.
 - [ ] **G33** Click "Wipe and Load Mock Data". PASS: the wipe fires immediately — there is no confirmation dialog — then the page renders the one-time demo-credentials reveal panel (`.credential-reveal`, titled "Save your demo sign-ins") listing EVERY login-capable seeded identity's email + fresh password in the monospace `.credential-reveal-box`, one credential per line, with a "Copy all" button. (Mock data seeds two orgs — `'1'` Stark Industries and `'2'` Wayne Enterprises — so the list spans both orgs' seeded humans; Tony Stark / `current` is the multi-org admin.) The page does NOT navigate until "I have saved it — continue" is clicked; clicking it redirects to `dashboard/index.html`. Navigate to `ideas/` — 11 ideas are back.
 - [ ] **G34** Return to `snapshots/`, wipe data, then use "Upload Snapshot" file input and select the previously downloaded JSON file. PASS: redirects to `dashboard/index.html`. Data matches the snapshot.
 - [ ] **G36 — Header org-switcher (multi-org user)** After "Wipe and Load Mock Data" (G33) seeds two orgs and boot signs in as the multi-org admin Tony Stark (`current`), the header greeting shows an org `<select>` (`.org-switcher`) next to the name — it appears ONLY because the user can reach ≥2 orgs (`shouldShowOrgSwitcher`). PASS: the select lists "Stark Industries" and "Wayne Enterprises" with Stark active. Note the Members and Ideas lists for Stark. Select "Wayne Enterprises" → the page does a FULL reload and re-scopes: Members shows Wayne's roster and Ideas shows Wayne's ideas (org-fenced — Stark's rows are no longer visible). Reload the page again WITHOUT changing the select → the selection persists (Wayne stays active; the choice is stored under `fusion.active-org` and boot re-exchanges a scoped token from it). A single-org seeded user, by contrast, sees NO org `<select>` in the header. Source of truth: `web-app/app/org-switcher.ts`, `web-app/app/adapters/org-session.ts`, `web-app/app/core.ts::scopeBootToActiveOrg`. (This case requires the two-org mock-data seed, so it runs in Phase 4 alongside G30–G35 — never concurrently with Phase 2 agents.)
@@ -1753,17 +1746,18 @@ restored data.)
 - [ ] **G35** On `snapshots/`, click "Upload Snapshot" and select a
   malformed JSON file (e.g. truncated mid-object). PASS: a toast or
   inline error reports the upload failed with a human-readable
-  message; existing data in localStorage is untouched (verify via
-  DevTools that no fusion-ai:* keys were overwritten or cleared).
-  Note: malformed JSON is rejected at parse time — BEFORE any
-  write — so the wipe-on-fail path is NOT exercised by this case.
-  Wipe-on-fail fires for the rarer scenario where parse succeeds
-  but a per-row validator throws mid-write; that path is covered
-  by `tests/snapshot-wipe-on-fail.test.ts`. The pre-parse
-  rejection logic and the wipe-on-fail behavior are covered
-  by `tests/snapshot-import-validation.test.ts` and
-  `tests/snapshot-wipe-on-fail.test.ts` — this case verifies the
-  error toast/inline-error surfaces in the UI.)
+  message; existing data is untouched (verify via DevTools that
+  the IndexedDB object stores were not overwritten or cleared).
+  Note: malformed JSON is rejected at parse time — BEFORE the
+  import transaction opens — so no data is touched. A
+  parse-success but validator-throw is rejected at the gate too;
+  and on IndexedDB the clear+put runs in one transaction, so even
+  a mid-write failure aborts whole, leaving prior data intact
+  (atomic import replaced wipe-on-fail). Covered by
+  `tests/snapshot-import-validation.test.ts` and
+  `tests/snapshot-wipe-on-fail.test.ts` (now atomic-rollback) —
+  this case verifies the error toast/inline-error surfaces in the
+  UI.)
 - [ ] **G36** Member lifecycle is recorded in the `states`
   event log. On a member detail page (human OR AI), click
   Edit, change the State select (active / pending /
@@ -1771,15 +1765,15 @@ restored data.)
   via `postHumanMemberStateChange` /
   `postAIMemberStateChange` — both kinds expose the same
   State select and share the 3-value vocabulary per
-  Commandment III (Uniformity). Verify by inspecting
-  `fusion-ai:states` in DevTools: a row appears with
+  Commandment III (Uniformity). Verify by inspecting the
+  `states` store in DevTools: a row appears with
   `entity_id` = the member's id, `state` = the chosen
   value, `member_id` = the actor, and the member row in
   `members` / `ai_members` itself is unchanged — the
   states log carries the lifecycle stage, not a column on
   the entity. After reload the member's badge text and
   styling reflect the persisted state.
-- [ ] **G37 — Boot recovery from an incompatible/partial schema** With the app loaded, open DevTools and corrupt localStorage to a PARTIAL CURRENT schema: `localStorage.clear(); localStorage.setItem('fusion-ai:organizations','[]'); localStorage.setItem('fusion-ai:workers','[]')` — a current table is present so `hasSchema()` is true, but `members` and the rest are missing (the pre-rename / version-skew shape). Navigate to a schema-requiring page (e.g. `dashboard/index.html`). PASS: boot's `initDatabase()` throws `MissingTableError`, and `core.ts` REDIRECTS to `snapshots/index.html?missing-table=members` (NOT the terminal "Failed to initialize database" dead-end). The snapshots recovery page RENDERS its four operation cards plus the warning banner 'The schema is missing the "members" table. Recreate the schema below to continue.' and "Your database is empty." — so the user can recover via Wipe and Load Mock Data / Upload Snapshot / Create Pristine. (Before the BOOT-01 fix this dead-ended on the top-level error page; before the partial-schema follow-up the snapshots page itself threw `MissingTableError` in `getHasAnyHumanMembers` and showed "Something went wrong / Try Again".) A `workers`-only localStorage (no current table) instead takes the clean-empty path — `hasSchema()` is false → redirect to `snapshots/` with the "empty database" banner and the same recovery cards. Afterward, Wipe and Load Mock Data to restore a healthy DB before continuing. Source: `web-app/app/core.ts` (`redirectIfMissingTable` + the `initDatabase()` catch), `web-app/app/adapters/snapshots.ts` (`getHasAnyHumanMembers`), `web-app/snapshots/index.ts` (`mutateMissingTableBanner`).
+- [ ] **G37 — Boot recovery from a missing schema** With the app loaded, open DevTools → Application → IndexedDB and delete the `fusion-ai` database (or clear the `__schema__` store). Reload a schema-requiring page (e.g. `dashboard/index.html`). PASS: boot reopens a fresh empty database, `hasSchema()` is false, and `core.ts` REDIRECTS to `snapshots/index.html` with the "Your database is empty." banner and the four recovery cards (Wipe and Load Mock Data / Upload Snapshot / Create Pristine) — never the terminal "Failed to initialize database" dead-end. Afterward, Wipe and Load Mock Data to restore a healthy DB before continuing. (Unlike the old localStorage tier, IndexedDB object stores always exist post-upgrade, so a hand-corrupted "partial table" shape is no longer reproducible; a genuinely missing store arises only on a schema version bump, where boot throws `MissingTableError` and `redirectIfMissingTable` routes to `snapshots/index.html?missing-table=<name>` with the matching "The schema is missing the \"<name>\" table" banner.) Source: `web-app/app/core.ts` (`redirectIfMissingTable` + the `initDatabase()` catch), `web-app/app/adapters/snapshots.ts` (`getHasAnyHumanMembers`), `web-app/snapshots/index.ts` (`mutateMissingTableBanner`).
 
 ### Billing (`billing/`) — STUB
 
@@ -1813,8 +1807,8 @@ feature is implemented.
   card returns to read mode showing the new
   values. Reload the page. PASS: new values
   persist (round-tripped through `PUT
-  /api/organization`). Inspect localStorage:
-  `fusion-ai:organization` row has the updated
+  /api/organization`). Inspect the `organizations`
+  store (IndexedDB): the org row has the updated
   `name` and `domain` fields alongside the
   unchanged plan/seats/billing fields.
 
@@ -1867,7 +1861,7 @@ feature is implemented.
 ### Loading States
 
 - [ ] **I21** Navigate to a data-dependent page with mock data loaded. PASS: loading skeleton (card-grid, card-list, or detail pattern) appears briefly before content renders.
-- [ ] **I22** If an error occurs inside a `withLoadingState()` fetch path (e.g. a data-dependent page hits a thrown adapter error after the database initialized successfully), the error state with "Try Again" retry button is shown. PASS: clicking retry re-attempts data loading. (Note: errors surfaced from `initDatabase` itself — e.g. corrupted localStorage that fails before the page renders — show a separate "Failed to initialize database" error UI via `handleDatabaseError`, without a retry button. Both are valid error states for different layers.)
+- [ ] **I22** If an error occurs inside a `withLoadingState()` fetch path (e.g. a data-dependent page hits a thrown adapter error after the database initialized successfully), the error state with "Try Again" retry button is shown. PASS: clicking retry re-attempts data loading. (Note: errors surfaced from `initDatabase` itself — e.g. a failed IndexedDB open/version error before the page renders — show a separate "Failed to initialize database" error UI via `handleDatabaseError`, without a retry button. Both are valid error states for different layers.)
 
 ### Toasts
 
@@ -1915,7 +1909,7 @@ K7 has been reassigned to Agent-E and appears at the end of
 the K30 subsection. K8 has been moved to Phase 4 alongside
 G30–G35 (snapshot lifecycle) and is documented in the
 Snapshots section below — it MUST NOT run in Phase 2
-because it wipes localStorage, which is shared across the
+because it wipes the database, which is shared across the
 seven Phase 2 agents.
 
 **K1.** Open Organization page; confirm Objectives box
@@ -1944,11 +1938,11 @@ new position persists across a page reload.
 
 **K8.** **Phase 4 case** — runs alone alongside G30–G35
 after Phase 2 and Phase 3 complete. Catastrophic if run
-in Phase 2 because it wipes localStorage, which is shared
+in Phase 2 because it wipes the database, which is shared
 across all seven Phase 2 agents.
 
-Empty state: wipe localStorage via DevTools
-(Application > Local Storage > Clear All), then navigate
+Empty state: wipe the database via DevTools (Application >
+IndexedDB > delete `fusion-ai`), then navigate
 to the Organization page. PASS if the empty-state copy
 "No objectives yet. Add one to get started." renders
 (or the bootstrap redirects to the snapshots page per the
@@ -2017,8 +2011,8 @@ approved) shows the negative score.
 
 **K18.** "No-payload" save: with no slider moved off its
 `data-initial-value`, the `Save` button stays disabled and
-no new rows are written to
-`fusion-ai:project_objective_baseline_scores` (count
+no new rows are written to the
+`project_objective_baseline_scores` store (count
 unchanged via console).
 
 ### K19–K23 — Inline actual measurement + Archive (Agent-E)
@@ -2080,7 +2074,7 @@ Portfolio Impact) and an Aggregate Objectives box
 
 **K29.** From another tab, log a measurement on an approved
 project. PASS if the dashboard cards update within ~1
-second (StorageEvent + scoreChanges propagation).
+second (BroadcastChannel + scoreChanges propagation).
 
 ### K30 + K7 — Project history modal & temporal name resolution (Agent-E)
 
@@ -2102,9 +2096,8 @@ PASS if:
   collapsed)
 
 **K7.** After K30 has run AND Agent-G's K3 has executed
-(verify via
-`localStorage.getItem('fusion-ai:objective_revisions')` —
-≥1 row with a `name` change confirms K3 ran), reopen the
+(verify the `objective_revisions` store in IndexedDB holds
+≥1 row with a `name` change, confirming K3 ran), reopen the
 project's history modal. PASS if events that predate the
 K3 edit display the OLD objective name, not the new one
 (temporal name resolution). If after 10 minutes
@@ -2181,6 +2174,19 @@ panel, and the property-test gate.
   control exists in the toy) or via the snapshot wipe.
   PASS: lifecycle state reads `archived`; the list page
   excludes the row from active counts.
+
+## L. IndexedDB Persistence Tier
+
+Backend: `api/backend-indexeddb.ts`. No Node test (no fake-IDB, zero devDeps) — verified in-browser via the Chrome MCP. Serve: `TMPDIR=/tmp/claude ./serve 8080`.
+
+- [ ] **L1** Boot creates the database. Inspect `indexedDB.databases()` on the dashboard. PASS: `fusion-ai@v1` with 33 object stores (32 tables + `__schema__`).
+- [ ] **L2** Missing-schema route. Open the dashboard against an empty database. PASS: it redirects to the Snapshots page.
+- [ ] **L3** Atomic seed. Click "Wipe and Load Mock Data". PASS: the `__schema__` marker and table rows persist; the dashboard renders the seeded org.
+- [ ] **L4** Persistence across reload. Reload the dashboard. PASS: it renders the seeded data without re-routing to Snapshots.
+- [ ] **L5** Cross-tab append survives (lost-update fix). From two connections (two tabs), append distinct `states` rows concurrently. PASS: both rows survive (count grows by 2) — the old localStorage clobber is gone.
+- [ ] **L6** Cross-tab refresh. Commit a write in one of two open tabs. PASS: a `BroadcastChannel('fusion-ai:data')` message with the touched tables reaches the other tab; the poster is not echoed (no self-refresh).
+- [ ] **L7** Atomic import. The clear+put import runs in one `IDBTransaction`. PASS: a rejected import leaves prior data intact (no corruption).
+- [ ] **L8** Quota pre-flight. PASS: an oversize snapshot rejects with `SnapshotTooLargeError` before any write (also `tests/snapshot-quota.test.ts`).
 
 ## J. Teardown
 

@@ -111,14 +111,20 @@ is HTTP-only.
   ledger. Per-org roles via `currentRolesForInOrg`. See
   [SCHEMA.md](SCHEMA.md) /
   [ARCHITECTURE.md](ARCHITECTURE.md).
-- **Data.** REST-style API (`api/`) over localStorage. Adapters
+- **Data.** REST-style API (`api/`) over IndexedDB. Adapters
   in `web-app/app/adapters/` shape rows for pages.
 - **Presentation.** Presenters in `web-app/app/presenters/` emit
   `SafeHtml`.
-- **Database.** localStorage with JSON serialization; each
-  table is a `fusion-ai:tableName` key. The `states` table is
-  the unified append-only event log — storage truth and the
-  state alphabets in [SCHEMA.md](SCHEMA.md).
+- **Database.** IndexedDB (`api/backend-indexeddb.ts`): one
+  object store per table (`keyPath: 'id'`) plus a `__schema__`
+  marker store, at version 1. Every store op crosses the
+  `StorageBackend` transaction seam (`api/db.ts`) — a real
+  `IDBTransaction` that commits on `oncomplete` and aborts on a
+  thrown body. The memory + localStorage backends simulate the
+  same transaction (buffer then flush) for the automated suite
+  and the demo tier. The `states` table is the unified
+  append-only event log — storage truth and the state
+  alphabets in [SCHEMA.md](SCHEMA.md).
 - **State.** Module-level vars + pub-sub for theme, mobile,
   auth, sidebar.
 
@@ -242,7 +248,10 @@ version/query adapters, every data adapter (including
 and `adapters-flow-publish.test.ts` for
 `validateFlowForCreation` / `getFlowsForCreation`), the
 workbox inbox aggregation, the mermaid round-trip,
-in-browser ZIP, snapshot import-validation/quota/wipe-on-fail,
+in-browser ZIP, snapshot import-validation/quota/atomic-import,
+the memory + localStorage transaction backends
+(`backend-tx-memory`, `backend-tx-localstorage`), the tx
+runners and view, the org-fence-in-tx, the commit batch route,
 api routing, navigation, mock-data validity, the two-tier
 hazard predicate (`tests/flow-graph-hazard.test.ts` covers
 `shouldShowMemberHazard`), and the SafeHtml output of the
@@ -305,23 +314,26 @@ meaningless. Report the failure, stop, await fix.
   for theme and sidebar state are wrapped in try/catch that
   log at `warn` level — quota errors don't break the app but
   are observable via the logger.
-- **Snapshots wipe-first.** All snapshot operations
-  (pristine, mock data, import) call
-  `DELETE('snapshots/schema')` before writing — there is no
-  merge, only replace.
+- **Snapshots replace, not merge.** Import clears every table
+  and writes the snapshot rows in ONE transaction (`tx.clear`
+  + `tx.put` over `TABLE_NAMES`); pristine/mock-data seeding
+  wipes via `deleteSchema` first. On IndexedDB the clear+put
+  is a genuine atomic commit.
 - **Snapshot quota pre-flight.** `putSnapshotFromFile`
   consults `navigator.storage.estimate()` and rejects with
   `SnapshotTooLargeError` if `file.size` exceeds half of
   `quota - usage` (the import doubles peak memory while
   parsing). Falls back to a 5 MB hard cap when
   `navigator.storage.estimate()` is unavailable.
-- **Snapshot wipe-on-fail.** With pre-flight quota checks +
-  per-row validation + column-level compression, mid-write
-  failure is rare; when it does happen, `importSnapshot`
-  wipes every `fusion-ai:<table>` key so the next bootstrap
-  detects no schema and routes the user to the snapshots
-  page to re-import. No backup, no sentinel, no rollback —
-  real atomicity arrives with Postgres.
+- **Snapshot import is atomic (wipe-on-fail retired).** On
+  IndexedDB the clear+put runs in one `IDBTransaction` — it
+  commits whole or aborts whole, so a failed import leaves
+  prior data intact with no manual wipe. Validators run at the
+  gate (`parseAndValidateSnapshot`, `scanForRetiredKeys`,
+  quota pre-flight) BEFORE the transaction. The simulated
+  localStorage tier rolls back logic errors the same way, but
+  its multi-key flush is still not OS-atomic on a mid-write
+  quota error — the one gap IndexedDB closes.
 - **`file:///` protocol.** Navigation detects file protocol
   and skips link prefetching. Page URLs use relative paths.
   Code supports `file:///` locally but testing is HTTP-only.
@@ -341,19 +353,23 @@ meaningless. Report the failure, stop, await fix.
   `state_field_values`) is the seam — read
   `api/store-entity.ts` and `api/store-state.ts` together to
   see both halves.
-- **Cross-tab writes to the states log can lose updates.**
-  Each browser tab builds its own `LocalStorageDbAdapter`, so
-  the per-store serializer (`createSerializer`) only orders
-  writes *within* one tab. Two tabs — or parallel browser
-  agents — writing the shared `fusion-ai:states` key
-  concurrently both read v0; the second `setItem` overwrites
-  the first. Within one tab there is no race (proven by the
-  green `concurrent puts to same store` test in
-  `db-localstorage-compression.test.ts`). An in-memory mutex
-  cannot fix this — the tabs share no heap — so only a
-  browser-mediated lock (Web Locks) or the Postgres tier can.
-  Parallel test agents must treat the states log as a
-  shared-write hazard. Real atomicity arrives with Postgres.
+- **Cross-tab writes are safe (lost-update hazard closed).**
+  IndexedDB gives each tab its own connection to one shared
+  database, and an append is an O(1) `objectStore.put`, not a
+  whole-table rewrite — so two tabs appending to `states`
+  concurrently both survive (verified in-browser). A
+  successful readwrite commit posts the touched table names
+  over a `BroadcastChannel` (`adapters/broadcast-channel.ts`)
+  so other tabs refresh; the poster is never echoed, so it
+  does not double-refresh. Theme/sidebar still sync over
+  `StorageEvent` (they stay in localStorage).
+- **IndexedDB auto-commit constraint.** An `IDBTransaction`
+  lives only while it has pending requests; awaiting any
+  NON-IDB promise inside a `transaction(…)` body (a timer,
+  fetch, gzip, HMAC) yields to a macrotask and the transaction
+  commits early. So every `transaction(…)` body awaits ONLY
+  row ops — validators, crypto, and compression run OUTSIDE
+  the tx. Sync compute between row ops is fine.
 - **`state_field_values.field_id` references
   `record_attributes.id`.** the column name predates Records
   and stays until a second non-Record consumer arrives. The
