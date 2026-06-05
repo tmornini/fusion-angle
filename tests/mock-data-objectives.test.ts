@@ -1,7 +1,10 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
-import { populateMockData } from '../api/mock-data.ts';
+import {
+    populateMockData,
+    OBJECTIVE_SEEDS,
+} from '../api/mock-data.ts';
 import {
     validateObjectiveEntity,
     validateObjectiveRevisionEntity,
@@ -32,13 +35,14 @@ async function projectIdsByState(
         .map(([id]) => id);
 }
 
-test('populateMockData seeds 4 objectives', async () => {
+test('seeds every objective seed plus the org-2 objective',
+async () => {
     const db = new MemoryDbAdapter();
     await db.createSchema();
     await seedRootAdmin(db);
     await populateMockData(db);
     const rows = await db.objectives.getAll();
-    assert.equal(rows.length, 4);
+    assert.equal(rows.length, OBJECTIVE_SEEDS.length + 1);
     for (const r of rows) {
         const { id: _id, ...body } = r;
         validateObjectiveEntity(body);
@@ -53,7 +57,7 @@ test('populateMockData seeds one revision per objective',
         await populateMockData(db);
         const revs =
             await db.objectiveRevisions.getAll();
-        assert.equal(revs.length, 4);
+        assert.equal(revs.length, OBJECTIVE_SEEDS.length + 1);
         for (const r of revs) {
             const { id: _id, ...body } = r;
             validateObjectiveRevisionEntity(body);
@@ -91,8 +95,13 @@ test('approved projects have full baseline coverage',
             approved.length > 0,
             'seed has approved projects',
         );
-        const objCount =
-            (await db.objectives.getAll()).length;
+        // Coverage is per-org since SP-6: an approved project
+        // is scored against the objectives in ITS org, not the
+        // global set.
+        const objectives = await db.objectives.getAll();
+        const orgByProject = new Map(
+            (await db.projects.getAll())
+                .map(p => [p.id, p.organization_id]));
         const allBaselines = await
             db.projectObjectiveBaselineScores.getAll();
         for (const pid of approved) {
@@ -101,9 +110,12 @@ test('approved projects have full baseline coverage',
                     .filter(b => b.project_id === pid)
                     .map(b => b.objective_id),
             );
+            const orgObjCount = objectives.filter(
+                o => o.organization_id
+                    === orgByProject.get(pid)).length;
             assert.equal(
                 pairs.size,
-                objCount,
+                orgObjCount,
                 `project ${pid} missing coverage`,
             );
         }

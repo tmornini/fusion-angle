@@ -9,6 +9,10 @@ import {
 } from '../../../api/types.ts';
 import type { RequestContext } from './shared.ts';
 
+// Surface the wire shape so the providers presenter speaks
+// one tongue through the adapter barrel.
+export type { IdentityProviderEntity };
+
 async function appendProviderEvent(
     ctx: RequestContext,
     identityId: Id,
@@ -47,6 +51,20 @@ export async function postProviderUnlink(
         ctx, identityId, provider, providerSubject,
         'unlinked',
     );
+}
+
+// The provider link/unlink EVENT LOG for one identity — the
+// raw append-only ledger in chronological order, NOT the
+// reduced current state (that is getProvidersFor). The UI
+// renders this so a person sees every link and unlink.
+export async function getProviderEvents(
+    ctx: RequestContext,
+    identityId: Id,
+): Promise<IdentityProviderEntity[]> {
+    const all = await ctx.GET<IdentityProviderEntity[]>(
+        'identity-providers',
+    );
+    return all.filter(ev => ev.identity_id === identityId);
 }
 
 // The providers an identity currently has linked: the latest

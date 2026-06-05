@@ -64,6 +64,7 @@ export class OrgScopedEntityStore<T extends OrgScoped>
         id: string,
         fields: Omit<T, 'id'>,
     ): Promise<T> {
+        await this.#assertWritable(id);
         return this.#inner.put(id, this.#stamp(fields));
     }
 
@@ -73,6 +74,9 @@ export class OrgScopedEntityStore<T extends OrgScoped>
     ): Promise<void> {
         for (const id of deleteIds) {
             await this.getById(id);
+        }
+        for (const entry of entries) {
+            await this.#assertWritable(entry.id);
         }
         const stamped = entries.map(entry => ({
             id: entry.id,
@@ -84,6 +88,24 @@ export class OrgScopedEntityStore<T extends OrgScoped>
     async delete(id: string): Promise<void> {
         await this.getById(id);
         await this.#inner.delete(id);
+    }
+
+    // A write may target a brand-new id (create) or an id this
+    // org already owns (update) — never an id owned by another
+    // tenant, which 404s exactly as a foreign read does: no
+    // existence confirmed, no clobber, no org theft. The
+    // write-side twin of getById's read fence.
+    async #assertWritable(id: string): Promise<void> {
+        let existing: T;
+        try {
+            existing = await this.#inner.getById(id);
+        } catch (e) {
+            if (e instanceof EntityNotFound) return;
+            throw e;
+        }
+        if (existing.organization_id !== this.#org) {
+            throw new EntityNotFound(this.#table, id);
+        }
     }
 
     // Stamp org onto a write body: the store owns the

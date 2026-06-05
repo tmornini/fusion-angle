@@ -247,7 +247,7 @@ export async function getProjectRow(
 export async function putProject(
     ctx: RequestContext,
     id: string,
-    entity: Omit<ProjectEntity, 'id'>,
+    entity: Omit<ProjectEntity, 'id' | 'organization_id'>,
 ): Promise<void> {
     await ctx.PUT(`projects/${id}`, entity);
     projectChanges.notify();

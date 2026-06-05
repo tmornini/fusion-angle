@@ -174,10 +174,14 @@ export async function init(): Promise<void> {
             const entity =
                 projectEntities.get(id);
             if (!entity) return;
+            const {
+                organization_id: _org,
+                ...fields
+            } = entity;
             await putProject(
                 sessionContext(), id,
                 {
-                    ...entity,
+                    ...fields,
                     position: newPosition,
                 },
             );

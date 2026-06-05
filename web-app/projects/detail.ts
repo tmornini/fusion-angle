@@ -681,7 +681,10 @@ async function handleSave(): Promise<void> {
         return;
     }
     const projectId = state.view.idForLink();
-    const entity = state.entity;
+    const {
+        organization_id: _org,
+        ...entity
+    } = state.entity;
     const patch = projectPatchFromDraft(
         state.view,
         state.draft,

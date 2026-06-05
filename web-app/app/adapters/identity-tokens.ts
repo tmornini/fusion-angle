@@ -16,6 +16,10 @@ import {
 } from '../../../api/identity-tokens.ts';
 import type { RequestContext, WriteOp } from './shared.ts';
 
+// Surface the wire shape so the tokens presenter speaks one
+// tongue through the adapter barrel.
+export type { IdentityTokenEntity };
+
 // CROSS-TAB SHARED-WRITE HAZARD. postTokenRotation reads the
 // ledger then appends — two tabs (or parallel agents) rotating
 // the same chain both read v0 and the second commit overwrites
@@ -113,6 +117,41 @@ export async function postTokenRevocation(
             parent_jti: '', at,
         })),
     });
+}
+
+// One refresh-rotation lineage: the chain_id plus its events
+// in append (chronological) order.
+export interface TokenChain {
+    readonly chainId: string;
+    readonly events: readonly IdentityTokenEntity[];
+}
+
+// All token chains for one identity: read the ledger, keep
+// this identity's rows, then group by chain_id. The UI
+// renders each chain so a session's issue/rotate/revoke
+// lineage reads as one unit.
+export async function getTokenChainsFor(
+    ctx: RequestContext,
+    identityId: Id,
+): Promise<TokenChain[]> {
+    const rows = await ctx.GET<IdentityTokenEntity[]>(
+        'identity-tokens',
+    );
+    const byChain = new Map<string, IdentityTokenEntity[]>();
+    for (const row of rows) {
+        if (row.identity_id !== identityId) continue;
+        const events = byChain.get(row.chain_id);
+        if (events) {
+            events.push(row);
+        } else {
+            byChain.set(row.chain_id, [row]);
+        }
+    }
+    const chains: TokenChain[] = [];
+    for (const [chainId, events] of byChain) {
+        chains.push({ chainId, events });
+    }
+    return chains;
 }
 
 // The current state of the chain a jti belongs to (null if the

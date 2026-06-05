@@ -68,7 +68,9 @@ is "server-fulfilled later" — it slots into the auth middleware and
 
 6. **Principal in the token, never in the path.** Access token (JWT,
    DPoP-bindable) carries `sub`=identity-id, `roles`, `name`,
-   `aud`/origin (which website), `cnf` (DPoP key) — **no org claim**.
+   `aud`/origin (which website), `cnf` (DPoP key). [SUPERSEDED by
+   SP-2 deviation (a): an `org` (active) + `orgs` (reachable) claim
+   now ride the token; see Execution status.]
    Identity-id appears in a path only where the identity is the
    resource (`/identities/:id/…`). Delegation = RFC 8693 token
    exchange.
@@ -302,8 +304,50 @@ Six independently-shippable sub-projects. **Critical path
     buffer; WebCrypto's `BufferSource` requires `Uint8Array<ArrayBuffer>`
     (not the default `<ArrayBufferLike>`), so `base64UrlToBytes` and the
     PBKDF2 salt are typed `Uint8Array<ArrayBuffer>`.
-- **SP-2, 6 — not started.** SP-5 is done; next on the critical path:
-  **SP-2 Tenancy** (the `5 → {2-facades, 6}` fork).
+- **SP-2 Tenancy — ✅ DONE** (executed 2026-06-04; commits
+  323228d..f5521df). Promoted the `organization` singleton to an
+  `organizations` tenant-root table; added NOT-NULL `organization_id`
+  to the org-owned entities (`role_grants`, `ideas`, `projects`,
+  `flows`, `work_orders`, `records`, `record_attributes`,
+  `objectives`), backfilled to `DEFAULT_ORG` ('1') on re-seed. Built
+  the `OrgScopedEntityStore` decorator + `orgScopedAdapter` factory
+  (filter on read, stamp on write, foreign id → 404 never 403), wired
+  into `handleRequest` as the per-request `effective` adapter (inert
+  for flat tokens). Extended the `token-exchange` grant to mint
+  org-scoped tokens after a membership check (grant-first — a
+  non-member is a 403 minting nothing); added the
+  `/organizations/:org/:entity[/:id]` facade that exchanges the
+  caller's bearer and re-enters the gate against the flat path.
+  Headline isolation proven in `tests/api-org-isolation.test.ts`.
+  - **Deviation (a) — org rides a verified token claim, not the
+    path.** Point 6 froze "no org claim"; the user chose an `org`
+    claim (set once at exchange) as the tamper-evident enforcement
+    seam. The decorator reads `org` from the VERIFIED claim, never a
+    caller-controlled path/query.
+  - **Deviation (b) — multi-org membership via a `memberships` join,
+    not `organization_id` on `members`.** A mid-execution requirement
+    surfaced (switch orgs without re-auth; enumerate reachable orgs),
+    so an identity must reach MANY orgs. `members` / `human_members` /
+    `ai_members` STAY GLOBAL (member.id === identity.id preserved); a
+    new `memberships` join `(id, identity_id, organization_id, at)` is
+    the org-scoped covenant — the source of enumerate and the exchange
+    member-check.
+  - **Deviation (c) — the token embeds the reachable `orgs` list.**
+    Alongside the active `org`, every issued/exchanged token carries
+    `orgs: Id[]` (derived from `memberships` at mint); `Principal`
+    gains `organizations`. `GET /organizations` (scoped to the
+    caller's memberships) is the authoritative fresh enumerate source
+    the `orgs` claim snapshots.
+  - **DEFERRED:** per-org member profiles; the member-list-by-
+    membership derivation (the members list is still global in SP-2);
+    broad web-app migration to facade routes (only `admin.ts`
+    migrated — the rest stay flat, stamping `DEFAULT_ORG` in their
+    adapters as the single-org interim); org-aware roles
+    (`currentRolesForInOrg`). Tenant isolation MUST NOT be relied on
+    in a networked/multi-user context until the HMAC signing key lives
+    server-side (inherited SP-3/5 constraint).
+- **SP-6 — not started.** SP-2 is done; SP-6 (identity surface +
+  org-switcher console) is next on the critical path.
 
 ## Sub-project 1 — Identity core (detailed; build first)
 
@@ -532,18 +576,19 @@ migrations arrive with Postgres.
   `identity_token_revocations`) for one consistent voice. Lands with
   the Postgres tier.
 
-## Next step (SP-5 executed)
+## Next step (SP-2 executed)
 
-SP-1, SP-3, SP-4, and SP-5 are done (see Execution status). The next
-sub-project on the critical path is **SP-2 (Tenancy)**: promote the
-`organization` singleton to a tenant root; add NOT-NULL
-`organization_id` to org-scoped entities (backfill to a default org so
-the single-org present keeps working); add `/organizations/:id/
-<entity>/` facade routes that token-exchange an internal sub-request
-to the flat root store + the `organization_id` leakage guard. SP-5's
-seams to build on: the `clients` registry, the `/authentication/token`
-`token-exchange` grant (the org facade issues the internal RFC 8693
-sub-request), and the real signed tokens now flowing through the gate.
-Invoke the writing-plans skill to produce the detailed SP-2 plan from
-the sketch above, then execute it TDD-first against
+SP-1, SP-2, SP-3, SP-4, and SP-5 are done (see Execution status). The
+next sub-project on the critical path is **SP-6 (Identity surface)**:
+the `/identities` CRUD + `/identity-pii` + `/identity-providers` +
+`/identity-tokens` management UI and the org-switcher console (the
+multi-org token machinery — `org`/`orgs` claims, the `memberships`
+join, the `GET /organizations` enumerate — is already built in SP-2
+for it to consume). SP-2 also left two follow-ons SP-6 (or a later
+sub-project) should pick up: per-org member profiles + the
+member-list-by-membership derivation, and migrating the remaining
+web-app write adapters from flat routes onto the
+`/organizations/:org/...` facade (today only `admin.ts` is migrated;
+the rest stamp `DEFAULT_ORG` directly). Invoke the writing-plans skill
+to produce the detailed SP-6 plan, then execute it TDD-first against
 `TMPDIR=/tmp/claude ./validate`.

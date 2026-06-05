@@ -3,7 +3,6 @@ import type {
     RecordAttributeId,
     RecordId,
 } from '../../../api/types.ts';
-import { DEFAULT_ORG } from '../../../api/types.ts';
 import type { RequestContext } from './shared.ts';
 import {
     notifyRecordChange,
@@ -52,7 +51,7 @@ export async function putRecordAttribute(
     >,
 ): Promise<void> {
     await ctx.PUT(`record-attributes/${id}`, {
-        ...entity, organization_id: DEFAULT_ORG,
+        ...entity,
     });
     notifyRecordChange();
 }

@@ -12,6 +12,7 @@ import {
     getHasAnyHumanMembers,
     nowUtc,
     getUrlParam,
+    postClipboardCopy,
 } from '../app/adapters/index.ts';
 import {
     $, $input, $button, createElement,
@@ -33,9 +34,10 @@ import {
 } from '../app/core.ts';
 import {
     credentialRevealPanel,
+    credentialsCopyText,
 } from '../app/presenters/credential-reveal.ts';
 import type {
-    SeededAdmin,
+    SeededCredentials,
 } from '../../api/mock-data.ts';
 import {
     iconTrash,
@@ -66,7 +68,7 @@ type PendingState =
     | { kind: 'idle' }
     | {
         kind: 'pending';
-        action: () => Promise<SeededAdmin>;
+        action: () => Promise<SeededCredentials>;
         button: HTMLButtonElement;
         label: string;
     };
@@ -120,9 +122,9 @@ export async function init(
         // error toast names this
         // explicitly so the half-state
         // isn't a silent surprise.
-        let admin: SeededAdmin;
+        let creds: SeededCredentials;
         try {
-            admin = await action();
+            creds = await action();
         } catch (err) {
             log.error(
                 label
@@ -146,23 +148,45 @@ export async function init(
                 originalText;
             return;
         }
-        revealThenNavigate(admin);
+        revealThenNavigate(creds);
     }
 
-    // After wipe-and-load the seeded admin password exists only
-    // in this response — surface it once, then navigate only
-    // when the user acknowledges they have saved it.
+    // After wipe-and-load the seeded demo passwords exist only
+    // in this response — surface them once, then navigate only
+    // when the user acknowledges they have saved them.
     function revealThenNavigate(
-        admin: SeededAdmin,
+        creds: SeededCredentials,
     ): void {
         const panel = $('#snapshots-content', document);
         if (!panel) return;
         setHtml(panel, html`
-            ${credentialRevealPanel(admin)}
+            ${credentialRevealPanel(creds)}
             <button class="btn btn-primary"
                 id="credential-continue-btn">
                 I have saved it — continue
             </button>`);
+        $button(
+            '#credential-copy-all-btn', document,
+        )?.addEventListener('click', async () => {
+            try {
+                await postClipboardCopy(
+                    credentialsCopyText(creds),
+                );
+            } catch (err) {
+                log.error(
+                    'clipboard copy failed',
+                    'snapshots',
+                    err,
+                );
+                showToast(
+                    'Copy failed — select and copy'
+                    + ' the credentials manually',
+                    'error',
+                );
+                return;
+            }
+            showToast('Credentials copied', 'success');
+        });
         $button(
             '#credential-continue-btn', document,
         )?.addEventListener(
@@ -174,7 +198,7 @@ export async function init(
     function confirmAction(
         button: HTMLButtonElement,
         label: string,
-        action: () => Promise<SeededAdmin>,
+        action: () => Promise<SeededCredentials>,
         message?: string,
     ): void {
         pending = {

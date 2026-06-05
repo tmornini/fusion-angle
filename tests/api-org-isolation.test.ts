@@ -42,12 +42,22 @@ function req(
     });
 }
 
-// `current` is a global admin (seedRootAdmin) and a member of
-// org A only. Ideas exist in both A and B.
+// `current` holds admin in org A (the administered org) and
+// in DEFAULT_ORG (seedRootAdmin), and is a member of org A
+// only. Ideas exist in both A and B. Roles are per-org since
+// Phase 3, so the org-A grant is what authorizes the facade
+// tests; seedRootAdmin's DEFAULT_ORG grant keeps the
+// flat-token enumerate test authorized.
 async function twoOrgs(): Promise<MemoryDbAdapter> {
     const db = new MemoryDbAdapter();
     await db.createSchema();
     await seedRootAdmin(db);
+    await db.roleGrants.put('role-current-admin-a', {
+        organization_id: 'A', identity_id: 'current',
+        role: 'admin', action: 'granted',
+        by_member_id: 'system',
+        at: '2020-01-01T00:00:00.000Z',
+    });
     await db.memberships.put('m-a', {
         organization_id: 'A', identity_id: 'current',
         at: '2026-06-04T00:00:00.000Z',

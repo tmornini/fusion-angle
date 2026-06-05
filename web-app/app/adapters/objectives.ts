@@ -7,7 +7,7 @@ import type {
     StateEntity,
 } from '../../../api/types.ts';
 import {
-    nowUtc, DEFAULT_ORG,
+    nowUtc,
 } from '../../../api/types.ts';
 import type { RequestContext } from './shared.ts';
 import {
@@ -195,7 +195,6 @@ export async function postObjectiveCreation(
                 method: 'put',
                 resource: `objectives/${id}`,
                 body: {
-                    organization_id: DEFAULT_ORG,
                     position,
                 },
             },
@@ -278,7 +277,6 @@ export async function putObjectivePosition(
             method: 'put' as const,
             resource: `objectives/${id}`,
             body: {
-                organization_id: DEFAULT_ORG,
                 position,
             },
         }],

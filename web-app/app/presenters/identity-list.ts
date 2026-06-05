@@ -1,0 +1,94 @@
+import {
+    html, setHtml, SafeHtml,
+} from '../safe-html.ts';
+import { initials } from '../core.ts';
+import { DISPLAY_ABSENT } from '../format.ts';
+import { iconShield } from '../icons.ts';
+import {
+    ERASED_MEMBER_NAME,
+    type IdentityRosterRow,
+} from '../adapters/index.ts';
+
+const KIND_LABEL: Readonly<Record<string, string>> = {
+    person: 'Person',
+    service: 'Service',
+};
+
+function buildPersonAvatar(name: string): SafeHtml {
+    return html`
+        <div class="avatar avatar-tinted">
+            <span class="${
+                'text-sm font-bold text-primary'
+            }">${initials(name)}</span>
+        </div>`;
+}
+
+function buildServiceAvatar(): SafeHtml {
+    return html`
+        <div class="avatar avatar-tinted">
+            ${iconShield(16, 'text-primary')}
+        </div>`;
+}
+
+function buildRow(row: IdentityRosterRow): SafeHtml {
+    const isPerson = row.kind === 'person';
+    const name = isPerson
+        ? (row.pii.erased
+            ? ERASED_MEMBER_NAME
+            : row.pii.name)
+        : row.id;
+    const sub = isPerson
+        ? (row.pii.erased
+            ? DISPLAY_ABSENT
+            : row.pii.email)
+        : row.id;
+    return html`
+        <div class="${
+            'card card-hover p-4 cursor-pointer'
+            + ' flex items-center gap-4'
+        }"
+            data-identity-id="${row.id}">
+            ${
+                isPerson
+                    ? buildPersonAvatar(name)
+                    : buildServiceAvatar()
+            }
+            <div class="flex-fill min-w-0">
+                <p class="font-medium truncate">
+                    ${name}
+                </p>
+                <p class="${
+                    'text-xs text-muted truncate'
+                }">${sub}</p>
+            </div>
+            <div class="${
+                'flex flex-col items-end gap-2 ml-6'
+            }">
+                <span class="${
+                    'badge badge-secondary'
+                }">${KIND_LABEL[row.kind] ?? row.kind}</span>
+            </div>
+        </div>`;
+}
+
+function buildEmptyState(): SafeHtml {
+    return html`<div class="${
+        'p-4 text-sm text-muted text-center'
+    }">No identities yet.</div>`;
+}
+
+export class IdentityRosterPresenter {
+    readonly #rows: readonly IdentityRosterRow[];
+
+    constructor(rows: readonly IdentityRosterRow[]) {
+        this.#rows = rows;
+    }
+
+    render(container: HTMLElement): void {
+        setHtml(container, html`${
+            this.#rows.length === 0
+                ? buildEmptyState()
+                : html`${this.#rows.map(buildRow)}`
+        }`);
+    }
+}

@@ -5,6 +5,8 @@ interface HeaderData {
     memberId: string;
     memberName: string;
     organization: string;
+    orgs: ReadonlyArray<{ id: string; name: string }>;
+    activeOrgId: string;
     greeting: string;
     stats: ReadonlyArray<{
         value: string | number;
@@ -17,26 +19,36 @@ async function getHeaderData(
     const {
         sessionContext,
         getHumanMember,
-        getOrganization,
         getDashboardStats,
         ERASED_MEMBER_NAME,
     } = await import('./adapters');
+    const { getOrganizations } =
+        await import('./adapters/organizations.ts');
+    const { DEFAULT_ORG } =
+        await import('../../api/types.ts');
     const { getTimeOfDay } =
         await import('./format');
     const ctx = sessionContext();
-    const [member, org, stats] =
+    const [member, orgs, stats] =
         await Promise.all([
             getHumanMember(ctx, 'current'),
-            getOrganization(ctx),
+            getOrganizations(ctx),
             getDashboardStats(ctx),
         ]);
     const pii = member.pii();
+    const activeOrgId =
+        ctx.identity.organization ?? DEFAULT_ORG;
+    const active =
+        orgs.find(o => o.id === activeOrgId);
     return {
         memberId: member.idForLink(),
         memberName: pii.erased
             ? ERASED_MEMBER_NAME
             : pii.name,
-        organization: org.nameText(),
+        organization: active ? active.name : '',
+        orgs: orgs.map(
+            o => ({ id: o.id, name: o.name })),
+        activeOrgId,
         greeting: getTimeOfDay(),
         stats,
     };
@@ -47,6 +59,8 @@ export async function mutateHeaderInfo(
     const headerInfo = await getHeaderData();
     const { html, setHtml } =
         await import('./safe-html');
+    const { orgSwitcherHtml, wireOrgSwitcher } =
+        await import('./org-switcher.ts');
     const greetingEl =
         $('#header-greeting', document);
     if (greetingEl) {
@@ -55,7 +69,8 @@ export async function mutateHeaderInfo(
             html`<span
 class="font-normal">Good ${
 headerInfo.greeting},</span> ${
-headerInfo.memberName}`,
+headerInfo.memberName}${
+orgSwitcherHtml(headerInfo.orgs)}`,
         );
         greetingEl.setAttribute('role', 'button');
         greetingEl.setAttribute('tabindex', '0');
@@ -84,6 +99,7 @@ headerInfo.memberName}`,
                 }
             },
         );
+        wireOrgSwitcher(headerInfo.activeOrgId);
     }
     const statsEl =
         $('#header-stats', document);

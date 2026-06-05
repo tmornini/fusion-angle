@@ -1,0 +1,89 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { MemoryDbAdapter } from '../api/db-memory.ts';
+import { GET } from '../api/api.ts';
+import { populateMockData } from '../api/mock-data.ts';
+import {
+    createRequestContext,
+} from '../web-app/app/adapters/shared.ts';
+import {
+    getOrganizations,
+} from '../web-app/app/adapters/organizations.ts';
+import {
+    postOrgSessionExchange,
+} from '../web-app/app/adapters/org-session.ts';
+import { devToken } from './token-fixtures.ts';
+
+// End-to-end of the boot-scope + org-switch flow the browser
+// drives: enumerate reachable orgs, exchange a scoped token,
+// and read org-fenced data — without the DOM. Proves switching
+// re-scopes the roster and ideas, and that org '1' data is
+// hidden from org '2'.
+
+async function seeded(): Promise<MemoryDbAdapter> {
+    const db = new MemoryDbAdapter();
+    await db.createSchema();
+    await populateMockData(db);
+    return db;
+}
+
+const idsOf = (rows: { id: string }[]): string[] =>
+    [...rows.map(r => r.id)].sort();
+
+test('boot enumerates both demo orgs for the admin',
+async () => {
+    const db = await seeded();
+    const ctx = createRequestContext(
+        db, await devToken('current'));
+    const orgs = await getOrganizations(ctx);
+    assert.deepEqual(
+        [...orgs.map(o => o.id)].sort(), ['1', '2']);
+});
+
+test('switching the active org re-scopes members and ideas',
+async () => {
+    const db = await seeded();
+    const flat = await devToken('current');
+    const ctx = createRequestContext(db, flat);
+    const tokA = await postOrgSessionExchange(ctx, flat, '1');
+    const tokB = await postOrgSessionExchange(ctx, flat, '2');
+
+    const membersA = idsOf(
+        await GET<{ id: string }[]>(db, 'members', tokA));
+    const membersB = idsOf(
+        await GET<{ id: string }[]>(db, 'members', tokB));
+    const ideasA = idsOf(
+        await GET<{ id: string }[]>(db, 'ideas', tokA));
+    const ideasB = idsOf(
+        await GET<{ id: string }[]>(db, 'ideas', tokB));
+
+    assert.ok(
+        membersA.length > 0 && membersB.length > 0,
+        'both orgs have members');
+    assert.ok(
+        ideasA.length > 0 && ideasB.length > 0,
+        'both orgs have ideas');
+    assert.notDeepEqual(
+        membersA, membersB, 'roster re-scopes on switch');
+    assert.notDeepEqual(
+        ideasA, ideasB, 'ideas re-scope on switch');
+    for (const id of ideasA) {
+        assert.ok(
+            !ideasB.includes(id),
+            'org-1 ideas are fenced from org-2');
+    }
+});
+
+test('a flat boot token resolves to the default org view',
+async () => {
+    const db = await seeded();
+    const flat = await devToken('current');
+    const flatIdeas = idsOf(
+        await GET<{ id: string }[]>(db, 'ideas', flat));
+    const ctx = createRequestContext(db, flat);
+    const tokA = await postOrgSessionExchange(ctx, flat, '1');
+    const org1Ideas = idsOf(
+        await GET<{ id: string }[]>(db, 'ideas', tokA));
+    // the flat bridge fences to DEFAULT_ORG ('1') — same view
+    assert.deepEqual(flatIdeas, org1Ideas);
+});

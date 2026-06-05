@@ -19,7 +19,22 @@ import { log } from './logger.ts';
 import { MissingTableError } from './adapters/index.ts';
 import {
     establishSession,
+    getSessionToken,
+    setSessionToken,
 } from './adapters/init.ts';
+import { sessionContext } from './adapters/shared.ts';
+import {
+    getOrganizations,
+} from './adapters/organizations.ts';
+import {
+    resolveActiveOrg,
+    postOrgSessionExchange,
+    ACTIVE_ORG_KEY,
+} from './adapters/org-session.ts';
+import {
+    getPreference,
+    writePreference,
+} from './adapters/preferences.ts';
 import { navigateTo } from './navigation.ts';
 import { PAGE_REGISTRY } from './page-registry.ts';
 
@@ -75,6 +90,24 @@ function redirectIfMissingTable(
     return true;
 }
 
+// Boot always scopes the session to an active org: enumerate
+// the member's reachable orgs, resolve the active one (the
+// persisted choice, else DEFAULT_ORG, else the sole org), and
+// install an org-scoped token BEFORE first render so every read
+// is fenced to one tenant.
+async function scopeBootToActiveOrg(): Promise<void> {
+    const ctx = sessionContext();
+    const reachable =
+        (await getOrganizations(ctx)).map(o => o.id);
+    if (reachable.length === 0) return;
+    const active = resolveActiveOrg(
+        reachable, getPreference(ACTIVE_ORG_KEY));
+    setSessionToken(
+        await postOrgSessionExchange(
+            ctx, getSessionToken(), active));
+    writePreference(ACTIVE_ORG_KEY, active);
+}
+
 document.addEventListener(
     'DOMContentLoaded',
     async () => {
@@ -91,6 +124,7 @@ document.addEventListener(
 
         if (hasSchema) {
             await establishSession('current', 'Demo User');
+            await scopeBootToActiveOrg();
         }
 
         const pageName = getPageName();

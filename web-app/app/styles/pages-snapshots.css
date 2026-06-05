@@ -49,3 +49,33 @@
   user-select: all;
   word-break: break-all;
 }
+
+.credential-reveal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.credential-reveal-box {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  background: hsl(var(--muted) / 0.4);
+  padding: var(--space-2) var(--space-3);
+  max-height: 14rem;
+  overflow-y: auto;
+}
+
+.credential-reveal-line {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-1) 0;
+}
+
+.credential-reveal-user {
+  color: hsl(var(--muted-foreground));
+}

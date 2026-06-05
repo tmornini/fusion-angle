@@ -401,50 +401,80 @@ const MOCK_SEED_TIMESTAMP =
     '2026-01-01T00:00:00.000Z';
 const ADMIN_USERNAME = 'demo@example.com';
 
+// The demo's second organization. org '2' is a new ROW, not
+// a new table — generate-schema-svg derives FK targets from
+// *_id pluralization, so a new table would shift the schema.
+const ORG_TWO = '2';
+
+// Deterministic org partition for non-admin seeds: even
+// index → org '1', odd → org '2'. ~half/half; the seed test
+// pins per-org invariants, not the exact assignments.
+function assignOrg(index: number): string {
+    return index % 2 === 0 ? DEFAULT_ORG : ORG_TWO;
+}
+
 // The seeded admin credential set, returned to the caller so a
 // one-time reveal can surface the plaintext password. The
 // plaintext is never stored — only its PBKDF2 hash lands in the
 // identity_credentials.secret column.
-export interface SeededAdmin {
-    readonly adminUsername: string;
-    readonly adminPassword: string;
+export interface SeededIdentityCredential {
+    readonly identityId: string;
+    readonly username: string;
+    readonly password: string;
 }
 
-// Seed the demo admin's password and the system client_secret
-// as real PBKDF2 hashes (a placeholder string would not verify
-// through the real /authentication/authorize loop). The admin
-// password is generated crypto-grade and RETURNED in plaintext
-// for one-time surfacing; the system secret is generated,
-// hashed, and discarded. Both seed paths call this.
-async function seedAdminCredentials(
+// The freshly-seeded human sign-ins, surfaced in-band exactly
+// once. Only PBKDF2 hashes land in identity_credentials.secret;
+// these plaintexts live only in this return value. DEMO-ONLY:
+// the in-band plaintext return is deleted at the server tier.
+export interface SeededCredentials {
+    readonly identities:
+        readonly SeededIdentityCredential[];
+}
+
+// Mint a fresh crypto-grade password for EVERY login-capable
+// person identity (one with a PII email), hash it into the
+// credential ledger, and return the plaintexts in-band for a
+// one-time reveal. A placeholder string would not verify
+// through the real /authentication/authorize loop. The system
+// identity signs with a client_secret — generated, hashed, and
+// discarded, never revealed. Both seed paths call this.
+async function seedHumanCredentials(
     adapter: DbAdapter,
-): Promise<SeededAdmin> {
-    const adminPassword = generateCryptoSafeBase62();
-    const adminSecret = await hashPassword(adminPassword);
-    const systemSecret = await hashPassword(
-        generateCryptoSafeBase62(),
-    );
-    await Promise.all([
-        adapter.identityCredentials.put(
-            'seed-cred-current-password', {
-                identity_id: 'current',
-                kind: 'password',
-                status: 'set',
-                secret: adminSecret,
-                at: MOCK_SEED_TIMESTAMP,
-            },
-        ),
-        adapter.identityCredentials.put(
-            'seed-cred-system-client-secret', {
-                identity_id: SYSTEM_MEMBER_ID,
-                kind: 'client_secret',
-                status: 'set',
-                secret: systemSecret,
-                at: MOCK_SEED_TIMESTAMP,
-            },
-        ),
-    ]);
-    return { adminUsername: ADMIN_USERNAME, adminPassword };
+): Promise<SeededCredentials> {
+    const piiById = new Map(
+        (await adapter.identityPii.getAll())
+            .map(p => [p.id, p]));
+    const persons = (await adapter.identities.getAll())
+        .filter(i => i.kind === 'person'
+            && piiById.has(i.id));
+    const reveals = await Promise.all(
+        persons.map(async identity => {
+            const password = generateCryptoSafeBase62();
+            await adapter.identityCredentials.put(
+                'seed-cred-' + identity.id + '-password', {
+                    identity_id: identity.id,
+                    kind: 'password',
+                    status: 'set',
+                    secret: await hashPassword(password),
+                    at: MOCK_SEED_TIMESTAMP,
+                });
+            return {
+                identityId: identity.id,
+                username: piiById.get(identity.id)!.email,
+                password,
+            };
+        }));
+    await adapter.identityCredentials.put(
+        'seed-cred-system-client-secret', {
+            identity_id: SYSTEM_MEMBER_ID,
+            kind: 'client_secret',
+            status: 'set',
+            secret: await hashPassword(
+                generateCryptoSafeBase62()),
+            at: MOCK_SEED_TIMESTAMP,
+        });
+    return { identities: reveals };
 }
 
 export const OBJECTIVE_SEEDS: Array<{
@@ -481,7 +511,7 @@ export const OBJECTIVE_SEEDS: Array<{
 
 export async function populateMockData(
     adapter: DbAdapter,
-): Promise<SeededAdmin> {
+): Promise<SeededCredentials> {
     const members: SeedHumanMember[] = [
         {
             id: 'LhfaUUf4IumVsCSGB4xjdK',
@@ -746,23 +776,30 @@ export async function populateMockData(
     ];
 
     await Promise.all([
-        ...members.flatMap(member => {
+        ...members.flatMap((member, index) => {
             const {
                 id: _id, state: _state, name,
                 email, phone, bio,
                 strengths, team_dimensions,
                 ...detail
             } = member;
+            // 'current' (the admin) joins BOTH orgs; every
+            // other human is single-org via assignOrg.
+            const orgs = member.id === 'current'
+                ? [DEFAULT_ORG, ORG_TWO]
+                : [assignOrg(index)];
             return [
                 adapter.members.put(member.id, {
                     type: 'human',
                 }),
-                adapter.memberships.put(
-                    'seed-membership-' + member.id, {
-                        organization_id: DEFAULT_ORG,
-                        identity_id: member.id,
-                        at: MOCK_SEED_TIMESTAMP,
-                    }),
+                ...orgs.map((org, n) =>
+                    adapter.memberships.put(
+                        'seed-membership-'
+                        + member.id + '-' + n, {
+                            organization_id: org,
+                            identity_id: member.id,
+                            at: MOCK_SEED_TIMESTAMP,
+                        })),
                 adapter.humanMembers.put(member.id, {
                     ...detail,
                     strengths:
@@ -792,6 +829,16 @@ export async function populateMockData(
         adapter.roleGrants.put(
             'seed-role-current-admin', {
                 organization_id: DEFAULT_ORG,
+                identity_id: 'current',
+                role: 'admin',
+                action: 'granted',
+                by_member_id: SYSTEM_MEMBER_ID,
+                at: MOCK_SEED_TIMESTAMP,
+            },
+        ),
+        adapter.roleGrants.put(
+            'seed-role-current-admin-org2', {
+                organization_id: ORG_TWO,
                 identity_id: 'current',
                 role: 'admin',
                 action: 'granted',
@@ -1151,9 +1198,9 @@ export async function populateMockData(
     ];
 
     await Promise.all([
-        ...ideas.map(idea =>
+        ...ideas.map((idea, i) =>
             adapter.ideas.put(idea.id, {
-                ...idea, organization_id: DEFAULT_ORG,
+                ...idea, organization_id: assignOrg(i),
             }),
         ),
         adapter.organizations.put(DEFAULT_ORG, {
@@ -1165,6 +1212,16 @@ export async function populateMockData(
             projects_limit: TIER_PROJECTS_LIMIT,
             ideas_limit: TIER_IDEAS_LIMIT,
             last_activity: dt(0, 16, 0),
+        }),
+        adapter.organizations.put(ORG_TWO, {
+            name: 'Wayne Enterprises',
+            domain: 'wayne.example.com',
+            next_billing: dt(-200, 0, 0),
+            seats: TIER_SEATS_LIMIT,
+            used_seats: 5,
+            projects_limit: TIER_PROJECTS_LIMIT,
+            ideas_limit: TIER_IDEAS_LIMIT,
+            last_activity: dt(0, 12, 0),
         }),
     ]);
 
@@ -2833,11 +2890,12 @@ export async function populateMockData(
         },
     ];
 
-    // Flow ↔ Record bindings. Customer Profile is
-    // bound to two flows (Customer Onboarding and
-    // Lead-to-Close); Project Brief is bound to
-    // Fusion Flow. The Layout Test flow is left
-    // unbound — it exists to exercise Auto Layout.
+    // Flow ↔ Record bindings. Customer Profile (org '1')
+    // is bound to two flows (Customer Onboarding and
+    // Lead-to-Close); Project Brief (org '2') is bound to
+    // the org-'2' flow so every binding stays within one
+    // org. The Layout Test flow is left unbound — it
+    // exists to exercise Auto Layout.
     const mockFlowRecords: FlowRecordEntity[] = [
         {
             id: 'frb01CustOnbCustProfA1',
@@ -2853,9 +2911,12 @@ export async function populateMockData(
             at: wfTimestamp,
         },
         {
+            // Project Brief lives in org '2'
+            // (assignOrg(index 1)), so it binds to the
+            // org-'2' flow — flowOrg === recordOrg keeps
+            // the binding visible behind the org fence.
             id: 'frb03Fus10nPr0jBri3f03',
-            flow_id:
-                'E2BnBlZyrriqsQYkmS4usb',
+            flow_id: 'seed-flow-org2',
             record_id: projectBriefRecordId,
             at: wfTimestamp,
         },
@@ -5686,6 +5747,33 @@ export async function populateMockData(
                 ...flow, organization_id: DEFAULT_ORG,
             }),
         ),
+        // Org '2' owns a small, self-contained slice so each
+        // org owns at least one project and flow. The whole
+        // work-order graph stays in org '1', so org '2' gets a
+        // work-order-free flow and a flow-free project — no
+        // cross-org coupling.
+        adapter.projects.put('seed-project-org2', {
+            ...projects[0]!,
+            organization_id: ORG_TWO,
+            title: 'Wayne R&D Portfolio',
+        }),
+        adapter.flows.put('seed-flow-org2', {
+            organization_id: ORG_TWO,
+            name: 'Wayne Onboarding',
+            is_locked: false,
+            is_auto_layout: true,
+            is_auto_fit: true,
+            lock_timeout: DEFAULT_LOCK_TIMEOUT,
+            graph: jsonObjectField({
+                nodes: [], edges: [],
+            }),
+        }),
+        adapter.states.put('seed-state-flow-org2', {
+            entity_id: 'seed-flow-org2',
+            state: 'active',
+            member_id: SYSTEM_MEMBER_ID,
+            at: MOCK_SEED_TIMESTAMP,
+        }),
     ]);
 
     const ideaSubmissions:
@@ -5839,6 +5927,16 @@ export async function populateMockData(
     ];
 
     const projectStateEvents: StateEntity[] = [
+        {
+            // 'submitted' so the scoring loop skips this org-'2'
+            // project — no cross-org score against org-'1'
+            // objectives.
+            id: 'seed-state-project-org2',
+            entity_id: 'seed-project-org2',
+            state: 'submitted',
+            member_id: SYSTEM_MEMBER_ID,
+            at: MOCK_SEED_TIMESTAMP,
+        },
         {
             id: 'pSe01Cu5tSegmAi5pEv01',
             entity_id: 'u6YkHhlGc91oDMkr3x0isa',
@@ -6050,6 +6148,12 @@ export async function populateMockData(
         });
     }
 
+    // Each record attribute is stamped with ITS parent
+    // record's org, so the recordAttributes-match-parent
+    // invariant holds however records are partitioned.
+    const recordOrgById = new Map(
+        mockRecords.map((r, i) => [r.id, assignOrg(i)]));
+
     await Promise.all([
         ...ideaSubmissions.map(r =>
             adapter.ideaSubmissions.put(
@@ -6150,9 +6254,9 @@ export async function populateMockData(
                 at: r.at,
             }),
         ),
-        ...mockRecords.map(r =>
+        ...mockRecords.map((r, i) =>
             adapter.records.put(r.id, {
-                organization_id: DEFAULT_ORG,
+                organization_id: assignOrg(i),
                 name: r.name,
                 description: r.description,
                 position: r.position,
@@ -6160,7 +6264,8 @@ export async function populateMockData(
         ),
         ...mockRecordAttributes.map(r =>
             adapter.recordAttributes.put(r.id, {
-                organization_id: DEFAULT_ORG,
+                organization_id:
+                    recordOrgById.get(r.record_id)!,
                 record_id: r.record_id,
                 name: r.name,
                 attribute_type:
@@ -6216,6 +6321,21 @@ export async function populateMockData(
             },
         );
     }
+
+    // Org '2' owns one objective so each org owns at least one.
+    await adapter.objectives.put('seed-objective-org2', {
+        organization_id: ORG_TWO,
+        position: 0,
+    });
+    await adapter.objectiveRevisions.put(
+        `seed-objective-org2:${MOCK_SEED_TIMESTAMP}`, {
+            objective_id: 'seed-objective-org2',
+            name: 'Wayne demo objective',
+            description: 'Second-org demo objective.',
+            member_id: SYSTEM_MEMBER_ID,
+            at: MOCK_SEED_TIMESTAMP,
+        },
+    );
 
     const allProjects = await adapter.projects.getAll();
     const projectStateById = new Map(
@@ -6349,12 +6469,12 @@ export async function populateMockData(
         }
     }
 
-    return seedAdminCredentials(adapter);
+    return seedHumanCredentials(adapter);
 }
 
 export async function populateBootstrapData(
     adapter: DbAdapter,
-): Promise<SeededAdmin> {
+): Promise<SeededCredentials> {
     // The pristine seed plants only what the app needs
     // to render its shell: the system actor that authors
     // state events, the current user, and the singleton
@@ -6437,5 +6557,5 @@ export async function populateBootstrapData(
         ),
     ]);
 
-    return seedAdminCredentials(adapter);
+    return seedHumanCredentials(adapter);
 }

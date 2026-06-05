@@ -11,6 +11,10 @@ import {
 import { hashPassword } from '../../../api/password-hash.ts';
 import type { RequestContext } from './shared.ts';
 
+// Surface the credential-kind union so the identity detail
+// presenter speaks one tongue through the adapter barrel.
+export type { IdentityCredentialKind };
+
 async function appendCredentialEvent(
     ctx: RequestContext,
     identityId: Id,

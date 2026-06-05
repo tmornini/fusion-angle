@@ -1,0 +1,19 @@
+/* Org switcher: a native <select> in the header greeting,
+   shown only when the member can reach two or more orgs. */
+.org-switcher {
+  margin-left: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  background-color: hsl(var(--secondary));
+  color: hsl(var(--foreground));
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+}
+
+.org-switcher:focus-visible {
+  outline: 2px solid hsl(var(--ring, var(--border)));
+  outline-offset: 2px;
+}

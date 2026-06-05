@@ -9,7 +9,6 @@ import {
     jsonObjectField,
     msSinceUtc,
     MS_PER_SECOND,
-    DEFAULT_ORG,
 } from '../../../api/types.ts';
 import {
     validateStoredGraphJson,
@@ -202,7 +201,6 @@ export async function postWorkOrderCreation(
                     `work-orders/`
                     + `${input.workOrderId}`,
                 body: {
-                    organization_id: DEFAULT_ORG,
                     display_id: displayId,
                     flow_graph: flowGraphField,
                     position,
@@ -359,7 +357,7 @@ export async function putWorkOrder(
     entity: Omit<WorkOrderEntity, 'id' | 'organization_id'>,
 ): Promise<void> {
     await ctx.PUT(`work-orders/${id}`, {
-        ...entity, organization_id: DEFAULT_ORG,
+        ...entity,
     });
     workOrderChanges.notify();
 }

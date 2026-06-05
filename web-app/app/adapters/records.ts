@@ -160,7 +160,7 @@ export async function putRecord(
     entity: Omit<RecordEntity, 'id' | 'organization_id'>,
 ): Promise<void> {
     await ctx.PUT(`records/${id}`, {
-        ...entity, organization_id: DEFAULT_ORG,
+        ...entity,
     });
     recordChanges.notify();
 }
@@ -202,11 +202,15 @@ export async function postRecordChange(
     id: RecordId,
     change: RecordChange,
 ): Promise<void> {
+    // The server stamps organization_id from the verified
+    // token; this present-and-valid value only satisfies the
+    // multi-put body validator, which requires the column.
+    const org = ctx.identity.organization ?? DEFAULT_ORG;
     const record = {
-        ...change.record, organization_id: DEFAULT_ORG,
+        ...change.record, organization_id: org,
     };
     const attributes = change.attributes.map(a => ({
-        ...a, organization_id: DEFAULT_ORG,
+        ...a, organization_id: org,
     }));
     if (change.kind === 'create') {
         const initialStateEventId =

@@ -2,6 +2,7 @@ import type { DbAdapter } from './db.ts';
 import {
     mintAccessToken,
     verifyAccessToken,
+    revokedBeforeSeconds,
 } from './access-token.ts';
 import {
     generateCryptoSafeBase62,
@@ -15,7 +16,10 @@ import {
     type IdentityPiiEntity,
 } from './types.ts';
 import { codeState } from './authorization-codes.ts';
-import { planRotation } from './identity-tokens.ts';
+import {
+    planRotation,
+    isTokenRevoked,
+} from './identity-tokens.ts';
 import { verifyPassword } from './password-hash.ts';
 
 // The OAuth 2.1 token + authorize logic, kept out of the route
@@ -146,6 +150,31 @@ async function appendEvents(
     }
 }
 
+// Both revocation controls the gate enforces, in ONE place so
+// every token-accepting path honors them: the coarse
+// logout-everywhere stamp (a token whose iat predates the
+// revocation is dead) and the per-jti chain. A mint path that
+// skips these would launder a revoked-but-unexpired token into
+// a fresh valid pair the gate then accepts.
+export async function tokenRevocationReason(
+    adapter: DbAdapter,
+    sub: string,
+    iat: number,
+    jti: string,
+): Promise<string | null> {
+    const revs =
+        await adapter.identityTokenRevocations.getAll();
+    const revokedBefore = revokedBeforeSeconds(revs, sub);
+    if (revokedBefore !== null && iat < revokedBefore) {
+        return 'token revoked';
+    }
+    const ledger = await adapter.identityTokens.getAll();
+    if (isTokenRevoked(ledger, jti)) {
+        return 'token chain revoked';
+    }
+    return null;
+}
+
 // refresh grant: rotate a live refresh jti (retire it, issue a
 // successor in the same chain) and mint a new pair. A non-live
 // jti is reuse — the whole chain is revoked, then 401. An
@@ -163,6 +192,13 @@ async function grantRefresh(
         return failure(
             401, 'invalid refresh token: ' + verified.reason,
         );
+    }
+    const refreshRev = await tokenRevocationReason(
+        adapter, verified.claims.sub,
+        verified.claims.iat, verified.claims.jti,
+    );
+    if (refreshRev !== null) {
+        return failure(401, refreshRev);
     }
     const rows = await adapter.identityTokens.getAll();
     const plan = planRotation(
@@ -217,6 +253,13 @@ async function grantTokenExchange(
             401,
             'token-exchange needs valid subject/actor tokens',
         );
+    }
+    const subjectRev = await tokenRevocationReason(
+        adapter, subjectV.claims.sub,
+        subjectV.claims.iat, subjectV.claims.jti,
+    );
+    if (subjectRev !== null) {
+        return failure(401, subjectRev);
     }
     const subject = subjectV.claims.sub;
     const actor = actorV.claims.sub;

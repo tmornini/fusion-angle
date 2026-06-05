@@ -1,19 +1,21 @@
 import type { Id, RoleGrantEntity } from './types.ts';
 
-// Roles an identity currently holds: the latest action per
-// (identity_id, role) — a 'granted' with no later 'revoked'
-// wins. `at` is RFC-3339 zulu (lexical = chronological).
-// This reduces to an ACTION, not just a stamp, so a same-`at`
-// tie MUST resolve to the later event. `nowUtc()` is
-// millisecond-resolution, so a grant and an immediate revoke
-// can share an `at`; `>=` lets the later-APPENDED row win —
-// for this single-writer append-only ledger that is the
-// later action, the secure tie-break (revoke beats grant).
-// (latestRevocationAt can use `>`: it reduces to a scalar
-// stamp where tied `at` rows are value-identical.)
-export function currentRolesFor(
+// Roles an identity currently holds IN A GIVEN ORG: the
+// latest action per role within that org — a 'granted' with
+// no later 'revoked' wins. The org predicate sits beside the
+// identity filter, so a grant in another org is invisible
+// here: this is the per-tenant fence at the role layer, the
+// half of `role_grants.organization_id` the gate had been
+// writing but never reading. `at` is RFC-3339 zulu (lexical =
+// chronological). The reduce resolves to an ACTION, not just
+// a stamp, so a same-`at` tie MUST resolve to the later
+// event; `>=` lets the later-APPENDED row win — for this
+// single-writer append-only ledger that is the later action,
+// the secure tie-break (revoke beats grant).
+export function currentRolesForInOrg(
     rows: readonly RoleGrantEntity[],
     identityId: Id,
+    org: Id,
 ): string[] {
     const latest = new Map<
         string,
@@ -21,6 +23,7 @@ export function currentRolesFor(
     >();
     for (const row of rows) {
         if (row.identity_id !== identityId) continue;
+        if (row.organization_id !== org) continue;
         const prev = latest.get(row.role);
         if (prev === undefined || row.at >= prev.at) {
             latest.set(

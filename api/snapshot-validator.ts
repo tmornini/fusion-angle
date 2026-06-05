@@ -3,6 +3,15 @@ import {
     validateMemberEntity,
     validateHumanMemberEntity,
     validateAIMemberEntity,
+    validateIdentityEntity,
+    validateIdentityPiiEntity,
+    validateIdentityCredentialEntity,
+    validateIdentityTokenRevocationEntity,
+    validateRoleGrantEntity,
+    validateIdentityTokenEntity,
+    validateClientEntity,
+    validateIdentityProviderEntity,
+    validateAuthorizationCodeEntity,
     validateIdeaEntity,
     validateProjectEntity,
     validateFlowEntity,
@@ -47,6 +56,33 @@ function validateSnapshotRow(
                 break;
             case 'ai_members':
                 validateAIMemberEntity(body);
+                break;
+            case 'identities':
+                validateIdentityEntity(body);
+                break;
+            case 'identity_pii':
+                validateIdentityPiiEntity(body);
+                break;
+            case 'identity_credentials':
+                validateIdentityCredentialEntity(body);
+                break;
+            case 'identity_token_revocations':
+                validateIdentityTokenRevocationEntity(body);
+                break;
+            case 'role_grants':
+                validateRoleGrantEntity(body);
+                break;
+            case 'identity_tokens':
+                validateIdentityTokenEntity(body);
+                break;
+            case 'clients':
+                validateClientEntity(body);
+                break;
+            case 'identity_providers':
+                validateIdentityProviderEntity(body);
+                break;
+            case 'authorization_codes':
+                validateAuthorizationCodeEntity(body);
                 break;
             case 'ideas':
                 validateIdeaEntity(body);

@@ -8,7 +8,6 @@ import {
     nowUtc,
     jsonObjectField,
     DEFAULT_LOCK_TIMEOUT,
-    DEFAULT_ORG,
 } from '../../../api/types.ts';
 import {
     buildStartAndCompleteNodes,
@@ -76,7 +75,6 @@ export async function postFlowCreation(
                 resource:
                     `flows/${input.flowId}`,
                 body: {
-                    organization_id: DEFAULT_ORG,
                     name: input.name,
                     is_locked: false,
                     is_auto_layout: false,
@@ -121,8 +119,9 @@ export async function putFlow(
     id: string,
     save: FlowSaveShape,
 ): Promise<void> {
-    const entity: Omit<FlowEntity, 'id'> = {
-        organization_id: DEFAULT_ORG,
+    const entity: Omit<
+        FlowEntity, 'id' | 'organization_id'
+    > = {
         name: save.name,
         is_locked: save.isLocked,
         is_auto_layout: save.isAutoLayout,

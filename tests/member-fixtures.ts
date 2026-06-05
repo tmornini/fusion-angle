@@ -2,6 +2,7 @@ import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import {
     HumanMember,
     AIMember,
+    DEFAULT_ORG,
     type MemberState,
 } from '../api/types.ts';
 import {
@@ -80,6 +81,13 @@ export async function seedHumanMember(
     await db.states.record(
         `st-${id}`, id, state, 'system',
     );
+    // A member belongs to an org via the ledger — the member
+    // list derives from it, so a seeded member needs one.
+    await db.memberships.put(`mb-${id}`, {
+        organization_id: DEFAULT_ORG,
+        identity_id: id,
+        at: '2020-01-01T00:00:00.000Z',
+    });
 }
 
 export async function seedAIMember(
@@ -93,6 +101,11 @@ export async function seedAIMember(
     await db.states.record(
         `st-${id}`, id, state, 'system',
     );
+    await db.memberships.put(`mb-${id}`, {
+        organization_id: DEFAULT_ORG,
+        identity_id: id,
+        at: '2020-01-01T00:00:00.000Z',
+    });
 }
 
 export async function seedCurrentMember(

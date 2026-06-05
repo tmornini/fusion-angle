@@ -34,6 +34,7 @@ import type {
     WorkOrderEntity,
     MemberEntity,
 } from './types.ts';
+import { DEFAULT_ORG } from './types.ts';
 import {
     validateOrganizationEntity,
     validateRecordMultiPutBody,
@@ -43,19 +44,18 @@ import {
     verifyAccessToken,
     principalFromToken,
     ANONYMOUS_ID,
-    revokedBeforeSeconds,
     type Principal,
 } from './access-token.ts';
 import { orgScopedAdapter } from './db-org-scoped.ts';
 import {
-    currentRolesFor,
+    currentRolesForInOrg,
     isPermitted,
 } from './authorization.ts';
-import { isTokenRevoked } from './identity-tokens.ts';
 import {
     postToken,
     postAuthorize,
     exchangeBearerForOrg,
+    tokenRevocationReason,
 } from './authentication.ts';
 
 export class ApiError {
@@ -204,7 +204,25 @@ async function applyRecordMultiPut(
 
 const routes: Route[] = [
     route('members', {
-        get: (db) => db.members.getAll(),
+        // Members are derived from the membership ledger off
+        // `effective`: the org-scoped memberships name the
+        // org's members; the members directory itself is
+        // global (no org column). The join IS the org fence —
+        // it re-scopes on an org switch with no denormalized
+        // column to keep in sync. The system member rides
+        // along unconditionally — it has no membership but
+        // authors events in every org, so author resolution
+        // (getMemberMap) must still find it; the human/ai
+        // roster filters it out by type.
+        get: async (db) => {
+            const memberships =
+                await db.memberships.getAll();
+            const ids = new Set(
+                memberships.map(m => m.identity_id));
+            const all = await db.members.getAll();
+            return all.filter(
+                m => ids.has(m.id) || m.type === 'system');
+        },
     }),
     route('ai-members', {
         get: (db) => db.aiMembers.getAll(),
@@ -733,6 +751,10 @@ const routes: Route[] = [
         delete: (db) => db.deleteSchema(),
         post: (db) => db.createSchema(),
     }),
+    // DEMO-ONLY: these seed routes return SeededCredentials —
+    // freshly-minted plaintext sign-ins surfaced in-band, once.
+    // Only PBKDF2 hashes are stored; the in-band plaintext
+    // return is deleted at the server tier.
     route('snapshots/mock-data', {
         post: async (db) => {
             const { populateMockData } =
@@ -836,19 +858,12 @@ async function authenticateRequest(
     if (result.claims.sub === ANONYMOUS_ID) {
         return 'anonymous principal not authenticated';
     }
-    const rows =
-        await adapter.identityTokenRevocations.getAll();
-    const revokedBefore = revokedBeforeSeconds(
-        rows, result.claims.sub,
+    const revoked = await tokenRevocationReason(
+        adapter, result.claims.sub,
+        result.claims.iat, result.claims.jti,
     );
-    if (revokedBefore !== null
-        && result.claims.iat < revokedBefore) {
-        return 'token revoked';
-    }
-    const tokenLedger =
-        await adapter.identityTokens.getAll();
-    if (isTokenRevoked(tokenLedger, result.claims.jti)) {
-        return 'token chain revoked';
+    if (revoked !== null) {
+        return revoked;
     }
     return principalFromToken(token);
 }
@@ -860,7 +875,16 @@ async function authorizeRequest(
     pathname: string,
 ): Promise<string | null> {
     const rows = await adapter.roleGrants.getAll();
-    const roles = currentRolesFor(rows, principal.id);
+    // Roles are per-org. The verified token claim — never the
+    // path — names the org; a flat (un-exchanged) token has
+    // none and falls back to DEFAULT_ORG, an EXPLICIT named
+    // bridge for the legacy un-scoped caller, not a silent
+    // helper default. After the facade migration every session
+    // token carries an org and this bridge goes unused.
+    const org = principal.organization ?? DEFAULT_ORG;
+    const roles = currentRolesForInOrg(
+        rows, principal.id, org,
+    );
     if (isPermitted(method, pathname, roles)) {
         return null;
     }
@@ -966,12 +990,15 @@ export async function handleRequest(
     const method = request.method;
 
     const routePattern = matched.segments.join('/');
-    // The org guard rides the verified Principal: a flat token
-    // has no org → `effective` stays the base adapter (inert —
-    // every legacy caller byte-identical); an org-exchanged
-    // token fences every store dispatch to its tenant. Authz
-    // keeps reading the base adapter: identity and roles are
-    // global concerns.
+    // Every authenticated request runs org-scoped: the verified
+    // org claim names the tenant; a flat (un-exchanged) token
+    // falls back to DEFAULT_ORG — an EXPLICIT named bridge, so
+    // there is no honest "unscoped default" and a write always
+    // lands in a real org. Org-owned stores fence to that org
+    // server-side; the global identity/auth spine passes
+    // through. Authz reads the global role_grants ledger but
+    // filters it to the same org (see authorizeRequest):
+    // identity is global, roles and org data are per-org.
     let effective: DbAdapter = adapter;
     if (!BEARER_EXEMPT_ROUTES.has(routePattern)) {
         const authResult =
@@ -995,11 +1022,10 @@ export async function handleRequest(
             && routePattern === 'organizations') {
             return enumerateMyOrgs(adapter, authResult);
         }
-        if (authResult.organization !== undefined) {
-            effective = orgScopedAdapter(
-                adapter, authResult.organization,
-            );
-        }
+        effective = orgScopedAdapter(
+            adapter,
+            authResult.organization ?? DEFAULT_ORG,
+        );
     }
 
     // Parse the request body when the method

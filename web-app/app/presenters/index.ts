@@ -147,3 +147,16 @@ export {
     type RecordDetailDraft,
     type AttributeDraft,
 } from './record-detail.ts';
+export {
+    IdentityDetailPresenter,
+    type IdentityDetailView,
+} from './identity-detail.ts';
+export {
+    IdentityRosterPresenter,
+} from './identity-list.ts';
+export {
+    IdentityProvidersPresenter,
+} from './identity-providers.ts';
+export {
+    IdentityTokensPresenter,
+} from './identity-tokens.ts';
