@@ -45,14 +45,12 @@ test('renders a row per provider event', () => {
     const rec = record();
     new IdentityProvidersPresenter([
         {
-            id: 'e1', identity_id: 'p1',
-            provider: 'google', provider_subject: 'g-1',
+            provider: 'google', providerSubject: 'g-1',
             action: 'linked',
             at: '2026-01-01T00:00:00.000Z',
         },
         {
-            id: 'e2', identity_id: 'p1',
-            provider: 'google', provider_subject: 'g-1',
+            provider: 'google', providerSubject: 'g-1',
             action: 'unlinked',
             at: '2026-01-02T00:00:00.000Z',
         },

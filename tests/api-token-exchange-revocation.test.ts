@@ -56,3 +56,31 @@ test('refresh rejects a logged-out token', async () => {
     assert.equal(res.ok, false);
     if (!res.ok) assert.equal(res.status, 401);
 });
+
+test('refresh on a logged-out but live jti is the'
+    + ' revocation, not reuse', async () => {
+    const db = await revokedDb();
+    // A LIVE issued jti in the ledger: without the
+    // logout-everywhere stamp this would rotate cleanly, so
+    // the ONLY thing that can reject it is the iat<revokedBefore
+    // branch — pinning that branch, not the reuse path.
+    await db.identityTokens.put('t-live', {
+        jti: 'live-jti', identity_id: 'u1',
+        action: 'issued', chain_id: 'c1', parent_jti: '',
+        at: '2019-01-01T00:00:00.000Z',
+    });
+    const iat = Math.floor(
+        Date.parse('2019-01-01T00:00:00.000Z') / 1000);
+    const token = await mintAccessToken({
+        sub: 'u1', roles: [], name: 'X',
+        iat, ttlSeconds: 10_000_000_000, jti: 'live-jti',
+    });
+    const res = await postToken(db, {
+        grant_type: 'refresh', refresh_token: token,
+    });
+    assert.equal(res.ok, false);
+    if (!res.ok) {
+        assert.equal(res.status, 401);
+        assert.equal(res.error, 'token revoked');
+    }
+});

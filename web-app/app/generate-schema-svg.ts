@@ -1,5 +1,5 @@
 // Derive SCHEMA.svg — the entity-relationship diagram — from the
-// schema of record: api/db.ts (the DbAdapter store map, whose
+// schema of record: api/db.ts (the DbStores store map, whose
 // property names are the tables) and api/types.ts (the entity
 // interfaces, whose fields are the columns and whose *_id fields
 // are the foreign keys). The schema is the source; this emits a
@@ -81,7 +81,7 @@ function parseStores(
     src: string,
 ): { table: string; entity: string }[] {
     const flat = sliceBlock(
-        src, 'export interface DbAdapter {',
+        src, 'export interface DbStores {',
     ).replace(/\s+/g, ' ');
     const out: { table: string; entity: string }[] = [];
     const reStore = new RegExp(

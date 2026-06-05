@@ -14,6 +14,7 @@ import {
     type RequestContext,
 } from '../web-app/app/adapters/shared.ts';
 import { devToken } from './token-fixtures.ts';
+import { MissingTableError } from '../api/db.ts';
 import {
     mintAccessToken,
     ANONYMOUS_ID,
@@ -429,5 +430,26 @@ test(
         const ctx = createRequestContext(db, await anonToken());
         assert.equal(
             await getHasAnyHumanMembers(ctx), true);
+    },
+);
+
+// A partial/incompatible schema makes the snapshot export
+// throw MissingTableError. The recovery page must still
+// render its seed/import controls, so this resolves to false
+// rather than propagating the throw (BOOT-01 follow-up).
+test(
+    'getHasAnyHumanMembers is false when the schema is'
+    + ' partial (export throws MissingTableError)',
+    async () => {
+        const ctx = {
+            GET: async (resource: string) => {
+                if (resource === 'snapshots/schema') {
+                    throw new MissingTableError('members');
+                }
+                return null;
+            },
+        } as unknown as RequestContext;
+        assert.equal(
+            await getHasAnyHumanMembers(ctx), false);
     },
 );

@@ -75,11 +75,14 @@ const MOBILE_QUERY = '(max-width: '
 const DARK_QUERY =
     '(prefers-color-scheme: dark)';
 
+// State starts at pure domain defaults so importing
+// this module touches neither localStorage nor window.
+// initState() hydrates the persisted preferences at
+// boot — see core.ts DOMContentLoaded.
 let state: Readonly<AppState> = {
-    theme: loadStoredTheme(),
-    isMobile: mediaQueryMatches(MOBILE_QUERY),
-    isSidebarCollapsed:
-        loadStoredSidebarCollapsed(),
+    theme: 'system',
+    isMobile: false,
+    isSidebarCollapsed: false,
     isSidebarOpen: false,
     isSearchOpen: false,
     searchQuery: '',
@@ -186,6 +189,15 @@ function collapseSidebar(
     applySidebarCollapsed(collapsed);
 }
 
+function initState(): void {
+    setState({
+        theme: loadStoredTheme(),
+        isMobile: mediaQueryMatches(MOBILE_QUERY),
+        isSidebarCollapsed:
+            loadStoredSidebarCollapsed(),
+    });
+}
+
 function initListeners(): void {
     subscribeMediaQuery(
         DARK_QUERY,
@@ -253,5 +265,6 @@ export {
     persistThemePreference,
     collapseSidebar,
     isValidTheme,
+    initState,
     initListeners,
 };

@@ -121,8 +121,8 @@ test(
 );
 
 test(
-    'ctx.commit throws CommitError naming the'
-    + ' failed op and exposing applied prefix',
+    'ctx.commit throws CommitError and rolls back'
+    + ' the whole batch',
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
@@ -157,15 +157,12 @@ test(
         }
         assert.ok(caught instanceof CommitError);
         const err = caught as CommitError;
-        assert.equal(err.failedAt, 1);
-        assert.equal(err.applied.length, 1);
-        assert.equal(err.applied[0], goodA);
+        assert.equal(err.failedAt, 0);
+        assert.equal(err.applied.length, 0);
         assert.ok(err.cause instanceof Error);
-        // No rollback: first op landed.
+        // Real rollback: the earlier valid op did not land.
         const all = await db.aiMembers.getAll();
-        assert.equal(all.length, 1);
-        assert.equal(all[0]!.id, 'ai_1');
-        assert.equal(all[0]!.description, 'A');
+        assert.equal(all.length, 0);
         // Channel did NOT fire.
         assert.equal(count, 0);
     },
@@ -200,8 +197,8 @@ test(
 );
 
 test(
-    'ctx.commit CommitError reports failedAt N-1'
-    + ' when final op fails',
+    'ctx.commit rolls back every op when the'
+    + ' final op fails',
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
@@ -230,11 +227,15 @@ test(
         } catch (e) { caught = e; }
         assert.ok(caught instanceof CommitError);
         assert.equal(
-            (caught as CommitError).failedAt, 2,
+            (caught as CommitError).failedAt, 0,
         );
         assert.equal(
             (caught as CommitError).applied.length,
-            2,
+            0,
+        );
+        // Real rollback: neither good op landed.
+        assert.equal(
+            (await db.aiMembers.getAll()).length, 0,
         );
     },
 );

@@ -3,6 +3,7 @@ import { strict as assert } from 'node:assert';
 import {
     subscribeSchemaChanges,
 } from '../web-app/app/adapters/schema.ts';
+import { MemoryDbAdapter } from '../api/db-memory.ts';
 
 test(
     'subscribeSchemaChanges returns'
@@ -23,8 +24,9 @@ test(
 // the schema is absent. This test stubs the
 // minimum DOM/storage surface initCommandPalette
 // touches, points the global adapter at a
-// pristine localStorage, and asserts the call
-// completes without throwing. With the bug
+// pristine in-memory tier (IndexedDB has no Node
+// stub), and asserts the call completes without
+// throwing. With the bug
 // reverted (eager `void getSearchIndex()` with
 // no schema gate), the unhandled rejection from
 // getIdeas surfaces here.
@@ -43,7 +45,9 @@ test(
                 '../web-app/app/command-palette.ts'
                 );
             const hasSchema =
-                await initAdapter();
+                await initAdapter(
+                    () => new MemoryDbAdapter(),
+                );
             assert.equal(
                 hasSchema, false,
                 'precondition: no schema',
@@ -112,9 +116,7 @@ function createFakeStorage(): FakeStorage {
 
 interface SavedGlobals {
     document: unknown;
-    localStorage: unknown;
     hadDocument: boolean;
-    hadLocalStorage: boolean;
 }
 
 let saved: SavedGlobals | null = null;
@@ -127,9 +129,7 @@ function installGlobals(
     >;
     saved = {
         document: g.document,
-        localStorage: g.localStorage,
         hadDocument: 'document' in g,
-        hadLocalStorage: 'localStorage' in g,
     };
     // Minimal document stub. initCommandPalette uses
     // only addEventListener (global keydown bind) and
@@ -157,10 +157,6 @@ function uninstallGlobals(): void {
     } else {
         delete g.document;
     }
-    if (saved.hadLocalStorage) {
-        g.localStorage = saved.localStorage;
-    } else {
-        delete g.localStorage;
-    }
+    delete g.localStorage;
     saved = null;
 }

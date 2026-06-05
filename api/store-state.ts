@@ -1,81 +1,73 @@
 import {
     EntityNotFound,
     type StateStore as StateStoreInterface,
-    type StorageBackend,
+    type Tx,
+    type TxRunner,
 } from './db.ts';
 import {
     nowUtc,
     type Id,
     type StateEntity,
 } from './types.ts';
-import { createSerializer } from './store-serializer.ts';
 
-// The states table is the append-only event log
-// of every state change in the system. One row,
-// one fact. `record` writes a single row with
-// caller-supplied id (Commandment VII —
-// idempotency: retries hit the same row). The
-// table itself never deletes; the read methods
-// scan-and-filter (Postgres tier will index).
+// The states table is the append-only event log of every
+// state change in the system. One row, one fact. `record`
+// writes a single row with caller-supplied id (Commandment
+// VII — idempotency: retries hit the same row). The table
+// never deletes; the read methods scan-and-filter (the
+// Postgres tier will index).
+//
+// Every op crosses the runner: standalone, the runner opens
+// a fresh single-op transaction; joined to a view, it runs
+// against the already-open tx. The `*In(tx)` twins let a
+// joined reader (EntityStore) scan the log inside the SAME
+// transaction that reads the entity row — two reads, one
+// truth.
 export class StateStore
     implements StateStoreInterface
 {
-    readonly #backend: StorageBackend;
+    readonly #run: TxRunner;
     readonly #table: string;
-    readonly #serialize:
-        <R>(fn: () => Promise<R>) => Promise<R>;
 
-    constructor(
-        backend: StorageBackend,
-        table: string,
-    ) {
-        this.#backend = backend;
+    constructor(run: TxRunner, table: string) {
+        this.#run = run;
         this.#table = table;
-        this.#serialize = createSerializer();
     }
 
     async getAll(): Promise<StateEntity[]> {
-        return this.#backend.read<StateEntity>(
-            this.#table,
+        return this.#run(
+            [this.#table], 'readonly',
+            tx => tx.getAll<StateEntity>(this.#table),
         );
     }
 
     async getById(id: Id): Promise<StateEntity> {
-        const rows = await this.#backend.read<
-            StateEntity
-        >(this.#table);
-        const row = rows.find(r => r.id === id);
-        if (!row) {
-            throw new EntityNotFound(
-                this.#table, id,
-            );
-        }
-        return row;
+        return this.#run(
+            [this.#table], 'readonly',
+            async (tx) => {
+                const row = await tx.get<StateEntity>(
+                    this.#table, id,
+                );
+                if (!row) {
+                    throw new EntityNotFound(
+                        this.#table, id,
+                    );
+                }
+                return row;
+            },
+        );
     }
 
     async put(
         id: Id,
         fields: Omit<StateEntity, 'id'>,
     ): Promise<StateEntity> {
-        return this.#serialize(async () => {
-            const rows = await this.#backend.read<
-                StateEntity
-            >(this.#table);
-            const index = rows.findIndex(
-                r => r.id === id,
-            );
-            const written: StateEntity = {
-                ...fields,
-                id,
-            };
-            const next = index >= 0
-                ? rows.with(index, written)
-                : [...rows, written];
-            await this.#backend.write(
-                this.#table, next,
-            );
-            return written;
-        });
+        const written: StateEntity = { ...fields, id };
+        await this.#run(
+            [this.#table], 'readwrite',
+            tx => tx.put(this.#table, written),
+        );
+        return written;
     }
 
     async record(
@@ -95,9 +87,40 @@ export class StateStore
     async currentFor(
         entityId: Id,
     ): Promise<StateEntity | null> {
-        const rows = await this.#backend.read<
-            StateEntity
-        >(this.#table);
+        return this.#run(
+            [this.#table], 'readonly',
+            tx => this.currentForIn(tx, entityId),
+        );
+    }
+
+    async allFor(entityId: Id): Promise<StateEntity[]> {
+        return this.#run(
+            [this.#table], 'readonly',
+            tx => this.allForIn(tx, entityId),
+        );
+    }
+
+    async deletedIds(): Promise<Set<Id>> {
+        return this.#run(
+            [this.#table], 'readonly',
+            tx => this.deletedIdsIn(tx),
+        );
+    }
+
+    async isDeleted(id: Id): Promise<boolean> {
+        return this.#run(
+            [this.#table], 'readonly',
+            tx => this.isDeletedIn(tx, id),
+        );
+    }
+
+    async currentForIn(
+        tx: Tx,
+        entityId: Id,
+    ): Promise<StateEntity | null> {
+        const rows = await tx.getAll<StateEntity>(
+            this.#table,
+        );
         let latest: StateEntity | null = null;
         for (const row of rows) {
             if (row.entity_id !== entityId) {
@@ -113,12 +136,13 @@ export class StateStore
         return latest;
     }
 
-    async allFor(
+    async allForIn(
+        tx: Tx,
         entityId: Id,
     ): Promise<StateEntity[]> {
-        const rows = await this.#backend.read<
-            StateEntity
-        >(this.#table);
+        const rows = await tx.getAll<StateEntity>(
+            this.#table,
+        );
         return rows
             .filter(r => r.entity_id === entityId)
             .sort((a, b) =>
@@ -129,17 +153,17 @@ export class StateStore
     }
 
     // Answers "which entities are currently in
-    // state=deleted?" by scanning the log and keeping
-    // the latest event per entity_id (>= tiebreak so
-    // same-millisecond writes resolve to insertion
-    // order — the deterministic order the append-only
-    // log already captures). Hot path for getAll on
-    // every EntityStore.
-    async deletedIds(): Promise<Set<Id>> {
-        const rows = await this.#backend.read<
-            StateEntity
-        >(this.#table);
-        const latestByEntity = new Map<Id, StateEntity>();
+    // state=deleted?" by scanning the log and keeping the
+    // latest event per entity_id (>= tiebreak so
+    // same-millisecond writes resolve to insertion order —
+    // the deterministic order the append-only log already
+    // captures). Hot path for getAll on every EntityStore.
+    async deletedIdsIn(tx: Tx): Promise<Set<Id>> {
+        const rows = await tx.getAll<StateEntity>(
+            this.#table,
+        );
+        const latestByEntity =
+            new Map<Id, StateEntity>();
         for (const row of rows) {
             const seen =
                 latestByEntity.get(row.entity_id);
@@ -159,14 +183,16 @@ export class StateStore
         return deleted;
     }
 
-    // Single-entity variant for getById's hot path.
-    // Scans the log once, keeps only rows for the
-    // requested entity, returns whether the latest
-    // is 'deleted'. O(events per entity) — small.
-    async isDeleted(id: Id): Promise<boolean> {
-        const rows = await this.#backend.read<
-            StateEntity
-        >(this.#table);
+    // Single-entity variant for getById's hot path. Scans
+    // the log once, keeps only rows for the requested
+    // entity, returns whether the latest is 'deleted'.
+    async isDeletedIn(
+        tx: Tx,
+        id: Id,
+    ): Promise<boolean> {
+        const rows = await tx.getAll<StateEntity>(
+            this.#table,
+        );
         let latest: StateEntity | null = null;
         for (const row of rows) {
             if (row.entity_id !== id) continue;

@@ -87,6 +87,33 @@ test('replaying a consumed code is a 401 no-op', async () => {
         (await db.identityTokens.getAll()).length, before);
 });
 
+test(
+    'concurrent authorization_code grants spend the'
+    + ' code exactly once',
+    async () => {
+        const db = await freshDb();
+        await seedRootAdmin(db);
+        await db.authorizationCodes.put('ev1', issuedCode);
+        const [a, b] = await Promise.all([
+            handleRequest(db, tokenRequest({
+                grant_type: 'authorization_code',
+                code: 'the-code',
+            })),
+            handleRequest(db, tokenRequest({
+                grant_type: 'authorization_code',
+                code: 'the-code',
+            })),
+        ]);
+        assert.deepEqual(
+            [a.status, b.status].sort(), [200, 401],
+        );
+        assert.equal(
+            (await db.identityTokens.getAll()).length, 1,
+            'exactly one token chain minted',
+        );
+    },
+);
+
 test('an unknown code is a 401', async () => {
     const db = await freshDb();
     const res = await handleRequest(db, tokenRequest({

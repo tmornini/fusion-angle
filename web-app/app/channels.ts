@@ -1,9 +1,6 @@
 import {
-    STORAGE_KEY_PREFIX,
-} from './storage-keys.ts';
-import {
-    subscribeStorageEvent,
-} from './adapters/storage-event.ts';
+    subscribeTablesChanged,
+} from './adapters/broadcast-channel.ts';
 
 type Listener<T> = (value: T) => void;
 
@@ -34,23 +31,6 @@ export function createChannel<T>(
     };
 }
 
-export function bridgeStorageToChannel(
-    tableNames: readonly string[],
-    channel: Channel<void>,
-): void {
-    const watchedKeys = new Set(
-        tableNames.map(
-            t => STORAGE_KEY_PREFIX + t,
-        ),
-    );
-    subscribeStorageEvent((e) => {
-        if (e.key === null) return;
-        if (watchedKeys.has(e.key)) {
-            channel.send();
-        }
-    });
-}
-
 export interface SubscriptionChannel {
     notify(): void;
     subscribe(
@@ -62,7 +42,16 @@ export function createSubscriptionChannel(
     tableNames: readonly string[],
 ): SubscriptionChannel {
     const channel = createChannel<void>();
-    bridgeStorageToChannel(tableNames, channel);
+    const watched = new Set(tableNames);
+    // Another tab's readwrite commit broadcasts the tables it
+    // touched; refresh when any overlaps ours. The poster's
+    // own tab never hears the message, so it does not
+    // double-refresh.
+    subscribeTablesChanged((tables) => {
+        if (tables.some(t => watched.has(t))) {
+            channel.send();
+        }
+    });
     return {
         notify: () => channel.send(),
         subscribe: (fn) =>

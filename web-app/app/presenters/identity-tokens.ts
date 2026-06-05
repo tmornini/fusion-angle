@@ -4,12 +4,12 @@ import {
 import { formatDateTime } from '../core.ts';
 import { DISPLAY_ABSENT } from '../format.ts';
 import type {
-    IdentityTokenEntity,
+    TokenEvent,
     TokenChain,
 } from '../adapters/index.ts';
 
 function actionBadgeClass(
-    action: IdentityTokenEntity['action'],
+    action: TokenEvent['action'],
 ): string {
     if (action === 'issued') return 'badge badge-success';
     if (action === 'revoked') return 'badge badge-error';
@@ -17,7 +17,7 @@ function actionBadgeClass(
 }
 
 function buildEventRow(
-    event: IdentityTokenEntity,
+    event: TokenEvent,
 ): SafeHtml {
     return html`
         <div class="${
@@ -31,9 +31,9 @@ function buildEventRow(
                     'text-xs text-muted truncate'
                 }">
                     parent: ${
-                        event.parent_jti === ''
+                        event.parentJti === ''
                             ? DISPLAY_ABSENT
-                            : event.parent_jti
+                            : event.parentJti
                     }
                 </p>
             </div>

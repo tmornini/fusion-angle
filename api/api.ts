@@ -2,6 +2,7 @@ import type { DbAdapter } from './db.ts';
 import {
     EntityNotFound,
     MissingTableError,
+    TABLE_NAMES,
 } from './db.ts';
 import type {
     AIMemberEntity,
@@ -189,24 +190,214 @@ async function applyRecordMultiPut(
         body.kind === 'edit'
             ? body.removedAttributeIds
             : [];
-    await db.records.put(body.id, body.record);
-    if (body.kind === 'create') {
-        const member =
-            await db.members.getById('current');
-        await db.states.record(
-            body.initialStateEventId,
-            body.id,
-            body.initialState,
-            member.id,
+    // The record, its initial state event, and its
+    // attributes commit as one transaction — a mid-write
+    // failure (e.g. a missing current member) rolls the
+    // whole thing back rather than orphaning the record.
+    await db.transaction(
+        ['records', 'record_attributes', 'states', 'members'],
+        async (view) => {
+            await view.records.put(body.id, body.record);
+            if (body.kind === 'create') {
+                const member =
+                    await view.members.getById('current');
+                await view.states.record(
+                    body.initialStateEventId,
+                    body.id,
+                    body.initialState,
+                    member.id,
+                );
+            }
+            if (
+                entries.length > 0
+                || removedIds.length > 0
+            ) {
+                await view.recordAttributes.putMany(
+                    entries, removedIds,
+                );
+            }
+        },
+    );
+}
+
+
+// One unit of a batched commit: a put (full-state upsert)
+// or a delete, addressed by resource path. Validated at the
+// gate, then dispatched to the same per-resource handler the
+// HTTP router uses, bound to the open transaction view.
+export type CommitOp =
+    | {
+        method: 'put';
+        resource: string;
+        body: Record<string, unknown>;
+    }
+    | {
+        method: 'delete';
+        resource: string;
+    };
+
+function validateCommitOp(
+    raw: unknown,
+    index: number,
+): CommitOp {
+    const label = 'commit op[' + index + ']';
+    if (
+        typeof raw !== 'object'
+        || raw === null
+        || Array.isArray(raw)
+    ) {
+        throw new ApiError(
+            label + ' must be an object.',
+            HTTP_BAD_REQUEST,
         );
     }
-    if (entries.length > 0 || removedIds.length > 0) {
-        await db.recordAttributes.putMany(
-            entries, removedIds,
+    const op = raw as Record<string, unknown>;
+    const resource = op['resource'];
+    if (typeof resource !== 'string' || resource === '') {
+        throw new ApiError(
+            label + ' needs a non-empty "resource".',
+            HTTP_BAD_REQUEST,
         );
+    }
+    if (op['method'] === 'put') {
+        const body = op['body'];
+        if (
+            typeof body !== 'object'
+            || body === null
+            || Array.isArray(body)
+        ) {
+            throw new ApiError(
+                label + ' put needs an object "body".',
+                HTTP_BAD_REQUEST,
+            );
+        }
+        return {
+            method: 'put',
+            resource,
+            body: body as Record<string, unknown>,
+        };
+    }
+    if (op['method'] === 'delete') {
+        return { method: 'delete', resource };
+    }
+    throw new ApiError(
+        label + ' method must be "put" or "delete".',
+        HTTP_BAD_REQUEST,
+    );
+}
+
+function validateCommitBody(
+    payload: Record<string, unknown>,
+): CommitOp[] {
+    const ops = payload['ops'];
+    if (!Array.isArray(ops)) {
+        throw new ApiError(
+            'commit body needs an "ops" array.',
+            HTTP_BAD_REQUEST,
+        );
+    }
+    return ops.map(validateCommitOp);
+}
+
+const COMMIT_TABLES: ReadonlySet<string> =
+    new Set(TABLE_NAMES);
+
+// Resources whose collection name is not their table; every
+// other resource maps first-segment hyphen→underscore. The
+// map is closed and enumerated — no reflection.
+const COMMIT_RESOURCE_TABLE: Record<string, string> = {
+    'current-member': 'members',
+};
+
+function tableForCommitResource(resource: string): string {
+    const first =
+        resource.split('/').filter(Boolean)[0];
+    if (first === undefined) {
+        throw new ApiError(
+            'commit op resource is empty.',
+            HTTP_BAD_REQUEST,
+        );
+    }
+    const table =
+        COMMIT_RESOURCE_TABLE[first]
+        ?? first.replace(/-/g, '_');
+    if (!COMMIT_TABLES.has(table)) {
+        throw new ApiError(
+            'commit op resource "' + resource
+            + '" maps to no table.',
+            HTTP_BAD_REQUEST,
+        );
+    }
+    return table;
+}
+
+// The transaction scope for a batch. Always includes
+// 'states': every org-scoped put reads it (the fence's
+// #assertWritable getById scans the tombstone log), so it
+// must be in scope.
+export function unionTablesFor(
+    ops: readonly CommitOp[],
+): string[] {
+    const tables = new Set<string>(['states']);
+    for (const op of ops) {
+        tables.add(tableForCommitResource(op.resource));
+    }
+    return [...tables];
+}
+
+async function dispatchOpInTx(
+    view: DbAdapter,
+    op: CommitOp,
+): Promise<void> {
+    const segments =
+        op.resource.split('/').filter(Boolean);
+    const match = matchRoute(segments);
+    if (match === null) {
+        throw new ApiError(
+            'commit op resource not found: '
+            + op.resource,
+            HTTP_NOT_FOUND,
+        );
+    }
+    const { route: matched, params } = match;
+    if (op.method === 'put') {
+        if (matched.put === undefined) {
+            throw new ApiError(
+                'commit op put not allowed on '
+                + op.resource,
+                HTTP_BAD_REQUEST,
+            );
+        }
+        await matched.put(view, params, op.body);
+    } else {
+        if (matched.delete === undefined) {
+            throw new ApiError(
+                'commit op delete not allowed on '
+                + op.resource,
+                HTTP_BAD_REQUEST,
+            );
+        }
+        await matched.delete(view, params);
     }
 }
 
+// The batch route's body handler. One authenticated request;
+// `effective` is already org-scoped, and its transaction
+// re-scopes the view — so each op dispatches without re-auth
+// or re-latency. Real rollback: any op throwing discards the
+// whole batch.
+async function applyCommit(
+    effective: DbAdapter,
+    payload: Record<string, unknown>,
+): Promise<void> {
+    const ops = validateCommitBody(payload);
+    const tables = unionTablesFor(ops);
+    await effective.transaction(tables, async (view) => {
+        for (const op of ops) {
+            await dispatchOpInTx(view, op);
+        }
+    });
+}
 
 const routes: Route[] = [
     route('members', {
@@ -590,6 +781,11 @@ const routes: Route[] = [
     route('records-multi-put', {
         post: async (db, _p, body) => {
             await applyRecordMultiPut(db, body);
+        },
+    }),
+    route('commit', {
+        post: async (db, _p, body) => {
+            await applyCommit(db, body);
         },
     }),
 

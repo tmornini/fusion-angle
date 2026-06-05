@@ -1,4 +1,5 @@
 import {
+    initState,
     initListeners,
 } from './state.ts';
 import {
@@ -117,6 +118,7 @@ async function scopeBootToActiveOrg(): Promise<void> {
 document.addEventListener(
     'DOMContentLoaded',
     async () => {
+        initState();
         initListeners();
 
         let hasSchema: boolean;

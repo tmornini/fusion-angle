@@ -21,13 +21,14 @@ import {
 
 // A unit of write work executed by ctx.commit().
 // `put` upserts a row by full state; `delete` removes
-// a row by its resource path. Sequenced in order; on
-// failure, commit() throws CommitError(failedAt,
-// applied, cause) so the caller can name the failed
-// op and reconcile. No rollback (real atomicity
-// arrives with Postgres). notifyChannels fire only
-// after all ops succeed — single batched event per
-// channel per logical operation.
+// a row by its resource path. The whole batch posts as
+// ONE request and commits in one transaction — it
+// applies entirely or not at all. On failure, commit()
+// throws CommitError(0, [], cause); `applied` is always
+// empty because real rollback leaves nothing partially
+// applied. notifyChannels fire only after the batch
+// succeeds — one batched event per channel per logical
+// operation.
 export type WriteOp =
     | {
         method: 'put';
@@ -104,29 +105,14 @@ export function createRequestContext(
         commit: async (
             tx: Transaction,
         ): Promise<void> => {
-            const applied: WriteOp[] = [];
-            for (
-                const [i, op] of tx.ops.entries()
-            ) {
-                try {
-                    if (op.method === 'put') {
-                        await ctx.PUT(
-                            op.resource,
-                            op.body,
-                        );
-                    } else {
-                        await ctx.DELETE(
-                            op.resource,
-                        );
-                    }
-                } catch (e) {
-                    throw new CommitError(
-                        i,
-                        applied,
-                        e as Error,
-                    );
-                }
-                applied.push(op);
+            try {
+                await ctx.POST('commit', {
+                    ops: tx.ops,
+                });
+            } catch (e) {
+                // Atomic batch: a failure applied nothing,
+                // so `applied` is always empty.
+                throw new CommitError(0, [], e as Error);
             }
             if (tx.notifyChannels) {
                 for (

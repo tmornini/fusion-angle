@@ -20,7 +20,10 @@ import {
     planRotation,
     isTokenRevoked,
 } from './identity-tokens.ts';
-import { verifyPassword } from './password-hash.ts';
+import {
+    hashPassword,
+    verifyPassword,
+} from './password-hash.ts';
 import {
     currentDefaultOrgFor,
 } from './authorization.ts';
@@ -151,17 +154,15 @@ async function mintPair(
     };
 }
 
-// Issue a pair on a NEW chain — the refresh jti is recorded as a
-// fresh chain root. Used by grants that start a session.
-async function issueTokenPair(
-    adapter: DbAdapter,
+// Record a fresh chain root (the refresh jti) and return it. A
+// pure DB write — safe to run inside a caller's transaction, so
+// the issue can be atomic with whatever the grant consumes.
+async function recordIssuedRoot(
+    view: DbAdapter,
     identityId: Id,
-    name: string,
-    act?: { sub: Id },
-    org?: Id,
-): Promise<TokenResponse> {
+): Promise<string> {
     const refreshJti = generateCryptoSafeBase62();
-    await adapter.identityTokens.put(
+    await view.identityTokens.put(
         generateCryptoSafeBase62(), {
             jti: refreshJti,
             identity_id: identityId,
@@ -170,6 +171,22 @@ async function issueTokenPair(
             parent_jti: '',
             at: nowUtc(),
         });
+    return refreshJti;
+}
+
+// Issue a pair on a NEW chain — the refresh jti is recorded as a
+// fresh chain root. Used by grants that start a session without
+// consuming a single-use resource (so the single write needs no
+// surrounding transaction).
+async function issueTokenPair(
+    adapter: DbAdapter,
+    identityId: Id,
+    name: string,
+    act?: { sub: Id },
+    org?: Id,
+): Promise<TokenResponse> {
+    const refreshJti =
+        await recordIssuedRoot(adapter, identityId);
     const orgs = await subjectOrgs(adapter, identityId);
     return mintPair(identityId, name, refreshJti, act, {
         ...(org ? { org } : {}),
@@ -238,26 +255,43 @@ async function grantRefresh(
     if (refreshRev !== null) {
         return failure(401, refreshRev);
     }
-    const rows = await adapter.identityTokens.getAll();
-    const plan = planRotation(
-        rows, verified.claims.jti,
-        generateCryptoSafeBase62(), nowUtc(),
+    // Read the token ledger, plan the rotation, and append its
+    // events in ONE transaction — a concurrent reuse of the same
+    // jti can not double-rotate.
+    const outcome = await adapter.transaction(
+        ['identity_tokens'],
+        async (view) => {
+            const rows =
+                await view.identityTokens.getAll();
+            const plan = planRotation(
+                rows, verified.claims.jti,
+                generateCryptoSafeBase62(), nowUtc(),
+            );
+            if (plan.kind === 'rotate') {
+                await appendEvents(view, plan.appends);
+                return {
+                    kind: 'rotate' as const,
+                    newJti: plan.newJti,
+                };
+            }
+            if (plan.kind === 'replay') {
+                await appendEvents(view, plan.appends);
+            }
+            return { kind: 'fail' as const };
+        },
     );
-    if (plan.kind === 'rotate') {
-        await appendEvents(adapter, plan.appends);
-        const name = await nameFor(adapter, verified.claims.sub);
+    if (outcome.kind === 'rotate') {
+        const name =
+            await nameFor(adapter, verified.claims.sub);
         const orgs = await subjectOrgs(
             adapter, verified.claims.sub);
         return {
             ok: true,
             response: await mintPair(
-                verified.claims.sub, name, plan.newJti,
+                verified.claims.sub, name, outcome.newJti,
                 undefined, { orgs },
             ),
         };
-    }
-    if (plan.kind === 'replay') {
-        await appendEvents(adapter, plan.appends);
     }
     return failure(401, 'refresh token reuse or unknown');
 }
@@ -393,26 +427,52 @@ async function grantAuthorizationCode(
     const code = typeof body.code === 'string'
         ? body.code
         : '';
-    const rows = await adapter.authorizationCodes.getAll();
-    const state = codeState(rows, code);
-    if (state === null || state.status !== 'issued') {
+    // Read the code state, consume it, and record the issued
+    // chain root in ONE transaction — a concurrent replay can
+    // not slip between the check and the consume (double-spend).
+    const issued = await adapter.transaction(
+        ['authorization_codes', 'identity_tokens'],
+        async (view) => {
+            const rows =
+                await view.authorizationCodes.getAll();
+            const state = codeState(rows, code);
+            if (
+                state === null
+                || state.status !== 'issued'
+            ) {
+                return null;
+            }
+            await view.authorizationCodes.put(
+                generateCryptoSafeBase62(), {
+                    code,
+                    identity_id: state.identityId,
+                    client_id: state.clientId,
+                    status: 'consumed',
+                    at: nowUtc(),
+                });
+            const refreshJti = await recordIssuedRoot(
+                view, state.identityId,
+            );
+            return {
+                identityId: state.identityId,
+                refreshJti,
+            };
+        },
+    );
+    if (issued === null) {
         return failure(
             401, 'invalid or used authorization code',
         );
     }
-    await adapter.authorizationCodes.put(
-        generateCryptoSafeBase62(), {
-            code,
-            identity_id: state.identityId,
-            client_id: state.clientId,
-            status: 'consumed',
-            at: nowUtc(),
-        });
-    const name = await nameFor(adapter, state.identityId);
+    const name =
+        await nameFor(adapter, issued.identityId);
+    const orgs =
+        await subjectOrgs(adapter, issued.identityId);
     return {
         ok: true,
-        response: await issueTokenPair(
-            adapter, state.identityId, name,
+        response: await mintPair(
+            issued.identityId, name, issued.refreshJti,
+            undefined, { orgs },
         ),
     };
 }
@@ -488,6 +548,23 @@ function currentPasswordSecret(
     return latest.secret;
 }
 
+// A real PHC over a throwaway secret, hashed ONCE then cached.
+// The unknown-user and missing-secret paths verify the
+// presented password against THIS before the identical 401, so
+// a failed login costs the same PBKDF2 work whether or not the
+// user exists — closing the timing channel a uniform 401 body
+// cannot. Lazy-init of a derived constant, not a measured cache.
+let timingEqualizerPhc: string | null = null;
+async function equalizeFailureTiming(
+    password: string,
+): Promise<void> {
+    if (timingEqualizerPhc === null) {
+        timingEqualizerPhc =
+            await hashPassword('timing-equalizer');
+    }
+    await verifyPassword(password, timingEqualizerPhc);
+}
+
 // The password loop: verify username + password, and on success
 // issue an authorization code bound to (identity, client). Every
 // failure returns the SAME 401 (no user enumeration) and appends
@@ -510,12 +587,18 @@ async function authorizePassword(
     };
     const piiRows = await adapter.identityPii.getAll();
     const identityId = identityByEmail(piiRows, username);
-    if (identityId === null) return denied;
+    if (identityId === null) {
+        await equalizeFailureTiming(password);
+        return denied;
+    }
     const credRows =
         await adapter.identityCredentials.getAll();
     const secret =
         currentPasswordSecret(credRows, identityId);
-    if (secret === null) return denied;
+    if (secret === null) {
+        await equalizeFailureTiming(password);
+        return denied;
+    }
     if (!(await verifyPassword(password, secret))) {
         return denied;
     }

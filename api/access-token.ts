@@ -156,6 +156,10 @@ export interface MintInput {
     readonly iat: number;
     readonly ttlSeconds: number;
     readonly jti: string;
+    // Overrides the audience for tests that must mint a
+    // real-signed wrong-aud token; production omits it and
+    // gets TOKEN_AUDIENCE.
+    readonly aud?: string;
     readonly act?: { readonly sub: Id };
     readonly org?: Id;
     readonly orgs?: readonly Id[];
@@ -168,7 +172,7 @@ export async function mintAccessToken(
         sub: input.sub,
         roles: input.roles,
         name: input.name,
-        aud: TOKEN_AUDIENCE,
+        aud: input.aud ?? TOKEN_AUDIENCE,
         iat: input.iat,
         nbf: input.iat,
         exp: input.iat + input.ttlSeconds,

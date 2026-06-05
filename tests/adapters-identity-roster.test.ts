@@ -120,7 +120,7 @@ async () => {
     const events = await getProviderEvents(ctx, 'p1');
     assert.equal(events.length, 2);
     assert.equal(
-        events.every(e => e.identity_id === 'p1'),
+        events.every(e => e.providerSubject === 'g-1'),
         true,
     );
 });

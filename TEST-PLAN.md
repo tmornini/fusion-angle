@@ -1685,6 +1685,11 @@ the claude-in-chrome MCP.
   saved"; on reopen the read view shows the new model as
   "{name} — {provider}".
 
+### Identity tokens & providers (`identity-tokens/`, `identity-providers/`)
+
+- [ ] **G25** Navigate to `identity-tokens/index.html?identityId=current` (or open an identity from `identities/` and click its "Tokens" link). PASS: the "Tokens — Refresh-token chains for this identity" page renders one card per chain, each showing the chain id, the event jti, `parent: —` for a root event (or the parent jti for a rotated one), an `issued`/`rotated`/`revoked` badge, and a LOCAL-time stamp; an identity with no tokens shows "No tokens." The presenter consumes the adapter's camelCase `TokenEvent` domain shape (`jti`, `parentJti`, `action`, `at`) — a snake_case storage leak would render `parent: undefined` instead of `parent: —`. Source: `web-app/app/adapters/identity-tokens.ts` (`TokenEvent`), `web-app/app/presenters/identity-tokens.ts`.
+- [ ] **G26** Navigate to `identity-providers/index.html?identityId=current` (or the identity's "Providers" link). PASS: the "Identity Providers — External sign-in links for this identity" page renders one card per link/unlink event (provider name + the `providerSubject` + a `linked`/`unlinked` badge + local-time stamp), or "No linked providers." for an identity with none (the seeded `current` logs in by password, so its providers list is empty). The presenter consumes the adapter's camelCase `ProviderEvent` shape (`provider`, `providerSubject`, `action`, `at`). Source: `web-app/app/adapters/identity-providers.ts` (`ProviderEvent`), `web-app/app/presenters/identity-providers.ts`.
+
 ### Snapshots (`snapshots/`) — Phase 4 (Run These Last)
 
 **Phase 4 — Snapshot lifecycle & objective wipe.** Cases
@@ -1774,6 +1779,7 @@ restored data.)
   states log carries the lifecycle stage, not a column on
   the entity. After reload the member's badge text and
   styling reflect the persisted state.
+- [ ] **G37 — Boot recovery from an incompatible/partial schema** With the app loaded, open DevTools and corrupt localStorage to a PARTIAL CURRENT schema: `localStorage.clear(); localStorage.setItem('fusion-ai:organizations','[]'); localStorage.setItem('fusion-ai:workers','[]')` — a current table is present so `hasSchema()` is true, but `members` and the rest are missing (the pre-rename / version-skew shape). Navigate to a schema-requiring page (e.g. `dashboard/index.html`). PASS: boot's `initDatabase()` throws `MissingTableError`, and `core.ts` REDIRECTS to `snapshots/index.html?missing-table=members` (NOT the terminal "Failed to initialize database" dead-end). The snapshots recovery page RENDERS its four operation cards plus the warning banner 'The schema is missing the "members" table. Recreate the schema below to continue.' and "Your database is empty." — so the user can recover via Wipe and Load Mock Data / Upload Snapshot / Create Pristine. (Before the BOOT-01 fix this dead-ended on the top-level error page; before the partial-schema follow-up the snapshots page itself threw `MissingTableError` in `getHasAnyHumanMembers` and showed "Something went wrong / Try Again".) A `workers`-only localStorage (no current table) instead takes the clean-empty path — `hasSchema()` is false → redirect to `snapshots/` with the "empty database" banner and the same recovery cards. Afterward, Wipe and Load Mock Data to restore a healthy DB before continuing. Source: `web-app/app/core.ts` (`redirectIfMissingTable` + the `initDatabase()` catch), `web-app/app/adapters/snapshots.ts` (`getHasAnyHumanMembers`), `web-app/snapshots/index.ts` (`mutateMissingTableBanner`).
 
 ### Billing (`billing/`) — STUB
 

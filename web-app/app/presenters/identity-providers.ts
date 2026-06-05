@@ -3,11 +3,11 @@ import {
 } from '../safe-html.ts';
 import { formatDateTime } from '../core.ts';
 import type {
-    IdentityProviderEntity,
+    ProviderEvent,
 } from '../adapters/index.ts';
 
 function actionBadgeClass(
-    action: IdentityProviderEntity['action'],
+    action: ProviderEvent['action'],
 ): string {
     return action === 'linked'
         ? 'badge badge-success'
@@ -15,7 +15,7 @@ function actionBadgeClass(
 }
 
 function buildEventRow(
-    event: IdentityProviderEntity,
+    event: ProviderEvent,
 ): SafeHtml {
     return html`
         <div class="${
@@ -28,7 +28,7 @@ function buildEventRow(
                 <p class="${
                     'text-xs text-muted truncate'
                 }">
-                    ${event.provider_subject}
+                    ${event.providerSubject}
                 </p>
             </div>
             <div class="${
@@ -53,10 +53,10 @@ function buildEmptyState(): SafeHtml {
 }
 
 export class IdentityProvidersPresenter {
-    readonly #events: readonly IdentityProviderEntity[];
+    readonly #events: readonly ProviderEvent[];
 
     constructor(
-        events: readonly IdentityProviderEntity[],
+        events: readonly ProviderEvent[],
     ) {
         this.#events = events;
     }

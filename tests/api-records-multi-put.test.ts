@@ -466,3 +466,33 @@ test(
         );
     },
 );
+
+test(
+    'POST records-multi-put create rolls back the'
+    + ' record when the current member is missing',
+    async () => {
+        const db = await freshDb();
+        // No seedCurrentMember: the create reads
+        // members/current, which 404s after the record
+        // write — the whole operation must roll back.
+        await assert.rejects(
+            () => POST(db, 'records-multi-put', {
+                kind: 'create',
+                id: 'rec-rollback',
+                record: {
+                    organization_id: '1',
+                    name: 'Doomed', description: '',
+                    position: 1,
+                },
+                attributes: [],
+                initialState: 'active',
+                initialStateEventId: 'ev-x',
+            }, DEV_TOKEN),
+        );
+        await assert.rejects(
+            () => GET(
+                db, 'records/rec-rollback', DEV_TOKEN,
+            ),
+        );
+    },
+);

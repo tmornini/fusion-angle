@@ -1,4 +1,5 @@
 import type { DbAdapter } from './db.ts';
+import { TABLE_NAMES } from './db.ts';
 import type {
     HumanMemberEntity,
     MemberState,
@@ -513,6 +514,17 @@ export const OBJECTIVE_SEEDS: Array<{
 ];
 
 export async function populateMockData(
+    adapter: DbAdapter,
+): Promise<SeededCredentials> {
+    // Seed the whole demo dataset in one transaction, so a
+    // mid-seed failure leaves no half-populated schema.
+    return adapter.transaction(
+        TABLE_NAMES,
+        (view) => populateMockDataIn(view),
+    );
+}
+
+async function populateMockDataIn(
     adapter: DbAdapter,
 ): Promise<SeededCredentials> {
     const members: SeedHumanMember[] = [
@@ -6482,6 +6494,16 @@ export async function populateMockData(
 }
 
 export async function populateBootstrapData(
+    adapter: DbAdapter,
+): Promise<SeededCredentials> {
+    // Seed the pristine bootstrap data in one transaction.
+    return adapter.transaction(
+        TABLE_NAMES,
+        (view) => populateBootstrapDataIn(view),
+    );
+}
+
+async function populateBootstrapDataIn(
     adapter: DbAdapter,
 ): Promise<SeededCredentials> {
     // The pristine seed plants only what the app needs

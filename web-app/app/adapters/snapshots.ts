@@ -1,5 +1,6 @@
 import type { RequestContext } from './shared.ts';
 import type { SeededCredentials } from '../../../api/mock-data.ts';
+import { MissingTableError } from '../../../api/db.ts';
 
 // Fallback when navigator.storage.estimate() is
 // unavailable (older browsers, Node test runtime).
@@ -260,8 +261,17 @@ export async function getHasAnyHumanMembers(
     // (`snapshots/schema`, exempt from the Bearer gate),
     // never the protected `members` route, so the page works
     // without authentication. `null` = no schema = no data.
-    const snapshot =
-        await ctx.GET<string | null>('snapshots/schema');
+    let snapshot: string | null;
+    try {
+        snapshot =
+            await ctx.GET<string | null>('snapshots/schema');
+    } catch (err) {
+        // A partial/incompatible schema throws MissingTableError
+        // on export; treat it as "no usable data" so the
+        // recovery page still renders its seed/import controls.
+        if (err instanceof MissingTableError) return false;
+        throw err;
+    }
     if (snapshot === null) {
         return false;
     }

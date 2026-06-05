@@ -95,6 +95,18 @@ test('rejects a token minted for a different audience', async () => {
         false);
 });
 
+test('a real-signed token for a foreign audience is rejected'
+    + ' at the audience gate', async () => {
+    const t = await mintAccessToken({
+        sub: 'current', roles: [], name: 'Demo',
+        iat: 1_700_000_000, ttlSeconds: 10_000_000_000,
+        jti: 'jti-test', aud: 'evil-site',
+    });
+    const r = await verifyAccessToken(t, 1_700_000_100);
+    assert.equal(r.valid, false);
+    assert.equal(!r.valid && r.reason, 'wrong audience');
+});
+
 test('principalFromToken reads sub/roles/name', async () => {
     const p = principalFromToken(await token());
     assert.equal(p.id, 'current');

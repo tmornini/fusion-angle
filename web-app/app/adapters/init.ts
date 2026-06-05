@@ -1,6 +1,9 @@
 import {
-    LocalStorageDbAdapter,
-} from '../../../api/db-localstorage.ts';
+    IndexedDbDbAdapter,
+} from '../../../api/db-indexeddb.ts';
+import {
+    postTablesChanged,
+} from './broadcast-channel.ts';
 import type { DbAdapter } from '../../../api/db.ts';
 import { GET } from '../../../api/api.ts';
 import {
@@ -13,10 +16,21 @@ import {
 
 let adapter: DbAdapter | undefined;
 
+// The persistence tier: a real IndexedDB transaction per op,
+// O(1) appends, and cross-tab refresh via the posted table
+// names. The connection opens in initialize().
+function defaultAdapter(): DbAdapter {
+    return new IndexedDbDbAdapter(postTablesChanged);
+}
+
+// `makeAdapter` is injectable so boot-path tests can
+// substitute an in-memory tier — IndexedDB has no Node stub,
+// and we add no fake. Production passes nothing.
 export async function initAdapter(
+    makeAdapter: () => DbAdapter = defaultAdapter,
 ): Promise<boolean> {
     await ensureSessionToken();
-    adapter = new LocalStorageDbAdapter();
+    adapter = makeAdapter();
     await adapter.initialize();
     const schema =
         await GET<string | null>(

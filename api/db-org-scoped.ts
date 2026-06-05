@@ -42,6 +42,16 @@ export function orgScopedAdapter(
         importSnapshot: (json) =>
             base.importSnapshot(json),
         simulateLatency: () => base.simulateLatency(),
+        // Re-scope the open view to `org` so the fence rides
+        // INSIDE the tx: OrgScopedEntityStore's
+        // #assertWritable read and its inner put now run in
+        // one transaction, closing the TOCTOU for free — no
+        // OrgScopedEntityStore change needed.
+        transaction: (tables, fn) =>
+            base.transaction(
+                tables,
+                (view) => fn(orgScopedAdapter(view, org)),
+            ),
 
         // Global identity/auth spine — untouched.
         members: base.members,

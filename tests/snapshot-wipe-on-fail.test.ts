@@ -3,19 +3,15 @@ import { strict as assert } from 'node:assert';
 import {
     LocalStorageDbAdapter,
 } from '../api/db-localstorage.ts';
+import { MemoryDbAdapter } from '../api/db-memory.ts';
 
 const KEY_PREFIX = 'fusion-ai:';
 
-interface FailingShim {
-    map: Map<string, string>;
-    callCount: { value: number };
-}
-
 function installFailingShim(
     failOnSetCall: number,
-): FailingShim {
+): Map<string, string> {
     const map = new Map<string, string>();
-    const callCount = { value: 0 };
+    let calls = 0;
     (globalThis as unknown as {
         localStorage: {
             getItem(k: string): string | null;
@@ -27,13 +23,9 @@ function installFailingShim(
             return map.get(key) ?? null;
         },
         setItem(key, value) {
-            callCount.value += 1;
-            if (
-                callCount.value === failOnSetCall
-            ) {
-                throw new Error(
-                    'simulated quota error',
-                );
+            calls += 1;
+            if (calls === failOnSetCall) {
+                throw new Error('simulated quota error');
             }
             map.set(key, value);
         },
@@ -41,53 +33,49 @@ function installFailingShim(
             map.delete(key);
         },
     };
-    return { map, callCount };
+    return map;
 }
 
+// Wipe-on-fail is retired: the import now runs in one
+// transaction, so a validation error (at the gate) or a
+// logic error (inside the tx) leaves prior data intact via
+// the buffer discard. A mid-flush OS error (quota) on
+// localStorage is the one gap left — its multi-key write is
+// not atomic — and the IndexedDB tier (Phase B) closes it.
 test(
-    'wipes table keys when setItem fails mid-import',
+    'a storage write failure surfaces as a rejection',
     async () => {
-        // Fail on the 3rd setItem call — by then
-        // a couple of tables have been written
-        // and we want to confirm those get wiped.
-        const shim = installFailingShim(3);
+        installFailingShim(3);
         const adapter = new LocalStorageDbAdapter();
         await adapter.initialize();
-
-        // Pre-populate one entry to confirm it
-        // also gets wiped as part of the failure
-        // recovery.
-        shim.map.set(
-            KEY_PREFIX + 'members',
-            '[]',
-        );
-
         const snapshot = JSON.stringify({
             members: [],
             ideas: [],
             projects: [],
-            flows: [],
-            flow_versions: [],
-            project_flows: [],
-            work_orders: [],
-            flow_work_orders: [],
-            states: [],
-            state_field_values: [],
-            organization: [],
-            idea_submissions: [],
-            deleted: [],
         });
-
         await assert.rejects(
             () => adapter.importSnapshot(snapshot),
         );
+    },
+);
 
-        // No fusion-ai:* table keys remain.
-        for (const key of shim.map.keys()) {
-            assert.ok(
-                !key.startsWith(KEY_PREFIX),
-                'leftover key after wipe: ' + key,
-            );
-        }
+test(
+    'a rejected import leaves prior data intact',
+    async () => {
+        const adapter = new MemoryDbAdapter();
+        await adapter.importSnapshot(JSON.stringify({
+            members: [{ id: 'm1', type: 'human' }],
+        }));
+        // An invalid row rejects at the validation gate,
+        // before any storage touch — so the prior import
+        // survives whole.
+        await assert.rejects(
+            () => adapter.importSnapshot(JSON.stringify({
+                members: [{ id: 'm2', type: 'nope' }],
+            })),
+        );
+        const members = await adapter.members.getAll();
+        assert.equal(members.length, 1);
+        assert.equal(members[0]!.id, 'm1');
     },
 );
