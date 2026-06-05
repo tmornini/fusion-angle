@@ -485,9 +485,10 @@ applies:
 4. `dark-mode.css` — dark theme overrides
 5. `base.css` — global resets, view transitions
 6. `components-*.css` — reusable component families
-   (avatar, badges, buttons, cards, controls, dialog,
-   feedback, inputs, layout-helpers, menus, metrics,
-   org-switcher, page-placeholder, tables, tabs, toast)
+   (avatar, badges, brand, buttons, cards, controls,
+   dialog, feedback, inputs, layout-helpers, menus,
+   metrics, org-switcher, page-placeholder, tables, tabs,
+   toast)
 7. `layout.css` — sidebar, header, main-content shell
 8. `utilities.css` — single-property primitives plus
    container widths and hover-link

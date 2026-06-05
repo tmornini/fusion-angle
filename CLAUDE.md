@@ -57,7 +57,10 @@ tools can drive the page normally.
 `.css` files (excluding `compose.ts`) and on every `.md`
 file at the repo root except [TEST-PLAN.md](TEST-PLAN.md) — exempted
 because each test case bullet is meant to scan as one
-self-contained line.
+self-contained line. Finally it runs the
+`generate-schema-svg --check` gate, which fails on
+`SCHEMA.svg` drift from the schema of record (`api/db.ts` +
+`api/types.ts`).
 
 For what each test layer covers, see `## Testing`.
 
