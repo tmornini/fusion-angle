@@ -14,6 +14,13 @@ export interface Principal {
     readonly id: Id;
     readonly roles: readonly string[];
     readonly name: string;
+    // SP-2 tenant scope: set once from the token's `org`
+    // claim; absent for an unscoped single-org principal.
+    readonly organization?: Id;
+    // The reachable set, from the token's `orgs` claim — every
+    // org this identity is a member of (enumerate without a
+    // round-trip). The active `organization` is one of these.
+    readonly organizations?: readonly Id[];
 }
 
 // The JWT claim contract. `aud` names the origin the token is
@@ -23,7 +30,11 @@ export interface Principal {
 // (SP-5 binds the key — present in the contract, unenforced
 // now); `jti` is the unique token id (reuse-detection: SP-5);
 // `act` is the RFC 8693 delegation actor (token-exchange shapes
-// sub = the subject and act.sub = the acting party).
+// sub = the subject and act.sub = the acting party). `org` is
+// the SP-2 tenant scope, present only on an org-exchanged token;
+// its absence is an unscoped single-org caller. `orgs` is the
+// reachable set — every org the subject is a member of, from
+// the membership ledger at mint time.
 export interface AccessTokenClaims {
     readonly sub: Id;
     readonly roles: readonly string[];
@@ -31,6 +42,8 @@ export interface AccessTokenClaims {
     readonly aud: string;
     readonly cnf?: { readonly jkt: string };
     readonly act?: { readonly sub: Id };
+    readonly org?: Id;
+    readonly orgs?: readonly Id[];
     readonly iat: number;
     readonly nbf: number;
     readonly exp: number;
@@ -144,6 +157,8 @@ export interface MintInput {
     readonly ttlSeconds: number;
     readonly jti: string;
     readonly act?: { readonly sub: Id };
+    readonly org?: Id;
+    readonly orgs?: readonly Id[];
 }
 
 export async function mintAccessToken(
@@ -159,6 +174,8 @@ export async function mintAccessToken(
         exp: input.iat + input.ttlSeconds,
         jti: input.jti,
         ...(input.act ? { act: input.act } : {}),
+        ...(input.org ? { org: input.org } : {}),
+        ...(input.orgs ? { orgs: input.orgs } : {}),
     };
     const head =
         base64UrlEncode(JSON.stringify(HEADER));
@@ -182,6 +199,15 @@ function hasClaimShape(
         }
         if (typeof (c.act as { sub?: unknown }).sub
             !== 'string') {
+            return false;
+        }
+    }
+    if (c.org !== undefined && typeof c.org !== 'string') {
+        return false;
+    }
+    if (c.orgs !== undefined) {
+        if (!Array.isArray(c.orgs)
+            || c.orgs.some(o => typeof o !== 'string')) {
             return false;
         }
     }
@@ -221,6 +247,9 @@ export function principalFromToken(
         id: claims.sub,
         roles: claims.roles,
         name: claims.name,
+        ...(claims.org ? { organization: claims.org } : {}),
+        ...(claims.orgs
+            ? { organizations: claims.orgs } : {}),
     };
 }
 

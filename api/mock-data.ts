@@ -29,6 +29,7 @@ import {
     MS_PER_SECOND,
     MS_PER_DAY,
     SYSTEM_MEMBER_ID,
+    DEFAULT_ORG,
 } from './types.ts';
 import {
     generateCryptoSafeBase62,
@@ -353,6 +354,7 @@ function generateFlowWorkload(args: {
 
         workOrders.push({
             id: woId,
+            organization_id: DEFAULT_ORG,
             display_id: displayId,
             flow_graph: frozenFlowGraph,
             position: i + 1,
@@ -755,6 +757,12 @@ export async function populateMockData(
                 adapter.members.put(member.id, {
                     type: 'human',
                 }),
+                adapter.memberships.put(
+                    'seed-membership-' + member.id, {
+                        organization_id: DEFAULT_ORG,
+                        identity_id: member.id,
+                        at: MOCK_SEED_TIMESTAMP,
+                    }),
                 adapter.humanMembers.put(member.id, {
                     ...detail,
                     strengths:
@@ -783,6 +791,7 @@ export async function populateMockData(
         }),
         adapter.roleGrants.put(
             'seed-role-current-admin', {
+                organization_id: DEFAULT_ORG,
                 identity_id: 'current',
                 role: 'admin',
                 action: 'granted',
@@ -813,7 +822,7 @@ export async function populateMockData(
         },
     ];
 
-    const ideas: IdeaEntity[] = [
+    const ideas: Omit<IdeaEntity, 'organization_id'>[] = [
         {
             id: 'eT5xdKjzLDmuRn3r7XMX4R',
             title: 'AI-Powered Customer'
@@ -1143,9 +1152,11 @@ export async function populateMockData(
 
     await Promise.all([
         ...ideas.map(idea =>
-            adapter.ideas.put(idea.id, idea),
+            adapter.ideas.put(idea.id, {
+                ...idea, organization_id: DEFAULT_ORG,
+            }),
         ),
-        adapter.organization.put({
+        adapter.organizations.put(DEFAULT_ORG, {
             name: 'Stark Industries',
             domain: 'acmecorp.com',
             next_billing: dt(-300, 0, 0),
@@ -1160,7 +1171,8 @@ export async function populateMockData(
     const l2cProjectId =
         'L2cP01SalesPip3l1n3L01';
 
-    const projects: ProjectEntity[] = [
+    const projects:
+        Omit<ProjectEntity, 'organization_id'>[] = [
         {
             id: 'u6YkHhlGc91oDMkr3x0isa',
             title: 'AI-Powered Customer'
@@ -1623,7 +1635,7 @@ export async function populateMockData(
     ];
 
     const mockFlows:
-        FlowEntity[] = [
+        Omit<FlowEntity, 'organization_id'>[] = [
         {
             id: 'h5mErVBQhwdMKwi1co30jB',
             name: 'Customer Onboarding',
@@ -2634,7 +2646,8 @@ export async function populateMockData(
     const projectBriefRecordId =
         'rec02Pr0jBriefRec0rd02';
 
-    const mockRecords: RecordEntity[] = [
+    const mockRecords:
+        Omit<RecordEntity, 'organization_id'>[] = [
         {
             id: customerProfileRecordId,
             name: 'Customer Profile',
@@ -2674,7 +2687,7 @@ export async function populateMockData(
     }];
 
     const mockRecordAttributes:
-        RecordAttributeEntity[] = [
+        Omit<RecordAttributeEntity, 'organization_id'>[] = [
         {
             id: '5JZ0LeKdPCa4QMtg1RsF1M',
             record_id: customerProfileRecordId,
@@ -2968,7 +2981,7 @@ export async function populateMockData(
         'AdQlKf43JV6yrhQbyskDkR';
 
     const mockWorkOrders:
-        WorkOrderEntity[] = [
+        Omit<WorkOrderEntity, 'organization_id'>[] = [
         {
             id: woId,
             display_id: 'a7c3e1f9',
@@ -5664,15 +5677,14 @@ export async function populateMockData(
 
     await Promise.all([
         ...projects.map(project =>
-            adapter.projects.put(
-                project.id,
-                project,
-            ),
+            adapter.projects.put(project.id, {
+                ...project, organization_id: DEFAULT_ORG,
+            }),
         ),
         ...mockFlows.map(flow =>
-            adapter.flows.put(
-                flow.id, flow,
-            ),
+            adapter.flows.put(flow.id, {
+                ...flow, organization_id: DEFAULT_ORG,
+            }),
         ),
     ]);
 
@@ -6050,9 +6062,9 @@ export async function populateMockData(
             ),
         ),
         ...mockWorkOrders.map(r =>
-            adapter.workOrders.put(
-                r.id, r,
-            ),
+            adapter.workOrders.put(r.id, {
+                ...r, organization_id: DEFAULT_ORG,
+            }),
         ),
         ...mockFlowWorkOrders.map(r =>
             adapter.flowWorkOrders.put(
@@ -6109,6 +6121,12 @@ export async function populateMockData(
                 adapter.members.put(m.id, {
                     type: 'ai',
                 }),
+                adapter.memberships.put(
+                    'seed-membership-' + m.id, {
+                        organization_id: DEFAULT_ORG,
+                        identity_id: m.id,
+                        at: MOCK_SEED_TIMESTAMP,
+                    }),
                 adapter.aiMembers.put(m.id, detail),
                 adapter.identities.put(m.id, {
                     kind: 'service',
@@ -6134,6 +6152,7 @@ export async function populateMockData(
         ),
         ...mockRecords.map(r =>
             adapter.records.put(r.id, {
+                organization_id: DEFAULT_ORG,
                 name: r.name,
                 description: r.description,
                 position: r.position,
@@ -6141,6 +6160,7 @@ export async function populateMockData(
         ),
         ...mockRecordAttributes.map(r =>
             adapter.recordAttributes.put(r.id, {
+                organization_id: DEFAULT_ORG,
                 record_id: r.record_id,
                 name: r.name,
                 attribute_type:
@@ -6180,6 +6200,7 @@ export async function populateMockData(
 
     for (const seed of OBJECTIVE_SEEDS) {
         await adapter.objectives.put(seed.id, {
+            organization_id: DEFAULT_ORG,
             position: seed.position,
         });
         await adapter.objectiveRevisions.put(
@@ -6350,6 +6371,12 @@ export async function populateBootstrapData(
         adapter.members.put('current', {
             type: 'human',
         }),
+        adapter.memberships.put(
+            'bootstrap-membership-current', {
+                organization_id: DEFAULT_ORG,
+                identity_id: 'current',
+                at: MOCK_SEED_TIMESTAMP,
+            }),
         adapter.identities.put('current', {
             kind: 'person',
         }),
@@ -6388,7 +6415,7 @@ export async function populateBootstrapData(
             'active',
             SYSTEM_MEMBER_ID,
         ),
-        adapter.organization.put({
+        adapter.organizations.put(DEFAULT_ORG, {
             name: 'Stark Industries',
             domain: 'acmecorp.com',
             next_billing: dt(-300, 0, 0),
@@ -6400,6 +6427,7 @@ export async function populateBootstrapData(
         }),
         adapter.roleGrants.put(
             'bootstrap-role-current-admin', {
+                organization_id: DEFAULT_ORG,
                 identity_id: 'current',
                 role: 'admin',
                 action: 'granted',

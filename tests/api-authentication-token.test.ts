@@ -5,6 +5,7 @@ import { GET, handleRequest } from '../api/api.ts';
 import { seedRootAdmin } from './root-admin-fixture.ts';
 import { devToken } from './token-fixtures.ts';
 import { decodeAccessToken } from '../api/access-token.ts';
+import { DEFAULT_ORG } from '../api/types.ts';
 
 const BASE = 'http://localhost';
 
@@ -189,6 +190,70 @@ async () => {
     }))).status, 401);
 });
 
+test('token-exchange into a member org carries org + orgs',
+async () => {
+    const db = await freshDb();
+    await db.memberships.put('m-current', {
+        organization_id: DEFAULT_ORG,
+        identity_id: 'current',
+        at: '2026-06-04T00:00:00.000Z',
+    });
+    const res = await handleRequest(db, tokenRequest({
+        grant_type: 'token-exchange',
+        subject_token: await devToken('current'),
+        actor_token: await devToken('current'),
+        organization: DEFAULT_ORG,
+    }));
+    assert.equal(res.status, 200);
+    const body = await res.json() as { access_token: string };
+    const claims = decodeAccessToken(body.access_token);
+    assert.equal(claims.org, DEFAULT_ORG);
+    assert.deepEqual(claims.orgs, [DEFAULT_ORG]);
+});
+
+test('token-exchange into a non-member org is 403',
+async () => {
+    const db = await freshDb();
+    // current is a member of DEFAULT_ORG but not org '7'
+    await db.memberships.put('m-current', {
+        organization_id: DEFAULT_ORG,
+        identity_id: 'current',
+        at: '2026-06-04T00:00:00.000Z',
+    });
+    const before =
+        (await db.identityTokens.getAll()).length;
+    const res = await handleRequest(db, tokenRequest({
+        grant_type: 'token-exchange',
+        subject_token: await devToken('current'),
+        actor_token: await devToken('current'),
+        organization: '7',
+    }));
+    assert.equal(res.status, 403);
+    // grant-first: a denied exchange mints nothing
+    assert.equal(
+        (await db.identityTokens.getAll()).length, before);
+});
+
+test('a flat exchange carries orgs but no active org',
+async () => {
+    const db = await freshDb();
+    await db.memberships.put('m-current', {
+        organization_id: DEFAULT_ORG,
+        identity_id: 'current',
+        at: '2026-06-04T00:00:00.000Z',
+    });
+    const res = await handleRequest(db, tokenRequest({
+        grant_type: 'token-exchange',
+        subject_token: await devToken('current'),
+        actor_token: await devToken('current'),
+    }));
+    assert.equal(res.status, 200);
+    const body = await res.json() as { access_token: string };
+    const claims = decodeAccessToken(body.access_token);
+    assert.equal(claims.org, undefined);
+    assert.deepEqual(claims.orgs, [DEFAULT_ORG]);
+});
+
 const activeClient = {
     grant_types: 'client_credentials',
     redirect_uris: '', jwks: '{"keys":[]}',
@@ -199,6 +264,7 @@ test('client_credentials issues a gate-valid token', async () => {
     const db = await freshDb();
     // the service principal (client id) holds an admin role
     await db.roleGrants.put('rg-svc', {
+        organization_id: DEFAULT_ORG,
         identity_id: 'svc-client', role: 'admin',
         action: 'granted', by_member_id: 'system',
         at: '2020-01-01T00:00:00.000Z',

@@ -507,9 +507,14 @@ partitions them.
 
 ## Platform
 
-### organization
+### organizations
 
-Singleton table (single row, `id = '1'`).
+Tenant-root table — one row per organization. The SP-2 seed
+plants a single default org (`id = '1'`, the `DEFAULT_ORG`
+constant). Every org-owned entity carries a NOT-NULL
+`organization_id` FK to this table; pure join tables derive
+org from their parent, and the identity/auth spine stays
+global.
 
 | Column | Type |
 |--------|------|

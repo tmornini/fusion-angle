@@ -30,6 +30,7 @@ import type {
 } from '../api/types.ts';
 import {
     DEFAULT_LOCK_TIMEOUT,
+    DEFAULT_ORG,
 } from '../api/types.ts';
 import { populateMockData } from '../api/mock-data.ts';
 import { NODE_WIDTH } from '../web-app/app/flow-layout.ts';
@@ -119,6 +120,7 @@ function putProject(
     title: string,
 ): Promise<ProjectEntity> {
     return db.projects.put(id, {
+        organization_id: DEFAULT_ORG,
         title,
         description: '',
         progress: 0,

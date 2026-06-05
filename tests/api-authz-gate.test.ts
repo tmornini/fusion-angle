@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
+import { DEFAULT_ORG } from '../api/types.ts';
 import { GET, handleRequest } from '../api/api.ts';
 import { devToken } from './token-fixtures.ts';
 import { seedRootAdmin } from './root-admin-fixture.ts';
@@ -45,6 +46,7 @@ test('admin may write a role grant', async () => {
                 'Authorization': 'Bearer ' + await devToken(),
             },
             body: JSON.stringify({
+                organization_id: DEFAULT_ORG,
                 identity_id: 'p2', role: 'viewer',
                 action: 'granted',
                 by_member_id: 'current',
@@ -64,6 +66,7 @@ test('a non-admin may not write a role grant', async () => {
                 'Authorization': 'Bearer ' + await devToken(),
             },
             body: JSON.stringify({
+                organization_id: DEFAULT_ORG,
                 identity_id: 'p2', role: 'viewer',
                 action: 'granted',
                 by_member_id: 'current',

@@ -6,7 +6,10 @@ import {
     validateFlowRecordEntity,
     validateRecordMultiPutBody,
 } from '../api/validators.ts';
-import { jsonArrayField } from '../api/types.ts';
+import {
+    jsonArrayField,
+    DEFAULT_ORG,
+} from '../api/types.ts';
 
 // validateRecordEntity
 
@@ -14,6 +17,7 @@ test(
     'validateRecordEntity accepts a valid payload',
     () => {
         const out = validateRecordEntity({
+            organization_id: DEFAULT_ORG,
             name: 'Customer',
             description: 'Customer record',
             position: 1,
@@ -31,6 +35,7 @@ test(
     () => {
         assert.throws(
             () => validateRecordEntity({
+                organization_id: DEFAULT_ORG,
                 name: '',
                 description: 'x',
                 position: 1,
@@ -85,6 +90,7 @@ test(
     () => {
         assert.throws(
             () => validateRecordEntity({
+                organization_id: DEFAULT_ORG,
                 name: 7,
                 description: 'd',
                 position: 1,
@@ -99,6 +105,7 @@ test(
     () => {
         assert.throws(
             () => validateRecordEntity({
+                organization_id: DEFAULT_ORG,
                 name: 'C',
                 description: 'd',
                 position: 'first',
@@ -114,6 +121,7 @@ test(
     + ' valid payload',
     () => {
         const out = validateRecordAttributeEntity({
+            organization_id: DEFAULT_ORG,
             record_id: 'rec-1',
             name: 'Email',
             attribute_type: 'text',
@@ -133,6 +141,7 @@ test(
     () => {
         assert.throws(
             () => validateRecordAttributeEntity({
+                organization_id: DEFAULT_ORG,
                 record_id: 'rec-1',
                 name: '',
                 attribute_type: 'text',
@@ -151,6 +160,7 @@ test(
     () => {
         assert.throws(
             () => validateRecordAttributeEntity({
+                organization_id: DEFAULT_ORG,
                 record_id: 'rec-1',
                 name: 'X',
                 attribute_type: 'multi_select',
@@ -205,6 +215,7 @@ test(
     () => {
         assert.throws(
             () => validateRecordAttributeEntity({
+                organization_id: DEFAULT_ORG,
                 record_id: 'rec-1',
                 name: 'Count',
                 attribute_type: 'number',
@@ -227,6 +238,7 @@ test(
     () => {
         assert.throws(
             () => validateRecordAttributeEntity({
+                organization_id: DEFAULT_ORG,
                 record_id: 'rec-1',
                 name: 'X',
                 attribute_type: 'text',
@@ -246,6 +258,7 @@ test(
     + ' attribute_type',
     () => {
         const out = validateRecordAttributeEntity({
+            organization_id: DEFAULT_ORG,
             record_id: 'rec-1',
             name: 'When',
             attribute_type: 'date',
@@ -329,6 +342,7 @@ test(
             kind: 'create',
             id: 'rec-1',
             record: {
+                organization_id: DEFAULT_ORG,
                 name: 'R',
                 description: 'd',
                 position: 1,
@@ -336,6 +350,7 @@ test(
             attributes: [
                 {
                     id: 'a-1',
+                    organization_id: DEFAULT_ORG,
                     record_id: 'rec-1',
                     name: 'X',
                     attribute_type: 'text',
@@ -372,12 +387,14 @@ test(
                 kind: 'create',
                 id: 'rec-1',
                 record: {
+                    organization_id: DEFAULT_ORG,
                     name: 'R', description: '',
                     position: 1,
                 },
                 attributes: [
                     {
                         id: 'a-1',
+                        organization_id: DEFAULT_ORG,
                         record_id: 'rec-other',
                         name: 'X',
                         attribute_type: 'text',
@@ -407,6 +424,7 @@ test(
                 kind: 'create',
                 id: 'rec-1',
                 record: {
+                    organization_id: DEFAULT_ORG,
                     name: 'R', description: '',
                     position: 1,
                 },
@@ -428,6 +446,7 @@ test(
                 kind: 'create',
                 id: 'rec-1',
                 record: {
+                    organization_id: DEFAULT_ORG,
                     name: 'R', description: '',
                     position: 1,
                 },
@@ -449,6 +468,7 @@ test(
             kind: 'edit',
             id: 'rec-1',
             record: {
+                organization_id: DEFAULT_ORG,
                 name: 'R',
                 description: '',
                 position: 1,
@@ -476,6 +496,7 @@ test(
                 kind: 'edit',
                 id: 'rec-1',
                 record: {
+                    organization_id: DEFAULT_ORG,
                     name: 'R', description: '',
                     position: 1,
                 },
@@ -499,6 +520,7 @@ test(
                 kind: 'destroy',
                 id: 'rec-1',
                 record: {
+                    organization_id: DEFAULT_ORG,
                     name: 'R', description: '',
                     position: 1,
                 },
@@ -517,6 +539,7 @@ test(
             () => validateRecordMultiPutBody({
                 id: 'rec-1',
                 record: {
+                    organization_id: DEFAULT_ORG,
                     name: 'R', description: '',
                     position: 1,
                 },

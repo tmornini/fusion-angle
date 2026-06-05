@@ -1,7 +1,6 @@
 import { TABLE_NAMES } from './db.ts';
 import type {
     DbAdapter,
-    SingletonStore as ISingletonStore,
     EntityStore as IEntityStore,
     StateStore as IStateStore,
 } from './db.ts';
@@ -10,7 +9,6 @@ import { LocalStorageBackend } from
 import { EntityStore } from './store-entity.ts';
 import { HistoryEntityStore }
     from './store-history-entity.ts';
-import { SingletonStore } from './store-singleton.ts';
 import { StateStore } from './store-state.ts';
 import type {
     MemberEntity,
@@ -30,6 +28,7 @@ import type {
     FlowEntity,
     FlowVersionEntity,
     OrganizationEntity,
+    MembershipEntity,
     IdeaSubmissionEntity,
     ProjectFlowEntity,
     WorkOrderEntity,
@@ -72,6 +71,7 @@ import {
     validateRecordAttributeEntity,
     validateFlowRecordEntity,
     validateOrganizationEntity,
+    validateMembershipEntity,
     validateIdeaSubmissionEntity,
     validateObjectiveEntity,
     validateObjectiveRevisionEntity,
@@ -123,8 +123,10 @@ export class LocalStorageDbAdapter implements DbAdapter {
         IEntityStore<RecordAttributeEntity>;
     readonly flowRecords:
         IEntityStore<FlowRecordEntity>;
-    readonly organization:
-        ISingletonStore<OrganizationEntity>;
+    readonly organizations:
+        IEntityStore<OrganizationEntity>;
+    readonly memberships:
+        IEntityStore<MembershipEntity>;
     readonly ideaSubmissions:
         IEntityStore<IdeaSubmissionEntity>;
     readonly objectives: IEntityStore<Objective>;
@@ -143,9 +145,15 @@ export class LocalStorageDbAdapter implements DbAdapter {
             backend, 'states',
         );
         this.states = stateStore;
-        this.organization =
-            new SingletonStore<OrganizationEntity>(
-                'organization', backend,
+        this.organizations =
+            new EntityStore(
+                'organizations', backend, stateStore,
+                validateOrganizationEntity,
+            );
+        this.memberships =
+            new EntityStore(
+                'memberships', backend, stateStore,
+                validateMembershipEntity,
             );
 
         this.members =

@@ -9,6 +9,13 @@ export type MemberId = Id;
 
 export type ModelId = Id;
 
+// The single tenant every pre-multitenancy entity belongs
+// to. Seeds and the single-org web-app writers stamp it
+// explicitly; once a writer moves to an /organizations
+// facade route, the org-guard decorator stamps instead. A
+// real per-tenant value arrives with a second organization.
+export const DEFAULT_ORG: Id = '1';
+
 export interface ProviderModel {
     id: ModelId;
     provider: string;
@@ -478,6 +485,7 @@ export type RoleGrantAction = 'granted' | 'revoked';
 // fresh at the gate — never from a token claim.
 export interface RoleGrantEntity {
     id: Id;
+    organization_id: Id;
     identity_id: Id;
     role: string;
     action: RoleGrantAction;
@@ -907,6 +915,7 @@ export function isSystemMember(
 
 export interface IdeaEntity {
     id: Id;
+    organization_id: Id;
     title: string;
     position: number;
     problem_statement: string;
@@ -920,6 +929,7 @@ export type ObjectiveId = Id;
 
 export interface Objective {
     id: ObjectiveId;
+    organization_id: Id;
     position: number;
 }
 
@@ -952,6 +962,7 @@ export interface ProjectObjectiveActualScore {
 
 export interface ProjectEntity {
     id: Id;
+    organization_id: Id;
     title: string;
     description: string;
     progress: number;
@@ -1000,6 +1011,7 @@ export const DEFAULT_NODE_TASK_INSTRUCTIONS = '';
 
 export interface FlowEntity {
     id: Id;
+    organization_id: Id;
     name: string;
     is_locked: boolean;
     is_auto_layout: boolean;
@@ -1030,6 +1042,7 @@ export interface WorkOrderFlowGraph {
 
 export interface WorkOrderEntity {
     id: Id;
+    organization_id: Id;
     display_id: string;
     flow_graph: JsonObjectField;
     position: number;
@@ -1044,6 +1057,7 @@ export interface FlowWorkOrderEntity {
 
 export interface RecordEntity {
     id: RecordId;
+    organization_id: Id;
     name: string;
     description: string;
     position: number;
@@ -1051,6 +1065,7 @@ export interface RecordEntity {
 
 export interface RecordAttributeEntity {
     id: RecordAttributeId;
+    organization_id: Id;
     record_id: RecordId;
     name: string;
     attribute_type: AttributeType;
@@ -1088,6 +1103,19 @@ export interface OrganizationEntity {
     projects_limit: number;
     ideas_limit: number;
     last_activity: string;
+}
+
+// The covenant binding an identity to an organization, with
+// the moment of union. The source of "which orgs can this
+// identity reach" — enumerated globally for a subject, scoped
+// per-tenant through the org guard. A person in N orgs has N
+// membership rows; member.id === identity.id stays global
+// (one profile, many memberships).
+export interface MembershipEntity {
+    id: Id;
+    organization_id: Id;
+    identity_id: Id;
+    at: string;
 }
 
 export interface IdeaSubmissionEntity {

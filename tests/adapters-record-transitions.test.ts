@@ -17,6 +17,7 @@ import {
     jsonArrayField,
     SYSTEM_MEMBER_ID,
     DEFAULT_LOCK_TIMEOUT,
+    DEFAULT_ORG,
     type GraphNode,
     type GraphEdge,
     type NodeAttribute,
@@ -92,6 +93,7 @@ async function seedWorkOrder(
     currentNodeId: string,
 ): Promise<void> {
     await db.workOrders.put(id, {
+        organization_id: DEFAULT_ORG,
         display_id: 'WO-1',
         flow_graph: jsonObjectField(
             flowGraph as unknown as Record<
@@ -133,6 +135,7 @@ async function seedAttribute(
     } = {},
 ): Promise<void> {
     await db.recordAttributes.put(id, {
+        organization_id: DEFAULT_ORG,
         record_id: recordId,
         name: options.name ?? 'Attr',
         attribute_type:

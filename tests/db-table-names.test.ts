@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { TABLE_NAMES } from '../api/db.ts';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
+import { DEFAULT_ORG } from '../api/types.ts';
 
 test('TABLE_NAMES includes the objective tables', () => {
     const expected = [
@@ -22,7 +23,9 @@ test('MemoryDbAdapter exposes objective stores',
     async () => {
         const db = new MemoryDbAdapter();
         await db.createSchema();
-        await db.objectives.put('o1', { position: 0 });
+        await db.objectives.put('o1', {
+            organization_id: DEFAULT_ORG, position: 0,
+        });
         const all = await db.objectives.getAll();
         assert.equal(all.length, 1);
         assert.equal(all[0]!.id, 'o1');

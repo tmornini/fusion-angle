@@ -60,14 +60,32 @@ async function nameFor(
     return pii?.name ?? identityId;
 }
 
+// The subject's reachable orgs — every org it is a member of,
+// derived fresh from the membership ledger (never cached). The
+// source of the token's `orgs` claim and the exchange's
+// member-check.
+async function subjectOrgs(
+    adapter: DbAdapter,
+    identityId: Id,
+): Promise<Id[]> {
+    const rows = await adapter.memberships.getAll();
+    return rows
+        .filter(m => m.identity_id === identityId)
+        .map(m => m.organization_id);
+}
+
 // Mint an access + refresh JWT pair. The access token gets a
 // fresh short-lived jti; the refresh token carries `refreshJti`
-// (its lifecycle is tracked separately in identity_tokens).
+// (its lifecycle is tracked separately in identity_tokens). The
+// access token also carries the active `org` (when exchanged
+// into a tenant) and the reachable `orgs` set; the refresh
+// token stays org-agnostic so a tenant switch re-exchanges.
 async function mintPair(
     identityId: Id,
     name: string,
     refreshJti: string,
     act?: { sub: Id },
+    scope?: { org?: Id; orgs?: readonly Id[] },
 ): Promise<TokenResponse> {
     const iat = Math.floor(Date.now() / 1000);
     const accessToken = await mintAccessToken({
@@ -75,6 +93,9 @@ async function mintPair(
         ttlSeconds: ACCESS_TTL_SECONDS,
         jti: generateCryptoSafeBase62(),
         ...(act ? { act } : {}),
+        ...(scope?.org ? { org: scope.org } : {}),
+        ...(scope?.orgs && scope.orgs.length > 0
+            ? { orgs: scope.orgs } : {}),
     });
     const refreshToken = await mintAccessToken({
         sub: identityId, roles: [], name, iat,
@@ -95,6 +116,7 @@ async function issueTokenPair(
     identityId: Id,
     name: string,
     act?: { sub: Id },
+    org?: Id,
 ): Promise<TokenResponse> {
     const refreshJti = generateCryptoSafeBase62();
     await adapter.identityTokens.put(
@@ -106,7 +128,11 @@ async function issueTokenPair(
             parent_jti: '',
             at: nowUtc(),
         });
-    return mintPair(identityId, name, refreshJti, act);
+    const orgs = await subjectOrgs(adapter, identityId);
+    return mintPair(identityId, name, refreshJti, act, {
+        ...(org ? { org } : {}),
+        orgs,
+    });
 }
 
 async function appendEvents(
@@ -146,10 +172,13 @@ async function grantRefresh(
     if (plan.kind === 'rotate') {
         await appendEvents(adapter, plan.appends);
         const name = await nameFor(adapter, verified.claims.sub);
+        const orgs = await subjectOrgs(
+            adapter, verified.claims.sub);
         return {
             ok: true,
             response: await mintPair(
                 verified.claims.sub, name, plan.newJti,
+                undefined, { orgs },
             ),
         };
     }
@@ -191,13 +220,44 @@ async function grantTokenExchange(
     }
     const subject = subjectV.claims.sub;
     const actor = actorV.claims.sub;
+    const organization =
+        typeof body.organization === 'string'
+            ? body.organization
+            : '';
+    if (organization !== '') {
+        const orgs = await subjectOrgs(adapter, subject);
+        if (!orgs.includes(organization)) {
+            return failure(
+                403,
+                'subject is not a member of'
+                + ' the organization',
+            );
+        }
+    }
     const name = await nameFor(adapter, subject);
     return {
         ok: true,
         response: await issueTokenPair(
             adapter, subject, name, { sub: actor },
+            organization === '' ? undefined : organization,
         ),
     };
+}
+
+// The facade's self-delegation: a caller exchanges its own
+// bearer for a token scoped to `org` (subject == actor == the
+// caller). Returns 403, minting nothing, when the caller is
+// not a member — the gate's tenant fence.
+export async function exchangeBearerForOrg(
+    adapter: DbAdapter,
+    bearer: string,
+    org: Id,
+): Promise<TokenResult> {
+    return grantTokenExchange(adapter, {
+        subject_token: bearer,
+        actor_token: bearer,
+        organization: org,
+    });
 }
 
 // client_credentials via private_key_jwt: a headless client

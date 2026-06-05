@@ -1,4 +1,5 @@
 import type { DbAdapter } from '../api/db.ts';
+import { DEFAULT_ORG } from '../api/types.ts';
 
 // Grant the demo `current` identity the `admin` role directly
 // at the storage layer (below the gate), so a test that
@@ -10,6 +11,7 @@ export async function seedRootAdmin(
     db: DbAdapter,
 ): Promise<void> {
     await db.roleGrants.put('test-role-current-admin', {
+        organization_id: DEFAULT_ORG,
         identity_id: 'current',
         role: 'admin',
         action: 'granted',

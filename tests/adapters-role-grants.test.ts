@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
+import { DEFAULT_ORG } from '../api/types.ts';
 import {
     validateRoleGrantEntity,
 } from '../api/validators.ts';
@@ -18,6 +19,7 @@ import {
 test('validates a role-grant body', () => {
     assert.deepEqual(
         validateRoleGrantEntity({
+            organization_id: DEFAULT_ORG,
             identity_id: 'current',
             role: 'admin',
             action: 'granted',
@@ -25,6 +27,7 @@ test('validates a role-grant body', () => {
             at: '2026-06-03T00:00:00.000Z',
         }),
         {
+            organization_id: DEFAULT_ORG,
             identity_id: 'current',
             role: 'admin',
             action: 'granted',
@@ -37,6 +40,7 @@ test('validates a role-grant body', () => {
 test('rejects an extra key', () => {
     assert.throws(() =>
         validateRoleGrantEntity({
+            organization_id: DEFAULT_ORG,
             identity_id: 'c', role: 'admin',
             action: 'granted', by_member_id: 's',
             at: 'x', extra: 1,
@@ -46,6 +50,7 @@ test('rejects an extra key', () => {
 test('rejects an unknown action', () => {
     assert.throws(() =>
         validateRoleGrantEntity({
+            organization_id: DEFAULT_ORG,
             identity_id: 'c', role: 'admin',
             action: 'elevated', by_member_id: 's',
             at: '2026-06-03T00:00:00.000Z',
@@ -55,6 +60,7 @@ test('rejects an unknown action', () => {
 test('rejects an unparseable timestamp', () => {
     assert.throws(() =>
         validateRoleGrantEntity({
+            organization_id: DEFAULT_ORG,
             identity_id: 'c', role: 'admin',
             action: 'granted', by_member_id: 's',
             at: 'not-a-date',
@@ -65,11 +71,13 @@ test('role_grants store retains appended events', async () => {
     const db = new MemoryDbAdapter();
     await db.createSchema();
     await db.roleGrants.put('g1', {
+        organization_id: DEFAULT_ORG,
         identity_id: 'current', role: 'admin',
         action: 'granted', by_member_id: 'system',
         at: '2026-01-01T00:00:00.000Z',
     });
     await db.roleGrants.put('g2', {
+        organization_id: DEFAULT_ORG,
         identity_id: 'current', role: 'admin',
         action: 'revoked', by_member_id: 'system',
         at: '2026-02-01T00:00:00.000Z',

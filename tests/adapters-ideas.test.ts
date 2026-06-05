@@ -16,10 +16,11 @@ import {
     postIdeaStateChange,
     postIdeaConversion,
 } from '../web-app/app/adapters/ideas.ts';
-import type {
-    IdeaEntity,
-    ProjectEntity,
-    ProjectObjectiveBaselineScore,
+import {
+    DEFAULT_ORG,
+    type IdeaEntity,
+    type ProjectEntity,
+    type ProjectObjectiveBaselineScore,
 } from '../api/types.ts';
 import {
     seedHumanMember,
@@ -32,6 +33,7 @@ function buildIdea(
     id: string, title: string,
 ): Omit<IdeaEntity, 'id'> {
     return {
+        organization_id: DEFAULT_ORG,
         title,
         position: 1,
         problem_statement: 'p',
@@ -257,6 +259,7 @@ test(
 
         const projectEntity:
             Omit<ProjectEntity, 'id'> = {
+            organization_id: DEFAULT_ORG,
             title: 'P1',
             description: 'done when X',
             progress: 0,
@@ -335,6 +338,7 @@ test(
         await seedIdeaState(db, 'i1', 'approved');
         const projectEntity:
             Omit<ProjectEntity, 'id'> = {
+            organization_id: DEFAULT_ORG,
             title: 'P1',
             description: 'done when X',
             progress: 0,

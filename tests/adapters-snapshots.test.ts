@@ -36,6 +36,7 @@ import {
     SnapshotTooLargeError,
     SnapshotIncompatibleError,
 } from '../web-app/app/adapters/snapshots.ts';
+import { DEFAULT_ORG } from '../api/types.ts';
 
 // A human_members detail row in the post-normalization
 // shape (no name or contact PII — name lives on the parent
@@ -77,6 +78,7 @@ test(
         const { db, ctx } = await setup();
         await db.ideas.put('i1', {
             id: 'i1',
+            organization_id: DEFAULT_ORG,
             title: 'Seeded idea',
             position: 1,
             problem_statement: 'p',

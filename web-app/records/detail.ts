@@ -574,7 +574,7 @@ async function handleSave(
         return;
     }
     const recordFields: Omit<
-        RecordEntity, 'id'
+        RecordEntity, 'id' | 'organization_id'
     > = {
         name: draft.name.trim(),
         description: draft.description,
@@ -640,7 +640,7 @@ async function handleSave(
 function draftToEntities(
     draft: RecordDetailDraft,
     recordId: string,
-): RecordAttributeEntity[] {
+): Omit<RecordAttributeEntity, 'organization_id'>[] {
     return draft.attributes
         .filter(a => a.name.trim() !== '')
         .map((a, i) => ({
@@ -658,7 +658,9 @@ function draftToEntities(
 }
 
 function draftAttributesDifferFromOriginal(
-    draftEntities: readonly RecordAttributeEntity[],
+    draftEntities: readonly Omit<
+        RecordAttributeEntity, 'organization_id'
+    >[],
     originalAttrs: readonly RecordAttributeEntity[],
 ): boolean {
     const originalById = new Map(

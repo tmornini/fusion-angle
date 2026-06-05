@@ -9,6 +9,7 @@ import type {
 import {
     RecordModel,
     assertRecordState,
+    DEFAULT_ORG,
 } from '../../../api/types.ts';
 import type { RequestContext } from './shared.ts';
 import {
@@ -156,9 +157,11 @@ export async function getRecords(
 export async function putRecord(
     ctx: RequestContext,
     id: RecordId,
-    entity: Omit<RecordEntity, 'id'>,
+    entity: Omit<RecordEntity, 'id' | 'organization_id'>,
 ): Promise<void> {
-    await ctx.PUT(`records/${id}`, entity);
+    await ctx.PUT(`records/${id}`, {
+        ...entity, organization_id: DEFAULT_ORG,
+    });
     recordChanges.notify();
 }
 
@@ -172,15 +175,21 @@ export async function deleteRecord(
 
 export interface RecordChangeCreate {
     readonly kind: 'create';
-    readonly record: Omit<RecordEntity, 'id'>;
-    readonly attributes: readonly RecordAttributeEntity[];
+    readonly record:
+        Omit<RecordEntity, 'id' | 'organization_id'>;
+    readonly attributes: readonly Omit<
+        RecordAttributeEntity, 'organization_id'
+    >[];
     readonly initialState: RecordState;
 }
 
 export interface RecordChangeEdit {
     readonly kind: 'edit';
-    readonly record: Omit<RecordEntity, 'id'>;
-    readonly attributes: readonly RecordAttributeEntity[];
+    readonly record:
+        Omit<RecordEntity, 'id' | 'organization_id'>;
+    readonly attributes: readonly Omit<
+        RecordAttributeEntity, 'organization_id'
+    >[];
     readonly removedAttributeIds: readonly string[];
 }
 
@@ -193,14 +202,20 @@ export async function postRecordChange(
     id: RecordId,
     change: RecordChange,
 ): Promise<void> {
+    const record = {
+        ...change.record, organization_id: DEFAULT_ORG,
+    };
+    const attributes = change.attributes.map(a => ({
+        ...a, organization_id: DEFAULT_ORG,
+    }));
     if (change.kind === 'create') {
         const initialStateEventId =
             generateCryptoSafeBase62();
         await ctx.POST('records-multi-put', {
             kind: 'create',
             id,
-            record: change.record,
-            attributes: change.attributes,
+            record,
+            attributes,
             initialState: change.initialState,
             initialStateEventId,
         });
@@ -208,8 +223,8 @@ export async function postRecordChange(
         await ctx.POST('records-multi-put', {
             kind: 'edit',
             id,
-            record: change.record,
-            attributes: change.attributes,
+            record,
+            attributes,
             removedAttributeIds:
                 change.removedAttributeIds,
         });

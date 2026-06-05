@@ -9,6 +9,7 @@ import type {
 import {
     Idea, nowUtc,
     ideaIsVisible,
+    DEFAULT_ORG,
 } from '../../../api/types.ts';
 import type { RequestContext } from './shared.ts';
 import {
@@ -197,11 +198,12 @@ export async function putIdea(
 export async function postIdeaCreation(
     ctx: RequestContext,
     id: string,
-    entity: Omit<IdeaEntity, 'id'>,
+    entity: Omit<IdeaEntity, 'id' | 'organization_id'>,
     initialState: IdeaState,
 ): Promise<void> {
-    const ideaBody =
-        entity as unknown as Record<string, unknown>;
+    const ideaBody = {
+        ...entity, organization_id: DEFAULT_ORG,
+    } as unknown as Record<string, unknown>;
     await ctx.commit({
         ops: [
             {
@@ -283,9 +285,9 @@ export async function postIdeaConversion(
     ctx: RequestContext,
     ideaId: string,
     projectId: string,
-    project: Omit<ProjectEntity, 'id'>,
+    project: Omit<ProjectEntity, 'id' | 'organization_id'>,
     projectState: ProjectState,
-    promotedIdea: Omit<IdeaEntity, 'id'>,
+    promotedIdea: Omit<IdeaEntity, 'id' | 'organization_id'>,
     baselines: readonly {
         objectiveId: ObjectiveId;
         score: number;
@@ -297,10 +299,12 @@ export async function postIdeaConversion(
         baselines.map(b => b.objectiveId),
     );
     type AnyBody = Record<string, unknown>;
-    const projectBody =
-        project as unknown as AnyBody;
-    const ideaBody =
-        promotedIdea as unknown as AnyBody;
+    const projectBody = {
+        ...project, organization_id: DEFAULT_ORG,
+    } as unknown as AnyBody;
+    const ideaBody = {
+        ...promotedIdea, organization_id: DEFAULT_ORG,
+    } as unknown as AnyBody;
     const at = nowUtc();
     const member = await getCurrentHumanMember(ctx);
     await ctx.commit({

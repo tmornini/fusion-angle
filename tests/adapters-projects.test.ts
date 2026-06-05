@@ -19,6 +19,7 @@ import {
 import {
     Project,
     COST_DIVISOR,
+    DEFAULT_ORG,
 } from '../api/types.ts';
 import type {
     ProjectEntity,
@@ -36,6 +37,7 @@ function buildProject(
     overrides?: Partial<ProjectEntity>,
 ): Omit<ProjectEntity, 'id'> {
     const base: Omit<ProjectEntity, 'id'> = {
+        organization_id: DEFAULT_ORG,
         title,
         description: 'desc for ' + title,
         progress: 25,

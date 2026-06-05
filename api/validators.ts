@@ -29,6 +29,7 @@ import type {
     FlowWorkOrderEntity,
     StateFieldValueEntity,
     OrganizationEntity,
+    MembershipEntity,
     IdeaSubmissionEntity,
     ProjectFlowEntity,
     RecordEntity,
@@ -714,7 +715,8 @@ validateIdentityTokenRevocationEntity(
 }
 
 const ROLE_GRANT_BODY_KEYS: readonly string[] = [
-    'identity_id', 'role', 'action', 'by_member_id', 'at',
+    'organization_id', 'identity_id', 'role', 'action',
+    'by_member_id', 'at',
 ];
 
 export function validateRoleGrantEntity(
@@ -738,6 +740,7 @@ export function validateRoleGrantEntity(
         );
     }
     return {
+        organization_id: pickString(body, 'organization_id'),
         identity_id: pickString(body, 'identity_id'),
         role: pickString(body, 'role'),
         action,
@@ -944,7 +947,7 @@ export function validateAIMemberEntity(
 }
 
 const IDEA_BODY_KEYS: readonly string[] = [
-    'title', 'position',
+    'organization_id', 'title', 'position',
     'problem_statement', 'target_users',
     'proposed_solution', 'expected_outcome',
     'success_metrics',
@@ -957,6 +960,7 @@ export function validateIdeaEntity(
         body, IDEA_BODY_KEYS, 'IdeaEntity',
     );
     return {
+        organization_id: pickString(body, 'organization_id'),
         title: pickString(
             body, 'title',
         ),
@@ -982,7 +986,7 @@ export function validateIdeaEntity(
 }
 
 const PROJECT_BODY_KEYS: readonly string[] = [
-    'title', 'description',
+    'organization_id', 'title', 'description',
     'progress', 'start_date',
     'target_end_date', 'estimated_cost',
     'actual_cost', 'position',
@@ -997,6 +1001,7 @@ export function validateProjectEntity(
         'ProjectEntity',
     );
     return {
+        organization_id: pickString(body, 'organization_id'),
         title: pickString(
             body, 'title',
         ),
@@ -1026,7 +1031,7 @@ export function validateProjectEntity(
 
 
 const FLOW_BODY_KEYS: readonly string[] = [
-    'name', 'is_locked',
+    'organization_id', 'name', 'is_locked',
     'is_auto_layout', 'is_auto_fit',
     'lock_timeout', 'graph',
 ];
@@ -1038,6 +1043,7 @@ export function validateFlowEntity(
         body, FLOW_BODY_KEYS, 'FlowEntity',
     );
     return {
+        organization_id: pickString(body, 'organization_id'),
         name: pickString(
             body, 'name',
         ),
@@ -1105,7 +1111,7 @@ export function validateFlowVersionEntity(
 
 const WORK_ORDER_BODY_KEYS:
     readonly string[] = [
-    'display_id', 'flow_graph',
+    'organization_id', 'display_id', 'flow_graph',
     'position',
 ];
 
@@ -1118,6 +1124,7 @@ export function validateWorkOrderEntity(
         'WorkOrderEntity',
     );
     return {
+        organization_id: pickString(body, 'organization_id'),
         display_id: pickString(
             body, 'display_id',
         ),
@@ -1226,6 +1233,32 @@ export function validateOrganizationEntity(
     };
 }
 
+const MEMBERSHIP_BODY_KEYS: readonly string[] = [
+    'organization_id', 'identity_id', 'at',
+];
+
+export function validateMembershipEntity(
+    body: Record<string, unknown>,
+): Omit<MembershipEntity, 'id'> {
+    assertOnlyKeys(
+        body, MEMBERSHIP_BODY_KEYS, 'MembershipEntity',
+    );
+    const at = pickString(body, 'at');
+    if (Number.isNaN(Date.parse(at))) {
+        throw new Error(
+            'invalid timestamp "' + at + '" on '
+            + 'MembershipEntity',
+        );
+    }
+    return {
+        organization_id: pickString(
+            body, 'organization_id',
+        ),
+        identity_id: pickString(body, 'identity_id'),
+        at,
+    };
+}
+
 const IDEA_SUBMISSION_BODY_KEYS:
     readonly string[] = [
     'idea_id', 'member_id', 'at',
@@ -1279,7 +1312,7 @@ export function validateProjectFlowEntity(
 }
 
 const OBJECTIVE_BODY_KEYS: readonly string[] = [
-    'position',
+    'organization_id', 'position',
 ];
 
 export function validateObjectiveEntity(
@@ -1289,6 +1322,7 @@ export function validateObjectiveEntity(
         body, OBJECTIVE_BODY_KEYS, 'Objective',
     );
     return {
+        organization_id: pickString(body, 'organization_id'),
         position: pickNumber(body, 'position'),
     };
 }
@@ -1419,7 +1453,7 @@ export function validateStateEntity(
 }
 
 const RECORD_BODY_KEYS: readonly string[] = [
-    'name', 'description', 'position',
+    'organization_id', 'name', 'description', 'position',
 ];
 
 export function validateRecordEntity(
@@ -1436,6 +1470,7 @@ export function validateRecordEntity(
         );
     }
     return {
+        organization_id: pickString(body, 'organization_id'),
         name,
         description: pickString(
             body, 'description',
@@ -1448,8 +1483,9 @@ export function validateRecordEntity(
 
 const RECORD_ATTRIBUTE_BODY_KEYS:
     readonly string[] = [
-    'record_id', 'name', 'attribute_type',
-    'sort_order', 'options', 'constraints',
+    'organization_id', 'record_id', 'name',
+    'attribute_type', 'sort_order',
+    'options', 'constraints',
 ];
 
 export function validateRecordAttributeEntity(
@@ -1520,6 +1556,7 @@ export function validateRecordAttributeEntity(
         }
     }
     return {
+        organization_id: pickString(body, 'organization_id'),
         record_id: pickString(
             body, 'record_id',
         ),

@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
+import { DEFAULT_ORG } from '../api/types.ts';
 import { populateMockData } from '../api/mock-data.ts';
 import {
     validateMemberEntity,
@@ -101,17 +102,17 @@ for (const [name, getAll, validate] of TABLES) {
     );
 }
 
-// organization is a singleton store, not an entity store.
+// organizations is now an entity store (the tenant root).
 
-test('mock-data seeds the organization singleton', async () => {
+test('mock-data seeds the organizations table', async () => {
     const db = await seededDb();
-    const org = await db.organization.get();
+    const org = await db.organizations.getById(DEFAULT_ORG);
     assert.ok(org.id.length > 0);
 });
 
 test('mock-data organization row passes the validator', async () => {
     const db = await seededDb();
-    const org = await db.organization.get();
+    const org = await db.organizations.getById(DEFAULT_ORG);
     assert.doesNotThrow(
         () => validateOrganizationEntity(withoutId(org)),
     );

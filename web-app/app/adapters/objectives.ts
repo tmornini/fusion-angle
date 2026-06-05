@@ -6,7 +6,9 @@ import type {
     ObjectiveState,
     StateEntity,
 } from '../../../api/types.ts';
-import { nowUtc } from '../../../api/types.ts';
+import {
+    nowUtc, DEFAULT_ORG,
+} from '../../../api/types.ts';
 import type { RequestContext } from './shared.ts';
 import {
     createSubscriptionChannel,
@@ -192,7 +194,10 @@ export async function postObjectiveCreation(
             {
                 method: 'put',
                 resource: `objectives/${id}`,
-                body: { position },
+                body: {
+                    organization_id: DEFAULT_ORG,
+                    position,
+                },
             },
             {
                 method: 'put',
@@ -272,7 +277,10 @@ export async function putObjectivePosition(
         ops: [{
             method: 'put' as const,
             resource: `objectives/${id}`,
-            body: { position },
+            body: {
+                organization_id: DEFAULT_ORG,
+                position,
+            },
         }],
     });
     notifyObjectiveChange();

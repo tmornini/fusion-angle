@@ -13,6 +13,7 @@ import {
 import {
     jsonObjectField,
     DEFAULT_LOCK_TIMEOUT,
+    DEFAULT_ORG,
 } from '../api/types.ts';
 import type {
     FlowEntity,
@@ -63,6 +64,7 @@ function buildFlow(
     graph: StoredGraph,
 ): Omit<FlowEntity, 'id'> {
     return {
+        organization_id: DEFAULT_ORG,
         name,
         is_locked: false,
         is_auto_layout: true,
@@ -124,12 +126,14 @@ test(
         // flow-work-orders and flow transitions,
         // not from work-order.flow_graph)
         await db.workOrders.put('wo1', {
+            organization_id: DEFAULT_ORG,
             display_id: 'WO-1',
             flow_graph:
                 jsonObjectField({}) as never,
             position: 1,
         });
         await db.workOrders.put('wo2', {
+            organization_id: DEFAULT_ORG,
             display_id: 'WO-2',
             flow_graph:
                 jsonObjectField({}) as never,
@@ -231,6 +235,7 @@ test(
             buildFlow('AutoLayout', buildTestGraph()),
         );
         await db.workOrders.put('wo1', {
+            organization_id: DEFAULT_ORG,
             display_id: 'WO-1',
             flow_graph: jsonObjectField({}) as never,
             position: 1,

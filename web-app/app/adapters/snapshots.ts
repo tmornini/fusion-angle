@@ -70,6 +70,7 @@ export const RETIRED_KEYS_PER_TABLE:
 export const RETIRED_TABLES: readonly string[] = [
     'activities',
     'activity_actors',
+    'organization',
 ];
 
 // State-event values the alphabet has retired. Old

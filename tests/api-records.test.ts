@@ -6,7 +6,9 @@ import {
 import {
     MemoryDbAdapter,
 } from '../api/db-memory.ts';
-import { jsonArrayField } from '../api/types.ts';
+import {
+    jsonArrayField, DEFAULT_ORG,
+} from '../api/types.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import {
     seedRootAdmin,
@@ -38,6 +40,7 @@ test(
         const db = await freshDb();
         await PUT(db, 'records/rec-1', {
             id: 'rec-1',
+            organization_id: DEFAULT_ORG,
             name: 'Customer',
             description: 'A customer record',
             position: 1,
@@ -60,6 +63,7 @@ test(
         const db = await freshDb();
         await PUT(db, 'records/rec-1', {
             id: 'rec-1',
+            organization_id: DEFAULT_ORG,
             name: 'X',
             description: '',
             position: 1,
@@ -91,6 +95,7 @@ test(
         const db = await freshDb();
         await PUT(db, 'record-attributes/a-1', {
             id: 'a-1',
+            organization_id: DEFAULT_ORG,
             record_id: 'rec-1',
             name: 'Email',
             attribute_type: 'text',
@@ -117,6 +122,7 @@ test(
         const db = await freshDb();
         await PUT(db, 'record-attributes/a-1', {
             id: 'a-1',
+            organization_id: DEFAULT_ORG,
             record_id: 'rec-1',
             name: 'X',
             attribute_type: 'text',

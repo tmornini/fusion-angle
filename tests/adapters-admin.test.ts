@@ -11,9 +11,10 @@ import { devToken } from './token-fixtures.ts';
 import {
     getOrganizationStats,
 } from '../web-app/app/adapters/admin.ts';
-import type {
-    ProjectEntity, IdeaEntity,
-    MemberState,
+import {
+    DEFAULT_ORG,
+    type ProjectEntity, type IdeaEntity,
+    type MemberState,
 } from '../api/types.ts';
 import { seedHumanMember } from './member-fixtures.ts';
 import {
@@ -35,6 +36,7 @@ function buildProject(
     id: string,
 ): Omit<ProjectEntity, 'id'> {
     return {
+        organization_id: DEFAULT_ORG,
         title: 'P-' + id,
         description: 'desc',
         progress: 25,
@@ -50,6 +52,7 @@ function buildIdea(
     id: string,
 ): Omit<IdeaEntity, 'id'> {
     return {
+        organization_id: DEFAULT_ORG,
         title: 'I-' + id,
         position: 1,
         problem_statement: 'p',

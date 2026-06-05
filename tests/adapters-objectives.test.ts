@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
+import { DEFAULT_ORG } from '../api/types.ts';
 import { createRequestContext } from
     '../web-app/app/adapters/shared.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
@@ -32,11 +33,15 @@ function ctxFor(db: MemoryDbAdapter) {
     return createRequestContext(db, DEV_TOKEN);
 }
 
+function objective(position: number) {
+    return { organization_id: DEFAULT_ORG, position };
+}
+
 test('getObjective returns a single row', async () => {
     const db = new MemoryDbAdapter();
     await db.createSchema();
     await seedRootAdmin(db);
-    await db.objectives.put('o1', { position: 0 });
+    await db.objectives.put('o1', objective(0));
     const ctx = ctxFor(db);
     const v = await getObjective(ctx, 'o1');
     assert.equal(v.id, 'o1');
@@ -47,8 +52,8 @@ test('getObjectives returns all', async () => {
     const db = new MemoryDbAdapter();
     await db.createSchema();
     await seedRootAdmin(db);
-    await db.objectives.put('o1', { position: 0 });
-    await db.objectives.put('o2', { position: 1 });
+    await db.objectives.put('o1', objective(0));
+    await db.objectives.put('o2', objective(1));
     const ctx = ctxFor(db);
     const rows = await getObjectives(ctx);
     assert.equal(rows.length, 2);
@@ -58,7 +63,7 @@ test('getArchivedObjectiveIds returns a Set', async () => {
     const db = new MemoryDbAdapter();
     await db.createSchema();
     await seedRootAdmin(db);
-    await db.objectives.put('o1', { position: 0 });
+    await db.objectives.put('o1', objective(0));
     await db.states.record(
         'e1', 'o1', 'archived', 'system',
     );
@@ -73,7 +78,7 @@ test('getArchivedObjectiveIds excludes an archived project',
         const db = new MemoryDbAdapter();
         await db.createSchema();
         await seedRootAdmin(db);
-        await db.objectives.put('o1', { position: 0 });
+        await db.objectives.put('o1', objective(0));
         await db.states.record(
             'e-o1', 'o1', 'archived', 'system',
         );
@@ -92,7 +97,7 @@ test('getObjectiveArchivalEvents surfaces the actor',
         const db = new MemoryDbAdapter();
         await db.createSchema();
         await seedRootAdmin(db);
-        await db.objectives.put('o1', { position: 0 });
+        await db.objectives.put('o1', objective(0));
         await db.states.record(
             'e1', 'o1', 'archived', 'w-sarah',
         );
@@ -151,8 +156,8 @@ test('getActiveObjectives filters archived',
         const db = new MemoryDbAdapter();
         await db.createSchema();
         await seedRootAdmin(db);
-        await db.objectives.put('o1', { position: 0 });
-        await db.objectives.put('o2', { position: 1 });
+        await db.objectives.put('o1', objective(0));
+        await db.objectives.put('o2', objective(1));
         await db.states.record(
             'e1', 'o2', 'archived', 'system',
         );
