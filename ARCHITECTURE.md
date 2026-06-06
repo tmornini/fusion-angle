@@ -176,6 +176,58 @@ tagged union, erased fallback at the call site). Erasure
 splices `identity_pii` only; the identity, the member, and
 every `member_id` reference survive.
 
+## Server-tier deploy blockers
+
+Every item below is INERT today: the whole store is client-side
+IndexedDB in the page-runner's own browser, so there is no trust
+boundary to cross. Each becomes a live exposure the moment the
+backend is physically split out and the browser becomes an
+untrusted client. None is coded around yet — no server exists —
+so this is the disclosure checklist that gates that split.
+
+- **Client-shipped HMAC key.** `SIGNING_KEY_MATERIAL`
+  (`api/access-token.ts:70`) is a constant in client JS, so any
+  party with the bundle can mint a valid token — forgery is
+  trivial. The server tier relocates ONLY the key (client
+  constant → server secret/KMS) and who-mints (browser →
+  `/authentication/token`); the wire format, alg (HS256), and
+  every caller signature stay put.
+- **Unenforced token-exchange delegation.** `grantTokenExchange`
+  (`api/authentication.ts:307`) VERIFIES both subject and actor
+  tokens, but whether `actor` may act-as `subject` — the
+  delegation policy — is NOT enforced; that authorization lands
+  with the server tier. The claim shape (`sub`, `act.sub`) is
+  frozen now.
+- **Structural-only `client_assertion`.** `grantClientCredentials`
+  (`api/authentication.ts:384`) requires the `client_assertion`
+  to be only a three-segment JWT; real JWS verification against
+  the client's JWKS is deferred to the server tier. A headless
+  client can authenticate with an unsigned assertion.
+- **Bearer-exempt snapshot plane.** `BEARER_EXEMPT_ROUTES`
+  (`api/api.ts:100`) exempts the four `snapshots/*` seed routes
+  from the gate (infrastructure below the auth tier). Networked,
+  an unauthenticated caller could wipe and re-seed the
+  datastore. Worse, the mock-data seeder returns freshly-minted
+  plaintext credentials in-band for a one-time reveal (only
+  PBKDF2 hashes are stored — the in-band return is demo-only and
+  must be removed at the server tier), so an unauth caller could
+  seed AND harvest working admin creds.
+- **Raw `error.message` in the 500 fallback.** The catch-all in
+  `handleRequest` (`api/api.ts:1478`) returns `error.message`
+  verbatim with a 500, leaking internal fault detail to the
+  client. The server tier must return an opaque body and log the
+  detail server-side.
+- **Admin-or-nothing `ROUTE_POLICY`.** `ROUTE_POLICY`
+  (`api/authorization.ts:77`) grants `admin` every verb at `/`
+  and lists no narrower (verb, prefix) entries, so authorization
+  is all-or-nothing — any non-admin role is denied everything.
+  Finer-grained entries widen access as real roles arrive.
+- **De-membership latency on the token claim.** A session token
+  carries its `orgs`/roles claim for `SESSION_TTL_SECONDS`
+  (15 min, `web-app/app/adapters/init.ts:52`). Revoking a
+  membership does not take effect until the token expires or is
+  revoked, so a removed member retains access for up to the TTL.
+
 ## API Layer (`/api`)
 
 `api/types.ts` (row types + shared aliases — `MemberId`,
