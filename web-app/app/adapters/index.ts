@@ -9,6 +9,9 @@ export {
 export {
     MissingTableError,
 } from '../../../api/db.ts';
+export {
+    UnauthorizedError,
+} from '../../../api/api.ts';
 export * from './shared.ts';
 export * from './schema.ts';
 export * from './dashboard.ts';

@@ -21,7 +21,7 @@ import type {
 } from '../adapters/flows.ts';
 import type {
     MemberId,
-    RecordAttributeEntity,
+    RecordAttribute,
 } from '../../../api/types.ts';
 import {
     generateCryptoSafeBase62,
@@ -101,7 +101,7 @@ interface DesignerState {
     savedViewBox: SavedViewBox;
     humanMembers: HumanMember[];
     aiMembers: AIMember[];
-    recordAttributes: RecordAttributeEntity[];
+    recordAttributes: RecordAttribute[];
 }
 
 export type FlowSnapshot = Readonly<DesignerState>;
@@ -118,7 +118,7 @@ export function buildInitialFlowSnapshot(
     humanMembers: HumanMember[],
     aiMembers: AIMember[],
     recordAttributes:
-        RecordAttributeEntity[],
+        RecordAttribute[],
 ): FlowSnapshot {
     const interaction = buildInteractionState(
         canvasW, canvasH,
@@ -1029,7 +1029,7 @@ Auto Fit</label>
 
     withRecordAttributes(
         attributes:
-            readonly RecordAttributeEntity[],
+            readonly RecordAttribute[],
     ): FlowSnapshot {
         return {
             ...this.#snapshot,
@@ -1038,7 +1038,7 @@ Auto Fit</label>
     }
 
     recordAttributes():
-        readonly RecordAttributeEntity[] {
+        readonly RecordAttribute[] {
         return this.#snapshot.recordAttributes;
     }
 

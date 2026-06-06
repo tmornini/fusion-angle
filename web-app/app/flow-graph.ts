@@ -36,10 +36,17 @@ function canShowPort(
         && (!isSpecial || !hasConnections);
 }
 
-export const BLUE = '#4B6CA1';
-const WARN = '#d97706';
-const GREEN = '#16a34a';
-const RED = '#b91c1c';
+// Flow-canvas palette, centralized so one edit reskins the
+// whole SVG. hsl(var(--token)) resolves inside SVG exactly as
+// in CSS — theme-reactive, no raw hex. BLUE stays exported for
+// the designer presenter.
+export const BLUE = 'hsl(var(--primary))';
+const WARN = 'hsl(var(--warning))';
+const GREEN = 'hsl(var(--success))';
+const RED = 'hsl(var(--error))';
+const SURFACE = 'hsl(var(--background))';
+const FOREGROUND = 'hsl(var(--foreground))';
+const MUTED = 'hsl(var(--muted-foreground))';
 
 export const GRID_CELL = 24;
 const GRID_DOT_RADIUS = 0.7;
@@ -321,9 +328,7 @@ function buildDefs(): string {
         + `<circle cx="${gridCenter}"`
         + ` cy="${gridCenter}"`
         + ` r="${GRID_DOT_RADIUS}"`
-        + ' fill="var('
-        + '--color-muted-foreground,'
-        + ' #5a6480)"/>'
+        + ` fill="${MUTED}"/>`
         + '</pattern>'
         + '<marker id="flow-arrow"'
         + markerAttrs
@@ -383,8 +388,7 @@ function buildGrid(
         + ` x="${vbX}" y="${vbY}"`
         + ` width="${vbW}"`
         + ` height="${vbH}"`
-        + ' fill="var('
-        + '--color-surface, #1a1f2e)"/>'
+        + ` fill="${SURFACE}"/>`
         + '<rect'
         + ` x="${vbX}" y="${vbY}"`
         + ` width="${vbW}"`
@@ -498,8 +502,7 @@ function buildNode(
         + ' text-anchor="middle"'
         + ` font-size="${NODE_LABEL_FONT}"`
         + ' font-weight="600"'
-        + ' fill="var('
-        + '--color-foreground, #e0e4ef)">'
+        + ` fill="${FOREGROUND}">`
         + nameEsc + '</text>';
 
     if (!isSpecial) {
@@ -515,9 +518,7 @@ function buildNode(
             + ` y="${NODE_META_Y}"`
             + ' text-anchor="middle"'
             + ` font-size="${NODE_META_FONT}"`
-            + ' fill="var('
-            + '--color-muted-foreground,'
-            + ' #5a6480)">'
+            + ` fill="${MUTED}">`
             + escapeForHtml(meta)
             + '</text>';
     }
@@ -798,7 +799,14 @@ function buildEdge(
     const labelT = aimOffset === 0
         ? BEZIER_MIDPOINT
         : BIDI_LABEL_T;
-    const mid = bezierAt(pathD, labelT);
+    // Base anchor on the routed path; the perpendicular offset
+    // below is the INTENTIONAL nudge that keeps two-way edge
+    // labels legible. A waypoint edge is a Q/T polyline, so
+    // anchor along it — bezierAt is for the cubic case only.
+    const mid = waypoints.length > 0
+        ? pointAlongPolyline(
+            [startPt, ...waypoints, endPt], labelT)
+        : bezierAt(pathD, labelT);
     const midX = mid.x
         + perpX * BIDI_LABEL_OFFSET;
     const midY = mid.y
@@ -831,9 +839,7 @@ function buildEdge(
         }"`
         + ' text-anchor="middle"'
         + ` font-size="${LABEL_FONT}"`
-        + ' fill="var('
-        + '--color-foreground,'
-        + ' #e0e4ef)">'
+        + ` fill="${FOREGROUND}">`
         + labelEsc
         + '</text>';
 
@@ -946,13 +952,52 @@ export function buildEdgePreviewPath(
         + ' pointer-events="none"/>';
 }
 
+// The point at fraction `t` of a polyline's arc length. A
+// waypoint edge renders as a Q/T quadratic chain through these
+// points; bezierAt (cubic) would misread its control numbers
+// and float the label off the route, so waypoint labels are
+// placed along the polyline instead — close to the rendered
+// curve and, unlike the cubic misparse, always ON the path.
+export function pointAlongPolyline(
+    pts: readonly { x: number; y: number }[],
+    t: number,
+): { x: number; y: number } {
+    const first = pts[0]!;
+    const segLens: number[] = [];
+    let total = 0;
+    for (let i = 1; i < pts.length; i++) {
+        const len = Math.hypot(
+            pts[i]!.x - pts[i - 1]!.x,
+            pts[i]!.y - pts[i - 1]!.y,
+        );
+        segLens.push(len);
+        total += len;
+    }
+    if (total === 0) return { x: first.x, y: first.y };
+    let target = t * total;
+    for (let i = 0; i < segLens.length; i++) {
+        const len = segLens[i]!;
+        if (target <= len || i === segLens.length - 1) {
+            const frac = len === 0 ? 0 : target / len;
+            const a = pts[i]!;
+            const b = pts[i + 1]!;
+            return {
+                x: a.x + (b.x - a.x) * frac,
+                y: a.y + (b.y - a.y) * frac,
+            };
+        }
+        target -= len;
+    }
+    return { x: first.x, y: first.y };
+}
+
 // Cubic Bézier B(t) = u³P0 + 3u²t P1 + 3ut² P2 + t³P3
-// where u = 1-t, P0..P3 are the control points.
-// Used to place an edge's label at parameter t along the
-// curve we drew. The SVG path mini-language separates
-// numbers with either commas or whitespace, so we split on
-// /[,\s]+/. We don't validate path syntax because we only
-// call this on paths constructed by this same file.
+// where u = 1-t, P0..P3 are the control points. Places a
+// CUBIC (no-waypoint) edge's label at parameter t along the
+// curve we drew; waypoint edges use pointAlongPolyline. The
+// SVG path mini-language separates numbers with commas or
+// whitespace, so we split on /[,\s]+/. We don't validate path
+// syntax because we only call this on paths we constructed.
 function bezierAt(
     pathD: string,
     t: number,

@@ -1,10 +1,9 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import {
-    jsonArrayField,
-    type RecordAttributeEntity,
-    type AttributeType,
-    type Constraint,
+import type {
+    RecordAttribute,
+    AttributeType,
+    Constraint,
 } from '../api/types.ts';
 import {
     validateAttributeValue,
@@ -14,18 +13,16 @@ import {
 function makeAttribute(
     attributeType: AttributeType,
     constraints: Constraint[] = [],
-    overrides: Partial<RecordAttributeEntity> = {},
-): RecordAttributeEntity {
+    overrides: Partial<RecordAttribute> = {},
+): RecordAttribute {
     return {
         id: 'a-1',
         record_id: 'rec-1',
         name: 'Field',
         attribute_type: attributeType,
         sort_order: 0,
-        options: jsonArrayField([]),
-        constraints: jsonArrayField(
-            constraints as unknown[],
-        ),
+        options: [],
+        constraints,
         ...overrides,
     };
 }

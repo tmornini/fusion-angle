@@ -202,6 +202,20 @@ export function validateStringArrayJson(
     );
 }
 
+export function validateConstraintArrayJson(
+    raw: string,
+    label: string,
+): Constraint[] {
+    const parsed = parseOrThrow(raw, label);
+    const arr = asArray(parsed, label);
+    return arr.map((item, i) =>
+        asConstraint(
+            item,
+            label + '[' + i + ']',
+        ),
+    );
+}
+
 export function
 validateStringNumberRecordJson(
     raw: string,

@@ -93,9 +93,10 @@ export async function ensureSessionToken(): Promise<void> {
 }
 
 // Returns the already-minted per-tab token. ensureSessionToken
-// (boot) or establishSession (login) must have seeded it; an
-// unseeded holder is a boot-order bug, not a state to mask —
-// crash with a clear message rather than return a wrong token.
+// (boot) must have seeded it; the boot gate / login / recovery
+// then REPLACE it via setSessionToken. An unseeded holder is a
+// boot-order bug, not a state to mask — crash with a clear
+// message rather than return a wrong token.
 export function getSessionToken(): string {
     if (sessionToken === undefined) {
         throw new Error(
@@ -104,17 +105,4 @@ export function getSessionToken(): string {
         );
     }
     return sessionToken;
-}
-
-// Mint and install a session token DIRECTLY for `sub` — the
-// mock-auth convenience for app-boot and demo sign-up. The REAL
-// password flow (verify a credential through the OAuth front
-// doors) is loginViaPassword in adapters/authentication.ts; boot
-// keeps this direct mint because the seed admin password is
-// random and surfaced once, so none is available at boot time.
-export async function establishSession(
-    sub: string,
-    name: string,
-): Promise<void> {
-    setSessionToken(await mintSessionToken(sub, name));
 }

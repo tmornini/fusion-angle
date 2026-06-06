@@ -4,6 +4,10 @@ import { MemoryDbAdapter } from '../api/db-memory.ts';
 import { orgScopedAdapter } from '../api/db-org-scoped.ts';
 import { OrgScopedEntityStore }
     from '../api/store-org-scoped.ts';
+import {
+    ParentScopedEntityStore,
+    ParentScopedStateStore,
+} from '../api/store-parent-scoped.ts';
 
 function ideaBody(org: string, title: string) {
     return {
@@ -28,7 +32,25 @@ test('global stores pass through unwrapped', async () => {
     assert.equal(scoped.identities, db.identities);
     assert.equal(scoped.members, db.members);
     assert.equal(scoped.organizations, db.organizations);
-    assert.equal(scoped.states, db.states);
+});
+
+test('parent-derived stores are wrapped by the read fence',
+async () => {
+    const db = await seeded();
+    const scoped = orgScopedAdapter(db, 'A');
+    assert.ok(
+        scoped.states instanceof ParentScopedStateStore,
+    );
+    assert.ok(
+        scoped.flowVersions instanceof ParentScopedEntityStore,
+    );
+    assert.ok(
+        scoped.identityPii instanceof ParentScopedEntityStore,
+    );
+    assert.ok(
+        scoped.identityCredentials
+            instanceof ParentScopedEntityStore,
+    );
 });
 
 test('org-owned stores are wrapped by the guard', async () => {

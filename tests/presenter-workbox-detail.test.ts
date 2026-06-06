@@ -1,7 +1,6 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import {
-    jsonArrayField,
     jsonObjectField,
     DEFAULT_LOCK_TIMEOUT,
     type WorkOrderEntity,
@@ -10,7 +9,7 @@ import {
     type GraphNode,
     type GraphEdge,
     type NodeAttribute,
-    type RecordAttributeEntity,
+    type RecordAttribute,
     type AttributeType,
     type Id,
     type Member,
@@ -51,8 +50,8 @@ function makeAttributeRef(
 }
 
 function makeAttribute(
-    overrides: Partial<RecordAttributeEntity> = {},
-): RecordAttributeEntity {
+    overrides: Partial<RecordAttribute> = {},
+): RecordAttribute {
     const attributeType: AttributeType =
         overrides.attribute_type ?? 'text';
     return {
@@ -61,8 +60,8 @@ function makeAttribute(
         name: 'Notes',
         attribute_type: attributeType,
         sort_order: 0,
-        options: jsonArrayField([]),
-        constraints: jsonArrayField([]),
+        options: [],
+        constraints: [],
         ...overrides,
     };
 }
@@ -167,8 +166,8 @@ function makeMemberMap(
 }
 
 function makeAttributeMap(
-    attributes: RecordAttributeEntity[],
-): ReadonlyMap<string, RecordAttributeEntity> {
+    attributes: RecordAttribute[],
+): ReadonlyMap<string, RecordAttribute> {
     return new Map(
         attributes.map(
             a => [a.id, a] as const,
@@ -191,7 +190,7 @@ function makePresenter(
         activeClaim?:
             { memberId: Id; at: string } | null;
         currentMemberId?: string;
-        attributes?: RecordAttributeEntity[];
+        attributes?: RecordAttribute[];
     } = {},
 ): WorkboxDetailPresenter {
     const graph = args.graph ?? makeFlowGraph();
@@ -290,9 +289,7 @@ test(
         const ref = makeAttributeRef();
         const attribute = makeAttribute({
             attribute_type: 'select',
-            options: jsonArrayField(
-                ['Low', 'High'],
-            ),
+            options: ['Low', 'High'],
         });
         const out = buildAttributeInputHtml(
             ref, attribute,
@@ -311,9 +308,7 @@ test(
         const ref = makeAttributeRef();
         const attribute = makeAttribute({
             attribute_type: 'radio',
-            options: jsonArrayField(
-                ['Low', 'High'],
-            ),
+            options: ['Low', 'High'],
         });
         const out = buildAttributeInputHtml(
             ref, attribute,
@@ -366,7 +361,7 @@ test(
         });
         const attribute = makeAttribute({
             attribute_type: 'select',
-            options: jsonArrayField(['A']),
+            options: ['A'],
         });
         const out = buildAttributeInputHtml(
             ref, attribute,

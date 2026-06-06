@@ -1,12 +1,8 @@
 import type {
     AttributeType,
-    Constraint,
-    RecordAttributeEntity,
+    RecordAttribute,
     RecordAttributeId,
 } from '../../api/types.ts';
-import {
-    asConstraint,
-} from '../../api/validators.ts';
 
 export type ConstraintViolation =
     | {
@@ -32,27 +28,6 @@ export type ConstraintViolation =
         attributeName: string;
         max: string;
     };
-
-function parseConstraints(
-    attribute: RecordAttributeEntity,
-): Constraint[] {
-    const raw = JSON.parse(
-        attribute.constraints,
-    ) as unknown;
-    if (!Array.isArray(raw)) {
-        throw new Error(
-            'attribute ' + attribute.id
-            + ' constraints is not an array',
-        );
-    }
-    return raw.map(
-        (c, i) => asConstraint(
-            c,
-            'attribute ' + attribute.id
-            + '.constraints[' + i + ']',
-        ),
-    );
-}
 
 function parseNumericByType(
     value: string,
@@ -93,14 +68,14 @@ function compareLte(
 }
 
 export function validateAttributeValue(
-    attribute: RecordAttributeEntity,
+    attribute: RecordAttribute,
     value: string | null,
 ): ConstraintViolation[] {
     if (value === null || value === '') {
         return [];
     }
     const out: ConstraintViolation[] = [];
-    for (const c of parseConstraints(attribute)) {
+    for (const c of attribute.constraints) {
         if (c.kind === 'regex') {
             const re = new RegExp(c.pattern);
             if (!re.test(value)) {
@@ -148,7 +123,7 @@ export function validateAttributeValue(
 
 export function formatViolation(
     v: ConstraintViolation,
-    attribute: RecordAttributeEntity,
+    attribute: RecordAttribute,
 ): string {
     if (v.kind === 'required') {
         return v.attributeName + ' is required';

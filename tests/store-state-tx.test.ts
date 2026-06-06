@@ -5,6 +5,7 @@ import {
 } from '../api/backend-memory.ts';
 import { StateStore } from '../api/store-state.ts';
 import { backendRunner } from '../api/db.ts';
+import { validateStateEntity } from '../api/validators.ts';
 
 async function statesStore(): Promise<{
     backend: MemoryStorageBackend;
@@ -14,6 +15,7 @@ async function statesStore(): Promise<{
     await backend.ensureTables(['states']);
     const states = new StateStore(
         backendRunner(backend), 'states',
+        validateStateEntity,
     );
     return { backend, states };
 }

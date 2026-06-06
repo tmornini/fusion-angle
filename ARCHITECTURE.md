@@ -113,13 +113,25 @@ stamps the org onto writes, and 404s a foreign id — NEVER
 403, which would confirm a foreign row exists. The write
 fence (`#assertWritable`) rejects a write that targets an id
 another tenant owns, the write-side twin of the read fence.
-`orgScopedAdapter` (`api/db-org-scoped.ts`) wraps ONLY the
+`orgScopedAdapter` (`api/db-org-scoped.ts`) fences the
 org-owned stores (ideas, projects, flows, work_orders,
 records, record_attributes, objectives, role_grants,
-memberships); the global identity/auth spine and the
-junction/ledger tables pass straight through. The HMAC
-signing key is client-shipped, so this is demo-grade
-isolation until the server tier.
+memberships) by their stamped org, and the parent-derived
+leaves (`flow_versions`, junctions, scores, the states log,
+…) by `ParentScopedEntityStore` — a READ-time server-side
+join that resolves each leaf's owning org THROUGH its
+already-fenced parent (`api/store-parent-scoped.ts`). Only
+the global identity/auth spine and the organizations
+directory pass straight through; route guards fence the
+directory and the credential/PII reads. The HMAC signing
+key is client-shipped, so this is demo-grade isolation
+until the server tier.
+
+Derive-from-parent is WRITE stamping, not READ isolation:
+`OrgScopedEntityStore` stamps the parent's org on write, but
+that stamp alone does not isolate reads of the leaves that
+derive their org from it — `ParentScopedEntityStore` runs
+that derivation on READ. The two are distinct mechanisms.
 
 ### Multitenancy model
 

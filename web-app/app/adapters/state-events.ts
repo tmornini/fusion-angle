@@ -84,6 +84,11 @@ function latestByAt(
 // type, so every surviving event speaks that type's
 // alphabet and the `S` cast holds. On equal `at` the
 // later-inserted row wins — the order the log captures.
+//
+// As of the parent-scoped states fence the server returns
+// only the caller-org's events, so the id-filter's CROSS-
+// TENANT safety role here is now redundant; its DERIVATION
+// role (latest-per-entity, by id) remains — hence no deletion.
 export function latestStatesForIds<S extends string>(
     events: readonly StateEntity[],
     ids: ReadonlySet<Id>,

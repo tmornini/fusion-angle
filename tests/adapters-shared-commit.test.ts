@@ -10,9 +10,6 @@ import {
     seedRootAdmin,
 } from './root-admin-fixture.ts';
 import {
-    createChannel,
-} from '../web-app/app/channels.ts';
-import {
     getProviderModels,
 } from '../api/provider-models.ts';
 
@@ -68,59 +65,6 @@ test(
 );
 
 test(
-    'ctx.commit fires each notifyChannel'
-    + ' exactly once after ops complete',
-    async () => {
-        const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
-        const ctx = createRequestContext(db, await devToken());
-        const ch1 = createChannel<void>();
-        const ch2 = createChannel<void>();
-        let count1 = 0;
-        let count2 = 0;
-        ch1.subscribe(() => { count1++; });
-        ch2.subscribe(() => { count2++; });
-        await ctx.commit({
-            ops: [
-                {
-                    method: 'put',
-                    resource: 'ai-members/ai_1',
-                    body: buildAIMemberBody('A'),
-                },
-                {
-                    method: 'put',
-                    resource: 'ai-members/ai_2',
-                    body: buildAIMemberBody('B'),
-                },
-            ],
-            notifyChannels: [ch1, ch2],
-        });
-        assert.equal(count1, 1);
-        assert.equal(count2, 1);
-    },
-);
-
-test(
-    'ctx.commit with empty ops still fires'
-    + ' notifyChannels',
-    async () => {
-        const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
-        const ctx = createRequestContext(db, await devToken());
-        const ch = createChannel<void>();
-        let count = 0;
-        ch.subscribe(() => { count++; });
-        await ctx.commit({
-            ops: [],
-            notifyChannels: [ch],
-        });
-        assert.equal(count, 1);
-    },
-);
-
-test(
     'ctx.commit throws CommitError and rolls back'
     + ' the whole batch',
     async () => {
@@ -128,9 +72,6 @@ test(
         await db.createSchema();
         await seedRootAdmin(db);
         const ctx = createRequestContext(db, await devToken());
-        const ch = createChannel<void>();
-        let count = 0;
-        ch.subscribe(() => { count++; });
         const goodA = {
             method: 'put' as const,
             resource: 'ai-members/ai_1',
@@ -150,7 +91,6 @@ test(
         try {
             await ctx.commit({
                 ops: [goodA, bad, goodC],
-                notifyChannels: [ch],
             });
         } catch (e) {
             caught = e;
@@ -163,8 +103,6 @@ test(
         // Real rollback: the earlier valid op did not land.
         const all = await db.aiMembers.getAll();
         assert.equal(all.length, 0);
-        // Channel did NOT fire.
-        assert.equal(count, 0);
     },
 );
 

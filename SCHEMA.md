@@ -163,7 +163,8 @@ splice. This is the OPPOSITE discipline from
 `identity_pii` (which erases by splice). `secret`
 is opaque material stored UNHASHED at this seam;
 hashing, verification, and OAuth infrastructure are
-SP-5. SP-1 enforces non-leakage on read.
+SP-5. The read routes project `secret` out (api.ts
+`withoutSecret`), so it never crosses the API boundary.
 
 | Column | Type |
 |--------|------|

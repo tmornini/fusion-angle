@@ -21,6 +21,11 @@ import {
 import {
     mutateHeaderInfo,
 } from './header-info.ts';
+import { navigateTo } from './navigation.ts';
+import { sessionContext } from './adapters/shared.ts';
+import {
+    postSessionLogout,
+} from './adapters/session-logout.ts';
 
 function initSidebar(): void {
     function toggleSidebar(): void {
@@ -54,11 +59,33 @@ function initSidebar(): void {
     );
 }
 
+// Bind every [data-signout] control (both the desktop and the
+// mobile sidebar carry one). The server revoke is best-effort:
+// postSessionLogout always scrubs the local session in its
+// finally, so we navigate to the login page regardless — a
+// failed revoke is logged, never a reason to strand the user.
+function initSignOut(): void {
+    const signOut = async (): Promise<void> => {
+        try {
+            await postSessionLogout(sessionContext());
+        } catch (err) {
+            log.warn('sign-out revoke failed', 'layout', err);
+        } finally {
+            navigateTo('auth');
+        }
+    };
+    document
+        .querySelectorAll('[data-signout]')
+        .forEach(el =>
+            el.addEventListener('click', signOut));
+}
+
 async function initSidebarLayout(
     hasSchema = true,
 ): Promise<void> {
     initActiveNavItem();
     initSidebar();
+    initSignOut();
     initThemeAndDropdowns();
     initMobileDrawer();
     mutateThemeToggleIcon();

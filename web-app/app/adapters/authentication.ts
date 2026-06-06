@@ -1,4 +1,8 @@
 import type { RequestContext } from './shared.ts';
+import { UnauthorizedError } from '../../../api/api.ts';
+import type {
+    SessionCredentials,
+} from './session-credentials.ts';
 
 // The OAuth client id this web app authenticates as.
 const WEB_CLIENT_ID = 'web-app';
@@ -6,10 +10,12 @@ const WEB_CLIENT_ID = 'web-app';
 // Drive the real OAuth front doors: the interactive password
 // loop (/authentication/authorize) yields an authorization code,
 // which /authentication/token exchanges for a signed access +
-// refresh pair. Returns the access token, or null on any failure
-// (bad credentials, etc.). The caller installs it as the per-tab
-// session — keeping this free of the global session side effect
-// so it is testable.
+// refresh pair. Returns the credential pair, or null when the
+// credentials are bad (a 401 from either door). A non-401 fault
+// (a 500, a network error) is a BUG, not a wrong password — it
+// propagates. The caller persists and installs the result,
+// keeping this free of the global session side effect so it is
+// testable.
 //
 // DEPLOYMENT CONSTRAINT (unchanged): the HMAC signing key is
 // still a client-shipped constant, so the token is real but
@@ -20,7 +26,7 @@ export async function loginViaPassword(
     ctx: RequestContext,
     username: string,
     password: string,
-): Promise<string | null> {
+): Promise<SessionCredentials | null> {
     let code: string;
     try {
         code = (await ctx.POST<{ code: string }>(
@@ -30,16 +36,32 @@ export async function loginViaPassword(
                 password,
                 client_id: WEB_CLIENT_ID,
             })).code;
-    } catch {
-        return null;   // bad credentials → no session
+    } catch (err) {
+        if (err instanceof UnauthorizedError) {
+            return null;   // bad credentials → no session
+        }
+        throw err;
     }
+    let grant: {
+        access_token: string;
+        refresh_token: string;
+    };
     try {
-        return (await ctx.POST<{ access_token: string }>(
-            'authentication/token', {
-                grant_type: 'authorization_code',
-                code,
-            })).access_token;
-    } catch {
-        return null;
+        grant = await ctx.POST<{
+            access_token: string;
+            refresh_token: string;
+        }>('authentication/token', {
+            grant_type: 'authorization_code',
+            code,
+        });
+    } catch (err) {
+        if (err instanceof UnauthorizedError) {
+            return null;
+        }
+        throw err;
     }
+    return {
+        accessToken: grant.access_token,
+        refreshToken: grant.refresh_token,
+    };
 }

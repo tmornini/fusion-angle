@@ -1,14 +1,18 @@
 const MAX_TOASTS = 5;
 const TOAST_DURATION_MS = 6000;
+// Matches the `.toast--closing` fade in components-toast.css
+// (var(--duration-slow)); the class owns the visual, this owns
+// the removal-after-fade timing.
 const TOAST_TRANSITION_MS = 300;
 const TOAST_CONTAINER_ID = 'toast-container';
 
 function closeActiveToast(
     toast: HTMLElement,
 ): void {
-    toast.style.opacity = '0';
-    toast.style.transition =
-        `opacity ${TOAST_TRANSITION_MS}ms ease`;
+    if (toast.classList.contains('toast--closing')) {
+        return;
+    }
+    toast.classList.add('toast--closing');
     setTimeout(
         () => toast.remove(),
         TOAST_TRANSITION_MS,

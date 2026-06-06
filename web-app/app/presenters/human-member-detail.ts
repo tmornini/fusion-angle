@@ -3,7 +3,7 @@ import {
 } from '../safe-html.ts';
 import { $required } from '../dom.ts';
 import { initials } from '../core.ts';
-import { DISPLAY_ABSENT } from '../format.ts';
+import { displayText } from '../format.ts';
 import {
     iconArrowLeft,
     iconEdit,
@@ -258,7 +258,7 @@ function buildReadonlyField(
                 icon ?? html``
             } ${label}</p>
             <p class="text-sm">
-                ${value === '' ? DISPLAY_ABSENT : value}
+                ${displayText(value)}
             </p>
         </div>`;
 }
@@ -353,7 +353,7 @@ function buildReadonlyBio(
                 'label mb-2 block'
             }">Bio</p>
             <p class="text-sm">
-                ${value === '' ? DISPLAY_ABSENT : value}
+                ${displayText(value)}
             </p>
         </div>`;
 }

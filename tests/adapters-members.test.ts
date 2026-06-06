@@ -11,8 +11,12 @@ import { devToken } from './token-fixtures.ts';
 import {
     postHumanMemberCreation,
     postHumanMemberStateChange,
+    featuredHumanMembers,
     type HumanMemberDraft,
 } from '../web-app/app/adapters/members.ts';
+import type {
+    HumanMember,
+} from '../web-app/app/presenters/member.ts';
 import {
     seedCurrentMember,
     seedHumanMember,
@@ -93,3 +97,22 @@ test(
         );
     },
 );
+
+test('featuredHumanMembers keeps only members with a dept',
+() => {
+    const mk = (dept: boolean) =>
+        ({ hasDepartment: () => dept }) as
+            unknown as HumanMember;
+    const result = featuredHumanMembers([
+        mk(true), mk(false), mk(true),
+    ]);
+    assert.equal(result.length, 2);
+});
+
+test('featuredHumanMembers caps the list at six', () => {
+    const mk = () =>
+        ({ hasDepartment: () => true }) as
+            unknown as HumanMember;
+    const ten = Array.from({ length: 10 }, mk);
+    assert.equal(featuredHumanMembers(ten).length, 6);
+});

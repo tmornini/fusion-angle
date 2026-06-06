@@ -19,8 +19,7 @@ export class EntityStore<T extends { id: string }>
         table: string,
         run: TxRunner,
         stateStore: StateStore,
-        validate: EntityValidator<T> = (b) =>
-            b as unknown as Omit<T, 'id'>,
+        validate: EntityValidator<T>,
     ) {
         this.#table = table;
         this.#run = run;

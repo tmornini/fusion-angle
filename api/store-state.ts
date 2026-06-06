@@ -1,6 +1,7 @@
 import {
     EntityNotFound,
     type StateStore as StateStoreInterface,
+    type EntityValidator,
     type Tx,
     type TxRunner,
 } from './db.ts';
@@ -28,10 +29,16 @@ export class StateStore
 {
     readonly #run: TxRunner;
     readonly #table: string;
+    readonly #validate: EntityValidator<StateEntity>;
 
-    constructor(run: TxRunner, table: string) {
+    constructor(
+        run: TxRunner,
+        table: string,
+        validate: EntityValidator<StateEntity>,
+    ) {
         this.#run = run;
         this.#table = table;
+        this.#validate = validate;
     }
 
     async getAll(): Promise<StateEntity[]> {
@@ -62,7 +69,16 @@ export class StateStore
         id: Id,
         fields: Omit<StateEntity, 'id'>,
     ): Promise<StateEntity> {
-        const written: StateEntity = { ...fields, id };
+        // Validate at the storage edge — the same gate the
+        // states route applies, so a direct put cannot smuggle
+        // a malformed event past it.
+        const written: StateEntity = {
+            ...this.#validate(
+                fields as unknown as
+                    Record<string, unknown>,
+            ),
+            id,
+        };
         await this.#run(
             [this.#table], 'readwrite',
             tx => tx.put(this.#table, written),

@@ -20,20 +20,13 @@ import {
 } from './icons.ts';
 import type { SafeHtml } from './safe-html.ts';
 
-const MOBILE_BREAKPOINT_PX = 768;
 const BOOL_STRING_TRUE = 'true';
 const BOOL_STRING_FALSE = 'false';
 
 interface AppState {
     theme: 'light' | 'dark' | 'system';
-    isMobile: boolean;
     isSidebarCollapsed: boolean;
-    isSidebarOpen: boolean;
-    isSearchOpen: boolean;
-    searchQuery: string;
 }
-
-type StateListener = () => void;
 
 function isValidTheme(
     value: string | null,
@@ -69,9 +62,6 @@ function loadStoredSidebarCollapsed(
     );
 }
 
-const MOBILE_QUERY = '(max-width: '
-    + MOBILE_BREAKPOINT_PX
-    + 'px)';
 const DARK_QUERY =
     '(prefers-color-scheme: dark)';
 
@@ -81,34 +71,13 @@ const DARK_QUERY =
 // boot — see core.ts DOMContentLoaded.
 let state: Readonly<AppState> = {
     theme: 'system',
-    isMobile: false,
     isSidebarCollapsed: false,
-    isSidebarOpen: false,
-    isSearchOpen: false,
-    searchQuery: '',
 };
-
-const subs = new Set<StateListener>();
-
-function getState(): Readonly<AppState> {
-    return state;
-}
 
 function setState(
     partial: Partial<AppState>,
 ): void {
     state = { ...state, ...partial };
-    const snapshot = [...subs];
-    snapshot.forEach(fn => fn());
-}
-
-function subscribe(
-    fn: StateListener,
-): () => void {
-    subs.add(fn);
-    return () => {
-        subs.delete(fn);
-    };
 }
 
 function computeTheme(): 'light' | 'dark' {
@@ -192,7 +161,6 @@ function collapseSidebar(
 function initState(): void {
     setState({
         theme: loadStoredTheme(),
-        isMobile: mediaQueryMatches(MOBILE_QUERY),
         isSidebarCollapsed:
             loadStoredSidebarCollapsed(),
     });
@@ -204,19 +172,6 @@ function initListeners(): void {
         () => {
             if (state.theme === 'system') {
                 applyResolvedTheme();
-            }
-        },
-    );
-
-    subscribeMediaQuery(
-        MOBILE_QUERY,
-        (matches) => {
-            setState({ isMobile: matches });
-            if (!matches) {
-                setState({
-                    isSidebarOpen: false,
-                    isSearchOpen: false,
-                });
             }
         },
     );
@@ -256,9 +211,7 @@ function initListeners(): void {
 
 export type { AppState };
 export {
-    getState,
     setState,
-    subscribe,
     computeTheme,
     getThemeIcon,
     applyResolvedTheme,

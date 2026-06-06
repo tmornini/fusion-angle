@@ -86,6 +86,25 @@ p { line-height: var(--leading-normal); }
   color: hsl(var(--blue-900));
 }
 
+/* Skip-to-content link: off-screen until keyboard focus,
+   then slides into the top-left over the layout. */
+.skip-link {
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-2);
+  z-index: 100;
+  padding: var(--space-2) var(--space-4);
+  background-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border-radius: var(--radius);
+  transform: translateY(-150%);
+  transition: transform var(--duration-fast) var(--ease-default);
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+}
+
 /* View transitions */
 
 @view-transition {

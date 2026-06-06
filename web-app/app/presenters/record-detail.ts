@@ -10,7 +10,7 @@ import {
 } from '../icons.ts';
 import type {
     RecordEntity,
-    RecordAttributeEntity,
+    RecordAttribute,
     RecordState,
     WorkOrderEntity,
     AttributeType,
@@ -25,7 +25,7 @@ export interface RecordDetailView {
     readonly record: RecordEntity;
     readonly state: RecordState;
     readonly attributes:
-        readonly RecordAttributeEntity[];
+        readonly RecordAttribute[];
     readonly boundFlows: readonly {
         id: string;
         name: string;
@@ -113,10 +113,8 @@ export class RecordDetailPresenter {
     }
 
     #buildAttributeRow(
-        a: RecordAttributeEntity,
+        a: RecordAttribute,
     ): SafeHtml {
-        const constraints =
-            parseConstraints(a.constraints);
         return html`<div
             class="record-attribute-row">
             <span class="font-medium"
@@ -126,7 +124,7 @@ export class RecordDetailPresenter {
             }">${a.attribute_type}</span>
             <span class="text-muted text-sm"
                 >${
-                    constraints
+                    a.constraints
                         .map(formatConstraint)
                         .join(' · ')
                 }</span>
@@ -204,7 +202,7 @@ export function recordDraftFromView(
     view: {
         record: RecordEntity;
         attributes:
-            readonly RecordAttributeEntity[];
+            readonly RecordAttribute[];
     },
 ): RecordDetailDraft {
     return {
@@ -220,11 +218,9 @@ export function recordDraftFromView(
                 name: a.name,
                 attribute_type: a.attribute_type,
                 sort_order: a.sort_order,
-                options: parseOptions(
-                    a.options,
-                ),
-                constraints: parseConstraints(
-                    a.constraints,
+                options: [...a.options],
+                constraints: a.constraints.map(
+                    c => ({ ...c }),
                 ),
             })),
     };
@@ -448,20 +444,6 @@ export class RecordDetailEditPresenter {
             </button>
         </div>`;
     }
-}
-
-function parseConstraints(
-    raw: string,
-): Constraint[] {
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return [];
-    return parsed as Constraint[];
-}
-
-function parseOptions(raw: string): string[] {
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return [];
-    return parsed as string[];
 }
 
 export function allowedConstraintKinds(

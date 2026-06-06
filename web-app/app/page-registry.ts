@@ -26,6 +26,12 @@ export interface PageEntry {
     keywords?: string;
     searchable?: boolean;
     requiresSchema?: boolean;
+    // Auth-gated by default: a page is exempt only when this is
+    // explicitly false (mirrors requiresSchema). The boot gate
+    // reads `requiresAuth !== false`, so the 23 app pages that
+    // omit it inherit true; only the public surface and the
+    // pre-auth bootstrap plane opt out.
+    requiresAuth?: boolean;
     cssBundles?: string[];
     loader: () => Promise<{
         init: (
@@ -311,6 +317,7 @@ export const PAGE_REGISTRY: Record<
         keywords:
             'data export import wipe',
         requiresSchema: false,
+        requiresAuth: false,
         cssBundles: ['pages-snapshots'],
         loader: () => import('../snapshots/index'),
     },
@@ -324,6 +331,7 @@ export const PAGE_REGISTRY: Record<
         keywords:
             'components ui reference',
         requiresSchema: false,
+        requiresAuth: false,
         cssBundles: ['pages-design-system'],
         loader: () => import('../design-system/index'),
     },
@@ -334,6 +342,7 @@ export const PAGE_REGISTRY: Record<
         sourceFile: 'index',
         searchable: false,
         requiresSchema: false,
+        requiresAuth: false,
         cssBundles: ['pages-auth'],
         loader: () => import('../auth/index'),
     },
@@ -344,6 +353,7 @@ export const PAGE_REGISTRY: Record<
         sourceFile: 'index',
         searchable: false,
         requiresSchema: false,
+        requiresAuth: false,
         cssBundles: ['pages-landing'],
         loader: () => import('../landing/index'),
     },
@@ -354,6 +364,7 @@ export const PAGE_REGISTRY: Record<
         sourceFile: 'index',
         searchable: false,
         requiresSchema: false,
+        requiresAuth: false,
         loader: () => import('../not-found/index'),
     },
 };

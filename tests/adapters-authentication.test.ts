@@ -3,13 +3,17 @@ import assert from 'node:assert/strict';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import { GET } from '../api/api.ts';
 import { hashPassword } from '../api/password-hash.ts';
+import { decodeAccessToken } from '../api/access-token.ts';
 import {
     createRequestContext,
+    type RequestContext,
 } from '../web-app/app/adapters/shared.ts';
 import { devToken } from './token-fixtures.ts';
 import {
     loginViaPassword,
 } from '../web-app/app/adapters/authentication.ts';
+
+const REFRESH_TTL_SECONDS = 30 * 24 * 60 * 60;
 
 async function passwordUserCtx() {
     const db = new MemoryDbAdapter();
@@ -39,12 +43,25 @@ async function passwordUserCtx() {
     return { db, ctx };
 }
 
-test('loginViaPassword returns a gate-valid token', async () => {
+test('loginViaPassword returns a gate-valid credential pair',
+async () => {
     const { db, ctx } = await passwordUserCtx();
-    const tok = await loginViaPassword(
+    const creds = await loginViaPassword(
         ctx, 'demo@example.com', 's3cret');
-    assert.ok(tok);
-    assert.ok(Array.isArray(await GET(db, 'members', tok)));
+    assert.ok(creds);
+    assert.ok(Array.isArray(
+        await GET(db, 'members', creds.accessToken)));
+});
+
+test('loginViaPassword issues a 30-day refresh token',
+async () => {
+    const { ctx } = await passwordUserCtx();
+    const creds = await loginViaPassword(
+        ctx, 'demo@example.com', 's3cret');
+    assert.ok(creds);
+    const claims = decodeAccessToken(creds.refreshToken);
+    assert.equal(
+        claims.exp - claims.iat, REFRESH_TTL_SECONDS);
 });
 
 test('loginViaPassword returns null on a wrong password',
@@ -63,4 +80,18 @@ async () => {
         await loginViaPassword(
             ctx, 'ghost@example.com', 's3cret'),
         null);
+});
+
+test('loginViaPassword rethrows a non-401 fault, never masks',
+async () => {
+    // An upstream 500 / network fault is a BUG, not a wrong
+    // password — it must surface, not collapse to null.
+    const ctx = {
+        POST: async () => {
+            throw new Error('upstream 500');
+        },
+    } as unknown as RequestContext;
+    await assert.rejects(
+        () => loginViaPassword(ctx, 'a@b.c', 'pw'),
+        /upstream 500/);
 });

@@ -23,8 +23,7 @@ export class HistoryEntityStore<
     constructor(
         table: string,
         run: TxRunner,
-        validate: EntityValidator<T> = (b) =>
-            b as unknown as Omit<T, 'id'>,
+        validate: EntityValidator<T>,
     ) {
         this.#table = table;
         this.#run = run;

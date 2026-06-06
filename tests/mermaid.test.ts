@@ -305,3 +305,25 @@ test('mermaid drops node task instructions', () => {
         !text.includes('SECRET INSTRUCTIONS'),
     );
 });
+
+test('parseMermaid throws on an unsupported diagram type', () => {
+    assert.throws(
+        () => parseMermaid('sequenceDiagram\n  A->>B: hi'),
+        /Unsupported mermaid diagram/,
+    );
+});
+
+test('parseMermaid parses a state diagram pseudo-states',
+() => {
+    const result = parseMermaid(
+        'stateDiagram-v2\n'
+        + '[*] --> Active\n'
+        + 'Active --> [*]',
+    );
+    // [*] resolves to Create/Archive pseudo nodes.
+    const names = result.nodes.map(n => n.name);
+    assert.ok(names.includes('Active'));
+    assert.ok(names.includes('Create'));
+    assert.ok(names.includes('Archive'));
+    assert.equal(result.edges.length, 2);
+});

@@ -17,13 +17,19 @@ import {
     handlePageLoadError,
 } from './page-loader.ts';
 import { log } from './logger.ts';
-import { MissingTableError } from './adapters/index.ts';
 import {
-    establishSession,
+    MissingTableError,
+    UnauthorizedError,
+} from './adapters/index.ts';
+import {
+    getDbAdapter,
     getSessionToken,
     setSessionToken,
 } from './adapters/init.ts';
-import { sessionContext } from './adapters/shared.ts';
+import {
+    sessionContext,
+    createRequestContext,
+} from './adapters/shared.ts';
 import {
     getOrganizations,
 } from './adapters/organizations.ts';
@@ -39,6 +45,19 @@ import {
     getPreference,
     writePreference,
 } from './adapters/preferences.ts';
+import {
+    type SessionCredentials,
+    getSessionCredentials,
+    putSessionCredentials,
+    deleteSessionCredentials,
+} from './adapters/session-credentials.ts';
+import {
+    resolveCredentialDecision,
+} from './credential-resolution.ts';
+import {
+    postSessionRefresh,
+} from './adapters/session-refresh.ts';
+import { redirectToLogin } from './auth-redirect.ts';
 import { navigateTo } from './navigation.ts';
 import { PAGE_REGISTRY } from './page-registry.ts';
 
@@ -115,6 +134,59 @@ async function scopeBootToActiveOrg(): Promise<void> {
     writePreference(ACTIVE_ORG_KEY, active);
 }
 
+// Resolve the boot session from the persisted credential: install
+// a live access token, silently refresh a dead one, or bounce to
+// login when there is nothing usable. Returns false once it has
+// redirected — the caller must stop booting. `now` is computed
+// inline; the private nowSeconds stays private to init.
+async function bootAuthGate(): Promise<boolean> {
+    let creds: SessionCredentials | null;
+    try {
+        creds = getSessionCredentials();
+    } catch {
+        // a corrupt blob is unrecoverable — scrub and bounce
+        deleteSessionCredentials();
+        redirectToLogin();
+        return false;
+    }
+    const now = Math.floor(Date.now() / 1000);
+    const decision = resolveCredentialDecision(creds, now);
+    if (decision.kind === 'install') {
+        setSessionToken(decision.accessToken);
+        return true;
+    }
+    if (decision.kind === 'refresh') {
+        return installRefreshedSession(decision.refreshToken);
+    }
+    redirectToLogin();   // decision.kind === 'login'
+    return false;
+}
+
+// Refresh a dead-access / live-refresh session at boot on a
+// recovery-FREE context (a refresh that 401s is terminal). The
+// flat token is installed; scopeBootToActiveOrg then re-scopes
+// its org. A dead refresh scrubs and bounces.
+async function installRefreshedSession(
+    refreshToken: string,
+): Promise<boolean> {
+    const ctx = createRequestContext(
+        getDbAdapter(), getSessionToken());
+    try {
+        const creds = await postSessionRefresh(
+            ctx, refreshToken);
+        putSessionCredentials(creds);
+        setSessionToken(creds.accessToken);
+        return true;
+    } catch (err) {
+        if (err instanceof UnauthorizedError) {
+            deleteSessionCredentials();
+            redirectToLogin();
+            return false;
+        }
+        throw err;
+    }
+}
+
 document.addEventListener(
     'DOMContentLoaded',
     async () => {
@@ -140,11 +212,6 @@ document.addEventListener(
             }
         }
 
-        if (hasSchema) {
-            await establishSession('current', 'Demo User');
-            await scopeBootToActiveOrg();
-        }
-
         const pageName = getPageName();
 
         if (
@@ -154,6 +221,17 @@ document.addEventListener(
         ) {
             navigateTo('snapshots');
             return;
+        }
+
+        if (
+            hasSchema
+            && PAGE_REGISTRY[pageName]?.requiresAuth
+                !== false
+        ) {
+            if (!(await bootAuthGate())) {
+                return;   // bounced to login
+            }
+            await scopeBootToActiveOrg();
         }
 
         if (

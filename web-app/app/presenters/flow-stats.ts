@@ -20,12 +20,11 @@ import {
     formatMinAscending,
 } from '../duration-units.ts';
 
-// DASH is the canonical absent-value marker;
-// fmtDur guards both null and 0 (no data).
-const DASH = DISPLAY_ABSENT;
+// fmtDur guards both null and 0 (no data), showing the
+// canonical absent-value marker.
 function fmtDur(sec: number | null): string {
     return sec === null || sec === 0
-        ? DASH
+        ? DISPLAY_ABSENT
         : formatMinAscending(sec);
 }
 // Throughput below 1/wk shown as "<1/wk" to

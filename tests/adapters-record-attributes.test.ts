@@ -15,7 +15,6 @@ import {
     deleteRecordAttribute,
 } from
 '../web-app/app/adapters/record-attributes.ts';
-import { jsonArrayField } from '../api/types.ts';
 
 test(
     'putRecordAttribute then getRecordAttribute'
@@ -30,8 +29,8 @@ test(
             name: 'Email',
             attribute_type: 'text',
             sort_order: 1,
-            options: jsonArrayField([]),
-            constraints: jsonArrayField([]),
+            options: [],
+            constraints: [],
         });
         const stored = await getRecordAttribute(
             ctx, 'attr-1',
@@ -57,24 +56,24 @@ test(
             name: 'A1',
             attribute_type: 'text',
             sort_order: 1,
-            options: jsonArrayField([]),
-            constraints: jsonArrayField([]),
+            options: [],
+            constraints: [],
         });
         await putRecordAttribute(ctx, 'a-2', {
             record_id: 'rec-1',
             name: 'A2',
             attribute_type: 'text',
             sort_order: 2,
-            options: jsonArrayField([]),
-            constraints: jsonArrayField([]),
+            options: [],
+            constraints: [],
         });
         await putRecordAttribute(ctx, 'b-1', {
             record_id: 'rec-2',
             name: 'B1',
             attribute_type: 'text',
             sort_order: 1,
-            options: jsonArrayField([]),
-            constraints: jsonArrayField([]),
+            options: [],
+            constraints: [],
         });
         const rec1 = await
             getRecordAttributesByRecord(
@@ -98,24 +97,24 @@ test(
             name: 'middle',
             attribute_type: 'text',
             sort_order: 5,
-            options: jsonArrayField([]),
-            constraints: jsonArrayField([]),
+            options: [],
+            constraints: [],
         });
         await putRecordAttribute(ctx, 'a-first', {
             record_id: 'rec-1',
             name: 'first',
             attribute_type: 'text',
             sort_order: 1,
-            options: jsonArrayField([]),
-            constraints: jsonArrayField([]),
+            options: [],
+            constraints: [],
         });
         await putRecordAttribute(ctx, 'a-last', {
             record_id: 'rec-1',
             name: 'last',
             attribute_type: 'text',
             sort_order: 10,
-            options: jsonArrayField([]),
-            constraints: jsonArrayField([]),
+            options: [],
+            constraints: [],
         });
         const rows = await
             getRecordAttributesByRecord(
@@ -140,8 +139,8 @@ test(
             name: 'A1',
             attribute_type: 'text',
             sort_order: 1,
-            options: jsonArrayField([]),
-            constraints: jsonArrayField([]),
+            options: [],
+            constraints: [],
         });
         await deleteRecordAttribute(ctx, 'a-1');
         await assert.rejects(
@@ -164,11 +163,11 @@ test(
                 name: 'X',
                 attribute_type: 'number',
                 sort_order: 1,
-                options: jsonArrayField([]),
-                constraints: jsonArrayField([{
+                options: [],
+                constraints: [{
                     kind: 'regex',
                     pattern: '^\\d+$',
-                }]),
+                }],
             }),
             /regex/,
         );
@@ -189,11 +188,11 @@ test(
                 name: 'X',
                 attribute_type: 'text',
                 sort_order: 1,
-                options: jsonArrayField([]),
-                constraints: jsonArrayField([{
+                options: [],
+                constraints: [{
                     kind: 'range_min',
                     min: '0',
-                }]),
+                }],
             }),
         );
     },
@@ -212,11 +211,11 @@ test(
             name: 'When',
             attribute_type: 'date',
             sort_order: 1,
-            options: jsonArrayField([]),
-            constraints: jsonArrayField([{
+            options: [],
+            constraints: [{
                 kind: 'range_min',
                 min: '2000-01-01',
-            }]),
+            }],
         });
         const stored = await getRecordAttribute(
             ctx, 'a-1',
@@ -238,12 +237,12 @@ test(
             name: 'Email',
             attribute_type: 'text',
             sort_order: 1,
-            options: jsonArrayField([]),
-            constraints: jsonArrayField([{
+            options: [],
+            constraints: [{
                 kind: 'regex',
                 pattern:
                     '^[^@]+@[^@]+\\.[^@]+$',
-            }]),
+            }],
         });
         const stored = await getRecordAttribute(
             ctx, 'a-1',

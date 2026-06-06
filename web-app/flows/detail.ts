@@ -31,7 +31,6 @@ import {
 } from '../app/adapters/index.ts';
 import type {
     MemberId,
-    RecordAttributeEntity,
     RecordAttributeId,
     RecordEntity,
     RecordId,

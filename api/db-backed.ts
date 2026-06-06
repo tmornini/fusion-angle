@@ -76,6 +76,7 @@ import {
     validateWorkOrderEntity,
     validateFlowWorkOrderEntity,
     validateStateFieldValueEntity,
+    validateStateEntity,
     validateRecordEntity,
     validateRecordAttributeEntity,
     validateFlowRecordEntity,
@@ -267,7 +268,8 @@ export class BackedDbAdapter implements DbAdapter {
     // binds it to the backend; the transaction view rebinds
     // the same wiring to an open tx via ambientRunner.
     #buildStores(run: TxRunner): DbStores {
-        const stateStore = new StateStore(run, 'states');
+        const stateStore = new StateStore(
+            run, 'states', validateStateEntity);
         return {
             states: stateStore,
             organizations: new EntityStore(

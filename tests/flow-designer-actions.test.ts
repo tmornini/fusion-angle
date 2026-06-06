@@ -10,6 +10,14 @@ import {
     applyDeleteEdge,
     applyUpdateNode,
     applyUpdateEdge,
+    applyAddNode,
+    applyAddAttributeRef,
+    applyRemoveAttributeRef,
+    applyUpdateAttributeMode,
+    applyUpdateAttributeRequired,
+    applyAutoLayout,
+    applyPanToRevealSelected,
+    applyPanelTransition,
 } from '../web-app/app/flow-designer-actions.ts';
 
 const node = (id: string, x = 0, y = 0) => ({
@@ -252,4 +260,127 @@ test('applyUpdateEdge patches matching id', () => {
     );
     assert.equal(result[0]?.name, 'go');
     assert.equal(result[1]?.name, '');
+});
+
+// ── T16: previously-untested apply* transforms ──
+
+const attr = (
+    id: string,
+    mode: 'editable' | 'readonly' = 'editable',
+    isRequired = false,
+) => ({ attribute_id: id, mode, isRequired });
+
+test('applyAddNode appends a node with defaults', () => {
+    const result = applyAddNode(
+        [node('a')], 'b', 'New', 10, 20);
+    assert.equal(result.length, 2);
+    const added = result[1]!;
+    assert.equal(added.id, 'b');
+    assert.equal(added.name, 'New');
+    assert.equal(added.positionX, 10);
+    assert.equal(added.positionY, 20);
+    assert.equal(added.isCreate, false);
+    assert.equal(added.isArchive, false);
+});
+
+test('applyAddNode does not mutate the input', () => {
+    const nodes = [node('a')];
+    applyAddNode(nodes, 'b', 'New', 0, 0);
+    assert.equal(nodes.length, 1);
+});
+
+test('applyAddAttributeRef appends to the matching node', () => {
+    const nodes = [
+        { ...node('a'), attributes: [] },
+        { ...node('b'), attributes: [] },
+    ];
+    const result = applyAddAttributeRef(
+        nodes, 'a', attr('x'));
+    assert.deepEqual(
+        result[0]!.attributes.map(r => r.attribute_id),
+        ['x']);
+    assert.equal(result[1]!.attributes.length, 0);
+});
+
+test('applyRemoveAttributeRef drops by attribute_id', () => {
+    const nodes = [
+        {
+            ...node('a'),
+            attributes: [attr('x'), attr('y')],
+        },
+    ];
+    const result = applyRemoveAttributeRef(nodes, 'a', 'x');
+    assert.deepEqual(
+        result[0]!.attributes.map(r => r.attribute_id),
+        ['y']);
+});
+
+test('applyUpdateAttributeMode updates the one ref', () => {
+    const nodes = [
+        {
+            ...node('a'),
+            attributes: [attr('x', 'editable')],
+        },
+    ];
+    const result = applyUpdateAttributeMode(
+        nodes, 'a', 'x', 'readonly');
+    assert.equal(
+        result[0]!.attributes[0]!.mode, 'readonly');
+});
+
+test('applyUpdateAttributeRequired flips the flag', () => {
+    const nodes = [
+        {
+            ...node('a'),
+            attributes: [attr('x', 'editable', false)],
+        },
+    ];
+    const result = applyUpdateAttributeRequired(
+        nodes, 'a', 'x', true);
+    assert.equal(
+        result[0]!.attributes[0]!.isRequired, true);
+});
+
+test('applyAutoLayout positions every node', () => {
+    const result = applyAutoLayout(
+        [{ ...node('a'), isCreate: true }, node('b')],
+        [edge('e1', 'a', 'b')],
+        800, 600, false, 0);
+    for (const n of result.nodes) {
+        assert.equal(typeof n.positionX, 'number');
+        assert.equal(typeof n.positionY, 'number');
+    }
+    assert.ok(result.edgeWaypoints instanceof Map);
+});
+
+test('applyPanToRevealSelected centers a node, else null',
+() => {
+    const vb = { x: 0, y: 0, w: 800, h: 600 };
+    const at100 = applyPanToRevealSelected(
+        'a', null, [node('a', 100, 0)], [], vb, 800, 0);
+    const at200 = applyPanToRevealSelected(
+        'a', null, [node('a', 200, 0)], [], vb, 800, 0);
+    assert.ok(at100 !== null && at200 !== null);
+    // A node 100 to the right shifts the origin by 100.
+    assert.equal(at200!.x - at100!.x, 100);
+    // No selection → no pan.
+    assert.equal(
+        applyPanToRevealSelected(
+            null, null, [], [], vb, 800, 0),
+        null);
+});
+
+test('applyPanelTransition saves the viewBox on open', () => {
+    const vb = { x: 5, y: 6, w: 800, h: 600 };
+    // autoFit short-circuits to null.
+    assert.equal(
+        applyPanelTransition(
+            true, true, { kind: 'none' }, vb),
+        null);
+    // Panel just opened → save the viewBox + request a pan.
+    const opened = applyPanelTransition(
+        false, true, { kind: 'none' }, vb);
+    assert.ok(opened !== null);
+    assert.equal(opened!.shouldPanToReveal, true);
+    assert.equal(opened!.savedViewBox.kind, 'saved');
 });

@@ -443,6 +443,14 @@ export interface SeededCredentials {
 // through the real /authentication/authorize loop. The system
 // identity signs with a client_secret — generated, hashed, and
 // discarded, never revealed. Both seed paths call this.
+// Seed login credentials for every login-capable person (one
+// with a PII email) plus the system client secret. Runs AFTER
+// the entity seed commits, NEVER inside it: PBKDF2 hashing is
+// async crypto, and awaiting a non-IDB promise inside a
+// transaction body auto-commits the IndexedDB transaction
+// early (CLAUDE.md § IndexedDB auto-commit). So every hash is
+// computed up front, then the credential rows land together in
+// one transaction of pure row ops.
 async function seedHumanCredentials(
     adapter: DbAdapter,
 ): Promise<SeededCredentials> {
@@ -452,33 +460,50 @@ async function seedHumanCredentials(
     const persons = (await adapter.identities.getAll())
         .filter(i => i.kind === 'person'
             && piiById.has(i.id));
-    const reveals = await Promise.all(
+    const planned = await Promise.all(
         persons.map(async identity => {
             const password = generateCryptoSafeBase62();
-            await adapter.identityCredentials.put(
-                'seed-cred-' + identity.id + '-password', {
-                    identity_id: identity.id,
-                    kind: 'password',
-                    status: 'set',
-                    secret: await hashPassword(password),
-                    at: MOCK_SEED_TIMESTAMP,
-                });
             return {
+                id: 'seed-cred-'
+                    + identity.id + '-password',
                 identityId: identity.id,
                 username: piiById.get(identity.id)!.email,
                 password,
+                secret: await hashPassword(password),
             };
         }));
-    await adapter.identityCredentials.put(
-        'seed-cred-system-client-secret', {
-            identity_id: SYSTEM_MEMBER_ID,
-            kind: 'client_secret',
-            status: 'set',
-            secret: await hashPassword(
-                generateCryptoSafeBase62()),
-            at: MOCK_SEED_TIMESTAMP,
-        });
-    return { identities: reveals };
+    const systemSecret = await hashPassword(
+        generateCryptoSafeBase62());
+    await adapter.transaction(
+        ['identity_credentials'],
+        async (view) => {
+            await Promise.all([
+                ...planned.map(cred =>
+                    view.identityCredentials.put(cred.id, {
+                        identity_id: cred.identityId,
+                        kind: 'password',
+                        status: 'set',
+                        secret: cred.secret,
+                        at: MOCK_SEED_TIMESTAMP,
+                    })),
+                view.identityCredentials.put(
+                    'seed-cred-system-client-secret', {
+                        identity_id: SYSTEM_MEMBER_ID,
+                        kind: 'client_secret',
+                        status: 'set',
+                        secret: systemSecret,
+                        at: MOCK_SEED_TIMESTAMP,
+                    }),
+            ]);
+        },
+    );
+    return {
+        identities: planned.map(cred => ({
+            identityId: cred.identityId,
+            username: cred.username,
+            password: cred.password,
+        })),
+    };
 }
 
 export const OBJECTIVE_SEEDS: Array<{
@@ -517,16 +542,19 @@ export async function populateMockData(
     adapter: DbAdapter,
 ): Promise<SeededCredentials> {
     // Seed the whole demo dataset in one transaction, so a
-    // mid-seed failure leaves no half-populated schema.
-    return adapter.transaction(
+    // mid-seed failure leaves no half-populated schema. The
+    // credentials seed runs after it commits — its PBKDF2
+    // hashing is async crypto and cannot run inside the tx.
+    await adapter.transaction(
         TABLE_NAMES,
         (view) => populateMockDataIn(view),
     );
+    return seedHumanCredentials(adapter);
 }
 
 async function populateMockDataIn(
     adapter: DbAdapter,
-): Promise<SeededCredentials> {
+): Promise<void> {
     const members: SeedHumanMember[] = [
         {
             id: 'LhfaUUf4IumVsCSGB4xjdK',
@@ -6489,23 +6517,24 @@ async function populateMockDataIn(
             }
         }
     }
-
-    return seedHumanCredentials(adapter);
 }
 
 export async function populateBootstrapData(
     adapter: DbAdapter,
 ): Promise<SeededCredentials> {
     // Seed the pristine bootstrap data in one transaction.
-    return adapter.transaction(
+    // Credentials seed after it commits — PBKDF2 hashing is
+    // async crypto and cannot run inside the tx.
+    await adapter.transaction(
         TABLE_NAMES,
         (view) => populateBootstrapDataIn(view),
     );
+    return seedHumanCredentials(adapter);
 }
 
 async function populateBootstrapDataIn(
     adapter: DbAdapter,
-): Promise<SeededCredentials> {
+): Promise<void> {
     // The pristine seed plants only what the app needs
     // to render its shell: the system actor that authors
     // state events, the current user, and the singleton
@@ -6593,6 +6622,4 @@ async function populateBootstrapDataIn(
             },
         ),
     ]);
-
-    return seedHumanCredentials(adapter);
 }

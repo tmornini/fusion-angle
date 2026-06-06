@@ -34,7 +34,7 @@ import {
 } from '../app/adapters/index.ts';
 import type {
     NodeAttribute,
-    RecordAttributeEntity,
+    RecordAttribute,
 } from '../../api/types.ts';
 
 /* ── Helpers ─────────────── */
@@ -254,7 +254,7 @@ async function loadPresenter(
         getMemberMap(ctx),
         getRecordForFlow(ctx, fg.flowId),
     ]);
-    const attributes: RecordAttributeEntity[] =
+    const attributes: RecordAttribute[] =
         recordId === null
             ? []
             : await getRecordAttributesByRecord(

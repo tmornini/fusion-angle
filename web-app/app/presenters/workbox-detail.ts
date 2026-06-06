@@ -12,7 +12,7 @@ import {
     type GraphNode,
     type GraphEdge,
     type NodeAttribute,
-    type RecordAttributeEntity,
+    type RecordAttribute,
     type HistoryEntry,
     type HistoryFieldValue,
     type ClaimStatus,
@@ -40,7 +40,7 @@ const ATTRIBUTE_HTML_TYPE: Record<
 
 export function buildAttributeInputHtml(
     ref: NodeAttribute,
-    attribute: RecordAttributeEntity,
+    attribute: RecordAttribute,
 ): SafeHtml {
     const id = attribute.id;
     const isReadonly = ref.mode === 'readonly';
@@ -54,9 +54,7 @@ export function buildAttributeInputHtml(
         ? trusted('disabled')
         : html``;
     if (attribute.attribute_type === 'select') {
-        const options = JSON.parse(
-            attribute.options,
-        ) as string[];
+        const options = attribute.options;
         return html`<select
             class="input"
             data-attribute-id="${id}"
@@ -73,9 +71,7 @@ export function buildAttributeInputHtml(
         </select>`;
     }
     if (attribute.attribute_type === 'radio') {
-        const options = JSON.parse(
-            attribute.options,
-        ) as string[];
+        const options = attribute.options;
         return html`<div class="radio-group">
             ${options.map(
                 o => html`<label
@@ -125,7 +121,7 @@ export class WorkboxDetailPresenter {
         readonly HistoryEntry[];
     readonly #claim: ClaimStatus;
     readonly #attributeMap: ReadonlyMap<
-        string, RecordAttributeEntity
+        string, RecordAttribute
     >;
 
     constructor(
@@ -142,7 +138,7 @@ export class WorkboxDetailPresenter {
         memberMap: Map<Id, Member>,
         currentMemberId: string,
         attributeMap: ReadonlyMap<
-            string, RecordAttributeEntity
+            string, RecordAttribute
         >,
     ) {
         this.#workOrder = workOrder;
@@ -371,7 +367,7 @@ export class WorkboxDetailPresenter {
 
     #requireAttribute(
         ref: NodeAttribute,
-    ): RecordAttributeEntity {
+    ): RecordAttribute {
         return this.#requireAttributeById(
             ref.attribute_id,
         );
@@ -379,7 +375,7 @@ export class WorkboxDetailPresenter {
 
     #requireAttributeById(
         attributeId: string,
-    ): RecordAttributeEntity {
+    ): RecordAttribute {
         const attribute = this.#attributeMap.get(
             attributeId,
         );
@@ -457,7 +453,7 @@ export class WorkboxDetailPresenter {
 
     #buildAttributeRow(
         ref: NodeAttribute,
-        attribute: RecordAttributeEntity,
+        attribute: RecordAttribute,
     ): SafeHtml {
         const label = attribute.name
             + (ref.isRequired ? ' *' : '');
@@ -560,7 +556,7 @@ function buildHistory(
     nodes: readonly GraphNode[],
     memberMap: Map<Id, Member>,
     attributeMap: ReadonlyMap<
-        string, RecordAttributeEntity
+        string, RecordAttribute
     >,
 ): HistoryEntry[] {
     return sortedTransitions.map(t => {

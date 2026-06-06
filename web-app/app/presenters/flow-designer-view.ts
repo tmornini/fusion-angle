@@ -18,7 +18,7 @@ import type {
     GraphNode,
     GraphEdge,
     NodeAttribute,
-    RecordAttributeEntity,
+    RecordAttribute,
 } from '../adapters/index.ts';
 import {
     HumanMember,
@@ -28,7 +28,7 @@ import {
 
 export function buildAttributeRefRow(
     ref: NodeAttribute,
-    attribute: RecordAttributeEntity,
+    attribute: RecordAttribute,
     isLocked: boolean,
 ): SafeHtml {
     const disabledAttr = trusted(
@@ -121,7 +121,7 @@ export function buildNodePanel(
     isLocked: boolean,
     humans: HumanMember[],
     ais: AIMember[],
-    attributes: readonly RecordAttributeEntity[],
+    attributes: readonly RecordAttribute[],
 ): SafeHtml {
     const isSpecial =
         node.isCreate || node.isArchive;

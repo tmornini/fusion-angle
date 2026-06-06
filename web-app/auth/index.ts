@@ -13,15 +13,21 @@ import {
 import { navigateTo } from '../app/core.ts';
 import { getViewportWidth } from '../app/adapters/index.ts';
 import {
-    establishSession,
+    getDbAdapter,
+    getSessionToken,
     setSessionToken,
 } from '../app/adapters/init.ts';
 import {
-    sessionContext,
+    createRequestContext,
 } from '../app/adapters/shared.ts';
 import {
     loginViaPassword,
 } from '../app/adapters/authentication.ts';
+import {
+    putSessionCredentials,
+} from '../app/adapters/session-credentials.ts';
+import { decodeReturnTarget } from '../app/auth-redirect.ts';
+import { getUrlParam } from '../app/adapters/url-params.ts';
 
 function validateEmail(
     email: string,
@@ -520,10 +526,15 @@ export async function init(): Promise<void> {
 
         setTimeout(async () => {
             if (isLogin) {
-                const token = await loginViaPassword(
-                    sessionContext(), email, password,
+                // A recovery-free context: login establishes a
+                // NEW session and must not refresh-recover the
+                // OLD one on a 401 (a wrong password).
+                const creds = await loginViaPassword(
+                    createRequestContext(
+                        getDbAdapter(), getSessionToken()),
+                    email, password,
                 );
-                if (token === null) {
+                if (creds === null) {
                     setHtml(submitBtn, trusted(savedBtn));
                     submitBtn.removeAttribute('disabled');
                     passwordError.textContent =
@@ -536,23 +547,31 @@ export async function init(): Promise<void> {
                     );
                     return;
                 }
-                setSessionToken(token);
-                navigateTo('dashboard');
+                // Persist BEFORE navigating: navigateTo hard-
+                // reloads, wiping the in-memory token holder —
+                // only the persisted blob survives to re-
+                // establish the session at boot.
+                putSessionCredentials(creds);
+                setSessionToken(creds.accessToken);
+                const dest = decodeReturnTarget(
+                    getUrlParam('return'),
+                );
+                navigateTo(dest.page, dest.params);
                 return;
             }
-            // Sign-up creating a real identity + credential is
-            // SP-6 scope; the demo mock-establishes a session so
-            // the new-account path still lands on the dashboard.
-            await establishSession('current', 'Demo User');
+            // Real sign-up (identity + credential creation) is
+            // SP-6. Until then DO NOT mock-establish a session:
+            // a bare mock with no refresh token bounces on
+            // reload and would admit anyone to the seeded
+            // admin's data. Nudge to sign-in instead.
+            submitBtn.removeAttribute('disabled');
             showToast(
-                'Welcome to Fusion AI!'
-                + ' Your account has'
-                + ' been created.',
-                'success',
+                'Sign-up is coming soon — sign in with a'
+                + ' seeded account.',
+                'info',
             );
-            setTimeout(() => {
-                navigateTo('dashboard');
-            }, 1500);
+            isLogin = true;
+            updateMode();
         }, 800);
     });
 }

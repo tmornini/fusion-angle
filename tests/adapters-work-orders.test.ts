@@ -26,6 +26,10 @@ import {
 } from
 '../web-app/app/adapters/state-events.ts';
 import {
+    deleteWorkOrderClaim,
+} from
+'../web-app/app/adapters/work-orders-deletions.ts';
+import {
     jsonObjectField,
     DEFAULT_LOCK_TIMEOUT,
 } from '../api/types.ts';
@@ -776,3 +780,16 @@ test(
         assert.equal(claims.has(orphan), false);
     },
 );
+
+test('deleteWorkOrderClaim appends a claim_released event',
+async () => {
+    const db = new MemoryDbAdapter();
+    await db.createSchema();
+    await seedRootAdmin(db);
+    await seedHumanMember(db, 'current', 'Demo Test');
+    const ctx = createRequestContext(db, await devToken());
+    await deleteWorkOrderClaim(ctx, 'wo-release-1');
+    const events = await db.states.allFor('wo-release-1');
+    assert.equal(events.length, 1);
+    assert.equal(events[0]!.state, 'claim_released');
+});

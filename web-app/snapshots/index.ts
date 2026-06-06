@@ -195,11 +195,14 @@ export async function init(
         );
     }
 
+    // Every destructive action confirms first. `message` is
+    // required so a caller cannot silently bypass the dialog —
+    // the confirm step is the gate, not an opt-in.
     function confirmAction(
         button: HTMLButtonElement,
         label: string,
         action: () => Promise<SeededCredentials>,
-        message?: string,
+        message: string,
     ): void {
         pending = {
             kind: 'pending',
@@ -207,18 +210,14 @@ export async function init(
             button,
             label,
         };
-        if (message) {
-            const msg = $(
-                '#confirm-wipe-message',
-                document,
-            );
-            if (msg) {
-                msg.textContent = message;
-            }
-            openDialog('confirm-wipe');
-        } else {
-            void executePending();
+        const msg = $(
+            '#confirm-wipe-message',
+            document,
+        );
+        if (msg) {
+            msg.textContent = message;
         }
+        openDialog('confirm-wipe');
     }
 
     setHtml(root, html`
@@ -390,6 +389,12 @@ export async function init(
                         await postSchemaCreation(ctx);
                         return postMockDataLoad(ctx);
                     },
+                    'Are you sure you want'
+                    + ' to wipe all data and'
+                    + ' load mock data? All'
+                    + ' existing data will be'
+                    + ' removed. This cannot'
+                    + ' be undone.',
                 ),
         );
     }

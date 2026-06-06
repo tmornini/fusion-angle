@@ -122,7 +122,7 @@ time budgets while keeping per-entity mutation domains disjoint:
    - Agent-F — Flows (includes hazard severity, flow-publish
      gate)
    - Agent-F2 — Workbox (includes Create-Work-Order picker
-     READY / NOT READY split)
+     READY / NOT READY split) + Records (section R)
    - Agent-G — Admin (Members page, Member detail (human + AI),
      Identities (list + detail + providers + tokens),
      Organization, Snapshots, Billing). The retired Teams /
@@ -130,9 +130,10 @@ time budgets while keeping per-entity mutation domains disjoint:
 4. **Phase 3 — Cross-cutting** (one agent, alone): I1–I28.
    Mutates global UI state (theme, sidebar, command palette) —
    no concurrent agents.
-5. **Phase 4 — Snapshot lifecycle** (one agent, alone):
-   G30–G35. Wipes and reloads the database — strictly last
-   before teardown.
+5. **Phase 4 — Snapshot lifecycle + persistence tier** (one
+   agent, alone): G30–G35 and L1–L8 (IndexedDB persistence).
+   Wipes and reloads the database — strictly last before
+   teardown.
 6. **Phase 5 — Teardown** (main): stop HTTP server, remove
    build directory, verify distribution ZIP remains, aggregate
    results.
@@ -275,12 +276,14 @@ last (they wipe the database). See `CLAUDE.md` section
 | F. Tools | 74 |
 | F2. Workbox | 26 |
 | FS. Flow Statistics | 9 |
-| G. Admin Pages | 27 |
+| G. Admin Pages | 31 |
 | H. Reference & System | 2 |
 | I. Cross-Cutting Concerns | 30 |
 | J. Teardown | 3 |
 | K. Objectives & Scoring | 30 |
-| **Total** | **326** |
+| R. Records | 19 |
+| L. IndexedDB Persistence Tier | 8 |
+| **Total** | **357** |
 
 ### Combined Totals (CLI + Browser)
 
@@ -289,9 +292,9 @@ only. Combined with the CLI automated suite:
 
 | Layer                  | Cases    |
 |------------------------|---------:|
-| CLI automated tests    |      984 |
-| Browser regression     |      326 |
-| **Combined TOTAL**     | **1310** |
+| CLI automated tests    |     1416 |
+| Browser regression     |      357 |
+| **Combined TOTAL**     | **1773** |
 
 CLI count = most recent `./validate` (AT2) report; the number
 grows as tests land in `tests/*.test.ts`. Browser count = the
@@ -311,8 +314,8 @@ Format` at the bottom of this file):
 | pending  | Default (`- [ ]`); not yet executed  |  n/a   |
 
 A fully green run reports:
-`PASS = 1310, FAIL = 0, BLOCKED ≤ k, DEFERRED ≤ j, DRIFT = 0`,
-where the six status counts sum to **Combined TOTAL** (1310).
+`PASS = 1773, FAIL = 0, BLOCKED ≤ k, DEFERRED ≤ j, DRIFT = 0`,
+where the six status counts sum to **Combined TOTAL** (1773).
 `BLOCKED ≠ FAIL` and `DRIFT ≠ FAIL` — only `FAIL` indicates a
 regression.
 
@@ -634,6 +637,8 @@ on. Run these in order.
 
 ### Auth Page (`auth/`)
 
+> Note: the demo auto-login is RETIRED. Gated pages now require a signed-in session — after seeding (Create Pristine Environment / Load Mock Data), sign in with the surfaced admin credentials before exercising gated pages. Cases below that "navigate to `dashboard`" assume a valid sign-in.
+
 - [ ] **B4** Page loads in **Sign In** mode by default. PASS: title is "Welcome back", submit button reads "Sign in" with an SVG arrow icon (matching the Sign Up button's "Create account" affordance per B10).
 - [ ] **B5** On desktop (≥1024px), left panel shows branded marketing stats (10K+ Active Users, 98% Satisfaction, 50+ Integrations). PASS: two-column layout visible.
 - [ ] **B6** Submit with empty fields. PASS: "Email is required" error appears below email input; input gets error styling.
@@ -641,13 +646,31 @@ on. Run these in order.
 - [ ] **B8** Enter `test@example.com`, password `123`. PASS: "Password must be at least 6 characters" error on password.
 - [ ] **B9** Enter `test@example.com`, password `password123`, click "Sign in". PASS: button shows spinner briefly, then navigates to `dashboard/index.html`.
 - [ ] **B10** Click the "Sign up" button (positioned next to the static "Don't have an account?" label — the label is not itself the toggle; the adjacent button is). PASS: switches to Sign Up mode — title changes to "Get started", "Company name (optional)" field appears, submit reads "Create account" with an SVG arrow icon (not a literal "→" character).
-- [ ] **B11** Fill valid email + password (≥6 chars) in Sign Up mode, click "Create account →". PASS: toast "Welcome to Fusion AI! Your account has been created." appears, then navigates to `dashboard/index.html` after a brief delay (the dedicated onboarding page has been retired — sign-up routes straight to the dashboard).
+- [ ] **B11** Fill valid email + password (≥6 chars) in Sign Up mode, click "Create account →". PASS: toast "Sign-up is coming soon — sign in with a seeded account." appears, the form flips to **Sign In** mode (title "Welcome back"), and NO navigation occurs — the demo no longer mock-establishes a session (real sign-up is SP-6; minting a bare mock with no refresh token would bounce on reload and could admit anyone to the seeded admin's data).
 
 ### Auth Validation Edge Cases
 
 - [ ] **B12** In Sign In mode, enter valid email, valid password, then clear email and submit. PASS: email error reappears.
 - [ ] **B13** Toggle between Sign In and Sign Up modes multiple times. PASS: form resets cleanly each time, no layout glitches.
 - [ ] **B14** Footer shows "By continuing, you agree to our Terms of Service and Privacy Policy." PASS: text is visible.
+
+### Auth Session & Redirect
+
+- [ ] **B15** With no stored credential (sign out, or delete the `localStorage` key `fusion.session-credentials`), open `dashboard/index.html` directly. PASS: bounced to `auth/index.html?return=dashboard` (the Sign In page), not the dashboard.
+- [ ] **B16** From the B15 bounce, sign in with the seeded admin credentials. PASS: lands on `dashboard/index.html` — the `?return=` target, not a generic default.
+- [ ] **B17** With no credential, open `flows/detail.html?flowId=<id>` directly. PASS: bounced to `auth` with the flow preserved in `?return=`; after signing in, lands back on that exact flow with `flowId` intact.
+- [ ] **B18** After signing in on the dashboard, reload (Cmd-R). PASS: stays authenticated on the dashboard — no bounce to `auth` (the credential persisted across the hard-reload).
+- [ ] **B19** With no credential, open each exempt page in turn — `landing/`, `auth/`, `not-found/`, `design-system/`, `snapshots/`. PASS: each renders normally with NO redirect to `auth` (public surface + bootstrap plane are gate-exempt).
+- [ ] **B20** After signing in, close the tab, then reopen `dashboard/index.html` in a new tab. PASS: still authenticated — no bounce (the credential lives in `localStorage`, not tab memory).
+- [ ] **B21** Silent refresh: after signing in, in DevTools replace the stored `access_token` with an expired JWT (keep the live `refresh_token`), then navigate to `members/`. PASS: the page loads with no bounce and no error card — the dead access token was refreshed transparently.
+- [ ] **B22** Both tokens dead: replace BOTH `access_token` and `refresh_token` with expired JWTs, then open `dashboard/`. PASS: bounced once to `auth?return=dashboard` — no retry loop, no console error storm.
+
+> Note: `snapshots/` is intentionally an UNAUTHENTICATED plane — its import/bootstrap routes are BEARER-exempt and can wipe the store. It stays gate-exempt by design so a wiped-DB user can reach recovery; acceptable only because the store is single-user and client-side (B19 covers it).
+
+### Sidebar Sign-out
+
+- [ ] **B23** On any gated page (e.g. dashboard), click "Sign out" in the sidebar. PASS: `fusion.session-credentials` is removed from `localStorage`, a revocation row is recorded, and the page navigates to `auth`; pressing Back to the protected page bounces again to `auth`.
+- [ ] **B24** Open the app in two tabs (both signed in). Click "Sign out" in tab A, then trigger a fetch in tab B (navigate within it). PASS: tab B's next request 401s against the shared revocation ledger and bounces to `auth` — eventual cross-tab convergence, no corruption.
 
 ---
 
@@ -1684,6 +1707,13 @@ the claude-in-chrome MCP.
   saved"; on reopen the read view shows the new model as
   "{name} — {provider}".
 
+### Identities (list & detail) (`identities/`, `identity-detail/`)
+
+- [ ] **G43** Navigate to `identities/index.html` (or click "Identities" in the sidebar). PASS: the header reads "Identities" with an "Add Identity" button (`#add-identity-btn`); `#identity-list` renders one `.card[data-identity-id]` per identity — a person row shows an initials avatar + name + email sub-line + a "Person" badge; a service row shows a shield avatar + the id (as both name and sub) + a "Service" badge. With mock data seeded, ≥11 person rows (Emily Rodriguez, David Martinez, Sarah Chen, …) and ≥5 service rows appear, including the system service identity. An empty roster renders "No identities yet." Source: `web-app/identities/index.ts`, `web-app/app/presenters/identity-list.ts` (`IdentityRosterPresenter`).
+- [ ] **G44** Click "Add Identity". PASS: the `add-identity` dialog opens with a Kind toggle (Person checked by default / Service). With Person selected, the person form (`#add-identity-person-form`) shows Name/Email/Phone/Bio inputs; fill Name + Email, click "Create" (`#add-identity-submit`) → an "Identity added" toast, the dialog closes, and the new person appears in the roster (name + email). Re-open the dialog and click the "Service" radio → the person form hides and the service form (`#svc-secret`, "Client Secret") shows; enter a secret, Create → a "Service identity added" toast, the dialog closes, and a new "Service"-badged row appears. Submitting Person with an empty Name or Email shows "Name and email are required" and keeps the dialog open. Source: `web-app/identities/index.ts` (`handleAddIdentitySubmit` / `submitPersonForm` / `submitServiceForm`).
+- [ ] **G45** From the roster, click a person row (`.card[data-identity-id]`). PASS: navigates to `identities/detail.html?identityId=<id>`, which renders the back button (`#identity-back-btn`), the name + a kind badge + the id, a "Personal Information" card (Name/Email/Phone/Bio — each empty field rendered as "—" via `DISPLAY_ABSENT`), a "Connections" card (Identity Providers / Tokens buttons), and — for a person — an "Erase PII" button (`#identity-erase-btn`). A service identity instead shows a "Credentials" card and NO erase button (only persons carry erasable PII). Source: `web-app/identities/index.ts` (`onListClick`), `web-app/identities/detail.ts`, `web-app/app/presenters/identity-detail.ts`.
+- [ ] **G46** On a person's detail page, click "Erase PII" (`#identity-erase-btn`) and accept the `window.confirm` ("Erase this identity's personal information? The identity itself survives."). PASS: `deleteIdentityPii` runs, a "Personal information erased" toast appears, and the view re-renders in place — the name becomes "Unknown member" (`ERASED_MEMBER_NAME`) and Email/Phone/Bio all read "—" (`DISPLAY_ABSENT`); the identity row still exists in the roster (erasure splices `identity_pii` only, leaving the identity and every `member_id` reference intact). Declining the confirm leaves the PII unchanged. Source: `web-app/identities/detail.ts` (`handleErase` → `deleteIdentityPii`). MCP note: stub `window.confirm` to return true before the click — a native modal blocks the extension.
+
 ### Identity tokens & providers (`identity-tokens/`, `identity-providers/`)
 
 - [ ] **G25** Navigate to `identity-tokens/index.html?identityId=current` (or open an identity from `identities/` and click its "Tokens" link). PASS: the "Tokens — Refresh-token chains for this identity" page renders one card per chain, each showing the chain id, the event jti, `parent: —` for a root event (or the parent jti for a rotated one), an `issued`/`rotated`/`revoked` badge, and a LOCAL-time stamp; an identity with no tokens shows "No tokens." The presenter consumes the adapter's camelCase `TokenEvent` domain shape (`jti`, `parentJti`, `action`, `at`) — a snake_case storage leak would render `parent: undefined` instead of `parent: —`. Source: `web-app/app/adapters/identity-tokens.ts` (`TokenEvent`), `web-app/app/presenters/identity-tokens.ts`.
@@ -1737,7 +1767,7 @@ restored data.)
   store holds one row. The full table set is the constant
   `TABLE_NAMES` in `api/db.ts`; cross-check against that. No
   object stores outside that list (plus `__schema__`) appear.
-- [ ] **G33** Click "Wipe and Load Mock Data". PASS: the wipe fires immediately — there is no confirmation dialog — then the page renders the one-time demo-credentials reveal panel (`.credential-reveal`, titled "Save your demo sign-ins") listing EVERY login-capable seeded identity's email + fresh password in the monospace `.credential-reveal-box`, one credential per line, with a "Copy all" button. (Mock data seeds two orgs — `'1'` Stark Industries and `'2'` Wayne Enterprises — so the list spans both orgs' seeded humans; Tony Stark / `current` is the multi-org admin.) The page does NOT navigate until "I have saved it — continue" is clicked; clicking it redirects to `dashboard/index.html`. Navigate to `ideas/` — 11 ideas are back.
+- [ ] **G33** Click "Wipe and Load Mock Data", then Confirm the dialog. PASS: a confirm dialog (`#confirm-wipe-dialog`, titled "Confirm Action") appears first warning the wipe cannot be undone — Cancel aborts with no change; on Confirm the page renders the one-time demo-credentials reveal panel (`.credential-reveal`, titled "Save your demo sign-ins") listing EVERY login-capable seeded identity's email + fresh password in the monospace `.credential-reveal-box`, one credential per line, with a "Copy all" button. (Mock data seeds two orgs — `'1'` Stark Industries and `'2'` Wayne Enterprises — so the list spans both orgs' seeded humans; Tony Stark / `current` is the multi-org admin.) The page does NOT navigate until "I have saved it — continue" is clicked; clicking it redirects to `dashboard/index.html`. Navigate to `ideas/` — 11 ideas are back.
 - [ ] **G34** Return to `snapshots/`, wipe data, then use "Upload Snapshot" file input and select the previously downloaded JSON file. PASS: redirects to `dashboard/index.html`. Data matches the snapshot.
 - [ ] **G36 — Header org-switcher (multi-org user)** After "Wipe and Load Mock Data" (G33) seeds two orgs and boot signs in as the multi-org admin Tony Stark (`current`), the header greeting shows an org `<select>` (`.org-switcher`) next to the name — it appears ONLY because the user can reach ≥2 orgs (`shouldShowOrgSwitcher`). PASS: the select lists "Stark Industries" and "Wayne Enterprises" with Stark active. Note the Members and Ideas lists for Stark. Select "Wayne Enterprises" → the page does a FULL reload and re-scopes: Members shows Wayne's roster and Ideas shows Wayne's ideas (org-fenced — Stark's rows are no longer visible). Reload the page again WITHOUT changing the select → the selection persists (Wayne stays active; the choice is stored under `fusion.active-org` and boot re-exchanges a scoped token from it). A single-org seeded user, by contrast, sees NO org `<select>` in the header. Source of truth: `web-app/app/org-switcher.ts`, `web-app/app/adapters/org-session.ts`, `web-app/app/core.ts::scopeBootToActiveOrg`. (This case requires the two-org mock-data seed, so it runs in Phase 4 alongside G30–G35 — never concurrently with Phase 2 agents.)
 
@@ -1758,7 +1788,7 @@ restored data.)
   `tests/snapshot-wipe-on-fail.test.ts` (now atomic-rollback) —
   this case verifies the error toast/inline-error surfaces in the
   UI.)
-- [ ] **G36** Member lifecycle is recorded in the `states`
+- [ ] **G41** Member lifecycle is recorded in the `states`
   event log. On a member detail page (human OR AI), click
   Edit, change the State select (active / pending /
   archived), and Save. PASS: the chosen state is written
@@ -1783,7 +1813,7 @@ verify the page loads and the sidebar nav link works
 — functional billing tests will be added when the
 feature is implemented.
 
-- [ ] **G37** Click "Billing" in the sidebar. PASS:
+- [ ] **G42** Click "Billing" in the sidebar. PASS:
   browser navigates to `billing/index.html`. The page
   renders without console errors. Sidebar highlights
   the Billing link as active. No runtime JS errors
@@ -2113,6 +2143,12 @@ Sidebar entry plus list/detail pages, attribute editor with
 constraint sub-editor, flow binding, per-node attribute
 panel, and the property-test gate.
 
+Owner agent: Agent-F2 (Phase 2). The property-test gate
+(R13–R14a) rides Agent-F2's own work orders, and the record
+CRUD adds `records`, `record_attributes`, `flow_records` to
+its mutation domain — disjoint from every other agent, so no
+write-domain collision.
+
 - [ ] **R1** Sidebar shows a Records entry; click navigates
   to `records/`. PASS: list page renders ≥2 seeded Records
   (Customer Profile, Project Brief).
@@ -2179,6 +2215,8 @@ panel, and the property-test gate.
 
 Backend: `api/backend-indexeddb.ts`. No Node test (no fake-IDB, zero devDeps) — verified in-browser via the Chrome MCP. Serve: `TMPDIR=/tmp/claude ./serve 8080`.
 
+Owner: Phase 4 (alone, after Phase 2). L1–L8 reopen, wipe, and reseed the `fusion-ai` database, so they need exclusive DB access alongside G30–G35 — never concurrently with the seven Phase 2 agents.
+
 - [ ] **L1** Boot creates the database. Inspect `indexedDB.databases()` on the dashboard. PASS: `fusion-ai@v1` with 33 object stores (32 tables + `__schema__`).
 - [ ] **L2** Missing-schema route. Open the dashboard against an empty database. PASS: it redirects to the Snapshots page.
 - [ ] **L3** Atomic seed. Click "Wipe and Load Mock Data". PASS: the `__schema__` marker and table rows persist; the dashboard renders the seeded org.
@@ -2225,10 +2263,10 @@ Total: <N> cases — PASS X · BLOCKED Y · FAIL Z
 | Agent-D       | D1–D37            |    X |       Y |    Z |
 | Agent-E       | E1–E11            |   11 |       0 |    0 |
 | Agent-F       | F1–F74 + FS1–FS9  |    X |       Y |    Z |
-| Agent-F2      | WB1–WB22 + subs   |   25 |       0 |    0 |
-| Agent-G       | G9–14,19–24,36–40 |    X |       0 |    0 |
+| Agent-F2      | WB1–WB22 + subs, R1–R15 | X |    0 |    0 |
+| Agent-G       | G9–14,19–24,36–46 |    X |       0 |    0 |
 | Phase-3       | I1–I30            |    X |       Y |    Z |
-| Phase-4       | G30–G35           |    6 |       0 |    0 |
+| Phase-4       | G30–G35 + L1–L8   |    X |       0 |    0 |
 | Teardown      | J1–J3             |    3 |       0 |    0 |
 
 ## BLOCKED detail (known MCP limitations — NOT failures)

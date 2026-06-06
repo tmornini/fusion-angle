@@ -34,6 +34,7 @@ import {
 import type {
     FlowEntity,
     RecordEntity,
+    RecordAttribute,
     RecordAttributeEntity,
     Constraint,
 } from '../../api/types.ts';
@@ -47,7 +48,7 @@ type PageState =
         kind: 'editing';
         draft: RecordDetailDraft;
         originalAttributes:
-            readonly RecordAttributeEntity[];
+            readonly RecordAttribute[];
         pendingAttributeName: string;
     };
 
@@ -661,7 +662,7 @@ function draftAttributesDifferFromOriginal(
     draftEntities: readonly Omit<
         RecordAttributeEntity, 'organization_id'
     >[],
-    originalAttrs: readonly RecordAttributeEntity[],
+    originalAttrs: readonly RecordAttribute[],
 ): boolean {
     const originalById = new Map(
         originalAttrs.map(
@@ -675,8 +676,9 @@ function draftAttributesDifferFromOriginal(
             || o.name !== d.name
             || o.attribute_type !== d.attribute_type
             || o.sort_order !== d.sort_order
-            || o.options !== d.options
-            || o.constraints !== d.constraints
+            || jsonArrayField(o.options) !== d.options
+            || jsonArrayField(o.constraints)
+                !== d.constraints
         ) {
             return true;
         }

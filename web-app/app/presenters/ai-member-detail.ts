@@ -2,7 +2,7 @@ import {
     html, setHtml, SafeHtml, trusted,
 } from '../safe-html.ts';
 import { $required } from '../dom.ts';
-import { DISPLAY_ABSENT } from '../format.ts';
+import { DISPLAY_ABSENT, displayText } from '../format.ts';
 import {
     iconArrowLeft,
     iconEdit,
@@ -210,7 +210,7 @@ function buildReadonlyField(
                 icon ?? html``
             } ${label}</p>
             <p class="text-sm">
-                ${value === '' ? DISPLAY_ABSENT : value}
+                ${displayText(value)}
             </p>
         </div>`;
 }
@@ -248,7 +248,7 @@ function buildReadonlyDescription(
                 'label mb-2 block'
             }">Description</p>
             <p class="text-sm">
-                ${value === '' ? DISPLAY_ABSENT : value}
+                ${displayText(value)}
             </p>
         </div>`;
 }
@@ -311,7 +311,7 @@ function buildReadonlySkillFocus(
                 'label mb-2 block'
             }">Skill Focus</p>
             <p class="text-sm">
-                ${value === '' ? DISPLAY_ABSENT : value}
+                ${displayText(value)}
             </p>
         </div>`;
 }
