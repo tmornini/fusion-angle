@@ -10,6 +10,11 @@ import {
     type IdeaDraftFields,
 } from '../app/presenters/index.ts';
 import { showToast } from '../app/toast.ts';
+import {
+    createPageAbort,
+    bindPageListeners,
+} from '../app/page-lifecycle.ts';
+import { extractErrorMessage } from '../app/error-helpers.ts';
 import { log } from '../app/logger.ts';
 import {
     buildSkeleton,
@@ -20,6 +25,7 @@ import {
     trimStrings,
     openDialog,
     closeDialog,
+    parseDialogClick,
 } from '../app/core.ts';
 import {
     getIdea,
@@ -30,8 +36,7 @@ import {
     type IdeaWithSubmitter,
 } from '../app/adapters/index.ts';
 
-const pageAbort = new AbortController();
-const signal = pageAbort.signal;
+const { signal } = createPageAbort();
 
 type PageState =
     | {
@@ -106,9 +111,7 @@ async function transitionIdea(
             ctx, ideaId, toState,
         );
     } catch (err) {
-        const detail = err instanceof Error
-            ? err.message
-            : String(err);
+        const detail = extractErrorMessage(err);
         log.error(
             'postIdeaStateChange failed',
             'ideas', err,
@@ -197,19 +200,11 @@ export async function init(
 function bindStableListeners(
     container: HTMLElement,
 ): void {
-    container.addEventListener(
-        'click', e => onClick(e),
-        { signal },
-    );
-    container.addEventListener(
-        'input', e => onInput(e),
-        { signal },
-    );
-    container.addEventListener(
-        'keydown',
-        e => onContainerKeydown(e),
-        { signal },
-    );
+    bindPageListeners(container, {
+        click: e => onClick(e),
+        input: e => onInput(e),
+        keydown: e => onContainerKeydown(e),
+    }, signal);
     document.addEventListener(
         'keydown',
         e => onDocumentKeydown(e),
@@ -223,45 +218,18 @@ function onClick(
     const target = e.target as Element | null;
     if (!target) return;
 
-    if (handleDialogClicks(target)) return;
+    const dialogIntent = parseDialogClick(target);
+    if (dialogIntent) {
+        if (dialogIntent.kind === 'open') {
+            openDialog(dialogIntent.id);
+        } else {
+            closeDialog(dialogIntent.id);
+        }
+        return;
+    }
     if (handleIdeaActions(target)) {
         return;
     }
-}
-
-function handleDialogClicks(
-    target: Element,
-): boolean {
-    if (target.classList.contains(
-        'dialog-backdrop',
-    )) {
-        const id = target.getAttribute(
-            'data-dialog-id',
-        );
-        if (id) closeDialog(id);
-        return true;
-    }
-    const openEl = target.closest(
-        '[data-dialog-open]',
-    );
-    if (openEl) {
-        const id = openEl.getAttribute(
-            'data-dialog-open',
-        );
-        if (id) openDialog(id);
-        return true;
-    }
-    const cancelEl = target.closest(
-        '[data-dialog-cancel]',
-    );
-    if (cancelEl) {
-        const id = cancelEl.getAttribute(
-            'data-dialog-cancel',
-        );
-        if (id) closeDialog(id);
-        return true;
-    }
-    return false;
 }
 
 function handleIdeaActions(

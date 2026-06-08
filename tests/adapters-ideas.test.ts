@@ -7,7 +7,8 @@ import {
     createRequestContext,
     type RequestContext,
 } from '../web-app/app/adapters/shared.ts';
-import { devToken } from './token-fixtures.ts';
+import { devToken, orgToken } from './token-fixtures.ts';
+import { populateMockData } from '../api/mock-data.ts';
 import {
     getIdeas,
     getIdea,
@@ -25,8 +26,8 @@ import {
     seedHumanMember,
 } from './member-fixtures.ts';
 import {
-    seedRootAdmin,
-} from './root-admin-fixture.ts';
+    seedAdminSchema,
+} from './test-fixtures.ts';
 
 function buildIdea(
     id: string, title: string,
@@ -61,8 +62,7 @@ async function setupDb(): Promise<{
     ctx: RequestContext;
 }> {
     const db = new MemoryDbAdapter();
-    await db.createSchema();
-    await seedRootAdmin(db);
+    await seedAdminSchema(db);
     const ctx = createRequestContext(db, await devToken());
     return { db, ctx };
 }
@@ -392,4 +392,25 @@ test('deleted ideas are filtered from getIdeas', async () => {
     assert.equal(
         result[0]?.idea.titleText(), 'Keep',
     );
+});
+
+// The Organization page calls getIdeas per org; a submitter
+// outside the idea's org roster makes memberName throw and
+// crashes the page. The seed must keep every submitter a
+// co-member of their idea's org, in BOTH orgs.
+test('getIdeas resolves every seeded submitter in'
+    + ' both orgs', async () => {
+    const db = new MemoryDbAdapter();
+    await db.createSchema();
+    await populateMockData(db);
+    for (const org of ['1', '2']) {
+        const ctx = createRequestContext(
+            db, await orgToken('current', org));
+        const ideas = await getIdeas(ctx);
+        for (const i of ideas) {
+            assert.ok(
+                i.submitterName.length > 0,
+                'empty submitter in org ' + org);
+        }
+    }
 });

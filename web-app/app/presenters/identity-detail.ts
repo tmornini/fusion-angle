@@ -13,8 +13,10 @@ import {
 } from '../icons.ts';
 import {
     Identity,
-    ERASED_MEMBER_NAME,
+    IDENTITY_WITHOUT_PII_NAME,
+    UNNAMED_SERVICE_NAME,
     type MemberPii,
+    type ServiceFacet,
     type IdentityCredentialKind,
 } from '../adapters/index.ts';
 
@@ -26,6 +28,7 @@ const KIND_LABEL: Readonly<Record<string, string>> = {
 export interface IdentityDetailView {
     readonly identity: Identity;
     readonly pii: MemberPii;
+    readonly service: ServiceFacet;
     readonly activeCredentialKinds:
         readonly IdentityCredentialKind[];
 }
@@ -87,9 +90,13 @@ function buildTitleSection(
     view: IdentityDetailView,
 ): SafeHtml {
     const kind = view.identity.kindValue();
-    const name = view.pii.erased
-        ? ERASED_MEMBER_NAME
-        : view.pii.name;
+    const name = view.identity.isPerson()
+        ? (view.pii.erased
+            ? IDENTITY_WITHOUT_PII_NAME
+            : view.pii.name)
+        : (view.service.named
+            ? view.service.name
+            : UNNAMED_SERVICE_NAME);
     return html`
         <div class="${
             'flex flex-wrap items-center'
@@ -140,7 +147,7 @@ function buildPersonalInfoCard(
     view: IdentityDetailView,
 ): SafeHtml {
     const name = view.pii.erased
-        ? ERASED_MEMBER_NAME
+        ? IDENTITY_WITHOUT_PII_NAME
         : view.pii.name;
     const email = view.pii.erased ? '' : view.pii.email;
     const phone = view.pii.erased ? '' : view.pii.phone;

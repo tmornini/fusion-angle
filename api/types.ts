@@ -137,6 +137,22 @@ export const OBJECTIVE_STATES = [
 export type ObjectiveState =
     typeof OBJECTIVE_STATES[number];
 
+// The invitation lifecycle, append-only in the states log keyed
+// to the invitation id. Grant (admin) appends 'pending'; the
+// invitee appends 'accepted' (which writes the membership) or
+// 'declined'; the admin appends 'revoked' to cancel a pending
+// invite. Current status = the latest event — derive, never
+// mutate. No 'deleted': an invitation persists as audit.
+export const INVITATION_STATES = [
+    'pending',
+    'accepted',
+    'declined',
+    'revoked',
+] as const;
+
+export type InvitationState =
+    typeof INVITATION_STATES[number];
+
 export type StoredBoolean = 0 | 1;
 
 export type JsonArrayField = string & {
@@ -346,6 +362,25 @@ export function assertObjectiveState(
     if (!includes(OBJECTIVE_STATES, v)) {
         throw new Error(
             'expected ObjectiveState for '
+                + label + ', got ' + v,
+        );
+    }
+    return v;
+}
+
+export function isInvitationState(
+    v: string,
+): v is InvitationState {
+    return includes(INVITATION_STATES, v);
+}
+
+export function assertInvitationState(
+    v: string,
+    label: string,
+): InvitationState {
+    if (!includes(INVITATION_STATES, v)) {
+        throw new Error(
+            'expected InvitationState for '
                 + label + ', got ' + v,
         );
     }
@@ -1139,6 +1174,22 @@ export interface MembershipEntity {
     at: string;
 }
 
+// An invitation binding an identity to an organization, awaiting
+// the holder's answer. Immutable like a membership, but its
+// lifecycle lives in the states log (INVITATION_STATES). The org
+// is the inviting admin's; the identity is the invitee. An
+// ACCEPTED invitation is what writes the real membership row —
+// the invitation itself never grants reach. Global-spine (not
+// org-fenced), because the invitee must read an invitation to an
+// org they are not yet in; the invitation routes fence by the
+// caller's identity (invitee) or admin role (inviter).
+export interface InvitationEntity {
+    id: Id;
+    organization_id: Id;
+    identity_id: Id;
+    at: string;
+}
+
 export interface IdeaSubmissionEntity {
     id: Id;
     idea_id: Id;
@@ -1273,6 +1324,28 @@ export const PROJECT_STATE_CONFIG: Record<
     'deleted': {
         label: 'Deleted',
         className: 'badge-default',
+    },
+};
+
+export const INVITATION_STATE_CONFIG: Record<
+    InvitationState,
+    StatusDisplay
+> = {
+    pending: {
+        label: 'Pending',
+        className: 'badge-warning',
+    },
+    accepted: {
+        label: 'Accepted',
+        className: 'badge-success',
+    },
+    declined: {
+        label: 'Declined',
+        className: 'badge-default',
+    },
+    revoked: {
+        label: 'Revoked',
+        className: 'badge-error',
     },
 };
 

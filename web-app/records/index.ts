@@ -9,6 +9,7 @@ import {
     iconPlus, iconDatabase,
 } from '../app/icons.ts';
 import { navigateTo } from '../app/core.ts';
+import { createPageAbort } from '../app/page-lifecycle.ts';
 import {
     sessionContext,
     getRecords,
@@ -28,8 +29,7 @@ import {
     initDragReorder,
 } from '../app/drag-reorder.ts';
 
-const pageAbort = new AbortController();
-const signal = pageAbort.signal;
+const { signal } = createPageAbort();
 
 let recordState: RecordListState | null = null;
 let listEl: HTMLElement | null = null;

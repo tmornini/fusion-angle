@@ -3,6 +3,7 @@ import {
     type EntityStore as EntityStoreInterface,
     type EntityPut,
     type EntityValidator,
+    type KeyedCollectionReader,
     type TxRunner,
 } from './db.ts';
 
@@ -14,7 +15,9 @@ import {
 // states log: it declares only its own table on every tx.
 export class HistoryEntityStore<
     T extends { id: string },
-> implements EntityStoreInterface<T>
+> implements
+    EntityStoreInterface<T>,
+    KeyedCollectionReader<T>
 {
     readonly #table: string;
     readonly #run: TxRunner;
@@ -34,6 +37,21 @@ export class HistoryEntityStore<
         return this.#run(
             [this.#table], 'readonly',
             tx => tx.getAll<T>(this.#table),
+        );
+    }
+
+    // The keyed-collection read: getAll narrowed to one
+    // indexed column. History rows never tombstone, so —
+    // like getAll — no deleted-id scan; just the index slice.
+    async getAllWhere(
+        column: string,
+        key: string,
+    ): Promise<T[]> {
+        return this.#run(
+            [this.#table], 'readonly',
+            tx => tx.getWhere<T>(
+                this.#table, column, key,
+            ),
         );
     }
 

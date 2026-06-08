@@ -148,6 +148,47 @@ denormalized column to sync. Per-org roles resolve via
 action per `(organization_id, identity_id, role)`, fenced to
 the request's org.
 
+### Invitation lifecycle and acceptance
+
+A `memberships` row is now born from an INVITATION accept —
+the first live membership-write path (the ledger was
+seed-only before). `invitations` (id, organization_id,
+identity_id, at) is GLOBAL spine, pass-through, NOT
+org-fenced: the invitee must read an invitation to an org it
+is not yet in, so the row cannot hide behind the org fence.
+Its lifecycle is event-sourced in the append-only `states`
+log under the alphabet {pending, accepted, declined,
+revoked}, keyed to the invitation id; current status is the
+LATEST event, derived and never mutated — the row itself
+persists as audit through every transition.
+
+Grant (admin) appends `pending`. Accept (invitee) appends
+`accepted` AND writes the real `memberships` row in the SAME
+atomic ctx-batch, stamped with the INVITATION's org — not the
+caller's active org. Acceptance is inherently a cross-org act
+(the invitee acts on an org it does not yet belong to), so it
+cannot ride the org-stamped write path. Decline (invitee)
+appends `declined`; Revoke (admin) appends `revoked`.
+
+The surface is dedicated facade request handlers on the BASE
+(un-org-scoped) adapter — like `identityDefaultOrgRequest` —
+bypassing the admin-only `ROUTE_POLICY` with explicit guards:
+grant/revoke and the sent-list require an admin role in the
+relevant org; accept/decline and the invitee read require the
+caller to BE the invitee (identity match). That identity
+guard is what lets a non-admin invitee accept. The
+identity-scoped read (`GET /invitations`) returns the
+caller's own invitations plus latest state; the admin read
+(`GET /invitations/sent`) returns the active org's pending
+invitations. `invitations` joins the states owner-resolver
+probe, so an invitation's lifecycle events resolve to the
+invitation's org and stay out of every other tenant's
+`/states` read.
+
+`memberships` semantics are UNCHANGED: a row still means an
+accepted member, and the roster, reachable-orgs enumeration,
+and token exchange all read it untouched.
+
 ### Facade + enumeration
 
 `/organizations/:org/:entity[/:id]` is a facade:
@@ -196,6 +237,9 @@ boundary to cross. Each becomes a live exposure the moment the
 backend is physically split out and the browser becomes an
 untrusted client. None is coded around yet — no server exists —
 so this is the disclosure checklist that gates that split.
+An audit re-confirms each is still KNOWN (seam flag present,
+unwidened) and separates any NEW exposure — see
+[AUDIT.md](AUDIT.md) § Security: KNOWN vs NEW.
 
 - **Client-shipped HMAC key.** `SIGNING_KEY_MATERIAL`
   (`api/access-token.ts:70`) is a constant in client JS, so any

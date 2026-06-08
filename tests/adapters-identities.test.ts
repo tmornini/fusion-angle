@@ -12,13 +12,12 @@ import {
 } from '../web-app/app/adapters/identities.ts';
 import { seedPersonIdentity } from './identity-fixtures.ts';
 import {
-    seedRootAdmin,
-} from './root-admin-fixture.ts';
+    seedAdminSchema,
+} from './test-fixtures.ts';
 
 async function setup() {
     const db = new MemoryDbAdapter();
-    await db.createSchema();
-    await seedRootAdmin(db);
+    await seedAdminSchema(db);
     return { db, ctx: createRequestContext(db, await devToken()) };
 }
 

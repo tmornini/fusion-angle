@@ -18,8 +18,8 @@ import {
     seedHumanMember,
 } from './member-fixtures.ts';
 import {
-    seedRootAdmin,
-} from './root-admin-fixture.ts';
+    seedAdminSchema,
+} from './test-fixtures.ts';
 
 const SAMPLE_PROJECT_BODY = {
     organization_id: '1',
@@ -79,8 +79,7 @@ test('archival validator: not ready when actuals missing',
 test('postProjectApproval moves state to approved',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         await seedCurrentMember(db);
         await db.projects.put('p1', SAMPLE_PROJECT_BODY);
         await db.states.record(
@@ -105,8 +104,7 @@ test('postProjectApproval moves state to approved',
 test('postProjectApproval throws when not ready',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         await seedCurrentMember(db);
         await db.projects.put('p1', SAMPLE_PROJECT_BODY);
         await db.objectives.put('o1', {
@@ -122,8 +120,7 @@ test('postProjectApproval throws when not ready',
 test('postProjectArchival moves state to archived',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         await seedCurrentMember(db);
         await db.projects.put('p1', SAMPLE_PROJECT_BODY);
         await db.states.record(

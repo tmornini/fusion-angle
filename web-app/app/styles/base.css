@@ -138,6 +138,17 @@ p { line-height: var(--leading-normal); }
   animation: none;
 }
 
+/* Reduced motion: the universal reset in responsive.css cannot
+   reach the ::view-transition-* pseudo tree, so neutralize the
+   page-content transition here. */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none;
+  }
+}
+
 @keyframes fade-out {
   from { opacity: 1; }
   to { opacity: 0; }

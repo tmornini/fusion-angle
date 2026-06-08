@@ -34,12 +34,11 @@ import {
     putSessionCredentials,
 } from '../web-app/app/adapters/session-credentials.ts';
 import { devToken, orgToken } from './token-fixtures.ts';
-import { seedRootAdmin } from './root-admin-fixture.ts';
+import { seedAdminSchema } from './test-fixtures.ts';
 
 async function setup() {
     const db = new MemoryDbAdapter();
-    await db.createSchema();
-    await seedRootAdmin(db);
+    await seedAdminSchema(db);
     const ctx = createRequestContext(db, await devToken());
     return { db, ctx };
 }

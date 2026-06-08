@@ -16,7 +16,7 @@ import {
 } from '../web-app/app/adapters/objectives.ts';
 import type { DbAdapter } from '../api/db.ts';
 import { seedHumanMember } from './member-fixtures.ts';
-import { seedRootAdmin } from './root-admin-fixture.ts';
+import { seedAdminSchema } from './test-fixtures.ts';
 
 function installLocalStorageShim(): void {
     const map = new Map<string, string>();
@@ -65,11 +65,9 @@ test('K5 reactivation parity across memory and localStorage',
     async () => {
         installLocalStorageShim();
         const memDb = new MemoryDbAdapter();
-        await memDb.createSchema();
-        await seedRootAdmin(memDb);
+        await seedAdminSchema(memDb);
         const lsDb = new LocalStorageDbAdapter();
-        await lsDb.createSchema();
-        await seedRootAdmin(lsDb);
+        await seedAdminSchema(lsDb);
 
         const mem = await runReactivationScenario(memDb);
         const ls = await runReactivationScenario(lsDb);

@@ -9,6 +9,7 @@ import {
     isRowShaped,
 } from './storage-serialize.ts';
 import { bufferTx } from './backend-buffer-tx.ts';
+import { extractErrorMessage } from './error-helpers.ts';
 import { createSerializer } from './store-serializer.ts';
 
 const KEY_PREFIX = 'fusion-ai:';
@@ -138,9 +139,7 @@ export class LocalStorageBackend
             throw new Error(
                 'Decompressing table "'
                 + table + '" failed: '
-                + (e instanceof Error
-                    ? e.message
-                    : String(e)),
+                + extractErrorMessage(e),
             );
         }
         let parsed: unknown;
@@ -150,9 +149,7 @@ export class LocalStorageBackend
             throw new Error(
                 'Parsing table "'
                 + table + '" failed: '
-                + (e instanceof Error
-                    ? e.message
-                    : String(e)),
+                + extractErrorMessage(e),
             );
         }
         if (!Array.isArray(parsed)) {

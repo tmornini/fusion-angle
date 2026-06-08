@@ -160,11 +160,13 @@ export async function init(
         const panel = $('#snapshots-content', document);
         if (!panel) return;
         setHtml(panel, html`
-            ${credentialRevealPanel(creds)}
-            <button class="btn btn-primary"
-                id="credential-continue-btn">
-                I have saved it — continue
-            </button>`);
+            <div class="credential-reveal-wrap">
+                ${credentialRevealPanel(creds)}
+                <button class="btn btn-primary"
+                    id="credential-continue-btn">
+                    I have saved it — continue
+                </button>
+            </div>`);
         $button(
             '#credential-copy-all-btn', document,
         )?.addEventListener('click', async () => {

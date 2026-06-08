@@ -8,8 +8,8 @@ import { MemoryDbAdapter } from '../api/db-memory.ts';
 import { PUT, GET, DELETE } from '../api/api.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import {
-    seedRootAdmin,
-} from './root-admin-fixture.ts';
+    seedAdminSchema,
+} from './test-fixtures.ts';
 
 test('validateIdentityEntity accepts person/service', () => {
     assert.deepEqual(
@@ -58,8 +58,7 @@ test('validateIdentityPiiEntity rejects missing field', () => {
 
 async function freshDb() {
     const db = new MemoryDbAdapter();
-    await db.createSchema();
-    await seedRootAdmin(db);
+    await seedAdminSchema(db);
     return db;
 }
 

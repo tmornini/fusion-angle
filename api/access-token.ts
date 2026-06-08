@@ -5,6 +5,7 @@ import {
     base64UrlToBytes,
 } from './base64url.ts';
 import type { Id } from './types.ts';
+import { latestByKey } from './ledger-reduction.ts';
 
 // The resolved principal — the verified subject of a request.
 // Distinct from the storage `Identity` ({id,kind}): this is
@@ -303,21 +304,18 @@ export async function verifyAccessToken(
 }
 
 // The single home of the latest-`at`-wins revocation reduce.
-// RFC-3339 zulu sorts lexically = chronologically, so the
-// lexically-greatest `at` is the most recent. Returns the
-// stamp string or null (no revocation for this identity).
+// RFC-3339 zulu sorts lexically = chronologically. Passes an
+// explicit strict `>` compare to preserve the original reduce
+// exactly; since it extracts the `at` stamp, a same-`at` tie is
+// value-identical either way. Returns the stamp string or null.
 export function latestRevocationAt(
     rows: readonly { identity_id: Id; at: string }[],
     identityId: Id,
 ): string | null {
-    let latest: string | null = null;
-    for (const row of rows) {
-        if (row.identity_id !== identityId) continue;
-        if (latest === null || row.at > latest) {
-            latest = row.at;
-        }
-    }
-    return latest;
+    const latest = latestByKey(
+        rows, row => row.identity_id, (a, b) => a.at > b.at,
+    ).get(identityId);
+    return latest === undefined ? null : latest.at;
 }
 
 // Convert the shared latest-wins reduce to epoch seconds for

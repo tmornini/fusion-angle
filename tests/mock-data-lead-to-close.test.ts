@@ -13,7 +13,7 @@ import { devToken } from './token-fixtures.ts';
 import {
     getFlowStats,
 } from '../web-app/app/adapters/flow-stats.ts';
-import { seedRootAdmin } from './root-admin-fixture.ts';
+import { seedAdminSchema } from './test-fixtures.ts';
 
 const FLOW_NAME = 'Lead-to-Close';
 const EXPECTED_NODE_COUNT = 7;
@@ -26,8 +26,7 @@ const COLD_WORKING_NODE_HEAT_MAX = 0.25;
 
 async function seededLeadToClose() {
     const db = new MemoryDbAdapter();
-    await db.createSchema();
-    await seedRootAdmin(db);
+    await seedAdminSchema(db);
     await populateMockData(db);
     const flows = await db.flows.getAll();
     const flow = flows.find(

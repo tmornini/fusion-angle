@@ -1,4 +1,5 @@
 import { $ } from '../app/dom.ts';
+import { createPageAbort } from '../app/page-lifecycle.ts';
 import { setHtml } from '../app/safe-html.ts';
 import { showToast } from '../app/toast.ts';
 import {
@@ -39,8 +40,7 @@ import type {
     Constraint,
 } from '../../api/types.ts';
 
-const pageAbort = new AbortController();
-const signal = pageAbort.signal;
+const { signal } = createPageAbort();
 
 type PageState =
     | { kind: 'reading' }

@@ -1,6 +1,17 @@
 <div id="organization-content">
 </div>
 
+<!-- Sent invitations: outstanding (pending) invitations this
+     org has sent, with a Revoke per row. Admin-only; hidden
+     until the admin read succeeds. -->
+<div id="sent-invitations-box" class="mt-6 hidden">
+    <h2 class="text-lg font-semibold mb-3">
+        Sent invitations
+    </h2>
+    <div id="sent-invitations-list"
+        class="flex flex-col gap-3"></div>
+</div>
+
 <!-- Add Objective dialog -->
 <div id="add-objective-backdrop"
     class="dialog-backdrop hidden"></div>

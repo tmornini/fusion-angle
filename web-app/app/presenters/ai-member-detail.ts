@@ -2,6 +2,9 @@ import {
     html, setHtml, SafeHtml, trusted,
 } from '../safe-html.ts';
 import { $required } from '../dom.ts';
+import {
+    makeFieldKeyValidator,
+} from '../field-key-validator.ts';
 import { DISPLAY_ABSENT, displayText } from '../format.ts';
 import {
     iconArrowLeft,
@@ -43,14 +46,8 @@ const FIELD_KEYS: ReadonlySet<AIMemberFieldKey> =
         'model', 'state',
     ]);
 
-export function isAIMemberFieldKey(
-    s: string | null,
-): s is AIMemberFieldKey {
-    return s !== null
-        && FIELD_KEYS.has(
-            s as AIMemberFieldKey,
-        );
-}
+export const isAIMemberFieldKey =
+    makeFieldKeyValidator(FIELD_KEYS);
 
 export function aiMemberDraftFromMember(
     member: AIMember,

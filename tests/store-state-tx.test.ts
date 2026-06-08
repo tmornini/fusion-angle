@@ -125,3 +125,153 @@ test(
         );
     },
 );
+
+// Golden tiebreak characterization. The two readers split
+// on a same-`at` tie ON PURPOSE: currentForIn keeps the
+// FIRST-appended row (strict `>`), isDeletedIn takes the
+// LAST-appended (default `>=`). These pin that split so a
+// data-source rewrite stays byte-identical.
+
+test(
+    'currentForIn keeps the first-appended row on an at tie',
+    async () => {
+        const { backend, states } = await statesStore();
+        await states.put('s1', {
+            entity_id: 'e1',
+            state: 'a',
+            member_id: 'm1',
+            at: '2026-01-01T00:00:00.000Z',
+        });
+        await states.put('s2', {
+            entity_id: 'e1',
+            state: 'b',
+            member_id: 'm1',
+            at: '2026-01-01T00:00:00.000Z',
+        });
+        const current = await backend.transaction(
+            ['states'], 'readonly',
+            tx => states.currentForIn(tx, 'e1'),
+        );
+        assert.equal(current!.state, 'a');
+    },
+);
+
+test(
+    'currentForIn isolates its entity from co-at others',
+    async () => {
+        const { backend, states } = await statesStore();
+        await states.put('s1', {
+            entity_id: 'e1',
+            state: 'a',
+            member_id: 'm1',
+            at: '2026-01-01T00:00:00.000Z',
+        });
+        await states.put('s2', {
+            entity_id: 'e2',
+            state: 'x',
+            member_id: 'm1',
+            at: '2026-01-01T00:00:00.000Z',
+        });
+        await states.put('s3', {
+            entity_id: 'e1',
+            state: 'b',
+            member_id: 'm1',
+            at: '2026-01-01T00:00:00.000Z',
+        });
+        const current = await backend.transaction(
+            ['states'], 'readonly',
+            tx => states.currentForIn(tx, 'e1'),
+        );
+        assert.equal(current!.state, 'a');
+    },
+);
+
+test(
+    'currentForIn returns null for an unknown entity',
+    async () => {
+        const { backend, states } = await statesStore();
+        await states.put('s1', {
+            entity_id: 'e1',
+            state: 'a',
+            member_id: 'm1',
+            at: '2026-01-01T00:00:00.000Z',
+        });
+        const current = await backend.transaction(
+            ['states'], 'readonly',
+            tx => states.currentForIn(tx, 'ghost'),
+        );
+        assert.equal(current, null);
+    },
+);
+
+test(
+    'isDeletedIn takes the last-appended row on an at tie',
+    async () => {
+        const { backend, states } = await statesStore();
+        await states.put('s1', {
+            entity_id: 'e1',
+            state: 'active',
+            member_id: 'm1',
+            at: '2026-01-01T00:00:00.000Z',
+        });
+        await states.put('s2', {
+            entity_id: 'e1',
+            state: 'deleted',
+            member_id: 'm1',
+            at: '2026-01-01T00:00:00.000Z',
+        });
+        const deleted = await backend.transaction(
+            ['states'], 'readonly',
+            tx => states.isDeletedIn(tx, 'e1'),
+        );
+        assert.equal(deleted, true);
+    },
+);
+
+test(
+    'isDeletedIn lets a co-at undelete win when last',
+    async () => {
+        const { backend, states } = await statesStore();
+        await states.put('s1', {
+            entity_id: 'e1',
+            state: 'deleted',
+            member_id: 'm1',
+            at: '2026-01-01T00:00:00.000Z',
+        });
+        await states.put('s2', {
+            entity_id: 'e1',
+            state: 'active',
+            member_id: 'm1',
+            at: '2026-01-01T00:00:00.000Z',
+        });
+        const deleted = await backend.transaction(
+            ['states'], 'readonly',
+            tx => states.isDeletedIn(tx, 'e1'),
+        );
+        assert.equal(deleted, false);
+    },
+);
+
+test(
+    'isDeletedIn is false after an undelete over time',
+    async () => {
+        const { backend, states } = await statesStore();
+        await states.put('s1', {
+            entity_id: 'e1',
+            state: 'deleted',
+            member_id: 'm1',
+            at: '2026-01-01T00:00:00.000Z',
+        });
+        await states.put('s2', {
+            entity_id: 'e1',
+            state: 'active',
+            member_id: 'm1',
+            at: '2026-01-02T00:00:00.000Z',
+        });
+        const deleted = await backend.transaction(
+            ['states'], 'readonly',
+            tx => states.isDeletedIn(tx, 'e1'),
+        );
+        assert.equal(deleted, false);
+    },
+);

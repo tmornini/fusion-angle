@@ -17,6 +17,7 @@ import {
     memberName,
     isHumanMember,
     isAIMember,
+    MEMBER_WITHOUT_PII_NAME,
 } from '../web-app/app/adapters/members-union.ts';
 import type {
     MemberId,
@@ -30,15 +31,14 @@ import {
     seedAIMember,
 } from './member-fixtures.ts';
 import {
-    seedRootAdmin,
-} from './root-admin-fixture.ts';
+    seedAdminSchema,
+} from './test-fixtures.ts';
 
 async function setupSeeded(): Promise<{
     db: MemoryDbAdapter;
 }> {
     const db = new MemoryDbAdapter();
-    await db.createSchema();
-    await seedRootAdmin(db);
+    await seedAdminSchema(db);
     await seedHumanMember(
         db, 'hw_sarah_chen', 'Sarah Test',
     );
@@ -53,8 +53,7 @@ test(
     + ' resolves it as an author',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         await seedHumanMember(
             db, 'hw_sarah', 'Sarah Chen',
         );
@@ -174,8 +173,7 @@ test(
     + ' an empty array',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         const ctx = createRequestContext(db, await devToken());
         const members = await getMembers(ctx);
         assert.deepEqual(members, []);
@@ -187,36 +185,35 @@ test(
     + ' has no identity_pii row (erased)',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
-        await db.members.put('hw_erased', {
+        await seedAdminSchema(db);
+        await db.members.put('member_without_pii', {
             type: 'human',
         });
-        await db.humanMembers.put('hw_erased', {
+        await db.humanMembers.put('member_without_pii', {
             title: 'product_manager',
             department: 'Product',
             strengths: '[]' as never,
             team_dimensions: '{}' as never,
         });
-        await db.identities.put('hw_erased', {
+        await db.identities.put('member_without_pii', {
             kind: 'person',
         });
         // Erasure removes PII, not the membership — the member
         // still belongs to the org, so the join still finds it.
-        await db.memberships.put('mb-hw_erased', {
+        await db.memberships.put('mb-member_without_pii', {
             organization_id: '1',
-            identity_id: 'hw_erased',
+            identity_id: 'member_without_pii',
             at: '2020-01-01T00:00:00.000Z',
         });
         await db.states.record(
-            'st-hw_erased', 'hw_erased',
+            'st-member_without_pii', 'member_without_pii',
             'active', 'system',
         );
         const ctx = createRequestContext(db, await devToken());
         const map = await getMemberMap(ctx);
         assert.equal(
-            memberName(map, 'hw_erased'),
-            'Unknown member',
+            memberName(map, 'member_without_pii'),
+            MEMBER_WITHOUT_PII_NAME,
         );
     },
 );

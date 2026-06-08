@@ -19,6 +19,7 @@ import type {
     FlowVersionEntity,
     OrganizationEntity,
     MembershipEntity,
+    InvitationEntity,
     IdeaSubmissionEntity,
     ProjectFlowEntity,
     WorkOrderEntity,
@@ -84,6 +85,23 @@ export interface EntityStore<
     delete(id: string): Promise<void>;
 }
 
+// A keyed sub-collection read: the rows of one table whose
+// indexed `column` equals `key`, tombstones already removed.
+// The concrete EntityStore implements it over `Tx.getWhere`,
+// so the org fence narrows a collection to its tenant through
+// the organization_id index instead of scanning the whole
+// table and filtering in JS. Kept OFF the EntityStore
+// contract — the decorators and the history store would only
+// carry a read they never serve (Interface Segregation).
+export interface KeyedCollectionReader<
+    T extends { id: string },
+> {
+    getAllWhere(
+        column: string,
+        key: string,
+    ): Promise<T[]>;
+}
+
 // The storage-edge validator. Stores accept one at
 // construction and re-verify every `put` body through
 // it — the same telling-shape function used by the
@@ -143,6 +161,18 @@ export interface Tx {
     ): Promise<T | null>;
     getAll<T extends { id: string }>(
         table: string,
+    ): Promise<T[]>;
+    // The rows where `column` equals `key` — the indexed
+    // answer to `WHERE column = key`, served without
+    // scanning the table. `column` must carry a secondary
+    // index (TABLE_INDEXES); the native factory resolves it
+    // to `store.index(column)`. The matches keep each tier's
+    // own row order, so a reducer folds them exactly as
+    // it folds a full read.
+    getWhere<T extends { id: string }>(
+        table: string,
+        column: string,
+        key: string,
     ): Promise<T[]>;
     put<T extends { id: string }>(
         table: string,
@@ -263,6 +293,8 @@ export interface DbStores {
         EntityStore<OrganizationEntity>;
     memberships:
         EntityStore<MembershipEntity>;
+    invitations:
+        EntityStore<InvitationEntity>;
     ideaSubmissions:
         EntityStore<
             IdeaSubmissionEntity
@@ -329,6 +361,7 @@ export const TABLE_NAMES = [
     'flow_records',
     'organizations',
     'memberships',
+    'invitations',
     'idea_submissions',
     'objectives',
     'objective_revisions',
@@ -336,3 +369,44 @@ export const TABLE_NAMES = [
     'project_objective_actual_scores',
     'states',
 ];
+
+// The secondary indexes each store carries: every FK and
+// read-discriminator column, declared beside TABLE_NAMES as
+// the schema of record both backends read. A keyed read
+// (`Tx.getWhere`) names one of these. Index ONLY NOT-NULL
+// columns — IndexedDB omits a row missing the keyPath from
+// `index.getAll`, and the NOT-NULL covenant guarantees
+// declared FKs are present. Tables absent here have no
+// narrowing discriminator: the collection IS its rows.
+export const TABLE_INDEXES:
+    Record<string, readonly string[]> = {
+    identity_pii: ['email'],
+    identity_credentials: ['identity_id'],
+    identity_token_revocations: ['identity_id'],
+    identity_default_orgs: ['identity_id'],
+    role_grants: ['organization_id', 'identity_id'],
+    identity_tokens: ['jti', 'chain_id', 'identity_id'],
+    identity_providers: ['identity_id'],
+    authorization_codes: ['code', 'identity_id'],
+    ideas: ['organization_id'],
+    projects: ['organization_id'],
+    flows: ['organization_id'],
+    flow_versions: ['flow_id'],
+    project_flows: ['project_id', 'flow_id'],
+    work_orders: ['organization_id'],
+    flow_work_orders: ['flow_id', 'work_order_id'],
+    state_field_values: ['state_event_id', 'field_id'],
+    records: ['organization_id'],
+    record_attributes: ['organization_id', 'record_id'],
+    flow_records: ['flow_id', 'record_id'],
+    memberships: ['organization_id', 'identity_id'],
+    invitations: ['organization_id', 'identity_id'],
+    idea_submissions: ['idea_id'],
+    objectives: ['organization_id'],
+    objective_revisions: ['objective_id'],
+    project_objective_baseline_scores:
+        ['project_id', 'objective_id'],
+    project_objective_actual_scores:
+        ['project_id', 'objective_id'],
+    states: ['entity_id', 'member_id'],
+};

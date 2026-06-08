@@ -77,6 +77,35 @@ async () => {
     assert.equal(res.status, 401);
 });
 
+// A KNOWN user whose only password credential is revoked has
+// no live secret: the login pays the same equalizing PBKDF2
+// cost and returns the identical 401. Pins the secret===null
+// miss path (the second arm of the no-enumeration timing
+// equalizer) that the identity_id credential narrow flows
+// through.
+test('a revoked password credential is the same 401',
+async () => {
+    const db = new MemoryDbAdapter();
+    await db.createSchema();
+    await db.identityPii.put('current', {
+        name: 'Demo', email: 'demo@example.com',
+        phone: '555-0100', bio: 'demo user',
+    });
+    await db.identityCredentials.put('c1', {
+        identity_id: 'current', kind: 'password',
+        status: 'revoked',
+        secret: await hashPassword('s3cret'),
+        at: '2026-06-03T00:00:00.000Z',
+    });
+    const res = await handleRequest(db, authorize({
+        method: 'password', username: 'demo@example.com',
+        password: 's3cret', client_id: 'web',
+    }));
+    assert.equal(res.status, 401);
+    assert.equal(
+        (await db.authorizationCodes.getAll()).length, 0);
+});
+
 test('passkey, provider, and oidc are 501 seams', async () => {
     const db = await dbWithPasswordUser();
     for (const method of ['passkey', 'provider', 'oidc']) {

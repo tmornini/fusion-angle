@@ -38,15 +38,15 @@ export function notifyAIMemberChange(): void {
 export type AIMemberDraft =
     Omit<AIMemberEntity, 'id'>;
 
-export async function getAIMemberMap(
-    ctx: RequestContext,
-): Promise<Map<MemberId, AIMember>> {
-    const [parents, details, stateMap] =
-        await Promise.all([
-            ctx.GET<MemberEntity[]>('members'),
-            ctx.GET<AIMemberEntity[]>('ai-members'),
-            getMemberStates(ctx),
-        ]);
+// Assemble the AI-member map from already-read rows — pure,
+// no ctx, no IO. getAIMemberMap reads then delegates here;
+// getMembers (the roster) feeds this builder from one
+// batched read shared with the human builder.
+export function buildAIMemberMap(
+    parents: readonly MemberEntity[],
+    details: readonly AIMemberEntity[],
+    stateMap: ReadonlyMap<MemberId, MemberState>,
+): Map<MemberId, AIMember> {
     const detailById = new Map(
         details.map(d => [d.id, d]),
     );
@@ -72,6 +72,18 @@ export async function getAIMemberMap(
         );
     }
     return map;
+}
+
+export async function getAIMemberMap(
+    ctx: RequestContext,
+): Promise<Map<MemberId, AIMember>> {
+    const [parents, details, stateMap] =
+        await Promise.all([
+            ctx.GET<MemberEntity[]>('members'),
+            ctx.GET<AIMemberEntity[]>('ai-members'),
+            getMemberStates(ctx),
+        ]);
+    return buildAIMemberMap(parents, details, stateMap);
 }
 
 export async function getAIMembers(

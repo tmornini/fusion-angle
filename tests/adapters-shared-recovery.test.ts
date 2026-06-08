@@ -40,8 +40,12 @@ import {
     getSessionCredentials,
     putSessionCredentials,
 } from '../web-app/app/adapters/session-credentials.ts';
-import { seedRootAdmin } from './root-admin-fixture.ts';
-import { expiredToken } from './token-fixtures.ts';
+import { seedAdminSchema } from './test-fixtures.ts';
+import { devToken, expiredToken } from './token-fixtures.ts';
+import { ANONYMOUS_ID } from '../api/access-token.ts';
+import {
+    getSessionToken,
+} from '../web-app/app/adapters/init.ts';
 
 const BASE = 'http://localhost';
 
@@ -53,8 +57,7 @@ const issuedCode = {
 
 async function freshDb() {
     const db = new MemoryDbAdapter();
-    await db.createSchema();
-    await seedRootAdmin(db);
+    await seedAdminSchema(db);
     return db;
 }
 
@@ -91,6 +94,32 @@ async () => {
     // the 401 triggers refresh + org re-scope + one retry
     const members = await ctx.GET('members');
     assert.ok(Array.isArray(members));
+});
+
+test('a live credential with an anonymous-seed holder re-scopes'
++ ' rather than scrubbing the session',
+async () => {
+    localStorage.clear();
+    window.location.href = '';
+    const db = await freshDb();
+    const pair = await issuePair(db);
+    // the persisted credential is live, but the per-tab holder is
+    // still the anonymous seed (an org-bound read ran before boot
+    // scoped the session) — the read 401s 'anonymous principal'
+    putSessionCredentials({
+        accessToken: pair.access_token,
+        refreshToken: pair.refresh_token,
+    });
+    const seed = await devToken(ANONYMOUS_ID);
+    setSessionToken(seed);
+    const ctx = createRequestContext(
+        db, seed, { recover: true });
+    // recovery re-installs the live token, re-scopes, and retries
+    const members = await ctx.GET('members');
+    assert.ok(Array.isArray(members));
+    // the live session is preserved (not scrubbed) and now scoped
+    assert.notEqual(getSessionCredentials(), null);
+    assert.notEqual(getSessionToken(), seed);
 });
 
 test('recovery with both tokens dead scrubs and bounces',

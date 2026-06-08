@@ -44,8 +44,8 @@ import {
     seedHumanMember,
 } from './member-fixtures.ts';
 import {
-    seedRootAdmin,
-} from './root-admin-fixture.ts';
+    seedAdminSchema,
+} from './test-fixtures.ts';
 
 interface CreateIds {
     workOrderId: string;
@@ -160,8 +160,7 @@ async function setupDb(): Promise<{
     ctx: RequestContext;
 }> {
     const db = new MemoryDbAdapter();
-    await db.createSchema();
-    await seedRootAdmin(db);
+    await seedAdminSchema(db);
     await seedHumanMember(db, 'current', 'Demo Test');
     const ctx = createRequestContext(db, await devToken());
     return { db, ctx };
@@ -612,8 +611,7 @@ test(
     + 'flow-work-order rows',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         await db.flowWorkOrders.put(
             'fwo1',
             {
@@ -656,8 +654,7 @@ test(
     + 'claimed event as implicitly expired',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         await seedHumanMember(
             db, 'current', 'Demo Test',
         );
@@ -689,8 +686,7 @@ test(
     + 'claim when within the lock window',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         await seedHumanMember(
             db, 'current', 'Demo Test',
         );
@@ -721,8 +717,7 @@ test(
     + 'lockTimeout and the work-order set',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         await seedHumanMember(
             db, 'current', 'Demo Test',
         );
@@ -784,8 +779,7 @@ test(
 test('deleteWorkOrderClaim appends a claim_released event',
 async () => {
     const db = new MemoryDbAdapter();
-    await db.createSchema();
-    await seedRootAdmin(db);
+    await seedAdminSchema(db);
     await seedHumanMember(db, 'current', 'Demo Test');
     const ctx = createRequestContext(db, await devToken());
     await deleteWorkOrderClaim(ctx, 'wo-release-1');

@@ -1,4 +1,5 @@
 import type { ObjectiveId } from '../../api/types.ts';
+import { latestByKey } from '../../api/ledger-reduction.ts';
 
 export type Tone = 'success' | 'error' | 'muted';
 
@@ -9,16 +10,12 @@ export function latestPerPair<T extends {
     objective_id: string;
     at: string;
 }>(rows: readonly T[]): T[] {
-    const map = new Map<string, T>();
-    for (const r of rows) {
-        const key =
-            `${r.project_id}:${r.objective_id}`;
-        const prev = map.get(key);
-        if (!prev || r.at > prev.at) {
-            map.set(key, r);
-        }
-    }
-    return Array.from(map.values());
+    const latest = latestByKey(
+        rows,
+        r => `${r.project_id}:${r.objective_id}`,
+        (a, b) => a.at > b.at,
+    );
+    return Array.from(latest.values());
 }
 
 // Geometric position-weighted mean. Each successive

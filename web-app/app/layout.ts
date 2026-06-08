@@ -21,8 +21,14 @@ import {
 import {
     mutateHeaderInfo,
 } from './header-info.ts';
+import {
+    mutateInvitationsBell,
+} from './invitations-indicator.ts';
 import { navigateTo } from './navigation.ts';
 import { sessionContext } from './adapters/shared.ts';
+import {
+    sessionIsOrgScoped,
+} from './adapters/init.ts';
 import {
     postSessionLogout,
 } from './adapters/session-logout.ts';
@@ -89,11 +95,31 @@ async function initSidebarLayout(
     initThemeAndDropdowns();
     initMobileDrawer();
     mutateThemeToggleIcon();
-    if (hasSchema) {
-        await Promise.all([
+    // The member chip and header read members/current and the active
+    // org — org-bound reads that require a scoped session. On an
+    // auth-exempt sidebar page with no logged-in visitor the holder
+    // is the anonymous seed, so we skip them rather than fire reads
+    // that 401 'anonymous principal' and throw 'no active org'.
+    if (hasSchema && sessionIsOrgScoped()) {
+        // Each widget settles independently: a member with no
+        // admin role is forbidden the org reads the sidebar and
+        // header strip make, but the identity-scoped invitations
+        // bell must still appear. allSettled keeps one widget's
+        // denial from suppressing the others; rejections are
+        // logged, never swallowed.
+        const results = await Promise.allSettled([
             mutateSidebarMember(),
             mutateHeaderInfo(),
+            mutateInvitationsBell(),
         ]);
+        for (const result of results) {
+            if (result.status === 'rejected') {
+                log.warn(
+                    'sidebar widget failed to load',
+                    'layout', result.reason,
+                );
+            }
+        }
     }
 }
 

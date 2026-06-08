@@ -258,6 +258,37 @@ function initDialog(
     }
 }
 
+// A click's dialog intent, or null when the target is not a
+// dialog control. Pure: reads the target's dialog data
+// attributes and returns what to do; the caller drives
+// openDialog/closeDialog. The identical predicate the idea and
+// project detail pages otherwise hand-roll.
+export type DialogIntent =
+    | { readonly kind: 'open'; readonly id: string }
+    | { readonly kind: 'close'; readonly id: string };
+
+export function parseDialogClick(
+    target: Element,
+): DialogIntent | null {
+    if (target.classList.contains('dialog-backdrop')) {
+        const id = target.getAttribute('data-dialog-id');
+        return id ? { kind: 'close', id } : null;
+    }
+    const openEl = target.closest('[data-dialog-open]');
+    if (openEl) {
+        const id = openEl.getAttribute('data-dialog-open');
+        return id ? { kind: 'open', id } : null;
+    }
+    const cancelEl = target.closest('[data-dialog-cancel]');
+    if (cancelEl) {
+        const id = cancelEl.getAttribute(
+            'data-dialog-cancel',
+        );
+        return id ? { kind: 'close', id } : null;
+    }
+    return null;
+}
+
 export {
     openDialog,
     closeDialog,

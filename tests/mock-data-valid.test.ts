@@ -146,3 +146,60 @@ test(
         }
     },
 );
+
+// The Workbox inbox resolves every work-order transition's
+// author through the org-scoped member map (memberName).
+// A transition stamped by a member who is not in the work
+// order's org is therefore an impossible state — it crashes
+// the inbox rather than degrading. Pin the invariant here so
+// a cross-org author in the seed (e.g. a Wayne member on a
+// Stark flow node) fails the suite instead of production.
+
+test(
+    'every work-order transition author belongs to'
+    + ' the work order\'s org',
+    async () => {
+        const db = await seededDb();
+        const [
+            workOrders, states, memberships, members,
+        ] = await Promise.all([
+            db.workOrders.getAll(),
+            db.states.getAll(),
+            db.memberships.getAll(),
+            db.members.getAll(),
+        ]);
+        const orgByWo = new Map(
+            workOrders.map(w => [w.id, w.organization_id]),
+        );
+        const orgsByMember = new Map<string, Set<string>>();
+        for (const m of memberships) {
+            const set = orgsByMember.get(m.identity_id)
+                ?? new Set<string>();
+            set.add(m.organization_id);
+            orgsByMember.set(m.identity_id, set);
+        }
+        const systemMembers = new Set(
+            members
+                .filter(m => m.type === 'system')
+                .map(m => m.id),
+        );
+        const violations = new Set<string>();
+        for (const s of states) {
+            const woOrg = orgByWo.get(s.entity_id);
+            if (woOrg === undefined) continue;
+            if (systemMembers.has(s.member_id)) continue;
+            const orgs = orgsByMember.get(s.member_id);
+            if (orgs === undefined || !orgs.has(woOrg)) {
+                violations.add(
+                    s.member_id + ' in org ' + woOrg,
+                );
+            }
+        }
+        assert.deepEqual(
+            [...violations],
+            [],
+            'cross-org work-order transition authors: '
+            + [...violations].join('; '),
+        );
+    },
+);

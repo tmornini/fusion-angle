@@ -2,17 +2,23 @@ import type {
     MemberId,
     Member,
     MemberEntity,
+    HumanMemberEntity,
+    AIMemberEntity,
+    IdentityPiiEntity,
+    MemberState,
+    StateEntity,
 } from '../../../api/types.ts';
 import { SystemMember } from '../../../api/types.ts';
 import type { RequestContext } from './shared.ts';
 import {
-    getHumanMembers,
+    buildHumanMemberMap,
 } from './members.ts';
 import {
-    getAIMembers,
+    buildAIMemberMap,
 } from './ai-members.ts';
 import {
     getMemberStates,
+    latestStatesForIds,
 } from './state-events.ts';
 
 export {
@@ -51,14 +57,43 @@ async function getSystemMembers(
     return out;
 }
 
+// The roster. Reads members, human-members, identity-pii,
+// ai-members and the states log ONCE, derives the latest
+// state per member a single time via latestStatesForIds,
+// then feeds both pure builders. Earlier this fanned out to
+// getHumanMembers + getAIMembers, each of which re-read
+// members and the states log via getMemberStates — so the
+// members table was read four times and the states log
+// twice per roster load. The states log read is the costly
+// one (the org fence resolves every event's owning org), so
+// deriving once is the "read the ledger once" cleanup.
 export async function getMembers(
     ctx: RequestContext,
 ): Promise<Member[]> {
-    const [humans, ais] = await Promise.all([
-        getHumanMembers(ctx),
-        getAIMembers(ctx),
+    const [
+        parents, humanDetails, piiRows, aiDetails, events,
+    ] = await Promise.all([
+        ctx.GET<MemberEntity[]>('members'),
+        ctx.GET<HumanMemberEntity[]>('human-members'),
+        ctx.GET<IdentityPiiEntity[]>('identity-pii'),
+        ctx.GET<AIMemberEntity[]>('ai-members'),
+        ctx.GET<StateEntity[]>('states'),
     ]);
-    return [...humans, ...ais];
+    const ids = new Set<MemberId>(
+        parents.map(p => p.id),
+    );
+    const stateMap =
+        latestStatesForIds<MemberState>(events, ids);
+    const humans = buildHumanMemberMap(
+        parents, humanDetails, piiRows, stateMap,
+    );
+    const ais = buildAIMemberMap(
+        parents, aiDetails, stateMap,
+    );
+    return [
+        ...humans.values(),
+        ...ais.values(),
+    ];
 }
 
 // Resolve every member by id for name display. Unlike
@@ -79,7 +114,10 @@ export async function getMemberMap(
     );
 }
 
-export const ERASED_MEMBER_NAME = 'Unknown member';
+// The display name for a member whose PII is absent — erased,
+// or never recorded. Member-domain vocabulary; the identity
+// surfaces use IDENTITY_WITHOUT_PII_NAME instead.
+export const MEMBER_WITHOUT_PII_NAME = 'Member without PII';
 
 export function memberName(
     memberMap: Map<MemberId, Member>,
@@ -95,7 +133,7 @@ export function memberName(
     if (member.kind === 'human') {
         const pii = member.pii();
         return pii.erased
-            ? ERASED_MEMBER_NAME
+            ? MEMBER_WITHOUT_PII_NAME
             : pii.name;
     }
     return member.name();

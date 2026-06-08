@@ -9,7 +9,10 @@ import {
     nowUtc,
     projectStateIsApproved,
 } from '../../../api/types.ts';
-import type { RequestContext } from './shared.ts';
+import {
+    filterByField,
+    type RequestContext,
+} from './shared.ts';
 import {
     getActiveObjectives,
     getObjectives,
@@ -54,9 +57,7 @@ export async function getBaselineScoresForProject(
     const all = await ctx.GET<
         ProjectObjectiveBaselineScore[]
     >('project-objective-baseline-scores');
-    return all.filter(
-        r => r.project_id === projectId,
-    );
+    return filterByField(all, 'project_id', projectId);
 }
 
 export async function getActualScoresForProject(
@@ -66,9 +67,7 @@ export async function getActualScoresForProject(
     const all = await ctx.GET<
         ProjectObjectiveActualScore[]
     >('project-objective-actual-scores');
-    return all.filter(
-        r => r.project_id === projectId,
-    );
+    return filterByField(all, 'project_id', projectId);
 }
 
 export async function getProjectScoring(
@@ -242,12 +241,10 @@ export async function getObjectiveAggregates(
     const result = [];
     for (const obj of activeObjs) {
         const baselineScores =
-            latestB
-                .filter(r => r.objective_id === obj.id)
+            filterByField(latestB, 'objective_id', obj.id)
                 .map(r => r.score);
         const actualScores =
-            latestA
-                .filter(r => r.objective_id === obj.id)
+            filterByField(latestA, 'objective_id', obj.id)
                 .map(r => r.score);
 
         result.push({
@@ -311,8 +308,9 @@ export async function getObjectiveTrendlines(
     const result = new Map<ObjectiveId, TrendPoint[]>();
 
     for (const obj of activeObjs) {
-        const baselineRows = latestBaselineForApproved
-            .filter(r => r.objective_id === obj.id);
+        const baselineRows = filterByField(
+            latestBaselineForApproved, 'objective_id', obj.id,
+        );
         const baselineMean = meanOrUndefined(
             baselineRows.map(r => r.score),
         );
@@ -327,10 +325,10 @@ export async function getObjectiveTrendlines(
         const points: TrendPoint[] = [
             { at: baselineAt, value: baselineMean },
         ];
-        const actualsForObj = approvedActuals
-            .filter(r => r.objective_id === obj.id)
-            .slice()
-            .sort((a, b) => a.at.localeCompare(b.at));
+        const actualsForObj =
+            filterByField(approvedActuals, 'objective_id', obj.id)
+                .slice()
+                .sort((a, b) => a.at.localeCompare(b.at));
         const runningLatest = new Map<string, number>();
         let pendingAt: string | undefined = undefined;
         for (const row of actualsForObj) {

@@ -14,6 +14,9 @@ import {
     validateStoredGraphJson,
 } from '../../../api/validators.ts';
 import {
+    latestByKey,
+} from '../../../api/ledger-reduction.ts';
+import {
     validateWorkOrderFlowGraph,
 } from './work-orders-queries.ts';
 import {
@@ -96,15 +99,12 @@ function latestClaimEvent(
     states: readonly StateEntity[],
     workOrderId: string,
 ): StateEntity | null {
-    let latest: StateEntity | null = null;
-    for (const ev of states) {
-        if (ev.entity_id !== workOrderId) continue;
-        if (!CLAIM_STATES.has(ev.state)) continue;
-        if (latest === null || ev.at >= latest.at) {
-            latest = ev;
-        }
-    }
-    return latest;
+    const claims = states.filter(
+        ev => ev.entity_id === workOrderId
+            && CLAIM_STATES.has(ev.state),
+    );
+    return latestByKey(claims, ev => ev.entity_id)
+        .get(workOrderId) ?? null;
 }
 
 function isClaimEventExpired(

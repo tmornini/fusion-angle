@@ -26,7 +26,7 @@ import {
     seedCurrentMember,
     seedHumanMember,
 } from './member-fixtures.ts';
-import { seedRootAdmin } from './root-admin-fixture.ts';
+import { seedAdminSchema } from './test-fixtures.ts';
 
 function ctxFor(db: MemoryDbAdapter) {
     return createRequestContext(db, DEV_TOKEN);
@@ -38,8 +38,7 @@ function objective(position: number) {
 
 test('getObjective returns a single row', async () => {
     const db = new MemoryDbAdapter();
-    await db.createSchema();
-    await seedRootAdmin(db);
+    await seedAdminSchema(db);
     await db.objectives.put('o1', objective(0));
     const ctx = ctxFor(db);
     const v = await getObjective(ctx, 'o1');
@@ -49,8 +48,7 @@ test('getObjective returns a single row', async () => {
 
 test('getObjectives returns all', async () => {
     const db = new MemoryDbAdapter();
-    await db.createSchema();
-    await seedRootAdmin(db);
+    await seedAdminSchema(db);
     await db.objectives.put('o1', objective(0));
     await db.objectives.put('o2', objective(1));
     const ctx = ctxFor(db);
@@ -60,8 +58,7 @@ test('getObjectives returns all', async () => {
 
 test('getArchivedObjectiveIds returns a Set', async () => {
     const db = new MemoryDbAdapter();
-    await db.createSchema();
-    await seedRootAdmin(db);
+    await seedAdminSchema(db);
     await db.objectives.put('o1', objective(0));
     await db.states.record(
         'e1', 'o1', 'archived', 'system',
@@ -75,8 +72,7 @@ test('getArchivedObjectiveIds returns a Set', async () => {
 test('getArchivedObjectiveIds excludes an archived project',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         await db.objectives.put('o1', objective(0));
         await db.states.record(
             'e-o1', 'o1', 'archived', 'system',
@@ -94,8 +90,7 @@ test('getArchivedObjectiveIds excludes an archived project',
 test('getObjectiveArchivalEvents surfaces the actor',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         await db.objectives.put('o1', objective(0));
         await db.states.record(
             'e1', 'o1', 'archived', 'w-sarah',
@@ -110,8 +105,7 @@ test('getObjectiveArchivalEvents surfaces the actor',
 test('getObjectiveRevisions returns all for an objective',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         await db.objectiveRevisions.put(
             'o1:2026-05-14T00:00:00.000Z',
             {
@@ -153,8 +147,7 @@ test('getObjectiveRevisions returns all for an objective',
 test('getActiveObjectives filters archived',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         await db.objectives.put('o1', objective(0));
         await db.objectives.put('o2', objective(1));
         await db.states.record(
@@ -169,8 +162,7 @@ test('getActiveObjectives filters archived',
 test('getCurrentObjectiveDefinition returns latest revision',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         await db.objectiveRevisions.put(
             'o1:2026-05-14T00:00:00.000Z',
             {
@@ -200,8 +192,7 @@ test('getCurrentObjectiveDefinition returns latest revision',
 test('getObjectiveDefinitionAt returns historical name',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         await db.objectiveRevisions.put(
             'o1:2026-05-14T00:00:00.000Z',
             {
@@ -230,8 +221,7 @@ test('getObjectiveDefinitionAt returns historical name',
 test('postObjectiveCreation writes objective + revision',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         await seedCurrentMember(db);
         const ctx = ctxFor(db);
         await postObjectiveCreation(
@@ -248,8 +238,7 @@ test('postObjectiveCreation writes objective + revision',
 test('postObjectiveRevision appends a revision row',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         await seedCurrentMember(db);
         const ctx = ctxFor(db);
         await postObjectiveCreation(
@@ -268,8 +257,7 @@ test('postObjectiveRevision appends a revision row',
 test('postObjectiveArchival archives an objective',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         await seedCurrentMember(db);
         const ctx = ctxFor(db);
         await postObjectiveCreation(
@@ -284,8 +272,7 @@ test('postObjectiveArchival archives an objective',
 test('postObjectiveReactivation returns objective to active list',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         await seedCurrentMember(db);
         const ctx = ctxFor(db);
         await postObjectiveCreation(
@@ -308,8 +295,7 @@ test('postObjectiveReactivation returns objective to active list',
 test('reactivation does not emit a deleted state event',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         await seedCurrentMember(db);
         const ctx = ctxFor(db);
         await postObjectiveCreation(
@@ -328,8 +314,7 @@ test(
     + ' value without renumbering its peers',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         await seedCurrentMember(db);
         const ctx = ctxFor(db);
         await postObjectiveCreation(
@@ -360,8 +345,7 @@ test(
     + ' renumbering anyone',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         await seedCurrentMember(db);
         const ctx = ctxFor(db);
         await postObjectiveCreation(
@@ -402,8 +386,7 @@ test(
     + ' reorders',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         await seedCurrentMember(db);
         const ctx = ctxFor(db);
         await postObjectiveCreation(

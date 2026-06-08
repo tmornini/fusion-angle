@@ -5,6 +5,10 @@
 // the guard; we key on `window`, so post/subscribe are no-ops
 // under `node --test` and never hold the process open.
 
+import {
+    subscribeEventListener,
+} from './event-listener.ts';
+
 const CHANNEL_NAME = 'fusion-ai:data';
 
 interface TablesMessage {
@@ -50,8 +54,7 @@ export function subscribeTablesChanged(
         const message = event.data as TablesMessage;
         handler(message.tables);
     };
-    ch.addEventListener('message', listener);
-    return () => ch.removeEventListener('message', listener);
+    return subscribeEventListener(ch, 'message', listener);
 }
 
 // Close the channel — called on pagehide / adapter close so a

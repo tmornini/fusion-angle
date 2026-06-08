@@ -3,29 +3,14 @@ import assert from 'node:assert/strict';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import { devToken, orgToken } from './token-fixtures.ts';
-import { seedRootAdmin } from './root-admin-fixture.ts';
+import {
+    ideaBody,
+    orgRow,
+    seedAdminSchema,
+} from './test-fixtures.ts';
 import { jsonObjectField } from '../api/types.ts';
 
 const BASE = 'http://localhost';
-
-function ideaBody(org: string, title: string) {
-    return {
-        organization_id: org, title,
-        position: 0, problem_statement: '',
-        target_users: '', proposed_solution: '',
-        expected_outcome: '', success_metrics: '',
-    };
-}
-
-function orgRow(name: string) {
-    return {
-        name, domain: 'x.com',
-        next_billing: '2026-01-01T00:00:00.000Z',
-        seats: 10, used_seats: 1,
-        projects_limit: 10, ideas_limit: 10,
-        last_activity: '2026-01-01T00:00:00.000Z',
-    };
-}
 
 function req(
     method: string,
@@ -51,8 +36,7 @@ function req(
 // test authorized.
 async function twoOrgs(): Promise<MemoryDbAdapter> {
     const db = new MemoryDbAdapter();
-    await db.createSchema();
-    await seedRootAdmin(db);
+    await seedAdminSchema(db);
     await db.roleGrants.put('role-current-admin-a', {
         organization_id: 'A', identity_id: 'current',
         role: 'admin', action: 'granted',
@@ -116,6 +100,50 @@ test('the facade requires a bearer token', async () => {
     const res = await handleRequest(db, new Request(
         `${BASE}/organizations/A/ideas`));
     assert.equal(res.status, 401);
+});
+
+// ---- A roleless member (membership, no role grant) ----
+// The non-admin invitee. GET /organizations self-fences to
+// the caller's own memberships, so it gates on authentication,
+// not a role; org-owned reads and writes stay admin-gated.
+
+async function rolelessMemberDb(): Promise<MemoryDbAdapter> {
+    const db = new MemoryDbAdapter();
+    await db.createSchema();
+    await db.organizations.put('A', orgRow('Acme'));
+    await db.organizations.put('B', orgRow('Beta'));
+    await db.memberships.put('m-sarah-a', {
+        organization_id: 'A', identity_id: 'sarah',
+        at: '2026-06-04T00:00:00.000Z',
+    });
+    return db;
+}
+
+test('a roleless member enumerates only their member orgs',
+async () => {
+    const db = await rolelessMemberDb();
+    const res = await handleRequest(db, req(
+        'GET', '/organizations', await devToken('sarah')));
+    assert.equal(res.status, 200);
+    const rows = await res.json() as { id: string }[];
+    assert.deepEqual(rows.map(r => r.id), ['A']);
+});
+
+test('a roleless member is still denied org-owned reads',
+async () => {
+    const db = await rolelessMemberDb();
+    const res = await handleRequest(db, req(
+        'GET', '/members', await devToken('sarah')));
+    assert.equal(res.status, 403);
+});
+
+test('a roleless member is still denied org-owned writes',
+async () => {
+    const db = await rolelessMemberDb();
+    const res = await handleRequest(db, req(
+        'PUT', '/ideas/new-idea', await devToken('sarah'),
+        { id: 'new-idea', ...ideaBody('A', 'sneak') }));
+    assert.equal(res.status, 403);
 });
 
 // ---- T8: the parent-derived READ fence (server-side join) ----
@@ -417,4 +445,60 @@ test('organizations/:id 404s a non-member org', async () => {
         'GET', '/organizations/B',
         await orgToken('current', 'A')));
     assert.equal(foreign.status, 404);
+});
+
+// ---- Orphan visibility (null owner → visible to all orgs) ----
+// isVisible keeps a row whose owner resolves to null: an
+// identity that belongs to NO org, or a state event whose
+// entity matches nothing, is an orphan — visible to every
+// tenant so an incomplete-but-harmless row is not mistaken for
+// another tenant's data. The covenant above pins the
+// co-member-visible and foreign-hidden branches; these pin the
+// THIRD branch the membership resolvers pass through, so a
+// keyed-read rewrite that silently drops the orphan would fail
+// here.
+
+test('identity-pii shows an orphan with no membership',
+async () => {
+    const db = await deepDb();
+    await db.identityPii.put('orphan', {
+        name: 'orphan', email: 'orphan@x.com',
+        phone: '', bio: '',
+    });
+    const res = await facadeGet(db, '/identity-pii');
+    assert.equal(res.status, 200);
+    const ids = new Set(
+        (await res.json() as { id: string }[]).map(r => r.id));
+    assert.ok(ids.has('orphan'));  // no membership → visible
+    assert.ok(!ids.has('pb'));     // B-only → still hidden
+});
+
+test('identity-credentials show an orphan with no membership',
+async () => {
+    const db = await deepDb();
+    await db.identityCredentials.put('cred-orphan', {
+        identity_id: 'orphan', kind: 'password',
+        status: 'set', secret: 'HASH-orphan', at: T8_AT,
+    });
+    const res = await facadeGet(db, '/identity-credentials');
+    assert.equal(res.status, 200);
+    const ids = new Set((await res.json() as Array<{
+        identity_id: string;
+    }>).map(r => r.identity_id));
+    assert.ok(ids.has('orphan'));  // no membership → visible
+    assert.ok(!ids.has('pb'));     // B-only → still hidden
+});
+
+test('states show an orphan event with no owner', async () => {
+    const db = await deepDb();
+    await db.states.put('seGhost', {
+        entity_id: 'ghost', state: 'active',
+        member_id: 'system', at: T8_AT,
+    });
+    const res = await facadeGet(db, '/states');
+    assert.equal(res.status, 200);
+    const ids = new Set(
+        (await res.json() as { id: string }[]).map(r => r.id));
+    assert.ok(ids.has('seGhost'));  // unowned → visible orphan
+    assert.ok(!ids.has('seB'));     // B's event → still hidden
 });

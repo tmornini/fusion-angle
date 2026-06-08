@@ -1,4 +1,5 @@
 import { $, getRequiredAttribute } from '../app/dom.ts';
+import { createPageAbort } from '../app/page-lifecycle.ts';
 import {
     buildSkeleton,
     withLoadingState,
@@ -30,8 +31,7 @@ import {
     initDragReorder,
 } from '../app/drag-reorder.ts';
 
-const pageAbort = new AbortController();
-const signal = pageAbort.signal;
+const { signal } = createPageAbort();
 
 type ScoreRow = Awaited<
     ReturnType<typeof getProjectsScoreColumn>

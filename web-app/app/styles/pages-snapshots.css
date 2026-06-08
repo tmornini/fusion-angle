@@ -8,10 +8,23 @@
   margin-top: var(--space-6);
 }
 
-/* One-time admin credential reveal after wipe-and-load. */
+/* One-time admin credential reveal after wipe-and-load. The
+   wrap lifts the card and continue button out of the snapshot
+   card grid into one left-aligned column so they line up. */
+
+.credential-reveal-wrap {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-width: 34rem;
+}
+
+.credential-reveal-wrap > .btn {
+  align-self: flex-start;
+}
 
 .credential-reveal {
-  margin-top: var(--space-6);
   padding: var(--space-5);
   border: 1px solid hsl(var(--warning));
   border-radius: var(--radius);
@@ -47,7 +60,7 @@
   font-family: var(--font-mono);
   font-size: 1rem;
   user-select: all;
-  word-break: break-all;
+  overflow-wrap: anywhere;
 }
 
 .credential-reveal-head {
@@ -58,24 +71,28 @@
   margin-bottom: var(--space-2);
 }
 
+/* A two-column grid so emails and secrets line up across
+   rows. The per-row wrapper is display: contents so its two
+   spans land directly in the grid. Temporary one-time panel —
+   it grows with the content rather than scrolling. */
 .credential-reveal-box {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-5);
   font-family: var(--font-mono);
   font-size: 0.8125rem;
   border: 1px solid hsl(var(--border));
   border-radius: var(--radius);
   background: hsl(var(--muted) / 0.4);
   padding: var(--space-2) var(--space-3);
-  max-height: 14rem;
-  overflow-y: auto;
 }
 
 .credential-reveal-line {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--space-4);
-  padding: var(--space-1) 0;
+  display: contents;
 }
 
 .credential-reveal-user {
   color: hsl(var(--muted-foreground));
+  white-space: nowrap;
 }

@@ -9,6 +9,10 @@ import {
     type IdentityCredentialStatus,
 } from '../../../api/types.ts';
 import { hashPassword } from '../../../api/password-hash.ts';
+import {
+    latestByKey,
+} from '../../../api/ledger-reduction.ts';
+import { filterByField } from './shared.ts';
 import type { RequestContext } from './shared.ts';
 
 // Surface the credential-kind union so the identity detail
@@ -83,23 +87,13 @@ export async function getIdentityCredentialState(
     const all = await ctx.GET<
         IdentityCredentialEntity[]
     >('identity-credentials');
-    const latestByKind = new Map<
-        IdentityCredentialKind,
-        { status: IdentityCredentialStatus; at: string }
-    >();
-    for (const ev of all) {
-        if (ev.identity_id !== identityId) continue;
-        // Latest by `at`, not array order — a snapshot
-        // reimport or concurrent write can reorder rows.
-        // Same secure `>=` tie-break as currentRolesForInOrg.
-        const prev = latestByKind.get(ev.kind);
-        if (prev === undefined || ev.at >= prev.at) {
-            latestByKind.set(
-                ev.kind,
-                { status: ev.status, at: ev.at },
-            );
-        }
-    }
+    const forIdentity = filterByField(
+        all, 'identity_id', identityId,
+    );
+    // Latest by `at`, not array order — a snapshot reimport
+    // or concurrent write can reorder rows. latestByKey's
+    // default >= tiebreak is the secure direction.
+    const latestByKind = latestByKey(forIdentity, ev => ev.kind);
     const active: IdentityCredentialKind[] = [];
     for (const [kind, last] of latestByKind) {
         if (last.status !== 'revoked') {

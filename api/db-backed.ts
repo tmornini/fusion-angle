@@ -32,6 +32,7 @@ import type {
     FlowVersionEntity,
     OrganizationEntity,
     MembershipEntity,
+    InvitationEntity,
     IdeaSubmissionEntity,
     ProjectFlowEntity,
     WorkOrderEntity,
@@ -85,6 +86,7 @@ import {
     validateObjectiveRevisionEntity,
     validateOrganizationEntity,
     validateMembershipEntity,
+    validateInvitationEntity,
 } from './validators.ts';
 
 // One adapter over any StorageBackend. The 32-store wiring,
@@ -144,6 +146,8 @@ export class BackedDbAdapter implements DbAdapter {
         IEntityStore<OrganizationEntity>;
     readonly memberships!:
         IEntityStore<MembershipEntity>;
+    readonly invitations!:
+        IEntityStore<InvitationEntity>;
     readonly ideaSubmissions!:
         IEntityStore<IdeaSubmissionEntity>;
     readonly objectives!: IEntityStore<Objective>;
@@ -279,6 +283,10 @@ export class BackedDbAdapter implements DbAdapter {
             memberships: new EntityStore(
                 'memberships', run, stateStore,
                 validateMembershipEntity,
+            ),
+            invitations: new EntityStore(
+                'invitations', run, stateStore,
+                validateInvitationEntity,
             ),
             members: new EntityStore(
                 'members', run, stateStore,

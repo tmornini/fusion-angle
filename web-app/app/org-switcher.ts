@@ -46,34 +46,28 @@ function switchToOrg(org: string): void {
     location.reload();
 }
 
-// Select the active org and wire the change handler. The
-// `<select>` lives inside the clickable greeting, so its
-// pointer/keyboard events stopPropagation — selecting an org
-// must not also open the member profile.
+// Select the active org and wire each switcher group. The
+// desktop and mobile sidebars each render one, so this wires
+// EVERY `.org-switcher-group` rather than the first — both stay
+// live and in sync after a switch.
 export function wireOrgSwitcher(activeOrgId: string): void {
-    const select =
-        document.querySelector<HTMLSelectElement>(
-            '.org-switcher');
-    if (select === null) return;
-    select.value = activeOrgId;
-    for (const type of ['click', 'mousedown', 'keydown']) {
-        select.addEventListener(
-            type, e => e.stopPropagation());
-    }
-    select.addEventListener('change', () => {
-        switchToOrg(select.value);
-    });
-    const setDefault =
-        document.querySelector<HTMLButtonElement>(
-            '.org-set-default');
-    if (setDefault === null) return;
-    setDefault.addEventListener('click', e => {
-        e.stopPropagation();
-        void setActiveOrgAsDefault(select.value);
-    });
-    for (const type of ['mousedown', 'keydown']) {
-        setDefault.addEventListener(
-            type, e => e.stopPropagation());
+    const groups = document.querySelectorAll<HTMLElement>(
+        '.org-switcher-group');
+    for (const group of groups) {
+        const select =
+            group.querySelector<HTMLSelectElement>(
+                '.org-switcher');
+        if (select === null) continue;
+        select.value = activeOrgId;
+        select.addEventListener('change', () => {
+            switchToOrg(select.value);
+        });
+        const setDefault =
+            group.querySelector<HTMLButtonElement>(
+                '.org-set-default');
+        setDefault?.addEventListener('click', () => {
+            void setActiveOrgAsDefault(select.value);
+        });
     }
 }
 

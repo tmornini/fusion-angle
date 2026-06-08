@@ -10,7 +10,7 @@ import {
 import {
     postSessionRefresh,
 } from '../web-app/app/adapters/session-refresh.ts';
-import { seedRootAdmin } from './root-admin-fixture.ts';
+import { seedAdminSchema } from './test-fixtures.ts';
 import { devToken } from './token-fixtures.ts';
 
 const BASE = 'http://localhost';
@@ -23,8 +23,7 @@ const issuedCode = {
 
 async function freshDb() {
     const db = new MemoryDbAdapter();
-    await db.createSchema();
-    await seedRootAdmin(db);
+    await seedAdminSchema(db);
     return db;
 }
 

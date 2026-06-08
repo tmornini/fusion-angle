@@ -3,39 +3,28 @@ import type {
     RoleGrantEntity,
     IdentityDefaultOrgEntity,
 } from './types.ts';
+import { latestByKey } from './ledger-reduction.ts';
 
-// Roles an identity currently holds IN A GIVEN ORG: the
-// latest action per role within that org — a 'granted' with
-// no later 'revoked' wins. The org predicate sits beside the
-// identity filter, so a grant in another org is invisible
-// here: this is the per-tenant fence at the role layer, the
-// half of `role_grants.organization_id` the gate had been
-// writing but never reading. `at` is RFC-3339 zulu (lexical =
-// chronological). The reduce resolves to an ACTION, not just
-// a stamp, so a same-`at` tie MUST resolve to the later
-// event; `>=` lets the later-APPENDED row win — for this
-// single-writer append-only ledger that is the later action,
-// the secure tie-break (revoke beats grant).
+// Roles an identity currently holds IN A GIVEN ORG: the latest
+// action per role within that org — a 'granted' with no later
+// 'revoked' wins. The org predicate sits beside the identity
+// filter, so a grant in another org is invisible here: this is
+// the per-tenant fence at the role layer, the half of
+// `role_grants.organization_id` the gate had been writing but
+// never reading. latestByKey's default >= tiebreak resolves a
+// same-`at` tie to the later-appended row — for this single-
+// writer append-only ledger that is the later action, the
+// secure tie-break (revoke beats grant).
 export function currentRolesForInOrg(
     rows: readonly RoleGrantEntity[],
     identityId: Id,
     org: Id,
 ): string[] {
-    const latest = new Map<
-        string,
-        { action: RoleGrantEntity['action']; at: string }
-    >();
-    for (const row of rows) {
-        if (row.identity_id !== identityId) continue;
-        if (row.organization_id !== org) continue;
-        const prev = latest.get(row.role);
-        if (prev === undefined || row.at >= prev.at) {
-            latest.set(
-                row.role,
-                { action: row.action, at: row.at },
-            );
-        }
-    }
+    const inOrg = rows.filter(
+        row => row.identity_id === identityId
+            && row.organization_id === org,
+    );
+    const latest = latestByKey(inOrg, row => row.role);
     const held: string[] = [];
     for (const [role, last] of latest) {
         if (last.action === 'granted') held.push(role);
@@ -45,20 +34,15 @@ export function currentRolesForInOrg(
 
 // The org an identity has CURRENTLY chosen as its default: the
 // latest event in its append-only default-org ledger, null when
-// it has none. Same secure `>=` tie-break as currentRolesForInOrg
-// — a same-`at` tie resolves to the later-appended row.
+// it has none. latestByKey's default >= tiebreak resolves a
+// same-`at` tie to the later-appended row.
 export function currentDefaultOrgFor(
     rows: readonly IdentityDefaultOrgEntity[],
     identityId: Id,
 ): Id | null {
-    let chosen: { org: Id; at: string } | null = null;
-    for (const row of rows) {
-        if (row.identity_id !== identityId) continue;
-        if (chosen === null || row.at >= chosen.at) {
-            chosen = { org: row.organization_id, at: row.at };
-        }
-    }
-    return chosen === null ? null : chosen.org;
+    const chosen = latestByKey(rows, row => row.identity_id)
+        .get(identityId);
+    return chosen === undefined ? null : chosen.organization_id;
 }
 
 // A policy entry: the roles permitted to use `verb` on any

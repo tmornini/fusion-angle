@@ -3,28 +3,24 @@ import type {
     IdentityTokenAction,
     IdentityTokenEntity,
 } from './types.ts';
+import {
+    latestByKey,
+    findFirstByKey,
+} from './ledger-reduction.ts';
 
 // Pure reductions over the append-only identity_tokens ledger.
 // The store is a dumb log; current validity is derived here.
 
 // The latest lifecycle action for a jti, or null if it has no
-// events. RFC-3339 zulu `at` sorts lexically = chronologically;
-// a same-instant tie keeps the LATER-APPENDED event (>=) — the
-// secure direction, so a revoke beats a co-timestamped issue.
+// events. latestByKey's default >= tiebreak keeps the later-
+// appended event on a same-`at` tie — the secure direction, so
+// a revoke beats a co-timestamped issue.
 export function latestActionForJti(
     rows: readonly IdentityTokenEntity[],
     jti: string,
 ): IdentityTokenAction | null {
-    let latest:
-        { action: IdentityTokenAction; at: string } | null
-        = null;
-    for (const row of rows) {
-        if (row.jti !== jti) continue;
-        if (latest === null || row.at >= latest.at) {
-            latest = { action: row.action, at: row.at };
-        }
-    }
-    return latest === null ? null : latest.action;
+    const latest = latestByKey(rows, row => row.jti).get(jti);
+    return latest === undefined ? null : latest.action;
 }
 
 // The chain_id a jti belongs to (null if unknown). Every event
@@ -33,10 +29,9 @@ export function chainIdForJti(
     rows: readonly IdentityTokenEntity[],
     jti: string,
 ): string | null {
-    for (const row of rows) {
-        if (row.jti === jti) return row.chain_id;
-    }
-    return null;
+    return findFirstByKey(
+        rows, row => row.jti === jti, row => row.chain_id,
+    );
 }
 
 // Every distinct jti that has ever appeared in a chain — the
@@ -70,10 +65,9 @@ export function identityForJti(
     rows: readonly IdentityTokenEntity[],
     jti: string,
 ): Id | null {
-    for (const row of rows) {
-        if (row.jti === jti) return row.identity_id;
-    }
-    return null;
+    return findFirstByKey(
+        rows, row => row.jti === jti, row => row.identity_id,
+    );
 }
 
 // The derived state of a chain: its current live jti (the one

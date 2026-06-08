@@ -3,11 +3,13 @@ import {
 } from '../safe-html.ts';
 import { $required } from '../dom.ts';
 import {
-    orderedKeys,
-} from './ordered-keys.ts';
-import {
     toggleStatusFilter,
 } from './list-filter.ts';
+import { stateBadge } from './state-badge.ts';
+import {
+    buildStateFilterBadges,
+    filteredSortedList,
+} from './list-choreography.ts';
 import {
     displayText, formatDateTime,
 } from '../core.ts';
@@ -592,25 +594,11 @@ export class IdeaPresenter {
     buildStateBadge(
         isActive: boolean | null,
     ): SafeHtml {
-        const cfg = IDEA_STATE_CONFIG[
-            this.#idea.stateValue()
-        ]!;
-        const icon = STATE_ICONS[
-            this.#idea.stateValue()
-        ]!;
-        const dimmed = isActive === false
-            ? 'true'
-            : 'false';
-        return html`<span class="${
-            'badge '
-            + cfg.className
-            + ' text-xs badge-fixed-w'
-            + ' cursor-pointer'
-        }" data-state="${
-            this.#idea.stateValue()
-        }" data-dimmed="${dimmed}">${
-            icon(14, '')
-        } ${cfg.label}</span>`;
+        const s = this.#idea.stateValue();
+        return stateBadge(
+            s, IDEA_STATE_CONFIG[s]!,
+            STATE_ICONS[s]!, isActive,
+        );
     }
 
     buildCard(
@@ -918,59 +906,28 @@ export class IdeaListPresenter {
     }
 
     #buildBadges(): SafeHtml {
-        const active = this.activeFilter();
-        const groups = Object.groupBy(
+        return buildStateFilterBadges(
             this.#ideas,
             i => i.stateGroup(),
+            ['active', 'in-review', 'sent-back', 'approved'],
+            this.activeFilter(),
+            (item, isActive) =>
+                item.buildStateBadge(isActive),
         );
-        const order: IdeaState[] = [
-            'active',
-            'in-review',
-            'sent-back',
-            'approved',
-        ];
-        const badges = orderedKeys(
-            groups, order,
-        )
-            .map(s => ({
-                state: s,
-                items: groups[s],
-            }))
-            .filter(
-                g => g.items
-                    && g.items.length > 0,
-            )
-            .map(g => g.items![0]!
-                .buildStateBadge(
-                    active === null
-                        ? null
-                        : g.state === active,
-                ));
-        return html`${badges}`;
     }
 
     #buildList(): SafeHtml {
-        const f = this.#filter;
-        const filtered =
-            f.kind === 'filtered'
-                ? this.#ideas.filter(
-                    i => i.matchesState(
-                        f.status,
-                    ),
-                )
-                : this.#ideas;
-        const sorted =
-            filtered.toSorted(
+        const hasGrip = this.#filter.kind === 'all';
+        return filteredSortedList(
+            this.#ideas,
+            this.#filter,
+            (i, status) => i.matchesState(status),
+            items => items.toSorted(
                 (a, b) =>
                     a.positionSortKey()
                     - b.positionSortKey(),
-            );
-        const hasGrip =
-            f.kind === 'all';
-        return html`${sorted.map(
-            idea => idea.buildCard(
-                'position', hasGrip,
             ),
-        )}`;
+            idea => idea.buildCard('position', hasGrip),
+        );
     }
 }

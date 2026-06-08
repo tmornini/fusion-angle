@@ -4,8 +4,8 @@ import { GET } from '../api/api.ts';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import { devToken } from './token-fixtures.ts';
 import {
-    seedRootAdmin,
-} from './root-admin-fixture.ts';
+    seedAdminSchema,
+} from './test-fixtures.ts';
 
 // Pin the collection routes that handleRequest
 // must serve. A new top-level resource is added
@@ -45,8 +45,7 @@ for (const route of COLLECTION_ROUTES) {
         + ` db`,
         async () => {
             const db = new MemoryDbAdapter();
-            await db.createSchema();
-            await seedRootAdmin(db);
+            await seedAdminSchema(db);
             const rows =
                 await GET<unknown[]>(
                     db, route, await devToken());

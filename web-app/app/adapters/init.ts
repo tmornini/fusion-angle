@@ -8,6 +8,7 @@ import type { DbAdapter } from '../../../api/db.ts';
 import { GET } from '../../../api/api.ts';
 import {
     mintAccessToken,
+    principalFromToken,
     ANONYMOUS_ID,
 } from '../../../api/access-token.ts';
 import {
@@ -105,4 +106,15 @@ export function getSessionToken(): string {
         );
     }
     return sessionToken;
+}
+
+// True only when the held token carries an `org` claim — the
+// post-exchange, org-scoped session. The anonymous seed and an
+// un-exchanged flat token both read false, so org-bound surfaces
+// (the sidebar member chip, the command palette index) can gate
+// their reads on a real scoped session instead of firing them on
+// a seed and surfacing a 'no active org' / anonymous-principal 401.
+export function sessionIsOrgScoped(): boolean {
+    return principalFromToken(getSessionToken()).organization
+        !== undefined;
 }

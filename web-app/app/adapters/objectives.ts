@@ -9,7 +9,10 @@ import type {
 import {
     nowUtc,
 } from '../../../api/types.ts';
-import type { RequestContext } from './shared.ts';
+import {
+    filterByField,
+    type RequestContext,
+} from './shared.ts';
 import {
     createSubscriptionChannel,
 } from '../channels.ts';
@@ -117,9 +120,7 @@ export async function getObjectiveRevisions(
     const all = await ctx.GET<ObjectiveRevision[]>(
         'objective-revisions',
     );
-    return all.filter(
-        r => r.objective_id === id,
-    );
+    return filterByField(all, 'objective_id', id);
 }
 
 export async function getActiveObjectives(

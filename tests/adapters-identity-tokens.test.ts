@@ -8,7 +8,7 @@ import {
     createRequestContext,
 } from '../web-app/app/adapters/shared.ts';
 import { devToken } from './token-fixtures.ts';
-import { seedRootAdmin } from './root-admin-fixture.ts';
+import { seedAdminSchema } from './test-fixtures.ts';
 import {
     postTokenIssue,
     postTokenRotation,
@@ -19,8 +19,7 @@ import {
 
 async function adminCtx() {
     const db = new MemoryDbAdapter();
-    await db.createSchema();
-    await seedRootAdmin(db);
+    await seedAdminSchema(db);
     return {
         db, ctx: createRequestContext(db, await devToken()),
     };

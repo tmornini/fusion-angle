@@ -125,8 +125,14 @@ export function viaParent<T, P extends OrgScoped>(
 interface OrgOwnedProbe {
     getById(id: string): Promise<{ organization_id: Id }>;
 }
+// The keyed membership read the ownership checks need: an
+// identity's memberships, narrowed through the identity_id
+// index rather than scanning the whole ledger once per row.
 interface MembershipReader {
-    getAll(): Promise<readonly {
+    getAllWhere(
+        column: string,
+        key: string,
+    ): Promise<readonly {
         identity_id: Id;
         organization_id: Id;
     }[]>;
@@ -145,8 +151,10 @@ export function viaMembership<T>(
 ): OwningOrgResolver<T> {
     return async (row) => {
         const id = identityIdOf(row);
-        const mine = (await memberships.getAll())
-            .filter(m => m.identity_id === id);
+        // The identity_id index IS the lookup — the rows it
+        // returns already match `id`, so no JS filter after.
+        const mine = await memberships.getAllWhere(
+            'identity_id', id);
         if (mine.length === 0) return null;
         return mine.some(m => m.organization_id === boundOrg)
             ? boundOrg
@@ -176,8 +184,8 @@ export async function ownerOrgOfEntity(
             if (!(e instanceof EntityNotFound)) throw e;
         }
     }
-    const mine = (await memberships.getAll())
-        .filter(m => m.identity_id === entityId);
+    const mine = await memberships.getAllWhere(
+        'identity_id', entityId);
     if (mine.length === 0) return null;
     return mine.some(m => m.organization_id === boundOrg)
         ? boundOrg

@@ -6,7 +6,10 @@ import type {
     FlowWorkOrderEntity,
     WorkOrderEntity,
 } from '../../../api/types.ts';
-import type { RequestContext } from './shared.ts';
+import {
+    filterByField,
+    type RequestContext,
+} from './shared.ts';
 import {
     notifyRecordChange,
 } from './records.ts';
@@ -70,8 +73,7 @@ export async function getFlowsForRecord(
     recordId: RecordId,
 ): Promise<Id[]> {
     const rows = await getFlowRecordRows(ctx);
-    return rows
-        .filter(r => r.record_id === recordId)
+    return filterByField(rows, 'record_id', recordId)
         .map(r => r.flow_id);
 }
 
@@ -90,8 +92,7 @@ export async function getWorkOrdersForRecord(
             ),
         ]);
     const flowIds = new Set(
-        bindings
-            .filter(b => b.record_id === recordId)
+        filterByField(bindings, 'record_id', recordId)
             .map(b => b.flow_id),
     );
     const workOrderIds = new Set(

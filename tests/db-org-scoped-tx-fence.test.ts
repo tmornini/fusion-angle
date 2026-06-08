@@ -2,15 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import { orgScopedAdapter } from '../api/db-org-scoped.ts';
-
-function ideaBody(org: string, title: string) {
-    return {
-        organization_id: org, title,
-        position: 0, problem_statement: '',
-        target_users: '', proposed_solution: '',
-        expected_outcome: '', success_metrics: '',
-    };
-}
+import { ideaBody } from './test-fixtures.ts';
 
 async function seeded() {
     const db = new MemoryDbAdapter();

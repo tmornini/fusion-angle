@@ -3,7 +3,11 @@ import assert from 'node:assert/strict';
 import { OrgScopedEntityStore }
     from '../api/store-org-scoped.ts';
 import { EntityNotFound } from '../api/db.ts';
-import type { EntityStore, EntityPut } from '../api/db.ts';
+import type {
+    EntityStore,
+    EntityPut,
+    KeyedCollectionReader,
+} from '../api/db.ts';
 
 interface Row {
     id: string;
@@ -13,7 +17,11 @@ interface Row {
 
 // A minimal in-memory EntityStore the decorator can wrap, so
 // the test exercises the guard's logic — not store-entity's.
-class FakeStore implements EntityStore<Row> {
+class FakeStore
+    implements
+        EntityStore<Row>,
+        KeyedCollectionReader<Row>
+{
     readonly #rows = new Map<string, Row>();
 
     constructor(seed: readonly Row[] = []) {
@@ -22,6 +30,17 @@ class FakeStore implements EntityStore<Row> {
 
     async getAll(): Promise<Row[]> {
         return [...this.#rows.values()];
+    }
+
+    async getAllWhere(
+        column: string,
+        key: string,
+    ): Promise<Row[]> {
+        return [...this.#rows.values()].filter(
+            row => (
+                row as unknown as Record<string, unknown>
+            )[column] === key,
+        );
     }
 
     async getById(id: string): Promise<Row> {

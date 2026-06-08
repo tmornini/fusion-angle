@@ -9,7 +9,10 @@ import {
     validateConstraintArrayJson,
     validateStringArrayJson,
 } from '../../../api/validators.ts';
-import type { RequestContext } from './shared.ts';
+import {
+    filterByField,
+    type RequestContext,
+} from './shared.ts';
 import {
     notifyRecordChange,
 } from './records.ts';
@@ -64,8 +67,7 @@ export async function getRecordAttributesByRecord(
     recordId: RecordId,
 ): Promise<RecordAttribute[]> {
     const rows = await getRecordAttributeRows(ctx);
-    return rows
-        .filter(a => a.record_id === recordId)
+    return filterByField(rows, 'record_id', recordId)
         .toSorted(
             (a, b) =>
                 a.sort_order - b.sort_order,

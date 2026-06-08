@@ -77,20 +77,18 @@ function memberPiiOf(
     };
 }
 
-export async function getHumanMemberMap(
-    ctx: RequestContext,
-): Promise<Map<MemberId, HumanMember>> {
-    const [parents, details, piiRows, stateMap] =
-        await Promise.all([
-            ctx.GET<MemberEntity[]>('members'),
-            ctx.GET<HumanMemberEntity[]>(
-                'human-members',
-            ),
-            ctx.GET<IdentityPiiEntity[]>(
-                'identity-pii',
-            ),
-            getMemberStates(ctx),
-        ]);
+// Assemble the human-member map from already-read rows —
+// pure, no ctx, no IO. getHumanMemberMap reads then
+// delegates here; getMembers (the roster) reads members,
+// human-members, identity-pii and states ONCE and feeds
+// this builder, deriving the state map a single time
+// rather than once per member kind.
+export function buildHumanMemberMap(
+    parents: readonly MemberEntity[],
+    details: readonly HumanMemberEntity[],
+    piiRows: readonly IdentityPiiEntity[],
+    stateMap: ReadonlyMap<MemberId, MemberState>,
+): Map<MemberId, HumanMember> {
     const detailById = new Map(
         details.map(d => [d.id, d]),
     );
@@ -124,6 +122,25 @@ export async function getHumanMemberMap(
         );
     }
     return map;
+}
+
+export async function getHumanMemberMap(
+    ctx: RequestContext,
+): Promise<Map<MemberId, HumanMember>> {
+    const [parents, details, piiRows, stateMap] =
+        await Promise.all([
+            ctx.GET<MemberEntity[]>('members'),
+            ctx.GET<HumanMemberEntity[]>(
+                'human-members',
+            ),
+            ctx.GET<IdentityPiiEntity[]>(
+                'identity-pii',
+            ),
+            getMemberStates(ctx),
+        ]);
+    return buildHumanMemberMap(
+        parents, details, piiRows, stateMap,
+    );
 }
 
 export async function getCurrentHumanMember(

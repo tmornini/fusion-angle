@@ -5,7 +5,7 @@ import {
     createRequestContext,
 } from '../web-app/app/adapters/shared.ts';
 import { devToken } from './token-fixtures.ts';
-import { seedRootAdmin } from './root-admin-fixture.ts';
+import { seedAdminSchema } from './test-fixtures.ts';
 import {
     getIdentities,
     getIdentityRoster,
@@ -17,11 +17,13 @@ import {
 import {
     getTokenChainsFor,
 } from '../web-app/app/adapters/identity-tokens.ts';
+import {
+    getProviderModels,
+} from '../api/provider-models.ts';
 
 async function setup() {
     const db = new MemoryDbAdapter();
-    await db.createSchema();
-    await seedRootAdmin(db);
+    await seedAdminSchema(db);
     return {
         db,
         ctx: createRequestContext(db, await devToken()),
@@ -59,16 +61,17 @@ async () => {
     const row = roster.find(r => r.id === 'p1');
     assert.ok(row, 'roster row for p1 exists');
     assert.equal(row.kind, 'person');
-    assert.equal(row.pii.erased, false);
-    if (!row.pii.erased) {
+    if (row.kind === 'person' && !row.pii.erased) {
         assert.equal(row.pii.name, 'Ada');
         assert.equal(row.pii.email, 'ada@x.io');
         assert.equal(row.pii.phone, '555');
         assert.equal(row.pii.bio, 'builds');
+    } else {
+        assert.fail('expected a present-pii person row');
     }
 });
 
-test('getIdentityRoster reports service identity as erased',
+test('getIdentityRoster reports a nameless service unnamed',
 async () => {
     const { ctx } = await setup();
     await postIdentityCreation(ctx, 's1', {
@@ -78,7 +81,37 @@ async () => {
     const row = roster.find(r => r.id === 's1');
     assert.ok(row, 'roster row for s1 exists');
     assert.equal(row.kind, 'service');
-    assert.equal(row.pii.erased, true);
+    if (row.kind === 'service') {
+        assert.equal(row.service.named, false);
+    } else {
+        assert.fail('expected a service row');
+    }
+});
+
+test('getIdentityRoster names a service from its ai-member',
+async () => {
+    const { db, ctx } = await setup();
+    await postIdentityCreation(ctx, 's2', {
+        kind: 'service', secret: 'shh',
+    });
+    await db.aiMembers.put('s2', {
+        name: 'Grok 4.3',
+        description: 'Fast reasoning model',
+        skill_focus: '',
+        model: getProviderModels()[0]!.id,
+    });
+    const roster = await getIdentityRoster(ctx);
+    const row = roster.find(r => r.id === 's2');
+    assert.ok(row, 'roster row for s2 exists');
+    assert.equal(row.kind, 'service');
+    if (row.kind === 'service' && row.service.named) {
+        assert.equal(row.service.name, 'Grok 4.3');
+        assert.equal(
+            row.service.detail, 'Fast reasoning model',
+        );
+    } else {
+        assert.fail('expected a named service row');
+    }
 });
 
 test('getIdentityRoster reports erased person as erased',

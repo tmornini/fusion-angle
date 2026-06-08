@@ -6,8 +6,8 @@ import {
 } from '../web-app/app/adapters/shared.ts';
 import { devToken } from './token-fixtures.ts';
 import {
-    seedRootAdmin,
-} from './root-admin-fixture.ts';
+    seedAdminSchema,
+} from './test-fixtures.ts';
 import {
     putFlowRecord,
     getFlowRecord,
@@ -57,8 +57,7 @@ test(
     + ' the binding row',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         const ctx = createRequestContext(db, await devToken());
         await putFlowRecord(ctx, 'fr-1', {
             flow_id: 'flow-1',
@@ -79,8 +78,7 @@ test(
     + ' record id, or null if unbound',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         const ctx = createRequestContext(db, await devToken());
         await putFlowRecord(ctx, 'fr-1', {
             flow_id: 'flow-1',
@@ -105,8 +103,7 @@ test(
     + ' bound to a record',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         const ctx = createRequestContext(db, await devToken());
         await putFlowRecord(ctx, 'fr-1', {
             flow_id: 'flow-a',
@@ -140,8 +137,7 @@ test(
     + ' to multiple flows',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         const ctx = createRequestContext(db, await devToken());
         // Bind rec-1 to two flows.
         await putFlowRecord(ctx, 'fr-1', {
@@ -183,8 +179,7 @@ test(
     + ' list for an unbound record',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         const ctx = createRequestContext(db, await devToken());
         const workOrders =
             await getWorkOrdersForRecord(
@@ -198,8 +193,7 @@ test(
     'deleteFlowRecord removes the binding row',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         const ctx = createRequestContext(db, await devToken());
         await putFlowRecord(ctx, 'fr-1', {
             flow_id: 'flow-1',

@@ -1,4 +1,10 @@
-import type { DbAdapter } from './db.ts';
+import type {
+    DbAdapter,
+    EntityStore,
+    EntityValidator,
+    KeyedCollectionReader,
+} from './db.ts';
+import { extractErrorMessage } from './error-helpers.ts';
 import {
     EntityNotFound,
     MissingTableError,
@@ -34,8 +40,14 @@ import type {
     StateFieldValueEntity,
     WorkOrderEntity,
     MemberEntity,
+    OrganizationEntity,
 } from './types.ts';
-import { nowUtc, type Id } from './types.ts';
+import {
+    nowUtc,
+    assertInvitationState,
+    type Id,
+    type InvitationState,
+} from './types.ts';
 import {
     generateCryptoSafeBase62,
 } from './crypto-safe-base62.ts';
@@ -59,6 +71,7 @@ import {
     currentDefaultOrgFor,
     isPermitted,
 } from './authorization.ts';
+import { latestByKey } from './ledger-reduction.ts';
 import {
     postToken,
     postAuthorize,
@@ -101,6 +114,7 @@ const HTTP_NOT_FOUND = 404;
 const HTTP_INTERNAL_ERROR = 500;
 const HTTP_UNAUTHORIZED = 401;
 const HTTP_FORBIDDEN = 403;
+const HTTP_CONFLICT = 409;
 
 // Authenticate in-tree requests at the one chokepoint. The
 // gate runs AFTER matchRoute (which already 404'd anything
@@ -204,6 +218,55 @@ function withoutSecret(
 ): Omit<IdentityCredentialEntity, 'secret'> {
     const { secret: _secret, ...rest } = cred;
     return rest;
+}
+
+// The `/noun/:id` resource over a standard EntityStore. The
+// verbs a resource exposes are data; each maps to its one fixed
+// store op (get→getById, put→put∘withoutId, delete→delete). The
+// optional putValidate / getTransform are wired ONCE here at
+// instantiation — Dependency Inversion, not a per-request branch
+// — so the returned Route's handlers are fixed closures reused
+// for the life of the process. The states log keeps its own
+// explicit routes (StateStore, append-only, custom readers).
+interface IdRouteConfig<T extends { id: string }> {
+    noun: string;
+    store: (db: DbAdapter) => EntityStore<T>;
+    verbs: ReadonlyArray<'get' | 'put' | 'delete'>;
+    putValidate?: EntityValidator<T>;
+    getTransform?: (row: T) => unknown;
+}
+
+function makeIdRoute<T extends { id: string }>(
+    config: IdRouteConfig<T>,
+): Route {
+    const { store, putValidate, getTransform } = config;
+    const handlers: {
+        get?: GetHandler;
+        put?: PutHandler;
+        delete?: DeleteHandler;
+    } = {};
+    if (config.verbs.includes('get')) {
+        handlers.get = getTransform === undefined
+            ? (db, p) => store(db).getById(param(p, 0))
+            : async (db, p) =>
+                getTransform(
+                    await store(db).getById(param(p, 0)),
+                );
+    }
+    if (config.verbs.includes('put')) {
+        handlers.put = (db, p, body) =>
+            store(db).put(
+                param(p, 0),
+                putValidate === undefined
+                    ? withoutId(body) as unknown as Omit<T, 'id'>
+                    : putValidate(withoutId(body)),
+            );
+    }
+    if (config.verbs.includes('delete')) {
+        handlers.delete = (db, p) =>
+            store(db).delete(param(p, 0));
+    }
+    return route(`${config.noun}/:id`, handlers);
 }
 
 async function applyRecordMultiPut(
@@ -453,167 +516,94 @@ const routes: Route[] = [
     route('ai-members', {
         get: (db) => db.aiMembers.getAll(),
     }),
-    route('ai-members/:id', {
-        get: (db, p) =>
-            db.aiMembers.getById(
-                param(p, 0),
-            ),
-        put: (db, p, payload) =>
-            db.aiMembers.put(
-                param(p, 0),
-                withoutId(payload) as unknown as Omit<
-                    AIMemberEntity, 'id'
-                >,
-            ),
+    makeIdRoute<AIMemberEntity>({
+        noun: 'ai-members',
+        store: db => db.aiMembers,
+        verbs: ['get', 'put'],
     }),
     route('human-members', {
         get: (db) => db.humanMembers.getAll(),
     }),
-    route('human-members/:id', {
-        get: (db, p) =>
-            db.humanMembers.getById(
-                param(p, 0),
-            ),
-        put: (db, p, payload) =>
-            db.humanMembers.put(
-                param(p, 0),
-                withoutId(payload) as unknown as Omit<
-                    HumanMemberEntity, 'id'
-                >,
-            ),
+    makeIdRoute<HumanMemberEntity>({
+        noun: 'human-members',
+        store: db => db.humanMembers,
+        verbs: ['get', 'put'],
     }),
     route('identities', {
         get: (db) => db.identities.getAll(),
     }),
-    route('identities/:id', {
-        get: (db, p) =>
-            db.identities.getById(param(p, 0)),
-        put: (db, p, payload) =>
-            db.identities.put(
-                param(p, 0),
-                withoutId(payload) as unknown as
-                    Omit<IdentityEntity, 'id'>,
-            ),
+    makeIdRoute<IdentityEntity>({
+        noun: 'identities',
+        store: db => db.identities,
+        verbs: ['get', 'put'],
     }),
     route('identity-pii', {
         get: (db) => db.identityPii.getAll(),
     }),
-    route('identity-pii/:id', {
-        get: (db, p) =>
-            db.identityPii.getById(param(p, 0)),
-        put: (db, p, payload) =>
-            db.identityPii.put(
-                param(p, 0),
-                withoutId(payload) as unknown as
-                    Omit<IdentityPiiEntity, 'id'>,
-            ),
-        delete: (db, p) =>
-            db.identityPii.delete(param(p, 0)),
+    makeIdRoute<IdentityPiiEntity>({
+        noun: 'identity-pii',
+        store: db => db.identityPii,
+        verbs: ['get', 'put', 'delete'],
     }),
     route('identity-credentials', {
         get: async (db) =>
             (await db.identityCredentials.getAll())
                 .map(withoutSecret),
     }),
-    route('identity-credentials/:id', {
-        get: async (db, p) =>
-            withoutSecret(
-                await db.identityCredentials.getById(
-                    param(p, 0))),
-        put: (db, p, payload) =>
-            db.identityCredentials.put(
-                param(p, 0),
-                withoutId(payload) as unknown as
-                    Omit<
-                        IdentityCredentialEntity, 'id'
-                    >,
-            ),
+    makeIdRoute<IdentityCredentialEntity>({
+        noun: 'identity-credentials',
+        store: db => db.identityCredentials,
+        verbs: ['get', 'put'],
+        getTransform: withoutSecret,
     }),
     route('identity-token-revocations', {
         get: (db) =>
             db.identityTokenRevocations.getAll(),
     }),
-    route('identity-token-revocations/:id', {
-        get: (db, p) =>
-            db.identityTokenRevocations.getById(
-                param(p, 0),
-            ),
-        put: (db, p, payload) =>
-            db.identityTokenRevocations.put(
-                param(p, 0),
-                withoutId(payload) as unknown as
-                    Omit<
-                        IdentityTokenRevocationEntity,
-                        'id'
-                    >,
-            ),
+    makeIdRoute<IdentityTokenRevocationEntity>({
+        noun: 'identity-token-revocations',
+        store: db => db.identityTokenRevocations,
+        verbs: ['get', 'put'],
     }),
     route('role-grants', {
         get: (db) => db.roleGrants.getAll(),
     }),
-    route('role-grants/:id', {
-        get: (db, p) =>
-            db.roleGrants.getById(param(p, 0)),
-        put: (db, p, payload) =>
-            db.roleGrants.put(
-                param(p, 0),
-                withoutId(payload) as unknown as
-                    Omit<RoleGrantEntity, 'id'>,
-            ),
+    makeIdRoute<RoleGrantEntity>({
+        noun: 'role-grants',
+        store: db => db.roleGrants,
+        verbs: ['get', 'put'],
     }),
     route('identity-tokens', {
         get: (db) => db.identityTokens.getAll(),
     }),
-    route('identity-tokens/:id', {
-        get: (db, p) =>
-            db.identityTokens.getById(param(p, 0)),
-        put: (db, p, payload) =>
-            db.identityTokens.put(
-                param(p, 0),
-                withoutId(payload) as unknown as
-                    Omit<IdentityTokenEntity, 'id'>,
-            ),
+    makeIdRoute<IdentityTokenEntity>({
+        noun: 'identity-tokens',
+        store: db => db.identityTokens,
+        verbs: ['get', 'put'],
     }),
     route('clients', {
         get: (db) => db.clients.getAll(),
     }),
-    route('clients/:id', {
-        get: (db, p) =>
-            db.clients.getById(param(p, 0)),
-        put: (db, p, payload) =>
-            db.clients.put(
-                param(p, 0),
-                withoutId(payload) as unknown as
-                    Omit<ClientEntity, 'id'>,
-            ),
-        delete: (db, p) =>
-            db.clients.delete(param(p, 0)),
+    makeIdRoute<ClientEntity>({
+        noun: 'clients',
+        store: db => db.clients,
+        verbs: ['get', 'put', 'delete'],
     }),
     route('identity-providers', {
         get: (db) => db.identityProviders.getAll(),
     }),
-    route('identity-providers/:id', {
-        get: (db, p) =>
-            db.identityProviders.getById(param(p, 0)),
-        put: (db, p, payload) =>
-            db.identityProviders.put(
-                param(p, 0),
-                withoutId(payload) as unknown as
-                    Omit<IdentityProviderEntity, 'id'>,
-            ),
+    makeIdRoute<IdentityProviderEntity>({
+        noun: 'identity-providers',
+        store: db => db.identityProviders,
+        verbs: ['get', 'put'],
     }),
     route('authorization-codes', {
         get: (db) => db.authorizationCodes.getAll(),
     }),
-    route('authorization-codes/:id', {
-        get: (db, p) =>
-            db.authorizationCodes.getById(param(p, 0)),
-        put: (db, p, payload) =>
-            db.authorizationCodes.put(
-                param(p, 0),
-                withoutId(payload) as unknown as
-                    Omit<AuthorizationCodeEntity, 'id'>,
-            ),
+    makeIdRoute<AuthorizationCodeEntity>({
+        noun: 'authorization-codes',
+        store: db => db.authorizationCodes,
+        verbs: ['get', 'put'],
     }),
     route('authentication/token', {
         post: async (db, _p, body) => {
@@ -651,163 +641,83 @@ const routes: Route[] = [
         get: (db) =>
             db.flows.getAll(),
     }),
-    route('flows/:id', {
-        get: (db, params) =>
-            db.flows.getById(
-                param(params, 0),
-            ),
-        put: (db, params, body) =>
-            db.flows.put(
-                param(params, 0),
-                withoutId(body) as unknown as Omit<
-                    FlowEntity, 'id'
-                >,
-            ),
+    makeIdRoute<FlowEntity>({
+        noun: 'flows',
+        store: db => db.flows,
+        verbs: ['get', 'put'],
     }),
     route('flow-versions', {
         get: (db) =>
             db.flowVersions.getAll(),
     }),
-    route('flow-versions/:id', {
-        get: (db, params) =>
-            db.flowVersions.getById(
-                param(params, 0),
-            ),
-        put: (db, params, body) =>
-            db.flowVersions.put(
-                param(params, 0),
-                withoutId(body) as unknown as Omit<
-                    FlowVersionEntity, 'id'
-                >,
-            ),
-        delete: (db, params) =>
-            db.flowVersions.delete(
-                param(params, 0),
-            ),
+    makeIdRoute<FlowVersionEntity>({
+        noun: 'flow-versions',
+        store: db => db.flowVersions,
+        verbs: ['get', 'put', 'delete'],
     }),
     route('project-flows', {
         get: (db) =>
             db.projectFlows
                 .getAll(),
     }),
-    route('project-flows/:id', {
-        put: (db, params, body) =>
-            db.projectFlows.put(
-                param(params, 0),
-                withoutId(body) as unknown as Omit<
-                    ProjectFlowEntity, 'id'
-                >,
-            ),
-        delete: (db, params) =>
-            db.projectFlows.delete(
-                param(params, 0),
-            ),
+    makeIdRoute<ProjectFlowEntity>({
+        noun: 'project-flows',
+        store: db => db.projectFlows,
+        verbs: ['put', 'delete'],
     }),
     route('work-orders', {
         get: (db) =>
             db.workOrders.getAll(),
     }),
-    route('work-orders/:id', {
-        get: (db, params) =>
-            db.workOrders.getById(
-                param(params, 0),
-            ),
-        put: (db, params, body) =>
-            db.workOrders.put(
-                param(params, 0),
-                withoutId(body) as unknown as Omit<
-                    WorkOrderEntity, 'id'
-                >,
-            ),
+    makeIdRoute<WorkOrderEntity>({
+        noun: 'work-orders',
+        store: db => db.workOrders,
+        verbs: ['get', 'put'],
     }),
     route('flow-work-orders', {
         get: (db) =>
             db.flowWorkOrders.getAll(),
     }),
-    route('flow-work-orders/:id', {
-        put: (db, params, body) =>
-            db.flowWorkOrders.put(
-                param(params, 0),
-                withoutId(body) as unknown as Omit<
-                    FlowWorkOrderEntity, 'id'
-                >,
-            ),
+    makeIdRoute<FlowWorkOrderEntity>({
+        noun: 'flow-work-orders',
+        store: db => db.flowWorkOrders,
+        verbs: ['put'],
     }),
     route('state-field-values', {
         get: (db) =>
             db.stateFieldValues
                 .getAll(),
     }),
-    route('state-field-values/:id', {
-        put: (db, params, body) =>
-            db.stateFieldValues.put(
-                param(params, 0),
-                withoutId(body) as unknown as Omit<
-                    StateFieldValueEntity, 'id'
-                >,
-            ),
-        delete: (db, params) =>
-            db.stateFieldValues.delete(
-                param(params, 0),
-            ),
+    makeIdRoute<StateFieldValueEntity>({
+        noun: 'state-field-values',
+        store: db => db.stateFieldValues,
+        verbs: ['put', 'delete'],
     }),
     route('records', {
         get: (db) => db.records.getAll(),
     }),
-    route('records/:id', {
-        get: (db, p) =>
-            db.records.getById(param(p, 0)),
-        put: (db, p, body) =>
-            db.records.put(
-                param(p, 0),
-                withoutId(body) as unknown as Omit<
-                    RecordEntity, 'id'
-                >,
-            ),
-        delete: (db, p) =>
-            db.records.delete(param(p, 0)),
+    makeIdRoute<RecordEntity>({
+        noun: 'records',
+        store: db => db.records,
+        verbs: ['get', 'put', 'delete'],
     }),
     route('record-attributes', {
         get: (db) =>
             db.recordAttributes.getAll(),
     }),
-    route('record-attributes/:id', {
-        get: (db, p) =>
-            db.recordAttributes.getById(
-                param(p, 0),
-            ),
-        put: (db, p, body) =>
-            db.recordAttributes.put(
-                param(p, 0),
-                withoutId(body) as unknown as Omit<
-                    RecordAttributeEntity, 'id'
-                >,
-            ),
-        delete: (db, p) =>
-            db.recordAttributes.delete(
-                param(p, 0),
-            ),
+    makeIdRoute<RecordAttributeEntity>({
+        noun: 'record-attributes',
+        store: db => db.recordAttributes,
+        verbs: ['get', 'put', 'delete'],
     }),
     route('flow-records', {
         get: (db) =>
             db.flowRecords.getAll(),
     }),
-    route('flow-records/:id', {
-        get: (db, p) =>
-            db.flowRecords.getById(
-                param(p, 0),
-            ),
-        put: (db, p, body) =>
-            db.flowRecords.put(
-                param(p, 0),
-                withoutId(body) as unknown as Omit<
-                    FlowRecordEntity, 'id'
-                >,
-            ),
-        delete: (db, p) =>
-            db.flowRecords.delete(
-                param(p, 0),
-            ),
+    makeIdRoute<FlowRecordEntity>({
+        noun: 'flow-records',
+        store: db => db.flowRecords,
+        verbs: ['get', 'put', 'delete'],
     }),
     route('records-multi-put', {
         post: async (db, _p, body) => {
@@ -823,135 +733,79 @@ const routes: Route[] = [
     route('organizations', {
         get: (db) => db.organizations.getAll(),
     }),
-    route('organizations/:id', {
-        get: (db, p) =>
-            db.organizations.getById(param(p, 0)),
-        put: (db, p, payload) =>
-            db.organizations.put(
-                param(p, 0),
-                validateOrganizationEntity(
-                    withoutId(payload),
-                ),
-            ),
+    makeIdRoute<OrganizationEntity>({
+        noun: 'organizations',
+        store: db => db.organizations,
+        verbs: ['get', 'put'],
+        putValidate: validateOrganizationEntity,
     }),
     route('memberships', {
         get: (db) => db.memberships.getAll(),
     }),
-    route('memberships/:id', {
-        get: (db, p) =>
-            db.memberships.getById(param(p, 0)),
-        put: (db, p, payload) =>
-            db.memberships.put(
-                param(p, 0),
-                withoutId(payload) as unknown as
-                    Omit<MembershipEntity, 'id'>,
-            ),
-        delete: (db, p) =>
-            db.memberships.delete(param(p, 0)),
+    makeIdRoute<MembershipEntity>({
+        noun: 'memberships',
+        store: db => db.memberships,
+        verbs: ['get', 'put', 'delete'],
     }),
     route('current-member', {
         get: (db) =>
             db.members.getById('current'),
     }),
 
-    route('members/:id', {
-        get: (db, p) =>
-            db.members.getById(param(p, 0)),
-        put: (db, p, payload) =>
-            db.members.put(
-                param(p, 0),
-                withoutId(payload) as unknown as Omit<
-                    MemberEntity, 'id'
-                >,
-            ),
+    makeIdRoute<MemberEntity>({
+        noun: 'members',
+        store: db => db.members,
+        verbs: ['get', 'put'],
     }),
-    route('ideas/:id', {
-        get: (db, p) =>
-            db.ideas.getById(param(p, 0)),
-        put: (db, p, payload) =>
-            db.ideas.put(
-                param(p, 0),
-                withoutId(payload) as unknown as Omit<
-                    IdeaEntity, 'id'
-                >,
-            ),
+    makeIdRoute<IdeaEntity>({
+        noun: 'ideas',
+        store: db => db.ideas,
+        verbs: ['get', 'put'],
     }),
-    route('projects/:id', {
-        get: (db, p) =>
-            db.projects.getById(
-                param(p, 0),
-            ),
-        put: (db, p, payload) =>
-            db.projects.put(
-                param(p, 0),
-                withoutId(payload) as unknown as Omit<
-                    ProjectEntity, 'id'
-                >,
-            ),
+    makeIdRoute<ProjectEntity>({
+        noun: 'projects',
+        store: db => db.projects,
+        verbs: ['get', 'put'],
     }),
-    route('idea-submissions/:id', {
-        put: (db, p, payload) =>
-            db.ideaSubmissions.put(
-                param(p, 0),
-                withoutId(payload) as unknown as Omit<
-                    IdeaSubmissionEntity, 'id'
-                >,
-            ),
+    makeIdRoute<IdeaSubmissionEntity>({
+        noun: 'idea-submissions',
+        store: db => db.ideaSubmissions,
+        verbs: ['put'],
     }),
     route('objectives', {
         get: (db) => db.objectives.getAll(),
     }),
-    route('objectives/:id', {
-        get: (db, p) =>
-            db.objectives.getById(
-                param(p, 0),
-            ),
-        put: (db, p, body) =>
-            db.objectives.put(
-                param(p, 0),
-                withoutId(body) as unknown as Omit<
-                    Objective, 'id'
-                >,
-            ),
+    makeIdRoute<Objective>({
+        noun: 'objectives',
+        store: db => db.objectives,
+        verbs: ['get', 'put'],
     }),
     route('objective-revisions', {
         get: (db) =>
             db.objectiveRevisions.getAll(),
     }),
-    route('objective-revisions/:id', {
-        put: (db, p, body) =>
-            db.objectiveRevisions.put(
-                param(p, 0),
-                withoutId(body) as unknown as Omit<
-                    ObjectiveRevision, 'id'
-                >,
-            ),
+    makeIdRoute<ObjectiveRevision>({
+        noun: 'objective-revisions',
+        store: db => db.objectiveRevisions,
+        verbs: ['put'],
     }),
     route('project-objective-baseline-scores', {
         get: (db) =>
             db.projectObjectiveBaselineScores.getAll(),
     }),
-    route('project-objective-baseline-scores/:id', {
-        put: (db, p, body) =>
-            db.projectObjectiveBaselineScores.put(
-                param(p, 0),
-                withoutId(body) as unknown as Omit<
-                    ProjectObjectiveBaselineScore, 'id'
-                >,
-            ),
+    makeIdRoute<ProjectObjectiveBaselineScore>({
+        noun: 'project-objective-baseline-scores',
+        store: db => db.projectObjectiveBaselineScores,
+        verbs: ['put'],
     }),
     route('project-objective-actual-scores', {
         get: (db) =>
             db.projectObjectiveActualScores.getAll(),
     }),
-    route('project-objective-actual-scores/:id', {
-        put: (db, p, body) =>
-            db.projectObjectiveActualScores.put(
-                param(p, 0),
-                withoutId(body) as unknown as Omit<
-                    ProjectObjectiveActualScore, 'id'
-                >,
-            ),
+    makeIdRoute<ProjectObjectiveActualScore>({
+        noun: 'project-objective-actual-scores',
+        store: db => db.projectObjectiveActualScores,
+        verbs: ['put'],
     }),
     route('states', {
         get: (db) => db.states.getAll(),
@@ -1281,6 +1135,472 @@ async function identityDefaultOrgRequest(
     );
 }
 
+// A JSON error response at one status — the shape every
+// invitation guard returns on rejection.
+function errorJson(message: string, status: number): Response {
+    return Response.json({ error: message }, { status });
+}
+
+// The active org of the caller: the verified token claim, else
+// the identity's resolved default. Null when the identity can
+// reach no org — the same denial the main gate raises.
+async function callerActiveOrg(
+    adapter: DbAdapter,
+    principal: Principal,
+): Promise<Id | null> {
+    return principal.organization
+        ?? await identityDefaultOrg(adapter, principal.id);
+}
+
+async function callerIsOrgAdmin(
+    adapter: DbAdapter,
+    identityId: Id,
+    org: Id,
+): Promise<boolean> {
+    const rows = await adapter.roleGrants.getAll();
+    return currentRolesForInOrg(rows, identityId, org)
+        .includes('admin');
+}
+
+// An invitation's current state: the latest event on its id,
+// resolved via latestByKey (the same derivation every entity's
+// state uses) rather than states.currentFor, whose strict-`>`
+// tiebreak keeps the FIRST event and would freeze a co-timestamped
+// lifecycle at 'pending'. On a same-millisecond `at` tie the
+// winner is backend-dependent (the memory tier preserves insertion
+// order; IndexedDB's index.getAll returns primary-key order) — not
+// an issue here, since each lifecycle transition is a distinct HTTP
+// request milliseconds-to-seconds apart, so `at` ties do not occur
+// in practice. Null when no event has been recorded.
+async function currentInvitationState(
+    adapter: DbAdapter,
+    id: Id,
+): Promise<InvitationState | null> {
+    const events = await adapter.states.allFor(id);
+    const latest = latestByKey(events, ev => ev.entity_id)
+        .get(id);
+    return latest === undefined
+        ? null
+        : assertInvitationState(latest.state, 'invitation ' + id);
+}
+
+// The invitation surface: an identity/org-spanning workflow the
+// org fence cannot host. The invitee reads and answers an
+// invitation to an org they are NOT yet in, and acceptance
+// writes the membership in the INVITATION's org — never the
+// caller's active org, which the org-scoped store would stamp.
+// So every op runs on the BASE adapter with an explicit guard,
+// like identityDefaultOrgRequest: grant/revoke/sent require an
+// admin role in the relevant org; accept/decline/read require
+// the caller to BE the invitee. These never touch the
+// admin-only ROUTE_POLICY, so a non-admin invitee can accept.
+// GET /organizations enumerates the caller's OWN membership
+// orgs — identity-scoped like /invitations, so it gates on
+// authentication, not a role. enumerateMyOrgs self-fences to
+// the caller's memberships, so a roleless member sees only
+// their own orgs and can boot the shell.
+async function organizationsEnumerationRequest(
+    adapter: DbAdapter,
+    request: Request,
+): Promise<Response> {
+    const authResult =
+        await authenticateRequest(adapter, request);
+    if (typeof authResult === 'string') {
+        return errorJson(authResult, HTTP_UNAUTHORIZED);
+    }
+    return enumerateMyOrgs(adapter, authResult);
+}
+
+async function invitationsRequest(
+    adapter: DbAdapter,
+    request: Request,
+    segments: readonly string[],
+): Promise<Response> {
+    const authResult =
+        await authenticateRequest(adapter, request);
+    if (typeof authResult === 'string') {
+        return errorJson(authResult, HTTP_UNAUTHORIZED);
+    }
+    const principal = authResult;
+    const method = request.method;
+    if (segments.length === 1) {
+        if (method === 'GET') {
+            return invitationsForInvitee(adapter, principal);
+        }
+        if (method === 'POST') {
+            return grantInvitation(adapter, request, principal);
+        }
+    }
+    if (segments.length === 2 && segments[1] === 'sent') {
+        if (method === 'GET') {
+            return sentInvitations(adapter, principal);
+        }
+    }
+    if (segments.length === 3 && method === 'POST') {
+        const id = segments[1]!;
+        const op = segments[2]!;
+        if (op === 'acceptance') {
+            return acceptInvitation(adapter, principal, id);
+        }
+        if (op === 'decline') {
+            return declineInvitation(adapter, principal, id);
+        }
+        if (op === 'revocation') {
+            return revokeInvitation(adapter, principal, id);
+        }
+    }
+    return errorJson(
+        'Not found: /' + segments.join('/'), HTTP_NOT_FOUND,
+    );
+}
+
+// The caller's own invitations, each enriched with the org name
+// and the inviter's name for display. The first event is the
+// grant (its actor is the inviter); the last event is the
+// current state. The whole result is the caller's own — never
+// another identity's.
+async function invitationsForInvitee(
+    adapter: DbAdapter,
+    principal: Principal,
+): Promise<Response> {
+    const mine = (await adapter.invitations.getAll())
+        .filter(inv => inv.identity_id === principal.id);
+    const orgName = new Map(
+        (await adapter.organizations.getAll())
+            .map(o => [o.id, o.name]));
+    const personName = new Map(
+        (await adapter.identityPii.getAll())
+            .map(p => [p.id, p.name]));
+    const out = [];
+    for (const inv of mine) {
+        const events = await adapter.states.allFor(inv.id);
+        const latest = latestByKey(events, ev => ev.entity_id)
+            .get(inv.id);
+        if (latest === undefined) continue;
+        // The inviter is the actor of the grant ('pending') event —
+        // found by state, not position, so a same-`at` tie cannot
+        // misattribute it. An absent name (erased PII) stays empty;
+        // the presenter then omits the "Invited by" line.
+        const grant = events.find(ev => ev.state === 'pending');
+        out.push({
+            id: inv.id,
+            organization_id: inv.organization_id,
+            organization_name:
+                orgName.get(inv.organization_id) ?? '',
+            identity_id: inv.identity_id,
+            invited_by_name: grant
+                ? personName.get(grant.member_id) ?? ''
+                : '',
+            at: inv.at,
+            state: assertInvitationState(
+                latest.state, 'invitation ' + inv.id),
+        });
+    }
+    return Response.json(out);
+}
+
+// The active org's outstanding (pending) invitations, for an
+// admin. The invitee email rides along because the admin
+// supplied it at grant time — need-to-know, not a PII leak.
+async function sentInvitations(
+    adapter: DbAdapter,
+    principal: Principal,
+): Promise<Response> {
+    const org = await callerActiveOrg(adapter, principal);
+    if (org === null) {
+        return errorJson(
+            'forbidden: identity has no organization',
+            HTTP_FORBIDDEN);
+    }
+    if (!await callerIsOrgAdmin(adapter, principal.id, org)) {
+        return errorJson(
+            'forbidden: listing sent invitations requires'
+            + ' an admin role', HTTP_FORBIDDEN);
+    }
+    const orgInvites = (await adapter.invitations.getAll())
+        .filter(inv => inv.organization_id === org);
+    const email = new Map(
+        (await adapter.identityPii.getAll())
+            .map(p => [p.id, p.email]));
+    const out = [];
+    for (const inv of orgInvites) {
+        const state = await currentInvitationState(
+            adapter, inv.id);
+        if (state !== 'pending') continue;
+        out.push({
+            id: inv.id,
+            organization_id: org,
+            identity_id: inv.identity_id,
+            invitee_email: email.get(inv.identity_id) ?? '',
+            at: inv.at,
+            state: 'pending',
+        });
+    }
+    return Response.json(out);
+}
+
+// Grant: an admin invites an EXISTING identity by email. The
+// org is the admin's verified active org. Idempotent on an
+// outstanding pending invite for the (org, identity) pair.
+// New-identity creation and email delivery are deferred.
+async function grantInvitation(
+    adapter: DbAdapter,
+    request: Request,
+    principal: Principal,
+): Promise<Response> {
+    const org = await callerActiveOrg(adapter, principal);
+    if (org === null) {
+        return errorJson(
+            'forbidden: identity has no organization',
+            HTTP_FORBIDDEN);
+    }
+    if (!await callerIsOrgAdmin(adapter, principal.id, org)) {
+        return errorJson(
+            'forbidden: granting an invitation requires an'
+            + ' admin role', HTTP_FORBIDDEN);
+    }
+    let body: Record<string, unknown>;
+    try {
+        body = (await request.json()) as Record<
+            string, unknown
+        >;
+    } catch {
+        return errorJson('Invalid JSON body', HTTP_BAD_REQUEST);
+    }
+    const email = typeof body.email === 'string'
+        ? body.email : '';
+    if (email === '') {
+        return errorJson(
+            'an "email" is required', HTTP_BAD_REQUEST);
+    }
+    // DEMO-TIER POSTURE: a missing email 404s and an already-member
+    // 409s, so an org admin can tell whether an email maps to an
+    // existing identity (even one in another org). This is a conscious
+    // tradeoff — the admin needs to know the invite landed, and the
+    // plan defers new-identity creation — of the same demo grade as the
+    // client-shipped HMAC key. A server tier would resolve emails
+    // without reflecting existence through the status code.
+    const match = (await adapter.identityPii.getAll())
+        .find(p => p.email === email);
+    if (match === undefined) {
+        return errorJson(
+            'no identity with that email', HTTP_NOT_FOUND);
+    }
+    const identityId = match.id;
+    const id = generateCryptoSafeBase62();
+    const eventId = generateCryptoSafeBase62();
+    const at = nowUtc();
+    // The member/pending checks and the write run in ONE transaction so
+    // two concurrent grants cannot both pass the check and each append a
+    // pending invitation (Commandment VII). The tx RETURNS its outcome
+    // (a closure-mutated outer var would not narrow), mapped below.
+    const result = await adapter.transaction(
+        ['invitations', 'states', 'memberships'],
+        async (view): Promise<GrantOutcome> => {
+            const member = (await view.memberships.getAll())
+                .some(m => m.identity_id === identityId
+                    && m.organization_id === org);
+            if (member) return { kind: 'member' };
+            const existing = await pendingInvitationFor(
+                view, org, identityId);
+            if (existing !== null) {
+                return {
+                    kind: 'existing',
+                    id: existing.id, at: existing.at,
+                };
+            }
+            await view.invitations.put(id, {
+                organization_id: org,
+                identity_id: identityId,
+                at,
+            });
+            await view.states.record(
+                eventId, id, 'pending', principal.id);
+            return { kind: 'created' };
+        },
+    );
+    if (result.kind === 'member') {
+        return errorJson(
+            'that identity is already a member of this'
+            + ' organization', HTTP_CONFLICT);
+    }
+    if (result.kind === 'existing') {
+        return Response.json({
+            id: result.id, organization_id: org,
+            identity_id: identityId, at: result.at,
+            state: 'pending',
+        });
+    }
+    return Response.json({
+        id, organization_id: org, identity_id: identityId,
+        at, state: 'pending',
+    });
+}
+
+type GrantOutcome =
+    | { kind: 'member' }
+    | { kind: 'existing'; id: Id; at: string }
+    | { kind: 'created' };
+
+// The org's outstanding pending invitation for an identity, or
+// null. The grant idempotency check.
+async function pendingInvitationFor(
+    adapter: DbAdapter,
+    org: Id,
+    identityId: Id,
+): Promise<{ id: Id; at: string } | null> {
+    const candidates = (await adapter.invitations.getAll())
+        .filter(inv => inv.organization_id === org
+            && inv.identity_id === identityId);
+    for (const inv of candidates) {
+        const state = await currentInvitationState(
+            adapter, inv.id);
+        if (state === 'pending') {
+            return { id: inv.id, at: inv.at };
+        }
+    }
+    return null;
+}
+
+// Accept: the invitee turns a pending invitation into a real
+// membership in the INVITATION's org, in one atomic batch with
+// the 'accepted' event. Idempotent: a re-accept is a no-op; a
+// non-pending invitation is a conflict.
+async function acceptInvitation(
+    adapter: DbAdapter,
+    principal: Principal,
+    id: Id,
+): Promise<Response> {
+    const inv = await loadInvitation(adapter, id);
+    if (inv === null) {
+        return errorJson('Not found: /invitations/' + id,
+            HTTP_NOT_FOUND);
+    }
+    if (inv.identity_id !== principal.id) {
+        return errorJson(
+            'forbidden: only the invitee may accept',
+            HTTP_FORBIDDEN);
+    }
+    const membershipId = generateCryptoSafeBase62();
+    const eventId = generateCryptoSafeBase62();
+    const at = nowUtc();
+    // The pending check rides INSIDE the write transaction so a
+    // concurrent revoke/decline cannot slip between the check and the
+    // membership write — a revoke must actually stop access (Commandment
+    // X / II). Mirrors grantAuthorizationCode's in-tx state gate.
+    let conflict = false;
+    await adapter.transaction(
+        ['memberships', 'states'],
+        async (view) => {
+            const state = await currentInvitationState(view, id);
+            if (state === 'accepted') return;   // idempotent no-op
+            if (state !== 'pending') { conflict = true; return; }
+            const already = (await view.memberships.getAll())
+                .some(m => m.identity_id === principal.id
+                    && m.organization_id
+                        === inv.organization_id);
+            if (!already) {
+                await view.memberships.put(membershipId, {
+                    organization_id: inv.organization_id,
+                    identity_id: principal.id,
+                    at,
+                });
+            }
+            await view.states.record(
+                eventId, id, 'accepted', principal.id);
+        },
+    );
+    if (conflict) {
+        return errorJson(
+            'invitation is not pending', HTTP_CONFLICT);
+    }
+    return new Response(null, { status: 204 });
+}
+
+// Decline: the invitee appends 'declined'. No membership is
+// written. Idempotent on an already-declined invitation.
+async function declineInvitation(
+    adapter: DbAdapter,
+    principal: Principal,
+    id: Id,
+): Promise<Response> {
+    const inv = await loadInvitation(adapter, id);
+    if (inv === null) {
+        return errorJson('Not found: /invitations/' + id,
+            HTTP_NOT_FOUND);
+    }
+    if (inv.identity_id !== principal.id) {
+        return errorJson(
+            'forbidden: only the invitee may decline',
+            HTTP_FORBIDDEN);
+    }
+    const eventId = generateCryptoSafeBase62();
+    let conflict = false;
+    await adapter.transaction(['states'], async (view) => {
+        const state = await currentInvitationState(view, id);
+        if (state === 'declined') return;   // idempotent no-op
+        if (state !== 'pending') { conflict = true; return; }
+        await view.states.record(
+            eventId, id, 'declined', principal.id);
+    });
+    if (conflict) {
+        return errorJson(
+            'invitation is not pending', HTTP_CONFLICT);
+    }
+    return new Response(null, { status: 204 });
+}
+
+// Revoke: an admin of the invitation's org cancels a pending
+// invite by appending 'revoked'. The invitation row persists as
+// audit (mirrors postRoleRevocation). Idempotent on an
+// already-revoked invitation.
+async function revokeInvitation(
+    adapter: DbAdapter,
+    principal: Principal,
+    id: Id,
+): Promise<Response> {
+    const inv = await loadInvitation(adapter, id);
+    if (inv === null) {
+        return errorJson('Not found: /invitations/' + id,
+            HTTP_NOT_FOUND);
+    }
+    if (!await callerIsOrgAdmin(
+        adapter, principal.id, inv.organization_id)) {
+        return errorJson(
+            'forbidden: revoking an invitation requires an'
+            + ' admin role', HTTP_FORBIDDEN);
+    }
+    const eventId = generateCryptoSafeBase62();
+    let conflict = false;
+    await adapter.transaction(['states'], async (view) => {
+        const state = await currentInvitationState(view, id);
+        if (state === 'revoked') return;   // idempotent no-op
+        if (state !== 'pending') { conflict = true; return; }
+        await view.states.record(
+            eventId, id, 'revoked', principal.id);
+    });
+    if (conflict) {
+        return errorJson(
+            'invitation is not pending', HTTP_CONFLICT);
+    }
+    return new Response(null, { status: 204 });
+}
+
+// Read one invitation by id from the base store, or null when
+// absent — the 404 the invitation routes raise.
+async function loadInvitation(
+    adapter: DbAdapter,
+    id: Id,
+): Promise<{ id: Id; organization_id: Id;
+    identity_id: Id; at: string } | null> {
+    try {
+        return await adapter.invitations.getById(id);
+    } catch (e) {
+        if (e instanceof EntityNotFound) return null;
+        throw e;
+    }
+}
+
 export async function handleRequest(
     adapter: DbAdapter,
     request: Request,
@@ -1304,6 +1624,23 @@ export async function handleRequest(
         return identityDefaultOrgRequest(
             adapter, request, pathSegments,
         );
+    }
+    // The invitation surface is identity/org-spanning, so it
+    // runs on the BASE adapter with explicit guards rather than
+    // the org-scoped route table — see invitationsRequest.
+    if (pathSegments[0] === 'invitations') {
+        return invitationsRequest(
+            adapter, request, pathSegments,
+        );
+    }
+    // Enumerating one's own orgs is identity-scoped, not
+    // org-owned: it runs above the admin gate so a roleless
+    // member can boot. Only the bare GET — PUT (create) and
+    // /organizations/:id keep the org-scoped route handling.
+    if (pathSegments[0] === 'organizations'
+        && pathSegments.length === 1
+        && request.method === 'GET') {
+        return organizationsEnumerationRequest(adapter, request);
     }
     const match = matchRoute(pathSegments);
 
@@ -1361,10 +1698,6 @@ export async function handleRequest(
                 { status: HTTP_FORBIDDEN },
             );
         }
-        if (method === 'GET'
-            && routePattern === 'organizations') {
-            return enumerateMyOrgs(adapter, authResult);
-        }
         // organizations/:id is global passthrough; fence READS
         // to the caller's memberships so a non-member id 404s
         // like any foreign row. PUT is not gated here — a new
@@ -1387,13 +1720,20 @@ export async function handleRequest(
             && (routePattern === 'entity-states/:id'
                 || routePattern
                     === 'entity-states/:id/history')) {
+            // Reach the keyed membership read kept off the
+            // EntityStore contract, so the owner resolves
+            // through the identity_id index, not a scan.
+            const memberships = adapter.memberships as
+                EntityStore<MembershipEntity>
+                    & KeyedCollectionReader<MembershipEntity>;
             const owner = await ownerOrgOfEntity(
                 [
                     adapter.ideas, adapter.projects,
                     adapter.flows, adapter.records,
                     adapter.objectives, adapter.workOrders,
+                    adapter.invitations,
                 ],
-                adapter.memberships, org, param(params, 0),
+                memberships, org, param(params, 0),
             );
             if (owner !== null && owner !== org) {
                 return Response.json(
@@ -1555,12 +1895,7 @@ export async function handleRequest(
             );
         }
         return Response.json(
-            {
-                error:
-                    error instanceof Error
-                        ? error.message
-                        : String(error),
-            },
+            { error: extractErrorMessage(error) },
             { status: HTTP_INTERNAL_ERROR },
         );
     }

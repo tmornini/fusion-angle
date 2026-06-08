@@ -213,3 +213,10 @@
   color: hsl(var(--error-text));
 }
 
+.ds-toast-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-width: 24rem;
+}
+

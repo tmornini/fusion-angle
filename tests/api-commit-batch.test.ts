@@ -5,7 +5,7 @@ import {
 } from '../api/api.ts';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
-import { seedRootAdmin } from './root-admin-fixture.ts';
+import { seedAdminSchema } from './test-fixtures.ts';
 
 function ideaBody(id: string, title: string) {
     return {
@@ -19,8 +19,7 @@ function ideaBody(id: string, title: string) {
 
 async function freshDb() {
     const db = new MemoryDbAdapter();
-    await db.createSchema();
-    await seedRootAdmin(db);
+    await seedAdminSchema(db);
     return db;
 }
 

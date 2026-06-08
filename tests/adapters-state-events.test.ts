@@ -15,7 +15,7 @@ import {
     seedAIMember,
     seedHumanMember,
 } from './member-fixtures.ts';
-import { seedRootAdmin } from './root-admin-fixture.ts';
+import { seedAdminSchema } from './test-fixtures.ts';
 import type {
     IdeaEntity, ProjectEntity, RecordEntity,
 } from '../api/types.ts';
@@ -67,8 +67,7 @@ function recordBody(
 test('getProjectStates excludes a same-valued idea',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         await db.projects.put('p1', projectBody('P'));
         await db.states.record(
             'ev-p1', 'p1', 'approved', 'system',
@@ -89,8 +88,7 @@ test('getProjectStates excludes a same-valued idea',
 test('getIdeaStates excludes a same-valued project',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         await db.ideas.put('i1', ideaBody('I'));
         await db.states.record(
             'ev-i1', 'i1', 'active', 'system',
@@ -111,8 +109,7 @@ test('getIdeaStates excludes a same-valued project',
 test('getRecordStates excludes a same-valued idea',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         await db.records.put('r1', recordBody('R'));
         await db.states.record(
             'ev-r1', 'r1', 'active', 'system',
@@ -133,8 +130,7 @@ test('getRecordStates excludes a same-valued idea',
 test('getMemberStates spans kinds and excludes an idea',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         await seedHumanMember(db, 'wh', 'Human');
         await seedAIMember(db, 'wa', 'Ai');
         await db.ideas.put('i1', ideaBody('I'));
@@ -154,8 +150,7 @@ test('getMemberStates spans kinds and excludes an idea',
 test('getProjectStates keeps the later event on a tie',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         await db.projects.put('p1', projectBody('P'));
         const at = '2026-01-01T00:00:00.000Z';
         await db.states.put('ev-1', {

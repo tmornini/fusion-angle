@@ -14,7 +14,7 @@ import {
     type Member,
     isHumanMember,
     isAIMember,
-    ERASED_MEMBER_NAME,
+    MEMBER_WITHOUT_PII_NAME,
 } from '../adapters/index.ts';
 import { DISPLAY_ABSENT } from '../format.ts';
 import {
@@ -46,7 +46,7 @@ export class HumanMemberRowPresenter {
     buildRow(isSelf: boolean = false): SafeHtml {
         const pii = this.#member.pii();
         const name = pii.erased
-            ? ERASED_MEMBER_NAME
+            ? MEMBER_WITHOUT_PII_NAME
             : pii.name;
         const email = pii.erased
             ? DISPLAY_ABSENT

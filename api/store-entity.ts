@@ -4,11 +4,14 @@ import {
     type EntityStore as EntityStoreInterface,
     type EntityPut,
     type EntityValidator,
+    type KeyedCollectionReader,
     type TxRunner,
 } from './db.ts';
 
 export class EntityStore<T extends { id: string }>
-    implements EntityStoreInterface<T>
+    implements
+        EntityStoreInterface<T>,
+        KeyedCollectionReader<T>
 {
     readonly #table: string;
     readonly #run: TxRunner;
@@ -36,6 +39,32 @@ export class EntityStore<T extends { id: string }>
             async (tx) => {
                 const rows = await tx.getAll<T>(
                     this.#table,
+                );
+                const deletedIds =
+                    await this.#stateStore.deletedIdsIn(
+                        tx,
+                    );
+                return rows.filter(
+                    row => !deletedIds.has(row.id),
+                );
+            },
+        );
+    }
+
+    // The keyed-collection read: getAll narrowed to one
+    // indexed column. Same one-tx discipline as getAll — the
+    // index returns only matching rows, the deleted-id scan
+    // rides the SAME tx, two reads one truth — so the org
+    // fence reads a tenant's slice without scanning the table.
+    async getAllWhere(
+        column: string,
+        key: string,
+    ): Promise<T[]> {
+        return this.#run(
+            [this.#table, 'states'], 'readonly',
+            async (tx) => {
+                const rows = await tx.getWhere<T>(
+                    this.#table, column, key,
                 );
                 const deletedIds =
                     await this.#stateStore.deletedIdsIn(

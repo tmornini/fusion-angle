@@ -15,16 +15,15 @@ import {
     seedAIMember,
 } from './member-fixtures.ts';
 import {
-    seedRootAdmin,
-} from './root-admin-fixture.ts';
+    seedAdminSchema,
+} from './test-fixtures.ts';
 
 test(
     'postAIMemberStateChange records a state event'
     + ' without touching the AI member row',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         await seedHumanMember(db, 'current', 'Demo User');
         await seedAIMember(db, 'ai1', 'Claude');
         const before =

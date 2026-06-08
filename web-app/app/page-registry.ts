@@ -247,6 +247,16 @@ export const PAGE_REGISTRY: Record<
         cssBundles: ['pages-members'],
         loader: () => import('../members/detail'),
     },
+    invitations: {
+        title: 'Invitations',
+        layout: 'sidebar',
+        sidebarKey: 'members',
+        sourceDir: 'invitations',
+        sourceFile: 'index',
+        icon: iconMail,
+        searchable: false,
+        loader: () => import('../invitations/index'),
+    },
     identities: {
         title: 'Identities',
         layout: 'sidebar',

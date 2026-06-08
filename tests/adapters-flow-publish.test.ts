@@ -20,8 +20,8 @@ import {
     DEFAULT_LOCK_TIMEOUT,
 } from '../api/types.ts';
 import {
-    seedRootAdmin,
-} from './root-admin-fixture.ts';
+    seedAdminSchema,
+} from './test-fixtures.ts';
 import type {
     FlowEntity,
     GraphEdge,
@@ -212,8 +212,7 @@ test(
     + ' notReady flows',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         const goodGraph = readyGraph();
         const badGraph: StoredGraph = {
             nodes: [
@@ -257,8 +256,7 @@ test(
     + ' entirely (regardless of readiness)',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         const { id: _g, ...lockedReadyBody } =
             buildFlowEntity(
                 'locked-ready', readyGraph(),

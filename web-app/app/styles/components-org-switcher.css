@@ -1,5 +1,5 @@
-/* Org switcher: a native <select> in the header greeting,
-   shown only when the member can reach two or more orgs. */
+/* Org switcher: a native <select> in the sidebar footer, shown
+   only when the member can reach two or more orgs. */
 .org-switcher {
   margin-left: var(--space-2);
   padding: var(--space-1) var(--space-2);
@@ -45,4 +45,23 @@
 .org-set-default:focus-visible {
   outline: 2px solid hsl(var(--ring, var(--border)));
   outline-offset: 2px;
+}
+
+/* In the narrow sidebar footer the cluster stacks full-width:
+   the select over the quiet "Set as default" button. */
+.sidebar-org-switcher {
+  margin-top: var(--space-2);
+}
+.sidebar-org-switcher .org-switcher-group {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-1);
+}
+.sidebar-org-switcher .org-switcher {
+  margin-left: 0;
+  width: 100%;
+}
+.sidebar-collapsed .sidebar-org-switcher {
+  display: none;
 }

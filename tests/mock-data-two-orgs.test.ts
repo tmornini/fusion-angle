@@ -134,6 +134,35 @@ test('every flow_records row joins same-org flow and'
     }
 });
 
+test('every idea submission names a submitter in its'
+    + " idea's org", async () => {
+    const { db } = await seed();
+    const ideaOrg = new Map(
+        (await db.ideas.getAll())
+            .map(i => [i.id, i.organization_id]));
+    const memberOrgs = new Map<string, Set<string>>();
+    for (const m of await db.memberships.getAll()) {
+        const set = memberOrgs.get(m.identity_id)
+            ?? new Set<string>();
+        set.add(m.organization_id);
+        memberOrgs.set(m.identity_id, set);
+    }
+    const violations: string[] = [];
+    for (const s of await db.ideaSubmissions.getAll()) {
+        const org = ideaOrg.get(s.idea_id);
+        const orgs = memberOrgs.get(s.member_id)
+            ?? new Set<string>();
+        if (org === undefined || !orgs.has(org)) {
+            violations.push(
+                s.id + ': ' + s.member_id
+                + ' not in idea org ' + org);
+        }
+    }
+    assert.deepEqual(
+        violations, [],
+        'cross-org submitters: ' + violations.join('; '));
+});
+
 test('every seeded human gets a verifiable password',
 async () => {
     const { db, creds } = await seed();

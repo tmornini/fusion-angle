@@ -3,6 +3,7 @@ import type { FlowGraph } from './flow-queries.ts';
 import type {
     RequestContext,
 } from './shared.ts';
+import { filterByField } from './shared.ts';
 import {
     buildFlowStats,
     type FlowStatsInput,
@@ -44,8 +45,7 @@ export async function getFlowStats(
     ]);
 
     const woIds = new Set(
-        fwoRows
-            .filter(r => r.flow_id === flowId)
+        filterByField(fwoRows, 'flow_id', flowId)
             .map(r => r.work_order_id),
     );
     const workOrders =

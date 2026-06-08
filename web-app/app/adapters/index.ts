@@ -24,6 +24,7 @@ export * from './objectives.ts';
 export * from './members.ts';
 export * from './ai-members.ts';
 export * from './members-union.ts';
+export * from './invitations.ts';
 export * from './identities.ts';
 export * from './identity-providers.ts';
 export * from './identity-tokens.ts';

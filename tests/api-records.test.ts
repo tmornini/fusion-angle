@@ -11,13 +11,12 @@ import {
 } from '../api/types.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import {
-    seedRootAdmin,
-} from './root-admin-fixture.ts';
+    seedAdminSchema,
+} from './test-fixtures.ts';
 
 async function freshDb() {
     const db = new MemoryDbAdapter();
-    await db.createSchema();
-    await seedRootAdmin(db);
+    await seedAdminSchema(db);
     return db;
 }
 

@@ -17,16 +17,15 @@ import {
 } from '../api/types.ts';
 import { seedHumanMember } from './member-fixtures.ts';
 import {
-    seedRootAdmin,
-} from './root-admin-fixture.ts';
+    seedAdminSchema,
+} from './test-fixtures.ts';
 
 async function setupDb(): Promise<{
     db: MemoryDbAdapter;
     ctx: RequestContext;
 }> {
     const db = new MemoryDbAdapter();
-    await db.createSchema();
-    await seedRootAdmin(db);
+    await seedAdminSchema(db);
     const ctx = createRequestContext(db, await devToken());
     return { db, ctx };
 }

@@ -7,8 +7,8 @@ import {
 } from '../web-app/app/adapters/shared.ts';
 import { devToken } from './token-fixtures.ts';
 import {
-    seedRootAdmin,
-} from './root-admin-fixture.ts';
+    seedAdminSchema,
+} from './test-fixtures.ts';
 import {
     getProviderModels,
 } from '../api/provider-models.ts';
@@ -26,8 +26,7 @@ test(
     'ctx.commit runs all ops in supplied order',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         const ctx = createRequestContext(db, await devToken());
         await ctx.commit({
             ops: [
@@ -69,8 +68,7 @@ test(
     + ' the whole batch',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         const ctx = createRequestContext(db, await devToken());
         const goodA = {
             method: 'put' as const,
@@ -111,8 +109,7 @@ test(
     + ' when first op fails',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         const ctx = createRequestContext(db, await devToken());
         const bad = {
             method: 'put' as const,
@@ -139,8 +136,7 @@ test(
     + ' final op fails',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         const ctx = createRequestContext(db, await devToken());
         const goodA = {
             method: 'put' as const,

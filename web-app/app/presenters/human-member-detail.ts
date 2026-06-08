@@ -2,6 +2,9 @@ import {
     html, setHtml, SafeHtml, trusted,
 } from '../safe-html.ts';
 import { $required } from '../dom.ts';
+import {
+    makeFieldKeyValidator,
+} from '../field-key-validator.ts';
 import { initials } from '../core.ts';
 import { displayText } from '../format.ts';
 import {
@@ -22,7 +25,7 @@ import {
     type HumanMemberDraft,
     isMemberState,
     jsonArrayField,
-    ERASED_MEMBER_NAME,
+    MEMBER_WITHOUT_PII_NAME,
 } from '../adapters/index.ts';
 import {
     WorkingStylesPresenter,
@@ -78,14 +81,8 @@ const FIELD_KEYS:
         'state', 'bio',
     ]);
 
-export function isHumanMemberFieldKey(
-    s: string | null,
-): s is HumanMemberFieldKey {
-    return s !== null
-        && FIELD_KEYS.has(
-            s as HumanMemberFieldKey,
-        );
-}
+export const isHumanMemberFieldKey =
+    makeFieldKeyValidator(FIELD_KEYS);
 
 export function humanMemberDraftFromMember(
     member: HumanMember,
@@ -181,7 +178,7 @@ function buildReadonlyTitleSection(
 ): SafeHtml {
     const pii = member.pii();
     const name = pii.erased
-        ? ERASED_MEMBER_NAME
+        ? MEMBER_WITHOUT_PII_NAME
         : pii.name;
     return html`
         <div class="${
@@ -216,7 +213,7 @@ function buildEditableTitleSection(
 ): SafeHtml {
     const pii = member.pii();
     const name = pii.erased
-        ? ERASED_MEMBER_NAME
+        ? MEMBER_WITHOUT_PII_NAME
         : pii.name;
     return html`
         <div class="${
@@ -392,7 +389,7 @@ function buildReadonlyPersonalInfoBody(
 ): SafeHtml {
     const pii = member.pii();
     const name = pii.erased
-        ? ERASED_MEMBER_NAME
+        ? MEMBER_WITHOUT_PII_NAME
         : pii.name;
     const email = pii.erased ? '' : pii.email;
     const phone = pii.erased ? '' : pii.phone;
@@ -447,7 +444,7 @@ function buildEditablePersonalInfoBody(
 ): SafeHtml {
     const pii = member.pii();
     const name = pii.erased
-        ? ERASED_MEMBER_NAME
+        ? MEMBER_WITHOUT_PII_NAME
         : pii.name;
     return html`
         <div class="${

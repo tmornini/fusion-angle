@@ -1,3 +1,7 @@
+import {
+    subscribeEventListener,
+} from './event-listener.ts';
+
 export function mediaQueryMatches(
     query: string,
 ): boolean {
@@ -12,8 +16,5 @@ export function subscribeMediaQuery(
     const handler =
         (e: MediaQueryListEvent) =>
             onChange(e.matches);
-    mq.addEventListener('change', handler);
-    return () => mq.removeEventListener(
-        'change', handler,
-    );
+    return subscribeEventListener(mq, 'change', handler);
 }

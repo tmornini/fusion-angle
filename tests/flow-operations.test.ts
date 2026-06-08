@@ -63,8 +63,8 @@ import {
     seedHumanMember,
 } from './member-fixtures.ts';
 import {
-    seedRootAdmin,
-} from './root-admin-fixture.ts';
+    seedAdminSchema,
+} from './test-fixtures.ts';
 
 const FLOW_ID = 'flow-1';
 
@@ -204,8 +204,7 @@ async function setupFlow(): Promise<{
     ctx: RequestContext;
 }> {
     const db = new MemoryDbAdapter();
-    await db.createSchema();
-    await seedRootAdmin(db);
+    await seedAdminSchema(db);
     await seedHumanMember(db, 'current', 'Demo User');
     const ctx = createRequestContext(db, DEV_TOKEN);
     await postFlowCreation(ctx, {
@@ -222,8 +221,7 @@ async function setupFlow(): Promise<{
 // which 404s, driving the catch → failOp(...).
 async function setupNoFlow(): Promise<MemoryDbAdapter> {
     const db = new MemoryDbAdapter();
-    await db.createSchema();
-    await seedRootAdmin(db);
+    await seedAdminSchema(db);
     return db;
 }
 

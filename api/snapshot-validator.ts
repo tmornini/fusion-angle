@@ -1,4 +1,5 @@
 import { TABLE_NAMES } from './db.ts';
+import { extractErrorMessage } from './error-helpers.ts';
 import {
     validateMemberEntity,
     validateHumanMemberEntity,
@@ -26,6 +27,7 @@ import {
     validateFlowRecordEntity,
     validateOrganizationEntity,
     validateMembershipEntity,
+    validateInvitationEntity,
     validateIdeaSubmissionEntity,
     validateStateEntity,
     validateObjectiveEntity,
@@ -131,6 +133,9 @@ function validateSnapshotRow(
             case 'memberships':
                 validateMembershipEntity(body);
                 break;
+            case 'invitations':
+                validateInvitationEntity(body);
+                break;
             case 'idea_submissions':
                 validateIdeaSubmissionEntity(body);
                 break;
@@ -151,10 +156,7 @@ function validateSnapshotRow(
                 break;
         }
     } catch (err) {
-        const msg =
-            err instanceof Error
-                ? err.message
-                : String(err);
+        const msg = extractErrorMessage(err);
         throw new Error(
             'Invalid snapshot row in '
             + label + ': ' + msg,

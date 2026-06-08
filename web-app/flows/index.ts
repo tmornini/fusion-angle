@@ -9,6 +9,7 @@ import {
     buildSkeleton,
     withLoadingState,
 } from '../app/loading-states.ts';
+import { extractErrorMessage } from '../app/error-helpers.ts';
 import {
     iconGitBranch,
 } from '../app/icons.ts';
@@ -357,9 +358,7 @@ async function handleFileSelect(
                 uuid, bytes, projectId,
             );
         } catch (err) {
-            const msg = err instanceof Error
-                ? err.message
-                : 'Import failed';
+            const msg = extractErrorMessage(err, 'Import failed');
             showToast(msg, 'error');
             input.value = '';
             return;
@@ -372,9 +371,7 @@ async function handleFileSelect(
                 uuid, text, projectId,
             );
         } catch (err) {
-            const msg = err instanceof Error
-                ? err.message
-                : 'Import failed';
+            const msg = extractErrorMessage(err, 'Import failed');
             showToast(msg, 'error');
             input.value = '';
             return;
@@ -554,10 +551,7 @@ async function handleOverwrite(
         });
     } catch (err) {
         clearPending(input);
-        const msg =
-            err instanceof Error
-                ? err.message
-                : 'Overwrite failed';
+        const msg = extractErrorMessage(err, 'Overwrite failed');
         showToast(msg, 'error');
         return;
     }
@@ -588,10 +582,7 @@ async function handleCreateNew(
         );
     } catch (err) {
         clearPending(input);
-        const msg =
-            err instanceof Error
-                ? err.message
-                : 'Import failed';
+        const msg = extractErrorMessage(err, 'Import failed');
         showToast(msg, 'error');
         return;
     }
@@ -627,10 +618,7 @@ async function handleCreate(
         );
     } catch (err) {
         clearPending(input);
-        const msg =
-            err instanceof Error
-                ? err.message
-                : 'Import failed';
+        const msg = extractErrorMessage(err, 'Import failed');
         showToast(msg, 'error');
         return;
     }

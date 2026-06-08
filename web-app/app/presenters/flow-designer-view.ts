@@ -23,7 +23,7 @@ import type {
 import {
     HumanMember,
     AIMember,
-    ERASED_MEMBER_NAME,
+    MEMBER_WITHOUT_PII_NAME,
 } from '../adapters/index.ts';
 
 export function buildAttributeRefRow(
@@ -193,7 +193,7 @@ class="text-xs text-muted"
     const humanName = (h: HumanMember): string => {
         const p = h.pii();
         return p.erased
-            ? ERASED_MEMBER_NAME
+            ? MEMBER_WITHOUT_PII_NAME
             : p.name;
     };
     const sortedHumans = [...humans].sort(

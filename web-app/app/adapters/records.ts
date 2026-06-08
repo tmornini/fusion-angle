@@ -15,6 +15,9 @@ import {
     type RequestContext,
 } from './shared.ts';
 import {
+    latestByKey,
+} from '../../../api/ledger-reduction.ts';
+import {
     buildStateEventOp,
     getRecordStates,
 } from './state-events.ts';
@@ -81,16 +84,9 @@ export async function getRecordState(
     const events = await ctx.GET<StateEntity[]>(
         `entity-states/${id}/history`,
     );
-    const latest = events.reduce<
-        StateEntity | null
-    >(
-        (acc, ev) =>
-            acc === null || ev.at >= acc.at
-                ? ev
-                : acc,
-        null,
-    );
-    if (latest === null) {
+    const latest = latestByKey(events, ev => ev.entity_id)
+        .get(id);
+    if (latest === undefined) {
         throw new Error(
             'no state event for record ' + id,
         );

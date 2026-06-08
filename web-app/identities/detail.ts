@@ -1,4 +1,5 @@
 import { $ } from '../app/dom.ts';
+import { createPageAbort } from '../app/page-lifecycle.ts';
 import { showToast } from '../app/toast.ts';
 import { log } from '../app/logger.ts';
 import {
@@ -9,10 +10,12 @@ import {
     sessionContext,
     getIdentity,
     getMemberPii,
+    getServiceFacet,
     deleteIdentityPii,
     getIdentityCredentialState,
     Identity,
     type MemberPii,
+    type ServiceFacet,
     type IdentityCredentialKind,
 } from '../app/adapters/index.ts';
 import {
@@ -20,8 +23,7 @@ import {
     type IdentityDetailView,
 } from '../app/presenters/index.ts';
 
-const pageAbort = new AbortController();
-const signal = pageAbort.signal;
+const { signal } = createPageAbort();
 
 let pageContainer: HTMLElement | null = null;
 let currentId: string | null = null;
@@ -29,6 +31,7 @@ let currentId: string | null = null;
 interface LoadedIdentity {
     identity: Identity;
     pii: MemberPii;
+    service: ServiceFacet;
     activeCredentialKinds:
         readonly IdentityCredentialKind[];
 }
@@ -48,12 +51,17 @@ async function loadIdentity(
         return null;
     }
     const pii = await getMemberPii(ctx, identityId);
+    const service: ServiceFacet = identity.isService()
+        ? await getServiceFacet(ctx, identityId)
+        : { named: false };
     const activeCredentialKinds = identity.isService()
         ? (await getIdentityCredentialState(
             ctx, identityId,
         )).active
         : [];
-    return { identity, pii, activeCredentialKinds };
+    return {
+        identity, pii, service, activeCredentialKinds,
+    };
 }
 
 function buildView(
@@ -62,6 +70,7 @@ function buildView(
     return {
         identity: loaded.identity,
         pii: loaded.pii,
+        service: loaded.service,
         activeCredentialKinds:
             loaded.activeCredentialKinds,
     };

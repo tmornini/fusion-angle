@@ -5,6 +5,7 @@ import {
     html, setHtml,
 } from '../app/safe-html.ts';
 import { log } from '../app/logger.ts';
+import { createPageAbort } from '../app/page-lifecycle.ts';
 import { showToast } from '../app/toast.ts';
 import {
     buildSkeleton,
@@ -47,8 +48,7 @@ import {
     initDragReorder,
 } from '../app/drag-reorder.ts';
 
-const pageAbort = new AbortController();
-const signal = pageAbort.signal;
+const { signal } = createPageAbort();
 
 let activePresenter:
     WorkboxInboxPresenter | null = null;

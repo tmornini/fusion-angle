@@ -26,12 +26,13 @@ import {
     type IdeaWithSubmitter,
     Project,
     HumanMember,
-    ERASED_MEMBER_NAME,
+    MEMBER_WITHOUT_PII_NAME,
 } from './adapters/index.ts';
 // init.ts is the composition root —
 // intentionally outside the adapter barrel.
 import {
     getDbAdapter,
+    sessionIsOrgScoped,
 } from './adapters/init.ts';
 import {
     PAGE_REGISTRY,
@@ -219,7 +220,7 @@ export function humanMemberToSearchItem(
 ): SearchItem {
     const pii = member.pii();
     const title = pii.erased
-        ? ERASED_MEMBER_NAME
+        ? MEMBER_WITHOUT_PII_NAME
         : pii.name;
     const emailKeyword = pii.erased
         ? ''
@@ -301,6 +302,11 @@ export function initCommandPalette(
     async function getSearchIndex(
     ): Promise<void> {
         if (state.isDataLoaded) return;
+        // The index reads ideas, projects, and members — org-bound.
+        // On an unscoped session (the anonymous seed on an auth-exempt
+        // sidebar page) skip the build rather than 401; a later scoped
+        // load reseeds it.
+        if (!sessionIsOrgScoped()) return;
 
         const ctx = sessionContext();
         const [ideas, projects, humans] =

@@ -10,13 +10,15 @@ import {
     type Id,
     type StateEntity,
 } from './types.ts';
+import { latestByKey } from './ledger-reduction.ts';
 
 // The states table is the append-only event log of every
 // state change in the system. One row, one fact. `record`
 // writes a single row with caller-supplied id (Commandment
 // VII — idempotency: retries hit the same row). The table
-// never deletes; the read methods scan-and-filter (the
-// Postgres tier will index).
+// never deletes. Entity-scoped reads narrow through the
+// `entity_id` index; deletedIdsIn alone still reduces the
+// whole log — no key answers "which ids are tombstoned".
 //
 // Every op crosses the runner: standalone, the runner opens
 // a fresh single-op transaction; joined to a view, it runs
@@ -134,38 +136,29 @@ export class StateStore
         tx: Tx,
         entityId: Id,
     ): Promise<StateEntity | null> {
-        const rows = await tx.getAll<StateEntity>(
-            this.#table,
+        const rows = await tx.getWhere<StateEntity>(
+            this.#table, 'entity_id', entityId,
         );
-        let latest: StateEntity | null = null;
-        for (const row of rows) {
-            if (row.entity_id !== entityId) {
-                continue;
-            }
-            if (
-                latest === null
-                || row.at > latest.at
-            ) {
-                latest = row;
-            }
-        }
-        return latest;
+        // Strict `>` keeps the FIRST-appended row on a
+        // same-`at` tie — deliberately unlike deletedIdsIn.
+        return latestByKey(
+            rows, row => row.entity_id,
+            (a, b) => a.at > b.at,
+        ).get(entityId) ?? null;
     }
 
     async allForIn(
         tx: Tx,
         entityId: Id,
     ): Promise<StateEntity[]> {
-        const rows = await tx.getAll<StateEntity>(
-            this.#table,
+        const rows = await tx.getWhere<StateEntity>(
+            this.#table, 'entity_id', entityId,
         );
-        return rows
-            .filter(r => r.entity_id === entityId)
-            .sort((a, b) =>
-                a.at < b.at ? -1
-                    : a.at > b.at ? 1
-                        : 0,
-            );
+        return rows.sort((a, b) =>
+            a.at < b.at ? -1
+                : a.at > b.at ? 1
+                    : 0,
+        );
     }
 
     // Answers "which entities are currently in
@@ -178,18 +171,9 @@ export class StateStore
         const rows = await tx.getAll<StateEntity>(
             this.#table,
         );
-        const latestByEntity =
-            new Map<Id, StateEntity>();
-        for (const row of rows) {
-            const seen =
-                latestByEntity.get(row.entity_id);
-            if (
-                seen === undefined
-                || row.at >= seen.at
-            ) {
-                latestByEntity.set(row.entity_id, row);
-            }
-        }
+        const latestByEntity = latestByKey(
+            rows, row => row.entity_id,
+        );
         const deleted = new Set<Id>();
         for (const [entityId, row] of latestByEntity) {
             if (row.state === 'deleted') {
@@ -199,27 +183,19 @@ export class StateStore
         return deleted;
     }
 
-    // Single-entity variant for getById's hot path. Scans
-    // the log once, keeps only rows for the requested
-    // entity, returns whether the latest is 'deleted'.
+    // Single-entity variant for getById's hot path. Reads
+    // this entity's events through the `entity_id` index and
+    // returns whether its latest event is 'deleted'.
     async isDeletedIn(
         tx: Tx,
         id: Id,
     ): Promise<boolean> {
-        const rows = await tx.getAll<StateEntity>(
-            this.#table,
+        const rows = await tx.getWhere<StateEntity>(
+            this.#table, 'entity_id', id,
         );
-        let latest: StateEntity | null = null;
-        for (const row of rows) {
-            if (row.entity_id !== id) continue;
-            if (
-                latest === null
-                || row.at >= latest.at
-            ) {
-                latest = row;
-            }
-        }
-        return latest !== null
+        const latest = latestByKey(rows, row => row.entity_id)
+            .get(id);
+        return latest !== undefined
             && latest.state === 'deleted';
     }
 }

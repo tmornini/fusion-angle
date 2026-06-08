@@ -7,13 +7,24 @@
                 organization
             </p>
         </div>
-        <button
-            class="btn btn-primary gap-2"
-            id="add-member-btn"
-        >
-            <span id="add-member-btn-icon"></span>
-            Add Member
-        </button>
+        <div class="flex items-center gap-2">
+            <button
+                class="btn btn-secondary gap-2"
+                id="invite-member-btn"
+            >
+                <span
+                    id="invite-member-btn-icon"
+                ></span>
+                Invite member
+            </button>
+            <button
+                class="btn btn-primary gap-2"
+                id="add-member-btn"
+            >
+                <span id="add-member-btn-icon"></span>
+                Add Member
+            </button>
+        </div>
     </div>
 
     <div class="flex items-center gap-4 mb-6">
@@ -266,6 +277,64 @@
                     id="add-member-submit-icon"
                 ></span>
                 Create
+            </button>
+        </div>
+    </div>
+
+    <div
+        id="invite-member-backdrop"
+        class="dialog-backdrop hidden"
+    ></div>
+    <div
+        id="invite-member-dialog"
+        class="dialog hidden"
+        aria-hidden="true"
+        role="dialog"
+        aria-modal="true"
+    >
+        <div class="dialog-header">
+            <h3
+                class="dialog-title flex
+                    items-center gap-2"
+            >
+                <span
+                    id="invite-member-dialog-icon"
+                ></span>
+                Invite member
+            </h3>
+        </div>
+        <div class="flex flex-col gap-3 py-4">
+            <p class="text-sm text-muted">
+                Invite an existing person to this
+                organization by email. They decide
+                whether to accept or decline.
+            </p>
+            <div>
+                <label
+                    class="label mb-1 block"
+                    for="invite-email"
+                >Email</label>
+                <input
+                    class="input"
+                    type="email"
+                    id="invite-email"
+                    placeholder="person@company.com"
+                />
+            </div>
+        </div>
+        <div class="dialog-footer">
+            <button
+                class="btn btn-outline"
+                id="invite-member-cancel"
+            >Cancel</button>
+            <button
+                class="btn btn-primary gap-2"
+                id="invite-member-submit"
+            >
+                <span
+                    id="invite-member-submit-icon"
+                ></span>
+                Send invitation
             </button>
         </div>
     </div>

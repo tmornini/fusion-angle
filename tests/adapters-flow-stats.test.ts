@@ -21,8 +21,8 @@ import type {
     StoredGraph,
 } from '../api/types.ts';
 import {
-    seedRootAdmin,
-} from './root-admin-fixture.ts';
+    seedAdminSchema,
+} from './test-fixtures.ts';
 
 // -- Fixture helpers --------------------------
 
@@ -111,8 +111,7 @@ test(
     + ' work orders',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
 
         // Flow f1 with an Onboarding graph
         await db.flows.put(
@@ -211,8 +210,7 @@ test(
     + ' the underlying error',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         const ctx = createRequestContext(db, await devToken());
         await assert.rejects(
             () => getFlowStats(ctx, 'nope'),
@@ -225,8 +223,7 @@ test(
     + ' returned graph and stat model are not degenerate',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         // buildFlow is is_auto_layout; buildTestGraph
         // seeds c→a→z all at (0,0).
         await db.flows.put(

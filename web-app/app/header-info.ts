@@ -1,13 +1,7 @@
 import { $ } from './dom.ts';
-import { navigateTo } from './navigation.ts';
 
 interface HeaderData {
-    memberId: string;
-    memberName: string;
     organization: string;
-    orgs: ReadonlyArray<{ id: string; name: string }>;
-    activeOrgId: string;
-    greeting: string;
     stats: ReadonlyArray<{
         value: string | number;
         label: string;
@@ -18,88 +12,32 @@ async function getHeaderData(
 ): Promise<HeaderData> {
     const {
         sessionContext,
-        getHumanMember,
+        getOrganization,
         getDashboardStats,
-        ERASED_MEMBER_NAME,
     } = await import('./adapters');
-    const { getOrganizations } =
-        await import('./adapters/organizations.ts');
-    const { activeOrg } =
-        await import('./adapters/shared.ts');
-    const { getTimeOfDay } =
-        await import('./format');
     const ctx = sessionContext();
-    const [member, orgs, stats] =
+    const [org, stats] =
         await Promise.all([
-            getHumanMember(ctx, 'current'),
-            getOrganizations(ctx),
+            getOrganization(ctx),
             getDashboardStats(ctx),
         ]);
-    const pii = member.pii();
-    const activeOrgId = activeOrg(ctx);
-    const active =
-        orgs.find(o => o.id === activeOrgId);
     return {
-        memberId: member.idForLink(),
-        memberName: pii.erased
-            ? ERASED_MEMBER_NAME
-            : pii.name,
-        organization: active ? active.name : '',
-        orgs: orgs.map(
-            o => ({ id: o.id, name: o.name })),
-        activeOrgId,
-        greeting: getTimeOfDay(),
+        organization: org.nameText(),
         stats,
     };
 }
 
+// The top-bar context strip: the active org name followed by the
+// dashboard stat tiles. The greeting and the org switcher that
+// once lived here have moved — the switcher to the sidebar
+// footer, the profile link to the sidebar member chip — leaving
+// the top bar to the pending-invitations indicator (see
+// invitations-indicator.ts) and this read-only strip.
 export async function mutateHeaderInfo(
 ): Promise<void> {
     const headerInfo = await getHeaderData();
     const { html, setHtml } =
         await import('./safe-html');
-    const { orgSwitcherHtml, wireOrgSwitcher } =
-        await import('./org-switcher.ts');
-    const greetingEl =
-        $('#header-greeting', document);
-    if (greetingEl) {
-        setHtml(
-            greetingEl,
-            html`<span
-class="font-normal">Good ${
-headerInfo.greeting},</span> ${
-headerInfo.memberName}${
-orgSwitcherHtml(headerInfo.orgs)}`,
-        );
-        greetingEl.setAttribute('role', 'button');
-        greetingEl.setAttribute('tabindex', '0');
-        greetingEl.setAttribute(
-            'aria-label',
-            'Open your member profile',
-        );
-        greetingEl.classList.add('cursor-pointer');
-        const goToProfile = (): void => {
-            navigateTo(
-                'member-detail',
-                { memberId: headerInfo.memberId },
-            );
-        };
-        greetingEl.addEventListener(
-            'click', goToProfile,
-        );
-        greetingEl.addEventListener(
-            'keydown', (e) => {
-                if (
-                    e.key === 'Enter'
-                    || e.key === ' '
-                ) {
-                    e.preventDefault();
-                    goToProfile();
-                }
-            },
-        );
-        wireOrgSwitcher(headerInfo.activeOrgId);
-    }
     const statsEl =
         $('#header-stats', document);
     if (statsEl) {

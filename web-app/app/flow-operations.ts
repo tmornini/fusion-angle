@@ -126,6 +126,15 @@ export function failOp(
     return { kind: 'fail', toast, toastVariant };
 }
 
+// The lock guard at the head of every mutating perform*: a
+// locked flow rejects with a uniform fail. Returns the OpFail to
+// return, or null when the flow is writable.
+export function requireFlowNotLocked(
+    snap: FlowSnapshot,
+): OpFail | null {
+    return snap.isLocked ? failOp('Flow is locked') : null;
+}
+
 export interface EdgeAddOk {
     readonly edge: GraphEdge;
     readonly advanceHistory: true;
@@ -157,9 +166,8 @@ export async function performAddEdge(
     fromId: string,
     toId: string,
 ): Promise<OpResult<EdgeAddOk>> {
-    if (snap.isLocked) {
-        return failOp('Flow is locked');
-    }
+    const locked = requireFlowNotLocked(snap);
+    if (locked) return locked;
     const from = snap.nodes.find(
         n => n.id === fromId,
     );
@@ -245,9 +253,8 @@ export async function performAddNodeAtPosition(
     x: number,
     y: number,
 ): Promise<OpResult<NodeAddOk>> {
-    if (snap.isLocked) {
-        return failOp('Flow is locked');
-    }
+    const locked = requireFlowNotLocked(snap);
+    if (locked) return locked;
     const fromNode = snap.nodes.find(
         n => n.id === fromNodeId,
     );
@@ -321,9 +328,8 @@ export async function performDeleteSelectedNodes(
     ctx: RequestContext,
     snap: FlowSnapshot,
 ): Promise<OpResult<NodesDeleteOk> | OpNoop> {
-    if (snap.isLocked) {
-        return failOp('Flow is locked');
-    }
+    const locked = requireFlowNotLocked(snap);
+    if (locked) return locked;
     const sel = snap.interaction.selection;
     if (sel.kind !== 'nodes') {
         return { kind: 'noop' };
@@ -372,9 +378,8 @@ export async function performDeleteSelectedEdge(
     ctx: RequestContext,
     snap: FlowSnapshot,
 ): Promise<OpResult<EdgeDeleteOk> | OpNoop> {
-    if (snap.isLocked) {
-        return failOp('Flow is locked');
-    }
+    const locked = requireFlowNotLocked(snap);
+    if (locked) return locked;
     const sel = snap.interaction.selection;
     if (sel.kind !== 'edge') {
         return { kind: 'noop' };
@@ -418,9 +423,8 @@ export async function performAddAttributeRef(
 ): Promise<
     OpResult<AttributeRefAddOk> | OpNoop
 > {
-    if (snap.isLocked) {
-        return failOp('Flow is locked');
-    }
+    const locked = requireFlowNotLocked(snap);
+    if (locked) return locked;
     const nodeId = singleSelectedNodeId(snap);
     if (!nodeId) {
         return { kind: 'noop' };
@@ -473,9 +477,8 @@ export async function performRemoveAttributeRef(
 ): Promise<
     OpResult<AttributeRefRemoveOk> | OpNoop
 > {
-    if (snap.isLocked) {
-        return failOp('Flow is locked');
-    }
+    const locked = requireFlowNotLocked(snap);
+    if (locked) return locked;
     const nodeId = singleSelectedNodeId(snap);
     if (!nodeId) {
         return { kind: 'noop' };
@@ -519,9 +522,8 @@ export async function performUpdateAttributeMode(
 ): Promise<
     OpResult<AttributeModeUpdateOk> | OpNoop
 > {
-    if (snap.isLocked) {
-        return failOp('Flow is locked');
-    }
+    const locked = requireFlowNotLocked(snap);
+    if (locked) return locked;
     const nodeId = singleSelectedNodeId(snap);
     if (!nodeId) {
         return { kind: 'noop' };
@@ -567,9 +569,8 @@ performUpdateAttributeRequired(
 ): Promise<
     OpResult<AttributeRequiredUpdateOk> | OpNoop
 > {
-    if (snap.isLocked) {
-        return failOp('Flow is locked');
-    }
+    const locked = requireFlowNotLocked(snap);
+    if (locked) return locked;
     const nodeId = singleSelectedNodeId(snap);
     if (!nodeId) {
         return { kind: 'noop' };
@@ -642,9 +643,8 @@ export async function performUndo(
     snap: FlowSnapshot,
     history: FlowHistorySnapshot,
 ): Promise<OpResult<HistoryOpOk>> {
-    if (snap.isLocked) {
-        return failOp('Flow is locked');
-    }
+    const locked = requireFlowNotLocked(snap);
+    if (locked) return locked;
     try {
         const versions = await getFlowVersions(
             ctx, snap.flowId,
@@ -713,9 +713,8 @@ export async function performRedo(
     snap: FlowSnapshot,
     history: FlowHistorySnapshot,
 ): Promise<OpResult<HistoryOpOk>> {
-    if (snap.isLocked) {
-        return failOp('Flow is locked');
-    }
+    const locked = requireFlowNotLocked(snap);
+    if (locked) return locked;
     const popped = removeFromRedoStack(history);
     if (!popped.version) {
         return {

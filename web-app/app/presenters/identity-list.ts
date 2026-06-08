@@ -5,7 +5,8 @@ import { initials } from '../core.ts';
 import { DISPLAY_ABSENT } from '../format.ts';
 import { iconShield } from '../icons.ts';
 import {
-    ERASED_MEMBER_NAME,
+    IDENTITY_WITHOUT_PII_NAME,
+    UNNAMED_SERVICE_NAME,
     type IdentityRosterRow,
 } from '../adapters/index.ts';
 
@@ -32,16 +33,20 @@ function buildServiceAvatar(): SafeHtml {
 
 function buildRow(row: IdentityRosterRow): SafeHtml {
     const isPerson = row.kind === 'person';
-    const name = isPerson
+    const name = row.kind === 'person'
         ? (row.pii.erased
-            ? ERASED_MEMBER_NAME
+            ? IDENTITY_WITHOUT_PII_NAME
             : row.pii.name)
-        : row.id;
-    const sub = isPerson
+        : (row.service.named
+            ? row.service.name
+            : UNNAMED_SERVICE_NAME);
+    const sub = row.kind === 'person'
         ? (row.pii.erased
             ? DISPLAY_ABSENT
             : row.pii.email)
-        : row.id;
+        : (row.service.named
+            ? row.service.detail
+            : DISPLAY_ABSENT);
     return html`
         <div class="${
             'card card-hover p-4 cursor-pointer'

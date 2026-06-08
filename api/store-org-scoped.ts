@@ -1,5 +1,9 @@
 import { EntityNotFound } from './db.ts';
-import type { EntityStore, EntityPut } from './db.ts';
+import type {
+    EntityStore,
+    EntityPut,
+    KeyedCollectionReader,
+} from './db.ts';
 import type { Id } from './types.ts';
 
 // The minimal shape the org guard requires: every row it
@@ -28,12 +32,13 @@ export interface OrgScoped {
 export class OrgScopedEntityStore<T extends OrgScoped>
     implements EntityStore<T>
 {
-    readonly #inner: EntityStore<T>;
+    readonly #inner:
+        EntityStore<T> & KeyedCollectionReader<T>;
     readonly #org: Id;
     readonly #table: string;
 
     constructor(
-        inner: EntityStore<T>,
+        inner: EntityStore<T> & KeyedCollectionReader<T>,
         org: Id,
         table: string,
     ) {
@@ -43,9 +48,12 @@ export class OrgScopedEntityStore<T extends OrgScoped>
     }
 
     async getAll(): Promise<T[]> {
-        const rows = await this.#inner.getAll();
-        return rows.filter(
-            row => row.organization_id === this.#org,
+        // The organization_id index IS the fence: read only
+        // this org's rows, no JS org filter after (re-filtering
+        // a result the gate already scoped is internal
+        // defense). The inner deleted filter rides the same tx.
+        return this.#inner.getAllWhere(
+            'organization_id', this.#org,
         );
     }
 

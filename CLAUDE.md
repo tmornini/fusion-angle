@@ -111,8 +111,12 @@ is HTTP-only.
   PRIMARY membership org, else a 403 — there is no global
   default. `organizations` is the tenant root; `memberships`
   joins identity↔org; the members roster is derived from that
-  ledger. Per-org roles via `currentRolesForInOrg`. See
-  [SCHEMA.md](SCHEMA.md) /
+  ledger. A `memberships` row is created when an invitee
+  ACCEPTS an `invitations` grant (the only live membership
+  write; `web-app/app/adapters/invitations.ts` + the
+  `invitations` facade in `api/api.ts`) — accept stamps the
+  INVITATION's org, not the caller's active org. Per-org roles
+  via `currentRolesForInOrg`. See [SCHEMA.md](SCHEMA.md) /
   [ARCHITECTURE.md](ARCHITECTURE.md).
 - **Data.** REST-style API (`api/`) over IndexedDB. Adapters
   in `web-app/app/adapters/` shape rows for pages.
@@ -217,13 +221,18 @@ and the identity/organizations/memberships stores.
 subdirectories `adapters/` (data-access + platform shims, both
 kinds share the folder), `presenters/` (presenter classes
 producing `SafeHtml`), and `styles/` (cascade-ordered CSS
-modules); `org-switcher.ts` is the header org `<select>` and
-`core.ts` scopes boot to the active org.
+modules); `org-switcher.ts` is the sidebar-footer org
+`<select>` (multi-org only) and `core.ts` scopes boot to the
+active org. `invitations.ts` is the invitation adapter; the
+top-bar pending-invitations bell lives in
+`invitations-indicator.ts`.
 `web-app/{dashboard,organization,ideas,projects,flows,members,`
-`identities,...}/` — page directories registered in
-`PAGE_REGISTRY` (sidebar-layout + standalone). The
+`invitations,identities,...}/` — page directories registered
+in `PAGE_REGISTRY` (sidebar-layout + standalone). The
 `identities` surface (list, detail, providers, tokens) shares
-the `identities` sidebar key. `billing/` is a stub.
+the `identities` sidebar key; `invitations/` is the invitee's
+own pending-invitations page (reached via the top-bar bell,
+sharing the `members` sidebar key). `billing/` is a stub.
 
 The composition root is `web-app/app/adapters/init.ts`. Run `ls`
 or read file headers — both are more current than this document
@@ -266,7 +275,11 @@ clan math), `adapters-flow-stats` (the read-only adapter
 via `MemoryDbAdapter`), `presenter-flow-stats` (the SafeHtml
 shape — including the *absence* of editor affordances), and
 `duration-units` (the compact ascending-unit duration
-formatter) — see `tests/` for the current set.
+formatter), and the invitation lifecycle
+(`adapters-invitations.test.ts` for grant/accept/decline/
+revoke + derive-from-states, `api-invitations-fence.test.ts`
+for the org fence + authz, `presenter-invitation-list.test.ts`
+for the SafeHtml) — see `tests/` for the current set.
 `api/db-memory.ts` provides an in-memory `DbAdapter` so
 adapter and api-layer tests run without `localStorage`.
 
@@ -298,6 +311,10 @@ line-length lint ABORTS the run automatically. Do not ask
 whether to continue — the bundle is built from the same
 source, so a failing CLI suite makes the browser run
 meaningless. Report the failure, stop, await fix.
+
+The full evidence-based audit this gate opens — eight
+dimensions from doctrine to security — is the runbook in
+[AUDIT.md](AUDIT.md); `./validate` is its Phase 0.
 
 ## Gotchas
 

@@ -16,6 +16,9 @@ import {
     generateCryptoSafeBase62,
 } from '../../../api/crypto-safe-base62.ts';
 import {
+    latestByKey,
+} from '../../../api/ledger-reduction.ts';
+import {
     getCurrentHumanMember,
 } from './members.ts';
 
@@ -64,18 +67,6 @@ function isClaimState(state: string): boolean {
     return CLAIM_STATES.has(state);
 }
 
-function latestByAt(
-    events: readonly StateEntity[],
-): StateEntity | null {
-    let latest: StateEntity | null = null;
-    for (const ev of events) {
-        if (latest === null || ev.at >= latest.at) {
-            latest = ev;
-        }
-    }
-    return latest;
-}
-
 // The states log is shared across entity types and the
 // alphabets overlap ('active', 'archived', 'approved',
 // 'sent-back', 'deleted'), so identity — not the state
@@ -93,14 +84,8 @@ export function latestStatesForIds<S extends string>(
     events: readonly StateEntity[],
     ids: ReadonlySet<Id>,
 ): Map<Id, S> {
-    const latest = new Map<Id, StateEntity>();
-    for (const ev of events) {
-        if (!ids.has(ev.entity_id)) continue;
-        const seen = latest.get(ev.entity_id);
-        if (seen === undefined || ev.at >= seen.at) {
-            latest.set(ev.entity_id, ev);
-        }
-    }
+    const inScope = events.filter(ev => ids.has(ev.entity_id));
+    const latest = latestByKey(inScope, ev => ev.entity_id);
     const out = new Map<Id, S>();
     for (const [id, ev] of latest) {
         out.set(id, ev.state as S);
@@ -139,8 +124,9 @@ export async function getWorkOrderCurrentNodeId(
     const transitions = events.filter(
         ev => !isClaimState(ev.state),
     );
-    const latest = latestByAt(transitions);
-    return latest === null ? null : latest.state;
+    const latest = latestByKey(transitions, ev => ev.entity_id)
+        .get(workOrderId);
+    return latest === undefined ? null : latest.state;
 }
 
 // Returns the member holding the active claim and
@@ -164,8 +150,9 @@ export async function getWorkOrderActiveClaim(
     const claims = events.filter(
         ev => isClaimState(ev.state),
     );
-    const latest = latestByAt(claims);
-    if (latest === null || latest.state !== 'claimed') {
+    const latest = latestByKey(claims, ev => ev.entity_id)
+        .get(workOrderId);
+    if (latest === undefined || latest.state !== 'claimed') {
         return null;
     }
     const elapsedMs = msSinceUtc(latest.at);
@@ -189,14 +176,8 @@ export async function getActiveClaimsByWorkOrder(
     lockTimeoutByWorkOrder: ReadonlyMap<Id, number>,
 ): Promise<Map<Id, { memberId: Id; at: string }>> {
     const all = await ctx.GET<StateEntity[]>('states');
-    const latestClaim = new Map<Id, StateEntity>();
-    for (const ev of all) {
-        if (!isClaimState(ev.state)) continue;
-        const seen = latestClaim.get(ev.entity_id);
-        if (seen === undefined || ev.at >= seen.at) {
-            latestClaim.set(ev.entity_id, ev);
-        }
-    }
+    const claims = all.filter(ev => isClaimState(ev.state));
+    const latestClaim = latestByKey(claims, ev => ev.entity_id);
     const out = new Map<
         Id, { memberId: Id; at: string }
     >();
@@ -304,8 +285,9 @@ export async function getIdeaState(
     const events = await ctx.GET<StateEntity[]>(
         `entity-states/${ideaId}/history`,
     );
-    const latest = latestByAt(events);
-    if (latest === null) {
+    const latest = latestByKey(events, ev => ev.entity_id)
+        .get(ideaId);
+    if (latest === undefined) {
         throw new Error(
             'no state event for idea ' + ideaId,
         );
@@ -342,8 +324,9 @@ export async function getProjectState(
     const events = await ctx.GET<StateEntity[]>(
         `entity-states/${projectId}/history`,
     );
-    const latest = latestByAt(events);
-    if (latest === null) {
+    const latest = latestByKey(events, ev => ev.entity_id)
+        .get(projectId);
+    if (latest === undefined) {
         throw new Error(
             'no state event for project ' + projectId,
         );
@@ -395,8 +378,9 @@ export async function getMemberState(
     const events = await ctx.GET<StateEntity[]>(
         `entity-states/${memberId}/history`,
     );
-    const latest = latestByAt(events);
-    if (latest === null) {
+    const latest = latestByKey(events, ev => ev.entity_id)
+        .get(memberId);
+    if (latest === undefined) {
         throw new Error(
             'no state event for member ' + memberId,
         );

@@ -1591,7 +1591,7 @@ async function populateMockDataIn(
     const memberSarah = 'LhfaUUf4IumVsCSGB4xjdK';
     const memberMarcus =
         'WxQn4LVWb76YkmqK5B0EPp';
-    const memberMike = 'bLP3X1hb1mSz8gY9neogU3';
+    const memberJessica = 'zyTbfbjcGEfbpCsNTP0XjX';
     const memberLisa = 'Trf1Up2jMsPhEnjbW4Ji1n';
     const memberClaude = 'LdoTR1fnyYpS1jPzEs57ek';
 
@@ -1654,7 +1654,7 @@ async function populateMockDataIn(
             isCreate: false,
             isArchive: false,
             memberIds: [
-                memberMike, memberSarah,
+                memberJessica, memberSarah,
             ],
             attributes: [],
             taskInstructions: '',
@@ -3008,8 +3008,8 @@ async function populateMockDataIn(
         '8jSnGiQ4Hedb2G75Y5aT7O';
     const woPersonSarah =
         'LhfaUUf4IumVsCSGB4xjdK';
-    const woPersonMike =
-        'bLP3X1hb1mSz8gY9neogU3';
+    const woPersonEmily =
+        '53J8h9dr76XFqCjYcNVwIR';
     // Data Capture node members: Marcus and the
     // current user (the in-clan members)
     const woPersonMarcus =
@@ -3802,7 +3802,7 @@ async function populateMockDataIn(
             id: 'eJEybxfXaf3sjwFilZnunU',
             entity_id: woId,
             state: woNodeReview,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at:
                 dt(13, 14, 30),
         },
@@ -3854,7 +3854,7 @@ async function populateMockDataIn(
             entity_id:
                 'taUp8y0cuMhzf0UOk6Ev8Y',
             state: woNodeNew,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(82, 10, 0),
         },
         {
@@ -3862,7 +3862,7 @@ async function populateMockDataIn(
             entity_id:
                 'taUp8y0cuMhzf0UOk6Ev8Y',
             state: woNodeCapture,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(82, 10, 8),
         },
         {
@@ -3878,7 +3878,7 @@ async function populateMockDataIn(
             entity_id:
                 'taUp8y0cuMhzf0UOk6Ev8Y',
             state: woNodeComplete,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(79, 9, 0),
         },
         // happy-path WO04: DC sojourn 3 days
@@ -3911,7 +3911,7 @@ async function populateMockDataIn(
             entity_id:
                 'KD2WFTEwzJFvxZ6cpCwpvc',
             state: woNodeComplete,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(71, 15, 0),
         },
         // happy-path WO05: DC sojourn 1 day
@@ -3920,7 +3920,7 @@ async function populateMockDataIn(
             entity_id:
                 'b6YNHrFyi6V9dJNXyCXu1K',
             state: woNodeNew,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(71, 9, 0),
         },
         {
@@ -3928,7 +3928,7 @@ async function populateMockDataIn(
             entity_id:
                 'b6YNHrFyi6V9dJNXyCXu1K',
             state: woNodeCapture,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(71, 9, 10),
         },
         {
@@ -3977,7 +3977,7 @@ async function populateMockDataIn(
             entity_id:
                 'V3AXXlSjJwDQAmkNiRA8aP',
             state: woNodeComplete,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(59, 14, 0),
         },
         // happy-path WO07: DC sojourn 2 days
@@ -3986,7 +3986,7 @@ async function populateMockDataIn(
             entity_id:
                 '9ooK5olzSsEnpgP8ASzBQi',
             state: woNodeNew,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(61, 9, 30),
         },
         {
@@ -3994,7 +3994,7 @@ async function populateMockDataIn(
             entity_id:
                 '9ooK5olzSsEnpgP8ASzBQi',
             state: woNodeCapture,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(61, 9, 45),
         },
         {
@@ -4043,7 +4043,7 @@ async function populateMockDataIn(
             entity_id:
                 'cnXN4DZx9dUVIZL4OZnyw0',
             state: woNodeComplete,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(51, 14, 0),
         },
         // happy-path WO09: DC sojourn 7 days (fat tail)
@@ -4052,7 +4052,7 @@ async function populateMockDataIn(
             entity_id:
                 'kKw82RQDHRfgg5xQnw1lPk',
             state: woNodeNew,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(52, 10, 0),
         },
         {
@@ -4060,7 +4060,7 @@ async function populateMockDataIn(
             entity_id:
                 'kKw82RQDHRfgg5xQnw1lPk',
             state: woNodeCapture,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(52, 10, 20),
         },
         {
@@ -4109,7 +4109,7 @@ async function populateMockDataIn(
             entity_id:
                 'ec0n7Ab6pJYLFDF6H0nyvV',
             state: woNodeComplete,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(43, 10, 0),
         },
         // happy-path WO11: DC sojourn 2 days
@@ -4118,7 +4118,7 @@ async function populateMockDataIn(
             entity_id:
                 'gAjJnjirIrIgcFDMJyNsPa',
             state: woNodeNew,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(44, 10, 30),
         },
         {
@@ -4126,7 +4126,7 @@ async function populateMockDataIn(
             entity_id:
                 'gAjJnjirIrIgcFDMJyNsPa',
             state: woNodeCapture,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(44, 10, 45),
         },
         {
@@ -4175,7 +4175,7 @@ async function populateMockDataIn(
             entity_id:
                 'kyWtMAZPazKqAfIwPzACsL',
             state: woNodeComplete,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(32, 9, 0),
         },
         // happy-path WO13: DC sojourn 1 day
@@ -4184,7 +4184,7 @@ async function populateMockDataIn(
             entity_id:
                 'C41Hni5pMxp8xMQFEGNaib',
             state: woNodeNew,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(37, 8, 0),
         },
         {
@@ -4192,7 +4192,7 @@ async function populateMockDataIn(
             entity_id:
                 'C41Hni5pMxp8xMQFEGNaib',
             state: woNodeCapture,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(37, 8, 10),
         },
         {
@@ -4241,7 +4241,7 @@ async function populateMockDataIn(
             entity_id:
                 'FGAZYYwoS9To1tNb24DfLc',
             state: woNodeComplete,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(22, 9, 0),
         },
         // happy-path WO15: DC sojourn 2 days
@@ -4250,7 +4250,7 @@ async function populateMockDataIn(
             entity_id:
                 '0zgLwuyPgtreVYjg4TScJR',
             state: woNodeNew,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(29, 10, 0),
         },
         {
@@ -4258,7 +4258,7 @@ async function populateMockDataIn(
             entity_id:
                 '0zgLwuyPgtreVYjg4TScJR',
             state: woNodeCapture,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(29, 10, 15),
         },
         {
@@ -4307,7 +4307,7 @@ async function populateMockDataIn(
             entity_id:
                 'XGJklKFO4aUtjSAEHEE8Zn',
             state: woNodeComplete,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(21, 14, 0),
         },
         // happy-path WO17: DC sojourn 1 day
@@ -4316,7 +4316,7 @@ async function populateMockDataIn(
             entity_id:
                 'rtuFD9uWn5zguEHyT3fh8s',
             state: woNodeNew,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(23, 8, 30),
         },
         {
@@ -4324,7 +4324,7 @@ async function populateMockDataIn(
             entity_id:
                 'rtuFD9uWn5zguEHyT3fh8s',
             state: woNodeCapture,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(23, 8, 42),
         },
         {
@@ -4373,7 +4373,7 @@ async function populateMockDataIn(
             entity_id:
                 'XrO05MeyqldO8qm0O4VPdq',
             state: woNodeComplete,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(14, 14, 0),
         },
         // happy-path WO19: DC sojourn 8 days (fat tail)
@@ -4382,7 +4382,7 @@ async function populateMockDataIn(
             entity_id:
                 'S74N7CPA2dsMESryJNrFAC',
             state: woNodeNew,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(17, 9, 0),
         },
         {
@@ -4390,7 +4390,7 @@ async function populateMockDataIn(
             entity_id:
                 'S74N7CPA2dsMESryJNrFAC',
             state: woNodeCapture,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(17, 9, 20),
         },
         {
@@ -4439,7 +4439,7 @@ async function populateMockDataIn(
             entity_id:
                 'Cr8KZH5Q2j5n8Q8Yw3qdMw',
             state: woNodeComplete,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(10, 9, 0),
         },
         // happy-path WO21: DC sojourn 3 days
@@ -4448,7 +4448,7 @@ async function populateMockDataIn(
             entity_id:
                 '4T56gYme7ae4Ya7AMA0hpW',
             state: woNodeNew,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(11, 10, 30),
         },
         {
@@ -4456,7 +4456,7 @@ async function populateMockDataIn(
             entity_id:
                 '4T56gYme7ae4Ya7AMA0hpW',
             state: woNodeCapture,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(11, 10, 48),
         },
         {
@@ -4505,7 +4505,7 @@ async function populateMockDataIn(
             entity_id:
                 'aFCyJrvokoJM5iINwO3WCf',
             state: woNodeComplete,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(7, 9, 0),
         },
         // happy-path WO23: DC sojourn 2 days
@@ -4514,7 +4514,7 @@ async function populateMockDataIn(
             entity_id:
                 'Sr4k75y6vuKODCA9zlSUjk',
             state: woNodeNew,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(6, 11, 0),
         },
         {
@@ -4522,7 +4522,7 @@ async function populateMockDataIn(
             entity_id:
                 'Sr4k75y6vuKODCA9zlSUjk',
             state: woNodeCapture,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(6, 11, 15),
         },
         {
@@ -4572,7 +4572,7 @@ async function populateMockDataIn(
             entity_id:
                 'Mm6KUpykGSwjD7YofI6zpb',
             state: woNodeCapture,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(74, 14, 0),
         },
         {
@@ -4604,7 +4604,7 @@ async function populateMockDataIn(
             entity_id:
                 'Mm6KUpykGSwjD7YofI6zpb',
             state: woNodeComplete,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(70, 9, 0),
         },
         // needs-revision WO25: loops DC->Review->DC
@@ -4613,7 +4613,7 @@ async function populateMockDataIn(
             entity_id:
                 'BbZ3Z7OZnFmdF5MBgVIYzI',
             state: woNodeNew,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(63, 10, 0),
         },
         {
@@ -4621,7 +4621,7 @@ async function populateMockDataIn(
             entity_id:
                 'BbZ3Z7OZnFmdF5MBgVIYzI',
             state: woNodeCapture,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(63, 10, 15),
         },
         {
@@ -4653,7 +4653,7 @@ async function populateMockDataIn(
             entity_id:
                 'BbZ3Z7OZnFmdF5MBgVIYzI',
             state: woNodeComplete,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(58, 9, 0),
         },
         // needs-revision WO26: loops DC->Review->DC
@@ -4686,7 +4686,7 @@ async function populateMockDataIn(
             entity_id:
                 'NydsTqMmCgEKI7R9xxp36g',
             state: woNodeCapture,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(47, 14, 0),
         },
         {
@@ -4711,7 +4711,7 @@ async function populateMockDataIn(
             entity_id:
                 'x2uQev3HutthrUWRFkXSkH',
             state: woNodeNew,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(38, 9, 0),
         },
         {
@@ -4719,7 +4719,7 @@ async function populateMockDataIn(
             entity_id:
                 'x2uQev3HutthrUWRFkXSkH',
             state: woNodeCapture,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(38, 9, 18),
         },
         {
@@ -4751,7 +4751,7 @@ async function populateMockDataIn(
             entity_id:
                 'x2uQev3HutthrUWRFkXSkH',
             state: woNodeComplete,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(33, 9, 0),
         },
         // needs-revision WO28: loops DC->Review->DC
@@ -4784,7 +4784,7 @@ async function populateMockDataIn(
             entity_id:
                 'w7XA9UnuYI7e46RTQL1xGW',
             state: woNodeCapture,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(22, 14, 0),
         },
         {
@@ -4809,7 +4809,7 @@ async function populateMockDataIn(
             entity_id:
                 '3H3XeeNE4rS2wbANs3JvYz',
             state: woNodeNew,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(12, 9, 30),
         },
         {
@@ -4817,7 +4817,7 @@ async function populateMockDataIn(
             entity_id:
                 '3H3XeeNE4rS2wbANs3JvYz',
             state: woNodeCapture,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(12, 9, 45),
         },
         {
@@ -4849,7 +4849,7 @@ async function populateMockDataIn(
             entity_id:
                 '3H3XeeNE4rS2wbANs3JvYz',
             state: woNodeComplete,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(8, 9, 0),
         },
         // in-flight WO30: sitting in Data Capture
@@ -4875,7 +4875,7 @@ async function populateMockDataIn(
             entity_id:
                 '0brjvcoPEVBwMkUQ3tKHWc',
             state: woNodeNew,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(10, 10, 0),
         },
         {
@@ -4883,7 +4883,7 @@ async function populateMockDataIn(
             entity_id:
                 '0brjvcoPEVBwMkUQ3tKHWc',
             state: woNodeCapture,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(10, 10, 20),
         },
         // in-flight WO32: sitting in Data Capture
@@ -4909,7 +4909,7 @@ async function populateMockDataIn(
             entity_id:
                 'GMhfH8lMQJXzE4vkjnSH1u',
             state: woNodeNew,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(4, 9, 0),
         },
         {
@@ -4917,7 +4917,7 @@ async function populateMockDataIn(
             entity_id:
                 'GMhfH8lMQJXzE4vkjnSH1u',
             state: woNodeCapture,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(4, 9, 18),
         },
         {
@@ -4960,7 +4960,7 @@ async function populateMockDataIn(
             entity_id:
                 'IyrpZrIl2hbmmnCtiifEGm',
             state: woNodeNew,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(35, 9, 0),
         },
         {
@@ -4968,7 +4968,7 @@ async function populateMockDataIn(
             entity_id:
                 'IyrpZrIl2hbmmnCtiifEGm',
             state: woNodeCapture,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(35, 9, 12),
         },
         {
@@ -4984,7 +4984,7 @@ async function populateMockDataIn(
             entity_id:
                 'IyrpZrIl2hbmmnCtiifEGm',
             state: woNodeComplete,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(31, 14, 0),
         },
         // out-of-clan WO36: Mike (not in DC members)
@@ -5010,7 +5010,7 @@ async function populateMockDataIn(
             entity_id:
                 'zYnDWBV4VP5guzW5fDWtHN',
             state: woNodeReview,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(20, 11, 0),
         },
         {
@@ -5030,7 +5030,7 @@ async function populateMockDataIn(
             entity_id:
                 '7HX7RPwlYopHWfD7I0QAPs',
             state: woNodeNew,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(108, 9, 0),
         },
         {
@@ -5038,7 +5038,7 @@ async function populateMockDataIn(
             entity_id:
                 '7HX7RPwlYopHWfD7I0QAPs',
             state: woNodeCapture,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(108, 9, 15),
         },
         {
@@ -5089,7 +5089,7 @@ async function populateMockDataIn(
             entity_id:
                 'EXphSopBU1Is2TH4QZo4nO',
             state: woNodeComplete,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(100, 9, 0),
         },
         // prc01: happy path, ~3 day draft sojourn
@@ -5114,7 +5114,7 @@ async function populateMockDataIn(
             entity_id:
                 'hRPNkjrYBTQqzzFe1t8FH6',
             state: prcNodeSubmit,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(57, 10, 0),
         },
         {
@@ -5122,7 +5122,7 @@ async function populateMockDataIn(
             entity_id:
                 'hRPNkjrYBTQqzzFe1t8FH6',
             state: prcNodeTriage,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(57, 10, 30),
         },
         {
@@ -5163,7 +5163,7 @@ async function populateMockDataIn(
             entity_id:
                 'L3UhOvrAGluk4kNnN6J8NT',
             state: prcNodeStart,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(45, 10, 0),
         },
         {
@@ -5171,7 +5171,7 @@ async function populateMockDataIn(
             entity_id:
                 'L3UhOvrAGluk4kNnN6J8NT',
             state: prcNodeDraft,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(45, 10, 10),
         },
         {
@@ -5179,7 +5179,7 @@ async function populateMockDataIn(
             entity_id:
                 'L3UhOvrAGluk4kNnN6J8NT',
             state: prcNodeSubmit,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(43, 9, 0),
         },
         {
@@ -5219,7 +5219,7 @@ async function populateMockDataIn(
             entity_id:
                 'L3UhOvrAGluk4kNnN6J8NT',
             state: prcNodeArchive,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(41, 10, 0),
         },
         // prc03: happy path, ~1 day draft sojourn
@@ -5276,7 +5276,7 @@ async function populateMockDataIn(
             entity_id:
                 'oTscblsEOjZDkvkW3vs7rU',
             state: prcNodeApproved,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(28, 16, 0),
         },
         {
@@ -5284,7 +5284,7 @@ async function populateMockDataIn(
             entity_id:
                 'oTscblsEOjZDkvkW3vs7rU',
             state: prcNodeArchive,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(27, 9, 0),
         },
         // prc04: happy path, ~4 day draft sojourn
@@ -5293,7 +5293,7 @@ async function populateMockDataIn(
             entity_id:
                 'Xpw9VGpZ6RyevuInSr8yze',
             state: prcNodeStart,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(20, 11, 0),
         },
         {
@@ -5301,7 +5301,7 @@ async function populateMockDataIn(
             entity_id:
                 'Xpw9VGpZ6RyevuInSr8yze',
             state: prcNodeDraft,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(20, 11, 5),
         },
         {
@@ -5341,7 +5341,7 @@ async function populateMockDataIn(
             entity_id:
                 'Xpw9VGpZ6RyevuInSr8yze',
             state: prcNodeApproved,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(15, 15, 30),
         },
         {
@@ -5349,7 +5349,7 @@ async function populateMockDataIn(
             entity_id:
                 'Xpw9VGpZ6RyevuInSr8yze',
             state: prcNodeArchive,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(14, 9, 0),
         },
         // prc05: revisit -- Decision sends to
@@ -5375,7 +5375,7 @@ async function populateMockDataIn(
             entity_id:
                 'yqPpJb0NoQDgx8DoZ183Nx',
             state: prcNodeSubmit,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(14, 10, 0),
         },
         {
@@ -5383,7 +5383,7 @@ async function populateMockDataIn(
             entity_id:
                 'yqPpJb0NoQDgx8DoZ183Nx',
             state: prcNodeTriage,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(14, 10, 15),
         },
         {
@@ -5433,7 +5433,7 @@ async function populateMockDataIn(
             entity_id:
                 'yqPpJb0NoQDgx8DoZ183Nx',
             state: prcNodeTriage,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(11, 10, 20),
         },
         {
@@ -5441,7 +5441,7 @@ async function populateMockDataIn(
             entity_id:
                 'yqPpJb0NoQDgx8DoZ183Nx',
             state: prcNodeQuickRev,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(11, 11, 0),
         },
         {
@@ -5474,7 +5474,7 @@ async function populateMockDataIn(
             entity_id:
                 'BUrGEVDMF6FeU35WUHUY5E',
             state: prcNodeStart,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(5, 10, 0),
         },
         {
@@ -5482,7 +5482,7 @@ async function populateMockDataIn(
             entity_id:
                 'BUrGEVDMF6FeU35WUHUY5E',
             state: prcNodeDraft,
-            member_id: woPersonMike,
+            member_id: woPersonEmily,
             at: dt(5, 10, 8),
         },
         {
@@ -5745,7 +5745,7 @@ async function populateMockDataIn(
                 [l2cDiscoveryNodeId, 1.10],
                 [l2cQualifNodeId, 1.10],
             ])],
-            [memberMike, new Map<
+            [memberJessica, new Map<
                 Id, number
             >([
                 [l2cProposalNodeId, 0.85],
@@ -5860,7 +5860,7 @@ async function populateMockDataIn(
         {
             id: 'r04u9qpJKSyNjP9Owxr5Be',
             idea_id: 'HRYrImq1rBJ5ZRe1T9TAVk',
-            member_id: 'zyTbfbjcGEfbpCsNTP0XjX',
+            member_id: '6xBfK5If82JKfThXb1wlzS',
             at: dt(45, 9, 0),
         },
         {
@@ -5872,7 +5872,7 @@ async function populateMockDataIn(
         {
             id: 'caBSqTgzDnvP8joamAG9OG',
             idea_id: 'SUb4gKXsZ1OsEauzqszg0t',
-            member_id: 'WxQn4LVWb76YkmqK5B0EPp',
+            member_id: 'I5ntELi16X3N3JYCCnxMjZ',
             at: dt(35, 9, 0),
         },
         {

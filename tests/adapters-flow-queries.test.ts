@@ -37,16 +37,15 @@ import {
     seedHumanMember,
 } from './member-fixtures.ts';
 import {
-    seedRootAdmin,
-} from './root-admin-fixture.ts';
+    seedAdminSchema,
+} from './test-fixtures.ts';
 
 async function setupMemDb(): Promise<{
     db: MemoryDbAdapter;
     ctx: RequestContext;
 }> {
     const db = new MemoryDbAdapter();
-    await db.createSchema();
-    await seedRootAdmin(db);
+    await seedAdminSchema(db);
     await seedHumanMember(db, 'current', 'Demo User');
     const ctx = createRequestContext(db, await devToken());
     return { db, ctx };
@@ -488,8 +487,7 @@ test(
     + ' stored positions are placeholders',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         await populateMockData(db);
         const g = await getFlowGraph(
             createRequestContext(db, await devToken()),

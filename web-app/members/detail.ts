@@ -16,6 +16,11 @@ import {
     type AIMemberDraftFields,
 } from '../app/presenters/index.ts';
 import { showToast } from '../app/toast.ts';
+import {
+    createPageAbort,
+    bindPageListeners,
+} from '../app/page-lifecycle.ts';
+import { extractErrorMessage } from '../app/error-helpers.ts';
 import { log } from '../app/logger.ts';
 import {
     buildSkeleton,
@@ -42,8 +47,7 @@ import {
     type MemberState,
 } from '../app/adapters/index.ts';
 
-const pageAbort = new AbortController();
-const signal = pageAbort.signal;
+const { signal } = createPageAbort();
 
 type HumanState =
     | {
@@ -220,23 +224,12 @@ async function refresh(
 function bindStableListeners(
     container: HTMLElement,
 ): void {
-    container.addEventListener(
-        'click', e => onClick(e),
-        { signal },
-    );
-    container.addEventListener(
-        'input', e => onInput(e),
-        { signal },
-    );
-    container.addEventListener(
-        'change', e => onInput(e),
-        { signal },
-    );
-    container.addEventListener(
-        'keydown',
-        e => onContainerKeydown(e),
-        { signal },
-    );
+    bindPageListeners(container, {
+        click: e => onClick(e),
+        input: e => onInput(e),
+        change: e => onInput(e),
+        keydown: e => onContainerKeydown(e),
+    }, signal);
     document.addEventListener(
         'keydown',
         e => onDocumentKeydown(e),
@@ -476,9 +469,7 @@ async function saveHumanMember(
             );
         }
     } catch (err) {
-        const detail = err instanceof Error
-            ? err.message
-            : String(err);
+        const detail = extractErrorMessage(err);
         log.error(
             'human member save failed',
             'members', err,

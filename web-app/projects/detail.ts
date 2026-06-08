@@ -3,6 +3,14 @@ import {
 } from '../app/dom.ts';
 import { showToast } from '../app/toast.ts';
 import {
+    createPageAbort,
+    bindPageListeners,
+} from '../app/page-lifecycle.ts';
+import { extractErrorMessage } from '../app/error-helpers.ts';
+import {
+    makeFieldKeyValidator,
+} from '../app/field-key-validator.ts';
+import {
     buildSkeleton, buildErrorState,
 } from '../app/loading-states.ts';
 import { setHtml } from '../app/safe-html.ts';
@@ -12,6 +20,7 @@ import {
     trimStrings,
     openDialog,
     closeDialog,
+    parseDialogClick,
 } from '../app/core.ts';
 import {
     getProject,
@@ -65,8 +74,7 @@ import {
     ProjectScoreHistoryPresenter,
 } from '../app/presenters/index.ts';
 
-const pageAbort = new AbortController();
-const signal = pageAbort.signal;
+const { signal } = createPageAbort();
 
 type PageState =
     | {
@@ -103,12 +111,7 @@ const SUBMIT_ON_ENTER_IDS:
         'new-flow-name',
     ]);
 
-function isFieldKey(
-    s: string | null,
-): s is ProjectFieldKey {
-    return s !== null
-        && FIELDS.has(s as ProjectFieldKey);
-}
+const isFieldKey = makeFieldKeyValidator(FIELDS);
 
 async function loadProjectView(
     projectId: string,
@@ -341,10 +344,7 @@ export async function init(
                     );
                     closeDialog('approve');
                 } catch (err) {
-                    const message =
-                        err instanceof Error
-                            ? err.message
-                            : String(err);
+                    const message = extractErrorMessage(err);
                     showToast(message, 'error');
                     closeDialog('approve');
                     throw err;
@@ -374,10 +374,7 @@ export async function init(
                     );
                     closeDialog('archive');
                 } catch (err) {
-                    const message =
-                        err instanceof Error
-                            ? err.message
-                            : String(err);
+                    const message = extractErrorMessage(err);
                     showToast(message, 'error');
                     closeDialog('archive');
                     throw err;
@@ -472,23 +469,12 @@ export async function init(
 function bindStableListeners(
     container: HTMLElement,
 ): void {
-    container.addEventListener(
-        'click', e => onClick(e),
-        { signal },
-    );
-    container.addEventListener(
-        'input', e => onInput(e),
-        { signal },
-    );
-    container.addEventListener(
-        'change', e => onInput(e),
-        { signal },
-    );
-    container.addEventListener(
-        'keydown',
-        e => onContainerKeydown(e),
-        { signal },
-    );
+    bindPageListeners(container, {
+        click: e => onClick(e),
+        input: e => onInput(e),
+        change: e => onInput(e),
+        keydown: e => onContainerKeydown(e),
+    }, signal);
     document.addEventListener(
         'keydown',
         e => onDocumentKeydown(e),
@@ -502,46 +488,19 @@ function onClick(
     const target = e.target as Element | null;
     if (!target) return;
 
-    if (handleDialogClicks(target)) return;
+    const dialogIntent = parseDialogClick(target);
+    if (dialogIntent) {
+        if (dialogIntent.kind === 'open') {
+            openDialog(dialogIntent.id);
+        } else {
+            closeDialog(dialogIntent.id);
+        }
+        return;
+    }
     if (handleFlowCardClick(e, target)) {
         return;
     }
     handleProjectActions(target);
-}
-
-function handleDialogClicks(
-    target: Element,
-): boolean {
-    if (target.classList.contains(
-        'dialog-backdrop',
-    )) {
-        const id = target.getAttribute(
-            'data-dialog-id',
-        );
-        if (id) closeDialog(id);
-        return true;
-    }
-    const openEl = target.closest(
-        '[data-dialog-open]',
-    );
-    if (openEl) {
-        const id = openEl.getAttribute(
-            'data-dialog-open',
-        );
-        if (id) openDialog(id);
-        return true;
-    }
-    const cancelEl = target.closest(
-        '[data-dialog-cancel]',
-    );
-    if (cancelEl) {
-        const id = cancelEl.getAttribute(
-            'data-dialog-cancel',
-        );
-        if (id) closeDialog(id);
-        return true;
-    }
-    return false;
 }
 
 function handleFlowCardClick(
@@ -702,9 +661,7 @@ async function handleSave(): Promise<void> {
             );
         }
     } catch (err) {
-        const detail = err instanceof Error
-            ? err.message
-            : String(err);
+        const detail = extractErrorMessage(err);
         log.error(
             'project save failed',
             'projects', err,

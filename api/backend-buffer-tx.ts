@@ -50,6 +50,17 @@ export function bufferTx(
         ): Promise<T[]> {
             return [...scoped(table)] as T[];
         },
+        async getWhere<T extends { id: string }>(
+            table: string,
+            column: string,
+            key: string,
+        ): Promise<T[]> {
+            return scoped(table).filter(
+                row => (
+                    row as Record<string, unknown>
+                )[column] === key,
+            ) as T[];
+        },
         async put<T extends { id: string }>(
             table: string,
             row: T,

@@ -44,6 +44,18 @@ import {
     writePreference,
 } from './preferences.ts';
 
+// Rows whose `field` equals `value` — the single-field
+// equality filter the adapters repeat. Type-safe: `field`
+// must be a key of T and `value` its type. Callers keep
+// their own map/sort.
+export function filterByField<T, K extends keyof T>(
+    rows: readonly T[],
+    field: K,
+    value: T[K],
+): T[] {
+    return rows.filter(row => row[field] === value);
+}
+
 // A unit of write work executed by ctx.commit().
 // `put` upserts a row by full state; `delete` removes
 // a row by its resource path. The whole batch posts as
@@ -216,6 +228,16 @@ async function recoverSession(
     }
     const now = Math.floor(Date.now() / 1000);
     const decision = resolveCredentialDecision(creds, now);
+    // A live access token ('install') that still drew a 401 did not
+    // expire — the holder was the unscoped anonymous seed (a read
+    // raced ahead of boot scoping). Re-install the live token and
+    // re-scope; the caller retries once. A genuinely dead token
+    // (revoked, not expired) 401s the re-scope and falls through to
+    // scrub + bounce — never destroying a live session over a
+    // recoverable unscoped read.
+    if (decision.kind === 'install') {
+        return installAndScope(adapter, decision.accessToken);
+    }
     if (decision.kind !== 'refresh') {
         deleteSessionCredentials();
         redirectToLogin();
@@ -227,17 +249,26 @@ async function recoverSession(
         return null;
     }
     putSessionCredentials(refreshed);
-    setSessionToken(refreshed.accessToken);
+    return installAndScope(adapter, refreshed.accessToken);
+}
+
+// Install a flat token as the session and re-scope it to the active
+// org, exactly as boot does. Returns the org-scoped token, or null
+// when the token died mid-re-scope (revoked, not expired) — then it
+// has scrubbed the credential and bounced to login. A non-401 is a
+// real bug and surfaces. This keeps recoverSession's contract whole:
+// it returns a token or null (having redirected), and never throws a
+// 401 past withAuthRecovery's catch. The shared tail of both
+// recovery branches: re-install a known-live token (install), and
+// refresh-then-install (refresh).
+async function installAndScope(
+    adapter: DbAdapter,
+    flatToken: string,
+): Promise<string | null> {
+    setSessionToken(flatToken);
     try {
-        await rescopeToActiveOrg(
-            adapter, refreshed.accessToken);
+        await rescopeToActiveOrg(adapter, flatToken);
     } catch (err) {
-        // The refreshed token died (revoked mid-flight) before
-        // the org re-scope completed — terminal, same as a dead
-        // refresh: scrub and bounce. A non-401 is a real bug and
-        // surfaces. This keeps recoverSession's contract whole:
-        // it returns a token or null (having redirected), and
-        // never throws a 401 past withAuthRecovery's catch.
         if (err instanceof UnauthorizedError) {
             deleteSessionCredentials();
             redirectToLogin();

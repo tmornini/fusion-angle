@@ -17,6 +17,7 @@ import {
 import type {
     RequestContext, WriteOp,
 } from './shared.ts';
+import { filterByField } from './shared.ts';
 
 export interface FlowVersion {
     id: string;
@@ -84,8 +85,7 @@ export async function postFlowVersion(
             'flow-versions',
         ),
     ]);
-    const mine = allVersions
-        .filter(v => v.flow_id === flowId)
+    const mine = filterByField(allVersions, 'flow_id', flowId)
         .sort(compareRows);
     // Anticipate the version about to be written;
     // trim the oldest if that pushes us past cap.
@@ -131,8 +131,7 @@ export async function getFlowVersions(
     const all = await ctx.GET<
         FlowVersionEntity[]
     >('flow-versions');
-    return all
-        .filter(v => v.flow_id === flowId)
+    return filterByField(all, 'flow_id', flowId)
         .sort((a, b) => -compareRows(a, b))
         .map(computeFlowVersion);
 }

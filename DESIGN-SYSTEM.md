@@ -178,6 +178,33 @@ inline-style strings.
 <span class="status-badge-error">Rejected</span>
 ```
 
+### Pending-invitations indicator
+
+The top-bar bell with a count badge, signalling that the
+caller has invitations awaiting a response. Styled in
+`components-badges.css`:
+
+- `.icon-badge-host` — a `position: relative` anchor placed
+  on the icon button so the badge can be positioned against
+  it.
+- `.icon-count-badge` — a small pill at the button's
+  top-right corner: `background: hsl(var(--primary))`,
+  `color: hsl(var(--primary-foreground))`, and a 2px
+  `hsl(var(--card))` border so it reads cleanly over the
+  button. Carries the pending count.
+
+```html
+<button class="btn-ghost icon-badge-host">
+  <!-- bell SVG -->
+  <span class="icon-count-badge">3</span>
+</button>
+```
+
+The bell renders **only** when the caller has one or more
+pending invitations; the badge shows that count. There is no
+empty bell — the affordance is honest, present exactly when
+there is something to act on.
+
 ### Metric Widgets
 
 ```html
@@ -335,12 +362,40 @@ codebase's standard for grouped selects from this
 point forward. Browser default styling (bold-italic
 group labels) is fine; no override needed.
 
-The header org-switcher `<select>` is the documented
+The sidebar org-switcher `<select>` is the documented
 exception to the `.input` select standard: it is a
-compact in-header control styled by `.org-switcher`
-(`components-org-switcher.css`), not `.input`, to fit
-the header greeting line. It renders only when the
-member can reach two or more orgs.
+compact control styled by `.org-switcher`
+(`components-org-switcher.css`), not `.input`. It was
+re-homed from the old top-bar greeting into the sidebar
+footer.
+
+### Sidebar org switcher
+
+The native `<select>` (`.org-switcher`) by which a member
+chooses the active org, paired with a quiet "Set as
+default" button (`.org-set-default`). The two sit in an
+`.org-switcher-group` cluster. CSS in
+`components-org-switcher.css`.
+
+The switcher renders **only** when the member can reach two
+or more orgs; a single-org member sees plain org text
+instead — no control where there is no choice.
+
+In the sidebar footer the cluster wraps in
+`.sidebar-org-switcher`, which restyles the inline
+`.org-switcher-group` to stack vertically: the `<select>`
+goes full-width over the quiet "Set as default" button.
+When the sidebar is collapsed (`.sidebar-collapsed`) the
+whole `.sidebar-org-switcher` is hidden.
+
+```html
+<div class="sidebar-org-switcher">
+  <div class="org-switcher-group">
+    <select class="org-switcher"><!-- orgs --></select>
+    <button class="org-set-default">Set as default</button>
+  </div>
+</div>
+```
 
 ### Dark Mode
 

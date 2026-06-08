@@ -23,16 +23,15 @@ import {
     seedHumanMember,
 } from './member-fixtures.ts';
 import {
-    seedRootAdmin,
-} from './root-admin-fixture.ts';
+    seedAdminSchema,
+} from './test-fixtures.ts';
 
 test(
     'postRecordChange create writes the row and'
     + ' the initial state event',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         await seedCurrentMember(db);
         const ctx = createRequestContext(db, await orgToken());
         await postRecordChange(ctx, 'rec-1', {
@@ -60,8 +59,7 @@ test(
     + ' alongside the record',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         await seedCurrentMember(db);
         const ctx = createRequestContext(db, await orgToken());
         await postRecordChange(ctx, 'rec-1', {
@@ -96,8 +94,7 @@ test(
     'putRecord overwrites an existing row',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         await seedCurrentMember(db);
         const ctx = createRequestContext(db, await orgToken());
         await postRecordChange(ctx, 'rec-1', {
@@ -126,8 +123,7 @@ test(
     + ' attributes with new ones',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         await seedCurrentMember(db);
         const ctx = createRequestContext(db, await orgToken());
         await postRecordChange(ctx, 'rec-1', {
@@ -181,8 +177,7 @@ test(
     + ' state event is deleted',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         await seedCurrentMember(db);
         const ctx = createRequestContext(db, await orgToken());
         await postRecordChange(ctx, 'rec-1', {
@@ -221,8 +216,7 @@ test(
     + ' archived',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         await seedCurrentMember(db);
         const ctx = createRequestContext(db, await orgToken());
         await postRecordChange(ctx, 'rec-1', {
@@ -248,8 +242,7 @@ test(
     + ' without touching the entity row',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         await seedCurrentMember(db);
         const ctx = createRequestContext(db, await orgToken());
         await postRecordChange(ctx, 'rec-1', {
@@ -278,8 +271,7 @@ test(
     'deleteRecord hard-splices the row',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         await seedCurrentMember(db);
         const ctx = createRequestContext(db, await orgToken());
         await postRecordChange(ctx, 'rec-1', {
@@ -304,8 +296,7 @@ test(
     + ' exists for the record',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         const ctx = createRequestContext(db, await orgToken());
         await assert.rejects(
             () => getRecordState(ctx, 'rec-missing'),
@@ -319,8 +310,7 @@ test(
     + ' states log',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         await seedCurrentMember(db);
         const ctx = createRequestContext(db, await orgToken());
         await postRecordChange(ctx, 'rec-1', {

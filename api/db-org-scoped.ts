@@ -1,7 +1,12 @@
 import { EntityNotFound } from './db.ts';
-import type { DbAdapter, EntityStore } from './db.ts';
+import type {
+    DbAdapter,
+    EntityStore,
+    KeyedCollectionReader,
+} from './db.ts';
 import type {
     Id,
+    MembershipEntity,
     FlowVersionEntity,
     ProjectFlowEntity,
     FlowWorkOrderEntity,
@@ -56,7 +61,16 @@ export function orgScopedAdapter(
         inner: EntityStore<T>,
         table: string,
     ): OrgScopedEntityStore<T> =>
-        new OrgScopedEntityStore(inner, org, table);
+        // The org-owned stores are the concrete EntityStore,
+        // which reads a tenant's slice through the
+        // organization_id index; the DbStores contract only
+        // surfaces the EntityStore interface, so we name here
+        // the keyed-read capability the concrete store has.
+        new OrgScopedEntityStore(
+            inner as EntityStore<T>
+                & KeyedCollectionReader<T>,
+            org, table,
+        );
 
     const parentScope = <T extends { id: string }>(
         inner: EntityStore<T>,
@@ -65,18 +79,31 @@ export function orgScopedAdapter(
     ): ParentScopedEntityStore<T> =>
         new ParentScopedEntityStore(inner, org, table, resolver);
 
+    // The membership ledger is read for parent-derived
+    // ownership (PII, credentials, state events). Its keyed
+    // read is kept off the EntityStore contract, so name it
+    // here once: resolve an identity's memberships through the
+    // identity_id index, never a per-row whole-ledger scan.
+    const memberships =
+        base.memberships as EntityStore<MembershipEntity>
+            & KeyedCollectionReader<MembershipEntity>;
+
     // A state event's entity_id is any org-owned entity, or an
     // org-less member visible only to a co-member of this org —
     // resolved through the UNFENCED stores so a foreign owner
-    // reports its real org and is hidden.
+    // reports its real org and is hidden. `invitations` is here
+    // (though global-spine) so an invitation's lifecycle events
+    // resolve to the invitation's org and stay out of every
+    // other tenant's /states read.
     const orgOwned = [
         base.ideas, base.projects, base.flows,
         base.records, base.objectives, base.workOrders,
+        base.invitations,
     ];
     const states = new ParentScopedStateStore(
         base.states, org, 'states',
         (row) => ownerOrgOfEntity(
-            orgOwned, base.memberships, org, row.entity_id,
+            orgOwned, memberships, org, row.entity_id,
         ),
     );
 
@@ -94,7 +121,7 @@ export function orgScopedAdapter(
                 throw e;
             }
             return ownerOrgOfEntity(
-                orgOwned, base.memberships, org, ev.entity_id,
+                orgOwned, memberships, org, ev.entity_id,
             );
         },
     );
@@ -137,6 +164,13 @@ export function orgScopedAdapter(
         // fence it to the caller's memberships.
         organizations: base.organizations,
 
+        // Invitations are global-spine: the invitee must read an
+        // invitation to an org they are NOT yet in, which an org
+        // fence would hide. The dedicated invitation routes fence
+        // by the caller's identity (invitee) or admin role
+        // (inviter) instead.
+        invitations: base.invitations,
+
         // Identity PII / credential facets — visible to the
         // caller's org only for co-members (need-to-know),
         // derived from the membership ledger. Credentials also
@@ -144,13 +178,13 @@ export function orgScopedAdapter(
         identityPii: parentScope(
             base.identityPii, 'identity_pii',
             viaMembership(
-                base.memberships,
+                memberships,
                 (r: IdentityPiiEntity) => r.id, org),
         ),
         identityCredentials: parentScope(
             base.identityCredentials, 'identity_credentials',
             viaMembership(
-                base.memberships,
+                memberships,
                 (r: IdentityCredentialEntity) =>
                     r.identity_id, org),
         ),

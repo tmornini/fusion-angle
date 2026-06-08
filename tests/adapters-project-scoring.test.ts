@@ -16,13 +16,12 @@ import {
     postProjectActualMeasurement,
 } from '../web-app/app/adapters/project-scoring.ts';
 import { seedHumanMember } from './member-fixtures.ts';
-import { seedRootAdmin } from './root-admin-fixture.ts';
+import { seedAdminSchema } from './test-fixtures.ts';
 
 test('getBaselineScoresForProject returns project rows',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         await db.projectObjectiveBaselineScores.put(
             'p1:o1:t1',
             {
@@ -52,8 +51,7 @@ test('getBaselineScoresForProject returns project rows',
 test('getActualScoresForProject returns project rows',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         await db.projectObjectiveActualScores.put(
             'p1:o1:t1',
             {
@@ -74,8 +72,7 @@ test('getActualScoresForProject returns project rows',
 test('getProjectScoring returns both lists',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         await db.projectObjectiveBaselineScores.put(
             'p1:o1:t1',
             {
@@ -158,8 +155,7 @@ async function seedTwoApprovedProjects(
 test('getPortfolioImpactSummary averages project averages',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         await seedTwoApprovedProjects(db);
         const ctx = createRequestContext(db, await devToken());
         const r = await getPortfolioImpactSummary(ctx);
@@ -170,8 +166,7 @@ test('getPortfolioImpactSummary averages project averages',
 test('getObjectiveAggregates returns per-objective rows',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         await seedTwoApprovedProjects(db);
         const ctx = createRequestContext(db, await devToken());
         const rows = await getObjectiveAggregates(ctx);
@@ -184,8 +179,7 @@ test('getObjectiveAggregates returns per-objective rows',
 test('getProjectsScoreColumn returns per-project rollup',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         await seedTwoApprovedProjects(db);
         const ctx = createRequestContext(db, await devToken());
         const rows = await getProjectsScoreColumn(ctx);
@@ -200,8 +194,7 @@ test(
     'getObjectiveTrendlines: baseline + two actuals',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         await seedTwoApprovedProjects(db);
         await db.projectObjectiveActualScores.put(
             'p1:o1:a1',
@@ -249,8 +242,7 @@ test(
     'getObjectiveTrendlines: baseline + one actual',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         await seedTwoApprovedProjects(db);
         await db.projectObjectiveActualScores.put(
             'p1:o1:a1',
@@ -280,8 +272,7 @@ test(
     'getObjectiveTrendlines: same-at batch is one point',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         await seedTwoApprovedProjects(db);
         await db.projectObjectiveActualScores.put(
             'p1:o1:a1',
@@ -320,8 +311,7 @@ test(
     'getObjectiveTrendlines: no baseline returns empty',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         await db.objectives.put('o1', {
             organization_id: '1',
             position: 0,
@@ -343,8 +333,7 @@ test(
 test('postProjectBaselineScoring appends event rows',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         await seedHumanMember(db, 'current', 'Demo User');
         const ctx = createRequestContext(db, await devToken());
         await postProjectBaselineScoring(ctx, 'p1', [
@@ -362,8 +351,7 @@ test('postProjectBaselineScoring appends event rows',
 test('postProjectActualMeasurement appends actual rows',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await seedRootAdmin(db);
+        await seedAdminSchema(db);
         await seedHumanMember(db, 'current', 'Demo User');
         const ctx = createRequestContext(db, await devToken());
         await postProjectActualMeasurement(ctx, 'p1', [

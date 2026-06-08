@@ -1,4 +1,5 @@
 import { $, getRequiredAttribute, populateIcons } from '../app/dom.ts';
+import { createPageAbort } from '../app/page-lifecycle.ts';
 import { html } from '../app/safe-html.ts';
 import {
     buildSkeleton,
@@ -26,8 +27,7 @@ import {
     initDragReorder,
 } from '../app/drag-reorder.ts';
 
-const pageAbort = new AbortController();
-const signal = pageAbort.signal;
+const { signal } = createPageAbort();
 
 let ideaState: IdeaListState | null = null;
 let listEl: HTMLElement | null = null;
