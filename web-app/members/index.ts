@@ -27,6 +27,7 @@ import {
     postAIMemberCreation,
     getCurrentHumanMember,
     postInvitationGrant,
+    type InvitationGrantOutcome,
     jsonArrayField,
     jsonObjectField,
     generateCryptoSafeBase62,
@@ -230,34 +231,82 @@ function bindInviteMemberDialog(): void {
         'invite-member-btn',
         handleInviteSubmit,
     );
+    // Clear a stale field error when the dialog reopens, so a
+    // prior rejection does not greet the next invite.
+    $('#invite-member-btn', document)?.addEventListener(
+        'click',
+        () => {
+            const input = $input('#invite-email', document);
+            if (input) setInviteEmailError(input, null);
+        },
+        { signal },
+    );
+}
+
+// Show (message) or clear (null) the invite dialog's inline
+// field error, mirroring the auth form's field-error pattern:
+// the input flags `input-error` and the message lives in its own
+// element — kept open so the admin can correct the address.
+function setInviteEmailError(
+    input: HTMLInputElement,
+    message: string | null,
+): void {
+    const el = $('#invite-email-error', document);
+    if (message === null) {
+        input.classList.remove('input-error');
+        if (el) {
+            el.textContent = '';
+            el.classList.add('hidden');
+        }
+        return;
+    }
+    input.classList.add('input-error');
+    if (el) {
+        el.textContent = message;
+        el.classList.remove('hidden');
+    }
 }
 
 async function handleInviteSubmit(): Promise<void> {
-    const email = $input(
-        '#invite-email', document,
-    )!.value.trim();
+    const input = $input('#invite-email', document)!;
+    setInviteEmailError(input, null);
+    const email = input.value.trim();
     if (!email) {
         showToast('Email is required', 'error');
         return;
     }
+    let outcome: InvitationGrantOutcome;
     try {
-        await postInvitationGrant(
+        outcome = await postInvitationGrant(
             sessionContext(), email,
         );
     } catch (err) {
-        const detail = extractErrorMessage(err);
+        // An unexpected fault — the server's expected 404 / 409
+        // come back as outcomes below, never as a throw.
         log.error(
             'postInvitationGrant failed',
             'members', err,
         );
         showToast(
-            `Failed to invite: ${detail}`, 'error',
+            `Failed to invite: ${extractErrorMessage(err)}`,
+            'error',
+        );
+        return;
+    }
+    if (outcome === 'no-identity') {
+        setInviteEmailError(
+            input, 'No identity found for that email.',
+        );
+        return;
+    }
+    if (outcome === 'already-member') {
+        setInviteEmailError(
+            input, 'Already a member of this organization.',
         );
         return;
     }
     showToast('Invitation sent', 'success');
-    const input = $input('#invite-email', document);
-    if (input) input.value = '';
+    input.value = '';
     closeDialog('invite-member');
 }
 

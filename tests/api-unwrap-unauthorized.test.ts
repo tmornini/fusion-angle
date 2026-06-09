@@ -1,7 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
-import { GET, UnauthorizedError } from '../api/api.ts';
+import {
+    GET, UnauthorizedError, RequestError,
+} from '../api/api.ts';
 import { devToken, expiredToken } from './token-fixtures.ts';
 
 async function freshDb() {
@@ -31,31 +33,38 @@ test('a 401 through a verb is an UnauthorizedError', async () => {
 // A 403 is authorization, not authentication: a live token
 // with no role. It must NOT be UnauthorizedError, or runtime
 // recovery would loop refreshing a token that is already fine.
-test('a 403 through a verb is a plain Error, not Unauthorized',
+// It IS a RequestError carrying status 403 — and still an Error,
+// so `instanceof Error` catch sites are unaffected.
+test('a 403 through a verb is a RequestError carrying status 403',
 async () => {
     const db = await freshDb();   // no role granted
     const tok = await devToken();
     await assert.rejects(
         () => GET(db, 'members', tok),
         (err: unknown) => {
+            assert.ok(err instanceof RequestError);
             assert.ok(err instanceof Error);
             assert.ok(!(err instanceof UnauthorizedError));
+            assert.equal((err as RequestError).status, 403);
             assert.match((err as Error).message, /forbidden/);
             return true;
         });
 });
 
-// A 404 (unknown route, gated out before auth even runs)
-// likewise stays a plain Error — only 401 is special-cased.
-test('a 404 through a verb is a plain Error, not Unauthorized',
+// A 404 likewise carries its status, so the web layer can branch
+// on it (a clean "not found" message) instead of string-matching
+// server prose. Only 401 is special-cased into UnauthorizedError.
+test('a 404 through a verb is a RequestError carrying status 404',
 async () => {
     const db = await freshDb();
     const tok = await devToken();
     await assert.rejects(
         () => GET(db, 'no-such-resource', tok),
         (err: unknown) => {
+            assert.ok(err instanceof RequestError);
             assert.ok(err instanceof Error);
             assert.ok(!(err instanceof UnauthorizedError));
+            assert.equal((err as RequestError).status, 404);
             return true;
         });
 });

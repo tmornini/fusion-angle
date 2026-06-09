@@ -2,10 +2,11 @@ import { html, type SafeHtml } from '../safe-html.ts';
 import type {
     Objective,
     ObjectiveId,
-    ProjectObjectiveBaselineScore,
-    ProjectObjectiveActualScore,
     ProjectState,
 } from '../../../api/types.ts';
+import type {
+    ObjectiveScore,
+} from '../adapters/project-scoring.ts';
 import {
     latestPerPair,
     formatSigned,
@@ -20,13 +21,13 @@ interface Definition {
 }
 
 function indexByObjective<T extends {
-    objective_id: ObjectiveId;
-    project_id: string;
+    objectiveId: ObjectiveId;
+    projectId: string;
     at: string;
 }>(rows: readonly T[]): Map<ObjectiveId, T> {
     const map = new Map<ObjectiveId, T>();
     for (const r of latestPerPair(rows)) {
-        map.set(r.objective_id, r);
+        map.set(r.objectiveId, r);
     }
     return map;
 }
@@ -47,17 +48,15 @@ function actualVisible(state: ProjectState): boolean {
 export class ProjectObjectivesPresenter {
     readonly #activeObjectives: Objective[];
     readonly #defs: Map<ObjectiveId, Definition>;
-    readonly #latestBaselines:
-        ProjectObjectiveBaselineScore[];
-    readonly #latestActuals:
-        ProjectObjectiveActualScore[];
+    readonly #latestBaselines: ObjectiveScore[];
+    readonly #latestActuals: ObjectiveScore[];
     readonly #state: ProjectState;
 
     constructor(
         activeObjectives: Objective[],
         defs: Map<ObjectiveId, Definition>,
-        latestBaselines: ProjectObjectiveBaselineScore[],
-        latestActuals: ProjectObjectiveActualScore[],
+        latestBaselines: ObjectiveScore[],
+        latestActuals: ObjectiveScore[],
         state: ProjectState,
     ) {
         this.#activeObjectives = activeObjectives;
@@ -125,10 +124,8 @@ export class ProjectObjectivesPresenter {
 
     #row(
         obj: Objective,
-        baseline:
-            ProjectObjectiveBaselineScore | undefined,
-        actual:
-            ProjectObjectiveActualScore | undefined,
+        baseline: ObjectiveScore | undefined,
+        actual: ObjectiveScore | undefined,
         showActual: boolean,
         baseEditable: boolean,
     ): SafeHtml {

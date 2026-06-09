@@ -124,7 +124,7 @@ async () => {
             phone: '555', bio: 'builds',
         },
     });
-    await ctx.DELETE('identity-pii/p1');
+    await ctx.DELETE('identities/p1/pii');
     const roster = await getIdentityRoster(ctx);
     const row = roster.find(r => r.id === 'p1');
     assert.ok(row, 'roster row for p1 exists');

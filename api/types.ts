@@ -413,7 +413,10 @@ export function formatCompactCurrency(
 }
 
 export function nowUtc(): string {
-    return new Date().toISOString();
+    // JS Date resolves only to milliseconds; SCHEMA.md documents
+    // the 6-digit microsecond zulu width. Pad the 3-digit
+    // fraction so every mint is one width with the seed helpers.
+    return new Date().toISOString().replace('Z', '000Z');
 }
 
 export function msSinceUtc(

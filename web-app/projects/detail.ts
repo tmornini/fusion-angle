@@ -889,10 +889,10 @@ async function openHistoryModal(
         ctx, projectId,
     );
     const baselineObjIds = new Set(
-        scoring.baseline.map(b => b.objective_id),
+        scoring.baseline.map(b => b.objectiveId),
     );
     for (const a of scoring.actual) {
-        baselineObjIds.add(a.objective_id);
+        baselineObjIds.add(a.objectiveId);
     }
     const revisions: ObjectiveRevision[] = [];
     const allArchivations =

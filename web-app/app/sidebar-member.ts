@@ -33,29 +33,23 @@ interface SidebarMember {
 
 async function getSidebarMember(
 ): Promise<SidebarMember> {
-    const {
-        sessionContext,
-        getHumanMember,
-        MEMBER_WITHOUT_PII_NAME,
-    } = await import('./adapters');
+    const { sessionContext } = await import('./adapters');
     const { getOrganizations } =
         await import('./adapters/organizations.ts');
     const { activeOrg } =
         await import('./adapters/shared.ts');
     const ctx = sessionContext();
-    const [member, orgs] =
-        await Promise.all([
-            getHumanMember(ctx, 'current'),
-            getOrganizations(ctx),
-        ]);
-    const pii = member.pii();
+    // The chip is the caller's own row, drawn entirely from
+    // role-independent sources: id + display name from the
+    // verified token (member.id === identity.id, name resolved
+    // per identity kind at mint), orgs from the self-fenced org
+    // enumeration — so a ROLELESS member's sidebar renders.
+    const orgs = await getOrganizations(ctx);
     const activeOrgId = activeOrg(ctx);
     const active = orgs.find(o => o.id === activeOrgId);
     return {
-        id: member.idForLink(),
-        name: pii.erased
-            ? MEMBER_WITHOUT_PII_NAME
-            : pii.name,
+        id: ctx.identity.id,
+        name: ctx.identity.name,
         organization: active ? active.name : '',
         orgs: orgs.map(o => ({ id: o.id, name: o.name })),
         activeOrgId,

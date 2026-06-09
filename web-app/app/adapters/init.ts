@@ -118,3 +118,14 @@ export function sessionIsOrgScoped(): boolean {
     return principalFromToken(getSessionToken()).organization
         !== undefined;
 }
+
+// True when the held token's identity can reach at least one org.
+// A freshly minted (flat) login token carries the reachable set
+// before org-scoping; an identity with zero memberships reads
+// false, so login and boot can land it on invitations instead of
+// an org-scoped dead end.
+export function sessionHasReachableOrg(): boolean {
+    const orgs =
+        principalFromToken(getSessionToken()).organizations;
+    return orgs !== undefined && orgs.length > 0;
+}

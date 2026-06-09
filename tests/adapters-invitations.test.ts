@@ -117,7 +117,8 @@ test('the invitations store round-trips a row', async () => {
 
 test('grant by email appends a pending invitation', async () => {
     const { db, ctx } = await ctxFor('current', '2');
-    await postInvitationGrant(ctx, 'sarah@x.com');
+    assert.equal(
+        await postInvitationGrant(ctx, 'sarah@x.com'), 'sent');
     const rows = await db.invitations.getAll();
     assert.equal(rows.length, 1);
     assert.equal(rows[0]!.organization_id, '2');
@@ -135,17 +136,20 @@ test('grant stamps the org from the verified token', async () => {
     assert.equal(rows[0]!.organization_id, '2');
 });
 
-test('grant by unknown email is rejected', async () => {
+test('grant by unknown email returns no-identity', async () => {
     const { ctx } = await ctxFor('current', '2');
-    await assert.rejects(
-        postInvitationGrant(ctx, 'nobody@x.com'));
+    assert.equal(
+        await postInvitationGrant(ctx, 'nobody@x.com'),
+        'no-identity');
 });
 
-test('grant for an existing member is rejected', async () => {
+test('grant for an existing member returns already-member',
+async () => {
     // Tony invites Sarah to Stark, where she is already a member.
     const { ctx } = await ctxFor('current', '1');
-    await assert.rejects(
-        postInvitationGrant(ctx, 'sarah@x.com'));
+    assert.equal(
+        await postInvitationGrant(ctx, 'sarah@x.com'),
+        'already-member');
 });
 
 test('a non-admin cannot grant', async () => {

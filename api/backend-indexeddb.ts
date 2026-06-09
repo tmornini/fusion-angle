@@ -41,6 +41,39 @@ function requestPromise<T>(
     });
 }
 
+// The first of `stores` absent from `available`, or undefined
+// when all are present. db.transaction() throws an opaque
+// NotFoundError when a named store is missing; this names the
+// culprit so openTx can raise a typed MissingTableError instead.
+export function firstMissingStore(
+    available: { contains(name: string): boolean },
+    stores: readonly string[],
+): string | undefined {
+    return stores.find(store => !available.contains(store));
+}
+
+// Open an IDBTransaction, converting the opaque NotFoundError a
+// missing store throws at CREATION time into the typed
+// MissingTableError the boot path routes to snapshots recovery.
+// The objectStore() guard in indexedDbTx only catches a missing
+// store INSIDE a live tx; this closes the creation-time gap.
+function openTx(
+    db: IDBDatabase,
+    stores: readonly string[],
+    mode: TxMode,
+): IDBTransaction {
+    try {
+        return db.transaction([...stores], mode);
+    } catch (err) {
+        const missing = firstMissingStore(
+            db.objectStoreNames, stores);
+        if (missing !== undefined) {
+            throw new MissingTableError(missing);
+        }
+        throw err;
+    }
+}
+
 // A row-granular Tx over a real IDBTransaction. `put` is an
 // idempotent upsert (keyPath 'id'); the NOT-NULL gate runs
 // here too, so the IDB tier rejects null/undefined fields
@@ -243,8 +276,8 @@ export class IndexedDbBackend implements StorageBackend {
     ): Promise<R> {
         const db = await this.#connection();
         return new Promise<R>((resolve, reject) => {
-            const idbTransaction = db.transaction(
-                [...tables], mode,
+            const idbTransaction = openTx(
+                db, tables, mode,
             );
             let result: R;
             let settled = false;
@@ -304,8 +337,8 @@ export class IndexedDbBackend implements StorageBackend {
     async hasSchema(): Promise<boolean> {
         const db = await this.#connection();
         return new Promise((resolve, reject) => {
-            const tx = db.transaction(
-                SCHEMA_STORE, 'readonly',
+            const tx = openTx(
+                db, [SCHEMA_STORE], 'readonly',
             );
             const request = tx.objectStore(SCHEMA_STORE)
                 .get(SCHEMA_MARKER_ID);
@@ -318,8 +351,8 @@ export class IndexedDbBackend implements StorageBackend {
     async createSchema(): Promise<void> {
         const db = await this.#connection();
         return new Promise((resolve, reject) => {
-            const tx = db.transaction(
-                SCHEMA_STORE, 'readwrite',
+            const tx = openTx(
+                db, [SCHEMA_STORE], 'readwrite',
             );
             tx.oncomplete = () => resolve();
             tx.onerror = () => reject(tx.error);

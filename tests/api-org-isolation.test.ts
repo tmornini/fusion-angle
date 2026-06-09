@@ -398,8 +398,11 @@ test('identity-pii lists only co-members', async () => {
     assert.ok(!ids.has('pb'));  // member of B only
     assert.equal(
         (await db.identityPii.getById('pb')).id, 'pb');
-    const foreign = await facadeGet(db, '/identity-pii/pb');
-    assert.equal(foreign.status, 404);
+    // The single-PII read is now self-only (a member reads only
+    // its own); a foreign read is a self-scope 403, identity-
+    // independent so it still never confirms pb exists.
+    const foreign = await facadeGet(db, '/identities/pb/pii');
+    assert.equal(foreign.status, 403);
 });
 
 test('identity-credentials hide secret and non-members',

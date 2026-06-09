@@ -66,6 +66,7 @@ export {
     DISPLAY_ABSENT,
     displayText,
     formatDate,
+    formatCalendarDate,
     formatDateTime,
     getTimeOfDay,
     initials,
@@ -89,13 +90,30 @@ async function loadAndInitCommandPalette(): Promise<void> {
     cp.initCommandPalette();
 }
 
+// Navigate to `page` unless already there. Returns true when it
+// redirected (the caller must stop booting), false when the
+// current page IS the target — the loop-guard that keeps a boot
+// redirect from bouncing to itself forever.
+function bounceTo(
+    page: string,
+    params?: Record<string, string>,
+): boolean {
+    if (getPageName() === page) return false;
+    navigateTo(page, params);
+    return true;
+}
+
 function redirectIfMissingTable(
     err: unknown,
 ): boolean {
     if (!(err instanceof MissingTableError)) {
         return false;
     }
-    if (getPageName() === 'snapshots') {
+    if (
+        !bounceTo('snapshots', {
+            'missing-table': err.table,
+        })
+    ) {
         log.warn(
             'missing table on snapshots page',
             'core',
@@ -108,22 +126,22 @@ function redirectIfMissingTable(
         'core',
         err,
     );
-    navigateTo('snapshots', {
-        'missing-table': err.table,
-    });
     return true;
 }
 
-// Boot always scopes the session to an active org: enumerate
-// the member's reachable orgs, resolve the active one (the
-// persisted choice, else the identity's default, else the first
-// reachable), and install an org-scoped token BEFORE first
-// render so every read is fenced to one tenant.
-async function scopeBootToActiveOrg(): Promise<void> {
+// Scope the session to an active org and report whether it
+// could: enumerate the member's reachable orgs, resolve the
+// active one (the persisted choice, else the identity's default,
+// else the first reachable), and install an org-scoped token
+// BEFORE first render so every read is fenced to one tenant.
+// Returns false when the identity reaches no org — the caller
+// decides what that means (bounce when auth-gated, degrade to
+// anonymous when the page is auth-exempt).
+async function scopeBootToActiveOrg(): Promise<boolean> {
     const ctx = sessionContext();
     const reachable =
         (await getOrganizations(ctx)).map(o => o.id);
-    if (reachable.length === 0) return;
+    if (reachable.length === 0) return false;
     const active = resolveActiveOrg(
         reachable,
         getPreference(ACTIVE_ORG_KEY),
@@ -133,6 +151,7 @@ async function scopeBootToActiveOrg(): Promise<void> {
         await postOrgSessionExchange(
             ctx, getSessionToken(), active));
     writePreference(ACTIVE_ORG_KEY, active);
+    return true;
 }
 
 // Best-effort scoping for an auth-EXEMPT page that still renders the
@@ -197,6 +216,16 @@ async function bootAuthGate(): Promise<boolean> {
     }
     redirectToLogin();   // decision.kind === 'login'
     return false;
+}
+
+// Resolve the boot's org scope, or bounce a zero-membership
+// identity to its only reachable surface — pending invitations.
+// Sibling to bootAuthGate: returns false once it has redirected,
+// so the caller stops booting. Accepting an invitation grants the
+// first membership and unblocks every org-scoped route.
+async function bootOrgGate(): Promise<boolean> {
+    if (await scopeBootToActiveOrg()) return true;
+    return !bounceTo('invitations');
 }
 
 // Refresh a dead-access / live-refresh session and install the new
@@ -282,7 +311,9 @@ document.addEventListener(
                 if (!(await bootAuthGate())) {
                     return;   // bounced to login
                 }
-                await scopeBootToActiveOrg();
+                if (!(await bootOrgGate())) {
+                    return;   // bounced to invitations
+                }
             } else {
                 await scopeBootIfCredentialed();
             }

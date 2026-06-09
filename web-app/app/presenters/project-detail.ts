@@ -15,7 +15,7 @@ import {
     iconTrendingUp,
 } from '../icons.ts';
 import {
-    formatDate,
+    formatCalendarDate,
     toDateInputValue,
     DISPLAY_ABSENT,
 } from '../core.ts';
@@ -294,7 +294,7 @@ function buildReadonlyDateCell(
                 }">${label}</p>
                 <p class="${
                     'text-sm font-medium'
-                }">${formatDate(savedDate)}</p>
+                }">${formatCalendarDate(savedDate)}</p>
             </div>
         </div>`;
 }
@@ -443,7 +443,7 @@ interface MetricArgs {
         s: number, c: string,
     ) => SafeHtml;
     baseline: number | null;
-    current: number | null;
+    actual: number | null;
     unit: string;
     prefix: string;
     isLowerBetter: boolean;
@@ -451,16 +451,16 @@ interface MetricArgs {
 
 function buildVariance(
     baseline: number | null,
-    current: number | null,
+    actual: number | null,
     isLowerBetter: boolean,
     unit: string,
     prefix: string,
 ): SafeHtml {
-    if (baseline === null || current === null) {
+    if (baseline === null || actual === null) {
         return html`<span class="text-muted"
             >${DISPLAY_ABSENT}</span>`;
     }
-    const diff = current - baseline;
+    const diff = actual - baseline;
     if (diff === 0)
         return html`<span class="text-muted"
             >${iconMinus(16, '')} 0</span>`;
@@ -506,13 +506,13 @@ function buildMetricCell(
                 }">
                     <span class="${
                         'text-xs text-muted'
-                    }">Current</span>
+                    }">Actual</span>
                     <span class="${
                         'text-sm font-medium'
                     }">${
-                        m.current
+                        m.actual
                             ? m.prefix
-                                + m.current
+                                + m.actual
                                 + m.unit
                             : DISPLAY_ABSENT
                     }</span>
@@ -537,7 +537,7 @@ function buildMetricCell(
                     }">Variance</span>
                     ${buildVariance(
                         m.baseline,
-                        m.current,
+                        m.actual,
                         m.isLowerBetter,
                         m.unit,
                         m.prefix,
@@ -591,7 +591,7 @@ function buildReadonlyMetrics(
             field: null,
             icon: iconClock,
             baseline: view.timeBaselineDays(),
-            current: view.timeCurrentDays(),
+            actual: view.timeActualDays(),
             unit: 'd',
             prefix: '',
             isLowerBetter: true,
@@ -602,7 +602,7 @@ function buildReadonlyMetrics(
             field: 'costBaseline',
             icon: iconDollarSign,
             baseline: view.costBaselineK(),
-            current: view.costCurrentK(),
+            actual: view.costActualK(),
             unit: 'k',
             prefix: '$',
             isLowerBetter: true,
@@ -613,7 +613,7 @@ function buildReadonlyMetrics(
             field: null,
             icon: iconTrendingUp,
             baseline: view.impactBaselineMean(),
-            current: view.impactActualMean(),
+            actual: view.impactActualMean(),
             unit: ' pts',
             prefix: '',
             isLowerBetter: false,
@@ -660,7 +660,7 @@ function buildEditableMetrics(
             field: null,
             icon: iconClock,
             baseline: view.timeBaselineDays(),
-            current: view.timeCurrentDays(),
+            actual: view.timeActualDays(),
             unit: 'd',
             prefix: '',
             isLowerBetter: true,
@@ -672,7 +672,7 @@ function buildEditableMetrics(
             icon: iconDollarSign,
             baseline:
                 Number(draft.costBaseline),
-            current: view.costCurrentK(),
+            actual: view.costActualK(),
             unit: 'k',
             prefix: '$',
             isLowerBetter: true,
@@ -683,7 +683,7 @@ function buildEditableMetrics(
             field: null,
             icon: iconTrendingUp,
             baseline: view.impactBaselineMean(),
-            current: view.impactActualMean(),
+            actual: view.impactActualMean(),
             unit: ' pts',
             prefix: '',
             isLowerBetter: false,

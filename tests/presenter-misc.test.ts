@@ -202,16 +202,23 @@ test(
                 { value: 0, max: 0 },
             ),
         ).render().toString();
-        // outerArc = PI*65, innerArc = PI*45;
-        // offset == arc length means "empty".
-        assert.match(
-            out,
-            /stroke-dashoffset="204\.20/,
-        );
-        assert.match(
-            out,
-            /stroke-dashoffset="141\.37/,
-        );
+        // Empty means each fill arc's offset equals
+        // its own dasharray (no visible fill) — the
+        // contract, not the radius-derived number.
+        const arcs = [...out.matchAll(
+            /stroke-dasharray="([\d.]+)"/g,
+        )].map((m) => Number(m[1]));
+        const offs = [...out.matchAll(
+            /stroke-dashoffset="([\d.]+)"/g,
+        )].map((m) => Number(m[1]));
+        assert.equal(arcs.length, 2);
+        assert.equal(offs.length, 2);
+        arcs.forEach((arc, i) => {
+            assert.ok(
+                Math.abs((offs[i] ?? NaN) - arc) < 0.01,
+                'arc ' + i + ' is empty',
+            );
+        });
     },
 );
 
@@ -355,16 +362,24 @@ test(
         const out = new GaugePresenter(
             makeBipolarGauge(-50, -50),
         ).render().toString();
-        // Outer half = pi*65/2 ≈ 102.10; at 50%
-        // magnitude the dashoffset ≈ 51.05.
-        assert.match(
-            out, /stroke-dashoffset="51\.0[0-9]+/,
-        );
-        // Inner half = pi*45/2 ≈ 70.69; offset
-        // at 50% magnitude ≈ 35.34.
-        assert.match(
-            out, /stroke-dashoffset="35\.3[0-9]+/,
-        );
+        // At 50% magnitude each active half is
+        // half-filled: offset is half its dasharray,
+        // independent of the half-arc's radius.
+        const arcs = [...out.matchAll(
+            /stroke-dasharray="([\d.]+)"/g,
+        )].map((m) => Number(m[1]));
+        const offs = [...out.matchAll(
+            /stroke-dashoffset="([\d.]+)"/g,
+        )].map((m) => Number(m[1]));
+        assert.equal(arcs.length, 2);
+        assert.equal(offs.length, 2);
+        arcs.forEach((arc, i) => {
+            assert.ok(
+                Math.abs((offs[i] ?? NaN) - arc / 2)
+                    < 0.01,
+                'half ' + i + ' is half-filled',
+            );
+        });
     },
 );
 

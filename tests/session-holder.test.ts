@@ -6,12 +6,17 @@ import {
     clearSessionToken,
     ensureSessionToken,
     sessionIsOrgScoped,
+    sessionHasReachableOrg,
 } from '../web-app/app/adapters/init.ts';
 import {
     principalFromToken,
     ANONYMOUS_ID,
 } from '../api/access-token.ts';
-import { devToken, orgToken } from './token-fixtures.ts';
+import {
+    devToken,
+    orgToken,
+    reachableToken,
+} from './token-fixtures.ts';
 
 test('defaults to an anonymous-principal token', async () => {
     clearSessionToken();
@@ -42,5 +47,23 @@ test('a flat token (no org claim) is not org-scoped', async () => {
 test('an org-exchanged token is org-scoped', async () => {
     setSessionToken(await orgToken());
     assert.equal(sessionIsOrgScoped(), true);
+    clearSessionToken();
+});
+
+test('a token with reachable orgs has one', async () => {
+    setSessionToken(await reachableToken());
+    assert.equal(sessionHasReachableOrg(), true);
+    clearSessionToken();
+});
+
+test('a flat token (no orgs claim) has none', async () => {
+    setSessionToken(await devToken());
+    assert.equal(sessionHasReachableOrg(), false);
+    clearSessionToken();
+});
+
+test('an empty reachable set has none', async () => {
+    setSessionToken(await reachableToken('current', []));
+    assert.equal(sessionHasReachableOrg(), false);
     clearSessionToken();
 });

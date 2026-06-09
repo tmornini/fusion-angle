@@ -101,6 +101,44 @@ for (const [name, getAll, validate] of TABLES) {
     );
 }
 
+// The Office of Time: every persisted `at` is 6-digit
+// microsecond zulu (SCHEMA.md). The append-only `states` log is
+// seeded AND appended at runtime, so a seed that mints a
+// different width than nowUtc() makes "latest by `at`" sort
+// wrong under lexical compare. Pin the score ledgers — they
+// feed the dashboard Objective sparkline tooltips — and the
+// states log to the canonical width.
+const ZULU_6 =
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$/;
+
+const AT_LEDGERS: ReadonlyArray<[
+    string,
+    (db: MemoryDbAdapter) => Promise<{ id: string; at: string }[]>,
+]> = [
+    ['projectObjectiveBaselineScores',
+        d => d.projectObjectiveBaselineScores.getAll()],
+    ['projectObjectiveActualScores',
+        d => d.projectObjectiveActualScores.getAll()],
+    ['states', d => d.states.getAll()],
+];
+
+for (const [name, getAll] of AT_LEDGERS) {
+    test(
+        `mock-data ${name}.at is 6-digit zulu`,
+        async () => {
+            const db = await seededDb();
+            const rows = await getAll(db);
+            assert.ok(rows.length > 0, `${name} empty`);
+            for (const row of rows) {
+                assert.match(
+                    row.at, ZULU_6,
+                    `row ${row.id} in ${name}`,
+                );
+            }
+        },
+    );
+}
+
 // organizations is now an entity store (the tenant root).
 
 test('mock-data seeds the organizations table', async () => {

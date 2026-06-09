@@ -32,8 +32,9 @@ cd fusion-ai
 ```
 
 Everything operational — build, test, conventions — lives
-in [CLAUDE.md](CLAUDE.md). Architecture, schema, and design
-system: [ARCHITECTURE.md](ARCHITECTURE.md) (with
+in [CLAUDE.md](CLAUDE.md); the manual browser regression plan
+is [TEST-PLAN.md](TEST-PLAN.md). Architecture, schema, and
+design system: [ARCHITECTURE.md](ARCHITECTURE.md) (with
 [FLOW-CANVAS.md](FLOW-CANVAS.md)), [SCHEMA.md](SCHEMA.md),
 [DESIGN-SYSTEM.md](DESIGN-SYSTEM.md). Audit runbook:
 [AUDIT.md](AUDIT.md).

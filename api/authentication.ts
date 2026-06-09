@@ -1,3 +1,4 @@
+import { EntityNotFound, keyed } from './db.ts';
 import type { DbAdapter } from './db.ts';
 import {
     mintAccessToken,
@@ -19,6 +20,7 @@ import { codeState } from './authorization-codes.ts';
 import {
     planRotation,
     isTokenRevoked,
+    chainIdForJti,
 } from './identity-tokens.ts';
 import {
     hashPassword,
@@ -69,10 +71,18 @@ async function nameFor(
     adapter: DbAdapter,
     identityId: Id,
 ): Promise<string> {
-    const all = await adapter.identityPii.getAll();
-    return findFirstByKey(
-        all, p => p.id === identityId, p => p.name,
-    ) ?? identityId;
+    // The id IS the PII keyPath, so a point read replaces the
+    // scan. An absent row (a service identity has no PII) 404s,
+    // which falls back to the id — the same value the scan's
+    // miss returned.
+    try {
+        return (
+            await adapter.identityPii.getById(identityId)
+        ).name;
+    } catch (e) {
+        if (e instanceof EntityNotFound) return identityId;
+        throw e;
+    }
 }
 
 // The subject's reachable orgs — every org it is a member of,
@@ -83,10 +93,9 @@ export async function subjectOrgs(
     adapter: DbAdapter,
     identityId: Id,
 ): Promise<Id[]> {
-    const rows = await adapter.memberships.getAll();
-    return rows
-        .filter(m => m.identity_id === identityId)
-        .map(m => m.organization_id);
+    const rows = await keyed(adapter.memberships)
+        .getAllWhere('identity_id', identityId);
+    return rows.map(m => m.organization_id);
 }
 
 // The org a flat (un-exchanged) token resolves to, server-side:
@@ -97,7 +106,8 @@ export async function identityDefaultOrg(
     adapter: DbAdapter,
     identityId: Id,
 ): Promise<Id | null> {
-    const events = await adapter.identityDefaultOrgs.getAll();
+    const events = await keyed(adapter.identityDefaultOrgs)
+        .getAllWhere('identity_id', identityId);
     const chosen = currentDefaultOrgFor(events, identityId);
     if (chosen !== null) return chosen;
     return await primaryMembershipOrg(adapter, identityId);
@@ -110,10 +120,12 @@ async function primaryMembershipOrg(
     adapter: DbAdapter,
     identityId: Id,
 ): Promise<Id | null> {
-    const rows = await adapter.memberships.getAll();
+    // The index already narrows to this identity's rows, so no
+    // per-row identity guard after (trust the gate).
+    const rows = await keyed(adapter.memberships)
+        .getAllWhere('identity_id', identityId);
     let best: { org: Id; at: string } | null = null;
     for (const row of rows) {
-        if (row.identity_id !== identityId) continue;
         if (best === null
             || row.at < best.at
             || (row.at === best.at
@@ -222,14 +234,18 @@ export async function tokenRevocationReason(
     iat: number,
     jti: string,
 ): Promise<string | null> {
-    const revs =
-        await adapter.identityTokenRevocations.getAll();
+    const revs = await keyed(adapter.identityTokenRevocations)
+        .getAllWhere('identity_id', sub);
     const revokedBefore = revokedBeforeSeconds(revs, sub);
     if (revokedBefore !== null && iat < revokedBefore) {
         return 'token revoked';
     }
-    const ledger = await adapter.identityTokens.getAll();
-    if (isTokenRevoked(ledger, jti)) {
+    // The gate check needs only THIS jti's events: a chain-wide
+    // revoke writes a 'revoked' event per jti, so the latest
+    // action for the presented jti already reflects it.
+    const events = await keyed(adapter.identityTokens)
+        .getAllWhere('jti', jti);
+    if (isTokenRevoked(events, jti)) {
         return 'token chain revoked';
     }
     return null;
@@ -266,8 +282,20 @@ async function grantRefresh(
     const outcome = await adapter.transaction(
         ['identity_tokens'],
         async (view) => {
-            const rows =
-                await view.identityTokens.getAll();
+            // Two-step narrow: find the presented jti's chain,
+            // then read the WHOLE chain — planRotation's replay
+            // path revokes every jti in it, so a jti-only read
+            // would under-revoke. Both reads are index hits in
+            // the open tx (no interleaved non-IDB await).
+            const tokens = keyed(view.identityTokens);
+            const byJti = await tokens.getAllWhere(
+                'jti', verified.claims.jti);
+            const chainId = chainIdForJti(
+                byJti, verified.claims.jti);
+            const rows = chainId === null
+                ? byJti
+                : await tokens.getAllWhere(
+                    'chain_id', chainId);
             const plan = planRotation(
                 rows, verified.claims.jti,
                 generateCryptoSafeBase62(), nowUtc(),
@@ -303,9 +331,10 @@ async function grantRefresh(
 
 // token-exchange (RFC 8693): mint a delegated token where sub =
 // the subject and act = the acting party. Both subject_token and
-// actor_token are VERIFIED (signature/exp/nbf/aud) — the same
-// frozen HMAC the refresh grant checks, so this is not weaker
-// than the rest of the gate. The remaining SEAM is the
+// actor_token are VERIFIED (signature/exp/nbf/aud) AND
+// revocation-checked — the same frozen HMAC the refresh grant
+// checks, so this is not weaker than the rest of the gate.
+// The remaining SEAM is the
 // DELEGATION POLICY: whether `actor` may act-as `subject` is NOT
 // yet enforced — that authorization lands with the server tier.
 // The claim shape (sub, act.sub) is frozen now.
@@ -337,6 +366,13 @@ async function grantTokenExchange(
     );
     if (subjectRev !== null) {
         return failure(401, subjectRev);
+    }
+    const actorRev = await tokenRevocationReason(
+        adapter, actorV.claims.sub,
+        actorV.claims.iat, actorV.claims.jti,
+    );
+    if (actorRev !== null) {
+        return failure(401, actorRev);
     }
     const subject = subjectV.claims.sub;
     const actor = actorV.claims.sub;
@@ -438,8 +474,8 @@ async function grantAuthorizationCode(
     const issued = await adapter.transaction(
         ['authorization_codes', 'identity_tokens'],
         async (view) => {
-            const rows =
-                await view.authorizationCodes.getAll();
+            const rows = await keyed(view.authorizationCodes)
+                .getAllWhere('code', code);
             const state = codeState(rows, code);
             if (
                 state === null
@@ -590,14 +626,15 @@ async function authorizePassword(
     const denied: AuthorizeResult = {
         ok: false, status: 401, error: 'invalid credentials',
     };
-    const piiRows = await adapter.identityPii.getAll();
+    const piiRows = await keyed(adapter.identityPii)
+        .getAllWhere('email', username);
     const identityId = identityByEmail(piiRows, username);
     if (identityId === null) {
         await equalizeFailureTiming(password);
         return denied;
     }
-    const credRows =
-        await adapter.identityCredentials.getAll();
+    const credRows = await keyed(adapter.identityCredentials)
+        .getAllWhere('identity_id', identityId);
     const secret =
         currentPasswordSecret(credRows, identityId);
     if (secret === null) {

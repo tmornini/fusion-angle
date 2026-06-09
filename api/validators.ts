@@ -548,16 +548,28 @@ export function pickJsonObjectField(
     return asJsonObjectField(body[key], key);
 }
 
-// A string field that must parse as a timestamp; returns it.
-// The entity label names the offender — same message every
-// ledger row's `at` validation emitted inline before.
+// RFC-3339 zulu, sub-seconds optional. The Office of Time's
+// enemy is AMBIGUITY: a date-only stamp is reinterpreted as
+// midnight-UTC (shifting the day across zones) and a zoned
+// offset is localtime — both rejected here. Sub-second WIDTH is
+// the mint's job (nowUtc/dt/isoFromMs all emit 6); an
+// unambiguous zulu second is valid with or without a fraction.
+// Date.parse alone waves the ambiguous forms through, so the
+// shape is pinned; Date.parse then rejects impossible dates the
+// shape admits (e.g. month 13).
+const ISO_ZULU =
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,9})?Z$/;
+
+// A string field that must be an RFC-3339 zulu timestamp;
+// returns it. The entity label names the offender — same message
+// every ledger row's `at` validation emitted inline before.
 export function validateTimestampField(
     body: Record<string, unknown>,
     field: string,
     entityLabel: string,
 ): string {
     const at = pickString(body, field);
-    if (Number.isNaN(Date.parse(at))) {
+    if (!ISO_ZULU.test(at) || Number.isNaN(Date.parse(at))) {
         throw new Error(
             'invalid timestamp "' + at + '" on ' + entityLabel,
         );
@@ -715,7 +727,9 @@ export function validateIdentityCredentialEntity(
         kind,
         status,
         secret: pickString(body, 'secret'),
-        at: pickString(body, 'at'),
+        at: validateTimestampField(
+            body, 'at', 'IdentityCredentialEntity',
+        ),
     };
 }
 
@@ -1122,8 +1136,8 @@ export function validateFlowVersionEntity(
         graph: pickJsonObjectField(
             body, 'graph',
         ),
-        at: pickString(
-            body, 'at',
+        at: validateTimestampField(
+            body, 'at', 'FlowVersionEntity',
         ),
     };
 }
@@ -1176,8 +1190,8 @@ export function validateFlowWorkOrderEntity(
         work_order_id: pickString(
             body, 'work_order_id',
         ),
-        at: pickString(
-            body, 'at',
+        at: validateTimestampField(
+            body, 'at', 'FlowWorkOrderEntity',
         ),
     };
 }
@@ -1316,8 +1330,8 @@ export function validateIdeaSubmissionEntity(
         member_id: pickString(
             body, 'member_id',
         ),
-        at: pickString(
-            body, 'at',
+        at: validateTimestampField(
+            body, 'at', 'IdeaSubmissionEntity',
         ),
     };
 }
@@ -1342,8 +1356,8 @@ export function validateProjectFlowEntity(
         flow_id: pickString(
             body, 'flow_id',
         ),
-        at: pickString(
-            body, 'at',
+        at: validateTimestampField(
+            body, 'at', 'ProjectFlowEntity',
         ),
     };
 }
@@ -1395,8 +1409,8 @@ export function validateObjectiveRevisionEntity(
         member_id: pickString(
             body, 'member_id',
         ),
-        at: pickString(
-            body, 'at',
+        at: validateTimestampField(
+            body, 'at', 'ObjectiveRevision',
         ),
     };
 }
@@ -1428,8 +1442,8 @@ export function validateBaselineScoreEntity(
         member_id: pickString(
             body, 'member_id',
         ),
-        at: pickString(
-            body, 'at',
+        at: validateTimestampField(
+            body, 'at', 'BaselineScore',
         ),
     };
 }
@@ -1461,8 +1475,8 @@ export function validateActualScoreEntity(
         member_id: pickString(
             body, 'member_id',
         ),
-        at: pickString(
-            body, 'at',
+        at: validateTimestampField(
+            body, 'at', 'ActualScore',
         ),
     };
 }
@@ -1485,7 +1499,9 @@ export function validateStateEntity(
         member_id: pickString(
             body, 'member_id',
         ),
-        at: pickString(body, 'at'),
+        at: validateTimestampField(
+            body, 'at', 'StateEntity',
+        ),
     };
 }
 
@@ -1624,7 +1640,9 @@ export function validateFlowRecordEntity(
         record_id: pickString(
             body, 'record_id',
         ),
-        at: pickString(body, 'at'),
+        at: validateTimestampField(
+            body, 'at', 'FlowRecordEntity',
+        ),
     };
 }
 

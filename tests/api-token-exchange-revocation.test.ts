@@ -47,6 +47,27 @@ async () => {
     if (!res.ok) assert.equal(res.status, 401);
 });
 
+test('token-exchange rejects a logged-out actor token',
+async () => {
+    const db = await revokedDb();
+    // u2 is a clean subject and a member; u1 is the
+    // logged-out actor. The subject passes every check,
+    // so only the actor-revocation check can reject.
+    await db.memberships.put('m2', {
+        organization_id: 'A', identity_id: 'u2',
+        at: '2020-01-01T00:00:00.000Z',
+    });
+    const subject = await tokenFor('u2');
+    const actor = await tokenFor('u1');
+    const res = await postToken(db, {
+        grant_type: 'token-exchange',
+        subject_token: subject, actor_token: actor,
+        organization: 'A',
+    });
+    assert.equal(res.ok, false);
+    if (!res.ok) assert.equal(res.status, 401);
+});
+
 test('refresh rejects a logged-out token', async () => {
     const db = await revokedDb();
     const token = await tokenFor('u1');

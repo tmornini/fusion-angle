@@ -219,7 +219,7 @@ export async function putHumanMember(
             },
             {
                 method: 'put',
-                resource: `identity-pii/${id}`,
+                resource: `identities/${id}/pii`,
                 body: { name, email, phone, bio },
             },
             {
@@ -260,7 +260,7 @@ export async function postHumanMemberCreation(
             },
             {
                 method: 'put',
-                resource: `identity-pii/${id}`,
+                resource: `identities/${id}/pii`,
                 body: { name, email, phone, bio },
             },
             {

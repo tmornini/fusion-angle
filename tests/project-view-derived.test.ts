@@ -6,8 +6,6 @@ import {
 } from '../web-app/app/adapters/projects.ts';
 import type {
     Objective,
-    ProjectObjectiveBaselineScore,
-    ProjectObjectiveActualScore,
 } from '../api/types.ts';
 
 function makeProject(): Project {
@@ -48,9 +46,9 @@ test(
 test(
     'impactBaselineMean returns score for single objective',
     () => {
-        const baseline: ProjectObjectiveBaselineScore[] = [
-            { id: 'b1', project_id: 'p1',
-              objective_id: 'o1',
+        const baseline = [
+            { id: 'b1', projectId: 'p1',
+              objectiveId: 'o1',
               score: 50, at: T1 },
         ];
         const v = new ProjectView(
@@ -66,12 +64,12 @@ test(
 test(
     'impactBaselineMean takes latest score per objective',
     () => {
-        const baseline: ProjectObjectiveBaselineScore[] = [
-            { id: 'b1', project_id: 'p1',
-              objective_id: 'o1',
+        const baseline = [
+            { id: 'b1', projectId: 'p1',
+              objectiveId: 'o1',
               score: 50, at: T1 },
-            { id: 'b2', project_id: 'p1',
-              objective_id: 'o1',
+            { id: 'b2', projectId: 'p1',
+              objectiveId: 'o1',
               score: 60, at: T2 },
         ];
         const v = new ProjectView(
@@ -92,12 +90,12 @@ test(
         // weighted sum = 60*1.0 + 40*0.95 = 98
         // weight total = 1.95
         // mean = 98 / 1.95 = 50.26 -> round = 50
-        const baseline: ProjectObjectiveBaselineScore[] = [
-            { id: 'b1', project_id: 'p1',
-              objective_id: 'o2',
+        const baseline = [
+            { id: 'b1', projectId: 'p1',
+              objectiveId: 'o2',
               score: 40, at: T1 },
-            { id: 'b2', project_id: 'p1',
-              objective_id: 'o1',
+            { id: 'b2', projectId: 'p1',
+              objectiveId: 'o1',
               score: 60, at: T1 },
         ];
         const v = new ProjectView(
@@ -113,17 +111,17 @@ test(
 test(
     'impactActualMean is null when not fully scored',
     () => {
-        const baseline: ProjectObjectiveBaselineScore[] = [
-            { id: 'b1', project_id: 'p1',
-              objective_id: 'o1',
+        const baseline = [
+            { id: 'b1', projectId: 'p1',
+              objectiveId: 'o1',
               score: 50, at: T1 },
-            { id: 'b2', project_id: 'p1',
-              objective_id: 'o2',
+            { id: 'b2', projectId: 'p1',
+              objectiveId: 'o2',
               score: 40, at: T1 },
         ];
-        const actual: ProjectObjectiveActualScore[] = [
-            { id: 'a1', project_id: 'p1',
-              objective_id: 'o1',
+        const actual = [
+            { id: 'a1', projectId: 'p1',
+              objectiveId: 'o1',
               score: 45, at: T2 },
         ];
         const v = new ProjectView(
@@ -143,20 +141,20 @@ test(
         // o1 actual 30, o2 actual 50:
         // weighted = 30*1.0 + 50*0.95 = 77.5
         // total = 1.95 → 39.74 -> round = 40
-        const baseline: ProjectObjectiveBaselineScore[] = [
-            { id: 'b1', project_id: 'p1',
-              objective_id: 'o1',
+        const baseline = [
+            { id: 'b1', projectId: 'p1',
+              objectiveId: 'o1',
               score: 50, at: T1 },
-            { id: 'b2', project_id: 'p1',
-              objective_id: 'o2',
+            { id: 'b2', projectId: 'p1',
+              objectiveId: 'o2',
               score: 40, at: T1 },
         ];
-        const actual: ProjectObjectiveActualScore[] = [
-            { id: 'a1', project_id: 'p1',
-              objective_id: 'o2',
+        const actual = [
+            { id: 'a1', projectId: 'p1',
+              objectiveId: 'o2',
               score: 50, at: T2 },
-            { id: 'a2', project_id: 'p1',
-              objective_id: 'o1',
+            { id: 'a2', projectId: 'p1',
+              objectiveId: 'o1',
               score: 30, at: T2 },
         ];
         const v = new ProjectView(
@@ -174,17 +172,17 @@ test(
     () => {
         // Only o1 baselined. Actuals for o1 and o2.
         // Result should consider only o1 actual.
-        const baseline: ProjectObjectiveBaselineScore[] = [
-            { id: 'b1', project_id: 'p1',
-              objective_id: 'o1',
+        const baseline = [
+            { id: 'b1', projectId: 'p1',
+              objectiveId: 'o1',
               score: 50, at: T1 },
         ];
-        const actual: ProjectObjectiveActualScore[] = [
-            { id: 'a1', project_id: 'p1',
-              objective_id: 'o1',
+        const actual = [
+            { id: 'a1', projectId: 'p1',
+              objectiveId: 'o1',
               score: 70, at: T2 },
-            { id: 'a2', project_id: 'p1',
-              objective_id: 'o2',
+            { id: 'a2', projectId: 'p1',
+              objectiveId: 'o2',
               score: 999, at: T2 },
         ];
         const v = new ProjectView(

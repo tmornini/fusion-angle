@@ -102,6 +102,18 @@ export interface KeyedCollectionReader<
     ): Promise<T[]>;
 }
 
+// Reach a store's keyed sub-collection read, kept off the
+// EntityStore contract by Interface Segregation. Both concrete
+// leaf stores (EntityStore + HistoryEntityStore) implement it,
+// so the cast is sound for every fenced or cold-spine store
+// that narrows a collection through a secondary index — the one
+// documented home for the assertion the DbStores types erase.
+export function keyed<T extends { id: string }>(
+    store: EntityStore<T>,
+): KeyedCollectionReader<T> {
+    return store as EntityStore<T> & KeyedCollectionReader<T>;
+}
+
 // The storage-edge validator. Stores accept one at
 // construction and re-verify every `put` body through
 // it — the same telling-shape function used by the

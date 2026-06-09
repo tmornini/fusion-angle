@@ -3,12 +3,13 @@ import type {
     Id,
     ObjectiveId,
     ObjectiveRevision,
-    ProjectObjectiveBaselineScore,
-    ProjectObjectiveActualScore,
 } from '../../../api/types.ts';
 import type {
     ObjectiveArchivalEvent,
 } from '../adapters/objectives.ts';
+import type {
+    ObjectiveScore,
+} from '../adapters/project-scoring.ts';
 import {
     formatSigned,
     toneForScore,
@@ -36,16 +37,16 @@ type Event =
         objectiveId: ObjectiveId };
 
 export class ProjectScoreHistoryPresenter {
-    readonly #baselines: ProjectObjectiveBaselineScore[];
-    readonly #actuals: ProjectObjectiveActualScore[];
+    readonly #baselines: ObjectiveScore[];
+    readonly #actuals: ObjectiveScore[];
     readonly #revisions: ObjectiveRevision[];
     readonly #archivations: ObjectiveArchivalEvent[];
     readonly #resolver: DefinitionResolver;
     readonly #memberName: MemberNameResolver;
 
     constructor(
-        baselines: ProjectObjectiveBaselineScore[],
-        actuals: ProjectObjectiveActualScore[],
+        baselines: ObjectiveScore[],
+        actuals: ObjectiveScore[],
         revisions: ObjectiveRevision[],
         archivations: ObjectiveArchivalEvent[],
         resolver: DefinitionResolver,
@@ -88,8 +89,8 @@ export class ProjectScoreHistoryPresenter {
             events.push({
                 kind: 'baseline',
                 at: b.at,
-                memberId: b.member_id,
-                objectiveId: b.objective_id,
+                memberId: b.memberId,
+                objectiveId: b.objectiveId,
                 score: b.score,
             });
         }
@@ -97,8 +98,8 @@ export class ProjectScoreHistoryPresenter {
             events.push({
                 kind: 'actual',
                 at: a.at,
-                memberId: a.member_id,
-                objectiveId: a.objective_id,
+                memberId: a.memberId,
+                objectiveId: a.objectiveId,
                 score: a.score,
             });
         }

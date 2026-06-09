@@ -1,5 +1,6 @@
 import type { Id, InvitationState } from '../../../api/types.ts';
 import type { RequestContext } from './shared.ts';
+import { RequestError } from '../../../api/api.ts';
 import {
     createSubscriptionChannel,
 } from '../channels.ts';
@@ -103,13 +104,33 @@ export async function getSentInvitations(
 // Invite an EXISTING identity, by email, to the admin's active
 // org. The server resolves the email to an identity (the PII
 // fence forbids a client-side identity picker) and appends a
-// pending invitation.
+// pending invitation. The outcome is returned in the domain's
+// own words so the page need not read HTTP status: 'sent' covers
+// a fresh grant AND a re-grant of an outstanding one (both 200);
+// the server's expected 404 / 409 become 'no-identity' /
+// 'already-member'. An unexpected fault still throws.
+export type InvitationGrantOutcome =
+    | 'sent'
+    | 'no-identity'
+    | 'already-member';
+
 export async function postInvitationGrant(
     ctx: RequestContext,
     email: string,
-): Promise<void> {
-    await ctx.POST('invitations', { email });
+): Promise<InvitationGrantOutcome> {
+    try {
+        await ctx.POST('invitations', { email });
+    } catch (err) {
+        if (err instanceof RequestError && err.status === 404) {
+            return 'no-identity';
+        }
+        if (err instanceof RequestError && err.status === 409) {
+            return 'already-member';
+        }
+        throw err;
+    }
     invitationChanges.notify();
+    return 'sent';
 }
 
 // Accept an invitation — the server writes the membership in the

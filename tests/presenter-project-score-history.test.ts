@@ -28,18 +28,18 @@ const { ProjectScoreHistoryPresenter } = await import(
 
 const baselines = [
     { id: 'b1',
-      project_id: 'p1', objective_id: 'o1',
-      score: 50, member_id: 'w1',
+      projectId: 'p1', objectiveId: 'o1',
+      score: 50, memberId: 'w1',
       at: '2026-03-01T14:23:00.000Z' },
     { id: 'b2',
-      project_id: 'p1', objective_id: 'o1',
-      score: 40, member_id: 'w1',
+      projectId: 'p1', objectiveId: 'o1',
+      score: 40, memberId: 'w1',
       at: '2026-03-05T09:10:00.000Z' },
 ];
 const actuals = [
     { id: 'a1',
-      project_id: 'p1', objective_id: 'o1',
-      score: 45, member_id: 'w1',
+      projectId: 'p1', objectiveId: 'o1',
+      score: 45, memberId: 'w1',
       at: '2026-04-01T16:45:00.000Z' },
 ];
 const revisions = [
@@ -138,8 +138,8 @@ test('revision event row shows the new objective name',
 
 test('positive score TD carries data-tone="success"', () => {
     const p = new ProjectScoreHistoryPresenter(
-        [{ id: 'b1', project_id: 'p1', objective_id: 'o1',
-            score: 40, member_id: 'w1',
+        [{ id: 'b1', projectId: 'p1', objectiveId: 'o1',
+            score: 40, memberId: 'w1',
             at: '2026-03-05T09:10:00.000Z' }],
         [], revisions, archivations, resolver, whoName,
     );
@@ -150,9 +150,9 @@ test('positive score TD carries data-tone="success"', () => {
 
 test('negative score TD carries data-tone="error"', () => {
     const p = new ProjectScoreHistoryPresenter(
-        [], [{ id: 'a1', project_id: 'p1',
-            objective_id: 'o1', score: -50,
-            member_id: 'w1',
+        [], [{ id: 'a1', projectId: 'p1',
+            objectiveId: 'o1', score: -50,
+            memberId: 'w1',
             at: '2026-04-01T16:45:00.000Z' }],
         revisions, archivations, resolver, whoName,
     );
@@ -163,8 +163,8 @@ test('negative score TD carries data-tone="error"', () => {
 
 test('zero score TD carries data-tone="muted"', () => {
     const p = new ProjectScoreHistoryPresenter(
-        [{ id: 'b1', project_id: 'p1', objective_id: 'o1',
-            score: 0, member_id: 'w1',
+        [{ id: 'b1', projectId: 'p1', objectiveId: 'o1',
+            score: 0, memberId: 'w1',
             at: '2026-03-05T09:10:00.000Z' }],
         [], revisions, archivations, resolver, whoName,
     );
@@ -201,9 +201,9 @@ test('Who column renders the actor name per row', () => {
     const who = (id: string): string =>
         id === 'w1' ? 'Sarah Lee' : id;
     const p = new ProjectScoreHistoryPresenter(
-        [{ id: 'b1', project_id: 'p1',
-           objective_id: 'o1', score: 40,
-           member_id: 'w1',
+        [{ id: 'b1', projectId: 'p1',
+           objectiveId: 'o1', score: 40,
+           memberId: 'w1',
            at: '2026-03-05T09:10:00.000Z' }],
         [], [], [], resolver, who,
     );

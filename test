@@ -1,4 +1,11 @@
 #!/bin/bash
 set -euo pipefail
 
-node --test --strip-types tests/*.test.ts
+# Instants render in LOCAL time, so date-formatting output shifts
+# with the runner's zone — a false prophet on a non-UTC machine.
+# Pin UTC for the main suite (deterministic), then verify the
+# instant-vs-calendar distinction under a fixed offset zone in
+# tests/tz/ (Honolulu, UTC-10, no DST). The tests/*.test.ts glob
+# is non-recursive, so it excludes tests/tz/.
+TZ=UTC node --test --strip-types tests/*.test.ts
+TZ=Pacific/Honolulu node --test --strip-types tests/tz/*.test.ts

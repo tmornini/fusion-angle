@@ -1,4 +1,4 @@
-import { EntityNotFound } from './db.ts';
+import { EntityNotFound, keyed } from './db.ts';
 import type {
     DbAdapter,
     EntityStore,
@@ -6,7 +6,6 @@ import type {
 } from './db.ts';
 import type {
     Id,
-    MembershipEntity,
     FlowVersionEntity,
     ProjectFlowEntity,
     FlowWorkOrderEntity,
@@ -84,9 +83,7 @@ export function orgScopedAdapter(
     // read is kept off the EntityStore contract, so name it
     // here once: resolve an identity's memberships through the
     // identity_id index, never a per-row whole-ledger scan.
-    const memberships =
-        base.memberships as EntityStore<MembershipEntity>
-            & KeyedCollectionReader<MembershipEntity>;
+    const memberships = keyed(base.memberships);
 
     // A state event's entity_id is any org-owned entity, or an
     // org-less member visible only to a co-member of this org —

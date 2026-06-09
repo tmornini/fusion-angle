@@ -163,6 +163,40 @@ test('every idea submission names a submitter in its'
         'cross-org submitters: ' + violations.join('; '));
 });
 
+test('every project score names an author in its'
+    + " project's org", async () => {
+    const { db } = await seed();
+    const projectOrg = new Map(
+        (await db.projects.getAll())
+            .map(p => [p.id, p.organization_id]));
+    const memberOrgs = new Map<string, Set<string>>();
+    for (const m of await db.memberships.getAll()) {
+        const set = memberOrgs.get(m.identity_id)
+            ?? new Set<string>();
+        set.add(m.organization_id);
+        memberOrgs.set(m.identity_id, set);
+    }
+    const scores = [
+        ...await db.projectObjectiveBaselineScores.getAll(),
+        ...await db.projectObjectiveActualScores.getAll(),
+    ];
+    assert.ok(scores.length > 0, 'scores exist');
+    const violations: string[] = [];
+    for (const s of scores) {
+        const org = projectOrg.get(s.project_id);
+        const orgs = memberOrgs.get(s.member_id)
+            ?? new Set<string>();
+        if (org === undefined || !orgs.has(org)) {
+            violations.push(
+                s.id + ': ' + s.member_id
+                + ' not in project org ' + org);
+        }
+    }
+    assert.deepEqual(
+        violations, [],
+        'cross-org score authors: ' + violations.join('; '));
+});
+
 test('every seeded human gets a verifiable password',
 async () => {
     const { db, creds } = await seed();

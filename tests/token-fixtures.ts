@@ -25,6 +25,21 @@ export async function orgToken(
     });
 }
 
+// A flat (un-exchanged) login token carrying the reachable
+// `orgs` set but no scoped `org` claim — the shape a freshly
+// minted password-grant token has before boot exchanges it for
+// an org-scoped session. Defaults to one reachable org; pass []
+// for the zero-membership identity.
+export async function reachableToken(
+    sub = 'current', orgs: readonly string[] = ['1'],
+): Promise<string> {
+    return mintAccessToken({
+        sub, roles: [], name: 'Demo', orgs,
+        iat: 1_700_000_000, ttlSeconds: 10_000_000_000,
+        jti: 'reach-' + sub,
+    });
+}
+
 export async function expiredToken(sub = 'current'): Promise<string> {
     return mintAccessToken({
         sub, roles: [], name: 'Demo',

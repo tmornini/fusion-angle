@@ -3,13 +3,14 @@ import type {
     Id,
     Objective,
     ObjectiveId,
-    ProjectObjectiveBaselineScore,
-    ProjectObjectiveActualScore,
 } from '../../../api/types.ts';
 import type { RequestContext } from './shared.ts';
 import type { ValidationResult } from './validation.ts';
 import { getActiveObjectives } from './objectives.ts';
-import { getProjectScoring } from './project-scoring.ts';
+import {
+    getProjectScoring,
+    type ObjectiveScore,
+} from './project-scoring.ts';
 import {
     postProjectStateChange,
 } from './projects.ts';
@@ -22,15 +23,15 @@ export type ProjectProblem =
 
 function latestPerObjective(
     rows: Array<{
-        objective_id: ObjectiveId;
+        objectiveId: ObjectiveId;
         at: string;
     }>,
 ): Set<ObjectiveId> {
     const map = new Map<ObjectiveId, string>();
     for (const r of rows) {
-        const prev = map.get(r.objective_id);
+        const prev = map.get(r.objectiveId);
         if (!prev || r.at > prev) {
-            map.set(r.objective_id, r.at);
+            map.set(r.objectiveId, r.at);
         }
     }
     return new Set(map.keys());
@@ -39,7 +40,7 @@ function latestPerObjective(
 export function validateProjectForApproval(
     project: ProjectEntity,
     activeObjectives: Objective[],
-    baselineScores: ProjectObjectiveBaselineScore[],
+    baselineScores: ObjectiveScore[],
 ): ValidationResult<ProjectProblem> {
     const scored = latestPerObjective(baselineScores);
     const problems: ProjectProblem[] = [];
@@ -59,8 +60,8 @@ export function validateProjectForApproval(
 
 export function validateProjectForArchival(
     project: ProjectEntity,
-    baselineScores: ProjectObjectiveBaselineScore[],
-    actualScores: ProjectObjectiveActualScore[],
+    baselineScores: ObjectiveScore[],
+    actualScores: ObjectiveScore[],
 ): ValidationResult<ProjectProblem> {
     const baselined =
         latestPerObjective(baselineScores);

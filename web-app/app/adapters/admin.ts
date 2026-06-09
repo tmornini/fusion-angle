@@ -6,7 +6,7 @@ import {
     putOrganization,
 } from './organizations.ts';
 import {
-    formatDate,
+    formatCalendarDate,
 } from '../format.ts';
 import {
     activeOrg,
@@ -84,7 +84,7 @@ export class Organization {
     }
 
     nextBillingDate(): string {
-        return formatDate(
+        return formatCalendarDate(
             this.#entity.next_billing,
         );
     }

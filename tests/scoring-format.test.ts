@@ -11,16 +11,16 @@ import type { ObjectiveId } from '../api/types.ts';
 test('latestPerPair keeps the latest by at',
     () => {
         const rows = [
-            { project_id: 'p1', objective_id: 'o1',
+            { projectId: 'p1', objectiveId: 'o1',
               score: 50,
               at: '2026-05-14T00:00:00.000Z' },
-            { project_id: 'p1', objective_id: 'o1',
+            { projectId: 'p1', objectiveId: 'o1',
               score: 60,
               at: '2026-05-15T00:00:00.000Z' },
-            { project_id: 'p1', objective_id: 'o2',
+            { projectId: 'p1', objectiveId: 'o2',
               score: -20,
               at: '2026-05-14T00:00:00.000Z' },
-            { project_id: 'p2', objective_id: 'o1',
+            { projectId: 'p2', objectiveId: 'o1',
               score: 10,
               at: '2026-05-14T00:00:00.000Z' },
         ];
@@ -28,8 +28,8 @@ test('latestPerPair keeps the latest by at',
         assert.equal(latest.length, 3);
         const byKey = new Map(
             latest.map(r =>
-                [r.project_id + ':'
-                    + r.objective_id, r.score]),
+                [r.projectId + ':'
+                    + r.objectiveId, r.score]),
         );
         assert.equal(byKey.get('p1:o1'), 60);
         assert.equal(byKey.get('p1:o2'), -20);
@@ -75,7 +75,7 @@ test(
     () => {
         assert.equal(
             weightedMeanByPosition(
-                [{ objective_id: 'o1' as ObjectiveId,
+                [{ objectiveId: 'o1' as ObjectiveId,
                    score: 42 }],
                 positions,
             ),
@@ -93,9 +93,9 @@ test(
         // mean = 98 / 1.95 = 50.256 → round = 50
         const result = weightedMeanByPosition(
             [
-                { objective_id: 'o1' as ObjectiveId,
+                { objectiveId: 'o1' as ObjectiveId,
                   score: 60 },
-                { objective_id: 'o2' as ObjectiveId,
+                { objectiveId: 'o2' as ObjectiveId,
                   score: 40 },
             ],
             positions,
@@ -111,9 +111,9 @@ test(
         // and applies weights. Same result as ordered.
         const result = weightedMeanByPosition(
             [
-                { objective_id: 'o2' as ObjectiveId,
+                { objectiveId: 'o2' as ObjectiveId,
                   score: 40 },
-                { objective_id: 'o1' as ObjectiveId,
+                { objectiveId: 'o1' as ObjectiveId,
                   score: 60 },
             ],
             positions,
@@ -123,11 +123,11 @@ test(
 );
 
 test(
-    'weightedMeanByPosition throws on unknown objective_id',
+    'weightedMeanByPosition throws on unknown objectiveId',
     () => {
         assert.throws(
             () => weightedMeanByPosition(
-                [{ objective_id:
+                [{ objectiveId:
                     'unknown' as ObjectiveId,
                    score: 5 }],
                 positions,

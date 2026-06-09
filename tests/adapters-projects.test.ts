@@ -256,7 +256,7 @@ test(
             4000 / COST_DIVISOR,
         );
         assert.equal(
-            view.costCurrentK(),
+            view.costActualK(),
             2000 / COST_DIVISOR,
         );
     },

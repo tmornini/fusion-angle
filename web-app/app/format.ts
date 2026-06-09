@@ -23,7 +23,24 @@ function getTimeOfDay(): string {
     return 'evening';
 }
 
+// An instant (a moment that happened) renders to LOCAL time —
+// the viewer sees it in their own zone (Office of Time).
 function formatDate(iso: string): string {
+    const parsedDate = new Date(iso);
+    if (isNaN(parsedDate.getTime())) return DISPLAY_ABSENT;
+    return parsedDate.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+    });
+}
+
+// A calendar date (a project start/end, a billing day) has no
+// time and no zone — the same day for every viewer. Pinning UTC
+// keeps a midnight-ish stamp from drifting a day in zones far
+// from UTC; the edit-input slice (toDateInputValue) is UTC too,
+// so display and editor agree.
+function formatCalendarDate(iso: string): string {
     const parsedDate = new Date(iso);
     if (isNaN(parsedDate.getTime())) return DISPLAY_ABSENT;
     return parsedDate.toLocaleDateString('en-US', {
@@ -91,6 +108,7 @@ export {
     DISPLAY_ABSENT,
     displayText,
     formatDate,
+    formatCalendarDate,
     formatDateTime,
     getTimeOfDay,
     initials,

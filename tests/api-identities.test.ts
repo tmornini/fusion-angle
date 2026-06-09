@@ -5,8 +5,8 @@ import {
     validateIdentityPiiEntity,
 } from '../api/validators.ts';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
-import { PUT, GET, DELETE } from '../api/api.ts';
-import { DEV_TOKEN } from './token-fixtures.ts';
+import { PUT, GET, DELETE, handleRequest } from '../api/api.ts';
+import { DEV_TOKEN, devToken } from './token-fixtures.ts';
 import {
     seedAdminSchema,
 } from './test-fixtures.ts';
@@ -72,22 +72,6 @@ test('PUT then GET an identity round-trips', async () => {
     assert.deepEqual(got, { id: 'abc', kind: 'person' });
 });
 
-test('DELETE identity-pii splices only the pii row',
-async () => {
-    const db = await freshDb();
-    await PUT(
-        db, 'identities/abc', { kind: 'person' }, DEV_TOKEN);
-    await PUT(db, 'identity-pii/abc', {
-        name: 'A', email: 'a@x.io', phone: 'p', bio: 'b',
-    }, DEV_TOKEN);
-    await DELETE(db, 'identity-pii/abc', DEV_TOKEN);
-    await assert.rejects(
-        () => GET(db, 'identity-pii/abc', DEV_TOKEN));
-    const id = await GET<{ id: string }>(
-        db, 'identities/abc', DEV_TOKEN);
-    assert.equal(id.id, 'abc');
-});
-
 test('bootstrap seeds an identity per member, id-equal',
 async () => {
     const db = await freshDb();
@@ -100,4 +84,104 @@ async () => {
     const cur = await GET<{ kind: string }>(
         db, 'identities/current', DEV_TOKEN);
     assert.equal(cur.kind, 'person');
+});
+
+// ---- /identities/:id/pii subtree authz ----
+// GET self-only (tree ownership); PUT/DELETE self-or-admin.
+// A roleless member reads/writes its OWN pii; an admin manages
+// any; nobody reads another's pii here (the roster reads the
+// identity-pii COLLECTION).
+
+const PII = {
+    name: 'Sarah', email: 's@x.io', phone: 'p', bio: 'b',
+};
+
+async function dbWithMember() {
+    const db = new MemoryDbAdapter();
+    await seedAdminSchema(db);   // 'current' admin in org '1'
+    await db.memberships.put('m-sarah', {
+        organization_id: '1', identity_id: 'sarah',
+        at: '2026-06-08T00:00:00.000Z',
+    });
+    await db.identities.put('sarah', { kind: 'person' });
+    await db.identityPii.put('sarah', PII);
+    return db;
+}
+
+function piiReq(
+    method: string, path: string, token: string,
+    body?: unknown,
+): Request {
+    return new Request('http://localhost' + path, {
+        method,
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token,
+        },
+        ...(body ? { body: JSON.stringify(body) } : {}),
+    });
+}
+
+test('a member reads its own pii on the subtree', async () => {
+    const db = await dbWithMember();
+    const pii = await GET<{ name: string }>(
+        db, 'identities/sarah/pii', await devToken('sarah'));
+    assert.equal(pii.name, 'Sarah');
+});
+
+test('a member cannot read another identity pii',
+async () => {
+    const db = await dbWithMember();
+    const res = await handleRequest(db, piiReq(
+        'GET', '/identities/current/pii',
+        await devToken('sarah')));
+    assert.equal(res.status, 403);
+});
+
+test('a GET of another pii is forbidden even for an admin',
+async () => {
+    const db = await dbWithMember();
+    const res = await handleRequest(db, piiReq(
+        'GET', '/identities/sarah/pii', DEV_TOKEN));
+    assert.equal(res.status, 403);
+});
+
+test('a member writes its own pii', async () => {
+    const db = await dbWithMember();
+    await PUT(db, 'identities/sarah/pii',
+        { ...PII, name: 'Sarah Lee' }, await devToken('sarah'));
+    const pii = await GET<{ name: string }>(
+        db, 'identities/sarah/pii', await devToken('sarah'));
+    assert.equal(pii.name, 'Sarah Lee');
+});
+
+test('an admin writes another identity pii', async () => {
+    const db = await dbWithMember();
+    await PUT(db, 'identities/sarah/pii',
+        { ...PII, name: 'By Admin' }, DEV_TOKEN);
+    const pii = await GET<{ name: string }>(
+        db, 'identities/sarah/pii', await devToken('sarah'));
+    assert.equal(pii.name, 'By Admin');
+});
+
+test('a non-admin cannot write another identity pii',
+async () => {
+    const db = await dbWithMember();
+    const res = await handleRequest(db, piiReq(
+        'PUT', '/identities/current/pii',
+        await devToken('sarah'), PII));
+    assert.equal(res.status, 403);
+});
+
+test('deleting pii on the subtree leaves the identity',
+async () => {
+    const db = await dbWithMember();
+    await DELETE(db, 'identities/sarah/pii', DEV_TOKEN);
+    const gone = await handleRequest(db, piiReq(
+        'GET', '/identities/sarah/pii',
+        await devToken('sarah')));
+    assert.equal(gone.status, 404);
+    const id = await GET<{ id: string }>(
+        db, 'identities/sarah', DEV_TOKEN);
+    assert.equal(id.id, 'sarah');
 });

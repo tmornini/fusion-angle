@@ -50,32 +50,71 @@ export function notifyProjectScoreChange(): void {
     projectScoreChanges.notify();
 }
 
-export async function getBaselineScoresForProject(
+// The camelCase domain shape for a scored objective. The
+// adapter is the divorce point: storage rows (snake_case)
+// are mapped here so the shared scoring utils and every
+// presenter speak one idiom. Baseline and actual share it.
+export interface ObjectiveScore {
+    projectId: Id;
+    objectiveId: ObjectiveId;
+    memberId: Id;
+    score: number;
+    at: string;
+}
+
+function toObjectiveScore(
+    r: ProjectObjectiveBaselineScore
+        | ProjectObjectiveActualScore,
+): ObjectiveScore {
+    return {
+        projectId: r.project_id,
+        objectiveId: r.objective_id,
+        memberId: r.member_id,
+        score: r.score,
+        at: r.at,
+    };
+}
+
+async function getAllBaselineScores(
     ctx: RequestContext,
-    projectId: Id,
-): Promise<ProjectObjectiveBaselineScore[]> {
+): Promise<ObjectiveScore[]> {
     const all = await ctx.GET<
         ProjectObjectiveBaselineScore[]
     >('project-objective-baseline-scores');
-    return filterByField(all, 'project_id', projectId);
+    return all.map(toObjectiveScore);
+}
+
+async function getAllActualScores(
+    ctx: RequestContext,
+): Promise<ObjectiveScore[]> {
+    const all = await ctx.GET<
+        ProjectObjectiveActualScore[]
+    >('project-objective-actual-scores');
+    return all.map(toObjectiveScore);
+}
+
+export async function getBaselineScoresForProject(
+    ctx: RequestContext,
+    projectId: Id,
+): Promise<ObjectiveScore[]> {
+    const all = await getAllBaselineScores(ctx);
+    return filterByField(all, 'projectId', projectId);
 }
 
 export async function getActualScoresForProject(
     ctx: RequestContext,
     projectId: Id,
-): Promise<ProjectObjectiveActualScore[]> {
-    const all = await ctx.GET<
-        ProjectObjectiveActualScore[]
-    >('project-objective-actual-scores');
-    return filterByField(all, 'project_id', projectId);
+): Promise<ObjectiveScore[]> {
+    const all = await getAllActualScores(ctx);
+    return filterByField(all, 'projectId', projectId);
 }
 
 export async function getProjectScoring(
     ctx: RequestContext,
     projectId: Id,
 ): Promise<{
-    baseline: ProjectObjectiveBaselineScore[];
-    actual: ProjectObjectiveActualScore[];
+    baseline: ObjectiveScore[];
+    actual: ObjectiveScore[];
 }> {
     const [baseline, actual] = await Promise.all([
         getBaselineScoresForProject(ctx, projectId),
@@ -93,15 +132,15 @@ function meanOrUndefined(
 }
 
 function groupByProject<T extends {
-    project_id: string;
+    projectId: string;
 }>(rows: T[]): Map<string, T[]> {
     const map = new Map<string, T[]>();
     for (const r of rows) {
-        const list = map.get(r.project_id);
+        const list = map.get(r.projectId);
         if (list) {
             list.push(r);
         } else {
-            map.set(r.project_id, [r]);
+            map.set(r.projectId, [r]);
         }
     }
     return map;
@@ -125,12 +164,8 @@ export async function getPortfolioImpactSummary(
         getObjectives(ctx),
         ctx.GET<ProjectEntity[]>('projects'),
         getProjectStates(ctx),
-        ctx.GET<ProjectObjectiveBaselineScore[]>(
-            'project-objective-baseline-scores',
-        ),
-        ctx.GET<ProjectObjectiveActualScore[]>(
-            'project-objective-actual-scores',
-        ),
+        getAllBaselineScores(ctx),
+        getAllActualScores(ctx),
     ]);
     const approved = projectRows.filter(p => {
         const s = projectStates.get(p.id);
@@ -160,19 +195,19 @@ export async function getPortfolioImpactSummary(
             actualByProject.get(p.id) ?? [],
         );
         const actualedObjs = new Set(
-            latestA.map(r => r.objective_id),
+            latestA.map(r => r.objectiveId),
         );
         const fullyActualed = latestB.every(b =>
-            actualedObjs.has(b.objective_id),
+            actualedObjs.has(b.objectiveId),
         );
         if (fullyActualed && latestB.length > 0) {
             const baselinedIds = new Set(
-                latestB.map(b => b.objective_id),
+                latestB.map(b => b.objectiveId),
             );
             const am = weightedMeanByPosition(
                 latestA.filter(
                     a => baselinedIds.has(
-                        a.objective_id,
+                        a.objectiveId,
                     ),
                 ),
                 posByObj,
@@ -214,12 +249,8 @@ export async function getObjectiveAggregates(
         getActiveObjectives(ctx),
         ctx.GET<ProjectEntity[]>('projects'),
         getProjectStates(ctx),
-        ctx.GET<ProjectObjectiveBaselineScore[]>(
-            'project-objective-baseline-scores',
-        ),
-        ctx.GET<ProjectObjectiveActualScore[]>(
-            'project-objective-actual-scores',
-        ),
+        getAllBaselineScores(ctx),
+        getAllActualScores(ctx),
     ]);
     const approved = projectRows.filter(p => {
         const s = projectStates.get(p.id);
@@ -229,22 +260,22 @@ export async function getObjectiveAggregates(
     const approvedIds = new Set(approved.map(p => p.id));
     const latestB = latestPerPair(
         allBaseline.filter(
-            b => approvedIds.has(b.project_id),
+            b => approvedIds.has(b.projectId),
         ),
     );
     const latestA = latestPerPair(
         allActual.filter(
-            a => approvedIds.has(a.project_id),
+            a => approvedIds.has(a.projectId),
         ),
     );
 
     const result = [];
     for (const obj of activeObjs) {
         const baselineScores =
-            filterByField(latestB, 'objective_id', obj.id)
+            filterByField(latestB, 'objectiveId', obj.id)
                 .map(r => r.score);
         const actualScores =
-            filterByField(latestA, 'objective_id', obj.id)
+            filterByField(latestA, 'objectiveId', obj.id)
                 .map(r => r.score);
 
         result.push({
@@ -280,12 +311,8 @@ export async function getObjectiveTrendlines(
         getActiveObjectives(ctx),
         ctx.GET<ProjectEntity[]>('projects'),
         getProjectStates(ctx),
-        ctx.GET<ProjectObjectiveBaselineScore[]>(
-            'project-objective-baseline-scores',
-        ),
-        ctx.GET<ProjectObjectiveActualScore[]>(
-            'project-objective-actual-scores',
-        ),
+        getAllBaselineScores(ctx),
+        getAllActualScores(ctx),
     ]);
     const approvedIds = new Set(
         projectRows
@@ -298,18 +325,18 @@ export async function getObjectiveTrendlines(
     );
     const latestBaselineForApproved = latestPerPair(
         allBaseline.filter(
-            b => approvedIds.has(b.project_id),
+            b => approvedIds.has(b.projectId),
         ),
     );
     const approvedActuals = allActual.filter(
-        a => approvedIds.has(a.project_id),
+        a => approvedIds.has(a.projectId),
     );
 
     const result = new Map<ObjectiveId, TrendPoint[]>();
 
     for (const obj of activeObjs) {
         const baselineRows = filterByField(
-            latestBaselineForApproved, 'objective_id', obj.id,
+            latestBaselineForApproved, 'objectiveId', obj.id,
         );
         const baselineMean = meanOrUndefined(
             baselineRows.map(r => r.score),
@@ -326,7 +353,7 @@ export async function getObjectiveTrendlines(
             { at: baselineAt, value: baselineMean },
         ];
         const actualsForObj =
-            filterByField(approvedActuals, 'objective_id', obj.id)
+            filterByField(approvedActuals, 'objectiveId', obj.id)
                 .slice()
                 .sort((a, b) => a.at.localeCompare(b.at));
         const runningLatest = new Map<string, number>();
@@ -341,7 +368,7 @@ export async function getObjectiveTrendlines(
                     points.push({ at: pendingAt, value: m });
                 }
             }
-            runningLatest.set(row.project_id, row.score);
+            runningLatest.set(row.projectId, row.score);
             pendingAt = row.at;
         }
         if (pendingAt !== undefined) {
@@ -430,12 +457,8 @@ export async function getProjectsScoreColumn(
         getActiveObjectives(ctx),
         getObjectives(ctx),
         ctx.GET<ProjectEntity[]>('projects'),
-        ctx.GET<ProjectObjectiveBaselineScore[]>(
-            'project-objective-baseline-scores',
-        ),
-        ctx.GET<ProjectObjectiveActualScore[]>(
-            'project-objective-actual-scores',
-        ),
+        getAllBaselineScores(ctx),
+        getAllActualScores(ctx),
     ]);
     const totalActive = activeObjs.length;
     const posByObj = new Map<ObjectiveId, number>(
@@ -453,10 +476,10 @@ export async function getProjectsScoreColumn(
             actualByProject.get(p.id) ?? [],
         );
         const baselinedIds = new Set(
-            latestB.map(b => b.objective_id),
+            latestB.map(b => b.objectiveId),
         );
         const actualedIds = new Set(
-            latestA.map(a => a.objective_id),
+            latestA.map(a => a.objectiveId),
         );
         const fullyActualed = latestB.length > 0
             && Array.from(baselinedIds).every(
@@ -471,7 +494,7 @@ export async function getProjectsScoreColumn(
                 ? weightedMeanByPosition(
                     latestA.filter(
                         a => baselinedIds.has(
-                            a.objective_id,
+                            a.objectiveId,
                         ),
                     ),
                     posByObj,

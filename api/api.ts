@@ -2,13 +2,13 @@ import type {
     DbAdapter,
     EntityStore,
     EntityValidator,
-    KeyedCollectionReader,
 } from './db.ts';
 import { extractErrorMessage } from './error-helpers.ts';
 import {
     EntityNotFound,
     MissingTableError,
     TABLE_NAMES,
+    keyed,
 } from './db.ts';
 import type {
     AIMemberEntity,
@@ -106,6 +106,21 @@ export class UnauthorizedError extends Error {
         super(reason);
         this.name = 'UnauthorizedError';
         this.reason = reason;
+    }
+}
+
+// Any non-401 non-ok response, raised with its HTTP status so the
+// web layer can branch on the status (e.g. 404 -> a clean "not
+// found" message) instead of string-matching server prose.
+// Extends Error (like UnauthorizedError) so catch sites matching
+// `instanceof Error` still see it; `status` carries the HTTP code.
+export class RequestError extends Error {
+    readonly status: number;
+
+    constructor(message: string, status: number) {
+        super(message);
+        this.name = 'RequestError';
+        this.status = status;
     }
 }
 
@@ -402,17 +417,21 @@ const COMMIT_RESOURCE_TABLE: Record<string, string> = {
 };
 
 function tableForCommitResource(resource: string): string {
-    const first =
-        resource.split('/').filter(Boolean)[0];
+    const segments = resource.split('/').filter(Boolean);
+    const first = segments[0];
     if (first === undefined) {
         throw new ApiError(
             'commit op resource is empty.',
             HTTP_BAD_REQUEST,
         );
     }
+    // identities/:id/pii is the PII facet of an identity's
+    // subtree — it lands in identity_pii, not identities.
     const table =
-        COMMIT_RESOURCE_TABLE[first]
-        ?? first.replace(/-/g, '_');
+        first === 'identities' && segments[2] === 'pii'
+            ? 'identity_pii'
+            : COMMIT_RESOURCE_TABLE[first]
+                ?? first.replace(/-/g, '_');
     if (!COMMIT_TABLES.has(table)) {
         throw new ApiError(
             'commit op resource "' + resource
@@ -537,13 +556,21 @@ const routes: Route[] = [
         store: db => db.identities,
         verbs: ['get', 'put'],
     }),
+    // PII is a facet of the identity's own subtree: GET is
+    // self-only, PUT/DELETE self-or-admin (enforced in the
+    // request gate, mirroring /identities/:id/default-org). The
+    // identity-pii COLLECTION below (admin roster) is separate.
+    route('identities/:id/pii', {
+        get: (db, p) => db.identityPii.getById(param(p, 0)),
+        put: (db, p, body) => db.identityPii.put(
+            param(p, 0),
+            withoutId(body) as unknown as
+                Omit<IdentityPiiEntity, 'id'>,
+        ),
+        delete: (db, p) => db.identityPii.delete(param(p, 0)),
+    }),
     route('identity-pii', {
         get: (db) => db.identityPii.getAll(),
-    }),
-    makeIdRoute<IdentityPiiEntity>({
-        noun: 'identity-pii',
-        store: db => db.identityPii,
-        verbs: ['get', 'put', 'delete'],
     }),
     route('identity-credentials', {
         get: async (db) =>
@@ -962,10 +989,12 @@ async function authorizeRequest(
     method: string,
     pathname: string,
 ): Promise<string | null> {
-    const rows = await adapter.roleGrants.getAll();
-    // Roles are per-org. The caller resolves the org once and
-    // passes it here; authz filters the global role_grants
-    // ledger to it — identity is global, roles are per-org.
+    // Roles are per-org, but a grant is keyed by identity:
+    // read this principal's grants through the identity_id
+    // index, then currentRolesForInOrg filters to the org —
+    // identity is global, roles are per-org.
+    const rows = await keyed(adapter.roleGrants)
+        .getAllWhere('identity_id', principal.id);
     const roles = currentRolesForInOrg(
         rows, principal.id, org,
     );
@@ -974,6 +1003,31 @@ async function authorizeRequest(
     }
     return 'forbidden: ' + method + ' ' + pathname
         + ' requires a role this principal lacks';
+}
+
+// The PII facet of an identity's subtree. A member reads ONLY
+// its own (GET self); writes are its own OR an admin's (member
+// management). Mirrors the tree-ownership check of
+// /identities/:id/default-org, widened to admin for writes.
+async function authorizeIdentityPii(
+    adapter: DbAdapter,
+    principal: Principal,
+    org: Id,
+    method: string,
+    targetId: string,
+): Promise<string | null> {
+    if (principal.id === targetId) {
+        return null;
+    }
+    if (method === 'GET') {
+        return 'forbidden: an identity may read only its'
+            + ' own pii';
+    }
+    if (await callerIsOrgAdmin(adapter, principal.id, org)) {
+        return null;
+    }
+    return "forbidden: writing another identity's pii"
+        + ' requires an admin role';
 }
 
 // Facade rewrite: exchange the caller's bearer for a token
@@ -1157,7 +1211,8 @@ async function callerIsOrgAdmin(
     identityId: Id,
     org: Id,
 ): Promise<boolean> {
-    const rows = await adapter.roleGrants.getAll();
+    const rows = await keyed(adapter.roleGrants)
+        .getAllWhere('identity_id', identityId);
     return currentRolesForInOrg(rows, identityId, org)
         .includes('admin');
 }
@@ -1689,9 +1744,14 @@ export async function handleRequest(
                 { status: HTTP_FORBIDDEN },
             );
         }
-        const authzFailure = await authorizeRequest(
-            adapter, authResult, org, method, pathname,
-        );
+        const authzFailure =
+            routePattern === 'identities/:id/pii'
+                ? await authorizeIdentityPii(
+                    adapter, authResult, org,
+                    method, param(params, 0))
+                : await authorizeRequest(
+                    adapter, authResult, org,
+                    method, pathname);
         if (authzFailure !== null) {
             return Response.json(
                 { error: authzFailure },
@@ -1723,9 +1783,7 @@ export async function handleRequest(
             // Reach the keyed membership read kept off the
             // EntityStore contract, so the owner resolves
             // through the identity_id index, not a scan.
-            const memberships = adapter.memberships as
-                EntityStore<MembershipEntity>
-                    & KeyedCollectionReader<MembershipEntity>;
+            const memberships = keyed(adapter.memberships);
             const owner = await ownerOrgOfEntity(
                 [
                     adapter.ideas, adapter.projects,
@@ -1916,8 +1974,9 @@ async function unwrapResponse<T>(
     if (response.status === HTTP_UNAUTHORIZED) {
         throw new UnauthorizedError(error);
     }
-    throw new Error(
+    throw new RequestError(
         `${error} (${response.url})`,
+        response.status,
     );
 }
 

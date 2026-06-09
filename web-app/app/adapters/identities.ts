@@ -191,14 +191,14 @@ export async function putMemberPii(
     id: Id,
     pii: Omit<IdentityPiiEntity, 'id'>,
 ): Promise<void> {
-    await ctx.PUT(`identity-pii/${id}`, { ...pii });
+    await ctx.PUT(`identities/${id}/pii`, { ...pii });
 }
 
 export async function deleteIdentityPii(
     ctx: RequestContext,
     id: Id,
 ): Promise<void> {
-    await ctx.DELETE(`identity-pii/${id}`);
+    await ctx.DELETE(`identities/${id}/pii`);
 }
 
 // A person identity carries PII; a service identity
@@ -233,7 +233,7 @@ export async function postIdentityCreation(
     if (spec.kind === 'person') {
         ops.push({
             method: 'put',
-            resource: `identity-pii/${id}`,
+            resource: `identities/${id}/pii`,
             body: { ...spec.pii },
         });
     } else {

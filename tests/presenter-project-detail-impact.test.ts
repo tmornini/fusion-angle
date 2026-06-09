@@ -26,8 +26,6 @@ const { ProjectDetailPresenter } = await import(
 
 import type {
     Objective,
-    ProjectObjectiveBaselineScore,
-    ProjectObjectiveActualScore,
 } from '../api/types.ts';
 
 function makeRecordingContainer(): {
@@ -92,12 +90,12 @@ const objectives: Objective[] = [
     { id: 'o2', position: 1 },
 ];
 
-const baselineFull: ProjectObjectiveBaselineScore[] = [
-    { id: 'b1', project_id: 'pr-1',
-      objective_id: 'o1',
+const baselineFull = [
+    { id: 'b1', projectId: 'pr-1',
+      objectiveId: 'o1',
       score: 50, at: '2026-01-02T00:00:00.000Z' },
-    { id: 'b2', project_id: 'pr-1',
-      objective_id: 'o2',
+    { id: 'b2', projectId: 'pr-1',
+      objectiveId: 'o2',
       score: 30, at: '2026-01-02T00:00:00.000Z' },
 ];
 
@@ -162,13 +160,13 @@ test(
 test(
     'Impact variance renders tone when fully scored',
     () => {
-        const actuals: ProjectObjectiveActualScore[] = [
-            { id: 'a1', project_id: 'pr-1',
-              objective_id: 'o1',
+        const actuals = [
+            { id: 'a1', projectId: 'pr-1',
+              objectiveId: 'o1',
               score: 60,
               at: '2026-02-01T00:00:00.000Z' },
-            { id: 'a2', project_id: 'pr-1',
-              objective_id: 'o2',
+            { id: 'a2', projectId: 'pr-1',
+              objectiveId: 'o2',
               score: 40,
               at: '2026-02-01T00:00:00.000Z' },
         ];

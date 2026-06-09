@@ -51,9 +51,9 @@ test('validator: ready when all scored', () => {
     const r = validateProjectForApproval(
         SAMPLE_PROJECT,
         [{ id: 'o1', position: 0 }],
-        [{ id: 'b1', project_id: 'p1',
-           objective_id: 'o1', score: 50,
-           member_id: 'w1',
+        [{ id: 'b1', projectId: 'p1',
+           objectiveId: 'o1', score: 50,
+           memberId: 'w1',
            at: '2026-05-14T00:00:00.000Z' }],
     );
     assert.equal(r.ready, true);
@@ -64,9 +64,9 @@ test('archival validator: not ready when actuals missing',
     () => {
         const r = validateProjectForArchival(
             SAMPLE_PROJECT,
-            [{ id: 'b1', project_id: 'p1',
-               objective_id: 'o1', score: 50,
-               member_id: 'w1',
+            [{ id: 'b1', projectId: 'p1',
+               objectiveId: 'o1', score: 50,
+               memberId: 'w1',
                at: '2026-05-14T00:00:00.000Z' }],
             [],
         );
