@@ -89,7 +89,7 @@ export async function getDashboardGauges(
     const msPerDay = MS_PER_DAY;
     const now = Date.now();
     let sumBaselineDays = 0;
-    let sumCurrentDays = 0;
+    let sumActualDays = 0;
     let sumEstimatedCost = 0;
     let sumActualCost = 0;
     for (const p of projects) {
@@ -111,7 +111,7 @@ export async function getDashboardGauges(
                 ),
             );
         }
-        sumCurrentDays += Math.max(
+        sumActualDays += Math.max(
             0,
             Math.floor(
                 (now - start) / msPerDay,
@@ -146,11 +146,11 @@ export async function getDashboardGauges(
                     `${sumBaselineDays}d`,
             },
             inner: {
-                value: sumCurrentDays,
+                value: sumActualDays,
                 max: sumBaselineDays,
-                label: 'Current',
+                label: 'Actual',
                 display:
-                    `${sumCurrentDays}d`,
+                    `${sumActualDays}d`,
             },
         },
         {
@@ -171,7 +171,7 @@ export async function getDashboardGauges(
             inner: {
                 value: actCost,
                 max: estCost,
-                label: 'Current',
+                label: 'Actual',
                 display:
                     formatCompactCurrency(
                         actCost,

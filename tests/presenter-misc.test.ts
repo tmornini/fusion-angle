@@ -60,7 +60,7 @@ function makeGauge(
             over.value, over.max, 'Baseline', '$10k',
         ),
         inner: makeArc(
-            inner.value, inner.max, 'Current', '$8k',
+            inner.value, inner.max, 'Actual', '$8k',
         ),
     } satisfies RatioGauge;
 }
@@ -167,7 +167,7 @@ test(
         assert.match(out, /Cost Baseline/);
         assert.match(out, /class="icon-box"/);
         assert.match(out, /Baseline/);
-        assert.match(out, /Current/);
+        assert.match(out, /Actual/);
         assert.match(out, /<svg/);
         noUnknownMagic(out);
     },
