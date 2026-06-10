@@ -6,6 +6,7 @@ export type Tone = 'success' | 'error' | 'muted';
 export const IMPACT_POSITION_DECAY = 0.95;
 
 export function latestPerPair<T extends {
+    id: string;
     projectId: string;
     objectiveId: string;
     at: string;
@@ -13,7 +14,6 @@ export function latestPerPair<T extends {
     const latest = latestByKey(
         rows,
         r => `${r.projectId}:${r.objectiveId}`,
-        (a, b) => a.at > b.at,
     );
     return Array.from(latest.values());
 }

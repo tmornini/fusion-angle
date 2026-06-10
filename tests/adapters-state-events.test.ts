@@ -152,7 +152,7 @@ test('getProjectStates keeps the later event on a tie',
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
         await db.projects.put('p1', projectBody('P'));
-        const at = '2026-01-01T00:00:00.000Z';
+        const at = '2026-01-01T00:00:00.000000Z';
         await db.states.put('ev-1', {
             entity_id: 'p1',
             state: 'under-review',

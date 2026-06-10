@@ -7,15 +7,14 @@ import type {
 import {
     nowUtc,
     jsonObjectField,
-    msSinceUtc,
-    MS_PER_SECOND,
 } from '../../../api/types.ts';
 import {
     validateStoredGraphJson,
 } from '../../../api/validators.ts';
 import {
-    latestByKey,
-} from '../../../api/ledger-reduction.ts';
+    latestClaimEvent,
+    isClaimEventExpired,
+} from '../../../api/work-order-claims.ts';
 import {
     validateWorkOrderFlowGraph,
 } from './work-orders-queries.ts';
@@ -36,9 +35,6 @@ import {
     buildStateEventOp,
 } from './state-events.ts';
 import {
-    generateCryptoSafeBase62,
-} from '../../../api/crypto-safe-base62.ts';
-import {
     nextPosition,
 } from '../drag-reorder-positions.ts';
 import type { StateEntity } from '../../../api/types.ts';
@@ -50,10 +46,10 @@ import {
 const workOrderChanges =
     createSubscriptionChannel(
         [
-            'work-orders',
+            'work_orders',
             'states',
-            'state-field-values',
-            'flow-work-orders',
+            'state_field_values',
+            'flow_work_orders',
         ],
     );
 
@@ -62,12 +58,6 @@ export function subscribeWorkOrderChanges(
 ): () => void {
     return workOrderChanges.subscribe(fn);
 }
-
-const CLAIM_STATES: ReadonlySet<string> = new Set([
-    'claimed',
-    'claim_released',
-    'claim_expired',
-]);
 
 async function generateDisplayId(
     uuid: string,
@@ -85,34 +75,6 @@ async function generateDisplayId(
             .padStart(2, '0');
     }
     return hex;
-}
-
-// Locate the latest claim-vocabulary event for one
-// work order from a snapshot of the global states
-// log. Returns null if none. Used by
-// postWorkOrderClaim to decide whether a prior
-// 'claimed' event has aged past the flow's lock
-// timeout — if so, the new claim records
-// 'claim_expired' for the prior claimant alongside
-// its own 'claimed' event.
-function latestClaimEvent(
-    states: readonly StateEntity[],
-    workOrderId: string,
-): StateEntity | null {
-    const claims = states.filter(
-        ev => ev.entity_id === workOrderId
-            && CLAIM_STATES.has(ev.state),
-    );
-    return latestByKey(claims, ev => ev.entity_id)
-        .get(workOrderId) ?? null;
-}
-
-function isClaimEventExpired(
-    claim: StateEntity,
-    lockTimeoutSeconds: number,
-): boolean {
-    return msSinceUtc(claim.at)
-        >= lockTimeoutSeconds * MS_PER_SECOND;
 }
 
 export interface WorkOrderCreationInput {
@@ -362,71 +324,18 @@ export async function putWorkOrder(
     workOrderChanges.notify();
 }
 
-// Two tabs can both observe no live claim, both
-// write a 'claimed' event, both succeed —
-// duplicate claims for one work order. localStorage
-// has no compare-and-swap, so any
-// read-check-write inside this function would
-// still have a TOCTOU window. Structural fix lives
-// in the Postgres migration: UNIQUE partial index
-// on the live-claim view. Until then, the UI
-// disables the claim button while a request is
-// pending.
+// The claim decision lives server-side: POST
+// work-orders/:id/claim reads the prior claim and
+// appends the new claim events in ONE transaction,
+// so two tabs racing the same claim cannot both
+// succeed — the duplicate-claim TOCTOU is closed at
+// the route, not papered over by a disabled button.
 export async function postWorkOrderClaim(
     ctx: RequestContext,
     workOrderId: string,
 ): Promise<void> {
-    // Notice any prior 'claimed' event that has
-    // already aged past the flow's lockTimeout — the
-    // new claim is superseding it. The
-    // 'claim_expired' event names the previous
-    // claimant (Codd: the event records who held
-    // the claim that aged out), and lands in the
-    // same atomic batch as the new claim's
-    // 'claimed' event.
-    const wo = await ctx.GET<WorkOrderEntity>(
-        `work-orders/${workOrderId}`,
+    await ctx.POST(
+        `work-orders/${workOrderId}/claim`, {},
     );
-    const fg = validateWorkOrderFlowGraph(
-        wo.flow_graph,
-    );
-    const states = await ctx.GET<StateEntity[]>(
-        'states',
-    );
-    const priorClaim = latestClaimEvent(
-        states, workOrderId,
-    );
-    const isPriorExpired =
-        priorClaim !== null
-        && priorClaim.state === 'claimed'
-        && isClaimEventExpired(
-            priorClaim, fg.lockTimeout,
-        );
-    const expiredOps: WriteOp[] = isPriorExpired
-        ? [{
-            method: 'put',
-            resource:
-                `states/`
-                + `${generateCryptoSafeBase62()}`,
-            body: {
-                entity_id: workOrderId,
-                state: 'claim_expired',
-                member_id: priorClaim!.member_id,
-                at: nowUtc(),
-            },
-        }]
-        : [];
-
-    await ctx.commit({
-        ops: [
-            ...expiredOps,
-            await buildStateEventOp(
-                ctx,
-                workOrderId,
-                'claimed',
-            ),
-        ],
-    });
-
     workOrderChanges.notify();
 }

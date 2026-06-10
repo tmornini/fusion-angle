@@ -10,12 +10,12 @@ test('validates a membership body', () => {
         validateMembershipEntity({
             organization_id: '1',
             identity_id: 'current',
-            at: '2026-06-04T00:00:00.000Z',
+            at: '2026-06-04T00:00:00.000000Z',
         }),
         {
             organization_id: '1',
             identity_id: 'current',
-            at: '2026-06-04T00:00:00.000Z',
+            at: '2026-06-04T00:00:00.000000Z',
         },
     );
 });
@@ -25,7 +25,7 @@ test('rejects a membership with an extra key', () => {
         validateMembershipEntity({
             organization_id: '1',
             identity_id: 'current',
-            at: '2026-06-04T00:00:00.000Z',
+            at: '2026-06-04T00:00:00.000000Z',
             role: 'admin',
         }));
 });
@@ -45,7 +45,7 @@ test('memberships store round-trips a row', async () => {
     await db.memberships.put('m1', {
         organization_id: '1',
         identity_id: 'current',
-        at: '2026-06-04T00:00:00.000Z',
+        at: '2026-06-04T00:00:00.000000Z',
     });
     const row = await db.memberships.getById('m1');
     assert.equal(row.identity_id, 'current');
@@ -59,15 +59,15 @@ test('a subject reaches its orgs via memberships', async () => {
     await db.createSchema();
     await db.memberships.put('m1', {
         organization_id: '1', identity_id: 'alice',
-        at: '2026-06-04T00:00:00.000Z',
+        at: '2026-06-04T00:00:00.000000Z',
     });
     await db.memberships.put('m2', {
         organization_id: '7', identity_id: 'alice',
-        at: '2026-06-04T00:00:00.000Z',
+        at: '2026-06-04T00:00:00.000000Z',
     });
     await db.memberships.put('m3', {
         organization_id: '1', identity_id: 'bob',
-        at: '2026-06-04T00:00:00.000Z',
+        at: '2026-06-04T00:00:00.000000Z',
     });
     const all = await db.memberships.getAll();
     const aliceOrgs = all

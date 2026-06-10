@@ -2,16 +2,20 @@ import {
     html, setHtml, trusted,
 } from '../safe-html.ts';
 import type { SafeHtml } from '../safe-html.ts';
-import { $, $required } from '../dom.ts';
-import { log } from '../logger.ts';
+import { $required } from '../dom.ts';
 import { showToast } from '../toast.ts';
 import {
     sessionContext,
-    putFlow,
-    postFlowVersion,
+    putFlowOps,
+    postFlowVersionOps,
+    notifyFlowChange,
     HumanMember,
     AIMember,
 } from '../adapters/index.ts';
+import type {
+    RequestContext,
+} from '../adapters/shared.ts';
+import { reportFault } from '../error-helpers.ts';
 import type {
     GraphNode,
     GraphEdge,
@@ -190,23 +194,59 @@ export class FlowDesignerPresenter {
         };
     }
 
-    async #saveFlow(
+    #saveChain: Promise<void> = Promise.resolve();
+
+    // Saves are SERIALIZED on one promise chain, so
+    // concurrent gestures can never reorder against
+    // each other; a failed save surfaces through
+    // reportFault and the chain survives for the
+    // saves queued behind it.
+    #queueSave(
+        versioned: boolean,
+        snap: FlowSnapshot,
+    ): void {
+        this.#saveChain = this.#saveChain.then(
+            async () => {
+                const ctx = sessionContext();
+                try {
+                    await this.#persistFlow(
+                        ctx, versioned, snap,
+                    );
+                } catch (err) {
+                    reportFault(
+                        ctx,
+                        'Failed to save flow',
+                        err,
+                    );
+                }
+            },
+        );
+    }
+
+    // The version snapshot and the flow write land
+    // as ONE atomic commit batch — a fault applies
+    // neither.
+    async #persistFlow(
+        ctx: RequestContext,
         versioned: boolean,
         snap: FlowSnapshot,
     ): Promise<void> {
-        const ctx = sessionContext();
-        if (versioned) {
-            await postFlowVersion(
+        const ops = [
+            ...versioned
+                ? await postFlowVersionOps(
+                    ctx,
+                    generateCryptoSafeBase62(),
+                    snap.flowId,
+                )
+                : [],
+            ...await putFlowOps(
                 ctx,
-                generateCryptoSafeBase62(),
                 snap.flowId,
-            );
-        }
-        await putFlow(
-            ctx,
-            snap.flowId,
-            this.#buildSaveShape(snap),
-        );
+                this.#buildSaveShape(snap),
+            ),
+        ];
+        await ctx.commit({ ops });
+        notifyFlowChange();
     }
 
     withNameEditing(
@@ -235,7 +275,7 @@ export class FlowDesignerPresenter {
             isLocked: result.isLocked,
             isEditingName: result.isEditingName,
         };
-        void this.#saveFlow(false, next);
+        this.#queueSave(false, next);
         return next;
     }
 
@@ -250,7 +290,7 @@ export class FlowDesignerPresenter {
             ...this.#snapshot,
             isAutoLayout: toggled,
         };
-        void this.#saveFlow(false, next);
+        this.#queueSave(false, next);
         if (toggled) {
             next = this.#applyLayoutReconcile(next);
         }
@@ -277,7 +317,7 @@ export class FlowDesignerPresenter {
             ...this.#snapshot,
             isAutoFit: toggled,
         };
-        void this.#saveFlow(false, next);
+        this.#queueSave(false, next);
         if (toggled) {
             this.#applyZoomToFit(next);
         }
@@ -315,7 +355,7 @@ export class FlowDesignerPresenter {
             flowName: result.flowName,
             isEditingName: result.isEditingName,
         };
-        void this.#saveFlow(true, next);
+        this.#queueSave(true, next);
         this.#noteMutation();
         return next;
     }
@@ -353,7 +393,7 @@ export class FlowDesignerPresenter {
                 positionY: n.positionY - centerY,
             })),
         };
-        void this.#saveFlow(false, next);
+        this.#queueSave(false, next);
         return next;
     }
 
@@ -592,13 +632,11 @@ Auto Fit</label>
         const set = (
             id: string, value: boolean,
         ): void => {
-            const el = $(id, container);
-            if (el) {
-                el.setAttribute(
+            $required(id, container)
+                .setAttribute(
                     'aria-checked',
                     String(value),
                 );
-            }
         };
         set(
             '#flow-lock-switch',
@@ -686,7 +724,7 @@ Auto Fit</label>
                 this.#snapshot.nodes, updates,
             ),
         };
-        void this.#saveFlow(true, moved);
+        this.#queueSave(true, moved);
         this.#noteMutation();
         return this.#applyLayoutReconcile(moved);
     }
@@ -742,7 +780,7 @@ Auto Fit</label>
             nodes: result.nodes,
             edgeWaypoints: result.edgeWaypoints,
         };
-        void this.#saveFlow(false, next);
+        this.#queueSave(false, next);
         return next;
     }
 
@@ -763,7 +801,7 @@ Auto Fit</label>
                 { name: name.trim() },
             ),
         };
-        void this.#saveFlow(true, next);
+        this.#queueSave(true, next);
         this.#noteMutation();
         return next;
     }
@@ -785,7 +823,7 @@ Auto Fit</label>
                 { taskInstructions: text },
             ),
         };
-        void this.#saveFlow(true, next);
+        this.#queueSave(true, next);
         this.#noteMutation();
         return next;
     }
@@ -807,7 +845,7 @@ Auto Fit</label>
                 { memberIds },
             ),
         };
-        void this.#saveFlow(true, next);
+        this.#queueSave(true, next);
         this.#noteMutation();
         return next;
     }
@@ -832,7 +870,7 @@ Auto Fit</label>
                 { name: name.trim() },
             ),
         };
-        void this.#saveFlow(true, next);
+        this.#queueSave(true, next);
         this.#noteMutation();
         return next;
     }

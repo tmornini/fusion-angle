@@ -24,17 +24,17 @@ async function memberOfBothAdminInA(): Promise<MemoryDbAdapter> {
     await db.createSchema();
     await db.memberships.put('m-a', {
         organization_id: 'A', identity_id: 'current',
-        at: '2026-06-04T00:00:00.000Z',
+        at: '2026-06-04T00:00:00.000000Z',
     });
     await db.memberships.put('m-b', {
         organization_id: 'B', identity_id: 'current',
-        at: '2026-06-04T00:00:00.000Z',
+        at: '2026-06-04T00:00:00.000000Z',
     });
     await db.roleGrants.put('g-a', {
         organization_id: 'A', identity_id: 'current',
         role: 'admin', action: 'granted',
         by_member_id: 'system',
-        at: '2026-06-04T00:00:00.000Z',
+        at: '2026-06-04T00:00:00.000000Z',
     });
     return db;
 }
@@ -63,13 +63,13 @@ async () => {
     await db.createSchema();
     await db.memberships.put('m', {
         organization_id: '1', identity_id: 'current',
-        at: '2026-06-04T00:00:00.000Z',
+        at: '2026-06-04T00:00:00.000000Z',
     });
     await db.roleGrants.put('g', {
         organization_id: '1', identity_id: 'current',
         role: 'admin', action: 'granted',
         by_member_id: 'system',
-        at: '2026-06-04T00:00:00.000Z',
+        at: '2026-06-04T00:00:00.000000Z',
     });
     const res = await handleRequest(db, req(
         'GET', '/members', await devToken('current')));

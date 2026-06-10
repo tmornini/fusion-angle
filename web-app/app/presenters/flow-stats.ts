@@ -9,6 +9,7 @@ import {
     html, trusted, setHtml, escapeForHtml,
     type SafeHtml,
 } from '../safe-html.ts';
+import { $required } from '../dom.ts';
 import { iconArrowLeft } from '../icons.ts';
 import {
     buildStatsGraphSvg,
@@ -373,10 +374,9 @@ ${this.buildLegend()}${footnote}</div>`;
         container: HTMLElement,
         nodeId: string | null,
     ): void {
-        const cardEl = container.querySelector(
-            '#flow-stats-card',
-        ) as HTMLElement | null;
-        if (!cardEl) return;
+        const cardEl = $required(
+            '#flow-stats-card', container,
+        );
         if (nodeId === null) {
             cardEl.classList.add('hidden');
             return;

@@ -1,7 +1,10 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
-import { EntityNotFound } from '../api/db.ts';
+import {
+    EntityNotFound,
+    LedgerImmutabilityError,
+} from '../api/db.ts';
 
 test(
     'put round-trip writes and reads back the row',
@@ -12,7 +15,7 @@ test(
             entity_id: 'e1',
             state: 'active',
             member_id: 'w1',
-            at: '2026-01-01T00:00:00.000Z',
+            at: '2026-01-01T00:00:00.000000Z',
         });
         assert.equal(written.id, 's1');
         assert.equal(written.entity_id, 'e1');
@@ -20,6 +23,51 @@ test(
         assert.equal(written.member_id, 'w1');
         const read = await db.states.getById('s1');
         assert.deepEqual(read, written);
+    },
+);
+
+test(
+    'identical re-put is an idempotent ok',
+    async () => {
+        const db = new MemoryDbAdapter();
+        await db.createSchema();
+        const fields = {
+            entity_id: 'e1',
+            state: 'active',
+            member_id: 'w1',
+            at: '2026-01-01T00:00:00.000000Z',
+        };
+        await db.states.put('s1', fields);
+        const again = await db.states.put('s1', fields);
+        assert.equal(again.id, 's1');
+        const all = await db.states.getAll();
+        assert.equal(all.length, 1);
+        assert.deepEqual(all[0], { ...fields, id: 's1' });
+    },
+);
+
+test(
+    'different re-put throws and leaves the event intact',
+    async () => {
+        const db = new MemoryDbAdapter();
+        await db.createSchema();
+        const fields = {
+            entity_id: 'e1',
+            state: 'active',
+            member_id: 'w1',
+            at: '2026-01-01T00:00:00.000000Z',
+        };
+        await db.states.put('s1', fields);
+        await assert.rejects(
+            () => db.states.put('s1', {
+                ...fields,
+                state: 'deleted',
+            }),
+            (err: unknown) =>
+                err instanceof LedgerImmutabilityError,
+        );
+        const read = await db.states.getById('s1');
+        assert.deepEqual(read, { ...fields, id: 's1' });
     },
 );
 
@@ -43,13 +91,13 @@ test('getAll returns every written row', async () => {
         entity_id: 'e1',
         state: 'a',
         member_id: 'w1',
-        at: '2026-01-01T00:00:00.000Z',
+        at: '2026-01-01T00:00:00.000000Z',
     });
     await db.states.put('s2', {
         entity_id: 'e2',
         state: 'b',
         member_id: 'w1',
-        at: '2026-01-02T00:00:00.000Z',
+        at: '2026-01-02T00:00:00.000000Z',
     });
     const all = await db.states.getAll();
     assert.equal(all.length, 2);
@@ -90,19 +138,19 @@ test(
             entity_id: 'e1',
             state: 'a',
             member_id: 'w1',
-            at: '2026-01-01T00:00:00.000Z',
+            at: '2026-01-01T00:00:00.000000Z',
         });
         await db.states.put('s2', {
             entity_id: 'e1',
             state: 'b',
             member_id: 'w1',
-            at: '2026-01-03T00:00:00.000Z',
+            at: '2026-01-03T00:00:00.000000Z',
         });
         await db.states.put('s3', {
             entity_id: 'e1',
             state: 'c',
             member_id: 'w1',
-            at: '2026-01-02T00:00:00.000Z',
+            at: '2026-01-02T00:00:00.000000Z',
         });
         const current =
             await db.states.currentFor('e1');
@@ -121,7 +169,7 @@ test(
             entity_id: 'e1',
             state: 'a',
             member_id: 'w1',
-            at: '2026-01-01T00:00:00.000Z',
+            at: '2026-01-01T00:00:00.000000Z',
         });
         const current =
             await db.states.currentFor('unknown');
@@ -139,25 +187,25 @@ test(
             entity_id: 'e1',
             state: 'b',
             member_id: 'w1',
-            at: '2026-01-02T00:00:00.000Z',
+            at: '2026-01-02T00:00:00.000000Z',
         });
         await db.states.put('s2', {
             entity_id: 'e2',
             state: 'x',
             member_id: 'w1',
-            at: '2026-01-01T00:00:00.000Z',
+            at: '2026-01-01T00:00:00.000000Z',
         });
         await db.states.put('s3', {
             entity_id: 'e1',
             state: 'a',
             member_id: 'w1',
-            at: '2026-01-01T00:00:00.000Z',
+            at: '2026-01-01T00:00:00.000000Z',
         });
         await db.states.put('s4', {
             entity_id: 'e1',
             state: 'c',
             member_id: 'w1',
-            at: '2026-01-03T00:00:00.000Z',
+            at: '2026-01-03T00:00:00.000000Z',
         });
         const events = await db.states.allFor('e1');
         assert.equal(events.length, 3);
@@ -168,9 +216,9 @@ test(
         assert.deepEqual(
             events.map(e => e.at),
             [
-                '2026-01-01T00:00:00.000Z',
-                '2026-01-02T00:00:00.000Z',
-                '2026-01-03T00:00:00.000Z',
+                '2026-01-01T00:00:00.000000Z',
+                '2026-01-02T00:00:00.000000Z',
+                '2026-01-03T00:00:00.000000Z',
             ],
         );
     },
@@ -185,7 +233,7 @@ test(
             entity_id: 'e1',
             state: 'a',
             member_id: 'w1',
-            at: '2026-01-01T00:00:00.000Z',
+            at: '2026-01-01T00:00:00.000000Z',
         });
         const events =
             await db.states.allFor('unknown');

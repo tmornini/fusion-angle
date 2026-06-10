@@ -25,8 +25,8 @@ const SAMPLE_PROJECT_BODY = {
     organization_id: '1',
     title: 't',
     description: 'd', progress: 0,
-    start_date: '2026-05-14T00:00:00.000Z',
-    target_end_date: '2026-05-14T00:00:00.000Z',
+    start_date: '2026-05-14',
+    target_end_date: '2026-05-14',
     estimated_cost: 0, actual_cost: 0,
     position: 0,
 };
@@ -54,7 +54,7 @@ test('validator: ready when all scored', () => {
         [{ id: 'b1', projectId: 'p1',
            objectiveId: 'o1', score: 50,
            memberId: 'w1',
-           at: '2026-05-14T00:00:00.000Z' }],
+           at: '2026-05-14T00:00:00.000000Z' }],
     );
     assert.equal(r.ready, true);
     assert.equal(r.problems.length, 0);
@@ -67,7 +67,7 @@ test('archival validator: not ready when actuals missing',
             [{ id: 'b1', projectId: 'p1',
                objectiveId: 'o1', score: 50,
                memberId: 'w1',
-               at: '2026-05-14T00:00:00.000Z' }],
+               at: '2026-05-14T00:00:00.000000Z' }],
             [],
         );
         assert.equal(r.ready, false);
@@ -93,7 +93,7 @@ test('postProjectApproval moves state to approved',
             { project_id: 'p1', objective_id: 'o1',
               score: 50,
               member_id: 'w1',
-              at: '2026-05-14T00:00:00.000Z' },
+              at: '2026-05-14T00:00:00.000000Z' },
         );
         const ctx = createRequestContext(db, await devToken());
         await postProjectApproval(ctx, 'p1');
@@ -134,14 +134,14 @@ test('postProjectArchival moves state to archived',
             { project_id: 'p1', objective_id: 'o1',
               score: 50,
               member_id: 'w1',
-              at: '2026-05-14T00:00:00.000Z' },
+              at: '2026-05-14T00:00:00.000000Z' },
         );
         await db.projectObjectiveActualScores.put(
             'a1',
             { project_id: 'p1', objective_id: 'o1',
               score: 40,
               member_id: 'w1',
-              at: '2026-05-15T00:00:00.000Z' },
+              at: '2026-05-15T00:00:00.000000Z' },
         );
         const ctx = createRequestContext(db, await devToken());
         await postProjectArchival(ctx, 'p1');

@@ -6,6 +6,7 @@ import { EntityNotFound } from '../api/db.ts';
 import type {
     EntityStore,
     EntityPut,
+    GuardedEntityWriter,
     KeyedCollectionReader,
 } from '../api/db.ts';
 
@@ -20,7 +21,8 @@ interface Row {
 class FakeStore
     implements
         EntityStore<Row>,
-        KeyedCollectionReader<Row>
+        KeyedCollectionReader<Row>,
+        GuardedEntityWriter<Row>
 {
     readonly #rows = new Map<string, Row>();
 
@@ -74,6 +76,52 @@ class FakeStore
 
     async delete(id: string): Promise<void> {
         this.#rows.delete(id);
+    }
+
+    async putGuarded(
+        id: string,
+        fields: Omit<Row, 'id'>,
+        guard: (
+            existing: Row | null,
+            id: string,
+        ) => void,
+    ): Promise<Row> {
+        guard(this.#rows.get(id) ?? null, id);
+        return this.put(id, fields);
+    }
+
+    async putManyGuarded(
+        entries: readonly EntityPut<Row>[],
+        deleteIds: readonly string[],
+        putGuard: (
+            existing: Row | null,
+            id: string,
+        ) => void,
+        deleteGuard: (existing: Row | null) => boolean,
+    ): Promise<void> {
+        for (const id of deleteIds) {
+            if (deleteGuard(this.#rows.get(id) ?? null)) {
+                this.#rows.delete(id);
+            }
+        }
+        for (const entry of entries) {
+            putGuard(
+                this.#rows.get(entry.id) ?? null,
+                entry.id,
+            );
+            this.#rows.set(entry.id, {
+                id: entry.id, ...entry.fields,
+            });
+        }
+    }
+
+    async deleteGuarded(
+        id: string,
+        guard: (existing: Row | null) => boolean,
+    ): Promise<void> {
+        if (guard(this.#rows.get(id) ?? null)) {
+            this.#rows.delete(id);
+        }
     }
 }
 
@@ -150,29 +198,46 @@ async () => {
     );
 });
 
-test('delete 404s a foreign-org id and splices nothing',
+test('delete no-ops a foreign-org id and splices nothing',
 async () => {
     const inner = seeded();
-    await assert.rejects(
-        () => scopedToA(inner).delete('b1'),
-        (e: unknown) => e instanceof EntityNotFound,
-    );
+    await scopedToA(inner).delete('b1');
     assert.equal((await inner.getById('b1')).label, 'theirs');
 });
 
-test('putMany 404s a foreign-org delete id, splices nothing',
+test('putMany no-ops a foreign-org delete id, splices nothing',
 async () => {
     const inner = seeded();
-    await assert.rejects(
-        () => scopedToA(inner).putMany([], ['b1']),
-        (e: unknown) => e instanceof EntityNotFound,
-    );
+    await scopedToA(inner).putMany([], ['b1']);
     assert.equal((await inner.getById('b1')).label, 'theirs');
 });
 
 test('delete removes an own-org row', async () => {
     const inner = seeded();
     await scopedToA(inner).delete('a1');
+    await assert.rejects(
+        () => inner.getById('a1'),
+        (e: unknown) => e instanceof EntityNotFound,
+    );
+});
+
+test('a replayed delete is an idempotent no-op', async () => {
+    const inner = seeded();
+    const scoped = scopedToA(inner);
+    await scoped.delete('a1');
+    await scoped.delete('a1');
+    await assert.rejects(
+        () => inner.getById('a1'),
+        (e: unknown) => e instanceof EntityNotFound,
+    );
+});
+
+test('a replayed putMany delete id is an idempotent no-op',
+async () => {
+    const inner = seeded();
+    const scoped = scopedToA(inner);
+    await scoped.putMany([], ['a1']);
+    await scoped.putMany([], ['a1']);
     await assert.rejects(
         () => inner.getById('a1'),
         (e: unknown) => e instanceof EntityNotFound,

@@ -216,8 +216,11 @@ function hasClaimShape(
             return false;
         }
     }
+    if (!Array.isArray(c.roles)
+        || c.roles.some(r => typeof r !== 'string')) {
+        return false;
+    }
     return typeof c.sub === 'string'
-        && Array.isArray(c.roles)
         && typeof c.name === 'string'
         && typeof c.aud === 'string'
         && typeof c.iat === 'number'
@@ -304,26 +307,33 @@ export async function verifyAccessToken(
 }
 
 // The single home of the latest-`at`-wins revocation reduce.
-// RFC-3339 zulu sorts lexically = chronologically. Passes an
-// explicit strict `>` compare to preserve the original reduce
-// exactly; since it extracts the `at` stamp, a same-`at` tie is
-// value-identical either way. Returns the stamp string or null.
+// RFC-3339 zulu sorts lexically = chronologically. The default
+// (at, id) total order decides; since this extracts the `at`
+// stamp, a same-`at` tie is value-identical either way.
+// Returns the stamp string or null.
 export function latestRevocationAt(
-    rows: readonly { identity_id: Id; at: string }[],
+    rows: readonly {
+        id: Id; identity_id: Id; at: string;
+    }[],
     identityId: Id,
 ): string | null {
     const latest = latestByKey(
-        rows, row => row.identity_id, (a, b) => a.at > b.at,
+        rows, row => row.identity_id,
     ).get(identityId);
     return latest === undefined ? null : latest.at;
 }
 
 // Convert the shared latest-wins reduce to epoch seconds for
-// the gate's `iat < revokedBefore` comparison. Returns null
-// when the identity has no revocation. The reduce itself lives
-// in latestRevocationAt — this only does the epoch conversion.
-export function revokedBeforeSeconds(
-    rows: readonly { identity_id: Id; at: string }[],
+// the gate's `iat <= revokedThrough` comparison. The floor
+// makes the stamp's whole second inclusive — hence "through":
+// a token minted within the revocation second is dead (shared
+// seconds fail closed). Returns null when the identity has no
+// revocation. The reduce itself lives in latestRevocationAt —
+// this only does the epoch conversion.
+export function revokedThroughSeconds(
+    rows: readonly {
+        id: Id; identity_id: Id; at: string;
+    }[],
     identityId: Id,
 ): number | null {
     const at = latestRevocationAt(rows, identityId);

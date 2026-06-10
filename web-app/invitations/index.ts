@@ -1,4 +1,4 @@
-import { $ } from '../app/dom.ts';
+import { $required } from '../app/dom.ts';
 import { showToast } from '../app/toast.ts';
 import { createPageAbort } from '../app/page-lifecycle.ts';
 import { extractErrorMessage } from '../app/error-helpers.ts';
@@ -24,8 +24,9 @@ let listEl: HTMLElement | null = null;
 let pending: InvitationView[] = [];
 
 export async function init(): Promise<void> {
-    const container = $('#invitations-list', document);
-    if (!container) return;
+    const container = $required(
+        '#invitations-list', document,
+    );
     listEl = container;
     const loaded = await withLoadingState(
         container,

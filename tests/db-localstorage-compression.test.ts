@@ -43,11 +43,12 @@ const baseVersion = {
                 attributes: [],
                 positionX: 0,
                 positionY: 0,
+                taskInstructions: '',
             },
         ],
         edges: [],
     }),
-    at: '2026-01-01T00:00:00.000Z',
+    at: '2026-01-01T00:00:00.000000Z',
 };
 
 test(
@@ -153,7 +154,7 @@ test(
                 state: 'n-to',
                 member_id: 'u-1',
                 at:
-                    '2026-01-01T00:00:00.000Z',
+                    '2026-01-01T00:00:00.000000Z',
             },
         );
         const stored = map.get(

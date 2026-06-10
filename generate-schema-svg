@@ -4,4 +4,4 @@ set -euo pipefail
 # Regenerate SCHEMA.svg (the ERD) from the schema of record.
 # Pass --check to fail instead of write when the SVG is stale;
 # ./validate uses that to gate drift.
-npx tsx web-app/app/generate-schema-svg.ts "$@"
+node --strip-types web-app/app/generate-schema-svg.ts "$@"

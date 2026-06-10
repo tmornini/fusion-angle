@@ -1,4 +1,4 @@
-import { $ } from '../app/dom.ts';
+import { $, $required } from '../app/dom.ts';
 import {
     html,
     setHtml,
@@ -50,9 +50,9 @@ async function renderObjectiveAggregates(
 
 export async function init(
 ): Promise<void> {
-    const container =
-        $('#gauge-container', document);
-    if (!container) return;
+    const container = $required(
+        '#gauge-container', document,
+    );
 
     const ctx = sessionContext();
     const gauges =

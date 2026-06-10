@@ -19,11 +19,11 @@ test('validates a revocation body', () => {
     assert.deepEqual(
         validateIdentityTokenRevocationEntity({
             identity_id: 'current',
-            at: '2026-06-03T00:00:00.000Z',
+            at: '2026-06-03T00:00:00.000000Z',
         }),
         {
             identity_id: 'current',
-            at: '2026-06-03T00:00:00.000Z',
+            at: '2026-06-03T00:00:00.000000Z',
         },
     );
 });

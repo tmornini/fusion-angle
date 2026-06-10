@@ -1,10 +1,11 @@
-import { $ } from '../app/dom.ts';
+import { $required } from '../app/dom.ts';
 import { html, setHtml } from '../app/safe-html.ts';
 import { iconSparkles } from '../app/icons.ts';
 
 export async function init(): Promise<void> {
-    const root = $('#page-root', document);
-    if (!root) return;
+    const root = $required(
+        '#page-root', document,
+    );
 
     setHtml(root, html`
     <div class="${

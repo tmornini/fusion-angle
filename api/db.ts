@@ -62,6 +62,25 @@ export class MissingTableError extends Error {
     }
 }
 
+// A re-put of an existing ledger event with a DIFFERENT
+// payload is an attempt to rewrite history — surfaced as a
+// conflict, never applied. The identical re-put stays
+// silent: that is the idempotent retry the id-keyed PUT
+// exists for.
+export class LedgerImmutabilityError extends Error {
+    readonly table: string;
+    readonly id: string;
+    constructor(table: string, id: string) {
+        super(
+            `Ledger event ${table}/${id} exists with a`
+            + ' different payload; the log is append-only',
+        );
+        this.table = table;
+        this.id = id;
+        this.name = 'LedgerImmutabilityError';
+    }
+}
+
 export interface EntityPut<
     T extends { id: string },
 > {
@@ -112,6 +131,54 @@ export function keyed<T extends { id: string }>(
     store: EntityStore<T>,
 ): KeyedCollectionReader<T> {
     return store as EntityStore<T> & KeyedCollectionReader<T>;
+}
+
+// The write-side fence capability: peek + decide + write in
+// ONE transaction, so no concurrent writer can slip between
+// the check and the row op. The peek hands each guard the
+// RAW row (or null when absent) — tombstone-blind, because a
+// fence must decide on the row that EXISTS, not the row
+// lifecycle presents. putGuarded's guard throws to reject
+// (the tx aborts, nothing written); deleteGuarded's guard
+// returns whether to splice — false is a silent no-op, so a
+// replayed or foreign DELETE is indistinguishable from
+// deleting an absent row (Commandment VII). putManyGuarded
+// applies both guards inside the batch's one transaction.
+export interface GuardedEntityWriter<
+    T extends { id: string },
+> {
+    putGuarded(
+        id: string,
+        fields: Omit<T, 'id'>,
+        guard: (
+            existing: T | null,
+            id: string,
+        ) => void,
+    ): Promise<T>;
+    putManyGuarded(
+        entries: readonly EntityPut<T>[],
+        deleteIds: readonly string[],
+        putGuard: (
+            existing: T | null,
+            id: string,
+        ) => void,
+        deleteGuard: (existing: T | null) => boolean,
+    ): Promise<void>;
+    deleteGuarded(
+        id: string,
+        guard: (existing: T | null) => boolean,
+    ): Promise<void>;
+}
+
+// Reach a store's guarded write capability, kept off the
+// EntityStore contract by Interface Segregation — only the
+// org fence needs it. Both concrete leaf stores implement
+// it, so the cast is sound for every fenced store — the same
+// documented assertion home as keyed().
+export function guarded<T extends { id: string }>(
+    store: EntityStore<T>,
+): GuardedEntityWriter<T> {
+    return store as EntityStore<T> & GuardedEntityWriter<T>;
 }
 
 // The storage-edge validator. Stores accept one at

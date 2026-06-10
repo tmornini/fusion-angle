@@ -235,54 +235,62 @@ Every item below is INERT today: the whole store is client-side
 IndexedDB in the page-runner's own browser, so there is no trust
 boundary to cross. Each becomes a live exposure the moment the
 backend is physically split out and the browser becomes an
-untrusted client. None is coded around yet — no server exists —
-so this is the disclosure checklist that gates that split.
-An audit re-confirms each is still KNOWN (seam flag present,
-unwidened) and separates any NEW exposure — see
-[AUDIT.md](AUDIT.md) § Security: KNOWN vs NEW.
+untrusted client — this is the disclosure checklist that gates
+that split. Several former entries are now mitigated client-tier
+and listed separately below. An audit re-confirms each remaining
+seam is still KNOWN (seam flag present, unwidened) and separates
+any NEW exposure — see [AUDIT.md](AUDIT.md) § Security: KNOWN
+vs NEW.
+
+Remaining seams — no client-tier mitigation exists:
 
 - **Client-shipped HMAC key.** `SIGNING_KEY_MATERIAL`
-  (`api/access-token.ts:70`) is a constant in client JS, so any
+  (`api/access-token.ts`) is a constant in client JS, so any
   party with the bundle can mint a valid token — forgery is
-  trivial. The server tier relocates ONLY the key (client
-  constant → server secret/KMS) and who-mints (browser →
-  `/authentication/token`); the wire format, alg (HS256), and
-  every caller signature stay put.
-- **Unenforced token-exchange delegation.** `grantTokenExchange`
-  (`api/authentication.ts:307`) VERIFIES both subject and actor
-  tokens, but whether `actor` may act-as `subject` — the
-  delegation policy — is NOT enforced; that authorization lands
-  with the server tier. The claim shape (`sub`, `act.sub`) is
-  frozen now.
-- **Structural-only `client_assertion`.** `grantClientCredentials`
-  (`api/authentication.ts:384`) requires the `client_assertion`
-  to be only a three-segment JWT; real JWS verification against
-  the client's JWKS is deferred to the server tier. A headless
-  client can authenticate with an unsigned assertion.
-- **Bearer-exempt snapshot plane.** `BEARER_EXEMPT_ROUTES`
-  (`api/api.ts:100`) exempts the four `snapshots/*` seed routes
-  from the gate (infrastructure below the auth tier). Networked,
-  an unauthenticated caller could wipe and re-seed the
-  datastore. Worse, the mock-data seeder returns freshly-minted
-  plaintext credentials in-band for a one-time reveal (only
-  PBKDF2 hashes are stored — the in-band return is demo-only and
-  must be removed at the server tier), so an unauth caller could
-  seed AND harvest working admin creds.
-- **Raw `error.message` in the 500 fallback.** The catch-all in
-  `handleRequest` (`api/api.ts:1478`) returns `error.message`
-  verbatim with a 500, leaking internal fault detail to the
-  client. The server tier must return an opaque body and log the
-  detail server-side.
-- **Admin-or-nothing `ROUTE_POLICY`.** `ROUTE_POLICY`
-  (`api/authorization.ts:77`) grants `admin` every verb at `/`
-  and lists no narrower (verb, prefix) entries, so authorization
-  is all-or-nothing — any non-admin role is denied everything.
-  Finer-grained entries widen access as real roles arrive.
-- **De-membership latency on the token claim.** A session token
-  carries its `orgs`/roles claim for `SESSION_TTL_SECONDS`
-  (15 min, `web-app/app/adapters/init.ts:52`). Revoking a
-  membership does not take effect until the token expires or is
-  revoked, so a removed member retains access for up to the TTL.
+  trivial. NO client-tier mitigation exists or is possible:
+  whatever the browser holds, the browser's user holds. Every
+  gate downstream of token verification (org fence, role
+  policy, membership liveness) is therefore demo-grade
+  isolation until the server tier relocates ONLY the key
+  (client constant → server secret/KMS) and who-mints (browser
+  → `/authentication/token`); the wire format, alg (HS256),
+  and every caller signature stay put.
+- **In-band credential reveal.** The mock-data seeder returns
+  freshly-minted plaintext credentials in-band for a one-time
+  reveal (only PBKDF2 hashes are stored). Demo-only by design;
+  the in-band return is deleted at the server tier.
+- **client_assertion jti replay.** JWS verification is real
+  (below), but no ledger yet remembers a jti as spent, so a
+  captured assertion replays until its `exp`. The replay
+  ledger lands with the server tier.
+
+Mitigated client-tier — the seam is narrowed in this codebase,
+re-verified by the automated suite:
+
+- **Token-exchange delegation** (`grantTokenExchange`,
+  `api/authentication.ts`): self-delegation ONLY — a
+  cross-party exchange (subject ≠ actor) is 403 until a
+  delegation ledger exists. The claim shape (`sub`,
+  `act.sub`) is frozen.
+- **`client_assertion` JWS** (`api/client-assertion.ts`):
+  really verified against the client's registered JWKS
+  (RS256/ES256, WebCrypto) plus RFC 7523 claim checks.
+- **Snapshot plane** (`BOOTSTRAP_ROUTES`, `api/api.ts`):
+  bearer-exempt ONLY while no schema exists (the bootstrap
+  window); once a schema exists the plane closes — bearer
+  plus the admin route policy.
+- **500 fallback body** (`handleRequest`, `api/api.ts`): a
+  fixed opaque `internal error` body; fault detail goes to
+  the console, never the wire.
+- **Route policy tiers** (`ROUTE_POLICY`,
+  `api/authorization.ts`): `admin` everywhere plus a real
+  `member` tier on the content surfaces; identity, credential,
+  membership, and snapshot surfaces stay admin-only,
+  deny-by-default.
+- **De-membership latency** (`handleRequest`): every fenced
+  request re-derives membership from the ledger, so revoking a
+  membership stops access on the NEXT request — the token's
+  15-minute org claim no longer rides out its TTL.
 
 ## API Layer (`/api`)
 

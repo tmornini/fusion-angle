@@ -205,12 +205,18 @@ export function isAttributeType(
     return includes(ATTRIBUTE_TYPES, v);
 }
 
+// A validation rejection is an EXPECTED failure: profane
+// input stopped at the gate. The api layer maps it to 400
+// with the message on the wire — unlike a bug, which gets
+// the opaque 500.
+export class ValidationError extends Error {}
+
 export function assertAttributeType(
     v: string,
     label: string,
 ): AttributeType {
     if (!includes(ATTRIBUTE_TYPES, v)) {
-        throw new Error(
+        throw new ValidationError(
             'expected AttributeType for '
                 + label + ', got ' + v,
         );
@@ -225,7 +231,7 @@ export function assertConstraintAppliesTo(
 ): void {
     if (kind === 'regex') {
         if (attributeType !== 'text') {
-            throw new Error(
+            throw new ValidationError(
                 "'regex' constraint requires"
                 + " attribute_type 'text' for "
                 + label + ", got "
@@ -238,7 +244,7 @@ export function assertConstraintAppliesTo(
         attributeType !== 'number'
         && attributeType !== 'date'
     ) {
-        throw new Error(
+        throw new ValidationError(
             "'" + kind + "' constraint"
             + " requires attribute_type"
             + " 'number' or 'date' for "
@@ -261,7 +267,7 @@ export function assertProjectState(
     label: string,
 ): ProjectState {
     if (!includes(PROJECT_STATES, v)) {
-        throw new Error(
+        throw new ValidationError(
             'expected ProjectState for '
                 + label + ', got ' + v,
         );
@@ -282,7 +288,7 @@ export function assertIdeaState(
     label: string,
 ): IdeaState {
     if (!includes(IDEA_STATES, v)) {
-        throw new Error(
+        throw new ValidationError(
             'expected IdeaState for '
                 + label + ', got ' + v,
         );
@@ -303,7 +309,7 @@ export function assertMemberState(
     label: string,
 ): MemberState {
     if (!includes(MEMBER_STATES, v)) {
-        throw new Error(
+        throw new ValidationError(
             'expected MemberState for '
                 + label + ', got ' + v,
         );
@@ -322,7 +328,7 @@ export function assertFlowState(
     label: string,
 ): FlowState {
     if (!includes(FLOW_STATES, v)) {
-        throw new Error(
+        throw new ValidationError(
             'expected FlowState for '
                 + label + ', got ' + v,
         );
@@ -341,7 +347,7 @@ export function assertRecordState(
     label: string,
 ): RecordState {
     if (!includes(RECORD_STATES, v)) {
-        throw new Error(
+        throw new ValidationError(
             'expected RecordState for '
                 + label + ', got ' + v,
         );
@@ -360,7 +366,7 @@ export function assertObjectiveState(
     label: string,
 ): ObjectiveState {
     if (!includes(OBJECTIVE_STATES, v)) {
-        throw new Error(
+        throw new ValidationError(
             'expected ObjectiveState for '
                 + label + ', got ' + v,
         );
@@ -379,7 +385,7 @@ export function assertInvitationState(
     label: string,
 ): InvitationState {
     if (!includes(INVITATION_STATES, v)) {
-        throw new Error(
+        throw new ValidationError(
             'expected InvitationState for '
                 + label + ', got ' + v,
         );
@@ -412,11 +418,38 @@ export function formatCompactCurrency(
     return `$${value}`;
 }
 
+// The mint's monotonicity state: the last millisecond stamped
+// and the same-ms sequence counter that fills the final three
+// fraction digits. Owned by nowUtc alone.
+let lastMintMs = 0;
+let sameMsSequence = 0;
+
 export function nowUtc(): string {
-    // JS Date resolves only to milliseconds; SCHEMA.md documents
-    // the 6-digit microsecond zulu width. Pad the 3-digit
-    // fraction so every mint is one width with the seed helpers.
-    return new Date().toISOString().replace('Z', '000Z');
+    // JS Date resolves only to milliseconds; SCHEMA.md
+    // documents the 6-digit microsecond zulu width. The final
+    // three fraction digits are a same-ms sequence counter, so
+    // within a realm every mint is STRICTLY later than the one
+    // before — the ledger reductions' latest-wins total order
+    // starts at the mint. A clock that stalls or steps back
+    // rides the counter; on counter overflow the mint
+    // busy-advances to the next millisecond.
+    const ms = Date.now();
+    if (ms > lastMintMs) {
+        lastMintMs = ms;
+        sameMsSequence = 0;
+    } else {
+        sameMsSequence += 1;
+        if (sameMsSequence > 999) {
+            let next = Date.now();
+            while (next <= lastMintMs) next = Date.now();
+            lastMintMs = next;
+            sameMsSequence = 0;
+        }
+    }
+    return new Date(lastMintMs).toISOString().replace(
+        'Z',
+        String(sameMsSequence).padStart(3, '0') + 'Z',
+    );
 }
 
 export function msSinceUtc(
@@ -1152,16 +1185,18 @@ export interface StateFieldValueEntity {
     value: string;
 }
 
+// Seat usage and last activity are NOT columns: both are
+// derived from their ledgers at read time (memberships count;
+// max states.at) — a stored aggregate would be a second truth
+// kept in sync by nothing.
 export interface OrganizationEntity {
     id: Id;
     name: string;
     domain: string;
     next_billing: string;
     seats: number;
-    used_seats: number;
     projects_limit: number;
     ideas_limit: number;
-    last_activity: string;
 }
 
 // The covenant binding an identity to an organization, with

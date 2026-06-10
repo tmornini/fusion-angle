@@ -1,5 +1,5 @@
 import {
-    $,
+    $, $required,
 } from './dom.ts';
 import {
     html,
@@ -748,9 +748,10 @@ posIndex === state.activeIndex
             );
         });
 
-        state.dialog.querySelector(
+        $required(
             '#command-palette-close',
-        )?.addEventListener(
+            state.dialog,
+        ).addEventListener(
             'click',
             close,
         );

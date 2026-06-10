@@ -36,7 +36,7 @@ async () => {
     await db.memberships.put('m', {
         organization_id: '1',
         identity_id: 'current',
-        at: '2026-06-04T00:00:00.000Z',
+        at: '2026-06-04T00:00:00.000000Z',
     });
     const orgs = await getOrganizations(ctx);
     assert.deepEqual(orgs.map(o => o.id), ['1']);

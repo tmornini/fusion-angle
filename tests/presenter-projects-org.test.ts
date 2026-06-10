@@ -132,10 +132,11 @@ function makeOrg() {
         domain: 'acme.example',
         next_billing: '2026-07-01',
         seats: 50,
-        used_seats: 12,
         projects_limit: 100,
         ideas_limit: 200,
-        last_activity: '2026-05-01',
+    }, {
+        usedSeats: 12,
+        lastActivityAt: '2026-05-01T00:00:00.000000Z',
     });
 }
 

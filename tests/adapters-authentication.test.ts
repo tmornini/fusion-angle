@@ -22,12 +22,12 @@ async function passwordUserCtx() {
         organization_id: '1',
         identity_id: 'current', role: 'admin',
         action: 'granted', by_member_id: 'system',
-        at: '2020-01-01T00:00:00.000Z',
+        at: '2020-01-01T00:00:00.000000Z',
     });
     await db.memberships.put('m', {
         organization_id: '1',
         identity_id: 'current',
-        at: '2020-01-01T00:00:00.000Z',
+        at: '2020-01-01T00:00:00.000000Z',
     });
     await db.identityPii.put('current', {
         name: 'Demo', email: 'demo@example.com',
@@ -36,7 +36,7 @@ async function passwordUserCtx() {
     await db.identityCredentials.put('c1', {
         identity_id: 'current', kind: 'password',
         status: 'set', secret: await hashPassword('s3cret'),
-        at: '2026-06-03T00:00:00.000Z',
+        at: '2026-06-03T00:00:00.000000Z',
     });
     const ctx = createRequestContext(
         db, await devToken('anonymous'));

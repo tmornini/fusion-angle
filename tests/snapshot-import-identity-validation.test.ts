@@ -45,7 +45,7 @@ async function acceptsImport(json: string): Promise<void> {
     await adapter.importSnapshot(json);
 }
 
-const AT = '2026-01-01T00:00:00.000Z';
+const AT = '2026-01-01T00:00:00.000000Z';
 
 // One valid row per newly-gated table, exact body keys.
 const VALID_ROWS: Record<

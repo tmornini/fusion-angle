@@ -116,8 +116,6 @@ const LABEL_BG_OPACITY = 0.9;
 const LABEL_TEXT_OFFSET_Y = 4;
 const LABEL_FONT = 11;
 
-const BEZIER_ORIGIN = 0;
-
 const NODE_ROLE = 'button';
 const EDGE_ROLE = 'button';
 const FOCUSABLE_TABINDEX = '0';
@@ -572,12 +570,13 @@ function buildNode(
             + '</g>';
     }
 
+    const idEsc = escapeForHtml(node.id);
     const labelEsc = escapeForHtml(displayName);
     const ariaCurrent = isSelected
         ? ' aria-current="true"' : '';
     return trusted(
         '<g'
-        + ` data-node-id="${node.id}"`
+        + ` data-node-id="${idEsc}"`
         + ' class="flow-node"'
         + ` role="${NODE_ROLE}"`
         + ` tabindex="${FOCUSABLE_TABINDEX}"`
@@ -848,6 +847,7 @@ function buildEdge(
         : '';
     const ariaCurrent = isSelected
         ? ' aria-current="true"' : '';
+    const idEsc = escapeForHtml(edge.id);
     const ariaLabel =
         escapeForHtml(fromNode.name)
         + ' to '
@@ -856,7 +856,7 @@ function buildEdge(
         + escapeForHtml(edge.name);
     return trusted(
         '<g'
-        + ` data-edge-id="${edge.id}"`
+        + ` data-edge-id="${idEsc}"`
         + ' class="flow-edge"'
         + ` role="${EDGE_ROLE}"`
         + ` tabindex="${FOCUSABLE_TABINDEX}"`
@@ -1006,12 +1006,6 @@ function bezierAt(
     const coords = parts
         .map(Number)
         .filter(n => !isNaN(n));
-    if (coords.length < 8) {
-        return {
-            x: coords[0] ?? BEZIER_ORIGIN,
-            y: coords[1] ?? BEZIER_ORIGIN,
-        };
-    }
     const u = 1 - t;
     const u2 = u * u;
     const u3 = u2 * u;

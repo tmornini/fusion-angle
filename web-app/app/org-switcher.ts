@@ -81,13 +81,7 @@ async function setActiveOrgAsDefault(
         await import('./adapters/shared.ts');
     const { putIdentityDefaultOrg } =
         await import('./adapters/identity-default-org.ts');
-    try {
-        await putIdentityDefaultOrg(sessionContext(), org);
-        showToast(
-            'Set as your default organization.', 'success');
-    } catch {
-        showToast(
-            'Could not set the default —'
-            + ' please try again.', 'error');
-    }
+    await putIdentityDefaultOrg(sessionContext(), org);
+    showToast(
+        'Set as your default organization.', 'success');
 }

@@ -18,8 +18,8 @@ const ev = (
     action, chain_id: chain, parent_jti: parent, at,
 });
 
-const T1 = '2026-01-01T00:00:00.000Z';
-const T2 = '2026-02-01T00:00:00.000Z';
+const T1 = '2026-01-01T00:00:00.000000Z';
+const T2 = '2026-02-01T00:00:00.000000Z';
 
 test('latestActionForJti returns the latest per jti', () => {
     const rows = [
@@ -30,12 +30,28 @@ test('latestActionForJti returns the latest per jti', () => {
     assert.equal(latestActionForJti(rows, 'unknown'), null);
 });
 
-test('a same-instant revoke beats an issue', () => {
-    const rows = [
-        ev('a', 'issued', 'c1', '', T1),
-        ev('a', 'revoked', 'c1', '', T1),   // appended later
-    ];
-    assert.equal(latestActionForJti(rows, 'a'), 'revoked');
+test('a same-instant revoke beats an issue, either order',
+() => {
+    const issued = ev('a', 'issued', 'c1', '', T1);
+    const revoked = ev('a', 'revoked', 'c1', '', T1);
+    assert.equal(
+        latestActionForJti([issued, revoked], 'a'),
+        'revoked');
+    assert.equal(
+        latestActionForJti([revoked, issued], 'a'),
+        'revoked');
+});
+
+test('a same-instant revoke beats a rotate, either order',
+() => {
+    const rotated = ev('a', 'rotated', 'c1', '', T1);
+    const revoked = ev('a', 'revoked', 'c1', '', T1);
+    assert.equal(
+        latestActionForJti([rotated, revoked], 'a'),
+        'revoked');
+    assert.equal(
+        latestActionForJti([revoked, rotated], 'a'),
+        'revoked');
 });
 
 test('chainIdForJti and jtisInChain group a lineage', () => {

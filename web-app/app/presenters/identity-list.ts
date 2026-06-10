@@ -10,7 +10,9 @@ import {
     type IdentityRosterRow,
 } from '../adapters/index.ts';
 
-const KIND_LABEL: Readonly<Record<string, string>> = {
+const KIND_LABEL: Readonly<
+    Record<IdentityRosterRow['kind'], string>
+> = {
     person: 'Person',
     service: 'Service',
 };
@@ -71,7 +73,7 @@ function buildRow(row: IdentityRosterRow): SafeHtml {
             }">
                 <span class="${
                     'badge badge-secondary'
-                }">${KIND_LABEL[row.kind] ?? row.kind}</span>
+                }">${KIND_LABEL[row.kind]}</span>
             </div>
         </div>`;
 }

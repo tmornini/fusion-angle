@@ -23,12 +23,10 @@ export function orgRow(
     return {
         name,
         domain: 'x.com',
-        next_billing: '2026-01-01T00:00:00.000Z',
+        next_billing: '2026-01-01T00:00:00.000000Z',
         seats: 10,
-        used_seats: 1,
         projects_limit: 10,
         ideas_limit: 10,
-        last_activity: '2026-01-01T00:00:00.000Z',
     };
 }
 

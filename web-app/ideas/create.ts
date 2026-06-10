@@ -1,5 +1,5 @@
 import {
-    $, $input, $textarea,
+    $, $input, $required, $textarea,
     bindEnterToClick,
 } from '../app/dom.ts';
 import {
@@ -32,9 +32,9 @@ export async function init():
     };
 
     function renderPage(): void {
-        const root =
-            $('#create-content', document);
-        if (!root) return;
+        const root = $required(
+            '#create-content', document,
+        );
         setHtml(
             root,
             new IdeaCreatePresenter(formState)
@@ -111,23 +111,23 @@ export async function init():
             navigateTo('ideas');
         };
 
-        $(
+        $required(
             '#idea-create-back-btn',
             document,
-        )?.addEventListener(
+        ).addEventListener(
             'click', goBack,
         );
-        $(
+        $required(
             '#idea-create-step-back',
             document,
-        )?.addEventListener(
+        ).addEventListener(
             'click', goBack,
         );
 
-        $(
+        $required(
             '#idea-create-step-next',
             document,
-        )?.addEventListener(
+        ).addEventListener(
             'click',
             async () => {
                 formState = readFormFromDom();

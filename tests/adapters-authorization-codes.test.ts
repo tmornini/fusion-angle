@@ -28,7 +28,7 @@ const goodRow = {
     identity_id: 'current',
     client_id: 'web',
     status: 'issued',
-    at: '2026-06-03T00:00:00.000Z',
+    at: '2026-06-03T00:00:00.000000Z',
 };
 
 test('validates an authorization code', () => {
@@ -56,7 +56,7 @@ test('authorization_codes store retains events', async () => {
     await db.authorizationCodes.put('a1', goodRow);
     await db.authorizationCodes.put('a2', {
         ...goodRow, status: 'consumed',
-        at: '2026-06-03T00:01:00.000Z',
+        at: '2026-06-03T00:01:00.000000Z',
     });
     assert.equal(
         (await db.authorizationCodes.getAll()).length, 2);

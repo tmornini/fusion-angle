@@ -85,15 +85,27 @@ export function projectPatchFromDraft(
     const state = isProjectState(draft.state)
         ? draft.state
         : fallbackState;
+    // An empty or non-numeric cost is a MISSING value, not
+    // zero — Number('') is 0, and storing it would fabricate
+    // a $0k baseline. Throw; the save path's catch surfaces
+    // the message as a toast.
+    const costK = Number(draft.costBaseline);
+    if (
+        draft.costBaseline.trim() === ''
+        || Number.isNaN(costK)
+    ) {
+        throw new Error(
+            'estimated cost must be a number, got "'
+            + draft.costBaseline + '"',
+        );
+    }
     return {
         entity: {
             title: draft.title,
             description: draft.description,
             start_date: draft.startDate,
             target_end_date: draft.targetEndDate,
-            estimated_cost:
-                Number(draft.costBaseline)
-                * COST_DIVISOR,
+            estimated_cost: costK * COST_DIVISOR,
         },
         state,
     };

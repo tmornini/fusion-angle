@@ -13,16 +13,16 @@ test('latestPerPair keeps the latest by at',
         const rows = [
             { projectId: 'p1', objectiveId: 'o1',
               score: 50,
-              at: '2026-05-14T00:00:00.000Z' },
+              at: '2026-05-14T00:00:00.000000Z' },
             { projectId: 'p1', objectiveId: 'o1',
               score: 60,
-              at: '2026-05-15T00:00:00.000Z' },
+              at: '2026-05-15T00:00:00.000000Z' },
             { projectId: 'p1', objectiveId: 'o2',
               score: -20,
-              at: '2026-05-14T00:00:00.000Z' },
+              at: '2026-05-14T00:00:00.000000Z' },
             { projectId: 'p2', objectiveId: 'o1',
               score: 10,
-              at: '2026-05-14T00:00:00.000Z' },
+              at: '2026-05-14T00:00:00.000000Z' },
         ];
         const latest = latestPerPair(rows);
         assert.equal(latest.length, 3);

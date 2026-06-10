@@ -14,7 +14,7 @@ import {
     seedAdminSchema,
 } from './test-fixtures.ts';
 
-const AT = '2026-05-20T00:00:00.000Z';
+const AT = '2026-05-20T00:00:00.000000Z';
 const VALID: ReadonlyArray<number> = [-100, 0, 100];
 const INVALID: ReadonlyArray<number> = [-101, 101, 106];
 const RANGE_MSG = /expected integer in \[-100, \+100\]/;

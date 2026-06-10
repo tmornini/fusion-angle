@@ -1,5 +1,5 @@
 import {
-    $, isFormField,
+    $required, isFormField,
 } from '../app/dom.ts';
 import {
     HumanMemberDetailPresenter,
@@ -20,7 +20,7 @@ import {
     createPageAbort,
     bindPageListeners,
 } from '../app/page-lifecycle.ts';
-import { extractErrorMessage } from '../app/error-helpers.ts';
+import { reportFault } from '../app/error-helpers.ts';
 import { log } from '../app/logger.ts';
 import {
     buildSkeleton,
@@ -149,10 +149,9 @@ export async function init(
         return;
     }
 
-    const container = $(
+    const container = $required(
         '#member-detail-content', document,
     );
-    if (!container) return;
     pageContainer = container;
 
     const member = await withLoadingState(
@@ -443,12 +442,8 @@ async function saveHumanMember(
             ctx, memberId,
         );
     } catch (err) {
-        log.error(
-            'getHumanMemberRow failed',
-            'members', err,
-        );
-        showToast(
-            'Failed to save member', 'error',
+        reportFault(
+            ctx, 'Failed to save member', err,
         );
         return;
     }
@@ -469,14 +464,8 @@ async function saveHumanMember(
             );
         }
     } catch (err) {
-        const detail = extractErrorMessage(err);
-        log.error(
-            'human member save failed',
-            'members', err,
-        );
-        showToast(
-            `Failed to save member: ${detail}`,
-            'error',
+        reportFault(
+            ctx, 'Failed to save member', err,
         );
         return;
     }
@@ -497,13 +486,10 @@ async function saveAIMember(
             ctx, memberId,
         );
     } catch (err) {
-        log.error(
-            'getAIMemberRow failed',
-            'members', err,
-        );
-        showToast(
+        reportFault(
+            ctx,
             'Failed to save AI member',
-            'error',
+            err,
         );
         return;
     }
@@ -527,13 +513,10 @@ async function saveAIMember(
             );
         }
     } catch (err) {
-        log.error(
-            'putAIMember failed',
-            'members', err,
-        );
-        showToast(
+        reportFault(
+            ctx,
             'Failed to save AI member',
-            'error',
+            err,
         );
         return;
     }

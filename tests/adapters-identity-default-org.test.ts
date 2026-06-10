@@ -10,7 +10,7 @@ import {
     getIdentityDefaultOrg,
 } from '../web-app/app/adapters/identity-default-org.ts';
 
-const AT = '2026-06-04T00:00:00.000Z';
+const AT = '2026-06-04T00:00:00.000000Z';
 
 async function memberOf(orgs: string[]) {
     const db = new MemoryDbAdapter();

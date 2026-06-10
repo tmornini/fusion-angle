@@ -11,6 +11,7 @@ import {
 import {
     seedAdminSchema,
 } from './test-fixtures.ts';
+import { seedOrgMember } from './root-admin-fixture.ts';
 
 const BASE = 'http://localhost';
 
@@ -94,12 +95,34 @@ test('a logout-everywhere revokes earlier tokens', async () => {
         db, 'identity-token-revocations/r1',
         {
             identity_id: 'current',
-            at: '2021-01-01T00:00:00.000Z',
+            at: '2021-01-01T00:00:00.000000Z',
         },
         await devToken(),
     );
     await assert.rejects(
         () => GET(db, 'members', stale), /revoked/);
+});
+
+test('a token minted within the revocation second is dead',
+async () => {
+    const db = await freshDb();
+    // The revocation is stamped at T.900; the token's iat is
+    // the same whole second. Shared seconds fail closed — the
+    // sub-second remainder must not let the token survive.
+    const revokedAt = '2021-01-01T00:00:00.900000Z';
+    const sameSecond = await mintAccessToken({
+        sub: 'current', roles: [], name: 'Demo',
+        iat: Math.floor(Date.parse(revokedAt) / 1000),
+        ttlSeconds: 10_000_000_000,
+        jti: 'same-second',
+    });
+    await PUT(
+        db, 'identity-token-revocations/r1',
+        { identity_id: 'current', at: revokedAt },
+        await devToken(),
+    );
+    await assert.rejects(
+        () => GET(db, 'members', sameSecond), /revoked/);
 });
 
 test('a token whose jti is revoked in the ledger is denied',
@@ -110,14 +133,41 @@ async () => {
     await db.identityTokens.put('e1', {
         jti: 'dev-current', identity_id: 'current',
         action: 'issued', chain_id: 'c1',
-        parent_jti: '', at: '2026-01-01T00:00:00.000Z',
+        parent_jti: '', at: '2026-01-01T00:00:00.000000Z',
     });
     await db.identityTokens.put('e2', {
         jti: 'dev-current', identity_id: 'current',
         action: 'revoked', chain_id: 'c1',
-        parent_jti: '', at: '2026-02-01T00:00:00.000Z',
+        parent_jti: '', at: '2026-02-01T00:00:00.000000Z',
     });
     await assert.rejects(
         async () => GET(db, 'members', await devToken()),
         /chain revoked/);
+});
+
+test('the snapshot plane closes once a schema exists',
+async () => {
+    const db = await freshDb();   // schema + root admin
+    // No bearer at all → 401 from the gate.
+    const bare = await handleRequest(db, new Request(
+        `${BASE}/snapshots/schema`));
+    assert.equal(bare.status, 401);
+    // An admin still reaches the plane through the gate.
+    const snap = await GET(
+        db, 'snapshots/schema', await devToken());
+    assert.ok(typeof snap === 'string');
+});
+
+test('a member is denied the closed snapshot plane',
+async () => {
+    const db = await freshDb();
+    await seedOrgMember(db, 'walt');
+    const res = await handleRequest(db, new Request(
+        `${BASE}/snapshots/schema`, {
+            headers: {
+                'Authorization':
+                    'Bearer ' + await devToken('walt'),
+            },
+        }));
+    assert.equal(res.status, 403);
 });

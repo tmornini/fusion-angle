@@ -177,6 +177,25 @@ export function sessionContext(): RequestContext {
     );
 }
 
+// All concurrent 401s share ONE recovery: the first failure
+// starts it, the rest await the same promise — a burst of
+// parallel reads over an expired token spends the refresh jti
+// exactly once. A second spend would be branded reuse by the
+// grant, revoking the winner's fresh chain and force-logging
+// the user out. Cleared on settle so the NEXT 401 starts a
+// fresh recovery.
+let recoveryInFlight: Promise<string | null> | null = null;
+
+function sharedRecovery(
+    adapter: DbAdapter,
+): Promise<string | null> {
+    recoveryInFlight ??= recoverSession(adapter)
+        .finally(() => {
+            recoveryInFlight = null;
+        });
+    return recoveryInFlight;
+}
+
 // Wrap one verb call with single-shot 401 recovery. The first
 // attempt runs on the live session token. A non-401 fault
 // surfaces untouched. A 401 drives one refresh + re-scope; the
@@ -193,7 +212,7 @@ async function withAuthRecovery<T>(
         if (!(err instanceof UnauthorizedError)) {
             throw err;
         }
-        const recovered = await recoverSession(adapter);
+        const recovered = await sharedRecovery(adapter);
         if (recovered === null) {
             throw err;   // unrefreshable — already redirected
         }

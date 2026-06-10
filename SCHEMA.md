@@ -17,6 +17,16 @@ below). JSON columns store stringified
 arrays or objects. All columns are NOT NULL — entity
 validation on creation ensures every field is present.
 
+**Timestamp width:** every persisted timestamp is RFC-3339
+zulu at EXACTLY six fraction digits (`…T12:00:00.000000Z`)
+— the one width the mints emit and the append-only ledgers
+sort (lexical = chronological holds only within one width).
+The validation gate rejects any other width, so a snapshot
+exported before this pin that carries 3-digit or
+fractionless stamps fails import loudly; the documented
+recovery is re-seeding (Settings → mock data) or
+re-exporting from a current build.
+
 **Boolean storage:** BOOLEAN columns are typed as `boolean`
 in TypeScript (`api/types.ts`) and persist NATIVELY — there
 is no `0`|`1` transform. The one storage-edge transform is
@@ -34,10 +44,11 @@ event.
 state columns (`status`, `readiness`, `deleted_at`,
 `deprecated_at`, etc. are all retired). Every entity
 lifecycle change is recorded as one row in the unified
-`states` event log. The latest event by `at` (with `>=`
-tiebreak on same-millisecond writes) is the entity's
-current state. `'deleted'` is a state event value, not a
-separate table. `EntityStore.getAll`/`getById` consult
+`states` event log. The latest event by `at` (a same-`at`
+tie falls to the larger row id — one total order on every
+backend) is the entity's current state. `'deleted'` is a
+state event value, not a separate table.
+`EntityStore.getAll`/`getById` consult
 `StateStore.deletedIds()` / `isDeleted(id)` to filter
 currently-deleted rows; `EntityStore.delete(id)` is
 retained for hard splice of relationship rows
@@ -285,10 +296,12 @@ built by us and others. Mutable config of record:
 redirect URIs change, JWKS rotate, a client is
 disabled. `grant_types` and `redirect_uris` are
 space-delimited (OAuth convention); `jwks` is the
-client's JSON Web Key Set as a JSON string, used to
-verify `private_key_jwt` assertions (real JWS verify
-is a server-tier seam); `aud` is the origin a token
-is minted for.
+client's JSON Web Key Set as a JSON string — JWS
+verification of `private_key_jwt` assertions runs for
+real against it (RS256/ES256, `api/client-assertion.ts`;
+jti replay tracking is the remaining server-tier seam);
+`aud` is the audience the client's assertions must
+claim and the origin a token is minted for.
 
 | Column | Type |
 |--------|------|
@@ -383,6 +396,13 @@ stamped on write and filtered on read by the gate.
 | estimated_cost | INTEGER |
 | actual_cost | INTEGER |
 | position | REAL |
+
+`start_date` / `target_end_date` are calendar DATES
+(`YYYY-MM-DD`, gated by `validateCalendarDateField`) —
+zone-neutral day markers, not instants, and the one
+deliberate exception to the RFC-3339-zulu rule: a
+project "starts on June 4" in every timezone; an
+instant would shift the rendered day across zones.
 
 Lifecycle state lives in `states` (alphabet
 `PROJECT_STATES`): `submitted`, `under-review`,
@@ -575,10 +595,13 @@ global.
 | domain | TEXT |
 | next_billing | TEXT |
 | seats | INTEGER |
-| used_seats | INTEGER |
 | projects_limit | INTEGER |
 | ideas_limit | INTEGER |
-| last_activity | TEXT |
+
+Seat usage and last activity are NOT columns: both are
+derived from their ledgers at read time (distinct
+identities in `memberships`; max `states.at`) — a stored
+aggregate would be a second truth kept in sync by nothing.
 
 ### memberships
 
@@ -615,8 +638,8 @@ organization, awaiting the holder's answer. Immutable like a
 `memberships` row — all columns NOT NULL — but its lifecycle
 lives in the `states` log (alphabet `INVITATION_STATES`), not
 a `status` column. The current state is the latest event on
-the invitation `id` (the same `>=` same-millisecond tiebreak
-as every entity), derived, never mutated.
+the invitation `id` (the same `(at, id)` tiebreak as every
+entity), derived, never mutated.
 
 Global-spine (pass-through), NOT org-fenced: the invitee must
 read an invitation to an org they are not yet a member of, so
@@ -753,9 +776,9 @@ lifecycle change in the system. One row, one fact.
 | member_id | TEXT | FK → members (actor) |
 | at | TEXT | RFC-3339 Zulu — moment of the event |
 
-The latest event on `entity_id` by `at` (with `>=`
-tiebreak on same-millisecond writes — the deterministic
-order the append-only log captures) is the entity's
+The latest event on `entity_id` by `at` (a same-`at` tie
+falls to the larger row id — a total order identical on
+every backend and row permutation) is the entity's
 current state. Reversal is a *new* event, not an edit of
 the prior row.
 

@@ -32,7 +32,7 @@ test(
                     entity_id: 'e1',
                     state: 'deleted',
                     member_id: 'm1',
-                    at: '2026-01-01T00:00:00.000Z',
+                    at: '2026-01-01T00:00:00.000000Z',
                 });
                 return states.deletedIdsIn(tx);
             },
@@ -53,14 +53,14 @@ test(
                     entity_id: 'e1',
                     state: 'active',
                     member_id: 'm1',
-                    at: '2026-01-01T00:00:00.000Z',
+                    at: '2026-01-01T00:00:00.000000Z',
                 });
                 await tx.put('states', {
                     id: 's2',
                     entity_id: 'e1',
                     state: 'deleted',
                     member_id: 'm1',
-                    at: '2026-01-02T00:00:00.000Z',
+                    at: '2026-01-02T00:00:00.000000Z',
                 });
                 return states.isDeletedIn(tx, 'e1');
             },
@@ -77,13 +77,13 @@ test(
             entity_id: 'e1',
             state: 'a',
             member_id: 'm1',
-            at: '2026-01-01T00:00:00.000Z',
+            at: '2026-01-01T00:00:00.000000Z',
         });
         await states.put('s2', {
             entity_id: 'e1',
             state: 'b',
             member_id: 'm1',
-            at: '2026-01-03T00:00:00.000Z',
+            at: '2026-01-03T00:00:00.000000Z',
         });
         const current = await backend.transaction(
             ['states'], 'readonly',
@@ -102,19 +102,19 @@ test(
             entity_id: 'e1',
             state: 'b',
             member_id: 'm1',
-            at: '2026-01-02T00:00:00.000Z',
+            at: '2026-01-02T00:00:00.000000Z',
         });
         await states.put('s2', {
             entity_id: 'e2',
             state: 'x',
             member_id: 'm1',
-            at: '2026-01-01T00:00:00.000Z',
+            at: '2026-01-01T00:00:00.000000Z',
         });
         await states.put('s3', {
             entity_id: 'e1',
             state: 'a',
             member_id: 'm1',
-            at: '2026-01-01T00:00:00.000Z',
+            at: '2026-01-01T00:00:00.000000Z',
         });
         const events = await backend.transaction(
             ['states'], 'readonly',
@@ -126,33 +126,33 @@ test(
     },
 );
 
-// Golden tiebreak characterization. The two readers split
-// on a same-`at` tie ON PURPOSE: currentForIn keeps the
-// FIRST-appended row (strict `>`), isDeletedIn takes the
-// LAST-appended (default `>=`). These pin that split so a
-// data-source rewrite stays byte-identical.
+// Tiebreak agreement. Every reader resolves a same-`at` tie
+// by the SAME (at, id) total order — larger id wins — so
+// list filtering (deletedIdsIn), lifecycle checks
+// (isDeletedIn), and currentForIn can never contradict each
+// other on any backend or row permutation.
 
 test(
-    'currentForIn keeps the first-appended row on an at tie',
+    'currentForIn keeps the larger-id row on an at tie',
     async () => {
         const { backend, states } = await statesStore();
         await states.put('s1', {
             entity_id: 'e1',
             state: 'a',
             member_id: 'm1',
-            at: '2026-01-01T00:00:00.000Z',
+            at: '2026-01-01T00:00:00.000000Z',
         });
         await states.put('s2', {
             entity_id: 'e1',
             state: 'b',
             member_id: 'm1',
-            at: '2026-01-01T00:00:00.000Z',
+            at: '2026-01-01T00:00:00.000000Z',
         });
         const current = await backend.transaction(
             ['states'], 'readonly',
             tx => states.currentForIn(tx, 'e1'),
         );
-        assert.equal(current!.state, 'a');
+        assert.equal(current!.state, 'b');
     },
 );
 
@@ -164,25 +164,55 @@ test(
             entity_id: 'e1',
             state: 'a',
             member_id: 'm1',
-            at: '2026-01-01T00:00:00.000Z',
+            at: '2026-01-01T00:00:00.000000Z',
         });
-        await states.put('s2', {
+        await states.put('s9', {
             entity_id: 'e2',
             state: 'x',
             member_id: 'm1',
-            at: '2026-01-01T00:00:00.000Z',
+            at: '2026-01-01T00:00:00.000000Z',
         });
         await states.put('s3', {
             entity_id: 'e1',
             state: 'b',
             member_id: 'm1',
-            at: '2026-01-01T00:00:00.000Z',
+            at: '2026-01-01T00:00:00.000000Z',
         });
         const current = await backend.transaction(
             ['states'], 'readonly',
             tx => states.currentForIn(tx, 'e1'),
         );
-        assert.equal(current!.state, 'a');
+        assert.equal(current!.state, 'b');
+    },
+);
+
+test(
+    'currentForIn and isDeletedIn agree on a co-at pair',
+    async () => {
+        const { backend, states } = await statesStore();
+        await states.put('s1', {
+            entity_id: 'e1',
+            state: 'deleted',
+            member_id: 'm1',
+            at: '2026-01-01T00:00:00.000000Z',
+        });
+        await states.put('s2', {
+            entity_id: 'e1',
+            state: 'active',
+            member_id: 'm1',
+            at: '2026-01-01T00:00:00.000000Z',
+        });
+        const [current, deleted] =
+            await backend.transaction(
+                ['states'], 'readonly',
+                async (tx) => [
+                    await states.currentForIn(tx, 'e1'),
+                    await states.isDeletedIn(tx, 'e1'),
+                ] as const,
+            );
+        assert.equal(
+            current!.state === 'deleted', deleted,
+        );
     },
 );
 
@@ -194,7 +224,7 @@ test(
             entity_id: 'e1',
             state: 'a',
             member_id: 'm1',
-            at: '2026-01-01T00:00:00.000Z',
+            at: '2026-01-01T00:00:00.000000Z',
         });
         const current = await backend.transaction(
             ['states'], 'readonly',
@@ -205,20 +235,20 @@ test(
 );
 
 test(
-    'isDeletedIn takes the last-appended row on an at tie',
+    'isDeletedIn takes the larger-id row on an at tie',
     async () => {
         const { backend, states } = await statesStore();
         await states.put('s1', {
             entity_id: 'e1',
             state: 'active',
             member_id: 'm1',
-            at: '2026-01-01T00:00:00.000Z',
+            at: '2026-01-01T00:00:00.000000Z',
         });
         await states.put('s2', {
             entity_id: 'e1',
             state: 'deleted',
             member_id: 'm1',
-            at: '2026-01-01T00:00:00.000Z',
+            at: '2026-01-01T00:00:00.000000Z',
         });
         const deleted = await backend.transaction(
             ['states'], 'readonly',
@@ -229,20 +259,20 @@ test(
 );
 
 test(
-    'isDeletedIn lets a co-at undelete win when last',
+    'isDeletedIn lets a co-at undelete win on larger id',
     async () => {
         const { backend, states } = await statesStore();
         await states.put('s1', {
             entity_id: 'e1',
             state: 'deleted',
             member_id: 'm1',
-            at: '2026-01-01T00:00:00.000Z',
+            at: '2026-01-01T00:00:00.000000Z',
         });
         await states.put('s2', {
             entity_id: 'e1',
             state: 'active',
             member_id: 'm1',
-            at: '2026-01-01T00:00:00.000Z',
+            at: '2026-01-01T00:00:00.000000Z',
         });
         const deleted = await backend.transaction(
             ['states'], 'readonly',
@@ -260,13 +290,13 @@ test(
             entity_id: 'e1',
             state: 'deleted',
             member_id: 'm1',
-            at: '2026-01-01T00:00:00.000Z',
+            at: '2026-01-01T00:00:00.000000Z',
         });
         await states.put('s2', {
             entity_id: 'e1',
             state: 'active',
             member_id: 'm1',
-            at: '2026-01-02T00:00:00.000Z',
+            at: '2026-01-02T00:00:00.000000Z',
         });
         const deleted = await backend.transaction(
             ['states'], 'readonly',

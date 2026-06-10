@@ -23,8 +23,8 @@ import {
     type WorkOrderFlowGraph,
 } from '../api/types.ts';
 
-const AT_CREATED = '2026-05-01T10:00:00.000Z';
-const AT_FIRST = '2026-05-01T11:00:00.000Z';
+const AT_CREATED = '2026-05-01T10:00:00.000000Z';
+const AT_FIRST = '2026-05-01T11:00:00.000000Z';
 
 async function seedSystemMember(
     db: MemoryDbAdapter,

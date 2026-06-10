@@ -21,6 +21,9 @@ import {
 import {
     getCurrentHumanMember,
 } from './members.ts';
+import {
+    isClaimState,
+} from '../../../api/work-order-claims.ts';
 
 // Constructs a single PUT op against the states table —
 // the atomic seam between an entity-lifecycle adapter and
@@ -47,24 +50,6 @@ export async function buildStateEventOp(
             at: nowUtc(),
         },
     };
-}
-
-// The closed claim vocabulary. Three strings: a claim
-// either exists ('claimed'), is voluntarily relinquished
-// ('claim_released'), or is forcibly superseded by a
-// newer claim ('claim_expired'). Every other state
-// string on a work_order entity_id is a node id
-// recording a transition. The byte-level split between
-// the two families is unambiguous: claim strings are
-// snake-cased English, node ids are base62 tokens.
-const CLAIM_STATES = new Set([
-    'claimed',
-    'claim_released',
-    'claim_expired',
-]);
-
-function isClaimState(state: string): boolean {
-    return CLAIM_STATES.has(state);
 }
 
 // The states log is shared across entity types and the

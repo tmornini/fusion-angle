@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import {
     GET, PUT, POST,
+    RequestError,
     handleRequest,
 } from '../api/api.ts';
 import {
@@ -65,6 +66,30 @@ test('PUT then GET round-trips an entity', async () => {
         );
     assert.equal(fetched.title, 'Test');
 });
+
+test(
+    'PUT states/:id rewrite of an event is 409',
+    async () => {
+        const db = await freshDb();
+        const event = {
+            entity_id: 'e1',
+            state: 'active',
+            member_id: 'w1',
+            at: '2026-01-01T00:00:00.000000Z',
+        };
+        await PUT(db, 'states/s1', event, DEV_TOKEN);
+        await assert.rejects(
+            () => PUT(db, 'states/s1', {
+                ...event,
+                state: 'deleted',
+            }, DEV_TOKEN),
+            (err: unknown) =>
+                err instanceof RequestError
+                && err.status === 409
+                && /append-only/.test(err.message),
+        );
+    },
+);
 
 test('GET ideas/ normalizes to collection', async () => {
     const db = await freshDb();
@@ -206,6 +231,8 @@ test(
                     headers: {
                         'Content-Type':
                             'application/json',
+                        'Authorization':
+                            'Bearer ' + DEV_TOKEN,
                     },
                     body: '{not valid json',
                 },
@@ -218,5 +245,71 @@ test(
             };
         assert.match(error, /Invalid JSON body/);
         assert.match(error, /POST/);
+    },
+);
+
+test(
+    'the 500 fallback body never carries fault detail',
+    async () => {
+        const db = await freshDb();
+        (db.ideas as unknown as {
+            getAllWhere: () => Promise<never>;
+        }).getAllWhere = async () => {
+            throw new Error('secret fault detail');
+        };
+        const response = await handleRequest(
+            db,
+            new Request('http://localhost/ideas', {
+                headers: {
+                    'Authorization':
+                        'Bearer ' + DEV_TOKEN,
+                },
+            }),
+        );
+        assert.equal(response.status, 500);
+        const { error } =
+            (await response.json()) as {
+                error: string;
+            };
+        assert.equal(error, 'internal error');
+    },
+);
+
+test(
+    'PUT with valid-JSON non-object bodies is 400'
+    + ' Bad Request, not 500',
+    async () => {
+        const db = await freshDb();
+        for (const raw of [
+            'null', '42', '"text"', '[1,2,3]',
+        ]) {
+            const response = await handleRequest(
+                db,
+                new Request(
+                    'http://localhost/ideas/i1',
+                    {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type':
+                                'application/json',
+                            'Authorization':
+                                'Bearer ' + DEV_TOKEN,
+                        },
+                        body: raw,
+                    },
+                ),
+            );
+            assert.equal(
+                response.status, 400,
+                'body ' + raw,
+            );
+            const { error } =
+                (await response.json()) as {
+                    error: string;
+                };
+            assert.match(
+                error, /Invalid JSON body/,
+            );
+        }
     },
 );

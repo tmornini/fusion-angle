@@ -43,6 +43,28 @@ export function postTablesChanged(
     getChannel()?.postMessage(message);
 }
 
+// The wire shape is another tab's dharma — validate it at
+// this adapter before any subscriber trusts it. A malformed
+// message is a bug in the poster; crash loudly rather than
+// hand subscribers a corrupt table list.
+export function tablesFromMessage(
+    data: unknown,
+): readonly string[] {
+    if (typeof data === 'object' && data !== null) {
+        const { tables } = data as { tables?: unknown };
+        if (
+            Array.isArray(tables)
+            && tables.every(t => typeof t === 'string')
+        ) {
+            return tables;
+        }
+    }
+    throw new Error(
+        'malformed cross-tab tables message: '
+        + JSON.stringify(data),
+    );
+}
+
 // Subscribe to cross-tab table-change announcements; returns
 // an unsubscribe function.
 export function subscribeTablesChanged(
@@ -51,8 +73,7 @@ export function subscribeTablesChanged(
     const ch = getChannel();
     if (ch === undefined) return () => {};
     const listener = (event: MessageEvent): void => {
-        const message = event.data as TablesMessage;
-        handler(message.tables);
+        handler(tablesFromMessage(event.data));
     };
     return subscribeEventListener(ch, 'message', listener);
 }

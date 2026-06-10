@@ -24,7 +24,7 @@ async function revokedDb(): Promise<MemoryDbAdapter> {
     await db.createSchema();
     await db.memberships.put('m', {
         organization_id: 'A', identity_id: 'u1',
-        at: '2020-01-01T00:00:00.000Z',
+        at: '2020-01-01T00:00:00.000000Z',
     });
     // logout-everywhere as of now: every u1 token minted
     // before this stamp is dead.
@@ -55,7 +55,7 @@ async () => {
     // so only the actor-revocation check can reject.
     await db.memberships.put('m2', {
         organization_id: 'A', identity_id: 'u2',
-        at: '2020-01-01T00:00:00.000Z',
+        at: '2020-01-01T00:00:00.000000Z',
     });
     const subject = await tokenFor('u2');
     const actor = await tokenFor('u1');
@@ -83,15 +83,15 @@ test('refresh on a logged-out but live jti is the'
     const db = await revokedDb();
     // A LIVE issued jti in the ledger: without the
     // logout-everywhere stamp this would rotate cleanly, so
-    // the ONLY thing that can reject it is the iat<revokedBefore
+    // the ONLY thing that can reject it is the revoked-through
     // branch — pinning that branch, not the reuse path.
     await db.identityTokens.put('t-live', {
         jti: 'live-jti', identity_id: 'u1',
         action: 'issued', chain_id: 'c1', parent_jti: '',
-        at: '2019-01-01T00:00:00.000Z',
+        at: '2019-01-01T00:00:00.000000Z',
     });
     const iat = Math.floor(
-        Date.parse('2019-01-01T00:00:00.000Z') / 1000);
+        Date.parse('2019-01-01T00:00:00.000000Z') / 1000);
     const token = await mintAccessToken({
         sub: 'u1', roles: [], name: 'X',
         iat, ttlSeconds: 10_000_000_000, jti: 'live-jti',

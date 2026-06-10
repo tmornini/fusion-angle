@@ -1,5 +1,5 @@
 import {
-    $, isFormField,
+    $required, isFormField,
 } from '../app/dom.ts';
 import {
     IdeaPresenter,
@@ -14,7 +14,7 @@ import {
     createPageAbort,
     bindPageListeners,
 } from '../app/page-lifecycle.ts';
-import { extractErrorMessage } from '../app/error-helpers.ts';
+import { reportFault } from '../app/error-helpers.ts';
 import { log } from '../app/logger.ts';
 import {
     buildSkeleton,
@@ -111,15 +111,7 @@ async function transitionIdea(
             ctx, ideaId, toState,
         );
     } catch (err) {
-        const detail = extractErrorMessage(err);
-        log.error(
-            'postIdeaStateChange failed',
-            'ideas', err,
-        );
-        showToast(
-            `${cfg.failureToast}: ${detail}`,
-            'error',
-        );
+        reportFault(ctx, cfg.failureToast, err);
         return;
     }
     showToast(
@@ -166,10 +158,9 @@ export async function init(
         return;
     }
 
-    const container = $(
+    const container = $required(
         '#idea-detail-content', document,
     );
-    if (!container) return;
     pageContainer = container;
 
     const ctx = sessionContext();

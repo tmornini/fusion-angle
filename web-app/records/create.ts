@@ -55,19 +55,11 @@ async function handleSubmit(): Promise<void> {
         existing.map(r => r.position),
     );
     const id = generateCryptoSafeBase62();
-    try {
-        await postRecordChange(ctx, id, {
-            kind: 'create',
-            record: { name, description, position },
-            attributes: [],
-            initialState: 'active',
-        });
-    } catch (err) {
-        showToast(
-            'Failed to create Record',
-            'error',
-        );
-        return;
-    }
+    await postRecordChange(ctx, id, {
+        kind: 'create',
+        record: { name, description, position },
+        attributes: [],
+        initialState: 'active',
+    });
     navigateTo('record-detail', { id });
 }

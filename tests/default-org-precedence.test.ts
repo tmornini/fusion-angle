@@ -3,8 +3,8 @@ import { strict as assert } from 'node:assert';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import { identityDefaultOrg } from '../api/authentication.ts';
 
-const T1 = '2026-01-01T00:00:00.000Z';
-const T2 = '2026-02-01T00:00:00.000Z';
+const T1 = '2026-01-01T00:00:00.000000Z';
+const T2 = '2026-02-01T00:00:00.000000Z';
 
 async function freshDb() {
     const db = new MemoryDbAdapter();

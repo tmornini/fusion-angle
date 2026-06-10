@@ -49,7 +49,7 @@ export interface RecordWithCounts {
 }
 
 const recordChanges = createSubscriptionChannel(
-    ['records', 'record-attributes', 'states'],
+    ['records', 'record_attributes', 'states'],
 );
 
 export function subscribeRecordChanges(

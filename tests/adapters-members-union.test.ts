@@ -203,7 +203,7 @@ test(
         await db.memberships.put('mb-member_without_pii', {
             organization_id: '1',
             identity_id: 'member_without_pii',
-            at: '2020-01-01T00:00:00.000Z',
+            at: '2020-01-01T00:00:00.000000Z',
         });
         await db.states.record(
             'st-member_without_pii', 'member_without_pii',

@@ -18,14 +18,16 @@ import {
 import {
     createSubscriptionChannel,
 } from '../channels.ts';
-import type { RequestContext } from './shared.ts';
+import type {
+    RequestContext, WriteOp,
+} from './shared.ts';
 
 const flowChanges =
     createSubscriptionChannel(
         [
             'flows',
-            'flow-versions',
-            'project-flows',
+            'flow_versions',
+            'project_flows',
         ],
     );
 
@@ -114,11 +116,14 @@ export interface FlowSaveShape {
     edges: GraphEdge[];
 }
 
-export async function putFlow(
+// The PUT-flow write pair — the row PUT plus its 'updated'
+// state event — as batch ops, so a caller can land them
+// atomically beside sibling ops in ONE ctx.commit.
+export async function putFlowOps(
     ctx: RequestContext,
     id: string,
     save: FlowSaveShape,
-): Promise<void> {
+): Promise<WriteOp[]> {
     const entity: Omit<
         FlowEntity, 'id' | 'organization_id'
     > = {
@@ -138,17 +143,25 @@ export async function putFlow(
         entity as unknown as Record<
             string, unknown
         >;
+    return [
+        {
+            method: 'put',
+            resource: `flows/${id}`,
+            body,
+        },
+        await buildStateEventOp(
+            ctx, id, 'updated',
+        ),
+    ];
+}
+
+export async function putFlow(
+    ctx: RequestContext,
+    id: string,
+    save: FlowSaveShape,
+): Promise<void> {
     await ctx.commit({
-        ops: [
-            {
-                method: 'put',
-                resource: `flows/${id}`,
-                body,
-            },
-            await buildStateEventOp(
-                ctx, id, 'updated',
-            ),
-        ],
+        ops: await putFlowOps(ctx, id, save),
     });
     flowChanges.notify();
 }

@@ -6,7 +6,7 @@ import {
     principalFromToken,
     decodeAccessToken,
     latestRevocationAt,
-    revokedBeforeSeconds,
+    revokedThroughSeconds,
     ANONYMOUS_PRINCIPAL,
 } from '../api/access-token.ts';
 import { base64UrlEncode } from '../api/base64url.ts';
@@ -195,37 +195,50 @@ test('decodeAccessToken rejects non-string orgs elements',
     );
 });
 
+test('decodeAccessToken rejects non-string roles elements',
+() => {
+    const body = base64UrlEncode(JSON.stringify({
+        sub: 'current', roles: ['admin', 7], name: 'Demo',
+        aud: 'fusion-ai-web', iat: 1_700_000_000,
+        nbf: 1_700_000_000, exp: 9_999_999_999, jti: 'x',
+    }));
+    assert.throws(
+        () => decodeAccessToken('h.' + body + '.s'),
+        /bad claim shape/,
+    );
+});
+
 test('exposes a named anonymous principal', () => {
     assert.equal(ANONYMOUS_PRINCIPAL.id, 'anonymous');
 });
 
 test('latestRevocationAt returns the most recent stamp', () => {
     const rows = [
-        { identity_id: 'a', at: '2021-01-01T00:00:00.000Z' },
-        { identity_id: 'a', at: '2023-06-01T00:00:00.000Z' },
-        { identity_id: 'a', at: '2022-01-01T00:00:00.000Z' },
+        { identity_id: 'a', at: '2021-01-01T00:00:00.000000Z' },
+        { identity_id: 'a', at: '2023-06-01T00:00:00.000000Z' },
+        { identity_id: 'a', at: '2022-01-01T00:00:00.000000Z' },
     ];
     assert.equal(
         latestRevocationAt(rows, 'a'),
-        '2023-06-01T00:00:00.000Z',
+        '2023-06-01T00:00:00.000000Z',
     );
 });
 
 test('latestRevocationAt isolates identities; null when none', () => {
     const rows = [
-        { identity_id: 'a', at: '2023-06-01T00:00:00.000Z' },
+        { identity_id: 'a', at: '2023-06-01T00:00:00.000000Z' },
     ];
     assert.equal(latestRevocationAt(rows, 'b'), null);
 });
 
-test('revokedBeforeSeconds converts the latest stamp', () => {
+test('revokedThroughSeconds converts the latest stamp', () => {
     const rows = [
-        { identity_id: 'a', at: '2021-01-01T00:00:00.000Z' },
-        { identity_id: 'a', at: '2023-06-01T00:00:00.000Z' },
+        { identity_id: 'a', at: '2021-01-01T00:00:00.000000Z' },
+        { identity_id: 'a', at: '2023-06-01T00:00:00.000000Z' },
     ];
     assert.equal(
-        revokedBeforeSeconds(rows, 'a'),
+        revokedThroughSeconds(rows, 'a'),
         Math.floor(
-            Date.parse('2023-06-01T00:00:00.000Z') / 1000),
+            Date.parse('2023-06-01T00:00:00.000000Z') / 1000),
     );
 });

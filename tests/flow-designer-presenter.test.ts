@@ -19,7 +19,7 @@ const emptyGraph = {
     isAutoLayout: false,
     isAutoFit: false,
     lockTimeout: 0,
-    createdAt: '2026-05-01T00:00:00.000Z',
+    createdAt: '2026-05-01T00:00:00.000000Z',
     nodes: [],
     edges: [],
 };

@@ -47,7 +47,7 @@ const PENDING = {
     organizationId: '2',
     organizationName: 'Wayne Enterprises',
     invitedByName: 'Tony Stark',
-    invitedAt: '2026-01-01T00:00:00.000Z',
+    invitedAt: '2026-01-01T00:00:00.000000Z',
     state: 'pending' as const,
 };
 
@@ -91,7 +91,7 @@ test('a sent invitation shows the invitee email and Revoke',
             organizationId: '2',
             identityId: 'sarah',
             inviteeEmail: 'sarah@x.com',
-            invitedAt: '2026-01-01T00:00:00.000Z',
+            invitedAt: '2026-01-01T00:00:00.000000Z',
             state: 'pending' as const,
         },
     ]).render(rec.container);

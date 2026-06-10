@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import {
     createChannel,
+    createSubscriptionChannel,
 } from '../web-app/app/channels.ts';
 
 test('subscribe receives subsequent send', () => {
@@ -55,4 +56,25 @@ test('unsubscribe is idempotent', () => {
 test('send with no subscribers is a no-op', () => {
     const ch = createChannel<number>();
     ch.send(1);
+});
+
+test('a watch on an unknown table name throws at creation',
+() => {
+    // the bell posts snake_case store names; a kebab-case
+    // API-resource name could never match — crash, don't
+    // subscribe to silence
+    assert.throws(
+        () => createSubscriptionChannel(['work-orders']),
+        /unknown table in cross-tab watch: work-orders/,
+    );
+});
+
+test('a watch on canonical table names is accepted', () => {
+    const ch = createSubscriptionChannel(
+        ['work_orders', 'states'],
+    );
+    let fired = 0;
+    ch.subscribe(() => { fired += 1; });
+    ch.notify();
+    assert.equal(fired, 1);
 });

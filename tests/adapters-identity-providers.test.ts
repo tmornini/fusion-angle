@@ -28,7 +28,7 @@ const goodRow = {
     provider: 'google',
     provider_subject: 'sub-123',
     action: 'linked',
-    at: '2026-06-03T00:00:00.000Z',
+    at: '2026-06-03T00:00:00.000000Z',
 };
 
 test('validates an identity-provider link', () => {
@@ -56,7 +56,7 @@ test('identity_providers store retains events', async () => {
     await db.identityProviders.put('p1', goodRow);
     await db.identityProviders.put('p2', {
         ...goodRow, action: 'unlinked',
-        at: '2026-07-01T00:00:00.000Z',
+        at: '2026-07-01T00:00:00.000000Z',
     });
     assert.equal(
         (await db.identityProviders.getAll()).length, 2);
@@ -95,11 +95,11 @@ async () => {
     // array-order "last wins" would wrongly drop it.
     await db.identityProviders.put('pl', {
         ...goodRow, identity_id: 'p2', action: 'linked',
-        at: '2026-02-01T00:00:00.000Z',
+        at: '2026-02-01T00:00:00.000000Z',
     });
     await db.identityProviders.put('pe', {
         ...goodRow, identity_id: 'p2', action: 'unlinked',
-        at: '2026-01-01T00:00:00.000Z',
+        at: '2026-01-01T00:00:00.000000Z',
     });
     assert.deepEqual(
         await getProvidersFor(ctx, 'p2'), ['google']);

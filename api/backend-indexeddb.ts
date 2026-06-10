@@ -85,8 +85,17 @@ function indexedDbTx(
     const store = (table: string): IDBObjectStore => {
         try {
             return idbTransaction.objectStore(table);
-        } catch {
-            throw new MissingTableError(table);
+        } catch (err) {
+            // Only a missing store is the boot-recovery
+            // signal; anything else (a use-after-commit
+            // InvalidStateError) is a bug and must surface.
+            if (
+                err instanceof DOMException
+                && err.name === 'NotFoundError'
+            ) {
+                throw new MissingTableError(table);
+            }
+            throw err;
         }
     };
     const assertWritable = (): void => {

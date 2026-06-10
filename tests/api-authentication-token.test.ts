@@ -4,6 +4,9 @@ import { MemoryDbAdapter } from '../api/db-memory.ts';
 import { GET, handleRequest } from '../api/api.ts';
 import { seedRootAdmin } from './root-admin-fixture.ts';
 import { devToken } from './token-fixtures.ts';
+import {
+    makeAssertionSigner,
+} from './client-assertion-fixtures.ts';
 import { decodeAccessToken } from '../api/access-token.ts';
 
 const BASE = 'http://localhost';
@@ -11,7 +14,7 @@ const BASE = 'http://localhost';
 const issuedCode = {
     code: 'the-code', identity_id: 'current',
     client_id: 'web', status: 'issued',
-    at: '2026-06-03T00:00:00.000Z',
+    at: '2026-06-03T00:00:00.000000Z',
 };
 
 async function freshDb() {
@@ -190,16 +193,35 @@ async () => {
     const res = await handleRequest(db, tokenRequest({
         grant_type: 'token-exchange',
         subject_token: await devToken('current'),
-        actor_token: await devToken('agent-7'),
+        actor_token: await devToken('current'),
     }));
     assert.equal(res.status, 200);
     const body = await res.json() as { access_token: string };
     const claims = decodeAccessToken(body.access_token);
     assert.equal(claims.sub, 'current');
-    assert.equal(claims.act?.sub, 'agent-7');
+    assert.equal(claims.act?.sub, 'current');
     // the delegated token passes the gate (current = admin)
     assert.ok(Array.isArray(
         await GET(db, 'members', body.access_token)));
+});
+
+test('token-exchange denies cross-party delegation',
+async () => {
+    const db = await freshDb();
+    await seedRootAdmin(db);
+    const before =
+        (await db.identityTokens.getAll()).length;
+    const res = await handleRequest(db, tokenRequest({
+        grant_type: 'token-exchange',
+        subject_token: await devToken('current'),
+        actor_token: await devToken('agent-7'),
+    }));
+    assert.equal(res.status, 403);
+    const body = await res.json() as { error: string };
+    assert.match(body.error, /self-delegation/);
+    // grant-first: a denied exchange mints nothing
+    assert.equal(
+        (await db.identityTokens.getAll()).length, before);
 });
 
 test('token-exchange rejects unverifiable tokens with 401',
@@ -222,7 +244,7 @@ async () => {
     await db.memberships.put('m-current', {
         organization_id: '1',
         identity_id: 'current',
-        at: '2026-06-04T00:00:00.000Z',
+        at: '2026-06-04T00:00:00.000000Z',
     });
     const res = await handleRequest(db, tokenRequest({
         grant_type: 'token-exchange',
@@ -244,7 +266,7 @@ async () => {
     await db.memberships.put('m-current', {
         organization_id: '1',
         identity_id: 'current',
-        at: '2026-06-04T00:00:00.000Z',
+        at: '2026-06-04T00:00:00.000000Z',
     });
     const before =
         (await db.identityTokens.getAll()).length;
@@ -266,7 +288,7 @@ async () => {
     await db.memberships.put('m-current', {
         organization_id: '1',
         identity_id: 'current',
-        at: '2026-06-04T00:00:00.000Z',
+        at: '2026-06-04T00:00:00.000000Z',
     });
     const res = await handleRequest(db, tokenRequest({
         grant_type: 'token-exchange',
@@ -286,6 +308,22 @@ const activeClient = {
     aud: 'fusion-ai-web', status: 'active',
 };
 
+// A really-signed assertion: fresh in-test key pair, public
+// JWKS registered on the client row, RFC 7523 claims.
+async function signedClientSetup() {
+    const signer = await makeAssertionSigner('ES256');
+    const now = Math.floor(Date.now() / 1000);
+    const assertion = await signer.sign({
+        iss: 'svc-client', sub: 'svc-client',
+        aud: 'fusion-ai-web',
+        exp: now + 300, iat: now, jti: 'assert-1',
+    });
+    return {
+        client: { ...activeClient, jwks: signer.jwks },
+        assertion,
+    };
+}
+
 test('client_credentials issues a gate-valid token', async () => {
     const db = await freshDb();
     // the service principal (client id) holds an admin role
@@ -293,23 +331,49 @@ test('client_credentials issues a gate-valid token', async () => {
         organization_id: '1',
         identity_id: 'svc-client', role: 'admin',
         action: 'granted', by_member_id: 'system',
-        at: '2020-01-01T00:00:00.000Z',
+        at: '2020-01-01T00:00:00.000000Z',
     });
     await db.memberships.put('m-svc', {
         organization_id: '1',
         identity_id: 'svc-client',
-        at: '2020-01-01T00:00:00.000Z',
+        at: '2020-01-01T00:00:00.000000Z',
     });
-    await db.clients.put('svc-client', activeClient);
+    const { client, assertion } =
+        await signedClientSetup();
+    await db.clients.put('svc-client', client);
     const res = await handleRequest(db, tokenRequest({
         grant_type: 'client_credentials',
         client_id: 'svc-client',
-        client_assertion: 'aaa.bbb.ccc',
+        client_assertion: assertion,
     }));
     assert.equal(res.status, 200);
     const body = await res.json() as { access_token: string };
     assert.ok(Array.isArray(
         await GET(db, 'members', body.access_token)));
+});
+
+test('client_credentials refuses an unsigned assertion',
+async () => {
+    const db = await freshDb();
+    const { client } = await signedClientSetup();
+    await db.clients.put('svc-client', client);
+    // Well-formed JWT shape, right claims, NO valid
+    // signature from the registered key.
+    const impostor = await makeAssertionSigner('ES256');
+    const now = Math.floor(Date.now() / 1000);
+    const forged = await impostor.sign({
+        iss: 'svc-client', sub: 'svc-client',
+        aud: 'fusion-ai-web',
+        exp: now + 300, iat: now, jti: 'assert-2',
+    });
+    const res = await handleRequest(db, tokenRequest({
+        grant_type: 'client_credentials',
+        client_id: 'svc-client',
+        client_assertion: forged,
+    }));
+    assert.equal(res.status, 401);
+    const body = await res.json() as { error: string };
+    assert.match(body.error, /invalid client_assertion/);
 });
 
 test('client_credentials with a malformed assertion is 401',
@@ -332,4 +396,22 @@ async () => {
         client_id: 'ghost', client_assertion: 'a.b.c',
     }));
     assert.equal(res.status, 401);
+});
+
+test('a clients store fault is a 500, never 401',
+async () => {
+    const db = await freshDb();
+    // Only EntityNotFound means 'unknown client'; any other
+    // fault is a bug and must surface, not wear a 401 mask.
+    (db.clients as unknown as {
+        getById: () => Promise<never>;
+    }).getById = async () => {
+        throw new Error('store exploded');
+    };
+    const res = await handleRequest(db, tokenRequest({
+        grant_type: 'client_credentials',
+        client_id: 'svc-client',
+        client_assertion: 'a.b.c',
+    }));
+    assert.equal(res.status, 500);
 });

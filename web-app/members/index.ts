@@ -1,5 +1,6 @@
 import {
-    $, $input, $select, $textarea,
+    $, $input, $inputRequired, $required,
+    $select, $textarea,
     populateIcons,
 } from '../app/dom.ts';
 import {
@@ -7,7 +8,10 @@ import {
 } from '../app/safe-html.ts';
 import { showToast } from '../app/toast.ts';
 import { createPageAbort } from '../app/page-lifecycle.ts';
-import { extractErrorMessage } from '../app/error-helpers.ts';
+import {
+    extractErrorMessage,
+    reportFault,
+} from '../app/error-helpers.ts';
 import {
     buildSkeleton, withLoadingState,
 } from '../app/loading-states.ts';
@@ -53,8 +57,9 @@ let membersState:
 let memberListEl: HTMLElement | null = null;
 
 export async function init(): Promise<void> {
-    const memberList = $('#member-list', document);
-    if (!memberList) return;
+    const memberList = $required(
+        '#member-list', document,
+    );
 
     populateIcons([
         ['#add-member-btn-icon', iconPersonPlus(16, '')],
@@ -135,8 +140,8 @@ function rerenderMembers(): void {
 }
 
 function initMemberListFilters(): void {
-    $input('#member-search', document)
-        ?.addEventListener(
+    $inputRequired('#member-search', document)
+        .addEventListener(
             'input', onSearchInput,
             { signal },
         );
@@ -218,8 +223,8 @@ function bindAddMemberDialog(): void {
             { signal },
         );
     });
-    $('#add-member-dialog', document)
-        ?.addEventListener(
+    $required('#add-member-dialog', document)
+        .addEventListener(
             'keydown', onDialogKeydown,
             { signal },
         );
@@ -233,7 +238,8 @@ function bindInviteMemberDialog(): void {
     );
     // Clear a stale field error when the dialog reopens, so a
     // prior rejection does not greet the next invite.
-    $('#invite-member-btn', document)?.addEventListener(
+    $required('#invite-member-btn', document)
+        .addEventListener(
         'click',
         () => {
             const input = $input('#invite-email', document);
@@ -386,9 +392,10 @@ async function submitHumanForm(): Promise<void> {
         '#hw-bio', document,
     )!.value;
     const id = generateCryptoSafeBase62();
+    const ctx = sessionContext();
     try {
         await postHumanMemberCreation(
-            sessionContext(),
+            ctx,
             id,
             trimStrings({
                 name,
@@ -412,14 +419,8 @@ async function submitHumanForm(): Promise<void> {
             'active',
         );
     } catch (err) {
-        const detail = extractErrorMessage(err);
-        log.error(
-            'postHumanMemberCreation failed',
-            'members', err,
-        );
-        showToast(
-            `Failed to add member: ${detail}`,
-            'error',
+        reportFault(
+            ctx, 'Failed to add member', err,
         );
         return;
     }
@@ -456,9 +457,10 @@ async function submitAIForm(): Promise<void> {
         return;
     }
     const id = generateCryptoSafeBase62();
+    const ctx = sessionContext();
     try {
         await postAIMemberCreation(
-            sessionContext(),
+            ctx,
             id,
             trimStrings({
                 name,
@@ -468,13 +470,8 @@ async function submitAIForm(): Promise<void> {
             }),
         );
     } catch (err) {
-        log.error(
-            'postAIMemberCreation failed',
-            'members', err,
-        );
-        showToast(
-            'Failed to add AI member',
-            'error',
+        reportFault(
+            ctx, 'Failed to add AI member', err,
         );
         return;
     }

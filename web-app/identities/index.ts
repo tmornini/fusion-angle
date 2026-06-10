@@ -1,14 +1,13 @@
 import {
-    $, $input, $textarea,
+    $, $input, $required, $textarea,
     populateIcons,
 } from '../app/dom.ts';
 import { showToast } from '../app/toast.ts';
 import { createPageAbort } from '../app/page-lifecycle.ts';
-import { extractErrorMessage } from '../app/error-helpers.ts';
+import { reportFault } from '../app/error-helpers.ts';
 import {
     buildSkeleton, withLoadingState,
 } from '../app/loading-states.ts';
-import { log } from '../app/logger.ts';
 import {
     iconPersonPlus, iconSend,
 } from '../app/icons.ts';
@@ -22,6 +21,7 @@ import {
     postIdentityCreation,
     generateCryptoSafeBase62,
     type IdentityRosterRow,
+    type RequestContext,
 } from '../app/adapters/index.ts';
 import {
     IdentityRosterPresenter,
@@ -32,8 +32,9 @@ const { signal } = createPageAbort();
 let identityListEl: HTMLElement | null = null;
 
 export async function init(): Promise<void> {
-    const list = $('#identity-list', document);
-    if (!list) return;
+    const list = $required(
+        '#identity-list', document,
+    );
 
     populateIcons([
         ['#add-identity-btn-icon', iconPersonPlus(16, '')],
@@ -67,11 +68,11 @@ function renderRoster(
         .render(identityListEl);
 }
 
-async function refresh(): Promise<void> {
+async function refresh(
+    ctx: RequestContext,
+): Promise<void> {
     if (!identityListEl) return;
-    const roster = await getIdentityRoster(
-        sessionContext(),
-    );
+    const roster = await getIdentityRoster(ctx);
     renderRoster(roster);
 }
 
@@ -170,9 +171,10 @@ async function submitPersonForm(): Promise<void> {
     const phone = $input('#id-phone', document)!.value;
     const bio = $textarea('#id-bio', document)!.value;
     const id = generateCryptoSafeBase62();
+    const ctx = sessionContext();
     try {
         await postIdentityCreation(
-            sessionContext(),
+            ctx,
             id,
             {
                 kind: 'person',
@@ -182,20 +184,14 @@ async function submitPersonForm(): Promise<void> {
             },
         );
     } catch (err) {
-        const detail = extractErrorMessage(err);
-        log.error(
-            'postIdentityCreation person failed',
-            'identities', err,
-        );
-        showToast(
-            `Failed to add identity: ${detail}`,
-            'error',
+        reportFault(
+            ctx, 'Failed to add identity', err,
         );
         return;
     }
     showToast('Identity added', 'success');
     closeDialog('add-identity');
-    void refresh();
+    void refresh(ctx);
 }
 
 async function submitServiceForm(): Promise<void> {
@@ -209,25 +205,20 @@ async function submitServiceForm(): Promise<void> {
         return;
     }
     const id = generateCryptoSafeBase62();
+    const ctx = sessionContext();
     try {
         await postIdentityCreation(
-            sessionContext(),
+            ctx,
             id,
             { kind: 'service', secret },
         );
     } catch (err) {
-        const detail = extractErrorMessage(err);
-        log.error(
-            'postIdentityCreation service failed',
-            'identities', err,
-        );
-        showToast(
-            `Failed to add identity: ${detail}`,
-            'error',
+        reportFault(
+            ctx, 'Failed to add identity', err,
         );
         return;
     }
     showToast('Service identity added', 'success');
     closeDialog('add-identity');
-    void refresh();
+    void refresh(ctx);
 }

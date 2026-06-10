@@ -1,5 +1,8 @@
 import { iconAlertTriangle } from './icons.ts';
 import {
+    extractErrorMessage,
+} from './error-helpers.ts';
+import {
     SafeHtml,
     html,
     setHtml,
@@ -191,19 +194,6 @@ export function buildEmptyState(
     </div>`;
 }
 
-export function formatErrorMessage(
-    error: unknown,
-    noMatchMessage: string,
-): string {
-    if (error instanceof Error)
-        return error.message;
-    if (
-        typeof error === 'string'
-        && error.length > 0
-    ) return error;
-    return noMatchMessage;
-}
-
 export interface EmptyStateConfig {
     icon: SafeHtml;
     title: string;
@@ -264,7 +254,7 @@ export async function withLoadingState<T>(
         setHtml(
             container,
             buildErrorState(
-                formatErrorMessage(
+                extractErrorMessage(
                     e,
                     'An unexpected'
                     + ' error'

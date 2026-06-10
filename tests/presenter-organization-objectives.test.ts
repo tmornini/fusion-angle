@@ -16,7 +16,7 @@ const defs = new Map([
     ['o3', { name: 'Old Quarterly', description: 'd3' }],
 ]);
 const archivedAt = new Map([
-    ['o3', '2026-03-15T00:00:00.000Z'],
+    ['o3', '2026-03-15T00:00:00.000000Z'],
 ]);
 
 test('renders active section with each active objective',

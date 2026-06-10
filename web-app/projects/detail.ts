@@ -1,12 +1,16 @@
 import {
-    $, $inputRequired, isFormField,
+    $, $inputRequired, $required,
+    isFormField,
 } from '../app/dom.ts';
 import { showToast } from '../app/toast.ts';
 import {
     createPageAbort,
     bindPageListeners,
 } from '../app/page-lifecycle.ts';
-import { extractErrorMessage } from '../app/error-helpers.ts';
+import {
+    extractErrorMessage,
+    reportFault,
+} from '../app/error-helpers.ts';
 import {
     makeFieldKeyValidator,
 } from '../app/field-key-validator.ts';
@@ -186,10 +190,9 @@ export async function init(
     }
     currentProjectId = projectId;
 
-    const container = $(
+    const container = $required(
         '#project-detail-content', document,
     );
-    if (!container) return;
     pageContainer = container;
     bindStableListeners(container);
     setHtml(
@@ -209,7 +212,7 @@ export async function init(
         ]);
     } catch (err) {
         log.error(
-            'getProject failed',
+            'project detail load failed',
             'projects', err,
         );
         setHtml(
@@ -644,16 +647,18 @@ async function handleSave(): Promise<void> {
         organization_id: _org,
         ...entity
     } = state.entity;
-    const patch = projectPatchFromDraft(
-        state.view,
-        state.draft,
-    );
-    const patchEntity = trimStrings(patch.entity);
     const ctx = sessionContext();
-    const next = { ...entity, ...patchEntity };
-    const stateChanged =
-        patch.state !== state.view.stateValue();
     try {
+        // Inside the try: a draft with an empty/invalid
+        // cost throws here and surfaces as the toast.
+        const patch = projectPatchFromDraft(
+            state.view,
+            state.draft,
+        );
+        const patchEntity = trimStrings(patch.entity);
+        const next = { ...entity, ...patchEntity };
+        const stateChanged =
+            patch.state !== state.view.stateValue();
         await putProject(ctx, projectId, next);
         if (stateChanged) {
             await postProjectStateChange(
@@ -661,14 +666,8 @@ async function handleSave(): Promise<void> {
             );
         }
     } catch (err) {
-        const detail = extractErrorMessage(err);
-        log.error(
-            'project save failed',
-            'projects', err,
-        );
-        showToast(
-            `Failed to save project: ${detail}`,
-            'error',
+        reportFault(
+            ctx, 'Failed to save project', err,
         );
         return;
     }

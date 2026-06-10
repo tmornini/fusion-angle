@@ -49,7 +49,7 @@ test('admin may write a role grant', async () => {
                 identity_id: 'p2', role: 'viewer',
                 action: 'granted',
                 by_member_id: 'current',
-                at: '2026-06-03T00:00:00.000Z',
+                at: '2026-06-03T00:00:00.000000Z',
             }),
         }));
     assert.equal(res.status, 200);
@@ -69,7 +69,7 @@ test('a non-admin may not write a role grant', async () => {
                 identity_id: 'p2', role: 'viewer',
                 action: 'granted',
                 by_member_id: 'current',
-                at: '2026-06-03T00:00:00.000Z',
+                at: '2026-06-03T00:00:00.000000Z',
             }),
         }));
     assert.equal(res.status, 403);

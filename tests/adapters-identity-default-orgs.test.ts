@@ -3,7 +3,7 @@ import { strict as assert } from 'node:assert';
 import { TABLE_NAMES } from '../api/db.ts';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 
-const AT = '2026-06-04T00:00:00.000Z';
+const AT = '2026-06-04T00:00:00.000000Z';
 
 test('TABLE_NAMES includes identity_default_orgs', () => {
     assert.ok(

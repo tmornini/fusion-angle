@@ -85,7 +85,7 @@ export async function seedHumanMember(
     await db.memberships.put(`mb-${id}`, {
         organization_id: '1',
         identity_id: id,
-        at: '2020-01-01T00:00:00.000Z',
+        at: '2020-01-01T00:00:00.000000Z',
     });
 }
 
@@ -103,7 +103,7 @@ export async function seedAIMember(
     await db.memberships.put(`mb-${id}`, {
         organization_id: '1',
         identity_id: id,
-        at: '2020-01-01T00:00:00.000Z',
+        at: '2020-01-01T00:00:00.000000Z',
     });
 }
 

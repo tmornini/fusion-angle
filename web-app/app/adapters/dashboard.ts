@@ -92,25 +92,25 @@ export async function getDashboardGauges(
     let sumActualDays = 0;
     let sumEstimatedCost = 0;
     let sumActualCost = 0;
+    // Both dates are gate-validated calendar dates
+    // (validateCalendarDateField) — parse cannot fail, so
+    // no project is silently dropped from the aggregate.
     for (const p of projects) {
         sumEstimatedCost += p.estimated_cost;
         sumActualCost += p.actual_cost;
         const start = new Date(
             p.start_date,
         ).getTime();
-        if (isNaN(start)) continue;
         const end = new Date(
             p.target_end_date,
         ).getTime();
-        if (!isNaN(end)) {
-            sumBaselineDays += Math.max(
-                0,
-                Math.ceil(
-                    (end - start)
-                    / msPerDay,
-                ),
-            );
-        }
+        sumBaselineDays += Math.max(
+            0,
+            Math.ceil(
+                (end - start)
+                / msPerDay,
+            ),
+        );
         sumActualDays += Math.max(
             0,
             Math.floor(

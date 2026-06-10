@@ -5,8 +5,9 @@
 // are the foreign keys). The schema is the source; this emits a
 // picture of it. Run via ./generate-schema-svg [--check].
 //
-// Dev tooling, like compose.ts: run with `npx tsx`, excluded from
-// tsc (Node APIs, no @types/node), kept under the 78-char lint.
+// Dev tooling, like compose.ts: run with `node --strip-types`,
+// excluded from tsc (Node APIs, no @types/node), kept under the
+// 78-char lint.
 // Output is deterministic — no clocks, no randomness, stable
 // ordering — so `--check` can gate staleness in ./validate.
 import { readFileSync, writeFileSync } from 'node:fs';

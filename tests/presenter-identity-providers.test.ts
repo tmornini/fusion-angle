@@ -47,12 +47,12 @@ test('renders a row per provider event', () => {
         {
             provider: 'google', providerSubject: 'g-1',
             action: 'linked',
-            at: '2026-01-01T00:00:00.000Z',
+            at: '2026-01-01T00:00:00.000000Z',
         },
         {
             provider: 'google', providerSubject: 'g-1',
             action: 'unlinked',
-            at: '2026-01-02T00:00:00.000Z',
+            at: '2026-01-02T00:00:00.000000Z',
         },
     ]).render(rec.container);
     const out = rec.html();

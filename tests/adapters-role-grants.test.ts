@@ -23,7 +23,7 @@ test('validates a role-grant body', () => {
             role: 'admin',
             action: 'granted',
             by_member_id: 'system',
-            at: '2026-06-03T00:00:00.000Z',
+            at: '2026-06-03T00:00:00.000000Z',
         }),
         {
             organization_id: '1',
@@ -31,7 +31,7 @@ test('validates a role-grant body', () => {
             role: 'admin',
             action: 'granted',
             by_member_id: 'system',
-            at: '2026-06-03T00:00:00.000Z',
+            at: '2026-06-03T00:00:00.000000Z',
         },
     );
 });
@@ -52,7 +52,7 @@ test('rejects an unknown action', () => {
             organization_id: '1',
             identity_id: 'c', role: 'admin',
             action: 'elevated', by_member_id: 's',
-            at: '2026-06-03T00:00:00.000Z',
+            at: '2026-06-03T00:00:00.000000Z',
         }));
 });
 
@@ -73,13 +73,13 @@ test('role_grants store retains appended events', async () => {
         organization_id: '1',
         identity_id: 'current', role: 'admin',
         action: 'granted', by_member_id: 'system',
-        at: '2026-01-01T00:00:00.000Z',
+        at: '2026-01-01T00:00:00.000000Z',
     });
     await db.roleGrants.put('g2', {
         organization_id: '1',
         identity_id: 'current', role: 'admin',
         action: 'revoked', by_member_id: 'system',
-        at: '2026-02-01T00:00:00.000Z',
+        at: '2026-02-01T00:00:00.000000Z',
     });
     const rows = await db.roleGrants.getAll();
     assert.equal(rows.length, 2);   // append-only retained

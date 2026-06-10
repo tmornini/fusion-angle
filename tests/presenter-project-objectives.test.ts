@@ -18,7 +18,7 @@ test('renders one row per active objective', () => {
         [{ id: 'b1',
            projectId: 'p1', objectiveId: 'o1',
            score: 50,
-           at: '2026-05-14T00:00:00.000Z' }],
+           at: '2026-05-14T00:00:00.000000Z' }],
         [],
         'under-review',
     );
@@ -35,7 +35,7 @@ test('shows "none yet" when no actuals',
         [{ id: 'b1',
            projectId: 'p1', objectiveId: 'o1',
            score: 50,
-           at: '2026-05-14T00:00:00.000Z' }],
+           at: '2026-05-14T00:00:00.000000Z' }],
         [],
         'under-review',
     );
@@ -50,11 +50,11 @@ test('shows latest actual with sign', () => {
         [{ id: 'b1',
            projectId: 'p1', objectiveId: 'o1',
            score: 50,
-           at: '2026-05-14T00:00:00.000Z' }],
+           at: '2026-05-14T00:00:00.000000Z' }],
         [{ id: 'a1',
            projectId: 'p1', objectiveId: 'o1',
            score: -10,
-           at: '2026-05-15T00:00:00.000Z' }],
+           at: '2026-05-15T00:00:00.000000Z' }],
         'approved',
     );
     const html = p.buildSection().toString();
@@ -88,7 +88,7 @@ test(
         [{ id: 'b1',
            projectId: 'p1', objectiveId: 'o1',
            score: 50,
-           at: '2026-05-14T00:00:00.000Z' }],
+           at: '2026-05-14T00:00:00.000000Z' }],
         [],
         'approved',
     );
@@ -111,7 +111,7 @@ test(
         [{ id: 'b1',
            projectId: 'p1', objectiveId: 'o1',
            score: 50,
-           at: '2026-05-14T00:00:00.000Z' }],
+           at: '2026-05-14T00:00:00.000000Z' }],
         [],
         'under-review',
     );
@@ -134,7 +134,7 @@ test(
         [{ id: 'b1',
            projectId: 'p1', objectiveId: 'o1',
            score: 50,
-           at: '2026-05-14T00:00:00.000Z' }],
+           at: '2026-05-14T00:00:00.000000Z' }],
         [],
         'declined',
     );
@@ -156,11 +156,11 @@ test(
         [{ id: 'b1',
            projectId: 'p1', objectiveId: 'o1',
            score: 50,
-           at: '2026-05-14T00:00:00.000Z' }],
+           at: '2026-05-14T00:00:00.000000Z' }],
         [{ id: 'a1',
            projectId: 'p1', objectiveId: 'o1',
            score: 30,
-           at: '2026-05-15T00:00:00.000Z' }],
+           at: '2026-05-15T00:00:00.000000Z' }],
         'archived',
     );
     const html = p.buildSection().toString();
@@ -182,7 +182,7 @@ test(
         [{ id: 'b1',
            projectId: 'p1', objectiveId: 'o1',
            score: 50,
-           at: '2026-05-14T00:00:00.000Z' }],
+           at: '2026-05-14T00:00:00.000000Z' }],
         [],
         'approved',
     );
@@ -229,11 +229,11 @@ test(
         [{ id: 'b1',
            projectId: 'p1', objectiveId: 'o1',
            score: 50,
-           at: '2026-05-14T00:00:00.000Z' }],
+           at: '2026-05-14T00:00:00.000000Z' }],
         [{ id: 'a1',
            projectId: 'p1', objectiveId: 'o1',
            score: 30,
-           at: '2026-05-15T00:00:00.000Z' }],
+           at: '2026-05-15T00:00:00.000000Z' }],
         'archived',
     );
     const html = p.buildSection().toString();

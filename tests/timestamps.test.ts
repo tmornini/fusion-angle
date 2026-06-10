@@ -17,3 +17,16 @@ test('nowUtc mints 6-digit microsecond zulu', () => {
 test('nowUtc is parseable to a real instant', () => {
     assert.ok(!Number.isNaN(Date.parse(nowUtc())));
 });
+
+test('nowUtc is strictly increasing across 10k mints', () => {
+    let prev = nowUtc();
+    for (let i = 0; i < 10_000; i++) {
+        const next = nowUtc();
+        assert.ok(
+            next > prev,
+            next + ' not after ' + prev,
+        );
+        assert.match(next, ZULU_6);
+        prev = next;
+    }
+});

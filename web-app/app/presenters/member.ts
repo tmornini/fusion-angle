@@ -198,7 +198,7 @@ export class AIMemberRowPresenter {
                     }">
                         ${findProviderModel(
                             this.#member.modelId(),
-                        )?.name ?? DISPLAY_ABSENT}
+                        )!.name}
                     </span>
                 </div>
             </div>

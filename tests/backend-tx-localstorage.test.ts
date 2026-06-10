@@ -79,7 +79,7 @@ test(
                 entity_id: 'wo-1',
                 state: 'active',
                 member_id: 'u-1',
-                at: '2026-01-01T00:00:00.000Z',
+                at: '2026-01-01T00:00:00.000000Z',
             }),
         );
         const stored = map.get(KEY_PREFIX + 'states');
@@ -134,7 +134,7 @@ test(
             entity_id: 'wo-1',
             state: 'active',
             member_id: 'u-1',
-            at: '2026-01-01T00:00:00.000Z',
+            at: '2026-01-01T00:00:00.000000Z',
         }];
         map.set(
             KEY_PREFIX + 'states',
@@ -197,7 +197,7 @@ test(
                     entity_id: 'u1',
                     state: 'active',
                     member_id: 'u1',
-                    at: '2026-01-01T00:00:00.000Z',
+                    at: '2026-01-01T00:00:00.000000Z',
                 });
             },
         );

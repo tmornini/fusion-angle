@@ -39,9 +39,9 @@ function makeProject(id: string): InstanceType<
         title: 't',
         description: 'd',
         progress: 0,
-        start_date: '2026-05-14T00:00:00.000Z',
+        start_date: '2026-05-14',
         target_end_date:
-            '2026-05-14T00:00:00.000Z',
+            '2026-05-14T00:00:00.000000Z',
         estimated_cost: 0,
         actual_cost: 0,
         position: 0,

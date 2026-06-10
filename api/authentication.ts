@@ -1,9 +1,12 @@
 import { EntityNotFound, keyed } from './db.ts';
 import type { DbAdapter } from './db.ts';
 import {
+    verifyClientAssertion,
+} from './client-assertion.ts';
+import {
     mintAccessToken,
     verifyAccessToken,
-    revokedBeforeSeconds,
+    revokedThroughSeconds,
 } from './access-token.ts';
 import {
     generateCryptoSafeBase62,
@@ -21,6 +24,8 @@ import {
     planRotation,
     isTokenRevoked,
     chainIdForJti,
+    identityForJti,
+    revocationAppends,
 } from './identity-tokens.ts';
 import {
     hashPassword,
@@ -224,10 +229,11 @@ async function appendEvents(
 
 // Both revocation controls the gate enforces, in ONE place so
 // every token-accepting path honors them: the coarse
-// logout-everywhere stamp (a token whose iat predates the
-// revocation is dead) and the per-jti chain. A mint path that
-// skips these would launder a revoked-but-unexpired token into
-// a fresh valid pair the gate then accepts.
+// logout-everywhere stamp (a token whose iat does not postdate
+// the revocation second is dead — shared seconds fail closed)
+// and the per-jti chain. A mint path that skips these would
+// launder a revoked-but-unexpired token into a fresh valid
+// pair the gate then accepts.
 export async function tokenRevocationReason(
     adapter: DbAdapter,
     sub: string,
@@ -236,8 +242,8 @@ export async function tokenRevocationReason(
 ): Promise<string | null> {
     const revs = await keyed(adapter.identityTokenRevocations)
         .getAllWhere('identity_id', sub);
-    const revokedBefore = revokedBeforeSeconds(revs, sub);
-    if (revokedBefore !== null && iat < revokedBefore) {
+    const revokedThrough = revokedThroughSeconds(revs, sub);
+    if (revokedThrough !== null && iat <= revokedThrough) {
         return 'token revoked';
     }
     // The gate check needs only THIS jti's events: a chain-wide
@@ -249,6 +255,86 @@ export async function tokenRevocationReason(
         return 'token chain revoked';
     }
     return null;
+}
+
+// The outcome of an atomic rotation attempt. 'rotate' carries
+// the successor jti; 'fail' covers reuse and unknown — on
+// reuse the whole chain's revocation has already landed in
+// the same transaction.
+export type RotationOutcome =
+    | { readonly kind: 'rotate'; readonly newJti: string }
+    | { readonly kind: 'fail' };
+
+// Read the token ledger, plan the rotation, and append its
+// events in ONE transaction — a concurrent reuse of the same
+// jti can not double-rotate. Shared by the refresh grant and
+// the POST identity-tokens/:jti/rotation route: one truth for
+// the atomic rotate.
+export function rotateRefreshJti(
+    adapter: DbAdapter,
+    presentedJti: string,
+): Promise<RotationOutcome> {
+    return adapter.transaction(
+        ['identity_tokens'],
+        async (view) => {
+            // Two-step narrow: find the presented jti's chain,
+            // then read the WHOLE chain — planRotation's replay
+            // path revokes every jti in it, so a jti-only read
+            // would under-revoke. Both reads are index hits in
+            // the open tx (no interleaved non-IDB await).
+            const tokens = keyed(view.identityTokens);
+            const byJti = await tokens.getAllWhere(
+                'jti', presentedJti);
+            const chainId = chainIdForJti(
+                byJti, presentedJti);
+            const rows = chainId === null
+                ? byJti
+                : await tokens.getAllWhere(
+                    'chain_id', chainId);
+            const plan = planRotation(
+                rows, presentedJti,
+                generateCryptoSafeBase62(), nowUtc(),
+            );
+            if (plan.kind === 'rotate') {
+                await appendEvents(view, plan.appends);
+                return {
+                    kind: 'rotate' as const,
+                    newJti: plan.newJti,
+                };
+            }
+            if (plan.kind === 'replay') {
+                await appendEvents(view, plan.appends);
+            }
+            return { kind: 'fail' as const };
+        },
+    );
+}
+
+// Revoke every jti in the chain `jti` belongs to (logging out
+// one session). Read and appends ride the same transaction, so
+// a concurrent rotation cannot slip a fresh successor past the
+// revoke. A no-op for an unknown jti.
+export function revokeTokenChain(
+    adapter: DbAdapter,
+    jti: string,
+): Promise<void> {
+    return adapter.transaction(
+        ['identity_tokens'],
+        async (view) => {
+            const tokens = keyed(view.identityTokens);
+            const byJti = await tokens.getAllWhere('jti', jti);
+            const chainId = chainIdForJti(byJti, jti);
+            const identityId = identityForJti(byJti, jti);
+            if (chainId === null || identityId === null) {
+                return;
+            }
+            const rows = await tokens.getAllWhere(
+                'chain_id', chainId);
+            await appendEvents(view, revocationAppends(
+                rows, chainId, identityId, nowUtc(),
+            ));
+        },
+    );
 }
 
 // refresh grant: rotate a live refresh jti (retire it, issue a
@@ -276,42 +362,8 @@ async function grantRefresh(
     if (refreshRev !== null) {
         return failure(401, refreshRev);
     }
-    // Read the token ledger, plan the rotation, and append its
-    // events in ONE transaction — a concurrent reuse of the same
-    // jti can not double-rotate.
-    const outcome = await adapter.transaction(
-        ['identity_tokens'],
-        async (view) => {
-            // Two-step narrow: find the presented jti's chain,
-            // then read the WHOLE chain — planRotation's replay
-            // path revokes every jti in it, so a jti-only read
-            // would under-revoke. Both reads are index hits in
-            // the open tx (no interleaved non-IDB await).
-            const tokens = keyed(view.identityTokens);
-            const byJti = await tokens.getAllWhere(
-                'jti', verified.claims.jti);
-            const chainId = chainIdForJti(
-                byJti, verified.claims.jti);
-            const rows = chainId === null
-                ? byJti
-                : await tokens.getAllWhere(
-                    'chain_id', chainId);
-            const plan = planRotation(
-                rows, verified.claims.jti,
-                generateCryptoSafeBase62(), nowUtc(),
-            );
-            if (plan.kind === 'rotate') {
-                await appendEvents(view, plan.appends);
-                return {
-                    kind: 'rotate' as const,
-                    newJti: plan.newJti,
-                };
-            }
-            if (plan.kind === 'replay') {
-                await appendEvents(view, plan.appends);
-            }
-            return { kind: 'fail' as const };
-        },
+    const outcome = await rotateRefreshJti(
+        adapter, verified.claims.jti,
     );
     if (outcome.kind === 'rotate') {
         const name =
@@ -334,9 +386,10 @@ async function grantRefresh(
 // actor_token are VERIFIED (signature/exp/nbf/aud) AND
 // revocation-checked — the same frozen HMAC the refresh grant
 // checks, so this is not weaker than the rest of the gate.
-// The remaining SEAM is the
-// DELEGATION POLICY: whether `actor` may act-as `subject` is NOT
-// yet enforced — that authorization lands with the server tier.
+// DELEGATION POLICY: self-delegation ONLY (subject === actor).
+// A cross-party exchange has no delegation ledger to authorize
+// act-as, so it fails closed — 403, minting nothing — until
+// that ledger lands with the server tier.
 // The claim shape (sub, act.sub) is frozen now.
 async function grantTokenExchange(
     adapter: DbAdapter,
@@ -376,6 +429,13 @@ async function grantTokenExchange(
     }
     const subject = subjectV.claims.sub;
     const actor = actorV.claims.sub;
+    if (subject !== actor) {
+        return failure(
+            403,
+            'token-exchange is limited to self-delegation'
+                + ' (subject must equal actor)',
+        );
+    }
     const organization =
         typeof body.organization === 'string'
             ? body.organization
@@ -417,11 +477,12 @@ export async function exchangeBearerForOrg(
 }
 
 // client_credentials via private_key_jwt: a headless client
-// authenticates as itself. SEAM — the client_assertion is only
-// structurally required (a three-segment JWT); real JWS
-// signature verification against the client's JWKS is deferred
-// to the server tier (spec lines 418-419). The token's sub is
-// the client id (a service principal).
+// authenticates as itself. The client_assertion is REALLY
+// verified — JWS signature against the client's registered
+// JWKS (RS256/ES256, WebCrypto) plus the RFC 7523 claim
+// checks, in api/client-assertion.ts. The remaining seam is
+// jti replay tracking (server tier). The token's sub is the
+// client id (a service principal).
 async function grantClientCredentials(
     adapter: DbAdapter,
     body: Record<string, unknown>,
@@ -436,8 +497,11 @@ async function grantClientCredentials(
     let client: ClientEntity;
     try {
         client = await adapter.clients.getById(clientId);
-    } catch {
-        return failure(401, 'unknown client');
+    } catch (e) {
+        if (e instanceof EntityNotFound) {
+            return failure(401, 'unknown client');
+        }
+        throw e;
     }
     if (client.status !== 'active') {
         return failure(401, 'client is disabled');
@@ -448,8 +512,15 @@ async function grantClientCredentials(
             400, 'client may not use client_credentials',
         );
     }
-    if (assertion.split('.').length !== 3) {
-        return failure(401, 'malformed client_assertion');
+    const verdict = await verifyClientAssertion(
+        assertion, client,
+        Math.floor(Date.now() / 1000),
+    );
+    if (!verdict.valid) {
+        return failure(
+            401,
+            'invalid client_assertion: ' + verdict.reason,
+        );
     }
     const name = await nameFor(adapter, clientId);
     return {

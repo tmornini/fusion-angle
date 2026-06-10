@@ -55,6 +55,7 @@ export function notifyProjectScoreChange(): void {
 // are mapped here so the shared scoring utils and every
 // presenter speak one idiom. Baseline and actual share it.
 export interface ObjectiveScore {
+    id: string;
     projectId: Id;
     objectiveId: ObjectiveId;
     memberId: Id;
@@ -67,6 +68,7 @@ function toObjectiveScore(
         | ProjectObjectiveActualScore,
 ): ObjectiveScore {
     return {
+        id: r.id,
         projectId: r.project_id,
         objectiveId: r.objective_id,
         memberId: r.member_id,

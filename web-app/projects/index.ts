@@ -1,4 +1,6 @@
-import { $, getRequiredAttribute } from '../app/dom.ts';
+import {
+    $, $required, getRequiredAttribute,
+} from '../app/dom.ts';
 import { createPageAbort } from '../app/page-lifecycle.ts';
 import {
     buildSkeleton,
@@ -69,10 +71,9 @@ async function loadProjectMaps(
 }
 
 export async function init(): Promise<void> {
-    const listEl = $(
+    const listEl = $required(
         '#projects-list', document,
     );
-    if (!listEl) return;
 
     const ctx = sessionContext();
     const projects = await withLoadingState(
@@ -127,9 +128,6 @@ export async function init(): Promise<void> {
     );
 
     subscribeProjectChanges(async () => {
-        if (!projectState || !projectListEl) {
-            return;
-        }
         const refreshCtx = sessionContext();
         const [refreshedProjects, maps] =
             await Promise.all([
@@ -137,7 +135,7 @@ export async function init(): Promise<void> {
                 loadProjectMaps(refreshCtx),
             ]);
         projectState = applyProjectListUpdate(
-            projectState, refreshedProjects,
+            projectState!, refreshedProjects,
         );
         projectEntities = maps.entities;
         scoreMap = maps.scores;
@@ -145,7 +143,6 @@ export async function init(): Promise<void> {
     });
 
     subscribeProjectScoreChanges(async () => {
-        if (!projectListEl) return;
         const col = await getProjectsScoreColumn(
             sessionContext(),
         );
@@ -156,7 +153,6 @@ export async function init(): Promise<void> {
     });
 
     subscribeObjectiveChanges(async () => {
-        if (!projectListEl) return;
         const col = await getProjectsScoreColumn(
             sessionContext(),
         );
@@ -190,9 +186,8 @@ export async function init(): Promise<void> {
 }
 
 function rerenderProjects(): void {
-    if (!projectState || !projectListEl) return;
     const presenter = new ProjectListPresenter(
-        projectState, scoreMap,
+        projectState!, scoreMap,
     );
     if (projectBadgesEl) {
         presenter.renderBadges(projectBadgesEl);
@@ -202,11 +197,10 @@ function rerenderProjects(): void {
             projectSortControlsEl,
         );
     }
-    presenter.renderList(projectListEl);
+    presenter.renderList(projectListEl!);
 }
 
 function onSortClick(e: MouseEvent): void {
-    if (!projectState) return;
     if (
         !(e.target instanceof HTMLElement)
     ) return;
@@ -215,16 +209,12 @@ function onSortClick(e: MouseEvent): void {
     );
     if (!toggle) return;
     projectState = applyProjectSortToggle(
-        projectState,
+        projectState!,
     );
     rerenderProjects();
 }
 
 function onBadgeClick(e: MouseEvent): void {
-    if (
-        !projectState || !projectBadgesEl
-        || !projectListEl
-    ) return;
     if (
         !(e.target instanceof HTMLElement)
     ) return;
@@ -235,7 +225,7 @@ function onBadgeClick(e: MouseEvent): void {
     const s = getRequiredAttribute(badge, 'data-state');
     if (!isProjectState(s)) return;
     projectState = applyProjectFilterToggle(
-        projectState, s,
+        projectState!, s,
     );
     rerenderProjects();
 }

@@ -3,8 +3,8 @@ import {
     html, setHtml,
 } from './safe-html.ts';
 import {
-    formatErrorMessage,
-} from './loading-states.ts';
+    extractErrorMessage,
+} from './error-helpers.ts';
 import { initAdapter } from './adapters/init.ts';
 
 export async function initDatabase(
@@ -38,7 +38,7 @@ export function handleDatabaseError(
             border-radius:0.5rem;
             overflow:auto;
             white-space:pre-wrap"
->${formatErrorMessage(
+>${extractErrorMessage(
     err, 'Unknown database error',
 )}</pre>
       <p>Try clearing site data

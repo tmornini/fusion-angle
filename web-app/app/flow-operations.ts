@@ -14,8 +14,11 @@ import {
 } from '../../api/types.ts';
 import {
     postFlowVersion,
+    postFlowVersionOps,
     putFlow,
-    deleteFlowVersion,
+    putFlowOps,
+    deleteFlowVersionOp,
+    notifyFlowChange,
     getFlowGraph,
     getFlowVersions,
     generateCryptoSafeBase62,
@@ -645,36 +648,39 @@ export async function performUndo(
 ): Promise<OpResult<HistoryOpOk>> {
     const locked = requireFlowNotLocked(snap);
     if (locked) return locked;
-    try {
-        const versions = await getFlowVersions(
-            ctx, snap.flowId,
-        );
-        const version = versions[0];
-        if (!version) {
-            return {
-                kind: 'ok',
-                freshSnap: snap,
-                newHistory: recordUndoHistoryMark(
-                    history, false,
-                ),
-            };
-        }
-        const stagedHistory = appendToRedoStack(
-            history,
-            {
-                id: generateCryptoSafeBase62(),
-                flowId: snap.flowId,
-                name: snap.flowName,
-                isLocked: snap.isLocked,
-                isAutoLayout: snap.isAutoLayout,
-                isAutoFit: snap.isAutoFit,
-                lockTimeout: snap.lockTimeout,
-                nodes: snap.nodes,
-                edges: snap.edges,
-                createdAt: nowUtc(),
-            },
-        );
-        await putFlow(ctx, snap.flowId, {
+    const versions = await getFlowVersions(
+        ctx, snap.flowId,
+    );
+    const version = versions[0];
+    if (!version) {
+        return {
+            kind: 'ok',
+            freshSnap: snap,
+            newHistory: recordUndoHistoryMark(
+                history, false,
+            ),
+        };
+    }
+    const stagedHistory = appendToRedoStack(
+        history,
+        {
+            id: generateCryptoSafeBase62(),
+            flowId: snap.flowId,
+            name: snap.flowName,
+            isLocked: snap.isLocked,
+            isAutoLayout: snap.isAutoLayout,
+            isAutoFit: snap.isAutoFit,
+            lockTimeout: snap.lockTimeout,
+            nodes: snap.nodes,
+            edges: snap.edges,
+            createdAt: nowUtc(),
+        },
+    );
+    // Restore + consume as ONE atomic batch: the
+    // flow can never land reverted while the
+    // version row survives unconsumed.
+    const ops = [
+        ...await putFlowOps(ctx, snap.flowId, {
             name: version.name,
             isLocked: version.isLocked,
             isAutoLayout: version.isAutoLayout,
@@ -682,23 +688,11 @@ export async function performUndo(
             lockTimeout: version.lockTimeout,
             nodes: version.nodes,
             edges: version.edges,
-        });
-        await deleteFlowVersion(ctx, version.id);
-        const graph = await getFlowGraph(
-            ctx, snap.flowId,
-        );
-        const remaining = await getFlowVersions(
-            ctx, snap.flowId,
-        );
-        const newHistory = recordUndoHistoryMark(
-            stagedHistory,
-            remaining.length > 0,
-        );
-        return {
-            kind: 'ok',
-            freshSnap: applyServerGraph(snap, graph),
-            newHistory,
-        };
+        }),
+        deleteFlowVersionOp(version.id),
+    ];
+    try {
+        await ctx.commit({ ops });
     } catch (err) {
         log.error(
             'performUndo failed',
@@ -706,6 +700,22 @@ export async function performUndo(
         );
         return failOp('Undo failed');
     }
+    notifyFlowChange();
+    const graph = await getFlowGraph(
+        ctx, snap.flowId,
+    );
+    const remaining = await getFlowVersions(
+        ctx, snap.flowId,
+    );
+    const newHistory = recordUndoHistoryMark(
+        stagedHistory,
+        remaining.length > 0,
+    );
+    return {
+        kind: 'ok',
+        freshSnap: applyServerGraph(snap, graph),
+        newHistory,
+    };
 }
 
 export async function performRedo(
@@ -723,14 +733,17 @@ export async function performRedo(
             newHistory: popped.snapshot,
         };
     }
-    try {
-        await postFlowVersion(
+    const v = popped.version;
+    // Snapshot + re-apply as ONE atomic batch:
+    // the current state can never land archived
+    // as a version while the redo graph is lost.
+    const ops = [
+        ...await postFlowVersionOps(
             ctx,
             generateCryptoSafeBase62(),
             snap.flowId,
-        );
-        const v = popped.version;
-        await putFlow(ctx, snap.flowId, {
+        ),
+        ...await putFlowOps(ctx, snap.flowId, {
             name: v.name,
             isLocked: v.isLocked,
             isAutoLayout: v.isAutoLayout,
@@ -738,18 +751,10 @@ export async function performRedo(
             lockTimeout: v.lockTimeout,
             nodes: v.nodes,
             edges: v.edges,
-        });
-        const graph = await getFlowGraph(
-            ctx, snap.flowId,
-        );
-        const newHistory = recordUndoHistoryMark(
-            popped.snapshot, true,
-        );
-        return {
-            kind: 'ok',
-            freshSnap: applyServerGraph(snap, graph),
-            newHistory,
-        };
+        }),
+    ];
+    try {
+        await ctx.commit({ ops });
     } catch (err) {
         log.error(
             'performRedo failed',
@@ -757,5 +762,17 @@ export async function performRedo(
         );
         return failOp('Redo failed');
     }
+    notifyFlowChange();
+    const graph = await getFlowGraph(
+        ctx, snap.flowId,
+    );
+    const newHistory = recordUndoHistoryMark(
+        popped.snapshot, true,
+    );
+    return {
+        kind: 'ok',
+        freshSnap: applyServerGraph(snap, graph),
+        newHistory,
+    };
 }
 

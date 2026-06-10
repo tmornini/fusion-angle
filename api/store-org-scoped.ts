@@ -1,4 +1,4 @@
-import { EntityNotFound } from './db.ts';
+import { EntityNotFound, guarded } from './db.ts';
 import type {
     EntityStore,
     EntityPut,
@@ -72,48 +72,62 @@ export class OrgScopedEntityStore<T extends OrgScoped>
         id: string,
         fields: Omit<T, 'id'>,
     ): Promise<T> {
-        await this.#assertWritable(id);
-        return this.#inner.put(id, this.#stamp(fields));
+        return guarded(this.#inner).putGuarded(
+            id,
+            this.#stamp(fields),
+            (existing, rowId) =>
+                this.#assertMine(existing, rowId),
+        );
     }
 
     async putMany(
         entries: readonly EntityPut<T>[],
         deleteIds: readonly string[],
     ): Promise<void> {
-        for (const id of deleteIds) {
-            await this.getById(id);
-        }
-        for (const entry of entries) {
-            await this.#assertWritable(entry.id);
-        }
         const stamped = entries.map(entry => ({
             id: entry.id,
             fields: this.#stamp(entry.fields),
         }));
-        await this.#inner.putMany(stamped, deleteIds);
+        await guarded(this.#inner).putManyGuarded(
+            stamped,
+            deleteIds,
+            (existing, rowId) =>
+                this.#assertMine(existing, rowId),
+            existing => this.#ownsRow(existing),
+        );
     }
 
     async delete(id: string): Promise<void> {
-        await this.getById(id);
-        await this.#inner.delete(id);
+        await guarded(this.#inner).deleteGuarded(
+            id,
+            existing => this.#ownsRow(existing),
+        );
     }
 
     // A write may target a brand-new id (create) or an id this
     // org already owns (update) — never an id owned by another
     // tenant, which 404s exactly as a foreign read does: no
     // existence confirmed, no clobber, no org theft. The
-    // write-side twin of getById's read fence.
-    async #assertWritable(id: string): Promise<void> {
-        let existing: T;
-        try {
-            existing = await this.#inner.getById(id);
-        } catch (e) {
-            if (e instanceof EntityNotFound) return;
-            throw e;
-        }
-        if (existing.organization_id !== this.#org) {
+    // write-side twin of getById's read fence. The peek is
+    // RAW (tombstone-blind) and rides the write's own tx, so
+    // a tombstoned foreign row cannot be re-stamped and no
+    // concurrent create can slip between check and write.
+    #assertMine(existing: T | null, id: string): void {
+        if (
+            existing !== null
+            && existing.organization_id !== this.#org
+        ) {
             throw new EntityNotFound(this.#table, id);
         }
+    }
+
+    // DELETE proceeds only on a row this org owns. Absent →
+    // no-op (an idempotent replay, Commandment VII); foreign
+    // → no-op, indistinguishable from absent — no existence
+    // confirmed, nothing spliced.
+    #ownsRow(existing: T | null): boolean {
+        return existing !== null
+            && existing.organization_id === this.#org;
     }
 
     // Stamp org onto a write body: the store owns the

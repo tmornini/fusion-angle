@@ -1,5 +1,6 @@
 import {
-    $, $select, getRequiredAttribute, createElement,
+    $, $required, $select,
+    getRequiredAttribute, createElement,
 } from '../app/dom.ts';
 import {
     html,
@@ -78,10 +79,9 @@ const importStore = new ImportStore();
 
 export async function init(
 ): Promise<void> {
-    const listEl = $(
+    const listEl = $required(
         '#flow-list', document,
     );
-    if (!listEl) return;
 
     const result = await withLoadingState(
         listEl,

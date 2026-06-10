@@ -3,6 +3,7 @@ import {
     type EntityStore as EntityStoreInterface,
     type EntityPut,
     type EntityValidator,
+    type GuardedEntityWriter,
     type KeyedCollectionReader,
     type TxRunner,
 } from './db.ts';
@@ -17,7 +18,8 @@ export class HistoryEntityStore<
     T extends { id: string },
 > implements
     EntityStoreInterface<T>,
-    KeyedCollectionReader<T>
+    KeyedCollectionReader<T>,
+    GuardedEntityWriter<T>
 {
     readonly #table: string;
     readonly #run: TxRunner;
@@ -122,6 +124,99 @@ export class HistoryEntityStore<
         await this.#run(
             [this.#table], 'readwrite',
             tx => tx.delete(this.#table, id),
+        );
+    }
+
+    // The guarded write primitives (GuardedEntityWriter):
+    // peek + guard + write ride ONE tx. History rows never
+    // tombstone, so the raw peek and the lifecycle view
+    // coincide here; the org fence still requires the
+    // capability on every store it wraps.
+    async putGuarded(
+        id: string,
+        fields: Omit<T, 'id'>,
+        guard: (
+            existing: T | null,
+            id: string,
+        ) => void,
+    ): Promise<T> {
+        const { id: _id, ...body } =
+            fields as unknown as Record<string, unknown>;
+        const written = {
+            ...this.#validate(body),
+            id,
+        } as T;
+        await this.#run(
+            [this.#table], 'readwrite',
+            async (tx) => {
+                guard(
+                    await tx.get<T>(this.#table, id),
+                    id,
+                );
+                await tx.put(this.#table, written);
+            },
+        );
+        return written;
+    }
+
+    async putManyGuarded(
+        entries: readonly EntityPut<T>[],
+        deleteIds: readonly string[],
+        putGuard: (
+            existing: T | null,
+            id: string,
+        ) => void,
+        deleteGuard: (existing: T | null) => boolean,
+    ): Promise<void> {
+        const written = entries.map(entry => {
+            const { id: _id, ...body } =
+                entry.fields as unknown as
+                    Record<string, unknown>;
+            return {
+                ...this.#validate(body),
+                id: entry.id,
+            } as T;
+        });
+        await this.#run(
+            [this.#table], 'readwrite',
+            async (tx) => {
+                for (const id of deleteIds) {
+                    const existing = await tx.get<T>(
+                        this.#table, id,
+                    );
+                    if (deleteGuard(existing)) {
+                        await tx.delete(
+                            this.#table, id,
+                        );
+                    }
+                }
+                for (const row of written) {
+                    putGuard(
+                        await tx.get<T>(
+                            this.#table, row.id,
+                        ),
+                        row.id,
+                    );
+                    await tx.put(this.#table, row);
+                }
+            },
+        );
+    }
+
+    async deleteGuarded(
+        id: string,
+        guard: (existing: T | null) => boolean,
+    ): Promise<void> {
+        await this.#run(
+            [this.#table], 'readwrite',
+            async (tx) => {
+                const existing = await tx.get<T>(
+                    this.#table, id,
+                );
+                if (guard(existing)) {
+                    await tx.delete(this.#table, id);
+                }
+            },
         );
     }
 }

@@ -77,7 +77,7 @@ test('getIdeas returns ideas with submitter', async () => {
     await db.ideaSubmissions.put('s1', {
         idea_id: 'i1',
         member_id: 'u1',
-        at: '2026-04-01T00:00:00Z',
+        at: '2026-04-01T00:00:00.000000Z',
     });
     const result = await getIdeas(ctx);
     assert.equal(result.length, 1);
@@ -119,7 +119,7 @@ test('getIdea finds submission for one idea', async () => {
     await db.ideaSubmissions.put('s1', {
         idea_id: 'i1',
         member_id: 'u1',
-        at: '2026-04-01T00:00:00Z',
+        at: '2026-04-01T00:00:00.000000Z',
     });
     const result = await getIdea(ctx, 'i1');
     assert.equal(result.idea.titleText(), 'A');
@@ -164,7 +164,7 @@ test('archived ideas are filtered from getIdeas', async () => {
     await db.ideaSubmissions.put('s1', {
         idea_id: 'i1',
         member_id: 'u1',
-        at: '2026-04-01T00:00:00Z',
+        at: '2026-04-01T00:00:00.000000Z',
     });
     await db.ideas.put(
         'i2', buildIdea('i2', 'Hide me'),
@@ -173,7 +173,7 @@ test('archived ideas are filtered from getIdeas', async () => {
     await db.ideaSubmissions.put('s2', {
         idea_id: 'i2',
         member_id: 'u1',
-        at: '2026-04-01T00:00:00Z',
+        at: '2026-04-01T00:00:00.000000Z',
     });
     const result = await getIdeas(ctx);
     assert.equal(result.length, 1);
@@ -375,7 +375,7 @@ test('deleted ideas are filtered from getIdeas', async () => {
     await db.ideaSubmissions.put('s1', {
         idea_id: 'i1',
         member_id: 'u1',
-        at: '2026-04-01T00:00:00Z',
+        at: '2026-04-01T00:00:00.000000Z',
     });
     await db.ideas.put(
         'i2', buildIdea('i2', 'Delete me'),
@@ -384,7 +384,7 @@ test('deleted ideas are filtered from getIdeas', async () => {
     await db.ideaSubmissions.put('s2', {
         idea_id: 'i2',
         member_id: 'u1',
-        at: '2026-04-01T00:00:00Z',
+        at: '2026-04-01T00:00:00.000000Z',
     });
     await db.ideas.delete('i2');
     const result = await getIdeas(ctx);

@@ -2,8 +2,10 @@ import { log } from './logger.ts';
 import { setHtml } from './safe-html.ts';
 import {
     buildErrorState,
-    formatErrorMessage,
 } from './loading-states.ts';
+import {
+    extractErrorMessage,
+} from './error-helpers.ts';
 import { navigateTo } from './navigation.ts';
 import {
     getUrlParams,
@@ -44,7 +46,7 @@ export function handlePageLoadError(
         setHtml(
             container,
             buildErrorState(
-                formatErrorMessage(
+                extractErrorMessage(
                     err,
                     'This page'
                     + ' failed to'

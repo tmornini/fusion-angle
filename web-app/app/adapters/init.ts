@@ -5,7 +5,6 @@ import {
     postTablesChanged,
 } from './broadcast-channel.ts';
 import type { DbAdapter } from '../../../api/db.ts';
-import { GET } from '../../../api/api.ts';
 import {
     mintAccessToken,
     principalFromToken,
@@ -33,12 +32,12 @@ export async function initAdapter(
     await ensureSessionToken();
     adapter = makeAdapter();
     await adapter.initialize();
-    const schema =
-        await GET<string | null>(
-            adapter, 'snapshots/schema',
-            getSessionToken(),
-        );
-    return schema !== null;
+    // The composition root probes the datastore directly —
+    // the same infrastructure tier as initialize() above.
+    // The HTTP snapshot plane is bearer-closed once a schema
+    // exists, and exporting the whole database to compare it
+    // against null was never the question being asked.
+    return adapter.hasSchema();
 }
 
 export function getDbAdapter(): DbAdapter {

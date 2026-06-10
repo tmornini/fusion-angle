@@ -18,7 +18,7 @@ const BASE = 'http://localhost';
 const issuedCode = {
     code: 'the-code', identity_id: 'current',
     client_id: 'web', status: 'issued',
-    at: '2026-06-03T00:00:00.000Z',
+    at: '2026-06-03T00:00:00.000000Z',
 };
 
 async function freshDb() {

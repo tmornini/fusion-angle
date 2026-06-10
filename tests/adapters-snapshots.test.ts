@@ -62,6 +62,34 @@ async function setup(): Promise<{
     return { db, ctx: createRequestContext(db, await devToken()) };
 }
 
+// Import REPLACES every table — a snapshot that omits the
+// importer's own membership and admin grant locks the session
+// out of the now-closed snapshot plane. Tests that keep using
+// the ctx after an import carry the admin's rows, exactly as
+// a real exported snapshot would.
+function withAdminRows(
+    tables: Record<string, unknown[]>,
+): Record<string, unknown[]> {
+    return {
+        memberships: [{
+            id: 'test-membership-current',
+            organization_id: '1',
+            identity_id: 'current',
+            at: '2020-01-01T00:00:00.000000Z',
+        }],
+        role_grants: [{
+            id: 'test-role-current-admin',
+            organization_id: '1',
+            identity_id: 'current',
+            role: 'admin',
+            action: 'granted',
+            by_member_id: 'system',
+            at: '2020-01-01T00:00:00.000000Z',
+        }],
+        ...tables,
+    };
+}
+
 test('getSnapshot returns a JSON object of tables', async () => {
     const { ctx } = await setup();
     const json = await getSnapshot(ctx);
@@ -115,11 +143,11 @@ test(
     'putSnapshot result is visible via getSnapshot',
     async () => {
         const { ctx } = await setup();
-        await putSnapshot(ctx, JSON.stringify({
+        await putSnapshot(ctx, JSON.stringify(withAdminRows({
             human_members: [
                 buildHumanDetail('u1'),
             ],
-        }));
+        })));
         const parsed =
             JSON.parse(await getSnapshot(ctx));
         assert.equal(parsed.human_members.length, 1);
@@ -134,11 +162,11 @@ test(
     + ' table contents',
     async () => {
         const { db, ctx } = await setup();
-        await putSnapshot(ctx, JSON.stringify({
+        await putSnapshot(ctx, JSON.stringify(withAdminRows({
             human_members: [
                 buildHumanDetail('u1'),
             ],
-        }));
+        })));
         await putSnapshot(ctx, JSON.stringify({
             human_members: [
                 buildHumanDetail('u2'),
@@ -287,7 +315,7 @@ test(
             flows: [{
                 id: 'f1',
                 name: 'F',
-                updated_at: '2024-01-01T00:00:00Z',
+                updated_at: '2024-01-01T00:00:00.000000Z',
             }],
         });
         await assert.rejects(
@@ -374,7 +402,7 @@ test(
                         entity_id: 'e1',
                         state: value,
                         member_id: 'w1',
-                        at: '2026-01-01T00:00:00Z',
+                        at: '2026-01-01T00:00:00.000000Z',
                     }],
                 });
                 const expected =
@@ -407,13 +435,29 @@ async function anonToken(): Promise<string> {
 // correct answer without a 401 at the gate.
 test(
     'getHasAnyHumanMembers is false for an anonymous viewer'
-    + ' with no members',
+    + ' before a schema exists',
     async () => {
+        const db = new MemoryDbAdapter();
+        const ctx = createRequestContext(db, await anonToken());
+        assert.equal(
+            await getHasAnyHumanMembers(ctx), false);
+    },
+);
+
+test(
+    'getHasAnyHumanMembers reads the closed plane as'
+    + ' data-present for an anonymous viewer',
+    async () => {
+        // Once a schema exists the snapshot plane is bearer-
+        // closed: the anonymous viewer cannot count members,
+        // so the conservative answer is true — the page must
+        // never offer a destructive seed over data it cannot
+        // see.
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
         const ctx = createRequestContext(db, await anonToken());
         assert.equal(
-            await getHasAnyHumanMembers(ctx), false);
+            await getHasAnyHumanMembers(ctx), true);
     },
 );
 

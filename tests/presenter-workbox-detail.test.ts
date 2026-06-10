@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import {
     jsonObjectField,
+    nowUtc,
     DEFAULT_LOCK_TIMEOUT,
     type WorkOrderEntity,
     type StateFieldValueEntity,
@@ -150,7 +151,7 @@ function makeTransition(
         from_node_id: '',
         to_node_id: 'n-1',
         member_id: 'p-1',
-        at: '2026-04-01T12:00:00.000Z',
+        at: '2026-04-01T12:00:00.000000Z',
         ...overrides,
     };
 }
@@ -400,13 +401,13 @@ test(
                     id: 't-1', from_node_id: '',
                     to_node_id: 'n-1',
                     at:
-                        '2026-04-01T12:00:00.000Z',
+                        '2026-04-01T12:00:00.000000Z',
                 }),
                 makeTransition({
                     id: 't-2', from_node_id: 'n-1',
                     to_node_id: 'n-2',
                     at:
-                        '2026-04-02T09:00:00.000Z',
+                        '2026-04-02T09:00:00.000000Z',
                 }),
             ],
         });
@@ -600,14 +601,14 @@ test(
                     to_node_id: 'n-1',
                     member_id: 'p-1',
                     at:
-                        '2026-04-01T12:00:00.000Z',
+                        '2026-04-01T12:00:00.000000Z',
                 }),
                 makeTransition({
                     id: 't-2', from_node_id: 'n-1',
                     to_node_id: 'n-2',
                     member_id: 'p-2',
                     at:
-                        '2026-04-03T08:00:00.000Z',
+                        '2026-04-03T08:00:00.000000Z',
                 }),
             ],
             fieldValues,
@@ -634,7 +635,7 @@ test(
         const presenter = makePresenter({
             activeClaim: {
                 memberId: 'p-1',
-                at: new Date().toISOString(),
+                at: nowUtc(),
             },
             currentMemberId: 'p-1',
         });
@@ -655,7 +656,7 @@ test(
         const presenter = makePresenter({
             activeClaim: {
                 memberId: 'p-2',
-                at: new Date().toISOString(),
+                at: nowUtc(),
             },
             currentMemberId: 'p-1',
         });

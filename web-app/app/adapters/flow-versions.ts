@@ -74,11 +74,15 @@ function compareRows(
     return 0;
 }
 
-export async function postFlowVersion(
+// The version-snapshot write set — the current flow row
+// captured as a new version, plus any over-cap trims — as
+// batch ops, so a caller can land them atomically beside
+// sibling ops in ONE ctx.commit.
+export async function postFlowVersionOps(
     ctx: RequestContext,
     versionId: string,
     flowId: string,
-): Promise<void> {
+): Promise<WriteOp[]> {
     const [flow, allVersions] = await Promise.all([
         ctx.GET<FlowEntity>('flows/' + flowId),
         ctx.GET<FlowVersionEntity[]>(
@@ -93,33 +97,39 @@ export async function postFlowVersion(
         (mine.length + 1) - FLOW_VERSION_CAP;
     const trims: WriteOp[] = [];
     for (let i = 0; i < excess; i++) {
-        trims.push({
-            method: 'delete',
-            resource:
-                'flow-versions/' + mine[i]!.id,
-        });
+        trims.push(deleteFlowVersionOp(mine[i]!.id));
     }
-    await ctx.commit({
-        ops: [
-            {
-                method: 'put',
-                resource:
-                    `flow-versions/${versionId}`,
-                body: {
-                    flow_id: flowId,
-                    name: flow.name,
-                    is_locked: flow.is_locked,
-                    is_auto_layout:
-                        flow.is_auto_layout,
-                    is_auto_fit: flow.is_auto_fit,
-                    lock_timeout:
-                        flow.lock_timeout,
-                    graph: flow.graph,
-                    at: nowUtc(),
-                },
+    return [
+        {
+            method: 'put',
+            resource:
+                `flow-versions/${versionId}`,
+            body: {
+                flow_id: flowId,
+                name: flow.name,
+                is_locked: flow.is_locked,
+                is_auto_layout:
+                    flow.is_auto_layout,
+                is_auto_fit: flow.is_auto_fit,
+                lock_timeout:
+                    flow.lock_timeout,
+                graph: flow.graph,
+                at: nowUtc(),
             },
-            ...trims,
-        ],
+        },
+        ...trims,
+    ];
+}
+
+export async function postFlowVersion(
+    ctx: RequestContext,
+    versionId: string,
+    flowId: string,
+): Promise<void> {
+    await ctx.commit({
+        ops: await postFlowVersionOps(
+            ctx, versionId, flowId,
+        ),
     });
     notifyFlowChange();
 }
@@ -136,13 +146,12 @@ export async function getFlowVersions(
         .map(computeFlowVersion);
 }
 
-export async function deleteFlowVersion(
-    ctx: RequestContext,
+export function deleteFlowVersionOp(
     versionId: string,
-): Promise<void> {
-    await ctx.DELETE(
-        'flow-versions/' + versionId,
-    );
-    notifyFlowChange();
+): WriteOp {
+    return {
+        method: 'delete',
+        resource: 'flow-versions/' + versionId,
+    };
 }
 

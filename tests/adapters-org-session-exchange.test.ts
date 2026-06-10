@@ -18,7 +18,7 @@ async function memberOf(orgs: string[]) {
     for (const [i, org] of orgs.entries()) {
         await db.memberships.put('m-' + i, {
             organization_id: org, identity_id: 'current',
-            at: '2026-06-04T00:00:00.000Z',
+            at: '2026-06-04T00:00:00.000000Z',
         });
     }
     return db;

@@ -288,7 +288,7 @@ test(
             entity_id: woId,
             state: 'n-finish',
             member_id: 'current',
-            at: '2030-01-01T00:00:00.000Z',
+            at: '2030-01-01T00:00:00.000000Z',
         });
         const {
             workOrders, transitionsByWo, memberMap,

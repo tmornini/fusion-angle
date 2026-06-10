@@ -28,7 +28,7 @@ test('getBaselineScoresForProject returns project rows',
                 project_id: 'p1', objective_id: 'o1',
                 score: 50,
                 member_id: 'w1',
-                at: '2026-05-14T00:00:00.000Z',
+                at: '2026-05-14T00:00:00.000000Z',
             },
         );
         await db.projectObjectiveBaselineScores.put(
@@ -37,7 +37,7 @@ test('getBaselineScoresForProject returns project rows',
                 project_id: 'p2', objective_id: 'o1',
                 score: -20,
                 member_id: 'w1',
-                at: '2026-05-14T00:00:00.000Z',
+                at: '2026-05-14T00:00:00.000000Z',
             },
         );
         const ctx = createRequestContext(db, await devToken());
@@ -58,7 +58,7 @@ test('getActualScoresForProject returns project rows',
                 project_id: 'p1', objective_id: 'o1',
                 score: 33,
                 member_id: 'w1',
-                at: '2026-05-14T00:00:00.000Z',
+                at: '2026-05-14T00:00:00.000000Z',
             },
         );
         const ctx = createRequestContext(db, await devToken());
@@ -79,7 +79,7 @@ test('getProjectScoring returns both lists',
                 project_id: 'p1', objective_id: 'o1',
                 score: 50,
                 member_id: 'w1',
-                at: '2026-05-14T00:00:00.000Z',
+                at: '2026-05-14T00:00:00.000000Z',
             },
         );
         await db.projectObjectiveActualScores.put(
@@ -88,7 +88,7 @@ test('getProjectScoring returns both lists',
                 project_id: 'p1', objective_id: 'o1',
                 score: 33,
                 member_id: 'w1',
-                at: '2026-05-15T00:00:00.000Z',
+                at: '2026-05-15T00:00:00.000000Z',
             },
         );
         const ctx = createRequestContext(db, await devToken());
@@ -105,8 +105,8 @@ async function seedTwoApprovedProjects(
     const projectBody = {
         organization_id: '1',
         description: 'd', progress: 0,
-        start_date: '2026-05-14T00:00:00.000Z',
-        target_end_date: '2026-05-14T00:00:00.000Z',
+        start_date: '2026-05-14',
+        target_end_date: '2026-05-14',
         estimated_cost: 0, actual_cost: 0,
     };
     await db.projects.put('p1', {
@@ -130,7 +130,7 @@ async function seedTwoApprovedProjects(
     await db.objectiveRevisions.put('o1:t0', {
         objective_id: 'o1', name: 'O', description: 'd',
         member_id: 'w1',
-        at: '2026-05-14T00:00:00.000Z',
+        at: '2026-05-14T00:00:00.000000Z',
     });
     await db.projectObjectiveBaselineScores.put(
         'p1:o1:t1',
@@ -138,7 +138,7 @@ async function seedTwoApprovedProjects(
             project_id: 'p1', objective_id: 'o1',
             score: 60,
             member_id: 'w1',
-            at: '2026-05-14T00:00:00.000Z',
+            at: '2026-05-14T00:00:00.000000Z',
         },
     );
     await db.projectObjectiveBaselineScores.put(
@@ -147,7 +147,7 @@ async function seedTwoApprovedProjects(
             project_id: 'p2', objective_id: 'o1',
             score: -20,
             member_id: 'w1',
-            at: '2026-05-14T00:00:00.000Z',
+            at: '2026-05-14T00:00:00.000000Z',
         },
     );
 }
@@ -202,7 +202,7 @@ test(
                 project_id: 'p1', objective_id: 'o1',
                 score: 40,
                 member_id: 'w1',
-                at: '2026-05-15T00:00:00.000Z',
+                at: '2026-05-15T00:00:00.000000Z',
             },
         );
         await db.projectObjectiveActualScores.put(
@@ -211,7 +211,7 @@ test(
                 project_id: 'p2', objective_id: 'o1',
                 score: 10,
                 member_id: 'w1',
-                at: '2026-05-16T00:00:00.000Z',
+                at: '2026-05-16T00:00:00.000000Z',
             },
         );
         const ctx = createRequestContext(db, await devToken());
@@ -224,13 +224,13 @@ test(
             points.map(p => p.value), [20, 40, 25],
         );
         assert.equal(
-            points[0]?.at, '2026-05-14T00:00:00.000Z',
+            points[0]?.at, '2026-05-14T00:00:00.000000Z',
         );
         assert.equal(
-            points[1]?.at, '2026-05-15T00:00:00.000Z',
+            points[1]?.at, '2026-05-15T00:00:00.000000Z',
         );
         assert.equal(
-            points[2]?.at, '2026-05-16T00:00:00.000Z',
+            points[2]?.at, '2026-05-16T00:00:00.000000Z',
         );
         // baselineMean = (60 + -20) / 2 = 20
         // after t1 (p1=40 only):        40
@@ -250,7 +250,7 @@ test(
                 project_id: 'p1', objective_id: 'o1',
                 score: 40,
                 member_id: 'w1',
-                at: '2026-05-15T00:00:00.000Z',
+                at: '2026-05-15T00:00:00.000000Z',
             },
         );
         const ctx = createRequestContext(db, await devToken());
@@ -263,7 +263,7 @@ test(
             points.map(p => p.value), [20, 40],
         );
         assert.equal(
-            points[1]?.at, '2026-05-15T00:00:00.000Z',
+            points[1]?.at, '2026-05-15T00:00:00.000000Z',
         );
     },
 );
@@ -280,7 +280,7 @@ test(
                 project_id: 'p1', objective_id: 'o1',
                 score: 40,
                 member_id: 'w1',
-                at: '2026-05-15T00:00:00.000Z',
+                at: '2026-05-15T00:00:00.000000Z',
             },
         );
         await db.projectObjectiveActualScores.put(
@@ -289,7 +289,7 @@ test(
                 project_id: 'p2', objective_id: 'o1',
                 score: 10,
                 member_id: 'w1',
-                at: '2026-05-15T00:00:00.000Z',
+                at: '2026-05-15T00:00:00.000000Z',
             },
         );
         const ctx = createRequestContext(db, await devToken());
@@ -302,7 +302,7 @@ test(
             points.map(p => p.value), [20, 25],
         );
         assert.equal(
-            points[1]?.at, '2026-05-15T00:00:00.000Z',
+            points[1]?.at, '2026-05-15T00:00:00.000000Z',
         );
     },
 );
@@ -320,7 +320,7 @@ test(
             objective_id: 'o1',
             name: 'O', description: 'd',
             member_id: 'w1',
-            at: '2026-05-14T00:00:00.000Z',
+            at: '2026-05-14T00:00:00.000000Z',
         });
         const ctx = createRequestContext(db, await devToken());
         const trendlines = await getObjectiveTrendlines(

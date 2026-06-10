@@ -5,7 +5,7 @@ import { handleRequest } from '../api/api.ts';
 import { devToken } from './token-fixtures.ts';
 
 const BASE = 'http://localhost';
-const AT = '2026-06-04T00:00:00.000Z';
+const AT = '2026-06-04T00:00:00.000000Z';
 
 async function freshDb() {
     const db = new MemoryDbAdapter();

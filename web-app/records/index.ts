@@ -1,5 +1,6 @@
 import {
-    $, getRequiredAttribute, populateIcons,
+    $, $required, getRequiredAttribute,
+    populateIcons,
 } from '../app/dom.ts';
 import {
     buildSkeleton,
@@ -36,10 +37,9 @@ let listEl: HTMLElement | null = null;
 let badgesEl: HTMLElement | null = null;
 
 export async function init(): Promise<void> {
-    const recordsListEl = $(
+    const recordsListEl = $required(
         '#records-list', document,
     );
-    if (!recordsListEl) return;
 
     const ctx = sessionContext();
     const records = await withLoadingState(

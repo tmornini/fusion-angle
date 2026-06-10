@@ -329,7 +329,7 @@ test(
             graph: jsonObjectField({
                 nodes: [], edges: [],
             }),
-            at: '2026-01-01T00:00:00.000Z',
+            at: '2026-01-01T00:00:00.000000Z',
         });
         const json =
             await adapter.exportSnapshot();

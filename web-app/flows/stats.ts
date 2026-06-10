@@ -1,5 +1,5 @@
 import {
-    $, getRequiredAttribute,
+    $required, getRequiredAttribute,
 } from '../app/dom.ts';
 import { navigateTo } from '../app/core.ts';
 import {
@@ -98,8 +98,9 @@ export async function init(
         navigateTo('flows');
         return;
     }
-    const host = $('#flow-stats', document);
-    if (!host) return;
+    const host = $required(
+        '#flow-stats', document,
+    );
 
     await withLoadingState(
         host,

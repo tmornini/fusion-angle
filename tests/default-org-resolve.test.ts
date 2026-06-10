@@ -7,8 +7,8 @@ import type {
     IdentityDefaultOrgEntity,
 } from '../api/types.ts';
 
-const AT1 = '2026-01-01T00:00:00.000Z';
-const AT2 = '2026-02-01T00:00:00.000Z';
+const AT1 = '2026-01-01T00:00:00.000000Z';
+const AT2 = '2026-02-01T00:00:00.000000Z';
 
 function ev(
     id: string,

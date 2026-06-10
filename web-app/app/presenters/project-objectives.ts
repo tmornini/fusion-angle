@@ -21,6 +21,7 @@ interface Definition {
 }
 
 function indexByObjective<T extends {
+    id: string;
     objectiveId: ObjectiveId;
     projectId: string;
     at: string;

@@ -30,27 +30,27 @@ const baselines = [
     { id: 'b1',
       projectId: 'p1', objectiveId: 'o1',
       score: 50, memberId: 'w1',
-      at: '2026-03-01T14:23:00.000Z' },
+      at: '2026-03-01T14:23:00.000000Z' },
     { id: 'b2',
       projectId: 'p1', objectiveId: 'o1',
       score: 40, memberId: 'w1',
-      at: '2026-03-05T09:10:00.000Z' },
+      at: '2026-03-05T09:10:00.000000Z' },
 ];
 const actuals = [
     { id: 'a1',
       projectId: 'p1', objectiveId: 'o1',
       score: 45, memberId: 'w1',
-      at: '2026-04-01T16:45:00.000Z' },
+      at: '2026-04-01T16:45:00.000000Z' },
 ];
 const revisions = [
     { id: 'r1',
       objective_id: 'o1', name: 'Increase Revenue',
       description: 'd1', member_id: 'w1',
-      at: '2026-02-01T00:00:00.000Z' },
+      at: '2026-02-01T00:00:00.000000Z' },
     { id: 'r2',
       objective_id: 'o1', name: 'Drive Growth',
       description: 'd2', member_id: 'w1',
-      at: '2026-03-18T11:02:00.000Z' },
+      at: '2026-03-18T11:02:00.000000Z' },
 ];
 const archivations: {
     objectiveId: string; memberId: string;
@@ -140,7 +140,7 @@ test('positive score TD carries data-tone="success"', () => {
     const p = new ProjectScoreHistoryPresenter(
         [{ id: 'b1', projectId: 'p1', objectiveId: 'o1',
             score: 40, memberId: 'w1',
-            at: '2026-03-05T09:10:00.000Z' }],
+            at: '2026-03-05T09:10:00.000000Z' }],
         [], revisions, archivations, resolver, whoName,
     );
     const html = p.buildBody().toString();
@@ -153,7 +153,7 @@ test('negative score TD carries data-tone="error"', () => {
         [], [{ id: 'a1', projectId: 'p1',
             objectiveId: 'o1', score: -50,
             memberId: 'w1',
-            at: '2026-04-01T16:45:00.000Z' }],
+            at: '2026-04-01T16:45:00.000000Z' }],
         revisions, archivations, resolver, whoName,
     );
     const html = p.buildBody().toString();
@@ -165,7 +165,7 @@ test('zero score TD carries data-tone="muted"', () => {
     const p = new ProjectScoreHistoryPresenter(
         [{ id: 'b1', projectId: 'p1', objectiveId: 'o1',
             score: 0, memberId: 'w1',
-            at: '2026-03-05T09:10:00.000Z' }],
+            at: '2026-03-05T09:10:00.000000Z' }],
         [], revisions, archivations, resolver, whoName,
     );
     const html = p.buildBody().toString();
@@ -177,7 +177,7 @@ test('archival event row resolves the objective name '
     const dep = [{
         objectiveId: 'o1',
         memberId: 'w1',
-        at: '2026-05-01T08:00:00.000Z',
+        at: '2026-05-01T08:00:00.000000Z',
     }];
     const p = new ProjectScoreHistoryPresenter(
         [], [], revisions, dep, resolver, whoName,
@@ -204,7 +204,7 @@ test('Who column renders the actor name per row', () => {
         [{ id: 'b1', projectId: 'p1',
            objectiveId: 'o1', score: 40,
            memberId: 'w1',
-           at: '2026-03-05T09:10:00.000Z' }],
+           at: '2026-03-05T09:10:00.000000Z' }],
         [], [], [], resolver, who,
     );
     const html = p.buildBody().toString();

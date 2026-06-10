@@ -7,8 +7,9 @@ import {
     createRequestContext,
     type RequestContext,
 } from '../web-app/app/adapters/shared.ts';
-import { devToken } from './token-fixtures.ts';
+import { devToken, orgToken } from './token-fixtures.ts';
 import {
+    getOrganization,
     getOrganizationStats,
 } from '../web-app/app/adapters/admin.ts';
 import {
@@ -18,6 +19,7 @@ import {
 import { seedHumanMember } from './member-fixtures.ts';
 import {
     seedAdminSchema,
+    orgRow,
 } from './test-fixtures.ts';
 
 async function setupDb(): Promise<{
@@ -83,7 +85,7 @@ async function seedIdea(
     await db.ideaSubmissions.put('sub-' + id, {
         idea_id: id,
         member_id: submitter,
-        at: '2026-04-01T00:00:00Z',
+        at: '2026-04-01T00:00:00.000000Z',
     });
 }
 
@@ -186,5 +188,66 @@ test(
         assert.equal(stats.projectsCurrent, 0);
         assert.equal(stats.ideasCurrent, 0);
         assert.equal(stats.activePeopleCount, 0);
+    },
+);
+
+test(
+    'getOrganization derives seat usage from the'
+    + ' memberships ledger',
+    async () => {
+        const db = new MemoryDbAdapter();
+        await seedAdminSchema(db);
+        await db.organizations.put('1', orgRow('Acme'));
+        // two rows for one identity + one other:
+        // DISTINCT identities = 2, not 3
+        await db.memberships.put('m1', {
+            organization_id: '1',
+            identity_id: 'current',
+            at: '2026-01-01T00:00:00.000000Z',
+        });
+        await db.memberships.put('m2', {
+            organization_id: '1',
+            identity_id: 'current',
+            at: '2026-02-01T00:00:00.000000Z',
+        });
+        await db.memberships.put('m3', {
+            organization_id: '1',
+            identity_id: 'other',
+            at: '2026-03-01T00:00:00.000000Z',
+        });
+        const ctx = createRequestContext(
+            db, await orgToken(),
+        );
+        const org = await getOrganization(ctx);
+        assert.equal(org.usedSeats(), 2);
+    },
+);
+
+test(
+    'getOrganization renders absent activity as a'
+    + ' dash, never a fabricated instant',
+    async () => {
+        const db = new MemoryDbAdapter();
+        await seedAdminSchema(db);
+        await db.organizations.put('1', orgRow('Acme'));
+        await db.memberships.put('m1', {
+            organization_id: '1',
+            identity_id: 'current',
+            at: '2026-01-01T00:00:00.000000Z',
+        });
+        const ctx = createRequestContext(
+            db, await orgToken(),
+        );
+        const before = await getOrganization(ctx);
+        assert.equal(before.lastActivityText(), '—');
+
+        await db.states.record(
+            'ev1', 'p1', 'approved', 'current',
+        );
+        const after = await getOrganization(ctx);
+        assert.notEqual(after.lastActivityText(), '—');
+        assert.match(
+            after.lastActivityText(), /\d{4}/,
+        );
     },
 );

@@ -52,7 +52,7 @@ const BASE = 'http://localhost';
 const issuedCode = {
     code: 'the-code', identity_id: 'current',
     client_id: 'web', status: 'issued',
-    at: '2026-06-03T00:00:00.000Z',
+    at: '2026-06-03T00:00:00.000000Z',
 };
 
 async function freshDb() {
@@ -94,6 +94,35 @@ async () => {
     // the 401 triggers refresh + org re-scope + one retry
     const members = await ctx.GET('members');
     assert.ok(Array.isArray(members));
+});
+
+test('concurrent 401s share exactly one refresh grant',
+async () => {
+    localStorage.clear();
+    const db = await freshDb();
+    const pair = await issuePair(db);
+    const deadAccess = await expiredToken();
+    putSessionCredentials({
+        accessToken: deadAccess,
+        refreshToken: pair.refresh_token,
+    });
+    setSessionToken(deadAccess);
+    const ctx = createRequestContext(
+        db, deadAccess, { recover: true });
+    // both reads 401 in parallel; a second refresh would be
+    // branded reuse and revoke the fresh chain
+    const [members, orgs] = await Promise.all([
+        ctx.GET('members'),
+        ctx.GET('organizations'),
+    ]);
+    assert.ok(Array.isArray(members));
+    assert.ok(Array.isArray(orgs));
+    // exactly ONE rotation event: the refresh jti was spent once
+    const rotations = (await db.identityTokens.getAll())
+        .filter(row => row.action === 'rotated');
+    assert.equal(rotations.length, 1);
+    // the session survived (nothing was branded reuse)
+    assert.notEqual(getSessionCredentials(), null);
 });
 
 test('a live credential with an anonymous-seed holder re-scopes'

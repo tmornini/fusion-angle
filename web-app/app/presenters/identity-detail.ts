@@ -18,9 +18,12 @@ import {
     type MemberPii,
     type ServiceFacet,
     type IdentityCredentialKind,
+    type IdentityKind,
 } from '../adapters/index.ts';
 
-const KIND_LABEL: Readonly<Record<string, string>> = {
+const KIND_LABEL: Readonly<
+    Record<IdentityKind, string>
+> = {
     person: 'Person',
     service: 'Service',
 };
@@ -108,7 +111,7 @@ function buildTitleSection(
                 ${name}
             </h1>
             <span class="badge badge-secondary text-xs">
-                ${KIND_LABEL[kind] ?? kind}
+                ${KIND_LABEL[kind]}
             </span>
         </div>
         <p class="text-sm text-muted">

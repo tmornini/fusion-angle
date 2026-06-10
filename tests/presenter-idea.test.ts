@@ -144,7 +144,7 @@ function makeIdea(
 function makeWithSubmitter(
     overrides: Partial<IdeaEntity> = {},
     submitterName = 'Ada Lovelace',
-    submittedAt = '2026-01-15T10:00:00.000Z',
+    submittedAt = '2026-01-15T10:00:00.000000Z',
     state: IdeaState = 'active',
 ): IdeaWithSubmitter {
     const entity = makeIdeaEntity(overrides);
@@ -255,7 +255,7 @@ test(
     () => {
         const presenter = new IdeaPresenter(
             makeIdea(), 'Ada Lovelace',
-            '2026-01-15T10:00:00.000Z',
+            '2026-01-15T10:00:00.000000Z',
         );
         const out = presenter
             .buildCard('position', true).toString();
@@ -500,7 +500,7 @@ test(
     () => {
         const presenter = new IdeaPresenter(
             makeIdea(), 'Grace Hopper',
-            '2026-02-02T08:30:00.000Z',
+            '2026-02-02T08:30:00.000000Z',
         );
         assert.equal(
             presenter.submitterName(),
@@ -508,7 +508,7 @@ test(
         );
         assert.equal(
             presenter.submittedAt(),
-            '2026-02-02T08:30:00.000Z',
+            '2026-02-02T08:30:00.000000Z',
         );
     },
 );
@@ -521,7 +521,7 @@ test(
     () => {
         const presenter = new IdeaEditPresenter(
             makeIdea(), FILLED_DRAFT,
-            'Ada', '2026-01-15T10:00:00.000Z',
+            'Ada', '2026-01-15T10:00:00.000000Z',
         );
         assert.equal(presenter.idForLink(), 'idea-1');
         assert.deepEqual(

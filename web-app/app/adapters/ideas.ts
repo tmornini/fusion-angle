@@ -38,7 +38,7 @@ import {
 
 const ideaChanges =
     createSubscriptionChannel(
-        ['ideas', 'idea-submissions', 'states'],
+        ['ideas', 'idea_submissions', 'states'],
     );
 
 export function subscribeIdeaChanges(

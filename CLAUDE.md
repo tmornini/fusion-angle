@@ -30,11 +30,8 @@ For local test-as-you-go:
 
 ### Sandbox invocation
 
-When running under the Claude Code sandbox, the defaults
-above fail two ways: `/tmp/` is not writable, and the tsx IPC
-pipe used by the `npx tsx` step inside `./build` lands in
-`$TMPDIR/tsx-501/…` which is outside the sandbox's allowed
-Unix-socket path (`/tmp/claude/tsx-501`). Use this invocation
+When running under the Claude Code sandbox, the default
+fails because `/tmp/` is not writable. Use this invocation
 instead:
 
 ```bash
@@ -42,8 +39,8 @@ TMPDIR=/tmp/claude ./serve 8080
 # open http://localhost:8080/landing/index.html
 ```
 
-`TMPDIR=/tmp/claude` redirects both tsx's IPC socket and
-`./serve`'s temp build dir into the sandbox-allowed path.
+`TMPDIR=/tmp/claude` redirects `./serve`'s temp build dir
+into the sandbox-allowed path.
 `localhost` is reachable from the sandbox, so the Chrome MCP
 tools can drive the page normally.
 

@@ -1,4 +1,6 @@
-import { $, populateIcons } from '../app/dom.ts';
+import {
+    $, $required, populateIcons,
+} from '../app/dom.ts';
 import {
     buildSkeleton, withLoadingState,
 } from '../app/loading-states.ts';
@@ -32,8 +34,9 @@ export async function init(
             navigateTo('identity-detail', { identityId });
         });
 
-    const list = $('#identity-tokens-list', document);
-    if (!list) return;
+    const list = $required(
+        '#identity-tokens-list', document,
+    );
 
     const ctx = sessionContext();
     const chains = await withLoadingState(

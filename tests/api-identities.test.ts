@@ -101,7 +101,7 @@ async function dbWithMember() {
     await seedAdminSchema(db);   // 'current' admin in org '1'
     await db.memberships.put('m-sarah', {
         organization_id: '1', identity_id: 'sarah',
-        at: '2026-06-08T00:00:00.000Z',
+        at: '2026-06-08T00:00:00.000000Z',
     });
     await db.identities.put('sarah', { kind: 'person' });
     await db.identityPii.put('sarah', PII);

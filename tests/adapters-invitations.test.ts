@@ -19,7 +19,7 @@ import {
     getSentInvitations,
 } from '../web-app/app/adapters/invitations.ts';
 
-const AT = '2026-01-01T00:00:00.000Z';
+const AT = '2026-01-01T00:00:00.000000Z';
 
 // Two orgs (Stark '1', Wayne '2'). Tony ('current') is admin
 // and member of both. Sarah is a Stark-only member. Dave is an

@@ -1,4 +1,4 @@
-import { $ } from '../app/dom.ts';
+import { $required } from '../app/dom.ts';
 import { createPageAbort } from '../app/page-lifecycle.ts';
 import { showToast } from '../app/toast.ts';
 import { log } from '../app/logger.ts';
@@ -38,18 +38,10 @@ interface LoadedIdentity {
 
 async function loadIdentity(
     identityId: string,
-): Promise<LoadedIdentity | null> {
+): Promise<LoadedIdentity> {
     const ctx = sessionContext();
-    let identity: Identity;
-    try {
-        identity = await getIdentity(ctx, identityId);
-    } catch (err) {
-        log.error(
-            'getIdentity failed',
-            'identities', err,
-        );
-        return null;
-    }
+    const identity =
+        await getIdentity(ctx, identityId);
     const pii = await getMemberPii(ctx, identityId);
     const service: ServiceFacet = identity.isService()
         ? await getServiceFacet(ctx, identityId)
@@ -86,10 +78,9 @@ export async function init(
     }
     currentId = identityId;
 
-    const container = $(
+    const container = $required(
         '#identity-detail-content', document,
     );
-    if (!container) return;
     pageContainer = container;
 
     const loaded = await withLoadingState(
@@ -99,7 +90,8 @@ export async function init(
         () => init(params),
     );
     if (!loaded) {
-        navigateTo('identities');
+        // a load fault already rendered the
+        // error-with-retry state in place
         return;
     }
 
@@ -172,7 +164,6 @@ async function handleErase(): Promise<void> {
     }
     showToast('Personal information erased', 'success');
     const loaded = await loadIdentity(currentId);
-    if (!loaded) return;
     new IdentityDetailPresenter(buildView(loaded))
         .renderUpdate(pageContainer);
 }

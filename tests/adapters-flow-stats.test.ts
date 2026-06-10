@@ -82,7 +82,8 @@ function buildFlow(
 function daysAgo(d: number): string {
     return new Date(
         Date.now() - d * 24 * 3600 * 1000,
-    ).toISOString();
+    ).toISOString()
+        .replace('Z', '000Z');
 }
 
 // c→a→z graph: c isCreate, z isArchive, a regular
@@ -119,22 +120,26 @@ test(
             buildFlow('Onboarding', buildTestGraph()),
         );
 
-        // Minimal work-order rows (no flow_graph
-        // needed — getFlowStats reads from
+        // Minimal VALID work-order graphs — the gate
+        // demands shape, but getFlowStats reads from
         // flow-work-orders and flow transitions,
-        // not from work-order.flow_graph)
+        // not from work-order.flow_graph
         await db.workOrders.put('wo1', {
             organization_id: '1',
             display_id: 'WO-1',
-            flow_graph:
-                jsonObjectField({}) as never,
+            flow_graph: jsonObjectField({
+                flowId: 'f1', name: 'Onboarding',
+                lockTimeout: 0, nodes: [], edges: [],
+            }),
             position: 1,
         });
         await db.workOrders.put('wo2', {
             organization_id: '1',
             display_id: 'WO-2',
-            flow_graph:
-                jsonObjectField({}) as never,
+            flow_graph: jsonObjectField({
+                flowId: 'f1', name: 'Onboarding',
+                lockTimeout: 0, nodes: [], edges: [],
+            }),
             position: 2,
         });
 
@@ -233,7 +238,10 @@ test(
         await db.workOrders.put('wo1', {
             organization_id: '1',
             display_id: 'WO-1',
-            flow_graph: jsonObjectField({}) as never,
+            flow_graph: jsonObjectField({
+                flowId: 'f1', name: 'AutoLayout',
+                lockTimeout: 0, nodes: [], edges: [],
+            }),
             position: 1,
         });
         await db.flowWorkOrders.put('fwo1', {

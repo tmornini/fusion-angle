@@ -3,9 +3,9 @@ import type {
     EntityStore,
     EntityValidator,
 } from './db.ts';
-import { extractErrorMessage } from './error-helpers.ts';
 import {
     EntityNotFound,
+    LedgerImmutabilityError,
     MissingTableError,
     TABLE_NAMES,
     keyed,
@@ -45,6 +45,7 @@ import type {
 import {
     nowUtc,
     assertInvitationState,
+    ValidationError,
     type Id,
     type InvitationState,
 } from './types.ts';
@@ -55,7 +56,18 @@ import {
     validateOrganizationEntity,
     validateRecordMultiPutBody,
     validateStateEntity,
+    validateWorkOrderFlowGraphJson,
 } from './validators.ts';
+import {
+    latestClaimEvent,
+    isClaimEventExpired,
+} from './work-order-claims.ts';
+import {
+    ATTRIBUTE_RESTRICT_TABLES,
+    collectAttributeReferrers,
+    hasReferrers,
+    describeReferrers,
+} from './record-attribute-refs.ts';
 import {
     verifyAccessToken,
     principalFromToken,
@@ -79,6 +91,8 @@ import {
     tokenRevocationReason,
     subjectOrgs,
     identityDefaultOrg,
+    rotateRefreshJti,
+    revokeTokenChain,
 } from './authentication.ts';
 
 export class ApiError {
@@ -138,20 +152,28 @@ const HTTP_CONFLICT = 409;
 // unauthenticated caller never reaches an instance lookup,
 // and resource-instance existence is never disclosed to it.
 // A 401 states only "no valid credentials," never that a
-// resource exists. The snapshot/bootstrap plane is EXEMPT
-// from the Bearer gate because it is infrastructure BELOW
-// the auth tier (it installs the datastore before any
-// identity can exist). Exempt-from-the-gate is NOT the same
-// as unauthenticated — it is a single audited surface; any
+// resource exists. The authentication grant surface is
+// permanently exempt — a caller cannot hold a token before
+// minting one. Exempt-from-the-gate is NOT the same as
+// unauthenticated — it is a single audited surface; any
 // addition here is security-sensitive.
-const BEARER_EXEMPT_ROUTES: ReadonlySet<string> =
+const AUTHENTICATION_ROUTES: ReadonlySet<string> =
+    new Set([
+        'authentication/token',
+        'authentication/authorize',
+    ]);
+
+// The snapshot/bootstrap plane is exempt ONLY while no schema
+// exists — infrastructure BELOW the auth tier (it installs
+// the datastore before any identity can exist). The moment a
+// schema exists, identities can exist, and the plane closes:
+// bearer plus the admin route policy, like any other route.
+const BOOTSTRAP_ROUTES: ReadonlySet<string> =
     new Set([
         'snapshots/schema',
         'snapshots/mock-data',
         'snapshots/bootstrap',
         'snapshots/import',
-        'authentication/token',
-        'authentication/authorize',
     ]);
 
 type GetHandler = (
@@ -301,8 +323,14 @@ async function applyRecordMultiPut(
     // attributes commit as one transaction — a mid-write
     // failure (e.g. a missing current member) rolls the
     // whole thing back rather than orphaning the record.
+    // Removed attributes are RESTRICTED inside the same tx:
+    // a referenced attribute 409s and the whole batch rolls
+    // back (api/record-attribute-refs.ts).
     await db.transaction(
-        ['records', 'record_attributes', 'states', 'members'],
+        [...new Set([
+            'records', 'record_attributes', 'states',
+            'members', ...ATTRIBUTE_RESTRICT_TABLES,
+        ])],
         async (view) => {
             await view.records.put(body.id, body.record);
             if (body.kind === 'create') {
@@ -314,6 +342,20 @@ async function applyRecordMultiPut(
                     body.initialState,
                     member.id,
                 );
+            }
+            if (removedIds.length > 0) {
+                const referrers =
+                    await collectAttributeReferrers(
+                        view, removedIds,
+                    );
+                for (const [id, refs] of referrers) {
+                    if (hasReferrers(refs)) {
+                        throw new ApiError(
+                            describeReferrers(id, refs),
+                            HTTP_CONFLICT,
+                        );
+                    }
+                }
             }
             if (
                 entries.length > 0
@@ -492,6 +534,33 @@ async function dispatchOpInTx(
     }
 }
 
+// Each batch op stands for the HTTP request it would have
+// been — so it faces the same role policy at the same gate.
+// One denied op fails the whole batch before any dispatch.
+// A malformed ops payload is NOT judged here: the dispatch
+// path's own validation raises the precise 400.
+export function commitOpsAuthzFailure(
+    payload: Record<string, unknown>,
+    roles: readonly string[],
+): string | null {
+    let ops: CommitOp[];
+    try {
+        ops = validateCommitBody(payload);
+    } catch {
+        return null;
+    }
+    for (const op of ops) {
+        const verb =
+            op.method === 'put' ? 'PUT' : 'DELETE';
+        if (!isPermitted(verb, '/' + op.resource, roles)) {
+            return 'forbidden: commit op ' + verb + ' /'
+                + op.resource
+                + ' requires a role this principal lacks';
+        }
+    }
+    return null;
+}
+
 // The batch route's body handler. One authenticated request;
 // `effective` is already org-scoped, and its transaction
 // re-scopes the view — so each op dispatches without re-auth
@@ -608,6 +677,38 @@ const routes: Route[] = [
         store: db => db.identityTokens,
         verbs: ['get', 'put'],
     }),
+    // Rotate a refresh jti. The ledger read, the rotation
+    // plan, and its appends ride ONE transaction
+    // (rotateRefreshJti — the same body the refresh grant
+    // runs), so two concurrent rotations of one chain
+    // cannot both observe the live jti (the lost-rotation
+    // TOCTOU). A live jti returns its successor; a
+    // known-but-not-live jti is reuse — the whole chain's
+    // revocation has already landed atomically — then 409.
+    route('identity-tokens/:jti/rotation', {
+        post: async (db, p) => {
+            const presented = param(p, 0);
+            const outcome = await rotateRefreshJti(
+                db, presented,
+            );
+            if (outcome.kind === 'rotate') {
+                return { jti: outcome.newJti };
+            }
+            throw new ApiError(
+                'refresh token is not live (reuse): '
+                    + presented,
+                HTTP_CONFLICT,
+            );
+        },
+    }),
+    // Revoke the whole chain a jti belongs to (log out one
+    // session). Read and appends ride one transaction; an
+    // unknown jti is an idempotent no-op.
+    route('identity-tokens/:jti/revocation', {
+        post: async (db, p) => {
+            await revokeTokenChain(db, param(p, 0));
+        },
+    }),
     route('clients', {
         get: (db) => db.clients.getAll(),
     }),
@@ -701,6 +802,72 @@ const routes: Route[] = [
         store: db => db.workOrders,
         verbs: ['get', 'put'],
     }),
+    // Claim a work order. The read of the prior claim and
+    // the append of the new claim events ride ONE
+    // transaction, so two concurrent claims cannot both
+    // observe "no live claim" (the duplicate-claim TOCTOU).
+    // A live claim by another member is a 409; by the
+    // caller, an idempotent no-op. A claim aged past the
+    // flow's lockTimeout is superseded: 'claim_expired'
+    // (naming the prior claimant) and the new 'claimed'
+    // land atomically.
+    route('work-orders/:id/claim', {
+        post: (db, p) =>
+            db.transaction(
+                ['work_orders', 'states', 'members'],
+                async (view) => {
+                    const workOrderId = param(p, 0);
+                    const wo = await view.workOrders
+                        .getById(workOrderId);
+                    const graph =
+                        validateWorkOrderFlowGraphJson(
+                            wo.flow_graph,
+                            'work_orders.flow_graph',
+                        );
+                    const member = await view.members
+                        .getById('current');
+                    const events = await view.states
+                        .allFor(workOrderId);
+                    const prior = latestClaimEvent(
+                        events, workOrderId,
+                    );
+                    const priorLive = prior !== null
+                        && prior.state === 'claimed'
+                        && !isClaimEventExpired(
+                            prior, graph.lockTimeout,
+                        );
+                    if (priorLive) {
+                        if (
+                            prior.member_id === member.id
+                        ) {
+                            return;
+                        }
+                        throw new ApiError(
+                            'work order is already'
+                                + ' claimed',
+                            HTTP_CONFLICT,
+                        );
+                    }
+                    if (
+                        prior !== null
+                        && prior.state === 'claimed'
+                    ) {
+                        await view.states.record(
+                            generateCryptoSafeBase62(),
+                            workOrderId,
+                            'claim_expired',
+                            prior.member_id,
+                        );
+                    }
+                    await view.states.record(
+                        generateCryptoSafeBase62(),
+                        workOrderId,
+                        'claimed',
+                        member.id,
+                    );
+                },
+            ),
+    }),
     route('flow-work-orders', {
         get: (db) =>
             db.flowWorkOrders.getAll(),
@@ -732,10 +899,46 @@ const routes: Route[] = [
         get: (db) =>
             db.recordAttributes.getAll(),
     }),
-    makeIdRoute<RecordAttributeEntity>({
-        noun: 'record-attributes',
-        store: db => db.recordAttributes,
-        verbs: ['get', 'put', 'delete'],
+    route('record-attributes/:id', {
+        get: (db, p) =>
+            db.recordAttributes.getById(param(p, 0)),
+        put: (db, p, body) =>
+            db.recordAttributes.put(
+                param(p, 0),
+                withoutId(body) as unknown as
+                    Omit<RecordAttributeEntity, 'id'>,
+            ),
+        // DELETE is RESTRICT, not cascade: an attribute
+        // still named by state_field_values rows or bound
+        // in a flow / work-order graph refuses to die (409
+        // naming the referrers) — destroying it would
+        // orphan immutable event payloads. The referrer
+        // check and the splice ride ONE transaction, so no
+        // writer can slip a new reference between them.
+        delete: (db, p) => {
+            const id = param(p, 0);
+            return db.transaction(
+                [...new Set([
+                    'record_attributes',
+                    ...ATTRIBUTE_RESTRICT_TABLES,
+                ])],
+                async (view) => {
+                    const referrers =
+                        await collectAttributeReferrers(
+                            view, [id],
+                        );
+                    const refs = referrers.get(id)!;
+                    if (hasReferrers(refs)) {
+                        throw new ApiError(
+                            describeReferrers(id, refs),
+                            HTTP_CONFLICT,
+                        );
+                    }
+                    await view.recordAttributes
+                        .delete(id);
+                },
+            );
+        },
     }),
     route('flow-records', {
         get: (db) =>
@@ -982,22 +1185,26 @@ async function authenticateRequest(
     return principalFromToken(token);
 }
 
-async function authorizeRequest(
+// Roles are per-org, but a grant is keyed by identity: read
+// this principal's grants through the identity_id index, then
+// currentRolesForInOrg filters to the org — identity is
+// global, roles are per-org. Derived ONCE per request at the
+// gate; every authorizer consumes the same derivation.
+async function callerRolesInOrg(
     adapter: DbAdapter,
     principal: Principal,
     org: Id,
-    method: string,
-    pathname: string,
-): Promise<string | null> {
-    // Roles are per-org, but a grant is keyed by identity:
-    // read this principal's grants through the identity_id
-    // index, then currentRolesForInOrg filters to the org —
-    // identity is global, roles are per-org.
+): Promise<string[]> {
     const rows = await keyed(adapter.roleGrants)
         .getAllWhere('identity_id', principal.id);
-    const roles = currentRolesForInOrg(
-        rows, principal.id, org,
-    );
+    return currentRolesForInOrg(rows, principal.id, org);
+}
+
+function authorizeRequest(
+    roles: readonly string[],
+    method: string,
+    pathname: string,
+): string | null {
     if (isPermitted(method, pathname, roles)) {
         return null;
     }
@@ -1009,13 +1216,12 @@ async function authorizeRequest(
 // its own (GET self); writes are its own OR an admin's (member
 // management). Mirrors the tree-ownership check of
 // /identities/:id/default-org, widened to admin for writes.
-async function authorizeIdentityPii(
-    adapter: DbAdapter,
+function authorizeIdentityPii(
     principal: Principal,
-    org: Id,
+    roles: readonly string[],
     method: string,
     targetId: string,
-): Promise<string | null> {
+): string | null {
     if (principal.id === targetId) {
         return null;
     }
@@ -1023,7 +1229,7 @@ async function authorizeIdentityPii(
         return 'forbidden: an identity may read only its'
             + ' own pii';
     }
-    if (await callerIsOrgAdmin(adapter, principal.id, org)) {
+    if (roles.includes('admin')) {
         return null;
     }
     return "forbidden: writing another identity's pii"
@@ -1098,12 +1304,41 @@ async function callerOrgIds(
     adapter: DbAdapter,
     principal: Principal,
 ): Promise<Set<Id>> {
-    const memberships = await adapter.memberships.getAll();
+    const memberships = await keyed(adapter.memberships)
+        .getAllWhere('identity_id', principal.id);
     return new Set(
-        memberships
-            .filter(m => m.identity_id === principal.id)
-            .map(m => m.organization_id),
+        memberships.map(m => m.organization_id),
     );
+}
+
+// Parse a request body that must be a JSON OBJECT. Valid JSON
+// that is not an object (null, number, string, array) is the
+// same client fault as malformed JSON — both stop at the 400
+// gate, neither reaches the domain boundary.
+type ParsedBody =
+    | { ok: true; body: Record<string, unknown> }
+    | { ok: false };
+
+async function parseObjectBody(
+    request: Request,
+): Promise<ParsedBody> {
+    let parsed: unknown;
+    try {
+        parsed = await request.json();
+    } catch {
+        return { ok: false };
+    }
+    if (
+        typeof parsed !== 'object'
+        || parsed === null
+        || Array.isArray(parsed)
+    ) {
+        return { ok: false };
+    }
+    return {
+        ok: true,
+        body: parsed as Record<string, unknown>,
+    };
 }
 
 // PUT/GET /identities/:id/default-org — the read/write face of
@@ -1142,17 +1377,14 @@ async function identityDefaultOrgRequest(
         });
     }
     if (request.method === 'PUT') {
-        let body: Record<string, unknown>;
-        try {
-            body = (await request.json()) as Record<
-                string, unknown
-            >;
-        } catch {
+        const parse = await parseObjectBody(request);
+        if (!parse.ok) {
             return Response.json(
                 { error: 'Invalid JSON body' },
                 { status: HTTP_BAD_REQUEST },
             );
         }
+        const body = parse.body;
         const org = typeof body.organization_id === 'string'
             ? body.organization_id
             : '';
@@ -1217,24 +1449,16 @@ async function callerIsOrgAdmin(
         .includes('admin');
 }
 
-// An invitation's current state: the latest event on its id,
-// resolved via latestByKey (the same derivation every entity's
-// state uses) rather than states.currentFor, whose strict-`>`
-// tiebreak keeps the FIRST event and would freeze a co-timestamped
-// lifecycle at 'pending'. On a same-millisecond `at` tie the
-// winner is backend-dependent (the memory tier preserves insertion
-// order; IndexedDB's index.getAll returns primary-key order) — not
-// an issue here, since each lifecycle transition is a distinct HTTP
-// request milliseconds-to-seconds apart, so `at` ties do not occur
-// in practice. Null when no event has been recorded.
+// An invitation's current state: the latest event on its id —
+// states.currentFor, the same (at, id) derivation every
+// entity's lifecycle uses. Null when no event has been
+// recorded.
 async function currentInvitationState(
     adapter: DbAdapter,
     id: Id,
 ): Promise<InvitationState | null> {
-    const events = await adapter.states.allFor(id);
-    const latest = latestByKey(events, ev => ev.entity_id)
-        .get(id);
-    return latest === undefined
+    const latest = await adapter.states.currentFor(id);
+    return latest === null
         ? null
         : assertInvitationState(latest.state, 'invitation ' + id);
 }
@@ -1414,14 +1638,11 @@ async function grantInvitation(
             'forbidden: granting an invitation requires an'
             + ' admin role', HTTP_FORBIDDEN);
     }
-    let body: Record<string, unknown>;
-    try {
-        body = (await request.json()) as Record<
-            string, unknown
-        >;
-    } catch {
+    const parse = await parseObjectBody(request);
+    if (!parse.ok) {
         return errorJson('Invalid JSON body', HTTP_BAD_REQUEST);
     }
+    const body = parse.body;
     const email = typeof body.email === 'string'
         ? body.email : '';
     if (email === '') {
@@ -1722,7 +1943,15 @@ export async function handleRequest(
     // stores fence to the org; the global identity/auth spine
     // passes through.
     let effective: DbAdapter = adapter;
-    if (!BEARER_EXEMPT_ROUTES.has(routePattern)) {
+    // The roles of an unauthenticated caller on a bearer-
+    // exempt route are honestly none; every fenced route
+    // overwrites this with the per-org derivation below.
+    let roles: readonly string[] = [];
+    const bearerExempt =
+        AUTHENTICATION_ROUTES.has(routePattern)
+        || (BOOTSTRAP_ROUTES.has(routePattern)
+            && !(await adapter.hasSchema()));
+    if (!bearerExempt) {
         const authResult =
             await authenticateRequest(adapter, request);
         if (typeof authResult === 'string') {
@@ -1744,14 +1973,32 @@ export async function handleRequest(
                 { status: HTTP_FORBIDDEN },
             );
         }
+        // The membership ledger is the live truth; the
+        // token's org claim is a mint-time snapshot of it.
+        // Re-derive membership on EVERY fenced request so a
+        // revoked membership stops access now — not when the
+        // token expires (the 15-minute de-membership window).
+        const memberOrgs =
+            await callerOrgIds(adapter, authResult);
+        if (!memberOrgs.has(org)) {
+            return Response.json(
+                {
+                    error: 'forbidden: no longer a member'
+                        + ' of this organization',
+                },
+                { status: HTTP_FORBIDDEN },
+            );
+        }
+        roles = await callerRolesInOrg(
+            adapter, authResult, org,
+        );
         const authzFailure =
             routePattern === 'identities/:id/pii'
-                ? await authorizeIdentityPii(
-                    adapter, authResult, org,
+                ? authorizeIdentityPii(
+                    authResult, roles,
                     method, param(params, 0))
-                : await authorizeRequest(
-                    adapter, authResult, org,
-                    method, pathname);
+                : authorizeRequest(
+                    roles, method, pathname);
         if (authzFailure !== null) {
             return Response.json(
                 { error: authzFailure },
@@ -1764,8 +2011,7 @@ export async function handleRequest(
         // org is created before its first membership exists.
         if (method === 'GET'
             && routePattern === 'organizations/:id'
-            && !(await callerOrgIds(adapter, authResult))
-                .has(param(params, 0))) {
+            && !memberOrgs.has(param(params, 0))) {
             return Response.json(
                 { error: 'Not found: ' + pathname },
                 { status: HTTP_NOT_FOUND },
@@ -1804,18 +2050,14 @@ export async function handleRequest(
     }
 
     // Parse the request body when the method
-    // has one. Malformed JSON is a client
-    // error (400), not a server fault — it
-    // must not flow into the domain-boundary
-    // try below.
+    // has one. A malformed or non-object JSON
+    // body is a client error (400), not a
+    // server fault — it must not flow into the
+    // domain-boundary try below.
     let body: Record<string, unknown> | undefined;
     if (method === 'PUT' || method === 'POST') {
-        try {
-            body = (await request.json()) as Record<
-                string,
-                unknown
-            >;
-        } catch {
+        const parse = await parseObjectBody(request);
+        if (!parse.ok) {
             return Response.json(
                 {
                     error:
@@ -1824,6 +2066,20 @@ export async function handleRequest(
                         + pathname,
                 },
                 { status: HTTP_BAD_REQUEST },
+            );
+        }
+        body = parse.body;
+    }
+
+    // The commit batch dispatches to the same route table —
+    // authorize each op as the request it stands for, with
+    // the roles already derived at the gate above.
+    if (routePattern === 'commit' && body !== undefined) {
+        const denied = commitOpsAuthzFailure(body, roles);
+        if (denied !== null) {
+            return Response.json(
+                { error: denied },
+                { status: HTTP_FORBIDDEN },
             );
         }
     }
@@ -1952,8 +2208,27 @@ export async function handleRequest(
                 { status: HTTP_NOT_FOUND },
             );
         }
+        if (
+            error instanceof LedgerImmutabilityError
+        ) {
+            return Response.json(
+                { error: error.message },
+                { status: HTTP_CONFLICT },
+            );
+        }
+        if (
+            error instanceof ValidationError
+        ) {
+            return Response.json(
+                { error: error.message },
+                { status: HTTP_BAD_REQUEST },
+            );
+        }
+        // The fault is server-side detail; the wire gets a
+        // fixed body, the console gets the evidence.
+        console.error(error);
         return Response.json(
-            { error: extractErrorMessage(error) },
+            { error: 'internal error' },
             { status: HTTP_INTERNAL_ERROR },
         );
     }

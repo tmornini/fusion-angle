@@ -154,7 +154,7 @@ function buildReadonlyTitleSection(
         <p class="text-sm text-muted">
             ${findProviderModel(
                 member.modelId(),
-            )?.provider ?? DISPLAY_ABSENT}
+            )!.provider}
         </p>`;
 }
 
@@ -333,10 +333,9 @@ function buildEditableSkillFocus(
 function buildReadonlyModel(
     modelId: string,
 ): SafeHtml {
-    const model = findProviderModel(modelId);
-    const label = model
-        ? model.name + ' — ' + model.provider
-        : DISPLAY_ABSENT;
+    const model = findProviderModel(modelId)!;
+    const label =
+        model.name + ' — ' + model.provider;
     return html`
         <div>
             <p class="${

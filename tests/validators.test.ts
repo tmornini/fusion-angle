@@ -95,6 +95,34 @@ test(
     },
 );
 
+test(
+    'validateHumanMemberEntity rejects non-string'
+    + ' strengths elements',
+    () => {
+        assert.throws(
+            () => validateHumanMemberEntity({
+                ...validHumanMember,
+                strengths: '[1, 2]',
+            }),
+            /HumanMemberEntity.strengths\[0\]/,
+        );
+    },
+);
+
+test(
+    'validateHumanMemberEntity rejects non-number'
+    + ' team dimension values',
+    () => {
+        assert.throws(
+            () => validateHumanMemberEntity({
+                ...validHumanMember,
+                team_dimensions: '{"driver":"high"}',
+            }),
+            /HumanMemberEntity.team_dimensions/,
+        );
+    },
+);
+
 // --- AIMemberEntity ---
 
 const validAIMember = {
@@ -287,6 +315,31 @@ test('validateProjectEntity rejects unknown key', () => {
     );
 });
 
+test(
+    'validateProjectEntity rejects a timestamp where a'
+    + ' calendar date belongs',
+    () => {
+    assert.throws(
+        () => validateProjectEntity({
+            ...validProject,
+            start_date: '2024-01-01T00:00:00.000000Z',
+        }),
+        /calendar date YYYY-MM-DD for ProjectEntity/,
+    );
+});
+
+test(
+    'validateProjectEntity rejects an impossible day',
+    () => {
+    assert.throws(
+        () => validateProjectEntity({
+            ...validProject,
+            target_end_date: '2024-02-30',
+        }),
+        /calendar date YYYY-MM-DD for ProjectEntity/,
+    );
+});
+
 // --- FlowEntity ---
 
 const validFlow = {
@@ -342,6 +395,58 @@ test(
     );
 });
 
+test(
+    'validateFlowEntity rejects a shapeless graph',
+    () => {
+    assert.throws(
+        () => validateFlowEntity({
+            ...validFlow,
+            graph: '{}',
+        }),
+        /expected array for FlowEntity.graph.nodes/,
+    );
+});
+
+function graphNode(id: string): Record<string, unknown> {
+    return {
+        id, name: 'n', positionX: 0, positionY: 0,
+        isCreate: false, isArchive: false,
+        memberIds: [], attributes: [],
+        taskInstructions: '',
+    };
+}
+
+test(
+    'validateFlowEntity rejects a node id outside the'
+    + ' id alphabet',
+    () => {
+    // markup-significant characters in a node id are the
+    // stored-XSS vector — the gate kills them at entry
+    assert.throws(
+        () => validateFlowEntity({
+            ...validFlow,
+            graph: JSON.stringify({
+                nodes: [graphNode('"><img src=x>')],
+                edges: [],
+            }),
+        }),
+        /must contain only \[A-Za-z0-9_-\]/,
+    );
+});
+
+test(
+    'validateFlowEntity accepts base62 node ids',
+    () => {
+    const result = validateFlowEntity({
+        ...validFlow,
+        graph: JSON.stringify({
+            nodes: [graphNode('n1')],
+            edges: [],
+        }),
+    });
+    assert.ok(result.graph.includes('n1'));
+});
+
 // --- FlowVersionEntity ---
 
 const validFlowVersion = {
@@ -352,7 +457,7 @@ const validFlowVersion = {
     is_auto_fit: true,
     lock_timeout: 28800,
     graph: '{"nodes":[],"edges":[]}',
-    at: '2024-01-01T00:00:00Z',
+    at: '2024-01-01T00:00:00.000000Z',
 };
 
 test(
@@ -414,12 +519,28 @@ test(
     );
 });
 
+test(
+    'validateWorkOrderEntity rejects a graph missing'
+    + ' flowId',
+    () => {
+    assert.throws(
+        () => validateWorkOrderEntity({
+            ...validWorkOrder,
+            flow_graph: JSON.stringify({
+                name: 'WO Flow', lockTimeout: 28800,
+                nodes: [], edges: [],
+            }),
+        }),
+        /WorkOrderEntity.flow_graph.flowId/,
+    );
+});
+
 // --- FlowWorkOrderEntity ---
 
 const validFlowWorkOrder = {
     flow_id: 'f-1',
     work_order_id: 'wo-1',
-    at: '2024-01-01T00:00:00Z',
+    at: '2024-01-01T00:00:00.000000Z',
 };
 
 test(
@@ -439,7 +560,7 @@ test(
     assert.throws(
         () => validateFlowWorkOrderEntity({
             flow_id: 'f-1',
-            at: '2024-01-01T00:00:00Z',
+            at: '2024-01-01T00:00:00.000000Z',
         }),
         /missing required key "work_order_id"/,
     );
@@ -484,10 +605,8 @@ const validOrg = {
     domain: 'acme.com',
     next_billing: '2025-01-01',
     seats: 10,
-    used_seats: 5,
     projects_limit: 50,
     ideas_limit: 200,
-    last_activity: '2024-01-01T00:00:00Z',
 };
 
 test(
@@ -532,10 +651,26 @@ test(
     const body = { ...validOrg };
     delete (
         body as Record<string, unknown>
-    )['last_activity'];
+    )['seats'];
     assert.throws(
         () => validateOrganizationEntity(body),
-        /missing required key "last_activity"/,
+        /missing required key "seats"/,
+    );
+});
+
+test(
+    'validateOrganizationEntity rejects the retired'
+    + ' stored aggregates',
+    () => {
+    // used_seats / last_activity are DERIVED from the
+    // memberships ledger and the states log — a stored
+    // copy is a second truth kept in sync by nothing
+    assert.throws(
+        () => validateOrganizationEntity({
+            ...validOrg,
+            used_seats: 5,
+        }),
+        /unexpected key "used_seats"/,
     );
 });
 
@@ -544,7 +679,7 @@ test(
 const validIdeaSubmission = {
     idea_id: 'i-1',
     member_id: 'u-1',
-    at: '2024-01-01T00:00:00Z',
+    at: '2024-01-01T00:00:00.000000Z',
 };
 
 test(
@@ -565,7 +700,7 @@ test(
     assert.throws(
         () => validateIdeaSubmissionEntity({
             member_id: 'u-1',
-            at: '2024-01-01T00:00:00Z',
+            at: '2024-01-01T00:00:00.000000Z',
         }),
         /missing required key "idea_id"/,
     );
@@ -576,7 +711,7 @@ test(
 const validProjectFlow = {
     project_id: 'p-1',
     flow_id: 'f-1',
-    at: '2024-01-01T00:00:00Z',
+    at: '2024-01-01T00:00:00.000000Z',
 };
 
 test(
@@ -596,7 +731,7 @@ test(
     assert.throws(
         () => validateProjectFlowEntity({
             project_id: 'p-1',
-            at: '2024-01-01T00:00:00Z',
+            at: '2024-01-01T00:00:00.000000Z',
         }),
         /missing required key "flow_id"/,
     );
@@ -838,5 +973,19 @@ test(
             options: '[]',
         }),
         /at least one option/,
+    );
+});
+
+test(
+    'validateRecordAttributeEntity rejects non-string'
+    + ' option elements on any type',
+    () => {
+    assert.throws(
+        () => validateRecordAttributeEntity({
+            ...validSelectAttribute,
+            attribute_type: 'text',
+            options: '[3]',
+        }),
+        /RecordAttributeEntity.options\[0\]/,
     );
 });

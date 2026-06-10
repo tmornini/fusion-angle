@@ -281,7 +281,7 @@ test(
         const out = validateFlowRecordEntity({
             flow_id: 'flow-1',
             record_id: 'rec-1',
-            at: '2026-05-01T00:00:00.000Z',
+            at: '2026-05-01T00:00:00.000000Z',
         });
         assert.equal(out.flow_id, 'flow-1');
         assert.equal(out.record_id, 'rec-1');

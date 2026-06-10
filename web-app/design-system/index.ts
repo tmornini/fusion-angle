@@ -1,4 +1,4 @@
-import { $ } from '../app/dom.ts';
+import { $required } from '../app/dom.ts';
 import {
     html,
     setHtml,
@@ -285,8 +285,9 @@ function buildFlowPropPanel(): SafeHtml {
 }
 
 export async function init(): Promise<void> {
-    const root = $('#design-system-content', document);
-    if (!root) return;
+    const root = $required(
+        '#design-system-content', document,
+    );
 
     setHtml(root, html`
     <div class="ds-page">

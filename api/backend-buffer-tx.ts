@@ -13,6 +13,11 @@ import type { Tx, TxMode } from './db.ts';
 // never in how the buffer is read or written here. The
 // NOT-NULL gate runs at `put` time, so a bad row throws
 // inside `fn` and the whole transaction rolls back.
+//
+// Reads hand out shallow copies (rows are flat), matching
+// IndexedDB's structured-clone-per-read value semantics —
+// a caller mutating a fetched row can never reach the
+// buffer or the committed store.
 export function bufferTx(
     buffer: Map<string, { id: string }[]>,
     mode: TxMode,
@@ -43,23 +48,27 @@ export function bufferTx(
             const row = scoped(table).find(
                 r => r.id === id,
             );
-            return (row ?? null) as T | null;
+            return row === undefined
+                ? null
+                : { ...row } as T;
         },
         async getAll<T extends { id: string }>(
             table: string,
         ): Promise<T[]> {
-            return [...scoped(table)] as T[];
+            return scoped(table).map(
+                row => ({ ...row }),
+            ) as T[];
         },
         async getWhere<T extends { id: string }>(
             table: string,
             column: string,
             key: string,
         ): Promise<T[]> {
-            return scoped(table).filter(
-                row => (
+            return scoped(table)
+                .filter(row => (
                     row as Record<string, unknown>
-                )[column] === key,
-            ) as T[];
+                )[column] === key)
+                .map(row => ({ ...row })) as T[];
         },
         async put<T extends { id: string }>(
             table: string,

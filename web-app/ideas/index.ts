@@ -1,4 +1,7 @@
-import { $, getRequiredAttribute, populateIcons } from '../app/dom.ts';
+import {
+    $, $required, getRequiredAttribute,
+    populateIcons,
+} from '../app/dom.ts';
 import { createPageAbort } from '../app/page-lifecycle.ts';
 import { html } from '../app/safe-html.ts';
 import {
@@ -34,10 +37,9 @@ let listEl: HTMLElement | null = null;
 let badgesEl: HTMLElement | null = null;
 
 export async function init(): Promise<void> {
-    const teamListEl = $(
+    const teamListEl = $required(
         '#ideas-list', document,
     );
-    if (!teamListEl) return;
 
     const ctx = sessionContext();
     const ideas = await withLoadingState(

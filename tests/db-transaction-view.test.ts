@@ -6,7 +6,7 @@ const aState = {
     entity_id: 'm1',
     state: 'active',
     member_id: 'm1',
-    at: '2026-01-01T00:00:00.000Z',
+    at: '2026-01-01T00:00:00.000000Z',
 };
 
 test(

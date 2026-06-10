@@ -40,7 +40,7 @@ function buildProject(
         title,
         description: 'desc',
         progress: 42,
-        start_date: '2026-01-01T00:00:00Z',
+        start_date: '2026-01-01',
         target_end_date:
             '2026-06-01T00:00:00Z',
         estimated_cost: 0,

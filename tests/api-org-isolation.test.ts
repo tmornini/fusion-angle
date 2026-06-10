@@ -41,11 +41,11 @@ async function twoOrgs(): Promise<MemoryDbAdapter> {
         organization_id: 'A', identity_id: 'current',
         role: 'admin', action: 'granted',
         by_member_id: 'system',
-        at: '2020-01-01T00:00:00.000Z',
+        at: '2020-01-01T00:00:00.000000Z',
     });
     await db.memberships.put('m-a', {
         organization_id: 'A', identity_id: 'current',
-        at: '2026-06-04T00:00:00.000Z',
+        at: '2026-06-04T00:00:00.000000Z',
     });
     await db.ideas.put('a1', ideaBody('A', 'mine'));
     await db.ideas.put('b1', ideaBody('B', 'theirs'));
@@ -114,7 +114,7 @@ async function rolelessMemberDb(): Promise<MemoryDbAdapter> {
     await db.organizations.put('B', orgRow('Beta'));
     await db.memberships.put('m-sarah-a', {
         organization_id: 'A', identity_id: 'sarah',
-        at: '2026-06-04T00:00:00.000Z',
+        at: '2026-06-04T00:00:00.000000Z',
     });
     return db;
 }
@@ -148,13 +148,13 @@ async () => {
 
 // ---- T8: the parent-derived READ fence (server-side join) ----
 
-const T8_AT = '2026-06-04T00:00:00.000Z';
+const T8_AT = '2026-06-04T00:00:00.000000Z';
 
 function projectBody(org: string) {
     return {
         organization_id: org, title: 't', description: 'd',
-        progress: 0, start_date: T8_AT,
-        target_end_date: T8_AT, estimated_cost: 0,
+        progress: 0, start_date: '2026-06-04',
+        target_end_date: '2026-06-04', estimated_cost: 0,
         actual_cost: 0, position: 0,
     };
 }
@@ -163,14 +163,19 @@ function flowBody(org: string) {
     return {
         organization_id: org, name: 'f', is_locked: false,
         is_auto_layout: false, is_auto_fit: false,
-        lock_timeout: 0, graph: jsonObjectField({}),
+        lock_timeout: 0,
+        graph: jsonObjectField({ nodes: [], edges: [] }),
     };
 }
 
 function workOrderBody(org: string) {
     return {
         organization_id: org, display_id: 'WO',
-        flow_graph: jsonObjectField({}), position: 0,
+        flow_graph: jsonObjectField({
+            flowId: 'f', name: 'f', lockTimeout: 0,
+            nodes: [], edges: [],
+        }),
+        position: 0,
     };
 }
 
@@ -191,7 +196,8 @@ async function seedChain(
     await db.flowVersions.put('fv' + s, {
         flow_id: 'f' + s, name: 'v', is_locked: false,
         is_auto_layout: false, is_auto_fit: false,
-        lock_timeout: 0, graph: jsonObjectField({}),
+        lock_timeout: 0,
+        graph: jsonObjectField({ nodes: [], edges: [] }),
         at: T8_AT,
     });
     await db.projectFlows.put('pf' + s, {

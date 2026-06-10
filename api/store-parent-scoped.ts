@@ -1,4 +1,4 @@
-import { EntityNotFound } from './db.ts';
+import { EntityNotFound, keyed } from './db.ts';
 import type {
     EntityStore,
     EntityPut,
@@ -65,6 +65,25 @@ export class ParentScopedEntityStore<T extends { id: string }>
             throw new EntityNotFound(this.#table, id);
         }
         return row;
+    }
+
+    // The keyed read, fenced like getAll: match through the
+    // inner index, then resolve each MATCHED row's owner —
+    // zero probe reads when nothing matches. Reached via
+    // keyed(); an in-tx caller must declare the resolver's
+    // probe tables alongside this one.
+    async getAllWhere(
+        column: string,
+        key: string,
+    ): Promise<T[]> {
+        const rows = await keyed(this.#inner)
+            .getAllWhere(column, key);
+        const owner = await Promise.all(
+            rows.map(row => this.#resolveOwningOrg(row)),
+        );
+        return rows.filter(
+            (_, i) => isVisible(owner[i]!, this.#org),
+        );
     }
 
     // Writes DELEGATE — they are not parent-fenced. A write

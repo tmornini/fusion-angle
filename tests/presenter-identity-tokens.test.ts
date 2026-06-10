@@ -50,12 +50,12 @@ test('renders a card per chain with each jti event', () => {
                 {
                     jti: 'j1', parentJti: '',
                     action: 'issued',
-                    at: '2026-01-01T00:00:00.000Z',
+                    at: '2026-01-01T00:00:00.000000Z',
                 },
                 {
                     jti: 'j2', parentJti: 'j1',
                     action: 'rotated',
-                    at: '2026-01-02T00:00:00.000Z',
+                    at: '2026-01-02T00:00:00.000000Z',
                 },
             ],
         },

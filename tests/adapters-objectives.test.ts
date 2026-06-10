@@ -107,33 +107,33 @@ test('getObjectiveRevisions returns all for an objective',
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
         await db.objectiveRevisions.put(
-            'o1:2026-05-14T00:00:00.000Z',
+            'o1:2026-05-14T00:00:00.000000Z',
             {
                 objective_id: 'o1',
                 name: 'Income',
                 description: 'd',
                 member_id: 'w1',
-                at: '2026-05-14T00:00:00.000Z',
+                at: '2026-05-14T00:00:00.000000Z',
             },
         );
         await db.objectiveRevisions.put(
-            'o1:2026-05-15T00:00:00.000Z',
+            'o1:2026-05-15T00:00:00.000000Z',
             {
                 objective_id: 'o1',
                 name: 'Increase incomes',
                 description: 'd2',
                 member_id: 'w1',
-                at: '2026-05-15T00:00:00.000Z',
+                at: '2026-05-15T00:00:00.000000Z',
             },
         );
         await db.objectiveRevisions.put(
-            'o2:2026-05-14T00:00:00.000Z',
+            'o2:2026-05-14T00:00:00.000000Z',
             {
                 objective_id: 'o2',
                 name: 'Expense',
                 description: 'd',
                 member_id: 'w1',
-                at: '2026-05-14T00:00:00.000Z',
+                at: '2026-05-14T00:00:00.000000Z',
             },
         );
         const ctx = ctxFor(db);
@@ -164,21 +164,21 @@ test('getCurrentObjectiveDefinition returns latest revision',
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
         await db.objectiveRevisions.put(
-            'o1:2026-05-14T00:00:00.000Z',
+            'o1:2026-05-14T00:00:00.000000Z',
             {
                 objective_id: 'o1', name: 'Old',
                 description: 'd1',
                 member_id: 'w1',
-                at: '2026-05-14T00:00:00.000Z',
+                at: '2026-05-14T00:00:00.000000Z',
             },
         );
         await db.objectiveRevisions.put(
-            'o1:2026-05-15T00:00:00.000Z',
+            'o1:2026-05-15T00:00:00.000000Z',
             {
                 objective_id: 'o1', name: 'New',
                 description: 'd2',
                 member_id: 'w1',
-                at: '2026-05-15T00:00:00.000Z',
+                at: '2026-05-15T00:00:00.000000Z',
             },
         );
         const ctx = ctxFor(db);
@@ -194,26 +194,26 @@ test('getObjectiveDefinitionAt returns historical name',
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
         await db.objectiveRevisions.put(
-            'o1:2026-05-14T00:00:00.000Z',
+            'o1:2026-05-14T00:00:00.000000Z',
             {
                 objective_id: 'o1', name: 'Old',
                 description: 'd1',
                 member_id: 'w1',
-                at: '2026-05-14T00:00:00.000Z',
+                at: '2026-05-14T00:00:00.000000Z',
             },
         );
         await db.objectiveRevisions.put(
-            'o1:2026-05-15T00:00:00.000Z',
+            'o1:2026-05-15T00:00:00.000000Z',
             {
                 objective_id: 'o1', name: 'New',
                 description: 'd2',
                 member_id: 'w1',
-                at: '2026-05-15T00:00:00.000Z',
+                at: '2026-05-15T00:00:00.000000Z',
             },
         );
         const ctx = ctxFor(db);
         const histDef = await getObjectiveDefinitionAt(
-            ctx, 'o1', '2026-05-14T12:00:00.000Z',
+            ctx, 'o1', '2026-05-14T12:00:00.000000Z',
         );
         assert.equal(histDef.name, 'Old');
     });

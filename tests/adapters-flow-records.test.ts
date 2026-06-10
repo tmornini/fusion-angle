@@ -21,7 +21,7 @@ import {
     DEFAULT_LOCK_TIMEOUT,
 } from '../api/types.ts';
 
-const AT = '2026-05-01T00:00:00.000Z';
+const AT = '2026-05-01T00:00:00.000000Z';
 
 async function seedWorkOrder(
     db: MemoryDbAdapter,

@@ -67,6 +67,20 @@ function dt(
         + `T${hours}:${minutes}:00.000000Z`;
 }
 
+// A calendar DATE (YYYY-MM-DD, no instant) — the grammar
+// validateCalendarDateField gates for project start/target
+// dates. Negative daysAgo reaches into the future, as dt.
+function dateOnly(daysAgo: number): string {
+    const d = new Date(Date.UTC(
+        now.getUTCFullYear(),
+        now.getUTCMonth(),
+        now.getUTCDate() - daysAgo,
+    ));
+    return d.getUTCFullYear() + '-'
+        + pad(d.getUTCMonth() + 1) + '-'
+        + pad(d.getUTCDate());
+}
+
 const MS_PER_HOUR =
     SECONDS_PER_HOUR * MS_PER_SECOND;
 const CREATE_DWELL_MS = 1000;
@@ -895,6 +909,23 @@ async function populateMockDataIn(
                 at: MOCK_SEED_TIMESTAMP,
             },
         ),
+        // Every non-admin human gets the member role in its
+        // membership org (same assignOrg(index) partition as
+        // the membership seed above), so each seeded sign-in
+        // lands on a working content tier — not a 403 wall.
+        ...members.flatMap((member, index) =>
+            member.id === 'current'
+                ? []
+                : [adapter.roleGrants.put(
+                    'seed-role-' + member.id + '-member', {
+                        organization_id: assignOrg(index),
+                        identity_id: member.id,
+                        role: 'member',
+                        action: 'granted',
+                        by_member_id: SYSTEM_MEMBER_ID,
+                        at: MOCK_SEED_TIMESTAMP,
+                    },
+                )]),
     ]);
 
     // Initial member state events. Every seeded
@@ -1257,20 +1288,16 @@ async function populateMockDataIn(
             domain: 'acmecorp.com',
             next_billing: dt(-300, 0, 0),
             seats: TIER_SEATS_LIMIT,
-            used_seats: 18,
             projects_limit: TIER_PROJECTS_LIMIT,
             ideas_limit: TIER_IDEAS_LIMIT,
-            last_activity: dt(0, 16, 0),
         }),
         adapter.organizations.put(ORG_TWO, {
             name: 'Wayne Enterprises',
             domain: 'wayne.example.com',
             next_billing: dt(-200, 0, 0),
             seats: TIER_SEATS_LIMIT,
-            used_seats: 5,
             projects_limit: TIER_PROJECTS_LIMIT,
             ideas_limit: TIER_IDEAS_LIMIT,
-            last_activity: dt(0, 12, 0),
         }),
     ]);
 
@@ -1290,8 +1317,8 @@ async function populateMockDataIn(
                 + ' behavior, purchase'
                 + ' history, and engagement.',
             progress: 67,
-            start_date: dt(60, 9, 0),
-            target_end_date: dt(-30, 9, 0),
+            start_date: dateOnly(60),
+            target_end_date: dateOnly(-30),
             estimated_cost: 88000,
             actual_cost: 51000,
             position: 1,
@@ -1306,8 +1333,8 @@ async function populateMockDataIn(
                 + ' ships formatted reports'
                 + ' on a schedule.',
             progress: 100,
-            start_date: dt(110, 9, 0),
-            target_end_date: dt(45, 9, 0),
+            start_date: dateOnly(110),
+            target_end_date: dateOnly(45),
             estimated_cost: 56000,
             actual_cost: 58000,
             position: 2,
@@ -1324,8 +1351,8 @@ async function populateMockDataIn(
                 + ' proposal, negotiation,'
                 + ' close.',
             progress: 69,
-            start_date: dt(55, 9, 0),
-            target_end_date: dt(-25, 9, 0),
+            start_date: dateOnly(55),
+            target_end_date: dateOnly(-25),
             estimated_cost: 78000,
             actual_cost: 48000,
             position: 3,
@@ -1340,8 +1367,8 @@ async function populateMockDataIn(
                 + ' equipment failures'
                 + ' before they occur.',
             progress: 17,
-            start_date: dt(18, 9, 0),
-            target_end_date: dt(-90, 9, 0),
+            start_date: dateOnly(18),
+            target_end_date: dateOnly(-90),
             estimated_cost: 110000,
             actual_cost: 7000,
             position: 4,
@@ -1356,8 +1383,8 @@ async function populateMockDataIn(
                 + ' automated anomaly alerts'
                 + ' for leadership.',
             progress: 100,
-            start_date: dt(95, 9, 0),
-            target_end_date: dt(40, 9, 0),
+            start_date: dateOnly(95),
+            target_end_date: dateOnly(40),
             estimated_cost: 50000,
             actual_cost: 52000,
             position: 5,
@@ -1372,8 +1399,8 @@ async function populateMockDataIn(
                 + ' triggers to cut carrying'
                 + ' costs and stockouts.',
             progress: 76,
-            start_date: dt(38, 9, 0),
-            target_end_date: dt(-12, 9, 0),
+            start_date: dateOnly(38),
+            target_end_date: dateOnly(-12),
             estimated_cost: 64000,
             actual_cost: 84000,
             position: 6,
@@ -1390,8 +1417,8 @@ async function populateMockDataIn(
                 + ' procedural questions for'
                 + ' new hires.',
             progress: 10,
-            start_date: dt(12, 9, 0),
-            target_end_date: dt(-110, 9, 0),
+            start_date: dateOnly(12),
+            target_end_date: dateOnly(-110),
             estimated_cost: 60000,
             actual_cost: 3500,
             position: 7,
@@ -1407,8 +1434,8 @@ async function populateMockDataIn(
                 + ' runbooks, and product'
                 + ' docs.',
             progress: 69,
-            start_date: dt(48, 9, 0),
-            target_end_date: dt(-22, 9, 0),
+            start_date: dateOnly(48),
+            target_end_date: dateOnly(-22),
             estimated_cost: 64000,
             actual_cost: 42000,
             position: 8,
@@ -1424,8 +1451,8 @@ async function populateMockDataIn(
                 + ' annual SOC 2 dossier in'
                 + ' hours rather than weeks.',
             progress: 86,
-            start_date: dt(72, 9, 0),
-            target_end_date: dt(-12, 9, 0),
+            start_date: dateOnly(72),
+            target_end_date: dateOnly(-12),
             estimated_cost: 102000,
             actual_cost: 142000,
             position: 9,
@@ -1440,8 +1467,8 @@ async function populateMockDataIn(
                 + ' five-minute RPO and'
                 + ' fifteen-minute RTO.',
             progress: 91,
-            start_date: dt(82, 9, 0),
-            target_end_date: dt(-8, 9, 0),
+            start_date: dateOnly(82),
+            target_end_date: dateOnly(-8),
             estimated_cost: 134000,
             actual_cost: 99000,
             position: 10,
@@ -1457,8 +1484,8 @@ async function populateMockDataIn(
                 + ' and onsite knowledge'
                 + ' access.',
             progress: 53,
-            start_date: dt(40, 9, 0),
-            target_end_date: dt(-35, 9, 0),
+            start_date: dateOnly(40),
+            target_end_date: dateOnly(-35),
             estimated_cost: 76000,
             actual_cost: 36000,
             position: 11,
@@ -1474,8 +1501,8 @@ async function populateMockDataIn(
                 + ' carbon ledger for ESG'
                 + ' reporting.',
             progress: 100,
-            start_date: dt(120, 9, 0),
-            target_end_date: dt(35, 9, 0),
+            start_date: dateOnly(120),
+            target_end_date: dateOnly(35),
             estimated_cost: 62000,
             actual_cost: 56000,
             position: 12,
@@ -1490,8 +1517,8 @@ async function populateMockDataIn(
                 + ' then surface gaps eight'
                 + ' weeks before they bite.',
             progress: 17,
-            start_date: dt(22, 9, 0),
-            target_end_date: dt(-105, 9, 0),
+            start_date: dateOnly(22),
+            target_end_date: dateOnly(-105),
             estimated_cost: 90000,
             actual_cost: 8500,
             position: 13,
@@ -1506,8 +1533,8 @@ async function populateMockDataIn(
                 + ' tier without a human'
                 + ' bottleneck.',
             progress: 78,
-            start_date: dt(65, 9, 0),
-            target_end_date: dt(-18, 9, 0),
+            start_date: dateOnly(65),
+            target_end_date: dateOnly(-18),
             estimated_cost: 70000,
             actual_cost: 45000,
             position: 14,
@@ -1523,8 +1550,8 @@ async function populateMockDataIn(
                 + ' workflows, and'
                 + ' audit-ready exports.',
             progress: 67,
-            start_date: dt(58, 9, 0),
-            target_end_date: dt(-28, 9, 0),
+            start_date: dateOnly(58),
+            target_end_date: dateOnly(-28),
             estimated_cost: 56000,
             actual_cost: 34000,
             position: 15,
@@ -1540,8 +1567,8 @@ async function populateMockDataIn(
                 + ' freshly submitted for'
                 + ' review.',
             progress: 0,
-            start_date: dt(5, 9, 0),
-            target_end_date: dt(-120, 9, 0),
+            start_date: dateOnly(5),
+            target_end_date: dateOnly(-120),
             estimated_cost: 42000,
             actual_cost: 0,
             position: 16,
@@ -6625,10 +6652,8 @@ async function populateBootstrapDataIn(
             domain: 'acmecorp.com',
             next_billing: dt(-300, 0, 0),
             seats: TIER_SEATS_LIMIT,
-            used_seats: 18,
             projects_limit: TIER_PROJECTS_LIMIT,
             ideas_limit: TIER_IDEAS_LIMIT,
-            last_activity: dt(0, 16, 0),
         }),
         adapter.roleGrants.put(
             'bootstrap-role-current-admin', {

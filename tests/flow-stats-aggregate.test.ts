@@ -53,7 +53,7 @@ export function makeFixture(): FlowStatsInput {
         workOrders: [],
         transitions: [],
         nowMs: Date.parse(
-            '2026-05-10T00:00:00.000Z',
+            '2026-05-10T00:00:00.000000Z',
         ),
         windowDays: 90,
         memberNameById: new Map(),

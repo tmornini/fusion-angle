@@ -138,17 +138,17 @@ async () => {
     await ctx.PUT('identity-providers/e1', {
         identity_id: 'p1', provider: 'google',
         provider_subject: 'g-1', action: 'linked',
-        at: '2026-01-01T00:00:00.000Z',
+        at: '2026-01-01T00:00:00.000000Z',
     });
     await ctx.PUT('identity-providers/e2', {
         identity_id: 'p1', provider: 'google',
         provider_subject: 'g-1', action: 'unlinked',
-        at: '2026-01-02T00:00:00.000Z',
+        at: '2026-01-02T00:00:00.000000Z',
     });
     await ctx.PUT('identity-providers/e3', {
         identity_id: 'other', provider: 'github',
         provider_subject: 'h-1', action: 'linked',
-        at: '2026-01-03T00:00:00.000Z',
+        at: '2026-01-03T00:00:00.000000Z',
     });
     const events = await getProviderEvents(ctx, 'p1');
     assert.equal(events.length, 2);
@@ -164,22 +164,22 @@ async () => {
     await ctx.PUT('identity-tokens/t1', {
         jti: 'j1', identity_id: 'p1', action: 'issued',
         chain_id: 'c1', parent_jti: '',
-        at: '2026-01-01T00:00:00.000Z',
+        at: '2026-01-01T00:00:00.000000Z',
     });
     await ctx.PUT('identity-tokens/t2', {
         jti: 'j2', identity_id: 'p1', action: 'issued',
         chain_id: 'c1', parent_jti: 'j1',
-        at: '2026-01-02T00:00:00.000Z',
+        at: '2026-01-02T00:00:00.000000Z',
     });
     await ctx.PUT('identity-tokens/t3', {
         jti: 'j3', identity_id: 'p1', action: 'issued',
         chain_id: 'c2', parent_jti: '',
-        at: '2026-01-03T00:00:00.000Z',
+        at: '2026-01-03T00:00:00.000000Z',
     });
     await ctx.PUT('identity-tokens/t4', {
         jti: 'j4', identity_id: 'other', action: 'issued',
         chain_id: 'c3', parent_jti: '',
-        at: '2026-01-04T00:00:00.000Z',
+        at: '2026-01-04T00:00:00.000000Z',
     });
     const chains = await getTokenChainsFor(ctx, 'p1');
     assert.equal(chains.length, 2);

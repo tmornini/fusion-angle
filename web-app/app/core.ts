@@ -57,6 +57,7 @@ import {
 import {
     postSessionRefresh,
 } from './adapters/session-refresh.ts';
+import { initErrorSurfacing } from './error-helpers.ts';
 import { redirectToLogin } from './auth-redirect.ts';
 import { navigateTo } from './navigation.ts';
 import { PAGE_REGISTRY } from './page-registry.ts';
@@ -270,6 +271,7 @@ async function installRefreshedSession(
 document.addEventListener(
     'DOMContentLoaded',
     async () => {
+        initErrorSurfacing();
         initState();
         initListeners();
 

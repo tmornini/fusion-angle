@@ -54,6 +54,7 @@ import {
     isProviderModelId,
 } from './provider-models.ts';
 import { extractErrorMessage } from './error-helpers.ts';
+import { ValidationError } from './types.ts';
 
 export function parseOrThrow(
     raw: string,
@@ -63,7 +64,7 @@ export function parseOrThrow(
         return JSON.parse(raw);
     } catch (e) {
         const msg = extractErrorMessage(e);
-        throw new Error(
+        throw new ValidationError(
             'invalid JSON for '
                 + label + ': ' + msg,
         );
@@ -75,7 +76,7 @@ export function asArray(
     label: string,
 ): unknown[] {
     if (!Array.isArray(value)) {
-        throw new Error(
+        throw new ValidationError(
             'expected array for '
                 + label
                 + ', got '
@@ -94,7 +95,7 @@ export function asObject(
         || value === null
         || Array.isArray(value)
     ) {
-        throw new Error(
+        throw new ValidationError(
             'expected object for '
                 + label
                 + ', got '
@@ -109,7 +110,7 @@ export function asString(
     label: string,
 ): string {
     if (typeof value !== 'string') {
-        throw new Error(
+        throw new ValidationError(
             'expected string for '
                 + label
                 + ', got '
@@ -127,7 +128,7 @@ export function asNumber(
         typeof value !== 'number'
         || !Number.isFinite(value)
     ) {
-        throw new Error(
+        throw new ValidationError(
             'expected finite number for '
                 + label
                 + ', got '
@@ -147,7 +148,7 @@ export function asScore(
         || value < -100
         || value > 100
     ) {
-        throw new Error(
+        throw new ValidationError(
             'expected integer in [-100, +100] for '
                 + label
                 + ', got '
@@ -162,7 +163,7 @@ export function asBoolean(
     label: string,
 ): boolean {
     if (typeof value !== 'boolean') {
-        throw new Error(
+        throw new ValidationError(
             'expected boolean for '
                 + label
                 + ', got '
@@ -250,7 +251,7 @@ function asNodeAttribute(
         !(NODE_ATTRIBUTE_MODES as
             readonly string[]).includes(mode)
     ) {
-        throw new Error(
+        throw new ValidationError(
             "expected 'editable' or 'readonly'"
             + ' for ' + label + '.mode, got '
             + mode,
@@ -305,7 +306,7 @@ export function asConstraint(
             ),
         };
     }
-    throw new Error(
+    throw new ValidationError(
         "expected Constraint kind 'regex',"
         + " 'range_min', or 'range_max' for "
         + label + '.kind, got ' + kind,
@@ -325,6 +326,28 @@ export function asMemberIds(
     );
 }
 
+// Graph node/edge ids flow into DOM ids and SVG markup, so
+// the gate pins them to the id alphabet — markup-significant
+// characters can never enter storage, killing the stored-XSS
+// class here rather than relying on every render site to
+// escape. Every id producer (designer, importers, seeds)
+// mints base62; _ and - are admitted for legacy snapshots.
+const GRAPH_ID_ALPHABET = /^[A-Za-z0-9_-]+$/;
+
+function asGraphId(
+    value: unknown,
+    label: string,
+): string {
+    const id = asString(value, label);
+    if (!GRAPH_ID_ALPHABET.test(id)) {
+        throw new ValidationError(
+            label + ' must contain only'
+            + ' [A-Za-z0-9_-], got ' + id,
+        );
+    }
+    return id;
+}
+
 function asGraphNode(
     value: unknown,
     label: string,
@@ -339,7 +362,7 @@ function asGraphNode(
         label + '.memberIds',
     );
     return {
-        id: asString(
+        id: asGraphId(
             obj['id'], label + '.id',
         ),
         name: asString(
@@ -382,17 +405,17 @@ function asGraphEdge(
 ): GraphEdge {
     const obj = asObject(value, label);
     return {
-        id: asString(
+        id: asGraphId(
             obj['id'], label + '.id',
         ),
         name: asString(
             obj['name'], label + '.name',
         ),
-        fromNodeId: asString(
+        fromNodeId: asGraphId(
             obj['fromNodeId'],
             label + '.fromNodeId',
         ),
-        toNodeId: asString(
+        toNodeId: asGraphId(
             obj['toNodeId'],
             label + '.toNodeId',
         ),
@@ -548,17 +571,21 @@ export function pickJsonObjectField(
     return asJsonObjectField(body[key], key);
 }
 
-// RFC-3339 zulu, sub-seconds optional. The Office of Time's
-// enemy is AMBIGUITY: a date-only stamp is reinterpreted as
-// midnight-UTC (shifting the day across zones) and a zoned
-// offset is localtime — both rejected here. Sub-second WIDTH is
-// the mint's job (nowUtc/dt/isoFromMs all emit 6); an
-// unambiguous zulu second is valid with or without a fraction.
-// Date.parse alone waves the ambiguous forms through, so the
-// shape is pinned; Date.parse then rejects impossible dates the
-// shape admits (e.g. month 13).
+// RFC-3339 zulu at EXACTLY six fraction digits — the one
+// width the mints emit (nowUtc/dt/isoFromMs) and the ledgers
+// sort. The Office of Time's enemy is AMBIGUITY (a date-only
+// stamp shifts the day across zones; a zoned offset is
+// localtime), and the latest-wins reductions add a second
+// enemy: WIDTH. Lexical compare is chronological only within
+// one width — a fractionless second sorts AFTER every
+// fractional stamp inside it ('Z' > '.'), so an admitted
+// off-width stamp could shadow the true latest event. The
+// gate is the persistence edge for externally-sourced rows
+// (PUT states/:id, the snapshot plane), so width is pinned
+// HERE; Date.parse then rejects impossible dates the shape
+// admits (e.g. month 13).
 const ISO_ZULU =
-    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,9})?Z$/;
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$/;
 
 // A string field that must be an RFC-3339 zulu timestamp;
 // returns it. The entity label names the offender — same message
@@ -570,11 +597,43 @@ export function validateTimestampField(
 ): string {
     const at = pickString(body, field);
     if (!ISO_ZULU.test(at) || Number.isNaN(Date.parse(at))) {
-        throw new Error(
+        throw new ValidationError(
             'invalid timestamp "' + at + '" on ' + entityLabel,
         );
     }
     return at;
+}
+
+// A calendar DATE, exactly YYYY-MM-DD — the OTHER temporal
+// grammar: a zone-neutral day marker, not an instant. Project
+// start/target dates carry no time of day; admitting a full
+// timestamp here would store two grammars in one column and
+// shift the rendered day across zones. Date.parse ROLLS OVER
+// an impossible day (2026-02-30 parses as March 1), so the
+// parsed instant is rendered back and must reproduce the
+// input day exactly.
+const CALENDAR_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+export function validateCalendarDateField(
+    body: Record<string, unknown>,
+    field: string,
+    entityLabel: string,
+): string {
+    const day = pickString(body, field);
+    const parsedMs = Date.parse(day);
+    if (
+        !CALENDAR_DATE.test(day)
+        || Number.isNaN(parsedMs)
+        || !new Date(parsedMs).toISOString()
+            .startsWith(day)
+    ) {
+        throw new ValidationError(
+            'expected calendar date YYYY-MM-DD for '
+            + entityLabel + '.' + field
+            + ', got "' + day + '"',
+        );
+    }
+    return day;
 }
 
 // A string field that must be one of `allowed`; returns the
@@ -592,7 +651,7 @@ export function validateEnumField<E extends string>(
     for (const option of allowed) {
         if (value === option) return option;
     }
-    throw new Error(
+    throw new ValidationError(
         'invalid ' + descriptor + ' "' + value
         + '" on ' + entityLabel,
     );
@@ -626,7 +685,7 @@ export function assertOnlyKeys(
     const expectedSet = new Set(expected);
     for (const key of Object.keys(body)) {
         if (!expectedSet.has(key)) {
-            throw new Error(
+            throw new ValidationError(
                 'unexpected key "'
                     + key + '"'
                     + ' for ' + label,
@@ -635,7 +694,7 @@ export function assertOnlyKeys(
     }
     for (const key of expected) {
         if (!(key in body)) {
-            throw new Error(
+            throw new ValidationError(
                 'missing required key "'
                     + key + '"'
                     + ' for ' + label,
@@ -927,6 +986,23 @@ export function validateHumanMemberEntity(
         HUMAN_MEMBER_BODY_KEYS,
         'HumanMemberEntity',
     );
+    // Structural gate: the columns store raw JSON strings,
+    // but their shapes are enforced at instantiation — the
+    // same validators the domain accessors run downstream
+    // as their transform.
+    const strengths = pickJsonArrayField(
+        body, 'strengths',
+    );
+    validateStringArrayJson(
+        strengths, 'HumanMemberEntity.strengths',
+    );
+    const teamDimensions = pickJsonObjectField(
+        body, 'team_dimensions',
+    );
+    validateStringNumberRecordJson(
+        teamDimensions,
+        'HumanMemberEntity.team_dimensions',
+    );
     return {
         title: pickString(
             body, 'title',
@@ -934,12 +1010,8 @@ export function validateHumanMemberEntity(
         department: pickString(
             body, 'department',
         ),
-        strengths: pickJsonArrayField(
-            body, 'strengths',
-        ),
-        team_dimensions: pickJsonObjectField(
-            body, 'team_dimensions',
-        ),
+        strengths,
+        team_dimensions: teamDimensions,
     };
 }
 
@@ -962,7 +1034,7 @@ export function validateAIMemberEntity(
     );
     const model = pickString(body, 'model');
     if (!isProviderModelId(model)) {
-        throw new Error(
+        throw new ValidationError(
             'model must be a known provider'
             + ' model id on AIMemberEntity',
         );
@@ -1044,11 +1116,11 @@ export function validateProjectEntity(
         progress: pickNumber(
             body, 'progress',
         ),
-        start_date: pickString(
-            body, 'start_date',
+        start_date: validateCalendarDateField(
+            body, 'start_date', 'ProjectEntity',
         ),
-        target_end_date: pickString(
-            body, 'target_end_date',
+        target_end_date: validateCalendarDateField(
+            body, 'target_end_date', 'ProjectEntity',
         ),
         estimated_cost: pickNumber(
             body, 'estimated_cost',
@@ -1075,6 +1147,12 @@ export function validateFlowEntity(
     assertOnlyKeys(
         body, FLOW_BODY_KEYS, 'FlowEntity',
     );
+    // Structural gate: the column stores the raw JSON string,
+    // but its shape (and the node/edge id alphabet) is
+    // enforced at instantiation — read adapters re-parse as
+    // their transform, never as a guard.
+    const graph = pickJsonObjectField(body, 'graph');
+    validateStoredGraphJson(graph, 'FlowEntity.graph');
     return {
         organization_id: pickString(body, 'organization_id'),
         name: pickString(
@@ -1092,9 +1170,7 @@ export function validateFlowEntity(
         lock_timeout: pickNumber(
             body, 'lock_timeout',
         ),
-        graph: pickJsonObjectField(
-            body, 'graph',
-        ),
+        graph,
     };
 }
 
@@ -1113,6 +1189,10 @@ export function validateFlowVersionEntity(
         body,
         FLOW_VERSION_BODY_KEYS,
         'FlowVersionEntity',
+    );
+    const graph = pickJsonObjectField(body, 'graph');
+    validateStoredGraphJson(
+        graph, 'FlowVersionEntity.graph',
     );
     return {
         flow_id: pickString(
@@ -1133,9 +1213,7 @@ export function validateFlowVersionEntity(
         lock_timeout: pickNumber(
             body, 'lock_timeout',
         ),
-        graph: pickJsonObjectField(
-            body, 'graph',
-        ),
+        graph,
         at: validateTimestampField(
             body, 'at', 'FlowVersionEntity',
         ),
@@ -1156,14 +1234,17 @@ export function validateWorkOrderEntity(
         WORK_ORDER_BODY_KEYS,
         'WorkOrderEntity',
     );
+    const flowGraph =
+        pickJsonObjectField(body, 'flow_graph');
+    validateWorkOrderFlowGraphJson(
+        flowGraph, 'WorkOrderEntity.flow_graph',
+    );
     return {
         organization_id: pickString(body, 'organization_id'),
         display_id: pickString(
             body, 'display_id',
         ),
-        flow_graph: pickJsonObjectField(
-            body, 'flow_graph',
-        ),
+        flow_graph: flowGraph,
         position: pickNumber(
             body, 'position',
         ),
@@ -1226,8 +1307,7 @@ validateStateFieldValueEntity(
 const ORGANIZATION_BODY_KEYS:
     readonly string[] = [
     'name', 'domain', 'next_billing',
-    'seats', 'used_seats', 'projects_limit',
-    'ideas_limit', 'last_activity',
+    'seats', 'projects_limit', 'ideas_limit',
 ];
 
 export function validateOrganizationEntity(
@@ -1251,17 +1331,11 @@ export function validateOrganizationEntity(
         seats: pickNumber(
             body, 'seats',
         ),
-        used_seats: pickNumber(
-            body, 'used_seats',
-        ),
         projects_limit: pickNumber(
             body, 'projects_limit',
         ),
         ideas_limit: pickNumber(
             body, 'ideas_limit',
-        ),
-        last_activity: pickString(
-            body, 'last_activity',
         ),
     };
 }
@@ -1394,7 +1468,7 @@ export function validateObjectiveRevisionEntity(
     );
     const name = pickString(body, 'name');
     if (name === '') {
-        throw new Error(
+        throw new ValidationError(
             'ObjectiveRevision.name must be non-empty',
         );
     }
@@ -1517,7 +1591,7 @@ export function validateRecordEntity(
     );
     const name = pickString(body, 'name');
     if (name === '') {
-        throw new Error(
+        throw new ValidationError(
             'RecordEntity.name must be'
             + ' non-empty',
         );
@@ -1551,7 +1625,7 @@ export function validateRecordAttributeEntity(
     );
     const name = pickString(body, 'name');
     if (name === '') {
-        throw new Error(
+        throw new ValidationError(
             'RecordAttributeEntity.name'
             + ' must be non-empty',
         );
@@ -1588,25 +1662,23 @@ export function validateRecordAttributeEntity(
     const optionsField = pickJsonArrayField(
         body, 'options',
     );
+    // Options are a string array for EVERY attribute type —
+    // the same shape the read adapter derives downstream.
+    const parsedOptions = validateStringArrayJson(
+        optionsField,
+        'RecordAttributeEntity.options',
+    );
     if (
-        attributeType === 'select'
-        || attributeType === 'radio'
+        (attributeType === 'select'
+            || attributeType === 'radio')
+        && parsedOptions.length === 0
     ) {
-        const parsedOptions = asArray(
-            parseOrThrow(
-                optionsField,
-                'RecordAttributeEntity.options',
-            ),
-            'RecordAttributeEntity.options',
+        throw new ValidationError(
+            'RecordAttributeEntity.options'
+            + ' must list at least one option'
+            + " for attribute_type '"
+            + attributeType + "'",
         );
-        if (parsedOptions.length === 0) {
-            throw new Error(
-                'RecordAttributeEntity.options'
-                + ' must list at least one option'
-                + " for attribute_type '"
-                + attributeType + "'",
-            );
-        }
     }
     return {
         organization_id: pickString(body, 'organization_id'),
@@ -1691,7 +1763,7 @@ function validateMultiPutAttribute(
     const validated =
         validateRecordAttributeEntity(rest);
     if (validated.record_id !== recordId) {
-        throw new Error(
+        throw new ValidationError(
             label + '.record_id must match'
             + ' top-level id; got '
             + validated.record_id
@@ -1784,7 +1856,7 @@ export function validateRecordMultiPutBody(
             removedAttributeIds,
         };
     }
-    throw new Error(
+    throw new ValidationError(
         "expected RecordMultiPutBody kind"
         + " 'create' or 'edit', got " + kind,
     );

@@ -5,8 +5,8 @@ import {
     mkdirSync,
 } from 'fs';
 import { join, dirname } from 'path';
-import { PAGE_REGISTRY } from './page-registry';
-import { buildSidebarNavItemsHtml } from './nav-items';
+import { PAGE_REGISTRY } from './page-registry.ts';
+import { buildSidebarNavItemsHtml } from './nav-items.ts';
 
 const ROOT = join(dirname(new URL(import.meta.url).pathname), '..');
 const outArg = process.argv[2];

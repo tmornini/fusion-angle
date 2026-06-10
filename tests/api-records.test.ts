@@ -161,7 +161,7 @@ test(
             id: 'fr-1',
             flow_id: 'flow-1',
             record_id: 'rec-1',
-            at: '2026-05-01T00:00:00.000Z',
+            at: '2026-05-01T00:00:00.000000Z',
         }, DEV_TOKEN);
         const stored = await GET<{
             id: string;
@@ -181,7 +181,7 @@ test(
             id: 'fr-1',
             flow_id: 'flow-1',
             record_id: 'rec-1',
-            at: '2026-05-01T00:00:00.000Z',
+            at: '2026-05-01T00:00:00.000000Z',
         }, DEV_TOKEN);
         await DELETE(db, 'flow-records/fr-1', DEV_TOKEN);
         await assert.rejects(

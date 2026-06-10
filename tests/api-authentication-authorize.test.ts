@@ -30,7 +30,7 @@ async function dbWithPasswordUser(): Promise<MemoryDbAdapter> {
     await db.identityCredentials.put('c1', {
         identity_id: 'current', kind: 'password',
         status: 'set', secret: await hashPassword('s3cret'),
-        at: '2026-06-03T00:00:00.000Z',
+        at: '2026-06-03T00:00:00.000000Z',
     });
     return db;
 }
@@ -95,7 +95,7 @@ async () => {
         identity_id: 'current', kind: 'password',
         status: 'revoked',
         secret: await hashPassword('s3cret'),
-        at: '2026-06-03T00:00:00.000Z',
+        at: '2026-06-03T00:00:00.000000Z',
     });
     const res = await handleRequest(db, authorize({
         method: 'password', username: 'demo@example.com',

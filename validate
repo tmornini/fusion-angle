@@ -1,12 +1,12 @@
 #!/bin/bash
 set -euo pipefail
 
-npx tsc --noEmit -p web-app/app/tsconfig.json
+npx --no-install tsc --noEmit -p web-app/app/tsconfig.json
 
 ./test
 
 AWK_LINT='length > 78 {
-  printf "%s:%d: %d chars\n", FILENAME, NR, length
+  printf "%s:%d: %d chars\n", FILENAME, FNR, length
 }'
 
 LONG_LINES=$( {

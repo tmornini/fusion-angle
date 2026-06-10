@@ -94,14 +94,14 @@ async () => {
         kind: 'password',
         status: 'set',
         secret: '',
-        at: '2026-02-01T00:00:00.000Z',
+        at: '2026-02-01T00:00:00.000000Z',
     });
     await db.identityCredentials.put('c2', {
         identity_id: 'p1',
         kind: 'password',
         status: 'revoked',
         secret: '',
-        at: '2026-01-01T00:00:00.000Z',
+        at: '2026-01-01T00:00:00.000000Z',
     });
     const state =
         await getIdentityCredentialState(ctx, 'p1');

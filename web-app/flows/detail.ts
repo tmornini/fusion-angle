@@ -1,5 +1,6 @@
 import {
-    $, $input, $inputRequired, $select,
+    $, $input, $inputRequired, $required,
+    $select,
 } from '../app/dom.ts';
 import { log } from '../app/logger.ts';
 import { setHtml, html } from '../app/safe-html.ts';
@@ -28,6 +29,7 @@ import {
     nowUtc,
     postClipboardCopy,
     subscribeResize,
+    type RequestContext,
 } from '../app/adapters/index.ts';
 import type {
     MemberId,
@@ -72,102 +74,11 @@ import {
     applyUpdateAttributeMode,
     applyUpdateAttributeRequired,
 } from '../app/flow-designer-actions.ts';
+import { Debouncer } from '../app/debouncer.ts';
 
 const FALLBACK_W = 800;
 const FALLBACK_H = 600;
 const SAVE_DELAY_MS = 800;
-
-class Debouncer {
-    #timer: ReturnType<
-        typeof setTimeout
-    > | undefined = undefined;
-    #pending:
-        | (() => void)
-        | undefined = undefined;
-    readonly #delayMs: number;
-    #scheduleCount: number = 0;
-    #burstStart: number = 0;
-
-    constructor(delayMs: number) {
-        this.#delayMs = delayMs;
-    }
-
-    schedule(fn: () => void): void {
-        if (this.#timer !== undefined) {
-            clearTimeout(this.#timer);
-        } else {
-            this.#scheduleCount = 0;
-            this.#burstStart =
-                performance.now();
-        }
-        this.#scheduleCount += 1;
-        this.#pending = fn;
-        const startedAt = this.#burstStart;
-        const count = this.#scheduleCount;
-        this.#timer = setTimeout(
-            () => {
-                this.#timer = undefined;
-                this.#pending = undefined;
-                const burstDurMs =
-                    performance.now() - startedAt;
-                const ratePerSec =
-                    burstDurMs > 0
-                        ? count / (burstDurMs / 1000)
-                        : 0;
-                const callStart =
-                    performance.now();
-                fn();
-                const callDurMs =
-                    performance.now() - callStart;
-                log.info(
-                    'flow save debouncer fire',
-                    'debouncer',
-                    {
-                        delayMs: this.#delayMs,
-                        burstSchedules: count,
-                        burstDurMs:
-                            Math.round(burstDurMs),
-                        keystrokesPerSec:
-                            Math.round(
-                                ratePerSec * 10,
-                            ) / 10,
-                        callDurMs:
-                            Math.round(
-                                callDurMs * 100,
-                            ) / 100,
-                    },
-                );
-            },
-            this.#delayMs,
-        );
-    }
-
-    flush(): void {
-        if (this.#timer !== undefined) {
-            clearTimeout(this.#timer);
-            this.#timer = undefined;
-        }
-        const pending = this.#pending;
-        this.#pending = undefined;
-        if (pending !== undefined) {
-            const callStart =
-                performance.now();
-            pending();
-            const callDurMs =
-                performance.now() - callStart;
-            log.info(
-                'flow save debouncer flush',
-                'debouncer',
-                {
-                    callDurMs:
-                        Math.round(
-                            callDurMs * 100,
-                        ) / 100,
-                },
-            );
-        }
-    }
-}
 
 type PanelStateRef = { open: boolean };
 
@@ -303,12 +214,14 @@ async function handleAddEdge(
     toId: string,
 ): Promise<void> {
     const snap = pageState.presenter().snapshot();
+    const ctx = sessionContext();
     const op = await performAddEdge(
-        sessionContext(), snap, fromId, toId,
+        ctx, snap, fromId, toId,
     );
     if (op.kind === 'fail') {
         await reportOpFailure(
-            op.toast, op.toastVariant, snap.flowId,
+            ctx, op.toast, op.toastVariant,
+            snap.flowId,
         );
         return;
     }
@@ -327,15 +240,14 @@ async function handleAddEdge(
 }
 
 async function reportOpFailure(
+    ctx: RequestContext,
     toast: string,
     toastVariant:
         | 'success' | 'error' | 'warning' | 'info',
     flowId: string,
 ): Promise<void> {
     showToast(toast, toastVariant);
-    const g = await getFlowGraph(
-        sessionContext(), flowId,
-    );
+    const g = await getFlowGraph(ctx, flowId);
     const current = pageState.presenter().snapshot();
     commit({
         ...current,
@@ -392,13 +304,15 @@ async function handleDeleteSelected(): Promise<void> {
 async function handleDeleteSelectedNodes(
 ): Promise<void> {
     const snap = pageState.presenter().snapshot();
+    const ctx = sessionContext();
     const op = await performDeleteSelectedNodes(
-        sessionContext(), snap,
+        ctx, snap,
     );
     if (op.kind === 'noop') return;
     if (op.kind === 'fail') {
         await reportOpFailure(
-            op.toast, op.toastVariant, snap.flowId,
+            ctx, op.toast, op.toastVariant,
+            snap.flowId,
         );
         return;
     }
@@ -423,13 +337,15 @@ async function handleDeleteSelectedNodes(
 async function handleDeleteSelectedEdge(
 ): Promise<void> {
     const snap = pageState.presenter().snapshot();
+    const ctx = sessionContext();
     const op = await performDeleteSelectedEdge(
-        sessionContext(), snap,
+        ctx, snap,
     );
     if (op.kind === 'noop') return;
     if (op.kind === 'fail') {
         await reportOpFailure(
-            op.toast, op.toastVariant, snap.flowId,
+            ctx, op.toast, op.toastVariant,
+            snap.flowId,
         );
         return;
     }
@@ -456,14 +372,16 @@ async function handleAddAttributeRef(
     attributeId: RecordAttributeId,
 ): Promise<void> {
     const snap = pageState.presenter().snapshot();
+    const ctx = sessionContext();
     const op = await performAddAttributeRef(
-        sessionContext(), snap, attributeId,
+        ctx, snap, attributeId,
         'editable', false,
     );
     if (op.kind === 'noop') return;
     if (op.kind === 'fail') {
         await reportOpFailure(
-            op.toast, op.toastVariant, snap.flowId,
+            ctx, op.toast, op.toastVariant,
+            snap.flowId,
         );
         return;
     }
@@ -483,13 +401,15 @@ async function handleRemoveAttributeRef(
     attributeId: RecordAttributeId,
 ): Promise<void> {
     const snap = pageState.presenter().snapshot();
+    const ctx = sessionContext();
     const op = await performRemoveAttributeRef(
-        sessionContext(), snap, attributeId,
+        ctx, snap, attributeId,
     );
     if (op.kind === 'noop') return;
     if (op.kind === 'fail') {
         await reportOpFailure(
-            op.toast, op.toastVariant, snap.flowId,
+            ctx, op.toast, op.toastVariant,
+            snap.flowId,
         );
         return;
     }
@@ -511,13 +431,15 @@ async function handleUpdateAttributeMode(
     mode: 'editable' | 'readonly',
 ): Promise<void> {
     const snap = pageState.presenter().snapshot();
+    const ctx = sessionContext();
     const op = await performUpdateAttributeMode(
-        sessionContext(), snap, attributeId, mode,
+        ctx, snap, attributeId, mode,
     );
     if (op.kind === 'noop') return;
     if (op.kind === 'fail') {
         await reportOpFailure(
-            op.toast, op.toastVariant, snap.flowId,
+            ctx, op.toast, op.toastVariant,
+            snap.flowId,
         );
         return;
     }
@@ -539,14 +461,16 @@ async function handleUpdateAttributeRequired(
     isRequired: boolean,
 ): Promise<void> {
     const snap = pageState.presenter().snapshot();
+    const ctx = sessionContext();
     const op = await performUpdateAttributeRequired(
-        sessionContext(), snap, attributeId,
+        ctx, snap, attributeId,
         isRequired,
     );
     if (op.kind === 'noop') return;
     if (op.kind === 'fail') {
         await reportOpFailure(
-            op.toast, op.toastVariant, snap.flowId,
+            ctx, op.toast, op.toastVariant,
+            snap.flowId,
         );
         return;
     }
@@ -569,12 +493,14 @@ async function handleAddNodeAtPosition(
     y: number,
 ): Promise<void> {
     const snap = pageState.presenter().snapshot();
+    const ctx = sessionContext();
     const op = await performAddNodeAtPosition(
-        sessionContext(), snap, fromId, x, y,
+        ctx, snap, fromId, x, y,
     );
     if (op.kind === 'fail') {
         await reportOpFailure(
-            op.toast, op.toastVariant, snap.flowId,
+            ctx, op.toast, op.toastVariant,
+            snap.flowId,
         );
         return;
     }
@@ -764,9 +690,9 @@ function bindSwitches(
     container: HTMLElement,
     signal: AbortSignal,
 ): void {
-    $(
+    $required(
         '#flow-lock-switch', container,
-    )?.addEventListener(
+    ).addEventListener(
         'click',
         () => {
             commit(
@@ -776,10 +702,10 @@ function bindSwitches(
         },
         { signal },
     );
-    $(
+    $required(
         '#flow-auto-layout-switch',
         container,
-    )?.addEventListener(
+    ).addEventListener(
         'click',
         () => {
             commit(
@@ -789,10 +715,10 @@ function bindSwitches(
         },
         { signal },
     );
-    $(
+    $required(
         '#flow-auto-fit-switch',
         container,
-    )?.addEventListener(
+    ).addEventListener(
         'click',
         () => {
             commitAndFit(
@@ -808,8 +734,8 @@ function bindBackButton(
     container: HTMLElement,
     signal: AbortSignal,
 ): void {
-    $('#flow-back-btn', container)
-        ?.addEventListener(
+    $required('#flow-back-btn', container)
+        .addEventListener(
             'click',
             () => {
                 const pid =
@@ -835,8 +761,8 @@ function bindStatsButton(
     signal: AbortSignal,
 ): void {
     const pid = pageState.projectId();
-    $('#flow-stats-btn', container)
-        ?.addEventListener(
+    $required('#flow-stats-btn', container)
+        .addEventListener(
             'click',
             () => {
                 navigateTo(
@@ -1332,7 +1258,7 @@ async function handleBindRecord(
         if (existing === recordId) return;
         if (existing !== null) {
             await deleteExistingFlowRecord(
-                flowId,
+                ctx, flowId,
             );
         }
         if (recordId !== null) {
@@ -1374,9 +1300,9 @@ async function handleBindRecord(
 }
 
 async function deleteExistingFlowRecord(
+    ctx: RequestContext,
     flowId: string,
 ): Promise<void> {
-    const ctx = sessionContext();
     const all = await ctx.GET<
         Array<{ id: string; flow_id: string }>
     >('flow-records');
@@ -1401,10 +1327,9 @@ export async function init(
         navigateTo('flows');
         return;
     }
-    const container = $(
+    const container = $required(
         '#flow-designer', document,
     );
-    if (!container) return;
     pageState.setContainer(container);
 
     const loaded = await withLoadingState(
@@ -1499,6 +1424,7 @@ export async function init(
     bindKeyboardShortcuts(
         container, panelStateRef, signal,
     );
+    bindFlushOnLeave(signal);
     const initialWrap = container.querySelector(
         '.flow-canvas-wrap',
     );
@@ -1537,6 +1463,32 @@ export async function init(
             reconcileFitFromDom();
         }
     });
+}
+
+// Every page leave is a full <a href> navigation, so a
+// debounced property edit still inside its SAVE_DELAY_MS
+// window would silently die with the document. Flush the
+// pending save the moment the page hides.
+function bindFlushOnLeave(
+    signal: AbortSignal,
+): void {
+    window.addEventListener(
+        'pagehide',
+        () => pageState.saveDebouncer().flush(),
+        { signal },
+    );
+    document.addEventListener(
+        'visibilitychange',
+        () => {
+            if (
+                document.visibilityState
+                    === 'hidden'
+            ) {
+                pageState.saveDebouncer().flush();
+            }
+        },
+        { signal },
+    );
 }
 
 function bindKeyboardShortcuts(

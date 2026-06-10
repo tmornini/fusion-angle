@@ -15,7 +15,8 @@ import {
     postClipboardCopy,
 } from '../app/adapters/index.ts';
 import {
-    $, $input, $button, createElement,
+    $, $button, $inputRequired, $required,
+    createElement,
 } from '../app/dom.ts';
 import {
     downloadBlob,
@@ -75,10 +76,9 @@ type PendingState =
 
 export async function init(
 ): Promise<void> {
-    const root = $(
+    const root = $required(
         '#snapshots-content', document,
     );
-    if (!root) return;
 
     const ctx = sessionContext();
     let pending: PendingState =
@@ -157,8 +157,9 @@ export async function init(
     function revealThenNavigate(
         creds: SeededCredentials,
     ): void {
-        const panel = $('#snapshots-content', document);
-        if (!panel) return;
+        const panel = $required(
+            '#snapshots-content', document,
+        );
         setHtml(panel, html`
             <div class="credential-reveal-wrap">
                 ${credentialRevealPanel(creds)}
@@ -167,9 +168,9 @@ export async function init(
                     I have saved it — continue
                 </button>
             </div>`);
-        $button(
+        $required(
             '#credential-copy-all-btn', document,
-        )?.addEventListener('click', async () => {
+        ).addEventListener('click', async () => {
             try {
                 await postClipboardCopy(
                     credentialsCopyText(creds),
@@ -189,9 +190,9 @@ export async function init(
             }
             showToast('Credentials copied', 'success');
         });
-        $button(
+        $required(
             '#credential-continue-btn', document,
-        )?.addEventListener(
+        ).addEventListener(
             'click',
             () => navigateTo('dashboard'),
         );
@@ -212,13 +213,10 @@ export async function init(
             button,
             label,
         };
-        const msg = $(
+        $required(
             '#confirm-wipe-message',
             document,
-        );
-        if (msg) {
-            msg.textContent = message;
-        }
+        ).textContent = message;
         openDialog('confirm-wipe');
     }
 
@@ -350,61 +348,57 @@ export async function init(
     mutateMissingTableBanner(root);
     await mutateEmptyBanner(root, ctx);
 
-    const wipeBtn = $button(
+    const wipeBtn = $required(
         '#wipe-btn', document,
+    ) as HTMLButtonElement;
+    wipeBtn.addEventListener(
+        'click',
+        () =>
+            confirmAction(
+                wipeBtn,
+                'Create pristine'
+                + ' environment',
+                async () => {
+                    await postSchemaCreation(ctx);
+                    return postBootstrap(ctx);
+                },
+                'Are you sure you'
+                + ' want to create a'
+                + ' pristine'
+                + ' environment? All'
+                + ' existing data'
+                + ' will be removed.'
+                + ' This cannot be'
+                + ' undone.',
+            ),
     );
-    if (wipeBtn) {
-        wipeBtn.addEventListener(
-            'click',
-            () =>
-                confirmAction(
-                    wipeBtn,
-                    'Create pristine'
-                    + ' environment',
-                    async () => {
-                        await postSchemaCreation(ctx);
-                        return postBootstrap(ctx);
-                    },
-                    'Are you sure you'
-                    + ' want to create a'
-                    + ' pristine'
-                    + ' environment? All'
-                    + ' existing data'
-                    + ' will be removed.'
-                    + ' This cannot be'
-                    + ' undone.',
-                ),
-        );
-    }
 
-    const reloadBtn = $button(
+    const reloadBtn = $required(
         '#reload-btn', document,
+    ) as HTMLButtonElement;
+    reloadBtn.addEventListener(
+        'click',
+        () =>
+            confirmAction(
+                reloadBtn,
+                'Load mock data',
+                async () => {
+                    await postSchemaCreation(ctx);
+                    return postMockDataLoad(ctx);
+                },
+                'Are you sure you want'
+                + ' to wipe all data and'
+                + ' load mock data? All'
+                + ' existing data will be'
+                + ' removed. This cannot'
+                + ' be undone.',
+            ),
     );
-    if (reloadBtn) {
-        reloadBtn.addEventListener(
-            'click',
-            () =>
-                confirmAction(
-                    reloadBtn,
-                    'Load mock data',
-                    async () => {
-                        await postSchemaCreation(ctx);
-                        return postMockDataLoad(ctx);
-                    },
-                    'Are you sure you want'
-                    + ' to wipe all data and'
-                    + ' load mock data? All'
-                    + ' existing data will be'
-                    + ' removed. This cannot'
-                    + ' be undone.',
-                ),
-        );
-    }
 
-    const importInput = $input(
+    const importInput = $inputRequired(
         '#upload-input', document,
     );
-    importInput?.addEventListener(
+    importInput.addEventListener(
         'change',
         async () => {
             const file =
@@ -455,9 +449,9 @@ export async function init(
         },
     );
 
-    $(
+    $required(
         '#download-btn', document,
-    )?.addEventListener(
+    ).addEventListener(
         'click',
         async () => {
             let json: string;
@@ -500,18 +494,18 @@ export async function init(
         },
     );
 
-    $(
+    $required(
         '#confirm-wipe-cancel', document,
-    )?.addEventListener(
+    ).addEventListener(
         'click',
         () => {
             pending = { kind: 'idle' };
             closeDialog('confirm-wipe');
         },
     );
-    $(
+    $required(
         '#confirm-wipe-backdrop', document,
-    )?.addEventListener(
+    ).addEventListener(
         'click',
         (e) => {
             if (
@@ -525,9 +519,9 @@ export async function init(
             }
         },
     );
-    $(
+    $required(
         '#confirm-wipe-submit', document,
-    )?.addEventListener(
+    ).addEventListener(
         'click',
         () => void executePending(),
     );
