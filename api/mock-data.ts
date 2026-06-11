@@ -556,11 +556,17 @@ export async function postMockDataLoad(
     // mid-seed failure leaves no half-populated schema. The
     // credentials seed runs after it commits — its PBKDF2
     // hashing is async crypto and cannot run inside the tx.
+    // The schema marker stamps LAST: it closes the anonymous
+    // bootstrap plane (request-auth BOOTSTRAP_ROUTES), so a
+    // failed seed must leave the plane open for retry.
+    await adapter.ensureTables(TABLE_NAMES);
     await adapter.transaction(
         TABLE_NAMES,
         (view) => postMockDataLoadIn(view),
     );
-    return seedHumanCredentials(adapter);
+    const creds = await seedHumanCredentials(adapter);
+    await adapter.postSchemaCreation();
+    return creds;
 }
 
 async function postMockDataLoadIn(
@@ -6560,12 +6566,17 @@ export async function postBootstrap(
 ): Promise<SeededCredentials> {
     // Seed the pristine bootstrap data in one transaction.
     // Credentials seed after it commits — PBKDF2 hashing is
-    // async crypto and cannot run inside the tx.
+    // async crypto and cannot run inside the tx. The schema
+    // marker stamps LAST so a failed bootstrap leaves the
+    // anonymous plane open for retry.
+    await adapter.ensureTables(TABLE_NAMES);
     await adapter.transaction(
         TABLE_NAMES,
         (view) => postBootstrapIn(view),
     );
-    return seedHumanCredentials(adapter);
+    const creds = await seedHumanCredentials(adapter);
+    await adapter.postSchemaCreation();
+    return creds;
 }
 
 async function postBootstrapIn(

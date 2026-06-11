@@ -377,6 +377,12 @@ export interface DbLifecycle {
     deleteSchema(): Promise<void>;
     hasSchema(): Promise<boolean>;
     postSchemaCreation(): Promise<void>;
+    // Make the named tables writable without declaring the
+    // schema present: the installer primitive data loads
+    // (seeds, snapshot import) run before their writes.
+    ensureTables(
+        tables: readonly string[],
+    ): Promise<void>;
     getSnapshot(): Promise<string>;
     putSnapshot(json: string): Promise<void>;
 }

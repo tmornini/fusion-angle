@@ -2,7 +2,6 @@ import {
     createRequestContext,
     sessionContext,
     deleteSchema,
-    postSchemaCreation,
     postBootstrap,
     postMockDataLoad,
     putSnapshotFromFile,
@@ -358,10 +357,7 @@ export async function init(
                 wipeBtn,
                 'Create pristine'
                 + ' environment',
-                async () => {
-                    await postSchemaCreation(ctx);
-                    return postBootstrap(ctx);
-                },
+                () => postBootstrap(ctx),
                 'Are you sure you'
                 + ' want to create a'
                 + ' pristine'
@@ -382,10 +378,7 @@ export async function init(
             confirmAction(
                 reloadBtn,
                 'Load mock data',
-                async () => {
-                    await postSchemaCreation(ctx);
-                    return postMockDataLoad(ctx);
-                },
+                () => postMockDataLoad(ctx),
                 'Are you sure you want'
                 + ' to wipe all data and'
                 + ' load mock data? All'

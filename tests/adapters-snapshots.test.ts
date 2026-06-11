@@ -29,7 +29,6 @@ import {
     getSnapshot,
     putSnapshot,
     putSnapshotFromFile,
-    postSchemaCreation,
     postMockDataLoad,
     deleteSchema,
     RETIRED_KEYS_PER_TABLE,
@@ -242,12 +241,16 @@ test(
     },
 );
 
-test('postSchemaCreation keeps existing data', async () => {
+test('a snapshot import stamps the schema marker', async () => {
     const { db, ctx } = await setup();
     await db.members.put('u1', {
         type: 'human',
     });
-    await postSchemaCreation(ctx);
+    const json = await getSnapshot(ctx);
+    await db.deleteSchema();
+    assert.equal(await db.hasSchema(), false);
+    await putSnapshot(ctx, json);
+    assert.equal(await db.hasSchema(), true);
     const rows = await db.members.getAll();
     assert.equal(rows.length, 1);
 });

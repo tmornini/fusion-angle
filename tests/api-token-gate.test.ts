@@ -1,7 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
-import { GET, PUT, handleRequest } from '../api/api.ts';
+import {
+    GET, POST, PUT, handleRequest,
+} from '../api/api.ts';
 import {
     devToken, expiredToken, notYetValidToken,
 } from './token-fixtures.ts';
@@ -82,6 +84,32 @@ test('public snapshot routes admit any token', async () => {
     });
     const snap = await GET(db, 'snapshots/schema', anon);
     assert.equal(snap, null);   // hasSchema false here
+});
+
+// The first-boot covenant: on a schema-less store the seed
+// route is ONE anonymous call that installs data, mints
+// credentials, and stamps the marker — and the stamp closes
+// the plane behind it. A second anonymous seed is refused.
+test('an anonymous first boot seeds once, then the plane'
++ ' closes', async () => {
+    const db = new MemoryDbAdapter();
+    const anon = await mintAccessToken({
+        aud: TOKEN_AUDIENCE,
+        sub: ANONYMOUS_ID, roles: [], name: 'Anonymous',
+        iat: 1_700_000_000, ttlSeconds: 10_000_000_000,
+        jti: 'anon-boot',
+    });
+    const creds = await POST<{
+        identities: readonly unknown[];
+    }>(
+        db, 'snapshots/mock-data', {}, anon,
+    );
+    assert.ok(creds.identities.length > 0);
+    assert.equal(await db.hasSchema(), true);
+    await assert.rejects(
+        () => POST(db, 'snapshots/mock-data', {}, anon),
+        /anonymous principal not authenticated/,
+    );
 });
 
 test('a logout-everywhere revokes earlier tokens', async () => {

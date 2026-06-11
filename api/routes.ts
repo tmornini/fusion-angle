@@ -737,7 +737,6 @@ export const routes: Route[] = [
                 ? db.getSnapshot()
                 : null,
         delete: (db) => db.deleteSchema(),
-        post: (db) => db.postSchemaCreation(),
     }),
     // DEMO-ONLY: these seed routes return SeededCredentials —
     // freshly-minted plaintext sign-ins surfaced in-band, once.

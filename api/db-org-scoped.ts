@@ -112,6 +112,8 @@ export function orgScopedAdapter(
         deleteSchema: () => base.deleteSchema(),
         hasSchema: () => base.hasSchema(),
         postSchemaCreation: () => base.postSchemaCreation(),
+        ensureTables: (tables) =>
+            base.ensureTables(tables),
         getSnapshot: () => base.getSnapshot(),
         putSnapshot: (json) =>
             base.putSnapshot(json),

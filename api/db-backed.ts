@@ -192,6 +192,12 @@ export class BackedDbAdapter
         return this.#backend.postSchemaCreation();
     }
 
+    ensureTables(
+        tables: readonly string[],
+    ): Promise<void> {
+        return this.#backend.ensureTables(tables);
+    }
+
     deleteSchema(): Promise<void> {
         return this.#backend.deleteSchema();
     }
@@ -231,6 +237,11 @@ export class BackedDbAdapter
                 }
             },
         );
+        // Imported data IS a schema: stamp the marker after
+        // the commit so hasSchema() answers true and the
+        // anonymous bootstrap plane closes behind a restore
+        // onto a fresh origin. A failed import never stamps.
+        await this.#backend.postSchemaCreation();
     }
 
     async transaction<R>(
@@ -254,6 +265,8 @@ export class BackedDbAdapter
             deleteSchema: () => this.deleteSchema(),
             hasSchema: () => this.hasSchema(),
             postSchemaCreation: () => this.postSchemaCreation(),
+            ensureTables: (tables) =>
+                this.ensureTables(tables),
             getSnapshot: () => this.getSnapshot(),
             putSnapshot: (json) =>
                 this.putSnapshot(json),

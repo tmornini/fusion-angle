@@ -193,12 +193,6 @@ export async function deleteSchema(
     await ctx.DELETE('snapshots/schema');
 }
 
-export async function postSchemaCreation(
-    ctx: RequestContext,
-): Promise<void> {
-    await ctx.POST('snapshots/schema', {});
-}
-
 export async function postMockDataLoad(
     ctx: RequestContext,
 ): Promise<SeededCredentials> {
