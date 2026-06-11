@@ -6,7 +6,7 @@ import { createPageAbort } from '../app/page-lifecycle.ts';
 import { html } from '../app/safe-html.ts';
 import {
     buildSkeleton,
-    withLoadingState,
+    loadInto,
 } from '../app/loading-states.ts';
 import {
     iconPlus, iconLightbulb,
@@ -18,6 +18,7 @@ import {
     subscribeIdeaChanges,
     isIdeaState,
     sessionContext,
+    type IdeaWithSubmitter,
 } from '../app/adapters/index.ts';
 import {
     IdeaListPresenter,
@@ -42,12 +43,12 @@ export async function init(): Promise<void> {
     );
 
     const ctx = sessionContext();
-    const ideas = await withLoadingState(
-        teamListEl,
-        buildSkeleton('card-list', 4),
-        () => getIdeas(ctx),
-        init,
-        {
+    await loadInto({
+        container: teamListEl,
+        skeleton: buildSkeleton('card-list', 4),
+        fetch: () => getIdeas(ctx),
+        retry: init,
+        emptyState: {
             icon: iconLightbulb(24, ''),
             title: 'No Ideas Yet',
             description:
@@ -64,7 +65,10 @@ export async function init(): Promise<void> {
                 )?.remove();
             },
         },
-    );
+        onData: ideas => onIdeasLoaded(
+            ideas, teamListEl,
+        ),
+    });
 
     populateIcons([
         ['#create-btn-icon', iconPlus(16, '')],
@@ -76,9 +80,12 @@ export async function init(): Promise<void> {
             () => navigateTo('idea-create'),
             { signal },
         );
+}
 
-    if (!ideas) return;
-
+function onIdeasLoaded(
+    ideas: IdeaWithSubmitter[],
+    teamListEl: HTMLElement,
+): void {
     ideaState = buildInitialIdeaListState(ideas);
     listEl = teamListEl;
     badgesEl = $(

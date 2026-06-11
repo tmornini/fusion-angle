@@ -5,6 +5,7 @@ import {
     TOKEN_AUDIENCE,
     verifyAccessToken,
     principalFromToken,
+    principalFromClaims,
     decodeAccessToken,
     latestRevocationAt,
     revokedThroughSeconds,
@@ -166,6 +167,24 @@ test('principalFromToken reads the orgs list', async () => {
 test('a flat token carries no orgs list', async () => {
     const p = principalFromToken(await token());
     assert.equal(p.organizations, undefined);
+});
+
+test('principalFromClaims matches principalFromToken on the'
+    + ' same token', async () => {
+    const variants = [
+        await token(),
+        await token({ org: '7' }),
+        await token({ orgs: ['1', '7'] }),
+        await token({ org: '7', orgs: ['1', '7'] }),
+    ];
+    for (const t of variants) {
+        const r = await verifyAccessToken(t, 1_700_000_100);
+        assert.equal(r.valid, true);
+        assert.deepEqual(
+            r.valid && principalFromClaims(r.claims),
+            principalFromToken(t),
+        );
+    }
 });
 
 test('decodeAccessToken rejects a non-array orgs claim',

@@ -383,7 +383,6 @@ test(
         const ready = makeIdea();
         assert.equal(ready.readinessValue(), 'ready');
         assert.equal(ready.isReady(), true);
-        assert.equal(ready.readinessLabel(), 'Ready');
     },
 );
 

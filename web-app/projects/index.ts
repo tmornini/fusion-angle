@@ -4,7 +4,7 @@ import {
 import { createPageAbort } from '../app/page-lifecycle.ts';
 import {
     buildSkeleton,
-    withLoadingState,
+    loadInto,
 } from '../app/loading-states.ts';
 import { iconFolderKanban } from '../app/icons.ts';
 import { navigateTo } from '../app/core.ts';
@@ -19,6 +19,7 @@ import {
     subscribeProjectChanges,
     subscribeProjectScoreChanges,
     subscribeObjectiveChanges,
+    type Project,
     type ProjectEntity,
 } from '../app/adapters/index.ts';
 import {
@@ -76,12 +77,12 @@ export async function init(): Promise<void> {
     );
 
     const ctx = sessionContext();
-    const projects = await withLoadingState(
-        listEl,
-        buildSkeleton('card-list', 4),
-        () => getProjects(ctx),
-        init,
-        {
+    await loadInto({
+        container: listEl,
+        skeleton: buildSkeleton('card-list', 4),
+        fetch: () => getProjects(ctx),
+        retry: init,
+        emptyState: {
             icon: iconFolderKanban(24, ''),
             title: 'No Projects Yet',
             description:
@@ -91,9 +92,17 @@ export async function init(): Promise<void> {
                 href: '../ideas/create.html',
             },
         },
-    );
-    if (!projects) return;
+        onData: projects => onProjectsLoaded(
+            projects, listEl, ctx,
+        ),
+    });
+}
 
+async function onProjectsLoaded(
+    projects: Project[],
+    listEl: HTMLElement,
+    ctx: ReturnType<typeof createRequestContext>,
+): Promise<void> {
     const maps = await loadProjectMaps(ctx);
 
     projectState =

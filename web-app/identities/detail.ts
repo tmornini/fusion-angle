@@ -3,7 +3,7 @@ import { createPageAbort } from '../app/page-lifecycle.ts';
 import { showToast } from '../app/toast.ts';
 import { log } from '../app/logger.ts';
 import {
-    buildSkeleton, withLoadingState,
+    buildSkeleton, loadInto,
 } from '../app/loading-states.ts';
 import {
     navigateTo, openDialog, closeDialog,
@@ -86,24 +86,21 @@ export async function init(
     );
     pageContainer = container;
 
-    const loaded = await withLoadingState(
+    await loadInto({
         container,
-        buildSkeleton('detail', 4),
-        () => loadIdentity(identityId),
-        () => init(params),
-    );
-    if (!loaded) {
-        // a load fault already rendered the
-        // error-with-retry state in place
-        return;
-    }
-
-    new IdentityDetailPresenter(buildView(loaded))
-        .renderShell(container);
-    bindListeners(container);
-    subscribeIdentityChanges(
-        () => void refresh(),
-    );
+        skeleton: buildSkeleton('detail', 4),
+        fetch: () => loadIdentity(identityId),
+        retry: () => init(params),
+        onData: loaded => {
+            new IdentityDetailPresenter(
+                buildView(loaded),
+            ).renderShell(container);
+            bindListeners(container);
+            subscribeIdentityChanges(
+                () => void refresh(),
+            );
+        },
+    });
 }
 
 async function refresh(): Promise<void> {

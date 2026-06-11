@@ -1,4 +1,4 @@
-import { EntityNotFoundError, keyed } from './db.ts';
+import { EntityNotFoundError } from './db.ts';
 import type {
     DbAdapter,
     EntityStore,
@@ -70,14 +70,14 @@ export class ParentScopedEntityStore<T extends { id: string }>
 
     // The keyed read, fenced like getAll: match through the
     // inner index, then resolve each MATCHED row's owner —
-    // zero probe reads when nothing matches. Reached via
-    // keyed(); an in-tx caller must declare the resolver's
-    // probe tables alongside this one.
+    // zero probe reads when nothing matches. An in-tx caller
+    // must declare the resolver's probe tables alongside this
+    // one.
     async getAllWhere(
         column: string,
         key: string,
     ): Promise<T[]> {
-        const rows = await keyed(this.#inner)
+        const rows = await this.#inner
             .getAllWhere(column, key);
         const owner = await Promise.all(
             rows.map(row => this.#resolveOwningOrg(row)),

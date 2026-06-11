@@ -4,10 +4,10 @@ import {
     ambientRunner,
 } from './db.ts';
 import type {
-    DbAdapter,
-    DbStores,
+    GuardedDbAdapter,
+    GuardedDbStores,
+    GuardedEntityStore,
     StorageBackend,
-    EntityStore as IEntityStore,
     StateStore as IStateStore,
     Tx,
     TxRunner,
@@ -46,6 +46,7 @@ import type {
     ProjectObjectiveBaselineScore,
     ProjectObjectiveActualScore,
 } from './types.ts';
+import type { LatencySimulation } from './latency.ts';
 import { EntityStore } from './store-entity.ts';
 import { HistoryEntityStore }
     from './store-history-entity.ts';
@@ -97,66 +98,68 @@ import {
 // an open hook the async tiers (IndexedDB) use to connect
 // before any store op. Schema lifecycle delegates to the
 // backend, which signals "schema exists" its own way.
-export class BackedDbAdapter implements DbAdapter {
+export class BackedDbAdapter
+    implements GuardedDbAdapter, LatencySimulation
+{
     readonly #backend: StorageBackend;
     readonly #latency: () => Promise<void>;
     readonly #open: () => Promise<void>;
 
-    readonly members!: IEntityStore<MemberEntity>;
+    readonly members!: GuardedEntityStore<MemberEntity>;
     readonly humanMembers!:
-        IEntityStore<HumanMemberEntity>;
-    readonly aiMembers!: IEntityStore<AIMemberEntity>;
+        GuardedEntityStore<HumanMemberEntity>;
+    readonly aiMembers!: GuardedEntityStore<AIMemberEntity>;
     readonly identities!:
-        IEntityStore<IdentityEntity>;
+        GuardedEntityStore<IdentityEntity>;
     readonly identityPii!:
-        IEntityStore<IdentityPiiEntity>;
+        GuardedEntityStore<IdentityPiiEntity>;
     readonly identityCredentials!:
-        IEntityStore<IdentityCredentialEntity>;
+        GuardedEntityStore<IdentityCredentialEntity>;
     readonly identityTokenRevocations!:
-        IEntityStore<IdentityTokenRevocationEntity>;
+        GuardedEntityStore<IdentityTokenRevocationEntity>;
     readonly identityDefaultOrgs!:
-        IEntityStore<IdentityDefaultOrgEntity>;
-    readonly roleGrants!: IEntityStore<RoleGrantEntity>;
+        GuardedEntityStore<IdentityDefaultOrgEntity>;
+    readonly roleGrants!: GuardedEntityStore<RoleGrantEntity>;
     readonly identityTokens!:
-        IEntityStore<IdentityTokenEntity>;
-    readonly clients!: IEntityStore<ClientEntity>;
+        GuardedEntityStore<IdentityTokenEntity>;
+    readonly clients!: GuardedEntityStore<ClientEntity>;
     readonly identityProviders!:
-        IEntityStore<IdentityProviderEntity>;
+        GuardedEntityStore<IdentityProviderEntity>;
     readonly authorizationCodes!:
-        IEntityStore<AuthorizationCodeEntity>;
-    readonly ideas!: IEntityStore<IdeaEntity>;
-    readonly projects!: IEntityStore<ProjectEntity>;
-    readonly flows!: IEntityStore<FlowEntity>;
+        GuardedEntityStore<AuthorizationCodeEntity>;
+    readonly ideas!: GuardedEntityStore<IdeaEntity>;
+    readonly projects!: GuardedEntityStore<ProjectEntity>;
+    readonly flows!: GuardedEntityStore<FlowEntity>;
     readonly flowVersions!:
-        IEntityStore<FlowVersionEntity>;
+        GuardedEntityStore<FlowVersionEntity>;
     readonly projectFlows!:
-        IEntityStore<ProjectFlowEntity>;
-    readonly workOrders!: IEntityStore<WorkOrderEntity>;
+        GuardedEntityStore<ProjectFlowEntity>;
+    readonly workOrders!: GuardedEntityStore<WorkOrderEntity>;
     readonly flowWorkOrders!:
-        IEntityStore<FlowWorkOrderEntity>;
+        GuardedEntityStore<FlowWorkOrderEntity>;
     readonly stateFieldValues!:
-        IEntityStore<StateFieldValueEntity>;
+        GuardedEntityStore<StateFieldValueEntity>;
     readonly records!:
-        IEntityStore<RecordEntity>;
+        GuardedEntityStore<RecordEntity>;
     readonly recordAttributes!:
-        IEntityStore<RecordAttributeEntity>;
+        GuardedEntityStore<RecordAttributeEntity>;
     readonly flowRecords!:
-        IEntityStore<FlowRecordEntity>;
+        GuardedEntityStore<FlowRecordEntity>;
     readonly organizations!:
-        IEntityStore<OrganizationEntity>;
+        GuardedEntityStore<OrganizationEntity>;
     readonly memberships!:
-        IEntityStore<MembershipEntity>;
+        GuardedEntityStore<MembershipEntity>;
     readonly invitations!:
-        IEntityStore<InvitationEntity>;
+        GuardedEntityStore<InvitationEntity>;
     readonly ideaSubmissions!:
-        IEntityStore<IdeaSubmissionEntity>;
-    readonly objectives!: IEntityStore<Objective>;
+        GuardedEntityStore<IdeaSubmissionEntity>;
+    readonly objectives!: GuardedEntityStore<Objective>;
     readonly objectiveRevisions!:
-        IEntityStore<ObjectiveRevision>;
+        GuardedEntityStore<ObjectiveRevision>;
     readonly projectObjectiveBaselineScores!:
-        IEntityStore<ProjectObjectiveBaselineScore>;
+        GuardedEntityStore<ProjectObjectiveBaselineScore>;
     readonly projectObjectiveActualScores!:
-        IEntityStore<ProjectObjectiveActualScore>;
+        GuardedEntityStore<ProjectObjectiveActualScore>;
     readonly states!: IStateStore;
 
     constructor(
@@ -176,9 +179,6 @@ export class BackedDbAdapter implements DbAdapter {
     async initialize(): Promise<void> {
         await this.#open();
     }
-
-    async close(): Promise<void> {}
-    async flush(): Promise<void> {}
 
     simulateLatency(): Promise<void> {
         return this.#latency();
@@ -235,7 +235,7 @@ export class BackedDbAdapter implements DbAdapter {
 
     async transaction<R>(
         tables: readonly string[],
-        fn: (view: DbAdapter) => Promise<R>,
+        fn: (view: GuardedDbAdapter) => Promise<R>,
     ): Promise<R> {
         return this.#backend.transaction(
             tables, 'readwrite',
@@ -243,23 +243,20 @@ export class BackedDbAdapter implements DbAdapter {
         );
     }
 
-    // A DbAdapter whose 32 stores are bound to the open tx
+    // An adapter whose 32 stores are bound to the open tx
     // (ambientRunner joins it), so every op runs in one
     // transaction. Lifecycle methods delegate to the parent;
     // a nested transaction throws.
-    #viewForTx(tx: Tx): DbAdapter {
+    #viewForTx(tx: Tx): GuardedDbAdapter {
         return {
             ...this.#buildStores(ambientRunner(tx)),
             initialize: () => this.initialize(),
-            close: () => this.close(),
-            flush: () => this.flush(),
             deleteSchema: () => this.deleteSchema(),
             hasSchema: () => this.hasSchema(),
             postSchemaCreation: () => this.postSchemaCreation(),
             getSnapshot: () => this.getSnapshot(),
             putSnapshot: (json) =>
                 this.putSnapshot(json),
-            simulateLatency: () => this.simulateLatency(),
             transaction: () => {
                 throw new Error(
                     'Nested transaction is not supported.',
@@ -271,7 +268,7 @@ export class BackedDbAdapter implements DbAdapter {
     // The 32-store wiring lives here once. The constructor
     // binds it to the backend; the transaction view rebinds
     // the same wiring to an open tx via ambientRunner.
-    #buildStores(run: TxRunner): DbStores {
+    #buildStores(run: TxRunner): GuardedDbStores {
         const stateStore = new StateStore(
             run, 'states', validateStateEntity);
         return {

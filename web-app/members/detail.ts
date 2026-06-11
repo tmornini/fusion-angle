@@ -24,7 +24,7 @@ import { reportFault } from '../app/error-helpers.ts';
 import { log } from '../app/logger.ts';
 import {
     buildSkeleton,
-    withLoadingState,
+    loadInto,
 } from '../app/loading-states.ts';
 import {
     navigateTo,
@@ -154,39 +154,44 @@ export async function init(
     );
     pageContainer = container;
 
-    const member = await withLoadingState(
+    await loadInto({
         container,
-        buildSkeleton('detail', 4),
-        () => loadMemberByEitherKind(memberId),
-        () => init(params),
-    );
-    if (!member) {
-        navigateTo('members');
-        return;
-    }
+        skeleton: buildSkeleton('detail', 4),
+        fetch: () => loadMemberByEitherKind(
+            memberId,
+        ),
+        retry: () => init(params),
+        onData: member => {
+            if (!member) {
+                navigateTo('members');
+                return;
+            }
 
-    if (member.kind === 'human') {
-        state = {
-            kind: 'reading',
-            variant: 'human',
-            member,
-        };
-    } else {
-        state = {
-            kind: 'reading',
-            variant: 'ai',
-            member,
-        };
-    }
-    buildPresenter().renderShell(container);
-    bindStableListeners(container);
+            if (member.kind === 'human') {
+                state = {
+                    kind: 'reading',
+                    variant: 'human',
+                    member,
+                };
+            } else {
+                state = {
+                    kind: 'reading',
+                    variant: 'ai',
+                    member,
+                };
+            }
+            buildPresenter()
+                .renderShell(container);
+            bindStableListeners(container);
 
-    subscribeHumanMemberChanges(
-        () => void refresh(memberId),
-    );
-    subscribeAIMemberChanges(
-        () => void refresh(memberId),
-    );
+            subscribeHumanMemberChanges(
+                () => void refresh(memberId),
+            );
+            subscribeAIMemberChanges(
+                () => void refresh(memberId),
+            );
+        },
+    });
 }
 
 export function reduceRefresh(

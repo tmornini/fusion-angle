@@ -1,4 +1,4 @@
-import { EntityNotFoundError, keyed } from './db.ts';
+import { EntityNotFoundError } from './db.ts';
 import type { DbAdapter } from './db.ts';
 import {
     verifyClientAssertion,
@@ -100,7 +100,7 @@ export async function subjectOrgs(
     adapter: DbAdapter,
     identityId: Id,
 ): Promise<Id[]> {
-    const rows = await keyed(adapter.memberships)
+    const rows = await adapter.memberships
         .getAllWhere('identity_id', identityId);
     return rows.map(m => m.organization_id);
 }
@@ -113,7 +113,7 @@ export async function identityDefaultOrg(
     adapter: DbAdapter,
     identityId: Id,
 ): Promise<Id | null> {
-    const events = await keyed(adapter.identityDefaultOrgs)
+    const events = await adapter.identityDefaultOrgs
         .getAllWhere('identity_id', identityId);
     const chosen = currentDefaultOrgFor(events, identityId);
     if (chosen !== null) return chosen;
@@ -129,7 +129,7 @@ async function primaryMembershipOrg(
 ): Promise<Id | null> {
     // The index already narrows to this identity's rows, so no
     // per-row identity guard after (trust the gate).
-    const rows = await keyed(adapter.memberships)
+    const rows = await adapter.memberships
         .getAllWhere('identity_id', identityId);
     let best: { org: Id; at: string } | null = null;
     for (const row of rows) {
@@ -244,7 +244,7 @@ export async function tokenRevocationReason(
     iat: number,
     jti: string,
 ): Promise<string | null> {
-    const revs = await keyed(adapter.identityTokenRevocations)
+    const revs = await adapter.identityTokenRevocations
         .getAllWhere('identity_id', sub);
     const revokedThrough = revokedThroughSeconds(revs, sub);
     if (revokedThrough !== null && iat <= revokedThrough) {
@@ -253,7 +253,7 @@ export async function tokenRevocationReason(
     // The gate check needs only THIS jti's events: a chain-wide
     // revoke writes a 'revoked' event per jti, so the latest
     // action for the presented jti already reflects it.
-    const events = await keyed(adapter.identityTokens)
+    const events = await adapter.identityTokens
         .getAllWhere('jti', jti);
     if (isTokenRevoked(events, jti)) {
         return 'token chain revoked';
@@ -286,7 +286,7 @@ export function rotateRefreshJti(
             // path revokes every jti in it, so a jti-only read
             // would under-revoke. Both reads are index hits in
             // the open tx (no interleaved non-IDB await).
-            const tokens = keyed(view.identityTokens);
+            const tokens = view.identityTokens;
             const byJti = await tokens.getAllWhere(
                 'jti', presentedJti);
             const chainId = chainIdForJti(
@@ -325,7 +325,7 @@ export function revokeTokenChain(
     return adapter.transaction(
         ['identity_tokens'],
         async (view) => {
-            const tokens = keyed(view.identityTokens);
+            const tokens = view.identityTokens;
             const byJti = await tokens.getAllWhere('jti', jti);
             const chainId = chainIdForJti(byJti, jti);
             const identityId = identityForJti(byJti, jti);
@@ -549,7 +549,7 @@ async function grantAuthorizationCode(
     const issued = await adapter.transaction(
         ['authorization_codes', 'identity_tokens'],
         async (view) => {
-            const rows = await keyed(view.authorizationCodes)
+            const rows = await view.authorizationCodes
                 .getAllWhere('code', code);
             const state = codeState(rows, code);
             if (
@@ -701,14 +701,14 @@ async function authorizePassword(
     const denied: AuthorizeResult = {
         ok: false, status: 401, error: 'invalid credentials',
     };
-    const piiRows = await keyed(adapter.identityPii)
+    const piiRows = await adapter.identityPii
         .getAllWhere('email', username);
     const identityId = identityByEmail(piiRows, username);
     if (identityId === null) {
         await equalizeFailureTiming(password);
         return denied;
     }
-    const credRows = await keyed(adapter.identityCredentials)
+    const credRows = await adapter.identityCredentials
         .getAllWhere('identity_id', identityId);
     const secret =
         currentPasswordSecret(credRows, identityId);

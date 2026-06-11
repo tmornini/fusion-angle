@@ -5,14 +5,12 @@ import {
     type EntityPut,
     type EntityValidator,
     type GuardedEntityWriter,
-    type KeyedCollectionReader,
     type TxRunner,
 } from './db.ts';
 
 export class EntityStore<T extends { id: string }>
     implements
         EntityStoreInterface<T>,
-        KeyedCollectionReader<T>,
         GuardedEntityWriter<T>
 {
     readonly #table: string;

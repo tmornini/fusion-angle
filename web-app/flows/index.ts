@@ -8,7 +8,7 @@ import {
 } from '../app/safe-html.ts';
 import {
     buildSkeleton,
-    withLoadingState,
+    loadInto,
 } from '../app/loading-states.ts';
 import { extractErrorMessage } from '../app/error-helpers.ts';
 import {
@@ -83,14 +83,14 @@ export async function init(
         '#flow-list', document,
     );
 
-    const result = await withLoadingState(
-        listEl,
-        buildSkeleton('card-list', 4),
-        () => getFlowsWithProjectNames(
+    await loadInto({
+        container: listEl,
+        skeleton: buildSkeleton('card-list', 4),
+        fetch: () => getFlowsWithProjectNames(
             sessionContext(),
         ),
-        init,
-        {
+        retry: init,
+        emptyState: {
             icon: iconGitBranch(24, ''),
             title: 'No Flows Yet',
             description:
@@ -104,8 +104,18 @@ export async function init(
                     + 'index.html',
             },
         },
-    );
-    if (!result) return;
+        onData: result => onFlowsLoaded(
+            result, listEl,
+        ),
+    });
+}
+
+function onFlowsLoaded(
+    result: Awaited<ReturnType<
+        typeof getFlowsWithProjectNames
+    >>,
+    listEl: HTMLElement,
+): void {
     const rendered = result.map(
         ({ summary, projectName }) =>
             new FlowPresenter(

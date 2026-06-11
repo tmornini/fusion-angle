@@ -48,7 +48,6 @@ export {
     type ProjectState,
     type ProjectEntity,
     isProjectState,
-    PROJECT_STATE_CONFIG,
     COST_DIVISOR,
 } from '../../../api/types.ts';
 
@@ -173,16 +172,6 @@ export class ProjectView {
     targetEndDateValue(): string {
         return this.#project
             .targetEndDateValue();
-    }
-
-    stateLabel(): string {
-        return this.#project
-            .stateLabel();
-    }
-
-    stateClassName(): string {
-        return this.#project
-            .stateClassName();
     }
 
     timeBaselineDays(): number {

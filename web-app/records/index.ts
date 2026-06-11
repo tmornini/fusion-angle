@@ -4,7 +4,7 @@ import {
 } from '../app/dom.ts';
 import {
     buildSkeleton,
-    withLoadingState,
+    loadInto,
 } from '../app/loading-states.ts';
 import {
     iconPlus, iconDatabase,
@@ -18,6 +18,7 @@ import {
     putRecord,
     subscribeRecordChanges,
     isRecordState,
+    type RecordWithCounts,
 } from '../app/adapters/index.ts';
 import {
     RecordListPresenter,
@@ -42,12 +43,12 @@ export async function init(): Promise<void> {
     );
 
     const ctx = sessionContext();
-    const records = await withLoadingState(
-        recordsListEl,
-        buildSkeleton('card-list', 4),
-        () => getRecords(ctx),
-        init,
-        {
+    await loadInto({
+        container: recordsListEl,
+        skeleton: buildSkeleton('card-list', 4),
+        fetch: () => getRecords(ctx),
+        retry: init,
+        emptyState: {
             icon: iconDatabase(24, ''),
             title: 'No Records Yet',
             description:
@@ -64,7 +65,10 @@ export async function init(): Promise<void> {
                 )?.remove();
             },
         },
-    );
+        onData: records => onRecordsLoaded(
+            records, recordsListEl,
+        ),
+    });
 
     populateIcons([
         ['#create-btn-icon', iconPlus(16, '')],
@@ -76,9 +80,12 @@ export async function init(): Promise<void> {
             () => navigateTo('record-create'),
             { signal },
         );
+}
 
-    if (!records) return;
-
+function onRecordsLoaded(
+    records: RecordWithCounts[],
+    recordsListEl: HTMLElement,
+): void {
     recordState =
         buildInitialRecordListState(records);
     listEl = recordsListEl;

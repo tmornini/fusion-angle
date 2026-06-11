@@ -31,7 +31,6 @@ import {
 export {
     RecordModel,
     RECORD_STATES,
-    RECORD_STATE_CONFIG,
     isRecordState,
     assertRecordState,
 } from '../../../api/types.ts';

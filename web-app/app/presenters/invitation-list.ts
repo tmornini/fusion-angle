@@ -4,6 +4,8 @@ import {
 import { DISPLAY_ABSENT, formatDate } from '../format.ts';
 import {
     INVITATION_STATE_CONFIG,
+} from './state-display.ts';
+import {
     type InvitationState,
     type InvitationView,
     type SentInvitation,

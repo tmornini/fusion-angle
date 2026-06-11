@@ -233,7 +233,6 @@ test(
         assert.equal(view.idForLink(), 'p1');
         assert.equal(view.titleText(), 'Viewable');
         assert.equal(view.stateValue(), 'approved');
-        assert.equal(view.stateLabel(), 'Approved');
         assert.equal(
             view.startDateValue(), '2026-01-01',
         );

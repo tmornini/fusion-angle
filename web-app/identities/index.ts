@@ -6,7 +6,7 @@ import { showToast } from '../app/toast.ts';
 import { createPageAbort } from '../app/page-lifecycle.ts';
 import { reportFault } from '../app/error-helpers.ts';
 import {
-    buildSkeleton, withLoadingState,
+    buildSkeleton, loadInto,
 } from '../app/loading-states.ts';
 import {
     iconPersonPlus, iconSend,
@@ -45,23 +45,25 @@ export async function init(): Promise<void> {
     bindAddIdentityDialog();
 
     const ctx = sessionContext();
-    const roster = await withLoadingState(
-        list,
-        buildSkeleton('table', 5),
-        () => getIdentityRoster(ctx),
-        init,
-    );
-    if (!roster) return;
-
-    identityListEl = list;
-    renderRoster(roster);
-    identityListEl.addEventListener(
-        'click', onListClick,
-        { signal },
-    );
-    subscribeIdentityChanges(
-        () => void refresh(sessionContext()),
-    );
+    await loadInto({
+        container: list,
+        skeleton: buildSkeleton('table', 5),
+        fetch: () => getIdentityRoster(ctx),
+        retry: init,
+        onData: roster => {
+            identityListEl = list;
+            renderRoster(roster);
+            identityListEl.addEventListener(
+                'click', onListClick,
+                { signal },
+            );
+            subscribeIdentityChanges(
+                () => void refresh(
+                    sessionContext(),
+                ),
+            );
+        },
+    });
 }
 
 function renderRoster(

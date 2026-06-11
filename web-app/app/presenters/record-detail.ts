@@ -18,8 +18,10 @@ import type {
 } from '../../../api/types.ts';
 import {
     ATTRIBUTE_TYPES,
-    RECORD_STATE_CONFIG,
 } from '../../../api/types.ts';
+import {
+    RECORD_STATE_CONFIG,
+} from './state-display.ts';
 
 export interface RecordDetailView {
     readonly record: RecordEntity;

@@ -9,12 +9,14 @@ in [SCHEMA.md](SCHEMA.md).
 
 Domain classes wrap entity + state: `Idea(entity, state)`,
 `Project(entity, state)`, `HumanMember(entity, state)`,
-`AIMember(entity, state)` all expose `stateValue()`,
-`stateLabel()`, and `stateClassName()` — the lifecycle
-stage is part of the domain object, not a separate fetch
-the presenter has to reconcile. `Idea` additionally
-exposes `readinessValue()`, `readinessLabel()`,
-`readinessClassName()`, and `isReady()` — readiness is
+`AIMember(entity, state)` all expose `stateValue()` — the
+lifecycle stage is part of the domain object, not a
+separate fetch the presenter has to reconcile. How a state
+is displayed (badge label and class) is presentation
+vocabulary, owned by the `*_STATE_CONFIG` maps in
+`web-app/app/presenters/state-display.ts` and keyed by the
+state alphabets in `api/types.ts`. `Idea` additionally
+exposes `readinessValue()` and `isReady()` — readiness is
 derived from required-field presence on every call.
 
 Readiness is a derived property of the `Idea` domain
@@ -94,18 +96,29 @@ copy says "Work orders using this Record" rather than
 
 ### Org-scoping at the gate
 
-Every authenticated request runs org-scoped. After
-`matchRoute` and the Bearer/role checks, `handleRequest`
-resolves `org = authResult.organization ??
-identityDefaultOrg(adapter, authResult.id)`, 403s a null
-org, then sets `effective = orgScopedAdapter(adapter, org)`
-and every handler runs against `effective`. The org rides
-the VERIFIED token claim, never the path; a flat
+Every authenticated request runs org-scoped, riding one
+request vessel — the server half of the Office of the
+Context (`api/request-context.ts`). `handleRequest` mints
+`IncomingContext` (requestId, method, pathname, base
+adapter; the facade re-entry keeps the outer request's id
+via the `x-request-id` header). The authentication step
+enriches it to `AuthenticatedContext` (principal), and
+`fenceRequest` (`api/request-auth.ts`) completes the
+`RequestContext` — organization, live `memberOrgs`, roles,
+and the org-scoped adapter — each field set exactly once.
+Every handler runs against the vessel's scoped adapter. The
+org rides the VERIFIED token claim, never the path; a flat
 (un-exchanged) token has none and resolves via
 `identityDefaultOrg`: the identity's SET default org
 (`identity_default_orgs` ledger, latest wins), else its
 PRIMARY membership org, else a 403 — there is no global
-default to fall back on.
+default to fall back on. Two covenants bound the vessel:
+it never carries the bearer token (authentication reads the
+header from the raw Request, so the vessel stays loggable),
+and route handlers keep their `(adapter, params, body)`
+contract — the route table is the chosen boundary where the
+vessel hands its scoped adapter to the handler, keeping
+handlers transport-free.
 
 `OrgScopedEntityStore` (`api/store-org-scoped.ts`) is an
 `EntityStore` decorator bound to one org: it filters reads,
@@ -275,7 +288,8 @@ re-verified by the automated suite:
 - **`client_assertion` JWS** (`api/client-assertion.ts`):
   really verified against the client's registered JWKS
   (RS256/ES256, WebCrypto) plus RFC 7523 claim checks.
-- **Snapshot plane** (`BOOTSTRAP_ROUTES`, `api/api.ts`):
+- **Snapshot plane** (`BOOTSTRAP_ROUTES`,
+  `api/request-auth.ts`):
   bearer-exempt ONLY while no schema exists (the bootstrap
   window); once a schema exists the plane closes — bearer
   plus the admin route policy.
@@ -287,10 +301,11 @@ re-verified by the automated suite:
   `member` tier on the content surfaces; identity, credential,
   membership, and snapshot surfaces stay admin-only,
   deny-by-default.
-- **De-membership latency** (`handleRequest`): every fenced
-  request re-derives membership from the ledger, so revoking a
-  membership stops access on the NEXT request — the token's
-  15-minute org claim no longer rides out its TTL.
+- **De-membership latency** (`fenceRequest`,
+  `api/request-auth.ts`): every fenced request re-derives
+  membership from the ledger, so revoking a membership stops
+  access on the NEXT request — the token's 15-minute org
+  claim no longer rides out its TTL.
 
 ## API Layer (`/api`)
 

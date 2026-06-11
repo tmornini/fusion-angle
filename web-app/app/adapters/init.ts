@@ -1,10 +1,12 @@
 import {
-    IndexedDbDbAdapter,
+    indexedDbAdapter,
 } from '../../../api/db-indexeddb.ts';
 import {
     postTablesChanged,
 } from './broadcast-channel.ts';
-import type { DbAdapter } from '../../../api/db.ts';
+import type {
+    ClientFacadeAdapter,
+} from '../../../api/api.ts';
 import {
     mintAccessToken,
     TOKEN_AUDIENCE,
@@ -18,19 +20,19 @@ import {
     nowEpochSeconds,
 } from '../../../api/types.ts';
 
-let adapter: DbAdapter | undefined;
+let adapter: ClientFacadeAdapter | undefined;
 
 // The persistence tier: a real IndexedDB transaction per op,
 // O(1) appends, and cross-tab refresh via the posted table
 // names. The connection opens in initialize(). Production
 // boot passes this; boot-path tests substitute an in-memory
 // tier — IndexedDB has no Node stub, and we add no fake.
-export function defaultAdapter(): DbAdapter {
-    return new IndexedDbDbAdapter(postTablesChanged);
+export function defaultAdapter(): ClientFacadeAdapter {
+    return indexedDbAdapter(postTablesChanged);
 }
 
 export async function initAdapter(
-    makeAdapter: () => DbAdapter,
+    makeAdapter: () => ClientFacadeAdapter,
 ): Promise<boolean> {
     await postSessionSeed();
     adapter = makeAdapter();
@@ -43,7 +45,7 @@ export async function initAdapter(
     return adapter.hasSchema();
 }
 
-export function getDbAdapter(): DbAdapter {
+export function getDbAdapter(): ClientFacadeAdapter {
     if (!adapter) {
         throw new Error(
             'initAdapter() not called.',

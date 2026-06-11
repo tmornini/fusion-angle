@@ -18,7 +18,7 @@ import { reportFault } from '../app/error-helpers.ts';
 import { log } from '../app/logger.ts';
 import {
     buildSkeleton,
-    withLoadingState,
+    loadInto,
 } from '../app/loading-states.ts';
 import {
     navigateTo,
@@ -164,27 +164,31 @@ export async function init(
     pageContainer = container;
 
     const ctx = sessionContext();
-    const view = await withLoadingState(
+    await loadInto({
         container,
-        buildSkeleton('detail', 4),
-        () => getIdea(ctx, ideaId),
-        () => init(params),
-    );
-    if (!view) return;
+        skeleton: buildSkeleton('detail', 4),
+        fetch: () => getIdea(ctx, ideaId),
+        retry: () => init(params),
+        onData: view => {
+            state = { kind: 'reading', view };
+            buildPresenter()
+                .renderShell(container);
+            bindStableListeners(container);
 
-    state = { kind: 'reading', view };
-    buildPresenter().renderShell(container);
-    bindStableListeners(container);
-
-    subscribeIdeaChanges(async () => {
-        if (!pageContainer || !state) return;
-        const fresh = await getIdea(
-            sessionContext(), ideaId,
-        );
-        state = {
-            kind: 'reading', view: fresh,
-        };
-        rerender();
+            subscribeIdeaChanges(async () => {
+                if (
+                    !pageContainer || !state
+                ) return;
+                const fresh = await getIdea(
+                    sessionContext(), ideaId,
+                );
+                state = {
+                    kind: 'reading',
+                    view: fresh,
+                };
+                rerender();
+            });
+        },
     });
 }
 

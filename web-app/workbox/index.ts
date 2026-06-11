@@ -9,7 +9,7 @@ import { createPageAbort } from '../app/page-lifecycle.ts';
 import { showToast } from '../app/toast.ts';
 import {
     buildSkeleton,
-    withLoadingState,
+    loadInto,
     type EmptyStateConfig,
 } from '../app/loading-states.ts';
 import {
@@ -118,21 +118,23 @@ async function rerenderInbox(
     mode: InboxMode,
     ctx: RequestContext,
 ): Promise<void> {
-    const items = await withLoadingState(
-        listEl,
-        buildSkeleton('card-list', 4),
-        () => loadInboxItems(mode, ctx),
-        init,
-        emptyStateFor(mode),
-    );
-    if (!items) return;
-    const presenter = new WorkboxInboxPresenter(
-        items, mode === 'active',
-    );
-    presenter.renderList(listEl);
-    if (mode === 'active') {
-        activePresenter = presenter;
-    }
+    await loadInto({
+        container: listEl,
+        skeleton: buildSkeleton('card-list', 4),
+        fetch: () => loadInboxItems(mode, ctx),
+        retry: init,
+        emptyState: emptyStateFor(mode),
+        onData: items => {
+            const presenter =
+                new WorkboxInboxPresenter(
+                    items, mode === 'active',
+                );
+            presenter.renderList(listEl);
+            if (mode === 'active') {
+                activePresenter = presenter;
+            }
+        },
+    });
 }
 
 function renderTabs(): void {
@@ -191,15 +193,25 @@ async function initActiveList(
     activeEl: HTMLElement,
     ctx: RequestContext,
 ): Promise<void> {
-    const items = await withLoadingState(
-        activeEl,
-        buildSkeleton('card-list', 4),
-        () => loadInboxItems('active', ctx),
-        init,
-        emptyStateFor('active'),
-    );
-    if (!items) return;
+    await loadInto({
+        container: activeEl,
+        skeleton: buildSkeleton('card-list', 4),
+        fetch: () => loadInboxItems(
+            'active', ctx,
+        ),
+        retry: init,
+        emptyState: emptyStateFor('active'),
+        onData: items => onActiveListLoaded(
+            items, activeEl, ctx,
+        ),
+    });
+}
 
+function onActiveListLoaded(
+    items: InboxItem[],
+    activeEl: HTMLElement,
+    ctx: RequestContext,
+): void {
     activePresenter = new WorkboxInboxPresenter(
         items, true,
     );
@@ -247,20 +259,23 @@ async function initArchiveList(
     archiveEl: HTMLElement,
     ctx: RequestContext,
 ): Promise<void> {
-    const items = await withLoadingState(
-        archiveEl,
-        buildSkeleton('card-list', 4),
-        () => loadInboxItems('archived', ctx),
-        init,
-        emptyStateFor('archived'),
-    );
-    if (!items) return;
-
-    const presenter = new WorkboxInboxPresenter(
-        items, false,
-    );
-    presenter.renderList(archiveEl);
-    bindRowNavigation(archiveEl);
+    await loadInto({
+        container: archiveEl,
+        skeleton: buildSkeleton('card-list', 4),
+        fetch: () => loadInboxItems(
+            'archived', ctx,
+        ),
+        retry: init,
+        emptyState: emptyStateFor('archived'),
+        onData: items => {
+            const presenter =
+                new WorkboxInboxPresenter(
+                    items, false,
+                );
+            presenter.renderList(archiveEl);
+            bindRowNavigation(archiveEl);
+        },
+    });
 }
 
 function bindRowNavigation(

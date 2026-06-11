@@ -5,7 +5,7 @@ import {
 } from '../app/safe-html.ts';
 import {
     buildSkeleton,
-    withLoadingState,
+    loadInto,
 } from '../app/loading-states.ts';
 import {
     sessionContext,
@@ -52,32 +52,32 @@ export async function init(
     );
 
     const ctx = sessionContext();
-    const gauges =
-        await withLoadingState(
-            container,
-            buildSkeleton('card-grid', 3),
-            () => getDashboardGauges(ctx),
-            () => init(),
-        );
-    if (!gauges) return;
-
-    const rendered = gauges.map(
-        g => new GaugePresenter(g).render(),
-    );
-    setHtml(
+    await loadInto({
         container,
-        html`${rendered}`,
-    );
+        skeleton: buildSkeleton('card-grid', 3),
+        fetch: () => getDashboardGauges(ctx),
+        retry: () => init(),
+        onData: async gauges => {
+            const rendered = gauges.map(
+                g => new GaugePresenter(g)
+                    .render(),
+            );
+            setHtml(
+                container,
+                html`${rendered}`,
+            );
 
-    subscribeProjectScoreChanges(
-        renderObjectiveAggregates,
-    );
-    subscribeObjectiveChanges(
-        renderObjectiveAggregates,
-    );
-    subscribeProjectChanges(
-        renderObjectiveAggregates,
-    );
+            subscribeProjectScoreChanges(
+                renderObjectiveAggregates,
+            );
+            subscribeObjectiveChanges(
+                renderObjectiveAggregates,
+            );
+            subscribeProjectChanges(
+                renderObjectiveAggregates,
+            );
 
-    await renderObjectiveAggregates();
+            await renderObjectiveAggregates();
+        },
+    });
 }

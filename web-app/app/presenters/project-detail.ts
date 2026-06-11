@@ -26,6 +26,8 @@ import type {
 } from '../adapters/index.ts';
 import {
     PROJECT_STATE_CONFIG,
+} from './state-display.ts';
+import {
     COST_DIVISOR,
     isProjectState,
 } from '../adapters/index.ts';
@@ -184,6 +186,7 @@ function buildSubtitle(
 function buildReadonlyTitleSection(
     view: ProjectView,
 ): SafeHtml {
+    const cfg = PROJECT_STATE_CONFIG[view.stateValue()];
     return html`
         <div class="${
             'flex flex-wrap items-center'
@@ -197,11 +200,11 @@ function buildReadonlyTitleSection(
             </h1>
             <span class="${
                 'badge '
-                + view.stateClassName()
+                + cfg.className
                 + ' text-xs'
             }">
                 ${iconCheckCircle2(14, '')}
-                ${view.stateLabel()}
+                ${cfg.label}
             </span>
         </div>
         ${buildSubtitle(view)}`;

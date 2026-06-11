@@ -19,7 +19,6 @@ import {
 } from '../channels.ts';
 export {
     HumanMember,
-    MEMBER_STATE_CONFIG,
     isMemberState,
     isDimensionKey,
 } from '../../../api/types.ts';

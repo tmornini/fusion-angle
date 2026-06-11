@@ -12,7 +12,7 @@ import { log } from '../app/logger.ts';
 import { showToast } from '../app/toast.ts';
 import {
     buildSkeleton,
-    withLoadingState,
+    loadInto,
 } from '../app/loading-states.ts';
 import { navigateTo } from '../app/core.ts';
 import {
@@ -299,10 +299,10 @@ export async function init(
         await getCurrentHumanMember(ctx);
     const memberId = memberRow.id;
 
-    const detail = await withLoadingState(
+    await loadInto({
         container,
-        buildSkeleton('detail', 4),
-        async () => {
+        skeleton: buildSkeleton('detail', 4),
+        fetch: async () => {
             let presenter =
                 await loadPresenter(
                     id,
@@ -329,33 +329,34 @@ export async function init(
             }
             return presenter;
         },
-        () => init(params),
-    );
-    if (!detail) return;
+        retry: () => init(params),
+        onData: detail => {
+            setHtml(
+                container,
+                detail.buildPage(),
+            );
 
-    setHtml(
-        container,
-        detail.buildPage(),
-    );
+            const backBtn = $(
+                '#work-order-back-btn',
+                container,
+            );
+            if (backBtn) {
+                backBtn.addEventListener(
+                    'click',
+                    () => navigateTo('workbox'),
+                );
+            }
 
-    const backBtn = $(
-        '#work-order-back-btn', container,
-    );
-    if (backBtn) {
-        backBtn.addEventListener(
-            'click',
-            () => navigateTo('workbox'),
-        );
-    }
-
-    if (
-        !detail.isArchive()
-    ) {
-        initTransitionButtons(
-            container, detail, ctx,
-        );
-        initUnclaimButton(
-            container, detail, ctx,
-        );
-    }
+            if (
+                !detail.isArchive()
+            ) {
+                initTransitionButtons(
+                    container, detail, ctx,
+                );
+                initUnclaimButton(
+                    container, detail, ctx,
+                );
+            }
+        },
+    });
 }

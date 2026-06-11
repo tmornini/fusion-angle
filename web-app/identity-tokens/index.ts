@@ -2,7 +2,7 @@ import {
     $, $required, populateIcons,
 } from '../app/dom.ts';
 import {
-    buildSkeleton, withLoadingState,
+    buildSkeleton, loadInto,
 } from '../app/loading-states.ts';
 import { navigateTo } from '../app/core.ts';
 import { iconArrowLeft } from '../app/icons.ts';
@@ -40,25 +40,31 @@ export async function init(
     );
 
     const ctx = sessionContext();
-    const chains = await withLoadingState(
-        list,
-        buildSkeleton('table', 3),
-        () => getTokenChainsFor(ctx, identityId),
-        () => init(params),
-    );
-    if (!chains) return;
+    await loadInto({
+        container: list,
+        skeleton: buildSkeleton('table', 3),
+        fetch: () => getTokenChainsFor(
+            ctx, identityId,
+        ),
+        retry: () => init(params),
+        onData: chains => {
+            new IdentityTokensPresenter(chains)
+                .render(list);
 
-    new IdentityTokensPresenter(chains)
-        .render(list);
-
-    const refresh = async (): Promise<void> => {
-        const fresh = await getTokenChainsFor(
-            sessionContext(), identityId,
-        );
-        new IdentityTokensPresenter(fresh)
-            .render(list);
-    };
-    subscribeIdentityTokenChanges(
-        () => void refresh(),
-    );
+            const refresh =
+                async (): Promise<void> => {
+                    const fresh =
+                        await getTokenChainsFor(
+                            sessionContext(),
+                            identityId,
+                        );
+                    new IdentityTokensPresenter(
+                        fresh,
+                    ).render(list);
+                };
+            subscribeIdentityTokenChanges(
+                () => void refresh(),
+            );
+        },
+    });
 }

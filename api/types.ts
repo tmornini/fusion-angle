@@ -712,18 +712,6 @@ export class HumanMember {
         return this.#state === 'archived';
     }
 
-    stateLabel(): string {
-        return (
-            MEMBER_STATE_CONFIG[this.#state]
-        )!.label;
-    }
-
-    stateClassName(): string {
-        return (
-            MEMBER_STATE_CONFIG[this.#state]
-        )!.className;
-    }
-
     hasDepartment(): boolean {
         return this.#department !== '';
     }
@@ -838,18 +826,6 @@ export class AIMember {
         return this.#state === 'archived';
     }
 
-    stateLabel(): string {
-        return (
-            MEMBER_STATE_CONFIG[this.#state]
-        )!.label;
-    }
-
-    stateClassName(): string {
-        return (
-            MEMBER_STATE_CONFIG[this.#state]
-        )!.className;
-    }
-
     stateValue(): MemberState {
         return this.#state;
     }
@@ -897,18 +873,6 @@ export class SystemMember {
 
     stateValue(): MemberState {
         return this.#state;
-    }
-
-    stateLabel(): string {
-        return (
-            MEMBER_STATE_CONFIG[this.#state]
-        )!.label;
-    }
-
-    stateClassName(): string {
-        return (
-            MEMBER_STATE_CONFIG[this.#state]
-        )!.className;
     }
 
     matchesSearch(term: string): boolean {
@@ -1192,151 +1156,6 @@ export interface ProjectFlowEntity {
     at: string;
 }
 
-export interface StatusDisplay {
-    label: string;
-    className: string;
-}
-
-export const MEMBER_STATE_CONFIG: Record<
-    MemberState,
-    StatusDisplay
-> = {
-    active: {
-        label: 'Active',
-        className: 'badge-success',
-    },
-    pending: {
-        label: 'Pending',
-        className: 'badge-warning',
-    },
-    archived: {
-        label: 'Archived',
-        className: 'badge-default',
-    },
-};
-
-export const IDEA_STATE_CONFIG: Record<
-    IdeaState,
-    StatusDisplay
-> = {
-    'active': {
-        label: 'Active',
-        className: 'badge-success',
-    },
-    'in-review': {
-        label: 'In Review',
-        className: 'badge-warning',
-    },
-    'approved': {
-        label: 'Approved',
-        className: 'badge-success',
-    },
-    'promoted': {
-        label: 'Promoted',
-        className: 'badge-primary',
-    },
-    'sent-back': {
-        label: 'Sent Back',
-        className: 'badge-error',
-    },
-    'archived': {
-        label: 'Archived',
-        className: 'badge-default',
-    },
-    'deleted': {
-        label: 'Deleted',
-        className: 'badge-default',
-    },
-};
-
-export const IDEA_READINESS_CONFIG: Record<
-    IdeaReadiness,
-    StatusDisplay
-> = {
-    'incomplete': {
-        label: 'Incomplete',
-        className: 'badge-warning',
-    },
-    'ready': {
-        label: 'Ready',
-        className: 'badge-success',
-    },
-};
-
-export const RECORD_STATE_CONFIG: Record<
-    RecordState,
-    StatusDisplay
-> = {
-    active: {
-        label: 'Active',
-        className: 'badge-success',
-    },
-    archived: {
-        label: 'Archived',
-        className: 'badge-default',
-    },
-    deleted: {
-        label: 'Deleted',
-        className: 'badge-default',
-    },
-};
-
-export const PROJECT_STATE_CONFIG: Record<
-    ProjectState,
-    StatusDisplay
-> = {
-    'submitted': {
-        label: 'Submitted',
-        className: 'badge-default',
-    },
-    'under-review': {
-        label: 'In Review',
-        className: 'badge-warning',
-    },
-    'sent-back': {
-        label: 'Sent Back',
-        className: 'badge-error',
-    },
-    'approved': {
-        label: 'Approved',
-        className: 'badge-success',
-    },
-    'declined': {
-        label: 'Declined',
-        className: 'badge-error',
-    },
-    'archived': {
-        label: 'Archived',
-        className: 'badge-success',
-    },
-    'deleted': {
-        label: 'Deleted',
-        className: 'badge-default',
-    },
-};
-
-export const INVITATION_STATE_CONFIG: Record<
-    InvitationState,
-    StatusDisplay
-> = {
-    pending: {
-        label: 'Pending',
-        className: 'badge-warning',
-    },
-    accepted: {
-        label: 'Accepted',
-        className: 'badge-success',
-    },
-    declined: {
-        label: 'Declined',
-        className: 'badge-default',
-    },
-    revoked: {
-        label: 'Revoked',
-        className: 'badge-error',
-    },
-};
-
 export class Idea {
     readonly #id: string;
     readonly #title: string;
@@ -1393,32 +1212,8 @@ export class Idea {
           : 'incomplete';
     }
 
-    readinessLabel(): string {
-        return IDEA_READINESS_CONFIG[
-            this.readinessValue()
-        ].label;
-    }
-
-    readinessClassName(): string {
-        return IDEA_READINESS_CONFIG[
-            this.readinessValue()
-        ].className;
-    }
-
     isReady(): boolean {
         return this.readinessValue() === 'ready';
-    }
-
-    stateLabel(): string {
-        return (
-            IDEA_STATE_CONFIG[this.#state]
-        )!.label;
-    }
-
-    stateClassName(): string {
-        return (
-            IDEA_STATE_CONFIG[this.#state]
-        )!.className;
     }
 
     matchesSearch(term: string): boolean {
@@ -1541,22 +1336,6 @@ export class Project {
         );
     }
 
-    stateLabel(): string {
-        return (
-            PROJECT_STATE_CONFIG[
-                this.#state
-            ]
-        )!.label;
-    }
-
-    stateClassName(): string {
-        return (
-            PROJECT_STATE_CONFIG[
-                this.#state
-            ]
-        )!.className;
-    }
-
     idForLink(): string {
         return this.#id;
     }
@@ -1629,18 +1408,6 @@ export class RecordModel {
 
     stateValue(): RecordState {
         return this.#state;
-    }
-
-    stateLabel(): string {
-        return (
-            RECORD_STATE_CONFIG[this.#state]
-        )!.label;
-    }
-
-    stateClassName(): string {
-        return (
-            RECORD_STATE_CONFIG[this.#state]
-        )!.className;
     }
 
     isActive(): boolean {

@@ -92,6 +92,16 @@ export interface EntityStore<
     T extends { id: string },
 > {
     getAll(): Promise<T[]>;
+    // The keyed sub-collection read: the rows whose indexed
+    // `column` equals `key`, tombstones already removed. The
+    // concrete stores serve it over `Tx.getWhere`; the fences
+    // serve it by matching through the inner index and then
+    // filtering to their slice. Every store face honors the
+    // same read, so no caller re-acquires it by assertion.
+    getAllWhere(
+        column: string,
+        key: string,
+    ): Promise<T[]>;
     getById(id: string): Promise<T>;
     put(
         id: string,
@@ -102,35 +112,6 @@ export interface EntityStore<
         deleteIds: readonly string[],
     ): Promise<void>;
     delete(id: string): Promise<void>;
-}
-
-// A keyed sub-collection read: the rows of one table whose
-// indexed `column` equals `key`, tombstones already removed.
-// The concrete EntityStore implements it over `Tx.getWhere`,
-// so the org fence narrows a collection to its tenant through
-// the organization_id index instead of scanning the whole
-// table and filtering in JS. Kept OFF the EntityStore
-// contract — the decorators and the history store would only
-// carry a read they never serve (Interface Segregation).
-export interface KeyedCollectionReader<
-    T extends { id: string },
-> {
-    getAllWhere(
-        column: string,
-        key: string,
-    ): Promise<T[]>;
-}
-
-// Reach a store's keyed sub-collection read, kept off the
-// EntityStore contract by Interface Segregation. Both concrete
-// leaf stores (EntityStore + HistoryEntityStore) implement it,
-// so the cast is sound for every fenced or cold-spine store
-// that narrows a collection through a secondary index — the one
-// documented home for the assertion the DbStores types erase.
-export function keyed<T extends { id: string }>(
-    store: EntityStore<T>,
-): KeyedCollectionReader<T> {
-    return store as EntityStore<T> & KeyedCollectionReader<T>;
 }
 
 // The write-side fence capability: peek + decide + write in
@@ -170,16 +151,12 @@ export interface GuardedEntityWriter<
     ): Promise<void>;
 }
 
-// Reach a store's guarded write capability, kept off the
-// EntityStore contract by Interface Segregation — only the
-// org fence needs it. Both concrete leaf stores implement
-// it, so the cast is sound for every fenced store — the same
-// documented assertion home as keyed().
-export function guarded<T extends { id: string }>(
-    store: EntityStore<T>,
-): GuardedEntityWriter<T> {
-    return store as EntityStore<T> & GuardedEntityWriter<T>;
-}
+// The full face of an unfenced leaf store: the plain
+// contract plus the guarded write capability the org fence
+// consumes. Kept off EntityStore by Interface Segregation —
+// the fence needs it inward but never re-exposes it.
+export type GuardedEntityStore<T extends { id: string }> =
+    EntityStore<T> & GuardedEntityWriter<T>;
 
 // The storage-edge validator. Stores accept one at
 // construction and re-verify every `put` body through
@@ -393,16 +370,18 @@ export interface DbStores {
     states: StateStore;
 }
 
-export interface DbAdapter extends DbStores {
+// Schema/connection lifecycle plus the snapshot plane — the
+// non-row surface every adapter face serves identically.
+export interface DbLifecycle {
     initialize(): Promise<void>;
-    close(): Promise<void>;
-    flush(): Promise<void>;
     deleteSchema(): Promise<void>;
     hasSchema(): Promise<boolean>;
     postSchemaCreation(): Promise<void>;
     getSnapshot(): Promise<string>;
     putSnapshot(json: string): Promise<void>;
-    simulateLatency(): Promise<void>;
+}
+
+export interface DbAdapter extends DbLifecycle, DbStores {
     // Run `fn` inside one transaction. The view it receives
     // exposes the same stores bound to the open tx, so every
     // op joins it — GET-modify-PUT and multi-PUT commit
@@ -410,6 +389,30 @@ export interface DbAdapter extends DbStores {
     transaction<R>(
         tables: readonly string[],
         fn: (view: DbAdapter) => Promise<R>,
+    ): Promise<R>;
+}
+
+// The unfenced tier's stores: every entity store carries the
+// guarded write capability the concrete leaf stores
+// implement; the states log keeps its own contract.
+export type GuardedDbStores = {
+    [K in keyof DbStores]: DbStores[K] extends
+        EntityStore<infer T>
+        ? GuardedEntityStore<T>
+        : DbStores[K];
+};
+
+// The unfenced tier's honest contract. The org fence consumes
+// THIS face, so the guarded write capability is carried by
+// the type from construction to use — never re-acquired by
+// assertion. The fenced face it returns is a plain DbAdapter:
+// the fence spends the guard; it does not re-expose it.
+export interface GuardedDbAdapter
+    extends DbLifecycle, GuardedDbStores
+{
+    transaction<R>(
+        tables: readonly string[],
+        fn: (view: GuardedDbAdapter) => Promise<R>,
     ): Promise<R>;
 }
 

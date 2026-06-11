@@ -7,7 +7,7 @@ import { setHtml, html } from '../app/safe-html.ts';
 import { showToast } from '../app/toast.ts';
 import {
     buildSkeleton,
-    withLoadingState,
+    loadInto,
 } from '../app/loading-states.ts';
 import {
     navigateTo,
@@ -1428,40 +1428,55 @@ export async function init(
     );
     pageState.setContainer(container);
 
-    const loaded = await withLoadingState(
+    await loadInto({
         container,
-        buildSkeleton('detail', 1),
-        async () => {
-            const ctx = sessionContext();
-            const [
-                graph, versions,
-                humanMembers, aiMembers,
-                records, boundRecordId,
-            ] = await Promise.all([
-                getFlowGraph(ctx, flowId),
-                getFlowVersions(ctx, flowId),
-                getHumanMembers(ctx),
-                getAIMembers(ctx),
-                getRecordEntities(ctx),
-                getRecordForFlow(ctx, flowId),
-            ]);
-            const recordAttributes =
-                boundRecordId
-                    ? await
-                        getRecordAttributesByRecord(
-                            ctx, boundRecordId,
-                        )
-                    : [];
-            return {
-                graph, versions,
-                humanMembers, aiMembers,
-                records, boundRecordId,
-                recordAttributes,
-            };
-        },
-    );
-    if (!loaded) return;
+        skeleton: buildSkeleton('detail', 1),
+        fetch: () => loadFlowDesignerBundle(
+            flowId,
+        ),
+        onData: loaded => onFlowLoaded(
+            loaded, container, flowId,
+        ),
+    });
+}
 
+async function loadFlowDesignerBundle(
+    flowId: string,
+) {
+    const ctx = sessionContext();
+    const [
+        graph, versions,
+        humanMembers, aiMembers,
+        records, boundRecordId,
+    ] = await Promise.all([
+        getFlowGraph(ctx, flowId),
+        getFlowVersions(ctx, flowId),
+        getHumanMembers(ctx),
+        getAIMembers(ctx),
+        getRecordEntities(ctx),
+        getRecordForFlow(ctx, flowId),
+    ]);
+    const recordAttributes =
+        boundRecordId
+            ? await getRecordAttributesByRecord(
+                ctx, boundRecordId,
+            )
+            : [];
+    return {
+        graph, versions,
+        humanMembers, aiMembers,
+        records, boundRecordId,
+        recordAttributes,
+    };
+}
+
+function onFlowLoaded(
+    loaded: Awaited<ReturnType<
+        typeof loadFlowDesignerBundle
+    >>,
+    container: HTMLElement,
+    flowId: string,
+): void {
     pageState.setCanvasSize(FALLBACK_W, FALLBACK_H);
     pageState.setNeedsFit(true);
     pageState.setHistory(

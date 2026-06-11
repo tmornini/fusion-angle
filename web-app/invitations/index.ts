@@ -3,7 +3,7 @@ import { showToast } from '../app/toast.ts';
 import { createPageAbort } from '../app/page-lifecycle.ts';
 import { extractErrorMessage } from '../app/error-helpers.ts';
 import {
-    buildSkeleton, withLoadingState,
+    buildSkeleton, loadInto,
 } from '../app/loading-states.ts';
 import { log } from '../app/logger.ts';
 import {
@@ -28,18 +28,25 @@ export async function init(): Promise<void> {
         '#invitations-list', document,
     );
     listEl = container;
-    const loaded = await withLoadingState(
+    await loadInto({
         container,
-        buildSkeleton('table', 3),
-        () => getInvitations(sessionContext()),
-        init,
-    );
-    if (!loaded) return;
-    pending = loaded.filter(inv => inv.state === 'pending');
-    rerender();
-    container.addEventListener(
-        'click', onListClick, { signal });
-    subscribeInvitationChanges(() => void refresh());
+        skeleton: buildSkeleton('table', 3),
+        fetch: () => getInvitations(
+            sessionContext(),
+        ),
+        retry: init,
+        onData: loaded => {
+            pending = loaded.filter(
+                inv => inv.state === 'pending',
+            );
+            rerender();
+            container.addEventListener(
+                'click', onListClick, { signal });
+            subscribeInvitationChanges(
+                () => void refresh(),
+            );
+        },
+    });
 }
 
 function rerender(): void {

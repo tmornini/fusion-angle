@@ -1,8 +1,8 @@
-import { EntityNotFoundError, guarded } from './db.ts';
+import { EntityNotFoundError } from './db.ts';
 import type {
     EntityStore,
+    GuardedEntityStore,
     EntityPut,
-    KeyedCollectionReader,
 } from './db.ts';
 import type { Id } from './types.ts';
 
@@ -32,13 +32,12 @@ export interface OrgScoped {
 export class OrgScopedEntityStore<T extends OrgScoped>
     implements EntityStore<T>
 {
-    readonly #inner:
-        EntityStore<T> & KeyedCollectionReader<T>;
+    readonly #inner: GuardedEntityStore<T>;
     readonly #org: Id;
     readonly #table: string;
 
     constructor(
-        inner: EntityStore<T> & KeyedCollectionReader<T>,
+        inner: GuardedEntityStore<T>,
         org: Id,
         table: string,
     ) {
@@ -57,6 +56,21 @@ export class OrgScopedEntityStore<T extends OrgScoped>
         );
     }
 
+    // The keyed read, fenced: match through the inner index,
+    // keep only this org's rows. Here the filter IS the fence
+    // — the matched slice spans tenants until it is applied.
+    async getAllWhere(
+        column: string,
+        key: string,
+    ): Promise<T[]> {
+        const rows = await this.#inner.getAllWhere(
+            column, key,
+        );
+        return rows.filter(
+            row => row.organization_id === this.#org,
+        );
+    }
+
     async getById(id: string): Promise<T> {
         const row = await this.#inner.getById(id);
         if (row.organization_id !== this.#org) {
@@ -72,7 +86,7 @@ export class OrgScopedEntityStore<T extends OrgScoped>
         id: string,
         fields: Omit<T, 'id'>,
     ): Promise<T> {
-        return guarded(this.#inner).putGuarded(
+        return this.#inner.putGuarded(
             id,
             this.#stamp(fields),
             (existing, rowId) =>
@@ -88,7 +102,7 @@ export class OrgScopedEntityStore<T extends OrgScoped>
             id: entry.id,
             fields: this.#stamp(entry.fields),
         }));
-        await guarded(this.#inner).putManyGuarded(
+        await this.#inner.putManyGuarded(
             stamped,
             deleteIds,
             (existing, rowId) =>
@@ -98,7 +112,7 @@ export class OrgScopedEntityStore<T extends OrgScoped>
     }
 
     async delete(id: string): Promise<void> {
-        await guarded(this.#inner).deleteGuarded(
+        await this.#inner.deleteGuarded(
             id,
             existing => this.#ownsRow(existing),
         );

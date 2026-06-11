@@ -13,7 +13,7 @@ import {
     reportFault,
 } from '../app/error-helpers.ts';
 import {
-    buildSkeleton, withLoadingState,
+    buildSkeleton, loadInto,
 } from '../app/loading-states.ts';
 import { log } from '../app/logger.ts';
 import {
@@ -85,10 +85,10 @@ export async function init(): Promise<void> {
     }
 
     const ctx = sessionContext();
-    const loaded = await withLoadingState(
-        memberList,
-        buildSkeleton('table', 5),
-        async () => {
+    await loadInto({
+        container: memberList,
+        skeleton: buildSkeleton('table', 5),
+        fetch: async () => {
             const [members, currentRow] =
                 await Promise.all([
                     getMembers(ctx),
@@ -96,28 +96,29 @@ export async function init(): Promise<void> {
                 ]);
             return { members, currentRow };
         },
-        init,
-    );
-    if (!loaded) return;
+        retry: init,
+        onData: loaded => {
+            membersState =
+                buildInitialManagedMembersState(
+                    loaded.members,
+                    loaded.currentRow.id,
+                );
 
-    membersState =
-        buildInitialManagedMembersState(
-            loaded.members, loaded.currentRow.id,
-        );
+            memberListEl = memberList;
+            rerenderMembers();
+            memberListEl.addEventListener(
+                'click', onMemberListClick,
+                { signal },
+            );
 
-    memberListEl = memberList;
-    rerenderMembers();
-    memberListEl.addEventListener(
-        'click', onMemberListClick,
-        { signal },
-    );
-
-    subscribeHumanMemberChanges(
-        () => void refresh(),
-    );
-    subscribeAIMemberChanges(
-        () => void refresh(),
-    );
+            subscribeHumanMemberChanges(
+                () => void refresh(),
+            );
+            subscribeAIMemberChanges(
+                () => void refresh(),
+            );
+        },
+    });
 }
 
 async function refresh(): Promise<void> {

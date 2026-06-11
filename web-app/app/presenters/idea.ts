@@ -37,7 +37,7 @@ import type {
 } from '../adapters/index.ts';
 import {
     IDEA_STATE_CONFIG,
-} from '../adapters/index.ts';
+} from './state-display.ts';
 
 const STATE_ICONS: Record<
     IdeaState,
@@ -181,6 +181,7 @@ function buildReadonlyTitleSection(
     submitterName: string,
     submittedAt: string,
 ): SafeHtml {
+    const cfg = IDEA_STATE_CONFIG[idea.stateValue()];
     return html`
         <div class="${
             'flex flex-wrap items-center'
@@ -195,10 +196,10 @@ function buildReadonlyTitleSection(
             </h1>
             <span class="${
                 'badge '
-                + idea.stateClassName()
+                + cfg.className
                 + ' text-xs'
             }">
-                ${idea.stateLabel()}
+                ${cfg.label}
             </span>
             ${buildReadinessPill(idea)}
         </div>
@@ -213,6 +214,7 @@ function buildEditableTitleSection(
     submitterName: string,
     submittedAt: string,
 ): SafeHtml {
+    const cfg = IDEA_STATE_CONFIG[idea.stateValue()];
     return html`
         <div class="${
             'flex flex-wrap items-center'
@@ -227,10 +229,10 @@ function buildEditableTitleSection(
                 value="${draft.title}" />
             <span class="${
                 'badge '
-                + idea.stateClassName()
+                + cfg.className
                 + ' text-xs'
             }">
-                ${idea.stateLabel()}
+                ${cfg.label}
             </span>
             ${buildReadinessPill(idea)}
         </div>
@@ -632,6 +634,9 @@ export class IdeaPresenter {
     }
 
     #buildHeading(): SafeHtml {
+        const cfg = IDEA_STATE_CONFIG[
+            this.#idea.stateValue()
+        ];
         return html`
         <h3 class="${
             'font-display'
@@ -653,13 +658,13 @@ export class IdeaPresenter {
         }">
             <span class="${
                 'badge '
-                + this.#idea.stateClassName()
+                + cfg.className
                 + ' text-xs badge-fixed-w'
             }">${
                 STATE_ICONS[
                     this.#idea.stateValue()
                 ]!(14, '')
-            } ${this.#idea.stateLabel()}</span>
+            } ${cfg.label}</span>
             ${buildReadinessPill(this.#idea)}
         </div>`;
     }

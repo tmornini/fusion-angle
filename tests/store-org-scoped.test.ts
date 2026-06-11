@@ -7,7 +7,6 @@ import type {
     EntityStore,
     EntityPut,
     GuardedEntityWriter,
-    KeyedCollectionReader,
 } from '../api/db.ts';
 
 interface Row {
@@ -21,7 +20,6 @@ interface Row {
 class FakeStore
     implements
         EntityStore<Row>,
-        KeyedCollectionReader<Row>,
         GuardedEntityWriter<Row>
 {
     readonly #rows = new Map<string, Row>();

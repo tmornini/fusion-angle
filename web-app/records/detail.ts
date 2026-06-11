@@ -5,7 +5,7 @@ import { showToast } from '../app/toast.ts';
 import { reportFault } from '../app/error-helpers.ts';
 import {
     buildSkeleton,
-    withLoadingState,
+    loadInto,
 } from '../app/loading-states.ts';
 import {
     navigateTo,
@@ -84,10 +84,10 @@ async function load(
 ): Promise<void> {
     const id = recordId;
     if (!id) return;
-    const loaded = await withLoadingState(
-        root,
-        buildSkeleton('detail', 1),
-        async () => {
+    await loadInto({
+        container: root,
+        skeleton: buildSkeleton('detail', 1),
+        fetch: async () => {
             const ctx = sessionContext();
             const [record, state,
                 attributes, flowIds,
@@ -110,18 +110,19 @@ async function load(
                 attributes, flows, workOrders,
             };
         },
-        () => load(root),
-    );
-    if (!loaded) return;
-    currentView = {
-        record: loaded.record,
-        state: loaded.state,
-        attributes: loaded.attributes,
-        boundFlows: loaded.flows,
-        workOrders: loaded.workOrders,
-    };
-    render(root);
-    bindActions(root);
+        retry: () => load(root),
+        onData: loaded => {
+            currentView = {
+                record: loaded.record,
+                state: loaded.state,
+                attributes: loaded.attributes,
+                boundFlows: loaded.flows,
+                workOrders: loaded.workOrders,
+            };
+            render(root);
+            bindActions(root);
+        },
+    });
 }
 
 async function loadFlowSummaries(

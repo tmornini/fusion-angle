@@ -14,8 +14,10 @@ import {
     iconBrain,
 } from '../icons.ts';
 import {
-    AIMember,
     MEMBER_STATE_CONFIG,
+} from './state-display.ts';
+import {
+    AIMember,
     isMemberState,
     type AIMemberDraft,
     type MemberState,
@@ -119,6 +121,7 @@ function buildAvatar(): SafeHtml {
 function buildReadonlyTitleSection(
     member: AIMember,
 ): SafeHtml {
+    const cfg = MEMBER_STATE_CONFIG[member.stateValue()];
     return html`
         <div class="${
             'flex flex-wrap items-center'
@@ -137,10 +140,10 @@ function buildReadonlyTitleSection(
             }">AI</span>
             <span class="${
                 'badge '
-                + member.stateClassName()
+                + cfg.className
                 + ' text-xs'
             }">
-                ${member.stateLabel()}
+                ${cfg.label}
             </span>
         </div>
         <p class="text-sm text-muted">
@@ -154,6 +157,7 @@ function buildEditableTitleSection(
     member: AIMember,
     draft: AIMemberDraftFields,
 ): SafeHtml {
+    const cfg = MEMBER_STATE_CONFIG[member.stateValue()];
     return html`
         <div class="${
             'flex flex-wrap items-center'
@@ -172,10 +176,10 @@ function buildEditableTitleSection(
             }">AI</span>
             <span class="${
                 'badge '
-                + member.stateClassName()
+                + cfg.className
                 + ' text-xs'
             }">
-                ${member.stateLabel()}
+                ${cfg.label}
             </span>
         </div>
         <p class="text-sm text-muted">

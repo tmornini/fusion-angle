@@ -4,7 +4,7 @@ import {
 import { navigateTo } from '../app/core.ts';
 import {
     buildSkeleton,
-    withLoadingState,
+    loadInto,
 } from '../app/loading-states.ts';
 import {
     sessionContext,
@@ -103,13 +103,13 @@ export async function init(
         '#flow-stats', document,
     );
 
-    await withLoadingState(
-        host,
-        buildSkeleton('detail', 1),
-        async () => {
-            const ctx = sessionContext();
-            const { model, graph } =
-                await getFlowStats(ctx, flowId);
+    await loadInto({
+        container: host,
+        skeleton: buildSkeleton('detail', 1),
+        fetch: () => getFlowStats(
+            sessionContext(), flowId,
+        ),
+        onData: ({ model, graph }) => {
             const viewBox = boundingViewBox(
                 graph.nodes,
                 STATS_VIEW_PADDING_PX,
@@ -269,5 +269,5 @@ export async function init(
                 { signal },
             );
         },
-    );
+    });
 }

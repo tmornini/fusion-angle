@@ -20,7 +20,7 @@ import type {
 } from '../adapters/index.ts';
 import {
     RECORD_STATE_CONFIG,
-} from '../adapters/index.ts';
+} from './state-display.ts';
 
 const STATE_ICONS: Record<
     RecordState,
@@ -151,6 +151,9 @@ export class RecordPresenter {
     }
 
     #buildHeading(): SafeHtml {
+        const cfg = RECORD_STATE_CONFIG[
+            this.#record.stateValue()
+        ];
         return html`
         <h3 class="${
             'font-display'
@@ -175,13 +178,13 @@ export class RecordPresenter {
         </p>
         <span class="${
             'badge '
-            + this.#record.stateClassName()
+            + cfg.className
             + ' text-xs badge-fixed-w mt-2'
         }">${
             STATE_ICONS[
                 this.#record.stateValue()
             ]!(14, '')
-        } ${this.#record.stateLabel()}</span>`;
+        } ${cfg.label}</span>`;
     }
 
     #buildMetadata(): SafeHtml {

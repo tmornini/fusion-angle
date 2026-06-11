@@ -236,10 +236,12 @@ export function decodeAccessToken(
     return claims;
 }
 
-export function principalFromToken(
-    token: string,
+// The one claims→principal projection. Callers that already
+// hold VERIFIED claims (the request gate) project directly —
+// re-decoding the raw token would revisit verification's work.
+export function principalFromClaims(
+    claims: AccessTokenClaims,
 ): Principal {
-    const claims = decodeAccessToken(token);
     return {
         id: claims.sub,
         roles: claims.roles,
@@ -248,6 +250,12 @@ export function principalFromToken(
         ...(claims.orgs
             ? { organizations: claims.orgs } : {}),
     };
+}
+
+export function principalFromToken(
+    token: string,
+): Principal {
+    return principalFromClaims(decodeAccessToken(token));
 }
 
 export type VerifyResult =

@@ -322,9 +322,6 @@ apply to it (RED is the audit's first finding).
 - **ES2024 target.** No transpilation. Native
   `Object.groupBy()`, `Map.groupBy()` are available. Assumes
   modern browser.
-- **`withLoadingState()` returns null.** Returns `null` on
-  error AND when data is empty with an `emptyState` config —
-  callers must check for null before using the result.
 - **Cross-tab theme sync.** `state.ts` listens to
   `StorageEvent` and syncs theme changes across browser tabs
   automatically.

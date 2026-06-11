@@ -19,8 +19,10 @@ import {
     iconCheckCircle2,
 } from '../icons.ts';
 import {
-    HumanMember,
     MEMBER_STATE_CONFIG,
+} from './state-display.ts';
+import {
+    HumanMember,
     type MemberState,
     type HumanMemberDraft,
     isMemberState,
@@ -168,6 +170,7 @@ function buildAvatar(
 function buildReadonlyTitleSection(
     member: HumanMember,
 ): SafeHtml {
+    const cfg = MEMBER_STATE_CONFIG[member.stateValue()];
     const pii = member.pii();
     const name = pii.erased
         ? MEMBER_WITHOUT_PII_NAME
@@ -186,10 +189,10 @@ function buildReadonlyTitleSection(
             </h1>
             <span class="${
                 'badge '
-                + member.stateClassName()
+                + cfg.className
                 + ' text-xs'
             }">
-                ${member.stateLabel()}
+                ${cfg.label}
             </span>
         </div>
         <p class="text-sm text-muted">
@@ -203,6 +206,7 @@ function buildEditableTitleSection(
     member: HumanMember,
     draft: HumanMemberDraftFields,
 ): SafeHtml {
+    const cfg = MEMBER_STATE_CONFIG[member.stateValue()];
     const pii = member.pii();
     const name = pii.erased
         ? MEMBER_WITHOUT_PII_NAME
@@ -221,10 +225,10 @@ function buildEditableTitleSection(
             </h1>
             <span class="${
                 'badge '
-                + member.stateClassName()
+                + cfg.className
                 + ' text-xs'
             }">
-                ${member.stateLabel()}
+                ${cfg.label}
             </span>
         </div>
         <p class="text-sm text-muted">

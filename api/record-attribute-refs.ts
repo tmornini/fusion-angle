@@ -1,4 +1,3 @@
-import { keyed } from './db.ts';
 import type { DbAdapter } from './db.ts';
 import {
     validateStoredGraphJson,
@@ -77,7 +76,7 @@ export async function collectAttributeReferrers(
     }));
     const referrers = new Map<string, AttributeReferrers>();
     for (const attributeId of attributeIds) {
-        const values = await keyed(view.stateFieldValues)
+        const values = await view.stateFieldValues
             .getAllWhere('field_id', attributeId);
         referrers.set(attributeId, {
             valueCount: values.length,

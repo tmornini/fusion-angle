@@ -1,3 +1,11 @@
+// The demo network-emulation seam, segregated from the
+// storage contract (Interface Segregation): only the client
+// verb facade awaits it before each simulated network hop —
+// no store, decorator, or route handler ever does.
+interface LatencySimulation {
+    simulateLatency(): Promise<void>;
+}
+
 interface LatencyConfig {
     readonly mu: number;
     readonly sigma: number;
@@ -48,4 +56,4 @@ export {
     DEFAULT_LATENCY_CONFIG,
     simulateNetworkLatency,
 };
-export type { LatencyConfig };
+export type { LatencyConfig, LatencySimulation };

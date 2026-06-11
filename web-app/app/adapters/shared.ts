@@ -1,4 +1,3 @@
-import type { DbAdapter } from '../../../api/db.ts';
 import {
     nowEpochSeconds,
     type Id,
@@ -9,6 +8,7 @@ import {
     DELETE as httpDelete,
     POST as httpPost,
     UnauthorizedError,
+    type ClientFacadeAdapter,
 } from '../../../api/api.ts';
 import {
     generateCryptoSafeBase62,
@@ -112,7 +112,7 @@ export interface RequestContext {
 // captured token. The recovering sibling below is the
 // sessionContext path.
 export function createRequestContext(
-    adapter: DbAdapter,
+    adapter: ClientFacadeAdapter,
     token: string,
 ): RequestContext {
     return makeRequestContext(adapter, token, false);
@@ -122,14 +122,14 @@ export function createRequestContext(
 // via withAuthRecovery and retries against the live token
 // once.
 export function createRecoveringRequestContext(
-    adapter: DbAdapter,
+    adapter: ClientFacadeAdapter,
     token: string,
 ): RequestContext {
     return makeRequestContext(adapter, token, true);
 }
 
 function makeRequestContext(
-    adapter: DbAdapter,
+    adapter: ClientFacadeAdapter,
     token: string,
     recover: boolean,
 ): RequestContext {
@@ -194,7 +194,7 @@ export function sessionContext(): RequestContext {
 let recoveryInFlight: Promise<string | null> | null = null;
 
 function sharedRecovery(
-    adapter: DbAdapter,
+    adapter: ClientFacadeAdapter,
 ): Promise<string | null> {
     recoveryInFlight ??= recoverSession(adapter)
         .finally(() => {
@@ -210,7 +210,7 @@ function sharedRecovery(
 // second 401 (or no refreshable credential) clears the session
 // and bounces to login — there is no third attempt.
 async function withAuthRecovery<T>(
-    adapter: DbAdapter,
+    adapter: ClientFacadeAdapter,
     make: (tok: string) => Promise<T>,
 ): Promise<T> {
     try {
@@ -241,7 +241,7 @@ async function withAuthRecovery<T>(
 // 401 with no refreshable credential never makes a pointless
 // refresh round-trip.
 async function recoverSession(
-    adapter: DbAdapter,
+    adapter: ClientFacadeAdapter,
 ): Promise<string | null> {
     let creds: SessionCredentials | null;
     try {
@@ -288,7 +288,7 @@ async function recoverSession(
 // recovery branches: re-install a known-live token (install), and
 // refresh-then-install (refresh).
 async function installAndScope(
-    adapter: DbAdapter,
+    adapter: ClientFacadeAdapter,
     flatToken: string,
 ): Promise<string | null> {
     putSessionToken(flatToken);
@@ -309,7 +309,7 @@ async function installAndScope(
 // that itself 401s (reuse/expiry) is terminal and must not
 // recurse. A dead refresh scrubs the session and bounces.
 async function refreshCredentials(
-    adapter: DbAdapter,
+    adapter: ClientFacadeAdapter,
     refreshToken: string,
 ): Promise<SessionCredentials | null> {
     const free = createRequestContext(adapter, getSessionToken());
@@ -330,7 +330,7 @@ async function refreshCredentials(
 // the REACHABLE set first, so the exchange never targets a
 // non-member org (H13). Mirrors scopeBootToActiveOrg.
 async function rescopeToActiveOrg(
-    adapter: DbAdapter,
+    adapter: ClientFacadeAdapter,
     flatToken: string,
 ): Promise<void> {
     const ctx = createRequestContext(adapter, flatToken);

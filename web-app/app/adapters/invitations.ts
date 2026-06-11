@@ -5,7 +5,6 @@ import {
     createSubscriptionChannel,
 } from '../channels.ts';
 export {
-    INVITATION_STATE_CONFIG,
     isInvitationState,
 } from '../../../api/types.ts';
 export type { InvitationState } from '../../../api/types.ts';

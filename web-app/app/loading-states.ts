@@ -186,20 +186,31 @@ export interface EmptyStateConfig {
     onEmpty?: () => void;
 }
 
-export async function withLoadingState<T>(
-    container: HTMLElement,
-    skeletonHtml: SafeHtml,
-    fetchFn: () => Promise<T>,
-    retryFn?: () => void,
-    emptyState?: EmptyStateConfig,
-): Promise<T | null> {
-    setHtml(container, skeletonHtml);
+// The load process owns its whole arc: skeleton while
+// fetching, error state (with retry) on failure, empty
+// state on an empty list, and the onData continuation on
+// success. Nothing returns to the call site — outcomes the
+// process has already rendered are not the caller's to
+// re-interrogate.
+export interface LoadIntoConfig<T> {
+    container: HTMLElement;
+    skeleton: SafeHtml;
+    fetch: () => Promise<T>;
+    retry?: () => void;
+    emptyState?: EmptyStateConfig;
+    onData: (data: T) => void | Promise<void>;
+}
+
+export async function loadInto<T>(
+    cfg: LoadIntoConfig<T>,
+): Promise<void> {
+    setHtml(cfg.container, cfg.skeleton);
     let data: T;
     try {
-        data = await fetchFn();
+        data = await cfg.fetch();
     } catch (e) {
         setHtml(
-            container,
+            cfg.container,
             buildErrorState(
                 extractErrorMessage(
                     e,
@@ -213,33 +224,33 @@ export async function withLoadingState<T>(
             ),
         );
         const retryBtn = $(
-            '[data-retry-btn]', container,
+            '[data-retry-btn]', cfg.container,
         );
-        if (retryBtn && retryFn) {
+        if (retryBtn && cfg.retry) {
             retryBtn.addEventListener(
                 'click',
-                retryFn,
+                cfg.retry,
             );
             retryBtn.focus();
         }
-        return null;
+        return;
     }
     if (
-        emptyState
+        cfg.emptyState
         && Array.isArray(data)
         && data.length === 0
     ) {
         setHtml(
-            container,
+            cfg.container,
             buildEmptyState(
-                emptyState.icon,
-                emptyState.title,
-                emptyState.description,
-                emptyState.action,
+                cfg.emptyState.icon,
+                cfg.emptyState.title,
+                cfg.emptyState.description,
+                cfg.emptyState.action,
             ),
         );
-        emptyState.onEmpty?.();
-        return null;
+        cfg.emptyState.onEmpty?.();
+        return;
     }
-    return data;
+    await cfg.onData(data);
 }
