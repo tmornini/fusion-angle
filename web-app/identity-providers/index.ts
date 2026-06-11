@@ -9,6 +9,7 @@ import { iconArrowLeft } from '../app/icons.ts';
 import {
     sessionContext,
     getProviderEvents,
+    subscribeIdentityProviderChanges,
 } from '../app/adapters/index.ts';
 import {
     IdentityProvidersPresenter,
@@ -49,4 +50,15 @@ export async function init(
 
     new IdentityProvidersPresenter(events)
         .render(list);
+
+    const refresh = async (): Promise<void> => {
+        const fresh = await getProviderEvents(
+            sessionContext(), identityId,
+        );
+        new IdentityProvidersPresenter(fresh)
+            .render(list);
+    };
+    subscribeIdentityProviderChanges(
+        () => void refresh(),
+    );
 }

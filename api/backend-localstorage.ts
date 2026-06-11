@@ -14,28 +14,14 @@ import { createSerializer } from './store-serializer.ts';
 
 const KEY_PREFIX = 'fusion-ai:';
 
-const COMPRESSED_TABLES: ReadonlySet<string> = new Set([
-    'states',
-    'flow_versions',
-]);
-
+// READ side only. Earlier builds gzip+base64'd the states
+// and flow_versions tables behind this prefix; measurement
+// (F-080) put the ENTIRE mock dataset at ~14% of the 5 MiB
+// quota raw — no bottleneck — so writes are plain JSON
+// again. The decoder stays solely to migrate stored gz1
+// payloads: a legacy table re-encodes raw on its next
+// flush.
 const COMPRESSION_PREFIX = 'gz1:';
-
-async function compressJson(
-    json: string,
-): Promise<string> {
-    const stream = new Blob([json]).stream().pipeThrough(
-        new CompressionStream('gzip'),
-    );
-    const buffer =
-        await new Response(stream).arrayBuffer();
-    const bytes = new Uint8Array(buffer);
-    let binary = '';
-    for (const b of bytes) {
-        binary += String.fromCharCode(b);
-    }
-    return COMPRESSION_PREFIX + btoa(binary);
-}
 
 async function decompressJson(
     stored: string,
@@ -171,22 +157,18 @@ export class LocalStorageBackend
         return parsed as { id: string }[];
     }
 
-    // Flush one table from a transaction buffer: re-gzip the
-    // compressed tables, then setItem. Rows arrive already
-    // serialized (the buffer ran the NOT-NULL gate at put
-    // time), so this only encodes and stores.
+    // Flush one table from a transaction buffer. Rows
+    // arrive already serialized (the buffer ran the
+    // NOT-NULL gate at put time), so this only stores.
     async #store(
         table: string,
         rows: { id: string }[],
     ): Promise<void> {
         const json = JSON.stringify(rows);
-        const payload = COMPRESSED_TABLES.has(table)
-            ? await compressJson(json)
-            : json;
         try {
             localStorage.setItem(
                 KEY_PREFIX + table,
-                payload,
+                json,
             );
         } catch (e) {
             if (

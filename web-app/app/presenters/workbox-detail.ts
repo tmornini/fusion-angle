@@ -57,6 +57,7 @@ export function buildAttributeInputHtml(
         const options = attribute.options;
         return html`<select
             class="input"
+            id="wo-attr-${id}"
             data-attribute-id="${id}"
             ${disabledAttr}
             ${requiredAttr}>
@@ -99,6 +100,7 @@ export function buildAttributeInputHtml(
     if (spec.type === 'checkbox') {
         return html`<input
             type="checkbox"
+            id="wo-attr-${id}"
             data-attribute-id="${id}"
             ${disabledAttr}
             ${requiredAttr} />`;
@@ -106,6 +108,7 @@ export function buildAttributeInputHtml(
     return html`<input
         type="${spec.type}"
         class="input"
+        id="wo-attr-${id}"
         data-attribute-id="${id}"
         ${readonlyAttr}
         ${requiredAttr} />`;
@@ -457,9 +460,25 @@ export class WorkboxDetailPresenter {
     ): SafeHtml {
         const label = attribute.name
             + (ref.isRequired ? ' *' : '');
+        if (
+            attribute.attribute_type === 'radio'
+        ) {
+            return html`<fieldset class="${
+                'attribute-group-fieldset mb-4'
+            }">
+                <legend
+                    class="label"
+                    >${label}</legend>
+                ${buildAttributeInputHtml(
+                    ref, attribute,
+                )}
+            </fieldset>`;
+        }
         return html`<div class="mb-4">
             <label
-                class="label">${label}</label>
+                class="label"
+                for="wo-attr-${attribute.id}"
+                >${label}</label>
             ${buildAttributeInputHtml(
                 ref, attribute,
             )}

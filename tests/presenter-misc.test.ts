@@ -34,6 +34,12 @@ import {
     makeHumanMember as buildHumanMember,
     makeAIMember as buildAIMember,
 } from './member-fixtures.ts';
+import {
+    formatSigned,
+} from '../web-app/app/scoring-format.ts';
+import {
+    DISPLAY_ABSENT,
+} from '../web-app/app/format.ts';
 
 // helpers
 
@@ -65,6 +71,17 @@ function makeGauge(
     } satisfies RatioGauge;
 }
 
+// Mirrors the production display rule
+// (adapters/dashboard.ts impactDisplay): absent
+// renders DISPLAY_ABSENT, present renders signed.
+function impactDisplay(
+    v: number | undefined,
+): string {
+    return v === undefined
+        ? DISPLAY_ABSENT
+        : formatSigned(v);
+}
+
 function makeBipolarGauge(
     outerValue: number | undefined,
     innerValue: number | undefined,
@@ -78,18 +95,12 @@ function makeBipolarGauge(
         outer: {
             value: outerValue,
             label: 'Baseline',
-            display: outerValue === undefined
-                ? '—'
-                : (outerValue >= 0 ? '+' : '')
-                    + outerValue,
+            display: impactDisplay(outerValue),
         },
         inner: {
             value: innerValue,
             label: 'Actual',
-            display: innerValue === undefined
-                ? '—'
-                : (innerValue >= 0 ? '+' : '')
-                    + innerValue,
+            display: impactDisplay(innerValue),
         },
     } satisfies BipolarGauge;
 }

@@ -3,6 +3,7 @@ import {
 } from '../safe-html.ts';
 import { initials } from '../core.ts';
 import { DISPLAY_ABSENT } from '../format.ts';
+import { buildPageUrl } from '../navigation.ts';
 import { mutedEmptyNote } from './empty-note.ts';
 import { iconShield } from '../icons.ts';
 import {
@@ -63,7 +64,15 @@ function buildRow(row: IdentityRosterRow): SafeHtml {
             }
             <div class="flex-fill min-w-0">
                 <p class="font-medium truncate">
-                    ${name}
+                    <a href="${
+                        buildPageUrl(
+                            'identity-detail',
+                            {
+                                identityId:
+                                    row.id,
+                            },
+                        )
+                    }">${name}</a>
                 </p>
                 <p class="${
                     'text-xs text-muted truncate'

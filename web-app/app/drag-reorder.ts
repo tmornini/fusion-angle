@@ -64,6 +64,24 @@ export function initDragReorder(
         };
     }
 
+    function positionsOf(
+        items: readonly HTMLElement[],
+    ): number[] {
+        return items.map(c => {
+            const raw = c.getAttribute(
+                'data-position',
+            );
+            if (raw === null) {
+                throw new Error(
+                    'drag-reorder:'
+                    + ' card missing'
+                    + ' data-position',
+                );
+            }
+            return parseFloat(raw);
+        });
+    }
+
     function dropIndex(
         y: number,
         lastIdx: number | null,
@@ -198,24 +216,9 @@ export function initDragReorder(
             clearIndicator();
             drag = { kind: 'idle' };
             const items = cards();
-            const positions = items.map(
-                c => {
-                    const raw =
-                        c.getAttribute(
-                            'data-position',
-                        );
-                    if (raw === null) {
-                        throw new Error(
-                            'drag-reorder:'
-                            + ' card missing'
-                            + ' data-position',
-                        );
-                    }
-                    return parseFloat(raw);
-                },
-            );
             const newPos = computeNewPosition(
-                positions, committedIdx,
+                positionsOf(items),
+                committedIdx,
             );
             for (const c of items) {
                 c.style.opacity = '';
@@ -235,6 +238,77 @@ export function initDragReorder(
         },
     );
 
+    // The keyboard path: arrow keys on a
+    // focused handle move its card one slot
+    // and announce the landing place.
+    const live = createElement('div');
+    live.className = 'sr-only';
+    live.setAttribute(
+        'aria-live', 'polite',
+    );
+    container.insertAdjacentElement(
+        'afterend', live,
+    );
+
+    let focusId: string | null = null;
+
+    container.addEventListener(
+        'keydown',
+        (e) => {
+            if (
+                e.key !== 'ArrowUp'
+                && e.key !== 'ArrowDown'
+            ) return;
+            if (
+                !(e.target
+                    instanceof Element)
+            ) return;
+            const handle = e.target.closest(
+                DRAG_HANDLE_SELECTOR,
+            );
+            if (!handle) return;
+            const card = handle
+                .closest<HTMLElement>(
+                    cardSelector,
+                );
+            if (!card) return;
+            e.preventDefault();
+            const items = cards();
+            const idx = items.indexOf(card);
+            const isUp =
+                e.key === 'ArrowUp';
+            if (isUp && idx === 0) return;
+            if (
+                !isUp
+                && idx === items.length - 1
+            ) return;
+            const id = card.getAttribute(
+                idAttribute,
+            );
+            if (id === null) {
+                throw new Error(
+                    'drag-reorder: card'
+                    + ' missing '
+                    + idAttribute
+                    + ' attribute',
+                );
+            }
+            const newPos =
+                computeNewPosition(
+                    positionsOf(items),
+                    isUp
+                        ? idx - 1
+                        : idx + 2,
+                );
+            focusId = id;
+            live.textContent =
+                'Moved to position '
+                + (isUp ? idx : idx + 2)
+                + ' of ' + items.length;
+            onReorder(id, newPos);
+        },
+    );
+
     function setDraggable(): void {
         for (const c of cards()) {
             c.setAttribute(
@@ -243,12 +317,34 @@ export function initDragReorder(
         }
     }
 
+    // The list rebuilds after a reorder
+    // commits; put focus back on the moved
+    // card's handle so arrow keys keep
+    // working from where the user was.
+    function restoreFocus(): void {
+        if (focusId === null) return;
+        const card = cards().find(
+            c => c.getAttribute(
+                idAttribute,
+            ) === focusId,
+        );
+        if (!card) return;
+        const handle = card
+            .querySelector<HTMLElement>(
+                DRAG_HANDLE_SELECTOR,
+            );
+        if (!handle) return;
+        focusId = null;
+        handle.focus();
+    }
+
     setDraggable();
 
     const observer =
-        new MutationObserver(
-            setDraggable,
-        );
+        new MutationObserver(() => {
+            setDraggable();
+            restoreFocus();
+        });
     observer.observe(
         container,
         { childList: true },

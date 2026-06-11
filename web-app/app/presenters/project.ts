@@ -15,6 +15,7 @@ import {
 import {
     toggleStatusFilter,
 } from './list-filter.ts';
+import { buildPageUrl } from '../navigation.ts';
 import { stateBadge } from './state-badge.ts';
 import {
     buildStateFilterBadges,
@@ -105,20 +106,35 @@ export class ProjectPresenter {
         <div class="${
             'flex items-center gap-4'
         }">
-            ${showGrip ? html`<div class="${
-                'hidden-mobile text-muted'
-                + ' drag-handle'
-            }">${
+            ${showGrip ? html`<button
+                type="button"
+                class="${
+                    'hidden-mobile text-muted'
+                    + ' drag-handle'
+                }"
+                aria-label="${
+                    'Reorder ' + this
+                        .#project.titleText()
+                }">${
                 iconGripVertical(20, '')
-            }</div>` : html``}
+            }</button>` : html``}
             <div class="flex-fill">
                 <h3 class="${
                     'font-display '
                     + 'font-semibold truncate'
+                }"><a href="${
+                    buildPageUrl(
+                        'project-detail',
+                        {
+                            projectId: this
+                                .#project
+                                .idForLink(),
+                        },
+                    )
                 }">${
                     this.#project
                         .titleText()
-                }</h3>
+                }</a></h3>
                 <span class="${
                     'badge '
                     + this.#project

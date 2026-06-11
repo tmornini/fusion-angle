@@ -17,19 +17,18 @@ test(
     },
 );
 
-// Integration: the eager-load path inside
-// initCommandPalette() must not invoke
-// getSearchIndex() (and thus getIdeas, which
-// throws MissingTableError on cold load) when
-// the schema is absent. This test stubs the
-// minimum DOM/storage surface initCommandPalette
-// touches, points the global adapter at a
-// pristine in-memory tier (IndexedDB has no Node
-// stub), and asserts the call completes without
-// throwing. With the bug
-// reverted (eager `void getSearchIndex()` with
-// no schema gate), the unhandled rejection from
-// getIdeas surfaces here.
+// Integration: initCommandPalette() performs no
+// data reads at init — the index builds lazily on
+// first open. getIdeas throws MissingTableError on
+// a cold load, so any init-time read against an
+// absent schema surfaces as an unhandled rejection
+// here. This test stubs the minimum DOM/storage
+// surface initCommandPalette touches, points the
+// global adapter at a pristine in-memory tier
+// (IndexedDB has no Node stub), and asserts the
+// call completes without throwing — guarding
+// against a regression to eager loading without a
+// schema gate.
 test(
     'initCommandPalette does not throw'
     + ' when schema is absent',

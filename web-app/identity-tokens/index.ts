@@ -9,6 +9,7 @@ import { iconArrowLeft } from '../app/icons.ts';
 import {
     sessionContext,
     getTokenChainsFor,
+    subscribeIdentityTokenChanges,
 } from '../app/adapters/index.ts';
 import {
     IdentityTokensPresenter,
@@ -49,4 +50,15 @@ export async function init(
 
     new IdentityTokensPresenter(chains)
         .render(list);
+
+    const refresh = async (): Promise<void> => {
+        const fresh = await getTokenChainsFor(
+            sessionContext(), identityId,
+        );
+        new IdentityTokensPresenter(fresh)
+            .render(list);
+    };
+    subscribeIdentityTokenChanges(
+        () => void refresh(),
+    );
 }

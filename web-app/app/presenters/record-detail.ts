@@ -273,6 +273,7 @@ export class RecordDetailEditPresenter {
             </div>
             <div class="mb-6">
                 <label class="label"
+                    for="record-edit-desc"
                     >Description</label>
                 <textarea
                     id="record-edit-desc"

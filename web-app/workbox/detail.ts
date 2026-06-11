@@ -83,6 +83,34 @@ function hasEmptyRequiredAttribute(
         });
 }
 
+// A violations failure renders in place — the panel names
+// each blocked rule. Any other fault logs and toasts.
+function reportTransitionFailure(
+    err: unknown,
+    violationsEl: HTMLElement | null,
+    detail: WorkboxDetailPresenter,
+): void {
+    if (
+        err instanceof RecordTransitionViolations
+    ) {
+        if (violationsEl) {
+            setHtml(
+                violationsEl,
+                detail.buildViolations(
+                    err.violations,
+                ),
+            );
+        }
+        return;
+    }
+    log.error(
+        'work order transition failed',
+        'workbox',
+        err,
+    );
+    showToast('Transition failed', 'error');
+}
+
 /* ── Event wiring ────────── */
 
 function initTransitionButtons(
@@ -144,32 +172,8 @@ function initTransitionButtons(
                         },
                     );
                 } catch (err) {
-                    if (
-                        err instanceof
-                        RecordTransitionViolations
-                    ) {
-                        if (violationsEl) {
-                            setHtml(
-                                violationsEl,
-                                detail
-                                    .buildViolations(
-                                        err.violations,
-                                    ),
-                            );
-                        }
-                        return;
-                    }
-                    log.error(
-                        'work order'
-                        + ' transition'
-                        + ' failed',
-                        'workbox',
-                        err,
-                    );
-                    showToast(
-                        'Transition'
-                        + ' failed',
-                        'error',
+                    reportTransitionFailure(
+                        err, violationsEl, detail,
                     );
                     return;
                 }

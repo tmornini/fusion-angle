@@ -13,7 +13,6 @@
 }
 
 .objective-list-item .drag-handle {
-    cursor: grab;
     opacity: 0.5;
     user-select: none;
 }

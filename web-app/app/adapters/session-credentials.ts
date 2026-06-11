@@ -23,11 +23,10 @@ export class SessionCredentialsCorruptError extends Error {
     }
 }
 
-// NOT under STORAGE_KEY_PREFIX ('fusion-ai:'): root-redirect
-// scans that prefix to decide "schema present", so a credential
-// surviving a DB wipe must not masquerade as a schema and route
-// recovery away from snapshots. Mirrors ACTIVE_ORG_KEY
-// ('fusion.active-org').
+// NOT under the localStorage backend's 'fusion-ai:' table
+// namespace: a credential is session state, not schema
+// data, and must survive a deleteSchema wipe of the table
+// keys. Mirrors ACTIVE_ORG_KEY ('fusion.active-org').
 const SESSION_CREDENTIALS_KEY = 'fusion.session-credentials';
 
 // Parse + validate at the gate. null ONLY for honest absence

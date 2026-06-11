@@ -1,5 +1,6 @@
 import type {
     Id,
+    Objective,
     ObjectiveId,
     ProjectEntity,
     ProjectObjectiveBaselineScore,
@@ -232,21 +233,27 @@ export async function getPortfolioImpactSummary(
     };
 }
 
-export async function getObjectiveAggregates(
+// The one read-set behind the dashboard's objective
+// widgets. Fetched ONCE per render and handed to the pure
+// builders below — the aggregates and trendlines consume
+// the same five logical reads, so fetching per-builder
+// repeated every read and its auth/ledger derivation.
+export interface ObjectiveScoringInputs {
+    activeObjectives: Objective[];
+    approvedProjectIds: Set<Id>;
+    baselineScores: ObjectiveScore[];
+    actualScores: ObjectiveScore[];
+}
+
+export async function getObjectiveScoringInputs(
     ctx: RequestContext,
-): Promise<Array<{
-    objectiveId: ObjectiveId;
-    baselineMean: number | undefined;
-    latestActualMean: number | undefined;
-    projectsBaselineScored: number;
-    projectsActualScored: number;
-}>> {
+): Promise<ObjectiveScoringInputs> {
     const [
-        activeObjs,
+        activeObjectives,
         projectRows,
         projectStates,
-        allBaseline,
-        allActual,
+        baselineScores,
+        actualScores,
     ] = await Promise.all([
         getActiveObjectives(ctx),
         ctx.GET<ProjectEntity[]>('projects'),
@@ -254,25 +261,47 @@ export async function getObjectiveAggregates(
         getAllBaselineScores(ctx),
         getAllActualScores(ctx),
     ]);
-    const approved = projectRows.filter(p => {
-        const s = projectStates.get(p.id);
-        return s !== undefined
-            && projectStateIsApproved(s);
-    });
-    const approvedIds = new Set(approved.map(p => p.id));
+    const approvedProjectIds = new Set(
+        projectRows
+            .filter(p => {
+                const s = projectStates.get(p.id);
+                return s !== undefined
+                    && projectStateIsApproved(s);
+            })
+            .map(p => p.id),
+    );
+    return {
+        activeObjectives,
+        approvedProjectIds,
+        baselineScores,
+        actualScores,
+    };
+}
+
+export function buildObjectiveAggregates(
+    inputs: ObjectiveScoringInputs,
+): Array<{
+    objectiveId: ObjectiveId;
+    baselineMean: number | undefined;
+    latestActualMean: number | undefined;
+    projectsBaselineScored: number;
+    projectsActualScored: number;
+}> {
+    const approvedIds =
+        inputs.approvedProjectIds;
     const latestB = latestPerPair(
-        allBaseline.filter(
+        inputs.baselineScores.filter(
             b => approvedIds.has(b.projectId),
         ),
     );
     const latestA = latestPerPair(
-        allActual.filter(
+        inputs.actualScores.filter(
             a => approvedIds.has(a.projectId),
         ),
     );
 
     const result = [];
-    for (const obj of activeObjs) {
+    for (const obj of inputs.activeObjectives) {
         const baselineScores =
             filterByField(latestB, 'objectiveId', obj.id)
                 .map(r => r.score);
@@ -300,43 +329,24 @@ export interface TrendPoint {
 // is its baseline (the starting reference mean, dated to
 // the last baseline edit); the rest are measured means,
 // one per distinct actual-score timestamp, in order.
-export async function getObjectiveTrendlines(
-    ctx: RequestContext,
-): Promise<Map<ObjectiveId, TrendPoint[]>> {
-    const [
-        activeObjs,
-        projectRows,
-        projectStates,
-        allBaseline,
-        allActual,
-    ] = await Promise.all([
-        getActiveObjectives(ctx),
-        ctx.GET<ProjectEntity[]>('projects'),
-        getProjectStates(ctx),
-        getAllBaselineScores(ctx),
-        getAllActualScores(ctx),
-    ]);
-    const approvedIds = new Set(
-        projectRows
-            .filter(p => {
-                const s = projectStates.get(p.id);
-                return s !== undefined
-                    && projectStateIsApproved(s);
-            })
-            .map(p => p.id),
-    );
+export function buildObjectiveTrendlines(
+    inputs: ObjectiveScoringInputs,
+): Map<ObjectiveId, TrendPoint[]> {
+    const approvedIds =
+        inputs.approvedProjectIds;
     const latestBaselineForApproved = latestPerPair(
-        allBaseline.filter(
+        inputs.baselineScores.filter(
             b => approvedIds.has(b.projectId),
         ),
     );
-    const approvedActuals = allActual.filter(
-        a => approvedIds.has(a.projectId),
-    );
+    const approvedActuals =
+        inputs.actualScores.filter(
+            a => approvedIds.has(a.projectId),
+        );
 
     const result = new Map<ObjectiveId, TrendPoint[]>();
 
-    for (const obj of activeObjs) {
+    for (const obj of inputs.activeObjectives) {
         const baselineRows = filterByField(
             latestBaselineForApproved, 'objectiveId', obj.id,
         );

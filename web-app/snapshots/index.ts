@@ -269,17 +269,17 @@ export async function init(
                 }</p>
             </div>
         </div>
-        <label class="${
-            'btn btn-outline'
-            + ' cursor-pointer text-center'
+        <button class="${
+            'btn btn-outline text-center'
         }"
+            id="upload-btn"
             data-tone="success">
             Upload Snapshot
-            <input type="file"
-                accept=".json"
-                id="upload-input"
-                class="hidden" />
-        </label>
+        </button>
+        <input type="file"
+            accept=".json"
+            id="upload-input"
+            class="hidden" />
     </div>
 
     <div class="card snapshot-card">
@@ -397,6 +397,12 @@ export async function init(
 
     const importInput = $inputRequired(
         '#upload-input', document,
+    );
+    $required(
+        '#upload-btn', document,
+    ).addEventListener(
+        'click',
+        () => importInput.click(),
     );
     importInput.addEventListener(
         'change',

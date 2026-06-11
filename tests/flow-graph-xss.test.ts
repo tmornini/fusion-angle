@@ -55,6 +55,7 @@ function render(
         { kind: 'none' },
         false, false, null,
         new Map(),
+        '',
     ).toString();
 }
 
@@ -101,6 +102,44 @@ test(
         assert.ok(
             out.includes(
                 'data-edge-id="'
+                + HOSTILE_ID_ESCAPED
+                + '"',
+            ),
+        );
+        assert.ok(
+            out.includes(
+                'data-edge-ref="'
+                + HOSTILE_ID_ESCAPED
+                + '"',
+            ),
+        );
+    },
+);
+
+test(
+    'a hostile edge id from the Create node'
+    + ' renders escaped in data-edge-ref',
+    () => {
+        const out = render(
+            [
+                node('a', {
+                    isCreate: true,
+                    positionX: 0,
+                    positionY: 0,
+                }),
+                node('b', {
+                    positionX: 300,
+                    positionY: 0,
+                }),
+            ],
+            [edge(HOSTILE_ID, 'a', 'b')],
+        );
+        assert.ok(
+            !out.includes(HOSTILE_ID),
+        );
+        assert.ok(
+            out.includes(
+                'data-edge-ref="'
                 + HOSTILE_ID_ESCAPED
                 + '"',
             ),

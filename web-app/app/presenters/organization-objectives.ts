@@ -116,10 +116,15 @@ export class OrganizationObjectivesPresenter {
                 data-position="${o.position}"
                 data-archived="${isArchived}">
                 ${!isArchived
-                    ? html`<span class="drag-handle"
-                        aria-label="Drag to reorder">
+                    ? html`<button
+                        type="button"
+                        class="drag-handle"
+                        aria-label="${
+                            'Reorder '
+                            + def.name
+                        }">
                         &#x22EE;&#x22EE;
-                      </span>`
+                      </button>`
                     : html``}
                 <div class="objective-text">
                     <strong>${def.name}</strong>

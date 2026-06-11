@@ -69,10 +69,17 @@ All grays are derived from blue tones for brand cohesion.
 | Info | `info-soft` | `info-border` | `info-text` | Informational |
 
 ### Contrast Ratios
-- Primary text on white: **8.5:1** ✓
-- Muted text on white: **5.2:1** ✓
-- Button text on primary: **6.8:1** ✓
-- Status text on soft bg: **5.1:1+** ✓
+
+Measured from the shipped light-mode tokens (WCAG 2.x
+relative luminance); every pair clears the 4.5:1 AA floor.
+
+- Primary text on white: **15.91:1** ✓
+- Muted text on white: **6.06:1** ✓
+- Button text on primary: **5.35:1** ✓
+- Success button text on `success`: **5.88:1**
+  (hover **4.62:1**) ✓
+- Status text on soft bg: **4.87:1+** (success 4.87,
+  warning 5.32, error 6.19, info 8.93) ✓
 
 ### Variants via `[data-tone]` and `[data-level]`
 

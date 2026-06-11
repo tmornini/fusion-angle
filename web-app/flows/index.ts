@@ -125,6 +125,12 @@ export async function init(
                 !(e.target
                     instanceof Element)
             ) return;
+            // Real links navigate
+            // themselves; the delegate
+            // must not double-fire.
+            if (
+                e.target.closest('a[href]')
+            ) return;
             // Stats button takes priority
             // so it doesn't also fire
             // card navigation.

@@ -1,22 +1,38 @@
 const MAX_TOASTS = 5;
 const TOAST_DURATION_MS = 6000;
-// Matches the `.toast--closing` fade in components-toast.css
-// (var(--duration-slow)); the class owns the visual, this owns
-// the removal-after-fade timing.
-const TOAST_TRANSITION_MS = 300;
+// Removal is event-driven — the fade itself rings the
+// bell — so no duration is duplicated here. This bound
+// exists ONLY for a fade that can never finish (e.g. an
+// undisplayed container, or CSS not yet loaded); it sits
+// far above any fade duration so it never clips one.
+// Under prefers-reduced-motion the universal reset clamps
+// the transition to 0.01ms and transitionend still fires.
+const TOAST_REMOVAL_FALLBACK_MS = 2000;
 const TOAST_CONTAINER_ID = 'toast-container';
 
-function closeActiveToast(
+// The closer owns the closing fact in closure state —
+// the class on the element is presentation, not the
+// record of whether closing has begun.
+function makeToastCloser(
     toast: HTMLElement,
-): void {
-    if (toast.classList.contains('toast--closing')) {
-        return;
-    }
-    toast.classList.add('toast--closing');
-    setTimeout(
-        () => toast.remove(),
-        TOAST_TRANSITION_MS,
-    );
+): () => void {
+    let closing = false;
+    return (): void => {
+        if (closing) return;
+        closing = true;
+        toast.classList.add('toast--closing');
+        const removeOnce = (): void => toast.remove();
+        toast.addEventListener(
+            'transitionend', removeOnce, { once: true },
+        );
+        toast.addEventListener(
+            'transitioncancel', removeOnce, { once: true },
+        );
+        setTimeout(
+            removeOnce,
+            TOAST_REMOVAL_FALLBACK_MS,
+        );
+    };
 }
 
 function ensureContainer(): HTMLElement {
@@ -55,16 +71,15 @@ export function showToast(
     msgSpan.textContent = message;
     toast.appendChild(msgSpan);
 
+    const closeToast = makeToastCloser(toast);
+
     const closeBtn = document.createElement('button');
     closeBtn.className = 'toast-close';
     closeBtn.setAttribute('aria-label', 'Dismiss');
     closeBtn.textContent = '×';
-    closeBtn.addEventListener('click', () => closeActiveToast(toast));
+    closeBtn.addEventListener('click', closeToast);
     toast.appendChild(closeBtn);
 
     container.prepend(toast);
-    setTimeout(
-            () => closeActiveToast(toast),
-            TOAST_DURATION_MS,
-    );
+    setTimeout(closeToast, TOAST_DURATION_MS);
 }

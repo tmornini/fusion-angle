@@ -1,8 +1,11 @@
 import {
     getThemeIcon,
-    isValidTheme,
     persistThemePreference,
 } from './state.ts';
+import {
+    isStoredTheme,
+    type StoredTheme,
+} from './adapters/preferences.ts';
 import { $, $$ } from './dom.ts';
 import { setHtml } from './safe-html.ts';
 import { showToast } from './toast.ts';
@@ -84,6 +87,52 @@ export function initDropdown(
     );
 }
 
+const THEME_NOT_SAVED_MESSAGE =
+    'Theme applied, but could not be saved.'
+    + ' It will reset on next load.';
+
+// persistThemePreference applies theme to memory and DOM
+// BEFORE writing, so the icon must update on every branch
+// — the live state is the new theme even when persist
+// throws. The dropdown stays open on a thrown persist so
+// the failure toast reads in place.
+function applyAndPersistTheme(
+    theme: StoredTheme,
+): void {
+    let persisted: boolean;
+    try {
+        persisted =
+            persistThemePreference(theme);
+    } catch (e) {
+        log.warn(
+            'persistThemePreference failed',
+            'theme-toggle',
+            e,
+        );
+        showToast(
+            THEME_NOT_SAVED_MESSAGE, 'error',
+        );
+        mutateThemeToggleIcon();
+        return;
+    }
+    if (!persisted) {
+        showToast(
+            THEME_NOT_SAVED_MESSAGE, 'warning',
+        );
+    }
+    mutateThemeToggleIcon();
+    closeAllDropdowns();
+}
+
+function closeAllDropdowns(): void {
+    $$(
+        '.dropdown-content', document,
+    ).forEach(
+        dropdown =>
+            dropdown.classList.add('hidden'),
+    );
+}
+
 export function initThemeAndDropdowns(
 ): void {
     for (const prefix of
@@ -107,62 +156,9 @@ export function initThemeAndDropdowns(
                             .getAttribute(
                                 'data-theme-set',
                             );
-                    if (
-                        isValidTheme(theme)
-                    ) {
-                        // persistThemePreference
-                        // applies theme to memory
-                        // and DOM BEFORE writing,
-                        // so the icon must update
-                        // on every branch — the
-                        // live state is the new
-                        // theme even when persist
-                        // throws.
-                        let persisted: boolean;
-                        try {
-                            persisted =
-                                persistThemePreference(
-                                    theme,
-                                );
-                        } catch (e) {
-                            log.warn(
-                                'persistThemePreference'
-                                    + ' failed',
-                                'theme-toggle',
-                                e,
-                            );
-                            showToast(
-                                'Theme applied,'
-                                + ' but could not'
-                                + ' be saved.'
-                                + ' It will reset'
-                                + ' on next load.',
-                                'error',
-                            );
-                            mutateThemeToggleIcon();
-                            return;
-                        }
-                        if (!persisted) {
-                            showToast(
-                                'Theme applied,'
-                                + ' but could not'
-                                + ' be saved.'
-                                + ' It will reset'
-                                + ' on next load.',
-                                'warning',
-                            );
-                        }
-                        mutateThemeToggleIcon();
-                        $$(
-                            '.dropdown-content',
-                            document,
-                        ).forEach(
-                            dropdown =>
-                                dropdown
-                                    .classList
-                                    .add(
-                                        'hidden',
-                                    ),
+                    if (isStoredTheme(theme)) {
+                        applyAndPersistTheme(
+                            theme,
                         );
                     }
                 },

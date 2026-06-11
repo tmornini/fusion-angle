@@ -90,3 +90,13 @@
   border: none;
   cursor: pointer;
 }
+
+.auth-signup-notice {
+  background-color: hsl(var(--info-soft));
+  border: 1px solid hsl(var(--info-border));
+  color: hsl(var(--info-text));
+  border-radius: var(--radius);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  margin-bottom: var(--space-5);
+}

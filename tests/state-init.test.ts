@@ -7,8 +7,10 @@ import {
 import {
     initState,
     computeTheme,
-    isValidTheme,
 } from '../web-app/app/state.ts';
+import {
+    isStoredTheme,
+} from '../web-app/app/adapters/preferences.ts';
 
 // The static import above is itself the purity assertion:
 // state.ts must not throw on import — it touches neither
@@ -89,10 +91,10 @@ test('initState throws on a corrupt stored sidebar', () => {
     }
 });
 
-test('isValidTheme accepts the three themes only', () => {
-    assert.equal(isValidTheme('light'), true);
-    assert.equal(isValidTheme('dark'), true);
-    assert.equal(isValidTheme('system'), true);
-    assert.equal(isValidTheme('purple'), false);
-    assert.equal(isValidTheme(null), false);
+test('isStoredTheme accepts the three themes only', () => {
+    assert.equal(isStoredTheme('light'), true);
+    assert.equal(isStoredTheme('dark'), true);
+    assert.equal(isStoredTheme('system'), true);
+    assert.equal(isStoredTheme('purple'), false);
+    assert.equal(isStoredTheme(null), false);
 });

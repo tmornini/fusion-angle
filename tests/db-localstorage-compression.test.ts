@@ -51,8 +51,11 @@ const baseVersion = {
     at: '2026-01-01T00:00:00.000000Z',
 };
 
+// Writes are plain JSON since the F-080 measurement
+// retired compression; the gz1: decoder survives for
+// READS of legacy payloads only (pinned below).
 test(
-    'flow_versions write produces gz1: prefix in storage',
+    'flow_versions write stores raw JSON',
     async () => {
         const map = installShim();
         const adapter = new LocalStorageDbAdapter();
@@ -65,8 +68,8 @@ test(
         );
         assert.ok(stored, 'expected stored value');
         assert.ok(
-            stored.startsWith('gz1:'),
-            'expected gz1: prefix, got '
+            stored.startsWith('['),
+            'expected raw JSON array, got '
             + stored.slice(0, 20),
         );
     },
@@ -142,7 +145,7 @@ test(
 );
 
 test(
-    'states write produces gz1: prefix',
+    'states write stores raw JSON',
     async () => {
         const map = installShim();
         const adapter = new LocalStorageDbAdapter();
@@ -162,8 +165,8 @@ test(
         );
         assert.ok(stored, 'expected stored value');
         assert.ok(
-            stored.startsWith('gz1:'),
-            'expected gz1: prefix, got '
+            stored.startsWith('['),
+            'expected raw JSON array, got '
             + stored.slice(0, 20),
         );
     },
@@ -184,30 +187,6 @@ test(
             stored.startsWith('['),
             'expected raw JSON array, got '
             + stored.slice(0, 20),
-        );
-    },
-);
-
-test(
-    'compression actually shrinks flow_versions storage',
-    async () => {
-        const map = installShim();
-        const adapter = new LocalStorageDbAdapter();
-        await adapter.postSchemaCreation();
-        for (let i = 0; i < 10; i++) {
-            await adapter.flowVersions.put(
-                `fv-${i}`, baseVersion,
-            );
-        }
-        const stored = map.get(
-            KEY_PREFIX + 'flow_versions',
-        )!;
-        // Raw JSON for 10 versions of this entity:
-        // ~5,000+ bytes. Compressed: should be < 1,500.
-        assert.ok(
-            stored.length < 2000,
-            'expected compressed length < 2000, got '
-            + String(stored.length),
         );
     },
 );
@@ -235,7 +214,7 @@ test(
 );
 
 test(
-    'snapshot import stores flow_versions compressed',
+    'snapshot import stores flow_versions raw',
     async () => {
         const map = installShim();
         const adapter = new LocalStorageDbAdapter();
@@ -250,8 +229,8 @@ test(
         );
         assert.ok(stored, 'expected stored value');
         assert.ok(
-            stored.startsWith('gz1:'),
-            'expected gz1: prefix after import, got '
+            stored.startsWith('['),
+            'expected raw JSON array after import, got '
             + (stored?.slice(0, 20) ?? ''),
         );
     },

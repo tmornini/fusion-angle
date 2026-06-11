@@ -535,19 +535,15 @@ export async function init(): Promise<void> {
         toggle.addEventListener(
             'click',
             () => {
-                const isHidden =
-                    menu.classList.contains(
+                const nowHidden =
+                    menu.classList.toggle(
                         'hidden',
                     );
-                menu.classList.toggle(
-                    'hidden',
-                    !isHidden,
-                );
                 setHtml(
                     toggle,
-                    isHidden
-                        ? iconX(24, '')
-                        : iconMenu(24, ''),
+                    nowHidden
+                        ? iconMenu(24, '')
+                        : iconX(24, ''),
                 );
             },
         );

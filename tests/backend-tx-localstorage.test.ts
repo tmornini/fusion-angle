@@ -66,8 +66,11 @@ test(
     },
 );
 
+// Flushes are raw JSON for every table since the F-080
+// measurement retired compression; the gz1: decode path
+// survives for legacy payloads (pinned below).
 test(
-    'a tx put to states flushes a gz1: payload',
+    'a tx put to states flushes raw JSON',
     async () => {
         const map = installShim();
         const backend = new LocalStorageBackend();
@@ -84,12 +87,12 @@ test(
         );
         const stored = map.get(KEY_PREFIX + 'states');
         assert.ok(stored);
-        assert.ok(stored.startsWith('gz1:'));
+        assert.ok(stored.startsWith('['));
     },
 );
 
 test(
-    'a tx put to an uncompressed table flushes raw JSON',
+    'a tx put to members flushes raw JSON',
     async () => {
         const map = installShim();
         const backend = new LocalStorageBackend();

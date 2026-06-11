@@ -166,3 +166,12 @@
   cursor: not-allowed;
   box-shadow: none;
 }
+
+/* Reorder grab handle: a real button (arrow keys move the
+   focused card) stripped of button chrome. */
+.drag-handle {
+  cursor: grab;
+  background: none;
+  border: 0;
+  padding: 0;
+}

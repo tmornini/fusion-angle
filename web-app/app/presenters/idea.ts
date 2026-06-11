@@ -13,6 +13,7 @@ import {
 import {
     displayText, formatDateTime,
 } from '../core.ts';
+import { buildPageUrl } from '../navigation.ts';
 import {
     iconGripVertical,
     iconClock,
@@ -605,12 +606,18 @@ export class IdeaPresenter {
         <div class="${
             'flex items-center gap-4'
         }">
-            ${showGrip ? html`<div class="${
-                'hidden-mobile text-muted'
-                + ' drag-handle'
-            }">${
+            ${showGrip ? html`<button
+                type="button"
+                class="${
+                    'hidden-mobile text-muted'
+                    + ' drag-handle'
+                }"
+                aria-label="${
+                    'Reorder '
+                    + this.#idea.titleText()
+                }">${
                 iconGripVertical(20, '')
-            }</div>` : html``}
+            }</button>` : html``}
             <div class="flex-fill">
                 ${this.#buildHeading()}
             </div>
@@ -631,7 +638,15 @@ export class IdeaPresenter {
             + ' font-semibold'
             + ' truncate'
         }">
-            ${this.#idea.titleText()}
+            <a href="${
+                buildPageUrl(
+                    'idea-detail',
+                    {
+                        ideaId: this.#idea
+                            .idForLink(),
+                    },
+                )
+            }">${this.#idea.titleText()}</a>
         </h3>
         <div class="${
             'flex items-center gap-2 mt-1'

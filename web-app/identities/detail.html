@@ -1,1 +1,31 @@
 <div id="identity-detail-content"></div>
+
+<div id="confirm-erase-backdrop"
+    class="dialog-backdrop hidden"></div>
+<div id="confirm-erase-dialog"
+    class="dialog dialog-narrow hidden"
+    aria-hidden="true"
+    role="alertdialog"
+    aria-labelledby="confirm-erase-title"
+    aria-describedby="confirm-erase-message">
+    <div class="dialog-header">
+        <h3 id="confirm-erase-title"
+            class="dialog-title">
+            Erase personal information?</h3>
+    </div>
+    <p id="confirm-erase-message"
+        class="text-sm text-muted">
+        The identity itself survives; only its
+        personal information is erased.
+    </p>
+    <div class="dialog-footer">
+        <button class="btn btn-outline"
+            data-action="cancel-confirm-erase">
+            Cancel
+        </button>
+        <button class="btn btn-destructive"
+            data-action="confirm-erase">
+            Erase
+        </button>
+    </div>
+</div>

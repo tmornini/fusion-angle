@@ -8,19 +8,17 @@
 // into a self-contained IIFE per ./build.
 
 import {
-    STORAGE_KEY_THEME,
-    STORAGE_KEY_SIDEBAR,
-} from './storage-keys.ts';
+    getStoredTheme,
+    getStoredSidebarCollapsed,
+} from './adapters/preferences.ts';
 import {
     mediaQueryMatches,
 } from './adapters/media-query.ts';
 
 (function applyTheme(): void {
-    const stored = localStorage.getItem(
-        STORAGE_KEY_THEME,
-    );
-    const dark = stored === 'dark'
-        || (stored !== 'light'
+    const theme = getStoredTheme();
+    const dark = theme === 'dark'
+        || (theme === 'system'
             && mediaQueryMatches(
                 '(prefers-color-scheme: dark)',
             ));
@@ -32,10 +30,7 @@ import {
 })();
 
 (function applySidebarCollapsed(): void {
-    const stored = localStorage.getItem(
-        STORAGE_KEY_SIDEBAR,
-    );
-    if (stored === 'true') {
+    if (getStoredSidebarCollapsed()) {
         document.documentElement.classList.add(
             'sidebar-collapsed',
         );

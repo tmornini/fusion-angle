@@ -1,5 +1,5 @@
 import {
-    html, setHtml, trusted,
+    html, setHtml,
 } from '../safe-html.ts';
 import type { SafeHtml } from '../safe-html.ts';
 import { $required } from '../dom.ts';
@@ -31,14 +31,9 @@ import {
 } from '../adapters/index.ts';
 import {
     buildGraphSvg,
-    perimeterPoint,
-    whichEdge,
-    controlOffset,
-    buildEdgePreviewPath,
-    BLUE,
+    buildConnectPreview,
 } from '../flow-graph.ts';
 import {
-    wouldBeCycle,
     NODE_WIDTH,
     NODE_HEIGHT,
 } from '../flow-layout.ts';
@@ -48,6 +43,7 @@ import {
     zoomOut as zoomOutState,
     fitBoxToCanvas,
     nodeBoundsBox,
+    marqueeDrawRect,
 } from '../flow-interactions.ts';
 import type {
     InteractionState,
@@ -565,6 +561,7 @@ class="flow-designer">
 }"><button class="switch"
     role="switch"
     aria-checked="false"
+    aria-label="Locked"
     id="flow-lock-switch"
     ><span class="switch-thumb"
     ></span></button>
@@ -575,6 +572,7 @@ Locked</label>
 }"><button class="switch"
     role="switch"
     aria-checked="false"
+    aria-label="Auto Layout"
     id="flow-auto-layout-switch"
     ><span class="switch-thumb"
     ></span></button>
@@ -585,6 +583,7 @@ Auto Layout</label>
 }"><button class="switch"
     role="switch"
     aria-checked="false"
+    aria-label="Auto Fit"
     id="flow-auto-fit-switch"
     ><span class="switch-thumb"
     ></span></button>
@@ -1124,178 +1123,6 @@ Auto Fit</label>
         return html``;
     }
 
-    #connectSourcePoint(): {
-        x: number;
-        y: number;
-    } | null {
-        const conn =
-            this.#snapshot.interaction.connect;
-        if (conn.kind !== 'connecting') {
-            return null;
-        }
-        const fromNode =
-            this.#snapshot.nodes.find(
-                n => n.id
-                    === conn.fromNodeId,
-            );
-        if (!fromNode) return null;
-        return perimeterPoint(
-            fromNode.positionX,
-            fromNode.positionY,
-            NODE_WIDTH, NODE_HEIGHT,
-            conn.toX, conn.toY,
-        );
-    }
-
-    #buildConnectPreview(): string {
-        const conn =
-            this.#snapshot.interaction
-                .connect;
-        if (conn.kind !== 'connecting') {
-            return '';
-        }
-        const src =
-            this.#connectSourcePoint();
-        if (!src) return '';
-        const fromNode =
-            this.#snapshot.nodes.find(
-                n => n.id
-                    === conn.fromNodeId,
-            );
-        if (!fromNode) return '';
-        if (conn.isShift) {
-            if (
-                conn.target.kind === 'node'
-            ) {
-                const targetId =
-                    conn.target.id;
-                const toNode =
-                    this.#snapshot.nodes.find(
-                        n => n.id
-                            === targetId,
-                    );
-                if (toNode) {
-                    const isCycle =
-                        wouldBeCycle(
-                            conn.fromNodeId,
-                            targetId,
-                            this.#snapshot
-                                .edges
-                                .map(e => ({
-                                    fromId:
-                                        e
-                                        .fromNodeId,
-                                    toId:
-                                        e
-                                        .toNodeId,
-                                })),
-                        );
-                    return buildEdgePreviewPath(
-                        fromNode,
-                        toNode,
-                        isCycle,
-                    );
-                }
-            }
-            return '<line'
-                + ` x1="${src.x}"`
-                + ` y1="${src.y}"`
-                + ` x2="${conn.toX}"`
-                + ` y2="${conn.toY}"`
-                + ' stroke='
-                + '"var('
-                + '--color-muted-foreground,'
-                + ' #5a6480)"'
-                + ' stroke-width="2"'
-                + ' opacity="0.5"'
-                + ' pointer-events="none"/>';
-        }
-        const gx =
-            conn.toX - NODE_WIDTH / 2;
-        const gy =
-            conn.toY - NODE_HEIGHT / 2;
-        const halfW = NODE_WIDTH / 2;
-        const fromCx =
-            fromNode.positionX + halfW;
-        const fromCy =
-            fromNode.positionY
-            + NODE_HEIGHT / 2;
-        const endPt = perimeterPoint(
-            gx, gy,
-            NODE_WIDTH, NODE_HEIGHT,
-            fromCx, fromCy,
-        );
-        const dist = Math.hypot(
-            endPt.x - src.x,
-            endPt.y - src.y,
-        );
-        const se = whichEdge(
-            src.x, src.y,
-            fromNode.positionX,
-            fromNode.positionY,
-            NODE_WIDTH, NODE_HEIGHT,
-        );
-        const ee = whichEdge(
-            endPt.x, endPt.y,
-            gx, gy,
-            NODE_WIDTH, NODE_HEIGHT,
-        );
-        const cp1 = controlOffset(
-            se, dist,
-        );
-        const cp2 = controlOffset(
-            ee, dist,
-        );
-        const pathD = 'M '
-            + String(src.x) + ' '
-            + String(src.y)
-            + ' C '
-            + String(src.x + cp1.dx)
-            + ' '
-            + String(src.y + cp1.dy)
-            + ', '
-            + String(endPt.x + cp2.dx)
-            + ' '
-            + String(endPt.y + cp2.dy)
-            + ', '
-            + String(endPt.x) + ' '
-            + String(endPt.y);
-        return '<path'
-            + ' d="' + pathD + '"'
-            + ' fill="none"'
-            + ` stroke="${BLUE}"`
-            + ' stroke-width="2"'
-            + ' opacity="0.3"'
-            + ' marker-end='
-            + '"url(#flow-arrow)"'
-            + ' pointer-events='
-            + '"none"/>'
-            + '<g transform="translate('
-            + String(gx) + ', '
-            + String(gy) + ')"'
-            + ' opacity="0.3"'
-            + ' pointer-events="none">'
-            + '<rect'
-            + ` width="${NODE_WIDTH}"`
-            + ` height="${NODE_HEIGHT}"`
-            + ' rx="10"'
-            + ' fill="var('
-            + '--color-card-bg)"'
-            + ` stroke="${BLUE}"`
-            + ' stroke-width="2"/>'
-            + '<text'
-            + ` x="${halfW}"`
-            + ' y="22"'
-            + ' text-anchor="middle"'
-            + ' font-size="14"'
-            + ' font-weight="600"'
-            + ' fill="var('
-            + '--color-foreground,'
-            + ' #e0e4ef)">'
-            + 'New State</text>'
-            + '</g>';
-    }
-
     #nodesForRender(): GraphNode[] {
         return applyDragPreview(
             this.#snapshot.nodes,
@@ -1311,26 +1138,10 @@ Auto Fit</label>
             this.#snapshot.interaction
                 .connect.kind
                 === 'connecting';
-        const m =
-            this.#snapshot.interaction.marquee;
-        const marqueeRect = m.kind
-            === 'selecting'
-            ? {
-                x: Math.min(
-                    m.startX, m.currentX,
-                ),
-                y: Math.min(
-                    m.startY, m.currentY,
-                ),
-                w: Math.abs(
-                    m.currentX - m.startX,
-                ),
-                h: Math.abs(
-                    m.currentY - m.startY,
-                ),
-            }
-            : null;
-        const svgHtml = buildGraphSvg(
+        const marqueeRect = marqueeDrawRect(
+            this.#snapshot.interaction.marquee,
+        );
+        return buildGraphSvg(
             nodes,
             this.#snapshot.edges,
             vb.x,
@@ -1343,22 +1154,12 @@ Auto Fit</label>
             isConn,
             marqueeRect,
             this.#snapshot.edgeWaypoints,
-        );
-        const preview =
-            this.#buildConnectPreview();
-        if (preview.length === 0) {
-            return svgHtml;
-        }
-        const svgStr = svgHtml.toString();
-        const closeTag = '</svg>';
-        const idx = svgStr.lastIndexOf(
-            closeTag,
-        );
-        if (idx === -1) return svgHtml;
-        return trusted(
-            svgStr.slice(0, idx)
-            + preview
-            + closeTag,
+            buildConnectPreview(
+                this.#snapshot.interaction
+                    .connect,
+                this.#snapshot.nodes,
+                this.#snapshot.edges,
+            ),
         );
     }
 

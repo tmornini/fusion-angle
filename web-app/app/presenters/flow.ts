@@ -12,6 +12,7 @@ import {
 import type {
     FlowSummary,
 } from '../adapters/flows.ts';
+import { buildPageUrl } from '../navigation.ts';
 
 export class FlowPresenter {
     readonly #flow: FlowSummary;
@@ -60,7 +61,12 @@ export class FlowPresenter {
                 </div>
                 <h3 class="${
                     'font-semibold mb-1'
-                }">${f.name}</h3>
+                }"><a href="${
+                    buildPageUrl(
+                        'flow-detail',
+                        { flowId: f.id },
+                    )
+                }">${f.name}</a></h3>
                 <div class="${
                     'flex flex-wrap '
                     + 'items-center'

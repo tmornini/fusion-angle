@@ -12,7 +12,22 @@ one tap off; toggle is ignored mid-gesture),
 propagates its new state to the presenter via the
 `request-update` action payload, consumed by detail.ts through
 `presenter.withInteractionState(state)` — the single sanctioned
-seam, no shared mutable state. The properties
+seam, no shared mutable state. While a gesture is in flight
+(drag, pan, marquee, connect), detail.ts routes
+`request-update` payloads to `flow-gesture-render.ts` instead:
+one narrow attribute-level mutation per animation frame (node
+transform, affected edge `d`/label, marquee rect, viewBox +
+grid, connect-preview layer), built from the same pure
+geometry the full rebuild uses (`computeEdgeGeometry`,
+`buildConnectPreview`, `marqueeDrawRect`). The presenter
+snapshot stays at the gesture-start state; pointer-up lands
+the final state through the sanctioned seam and a full
+rebuild. With Auto-Fit on, the camera re-fits at gesture end,
+not per move. Pointer-moves force no layout reads: the
+interaction layer captures the canvas rect at gesture start
+and maps client points through the FSM's own viewBox — exact,
+because the viewBox always shares the canvas aspect ratio and
+`svg.flow-canvas` carries no border or padding. The properties
 panel is positioned on the LEFT
 (`pages-flow-detail.css` `.flow-props-panel` uses
 `left: 0`); the visible canvas occupies pixels

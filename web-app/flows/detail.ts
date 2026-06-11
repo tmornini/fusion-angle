@@ -43,7 +43,14 @@ import {
 import {
     bindInteractions,
     type FlowGestureContext,
+    type InteractionState,
 } from '../app/flow-interactions.ts';
+import {
+    isGestureActive,
+} from '../app/flow-fsm-reduce.ts';
+import {
+    renderGestureFrame,
+} from '../app/flow-gesture-render.ts';
 import {
     FlowDesignerPresenter,
     buildInitialFlowSnapshot,
@@ -145,6 +152,30 @@ class PageState {
     #needsFit: boolean = true;
     #history: FlowHistorySnapshot =
         buildFlowHistorySnapshot(false);
+    #gestureRaf: number | null = null;
+    #pendingGestureState:
+        InteractionState | null = null;
+
+    gestureRaf(): number | null {
+        return this.#gestureRaf;
+    }
+
+    setGestureRaf(
+        handle: number | null,
+    ): void {
+        this.#gestureRaf = handle;
+    }
+
+    pendingGestureState(
+    ): InteractionState | null {
+        return this.#pendingGestureState;
+    }
+
+    setPendingGestureState(
+        state: InteractionState | null,
+    ): void {
+        this.#pendingGestureState = state;
+    }
 
     container(): HTMLElement {
         if (!this.#container) {
@@ -539,6 +570,56 @@ function update(
     pageState.setHistory(presenter.history());
 }
 
+// One narrow paint per animation frame while a gesture
+// is in flight: the latest FSM state wins, and the full
+// rebuild at a gesture boundary cancels anything still
+// pending, so a stale frame can never stomp the fresh
+// canvas. The presenter snapshot deliberately stays at
+// the gesture-start state; pointer-up lands the final
+// state through commit() and a full rebuild.
+function scheduleGestureFrame(
+    state: InteractionState,
+): void {
+    pageState.setPendingGestureState(state);
+    if (pageState.gestureRaf() !== null) {
+        return;
+    }
+    pageState.setGestureRaf(
+        requestAnimationFrame(
+            paintGestureFrame,
+        ),
+    );
+}
+
+function paintGestureFrame(): void {
+    pageState.setGestureRaf(null);
+    const state =
+        pageState.pendingGestureState();
+    pageState.setPendingGestureState(null);
+    if (!state) return;
+    const svg = pageState.container()
+        .querySelector('svg.flow-canvas');
+    if (!(svg instanceof SVGSVGElement)) {
+        return;
+    }
+    const snap =
+        pageState.presenter().snapshot();
+    renderGestureFrame(svg, state, {
+        nodes: snap.nodes,
+        edges: snap.edges,
+        edgeWaypoints: snap.edgeWaypoints,
+    });
+}
+
+function cancelGestureFrame(): void {
+    const handle = pageState.gestureRaf();
+    if (handle !== null) {
+        cancelAnimationFrame(handle);
+    }
+    pageState.setGestureRaf(null);
+    pageState.setPendingGestureState(null);
+}
+
 // Re-fit the camera to the geometry actually
 // rendered — curves, waypoints, labels, markers —
 // not merely the node rectangles. getBBox reports
@@ -797,6 +878,20 @@ function bindCanvasInteractions(
         wrap,
         state,
         (next) => {
+            // Mid-gesture updates paint narrowly under
+            // rAF; gesture boundaries (and everything
+            // else) take the full commit path.
+            if (
+                isGestureActive(
+                    pageState.presenter()
+                        .interactionState(),
+                )
+                && isGestureActive(next)
+            ) {
+                scheduleGestureFrame(next);
+                return;
+            }
+            cancelGestureFrame();
             const prevSelected = pageState
                 .presenter().selectedNodeId();
             commit(

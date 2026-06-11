@@ -19,6 +19,7 @@ import {
     sessionContext,
     getIdentityRoster,
     postIdentityCreation,
+    subscribeIdentityChanges,
     generateCryptoSafeBase62,
     type IdentityRosterRow,
     type RequestContext,
@@ -58,6 +59,9 @@ export async function init(): Promise<void> {
         'click', onListClick,
         { signal },
     );
+    subscribeIdentityChanges(
+        () => void refresh(sessionContext()),
+    );
 }
 
 function renderRoster(
@@ -79,6 +83,9 @@ async function refresh(
 function onListClick(e: MouseEvent): void {
     const target = e.target;
     if (!(target instanceof Element)) return;
+    // Real links navigate themselves; the
+    // delegate must not double-fire.
+    if (target.closest('a[href]')) return;
     const row = target.closest('[data-identity-id]');
     if (!row) return;
     const identityId = row.getAttribute(

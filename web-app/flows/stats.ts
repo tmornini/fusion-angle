@@ -182,6 +182,30 @@ export async function init(
                 { signal },
             );
 
+            const stepPathSelection = (
+                stepper: Element,
+            ): void => {
+                const dir = stepper.getAttribute(
+                    'data-stepper',
+                );
+                const max = Math.max(
+                    0,
+                    model.pathEntries.length - 1,
+                );
+                if (dir === 'next') {
+                    ui.selectedPathIndex = Math.min(
+                        ui.selectedPathIndex + 1,
+                        max,
+                    );
+                } else if (dir === 'prev') {
+                    ui.selectedPathIndex = Math.max(
+                        ui.selectedPathIndex - 1,
+                        0,
+                    );
+                }
+                presenter.renderUpdate(host, ui);
+            };
+
             host.addEventListener(
                 'click',
                 (e) => {
@@ -192,33 +216,7 @@ export async function init(
                         '[data-stepper]',
                     );
                     if (stepper) {
-                        const dir =
-                            stepper.getAttribute(
-                                'data-stepper',
-                            );
-                        const max = Math.max(
-                            0,
-                            model.pathEntries.length
-                            - 1,
-                        );
-                        if (dir === 'next') {
-                            ui.selectedPathIndex =
-                                Math.min(
-                                    ui.selectedPathIndex
-                                    + 1,
-                                    max,
-                                );
-                        } else if (dir === 'prev') {
-                            ui.selectedPathIndex =
-                                Math.max(
-                                    ui.selectedPathIndex
-                                    - 1,
-                                    0,
-                                );
-                        }
-                        presenter.renderUpdate(
-                            host, ui,
-                        );
+                        stepPathSelection(stepper);
                         return;
                     }
                     const backBtn = e.target.closest(

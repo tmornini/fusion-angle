@@ -235,7 +235,12 @@ function layout(tables: Table[]): {
     const byRank = new Map<number, Table[]>();
     for (const t of tables) {
         const r = rank.get(t.name)!;
-        (byRank.get(r) ?? byRank.set(r, []).get(r)!).push(t);
+        const list = byRank.get(r);
+        if (list) {
+            list.push(t);
+        } else {
+            byRank.set(r, [t]);
+        }
     }
     for (const list of byRank.values()) {
         list.sort((a, b) => (a.name < b.name ? -1 : 1));

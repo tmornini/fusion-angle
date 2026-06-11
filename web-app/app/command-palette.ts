@@ -22,7 +22,9 @@ import {
     featuredHumanMembers,
     sessionContext,
     putLocation,
-    subscribeSchemaChanges,
+    subscribeIdeaChanges,
+    subscribeProjectChanges,
+    subscribeHumanMemberChanges,
     type IdeaWithSubmitter,
     Project,
     HumanMember,
@@ -31,7 +33,6 @@ import {
 // init.ts is the composition root —
 // intentionally outside the adapter barrel.
 import {
-    getDbAdapter,
     sessionIsOrgScoped,
 } from './adapters/init.ts';
 import {
@@ -522,6 +523,22 @@ posIndex === state.activeIndex
         putLocation(item.href);
     }
 
+    function loadIndexAndRender(): void {
+        if (!state.input) return;
+        const query = state.input.value;
+        getSearchIndex().then(
+            () => mutateResults(query),
+            err => {
+                log.warn(
+                    'search index load failed',
+                    'palette',
+                    err,
+                );
+                mutateLoadError();
+            },
+        );
+    }
+
     function open(): void {
         if (state.isOpen) return;
         state.isOpen = true;
@@ -542,17 +559,7 @@ posIndex === state.activeIndex
             state.input.focus();
         }
 
-        getSearchIndex().then(
-            () => mutateResults(''),
-            err => {
-                log.warn(
-                    'search index load failed',
-                    'palette',
-                    err,
-                );
-                mutateLoadError();
-            },
-        );
+        loadIndexAndRender();
     }
 
     function close(): void {
@@ -915,42 +922,17 @@ posIndex === state.activeIndex
         );
     }
 
-    // Eager-load the search index so the
-    // first Cmd+K opens instantly. Without
-    // this, the user pays a 100-300 ms
-    // adapter-fetch latency on first open.
-    function flagEagerLoadFailure(err: unknown): void {
-        log.warn(
-            'eager search index load failed',
-            'palette',
-            err,
-        );
-        if (searchInput) {
-            searchInput.setAttribute(
-                'title',
-                'Search index unavailable —'
-                + ' open the palette to retry.',
-            );
-            searchInput.setAttribute(
-                'data-state', 'error',
-            );
-        }
+    // The index is a derived snapshot of ideas, projects,
+    // and members — it builds lazily on first open and
+    // re-derives when any source table rings its change
+    // channel, the same freshness covenant the data pages
+    // honor. No reads happen until the palette is opened.
+    function invalidateSearchIndex(): void {
+        state.isDataLoaded = false;
+        state.allItems = [];
+        if (state.isOpen) loadIndexAndRender();
     }
-    void (async () => {
-        const adapter = getDbAdapter();
-        if (await adapter.hasSchema()) {
-            getSearchIndex().catch(
-                flagEagerLoadFailure,
-            );
-            return;
-        }
-        const unsub = subscribeSchemaChanges(
-            () => {
-                unsub();
-                getSearchIndex().catch(
-                    flagEagerLoadFailure,
-                );
-            },
-        );
-    })();
+    subscribeIdeaChanges(invalidateSearchIndex);
+    subscribeProjectChanges(invalidateSearchIndex);
+    subscribeHumanMemberChanges(invalidateSearchIndex);
 }

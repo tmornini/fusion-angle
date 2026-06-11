@@ -10,6 +10,9 @@ import {
 } from '../../../api/types.ts';
 import { hashPassword } from '../../../api/password-hash.ts';
 import type { RequestContext, WriteOp } from './shared.ts';
+import {
+    createSubscriptionChannel,
+} from '../channels.ts';
 
 // Surface the domain class and PII shapes through the
 // adapter barrel so presenters speak one tongue (mirrors
@@ -21,6 +24,25 @@ export type {
     IdentityPiiEntity,
     MemberPii,
 };
+
+// The identity surfaces derive from these stores: roster
+// and detail read identities + PII + the AI facet; the
+// detail's credential state reads identity_credentials.
+const identityChanges =
+    createSubscriptionChannel(
+        [
+            'identities',
+            'identity_pii',
+            'ai_members',
+            'identity_credentials',
+        ],
+    );
+
+export function subscribeIdentityChanges(
+    fn: () => void,
+): () => void {
+    return identityChanges.subscribe(fn);
+}
 
 export async function getIdentity(
     ctx: RequestContext,
@@ -179,6 +201,7 @@ export async function deleteIdentityPii(
     id: Id,
 ): Promise<void> {
     await ctx.DELETE(`identities/${id}/pii`);
+    identityChanges.notify();
 }
 
 // A person identity carries PII; a service identity
@@ -235,4 +258,5 @@ export async function postIdentityCreation(
         });
     }
     await ctx.commit({ ops });
+    identityChanges.notify();
 }

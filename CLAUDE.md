@@ -14,7 +14,7 @@ when working with code in this repository.
 ./build --no-zip dir/  # Bundle to dir/ without zipping (for testing)
 ./build dir/           # ZIP to dir/ instead of ~/Desktop/
 ./build --help         # Show usage
-./serve <port>         # Build + start local HTTP server on <port>
+./serve [port]         # Build + start HTTP server (default 8080)
 ```
 
 **Commit before building.** `./build` requires a clean

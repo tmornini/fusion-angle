@@ -2,7 +2,7 @@ import {
     NODE_WIDTH, NODE_HEIGHT,
 } from './flow-layout.ts';
 import { showToast } from './toast.ts';
-import { reduceFsm }
+import { reduceFsm, isGestureActive }
     from './flow-fsm-reduce.ts';
 import type {
     FsmInput,
@@ -126,6 +126,37 @@ export type LastClick =
         time: number;
     };
 
+// The marquee's drawable rectangle, normalized from the
+// gesture's anchor and current corner. One computation
+// serves the full canvas rebuild and the narrow
+// in-gesture mutator.
+export function marqueeDrawRect(
+    marquee: MarqueeMode,
+): {
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+} | null {
+    if (marquee.kind !== 'selecting') {
+        return null;
+    }
+    return {
+        x: Math.min(
+            marquee.startX, marquee.currentX,
+        ),
+        y: Math.min(
+            marquee.startY, marquee.currentY,
+        ),
+        w: Math.abs(
+            marquee.currentX - marquee.startX,
+        ),
+        h: Math.abs(
+            marquee.currentY - marquee.startY,
+        ),
+    };
+}
+
 export interface InteractionState {
     selection: Selection;
     lastClick: LastClick;
@@ -196,6 +227,41 @@ function screenToSvg(
         ctm.inverse(),
     );
     return { x: svgPt.x, y: svgPt.y };
+}
+
+// The canvas's screen placement, captured once at gesture
+// start so pointer-moves never force a layout read.
+interface GestureRect {
+    left: number;
+    top: number;
+    w: number;
+    h: number;
+}
+
+// Map a client point into the FSM's user space from state
+// alone — no layout read. EXACT, not approximate: the
+// viewBox always shares the canvas's aspect ratio
+// (fitBoxToCanvas constructs canvas-aspect boxes; pan and
+// zoom preserve the w/h ratio), so preserveAspectRatio
+// never letterboxes, and svg.flow-canvas carries no border
+// or padding, so its bounding rect IS the SVG viewport.
+// Deriving from the FSM's own viewBox keeps the mapping
+// true even when the viewBox moves mid-gesture, where a
+// cached CTM would silently go stale.
+function gesturePointToSvg(
+    viewBox: ViewBox,
+    rect: GestureRect,
+    clientX: number,
+    clientY: number,
+): { x: number; y: number } {
+    return {
+        x: viewBox.x
+            + (clientX - rect.left)
+                * (viewBox.w / rect.w),
+        y: viewBox.y
+            + (clientY - rect.top)
+                * (viewBox.h / rect.h),
+    };
 }
 
 function ancestorAttr(
@@ -285,6 +351,7 @@ export function bindInteractions(
     let context = initialContext;
     let currentState: InteractionState = state;
     let activePointerId: number | null = null;
+    let gestureRect: GestureRect | null = null;
     if (currentState.isPanMode) {
         wrap.classList.add(
             'flow-pan-cursor',
@@ -397,6 +464,14 @@ export function bindInteractions(
             if (
                 !(target instanceof Element)
             ) return;
+            const rect =
+                svg.getBoundingClientRect();
+            gestureRect = {
+                left: rect.left,
+                top: rect.top,
+                w: rect.width,
+                h: rect.height,
+            };
             const svgPt = screenToSvg(
                 svg, e.clientX, e.clientY,
             );
@@ -480,24 +555,37 @@ export function bindInteractions(
     wrap.addEventListener(
         'pointermove',
         (e) => {
-            const svg = liveSvg();
-            if (!svg) return;
-            const svgPt = screenToSvg(
-                svg, e.clientX, e.clientY,
+            // The reducer ignores moves outside a
+            // gesture; skip the conversion work and
+            // its forced-layout reads entirely.
+            if (
+                !isGestureActive(currentState)
+            ) return;
+            const rect = gestureRect;
+            if (!rect) return;
+            const svgPt = gesturePointToSvg(
+                currentState.viewBox, rect,
+                e.clientX, e.clientY,
             );
+            // Only the connect gesture consumes the
+            // hovered node; the hit-test forces a
+            // layout, so the other gestures skip it.
             let hoverNodeId: string | null
                 = null;
-            const hit =
-                document.elementFromPoint(
-                    e.clientX, e.clientY,
-                );
-            if (hit instanceof Element) {
-                hoverNodeId = ancestorAttr(
-                    hit, 'data-node-id',
-                );
+            if (
+                currentState.connect.kind
+                    === 'connecting'
+            ) {
+                const hit =
+                    document.elementFromPoint(
+                        e.clientX, e.clientY,
+                    );
+                if (hit instanceof Element) {
+                    hoverNodeId = ancestorAttr(
+                        hit, 'data-node-id',
+                    );
+                }
             }
-            const rect =
-                svg.getBoundingClientRect();
             dispatch({
                 kind: 'pointer-move',
                 svgX: svgPt.x,
@@ -506,8 +594,8 @@ export function bindInteractions(
                 clientY: e.clientY,
                 isShift: e.shiftKey,
                 hoverNodeId,
-                svgRectW: rect.width,
-                svgRectH: rect.height,
+                svgRectW: rect.w,
+                svgRectH: rect.h,
             });
         },
         { signal },
@@ -566,6 +654,7 @@ export function bindInteractions(
                 fromNodePosition,
                 allNodes,
             });
+            gestureRect = null;
         },
         { signal },
     );

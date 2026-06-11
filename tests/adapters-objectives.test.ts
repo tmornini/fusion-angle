@@ -7,10 +7,10 @@ import { DEV_TOKEN } from './token-fixtures.ts';
 import {
     getObjectives,
     getArchivedObjectiveIds,
-    getObjectiveRevisions,
+    getObjectiveRevisionsByObjective,
     getObjectiveArchivalEvents,
     getActiveObjectives,
-    getCurrentObjectiveDefinition,
+    getCurrentObjectiveDefinitions,
     postObjectiveCreation,
     postObjectiveRevision,
     postObjectiveArchival,
@@ -43,6 +43,110 @@ test('getObjectives returns all', async () => {
     const rows = await getObjectives(ctx);
     assert.equal(rows.length, 2);
 });
+
+function revision(
+    objectiveId: string,
+    name: string,
+    at: string,
+) {
+    return {
+        objective_id: objectiveId,
+        name,
+        description: 'd:' + name,
+        member_id: 'w1',
+        at,
+    };
+}
+
+test(
+    'getObjectiveRevisionsByObjective groups one read',
+    async () => {
+        const db = new MemoryDbAdapter();
+        await seedAdminSchema(db);
+        await db.objectiveRevisions.put(
+            'o1:t0',
+            revision(
+                'o1', 'A',
+                '2026-05-14T00:00:00.000000Z',
+            ),
+        );
+        await db.objectiveRevisions.put(
+            'o1:t1',
+            revision(
+                'o1', 'B',
+                '2026-05-15T00:00:00.000000Z',
+            ),
+        );
+        await db.objectiveRevisions.put(
+            'o2:t0',
+            revision(
+                'o2', 'C',
+                '2026-05-14T00:00:00.000000Z',
+            ),
+        );
+        const grouped =
+            await getObjectiveRevisionsByObjective(
+                ctxFor(db),
+            );
+        assert.equal(grouped.size, 2);
+        assert.equal(grouped.get('o1')!.length, 2);
+        assert.equal(grouped.get('o2')!.length, 1);
+    },
+);
+
+test(
+    'getCurrentObjectiveDefinitions picks the latest'
+    + ' revision per requested id',
+    async () => {
+        const db = new MemoryDbAdapter();
+        await seedAdminSchema(db);
+        await db.objectiveRevisions.put(
+            'o1:t0',
+            revision(
+                'o1', 'Old',
+                '2026-05-14T00:00:00.000000Z',
+            ),
+        );
+        await db.objectiveRevisions.put(
+            'o1:t1',
+            revision(
+                'o1', 'New',
+                '2026-05-15T00:00:00.000000Z',
+            ),
+        );
+        await db.objectiveRevisions.put(
+            'o2:t0',
+            revision(
+                'o2', 'Other',
+                '2026-05-14T00:00:00.000000Z',
+            ),
+        );
+        const defs =
+            await getCurrentObjectiveDefinitions(
+                ctxFor(db), ['o1', 'o2'],
+            );
+        assert.equal(defs.get('o1')!.name, 'New');
+        assert.equal(
+            defs.get('o1')!.description, 'd:New',
+        );
+        assert.equal(defs.get('o2')!.name, 'Other');
+    },
+);
+
+test(
+    'getCurrentObjectiveDefinitions throws on an'
+    + ' objective with no revisions',
+    async () => {
+        const db = new MemoryDbAdapter();
+        await seedAdminSchema(db);
+        await assert.rejects(
+            getCurrentObjectiveDefinitions(
+                ctxFor(db), ['ghost'],
+            ),
+            /no revisions for objective ghost/,
+        );
+    },
+);
 
 test('getArchivedObjectiveIds returns a Set', async () => {
     const db = new MemoryDbAdapter();

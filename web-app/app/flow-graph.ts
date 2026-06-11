@@ -5,9 +5,11 @@ import type {
 } from './adapters/flows.ts';
 import type {
     Selection,
+    ConnectMode,
 } from './flow-interactions.ts';
 import {
     NODE_WIDTH, NODE_HEIGHT,
+    wouldBeCycle,
 } from './flow-layout.ts';
 import { pluralize } from './format.ts';
 import { findCycleEdgeIds } from './flow-cycle-edges.ts';
@@ -116,7 +118,7 @@ const LABEL_MIN_WIDTH = 36;
 export const LABEL_HEIGHT = 20;
 const LABEL_RADIUS = 4;
 const LABEL_BG_OPACITY = 0.9;
-const LABEL_TEXT_OFFSET_Y = 4;
+export const LABEL_TEXT_OFFSET_Y = 4;
 const LABEL_FONT = 11;
 
 const NODE_ROLE = 'button';
@@ -391,6 +393,7 @@ function buildGrid(
         + ` height="${vbH}"`
         + ` fill="${SURFACE}"/>`
         + '<rect'
+        + ' class="flow-grid-dots"'
         + ` x="${vbX}" y="${vbY}"`
         + ` width="${vbW}"`
         + ` height="${vbH}"`
@@ -632,18 +635,27 @@ function buildWaypointPath(
     return d;
 }
 
-function buildEdge(
-    edge: GraphEdge,
+// The drawable geometry of one edge: the routed path
+// and the label anchor along it. Pure math shared by
+// the full SVG rebuild (buildEdge) and the narrow
+// in-gesture mutator (flow-gesture-render.ts) — one
+// truth, so a dragged edge can never drift from its
+// rebuilt form.
+export interface EdgeGeometry {
+    pathD: string;
+    labelX: number;
+    labelY: number;
+}
+
+export function computeEdgeGeometry(
     fromNode: GraphNode,
     toNode: GraphNode,
-    isSelected: boolean,
     aimOffset: number,
-    isCycle: boolean,
     waypoints: readonly {
         x: number;
         y: number;
     }[],
-): SafeHtml {
+): EdgeGeometry {
     const fromCx =
         fromNode.positionX
         + NODE_WIDTH / 2;
@@ -658,9 +670,6 @@ function buildEdge(
         + NODE_HEIGHT / 2;
 
     let pathD: string;
-    let color: string;
-    let markerUrl: string;
-    let dashAttr: string;
 
     let aimFromX = toCx;
     let aimFromY = toCy;
@@ -750,6 +759,81 @@ function buildEdge(
             + String(endPt.y);
     }
 
+    const labelT = aimOffset === 0
+        ? BEZIER_MIDPOINT
+        : BIDI_LABEL_T;
+    // Base anchor on the routed path; the perpendicular offset
+    // below is the INTENTIONAL nudge that keeps two-way edge
+    // labels legible. A waypoint edge is a Q/T polyline, so
+    // anchor along it — bezierAt is for the cubic case only.
+    const mid = waypoints.length > 0
+        ? pointAlongPolyline(
+            [startPt, ...waypoints, endPt], labelT)
+        : bezierAt(pathD, labelT);
+    return {
+        pathD,
+        labelX: mid.x
+            + perpX * BIDI_LABEL_OFFSET,
+        labelY: mid.y
+            + perpY * BIDI_LABEL_OFFSET,
+    };
+}
+
+// aimOffset per edge id: 1 when the edge belongs to a
+// two-way pair (each direction bows to its own side),
+// else 0. One computation feeds both the full rebuild
+// and the narrow in-gesture mutator.
+export function computeEdgeAimOffsets(
+    edges: readonly GraphEdge[],
+): Map<string, number> {
+    const pairCounts =
+        new Map<string, number>();
+    for (const edge of edges) {
+        const k = canonicalEdgeKey(
+            edge.fromNodeId,
+            edge.toNodeId,
+        );
+        pairCounts.set(
+            k,
+            (pairCounts.get(k) ?? 0) + 1,
+        );
+    }
+    const offsets = new Map<string, number>();
+    for (const edge of edges) {
+        const k = canonicalEdgeKey(
+            edge.fromNodeId,
+            edge.toNodeId,
+        );
+        offsets.set(
+            edge.id,
+            (pairCounts.get(k) ?? 0) >= 2
+                ? 1 : 0,
+        );
+    }
+    return offsets;
+}
+
+function buildEdge(
+    edge: GraphEdge,
+    fromNode: GraphNode,
+    toNode: GraphNode,
+    isSelected: boolean,
+    aimOffset: number,
+    isCycle: boolean,
+    waypoints: readonly {
+        x: number;
+        y: number;
+    }[],
+): SafeHtml {
+    const geo = computeEdgeGeometry(
+        fromNode, toNode, aimOffset, waypoints,
+    );
+    const pathD = geo.pathD;
+
+    let color: string;
+    let markerUrl: string;
+    let dashAttr: string;
+
     if (isCycle) {
         color = WARN;
         markerUrl =
@@ -766,9 +850,17 @@ function buildEdge(
 
     const strokeWidth = EDGE_STROKE;
 
+    // data-edge-ref marks BOTH edge group variants for the
+    // narrow in-gesture mutator. The interaction layer keys
+    // on data-edge-id alone, so the Create-node edge stays
+    // non-interactive.
+    const idEsc = escapeForHtml(edge.id);
+
     if (fromNode.isCreate) {
         return trusted(
-            '<g aria-hidden="true">'
+            '<g'
+            + ` data-edge-ref="${idEsc}"`
+            + ' aria-hidden="true">'
             + '<path'
             + ` d="${pathD}"`
             + ' fill="none"'
@@ -796,21 +888,8 @@ function buildEdge(
         + ` marker-end="${markerUrl}"`;
     const visClose = '/>';
 
-    const labelT = aimOffset === 0
-        ? BEZIER_MIDPOINT
-        : BIDI_LABEL_T;
-    // Base anchor on the routed path; the perpendicular offset
-    // below is the INTENTIONAL nudge that keeps two-way edge
-    // labels legible. A waypoint edge is a Q/T polyline, so
-    // anchor along it — bezierAt is for the cubic case only.
-    const mid = waypoints.length > 0
-        ? pointAlongPolyline(
-            [startPt, ...waypoints, endPt], labelT)
-        : bezierAt(pathD, labelT);
-    const midX = mid.x
-        + perpX * BIDI_LABEL_OFFSET;
-    const midY = mid.y
-        + perpY * BIDI_LABEL_OFFSET;
+    const midX = geo.labelX;
+    const midY = geo.labelY;
     const truncEdge =
         truncateEdgeLabel(edge.name);
     const labelEsc =
@@ -848,7 +927,6 @@ function buildEdge(
         : '';
     const ariaCurrent = isSelected
         ? ' aria-current="true"' : '';
-    const idEsc = escapeForHtml(edge.id);
     const ariaLabel =
         escapeForHtml(fromNode.name)
         + ' to '
@@ -858,6 +936,7 @@ function buildEdge(
     return trusted(
         '<g'
         + ` data-edge-id="${idEsc}"`
+        + ` data-edge-ref="${idEsc}"`
         + ' class="flow-edge"'
         + ` role="${EDGE_ROLE}"`
         + ` tabindex="${FOCUSABLE_TABINDEX}"`
@@ -953,6 +1032,157 @@ export function buildEdgePreviewPath(
         + ' pointer-events="none"/>';
 }
 
+// The in-flight connection gesture's ghost markup: a
+// would-be edge to a hovered target (Shift), a dangling
+// line (Shift, no target), or a ghost "New State" node at
+// the pointer. One string build serves the full canvas
+// rebuild and the narrow in-gesture mutator, which
+// re-renders only this layer per frame.
+export function buildConnectPreview(
+    connect: ConnectMode,
+    nodes: readonly GraphNode[],
+    edges: readonly GraphEdge[],
+): string {
+    if (connect.kind !== 'connecting') {
+        return '';
+    }
+    const fromNode = nodes.find(
+        n => n.id === connect.fromNodeId,
+    );
+    if (!fromNode) return '';
+    const src = perimeterPoint(
+        fromNode.positionX,
+        fromNode.positionY,
+        NODE_WIDTH, NODE_HEIGHT,
+        connect.toX, connect.toY,
+    );
+    if (connect.isShift) {
+        if (
+            connect.target.kind === 'node'
+        ) {
+            const targetId =
+                connect.target.id;
+            const toNode = nodes.find(
+                n => n.id === targetId,
+            );
+            if (toNode) {
+                const isCycle =
+                    wouldBeCycle(
+                        connect.fromNodeId,
+                        targetId,
+                        edges.map(e => ({
+                            fromId:
+                                e.fromNodeId,
+                            toId:
+                                e.toNodeId,
+                        })),
+                    );
+                return buildEdgePreviewPath(
+                    fromNode,
+                    toNode,
+                    isCycle,
+                );
+            }
+        }
+        return '<line'
+            + ` x1="${src.x}"`
+            + ` y1="${src.y}"`
+            + ` x2="${connect.toX}"`
+            + ` y2="${connect.toY}"`
+            + ' stroke='
+            + '"var('
+            + '--color-muted-foreground,'
+            + ' #5a6480)"'
+            + ' stroke-width="2"'
+            + ' opacity="0.5"'
+            + ' pointer-events="none"/>';
+    }
+    const gx =
+        connect.toX - NODE_WIDTH / 2;
+    const gy =
+        connect.toY - NODE_HEIGHT / 2;
+    const halfW = NODE_WIDTH / 2;
+    const fromCx =
+        fromNode.positionX + halfW;
+    const fromCy =
+        fromNode.positionY
+        + NODE_HEIGHT / 2;
+    const endPt = perimeterPoint(
+        gx, gy,
+        NODE_WIDTH, NODE_HEIGHT,
+        fromCx, fromCy,
+    );
+    const dist = Math.hypot(
+        endPt.x - src.x,
+        endPt.y - src.y,
+    );
+    const se = whichEdge(
+        src.x, src.y,
+        fromNode.positionX,
+        fromNode.positionY,
+        NODE_WIDTH, NODE_HEIGHT,
+    );
+    const ee = whichEdge(
+        endPt.x, endPt.y,
+        gx, gy,
+        NODE_WIDTH, NODE_HEIGHT,
+    );
+    const cp1 = controlOffset(
+        se, dist,
+    );
+    const cp2 = controlOffset(
+        ee, dist,
+    );
+    const pathD = 'M '
+        + String(src.x) + ' '
+        + String(src.y)
+        + ' C '
+        + String(src.x + cp1.dx)
+        + ' '
+        + String(src.y + cp1.dy)
+        + ', '
+        + String(endPt.x + cp2.dx)
+        + ' '
+        + String(endPt.y + cp2.dy)
+        + ', '
+        + String(endPt.x) + ' '
+        + String(endPt.y);
+    return '<path'
+        + ' d="' + pathD + '"'
+        + ' fill="none"'
+        + ` stroke="${BLUE}"`
+        + ' stroke-width="2"'
+        + ' opacity="0.3"'
+        + ' marker-end='
+        + '"url(#flow-arrow)"'
+        + ' pointer-events='
+        + '"none"/>'
+        + '<g transform="translate('
+        + String(gx) + ', '
+        + String(gy) + ')"'
+        + ' opacity="0.3"'
+        + ' pointer-events="none">'
+        + '<rect'
+        + ` width="${NODE_WIDTH}"`
+        + ` height="${NODE_HEIGHT}"`
+        + ' rx="10"'
+        + ' fill="var('
+        + '--color-card-bg)"'
+        + ` stroke="${BLUE}"`
+        + ' stroke-width="2"/>'
+        + '<text'
+        + ` x="${halfW}"`
+        + ' y="22"'
+        + ' text-anchor="middle"'
+        + ' font-size="14"'
+        + ' font-weight="600"'
+        + ' fill="var('
+        + '--color-foreground,'
+        + ' #e0e4ef)">'
+        + 'New State</text>'
+        + '</g>';
+}
+
 // The point at fraction `t` of a polyline's arc length. A
 // waypoint edge renders as a Q/T quadratic chain through these
 // points; bezierAt (cubic) would misread its control numbers
@@ -1044,6 +1274,7 @@ export function buildGraphSvg(
         string,
         readonly { x: number; y: number }[]
     >,
+    connectPreview: string,
 ): SafeHtml {
     const nodeMap = new Map(
         nodes.map(n => [n.id, n]),
@@ -1051,22 +1282,8 @@ export function buildGraphSvg(
 
     const cycleEdgeIds = findCycleEdgeIds(nodes, edges);
 
-    const pairCounts =
-        new Map<string, number>();
-    for (const edge of edges) {
-        const k = canonicalEdgeKey(
-            edge.fromNodeId,
-            edge.toNodeId,
-        );
-        pairCounts.set(
-            k,
-            (pairCounts.get(k) ?? 0) + 1,
-        );
-    }
-    const bidi = new Set<string>();
-    for (const [k, c] of pairCounts) {
-        if (c >= 2) bidi.add(k);
-    }
+    const aimOffsets =
+        computeEdgeAimOffsets(edges);
 
     let edgeMarkup = '';
     for (const edge of edges) {
@@ -1075,14 +1292,8 @@ export function buildGraphSvg(
         const toNode =
             nodeMap.get(edge.toNodeId);
         if (!fromNode || !toNode) continue;
-        let aimOffset = 0;
-        const k = canonicalEdgeKey(
-            edge.fromNodeId,
-            edge.toNodeId,
-        );
-        if (bidi.has(k)) {
-            aimOffset = 1;
-        }
+        const aimOffset =
+            aimOffsets.get(edge.id)!;
         const isSelected =
             selection.kind === 'edge'
             && edge.id === selection.edgeId;
@@ -1188,6 +1399,10 @@ export function buildGraphSvg(
         + nodeMarkup
         + '</g>'
         + marqueeMarkup
+        + '<g class="flow-connect-preview"'
+        + ' pointer-events="none">'
+        + connectPreview
+        + '</g>'
         + '</svg>',
     );
 }

@@ -48,6 +48,6 @@ export function html(
     return new SafeHtml(result);
 }
 
-export function setHtml(element: HTMLElement, content: SafeHtml): void {
+export function setHtml(element: Element, content: SafeHtml): void {
     element.innerHTML = content.toString();
 }

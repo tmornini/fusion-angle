@@ -29,6 +29,7 @@ import {
     getObjectives,
     getArchivedObjectiveIds,
     getCurrentObjectiveDefinition,
+    getCurrentObjectiveDefinitions,
     postObjectiveCreation,
     postObjectiveRevision,
     postObjectiveArchival,
@@ -117,16 +118,12 @@ async function renderObjectives(): Promise<void> {
     const archived = allObjs.filter(
         o => archivedIds.has(o.id),
     );
-    const defs = new Map<string,
-        { name: string; description: string }>();
-    for (const o of [...active, ...archived]) {
-        defs.set(
-            o.id,
-            await getCurrentObjectiveDefinition(
-                ctx, o.id,
-            ),
+    const defs =
+        await getCurrentObjectiveDefinitions(
+            ctx,
+            [...active, ...archived]
+                .map(o => o.id),
         );
-    }
     const archivedAt = new Map<string, string>();
     const presenter =
         new OrganizationObjectivesPresenter(

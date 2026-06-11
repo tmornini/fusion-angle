@@ -46,8 +46,8 @@ import {
     subscribeProjectScoreChanges,
     getActiveObjectives,
     getObjectives,
-    getCurrentObjectiveDefinition,
-    getObjectiveRevisions,
+    getCurrentObjectiveDefinitions,
+    getObjectiveRevisionsByObjective,
     getObjectiveArchivalEvents,
     subscribeObjectiveChanges,
     postProjectApproval,
@@ -62,9 +62,6 @@ import {
     getMemberMap,
     memberName,
 } from '../app/adapters/members-union.ts';
-import type {
-    ObjectiveRevision,
-} from '../../api/types.ts';
 import { latestPerPair } from '../app/scoring-format.ts';
 import {
     ProjectDetailPresenter,
@@ -726,17 +723,10 @@ async function renderActionBarAndObjectives(
             getActiveObjectives(ctx),
             getProjectScoring(ctx, pid),
         ]);
-    const defs = new Map<string, {
-        name: string; description: string;
-    }>();
-    for (const o of active) {
-        defs.set(
-            o.id,
-            await getCurrentObjectiveDefinition(
-                ctx, o.id,
-            ),
+    const defs =
+        await getCurrentObjectiveDefinitions(
+            ctx, active.map(o => o.id),
         );
-    }
     const latestBaselines = latestPerPair(
         scoring.baseline,
     );
@@ -893,27 +883,18 @@ async function openHistoryModal(
     for (const a of scoring.actual) {
         baselineObjIds.add(a.objectiveId);
     }
-    const revisions: ObjectiveRevision[] = [];
     const allArchivals =
         await getObjectiveArchivalEvents(ctx);
     const archivals = allArchivals.filter(
         d => baselineObjIds.has(d.objectiveId),
     );
-    for (const objId of baselineObjIds) {
-        const revs = await getObjectiveRevisions(
-            ctx, objId,
+    const revsByObj =
+        await getObjectiveRevisionsByObjective(
+            ctx,
         );
-        revisions.push(...revs);
-    }
-    const revsByObj = new Map<
-        string, ObjectiveRevision[]
-    >();
-    for (const r of revisions) {
-        const arr =
-            revsByObj.get(r.objective_id) ?? [];
-        arr.push(r);
-        revsByObj.set(r.objective_id, arr);
-    }
+    const revisions = Array.from(
+        baselineObjIds,
+    ).flatMap(id => revsByObj.get(id) ?? []);
     const resolver = (
         objId: string, atTime: string,
     ) => {

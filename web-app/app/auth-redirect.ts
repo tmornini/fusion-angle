@@ -2,6 +2,7 @@ import { PAGE_REGISTRY } from './page-registry.ts';
 import { getPageName, navigateTo } from './navigation.ts';
 import {
     getUrlParams,
+    paramsFromQueryString,
     buildQueryString,
 } from './adapters/url-params.ts';
 
@@ -43,7 +44,10 @@ export function decodeReturnTarget(
     if (!isGatedPage(page)) {
         return defaultTarget();
     }
-    return { page, params: parseQuery(query) };
+    return {
+        page,
+        params: paramsFromQueryString(query),
+    };
 }
 
 // Bounce an auth-required page to login, carrying a ?return= so
@@ -67,12 +71,4 @@ function defaultTarget(): ReturnTarget {
 function isGatedPage(page: string): boolean {
     const entry = PAGE_REGISTRY[page];
     return entry !== undefined && entry.requiresAuth !== false;
-}
-
-function parseQuery(query: string): Record<string, string> {
-    const params: Record<string, string> = {};
-    new URLSearchParams(query).forEach((value, key) => {
-        params[key] = value;
-    });
-    return params;
 }

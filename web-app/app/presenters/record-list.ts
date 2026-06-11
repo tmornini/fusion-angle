@@ -12,6 +12,7 @@ import {
     iconCheckCircle2,
     iconClock,
 } from '../icons.ts';
+import { buildPageUrl } from '../navigation.ts';
 import type {
     RecordModel,
     RecordState,
@@ -124,12 +125,18 @@ export class RecordPresenter {
         <div class="${
             'flex items-center gap-4'
         }">
-            ${showGrip ? html`<div class="${
-                'hidden-mobile text-muted'
-                + ' drag-handle'
-            }">${
+            ${showGrip ? html`<button
+                type="button"
+                class="${
+                    'hidden-mobile text-muted'
+                    + ' drag-handle'
+                }"
+                aria-label="${
+                    'Reorder '
+                    + this.#record.nameText()
+                }">${
                 iconGripVertical(20, '')
-            }</div>` : html``}
+            }</button>` : html``}
             <div class="flex-fill min-w-0">
                 ${this.#buildHeading()}
             </div>
@@ -150,7 +157,15 @@ export class RecordPresenter {
             + ' font-semibold'
             + ' truncate'
         }">
-            ${this.#record.nameText()}
+            <a href="${
+                buildPageUrl(
+                    'record-detail',
+                    {
+                        id: this.#record
+                            .idForLink(),
+                    },
+                )
+            }">${this.#record.nameText()}</a>
         </h3>
         <p class="${
             'text-sm text-muted truncate'

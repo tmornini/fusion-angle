@@ -160,6 +160,31 @@ function indexedDbTx(
     };
 }
 
+// Create every object store (one per table + the schema
+// marker) with its declared indexes. Runs only inside
+// onupgradeneeded — the sole context where IndexedDB
+// permits createObjectStore.
+function createSchemaStores(db: IDBDatabase): void {
+    for (const table of TABLE_NAMES) {
+        if (db.objectStoreNames.contains(table)) {
+            continue;
+        }
+        const store = db.createObjectStore(
+            table, { keyPath: 'id' },
+        );
+        for (
+            const col of TABLE_INDEXES[table] ?? []
+        ) {
+            store.createIndex(col, col);
+        }
+    }
+    if (!db.objectStoreNames.contains(SCHEMA_STORE)) {
+        db.createObjectStore(
+            SCHEMA_STORE, { keyPath: 'id' },
+        );
+    }
+}
+
 export class IndexedDbBackend implements StorageBackend {
     #db: IDBDatabase | null;
     readonly #post: (tables: readonly string[]) => void;
@@ -181,33 +206,8 @@ export class IndexedDbBackend implements StorageBackend {
             const request = indexedDB.open(
                 DB_NAME, DB_VERSION,
             );
-            request.onupgradeneeded = () => {
-                const db = request.result;
-                for (const table of TABLE_NAMES) {
-                    if (
-                        !db.objectStoreNames.contains(table)
-                    ) {
-                        const store = db.createObjectStore(
-                            table, { keyPath: 'id' },
-                        );
-                        for (
-                            const col of
-                            TABLE_INDEXES[table] ?? []
-                        ) {
-                            store.createIndex(col, col);
-                        }
-                    }
-                }
-                if (
-                    !db.objectStoreNames.contains(
-                        SCHEMA_STORE,
-                    )
-                ) {
-                    db.createObjectStore(
-                        SCHEMA_STORE, { keyPath: 'id' },
-                    );
-                }
-            };
+            request.onupgradeneeded = () =>
+                createSchemaStores(request.result);
             request.onsuccess = () =>
                 resolve(request.result);
             request.onerror = () => reject(request.error);

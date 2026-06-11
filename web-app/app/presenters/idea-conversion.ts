@@ -437,7 +437,11 @@ export class IdeaConversionPresenter {
                             + ' flex'
                             + ' items-center'
                             + ' gap-2'
-                        }">
+                        }"
+                            for="${
+                                'convert-project'
+                                + '-name'
+                            }">
                             Project Name
                             ${this.#fieldCheck(
                                 'project-name',
@@ -468,7 +472,11 @@ export class IdeaConversionPresenter {
                             + ' flex'
                             + ' items-center'
                             + ' gap-2'
-                        }">
+                        }"
+                            for="${
+                                'convert-time'
+                                + '-days'
+                            }">
                             ${iconClock(
                                 16,
                                 'text-muted',
@@ -517,7 +525,8 @@ export class IdeaConversionPresenter {
                             + ' flex'
                             + ' items-center'
                             + ' gap-2'
-                        }">
+                        }"
+                            for="convert-cost">
                             ${iconDollarSign(
                                 16,
                                 'text-muted',
@@ -564,7 +573,11 @@ export class IdeaConversionPresenter {
                             + ' flex'
                             + ' items-center'
                             + ' gap-2'
-                        }">
+                        }"
+                            for="${
+                                'convert-success'
+                                + '-criteria'
+                            }">
                             Success Criteria
                             ${this.#fieldCheck(
                                 'success-criteria',
@@ -692,7 +705,11 @@ export class IdeaConversionPresenter {
                     + ' flex'
                     + ' items-center'
                     + ' gap-2'
-                }">
+                }"
+                    for="${
+                        'convert-baseline-'
+                        + obj.id
+                    }">
                     ${def.name}
                     ${this.#baselineCheck(
                         obj.id,
@@ -701,6 +718,10 @@ export class IdeaConversionPresenter {
                 <input type="range"
                     min="-100" max="100"
                     step="1"
+                    id="${
+                        'convert-baseline-'
+                        + obj.id
+                    }"
                     value="${value}"
                     data-initial-value="${value}"
                     data-objective-id="${obj.id}"

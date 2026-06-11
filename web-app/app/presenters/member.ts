@@ -12,14 +12,28 @@ import {
     HumanMember,
     AIMember,
     type Member,
+    type MemberState,
     isHumanMember,
     isAIMember,
     MEMBER_WITHOUT_PII_NAME,
 } from '../adapters/index.ts';
 import { DISPLAY_ABSENT } from '../format.ts';
+import { buildPageUrl } from '../navigation.ts';
 import {
     findProviderModel,
 } from '../../../api/provider-models.ts';
+
+const STATE_ICONS: Record<
+    MemberState,
+    (
+        size: number,
+        cssClass: string,
+    ) => SafeHtml
+> = {
+    active: iconCheckCircle2,
+    pending: iconClock,
+    archived: iconPersonX,
+};
 
 export type MemberKindFilter =
     | 'all'
@@ -78,7 +92,16 @@ export class HumanMemberRowPresenter {
                 <p class="${
                     'font-medium truncate'
                 }">
-                    ${name}
+                    <a href="${
+                        buildPageUrl(
+                            'member-detail',
+                            {
+                                memberId: this
+                                    .#member
+                                    .idForLink(),
+                            },
+                        )
+                    }">${name}</a>
                 </p>
                 <p class="${
                     'text-xs text-muted truncate'
@@ -107,29 +130,16 @@ export class HumanMemberRowPresenter {
     }
 
     #buildStatusBadge(): SafeHtml {
-        if (this.#member.isActive())
-            return html`<span
-                class="${
-                    'status-badge-success'
-                }">
-                ${iconCheckCircle2(14, '')}
-                Active
-            </span>`;
-        if (this.#member.isPending())
-            return html`<span
-                class="${
-                    'status-badge-warning'
-                }">
-                ${iconClock(14, '')}
-                Pending
-            </span>`;
         return html`<span
             class="${
-                'status-badge-error'
-            }">
-            ${iconPersonX(14, '')}
-            Archived
-        </span>`;
+                'badge '
+                + this.#member.stateClassName()
+                + ' text-xs'
+            }">${
+            STATE_ICONS[
+                this.#member.stateValue()
+            ]!(14, '')
+        } ${this.#member.stateLabel()}</span>`;
     }
 
     #buildTitleBadge(): SafeHtml {
@@ -180,7 +190,18 @@ export class AIMemberRowPresenter {
                 <p class="${
                     'font-medium truncate'
                 }">
-                    ${this.#member.nameText()}
+                    <a href="${
+                        buildPageUrl(
+                            'member-detail',
+                            {
+                                memberId: this
+                                    .#member
+                                    .idForLink(),
+                            },
+                        )
+                    }">${
+                        this.#member.nameText()
+                    }</a>
                 </p>
                 <p class="${
                     'text-xs text-muted truncate'

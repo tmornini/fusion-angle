@@ -114,6 +114,58 @@ export async function getObjectiveRevisions(
     return filterByField(all, 'objective_id', id);
 }
 
+// Every objective's revisions in ONE table read, grouped.
+// The per-objective form above re-reads the whole table
+// per id; callers walking an objective LIST batch here.
+export async function getObjectiveRevisionsByObjective(
+    ctx: RequestContext,
+): Promise<Map<ObjectiveId, ObjectiveRevision[]>> {
+    const all = await ctx.GET<ObjectiveRevision[]>(
+        'objective-revisions',
+    );
+    return Map.groupBy(all, r => r.objective_id);
+}
+
+// The current definition of every requested objective in
+// one table read. Throws on an objective with no
+// revisions: creation writes the first revision in the
+// same commit, so the absence is an impossible state.
+export async function getCurrentObjectiveDefinitions(
+    ctx: RequestContext,
+    ids: readonly ObjectiveId[],
+): Promise<Map<ObjectiveId, {
+    name: string;
+    description: string;
+}>> {
+    const grouped =
+        await getObjectiveRevisionsByObjective(ctx);
+    const defs = new Map<ObjectiveId, {
+        name: string;
+        description: string;
+    }>();
+    for (const id of ids) {
+        const revs = grouped.get(id);
+        if (!revs) {
+            throw new Error(
+                'no revisions for objective ' + id,
+            );
+        }
+        let latest = revs[0]!;
+        for (const r of revs) {
+            if (
+                r.at.localeCompare(latest.at) > 0
+            ) {
+                latest = r;
+            }
+        }
+        defs.set(id, {
+            name: latest.name,
+            description: latest.description,
+        });
+    }
+    return defs;
+}
+
 export async function getActiveObjectives(
     ctx: RequestContext,
 ): Promise<Objective[]> {
@@ -126,24 +178,18 @@ export async function getActiveObjectives(
         .sort((a, b) => a.position - b.position);
 }
 
+// The single-id form, for id-scoped gestures (e.g. the
+// organization page's edit dialog). List walkers use the
+// batched form — same reduce, one read.
 export async function getCurrentObjectiveDefinition(
     ctx: RequestContext,
     id: ObjectiveId,
 ): Promise<{ name: string; description: string }> {
-    const revs = await getObjectiveRevisions(ctx, id);
-    if (revs.length === 0) {
-        throw new Error(
-            'no revisions for objective ' + id,
+    const defs =
+        await getCurrentObjectiveDefinitions(
+            ctx, [id],
         );
-    }
-    revs.sort((a, b) =>
-        b.at.localeCompare(a.at),
-    );
-    const latest = revs[0]!;
-    return {
-        name: latest.name,
-        description: latest.description,
-    };
+    return defs.get(id)!;
 }
 
 export async function postObjectiveCreation(

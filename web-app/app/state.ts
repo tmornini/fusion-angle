@@ -1,6 +1,11 @@
 import {
-    getPreference,
     putPreference,
+    getStoredTheme,
+    getStoredSidebarCollapsed,
+    isStoredTheme,
+    BOOL_STRING_TRUE,
+    BOOL_STRING_FALSE,
+    type StoredTheme,
 } from './adapters/preferences.ts';
 import {
     mediaQueryMatches,
@@ -20,46 +25,9 @@ import {
 } from './icons.ts';
 import type { SafeHtml } from './safe-html.ts';
 
-const BOOL_STRING_TRUE = 'true';
-const BOOL_STRING_FALSE = 'false';
-
 interface AppState {
-    theme: 'light' | 'dark' | 'system';
+    theme: StoredTheme;
     isSidebarCollapsed: boolean;
-}
-
-function isValidTheme(
-    value: string | null,
-): value is AppState['theme'] {
-    return value === 'light'
-        || value === 'dark'
-        || value === 'system';
-}
-
-function loadStoredTheme(
-): AppState['theme'] {
-    const raw = getPreference(
-        STORAGE_KEY_THEME,
-    );
-    if (raw === null) return 'system';
-    if (isValidTheme(raw)) return raw;
-    throw new Error(
-        'corrupt stored theme: ' + raw,
-    );
-}
-
-function loadStoredSidebarCollapsed(
-): boolean {
-    const raw = getPreference(
-        STORAGE_KEY_SIDEBAR,
-    );
-    if (raw === null) return false;
-    if (raw === BOOL_STRING_TRUE) return true;
-    if (raw === BOOL_STRING_FALSE) return false;
-    throw new Error(
-        'corrupt stored sidebar state: '
-            + raw,
-    );
 }
 
 const DARK_QUERY =
@@ -160,9 +128,9 @@ function collapseSidebar(
 
 function initState(): void {
     setState({
-        theme: loadStoredTheme(),
+        theme: getStoredTheme(),
         isSidebarCollapsed:
-            loadStoredSidebarCollapsed(),
+            getStoredSidebarCollapsed(),
     });
 }
 
@@ -179,7 +147,7 @@ function initListeners(): void {
     subscribeStorageEvent((e) => {
         if (
             e.key === STORAGE_KEY_THEME
-            && isValidTheme(e.newValue)
+            && isStoredTheme(e.newValue)
         ) {
             setState({
                 theme: e.newValue,
@@ -216,7 +184,6 @@ export {
     applyResolvedTheme,
     persistThemePreference,
     collapseSidebar,
-    isValidTheme,
     initState,
     initListeners,
 };

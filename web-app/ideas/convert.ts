@@ -25,7 +25,7 @@ import {
 } from '../app/adapters/index.ts';
 import {
     getActiveObjectives,
-    getCurrentObjectiveDefinition,
+    getCurrentObjectiveDefinitions,
 } from '../app/adapters/objectives.ts';
 import { MS_PER_DAY } from '../../api/types.ts';
 import type {
@@ -102,16 +102,11 @@ export async function init(
     try {
         activeObjectives =
             await getActiveObjectives(ctx);
-        const defEntries = await Promise.all(
-            activeObjectives.map(async (o) => {
-                const def =
-                    await getCurrentObjectiveDefinition(
-                        ctx, o.id,
-                    );
-                return [o.id, def] as const;
-            }),
-        );
-        defs = new Map(defEntries);
+        defs =
+            await getCurrentObjectiveDefinitions(
+                ctx,
+                activeObjectives.map(o => o.id),
+            );
     } catch (err) {
         log.error(
             'objectives load failed',

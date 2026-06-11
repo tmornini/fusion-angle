@@ -9,8 +9,9 @@ import {
     getActualScoresForProject,
     getProjectScoring,
     getPortfolioImpactSummary,
-    getObjectiveAggregates,
-    getObjectiveTrendlines,
+    getObjectiveScoringInputs,
+    buildObjectiveAggregates,
+    buildObjectiveTrendlines,
     getProjectsScoreColumn,
     postProjectBaselineScoring,
     postProjectActualMeasurement,
@@ -163,13 +164,15 @@ test('getPortfolioImpactSummary averages project averages',
         assert.equal(r.baselineMean, 20); // (60 + -20) / 2
     });
 
-test('getObjectiveAggregates returns per-objective rows',
+test('buildObjectiveAggregates returns per-objective rows',
     async () => {
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
         await seedTwoApprovedProjects(db);
         const ctx = createRequestContext(db, await devToken());
-        const rows = await getObjectiveAggregates(ctx);
+        const rows = buildObjectiveAggregates(
+            await getObjectiveScoringInputs(ctx),
+        );
         assert.equal(rows.length, 1);
         assert.equal(rows[0]!.objectiveId, 'o1');
         assert.equal(rows[0]!.baselineMean, 20);
@@ -191,7 +194,7 @@ test('getProjectsScoreColumn returns per-project rollup',
     });
 
 test(
-    'getObjectiveTrendlines: baseline + two actuals',
+    'buildObjectiveTrendlines: baseline + two actuals',
     async () => {
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
@@ -215,8 +218,8 @@ test(
             },
         );
         const ctx = createRequestContext(db, await devToken());
-        const trendlines = await getObjectiveTrendlines(
-            ctx,
+        const trendlines = buildObjectiveTrendlines(
+            await getObjectiveScoringInputs(ctx),
         );
         const points = trendlines.get('o1');
         assert.ok(points, 'o1 trendline must exist');
@@ -239,7 +242,7 @@ test(
 );
 
 test(
-    'getObjectiveTrendlines: baseline + one actual',
+    'buildObjectiveTrendlines: baseline + one actual',
     async () => {
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
@@ -254,8 +257,8 @@ test(
             },
         );
         const ctx = createRequestContext(db, await devToken());
-        const trendlines = await getObjectiveTrendlines(
-            ctx,
+        const trendlines = buildObjectiveTrendlines(
+            await getObjectiveScoringInputs(ctx),
         );
         const points = trendlines.get('o1');
         assert.ok(points, 'o1 trendline must exist');
@@ -269,7 +272,7 @@ test(
 );
 
 test(
-    'getObjectiveTrendlines: same-at batch is one point',
+    'buildObjectiveTrendlines: same-at batch is one point',
     async () => {
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
@@ -293,8 +296,8 @@ test(
             },
         );
         const ctx = createRequestContext(db, await devToken());
-        const trendlines = await getObjectiveTrendlines(
-            ctx,
+        const trendlines = buildObjectiveTrendlines(
+            await getObjectiveScoringInputs(ctx),
         );
         const points = trendlines.get('o1');
         assert.ok(points, 'o1 trendline must exist');
@@ -308,7 +311,7 @@ test(
 );
 
 test(
-    'getObjectiveTrendlines: no baseline returns empty',
+    'buildObjectiveTrendlines: no baseline returns empty',
     async () => {
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
@@ -323,8 +326,8 @@ test(
             at: '2026-05-14T00:00:00.000000Z',
         });
         const ctx = createRequestContext(db, await devToken());
-        const trendlines = await getObjectiveTrendlines(
-            ctx,
+        const trendlines = buildObjectiveTrendlines(
+            await getObjectiveScoringInputs(ctx),
         );
         assert.deepEqual(trendlines.get('o1'), []);
     },

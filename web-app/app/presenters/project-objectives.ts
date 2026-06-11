@@ -187,10 +187,18 @@ export class ProjectObjectivesPresenter {
                         data-slider="actual">
                         <label class="${
                             'text-xs text-muted'
-                        }">Actual</label>
+                        }"
+                            for="${
+                                'objective-slider-'
+                                + obj.id
+                            }">Actual</label>
                         <input type="range"
                             min="-100" max="100"
                             step="1"
+                            id="${
+                                'objective-slider-'
+                                + obj.id
+                            }"
                             value="${actValue}"
                             data-initial-value="${
                                 actValue
@@ -212,10 +220,18 @@ export class ProjectObjectivesPresenter {
                         data-slider="baseline">
                         <label class="${
                             'text-xs text-muted'
-                        }">Baseline</label>
+                        }"
+                            for="${
+                                'objective-slider-'
+                                + obj.id
+                            }">Baseline</label>
                         <input type="range"
                             min="-100" max="100"
                             step="1"
+                            id="${
+                                'objective-slider-'
+                                + obj.id
+                            }"
                             value="${baseValue}"
                             data-initial-value="${
                                 baseValue

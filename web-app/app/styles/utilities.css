@@ -110,7 +110,6 @@
 
 /* Cursor */
 .cursor-pointer { cursor: pointer; }
-.drag-handle { cursor: grab; }
 .rounded-lg { border-radius: var(--radius-lg); }
 
 /* Border */

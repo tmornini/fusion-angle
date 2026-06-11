@@ -267,24 +267,26 @@ function buildFlowPropPanel(): SafeHtml {
         }">
             <div class="ds-prop-field">
                 <label class="${''
-                    }text-xs text-muted">${''
+                    }text-xs text-muted"
+                    for="ds-prop-name">${''
                     }Name</label>
                 <input class="input"
+                    id="ds-prop-name"
                     value="Data Capture"
                     readonly/>
             </div>
             <div class="ds-prop-field">
-                <label class="${''
+                <div class="${''
                     }text-xs text-muted">${''
-                    }Type</label>
+                    }Type</div>
                 <span class="${''
                     }badge badge-default">${''
                     }Standard</span>
             </div>
             <div class="ds-prop-field">
-                <label class="${''
+                <div class="${''
                     }text-xs text-muted">${''
-                    }Fields</label>
+                    }Fields</div>
                 <span class="${''
                     }text-sm">8 fields</span>
             </div>
@@ -789,20 +791,26 @@ export async function init(): Promise<void> {
                         <div>
                             <label class="${''
                                 }label mb-1${''
-                                } text-sm">${''
+                                } text-sm"
+                                for="${''
+                                }ds-input-default">${''
                                 }Default ${''
                                 }Input</label>
                             <input class="input"
+                                id="ds-input-default"
                                 placeholder="${''
                                 }Enter text..."/>
                         </div>
                         <div>
                             <label class="${''
                                 }label mb-1${''
-                                } text-sm">${''
+                                } text-sm"
+                                for="${''
+                                }ds-input-value">${''
                                 }With ${''
                                 }Value</label>
                             <input class="input"
+                                id="ds-input-value"
                                 value="${
                                     'Sample'
                                     + ' content'
@@ -811,12 +819,15 @@ export async function init(): Promise<void> {
                         <div>
                             <label class="${''
                                 }label mb-1${''
-                                } text-sm">${''
+                                } text-sm"
+                                for="${''
+                                }ds-input-error">${''
                                 }Error ${''
                                 }State</label>
                             <input class="${''
                                 }input${''
                                 } input-error"
+                                id="ds-input-error"
                                 value="${
                                     'Invalid'
                                     + ' input'
@@ -832,9 +843,12 @@ export async function init(): Promise<void> {
                         <div>
                             <label class="${''
                                 }label mb-1${''
-                                } text-sm">${''
+                                } text-sm"
+                                for="${''
+                                }ds-input-disabled">${''
                                 }Disabled</label>
                             <input class="input"
+                                id="ds-input-disabled"
                                 disabled
                                 placeholder="${''
                                 }Disabled${''
@@ -850,11 +864,15 @@ export async function init(): Promise<void> {
                         <div>
                             <label class="${''
                                 }label mb-1${''
-                                } text-sm">${''
+                                } text-sm"
+                                for="${''
+                                }ds-textarea-default">${''
                                 }Default ${''
                                 }Textarea</label>
                             <textarea
                                 class="textarea"
+                                id="${''
+                                }ds-textarea-default"
                                 placeholder="${''
                                 }Enter longer${''
                                 } text...">${''
@@ -863,12 +881,16 @@ export async function init(): Promise<void> {
                         <div>
                             <label class="${''
                                 }label mb-1${''
-                                } text-sm">${''
+                                } text-sm"
+                                for="${''
+                                }ds-textarea-error">${''
                                 }Error ${''
                                 }State</label>
                             <textarea class="${''
                                 }textarea${''
-                                } input-error">${''
+                                } input-error"
+                                id="${''
+                                }ds-textarea-error">${''
                                 }Invalid${''
                                 } content${''
                                 }</textarea>
@@ -1236,12 +1258,16 @@ export async function init(): Promise<void> {
                         <div>
                             <label class="${''
                                 }label mb-1${''
-                                } text-sm">${''
+                                } text-sm"
+                                for="${''
+                                }ds-validation-email">${''
                                 }Email ${''
                                 }Address</label>
                             <input class="${''
                                 }input${''
                                 } input-error"
+                                id="${''
+                                }ds-validation-email"
                                 value="${
                                     'invalid'
                                     + '-email'
@@ -1262,13 +1288,17 @@ export async function init(): Promise<void> {
                         <div>
                             <label class="${''
                                 }label mb-1${''
-                                } text-sm">${''
+                                } text-sm"
+                                for="${''
+                                }ds-validation-name">${''
                                 }Project ${''
                                 }Name</label>
                             <input class="${
                                 'input'
                                 + ' ds-success-border'
                             }"
+                                id="${''
+                                }ds-validation-name"
                                 value="${''
                                 }AI Segmentation"/>
                             <p class="${''

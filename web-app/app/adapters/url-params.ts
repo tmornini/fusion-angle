@@ -10,12 +10,19 @@ export function getUrlParam(
 
 export function getUrlParams():
     Record<string, string> {
-    const params: Record<string, string> = {};
-    new URLSearchParams(
+    return paramsFromQueryString(
         getQueryString(),
-    ).forEach((value, key) => {
-        params[key] = value;
-    });
+    );
+}
+
+export function paramsFromQueryString(
+    query: string,
+): Record<string, string> {
+    const params: Record<string, string> = {};
+    new URLSearchParams(query)
+        .forEach((value, key) => {
+            params[key] = value;
+        });
     return params;
 }
 

@@ -5,7 +5,9 @@ import { log } from '../app/logger.ts';
 import {
     buildSkeleton, withLoadingState,
 } from '../app/loading-states.ts';
-import { navigateTo } from '../app/core.ts';
+import {
+    navigateTo, openDialog, closeDialog,
+} from '../app/core.ts';
 import {
     sessionContext,
     getIdentity,
@@ -13,6 +15,7 @@ import {
     getServiceFacet,
     deleteIdentityPii,
     getIdentityCredentialState,
+    subscribeIdentityChanges,
     Identity,
     type MemberPii,
     type ServiceFacet,
@@ -98,11 +101,40 @@ export async function init(
     new IdentityDetailPresenter(buildView(loaded))
         .renderShell(container);
     bindListeners(container);
+    subscribeIdentityChanges(
+        () => void refresh(),
+    );
+}
+
+async function refresh(): Promise<void> {
+    if (!currentId || !pageContainer) return;
+    const loaded = await loadIdentity(currentId);
+    new IdentityDetailPresenter(buildView(loaded))
+        .renderUpdate(pageContainer);
 }
 
 function bindListeners(container: HTMLElement): void {
     container.addEventListener(
         'click', e => void onClick(e),
+        { signal },
+    );
+    $required(
+        '[data-action="cancel-confirm-erase"]',
+        document,
+    ).addEventListener(
+        'click',
+        () => closeDialog('confirm-erase'),
+        { signal },
+    );
+    $required(
+        '[data-action="confirm-erase"]',
+        document,
+    ).addEventListener(
+        'click',
+        () => {
+            closeDialog('confirm-erase');
+            void performErase();
+        },
         { signal },
     );
 }
@@ -139,17 +171,12 @@ async function onClick(e: MouseEvent): Promise<void> {
         return;
     }
     if (action === 'erase') {
-        await handleErase();
+        openDialog('confirm-erase');
     }
 }
 
-async function handleErase(): Promise<void> {
+async function performErase(): Promise<void> {
     if (!currentId || !pageContainer) return;
-    const confirmed = window.confirm(
-        'Erase this identity\'s personal information?'
-        + ' The identity itself survives.',
-    );
-    if (!confirmed) return;
     try {
         await deleteIdentityPii(
             sessionContext(), currentId,
@@ -163,7 +190,5 @@ async function handleErase(): Promise<void> {
         return;
     }
     showToast('Personal information erased', 'success');
-    const loaded = await loadIdentity(currentId);
-    new IdentityDetailPresenter(buildView(loaded))
-        .renderUpdate(pageContainer);
+    await refresh();
 }

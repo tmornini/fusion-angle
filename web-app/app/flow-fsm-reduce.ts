@@ -660,7 +660,12 @@ function onWheel(
     };
 }
 
-function isGestureActive(state: FsmState): boolean {
+// Exported: the interaction layer skips pointer-move
+// conversion work outside a gesture, and the detail page
+// routes in-gesture updates to the narrow renderer.
+export function isGestureActive(
+    state: FsmState,
+): boolean {
     return state.drag.kind === 'dragging'
         || state.connect.kind === 'connecting'
         || state.marquee.kind === 'selecting'

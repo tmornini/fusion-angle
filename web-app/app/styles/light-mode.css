@@ -31,9 +31,11 @@
   --muted: var(--gray-200);
   --muted-foreground: var(--gray-600);
 
-  /* Accent variants (tinted backgrounds and text) */
+  /* Accent variants (tinted backgrounds and text).
+     --accent-text on --accent-soft measures 4.80:1
+     (WCAG AA >= 4.5). */
   --accent-soft: 48 80% 95%;
-  --accent-text: 48 85% 30%;
+  --accent-text: 48 85% 28%;
 
   /* Semantic: Destructive */
   --destructive: 0 72% 51%;
@@ -44,10 +46,14 @@
   --border-strong: var(--gray-300);
   --input: var(--gray-200);
 
-  /* Status: Success */
+  /* Status: Success. Dark-on-green button text
+     (mirrors dark mode's idiom): the foreground
+     measures 5.88:1 on --success and 4.62:1 on
+     --success-hover (WCAG AA >= 4.5); white
+     measured 3.20:1 and failed. */
   --success: 152 60% 40%;
   --success-hover: 152 60% 35%;
-  --success-foreground: 0 0% 100%;
+  --success-foreground: 152 60% 5%;
   --success-soft: 152 50% 95%;
   --success-border: 152 45% 75%;
   --success-text: 152 60% 30%;

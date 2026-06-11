@@ -7,7 +7,10 @@ import { createRequestContext } from
 import { devToken } from './token-fixtures.ts';
 import { getDashboardGauges } from
     '../web-app/app/adapters/dashboard.ts';
-import { getObjectiveAggregates } from
+import {
+    getObjectiveScoringInputs,
+    buildObjectiveAggregates,
+} from
     '../web-app/app/adapters/project-scoring.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 
@@ -38,7 +41,9 @@ test('mock seed produces per-objective baseline means',
         await seedAdminSchema(db);
         await postMockDataLoad(db);
         const ctx = createRequestContext(db, await devToken());
-        const aggs = await getObjectiveAggregates(ctx);
+        const aggs = buildObjectiveAggregates(
+            await getObjectiveScoringInputs(ctx),
+        );
         const expected: ReadonlyArray<
             [string, number]
         > = [

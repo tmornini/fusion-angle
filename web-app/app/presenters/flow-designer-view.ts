@@ -139,13 +139,13 @@ class="flow-props-panel">
     >${iconX(14, '')}</button>
 </div>
 <div class="mb-2">
-<label class="text-xs text-muted"
-    >Name</label>
+<div class="text-xs text-muted"
+    >Name</div>
 <div class="text-sm">${label}</div>
 </div>
 <div class="mb-3">
-<label class="text-xs text-muted"
-    >Outgoing Transitions</label>
+<div class="text-xs text-muted"
+    >Outgoing Transitions</div>
 ${outgoing.length > 0
     ? outgoing.map(e => html`<div
 class="text-sm text-muted"
@@ -251,7 +251,7 @@ ${aiCheckboxes}
 </fieldset>
 <div class="mb-2">
 <label class="text-xs text-muted"
-    >Name</label>
+    for="prop-node-name">Name</label>
 <input type="text"
     class="input input-sm"
     id="prop-node-name"
@@ -259,6 +259,7 @@ ${aiCheckboxes}
 </div>
 <div class="mb-2">
 <label class="text-xs text-muted"
+    for="prop-node-instructions"
     >Task Instructions</label>
 <textarea
     class="textarea"
@@ -286,8 +287,8 @@ ${pickerAttributes.map(
 </div>
 </fieldset>
 <div class="mb-3">
-<label class="text-xs text-muted"
-    >Outgoing Transitions</label>
+<div class="text-xs text-muted"
+    >Outgoing Transitions</div>
 ${outgoing.length > 0
     ? outgoing.map(e => html`<div
 class="text-sm text-muted"
@@ -342,20 +343,20 @@ class="flow-props-panel">
 </div>
 <div class="mb-2">
 <label class="text-xs text-muted"
-    >Name</label>
+    for="prop-edge-name">Name</label>
 <input type="text"
     class="input input-sm"
     id="prop-edge-name"
     value="${edge.name}"${lockAttr} />
 </div>
 <div class="mb-2">
-<label class="text-xs text-muted"
-    >From</label>
+<div class="text-xs text-muted"
+    >From</div>
 <div class="text-sm">${fromName}</div>
 </div>
 <div class="mb-2">
-<label class="text-xs text-muted"
-    >To</label>
+<div class="text-xs text-muted"
+    >To</div>
 <div class="text-sm">${toName}</div>
 </div>
 </div>`;

@@ -12,9 +12,11 @@ test('stateBadge renders state, class, label, dimmed', () => {
         () => html`<svg></svg>`,
         false,
     ).toString();
+    assert.match(out, /^<button type="button"/);
     assert.match(out, /data-state="active"/);
     assert.match(out, /badge-success/);
     assert.match(out, /data-dimmed="true"/);
+    assert.match(out, /aria-pressed="false"/);
     assert.match(out, /Active/);
 });
 
@@ -27,4 +29,18 @@ test('stateBadge dims false when active or unfiltered', () => {
     assert.match(
         stateBadge('x', cfg, icon, null).toString(),
         /data-dimmed="false"/);
+});
+
+test('stateBadge presses only the active filter chip', () => {
+    const cfg = { className: 'c', label: 'L' };
+    const icon = () => html``;
+    assert.match(
+        stateBadge('x', cfg, icon, true).toString(),
+        /aria-pressed="true"/);
+    assert.match(
+        stateBadge('x', cfg, icon, false).toString(),
+        /aria-pressed="false"/);
+    assert.match(
+        stateBadge('x', cfg, icon, null).toString(),
+        /aria-pressed="false"/);
 });

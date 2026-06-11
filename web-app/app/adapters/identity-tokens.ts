@@ -3,6 +3,20 @@ import {
     type IdentityTokenEntity,
 } from '../../../api/types.ts';
 import type { RequestContext } from './shared.ts';
+import {
+    createSubscriptionChannel,
+} from '../channels.ts';
+
+const tokenChanges =
+    createSubscriptionChannel(
+        ['identity_tokens'],
+    );
+
+export function subscribeIdentityTokenChanges(
+    fn: () => void,
+): () => void {
+    return tokenChanges.subscribe(fn);
+}
 
 // Presenting a refresh jti that is not live (already rotated
 // away, revoked, or never issued) is reuse — the chain is

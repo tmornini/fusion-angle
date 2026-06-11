@@ -10,6 +10,20 @@ import {
 import {
     latestByKey,
 } from '../../../api/ledger-reduction.ts';
+import {
+    createSubscriptionChannel,
+} from '../channels.ts';
+
+const providerChanges =
+    createSubscriptionChannel(
+        ['identity_providers'],
+    );
+
+export function subscribeIdentityProviderChanges(
+    fn: () => void,
+): () => void {
+    return providerChanges.subscribe(fn);
+}
 
 // One provider link/unlink event in the domain idiom: the
 // presenter reads camelCase, never the snake_case row.
