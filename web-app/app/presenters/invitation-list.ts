@@ -1,7 +1,7 @@
 import {
     html, setHtml, SafeHtml,
 } from '../safe-html.ts';
-import { formatDate } from '../format.ts';
+import { DISPLAY_ABSENT, formatDate } from '../format.ts';
 import {
     INVITATION_STATE_CONFIG,
     type InvitationState,
@@ -37,12 +37,12 @@ function buildInviteeRow(inv: InvitationView): SafeHtml {
         }" data-invitation-id="${inv.id}">
             <div class="flex-fill min-w-0">
                 <p class="font-medium truncate">
-                    ${inv.organizationName}
+                    ${inv.organizationName ?? DISPLAY_ABSENT}
                 </p>
                 <p class="${
                     'text-xs text-muted truncate'
                 }">${
-                    inv.invitedByName !== ''
+                    inv.invitedByName !== undefined
                         ? html`Invited by ${
                             inv.invitedByName} · `
                         : ''
@@ -64,7 +64,7 @@ function buildSentRow(inv: SentInvitation): SafeHtml {
         }" data-invitation-id="${inv.id}">
             <div class="flex-fill min-w-0">
                 <p class="font-medium truncate">
-                    ${inv.inviteeEmail}
+                    ${inv.inviteeEmail ?? DISPLAY_ABSENT}
                 </p>
                 <p class="${
                     'text-xs text-muted truncate'

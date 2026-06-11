@@ -2,15 +2,15 @@ import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import {
-    populateMockData,
-    populateBootstrapData,
+    postMockDataLoad,
+    postBootstrap,
 } from '../api/mock-data.ts';
 import { identityDefaultOrg } from '../api/authentication.ts';
 
 async function mockSeeded() {
     const db = new MemoryDbAdapter();
-    await db.createSchema();
-    await populateMockData(db);
+    await db.postSchemaCreation();
+    await postMockDataLoad(db);
     return db;
 }
 
@@ -44,8 +44,8 @@ async () => {
 test("bootstrap seeds 'current' a default-org event for org 1",
 async () => {
     const db = new MemoryDbAdapter();
-    await db.createSchema();
-    await populateBootstrapData(db);
+    await db.postSchemaCreation();
+    await postBootstrap(db);
     const defaults = await db.identityDefaultOrgs.getAll();
     assert.ok(
         defaults.some(

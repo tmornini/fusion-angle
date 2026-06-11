@@ -1,4 +1,7 @@
-import { mintAccessToken } from '../api/access-token.ts';
+import {
+    mintAccessToken,
+    TOKEN_AUDIENCE,
+} from '../api/access-token.ts';
 
 // A deterministic, always-valid 'current' token: a fixed iat
 // with an enormous TTL puts exp far in the future, so it
@@ -6,6 +9,7 @@ import { mintAccessToken } from '../api/access-token.ts';
 // Async because minting now signs via WebCrypto (HMAC-SHA256).
 export async function devToken(sub = 'current'): Promise<string> {
     return mintAccessToken({
+        aud: TOKEN_AUDIENCE,
         sub, roles: [], name: 'Demo',
         iat: 1_700_000_000, ttlSeconds: 10_000_000_000,
         jti: 'dev-' + sub,
@@ -19,6 +23,7 @@ export async function orgToken(
     sub = 'current', org = '1',
 ): Promise<string> {
     return mintAccessToken({
+        aud: TOKEN_AUDIENCE,
         sub, roles: [], name: 'Demo', org,
         iat: 1_700_000_000, ttlSeconds: 10_000_000_000,
         jti: 'org-' + sub + '-' + org,
@@ -34,6 +39,7 @@ export async function reachableToken(
     sub = 'current', orgs: readonly string[] = ['1'],
 ): Promise<string> {
     return mintAccessToken({
+        aud: TOKEN_AUDIENCE,
         sub, roles: [], name: 'Demo', orgs,
         iat: 1_700_000_000, ttlSeconds: 10_000_000_000,
         jti: 'reach-' + sub,
@@ -42,6 +48,7 @@ export async function reachableToken(
 
 export async function expiredToken(sub = 'current'): Promise<string> {
     return mintAccessToken({
+        aud: TOKEN_AUDIENCE,
         sub, roles: [], name: 'Demo',
         iat: 1_600_000_000, ttlSeconds: 1,
         jti: 'exp-' + sub,
@@ -50,6 +57,7 @@ export async function expiredToken(sub = 'current'): Promise<string> {
 
 export async function notYetValidToken(sub = 'current'): Promise<string> {
     return mintAccessToken({
+        aud: TOKEN_AUDIENCE,
         sub, roles: [], name: 'Demo',
         iat: 4_000_000_000, ttlSeconds: 10_000_000_000,
         jti: 'nbf-' + sub,

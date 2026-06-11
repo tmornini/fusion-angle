@@ -1,7 +1,7 @@
 import {
     html, setHtml, SafeHtml, trusted,
 } from '../safe-html.ts';
-import { $required } from '../dom.ts';
+import { mutateSlot } from '../dom.ts';
 import {
     makeFieldKeyValidator,
 } from '../field-key-validator.ts';
@@ -107,14 +107,6 @@ function buildShell(
         }"></div>
     </div>
 </div>`);
-}
-
-function mutateSlot(
-    container: HTMLElement,
-    cls: string,
-    markup: SafeHtml,
-): void {
-    setHtml($required(cls, container), markup);
 }
 
 function buildAvatar(): SafeHtml {
@@ -427,7 +419,6 @@ function buildReadonlyIdentityBody(
 }
 
 function buildEditableIdentityBody(
-    member: AIMember,
     draft: AIMemberDraftFields,
 ): SafeHtml {
     return html`
@@ -591,7 +582,6 @@ export class AIMemberDetailEditPresenter {
             '.member-cards-slot',
             buildIdentityCard(
                 buildEditableIdentityBody(
-                    this.#member,
                     this.#draft,
                 ),
             ),

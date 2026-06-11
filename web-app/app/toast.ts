@@ -38,7 +38,7 @@ export function showToast(
         | 'success'
         | 'error'
         | 'warning'
-        | 'info' = 'info',
+        | 'info',
 ): void {
     const container = ensureContainer();
 
@@ -58,7 +58,7 @@ export function showToast(
     const closeBtn = document.createElement('button');
     closeBtn.className = 'toast-close';
     closeBtn.setAttribute('aria-label', 'Dismiss');
-    closeBtn.textContent = '\u00D7';
+    closeBtn.textContent = '×';
     closeBtn.addEventListener('click', () => closeActiveToast(toast));
     toast.appendChild(closeBtn);
 

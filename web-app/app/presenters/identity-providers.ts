@@ -2,6 +2,7 @@ import {
     html, setHtml, SafeHtml,
 } from '../safe-html.ts';
 import { formatDateTime } from '../core.ts';
+import { mutedEmptyNote } from './empty-note.ts';
 import type {
     ProviderEvent,
 } from '../adapters/index.ts';
@@ -46,12 +47,6 @@ function buildEventRow(
         </div>`;
 }
 
-function buildEmptyState(): SafeHtml {
-    return html`<div class="${
-        'p-4 text-sm text-muted text-center'
-    }">No linked providers.</div>`;
-}
-
 export class IdentityProvidersPresenter {
     readonly #events: readonly ProviderEvent[];
 
@@ -64,7 +59,7 @@ export class IdentityProvidersPresenter {
     render(container: HTMLElement): void {
         setHtml(container, html`${
             this.#events.length === 0
-                ? buildEmptyState()
+                ? mutedEmptyNote('No linked providers.')
                 : html`${this.#events.map(buildEventRow)}`
         }`);
     }

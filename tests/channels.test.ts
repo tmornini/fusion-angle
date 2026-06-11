@@ -47,15 +47,20 @@ test('subscribe after send does not get past values', () => {
 
 test('unsubscribe is idempotent', () => {
     const ch = createChannel<void>();
+    let survivorCalls = 0;
     const unsub = ch.subscribe(() => {});
+    ch.subscribe(() => { survivorCalls += 1; });
     unsub();
     unsub();
     ch.send();
+    // the second unsubscribe must not evict the
+    // other subscriber
+    assert.equal(survivorCalls, 1);
 });
 
 test('send with no subscribers is a no-op', () => {
     const ch = createChannel<number>();
-    ch.send(1);
+    assert.doesNotThrow(() => ch.send(1));
 });
 
 test('a watch on an unknown table name throws at creation',

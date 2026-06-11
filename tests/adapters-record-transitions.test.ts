@@ -32,7 +32,7 @@ async function seedSystemMember(
     await db.members.put(SYSTEM_MEMBER_ID, {
         type: 'system',
     });
-    await db.states.record(
+    await db.states.postEvent(
         'st-system', SYSTEM_MEMBER_ID, 'active',
         'system',
     );
@@ -71,14 +71,11 @@ function buildEdge(
 }
 
 function buildFlowGraph(
-    flowId: string,
     nodes: GraphNode[],
     edges: GraphEdge[],
 ): WorkOrderFlowGraph {
     return {
-        flowId,
         name: 'Flow',
-        description: '',
         lockTimeout: DEFAULT_LOCK_TIMEOUT,
         nodes,
         edges,
@@ -121,6 +118,20 @@ async function seedBinding(
     });
 }
 
+async function seedFlowLink(
+    db: MemoryDbAdapter,
+    flowId: string,
+    workOrderId: string,
+): Promise<void> {
+    await db.flowWorkOrders.put(
+        'fwo-' + workOrderId, {
+            flow_id: flowId,
+            work_order_id: workOrderId,
+            at: AT_CREATED,
+        },
+    );
+}
+
 async function seedAttribute(
     db: MemoryDbAdapter,
     id: string,
@@ -155,7 +166,6 @@ test(
         await seedAdminSchema(db);
         await seedSystemMember(db);
         const flowGraph = buildFlowGraph(
-            'flow-1',
             [
                 buildNode('n-create', [], {
                     isCreate: true,
@@ -169,7 +179,7 @@ test(
         );
         const ctx = createRequestContext(db, await devToken());
         const out = await validateRecordTransition(
-            ctx, 'wo-1', 'n-target',
+            ctx, 'wo-1', 'n-target', new Map(),
         );
         assert.deepEqual(out, []);
     },
@@ -184,7 +194,6 @@ test(
         await seedAdminSchema(db);
         await seedSystemMember(db);
         const flowGraph = buildFlowGraph(
-            'flow-1',
             [
                 buildNode('n-create', [], {
                     isCreate: true,
@@ -201,12 +210,13 @@ test(
             db, 'wo-1', flowGraph, 'n-create',
         );
         await seedBinding(db, 'flow-1', 'rec-1');
+        await seedFlowLink(db, 'flow-1', 'wo-1');
         await seedAttribute(db, 'a-1', 'rec-1', {
             name: 'Email',
         });
         const ctx = createRequestContext(db, await devToken());
         const out = await validateRecordTransition(
-            ctx, 'wo-1', 'n-target',
+            ctx, 'wo-1', 'n-target', new Map(),
         );
         assert.equal(out.length, 1);
         assert.equal(out[0]!.kind, 'required');
@@ -224,7 +234,6 @@ test(
         await seedAdminSchema(db);
         await seedSystemMember(db);
         const flowGraph = buildFlowGraph(
-            'flow-1',
             [
                 buildNode('n-create', [], {
                     isCreate: true,
@@ -262,12 +271,13 @@ test(
             value: 'me@example.com',
         });
         await seedBinding(db, 'flow-1', 'rec-1');
+        await seedFlowLink(db, 'flow-1', 'wo-1');
         await seedAttribute(db, 'a-1', 'rec-1', {
             name: 'Email',
         });
         const ctx = createRequestContext(db, await devToken());
         const out = await validateRecordTransition(
-            ctx, 'wo-1', 'n-target',
+            ctx, 'wo-1', 'n-target', new Map(),
         );
         assert.deepEqual(out, []);
     },
@@ -282,7 +292,6 @@ test(
         await seedAdminSchema(db);
         await seedSystemMember(db);
         const flowGraph = buildFlowGraph(
-            'flow-1',
             [
                 buildNode('n-create', [], {
                     isCreate: true,
@@ -299,6 +308,7 @@ test(
             db, 'wo-1', flowGraph, 'n-create',
         );
         await seedBinding(db, 'flow-1', 'rec-1');
+        await seedFlowLink(db, 'flow-1', 'wo-1');
         await seedAttribute(db, 'a-1', 'rec-1', {
             name: 'Code',
         });
@@ -319,7 +329,6 @@ test(
         await seedAdminSchema(db);
         await seedSystemMember(db);
         const flowGraph = buildFlowGraph(
-            'flow-1',
             [
                 buildNode('n-create', [], {
                     isCreate: true,
@@ -336,6 +345,7 @@ test(
             db, 'wo-1', flowGraph, 'n-create',
         );
         await seedBinding(db, 'flow-1', 'rec-1');
+        await seedFlowLink(db, 'flow-1', 'wo-1');
         await seedAttribute(db, 'a-1', 'rec-1', {
             name: 'Email',
             attribute_type: 'text',
@@ -364,7 +374,6 @@ test(
         await seedAdminSchema(db);
         await seedSystemMember(db);
         const flowGraph = buildFlowGraph(
-            'flow-1',
             [
                 buildNode('n-create', [], {
                     isCreate: true,
@@ -380,6 +389,7 @@ test(
         await assert.rejects(
             () => validateRecordTransition(
                 ctx, 'wo-1', 'n-ghost',
+                new Map(),
             ),
             /target node not found/,
         );

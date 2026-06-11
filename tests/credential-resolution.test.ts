@@ -3,12 +3,16 @@ import { strict as assert } from 'node:assert';
 import {
     resolveCredentialDecision,
 } from '../web-app/app/credential-resolution.ts';
-import { mintAccessToken } from '../api/access-token.ts';
+import {
+    mintAccessToken,
+    TOKEN_AUDIENCE,
+} from '../api/access-token.ts';
 
 // Mint a token whose exp is exactly `exp` (seconds). Only the
 // exp claim matters to the resolver, which is decode-only.
 async function tokenWithExp(exp: number): Promise<string> {
     return mintAccessToken({
+        aud: TOKEN_AUDIENCE,
         sub: 'current', roles: [], name: 'Demo',
         iat: exp - 1000, ttlSeconds: 1000, jti: 'j' + exp,
     });

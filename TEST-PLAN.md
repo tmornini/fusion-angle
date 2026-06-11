@@ -2104,7 +2104,7 @@ restored data.)
   for those rows). NOTE: pristine seeds NO Records —
   `records` and `record_attributes` are empty like every
   other non-essential table. Source of truth:
-  `populateBootstrapData` in `api/mock-data.ts`. IndexedDB
+  `postBootstrap` in `api/mock-data.ts`. IndexedDB
   stores each row as an object — no `gz1` compression, which
   was the localStorage tier — and the `__schema__` marker
   store holds one row. The full table set is the constant

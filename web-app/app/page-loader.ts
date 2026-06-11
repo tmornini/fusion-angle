@@ -1,4 +1,5 @@
 import { log } from './logger.ts';
+import { $ } from './dom.ts';
 import { setHtml } from './safe-html.ts';
 import {
     buildErrorState,
@@ -35,10 +36,7 @@ export function handlePageLoadError(
         err,
     );
     const container =
-        document
-            .querySelector<HTMLElement>(
-                '.page-content',
-            )
+        $('.page-content', document)
         || document.getElementById(
             'page-root',
         );
@@ -55,10 +53,7 @@ export function handlePageLoadError(
                 'Try Again',
             ),
         );
-        container
-            .querySelector(
-                '[data-retry-btn]',
-            )
+        $('[data-retry-btn]', container)
             ?.addEventListener(
                 'click',
                 () => location.reload(),

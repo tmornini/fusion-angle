@@ -20,7 +20,6 @@ import type {
     GraphNode,
     GraphEdge,
     FlowGraph,
-    FlowVersion,
     FlowSaveShape,
 } from '../adapters/flows.ts';
 import type {
@@ -425,15 +424,6 @@ export class FlowDesignerPresenter {
         return sel.nodeIds
             .values().next().value
             ?? null;
-    }
-
-    #selectedNodeIds(): Set<string> {
-        const sel =
-            this.#snapshot.interaction
-                .selection;
-        return sel.kind === 'nodes'
-            ? sel.nodeIds
-            : new Set<string>();
     }
 
     interactionState(): InteractionState {

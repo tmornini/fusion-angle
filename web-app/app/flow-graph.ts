@@ -1,5 +1,5 @@
 import type { SafeHtml } from './safe-html.ts';
-import { trusted, html, escapeForHtml } from './safe-html.ts';
+import { trusted, escapeForHtml } from './safe-html.ts';
 import type {
     GraphNode, GraphEdge,
 } from './adapters/flows.ts';
@@ -105,12 +105,15 @@ const BIDI_SPREAD_MAX = 80;
 const BIDI_LABEL_T = 0.47;
 const BIDI_LABEL_OFFSET = 12;
 
-const CYCLE_DASH = '6 3';
+// Exported: the design-system showcase renders edge
+// labels with the same geometry — one source, no copy
+// to desynchronize.
+export const CYCLE_DASH = '6 3';
 
-const LABEL_CHAR_WIDTH = 7;
-const LABEL_PADDING = 12;
+export const LABEL_CHAR_WIDTH = 7;
+export const LABEL_PADDING = 12;
 const LABEL_MIN_WIDTH = 36;
-const LABEL_HEIGHT = 20;
+export const LABEL_HEIGHT = 20;
 const LABEL_RADIUS = 4;
 const LABEL_BG_OPACITY = 0.9;
 const LABEL_TEXT_OFFSET_Y = 4;
@@ -400,7 +403,7 @@ function truncateLabel(
 ): string {
     return text.length > maxChars
         ? text.slice(0, maxChars - 1)
-            + '\u2026'
+            + '…'
         : text;
 }
 
@@ -448,13 +451,11 @@ function buildNode(
     node: GraphNode,
     edges: readonly GraphEdge[],
     isSelected: boolean,
-    isLocked: boolean,
     portPos: {
         x: number; y: number;
     } | null,
 ): SafeHtml {
     const { positionX, positionY } = node;
-    const halfH = NODE_HEIGHT / 2;
     const halfW = NODE_WIDTH / 2;
 
     let borderColor = BLUE;
@@ -1126,7 +1127,7 @@ export function buildGraphSvg(
         nodeMarkup +=
             buildNode(
                 node, edges, isSelected,
-                isLocked, portPos,
+                portPos,
             ).toString();
     }
 

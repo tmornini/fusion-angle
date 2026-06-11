@@ -1,10 +1,5 @@
 /* Tables: data grids, headers, row hover. */
 
-.table-container {
-  width: 100%;
-  overflow-x: auto;
-}
-
 .table {
   width: 100%;
   border-collapse: collapse;
@@ -28,4 +23,3 @@
 .table tbody tr:hover {
   background-color: hsl(var(--muted) / 0.5);
 }
-

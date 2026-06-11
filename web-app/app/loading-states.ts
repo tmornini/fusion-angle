@@ -1,4 +1,5 @@
 import { iconAlertTriangle } from './icons.ts';
+import { $ } from './dom.ts';
 import {
     extractErrorMessage,
 } from './error-helpers.ts';
@@ -13,8 +14,7 @@ export type SkeletonType =
     | 'card-grid'
     | 'card-list'
     | 'detail'
-    | 'table'
-    | 'stats-row';
+    | 'table';
 
 const SHIMMER_CLASS = 'skeleton-shimmer';
 
@@ -46,23 +46,6 @@ function buildSkeletonListItem(
     </div>
     <div class="${SHIMMER_CLASS}
         skeleton-badge"></div>
-    </div>`;
-}
-
-function buildSkeletonStatsRow(
-): SafeHtml {
-    return html`<div
-    class="grid grid-cols-4 gap-4 mb-6">
-    ${Array(4).fill(trusted(
-        `<div class="skeleton-card p-4">`
-        + `<div class="${SHIMMER_CLASS}`
-        + ` skeleton-text-sm mb-2 w-50">`
-        + `</div>`
-        + `<div class="${SHIMMER_CLASS}`
-        + ` skeleton-heading w-40">`
-        + `</div>`
-        + `</div>`,
-    ))}
     </div>`;
 }
 
@@ -144,8 +127,6 @@ export function buildSkeleton(
             + `</div>`,
         ))}
         </div>`;
-        case 'stats-row':
-            return buildSkeletonStatsRow();
         default:
             return html``;
     }
@@ -170,7 +151,7 @@ export function buildErrorState(
     </div>`;
 }
 
-export function buildEmptyState(
+function buildEmptyState(
     iconHtml: SafeHtml,
     title: string,
     description: string,
@@ -205,51 +186,17 @@ export interface EmptyStateConfig {
     onEmpty?: () => void;
 }
 
-export class TimeoutError extends Error {
-    constructor() {
-        super(
-            'Request timed out.'
-            + ' Please try again.',
-        );
-        this.name = 'TimeoutError';
-    }
-}
-
-async function fetchWithTimeout<T>(
-    fetchFn: () => Promise<T>,
-    timeoutMs: number,
-): Promise<T> {
-    return Promise.race([
-        fetchFn(),
-        new Promise<never>(
-            (_, reject) =>
-                setTimeout(
-                    () => reject(
-                        new TimeoutError(),
-                    ),
-                    timeoutMs,
-                ),
-        ),
-    ]);
-}
-
 export async function withLoadingState<T>(
     container: HTMLElement,
     skeletonHtml: SafeHtml,
     fetchFn: () => Promise<T>,
     retryFn?: () => void,
     emptyState?: EmptyStateConfig,
-    timeoutMs?: number,
 ): Promise<T | null> {
     setHtml(container, skeletonHtml);
-    const run = timeoutMs
-        ? () => fetchWithTimeout(
-            fetchFn, timeoutMs,
-        )
-        : fetchFn;
     let data: T;
     try {
-        data = await run();
+        data = await fetchFn();
     } catch (e) {
         setHtml(
             container,
@@ -265,13 +212,9 @@ export async function withLoadingState<T>(
                 'Try Again',
             ),
         );
-        const retryBtn =
-            container
-                .querySelector<
-                    HTMLElement
-                >(
-                    '[data-retry-btn]',
-                );
+        const retryBtn = $(
+            '[data-retry-btn]', container,
+        );
         if (retryBtn && retryFn) {
             retryBtn.addEventListener(
                 'click',

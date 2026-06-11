@@ -13,7 +13,7 @@ import {
     validateStoredGraphJson,
 } from '../../../api/validators.ts';
 import type { RequestContext } from './shared.ts';
-import { getFlowRows } from './flows.ts';
+import { filterByField } from './shared.ts';
 import { withRenderableLayout } from '../flow-graph-layout.ts';
 
 export type {
@@ -54,22 +54,7 @@ export interface FlowListItem {
     edgeCount: number;
 }
 
-export async function getFlows(
-    ctx: RequestContext,
-): Promise<FlowSummary[]> {
-    const flows = await getFlowRows(ctx);
-    return flows.map(f => {
-        const g = parseGraph(f.graph);
-        return {
-            id: f.id,
-            name: f.name,
-            nodeCount: g.nodes.length,
-            edgeCount: g.edges.length,
-        };
-    });
-}
-
-export async function getProjectFlowRows(
+export async function getProjectFlowEntities(
     ctx: RequestContext,
 ): Promise<ProjectFlowEntity[]> {
     return ctx.GET<ProjectFlowEntity[]>(
@@ -90,7 +75,7 @@ getFlowsWithProjectNames(
         flows, projectFlows, allProjects,
     ] = await Promise.all([
         ctx.GET<FlowEntity[]>('flows'),
-        getProjectFlowRows(ctx),
+        getProjectFlowEntities(ctx),
         ctx.GET<ProjectEntity[]>('projects'),
     ]);
     const projectNameById = new Map(
@@ -143,13 +128,9 @@ export async function getFlowsByProject(
         ]);
 
     const flowIds = new Set(
-        projectFlows
-            .filter(
-                pw =>
-                    pw.project_id
-                        === projectId,
-            )
-            .map(pw => pw.flow_id),
+        filterByField(
+            projectFlows, 'project_id', projectId,
+        ).map(pw => pw.flow_id),
     );
 
     const flowMap = new Map(

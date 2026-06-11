@@ -35,7 +35,7 @@ import type {
     StateEntity,
 } from './types.ts';
 
-export class EntityNotFound {
+export class EntityNotFoundError {
     readonly message: string;
     readonly table: string;
     readonly id: string;
@@ -200,27 +200,27 @@ export interface StateStore {
         id: Id,
         fields: Omit<StateEntity, 'id'>,
     ): Promise<StateEntity>;
-    record(
+    postEvent(
         id: Id,
         entityId: Id,
         state: string,
         memberId: Id,
     ): Promise<void>;
-    currentFor(
+    getCurrentFor(
         entityId: Id,
     ): Promise<StateEntity | null>;
-    allFor(entityId: Id): Promise<StateEntity[]>;
-    deletedIds(): Promise<Set<Id>>;
+    getAllFor(entityId: Id): Promise<StateEntity[]>;
+    getDeletedIds(): Promise<Set<Id>>;
     isDeleted(id: Id): Promise<boolean>;
     // The *In twins read the log within an already-open tx,
     // so a joined reader scans states in the same
     // transaction that reads the entity row.
-    currentForIn(
+    getCurrentForIn(
         tx: Tx,
         entityId: Id,
     ): Promise<StateEntity | null>;
-    allForIn(tx: Tx, entityId: Id): Promise<StateEntity[]>;
-    deletedIdsIn(tx: Tx): Promise<Set<Id>>;
+    getAllForIn(tx: Tx, entityId: Id): Promise<StateEntity[]>;
+    getDeletedIdsIn(tx: Tx): Promise<Set<Id>>;
     isDeletedIn(tx: Tx, id: Id): Promise<boolean>;
 }
 
@@ -280,7 +280,7 @@ export interface StorageBackend {
     // backends by table existence, IndexedDB by a marker
     // store (its object stores always exist post-upgrade).
     hasSchema(): Promise<boolean>;
-    createSchema(): Promise<void>;
+    postSchemaCreation(): Promise<void>;
     deleteSchema(): Promise<void>;
 }
 
@@ -399,9 +399,9 @@ export interface DbAdapter extends DbStores {
     flush(): Promise<void>;
     deleteSchema(): Promise<void>;
     hasSchema(): Promise<boolean>;
-    createSchema(): Promise<void>;
-    exportSnapshot(): Promise<string>;
-    importSnapshot(json: string): Promise<void>;
+    postSchemaCreation(): Promise<void>;
+    getSnapshot(): Promise<string>;
+    putSnapshot(json: string): Promise<void>;
     simulateLatency(): Promise<void>;
     // Run `fn` inside one transaction. The view it receives
     // exposes the same stores bound to the open tx, so every

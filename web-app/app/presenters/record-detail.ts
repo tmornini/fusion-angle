@@ -144,12 +144,12 @@ export class RecordDetailPresenter {
                     class="record-bound-flows">
                 ${this.#view.boundFlows.map(
                     f => html`<li>
-                        <a class="${
+                        <button type="button"
+                        class="${
                             'link record-flow-link'
                         }"
                         data-flow-id="${f.id}"
-                        href="javascript:void(0)"
-                            >${f.name}</a>
+                            >${f.name}</button>
                     </li>`,
                 )}
                 </ul>`}
@@ -168,14 +168,14 @@ export class RecordDetailPresenter {
                     class="record-work-orders">
                 ${this.#view.workOrders.map(
                     w => html`<li>
-                        <a class="${
+                        <button type="button"
+                        class="${
                             'link record-wo-link'
                         }"
                         data-work-order-id="${
                             w.id
                         }"
-                        href="javascript:void(0)"
-                            >#${w.display_id}</a>
+                            >#${w.display_id}</button>
                     </li>`,
                 )}
                 </ul>`}

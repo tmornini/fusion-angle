@@ -7,9 +7,9 @@ import { strict as assert } from 'node:assert';
 const fakeLocation = { href: '' };
 let dataPage: string | null = 'dashboard';
 
-// @ts-expect-error - Node global stub
+// @ts-expect-error — Node global stub
 globalThis.window = { location: fakeLocation };
-// @ts-expect-error - Node global stub
+// @ts-expect-error — Node global stub
 globalThis.document = {
     documentElement: {
         getAttribute(name: string): string | null {

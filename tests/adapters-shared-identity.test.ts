@@ -6,11 +6,13 @@ import {
 } from '../web-app/app/adapters/shared.ts';
 import {
     mintAccessToken,
+    TOKEN_AUDIENCE,
     ANONYMOUS_ID,
 } from '../api/access-token.ts';
 
 async function tokenFor(sub: string): Promise<string> {
     return mintAccessToken({
+        aud: TOKEN_AUDIENCE,
         sub, roles: [], name: 'Demo',
         iat: 1_700_000_000, ttlSeconds: 10_000_000_000,
         jti: 'j-' + sub,

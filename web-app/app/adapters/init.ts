@@ -7,29 +7,32 @@ import {
 import type { DbAdapter } from '../../../api/db.ts';
 import {
     mintAccessToken,
+    TOKEN_AUDIENCE,
     principalFromToken,
     ANONYMOUS_ID,
 } from '../../../api/access-token.ts';
 import {
     generateCryptoSafeBase62,
 } from '../../../api/crypto-safe-base62.ts';
+import {
+    nowEpochSeconds,
+} from '../../../api/types.ts';
 
 let adapter: DbAdapter | undefined;
 
 // The persistence tier: a real IndexedDB transaction per op,
 // O(1) appends, and cross-tab refresh via the posted table
-// names. The connection opens in initialize().
-function defaultAdapter(): DbAdapter {
+// names. The connection opens in initialize(). Production
+// boot passes this; boot-path tests substitute an in-memory
+// tier — IndexedDB has no Node stub, and we add no fake.
+export function defaultAdapter(): DbAdapter {
     return new IndexedDbDbAdapter(postTablesChanged);
 }
 
-// `makeAdapter` is injectable so boot-path tests can
-// substitute an in-memory tier — IndexedDB has no Node stub,
-// and we add no fake. Production passes nothing.
 export async function initAdapter(
-    makeAdapter: () => DbAdapter = defaultAdapter,
+    makeAdapter: () => DbAdapter,
 ): Promise<boolean> {
-    await ensureSessionToken();
+    await postSessionSeed();
     adapter = makeAdapter();
     await adapter.initialize();
     // The composition root probes the datastore directly —
@@ -53,29 +56,26 @@ const SESSION_TTL_SECONDS = 15 * 60;
 
 let sessionToken: string | undefined;
 
-function nowSeconds(): number {
-    return Math.floor(Date.now() / 1000);
-}
-
 async function mintSessionToken(
     sub: string,
     name: string,
 ): Promise<string> {
     return mintAccessToken({
+        aud: TOKEN_AUDIENCE,
         sub,
         roles: [],
         name,
-        iat: nowSeconds(),
+        iat: nowEpochSeconds(),
         ttlSeconds: SESSION_TTL_SECONDS,
         jti: generateCryptoSafeBase62(),
     });
 }
 
-export function setSessionToken(token: string): void {
+export function putSessionToken(token: string): void {
     sessionToken = token;
 }
 
-export function clearSessionToken(): void {
+export function deleteSessionToken(): void {
     sessionToken = undefined;
 }
 
@@ -84,7 +84,7 @@ export function clearSessionToken(): void {
 // cannot mint lazily; the boot path awaits this before any
 // getSessionToken() call. Idempotent: a holder already set
 // (anonymous or an established subject) is left untouched.
-export async function ensureSessionToken(): Promise<void> {
+export async function postSessionSeed(): Promise<void> {
     if (sessionToken === undefined) {
         sessionToken = await mintSessionToken(
             ANONYMOUS_ID, 'Anonymous',
@@ -92,16 +92,16 @@ export async function ensureSessionToken(): Promise<void> {
     }
 }
 
-// Returns the already-minted per-tab token. ensureSessionToken
+// Returns the already-minted per-tab token. postSessionSeed
 // (boot) must have seeded it; the boot gate / login / recovery
-// then REPLACE it via setSessionToken. An unseeded holder is a
+// then REPLACE it via putSessionToken. An unseeded holder is a
 // boot-order bug, not a state to mask — crash with a clear
 // message rather than return a wrong token.
 export function getSessionToken(): string {
     if (sessionToken === undefined) {
         throw new Error(
             'session token uninitialized;'
-            + ' await ensureSessionToken() first',
+            + ' await postSessionSeed() first',
         );
     }
     return sessionToken;

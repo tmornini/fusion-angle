@@ -309,8 +309,8 @@ spine (`identities`, `identity_pii`, `identity_credentials`,
 `authorization_codes`, `role_grants`, …) and the tenancy
 stores (`organizations`, `memberships`); [SCHEMA.md](SCHEMA.md)
 is the authoritative list and per-column reference),
-`api/store-state.ts` (the `StateStore` class — `record`,
-`currentFor`, `allFor`, `deletedIds`, `isDeleted`),
+`api/store-state.ts` (the `StateStore` class — `postEvent`,
+`getCurrentFor`, `getAllFor`, `getDeletedIds`, `isDeleted`),
 `api/store-entity.ts` (`EntityStore` — consults `StateStore`
 for delete filtering), `api/db-indexeddb.ts` (production
 persistence tier), `api/db-localstorage.ts` (demo tier),
@@ -341,16 +341,18 @@ session token. Tests pass `createRequestContext` a
 five HTTP operations — `GET/PUT states/:id`, `GET states`,
 `GET entity-states/:id` (current), and
 `GET entity-states/:id/history` (ordered) — each dispatching
-to a `StateStore` method (`record`, `currentFor`, `allFor`).
+to a `StateStore` method (`postEvent`, `getCurrentFor`,
+`getAllFor`).
 When no schema exists, non-entry pages redirect to snapshots.
 
 ## Storage tiers
 
 `StorageBackend` (`api/db.ts`) is the byte-level seam:
 `transaction(tables, mode, fn)` is the primitive every row op
-crosses, and `ensureTables` / `hasSchema` / `createSchema` /
-`deleteSchema` are schema lifecycle. Stores own semantics
-(tombstones, splices, singletons); backends own persistence
+crosses, and `ensureTables` / `hasSchema` /
+`postSchemaCreation` / `deleteSchema` are schema lifecycle.
+Stores own semantics (tombstones, splices, singletons);
+backends own persistence
 and encoding. `BackedDbAdapter` (`api/db-backed.ts`) composes
 one backend into the full `DbStores` bundle.
 
@@ -472,8 +474,11 @@ layer directly.
   `api/validators.ts` that take a raw value and return a typed
   value or throw. The `is*` type-guards remain for legitimate
   type-narrowing call sites.
-- Adapter functions use **domain nouns** (`getIdea`, not
-  `getIdeaEntity`) — return type already communicates shape.
+- Adapter reads are two-tier, named by what they return:
+  the **domain noun** read returns the domain object
+  (`getIdea` → `Idea`); where a raw stored-shape read also
+  exists it carries the **Entity** suffix (`getIdeaEntity`
+  → `IdeaEntity`). Never table vocabulary (`Row`/`Rows`).
 
 ## Adapter Conventions
 
@@ -501,8 +506,10 @@ layer directly.
   `ctx.GET/PUT/DELETE/POST/commit`. The standalone
   `GET/PUT/...` exports in `api/api.ts` are the transport
   `ctx` delegates to — adapters never import them directly.
-  Multi-table reads share one ctx so every adapter call in a
-  request sees the same snapshot.
+  Each verb dispatches its own request with its own per-op
+  transactions: two awaited reads on one ctx are NOT a
+  snapshot — a write (same tab or cross-tab) can land
+  between them.
 - **Platform-shim vs data-access adapters share `adapters/`.**
   Data-access adapters (`ideas.ts`, `flow-queries.ts`, etc.)
   fetch entity data through `ctx`. Platform shims

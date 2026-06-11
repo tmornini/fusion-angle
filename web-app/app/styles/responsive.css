@@ -1,13 +1,5 @@
 /* Mobile breakpoint overrides; reduced-motion. */
 
-@media (min-width: 640px) {
-  .sm\:grid-cols-2 { grid-template-columns: repeat(2, 1fr); }
-  .sm\:grid-cols-3 { grid-template-columns: repeat(3, 1fr); }
-  .sm\:p-6 { padding: var(--space-6); }
-  .sm\:text-2xl { font-size: var(--text-2xl); }
-  .sm\:text-3xl { font-size: var(--text-3xl); }
-}
-
 @media (min-width: 768px) {
   .md\:grid-cols-2 { grid-template-columns: repeat(2, 1fr); }
   .md\:grid-cols-3 { grid-template-columns: repeat(3, 1fr); }
@@ -21,10 +13,6 @@
   .lg\:grid-cols-4 { grid-template-columns: repeat(4, 1fr); }
 }
 
-@media (min-width: 1280px) {
-  .xl\:grid-cols-4 { grid-template-columns: repeat(4, 1fr); }
-}
-
 /* Mobile visibility utilities */
 .visible-mobile { display: none; }
 @media (max-width: 767px) {
@@ -32,48 +20,10 @@
   .visible-mobile { display: inline !important; }
   .stats-grid { grid-template-columns: repeat(2, 1fr); }
   .score-grid { grid-template-columns: 1fr !important; }
-  .edge-grid { grid-template-columns: 1fr; }
   .convert-grid { grid-template-columns: 1fr !important; }
   .detail-grid { grid-template-columns: 1fr !important; }
   .gauge-grid { grid-template-columns: 1fr; }
   .objective-aggregates-card { width: auto; }
-  .actions-grid { grid-template-columns: repeat(2, 1fr); }
-  .charts-grid { grid-template-columns: 1fr; }
-}
-
-/* Charts grid */
-.charts-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: var(--space-6);
-}
-
-.charts-grid svg {
-  color: hsl(var(--muted-foreground));
-}
-
-/* Donut legend */
-.donut-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2) var(--space-4);
-  justify-content: center;
-  margin-top: var(--space-3);
-}
-
-.donut-legend-item {
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
-  font-size: var(--text-xs);
-  color: hsl(var(--muted-foreground));
-}
-
-.donut-legend-dot {
-  width: 0.5rem;
-  height: 0.5rem;
-  border-radius: var(--radius-full);
-  flex-shrink: 0;
 }
 
 /* Reduced motion */
@@ -85,4 +35,3 @@
     transition-duration: 0.01ms !important;
   }
 }
-

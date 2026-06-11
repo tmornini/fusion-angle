@@ -24,9 +24,7 @@ import {
 import type {
     RequestContext, WriteOp,
 } from './shared.ts';
-import {
-    getCurrentHumanMember,
-} from './members.ts';
+import { filterByField } from './shared.ts';
 import {
     validateFlowForCreation,
     formatFlowProblem,
@@ -113,11 +111,9 @@ export async function postWorkOrderCreation(
         );
     }
 
-    const postStartEdges =
-        graph.edges.filter(
-            e => e.fromNodeId
-                === startNode.id,
-        );
+    const postStartEdges = filterByField(
+        graph.edges, 'fromNodeId', startNode.id,
+    );
     const [postStartEdge] = postStartEdges;
     if (
         postStartEdges.length !== 1
@@ -143,7 +139,6 @@ export async function postWorkOrderCreation(
 
     const flowGraph: WorkOrderFlowGraph =
         {
-            flowId: flow.id,
             name: flow.name,
             lockTimeout: flow.lock_timeout,
             nodes: graph.nodes,

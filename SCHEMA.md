@@ -42,14 +42,18 @@ event.
 
 **State and deletion:** Entity rows themselves never carry
 state columns (`status`, `readiness`, `deleted_at`,
-`deprecated_at`, etc. are all retired). Every entity
+`deprecated_at`, etc. are retired) — with one named
+deviation: `clients.status` is a mutable lifecycle column
+on the client registry row (see § clients). Ledger tables'
+`status` columns are event labels on immutable rows, not
+entity state. Every entity
 lifecycle change is recorded as one row in the unified
 `states` event log. The latest event by `at` (a same-`at`
 tie falls to the larger row id — one total order on every
 backend) is the entity's current state. `'deleted'` is a
 state event value, not a separate table.
 `EntityStore.getAll`/`getById` consult
-`StateStore.deletedIds()` / `isDeleted(id)` to filter
+`StateStore.getDeletedIds()` / `isDeleted(id)` to filter
 currently-deleted rows; `EntityStore.delete(id)` is
 retained for hard splice of relationship rows
 (`state_field_values`, etc.) where lifecycle event log
@@ -61,7 +65,7 @@ removal.
 **The `'system'` member:** `SYSTEM_MEMBER_ID = 'system'`
 in `api/types.ts` is a `members` parent row with
 `type = 'system'` and no detail row, seeded by both
-`populateMockData` and `populateBootstrapData`. Its
+`postMockDataLoad` and `postBootstrap`. Its
 corresponding `identity` row carries `kind = 'service'`
 — the platform itself as a non-person principal. State
 events with no specific user actor reference it. It is a
@@ -294,7 +298,11 @@ zulu moment, validated at the storage gate.
 OAuth client registry (`EntityStore`) — the websites
 built by us and others. Mutable config of record:
 redirect URIs change, JWKS rotate, a client is
-disabled. `grant_types` and `redirect_uris` are
+disabled. `status` (`active` | `disabled`) is the
+schema's one mutable lifecycle column on an entity
+row — a named deviation from the states-ledger
+discipline (§ State and deletion).
+`grant_types` and `redirect_uris` are
 space-delimited (OAuth convention); `jwks` is the
 client's JSON Web Key Set as a JSON string — JWS
 verification of `private_key_jwt` assertions runs for
@@ -553,8 +561,10 @@ on write and filtered on read by the gate.
 
 The `flow_graph` column stores a snapshot of the flow
 definition at work order creation time. Same structure as
-`flows.graph` plus flow-level metadata (`flowId`, `name`,
-`lockTimeout`).
+`flows.graph` plus flow-level metadata (`name`,
+`lockTimeout`). The flow identity lives only in the
+`flow_work_orders` join row; legacy snapshots may still
+carry a `flowId` key, which the validator ignores.
 
 Transitions and claims are NOT separate tables — both
 families of events live in the unified `states` log
@@ -579,9 +589,9 @@ partitions them.
 ### organizations
 
 Tenant-root table — one row per organization. The empty
-bootstrap (`populateBootstrapData`) seeds only the default
+bootstrap (`postBootstrap`) seeds only the default
 org (`id = '1'`, Stark Industries); the demo mock-data
-seed (`populateMockData`)
+seed (`postMockDataLoad`)
 plants TWO orgs — `'1'` Stark Industries and `'2'` Wayne
 Enterprises. Every org-owned entity carries a NOT-NULL
 `organization_id` FK to this table; pure join tables derive

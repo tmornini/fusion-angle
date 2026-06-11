@@ -1,5 +1,6 @@
-import { EntityNotFound, keyed } from './db.ts';
+import { EntityNotFoundError, keyed } from './db.ts';
 import type {
+    DbAdapter,
     EntityStore,
     EntityPut,
     StateStore,
@@ -62,7 +63,7 @@ export class ParentScopedEntityStore<T extends { id: string }>
         const row = await this.#inner.getById(id);
         const owner = await this.#resolveOwningOrg(row);
         if (!isVisible(owner, this.#org)) {
-            throw new EntityNotFound(this.#table, id);
+            throw new EntityNotFoundError(this.#table, id);
         }
         return row;
     }
@@ -134,7 +135,7 @@ export function viaParent<T, P extends OrgScoped>(
             const found = await parent.getById(parentIdOf(row));
             return found.organization_id;
         } catch (e) {
-            if (e instanceof EntityNotFound) return null;
+            if (e instanceof EntityNotFoundError) return null;
             throw e;
         }
     };
@@ -181,6 +182,23 @@ export function viaMembership<T>(
     };
 }
 
+// The org-owned stores the ownership probe walks — ONE list,
+// shared by the states read fence (db-org-scoped) and the
+// entity-states route guard (api.ts), so a new org-owned
+// entity extends the system in exactly one place.
+// `invitations` is included (though global-spine) so an
+// invitation's lifecycle events resolve to the invitation's
+// org and stay out of every other tenant's /states read.
+export function orgOwnedProbes(
+    db: DbAdapter,
+): readonly OrgOwnedProbe[] {
+    return [
+        db.ideas, db.projects, db.flows,
+        db.records, db.objectives, db.workOrders,
+        db.invitations,
+    ];
+}
+
 // Resolve the org that owns the entity behind a
 // `states.entity_id`. The log is unified across kinds, so the
 // id is probed against each org-owned store (UNFENCED, so a
@@ -200,7 +218,7 @@ export async function ownerOrgOfEntity(
             return (await store.getById(entityId))
                 .organization_id;
         } catch (e) {
-            if (!(e instanceof EntityNotFound)) throw e;
+            if (!(e instanceof EntityNotFoundError)) throw e;
         }
     }
     const mine = await memberships.getAllWhere(
@@ -212,12 +230,12 @@ export async function ownerOrgOfEntity(
 }
 
 // The READ fence for the unified states log. StateStore is not
-// an EntityStore (it has record/currentFor/allFor, no
+// an EntityStore (it has postEvent/getCurrentFor/getAllFor, no
 // putMany/delete), so it needs its own decorator. getAll and
 // getById — the row-level read endpoints (routes `states` and
 // `states/:id`) — fence by the same visible/hidden rule;
-// currentFor / allFor delegate and are gated at the
-// entity-states routes; the *In twins and deletedIds are
+// getCurrentFor / getAllFor delegate and are gated at the
+// entity-states routes; the *In twins and getDeletedIds are
 // internal delete-filter mechanics the org fence already covers
 // at the entity layer.
 export class ParentScopedStateStore implements StateStore {
@@ -252,7 +270,7 @@ export class ParentScopedStateStore implements StateStore {
         const row = await this.#inner.getById(id);
         const owner = await this.#resolveOwningOrg(row);
         if (!isVisible(owner, this.#org)) {
-            throw new EntityNotFound(this.#table, id);
+            throw new EntityNotFoundError(this.#table, id);
         }
         return row;
     }
@@ -264,46 +282,46 @@ export class ParentScopedStateStore implements StateStore {
         return this.#inner.put(id, fields);
     }
 
-    record(
+    postEvent(
         id: Id,
         entityId: Id,
         state: string,
         memberId: Id,
     ): Promise<void> {
-        return this.#inner.record(
+        return this.#inner.postEvent(
             id, entityId, state, memberId,
         );
     }
 
-    currentFor(entityId: Id): Promise<StateEntity | null> {
-        return this.#inner.currentFor(entityId);
+    getCurrentFor(entityId: Id): Promise<StateEntity | null> {
+        return this.#inner.getCurrentFor(entityId);
     }
 
-    allFor(entityId: Id): Promise<StateEntity[]> {
-        return this.#inner.allFor(entityId);
+    getAllFor(entityId: Id): Promise<StateEntity[]> {
+        return this.#inner.getAllFor(entityId);
     }
 
-    deletedIds(): Promise<Set<Id>> {
-        return this.#inner.deletedIds();
+    getDeletedIds(): Promise<Set<Id>> {
+        return this.#inner.getDeletedIds();
     }
 
     isDeleted(id: Id): Promise<boolean> {
         return this.#inner.isDeleted(id);
     }
 
-    currentForIn(
+    getCurrentForIn(
         tx: Tx,
         entityId: Id,
     ): Promise<StateEntity | null> {
-        return this.#inner.currentForIn(tx, entityId);
+        return this.#inner.getCurrentForIn(tx, entityId);
     }
 
-    allForIn(tx: Tx, entityId: Id): Promise<StateEntity[]> {
-        return this.#inner.allForIn(tx, entityId);
+    getAllForIn(tx: Tx, entityId: Id): Promise<StateEntity[]> {
+        return this.#inner.getAllForIn(tx, entityId);
     }
 
-    deletedIdsIn(tx: Tx): Promise<Set<Id>> {
-        return this.#inner.deletedIdsIn(tx);
+    getDeletedIdsIn(tx: Tx): Promise<Set<Id>> {
+        return this.#inner.getDeletedIdsIn(tx);
     }
 
     isDeletedIn(tx: Tx, id: Id): Promise<boolean> {

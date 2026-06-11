@@ -19,20 +19,11 @@ export type {
     FlowRecordId,
 } from '../../../api/types.ts';
 
-async function getFlowRecordRows(
+async function getFlowRecordEntities(
     ctx: RequestContext,
 ): Promise<FlowRecordEntity[]> {
     return ctx.GET<FlowRecordEntity[]>(
         'flow-records',
-    );
-}
-
-export async function getFlowRecord(
-    ctx: RequestContext,
-    id: FlowRecordId,
-): Promise<FlowRecordEntity> {
-    return ctx.GET<FlowRecordEntity>(
-        `flow-records/${id}`,
     );
 }
 
@@ -61,9 +52,31 @@ export async function getRecordForFlow(
     ctx: RequestContext,
     flowId: Id,
 ): Promise<RecordId | null> {
-    const rows = await getFlowRecordRows(ctx);
+    const rows = await getFlowRecordEntities(ctx);
     const found = rows.find(
         r => r.flow_id === flowId,
+    );
+    return found ? found.record_id : null;
+}
+
+export async function getRecordForWorkOrder(
+    ctx: RequestContext,
+    workOrderId: Id,
+): Promise<RecordId | null> {
+    const [links, bindings] = await Promise.all([
+        ctx.GET<FlowWorkOrderEntity[]>(
+            'flow-work-orders',
+        ),
+        getFlowRecordEntities(ctx),
+    ]);
+    const link = links.find(
+        l => l.work_order_id === workOrderId,
+    );
+    if (!link) {
+        return null;
+    }
+    const found = bindings.find(
+        b => b.flow_id === link.flow_id,
     );
     return found ? found.record_id : null;
 }
@@ -72,7 +85,7 @@ export async function getFlowsForRecord(
     ctx: RequestContext,
     recordId: RecordId,
 ): Promise<Id[]> {
-    const rows = await getFlowRecordRows(ctx);
+    const rows = await getFlowRecordEntities(ctx);
     return filterByField(rows, 'record_id', recordId)
         .map(r => r.flow_id);
 }
@@ -83,7 +96,7 @@ export async function getWorkOrdersForRecord(
 ): Promise<WorkOrderEntity[]> {
     const [bindings, flowWorkOrders, workOrders]
         = await Promise.all([
-            getFlowRecordRows(ctx),
+            getFlowRecordEntities(ctx),
             ctx.GET<FlowWorkOrderEntity[]>(
                 'flow-work-orders',
             ),

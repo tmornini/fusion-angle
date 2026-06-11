@@ -31,14 +31,9 @@ const SAMPLE_PROJECT_BODY = {
     position: 0,
 };
 
-const SAMPLE_PROJECT = {
-    id: 'p1', ...SAMPLE_PROJECT_BODY,
-};
-
 test('validator: not ready when objectives unscored',
     () => {
         const r = validateProjectForApproval(
-            SAMPLE_PROJECT,
             [{ id: 'o1', position: 0 },
              { id: 'o2', position: 1 }],
             [],
@@ -49,7 +44,6 @@ test('validator: not ready when objectives unscored',
 
 test('validator: ready when all scored', () => {
     const r = validateProjectForApproval(
-        SAMPLE_PROJECT,
         [{ id: 'o1', position: 0 }],
         [{ id: 'b1', projectId: 'p1',
            objectiveId: 'o1', score: 50,
@@ -63,7 +57,6 @@ test('validator: ready when all scored', () => {
 test('archival validator: not ready when actuals missing',
     () => {
         const r = validateProjectForArchival(
-            SAMPLE_PROJECT,
             [{ id: 'b1', projectId: 'p1',
                objectiveId: 'o1', score: 50,
                memberId: 'w1',
@@ -82,7 +75,7 @@ test('postProjectApproval moves state to approved',
         await seedAdminSchema(db);
         await seedCurrentMember(db);
         await db.projects.put('p1', SAMPLE_PROJECT_BODY);
-        await db.states.record(
+        await db.states.postEvent(
             'st-init', 'p1', 'under-review', 'current',
         );
         await db.objectives.put('o1', {
@@ -123,7 +116,7 @@ test('postProjectArchival moves state to archived',
         await seedAdminSchema(db);
         await seedCurrentMember(db);
         await db.projects.put('p1', SAMPLE_PROJECT_BODY);
-        await db.states.record(
+        await db.states.postEvent(
             'st-init', 'p1', 'approved', 'current',
         );
         await db.objectives.put('o1', {

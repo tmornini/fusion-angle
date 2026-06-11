@@ -4,17 +4,17 @@
 // Stub before any import, then load presenter
 // modules with dynamic import() so the stubs are
 // in place. Same pattern as logger.test.ts.
-// @ts-expect-error - Node global stub
+// @ts-expect-error — Node global stub
 globalThis.localStorage = {
     getItem: () => null,
     setItem: () => {},
 };
-// @ts-expect-error - Node global stub
+// @ts-expect-error — Node global stub
 globalThis.window = {
     matchMedia: () => ({ matches: false }),
     addEventListener: () => {},
 };
-// @ts-expect-error - Node global stub
+// @ts-expect-error — Node global stub
 globalThis.document = { addEventListener: () => {} };
 
 import { test } from 'node:test';
@@ -26,8 +26,8 @@ const {
 } = await import('../api/types.ts');
 
 const {
-    getProviderModels,
-} = await import('../api/provider-models.ts');
+    firstProviderModel,
+} = await import('./member-fixtures.ts');
 
 const {
     HumanMemberDetailPresenter,
@@ -134,7 +134,7 @@ function makeAIMember() {
                 'Long context, deep reasoning.',
             skill_focus:
                 'Deep reasoning over long docs.',
-            model: getProviderModels()[0]!.id,
+            model: firstProviderModel().id,
         },
         'active',
     );
@@ -176,7 +176,7 @@ test(
             makeAIMember(),
         ).renderShell(rec.container);
         const out = rec.allHtml();
-        const model = getProviderModels()[0]!;
+        const model = firstProviderModel();
         assert.match(out, new RegExp(model.name));
         assert.match(
             out, new RegExp(model.provider),
@@ -225,7 +225,7 @@ test(
             out,
             new RegExp(
                 'value="'
-                + getProviderModels()[0]!.id
+                + firstProviderModel().id
                 + '"[\\s\\S]*?selected',
             ),
         );

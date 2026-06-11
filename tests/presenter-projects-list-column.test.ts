@@ -3,17 +3,17 @@
 // Stub before any import, then load via dynamic
 // import() so stubs are in place.
 // Same pattern as presenter-projects-org.test.ts.
-// @ts-expect-error - Node global stub
+// @ts-expect-error — Node global stub
 globalThis.localStorage = {
     getItem: () => null,
     setItem: () => {},
 };
-// @ts-expect-error - Node global stub
+// @ts-expect-error — Node global stub
 globalThis.window = {
     matchMedia: () => ({ matches: false }),
     addEventListener: () => {},
 };
-// @ts-expect-error - Node global stub
+// @ts-expect-error — Node global stub
 globalThis.document = {
     addEventListener: () => {},
 };

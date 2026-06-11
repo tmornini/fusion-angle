@@ -1,4 +1,4 @@
-// @ts-expect-error - Node global stub
+// @ts-expect-error — Node global stub
 globalThis.localStorage = (() => {
     const store = new Map<string, string>();
     return {
@@ -21,9 +21,9 @@ globalThis.localStorage = (() => {
 
 // Minimal DOM stubs so redirectToLogin (getPageName reads
 // data-page; navigateTo sets window.location.href) runs in Node.
-// @ts-expect-error - Node global stub
+// @ts-expect-error — Node global stub
 globalThis.window = { location: { href: '', search: '' } };
-// @ts-expect-error - Node global stub
+// @ts-expect-error — Node global stub
 globalThis.document = {
     documentElement: { getAttribute: () => 'dashboard' },
 };
@@ -33,9 +33,9 @@ import { strict as assert } from 'node:assert';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest, UnauthorizedError } from '../api/api.ts';
 import {
-    createRequestContext,
+    createRecoveringRequestContext,
 } from '../web-app/app/adapters/shared.ts';
-import { setSessionToken } from '../web-app/app/adapters/init.ts';
+import { putSessionToken } from '../web-app/app/adapters/init.ts';
 import {
     getSessionCredentials,
     putSessionCredentials,
@@ -88,9 +88,9 @@ async () => {
         accessToken: deadAccess,
         refreshToken: pair.refresh_token,
     });
-    setSessionToken(deadAccess);
-    const ctx = createRequestContext(
-        db, deadAccess, { recover: true });
+    putSessionToken(deadAccess);
+    const ctx = createRecoveringRequestContext(
+        db, deadAccess);
     // the 401 triggers refresh + org re-scope + one retry
     const members = await ctx.GET('members');
     assert.ok(Array.isArray(members));
@@ -106,9 +106,9 @@ async () => {
         accessToken: deadAccess,
         refreshToken: pair.refresh_token,
     });
-    setSessionToken(deadAccess);
-    const ctx = createRequestContext(
-        db, deadAccess, { recover: true });
+    putSessionToken(deadAccess);
+    const ctx = createRecoveringRequestContext(
+        db, deadAccess);
     // both reads 401 in parallel; a second refresh would be
     // branded reuse and revoke the fresh chain
     const [members, orgs] = await Promise.all([
@@ -140,9 +140,9 @@ async () => {
         refreshToken: pair.refresh_token,
     });
     const seed = await devToken(ANONYMOUS_ID);
-    setSessionToken(seed);
-    const ctx = createRequestContext(
-        db, seed, { recover: true });
+    putSessionToken(seed);
+    const ctx = createRecoveringRequestContext(
+        db, seed);
     // recovery re-installs the live token, re-scopes, and retries
     const members = await ctx.GET('members');
     assert.ok(Array.isArray(members));
@@ -161,9 +161,9 @@ async () => {
     putSessionCredentials({
         accessToken: dead, refreshToken: dead,
     });
-    setSessionToken(dead);
-    const ctx = createRequestContext(
-        db, dead, { recover: true });
+    putSessionToken(dead);
+    const ctx = createRecoveringRequestContext(
+        db, dead);
     // the 401 is unrecoverable: the original error propagates
     await assert.rejects(
         () => ctx.GET('members'), UnauthorizedError);

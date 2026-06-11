@@ -53,17 +53,7 @@ export interface AccessTokenClaims {
 
 export const ANONYMOUS_ID: Id = 'anonymous';
 
-// The logged-out principal — a real, named first-class
-// subject, never null. The gate ACCEPTS it on public routes
-// and REJECTS it on protected routes (deny-by-default
-// authentication; role-based authorization is SP-4).
-export const ANONYMOUS_PRINCIPAL: Principal = {
-    id: ANONYMOUS_ID,
-    roles: [],
-    name: 'Anonymous',
-};
-
-const TOKEN_AUDIENCE = 'fusion-ai-web';
+export const TOKEN_AUDIENCE = 'fusion-ai-web';
 const SIGNING_KEY_ID = 'dev-co-located';
 
 // The HMAC secret. CLIENT-SHIPPED CONSTANT — the one thing the
@@ -157,10 +147,9 @@ export interface MintInput {
     readonly iat: number;
     readonly ttlSeconds: number;
     readonly jti: string;
-    // Overrides the audience for tests that must mint a
-    // real-signed wrong-aud token; production omits it and
-    // gets TOKEN_AUDIENCE.
-    readonly aud?: string;
+    // Production passes TOKEN_AUDIENCE; tests that must
+    // mint a real-signed wrong-aud token pass another.
+    readonly aud: string;
     readonly act?: { readonly sub: Id };
     readonly org?: Id;
     readonly orgs?: readonly Id[];
@@ -173,7 +162,7 @@ export async function mintAccessToken(
         sub: input.sub,
         roles: input.roles,
         name: input.name,
-        aud: input.aud ?? TOKEN_AUDIENCE,
+        aud: input.aud,
         iat: input.iat,
         nbf: input.iat,
         exp: input.iat + input.ttlSeconds,

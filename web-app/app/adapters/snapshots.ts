@@ -13,7 +13,7 @@ import {
 const FALLBACK_SNAPSHOT_CAP_BYTES = 5_000_000;
 
 // Headroom for the import operation itself: the
-// importSnapshot path holds the parsed snapshot in
+// putSnapshot path holds the parsed snapshot in
 // memory while writing per-table payloads, briefly
 // doubling peak usage. Half the available quota keeps
 // us off the QuotaExceededError edge.

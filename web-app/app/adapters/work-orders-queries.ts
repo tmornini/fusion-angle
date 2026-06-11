@@ -9,14 +9,6 @@ import {
     validateWorkOrderFlowGraphJson,
 } from '../../../api/validators.ts';
 import type { RequestContext } from './shared.ts';
-import {
-    getTransitionEventsByWorkOrder,
-    getWorkOrderTransitionEvents,
-    getWorkOrderActiveClaim,
-    getActiveClaimsByWorkOrder,
-    getWorkOrderCurrentNodeId,
-    type TransitionEvent,
-} from './state-events.ts';
 
 export type {
     WorkOrderEntity,
@@ -104,7 +96,7 @@ export async function getStateFieldValuesByEvent(
 
 /* ── Reads ───────────────── */
 
-export async function getWorkOrderRows(
+export async function getWorkOrderEntities(
     ctx: RequestContext,
 ): Promise<WorkOrderEntity[]> {
     return ctx.GET<WorkOrderEntity[]>(
@@ -112,7 +104,7 @@ export async function getWorkOrderRows(
     );
 }
 
-export async function getFlowWorkOrderRows(
+export async function getFlowWorkOrderEntities(
     ctx: RequestContext,
 ): Promise<FlowWorkOrderEntity[]> {
     return ctx.GET<
@@ -127,22 +119,4 @@ export async function getWorkOrder(
     return ctx.GET<WorkOrderEntity>(
         `work-orders/${id}`,
     );
-}
-
-// Resolves every work order's transition history into
-// the shape the workbox inbox aggregation consumes —
-// the union of every per-entity event projection.
-export async function getAllTransitionEvents(
-    ctx: RequestContext,
-): Promise<TransitionEvent[]> {
-    const byWo = await getTransitionEventsByWorkOrder(
-        ctx,
-    );
-    const out: TransitionEvent[] = [];
-    for (const events of byWo.values()) {
-        for (const ev of events) {
-            out.push(ev);
-        }
-    }
-    return out;
 }

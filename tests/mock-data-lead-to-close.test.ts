@@ -4,7 +4,7 @@ import {
     MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import {
-    populateMockData,
+    postMockDataLoad,
 } from '../api/mock-data.ts';
 import {
     createRequestContext,
@@ -27,7 +27,7 @@ const COLD_WORKING_NODE_HEAT_MAX = 0.25;
 async function seededLeadToClose() {
     const db = new MemoryDbAdapter();
     await seedAdminSchema(db);
-    await populateMockData(db);
+    await postMockDataLoad(db);
     const flows = await db.flows.getAll();
     const flow = flows.find(
         f => f.name === FLOW_NAME,

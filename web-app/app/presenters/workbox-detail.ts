@@ -581,7 +581,7 @@ function buildHistory(
         }
         return {
             fromNodeName:
-                t.from_node_id === ''
+                t.kind === 'creation'
                     ? 'Created'
                     : nodeNameById(
                         nodes,

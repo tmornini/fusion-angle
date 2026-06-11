@@ -37,7 +37,7 @@ test(
         const after =
             await db.aiMembers.getById('ai1');
         assert.deepEqual(after, before);
-        const events = await db.states.allFor('ai1');
+        const events = await db.states.getAllFor('ai1');
         assert.equal(events.length, 2);
         assert.equal(
             events.at(-1)?.state, 'archived',

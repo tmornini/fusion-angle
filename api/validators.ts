@@ -477,10 +477,6 @@ validateWorkOrderFlowGraphJson(
         label + '.edges',
     );
     return {
-        flowId: asString(
-            obj['flowId'],
-            label + '.flowId',
-        ),
         name: asString(
             obj['name'], label + '.name',
         ),
@@ -1861,4 +1857,3 @@ export function validateRecordMultiPutBody(
         + " 'create' or 'edit', got " + kind,
     );
 }
-

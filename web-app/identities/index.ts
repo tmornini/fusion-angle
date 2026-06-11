@@ -1,5 +1,5 @@
 import {
-    $, $input, $required, $textarea,
+    $, $$, $input, $required, $textarea,
     populateIcons,
 } from '../app/dom.ts';
 import { showToast } from '../app/toast.ts';
@@ -95,8 +95,8 @@ function bindAddIdentityDialog(): void {
         'add-identity-btn',
         handleAddIdentitySubmit,
     );
-    document.querySelectorAll<HTMLInputElement>(
-        '#add-identity-kind-toggle input',
+    $$(
+        '#add-identity-kind-toggle input', document,
     ).forEach(input => {
         input.addEventListener(
             'change', onKindRadioChange,
@@ -139,10 +139,11 @@ function onDialogKeydown(e: KeyboardEvent): void {
 }
 
 function selectedKind(): 'person' | 'service' {
-    const checked = document.querySelector<
-        HTMLInputElement
-    >('#add-identity-kind-toggle'
-        + ' input[name="identity-kind"]:checked');
+    const checked = $input(
+        '#add-identity-kind-toggle'
+        + ' input[name="identity-kind"]:checked',
+        document,
+    );
     if (checked && checked.value === 'service') {
         return 'service';
     }

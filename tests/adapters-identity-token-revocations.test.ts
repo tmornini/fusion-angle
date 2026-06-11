@@ -11,7 +11,6 @@ import { devToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import {
     postIdentityLogoutEverywhere,
-    getRevokedBefore,
 } from
     '../web-app/app/adapters/identity-token-revocations.ts';
 
@@ -48,22 +47,20 @@ async function setup() {
     return { db, ctx: createRequestContext(db, await devToken()) };
 }
 
-test('logout-everywhere appends; reduce is latest-wins',
+test('logout-everywhere appends, never splices',
 async () => {
     // Revoke a subject OTHER than the writer's ('current',
     // via devToken) so the second append's own Bearer is not
     // self-revoked by the first — the gate correctly revokes
     // the actor's stale token when it logs ITSELF out
-    // everywhere; this test exercises append + latest-wins,
-    // not that self-revocation.
+    // everywhere. The latest-wins reduce is pinned at the
+    // token-verify layer (access-token tests).
     const { db, ctx } = await setup();
     await postIdentityLogoutEverywhere(ctx, 'target');
     await postIdentityLogoutEverywhere(ctx, 'target');
     const rows =
         await db.identityTokenRevocations.getAll();
     assert.equal(rows.length, 2);            // retained
-    const stamp = await getRevokedBefore(ctx, 'target');
-    assert.equal(typeof stamp, 'string');
-    assert.equal(
-        await getRevokedBefore(ctx, 'other'), null);
+    assert.ok(rows.every(
+        r => r.identity_id === 'target'));
 });

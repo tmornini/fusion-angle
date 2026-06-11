@@ -5,10 +5,10 @@ import {
 } from '../api/db-memory.ts';
 import {
     createRequestContext,
-    type RequestContext,
 } from '../web-app/app/adapters/shared.ts';
-import { devToken, orgToken } from './token-fixtures.ts';
-import { populateMockData } from '../api/mock-data.ts';
+import { orgToken } from './token-fixtures.ts';
+import { adminContext } from './context-fixtures.ts';
+import { postMockDataLoad } from '../api/mock-data.ts';
 import {
     getIdeas,
     getIdea,
@@ -25,9 +25,6 @@ import {
 import {
     seedHumanMember,
 } from './member-fixtures.ts';
-import {
-    seedAdminSchema,
-} from './test-fixtures.ts';
 
 function buildIdea(
     id: string, title: string,
@@ -49,7 +46,7 @@ async function seedIdeaState(
     ideaId: string,
     state: string,
 ): Promise<void> {
-    await db.states.record(
+    await db.states.postEvent(
         `st-${ideaId}`,
         ideaId,
         state,
@@ -57,18 +54,8 @@ async function seedIdeaState(
     );
 }
 
-async function setupDb(): Promise<{
-    db: MemoryDbAdapter;
-    ctx: RequestContext;
-}> {
-    const db = new MemoryDbAdapter();
-    await seedAdminSchema(db);
-    const ctx = createRequestContext(db, await devToken());
-    return { db, ctx };
-}
-
 test('getIdeas returns ideas with submitter', async () => {
-    const { db, ctx } = await setupDb();
+    const { db, ctx } = await adminContext();
     await seedHumanMember(db, 'u1', 'Alice Test');
     await db.ideas.put('i1', buildIdea(
         'i1', 'First idea',
@@ -96,7 +83,7 @@ test('getIdeas returns ideas with submitter', async () => {
 });
 
 test('getIdeas throws when idea has no submission', async () => {
-    const { db, ctx } = await setupDb();
+    const { db, ctx } = await adminContext();
     await seedHumanMember(db, 'u1', 'Alice Test');
     await db.ideas.put('i1', buildIdea(
         'i1', 'Orphan',
@@ -110,7 +97,7 @@ test('getIdeas throws when idea has no submission', async () => {
 });
 
 test('getIdea finds submission for one idea', async () => {
-    const { db, ctx } = await setupDb();
+    const { db, ctx } = await adminContext();
     await seedHumanMember(db, 'u1', 'Alice Test');
     await db.ideas.put('i1', buildIdea(
         'i1', 'A',
@@ -129,7 +116,7 @@ test('getIdea finds submission for one idea', async () => {
 });
 
 test('getIdea throws on missing submission', async () => {
-    const { db, ctx } = await setupDb();
+    const { db, ctx } = await adminContext();
     await seedHumanMember(db, 'u1', 'Alice Test');
     await db.ideas.put(
         'i1', buildIdea('i1', 'A'),
@@ -142,7 +129,7 @@ test('getIdea throws on missing submission', async () => {
 });
 
 test('putIdea persists changes', async () => {
-    const { db, ctx } = await setupDb();
+    const { db, ctx } = await adminContext();
     await db.ideas.put(
         'i1', buildIdea('i1', 'Original'),
     );
@@ -155,7 +142,7 @@ test('putIdea persists changes', async () => {
 });
 
 test('archived ideas are filtered from getIdeas', async () => {
-    const { db, ctx } = await setupDb();
+    const { db, ctx } = await adminContext();
     await seedHumanMember(db, 'u1', 'Alice Test');
     await db.ideas.put(
         'i1', buildIdea('i1', 'Keep'),
@@ -186,7 +173,7 @@ test(
     'postIdeaCreation persists the row and'
     + ' records the initial state event',
     async () => {
-        const { db, ctx } = await setupDb();
+        const { db, ctx } = await adminContext();
         await seedHumanMember(
             db, 'current', 'Demo User',
         );
@@ -202,7 +189,7 @@ test(
             await db.ideas.getById('i1');
         assert.equal(row.title, 'Fresh');
         const events =
-            await db.states.allFor('i1');
+            await db.states.getAllFor('i1');
         assert.equal(events.length, 1);
         assert.equal(
             events[0]?.state,
@@ -215,7 +202,7 @@ test(
     'postIdeaStateChange records a state event'
     + ' without touching the idea row',
     async () => {
-        const { db, ctx } = await setupDb();
+        const { db, ctx } = await adminContext();
         await seedHumanMember(
             db, 'current', 'Demo User',
         );
@@ -234,7 +221,7 @@ test(
             await db.ideas.getById('i1');
         assert.deepEqual(after, before);
         const events =
-            await db.states.allFor('i1');
+            await db.states.getAllFor('i1');
         assert.equal(events.length, 2);
         assert.equal(
             events.at(-1)?.state, 'approved',
@@ -247,7 +234,7 @@ test(
     + ' two state events, and N baseline rows in'
     + ' one atomic batch',
     async () => {
-        const { db, ctx } = await setupDb();
+        const { db, ctx } = await adminContext();
         await seedHumanMember(
             db, 'current', 'Demo User',
         );
@@ -290,13 +277,13 @@ test(
         assert.equal(project.title, 'P1');
 
         const ideaEvents =
-            await db.states.allFor('i1');
+            await db.states.getAllFor('i1');
         assert.equal(
             ideaEvents.at(-1)?.state, 'promoted',
         );
 
         const projectEvents =
-            await db.states.allFor('p1');
+            await db.states.getAllFor('p1');
         assert.equal(projectEvents.length, 1);
         assert.equal(
             projectEvents[0]?.state, 'submitted',
@@ -327,7 +314,7 @@ test(
     'postIdeaConversion rejects a conversion'
     + ' missing a score for an active objective',
     async () => {
-        const { db, ctx } = await setupDb();
+        const { db, ctx } = await adminContext();
         await seedHumanMember(
             db, 'current', 'Demo User',
         );
@@ -366,7 +353,7 @@ test(
 );
 
 test('deleted ideas are filtered from getIdeas', async () => {
-    const { db, ctx } = await setupDb();
+    const { db, ctx } = await adminContext();
     await seedHumanMember(db, 'u1', 'Alice Test');
     await db.ideas.put(
         'i1', buildIdea('i1', 'Keep'),
@@ -401,8 +388,8 @@ test('deleted ideas are filtered from getIdeas', async () => {
 test('getIdeas resolves every seeded submitter in'
     + ' both orgs', async () => {
     const db = new MemoryDbAdapter();
-    await db.createSchema();
-    await populateMockData(db);
+    await db.postSchemaCreation();
+    await postMockDataLoad(db);
     for (const org of ['1', '2']) {
         const ctx = createRequestContext(
             db, await orgToken('current', org));

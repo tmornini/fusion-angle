@@ -21,7 +21,7 @@ async function statesStore(): Promise<{
 }
 
 test(
-    'deletedIdsIn reads the same tx uncommitted buffer',
+    'getDeletedIdsIn reads the same tx uncommitted buffer',
     async () => {
         const { backend, states } = await statesStore();
         const seen = await backend.transaction(
@@ -34,7 +34,7 @@ test(
                     member_id: 'm1',
                     at: '2026-01-01T00:00:00.000000Z',
                 });
-                return states.deletedIdsIn(tx);
+                return states.getDeletedIdsIn(tx);
             },
         );
         assert.ok(seen.has('e1'));
@@ -70,7 +70,7 @@ test(
 );
 
 test(
-    'currentForIn returns the latest event for an entity',
+    'getCurrentForIn returns the latest event for an entity',
     async () => {
         const { backend, states } = await statesStore();
         await states.put('s1', {
@@ -87,7 +87,7 @@ test(
         });
         const current = await backend.transaction(
             ['states'], 'readonly',
-            tx => states.currentForIn(tx, 'e1'),
+            tx => states.getCurrentForIn(tx, 'e1'),
         );
         assert.ok(current !== null);
         assert.equal(current.state, 'b');
@@ -95,7 +95,7 @@ test(
 );
 
 test(
-    'allForIn returns one entity sorted ascending by at',
+    'getAllForIn returns one entity sorted ascending by at',
     async () => {
         const { backend, states } = await statesStore();
         await states.put('s1', {
@@ -118,7 +118,7 @@ test(
         });
         const events = await backend.transaction(
             ['states'], 'readonly',
-            tx => states.allForIn(tx, 'e1'),
+            tx => states.getAllForIn(tx, 'e1'),
         );
         assert.deepEqual(
             events.map(e => e.state), ['a', 'b'],
@@ -128,12 +128,12 @@ test(
 
 // Tiebreak agreement. Every reader resolves a same-`at` tie
 // by the SAME (at, id) total order — larger id wins — so
-// list filtering (deletedIdsIn), lifecycle checks
-// (isDeletedIn), and currentForIn can never contradict each
+// list filtering (getDeletedIdsIn), lifecycle checks
+// (isDeletedIn), and getCurrentForIn can never contradict each
 // other on any backend or row permutation.
 
 test(
-    'currentForIn keeps the larger-id row on an at tie',
+    'getCurrentForIn keeps the larger-id row on an at tie',
     async () => {
         const { backend, states } = await statesStore();
         await states.put('s1', {
@@ -150,14 +150,14 @@ test(
         });
         const current = await backend.transaction(
             ['states'], 'readonly',
-            tx => states.currentForIn(tx, 'e1'),
+            tx => states.getCurrentForIn(tx, 'e1'),
         );
         assert.equal(current!.state, 'b');
     },
 );
 
 test(
-    'currentForIn isolates its entity from co-at others',
+    'getCurrentForIn isolates its entity from co-at others',
     async () => {
         const { backend, states } = await statesStore();
         await states.put('s1', {
@@ -180,14 +180,14 @@ test(
         });
         const current = await backend.transaction(
             ['states'], 'readonly',
-            tx => states.currentForIn(tx, 'e1'),
+            tx => states.getCurrentForIn(tx, 'e1'),
         );
         assert.equal(current!.state, 'b');
     },
 );
 
 test(
-    'currentForIn and isDeletedIn agree on a co-at pair',
+    'getCurrentForIn and isDeletedIn agree on a co-at pair',
     async () => {
         const { backend, states } = await statesStore();
         await states.put('s1', {
@@ -206,7 +206,7 @@ test(
             await backend.transaction(
                 ['states'], 'readonly',
                 async (tx) => [
-                    await states.currentForIn(tx, 'e1'),
+                    await states.getCurrentForIn(tx, 'e1'),
                     await states.isDeletedIn(tx, 'e1'),
                 ] as const,
             );
@@ -217,7 +217,7 @@ test(
 );
 
 test(
-    'currentForIn returns null for an unknown entity',
+    'getCurrentForIn returns null for an unknown entity',
     async () => {
         const { backend, states } = await statesStore();
         await states.put('s1', {
@@ -228,7 +228,7 @@ test(
         });
         const current = await backend.transaction(
             ['states'], 'readonly',
-            tx => states.currentForIn(tx, 'ghost'),
+            tx => states.getCurrentForIn(tx, 'ghost'),
         );
         assert.equal(current, null);
     },

@@ -25,10 +25,10 @@ function getTimeOfDay(): string {
 
 // An instant (a moment that happened) renders to LOCAL time —
 // the viewer sees it in their own zone (Office of Time).
+// Timestamps are gate-validated; a corrupt one renders as the
+// platform's visible 'Invalid Date', never as the absence dash.
 function formatDate(iso: string): string {
-    const parsedDate = new Date(iso);
-    if (isNaN(parsedDate.getTime())) return DISPLAY_ABSENT;
-    return parsedDate.toLocaleDateString('en-US', {
+    return new Date(iso).toLocaleDateString('en-US', {
         month: 'short',
         day: 'numeric',
         year: 'numeric',
@@ -41,9 +41,7 @@ function formatDate(iso: string): string {
 // from UTC; the edit-input slice (toDateInputValue) is UTC too,
 // so display and editor agree.
 function formatCalendarDate(iso: string): string {
-    const parsedDate = new Date(iso);
-    if (isNaN(parsedDate.getTime())) return DISPLAY_ABSENT;
-    return parsedDate.toLocaleDateString('en-US', {
+    return new Date(iso).toLocaleDateString('en-US', {
         month: 'short',
         day: 'numeric',
         year: 'numeric',
@@ -54,9 +52,7 @@ function formatCalendarDate(iso: string): string {
 function formatDateTime(
     iso: string,
 ): string {
-    const parsedDate = new Date(iso);
-    if (isNaN(parsedDate.getTime())) return DISPLAY_ABSENT;
-    return parsedDate.toLocaleString('en-US', {
+    return new Date(iso).toLocaleString('en-US', {
         month: 'short',
         day: 'numeric',
         year: 'numeric',
@@ -68,7 +64,6 @@ function formatDateTime(
 function toDateInputValue(
     iso: string,
 ): string {
-    if (!iso) return '';
     return iso.slice(0, 10);
 }
 

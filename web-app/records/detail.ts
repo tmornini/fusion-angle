@@ -1,4 +1,4 @@
-import { $required } from '../app/dom.ts';
+import { $, $required } from '../app/dom.ts';
 import { createPageAbort } from '../app/page-lifecycle.ts';
 import { setHtml } from '../app/safe-html.ts';
 import { showToast } from '../app/toast.ts';
@@ -172,7 +172,7 @@ function bindActions(root: HTMLElement): void {
     );
     root.addEventListener(
         'input',
-        e => onInput(root, e),
+        e => onInput(e),
         { signal },
     );
     root.addEventListener(
@@ -199,8 +199,8 @@ function onKeydown(
     commitPendingAttribute();
     render(root);
     bindActions(root);
-    const next = root.querySelector(
-        '#record-pending-attribute-name',
+    const next = $(
+        '#record-pending-attribute-name', root,
     );
     if (next instanceof HTMLInputElement) {
         next.focus();
@@ -373,9 +373,7 @@ function onChange(
     }
 }
 
-function onInput(
-    root: HTMLElement, e: Event,
-): void {
+function onInput(e: Event): void {
     if (pageState.kind !== 'editing') return;
     const target = e.target;
     if (

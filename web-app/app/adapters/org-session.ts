@@ -12,7 +12,7 @@ export const ACTIVE_ORG_KEY = 'fusion.active-org';
 // here as a thrown error. Returns the org-scoped access token;
 // the caller installs it as the per-tab session, kept free of
 // that global side effect so it stays testable (mirrors
-// loginViaPassword).
+// postPasswordLogin).
 export async function postOrgSessionExchange(
     ctx: RequestContext,
     subjectToken: string,

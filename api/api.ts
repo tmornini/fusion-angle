@@ -1,10 +1,9 @@
 import type {
     DbAdapter,
     EntityStore,
-    EntityValidator,
 } from './db.ts';
 import {
-    EntityNotFound,
+    EntityNotFoundError,
     LedgerImmutabilityError,
     MissingTableError,
     TABLE_NAMES,
@@ -44,6 +43,7 @@ import type {
 } from './types.ts';
 import {
     nowUtc,
+    nowEpochSeconds,
     assertInvitationState,
     ValidationError,
     type Id,
@@ -53,7 +53,6 @@ import {
     generateCryptoSafeBase62,
 } from './crypto-safe-base62.ts';
 import {
-    validateOrganizationEntity,
     validateRecordMultiPutBody,
     validateStateEntity,
     validateWorkOrderFlowGraphJson,
@@ -77,6 +76,7 @@ import {
 import { orgScopedAdapter } from './db-org-scoped.ts';
 import {
     ownerOrgOfEntity,
+    orgOwnedProbes,
 } from './store-parent-scoped.ts';
 import {
     currentRolesForInOrg,
@@ -260,23 +260,24 @@ function withoutSecret(
 // The `/noun/:id` resource over a standard EntityStore. The
 // verbs a resource exposes are data; each maps to its one fixed
 // store op (get→getById, put→put∘withoutId, delete→delete). The
-// optional putValidate / getTransform are wired ONCE here at
-// instantiation — Dependency Inversion, not a per-request branch
-// — so the returned Route's handlers are fixed closures reused
-// for the life of the process. The states log keeps its own
-// explicit routes (StateStore, append-only, custom readers).
+// optional getTransform is wired ONCE here at instantiation —
+// Dependency Inversion, not a per-request branch — so the
+// returned Route's handlers are fixed closures reused for the
+// life of the process. Validation runs in the store, which is
+// constructed with its entity validator — the route trusts it.
+// The states log keeps its own explicit routes (StateStore,
+// append-only, custom readers).
 interface IdRouteConfig<T extends { id: string }> {
     noun: string;
     store: (db: DbAdapter) => EntityStore<T>;
     verbs: ReadonlyArray<'get' | 'put' | 'delete'>;
-    putValidate?: EntityValidator<T>;
     getTransform?: (row: T) => unknown;
 }
 
 function makeIdRoute<T extends { id: string }>(
     config: IdRouteConfig<T>,
 ): Route {
-    const { store, putValidate, getTransform } = config;
+    const { store, getTransform } = config;
     const handlers: {
         get?: GetHandler;
         put?: PutHandler;
@@ -294,9 +295,7 @@ function makeIdRoute<T extends { id: string }>(
         handlers.put = (db, p, body) =>
             store(db).put(
                 param(p, 0),
-                putValidate === undefined
-                    ? withoutId(body) as unknown as Omit<T, 'id'>
-                    : putValidate(withoutId(body)),
+                withoutId(body) as unknown as Omit<T, 'id'>,
             );
     }
     if (config.verbs.includes('delete')) {
@@ -336,7 +335,7 @@ async function applyRecordMultiPut(
             if (body.kind === 'create') {
                 const member =
                     await view.members.getById('current');
-                await view.states.record(
+                await view.states.postEvent(
                     body.initialStateEventId,
                     body.id,
                     body.initialState,
@@ -827,7 +826,7 @@ const routes: Route[] = [
                     const member = await view.members
                         .getById('current');
                     const events = await view.states
-                        .allFor(workOrderId);
+                        .getAllFor(workOrderId);
                     const prior = latestClaimEvent(
                         events, workOrderId,
                     );
@@ -852,14 +851,14 @@ const routes: Route[] = [
                         prior !== null
                         && prior.state === 'claimed'
                     ) {
-                        await view.states.record(
+                        await view.states.postEvent(
                             generateCryptoSafeBase62(),
                             workOrderId,
                             'claim_expired',
                             prior.member_id,
                         );
                     }
-                    await view.states.record(
+                    await view.states.postEvent(
                         generateCryptoSafeBase62(),
                         workOrderId,
                         'claimed',
@@ -967,7 +966,6 @@ const routes: Route[] = [
         noun: 'organizations',
         store: db => db.organizations,
         verbs: ['get', 'put'],
-        putValidate: validateOrganizationEntity,
     }),
     route('memberships', {
         get: (db) => db.memberships.getAll(),
@@ -1053,20 +1051,20 @@ const routes: Route[] = [
     }),
     route('entity-states/:id', {
         get: (db, p) =>
-            db.states.currentFor(param(p, 0)),
+            db.states.getCurrentFor(param(p, 0)),
     }),
     route('entity-states/:id/history', {
         get: (db, p) =>
-            db.states.allFor(param(p, 0)),
+            db.states.getAllFor(param(p, 0)),
     }),
 
     route('snapshots/schema', {
         get: async (db) =>
             (await db.hasSchema())
-                ? db.exportSnapshot()
+                ? db.getSnapshot()
                 : null,
         delete: (db) => db.deleteSchema(),
-        post: (db) => db.createSchema(),
+        post: (db) => db.postSchemaCreation(),
     }),
     // DEMO-ONLY: these seed routes return SeededCredentials —
     // freshly-minted plaintext sign-ins surfaced in-band, once.
@@ -1074,17 +1072,17 @@ const routes: Route[] = [
     // return is deleted at the server tier.
     route('snapshots/mock-data', {
         post: async (db) => {
-            const { populateMockData } =
+            const { postMockDataLoad } =
                 await import('./mock-data.ts');
-            return populateMockData(db);
+            return postMockDataLoad(db);
         },
     }),
     route('snapshots/bootstrap', {
         post: async (db) => {
             const {
-                populateBootstrapData,
+                postBootstrap,
             } = await import('./mock-data.ts');
-            return populateBootstrapData(db);
+            return postBootstrap(db);
         },
     }),
     route('snapshots/import', {
@@ -1100,7 +1098,7 @@ const routes: Route[] = [
                     HTTP_BAD_REQUEST,
                 );
             }
-            return db.importSnapshot(
+            return db.putSnapshot(
                 payload.json,
             );
         },
@@ -1167,7 +1165,7 @@ async function authenticateRequest(
         return 'missing bearer token';
     }
     const token = header.slice('Bearer '.length);
-    const now = Math.floor(Date.now() / 1000);
+    const now = nowEpochSeconds();
     const result = await verifyAccessToken(token, now);
     if (!result.valid) {
         return result.reason;
@@ -1385,9 +1383,13 @@ async function identityDefaultOrgRequest(
             );
         }
         const body = parse.body;
-        const org = typeof body.organization_id === 'string'
-            ? body.organization_id
-            : '';
+        const org = body.organization_id;
+        if (typeof org !== 'string') {
+            return Response.json(
+                { error: 'organization_id is required' },
+                { status: HTTP_BAD_REQUEST },
+            );
+        }
         const memberOrgs =
             await subjectOrgs(adapter, identityId);
         if (!memberOrgs.includes(org)) {
@@ -1450,14 +1452,14 @@ async function callerIsOrgAdmin(
 }
 
 // An invitation's current state: the latest event on its id —
-// states.currentFor, the same (at, id) derivation every
+// states.getCurrentFor, the same (at, id) derivation every
 // entity's lifecycle uses. Null when no event has been
 // recorded.
 async function currentInvitationState(
     adapter: DbAdapter,
     id: Id,
 ): Promise<InvitationState | null> {
-    const latest = await adapter.states.currentFor(id);
+    const latest = await adapter.states.getCurrentFor(id);
     return latest === null
         ? null
         : assertInvitationState(latest.state, 'invitation ' + id);
@@ -1544,35 +1546,47 @@ async function invitationsForInvitee(
 ): Promise<Response> {
     const mine = (await adapter.invitations.getAll())
         .filter(inv => inv.identity_id === principal.id);
+    if (mine.length === 0) return Response.json([]);
     const orgName = new Map(
         (await adapter.organizations.getAll())
             .map(o => [o.id, o.name]));
     const personName = new Map(
         (await adapter.identityPii.getAll())
             .map(p => [p.id, p.name]));
+    // One states read serves every row — a per-invitation
+    // getAllFor opened one transaction per invitation for the
+    // same log.
+    const events = await adapter.states.getAll();
+    const latest = latestByKey(events, ev => ev.entity_id);
+    const eventsFor = Map.groupBy(events, ev => ev.entity_id);
     const out = [];
     for (const inv of mine) {
-        const events = await adapter.states.allFor(inv.id);
-        const latest = latestByKey(events, ev => ev.entity_id)
-            .get(inv.id);
-        if (latest === undefined) continue;
+        const current = latest.get(inv.id);
+        if (current === undefined) continue;
         // The inviter is the actor of the grant ('pending') event —
         // found by state, not position, so a same-`at` tie cannot
-        // misattribute it. An absent name (erased PII) stays empty;
-        // the presenter then omits the "Invited by" line.
-        const grant = events.find(ev => ev.state === 'pending');
+        // misattribute it. An absent related row (erased PII,
+        // vanished org) omits its key — absence on the wire is
+        // the absent key, never a '' sentinel.
+        const grant = eventsFor.get(inv.id)!
+            .find(ev => ev.state === 'pending');
+        const name = orgName.get(inv.organization_id);
+        const inviter = grant === undefined
+            ? undefined
+            : personName.get(grant.member_id);
         out.push({
             id: inv.id,
             organization_id: inv.organization_id,
-            organization_name:
-                orgName.get(inv.organization_id) ?? '',
+            ...(name !== undefined
+                ? { organization_name: name }
+                : {}),
             identity_id: inv.identity_id,
-            invited_by_name: grant
-                ? personName.get(grant.member_id) ?? ''
-                : '',
+            ...(inviter !== undefined
+                ? { invited_by_name: inviter }
+                : {}),
             at: inv.at,
             state: assertInvitationState(
-                latest.state, 'invitation ' + inv.id),
+                current.state, 'invitation ' + inv.id),
         });
     }
     return Response.json(out);
@@ -1598,19 +1612,31 @@ async function sentInvitations(
     }
     const orgInvites = (await adapter.invitations.getAll())
         .filter(inv => inv.organization_id === org);
+    if (orgInvites.length === 0) return Response.json([]);
     const email = new Map(
         (await adapter.identityPii.getAll())
             .map(p => [p.id, p.email]));
+    // One states read serves every row — getCurrentFor per
+    // invitation opened one transaction each for the same log.
+    const latest = latestByKey(
+        await adapter.states.getAll(), ev => ev.entity_id);
     const out = [];
     for (const inv of orgInvites) {
-        const state = await currentInvitationState(
-            adapter, inv.id);
+        const current = latest.get(inv.id);
+        if (current === undefined) continue;
+        const state = assertInvitationState(
+            current.state, 'invitation ' + inv.id);
         if (state !== 'pending') continue;
+        // Erased invitee PII omits the key — absence on the
+        // wire is the absent key, never a '' sentinel.
+        const inviteeEmail = email.get(inv.identity_id);
         out.push({
             id: inv.id,
             organization_id: org,
             identity_id: inv.identity_id,
-            invitee_email: email.get(inv.identity_id) ?? '',
+            ...(inviteeEmail !== undefined
+                ? { invitee_email: inviteeEmail }
+                : {}),
             at: inv.at,
             state: 'pending',
         });
@@ -1690,7 +1716,7 @@ async function grantInvitation(
                 identity_id: identityId,
                 at,
             });
-            await view.states.record(
+            await view.states.postEvent(
                 eventId, id, 'pending', principal.id);
             return { kind: 'created' };
         },
@@ -1728,9 +1754,16 @@ async function pendingInvitationFor(
     const candidates = (await adapter.invitations.getAll())
         .filter(inv => inv.organization_id === org
             && inv.identity_id === identityId);
+    if (candidates.length === 0) return null;
+    // One states read answers every candidate; on the grant
+    // path this joins the already-open transaction.
+    const latest = latestByKey(
+        await adapter.states.getAll(), ev => ev.entity_id);
     for (const inv of candidates) {
-        const state = await currentInvitationState(
-            adapter, inv.id);
+        const current = latest.get(inv.id);
+        if (current === undefined) continue;
+        const state = assertInvitationState(
+            current.state, 'invitation ' + inv.id);
         if (state === 'pending') {
             return { id: inv.id, at: inv.at };
         }
@@ -1782,7 +1815,7 @@ async function acceptInvitation(
                     at,
                 });
             }
-            await view.states.record(
+            await view.states.postEvent(
                 eventId, id, 'accepted', principal.id);
         },
     );
@@ -1816,7 +1849,7 @@ async function declineInvitation(
         const state = await currentInvitationState(view, id);
         if (state === 'declined') return;   // idempotent no-op
         if (state !== 'pending') { conflict = true; return; }
-        await view.states.record(
+        await view.states.postEvent(
             eventId, id, 'declined', principal.id);
     });
     if (conflict) {
@@ -1852,7 +1885,7 @@ async function revokeInvitation(
         const state = await currentInvitationState(view, id);
         if (state === 'revoked') return;   // idempotent no-op
         if (state !== 'pending') { conflict = true; return; }
-        await view.states.record(
+        await view.states.postEvent(
             eventId, id, 'revoked', principal.id);
     });
     if (conflict) {
@@ -1872,7 +1905,7 @@ async function loadInvitation(
     try {
         return await adapter.invitations.getById(id);
     } catch (e) {
-        if (e instanceof EntityNotFound) return null;
+        if (e instanceof EntityNotFoundError) return null;
         throw e;
     }
 }
@@ -2031,12 +2064,7 @@ export async function handleRequest(
             // through the identity_id index, not a scan.
             const memberships = keyed(adapter.memberships);
             const owner = await ownerOrgOfEntity(
-                [
-                    adapter.ideas, adapter.projects,
-                    adapter.flows, adapter.records,
-                    adapter.objectives, adapter.workOrders,
-                    adapter.invitations,
-                ],
+                orgOwnedProbes(adapter),
                 memberships, org, param(params, 0),
             );
             if (owner !== null && owner !== org) {
@@ -2201,7 +2229,7 @@ export async function handleRequest(
             );
         }
         if (
-            error instanceof EntityNotFound
+            error instanceof EntityNotFoundError
         ) {
             return Response.json(
                 { error: error.message },

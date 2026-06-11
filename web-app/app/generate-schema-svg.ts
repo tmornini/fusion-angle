@@ -207,6 +207,9 @@ function computeRanks(tables: Table[]): Map<string, number> {
 const BOX_W = 208;
 const HEADER_H = 26;
 const ROW_H = 18;
+const TEXT_INSET_X = 10;
+const HEADER_BASELINE_Y = 18;
+const ROW_BASELINE_Y = 13;
 const COL_GAP = 96;
 const ROW_GAP = 30;
 const PAD = 40;
@@ -278,16 +281,18 @@ function renderBox(p: Placed, parts: string[]): void {
         + `width="${BOX_W}" height="${h}" rx="6" />`,
         `    <rect class="head" x="${x}" y="${y}" `
         + `width="${BOX_W}" height="${HEADER_H}" rx="6" />`,
-        `    <text class="thead" x="${x + 10}" `
-        + `y="${y + 18}">${esc(t.name)}</text>`,
+        `    <text class="thead" x="${x + TEXT_INSET_X}" `
+        + `y="${y + HEADER_BASELINE_Y}">${esc(t.name)}</text>`,
     );
     t.columns.forEach((c, i) => {
-        const cy = y + HEADER_H + i * ROW_H + 13;
+        const cy = y + HEADER_H + i * ROW_H
+            + ROW_BASELINE_Y;
         const cls = c.pk ? 'pk' : c.fk ? 'fk' : 'col';
         parts.push(
-            `    <text class="${cls}" x="${x + 10}" `
+            `    <text class="${cls}" x="${x + TEXT_INSET_X}" `
             + `y="${cy}">${esc(c.name)}</text>`,
-            `    <text class="type" x="${x + BOX_W - 10}" `
+            `    <text class="type" x="${x
+            + BOX_W - TEXT_INSET_X}" `
             + `y="${cy}">${esc(c.type)}</text>`,
         );
     });

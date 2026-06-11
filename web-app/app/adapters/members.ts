@@ -41,10 +41,6 @@ export function subscribeHumanMemberChanges(
     return humanMemberChanges.subscribe(fn);
 }
 
-export function notifyHumanMemberChange(): void {
-    humanMemberChanges.notify();
-}
-
 // A human member draft: the contact PII plus the org-
 // profile detail fields, as the Add Member dialog and the
 // edit form supply them. Split across members / identities
@@ -186,7 +182,7 @@ export async function getHumanMember(
     );
 }
 
-export async function getHumanMemberRow(
+export async function getHumanMemberEntity(
     ctx: RequestContext,
     id: string,
 ): Promise<HumanMemberEntity> {

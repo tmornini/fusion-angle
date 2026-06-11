@@ -1,5 +1,6 @@
 import {
-    $, $required, getRequiredAttribute,
+    $, $$, getRequiredAttribute,
+    isFormField,
 } from '../app/dom.ts';
 import {
     html, setHtml,
@@ -28,7 +29,7 @@ import {
     sessionContext,
     generateCryptoSafeBase62,
     validateWorkOrderFlowGraph,
-    getRecordForFlow,
+    getRecordForWorkOrder,
     getRecordAttributesByRecord,
     RecordTransitionViolations,
 } from '../app/adapters/index.ts';
@@ -44,13 +45,11 @@ function collectAttributeValues(
 ): Record<string, string> {
     const values: Record<string, string> =
         {};
-    const inputs =
-        container.querySelectorAll<
-            HTMLInputElement
-            | HTMLSelectElement
-            | HTMLTextAreaElement
-        >('[data-attribute-id]');
+    const inputs = $$(
+        '[data-attribute-id]', container,
+    );
     for (const input of inputs) {
+        if (!isFormField(input)) continue;
         const attributeId = getRequiredAttribute(
             input, 'data-attribute-id',
         );
@@ -91,10 +90,9 @@ function initTransitionButtons(
     detail: WorkboxDetailPresenter,
     ctx: ReturnType<typeof createRequestContext>,
 ): void {
-    const buttons =
-        container.querySelectorAll<
-            HTMLButtonElement
-        >('[data-edge-id]');
+    const buttons = $$(
+        '[data-edge-id]', container,
+    );
     for (const btn of buttons) {
         btn.addEventListener(
             'click',
@@ -252,7 +250,7 @@ async function loadPresenter(
             ctx, workOrderId, fg.lockTimeout,
         ),
         getMemberMap(ctx),
-        getRecordForFlow(ctx, fg.flowId),
+        getRecordForWorkOrder(ctx, workOrderId),
     ]);
     const attributes: RecordAttribute[] =
         recordId === null

@@ -9,11 +9,9 @@ import {
     getRecord,
     getRecords,
     putRecord,
-    deleteRecord,
     getRecordState,
     postRecordChange,
     postRecordStateChange,
-    postRecordArchival,
 } from '../web-app/app/adapters/records.ts';
 import {
     jsonArrayField,
@@ -212,32 +210,6 @@ test(
 );
 
 test(
-    'postRecordArchival transitions the record to'
-    + ' archived',
-    async () => {
-        const db = new MemoryDbAdapter();
-        await seedAdminSchema(db);
-        await seedCurrentMember(db);
-        const ctx = createRequestContext(db, await orgToken());
-        await postRecordChange(ctx, 'rec-1', {
-            kind: 'create',
-            record: {
-                name: 'X',
-                description: '',
-                position: 1,
-            },
-            attributes: [],
-            initialState: 'active',
-        });
-        await postRecordArchival(ctx, 'rec-1');
-        const state = await getRecordState(
-            ctx, 'rec-1',
-        );
-        assert.equal(state, 'archived');
-    },
-);
-
-test(
     'postRecordStateChange records a new event'
     + ' without touching the entity row',
     async () => {
@@ -264,30 +236,6 @@ test(
             ctx, 'rec-1',
         );
         assert.equal(state, 'archived');
-    },
-);
-
-test(
-    'deleteRecord hard-splices the row',
-    async () => {
-        const db = new MemoryDbAdapter();
-        await seedAdminSchema(db);
-        await seedCurrentMember(db);
-        const ctx = createRequestContext(db, await orgToken());
-        await postRecordChange(ctx, 'rec-1', {
-            kind: 'create',
-            record: {
-                name: 'X',
-                description: '',
-                position: 1,
-            },
-            attributes: [],
-            initialState: 'active',
-        });
-        await deleteRecord(ctx, 'rec-1');
-        await assert.rejects(
-            () => getRecord(ctx, 'rec-1'),
-        );
     },
 );
 
@@ -326,7 +274,7 @@ test(
         await postRecordStateChange(
             ctx, 'rec-1', 'archived',
         );
-        const events = await db.states.allFor(
+        const events = await db.states.getAllFor(
             'rec-1',
         );
         const values = events

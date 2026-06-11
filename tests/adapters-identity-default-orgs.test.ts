@@ -16,7 +16,7 @@ test(
     'MemoryDbAdapter stores and returns a default-org event',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
+        await db.postSchemaCreation();
         await db.identityDefaultOrgs.put('d1', {
             identity_id: 'i1',
             organization_id: '1',

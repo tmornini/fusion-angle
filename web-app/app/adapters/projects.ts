@@ -52,7 +52,7 @@ export {
     COST_DIVISOR,
 } from '../../../api/types.ts';
 
-export async function getProjectRows(
+export async function getProjectEntities(
     ctx: RequestContext,
 ): Promise<ProjectEntity[]> {
     return ctx.GET<ProjectEntity[]>('projects');
@@ -62,7 +62,7 @@ export async function getProjects(
     ctx: RequestContext,
 ): Promise<Project[]> {
     const [rows, stateMap] = await Promise.all([
-        getProjectRows(ctx),
+        getProjectEntities(ctx),
         getProjectStates(ctx),
     ]);
     return rows
@@ -86,7 +86,7 @@ export async function getProject(
     id: string,
 ): Promise<Project> {
     const [row, state] = await Promise.all([
-        getProjectRow(ctx, id),
+        getProjectEntity(ctx, id),
         getProjectState(ctx, id),
     ]);
     return new Project(row, state);
@@ -234,7 +234,7 @@ export class ProjectView {
     }
 }
 
-export async function getProjectRow(
+export async function getProjectEntity(
     ctx: RequestContext,
     id: string,
 ): Promise<ProjectEntity> {
@@ -273,4 +273,3 @@ export async function postProjectStateChange(
     });
     projectChanges.notify();
 }
-

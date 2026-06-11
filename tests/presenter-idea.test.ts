@@ -258,7 +258,7 @@ test(
             '2026-01-15T10:00:00.000000Z',
         );
         const out = presenter
-            .buildCard('position', true).toString();
+            .buildCard(true).toString();
         assert.match(out, /Self-serve onboarding/);
         assert.match(out, /badge badge-success/);
         assert.match(out, /Active/);
@@ -279,9 +279,9 @@ test(
             makeIdea(), 'X', 'y',
         );
         const withGrip = presenter
-            .buildCard('position', true).toString();
+            .buildCard(true).toString();
         const withoutGrip = presenter
-            .buildCard('position', false)
+            .buildCard(false)
             .toString();
         assert.match(withGrip, /drag-handle/);
         assert.ok(!withoutGrip.includes(
@@ -302,12 +302,12 @@ test(
             makeIdea({}, 'active'), 'X', 'y',
         );
         assert.match(
-            approved.buildCard('position', false)
+            approved.buildCard(false)
                 .toString(),
             /data-idea-convert="idea-1"/,
         );
         assert.ok(
-            !active.buildCard('position', false)
+            !active.buildCard(false)
                 .toString()
                 .includes('data-idea-convert'),
         );
@@ -483,11 +483,11 @@ test(
             'X', 'y',
         );
         const incOut = incomplete
-            .buildCard('position', false).toString();
+            .buildCard(false).toString();
         const readyOut = ready
-            .buildCard('position', false).toString();
+            .buildCard(false).toString();
         const reviewOut = review
-            .buildCard('position', false).toString();
+            .buildCard(false).toString();
         assert.match(incOut, /Incomplete/);
         assert.ok(!readyOut.includes('Incomplete'));
         assert.ok(!reviewOut.includes('Incomplete'));

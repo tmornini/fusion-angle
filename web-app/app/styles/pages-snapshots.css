@@ -43,19 +43,6 @@
   margin-bottom: var(--space-4);
 }
 
-.credential-reveal-fields dt {
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: hsl(var(--muted-foreground));
-  margin-bottom: var(--space-1);
-}
-
-.credential-reveal-fields dd {
-  margin: 0 0 var(--space-3);
-  color: hsl(var(--foreground));
-}
-
 .credential-reveal-secret {
   font-family: var(--font-mono);
   font-size: 1rem;

@@ -109,7 +109,7 @@ test('the facade requires a bearer token', async () => {
 
 async function rolelessMemberDb(): Promise<MemoryDbAdapter> {
     const db = new MemoryDbAdapter();
-    await db.createSchema();
+    await db.postSchemaCreation();
     await db.organizations.put('A', orgRow('Acme'));
     await db.organizations.put('B', orgRow('Beta'));
     await db.memberships.put('m-sarah-a', {
@@ -240,7 +240,7 @@ async function seedChain(
 // member id directly (member.id === identity.id).
 async function deepDb(): Promise<MemoryDbAdapter> {
     const db = new MemoryDbAdapter();
-    await db.createSchema();
+    await db.postSchemaCreation();
     await db.organizations.put('A', orgRow('Acme'));
     await db.organizations.put('B', orgRow('Beta'));
     await db.roleGrants.put('rg-current-a', {

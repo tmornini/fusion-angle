@@ -1,5 +1,5 @@
 import {
-    $required, getRequiredAttribute,
+    $, $required, getRequiredAttribute,
 } from '../app/dom.ts';
 import { navigateTo } from '../app/core.ts';
 import {
@@ -22,6 +22,9 @@ import type { GraphNode } from '../../api/types.ts';
 // Empty canvas fallback when no nodes exist.
 const EMPTY_W = 200;
 const EMPTY_H = 200;
+
+// Uniform whitespace around the stats canvas.
+const STATS_VIEW_PADDING_PX = 40;
 
 // Smallest enclosing box for all node rects
 // plus uniform padding on all sides.
@@ -65,12 +68,10 @@ function anchorCardTo(
     host: HTMLElement,
     g: Element,
 ): void {
-    const area = host.querySelector(
-        '.flow-stats-canvas-area',
+    const area = $(
+        '.flow-stats-canvas-area', host,
     );
-    const card = host.querySelector(
-        '#flow-stats-card',
-    );
+    const card = $('#flow-stats-card', host);
     if (
         !(area instanceof HTMLElement)
         || !(card instanceof HTMLElement)
@@ -110,7 +111,8 @@ export async function init(
             const { model, graph } =
                 await getFlowStats(ctx, flowId);
             const viewBox = boundingViewBox(
-                graph.nodes, 40,
+                graph.nodes,
+                STATS_VIEW_PADDING_PX,
             );
             const presenter =
                 new FlowStatsPresenter(
@@ -121,8 +123,8 @@ export async function init(
             // Presenter is deliberately name-agnostic;
             // page module writes the graph's own values
             // so the header reflects the live flow name.
-            const nameEl = host.querySelector(
-                '.flow-stats-flow-name',
+            const nameEl = $(
+                '.flow-stats-flow-name', host,
             );
             if (nameEl) {
                 nameEl.textContent = graph.name;
@@ -174,7 +176,7 @@ export async function init(
                     if (!g) return;
                     ui.hoveredNodeId = null;
                     presenter.renderCard(
-                        host, ui.pinnedNodeId ?? null,
+                        host, ui.pinnedNodeId,
                     );
                 },
                 { signal },
@@ -252,8 +254,7 @@ export async function init(
                         presenter.renderCard(
                             host,
                             ui.pinnedNodeId
-                                ?? ui.hoveredNodeId
-                                ?? null,
+                                ?? ui.hoveredNodeId,
                         );
                         return;
                     }

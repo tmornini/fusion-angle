@@ -1,5 +1,5 @@
 import {
-    $, $required,
+    $, $$, $input, $required,
 } from './dom.ts';
 import {
     html,
@@ -21,7 +21,7 @@ import {
     getHumanMembers,
     featuredHumanMembers,
     sessionContext,
-    setLocation,
+    putLocation,
     subscribeSchemaChanges,
     type IdeaWithSubmitter,
     Project,
@@ -464,10 +464,10 @@ posIndex === state.activeIndex
 
     function mutateActiveItem(): void {
         if (!state.list) return;
-        state.list
-            .querySelectorAll(
-                '.command-palette-item',
-            )
+        $$(
+            '.command-palette-item',
+            state.list,
+        )
             .forEach((el, i) => {
                 el.setAttribute(
                     'aria-selected',
@@ -481,11 +481,11 @@ posIndex === state.activeIndex
                 state.activeIndex
             ];
         if (activeItem) {
-            const activeEl =
-                state.list.querySelector(
-                    `[data-item-id=`
-                    + `"${activeItem.id}"]`,
-                );
+            const activeEl = $(
+                `[data-item-id=`
+                + `"${activeItem.id}"]`,
+                state.list,
+            );
             if (activeEl)
                 activeEl.scrollIntoView(
                     { block: 'nearest' },
@@ -519,7 +519,7 @@ posIndex === state.activeIndex
             state.filteredItems[index];
         if (!item) return;
         close();
-        setLocation(item.href);
+        putLocation(item.href);
     }
 
     function open(): void {
@@ -648,8 +648,8 @@ posIndex === state.activeIndex
                 + ' class="flex'
                 + ' items-center'
                 + ' gap-1">'
-                + '<kbd>\u2191</kbd>'
-                + '<kbd>\u2193</kbd>'
+                + '<kbd>↑</kbd>'
+                + '<kbd>↓</kbd>'
                 + ' Navigate</span>',
             )}
             ${trusted(
@@ -657,7 +657,7 @@ posIndex === state.activeIndex
                 + ' class="flex'
                 + ' items-center'
                 + ' gap-1">'
-                + '<kbd>\u21B5</kbd>'
+                + '<kbd>↵</kbd>'
                 + ' Open</span>',
             )}
             ${trusted(
@@ -677,21 +677,18 @@ posIndex === state.activeIndex
         aria-live="polite"
         aria-atomic="true"></div>`);
 
-        state.input =
-            state.dialog
-                .querySelector<
-                    HTMLInputElement
-                >(
-                    '.command-palette-input',
-                );
-        state.list =
-            state.dialog.querySelector(
-                '#command-palette-listbox',
-            );
-        state.liveRegion =
-            state.dialog.querySelector(
-                '.command-palette-live',
-            );
+        state.input = $input(
+            '.command-palette-input',
+            state.dialog,
+        );
+        state.list = $(
+            '#command-palette-listbox',
+            state.dialog,
+        );
+        state.liveRegion = $(
+            '.command-palette-live',
+            state.dialog,
+        );
 
         function applyDebouncedQuery(): void {
             if (!state.input) return;

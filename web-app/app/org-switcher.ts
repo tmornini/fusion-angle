@@ -1,9 +1,10 @@
 import { html, type SafeHtml } from './safe-html.ts';
+import { $, $$, $select } from './dom.ts';
 import {
     shouldShowOrgSwitcher,
     ACTIVE_ORG_KEY,
 } from './adapters/org-session.ts';
-import { writePreference } from './adapters/preferences.ts';
+import { putPreference } from './adapters/preferences.ts';
 import { showToast } from './toast.ts';
 
 interface OrgOption {
@@ -35,7 +36,7 @@ export function orgSwitcherHtml(
 // confirmed persist — a false return means the id never
 // landed, so a reload would silently keep the prior org.
 function switchToOrg(org: string): void {
-    if (!writePreference(ACTIVE_ORG_KEY, org)) {
+    if (!putPreference(ACTIVE_ORG_KEY, org)) {
         showToast(
             'Could not switch organization —'
             + ' please try again.',
@@ -51,20 +52,15 @@ function switchToOrg(org: string): void {
 // EVERY `.org-switcher-group` rather than the first — both stay
 // live and in sync after a switch.
 export function wireOrgSwitcher(activeOrgId: string): void {
-    const groups = document.querySelectorAll<HTMLElement>(
-        '.org-switcher-group');
+    const groups = $$('.org-switcher-group', document);
     for (const group of groups) {
-        const select =
-            group.querySelector<HTMLSelectElement>(
-                '.org-switcher');
+        const select = $select('.org-switcher', group);
         if (select === null) continue;
         select.value = activeOrgId;
         select.addEventListener('change', () => {
             switchToOrg(select.value);
         });
-        const setDefault =
-            group.querySelector<HTMLButtonElement>(
-                '.org-set-default');
+        const setDefault = $('.org-set-default', group);
         setDefault?.addEventListener('click', () => {
             void setActiveOrgAsDefault(select.value);
         });

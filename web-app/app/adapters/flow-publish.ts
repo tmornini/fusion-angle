@@ -62,12 +62,19 @@ export function formatFlowProblem(
 export interface FlowPickerEntry {
     id: Id;
     name: string;
-    problemCount?: number;
+}
+
+// A not-ready flow always knows how many nodes block it —
+// the count is required, so a consumer can never invent one.
+export interface NotReadyFlowEntry {
+    id: Id;
+    name: string;
+    problemCount: number;
 }
 
 export interface FlowsForCreation {
     ready: FlowPickerEntry[];
-    notReady: FlowPickerEntry[];
+    notReady: NotReadyFlowEntry[];
 }
 
 export async function getFlowsForCreation(
@@ -77,7 +84,7 @@ export async function getFlowsForCreation(
         'flows',
     );
     const ready: FlowPickerEntry[] = [];
-    const notReady: FlowPickerEntry[] = [];
+    const notReady: NotReadyFlowEntry[] = [];
     for (const flow of flows) {
         const isLocked = asBoolean(
             flow.is_locked, 'is_locked',

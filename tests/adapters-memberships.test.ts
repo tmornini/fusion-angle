@@ -41,7 +41,7 @@ test('rejects a membership with a bad timestamp', () => {
 
 test('memberships store round-trips a row', async () => {
     const db = new MemoryDbAdapter();
-    await db.createSchema();
+    await db.postSchemaCreation();
     await db.memberships.put('m1', {
         organization_id: '1',
         identity_id: 'current',
@@ -56,7 +56,7 @@ test('memberships store round-trips a row', async () => {
 // orgs are its membership rows, derived fresh — never cached.
 test('a subject reaches its orgs via memberships', async () => {
     const db = new MemoryDbAdapter();
-    await db.createSchema();
+    await db.postSchemaCreation();
     await db.memberships.put('m1', {
         organization_id: '1', identity_id: 'alice',
         at: '2026-06-04T00:00:00.000000Z',

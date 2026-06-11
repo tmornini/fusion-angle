@@ -15,6 +15,14 @@ export function $$(
     return Array.from(parent.querySelectorAll(selector));
 }
 
+export function $button(
+    selector: string,
+    parent: ParentNode,
+): HTMLButtonElement | null {
+    return parent
+        .querySelector<HTMLButtonElement>(selector);
+}
+
 export function $input(
     selector: string,
     parent: ParentNode,
@@ -37,16 +45,6 @@ export function $textarea(
 ): HTMLTextAreaElement | null {
     return parent
         .querySelector<HTMLTextAreaElement>(
-            selector,
-        );
-}
-
-export function $button(
-    selector: string,
-    parent: ParentNode,
-): HTMLButtonElement | null {
-    return parent
-        .querySelector<HTMLButtonElement>(
             selector,
         );
 }
@@ -79,6 +77,23 @@ export function $inputRequired(
     if (!el) {
         throw new Error(
             'Required input not'
+            + ' found: ' + selector,
+        );
+    }
+    return el;
+}
+
+export function $textareaRequired(
+    selector: string,
+    parent: ParentNode,
+): HTMLTextAreaElement {
+    const el =
+        parent.querySelector<HTMLTextAreaElement>(
+            selector,
+        );
+    if (!el) {
+        throw new Error(
+            'Required textarea not'
             + ' found: ' + selector,
         );
     }
@@ -124,30 +139,23 @@ export function populateIcons(entries: Array<[string, SafeHtml]>): void {
     }
 }
 
+export function mutateSlot(
+    container: HTMLElement,
+    cls: string,
+    markup: SafeHtml,
+): void {
+    setHtml($required(cls, container), markup);
+}
+
 export const FOCUSABLE_SELECTOR =
     'a[href], button, input,'
     + ' select, textarea,'
     + ' [tabindex]:not([tabindex="-1"])';
 
-export function initToggleGroup(
-    selector: string,
-    attrName: string,
-    onChange: (value: string) => void,
-): void {
-    const buttons = $$(selector, document);
-    for (const btn of buttons) {
-        btn.addEventListener('click', () => {
-            const value = getRequiredAttribute(btn, attrName);
-            for (const b of buttons) b.classList.toggle('active', b === btn);
-            onChange(value);
-        });
-    }
-}
-
 export function bindEnterToClick(
     inputSel: string,
     btnSel: string,
-    root: ParentNode = document,
+    root: ParentNode,
 ): void {
     $input(inputSel, root)
         ?.addEventListener(

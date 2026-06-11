@@ -69,7 +69,6 @@ function makeLogMethod(
         const prefix = formatPrefix(
             level, context, requestId,
         );
-        // eslint-disable-next-line no-console
         switch (level) {
             case 'debug':
                 console.debug(

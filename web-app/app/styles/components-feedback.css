@@ -13,47 +13,6 @@
     border-radius: 3px;
 }
 
-.bipolar-bar::before {
-    content: '';
-    position: absolute;
-    left: 50%;
-    top: 0;
-    bottom: 0;
-    width: 1px;
-    background: hsl(var(--foreground) / 0.35);
-    transform: translateX(-0.5px);
-}
-
-.bipolar-bar::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    background: hsl(var(--tone-current));
-    opacity: 0.55;
-    width: calc(
-        abs(var(--baseline)) / 100 *
-        (var(--bar-width) / 2)
-    );
-}
-
-.bipolar-bar[data-tone='success']::after {
-    --tone-current: var(--success);
-    left: 50%;
-    border-radius: 0 3px 3px 0;
-}
-
-.bipolar-bar[data-tone='error']::after {
-    --tone-current: var(--destructive);
-    right: 50%;
-    border-radius: 3px 0 0 3px;
-}
-
-.bipolar-bar[data-tone='muted']::after {
-    display: none;
-}
-
-
 .progress-ring {
   position: relative;
   width: 3rem;
@@ -72,14 +31,6 @@
   justify-content: center;
   font-size: 0.625rem;
   font-weight: var(--font-weight-bold);
-}
-
-
-.skeleton {
-  background-color: hsl(var(--muted));
-  border-radius: var(--radius);
-  animation: pulse-subtle var(--duration-pulse)
-    ease-in-out infinite;
 }
 
 /* Shimmer skeleton loading */
@@ -220,7 +171,6 @@
   border-width: 0;
 }
 
-
 .progress {
   height: 0.5rem;
   width: 100%;
@@ -245,4 +195,3 @@
   transition: width var(--duration-slow)
     var(--ease-default);
 }
-

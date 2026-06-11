@@ -188,15 +188,15 @@ export class BackedDbAdapter implements DbAdapter {
         return this.#backend.hasSchema();
     }
 
-    createSchema(): Promise<void> {
-        return this.#backend.createSchema();
+    postSchemaCreation(): Promise<void> {
+        return this.#backend.postSchemaCreation();
     }
 
     deleteSchema(): Promise<void> {
         return this.#backend.deleteSchema();
     }
 
-    async exportSnapshot(): Promise<string> {
+    async getSnapshot(): Promise<string> {
         const obj = await this.#backend.transaction(
             TABLE_NAMES, 'readonly',
             async (tx) => {
@@ -210,7 +210,7 @@ export class BackedDbAdapter implements DbAdapter {
         return JSON.stringify(obj, null, 2);
     }
 
-    async importSnapshot(json: string): Promise<void> {
+    async putSnapshot(json: string): Promise<void> {
         // Validators run at the gate, before any storage
         // touch — a bad snapshot throws here, leaving prior
         // data intact. The clear+put then runs in one
@@ -255,10 +255,10 @@ export class BackedDbAdapter implements DbAdapter {
             flush: () => this.flush(),
             deleteSchema: () => this.deleteSchema(),
             hasSchema: () => this.hasSchema(),
-            createSchema: () => this.createSchema(),
-            exportSnapshot: () => this.exportSnapshot(),
-            importSnapshot: (json) =>
-                this.importSnapshot(json),
+            postSchemaCreation: () => this.postSchemaCreation(),
+            getSnapshot: () => this.getSnapshot(),
+            putSnapshot: (json) =>
+                this.putSnapshot(json),
             simulateLatency: () => this.simulateLatency(),
             transaction: () => {
                 throw new Error(

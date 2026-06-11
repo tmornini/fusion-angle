@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { OrgScopedEntityStore }
     from '../api/store-org-scoped.ts';
-import { EntityNotFound } from '../api/db.ts';
+import { EntityNotFoundError } from '../api/db.ts';
 import type {
     EntityStore,
     EntityPut,
@@ -48,7 +48,7 @@ class FakeStore
     async getById(id: string): Promise<Row> {
         const row = this.#rows.get(id);
         if (row === undefined) {
-            throw new EntityNotFound('rows', id);
+            throw new EntityNotFoundError('rows', id);
         }
         return row;
     }
@@ -153,7 +153,7 @@ test('getById returns an own-org row', async () => {
 test('getById 404s a foreign-org row', async () => {
     await assert.rejects(
         () => scopedToA(seeded()).getById('b1'),
-        (e: unknown) => e instanceof EntityNotFound,
+        (e: unknown) => e instanceof EntityNotFoundError,
     );
 });
 
@@ -163,8 +163,8 @@ async () => {
         .getById('b1').catch(e => e as unknown);
     const absent = await scopedToA(new FakeStore())
         .getById('b1').catch(e => e as unknown);
-    assert.ok(foreign instanceof EntityNotFound);
-    assert.ok(absent instanceof EntityNotFound);
+    assert.ok(foreign instanceof EntityNotFoundError);
+    assert.ok(absent instanceof EntityNotFoundError);
     assert.equal(foreign.message, absent.message);
     assert.equal(foreign.table, absent.table);
 });
@@ -217,7 +217,7 @@ test('delete removes an own-org row', async () => {
     await scopedToA(inner).delete('a1');
     await assert.rejects(
         () => inner.getById('a1'),
-        (e: unknown) => e instanceof EntityNotFound,
+        (e: unknown) => e instanceof EntityNotFoundError,
     );
 });
 
@@ -228,7 +228,7 @@ test('a replayed delete is an idempotent no-op', async () => {
     await scoped.delete('a1');
     await assert.rejects(
         () => inner.getById('a1'),
-        (e: unknown) => e instanceof EntityNotFound,
+        (e: unknown) => e instanceof EntityNotFoundError,
     );
 });
 
@@ -240,6 +240,6 @@ async () => {
     await scoped.putMany([], ['a1']);
     await assert.rejects(
         () => inner.getById('a1'),
-        (e: unknown) => e instanceof EntityNotFound,
+        (e: unknown) => e instanceof EntityNotFoundError,
     );
 });

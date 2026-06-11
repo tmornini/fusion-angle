@@ -165,8 +165,7 @@ export class IndexedDbBackend implements StorageBackend {
     readonly #post: (tables: readonly string[]) => void;
 
     constructor(
-        post: (tables: readonly string[]) => void =
-            () => {},
+        post: (tables: readonly string[]) => void,
     ) {
         this.#db = null;
         this.#post = post;
@@ -357,7 +356,7 @@ export class IndexedDbBackend implements StorageBackend {
         });
     }
 
-    async createSchema(): Promise<void> {
+    async postSchemaCreation(): Promise<void> {
         const db = await this.#connection();
         return new Promise((resolve, reject) => {
             const tx = openTx(
@@ -377,7 +376,7 @@ export class IndexedDbBackend implements StorageBackend {
     // "mock data") flow through here. Close our own
     // connection first — it would block the delete — then
     // reopen, leaving a healthy connection for the
-    // createSchema + populate that follows.
+    // postSchemaCreation + populate that follows.
     async deleteSchema(): Promise<void> {
         if (this.#db !== null) {
             this.#db.close();

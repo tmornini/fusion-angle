@@ -22,7 +22,7 @@ const token = (b: unknown) =>
 
 async function dbWithPasswordUser(): Promise<MemoryDbAdapter> {
     const db = new MemoryDbAdapter();
-    await db.createSchema();
+    await db.postSchemaCreation();
     await db.identityPii.put('current', {
         name: 'Demo', email: 'demo@example.com',
         phone: '555-0100', bio: 'demo user',
@@ -86,7 +86,7 @@ async () => {
 test('a revoked password credential is the same 401',
 async () => {
     const db = new MemoryDbAdapter();
-    await db.createSchema();
+    await db.postSchemaCreation();
     await db.identityPii.put('current', {
         name: 'Demo', email: 'demo@example.com',
         phone: '555-0100', bio: 'demo user',

@@ -2,8 +2,8 @@
 set -euo pipefail
 
 if [ $# -ne 1 ]; then
-  echo "Usage: ./serve <port>" >&2
-  exit 1
+    echo "Usage: ./serve <port>" >&2
+    exit 1
 fi
 
 PORT="$1"

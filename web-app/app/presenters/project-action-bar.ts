@@ -26,7 +26,7 @@ export class ProjectActionBarPresenter {
         state: ProjectState,
         approvalCheck: Check,
         archivalCheck: Check,
-        objectiveNames: ObjectiveNames = new Map(),
+        objectiveNames: ObjectiveNames,
     ) {
         this.#projectId = projectId;
         this.#state = state;

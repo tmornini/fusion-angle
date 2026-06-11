@@ -1,7 +1,7 @@
 import {
     html, setHtml, SafeHtml,
 } from '../safe-html.ts';
-import { $required } from '../dom.ts';
+import { mutateSlot } from '../dom.ts';
 import { initials } from '../core.ts';
 import { displayText } from '../format.ts';
 import {
@@ -69,14 +69,6 @@ function buildShell(container: HTMLElement): void {
         }"></div>
     </div>
 </div>`);
-}
-
-function mutateSlot(
-    container: HTMLElement,
-    cls: string,
-    markup: SafeHtml,
-): void {
-    setHtml($required(cls, container), markup);
 }
 
 function buildAvatar(initialsStr: string): SafeHtml {

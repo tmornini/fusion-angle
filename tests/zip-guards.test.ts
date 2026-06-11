@@ -19,7 +19,9 @@ test('default limits accept normal ZIP', async () => {
             data: encoder.encode('world'),
         },
     ]);
-    const entries = await getZipEntries(zip);
+    const entries = await getZipEntries(
+        zip, DEFAULT_ZIP_LIMITS,
+    );
     assert.equal(entries.length, 2);
     const decoder = new TextDecoder();
     assert.equal(

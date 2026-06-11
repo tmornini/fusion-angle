@@ -22,7 +22,7 @@ const WEB_CLIENT_ID = 'web-app';
 // forgeable. The flow and algorithm are now real; only the key
 // location moves at the server tier. This wiring does NOT lift
 // the constraint.
-export async function loginViaPassword(
+export async function postPasswordLogin(
     ctx: RequestContext,
     username: string,
     password: string,

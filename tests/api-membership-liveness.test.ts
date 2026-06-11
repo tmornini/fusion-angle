@@ -15,7 +15,7 @@ function req(path: string, token: string): Request {
 
 async function adminDb(): Promise<MemoryDbAdapter> {
     const db = new MemoryDbAdapter();
-    await db.createSchema();
+    await db.postSchemaCreation();
     await seedRootAdmin(db);
     return db;
 }

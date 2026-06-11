@@ -9,7 +9,7 @@ import {
     validateWorkOrderFlowGraph,
 } from './work-orders-queries.ts';
 import {
-    getRecordForFlow,
+    getRecordForWorkOrder,
 } from './flow-records.ts';
 import {
     getRecordAttributesByRecord,
@@ -49,8 +49,7 @@ export async function validateRecordTransition(
     workOrderId: Id,
     targetNodeId: Id,
     pendingValues:
-        ReadonlyMap<RecordAttributeId, string>
-        = new Map(),
+        ReadonlyMap<RecordAttributeId, string>,
 ): Promise<ConstraintViolation[]> {
     const wo = await ctx.GET<WorkOrderEntity>(
         `work-orders/${workOrderId}`,
@@ -68,8 +67,8 @@ export async function validateRecordTransition(
             + targetNodeId,
         );
     }
-    const recordId = await getRecordForFlow(
-        ctx, fg.flowId,
+    const recordId = await getRecordForWorkOrder(
+        ctx, workOrderId,
     );
     if (recordId === null) {
         return [];

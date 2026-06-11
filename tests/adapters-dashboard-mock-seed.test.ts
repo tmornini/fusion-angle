@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
-import { populateMockData } from '../api/mock-data.ts';
+import { postMockDataLoad } from '../api/mock-data.ts';
 import { createRequestContext } from
     '../web-app/app/adapters/shared.ts';
 import { devToken } from './token-fixtures.ts';
@@ -21,7 +21,7 @@ test('mock seed produces portfolio Impact baseline +50',
     async () => {
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
-        await populateMockData(db);
+        await postMockDataLoad(db);
         const ctx = createRequestContext(db, await devToken());
         const gauges = await getDashboardGauges(ctx);
         const impact = gauges.find(
@@ -36,7 +36,7 @@ test('mock seed produces per-objective baseline means',
     async () => {
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
-        await populateMockData(db);
+        await postMockDataLoad(db);
         const ctx = createRequestContext(db, await devToken());
         const aggs = await getObjectiveAggregates(ctx);
         const expected: ReadonlyArray<

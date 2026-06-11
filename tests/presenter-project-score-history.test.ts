@@ -52,7 +52,7 @@ const revisions = [
       description: 'd2', member_id: 'w1',
       at: '2026-03-18T11:02:00.000000Z' },
 ];
-const archivations: {
+const archivals: {
     objectiveId: string; memberId: string;
     at: string;
 }[] = [];
@@ -76,7 +76,7 @@ function resolver(objId: string, atTime: string) {
 
 test('merges all four streams chronologically', () => {
     const p = new ProjectScoreHistoryPresenter(
-        baselines, actuals, revisions, archivations,
+        baselines, actuals, revisions, archivals,
         resolver, whoName,
     );
     const html = p.buildBody().toString();
@@ -96,7 +96,7 @@ test('merges all four streams chronologically', () => {
 test('resolves historical objective name at each event',
     () => {
         const p = new ProjectScoreHistoryPresenter(
-            baselines, actuals, revisions, archivations,
+            baselines, actuals, revisions, archivals,
             resolver, whoName,
         );
         const html = p.buildBody().toString();
@@ -119,7 +119,7 @@ test('resolves historical objective name at each event',
 test('revision event row shows the new objective name',
     () => {
         const p = new ProjectScoreHistoryPresenter(
-            [], [], revisions, archivations, resolver, whoName,
+            [], [], revisions, archivals, resolver, whoName,
         );
         const html = p.buildBody().toString();
         const r1Pos = html.indexOf('2026-02-01');
@@ -141,7 +141,7 @@ test('positive score TD carries data-tone="success"', () => {
         [{ id: 'b1', projectId: 'p1', objectiveId: 'o1',
             score: 40, memberId: 'w1',
             at: '2026-03-05T09:10:00.000000Z' }],
-        [], revisions, archivations, resolver, whoName,
+        [], revisions, archivals, resolver, whoName,
     );
     const html = p.buildBody().toString();
     assert.match(html,
@@ -154,7 +154,7 @@ test('negative score TD carries data-tone="error"', () => {
             objectiveId: 'o1', score: -50,
             memberId: 'w1',
             at: '2026-04-01T16:45:00.000000Z' }],
-        revisions, archivations, resolver, whoName,
+        revisions, archivals, resolver, whoName,
     );
     const html = p.buildBody().toString();
     assert.match(html,
@@ -166,7 +166,7 @@ test('zero score TD carries data-tone="muted"', () => {
         [{ id: 'b1', projectId: 'p1', objectiveId: 'o1',
             score: 0, memberId: 'w1',
             at: '2026-03-05T09:10:00.000000Z' }],
-        [], revisions, archivations, resolver, whoName,
+        [], revisions, archivals, resolver, whoName,
     );
     const html = p.buildBody().toString();
     assert.match(html, /<td data-tone="muted">0<\/td>/);

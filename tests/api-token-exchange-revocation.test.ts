@@ -2,7 +2,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import { postToken } from '../api/authentication.ts';
-import { mintAccessToken } from '../api/access-token.ts';
+import {
+    mintAccessToken,
+    TOKEN_AUDIENCE,
+} from '../api/access-token.ts';
 import { nowUtc } from '../api/types.ts';
 
 // A revoked-but-unexpired token must not be launderable into a
@@ -13,6 +16,7 @@ import { nowUtc } from '../api/types.ts';
 async function tokenFor(sub: string): Promise<string> {
     const now = Math.floor(Date.now() / 1000) - 10;
     return mintAccessToken({
+        aud: TOKEN_AUDIENCE,
         sub, roles: [], name: 'X',
         iat: now, ttlSeconds: 900,
         jti: 'jti-' + sub + '-' + now,
@@ -21,7 +25,7 @@ async function tokenFor(sub: string): Promise<string> {
 
 async function revokedDb(): Promise<MemoryDbAdapter> {
     const db = new MemoryDbAdapter();
-    await db.createSchema();
+    await db.postSchemaCreation();
     await db.memberships.put('m', {
         organization_id: 'A', identity_id: 'u1',
         at: '2020-01-01T00:00:00.000000Z',
@@ -93,6 +97,7 @@ test('refresh on a logged-out but live jti is the'
     const iat = Math.floor(
         Date.parse('2019-01-01T00:00:00.000000Z') / 1000);
     const token = await mintAccessToken({
+        aud: TOKEN_AUDIENCE,
         sub: 'u1', roles: [], name: 'X',
         iat, ttlSeconds: 10_000_000_000, jti: 'live-jti',
     });

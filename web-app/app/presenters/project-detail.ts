@@ -1,7 +1,7 @@
 import {
     html, setHtml, SafeHtml, trusted,
 } from '../safe-html.ts';
-import { $required } from '../dom.ts';
+import { mutateSlot } from '../dom.ts';
 import {
     iconClock,
     iconDollarSign,
@@ -169,14 +169,6 @@ function buildShell(
     </div>
     ${buildNewFlowDialog()}
 </div>`);
-}
-
-function mutateSlot(
-    container: HTMLElement,
-    cls: string,
-    markup: SafeHtml,
-): void {
-    setHtml($required(cls, container), markup);
 }
 
 function buildSubtitle(
@@ -735,8 +727,8 @@ function buildFlowCard(
     flow: FlowListItem,
 ): SafeHtml {
     return html`
-        <a
-            href="#"
+        <button
+            type="button"
             data-flow-id="${flow.id}"
             class="${
                 'card card-hover'
@@ -770,7 +762,7 @@ function buildFlowCard(
                     )} edges</span>
                 </div>
             </div>
-        </a>`;
+        </button>`;
 }
 
 function buildFlowsSection(

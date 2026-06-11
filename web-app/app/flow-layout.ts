@@ -24,8 +24,7 @@ export const NODE_WIDTH = 160;
 export const NODE_HEIGHT = 64;
 export const HORIZONTAL_GAP = 60;
 export const VERTICAL_GAP = 180;
-export const START_X = 0;
-export const START_Y = 0;
+
 export const LABEL_SAFETY_MARGIN = 16;
 
 type Position = { x: number; y: number };

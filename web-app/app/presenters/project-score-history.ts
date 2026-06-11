@@ -40,7 +40,7 @@ export class ProjectScoreHistoryPresenter {
     readonly #baselines: ObjectiveScore[];
     readonly #actuals: ObjectiveScore[];
     readonly #revisions: ObjectiveRevision[];
-    readonly #archivations: ObjectiveArchivalEvent[];
+    readonly #archivals: ObjectiveArchivalEvent[];
     readonly #resolver: DefinitionResolver;
     readonly #memberName: MemberNameResolver;
 
@@ -48,14 +48,14 @@ export class ProjectScoreHistoryPresenter {
         baselines: ObjectiveScore[],
         actuals: ObjectiveScore[],
         revisions: ObjectiveRevision[],
-        archivations: ObjectiveArchivalEvent[],
+        archivals: ObjectiveArchivalEvent[],
         resolver: DefinitionResolver,
         memberName: MemberNameResolver,
     ) {
         this.#baselines = baselines;
         this.#actuals = actuals;
         this.#revisions = revisions;
-        this.#archivations = archivations;
+        this.#archivals = archivals;
         this.#resolver = resolver;
         this.#memberName = memberName;
     }
@@ -112,7 +112,7 @@ export class ProjectScoreHistoryPresenter {
                 name: r.name,
             });
         }
-        for (const d of this.#archivations) {
+        for (const d of this.#archivals) {
             events.push({
                 kind: 'archival',
                 at: d.at,

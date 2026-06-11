@@ -34,27 +34,8 @@
   box-shadow: var(--shadow-sm);
 }
 
-
-.view-toggle-btn {
-  background: transparent;
-  color: hsl(var(--muted-foreground));
-  transition: var(--transition-colors),
-              box-shadow var(--duration-fast) var(--ease-default);
-}
-
-.view-toggle-btn:hover {
-  color: hsl(var(--foreground));
-}
-
-.view-toggle-btn.active {
-  background-color: hsl(var(--card));
-  color: hsl(var(--foreground));
-  box-shadow: var(--shadow-sm);
-}
-
 /* Idea list — show actions on hover */
 .idea-actions {
   transition:
     opacity var(--duration-fast);
 }
-

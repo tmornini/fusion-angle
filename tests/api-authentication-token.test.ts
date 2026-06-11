@@ -19,7 +19,7 @@ const issuedCode = {
 
 async function freshDb() {
     const db = new MemoryDbAdapter();
-    await db.createSchema();
+    await db.postSchemaCreation();
     return db;
 }
 
@@ -401,7 +401,7 @@ async () => {
 test('a clients store fault is a 500, never 401',
 async () => {
     const db = await freshDb();
-    // Only EntityNotFound means 'unknown client'; any other
+    // Only EntityNotFoundError means 'unknown client'; any other
     // fault is a bug and must surface, not wear a 401 mask.
     (db.clients as unknown as {
         getById: () => Promise<never>;

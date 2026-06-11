@@ -6,7 +6,7 @@ import { ideaBody } from './test-fixtures.ts';
 
 async function seeded() {
     const db = new MemoryDbAdapter();
-    await db.createSchema();
+    await db.postSchemaCreation();
     await db.ideas.put('a1', ideaBody('A', 'mine'));
     await db.ideas.put('b1', ideaBody('B', 'theirs'));
     return db;

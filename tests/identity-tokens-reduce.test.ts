@@ -6,7 +6,6 @@ import {
     jtisInChain,
     isTokenRevoked,
     identityForJti,
-    chainState,
     planRotation,
 } from '../api/identity-tokens.ts';
 
@@ -79,18 +78,6 @@ test('identityForJti finds the owner', () => {
     const rows = [ev('a', 'issued', 'c1', '', T1)];
     assert.equal(identityForJti(rows, 'a'), 'current');
     assert.equal(identityForJti(rows, 'z'), null);
-});
-
-test('chainState reports the live jti and revoked flag', () => {
-    const rows = [
-        ev('a', 'issued', 'c1', '', T1),
-        ev('a', 'rotated', 'c1', '', T2),
-        ev('b', 'issued', 'c1', 'a', T2),
-    ];
-    assert.deepEqual(chainState(rows, 'c1'), {
-        chainId: 'c1', liveJti: 'b', revoked: false,
-    });
-    assert.equal(chainState(rows, 'nope'), null);
 });
 
 test('planRotation rotates a live jti', () => {

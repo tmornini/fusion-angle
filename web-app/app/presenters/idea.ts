@@ -1,7 +1,7 @@
 import {
     html, setHtml, SafeHtml,
 } from '../safe-html.ts';
-import { $required } from '../dom.ts';
+import { mutateSlot } from '../dom.ts';
 import {
     toggleStatusFilter,
 } from './list-filter.ts';
@@ -159,15 +159,6 @@ function buildShell(
     </div>
     <div class="idea-dialogs-slot"></div>
 </div>`);
-}
-
-function mutateSlot(
-    container: HTMLElement,
-    cls: string,
-    markup: SafeHtml,
-): void {
-    const slot = $required(cls, container);
-    setHtml(slot, markup);
 }
 
 function buildSubmittedByLine(
@@ -602,7 +593,6 @@ export class IdeaPresenter {
     }
 
     buildCard(
-        view: string,
         showGrip: boolean,
     ): SafeHtml {
         return html`
@@ -927,7 +917,7 @@ export class IdeaListPresenter {
                     a.positionSortKey()
                     - b.positionSortKey(),
             ),
-            idea => idea.buildCard('position', hasGrip),
+            idea => idea.buildCard(hasGrip),
         );
     }
 }

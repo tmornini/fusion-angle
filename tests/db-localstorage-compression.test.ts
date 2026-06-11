@@ -56,7 +56,7 @@ test(
     async () => {
         const map = installShim();
         const adapter = new LocalStorageDbAdapter();
-        await adapter.createSchema();
+        await adapter.postSchemaCreation();
         await adapter.flowVersions.put(
             'fv-prefix-test', baseVersion,
         );
@@ -77,7 +77,7 @@ test(
     async () => {
         installShim();
         const adapter = new LocalStorageDbAdapter();
-        await adapter.createSchema();
+        await adapter.postSchemaCreation();
         await adapter.flowVersions.put(
             'fv-rt', baseVersion,
         );
@@ -95,7 +95,7 @@ test(
     async () => {
         installShim();
         const adapter = new LocalStorageDbAdapter();
-        await adapter.createSchema();
+        await adapter.postSchemaCreation();
         await adapter.flowVersions.put(
             'fv-bool', baseVersion,
         );
@@ -116,7 +116,7 @@ test(
     async () => {
         installShim();
         const adapter = new LocalStorageDbAdapter();
-        await adapter.createSchema();
+        await adapter.postSchemaCreation();
         const ids = Array.from(
             { length: 11 },
             (_, i) => `u-${i}`,
@@ -146,7 +146,7 @@ test(
     async () => {
         const map = installShim();
         const adapter = new LocalStorageDbAdapter();
-        await adapter.createSchema();
+        await adapter.postSchemaCreation();
         await adapter.states.put(
             'evt-prefix-test',
             {
@@ -174,7 +174,7 @@ test(
     async () => {
         const map = installShim();
         const adapter = new LocalStorageDbAdapter();
-        await adapter.createSchema();
+        await adapter.postSchemaCreation();
         await adapter.members.put('u1', {
             type: 'human',
         });
@@ -193,7 +193,7 @@ test(
     async () => {
         const map = installShim();
         const adapter = new LocalStorageDbAdapter();
-        await adapter.createSchema();
+        await adapter.postSchemaCreation();
         for (let i = 0; i < 10; i++) {
             await adapter.flowVersions.put(
                 `fv-${i}`, baseVersion,
@@ -217,11 +217,11 @@ test(
     async () => {
         installShim();
         const adapter = new LocalStorageDbAdapter();
-        await adapter.createSchema();
+        await adapter.postSchemaCreation();
         await adapter.flowVersions.put(
             'fv-export', baseVersion,
         );
-        const json = await adapter.exportSnapshot();
+        const json = await adapter.getSnapshot();
         const parsed = JSON.parse(json);
         assert.ok(
             Array.isArray(parsed.flow_versions),
@@ -244,7 +244,7 @@ test(
                 { id: 'fv-imp', ...baseVersion },
             ],
         });
-        await adapter.importSnapshot(snapshot);
+        await adapter.putSnapshot(snapshot);
         const stored = map.get(
             KEY_PREFIX + 'flow_versions',
         );
@@ -262,7 +262,7 @@ test(
     async () => {
         const map = installShim();
         const adapter = new LocalStorageDbAdapter();
-        await adapter.createSchema();
+        await adapter.postSchemaCreation();
         const flowRow = {
             id: 'flow-aaaaaaaaaaaaaaaaaaaa',
             name: 'Test',

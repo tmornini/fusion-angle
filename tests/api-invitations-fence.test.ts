@@ -30,7 +30,7 @@ function req(
 // exactly why the invitation facade must stand outside it.
 async function seed(): Promise<MemoryDbAdapter> {
     const db = new MemoryDbAdapter();
-    await db.createSchema();
+    await db.postSchemaCreation();
     await db.organizations.put('1', orgRow('Stark'));
     await db.organizations.put('2', orgRow('Wayne'));
     for (const org of ['1', '2']) {

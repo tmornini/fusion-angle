@@ -1,5 +1,5 @@
 import {
-    $, $required, FOCUSABLE_SELECTOR,
+    $, $$, $required, FOCUSABLE_SELECTOR,
 } from './dom.ts';
 
 export function initMobileDrawer(
@@ -24,11 +24,9 @@ export function initMobileDrawer(
         backdrop.classList.remove(
             'hidden',
         );
-        const firstFocusable =
-            sheet
-                .querySelector<
-                    HTMLElement
-                >(FOCUSABLE_SELECTOR);
+        const firstFocusable = $(
+            FOCUSABLE_SELECTOR, sheet,
+        );
         firstFocusable?.focus();
     }
 
@@ -69,11 +67,9 @@ export function initMobileDrawer(
         'keydown',
         (e) => {
             if (e.key !== 'Tab') return;
-            const focusable =
-                sheet
-                    .querySelectorAll<
-                        HTMLElement
-                    >(FOCUSABLE_SELECTOR);
+            const focusable = $$(
+                FOCUSABLE_SELECTOR, sheet,
+            );
             if (focusable.length === 0)
                 return;
             const first =

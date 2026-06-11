@@ -6,10 +6,7 @@ import {
 } from '../web-app/app/adapters/shared.ts';
 import { devToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
-import { verifyPassword } from '../api/password-hash.ts';
 import {
-    postIdentityCredentialSet,
-    postIdentityCredentialRotation,
     postIdentityCredentialRevocation,
     getIdentityCredentialState,
 } from
@@ -21,25 +18,23 @@ async function setup() {
     return { db, ctx: createRequestContext(db, await devToken()) };
 }
 
-test('set marks the kind active', async () => {
-    const { ctx } = await setup();
-    await postIdentityCredentialSet(
-        ctx, 'p1', 'password', 'secret-v1',
-    );
-    const state =
-        await getIdentityCredentialState(ctx, 'p1');
-    assert.deepEqual(state.active, ['password']);
-});
-
 test('ledger retains set, rotate, revoke; latest wins',
 async () => {
     const { db, ctx } = await setup();
-    await postIdentityCredentialSet(
-        ctx, 'p1', 'password', 'secret-v1',
-    );
-    await postIdentityCredentialRotation(
-        ctx, 'p1', 'password', 'secret-v2',
-    );
+    await db.identityCredentials.put('c1', {
+        identity_id: 'p1',
+        kind: 'password',
+        status: 'set',
+        secret: 'phc-v1',
+        at: '2026-01-01T00:00:00.000000Z',
+    });
+    await db.identityCredentials.put('c2', {
+        identity_id: 'p1',
+        kind: 'password',
+        status: 'rotated',
+        secret: 'phc-v2',
+        at: '2026-01-02T00:00:00.000000Z',
+    });
     await postIdentityCredentialRevocation(
         ctx, 'p1', 'password',
     );
@@ -53,10 +48,14 @@ async () => {
 
 test('the secret never leaves the state adapter',
 async () => {
-    const { ctx } = await setup();
-    await postIdentityCredentialSet(
-        ctx, 'p1', 'password', 'super-secret',
-    );
+    const { db, ctx } = await setup();
+    await db.identityCredentials.put('c1', {
+        identity_id: 'p1',
+        kind: 'password',
+        status: 'set',
+        secret: 'super-secret',
+        at: '2026-01-01T00:00:00.000000Z',
+    });
     const state =
         await getIdentityCredentialState(ctx, 'p1');
     assert.equal('secret' in state, false);
@@ -65,22 +64,6 @@ async () => {
             .includes('super-secret'),
         false,
     );
-});
-
-test('the stored secret is a hashed PHC, not plaintext',
-async () => {
-    const { db, ctx } = await setup();
-    await postIdentityCredentialSet(
-        ctx, 'p1', 'password', 'super-secret',
-    );
-    const row = (await db.identityCredentials.getAll())
-        .find(r => r.identity_id === 'p1');
-    assert.ok(row, 'credential row exists');
-    assert.match(row.secret, /^\$pbkdf2-sha256\$/);
-    assert.notEqual(row.secret, 'super-secret');
-    assert.equal(
-        await verifyPassword('super-secret', row.secret),
-        true);
 });
 
 test('credential state is latest by at, not array order',

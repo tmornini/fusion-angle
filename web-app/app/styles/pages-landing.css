@@ -554,4 +554,3 @@
   transition: color var(--duration-fast) var(--ease-default);
 }
 .footer-socials a:hover { color: hsl(var(--foreground)); }
-

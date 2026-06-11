@@ -33,12 +33,12 @@ import {
 import {
     sessionContext,
     getHumanMember,
-    getHumanMemberRow,
+    getHumanMemberEntity,
     putHumanMember,
     postHumanMemberStateChange,
     subscribeHumanMemberChanges,
     getAIMember,
-    getAIMemberRow,
+    getAIMemberEntity,
     putAIMember,
     postAIMemberStateChange,
     subscribeAIMemberChanges,
@@ -438,7 +438,7 @@ async function saveHumanMember(
     const ctx = sessionContext();
     let row;
     try {
-        row = await getHumanMemberRow(
+        row = await getHumanMemberEntity(
             ctx, memberId,
         );
     } catch (err) {
@@ -482,7 +482,7 @@ async function saveAIMember(
     const ctx = sessionContext();
     let row;
     try {
-        row = await getAIMemberRow(
+        row = await getAIMemberEntity(
             ctx, memberId,
         );
     } catch (err) {

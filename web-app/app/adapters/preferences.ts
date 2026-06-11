@@ -15,7 +15,7 @@ function getPreference(
 // propagate. The boolean lets the caller
 // surface the failure to the user when the
 // preference is user-initiated.
-function writePreference(
+function putPreference(
     key: string,
     value: string,
 ): boolean {
@@ -41,5 +41,5 @@ function writePreference(
 
 export {
     getPreference,
-    writePreference,
+    putPreference,
 };

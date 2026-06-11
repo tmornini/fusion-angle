@@ -517,7 +517,7 @@
     <rect class="head" x="1560" y="642" width="208" height="26" rx="6" />
     <text class="thead" x="1570" y="660">objective_revisions</text>
     <text class="pk" x="1570" y="681">id</text>
-    <text class="type" x="1758" y="681">text</text>
+    <text class="type" x="1758" y="681">id</text>
     <text class="fk" x="1570" y="699">objective_id</text>
     <text class="type" x="1758" y="699">id</text>
     <text class="col" x="1570" y="717">name</text>
@@ -534,7 +534,7 @@
     <rect class="head" x="1864" y="204" width="208" height="26" rx="6" />
     <text class="thead" x="1874" y="222">project_objective_baseline_scores</text>
     <text class="pk" x="1874" y="243">id</text>
-    <text class="type" x="2062" y="243">text</text>
+    <text class="type" x="2062" y="243">id</text>
     <text class="fk" x="1874" y="261">project_id</text>
     <text class="type" x="2062" y="261">id</text>
     <text class="fk" x="1874" y="279">objective_id</text>
@@ -551,7 +551,7 @@
     <rect class="head" x="1864" y="40" width="208" height="26" rx="6" />
     <text class="thead" x="1874" y="58">project_objective_actual_scores</text>
     <text class="pk" x="1874" y="79">id</text>
-    <text class="type" x="2062" y="79">text</text>
+    <text class="type" x="2062" y="79">id</text>
     <text class="fk" x="1874" y="97">project_id</text>
     <text class="type" x="2062" y="97">id</text>
     <text class="fk" x="1874" y="115">objective_id</text>

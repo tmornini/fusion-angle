@@ -1,5 +1,5 @@
 import {
-    $, $input, $required, $textarea,
+    $, $$, $input, $required, $textarea,
     bindEnterToClick,
 } from '../app/dom.ts';
 import {
@@ -8,7 +8,7 @@ import {
 import { navigateTo } from '../app/core.ts';
 import {
     sessionContext,
-    getIdeaRows,
+    getIdeaEntities,
     postIdeaCreation,
     putIdeaSubmission,
     generateCryptoSafeBase62,
@@ -135,7 +135,7 @@ export async function init():
                 const ideaId =
                     generateCryptoSafeBase62();
                 const existing =
-                    await getIdeaRows(ctx);
+                    await getIdeaEntities(ctx);
                 const position = nextPosition(
                     existing.map(r => r.position),
                 );
@@ -180,11 +180,7 @@ export async function init():
             + ' #idea-create'
             + '-step-content'
             + ' textarea';
-        document
-            .querySelectorAll<
-                HTMLInputElement
-                | HTMLTextAreaElement
-            >(selector)
+        $$(selector, document)
             .forEach(field => {
                 field.addEventListener(
                     'input',
@@ -201,6 +197,7 @@ export async function init():
         bindEnterToClick(
             '#idea-create-field-title',
             nextSel,
+            document,
         );
     }
 

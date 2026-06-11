@@ -21,7 +21,7 @@ test('TABLE_NAMES includes the objective tables', () => {
 test('MemoryDbAdapter exposes objective stores',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
+        await db.postSchemaCreation();
         await db.objectives.put('o1', {
             organization_id: '1', position: 0,
         });

@@ -3,6 +3,7 @@ import {
 } from '../safe-html.ts';
 import { initials } from '../core.ts';
 import { DISPLAY_ABSENT } from '../format.ts';
+import { mutedEmptyNote } from './empty-note.ts';
 import { iconShield } from '../icons.ts';
 import {
     IDENTITY_WITHOUT_PII_NAME,
@@ -78,12 +79,6 @@ function buildRow(row: IdentityRosterRow): SafeHtml {
         </div>`;
 }
 
-function buildEmptyState(): SafeHtml {
-    return html`<div class="${
-        'p-4 text-sm text-muted text-center'
-    }">No identities yet.</div>`;
-}
-
 export class IdentityRosterPresenter {
     readonly #rows: readonly IdentityRosterRow[];
 
@@ -94,7 +89,7 @@ export class IdentityRosterPresenter {
     render(container: HTMLElement): void {
         setHtml(container, html`${
             this.#rows.length === 0
-                ? buildEmptyState()
+                ? mutedEmptyNote('No identities yet.')
                 : html`${this.#rows.map(buildRow)}`
         }`);
     }

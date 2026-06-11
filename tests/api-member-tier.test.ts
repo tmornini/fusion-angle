@@ -26,7 +26,7 @@ function req(
 
 async function memberDb(): Promise<MemoryDbAdapter> {
     const db = new MemoryDbAdapter();
-    await db.createSchema();
+    await db.postSchemaCreation();
     await seedOrgMember(db, MEMBER);
     return db;
 }

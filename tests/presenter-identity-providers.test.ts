@@ -1,16 +1,16 @@
 // state.ts reads localStorage / window / document at
 // module-eval time; stub before importing presenters.
-// @ts-expect-error - Node global stub
+// @ts-expect-error — Node global stub
 globalThis.localStorage = {
     getItem: () => null,
     setItem: () => {},
 };
-// @ts-expect-error - Node global stub
+// @ts-expect-error — Node global stub
 globalThis.window = {
     matchMedia: () => ({ matches: false }),
     addEventListener: () => {},
 };
-// @ts-expect-error - Node global stub
+// @ts-expect-error — Node global stub
 globalThis.document = { addEventListener: () => {} };
 
 import { test } from 'node:test';

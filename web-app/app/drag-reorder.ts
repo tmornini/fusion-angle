@@ -1,4 +1,4 @@
-import { createElement } from './dom.ts';
+import { $$, createElement } from './dom.ts';
 import {
     computeNewPosition,
     dropIndex as computeDropIndex,
@@ -36,12 +36,7 @@ export function initDragReorder(
         null;
 
     function cards(): HTMLElement[] {
-        return [
-            ...container
-                .querySelectorAll<
-                    HTMLElement
-                >(cardSelector),
-        ];
+        return $$(cardSelector, container);
     }
 
     function buildIndicator():

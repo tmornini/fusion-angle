@@ -23,28 +23,27 @@ export function subscribeInvitationChanges(
     return invitationChanges.subscribe(fn);
 }
 
-export function notifyInvitationChange(): void {
-    invitationChanges.notify();
-}
-
 // One invitation as the invitee sees it: the inviting org, who
-// invited them, when, and the current lifecycle state.
+// invited them, when, and the current lifecycle state. An
+// absent related row (erased inviter PII, vanished org) is an
+// absent key — never a '' sentinel.
 export interface InvitationView {
     readonly id: Id;
     readonly organizationId: Id;
-    readonly organizationName: string;
-    readonly invitedByName: string;
+    readonly organizationName?: string;
+    readonly invitedByName?: string;
     readonly invitedAt: string;
     readonly state: InvitationState;
 }
 
 // One outstanding invitation as the inviting admin sees it: the
-// invitee email they sent it to, and when.
+// invitee email they sent it to, and when. Erased invitee PII
+// is an absent key.
 export interface SentInvitation {
     readonly id: Id;
     readonly organizationId: Id;
     readonly identityId: Id;
-    readonly inviteeEmail: string;
+    readonly inviteeEmail?: string;
     readonly invitedAt: string;
     readonly state: InvitationState;
 }
@@ -52,9 +51,9 @@ export interface SentInvitation {
 interface InviteeRow {
     id: Id;
     organization_id: Id;
-    organization_name: string;
+    organization_name?: string;
     identity_id: Id;
-    invited_by_name: string;
+    invited_by_name?: string;
     at: string;
     state: InvitationState;
 }
@@ -63,7 +62,7 @@ interface SentRow {
     id: Id;
     organization_id: Id;
     identity_id: Id;
-    invitee_email: string;
+    invitee_email?: string;
     at: string;
     state: InvitationState;
 }
@@ -78,8 +77,12 @@ export async function getInvitations(
     return rows.map(row => ({
         id: row.id,
         organizationId: row.organization_id,
-        organizationName: row.organization_name,
-        invitedByName: row.invited_by_name,
+        ...(row.organization_name !== undefined
+            ? { organizationName: row.organization_name }
+            : {}),
+        ...(row.invited_by_name !== undefined
+            ? { invitedByName: row.invited_by_name }
+            : {}),
         invitedAt: row.at,
         state: row.state,
     }));
@@ -95,7 +98,9 @@ export async function getSentInvitations(
         id: row.id,
         organizationId: row.organization_id,
         identityId: row.identity_id,
-        inviteeEmail: row.invitee_email,
+        ...(row.invitee_email !== undefined
+            ? { inviteeEmail: row.invitee_email }
+            : {}),
         invitedAt: row.at,
         state: row.state,
     }));

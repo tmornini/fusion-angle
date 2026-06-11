@@ -4,7 +4,7 @@ import { strict as assert } from 'node:assert';
 // url-params.ts -> location.ts reads window.location.search.
 // Stub a minimal window so getUrlParam/getUrlParams work.
 function setSearch(search: string): void {
-    // @ts-expect-error - Node global stub
+    // @ts-expect-error — Node global stub
     globalThis.window = { location: { search } };
 }
 setSearch('');

@@ -147,17 +147,6 @@
   background: hsl(var(--muted) / 0.5);
 }
 
-.team-member-avatar {
-  width: 2.25rem;
-  height: 2.25rem;
-  border-radius: var(--radius);
-  background: hsl(var(--primary) / 0.1);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
 .flow-icon-pill {
   padding: var(--space-2);
   border-radius: var(--radius);
@@ -169,6 +158,9 @@
   text-decoration: none;
   color: inherit;
   display: block;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
 }
 
 .input-narrow-num {
@@ -209,4 +201,3 @@
   font-size: 1.125rem;
   font-weight: var(--font-weight-bold);
 }
-

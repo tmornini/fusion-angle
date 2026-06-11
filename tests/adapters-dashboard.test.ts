@@ -3,12 +3,7 @@ import { strict as assert } from 'node:assert';
 import {
     MemoryDbAdapter,
 } from '../api/db-memory.ts';
-import {
-    createRequestContext,
-    type RequestContext,
-} from '../web-app/app/adapters/shared.ts';
-import { devToken } from './token-fixtures.ts';
-import { seedAdminSchema } from './test-fixtures.ts';
+import { adminContext } from './context-fixtures.ts';
 import {
     getDashboardStats,
     getDashboardGauges,
@@ -19,17 +14,8 @@ import {
     type ProjectState,
     type FlowEntity,
     type JsonObjectField,
+    DEFAULT_LOCK_TIMEOUT,
 } from '../api/types.ts';
-
-async function setupDb(): Promise<{
-    db: MemoryDbAdapter;
-    ctx: RequestContext;
-}> {
-    const db = new MemoryDbAdapter();
-    await seedAdminSchema(db);
-    const ctx = createRequestContext(db, await devToken());
-    return { db, ctx };
-}
 
 function buildIdea(
     id: string,
@@ -52,7 +38,7 @@ async function seedIdea(
     state: string,
 ): Promise<void> {
     await db.ideas.put(id, buildIdea(id));
-    await db.states.record(
+    await db.states.postEvent(
         `st-${id}`, id, state, 'system',
     );
 }
@@ -87,7 +73,7 @@ async function seedProject(
     await db.projects.put(
         id, buildProject(id, overrides),
     );
-    await db.states.record(
+    await db.states.postEvent(
         `st-${id}`, id, state, 'system',
     );
 }
@@ -104,7 +90,7 @@ function buildFlow(
         is_locked: false,
         is_auto_layout: true,
         is_auto_fit: true,
-        lock_timeout: 28800,
+        lock_timeout: DEFAULT_LOCK_TIMEOUT,
         graph: EMPTY_GRAPH,
     };
 }
@@ -112,7 +98,7 @@ function buildFlow(
 test(
     'getDashboardStats labels Ideas, Projects, Flows',
     async () => {
-        const { ctx } = await setupDb();
+        const { ctx } = await adminContext();
         const stats = await getDashboardStats(ctx);
         assert.deepEqual(
             stats.map(s => s.label),
@@ -124,7 +110,7 @@ test(
 test(
     'getDashboardStats is all zeros on empty db',
     async () => {
-        const { ctx } = await setupDb();
+        const { ctx } = await adminContext();
         const stats = await getDashboardStats(ctx);
         assert.deepEqual(
             stats.map(s => s.value),
@@ -136,7 +122,7 @@ test(
 test(
     'getDashboardStats counts seeded entities',
     async () => {
-        const { db, ctx } = await setupDb();
+        const { db, ctx } = await adminContext();
         await seedIdea(db, 'i1', 'active');
         await seedIdea(db, 'i2', 'in-review');
         await seedProject(db, 'p1', 'approved');
@@ -153,7 +139,7 @@ test(
 test(
     'getDashboardStats excludes archived ideas',
     async () => {
-        const { db, ctx } = await setupDb();
+        const { db, ctx } = await adminContext();
         await seedIdea(db, 'i1', 'active');
         await seedIdea(db, 'i2', 'archived');
         await seedIdea(db, 'i3', 'deleted');
@@ -167,7 +153,7 @@ test(
 test(
     'getDashboardStats excludes deleted projects',
     async () => {
-        const { db, ctx } = await setupDb();
+        const { db, ctx } = await adminContext();
         await seedProject(db, 'p1', 'approved');
         await seedProject(db, 'p2', 'deleted');
         const stats = await getDashboardStats(ctx);
@@ -180,7 +166,7 @@ test(
 test(
     'getDashboardStats counts tombstoned out',
     async () => {
-        const { db, ctx } = await setupDb();
+        const { db, ctx } = await adminContext();
         await seedProject(db, 'p1', 'approved');
         await seedProject(db, 'p2', 'approved');
         await db.projects.delete('p2');
@@ -199,7 +185,7 @@ test(
 test(
     'getDashboardGauges returns Time, Cost, Impact',
     async () => {
-        const { ctx } = await setupDb();
+        const { ctx } = await adminContext();
         const gauges = await getDashboardGauges(ctx);
         assert.deepEqual(
             gauges.map(g => g.title),
@@ -215,7 +201,7 @@ test(
 test(
     'getDashboardGauges is zeroed on empty db',
     async () => {
-        const { ctx } = await setupDb();
+        const { ctx } = await adminContext();
         const gauges = await getDashboardGauges(ctx);
         const cost = gauges
             .find(g => g.title === 'Cost');
@@ -227,7 +213,7 @@ test(
 test(
     'getDashboardGauges sums approved projects only',
     async () => {
-        const { db, ctx } = await setupDb();
+        const { db, ctx } = await adminContext();
         await seedProject(db, 'p1', 'approved', {
             estimated_cost: 1000,
             actual_cost: 400,
@@ -253,7 +239,7 @@ test(
 test(
     'getDashboardGauges Time sums the 10-day span',
     async () => {
-        const { db, ctx } = await setupDb();
+        const { db, ctx } = await adminContext();
         await seedProject(db, 'p1', 'approved', {
             start_date: '2026-01-01',
             target_end_date: '2026-01-11',
@@ -269,9 +255,7 @@ test(
 test(
     'getDashboardGauges returns the three sibling gauges',
     async () => {
-        const db = new MemoryDbAdapter();
-        await seedAdminSchema(db);
-        const ctx = createRequestContext(db, await devToken());
+        const { ctx } = await adminContext();
         const gauges = await getDashboardGauges(ctx);
         assert.equal(gauges.length, 3);
         const titles = gauges.map(
@@ -288,7 +272,7 @@ test(
 test(
     'getDashboardGauges marks Impact as bipolar',
     async () => {
-        const { ctx } = await setupDb();
+        const { ctx } = await adminContext();
         const gauges = await getDashboardGauges(ctx);
         const impact = gauges
             .find(g => g.title === 'Impact');
@@ -299,7 +283,7 @@ test(
 test(
     'getDashboardGauges marks Time and Cost as ratio',
     async () => {
-        const { ctx } = await setupDb();
+        const { ctx } = await adminContext();
         const gauges = await getDashboardGauges(ctx);
         const time = gauges
             .find(g => g.title === 'Time');
@@ -314,7 +298,7 @@ test(
     'getDashboardGauges Impact passes'
     + ' undefined means without clamping to zero',
     async () => {
-        const { ctx } = await setupDb();
+        const { ctx } = await adminContext();
         const gauges = await getDashboardGauges(ctx);
         const impact = gauges
             .find(g => g.title === 'Impact');

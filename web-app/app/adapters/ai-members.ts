@@ -31,10 +31,6 @@ export function subscribeAIMemberChanges(
     return aiMemberChanges.subscribe(fn);
 }
 
-export function notifyAIMemberChange(): void {
-    aiMemberChanges.notify();
-}
-
 export type AIMemberDraft =
     Omit<AIMemberEntity, 'id'>;
 
@@ -108,7 +104,7 @@ export async function getAIMember(
     return new AIMember(parent, detail, state);
 }
 
-export async function getAIMemberRow(
+export async function getAIMemberEntity(
     ctx: RequestContext,
     id: MemberId,
 ): Promise<AIMemberEntity> {

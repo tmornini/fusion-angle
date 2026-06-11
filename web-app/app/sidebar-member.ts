@@ -1,4 +1,4 @@
-import { $ } from './dom.ts';
+import { $, $$ } from './dom.ts';
 import { setHtml } from './safe-html.ts';
 import { navigateTo } from './navigation.ts';
 import {
@@ -81,8 +81,7 @@ export async function mutateSidebarMember(
         if (el) setHtml(el, switcher);
     }
     wireOrgSwitcher(sidebarMember.activeOrgId);
-    const chips = document.querySelectorAll<HTMLElement>(
-        '.sidebar-member');
+    const chips = $$('.sidebar-member', document);
     for (const chip of chips) {
         chip.addEventListener(
             'click',

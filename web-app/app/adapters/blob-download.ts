@@ -1,6 +1,6 @@
 import { createElement } from '../dom.ts';
 
-export function downloadBlob(
+export function postBlobDownload(
     blob: Blob,
     filename: string,
 ): void {

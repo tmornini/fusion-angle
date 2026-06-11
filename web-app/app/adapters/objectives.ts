@@ -44,15 +44,6 @@ export function notifyObjectiveChange(): void {
     objectiveChanges.notify();
 }
 
-export async function getObjective(
-    ctx: RequestContext,
-    id: ObjectiveId,
-): Promise<Objective> {
-    return ctx.GET<Objective>(
-        `objectives/${id}`,
-    );
-}
-
 export async function getObjectives(
     ctx: RequestContext,
 ): Promise<Objective[]> {
@@ -149,31 +140,6 @@ export async function getCurrentObjectiveDefinition(
         b.at.localeCompare(a.at),
     );
     const latest = revs[0]!;
-    return {
-        name: latest.name,
-        description: latest.description,
-    };
-}
-
-export async function getObjectiveDefinitionAt(
-    ctx: RequestContext,
-    id: ObjectiveId,
-    atTime: string,
-): Promise<{ name: string; description: string }> {
-    const revs = await getObjectiveRevisions(ctx, id);
-    const eligible = revs.filter(
-        r => r.at <= atTime,
-    );
-    if (eligible.length === 0) {
-        throw new Error(
-            'no revision of ' + id
-            + ' at or before ' + atTime,
-        );
-    }
-    eligible.sort((a, b) =>
-        b.at.localeCompare(a.at),
-    );
-    const latest = eligible[0]!;
     return {
         name: latest.name,
         description: latest.description,

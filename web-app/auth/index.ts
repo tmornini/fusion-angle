@@ -18,14 +18,14 @@ import { getViewportWidth } from '../app/adapters/index.ts';
 import {
     getDbAdapter,
     getSessionToken,
-    setSessionToken,
+    putSessionToken,
     sessionHasReachableOrg,
 } from '../app/adapters/init.ts';
 import {
     createRequestContext,
 } from '../app/adapters/shared.ts';
 import {
-    loginViaPassword,
+    postPasswordLogin,
 } from '../app/adapters/authentication.ts';
 import {
     putSessionCredentials,
@@ -35,6 +35,14 @@ import type {
 } from '../app/adapters/session-credentials.ts';
 import { decodeReturnTarget } from '../app/auth-redirect.ts';
 import { getUrlParam } from '../app/adapters/url-params.ts';
+
+// The design system's lg breakpoint (CLAUDE.md § Mobile
+// Responsiveness) — the one TypeScript viewport check.
+const LG_BREAKPOINT_PX = 1024;
+
+// Spinner dwell before the submit continuation runs, so
+// the loading state is perceivable rather than a flicker.
+const SUBMIT_DWELL_MS = 800;
 
 function validateEmail(
     email: string,
@@ -251,10 +259,10 @@ export async function init(): Promise<void> {
                                 name="password"
                                 type="password"
                                 placeholder="${
-                                    '\u2022\u2022'
-                                    + '\u2022\u2022'
-                                    + '\u2022\u2022'
-                                    + '\u2022\u2022'
+                                    '••'
+                                    + '••'
+                                    + '••'
+                                    + '••'
                                 }"
                                 autocomplete="${
                                     'current-'
@@ -380,7 +388,7 @@ export async function init(): Promise<void> {
     const branding = $('#auth-branding', document);
     if (
         branding
-        && getViewportWidth() >= 1024
+        && getViewportWidth() >= LG_BREAKPOINT_PX
     ) {
         branding.classList.remove('hidden');
         branding.style.display = '';
@@ -388,7 +396,7 @@ export async function init(): Promise<void> {
     const mobileLogo = $('#mobile-logo', document);
     if (
         mobileLogo
-        && getViewportWidth() >= 1024
+        && getViewportWidth() >= LG_BREAKPOINT_PX
     ) {
         mobileLogo.classList.add('hidden');
     }
@@ -539,7 +547,7 @@ export async function init(): Promise<void> {
                 // OLD one on a 401 (a wrong password).
                 let creds: SessionCredentials | null;
                 try {
-                    creds = await loginViaPassword(
+                    creds = await postPasswordLogin(
                         createRequestContext(
                             getDbAdapter(), getSessionToken()),
                         email, password,
@@ -577,7 +585,7 @@ export async function init(): Promise<void> {
                 // only the persisted blob survives to re-
                 // establish the session at boot.
                 putSessionCredentials(creds);
-                setSessionToken(creds.accessToken);
+                putSessionToken(creds.accessToken);
                 // A zero-membership identity reaches no org and
                 // would 403 every org-scoped route; land it on
                 // its pending invitations instead of the return
@@ -605,6 +613,6 @@ export async function init(): Promise<void> {
             );
             isLogin = true;
             updateMode();
-        }, 800);
+        }, SUBMIT_DWELL_MS);
     });
 }

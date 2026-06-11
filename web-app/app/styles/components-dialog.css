@@ -51,14 +51,6 @@
   }
 }
 
-.modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.6em;
-  margin-top: 1em;
-}
-
-
 .dialog-backdrop {
   position: fixed;
   inset: 0;
@@ -109,7 +101,6 @@
   margin-top: var(--space-6);
 }
 
-
 .sheet-backdrop {
   position: fixed;
   inset: 0;
@@ -133,10 +124,3 @@
   width: 18rem;
   animation: slide-in-left var(--duration-slow) var(--ease-out);
 }
-
-.sheet-right {
-  right: 0;
-  width: 18rem;
-  animation: slide-in-right var(--duration-slow) var(--ease-out);
-}
-

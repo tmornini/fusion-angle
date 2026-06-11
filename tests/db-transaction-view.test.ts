@@ -13,7 +13,7 @@ test(
     'a view commits writes across stores atomically',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
+        await db.postSchemaCreation();
         await db.transaction(
             ['members', 'states'],
             async (view) => {
@@ -34,7 +34,7 @@ test(
     'a throw inside the view rolls back every store',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
+        await db.postSchemaCreation();
         await assert.rejects(
             () => db.transaction(
                 ['members', 'states'],
@@ -59,7 +59,7 @@ test(
     'stores in the view share one uncommitted buffer',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
+        await db.postSchemaCreation();
         const seen = await db.transaction(
             ['members', 'states'],
             async (view) => {
@@ -80,7 +80,7 @@ test(
     'a nested view transaction throws',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
+        await db.postSchemaCreation();
         await assert.rejects(
             () => db.transaction(
                 ['members'],

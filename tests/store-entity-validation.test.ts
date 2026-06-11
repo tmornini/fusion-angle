@@ -7,7 +7,9 @@ import { MemoryStorageBackend }
     from '../api/backend-memory.ts';
 import { StateStore } from '../api/store-state.ts';
 import { backendRunner } from '../api/db.ts';
-import type { Tx, TxMode } from '../api/db.ts';
+import type {
+    StorageBackend, Tx, TxMode,
+} from '../api/db.ts';
 import { validateStateEntity } from '../api/validators.ts';
 
 interface Thing { id: string; n: number }
@@ -25,15 +27,40 @@ async function primedBackend(): Promise<MemoryStorageBackend> {
     return backend;
 }
 
-class CountingBackend extends MemoryStorageBackend {
+// Counts transactions by decoration — the same
+// implement-and-delegate layering the org- and
+// parent-scoped stores use.
+class CountingBackend implements StorageBackend {
     transactions = 0;
-    async transaction<R>(
+    readonly #inner = new MemoryStorageBackend();
+
+    transaction<R>(
         tables: readonly string[],
         mode: TxMode,
         fn: (tx: Tx) => Promise<R>,
     ): Promise<R> {
         this.transactions++;
-        return super.transaction(tables, mode, fn);
+        return this.#inner.transaction(
+            tables, mode, fn,
+        );
+    }
+
+    ensureTables(
+        tables: readonly string[],
+    ): Promise<void> {
+        return this.#inner.ensureTables(tables);
+    }
+
+    hasSchema(): Promise<boolean> {
+        return this.#inner.hasSchema();
+    }
+
+    postSchemaCreation(): Promise<void> {
+        return this.#inner.postSchemaCreation();
+    }
+
+    deleteSchema(): Promise<void> {
+        return this.#inner.deleteSchema();
     }
 }
 

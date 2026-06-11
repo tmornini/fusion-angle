@@ -10,14 +10,14 @@ import {
 } from '../web-app/app/adapters/shared.ts';
 import { devToken } from './token-fixtures.ts';
 import {
-    loginViaPassword,
+    postPasswordLogin,
 } from '../web-app/app/adapters/authentication.ts';
 
 const REFRESH_TTL_SECONDS = 30 * 24 * 60 * 60;
 
 async function passwordUserCtx() {
     const db = new MemoryDbAdapter();
-    await db.createSchema();
+    await db.postSchemaCreation();
     await db.roleGrants.put('rg', {
         organization_id: '1',
         identity_id: 'current', role: 'admin',
@@ -43,20 +43,20 @@ async function passwordUserCtx() {
     return { db, ctx };
 }
 
-test('loginViaPassword returns a gate-valid credential pair',
+test('postPasswordLogin returns a gate-valid credential pair',
 async () => {
     const { db, ctx } = await passwordUserCtx();
-    const creds = await loginViaPassword(
+    const creds = await postPasswordLogin(
         ctx, 'demo@example.com', 's3cret');
     assert.ok(creds);
     assert.ok(Array.isArray(
         await GET(db, 'members', creds.accessToken)));
 });
 
-test('loginViaPassword issues a 30-day refresh token',
+test('postPasswordLogin issues a 30-day refresh token',
 async () => {
     const { ctx } = await passwordUserCtx();
-    const creds = await loginViaPassword(
+    const creds = await postPasswordLogin(
         ctx, 'demo@example.com', 's3cret');
     assert.ok(creds);
     const claims = decodeAccessToken(creds.refreshToken);
@@ -64,25 +64,25 @@ async () => {
         claims.exp - claims.iat, REFRESH_TTL_SECONDS);
 });
 
-test('loginViaPassword returns null on a wrong password',
+test('postPasswordLogin returns null on a wrong password',
 async () => {
     const { ctx } = await passwordUserCtx();
     assert.equal(
-        await loginViaPassword(
+        await postPasswordLogin(
             ctx, 'demo@example.com', 'WRONG'),
         null);
 });
 
-test('loginViaPassword returns null for an unknown user',
+test('postPasswordLogin returns null for an unknown user',
 async () => {
     const { ctx } = await passwordUserCtx();
     assert.equal(
-        await loginViaPassword(
+        await postPasswordLogin(
             ctx, 'ghost@example.com', 's3cret'),
         null);
 });
 
-test('loginViaPassword rethrows a non-401 fault, never masks',
+test('postPasswordLogin rethrows a non-401 fault, never masks',
 async () => {
     // An upstream 500 / network fault is a BUG, not a wrong
     // password — it must surface, not collapse to null.
@@ -92,6 +92,6 @@ async () => {
         },
     } as unknown as RequestContext;
     await assert.rejects(
-        () => loginViaPassword(ctx, 'a@b.c', 'pw'),
+        () => postPasswordLogin(ctx, 'a@b.c', 'pw'),
         /upstream 500/);
 });

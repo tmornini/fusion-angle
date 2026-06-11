@@ -124,7 +124,7 @@ export type OpResult<TOk extends object> =
 
 export function failOp(
     toast: string,
-    toastVariant: ToastVariant = 'error',
+    toastVariant: ToastVariant,
 ): OpFail {
     return { kind: 'fail', toast, toastVariant };
 }
@@ -135,7 +135,9 @@ export function failOp(
 export function requireFlowNotLocked(
     snap: FlowSnapshot,
 ): OpFail | null {
-    return snap.isLocked ? failOp('Flow is locked') : null;
+    return snap.isLocked
+        ? failOp('Flow is locked', 'error')
+        : null;
 }
 
 export interface EdgeAddOk {
@@ -193,16 +195,20 @@ export async function performAddEdge(
         return failOp(
             'Cannot create transition'
             + ' from end state',
+            'error',
         );
     }
     if (to.isCreate) {
         return failOp(
             'Cannot create transition'
             + ' to start state',
+            'error',
         );
     }
     if (hasEdgeBetween(snap.edges, fromId, toId)) {
-        return failOp('Transition already exists');
+        return failOp(
+            'Transition already exists', 'error',
+        );
     }
     if (
         from.isCreate
@@ -212,6 +218,7 @@ export async function performAddEdge(
             'Start state allows'
             + ' only one outgoing'
             + ' transition',
+            'error',
         );
     }
     const edgeId = generateCryptoSafeBase62();
@@ -233,6 +240,7 @@ export async function performAddEdge(
         );
         return failOp(
             'Failed to create transition',
+            'error',
         );
     }
     return {
@@ -271,6 +279,7 @@ export async function performAddNodeAtPosition(
     if (fromNode.isArchive) {
         return failOp(
             'Cannot create from end state',
+            'error',
         );
     }
     if (
@@ -281,6 +290,7 @@ export async function performAddNodeAtPosition(
             'Start state allows'
             + ' only one outgoing'
             + ' transition',
+            'error',
         );
     }
     const nodeId = generateCryptoSafeBase62();
@@ -310,7 +320,7 @@ export async function performAddNodeAtPosition(
             'performAddNodeAtPosition failed',
             'flow-operations', err,
         );
-        return failOp('Failed to add state');
+        return failOp('Failed to add state', 'error');
     }
     return {
         kind: 'ok',
@@ -362,7 +372,9 @@ export async function performDeleteSelectedNodes(
             'performDeleteSelectedNodes failed',
             'flow-operations', err,
         );
-        return failOp('Failed to delete state');
+        return failOp(
+            'Failed to delete state', 'error',
+        );
     }
     return {
         kind: 'ok',
@@ -402,6 +414,7 @@ export async function performDeleteSelectedEdge(
         );
         return failOp(
             'Failed to delete transition',
+            'error',
         );
     }
     return {
@@ -457,6 +470,7 @@ export async function performAddAttributeRef(
         );
         return failOp(
             'Failed to add attribute',
+            'error',
         );
     }
     return {
@@ -500,6 +514,7 @@ export async function performRemoveAttributeRef(
         );
         return failOp(
             'Failed to remove attribute',
+            'error',
         );
     }
     return {
@@ -545,6 +560,7 @@ export async function performUpdateAttributeMode(
         );
         return failOp(
             'Failed to update attribute mode',
+            'error',
         );
     }
     return {
@@ -596,6 +612,7 @@ performUpdateAttributeRequired(
         return failOp(
             'Failed to update attribute'
             + ' required',
+            'error',
         );
     }
     return {
@@ -698,7 +715,7 @@ export async function performUndo(
             'performUndo failed',
             'flow-operations', err,
         );
-        return failOp('Undo failed');
+        return failOp('Undo failed', 'error');
     }
     notifyFlowChange();
     const graph = await getFlowGraph(
@@ -760,7 +777,7 @@ export async function performRedo(
             'performRedo failed',
             'flow-operations', err,
         );
-        return failOp('Redo failed');
+        return failOp('Redo failed', 'error');
     }
     notifyFlowChange();
     const graph = await getFlowGraph(
@@ -775,4 +792,3 @@ export async function performRedo(
         newHistory,
     };
 }
-

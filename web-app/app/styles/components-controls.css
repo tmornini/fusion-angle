@@ -31,17 +31,3 @@
 .switch[aria-checked="true"] .switch-thumb {
   transform: translateX(1.25rem);
 }
-
-
-.separator {
-  height: 1px;
-  width: 100%;
-  background-color: hsl(var(--border));
-}
-
-.separator-vertical {
-  width: 1px;
-  height: 100%;
-  background-color: hsl(var(--border));
-}
-

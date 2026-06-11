@@ -1,13 +1,6 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import {
-    MemoryDbAdapter,
-} from '../api/db-memory.ts';
-import {
-    createRequestContext,
-    type RequestContext,
-} from '../web-app/app/adapters/shared.ts';
-import { devToken } from './token-fixtures.ts';
+import { adminContext } from './context-fixtures.ts';
 import {
     postHumanMemberCreation,
     postHumanMemberStateChange,
@@ -21,7 +14,6 @@ import {
     seedCurrentMember,
     seedHumanMember,
 } from './member-fixtures.ts';
-import { seedAdminSchema } from './test-fixtures.ts';
 
 function buildHumanMember(
     name: string,
@@ -39,21 +31,11 @@ function buildHumanMember(
     };
 }
 
-async function setupDb(): Promise<{
-    db: MemoryDbAdapter;
-    ctx: RequestContext;
-}> {
-    const db = new MemoryDbAdapter();
-    await seedAdminSchema(db);
-    const ctx = createRequestContext(db, await devToken());
-    return { db, ctx };
-}
-
 test(
     'postHumanMemberCreation persists the row'
     + ' and records the initial state event',
     async () => {
-        const { db, ctx } = await setupDb();
+        const { db, ctx } = await adminContext();
         await seedCurrentMember(db);
 
         await postHumanMemberCreation(
@@ -68,7 +50,7 @@ test(
         const pii =
             await db.identityPii.getById('w1');
         assert.equal(pii.name, 'Alice');
-        const events = await db.states.allFor('w1');
+        const events = await db.states.getAllFor('w1');
         assert.equal(events.length, 1);
         assert.equal(events[0]?.state, 'active');
     },
@@ -78,7 +60,7 @@ test(
     'postHumanMemberStateChange records a state'
     + ' event without touching the member row',
     async () => {
-        const { db, ctx } = await setupDb();
+        const { db, ctx } = await adminContext();
         await seedCurrentMember(db);
         await seedHumanMember(db, 'w1', 'Original Name');
         const before = await db.members.getById('w1');
@@ -89,7 +71,7 @@ test(
 
         const after = await db.members.getById('w1');
         assert.deepEqual(after, before);
-        const events = await db.states.allFor('w1');
+        const events = await db.states.getAllFor('w1');
         assert.equal(events.length, 2);
         assert.equal(
             events.at(-1)?.state, 'archived',

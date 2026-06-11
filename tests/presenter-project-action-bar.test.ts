@@ -17,6 +17,7 @@ test('under-review with no scores: Approve disabled',
                 ],
             },
             { ready: true, problems: [] },
+            new Map(),
         );
         const html = p.buildReviewActions().toString();
         assert.ok(
@@ -32,6 +33,7 @@ test('under-review with full scoring: Approve enabled',
             PROJECT_ID, 'under-review',
             { ready: true, problems: [] },
             { ready: true, problems: [] },
+            new Map(),
         );
         const html = p.buildReviewActions().toString();
         const approveDisabled = html.includes(
@@ -52,6 +54,7 @@ test('approved project: Archive shown',
                       objectiveId: 'o1' },
                 ],
             },
+            new Map(),
         );
         const html =
             p.buildLifecycleActions().toString();
@@ -66,6 +69,7 @@ test('approved with full actuals: Archive enabled',
             PROJECT_ID, 'approved',
             { ready: true, problems: [] },
             { ready: true, problems: [] },
+            new Map(),
         );
         const html =
             p.buildLifecycleActions().toString();
@@ -81,6 +85,7 @@ test('submitted project: Score button hidden, other review actions shown',
             PROJECT_ID, 'submitted',
             { ready: true, problems: [] },
             { ready: true, problems: [] },
+            new Map(),
         );
         const html = p.buildReviewActions().toString();
         assert.equal(
@@ -108,6 +113,7 @@ test('sent-back project: Score button hidden, other review actions shown',
             PROJECT_ID, 'sent-back',
             { ready: true, problems: [] },
             { ready: true, problems: [] },
+            new Map(),
         );
         const html = p.buildReviewActions().toString();
         assert.equal(
@@ -194,6 +200,7 @@ test('review actions empty on approved (lifecycle in header)',
             PROJECT_ID, 'approved',
             { ready: true, problems: [] },
             { ready: true, problems: [] },
+            new Map(),
         );
         const html = p.buildReviewActions().toString();
         assert.equal(html.trim(), '');
@@ -205,6 +212,7 @@ test('lifecycle actions empty on under-review',
             PROJECT_ID, 'under-review',
             { ready: true, problems: [] },
             { ready: true, problems: [] },
+            new Map(),
         );
         const html =
             p.buildLifecycleActions().toString();

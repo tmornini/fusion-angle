@@ -1,5 +1,5 @@
 import {
-    $, $input, $inputRequired, $required,
+    $, $$, $input, $inputRequired, $required,
     $select,
 } from '../app/dom.ts';
 import { log } from '../app/logger.ts';
@@ -20,7 +20,7 @@ import {
     getFlowVersions,
     getHumanMembers,
     getAIMembers,
-    getRecordRows,
+    getRecordEntities,
     getRecordForFlow,
     getRecordAttributesByRecord,
     putFlowRecord,
@@ -38,7 +38,7 @@ import type {
     RecordId,
 } from '../../api/types.ts';
 import {
-    downloadBlob,
+    postBlobDownload,
 } from '../app/adapters/blob-download.ts';
 import {
     bindInteractions,
@@ -981,7 +981,7 @@ async function handleExportZip(
             unknown as ArrayBuffer],
         { type: 'application/zip' },
     );
-    downloadBlob(blob, result.name);
+    postBlobDownload(blob, result.name);
     showToast(
         'Flow exported',
         'success',
@@ -991,8 +991,9 @@ async function handleExportZip(
 function parseMemberIdsFromPanel(
     panelEl: HTMLElement,
 ): MemberId[] {
-    const inputs = panelEl.querySelectorAll(
+    const inputs = $$(
         'input[type="checkbox"][data-member-id]',
+        panelEl,
     );
     const ids: MemberId[] = [];
     for (const input of inputs) {
@@ -1346,7 +1347,7 @@ export async function init(
                 getFlowVersions(ctx, flowId),
                 getHumanMembers(ctx),
                 getAIMembers(ctx),
-                getRecordRows(ctx),
+                getRecordEntities(ctx),
                 getRecordForFlow(ctx, flowId),
             ]);
             const recordAttributes =
@@ -1422,11 +1423,11 @@ export async function init(
         container, signal,
     );
     bindKeyboardShortcuts(
-        container, panelStateRef, signal,
+        panelStateRef, signal,
     );
     bindFlushOnLeave(signal);
-    const initialWrap = container.querySelector(
-        '.flow-canvas-wrap',
+    const initialWrap = $(
+        '.flow-canvas-wrap', container,
     );
     if (initialWrap instanceof HTMLElement) {
         const w = initialWrap.clientWidth;
@@ -1444,8 +1445,8 @@ export async function init(
         }
     }
     subscribeResize(container, () => {
-        const liveWrap = container.querySelector(
-            '.flow-canvas-wrap',
+        const liveWrap = $(
+            '.flow-canvas-wrap', container,
         );
         if (!(liveWrap instanceof HTMLElement)) {
             return;
@@ -1492,7 +1493,6 @@ function bindFlushOnLeave(
 }
 
 function bindKeyboardShortcuts(
-    container: HTMLElement,
     panelStateRef: PanelStateRef,
     signal: AbortSignal,
 ): void {

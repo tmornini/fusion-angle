@@ -1,7 +1,7 @@
 import type { FlowEntity } from '../../../api/types.ts';
 import type { RequestContext } from './shared.ts';
 
-export async function getFlowRows(
+export async function getFlowEntities(
     ctx: RequestContext,
 ): Promise<FlowEntity[]> {
     return ctx.GET<FlowEntity[]>('flows');

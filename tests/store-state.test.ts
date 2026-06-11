@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import {
-    EntityNotFound,
+    EntityNotFoundError,
     LedgerImmutabilityError,
 } from '../api/db.ts';
 
@@ -10,7 +10,7 @@ test(
     'put round-trip writes and reads back the row',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
+        await db.postSchemaCreation();
         const written = await db.states.put('s1', {
             entity_id: 'e1',
             state: 'active',
@@ -30,7 +30,7 @@ test(
     'identical re-put is an idempotent ok',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
+        await db.postSchemaCreation();
         const fields = {
             entity_id: 'e1',
             state: 'active',
@@ -50,7 +50,7 @@ test(
     'different re-put throws and leaves the event intact',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
+        await db.postSchemaCreation();
         const fields = {
             entity_id: 'e1',
             state: 'active',
@@ -72,21 +72,21 @@ test(
 );
 
 test(
-    'getById throws EntityNotFound for unknown id',
+    'getById throws EntityNotFoundError for unknown id',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
+        await db.postSchemaCreation();
         await assert.rejects(
             () => db.states.getById('missing'),
             (err: unknown) =>
-                err instanceof EntityNotFound,
+                err instanceof EntityNotFoundError,
         );
     },
 );
 
 test('getAll returns every written row', async () => {
     const db = new MemoryDbAdapter();
-    await db.createSchema();
+    await db.postSchemaCreation();
     await db.states.put('s1', {
         entity_id: 'e1',
         state: 'a',
@@ -109,15 +109,15 @@ test(
     'record writes nowUtc; later record has later at',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await db.states.record('s1', 'e1', 'a', 'w1');
+        await db.postSchemaCreation();
+        await db.states.postEvent('s1', 'e1', 'a', 'w1');
         // RFC-3339 timestamps from Date.now() share
         // millisecond resolution; pause to guarantee
         // ordering on fast machines.
         await new Promise(resolve =>
             setTimeout(resolve, 2),
         );
-        await db.states.record('s2', 'e1', 'b', 'w1');
+        await db.states.postEvent('s2', 'e1', 'b', 'w1');
         const first = await db.states.getById('s1');
         const second = await db.states.getById('s2');
         assert.ok(second.at > first.at);
@@ -133,7 +133,7 @@ test(
     'currentFor returns the latest of three events',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
+        await db.postSchemaCreation();
         await db.states.put('s1', {
             entity_id: 'e1',
             state: 'a',
@@ -153,7 +153,7 @@ test(
             at: '2026-01-02T00:00:00.000000Z',
         });
         const current =
-            await db.states.currentFor('e1');
+            await db.states.getCurrentFor('e1');
         assert.ok(current !== null);
         assert.equal(current.id, 's2');
         assert.equal(current.state, 'b');
@@ -164,7 +164,7 @@ test(
     'currentFor returns null for unknown entity_id',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
+        await db.postSchemaCreation();
         await db.states.put('s1', {
             entity_id: 'e1',
             state: 'a',
@@ -172,7 +172,7 @@ test(
             at: '2026-01-01T00:00:00.000000Z',
         });
         const current =
-            await db.states.currentFor('unknown');
+            await db.states.getCurrentFor('unknown');
         assert.equal(current, null);
     },
 );
@@ -182,7 +182,7 @@ test(
         + 'ascending by at',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
+        await db.postSchemaCreation();
         await db.states.put('s1', {
             entity_id: 'e1',
             state: 'b',
@@ -207,7 +207,7 @@ test(
             member_id: 'w1',
             at: '2026-01-03T00:00:00.000000Z',
         });
-        const events = await db.states.allFor('e1');
+        const events = await db.states.getAllFor('e1');
         assert.equal(events.length, 3);
         assert.deepEqual(
             events.map(e => e.state),
@@ -228,7 +228,7 @@ test(
     'allFor returns empty array for unknown entity_id',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
+        await db.postSchemaCreation();
         await db.states.put('s1', {
             entity_id: 'e1',
             state: 'a',
@@ -236,7 +236,7 @@ test(
             at: '2026-01-01T00:00:00.000000Z',
         });
         const events =
-            await db.states.allFor('unknown');
+            await db.states.getAllFor('unknown');
         assert.deepEqual(events, []);
     },
 );

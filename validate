@@ -6,23 +6,24 @@ npx --no-install tsc --noEmit -p web-app/app/tsconfig.json
 ./test
 
 AWK_LINT='length > 78 {
-  printf "%s:%d: %d chars\n", FILENAME, FNR, length
+    printf "%s:%d: %d chars\n", FILENAME, FNR, length
 }'
 
 LONG_LINES=$( {
-  find api web-app tests -type f \
-    \( -name '*.ts' -o -name '*.html' -o -name '*.css' \) \
-    ! -path 'web-app/app/compose.ts' \
-    -exec awk "$AWK_LINT" {} +
-  find . -maxdepth 1 -type f -name '*.md' \
-    ! -name 'TEST-PLAN.md' \
-    -exec awk "$AWK_LINT" {} +
+    find api web-app tests -type f \
+        \( -name '*.ts' -o -name '*.html' -o -name '*.css' \) \
+        ! -path 'web-app/app/compose.ts' \
+        -exec awk "$AWK_LINT" {} +
+    find . -maxdepth 1 -type f -name '*.md' \
+        ! -name 'TEST-PLAN.md' \
+        -exec awk "$AWK_LINT" {} +
+    awk "$AWK_LINT" build serve test validate generate-schema-svg
 } )
 
 if [ -n "$LONG_LINES" ]; then
-  echo "Error: lines exceed 78 characters:" >&2
-  echo "$LONG_LINES" >&2
-  exit 1
+    echo "Error: lines exceed 78 characters:" >&2
+    echo "$LONG_LINES" >&2
+    exit 1
 fi
 
 # SCHEMA.svg is derived from the schema; fail if it has drifted.

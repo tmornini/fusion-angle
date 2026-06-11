@@ -2,6 +2,7 @@ import {
     initState,
     initListeners,
 } from './state.ts';
+import { $ } from './dom.ts';
 import {
     getPageName,
 } from './navigation.ts';
@@ -24,7 +25,7 @@ import {
 import {
     getDbAdapter,
     getSessionToken,
-    setSessionToken,
+    putSessionToken,
 } from './adapters/init.ts';
 import {
     sessionContext,
@@ -42,8 +43,11 @@ import {
     getIdentityDefaultOrg,
 } from './adapters/identity-default-org.ts';
 import {
+    nowEpochSeconds,
+} from '../../api/types.ts';
+import {
     getPreference,
-    writePreference,
+    putPreference,
 } from './adapters/preferences.ts';
 import {
     type SessionCredentials,
@@ -148,10 +152,10 @@ async function scopeBootToActiveOrg(): Promise<boolean> {
         getPreference(ACTIVE_ORG_KEY),
         await getIdentityDefaultOrg(ctx),
     );
-    setSessionToken(
+    putSessionToken(
         await postOrgSessionExchange(
             ctx, getSessionToken(), active));
-    writePreference(ACTIVE_ORG_KEY, active);
+    putPreference(ACTIVE_ORG_KEY, active);
     return true;
 }
 
@@ -172,14 +176,14 @@ async function scopeBootIfCredentialed(): Promise<void> {
     } catch {
         return;   // a corrupt blob here just stays anonymous
     }
-    const now = Math.floor(Date.now() / 1000);
+    const now = nowEpochSeconds();
     const decision = resolveCredentialDecision(creds, now);
     if (decision.kind === 'login') {
         return;   // nothing usable — keep the anonymous seed
     }
     try {
         if (decision.kind === 'install') {
-            setSessionToken(decision.accessToken);
+            putSessionToken(decision.accessToken);
         } else if (
             !(await refreshAndInstall(decision.refreshToken))
         ) {
@@ -194,8 +198,7 @@ async function scopeBootIfCredentialed(): Promise<void> {
 // Resolve the boot session from the persisted credential: install
 // a live access token, silently refresh a dead one, or bounce to
 // login when there is nothing usable. Returns false once it has
-// redirected — the caller must stop booting. `now` is computed
-// inline; the private nowSeconds stays private to init.
+// redirected — the caller must stop booting.
 async function bootAuthGate(): Promise<boolean> {
     let creds: SessionCredentials | null;
     try {
@@ -206,10 +209,10 @@ async function bootAuthGate(): Promise<boolean> {
         redirectToLogin();
         return false;
     }
-    const now = Math.floor(Date.now() / 1000);
+    const now = nowEpochSeconds();
     const decision = resolveCredentialDecision(creds, now);
     if (decision.kind === 'install') {
-        setSessionToken(decision.accessToken);
+        putSessionToken(decision.accessToken);
         return true;
     }
     if (decision.kind === 'refresh') {
@@ -244,7 +247,7 @@ async function refreshAndInstall(
         const creds = await postSessionRefresh(
             ctx, refreshToken);
         putSessionCredentials(creds);
-        setSessionToken(creds.accessToken);
+        putSessionToken(creds.accessToken);
         return true;
     } catch (err) {
         if (err instanceof UnauthorizedError) {
@@ -321,11 +324,7 @@ document.addEventListener(
             }
         }
 
-        if (
-            document.querySelector(
-                '.sidebar-layout',
-            )
-        ) {
+        if ($('.sidebar-layout', document)) {
             try {
                 await initSidebarLayout(
                     hasSchema,

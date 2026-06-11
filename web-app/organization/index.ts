@@ -136,8 +136,8 @@ async function renderObjectives(): Promise<void> {
     if (!box) return;
     setHtml(box, presenter.buildBox());
 
-    const activeList = box.querySelector<HTMLElement>(
-        '[data-list="active"]',
+    const activeList = $(
+        '[data-list="active"]', box,
     );
     if (!activeList) return;
     initDragReorder(
@@ -241,8 +241,7 @@ export async function init(): Promise<void> {
                 'Try Again',
             ),
         );
-        container
-            .querySelector('[data-retry-btn]')
+        $('[data-retry-btn]', container)
             ?.addEventListener(
                 'click', () => init(),
                 { signal },

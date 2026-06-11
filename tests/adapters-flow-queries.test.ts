@@ -14,11 +14,10 @@ import {
 } from
 '../web-app/app/adapters/flow-mutations.ts';
 import {
-    getFlows,
     getFlowsByProject,
     getFlowGraph,
     getFlowsWithProjectNames,
-    getProjectFlowRows,
+    getProjectFlowEntities,
     type FlowGraph,
 } from
 '../web-app/app/adapters/flow-queries.ts';
@@ -31,7 +30,7 @@ import type {
 import {
     DEFAULT_LOCK_TIMEOUT,
 } from '../api/types.ts';
-import { populateMockData } from '../api/mock-data.ts';
+import { postMockDataLoad } from '../api/mock-data.ts';
 import { NODE_WIDTH } from '../web-app/app/flow-layout.ts';
 import {
     seedHumanMember,
@@ -211,62 +210,6 @@ test(
 );
 
 test(
-    'getFlows summarizes every flow with'
-    + ' node and edge counts',
-    async () => {
-        const { db } = await setupMemDb();
-        const c1 = createRequestContext(db, await devToken());
-        await createBaseFlow(c1, 'flow-1', 'p1');
-        await createBaseFlow(c1, 'flow-2', 'p1');
-        await saveGraph(
-            createRequestContext(db, await devToken()), 'flow-1',
-            [
-                buildNode('a'), buildNode('b'),
-                buildNode('c'),
-            ],
-            [buildEdge('ab', 'a', 'b')],
-        );
-        await saveGraph(
-            createRequestContext(db, await devToken()), 'flow-2',
-            [buildNode('x')], [],
-        );
-        const flows = await getFlows(
-            createRequestContext(db, await devToken()),
-        );
-        assert.equal(flows.length, 2);
-        const f1 = flows.find(
-            f => f.id === 'flow-1',
-        )!;
-        const f2 = flows.find(
-            f => f.id === 'flow-2',
-        )!;
-        assert.equal(f1.name, 'Flow flow-1');
-        assert.equal(f1.nodeCount, 3);
-        assert.equal(f1.edgeCount, 1);
-        assert.equal(f2.nodeCount, 1);
-        assert.equal(f2.edgeCount, 0);
-    },
-);
-
-test(
-    'getFlows on a fresh flow reports the'
-    + ' default two nodes and no edges',
-    async () => {
-        const { db } = await setupMemDb();
-        await createBaseFlow(
-            createRequestContext(db, await devToken()),
-            'flow-1', 'p1',
-        );
-        const flows = await getFlows(
-            createRequestContext(db, await devToken()),
-        );
-        assert.equal(flows.length, 1);
-        assert.equal(flows[0]!.nodeCount, 2);
-        assert.equal(flows[0]!.edgeCount, 0);
-    },
-);
-
-test(
     'getFlowsByProject returns only flows'
     + ' linked to the given project',
     async () => {
@@ -419,14 +362,14 @@ test(
 );
 
 test(
-    'getProjectFlowRows returns the link rows',
+    'getProjectFlowEntities returns the link rows',
     async () => {
         const { db } = await setupMemDb();
         const c1 = createRequestContext(db, await devToken());
         await createBaseFlow(c1, 'flow-1', 'p1');
         await createBaseFlow(c1, 'flow-2', 'p2');
         const rows: ProjectFlowEntity[] =
-            await getProjectFlowRows(
+            await getProjectFlowEntities(
                 createRequestContext(db, await devToken()),
             );
         assert.equal(rows.length, 2);
@@ -442,11 +385,11 @@ test(
 );
 
 test(
-    'getProjectFlowRows is empty when no'
+    'getProjectFlowEntities is empty when no'
     + ' flows have been created',
     async () => {
         const { db } = await setupMemDb();
-        const rows = await getProjectFlowRows(
+        const rows = await getProjectFlowEntities(
             createRequestContext(db, await devToken()),
         );
         assert.deepEqual(rows, []);
@@ -488,7 +431,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
-        await populateMockData(db);
+        await postMockDataLoad(db);
         const g = await getFlowGraph(
             createRequestContext(db, await devToken()),
             LAYOUT_TEST_FLOW_ID,

@@ -1,5 +1,5 @@
 import {
-    EntityNotFound,
+    EntityNotFoundError,
     type EntityStore as EntityStoreInterface,
     type EntityPut,
     type EntityValidator,
@@ -65,7 +65,7 @@ export class HistoryEntityStore<
                     this.#table, id,
                 );
                 if (!row) {
-                    throw new EntityNotFound(
+                    throw new EntityNotFoundError(
                         this.#table, id,
                     );
                 }

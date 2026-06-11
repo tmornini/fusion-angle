@@ -4,17 +4,17 @@
 // Stub before any import, then load presenter
 // modules with dynamic import() so the stubs are
 // in place. Same pattern as logger.test.ts.
-// @ts-expect-error - Node global stub
+// @ts-expect-error — Node global stub
 globalThis.localStorage = {
     getItem: () => null,
     setItem: () => {},
 };
-// @ts-expect-error - Node global stub
+// @ts-expect-error — Node global stub
 globalThis.window = {
     matchMedia: () => ({ matches: false }),
     addEventListener: () => {},
 };
-// @ts-expect-error - Node global stub
+// @ts-expect-error — Node global stub
 globalThis.document = { addEventListener: () => {} };
 
 import { test } from 'node:test';
@@ -160,7 +160,7 @@ test(
                 state: 'archived',
             }),
         );
-        const out = p.buildCard('position', false)
+        const out = p.buildCard(false)
             .toString();
         assert.match(out, /Gemini/);
         assert.match(out, /Archived/);
@@ -180,11 +180,11 @@ test(
             makeProject({}),
         );
         assert.match(
-            p.buildCard('position', true).toString(),
+            p.buildCard(true).toString(),
             /drag-handle/,
         );
         assert.equal(
-            p.buildCard('position', false)
+            p.buildCard(false)
                 .toString()
                 .includes('drag-handle'),
             false,

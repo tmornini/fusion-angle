@@ -1,18 +1,12 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
-import {
-    createRequestContext,
-} from '../web-app/app/adapters/shared.ts';
-import { devToken } from './token-fixtures.ts';
-import {
-    seedAdminSchema,
-} from './test-fixtures.ts';
+import { adminContext } from './context-fixtures.ts';
 import {
     putFlowRecord,
-    getFlowRecord,
     deleteFlowRecord,
     getRecordForFlow,
+    getRecordForWorkOrder,
     getFlowsForRecord,
     getWorkOrdersForRecord,
 } from '../web-app/app/adapters/flow-records.ts';
@@ -31,7 +25,6 @@ async function seedWorkOrder(
     position: number,
 ): Promise<void> {
     const flowGraph = jsonObjectField({
-        flowId,
         name: 'Flow',
         lockTimeout: DEFAULT_LOCK_TIMEOUT,
         nodes: [],
@@ -53,23 +46,19 @@ async function seedWorkOrder(
 }
 
 test(
-    'putFlowRecord then getFlowRecord round-trips'
-    + ' the binding row',
+    'putFlowRecord then getRecordForFlow round-trips'
+    + ' the binding',
     async () => {
-        const db = new MemoryDbAdapter();
-        await seedAdminSchema(db);
-        const ctx = createRequestContext(db, await devToken());
+        const { ctx } = await adminContext();
         await putFlowRecord(ctx, 'fr-1', {
             flow_id: 'flow-1',
             record_id: 'rec-1',
             at: AT,
         });
-        const stored = await getFlowRecord(
-            ctx, 'fr-1',
+        assert.equal(
+            await getRecordForFlow(ctx, 'flow-1'),
+            'rec-1',
         );
-        assert.equal(stored.flow_id, 'flow-1');
-        assert.equal(stored.record_id, 'rec-1');
-        assert.equal(stored.at, AT);
     },
 );
 
@@ -77,9 +66,7 @@ test(
     'getRecordForFlow returns the bound'
     + ' record id, or null if unbound',
     async () => {
-        const db = new MemoryDbAdapter();
-        await seedAdminSchema(db);
-        const ctx = createRequestContext(db, await devToken());
+        const { ctx } = await adminContext();
         await putFlowRecord(ctx, 'fr-1', {
             flow_id: 'flow-1',
             record_id: 'rec-1',
@@ -99,12 +86,68 @@ test(
 );
 
 test(
+    'getRecordForWorkOrder resolves the record'
+    + ' via flow_work_orders then flow_records',
+    async () => {
+        const { db, ctx } = await adminContext();
+        await seedWorkOrder(
+            db, 'wo-1', 'A001', 'flow-1', 1,
+        );
+        await putFlowRecord(ctx, 'fr-1', {
+            flow_id: 'flow-1',
+            record_id: 'rec-1',
+            at: AT,
+        });
+        assert.equal(
+            await getRecordForWorkOrder(
+                ctx, 'wo-1',
+            ),
+            'rec-1',
+        );
+    },
+);
+
+test(
+    'getRecordForWorkOrder returns null for a'
+    + ' work order with no flow link',
+    async () => {
+        const { ctx } = await adminContext();
+        await putFlowRecord(ctx, 'fr-1', {
+            flow_id: 'flow-1',
+            record_id: 'rec-1',
+            at: AT,
+        });
+        assert.equal(
+            await getRecordForWorkOrder(
+                ctx, 'wo-unlinked',
+            ),
+            null,
+        );
+    },
+);
+
+test(
+    'getRecordForWorkOrder returns null when the'
+    + ' linked flow has no record binding',
+    async () => {
+        const { db, ctx } = await adminContext();
+        await seedWorkOrder(
+            db, 'wo-1', 'A001', 'flow-1', 1,
+        );
+        assert.equal(
+            await getRecordForWorkOrder(
+                ctx, 'wo-1',
+            ),
+            null,
+        );
+    },
+);
+
+test(
     'getFlowsForRecord returns every flow id'
     + ' bound to a record',
     async () => {
-        const db = new MemoryDbAdapter();
-        await seedAdminSchema(db);
-        const ctx = createRequestContext(db, await devToken());
+        const { ctx } = await adminContext();
         await putFlowRecord(ctx, 'fr-1', {
             flow_id: 'flow-a',
             record_id: 'rec-1',
@@ -136,9 +179,7 @@ test(
     + ' work_orders correctly for a record bound'
     + ' to multiple flows',
     async () => {
-        const db = new MemoryDbAdapter();
-        await seedAdminSchema(db);
-        const ctx = createRequestContext(db, await devToken());
+        const { db, ctx } = await adminContext();
         // Bind rec-1 to two flows.
         await putFlowRecord(ctx, 'fr-1', {
             flow_id: 'flow-a',
@@ -178,9 +219,7 @@ test(
     'getWorkOrdersForRecord returns an empty'
     + ' list for an unbound record',
     async () => {
-        const db = new MemoryDbAdapter();
-        await seedAdminSchema(db);
-        const ctx = createRequestContext(db, await devToken());
+        const { ctx } = await adminContext();
         const workOrders =
             await getWorkOrdersForRecord(
                 ctx, 'rec-unknown',
@@ -192,18 +231,13 @@ test(
 test(
     'deleteFlowRecord removes the binding row',
     async () => {
-        const db = new MemoryDbAdapter();
-        await seedAdminSchema(db);
-        const ctx = createRequestContext(db, await devToken());
+        const { ctx } = await adminContext();
         await putFlowRecord(ctx, 'fr-1', {
             flow_id: 'flow-1',
             record_id: 'rec-1',
             at: AT,
         });
         await deleteFlowRecord(ctx, 'fr-1');
-        await assert.rejects(
-            () => getFlowRecord(ctx, 'fr-1'),
-        );
         assert.equal(
             await getRecordForFlow(ctx, 'flow-1'),
             null,

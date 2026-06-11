@@ -11,8 +11,8 @@ import {
 } from '../flow-stats-aggregate.ts';
 import { getFlowGraph } from './flow-queries.ts';
 import {
-    getWorkOrderRows,
-    getFlowWorkOrderRows,
+    getWorkOrderEntities,
+    getFlowWorkOrderEntities,
 } from './work-orders-queries.ts';
 import {
     getTransitionEventsByWorkOrder,
@@ -38,9 +38,9 @@ export async function getFlowStats(
         memberMap,
     ] = await Promise.all([
         getFlowGraph(ctx, flowId),
-        getWorkOrderRows(ctx),
+        getWorkOrderEntities(ctx),
         getTransitionEventsByWorkOrder(ctx),
-        getFlowWorkOrderRows(ctx),
+        getFlowWorkOrderEntities(ctx),
         getMemberMap(ctx),
     ]);
 

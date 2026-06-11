@@ -97,9 +97,8 @@ test('SECONDS_PER_DAY equals 86400', () => {
     assert.equal(SECONDS_PER_DAY, 86400);
 });
 
-test('formatDate handles invalid input', () => {
-    assert.equal(
-        formatDate('not-a-date'),
-        DISPLAY_ABSENT,
-    );
+test('formatDate surfaces corruption, never the dash', () => {
+    // Timestamps are gate-validated; a corrupt value inside
+    // the walls must render visibly, not as legitimate absence.
+    assert.equal(formatDate('not-a-date'), 'Invalid Date');
 });

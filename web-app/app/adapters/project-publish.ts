@@ -38,7 +38,6 @@ function latestPerObjective(
 }
 
 export function validateProjectForApproval(
-    project: ProjectEntity,
     activeObjectives: Objective[],
     baselineScores: ObjectiveScore[],
 ): ValidationResult<ProjectProblem> {
@@ -59,7 +58,6 @@ export function validateProjectForApproval(
 }
 
 export function validateProjectForArchival(
-    project: ProjectEntity,
     baselineScores: ObjectiveScore[],
     actualScores: ObjectiveScore[],
 ): ValidationResult<ProjectProblem> {
@@ -94,7 +92,7 @@ export async function postProjectApproval(
     ctx: RequestContext,
     projectId: Id,
 ): Promise<void> {
-    const project = await ctx.GET<ProjectEntity>(
+    await ctx.GET<ProjectEntity>(
         `projects/${projectId}`,
     );
     const [active, scoring] = await Promise.all([
@@ -102,7 +100,7 @@ export async function postProjectApproval(
         getProjectScoring(ctx, projectId),
     ]);
     const v = validateProjectForApproval(
-        project, active, scoring.baseline,
+        active, scoring.baseline,
     );
     if (!v.ready) {
         throw new ProjectNotReadyError(v.problems);
@@ -116,14 +114,14 @@ export async function postProjectArchival(
     ctx: RequestContext,
     projectId: Id,
 ): Promise<void> {
-    const project = await ctx.GET<ProjectEntity>(
+    await ctx.GET<ProjectEntity>(
         `projects/${projectId}`,
     );
     const scoring = await getProjectScoring(
         ctx, projectId,
     );
     const v = validateProjectForArchival(
-        project, scoring.baseline, scoring.actual,
+        scoring.baseline, scoring.actual,
     );
     if (!v.ready) {
         throw new ProjectNotReadyError(v.problems);

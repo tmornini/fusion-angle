@@ -16,6 +16,8 @@ import {
     type Member,
 } from '../api/types.ts';
 import type {
+    CreationTransition,
+    StepTransition,
     TransitionEvent,
 } from '../web-app/app/adapters/state-events.ts';
 import type {
@@ -142,14 +144,29 @@ function makeWorkOrder(
     };
 }
 
-function makeTransition(
-    overrides: Partial<TransitionEvent> = {},
+function makeCreation(
+    overrides: Partial<CreationTransition> = {},
 ): TransitionEvent {
     return {
+        kind: 'creation',
         id: 't-1',
         work_order_id: 'wo-1',
-        from_node_id: '',
         to_node_id: 'n-1',
+        member_id: 'p-1',
+        at: '2026-04-01T12:00:00.000000Z',
+        ...overrides,
+    };
+}
+
+function makeStep(
+    overrides: Partial<StepTransition> = {},
+): TransitionEvent {
+    return {
+        kind: 'step',
+        id: 't-2',
+        work_order_id: 'wo-1',
+        from_node_id: 'n-1',
+        to_node_id: 'n-2',
         member_id: 'p-1',
         at: '2026-04-01T12:00:00.000000Z',
         ...overrides,
@@ -198,7 +215,7 @@ function makePresenter(
     const workOrder =
         args.workOrder ?? makeWorkOrder(graph);
     const transitions = args.transitions ?? [
-        makeTransition(),
+        makeCreation(),
     ];
     const attributes = args.attributes ?? [];
     return new WorkboxDetailPresenter(
@@ -397,13 +414,13 @@ test(
         // n-1 -> n-2 (the complete node).
         const presenter = makePresenter({
             transitions: [
-                makeTransition({
-                    id: 't-1', from_node_id: '',
+                makeCreation({
+                    id: 't-1',
                     to_node_id: 'n-1',
                     at:
                         '2026-04-01T12:00:00.000000Z',
                 }),
-                makeTransition({
+                makeStep({
                     id: 't-2', from_node_id: 'n-1',
                     to_node_id: 'n-2',
                     at:
@@ -528,8 +545,8 @@ test(
     () => {
         const presenter = makePresenter({
             transitions: [
-                makeTransition({
-                    id: 't-1', from_node_id: '',
+                makeCreation({
+                    id: 't-1',
                     to_node_id: 'n-2',
                 }),
             ],
@@ -596,14 +613,14 @@ test(
         const presenter = makePresenter({
             graph,
             transitions: [
-                makeTransition({
-                    id: 't-1', from_node_id: '',
+                makeCreation({
+                    id: 't-1',
                     to_node_id: 'n-1',
                     member_id: 'p-1',
                     at:
                         '2026-04-01T12:00:00.000000Z',
                 }),
-                makeTransition({
+                makeStep({
                     id: 't-2', from_node_id: 'n-1',
                     to_node_id: 'n-2',
                     member_id: 'p-2',

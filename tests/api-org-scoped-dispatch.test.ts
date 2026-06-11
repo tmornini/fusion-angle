@@ -2,13 +2,17 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import { GET } from '../api/api.ts';
-import { mintAccessToken } from '../api/access-token.ts';
+import {
+    mintAccessToken,
+    TOKEN_AUDIENCE,
+} from '../api/access-token.ts';
 import { ideaBody, seedAdminSchema } from './test-fixtures.ts';
 
 // A real signed token for `current` (admin, via seedRootAdmin)
 // carrying an active `org` — what the facade exchange mints.
 async function orgToken(org: string): Promise<string> {
     return mintAccessToken({
+        aud: TOKEN_AUDIENCE,
         sub: 'current', roles: [], name: 'Demo',
         iat: 1_700_000_000,
         ttlSeconds: 10_000_000_000,

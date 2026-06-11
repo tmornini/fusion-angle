@@ -4,17 +4,17 @@
 // Stub before any import, then load presenter
 // modules with dynamic import() so the stubs are
 // in place. Same pattern as presenter-member-detail.
-// @ts-expect-error - Node global stub
+// @ts-expect-error — Node global stub
 globalThis.localStorage = {
     getItem: () => null,
     setItem: () => {},
 };
-// @ts-expect-error - Node global stub
+// @ts-expect-error — Node global stub
 globalThis.window = {
     matchMedia: () => ({ matches: false }),
     addEventListener: () => {},
 };
-// @ts-expect-error - Node global stub
+// @ts-expect-error — Node global stub
 globalThis.document = { addEventListener: () => {} };
 
 import { test } from 'node:test';

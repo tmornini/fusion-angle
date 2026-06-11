@@ -14,7 +14,7 @@ const AT = '2026-06-04T00:00:00.000000Z';
 
 async function memberOf(orgs: string[]) {
     const db = new MemoryDbAdapter();
-    await db.createSchema();
+    await db.postSchemaCreation();
     for (const [i, org] of orgs.entries()) {
         await db.memberships.put('m-' + i, {
             organization_id: org,

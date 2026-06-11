@@ -5,7 +5,7 @@ import {
 import {
     deleteSessionCredentials,
 } from './session-credentials.ts';
-import { clearSessionToken } from './init.ts';
+import { deleteSessionToken } from './init.ts';
 
 // Sign out: a coarse server-side revoke of every token for this
 // identity, then UNCONDITIONAL local teardown. The identity is
@@ -22,6 +22,6 @@ export async function postSessionLogout(
             ctx, ctx.identity.id);
     } finally {
         deleteSessionCredentials();
-        clearSessionToken();
+        deleteSessionToken();
     }
 }

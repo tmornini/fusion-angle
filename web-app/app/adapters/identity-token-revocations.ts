@@ -4,11 +4,7 @@ import {
 import {
     nowUtc,
     type Id,
-    type IdentityTokenRevocationEntity,
 } from '../../../api/types.ts';
-import {
-    latestRevocationAt,
-} from '../../../api/access-token.ts';
 import type { RequestContext } from './shared.ts';
 
 export async function postIdentityLogoutEverywhere(
@@ -20,14 +16,4 @@ export async function postIdentityLogoutEverywhere(
         `identity-token-revocations/${id}`,
         { identity_id: identityId, at: nowUtc() },
     );
-}
-
-export async function getRevokedBefore(
-    ctx: RequestContext,
-    identityId: Id,
-): Promise<string | null> {
-    const all = await ctx.GET<
-        IdentityTokenRevocationEntity[]
-    >('identity-token-revocations');
-    return latestRevocationAt(all, identityId);
 }

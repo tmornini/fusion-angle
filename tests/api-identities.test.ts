@@ -75,9 +75,9 @@ test('PUT then GET an identity round-trips', async () => {
 test('bootstrap seeds an identity per member, id-equal',
 async () => {
     const db = await freshDb();
-    const { populateBootstrapData } =
+    const { postBootstrap } =
         await import('../api/mock-data.ts');
-    await populateBootstrapData(db);
+    await postBootstrap(db);
     const sys = await GET<{ kind: string }>(
         db, 'identities/system', DEV_TOKEN);
     assert.equal(sys.kind, 'service');

@@ -77,10 +77,3 @@ export function subscribeTablesChanged(
     };
     return subscribeEventListener(ch, 'message', listener);
 }
-
-// Close the channel — called on pagehide / adapter close so a
-// reopened connection starts clean.
-export function closeBroadcastChannel(): void {
-    channel?.close();
-    channel = undefined;
-}

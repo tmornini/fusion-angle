@@ -1,4 +1,4 @@
-// @ts-expect-error - Node global stub
+// @ts-expect-error — Node global stub
 globalThis.localStorage = {
     getItem: () => null,
     setItem: () => {},
@@ -11,6 +11,7 @@ import {
     createRequestContext,
 } from '../web-app/app/adapters/shared.ts';
 import { devToken } from './token-fixtures.ts';
+import { adminContext } from './context-fixtures.ts';
 import {
     getMembers,
     getMemberMap,
@@ -60,7 +61,7 @@ test(
         await db.members.put('system', {
             type: 'system',
         });
-        await db.states.record(
+        await db.states.postEvent(
             'st-system', 'system',
             'active', 'system',
         );
@@ -172,9 +173,7 @@ test(
     'getMembers on an empty database returns'
     + ' an empty array',
     async () => {
-        const db = new MemoryDbAdapter();
-        await seedAdminSchema(db);
-        const ctx = createRequestContext(db, await devToken());
+        const { ctx } = await adminContext();
         const members = await getMembers(ctx);
         assert.deepEqual(members, []);
     },
@@ -205,7 +204,7 @@ test(
             identity_id: 'member_without_pii',
             at: '2020-01-01T00:00:00.000000Z',
         });
-        await db.states.record(
+        await db.states.postEvent(
             'st-member_without_pii', 'member_without_pii',
             'active', 'system',
         );

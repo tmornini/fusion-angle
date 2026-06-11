@@ -93,31 +93,6 @@ export function identityForJti(
     );
 }
 
-// The derived state of a chain: its current live jti (the one
-// whose latest action is 'issued', or null if none) and whether
-// any jti in it has been revoked.
-export interface TokenChainState {
-    readonly chainId: string;
-    readonly liveJti: string | null;
-    readonly revoked: boolean;
-}
-
-export function chainState(
-    rows: readonly IdentityTokenEntity[],
-    chainId: string,
-): TokenChainState | null {
-    const jtis = jtisInChain(rows, chainId);
-    if (jtis.length === 0) return null;
-    let liveJti: string | null = null;
-    let revoked = false;
-    for (const jti of jtis) {
-        const action = latestActionForJti(rows, jti);
-        if (action === 'issued') liveJti = jti;
-        if (action === 'revoked') revoked = true;
-    }
-    return { chainId, liveJti, revoked };
-}
-
 // The chain-wide revocation rows: one 'revoked' event per jti
 // ever seen in the chain, all at one instant. Shared by the
 // replay path of planRotation and the explicit revocation

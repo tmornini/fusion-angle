@@ -2,7 +2,7 @@
 set -euo pipefail
 
 usage() {
-  cat <<'USAGE'
+    cat <<'USAGE'
 Usage: ./build [--no-zip] [path/]
 
 Options:
@@ -23,21 +23,22 @@ NO_ZIP=false
 DEST=""
 
 for arg in "$@"; do
-  case "$arg" in
-    --help|-h) usage; exit 0 ;;
-    --no-zip)  NO_ZIP=true ;;
-    */)        DEST="$arg" ;;
-    *)
-      echo "Error: unknown argument: $arg" >&2
-      usage >&2
-      exit 1
-      ;;
-  esac
+    case "$arg" in
+        --help|-h) usage; exit 0 ;;
+        --no-zip)  NO_ZIP=true ;;
+        */)        DEST="$arg" ;;
+        *)
+            echo "Error: unknown argument: $arg" >&2
+            usage >&2
+            exit 1
+            ;;
+    esac
 done
 
 if [ -n "$(git status --porcelain)" ]; then
-  echo "Error: working directory is not clean. Commit or stash changes before building." >&2
-  exit 1
+    echo "Error: working directory is not clean." \
+        "Commit or stash changes before building." >&2
+    exit 1
 fi
 
 ./validate
@@ -45,52 +46,62 @@ fi
 echo "Building Fusion AI..."
 
 if [ "$NO_ZIP" = true ] && [ -n "$DEST" ]; then
-  BUILD_DIR="$DEST"
-  mkdir -p "$BUILD_DIR"
+    BUILD_DIR="$DEST"
+    mkdir -p "$BUILD_DIR"
 elif [ "$NO_ZIP" = true ]; then
-  BUILD_DIR=$(mktemp -d "${TMPDIR:-/tmp}/fusion-build.XXXXXX")
+    BUILD_DIR=$(mktemp -d "${TMPDIR:-/tmp}/fusion-build.XXXXXX")
 else
-  BUILD_DIR=$(mktemp -d "${TMPDIR:-/tmp}/fusion-build.XXXXXX")
-  trap 'rm -rf "$BUILD_DIR"' EXIT
+    BUILD_DIR=$(mktemp -d "${TMPDIR:-/tmp}/fusion-build.XXXXXX")
+    trap 'rm -rf "$BUILD_DIR"' EXIT
 fi
 
 node --strip-types web-app/app/compose.ts "$BUILD_DIR"
 
+# Fail when the artifact is empty or absent; report its
+# size otherwise — one voice for every emitted artifact.
+emitted() {
+    local label="$1" path="$2"
+    local name
+    name=$(basename "$path")
+    if [ ! -s "$path" ]; then
+        echo "ERROR: $name is empty or missing" >&2
+        exit 1
+    fi
+    echo "$label: assets/$name" \
+        "($(wc -c < "$path" | xargs) bytes)"
+}
 
 mkdir -p "$BUILD_DIR/assets"
 npx --no-install esbuild web-app/app/core.ts \
-  --bundle \
-  --minify \
-  --keep-names \
-  --target=es2024 \
-  --format=iife \
-  --outfile="$BUILD_DIR/assets/app.js"
+    --bundle \
+    --minify \
+    --keep-names \
+    --target=es2024 \
+    --format=iife \
+    --outfile="$BUILD_DIR/assets/app.js"
 
-[ -s "$BUILD_DIR/assets/app.js" ] || { echo "ERROR: app.js is empty or missing" >&2; exit 1; }
-echo "Bundle created: assets/app.js ($(wc -c < "$BUILD_DIR/assets/app.js" | xargs) bytes)"
+emitted "Bundle created" "$BUILD_DIR/assets/app.js"
 
 # Pre-app bootstrap scripts: extracted from former inline
 # <script> blocks so the page can run with a strict
 # Content-Security-Policy (script-src 'self').
 npx --no-install esbuild web-app/app/theme-init.ts \
-  --bundle \
-  --minify \
-  --target=es2024 \
-  --format=iife \
-  --outfile="$BUILD_DIR/assets/theme-init.js"
+    --bundle \
+    --minify \
+    --target=es2024 \
+    --format=iife \
+    --outfile="$BUILD_DIR/assets/theme-init.js"
 
-[ -s "$BUILD_DIR/assets/theme-init.js" ] || { echo "ERROR: theme-init.js is empty or missing" >&2; exit 1; }
-echo "Bundle created: assets/theme-init.js ($(wc -c < "$BUILD_DIR/assets/theme-init.js" | xargs) bytes)"
+emitted "Bundle created" "$BUILD_DIR/assets/theme-init.js"
 
 npx --no-install esbuild web-app/app/root-redirect.ts \
-  --bundle \
-  --minify \
-  --target=es2024 \
-  --format=iife \
-  --outfile="$BUILD_DIR/assets/root-redirect.js"
+    --bundle \
+    --minify \
+    --target=es2024 \
+    --format=iife \
+    --outfile="$BUILD_DIR/assets/root-redirect.js"
 
-[ -s "$BUILD_DIR/assets/root-redirect.js" ] || { echo "ERROR: root-redirect.js is empty or missing" >&2; exit 1; }
-echo "Bundle created: assets/root-redirect.js ($(wc -c < "$BUILD_DIR/assets/root-redirect.js" | xargs) bytes)"
+emitted "Bundle created" "$BUILD_DIR/assets/root-redirect.js"
 
 cat web-app/app/styles/tokens.css \
     web-app/app/styles/fonts.css \
@@ -102,19 +113,17 @@ cat web-app/app/styles/tokens.css \
     web-app/app/styles/utilities.css \
     web-app/app/styles/responsive.css \
     web-app/app/styles/command-palette.css \
-  | npx --no-install esbuild --loader=css --minify \
+    | npx --no-install esbuild --loader=css --minify \
     > "$BUILD_DIR/assets/styles.css"
 
-[ -s "$BUILD_DIR/assets/styles.css" ] || { echo "ERROR: styles.css is empty or missing" >&2; exit 1; }
-echo "Styles created: assets/styles.css ($(wc -c < "$BUILD_DIR/assets/styles.css" | xargs) bytes)"
+emitted "Styles created" "$BUILD_DIR/assets/styles.css"
 
 for f in web-app/app/styles/pages-*.css; do
-  [ -f "$f" ] || continue
-  name=$(basename "$f" .css)
-  npx --no-install esbuild --minify "$f" \
-    --outfile="$BUILD_DIR/assets/$name.css"
-  [ -s "$BUILD_DIR/assets/$name.css" ] || { echo "ERROR: $name.css is empty or missing" >&2; exit 1; }
-  echo "Styles created: assets/$name.css ($(wc -c < "$BUILD_DIR/assets/$name.css" | xargs) bytes)"
+    [ -f "$f" ] || continue
+    name=$(basename "$f" .css)
+    npx --no-install esbuild --minify "$f" \
+        --outfile="$BUILD_DIR/assets/$name.css"
+    emitted "Styles created" "$BUILD_DIR/assets/$name.css"
 done
 cp web-app/assets/*.woff2 "$BUILD_DIR/assets/"
 cp web-app/index.html "$BUILD_DIR/"
@@ -122,13 +131,13 @@ cp web-app/assets/favicon.ico "$BUILD_DIR/assets/"
 cp web-app/assets/favicon.svg "$BUILD_DIR/assets/"
 
 if [ "$NO_ZIP" = true ]; then
-  echo "Bundle: $BUILD_DIR"
+    echo "Bundle: $BUILD_DIR"
 else
-  SHA=$(git rev-parse --short=7 HEAD)
-  ZIPNAME="fusion-ai-${SHA}.zip"
-  ZIPDEST="${DEST:-$HOME/Desktop/}$ZIPNAME"
-  (cd "$BUILD_DIR" && zip -r "$ZIPDEST" .)
-  echo "Distribution: $ZIPDEST ($(wc -c < "$ZIPDEST" | xargs) bytes)"
+    SHA=$(git rev-parse --short=7 HEAD)
+    ZIPNAME="fusion-ai-${SHA}.zip"
+    ZIPDEST="${DEST:-$HOME/Desktop/}$ZIPNAME"
+    (cd "$BUILD_DIR" && zip -r "$ZIPDEST" .)
+    echo "Distribution: $ZIPDEST" \
+        "($(wc -c < "$ZIPDEST" | xargs) bytes)"
 fi
 echo "Done."
-

@@ -1,5 +1,5 @@
 import { PAGE_REGISTRY } from './page-registry.ts';
-import { setLocation } from './adapters/location.ts';
+import { putLocation } from './adapters/location.ts';
 import { buildQueryString } from './adapters/url-params.ts';
 
 function getPageName(): string {
@@ -37,7 +37,7 @@ function navigateTo(
     page: string,
     params?: Record<string, string>,
 ): void {
-    setLocation(buildPageUrl(page, params));
+    putLocation(buildPageUrl(page, params));
 }
 
 export { buildPageUrl, navigateTo, getPageName };

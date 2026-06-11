@@ -7,6 +7,7 @@ import {
 } from './token-fixtures.ts';
 import {
     mintAccessToken, ANONYMOUS_ID,
+    TOKEN_AUDIENCE,
 } from '../api/access-token.ts';
 import {
     seedAdminSchema,
@@ -57,6 +58,7 @@ test('rejects the anonymous principal on a protected route',
 async () => {
     const db = await freshDb();
     const anon = await mintAccessToken({
+        aud: TOKEN_AUDIENCE,
         sub: ANONYMOUS_ID, roles: [], name: 'Anonymous',
         iat: 1_700_000_000, ttlSeconds: 10_000_000_000,
         jti: 'anon',
@@ -67,12 +69,13 @@ async () => {
 
 // Public routes are exempt: even an anonymous token (which a
 // protected route rejects) reaches the snapshot plane. A bare
-// adapter (no createSchema) leaves hasSchema false, so the
+// adapter (no postSchemaCreation) leaves hasSchema false, so the
 // handler returns null — proving the route was reached, not
 // gated.
 test('public snapshot routes admit any token', async () => {
     const db = new MemoryDbAdapter();
     const anon = await mintAccessToken({
+        aud: TOKEN_AUDIENCE,
         sub: ANONYMOUS_ID, roles: [], name: 'Anonymous',
         iat: 1_700_000_000, ttlSeconds: 10_000_000_000,
         jti: 'anon2',
@@ -87,6 +90,7 @@ test('a logout-everywhere revokes earlier tokens', async () => {
     // writer (devToken, iat 1.7e9) is stamped AFTER it, so the
     // revocation does not revoke its own writer.
     const stale = await mintAccessToken({
+        aud: TOKEN_AUDIENCE,
         sub: 'current', roles: [], name: 'Demo',
         iat: 1_600_000_000, ttlSeconds: 10_000_000_000,
         jti: 'stale',
@@ -111,6 +115,7 @@ async () => {
     // sub-second remainder must not let the token survive.
     const revokedAt = '2021-01-01T00:00:00.900000Z';
     const sameSecond = await mintAccessToken({
+        aud: TOKEN_AUDIENCE,
         sub: 'current', roles: [], name: 'Demo',
         iat: Math.floor(Date.parse(revokedAt) / 1000),
         ttlSeconds: 10_000_000_000,

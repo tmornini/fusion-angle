@@ -10,13 +10,13 @@ import {
 } from '../format.ts';
 import { formatSigned } from '../scoring-format.ts';
 import type { RequestContext } from './shared.ts';
-import { getIdeaRows } from './ideas.ts';
+import { getIdeaEntities } from './ideas.ts';
 import {
     getIdeaStates,
     getProjectStates,
 } from './state-events.ts';
-import { getProjectRows } from './projects.ts';
-import { getFlowRows } from './flows.ts';
+import { getProjectEntities } from './projects.ts';
+import { getFlowEntities } from './flows.ts';
 import {
     getPortfolioImpactSummary,
 } from './project-scoring.ts';
@@ -71,7 +71,7 @@ export async function getDashboardGauges(
 ): Promise<GaugeData[]> {
     const [allProjects, projectStates, impact] =
         await Promise.all([
-            getProjectRows(ctx),
+            getProjectEntities(ctx),
             getProjectStates(ctx),
             getPortfolioImpactSummary(ctx),
         ]);
@@ -211,11 +211,11 @@ export async function getDashboardStats(
         ideas, ideaStates, projects,
         projectStates, flows,
     ] = await Promise.all([
-        getIdeaRows(ctx),
+        getIdeaEntities(ctx),
         getIdeaStates(ctx),
-        getProjectRows(ctx),
+        getProjectEntities(ctx),
         getProjectStates(ctx),
-        getFlowRows(ctx),
+        getFlowEntities(ctx),
     ]);
 
     return [

@@ -71,7 +71,7 @@ export class MemoryStorageBackend
         return this.#tables.size > 0;
     }
 
-    async createSchema(): Promise<void> {
+    async postSchemaCreation(): Promise<void> {
         await this.ensureTables(TABLE_NAMES);
     }
 

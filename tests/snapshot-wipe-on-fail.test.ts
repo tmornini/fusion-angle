@@ -54,7 +54,7 @@ test(
             projects: [],
         });
         await assert.rejects(
-            () => adapter.importSnapshot(snapshot),
+            () => adapter.putSnapshot(snapshot),
         );
     },
 );
@@ -63,14 +63,14 @@ test(
     'a rejected import leaves prior data intact',
     async () => {
         const adapter = new MemoryDbAdapter();
-        await adapter.importSnapshot(JSON.stringify({
+        await adapter.putSnapshot(JSON.stringify({
             members: [{ id: 'm1', type: 'human' }],
         }));
         // An invalid row rejects at the validation gate,
         // before any storage touch — so the prior import
         // survives whole.
         await assert.rejects(
-            () => adapter.importSnapshot(JSON.stringify({
+            () => adapter.putSnapshot(JSON.stringify({
                 members: [{ id: 'm2', type: 'nope' }],
             })),
         );

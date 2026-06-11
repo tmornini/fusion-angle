@@ -9,7 +9,7 @@ const BASE = 'http://localhost';
 
 async function freshDb() {
     const db = new MemoryDbAdapter();
-    await db.createSchema();
+    await db.postSchemaCreation();
     return db;
 }
 

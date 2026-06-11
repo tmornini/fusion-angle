@@ -1,11 +1,12 @@
 import {
-    $, $input, $textarea, bindEnterToClick,
+    $, $inputRequired, $textareaRequired,
+    bindEnterToClick,
 } from '../app/dom.ts';
 import { showToast } from '../app/toast.ts';
 import { navigateTo } from '../app/core.ts';
 import {
     sessionContext,
-    getRecordRows,
+    getRecordEntities,
     postRecordChange,
     generateCryptoSafeBase62,
 } from '../app/adapters/index.ts';
@@ -29,19 +30,19 @@ export async function init(): Promise<void> {
     bindEnterToClick(
         '#record-create-name',
         '#record-create-submit',
+        document,
     );
 }
 
 async function handleSubmit(): Promise<void> {
-    const nameEl = $input(
+    const nameEl = $inputRequired(
         '#record-create-name', document,
     );
-    const descEl = $textarea(
+    const descEl = $textareaRequired(
         '#record-create-description', document,
     );
-    const name = (nameEl?.value ?? '').trim();
-    const description =
-        (descEl?.value ?? '').trim();
+    const name = nameEl.value.trim();
+    const description = descEl.value.trim();
     if (name === '') {
         showToast(
             'Record name is required',
@@ -50,7 +51,7 @@ async function handleSubmit(): Promise<void> {
         return;
     }
     const ctx = sessionContext();
-    const existing = await getRecordRows(ctx);
+    const existing = await getRecordEntities(ctx);
     const position = nextPosition(
         existing.map(r => r.position),
     );

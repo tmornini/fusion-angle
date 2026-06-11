@@ -26,7 +26,6 @@
 .input:disabled { opacity: 0.5; cursor: not-allowed; }
 .input-error { border-color: hsl(var(--destructive)); }
 .input-error:focus { box-shadow: 0 0 0 2px hsl(var(--destructive) / 0.2); }
-.input-narrow { width: 10rem; }
 .search-wrapper-md { max-width: 20rem; }
 
 .dialog-wide { max-width: 36rem; }
@@ -34,17 +33,6 @@
 .dialog-scroll {
   max-height: 60vh;
   overflow-y: auto;
-}
-
-.table-header-row {
-  background: hsl(var(--muted) / 0.3);
-  border-bottom: 1px solid
-    hsl(var(--border));
-}
-
-.table-action-cell {
-  flex: 0 0 auto;
-  width: 2.5rem;
 }
 
 .textarea {
@@ -74,4 +62,3 @@
   color: hsl(var(--foreground));
   line-height: 1;
 }
-

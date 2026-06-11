@@ -63,11 +63,6 @@ const PROVIDER_MODELS: readonly ProviderModel[] = [
     },
 ];
 
-export function getProviderModels(
-): readonly ProviderModel[] {
-    return PROVIDER_MODELS;
-}
-
 export function getModelsByProvider(
 ): ReadonlyMap<string, readonly ProviderModel[]> {
     const byProvider =

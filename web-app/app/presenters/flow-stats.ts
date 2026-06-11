@@ -9,7 +9,7 @@ import {
     html, trusted, setHtml, escapeForHtml,
     type SafeHtml,
 } from '../safe-html.ts';
-import { $required } from '../dom.ts';
+import { $, $required } from '../dom.ts';
 import { iconArrowLeft } from '../icons.ts';
 import {
     buildStatsGraphSvg,
@@ -46,10 +46,12 @@ interface ViewBox {
     h: number;
 }
 
+// One absence encoding: null means no pin / no hover. The
+// fields are required, so no undefined shadow-absence exists.
 export interface FlowStatsUi {
     selectedPathIndex: number;
-    pinnedNodeId?: string | null;
-    hoveredNodeId?: string | null;
+    pinnedNodeId: string | null;
+    hoveredNodeId: string | null;
 }
 
 export class FlowStatsPresenter {
@@ -212,18 +214,16 @@ ${this.buildLegend()}${footnote}</div>`;
         // flow-name-agnostic; the page module
         // sets these from the FlowGraph it
         // already holds (Task 18).
-        const nameEl =
-            container.querySelector(
-                '.flow-stats-flow-name',
-            );
+        const nameEl = $(
+            '.flow-stats-flow-name', container,
+        );
         if (nameEl) {
             nameEl.textContent =
                 this.#flowName();
         }
-        const descEl =
-            container.querySelector(
-                '.flow-stats-flow-desc',
-            );
+        const descEl = $(
+            '.flow-stats-flow-desc', container,
+        );
         if (descEl) {
             descEl.textContent =
                 this.#flowDesc();
@@ -238,10 +238,9 @@ ${this.buildLegend()}${footnote}</div>`;
             this.#highlightFor(
                 ui.selectedPathIndex,
             );
-        const canvasHost =
-            container.querySelector(
-                '.flow-stats-canvas-host',
-            ) as HTMLElement | null;
+        const canvasHost = $(
+            '.flow-stats-canvas-host', container,
+        );
         if (canvasHost) {
             setHtml(
                 canvasHost,
@@ -252,10 +251,9 @@ ${this.buildLegend()}${footnote}</div>`;
                 ),
             );
         }
-        const stepperBar =
-            container.querySelector(
-                '.flow-stats-stepper-bar',
-            ) as HTMLElement | null;
+        const stepperBar = $(
+            '.flow-stats-stepper-bar', container,
+        );
         if (stepperBar) {
             setHtml(
                 stepperBar,
@@ -266,7 +264,7 @@ ${this.buildLegend()}${footnote}</div>`;
             );
         }
         this.renderCard(container, ui.pinnedNodeId
-            ?? ui.hoveredNodeId ?? null);
+            ?? ui.hoveredNodeId);
     }
 
     buildCard(s: NodeStat): SafeHtml {

@@ -149,7 +149,7 @@ class="flow-props-panel">
 ${outgoing.length > 0
     ? outgoing.map(e => html`<div
 class="text-sm text-muted"
->\u2192 ${e.name}</div>`)
+>→ ${e.name}</div>`)
     : html`<div class="text-sm text-muted"
         >None</div>`}
 </div>
@@ -291,7 +291,7 @@ ${pickerAttributes.map(
 ${outgoing.length > 0
     ? outgoing.map(e => html`<div
 class="text-sm text-muted"
->\u2192 ${e.name}</div>`)
+>→ ${e.name}</div>`)
     : html`<div class="text-sm text-muted"
         >None</div>`}
 </div>

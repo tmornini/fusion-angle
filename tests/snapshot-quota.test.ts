@@ -1,15 +1,10 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
-import {
-    createRequestContext,
-} from '../web-app/app/adapters/shared.ts';
-import { devToken } from './token-fixtures.ts';
 import {
     putSnapshotFromFile,
     SnapshotTooLargeError,
 } from '../web-app/app/adapters/snapshots.ts';
-import { seedAdminSchema } from './test-fixtures.ts';
+import { adminContext } from './context-fixtures.ts';
 
 test('SnapshotTooLargeError carries sizes', () => {
     const err = new SnapshotTooLargeError(100, 50);
@@ -24,9 +19,7 @@ test('SnapshotTooLargeError carries sizes', () => {
 });
 
 test('rejects file larger than half of available quota', async () => {
-    const db = new MemoryDbAdapter();
-    await seedAdminSchema(db);
-    const ctx = createRequestContext(db, await devToken());
+    const { ctx } = await adminContext();
     const nav = navigator as unknown as {
         storage?: {
             estimate(): Promise<{

@@ -5,8 +5,14 @@ import {
     type MemberState,
 } from '../api/types.ts';
 import {
-    getProviderModels,
+    getModelsByProvider,
 } from '../api/provider-models.ts';
+
+// The catalog's first model — the fixture default.
+export function firstProviderModel() {
+    return [...getModelsByProvider()
+        .values()][0]![0]!;
+}
 
 // Build/seed members in the post-normalization shape: a
 // parent row (type only) plus a kind-specific detail row,
@@ -27,7 +33,7 @@ function aiDetail() {
     return {
         description: '',
         skill_focus: '',
-        model: getProviderModels()[0]!.id,
+        model: firstProviderModel().id,
     };
 }
 
@@ -77,7 +83,7 @@ export async function seedHumanMember(
         phone: '',
         bio: '',
     });
-    await db.states.record(
+    await db.states.postEvent(
         `st-${id}`, id, state, 'system',
     );
     // A member belongs to an org via the ledger — the member
@@ -97,7 +103,7 @@ export async function seedAIMember(
 ): Promise<void> {
     await db.members.put(id, { type: 'ai' });
     await db.aiMembers.put(id, { name, ...aiDetail() });
-    await db.states.record(
+    await db.states.postEvent(
         `st-${id}`, id, state, 'system',
     );
     await db.memberships.put(`mb-${id}`, {

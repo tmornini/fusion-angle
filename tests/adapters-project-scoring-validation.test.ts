@@ -4,6 +4,7 @@ import { MemoryDbAdapter } from '../api/db-memory.ts';
 import { createRequestContext } from
     '../web-app/app/adapters/shared.ts';
 import { devToken } from './token-fixtures.ts';
+import { adminContext } from './context-fixtures.ts';
 import {
     postProjectBaselineScoring,
     postProjectActualMeasurement,
@@ -100,9 +101,7 @@ test('actual store.put rejects out-of-range scores',
 
 test('ctx.PUT rejects out-of-range baseline scores',
     async () => {
-        const db = new MemoryDbAdapter();
-        await seedAdminSchema(db);
-        const ctx = createRequestContext(db, await devToken());
+        const { ctx } = await adminContext();
         for (const score of INVALID) {
             await assert.rejects(
                 () => ctx.PUT(
@@ -120,9 +119,7 @@ test('ctx.PUT rejects out-of-range baseline scores',
 
 test('ctx.commit rejects out-of-range baseline scores',
     async () => {
-        const db = new MemoryDbAdapter();
-        await seedAdminSchema(db);
-        const ctx = createRequestContext(db, await devToken());
+        const { db, ctx } = await adminContext();
         for (const score of INVALID) {
             await assert.rejects(
                 () => ctx.commit({
@@ -148,9 +145,7 @@ test('ctx.commit rejects out-of-range baseline scores',
 
 test('ctx.commit rejects out-of-range actual scores',
     async () => {
-        const db = new MemoryDbAdapter();
-        await seedAdminSchema(db);
-        const ctx = createRequestContext(db, await devToken());
+        const { ctx } = await adminContext();
         for (const score of INVALID) {
             await assert.rejects(
                 () => ctx.commit({

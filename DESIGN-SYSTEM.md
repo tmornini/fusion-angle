@@ -659,4 +659,3 @@ promote to `components-X.css`.
 - ❌ Use decorative animations
 - ❌ Skip focus states on interactive elements
 - ❌ Mix typography scales inconsistently
-

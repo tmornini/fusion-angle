@@ -1,6 +1,6 @@
 import {
     getPreference,
-    writePreference,
+    putPreference,
 } from './adapters/preferences.ts';
 import {
     mediaQueryMatches,
@@ -127,7 +127,7 @@ function persistThemePreference(
 ): boolean {
     setState({ theme });
     applyResolvedTheme();
-    return writePreference(
+    return putPreference(
         STORAGE_KEY_THEME,
         theme,
     );
@@ -146,7 +146,7 @@ function applySidebarCollapsed(
 function collapseSidebar(
     collapsed: boolean,
 ): void {
-    writePreference(
+    putPreference(
         STORAGE_KEY_SIDEBAR,
         collapsed
             ? BOOL_STRING_TRUE
@@ -211,7 +211,6 @@ function initListeners(): void {
 
 export type { AppState };
 export {
-    setState,
     computeTheme,
     getThemeIcon,
     applyResolvedTheme,

@@ -17,8 +17,11 @@ import {
     asStoredGraph,
 } from '../api/validators.ts';
 import {
-    getProviderModels,
-} from '../api/provider-models.ts';
+    DEFAULT_LOCK_TIMEOUT,
+} from '../api/types.ts';
+import {
+    firstProviderModel,
+} from './member-fixtures.ts';
 
 // --- HumanMemberEntity ---
 
@@ -129,7 +132,7 @@ const validAIMember = {
     name: 'Claude Opus 4.8',
     description: 'Long context, deep reasoning.',
     skill_focus: 'Deep reasoning over long docs.',
-    model: getProviderModels()[0]!.id,
+    model: firstProviderModel().id,
 };
 
 test(
@@ -148,7 +151,7 @@ test(
         );
         assert.equal(
             result.model,
-            getProviderModels()[0]!.id,
+            firstProviderModel().id,
         );
     },
 );
@@ -348,7 +351,7 @@ const validFlow = {
     is_locked: false,
     is_auto_layout: true,
     is_auto_fit: true,
-    lock_timeout: 28800,
+    lock_timeout: DEFAULT_LOCK_TIMEOUT,
     graph: '{"nodes":[],"edges":[]}',
 };
 
@@ -455,7 +458,7 @@ const validFlowVersion = {
     is_locked: false,
     is_auto_layout: true,
     is_auto_fit: true,
-    lock_timeout: 28800,
+    lock_timeout: DEFAULT_LOCK_TIMEOUT,
     graph: '{"nodes":[],"edges":[]}',
     at: '2024-01-01T00:00:00.000000Z',
 };
@@ -484,9 +487,8 @@ test(
 // --- WorkOrderEntity ---
 
 const minimalWoGraph = JSON.stringify({
-    flowId: 'f-1',
     name: 'WO Flow',
-    lockTimeout: 28800,
+    lockTimeout: DEFAULT_LOCK_TIMEOUT,
     nodes: [],
     edges: [],
 });
@@ -520,19 +522,19 @@ test(
 });
 
 test(
-    'validateWorkOrderEntity rejects a graph missing'
-    + ' flowId',
+    'validateWorkOrderEntity tolerates legacy'
+    + ' graphs still carrying flowId',
     () => {
-    assert.throws(
-        () => validateWorkOrderEntity({
-            ...validWorkOrder,
-            flow_graph: JSON.stringify({
-                name: 'WO Flow', lockTimeout: 28800,
-                nodes: [], edges: [],
-            }),
+    const result = validateWorkOrderEntity({
+        ...validWorkOrder,
+        flow_graph: JSON.stringify({
+            flowId: 'f-legacy',
+            name: 'WO Flow',
+            lockTimeout: DEFAULT_LOCK_TIMEOUT,
+            nodes: [], edges: [],
         }),
-        /WorkOrderEntity.flow_graph.flowId/,
-    );
+    });
+    assert.equal(result.display_id, 'WO-001');
 });
 
 // --- FlowWorkOrderEntity ---
@@ -988,4 +990,64 @@ test(
         }),
         /RecordAttributeEntity.options\[0\]/,
     );
+});
+
+test(
+    'validateRecordAttributeEntity rejects a regex'
+    + ' constraint on a number attribute_type',
+    () => {
+    assert.throws(
+        () => validateRecordAttributeEntity({
+            ...validSelectAttribute,
+            attribute_type: 'number',
+            options: '[]',
+            constraints:
+                '[{"kind":"regex","pattern":"^\\\\d+$"}]',
+        }),
+        /regex/,
+    );
+});
+
+test(
+    'validateRecordAttributeEntity rejects range_min'
+    + ' on a text attribute_type',
+    () => {
+    assert.throws(
+        () => validateRecordAttributeEntity({
+            ...validSelectAttribute,
+            attribute_type: 'text',
+            options: '[]',
+            constraints:
+                '[{"kind":"range_min","min":"0"}]',
+        }),
+    );
+});
+
+test(
+    'validateRecordAttributeEntity accepts range_min'
+    + ' on a date attribute_type',
+    () => {
+    const result = validateRecordAttributeEntity({
+        ...validSelectAttribute,
+        attribute_type: 'date',
+        options: '[]',
+        constraints:
+            '[{"kind":"range_min","min":"2000-01-01"}]',
+    });
+    assert.equal(result.attribute_type, 'date');
+});
+
+test(
+    'validateRecordAttributeEntity accepts a regex'
+    + ' constraint on a text attribute_type',
+    () => {
+    const result = validateRecordAttributeEntity({
+        ...validSelectAttribute,
+        attribute_type: 'text',
+        options: '[]',
+        constraints:
+            '[{"kind":"regex",'
+            + '"pattern":"^[^@]+@[^@]+\\\\.[^@]+$"}]',
+    });
+    assert.equal(result.name, 'Priority');
 });

@@ -34,11 +34,6 @@
 .toast-error { border-left: 3px solid hsl(var(--error)); }
 .toast-warning { border-left: 3px solid hsl(var(--warning)); }
 .toast-info { border-left: 3px solid hsl(var(--info)); }
-
-.toast-title {
-    font-size: var(--text-base);
-    font-weight: var(--font-weight-medium);
-}
 .toast-message {
     font-size: var(--text-base);
     color: hsl(var(--muted-foreground));
@@ -58,4 +53,3 @@
   flex-shrink: 0;
 }
 .toast-close:hover { opacity: 1; }
-

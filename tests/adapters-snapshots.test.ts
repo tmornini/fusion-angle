@@ -1,4 +1,4 @@
-// @ts-expect-error - Node global stub
+// @ts-expect-error — Node global stub
 globalThis.localStorage = {
     getItem: () => null,
     setItem: () => {},
@@ -17,6 +17,7 @@ import { devToken } from './token-fixtures.ts';
 import { MissingTableError } from '../api/db.ts';
 import {
     mintAccessToken,
+    TOKEN_AUDIENCE,
     ANONYMOUS_ID,
 } from '../api/access-token.ts';
 import { seedHumanMember } from './member-fixtures.ts';
@@ -328,9 +329,17 @@ test(
 test(
     'putSnapshot accepts current-shape snapshot',
     async () => {
-        const { ctx } = await setup();
+        const { db, ctx } = await setup();
         const json = JSON.stringify({ members: [] });
         await putSnapshot(ctx, json);
+        // import REPLACES: the seeded admin rows are
+        // gone, proving the snapshot actually landed
+        assert.deepEqual(
+            await db.members.getAll(), [],
+        );
+        assert.deepEqual(
+            await db.memberships.getAll(), [],
+        );
     },
 );
 
@@ -424,6 +433,7 @@ test(
 
 async function anonToken(): Promise<string> {
     return mintAccessToken({
+        aud: TOKEN_AUDIENCE,
         sub: ANONYMOUS_ID, roles: [], name: 'Anonymous',
         iat: 1_700_000_000, ttlSeconds: 10_000_000_000,
         jti: 'anon',

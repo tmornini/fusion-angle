@@ -59,13 +59,13 @@ export {
     IDEA_READINESS_CONFIG,
 } from '../../../api/types.ts';
 
-export async function getIdeaRows(
+export async function getIdeaEntities(
     ctx: RequestContext,
 ): Promise<IdeaEntity[]> {
     return ctx.GET<IdeaEntity[]>('ideas');
 }
 
-export async function getIdeaRow(
+export async function getIdeaEntity(
     ctx: RequestContext,
     id: string,
 ): Promise<IdeaEntity> {
@@ -74,7 +74,7 @@ export async function getIdeaRow(
     );
 }
 
-async function getIdeaSubmissionRows(
+async function getIdeaSubmissionEntities(
     ctx: RequestContext,
 ): Promise<IdeaSubmissionEntity[]> {
     return ctx.GET<
@@ -82,11 +82,11 @@ async function getIdeaSubmissionRows(
     >('idea-submissions');
 }
 
-async function getIdeaSubmissionRow(
+async function getIdeaSubmissionEntity(
     ctx: RequestContext,
     ideaId: string,
 ): Promise<IdeaSubmissionEntity> {
-    const all = await getIdeaSubmissionRows(ctx);
+    const all = await getIdeaSubmissionEntities(ctx);
     const found = all.find(
         s => s.idea_id === ideaId,
     );
@@ -116,9 +116,9 @@ export async function getIdeas(
     const [
         rows, memberMap, submissions, stateMap,
     ] = await Promise.all([
-        getIdeaRows(ctx),
+        getIdeaEntities(ctx),
         getMemberMap(ctx),
-        getIdeaSubmissionRows(ctx),
+        getIdeaSubmissionEntities(ctx),
         getIdeaStates(ctx),
     ]);
     const submissionMap = new Map(
@@ -165,8 +165,8 @@ export async function getIdea(
     const [
         row, submission, memberMap, state,
     ] = await Promise.all([
-        getIdeaRow(ctx, ideaId),
-        getIdeaSubmissionRow(ctx, ideaId),
+        getIdeaEntity(ctx, ideaId),
+        getIdeaSubmissionEntity(ctx, ideaId),
         getMemberMap(ctx),
         getIdeaState(ctx, ideaId),
     ]);

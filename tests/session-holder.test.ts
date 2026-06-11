@@ -2,9 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
     getSessionToken,
-    setSessionToken,
-    clearSessionToken,
-    ensureSessionToken,
+    putSessionToken,
+    deleteSessionToken,
+    postSessionSeed,
     sessionIsOrgScoped,
     sessionHasReachableOrg,
 } from '../web-app/app/adapters/init.ts';
@@ -19,51 +19,51 @@ import {
 } from './token-fixtures.ts';
 
 test('defaults to an anonymous-principal token', async () => {
-    clearSessionToken();
-    await ensureSessionToken();
+    deleteSessionToken();
+    await postSessionSeed();
     const p = principalFromToken(getSessionToken());
     assert.equal(p.id, ANONYMOUS_ID);
 });
 
 test('returns the established token once set', () => {
-    setSessionToken('header.body.sig');
+    putSessionToken('header.body.sig');
     assert.equal(getSessionToken(), 'header.body.sig');
-    clearSessionToken();
+    deleteSessionToken();
 });
 
 test('the anonymous seed is not org-scoped', async () => {
-    clearSessionToken();
-    await ensureSessionToken();
+    deleteSessionToken();
+    await postSessionSeed();
     assert.equal(sessionIsOrgScoped(), false);
-    clearSessionToken();
+    deleteSessionToken();
 });
 
 test('a flat token (no org claim) is not org-scoped', async () => {
-    setSessionToken(await devToken());
+    putSessionToken(await devToken());
     assert.equal(sessionIsOrgScoped(), false);
-    clearSessionToken();
+    deleteSessionToken();
 });
 
 test('an org-exchanged token is org-scoped', async () => {
-    setSessionToken(await orgToken());
+    putSessionToken(await orgToken());
     assert.equal(sessionIsOrgScoped(), true);
-    clearSessionToken();
+    deleteSessionToken();
 });
 
 test('a token with reachable orgs has one', async () => {
-    setSessionToken(await reachableToken());
+    putSessionToken(await reachableToken());
     assert.equal(sessionHasReachableOrg(), true);
-    clearSessionToken();
+    deleteSessionToken();
 });
 
 test('a flat token (no orgs claim) has none', async () => {
-    setSessionToken(await devToken());
+    putSessionToken(await devToken());
     assert.equal(sessionHasReachableOrg(), false);
-    clearSessionToken();
+    deleteSessionToken();
 });
 
 test('an empty reachable set has none', async () => {
-    setSessionToken(await reachableToken('current', []));
+    putSessionToken(await reachableToken('current', []));
     assert.equal(sessionHasReachableOrg(), false);
-    clearSessionToken();
+    deleteSessionToken();
 });

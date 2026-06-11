@@ -1,5 +1,5 @@
 import {
-    EntityNotFound,
+    EntityNotFoundError,
     LedgerImmutabilityError,
     type StateStore as StateStoreInterface,
     type EntityValidator,
@@ -20,7 +20,7 @@ import { latestByKey } from './ledger-reduction.ts';
 // never deletes, and `put` enforces it: an identical re-put
 // is the idempotent retry; a different payload on an
 // existing id throws LedgerImmutabilityError. Entity-scoped
-// reads narrow through the `entity_id` index; deletedIdsIn
+// reads narrow through the `entity_id` index; getDeletedIdsIn
 // alone still reduces the whole log — no key answers "which
 // ids are tombstoned".
 //
@@ -62,7 +62,7 @@ export class StateStore
                     this.#table, id,
                 );
                 if (!row) {
-                    throw new EntityNotFound(
+                    throw new EntityNotFoundError(
                         this.#table, id,
                     );
                 }
@@ -108,7 +108,7 @@ export class StateStore
         return written;
     }
 
-    async record(
+    async postEvent(
         id: Id,
         entityId: Id,
         state: string,
@@ -122,26 +122,26 @@ export class StateStore
         });
     }
 
-    async currentFor(
+    async getCurrentFor(
         entityId: Id,
     ): Promise<StateEntity | null> {
         return this.#run(
             [this.#table], 'readonly',
-            tx => this.currentForIn(tx, entityId),
+            tx => this.getCurrentForIn(tx, entityId),
         );
     }
 
-    async allFor(entityId: Id): Promise<StateEntity[]> {
+    async getAllFor(entityId: Id): Promise<StateEntity[]> {
         return this.#run(
             [this.#table], 'readonly',
-            tx => this.allForIn(tx, entityId),
+            tx => this.getAllForIn(tx, entityId),
         );
     }
 
-    async deletedIds(): Promise<Set<Id>> {
+    async getDeletedIds(): Promise<Set<Id>> {
         return this.#run(
             [this.#table], 'readonly',
-            tx => this.deletedIdsIn(tx),
+            tx => this.getDeletedIdsIn(tx),
         );
     }
 
@@ -152,7 +152,7 @@ export class StateStore
         );
     }
 
-    async currentForIn(
+    async getCurrentForIn(
         tx: Tx,
         entityId: Id,
     ): Promise<StateEntity | null> {
@@ -160,14 +160,14 @@ export class StateStore
             this.#table, 'entity_id', entityId,
         );
         // The default (at, id) total order — ONE truth with
-        // deletedIdsIn/isDeletedIn, so list filtering and
+        // getDeletedIdsIn/isDeletedIn, so list filtering and
         // lifecycle reads can never contradict each other.
         return latestByKey(
             rows, row => row.entity_id,
         ).get(entityId) ?? null;
     }
 
-    async allForIn(
+    async getAllForIn(
         tx: Tx,
         entityId: Id,
     ): Promise<StateEntity[]> {
@@ -186,7 +186,7 @@ export class StateStore
     // latest event per entity_id under the (at, id) total
     // order — identical on every backend and every row
     // permutation. Hot path for getAll on every EntityStore.
-    async deletedIdsIn(tx: Tx): Promise<Set<Id>> {
+    async getDeletedIdsIn(tx: Tx): Promise<Set<Id>> {
         const rows = await tx.getAll<StateEntity>(
             this.#table,
         );

@@ -10,9 +10,7 @@ import {
 import { orgToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import {
-    postRoleGrant,
     postRoleRevocation,
-    getRolesFor,
 } from '../web-app/app/adapters/role-grants.ts';
 
 test('validates a role-grant body', () => {
@@ -68,7 +66,7 @@ test('rejects an unparseable timestamp', () => {
 
 test('role_grants store retains appended events', async () => {
     const db = new MemoryDbAdapter();
-    await db.createSchema();
+    await db.postSchemaCreation();
     await db.roleGrants.put('g1', {
         organization_id: '1',
         identity_id: 'current', role: 'admin',
@@ -91,27 +89,23 @@ async function adminCtx() {
     return { db, ctx: createRequestContext(db, await orgToken()) };
 }
 
-test('grant then read reflects the role', async () => {
-    const { ctx } = await adminCtx();
-    await postRoleGrant(ctx, 'p2', 'viewer');
-    assert.deepEqual(
-        await getRolesFor(ctx, 'p2'), ['viewer']);
-});
 
-test('revoke removes the role; ledger retains all', async () => {
+test('revocation appends and stamps the actor', async () => {
     const { db, ctx } = await adminCtx();
-    await postRoleGrant(ctx, 'p2', 'viewer');
+    await db.roleGrants.put('rg-test', {
+        organization_id: '1',
+        identity_id: 'p2',
+        role: 'viewer',
+        action: 'granted',
+        by_member_id: 'current',
+        at: '2026-01-01T00:00:00.000000Z',
+    });
     await postRoleRevocation(ctx, 'p2', 'viewer');
-    const events = await db.roleGrants.getAll();
-    // seed-admin + grant + revoke = 3 retained
-    assert.equal(events.length, 3);
-    assert.deepEqual(await getRolesFor(ctx, 'p2'), []);
-});
-
-test('the actor is recorded as by_member_id', async () => {
-    const { db, ctx } = await adminCtx();
-    await postRoleGrant(ctx, 'p2', 'viewer');
-    const rows = await db.roleGrants.getAll();
-    const granted = rows.find(r => r.identity_id === 'p2');
-    assert.equal(granted?.by_member_id, 'current');
+    const events = (await db.roleGrants.getAll())
+        .filter(r => r.identity_id === 'p2');
+    assert.equal(events.length, 2);   // grant retained
+    const revoked = events.find(
+        r => r.action === 'revoked',
+    );
+    assert.equal(revoked?.by_member_id, 'current');
 });

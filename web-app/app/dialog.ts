@@ -1,5 +1,5 @@
 import {
-    $required, FOCUSABLE_SELECTOR,
+    $, $$, $required, FOCUSABLE_SELECTOR,
 } from './dom.ts';
 
 const BACKDROP_SUFFIX = '-backdrop';
@@ -96,10 +96,9 @@ function openDialog(
             true,
         );
     }
-    const focusable =
-        dialog.querySelector<HTMLElement>(
-            FOCUSABLE_SELECTOR,
-        );
+    const focusable = $(
+        FOCUSABLE_SELECTOR, dialog,
+    );
     focusable?.focus();
 }
 
@@ -134,16 +133,8 @@ function initTabs(
     panelSelector: string,
     activeClass: string,
 ): void {
-    const tabs = Array.from(
-        document.querySelectorAll<HTMLElement>(
-            tabSelector,
-        ),
-    );
-    const panels = Array.from(
-        document.querySelectorAll<HTMLElement>(
-            panelSelector,
-        ),
-    );
+    const tabs = $$(tabSelector, document);
+    const panels = $$(panelSelector, document);
 
     tabs.forEach(tab => {
         const tabId = tab.dataset.tab;

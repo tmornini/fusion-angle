@@ -1,10 +1,8 @@
 import type {
     RecordAttribute,
     RecordAttributeEntity,
-    RecordAttributeId,
     RecordId,
 } from '../../../api/types.ts';
-import { jsonArrayField } from '../../../api/types.ts';
 import {
     validateConstraintArrayJson,
     validateStringArrayJson,
@@ -13,9 +11,6 @@ import {
     filterByField,
     type RequestContext,
 } from './shared.ts';
-import {
-    notifyRecordChange,
-} from './records.ts';
 
 export type {
     RecordAttribute,
@@ -43,7 +38,7 @@ function toRecordAttribute(
     };
 }
 
-export async function getRecordAttributeRows(
+export async function getRecordAttributeEntities(
     ctx: RequestContext,
 ): Promise<RecordAttribute[]> {
     const rows = await ctx.GET<
@@ -52,54 +47,14 @@ export async function getRecordAttributeRows(
     return rows.map(toRecordAttribute);
 }
 
-export async function getRecordAttribute(
-    ctx: RequestContext,
-    id: RecordAttributeId,
-): Promise<RecordAttribute> {
-    const row = await ctx.GET<RecordAttributeEntity>(
-        `record-attributes/${id}`,
-    );
-    return toRecordAttribute(row);
-}
-
 export async function getRecordAttributesByRecord(
     ctx: RequestContext,
     recordId: RecordId,
 ): Promise<RecordAttribute[]> {
-    const rows = await getRecordAttributeRows(ctx);
+    const rows = await getRecordAttributeEntities(ctx);
     return filterByField(rows, 'record_id', recordId)
         .toSorted(
             (a, b) =>
                 a.sort_order - b.sort_order,
         );
-}
-
-export async function putRecordAttribute(
-    ctx: RequestContext,
-    id: RecordAttributeId,
-    attribute: Omit<
-        RecordAttribute, 'id' | 'organization_id'
-    >,
-): Promise<void> {
-    await ctx.PUT(`record-attributes/${id}`, {
-        record_id: attribute.record_id,
-        name: attribute.name,
-        attribute_type: attribute.attribute_type,
-        sort_order: attribute.sort_order,
-        options: jsonArrayField(attribute.options),
-        constraints: jsonArrayField(
-            attribute.constraints,
-        ),
-    });
-    notifyRecordChange();
-}
-
-export async function deleteRecordAttribute(
-    ctx: RequestContext,
-    id: RecordAttributeId,
-): Promise<void> {
-    await ctx.DELETE(
-        `record-attributes/${id}`,
-    );
-    notifyRecordChange();
 }

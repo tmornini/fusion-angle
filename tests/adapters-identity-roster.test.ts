@@ -7,7 +7,6 @@ import {
 import { devToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import {
-    getIdentities,
     getIdentityRoster,
     postIdentityCreation,
 } from '../web-app/app/adapters/identities.ts';
@@ -18,8 +17,8 @@ import {
     getTokenChainsFor,
 } from '../web-app/app/adapters/identity-tokens.ts';
 import {
-    getProviderModels,
-} from '../api/provider-models.ts';
+    firstProviderModel,
+} from './member-fixtures.ts';
 
 async function setup() {
     const db = new MemoryDbAdapter();
@@ -29,23 +28,6 @@ async function setup() {
         ctx: createRequestContext(db, await devToken()),
     };
 }
-
-test('getIdentities returns every identity row', async () => {
-    const { ctx } = await setup();
-    await postIdentityCreation(ctx, 'p1', {
-        kind: 'person',
-        pii: {
-            name: 'Ada', email: 'ada@x.io',
-            phone: '1', bio: 'b',
-        },
-    });
-    await postIdentityCreation(ctx, 's1', {
-        kind: 'service', secret: 'shh',
-    });
-    const all = await getIdentities(ctx);
-    const ids = all.map(i => i.idForLink()).sort();
-    assert.deepEqual(ids, ['p1', 's1']);
-});
 
 test('getIdentityRoster joins pii; person carries fields',
 async () => {
@@ -98,7 +80,7 @@ async () => {
         name: 'Grok 4.3',
         description: 'Fast reasoning model',
         skill_focus: '',
-        model: getProviderModels()[0]!.id,
+        model: firstProviderModel().id,
     });
     const roster = await getIdentityRoster(ctx);
     const row = roster.find(r => r.id === 's2');

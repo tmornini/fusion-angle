@@ -7,6 +7,7 @@ import {
     createRequestContext,
 } from '../web-app/app/adapters/shared.ts';
 import { devToken } from './token-fixtures.ts';
+import { adminContext } from './context-fixtures.ts';
 import {
     getFlowStats,
 } from '../web-app/app/adapters/flow-stats.ts';
@@ -128,7 +129,7 @@ test(
             organization_id: '1',
             display_id: 'WO-1',
             flow_graph: jsonObjectField({
-                flowId: 'f1', name: 'Onboarding',
+                name: 'Onboarding',
                 lockTimeout: 0, nodes: [], edges: [],
             }),
             position: 1,
@@ -137,7 +138,7 @@ test(
             organization_id: '1',
             display_id: 'WO-2',
             flow_graph: jsonObjectField({
-                flowId: 'f1', name: 'Onboarding',
+                name: 'Onboarding',
                 lockTimeout: 0, nodes: [], edges: [],
             }),
             position: 2,
@@ -214,9 +215,7 @@ test(
     'getFlowStats unknown flowId propagates'
     + ' the underlying error',
     async () => {
-        const db = new MemoryDbAdapter();
-        await seedAdminSchema(db);
-        const ctx = createRequestContext(db, await devToken());
+        const { ctx } = await adminContext();
         await assert.rejects(
             () => getFlowStats(ctx, 'nope'),
         );
@@ -239,7 +238,7 @@ test(
             organization_id: '1',
             display_id: 'WO-1',
             flow_graph: jsonObjectField({
-                flowId: 'f1', name: 'AutoLayout',
+                name: 'AutoLayout',
                 lockTimeout: 0, nodes: [], edges: [],
             }),
             position: 1,

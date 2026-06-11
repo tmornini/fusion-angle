@@ -281,15 +281,6 @@ html.sidebar-collapsed .main-content {
   color: hsl(var(--foreground));
 }
 
-.mobile-main {
-  margin-left: 0;
-  padding-top: 3.5rem;
-}
-
-.mobile-main .page-content {
-  padding: var(--space-4);
-}
-
 /* Responsive layout: desktop/mobile element visibility */
 @media (min-width: 768px) {
   .mobile-header { display: none !important; }
@@ -347,11 +338,6 @@ html.sidebar-collapsed .main-content {
     grid-template-columns: repeat(3, 1fr);
     gap: var(--space-6);
 }
-.actions-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: var(--space-6);
-}
 .stats-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
@@ -361,11 +347,6 @@ html.sidebar-collapsed .main-content {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: var(--space-4);
-}
-.edge-grid {
-    display: grid;
-    grid-template-columns: 1fr 2fr;
-    gap: var(--space-6);
 }
 .convert-grid {
     display: grid;
@@ -377,4 +358,3 @@ html.sidebar-collapsed .main-content {
     grid-template-columns: 2fr 1fr;
     gap: var(--space-6);
 }
-

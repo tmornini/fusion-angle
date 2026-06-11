@@ -1,5 +1,8 @@
 import type { DbAdapter } from '../../../api/db.ts';
-import type { Id } from '../../../api/types.ts';
+import {
+    nowEpochSeconds,
+    type Id,
+} from '../../../api/types.ts';
 import {
     GET as httpGet,
     PUT as httpPut,
@@ -13,7 +16,7 @@ import {
 import {
     getDbAdapter,
     getSessionToken,
-    setSessionToken,
+    putSessionToken,
 } from './init.ts';
 import {
     type Principal,
@@ -41,7 +44,7 @@ import {
 } from './org-session.ts';
 import {
     getPreference,
-    writePreference,
+    putPreference,
 } from './preferences.ts';
 
 // Rows whose `field` equals `value` — the single-field
@@ -61,9 +64,8 @@ export function filterByField<T, K extends keyof T>(
 // a row by its resource path. The whole batch posts as
 // ONE request and commits in one transaction — it
 // applies entirely or not at all. On failure, commit()
-// throws CommitError(0, [], cause); `applied` is always
-// empty because real rollback leaves nothing partially
-// applied.
+// throws CommitError wrapping the cause; real rollback
+// leaves nothing partially applied.
 export type WriteOp =
     | {
         method: 'put';
@@ -80,22 +82,12 @@ export interface Transaction {
 }
 
 export class CommitError extends Error {
-    readonly failedAt: number;
-    readonly applied: readonly WriteOp[];
     readonly cause: Error;
-    constructor(
-        failedAt: number,
-        applied: readonly WriteOp[],
-        cause: Error,
-    ) {
+    constructor(cause: Error) {
         super(
-            'commit failed at op['
-            + failedAt + ']: '
-            + cause.message,
+            'commit failed: ' + cause.message,
         );
         this.name = 'CommitError';
-        this.failedAt = failedAt;
-        this.applied = applied;
         this.cause = cause;
     }
 }
@@ -116,18 +108,33 @@ export interface RequestContext {
     commit(tx: Transaction): Promise<void>;
 }
 
+// The recovery-free context: each verb runs directly on its
+// captured token. The recovering sibling below is the
+// sessionContext path.
 export function createRequestContext(
     adapter: DbAdapter,
     token: string,
-    options: { recover?: boolean } = {},
 ): RequestContext {
-    const recover = options.recover === true;
+    return makeRequestContext(adapter, token, false);
+}
+
+// The recovery-enabled context: a 401 refreshes the session
+// via withAuthRecovery and retries against the live token
+// once.
+export function createRecoveringRequestContext(
+    adapter: DbAdapter,
+    token: string,
+): RequestContext {
+    return makeRequestContext(adapter, token, true);
+}
+
+function makeRequestContext(
+    adapter: DbAdapter,
+    token: string,
+    recover: boolean,
+): RequestContext {
     const identity = principalFromToken(token);
 
-    // A recovery-free context runs each verb directly on its
-    // captured token; a recovery-enabled one (sessionContext)
-    // routes through withAuthRecovery, which on a 401 refreshes
-    // the session and retries against the live token once.
     function run<T>(
         make: (tok: string) => Promise<T>,
     ): Promise<T> {
@@ -164,7 +171,7 @@ export function createRequestContext(
             } catch (e) {
                 // Atomic batch: a failure applied nothing,
                 // so `applied` is always empty.
-                throw new CommitError(0, [], e as Error);
+                throw new CommitError(e as Error);
             }
         },
     };
@@ -172,8 +179,8 @@ export function createRequestContext(
 }
 
 export function sessionContext(): RequestContext {
-    return createRequestContext(
-        getDbAdapter(), getSessionToken(), { recover: true },
+    return createRecoveringRequestContext(
+        getDbAdapter(), getSessionToken(),
     );
 }
 
@@ -245,7 +252,7 @@ async function recoverSession(
         redirectToLogin();
         return null;
     }
-    const now = Math.floor(Date.now() / 1000);
+    const now = nowEpochSeconds();
     const decision = resolveCredentialDecision(creds, now);
     // A live access token ('install') that still drew a 401 did not
     // expire — the holder was the unscoped anonymous seed (a read
@@ -284,7 +291,7 @@ async function installAndScope(
     adapter: DbAdapter,
     flatToken: string,
 ): Promise<string | null> {
-    setSessionToken(flatToken);
+    putSessionToken(flatToken);
     try {
         await rescopeToActiveOrg(adapter, flatToken);
     } catch (err) {
@@ -337,9 +344,9 @@ async function rescopeToActiveOrg(
         getPreference(ACTIVE_ORG_KEY),
         await getIdentityDefaultOrg(ctx),
     );
-    setSessionToken(
+    putSessionToken(
         await postOrgSessionExchange(ctx, flatToken, active));
-    writePreference(ACTIVE_ORG_KEY, active);
+    putPreference(ACTIVE_ORG_KEY, active);
 }
 
 // The active org the session is scoped to. Post-boot the
@@ -356,4 +363,3 @@ export function activeOrg(ctx: RequestContext): Id {
     }
     return org;
 }
-

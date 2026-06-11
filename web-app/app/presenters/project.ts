@@ -88,7 +88,6 @@ export class ProjectPresenter {
     }
 
     buildCard(
-        view: string,
         showGrip: boolean,
         score?: ScoreRow,
     ): SafeHtml {
@@ -377,7 +376,7 @@ export class ProjectListPresenter {
         state: ProjectListState,
         scoreMap: ReadonlyMap<
             string, ScoreRow
-        > = new Map(),
+        >,
     ) {
         this.#projects = state.projects.map(
             p => new ProjectPresenter(p),
@@ -441,7 +440,6 @@ export class ProjectListPresenter {
             (p, status) => p.stateGroup() === status,
             items => this.#sortProjects([...items]),
             p => p.buildCard(
-                'position',
                 hasGrip,
                 this.#scoreMap.get(p.idForLink()),
             ),

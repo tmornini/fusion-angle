@@ -81,12 +81,23 @@ export function latestStatesForIds<S extends string>(
 // A transition event in the shape flow-stats-aggregate
 // and the workbox detail presenter expect. Derived
 // from the states log: each non-claim event for a
-// work order is a transition into state=to_node_id;
-// from_node_id is the prior event's state, '' for the
-// very first event (matching the creation-transition
-// convention). The id is the underlying state event's
-// id — the foreign-key target for state_field_values.
-export interface TransitionEvent {
+// work order is a transition into state=to_node_id.
+// The first event is the creation transition — it has
+// no prior node, so its union member carries no
+// from_node_id; every step names the node it left.
+// The id is the underlying state event's id — the
+// foreign-key target for state_field_values.
+export interface CreationTransition {
+    kind: 'creation';
+    id: Id;
+    work_order_id: Id;
+    to_node_id: Id;
+    member_id: Id;
+    at: string;
+}
+
+export interface StepTransition {
+    kind: 'step';
     id: Id;
     work_order_id: Id;
     from_node_id: Id;
@@ -94,6 +105,10 @@ export interface TransitionEvent {
     member_id: Id;
     at: string;
 }
+
+export type TransitionEvent =
+    | CreationTransition
+    | StepTransition;
 
 // Returns the work order's current node id — the
 // state of the latest non-claim event for
@@ -188,9 +203,9 @@ export async function getActiveClaimsByWorkOrder(
 // Project the non-claim events for one work order into
 // the TransitionEvent shape consumed by the workbox
 // detail presenter and (via the bulk variant below)
-// flow-stats-aggregate. The first event carries
-// from_node_id='' — the existing convention for
-// creation transitions.
+// flow-stats-aggregate. The first event becomes the
+// creation transition; each later event is a step from
+// the prior event's node.
 function projectTransitions(
     workOrderId: Id,
     events: readonly StateEntity[],
@@ -199,16 +214,22 @@ function projectTransitions(
         .filter(ev => !isClaimState(ev.state))
         .toSorted((a, b) => a.at.localeCompare(b.at));
     const out: TransitionEvent[] = [];
-    let prior = '';
+    let prior: Id | null = null;
     for (const ev of transitions) {
-        out.push({
+        const base = {
             id: ev.id,
             work_order_id: workOrderId,
-            from_node_id: prior,
             to_node_id: ev.state,
             member_id: ev.member_id,
             at: ev.at,
-        });
+        };
+        out.push(prior === null
+            ? { kind: 'creation', ...base }
+            : {
+                kind: 'step',
+                from_node_id: prior,
+                ...base,
+            });
         prior = ev.state;
     }
     return out;

@@ -8,7 +8,7 @@ import { devToken, expiredToken } from './token-fixtures.ts';
 
 async function freshDb() {
     const db = new MemoryDbAdapter();
-    await db.createSchema();
+    await db.postSchemaCreation();
     return db;
 }
 

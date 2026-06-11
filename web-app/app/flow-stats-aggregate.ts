@@ -313,12 +313,12 @@ export function buildFlowStats(
     const weeks = input.windowDays / 7;
 
     // Count OUT-transitions per (node, member) within
-    // the window.  Transitions with from_node_id='' are
-    // creation events and carry no producer signal.
+    // the window.  Creation transitions carry no
+    // producer signal.
     const outByNode =
         new Map<string, Map<string, number>>();
     for (const t of input.transitions) {
-        if (t.from_node_id === '') continue;
+        if (t.kind === 'creation') continue;
         if (!nodeById.has(t.from_node_id)) continue;
         const ms = Date.parse(t.at);
         if (ms < winLo || ms > winHi) continue;
@@ -409,6 +409,7 @@ export function buildFlowStats(
             // the window to compute route percentages.
             const perTarget = new Map<string, number>();
             for (const tx of input.transitions) {
+                if (tx.kind === 'creation') continue;
                 if (tx.from_node_id !== n.id) continue;
                 const ms = Date.parse(tx.at);
                 if (ms < winLo || ms > winHi) continue;

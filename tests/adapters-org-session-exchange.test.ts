@@ -14,7 +14,7 @@ import {
 
 async function memberOf(orgs: string[]) {
     const db = new MemoryDbAdapter();
-    await db.createSchema();
+    await db.postSchemaCreation();
     for (const [i, org] of orgs.entries()) {
         await db.memberships.put('m-' + i, {
             organization_id: org, identity_id: 'current',

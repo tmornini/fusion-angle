@@ -1,5 +1,15 @@
 /* Buttons: primary, secondary, outline, ghost, destructive, link. */
 
+/* Inline link affordance on a real button — strips the UA
+   button chrome so JS-navigation text reads as plain inline
+   content (font and color inherit via base.css). */
+.link {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
 .btn-accent {
   background: var(--gradient-accent);
   color: hsl(var(--accent-foreground));
@@ -156,4 +166,3 @@
   cursor: not-allowed;
   box-shadow: none;
 }
-

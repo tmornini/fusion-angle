@@ -1,4 +1,4 @@
-import { EntityNotFound, guarded } from './db.ts';
+import { EntityNotFoundError, guarded } from './db.ts';
 import type {
     EntityStore,
     EntityPut,
@@ -63,7 +63,7 @@ export class OrgScopedEntityStore<T extends OrgScoped>
             // The exact error a genuinely-absent id throws, so
             // a foreign-tenant row reads as one that never
             // existed — no existence is confirmed.
-            throw new EntityNotFound(this.#table, id);
+            throw new EntityNotFoundError(this.#table, id);
         }
         return row;
     }
@@ -117,7 +117,7 @@ export class OrgScopedEntityStore<T extends OrgScoped>
             existing !== null
             && existing.organization_id !== this.#org
         ) {
-            throw new EntityNotFound(this.#table, id);
+            throw new EntityNotFoundError(this.#table, id);
         }
     }
 

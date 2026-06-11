@@ -5,11 +5,14 @@ import {
 import {
     extractErrorMessage,
 } from './error-helpers.ts';
-import { initAdapter } from './adapters/init.ts';
+import {
+    defaultAdapter,
+    initAdapter,
+} from './adapters/init.ts';
 
 export async function initDatabase(
 ): Promise<boolean> {
-    return initAdapter();
+    return initAdapter(defaultAdapter);
 }
 
 // Inline styles here are intentional: this error is shown

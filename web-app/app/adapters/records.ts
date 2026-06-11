@@ -62,7 +62,7 @@ export function notifyRecordChange(): void {
     recordChanges.notify();
 }
 
-export async function getRecordRows(
+export async function getRecordEntities(
     ctx: RequestContext,
 ): Promise<RecordEntity[]> {
     return ctx.GET<RecordEntity[]>('records');
@@ -102,7 +102,7 @@ export async function getRecords(
     const [
         rows, attributes, flowRecords, stateMap,
     ] = await Promise.all([
-        getRecordRows(ctx),
+        getRecordEntities(ctx),
         ctx.GET<RecordAttributeEntity[]>(
             'record-attributes',
         ),
@@ -160,14 +160,6 @@ export async function putRecord(
     await ctx.PUT(`records/${id}`, {
         ...entity,
     });
-    recordChanges.notify();
-}
-
-export async function deleteRecord(
-    ctx: RequestContext,
-    id: RecordId,
-): Promise<void> {
-    await ctx.DELETE(`records/${id}`);
     recordChanges.notify();
 }
 
@@ -247,13 +239,4 @@ export async function postRecordStateChange(
         ],
     });
     recordChanges.notify();
-}
-
-export async function postRecordArchival(
-    ctx: RequestContext,
-    id: RecordId,
-): Promise<void> {
-    await postRecordStateChange(
-        ctx, id, 'archived',
-    );
 }

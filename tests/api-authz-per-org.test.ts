@@ -21,7 +21,7 @@ function req(
 // must keep the org-A grant from acting in org B.
 async function memberOfBothAdminInA(): Promise<MemoryDbAdapter> {
     const db = new MemoryDbAdapter();
-    await db.createSchema();
+    await db.postSchemaCreation();
     await db.memberships.put('m-a', {
         organization_id: 'A', identity_id: 'current',
         at: '2026-06-04T00:00:00.000000Z',
@@ -60,7 +60,7 @@ async () => {
 test('a flat token authorizes via its resolved membership',
 async () => {
     const db = new MemoryDbAdapter();
-    await db.createSchema();
+    await db.postSchemaCreation();
     await db.memberships.put('m', {
         organization_id: '1', identity_id: 'current',
         at: '2026-06-04T00:00:00.000000Z',

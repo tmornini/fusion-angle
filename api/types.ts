@@ -187,24 +187,6 @@ function includes<T extends string>(
         .includes(v);
 }
 
-const CONFIDENCE_LEVELS:
-    readonly ConfidenceLevel[]
-    = ['high', 'medium', 'low'];
-
-export function isConfidenceLevel(
-    v: string,
-): v is ConfidenceLevel {
-    return includes(
-        CONFIDENCE_LEVELS, v,
-    );
-}
-
-export function isAttributeType(
-    v: string,
-): v is AttributeType {
-    return includes(ATTRIBUTE_TYPES, v);
-}
-
 // A validation rejection is an EXPECTED failure: profane
 // input stopped at the gate. The api layer maps it to 400
 // with the message on the wire — unlike a bug, which gets
@@ -317,25 +299,6 @@ export function assertMemberState(
     return v;
 }
 
-export function isFlowState(
-    v: string,
-): v is FlowState {
-    return includes(FLOW_STATES, v);
-}
-
-export function assertFlowState(
-    v: string,
-    label: string,
-): FlowState {
-    if (!includes(FLOW_STATES, v)) {
-        throw new ValidationError(
-            'expected FlowState for '
-                + label + ', got ' + v,
-        );
-    }
-    return v;
-}
-
 export function isRecordState(
     v: string,
 ): v is RecordState {
@@ -349,25 +312,6 @@ export function assertRecordState(
     if (!includes(RECORD_STATES, v)) {
         throw new ValidationError(
             'expected RecordState for '
-                + label + ', got ' + v,
-        );
-    }
-    return v;
-}
-
-export function isObjectiveState(
-    v: string,
-): v is ObjectiveState {
-    return includes(OBJECTIVE_STATES, v);
-}
-
-export function assertObjectiveState(
-    v: string,
-    label: string,
-): ObjectiveState {
-    if (!includes(OBJECTIVE_STATES, v)) {
-        throw new ValidationError(
-            'expected ObjectiveState for '
                 + label + ', got ' + v,
         );
     }
@@ -416,6 +360,10 @@ export function formatCompactCurrency(
     if (value >= THOUSAND)
         return `$${Math.round(value / THOUSAND)}K`;
     return `$${value}`;
+}
+
+export function nowEpochSeconds(): number {
+    return Math.floor(Date.now() / MS_PER_SECOND);
 }
 
 // The mint's monotonicity state: the last millisecond stamped
@@ -596,11 +544,14 @@ export type ClientStatus = 'active' | 'disabled';
 
 // An OAuth client registry row — the "websites built by us and
 // others". Mutable config of record (EntityStore): redirect URIs
-// change, JWKS rotate, a client is disabled. `grant_types` and
-// `redirect_uris` are space-delimited (OAuth convention); `jwks`
-// is the client's JSON Web Key Set as a JSON string (used to
-// verify private_key_jwt assertions — real JWS verify is a
-// server-tier seam); `aud` is the origin a token is minted for.
+// change, JWKS rotate, a client is disabled. `status` is the
+// schema's one mutable lifecycle column on an entity row — a
+// named deviation from the states ledger (SCHEMA.md § clients).
+// `grant_types` and `redirect_uris` are space-delimited (OAuth
+// convention); `jwks` is the client's JSON Web Key Set as a JSON
+// string — private_key_jwt assertions are verified against it
+// for real (api/client-assertion.ts); `aud` is the origin a
+// token is minted for.
 export interface ClientEntity {
     id: Id;
     grant_types: string;
@@ -1011,7 +962,7 @@ export interface Objective {
 }
 
 export interface ObjectiveRevision {
-    id: string;
+    id: Id;
     objective_id: ObjectiveId;
     name: string;
     description: string;
@@ -1020,7 +971,7 @@ export interface ObjectiveRevision {
 }
 
 export interface ProjectObjectiveBaselineScore {
-    id: string;
+    id: Id;
     project_id: Id;
     objective_id: ObjectiveId;
     score: number;
@@ -1029,7 +980,7 @@ export interface ProjectObjectiveBaselineScore {
 }
 
 export interface ProjectObjectiveActualScore {
-    id: string;
+    id: Id;
     project_id: Id;
     objective_id: ObjectiveId;
     score: number;
@@ -1051,7 +1002,7 @@ export interface ProjectEntity {
 }
 
 export interface GraphNode {
-    id: string;
+    id: Id;
     name: string;
     positionX: number;
     positionY: number;
@@ -1063,10 +1014,10 @@ export interface GraphNode {
 }
 
 export interface GraphEdge {
-    id: string;
+    id: Id;
     name: string;
-    fromNodeId: string;
-    toNodeId: string;
+    fromNodeId: Id;
+    toNodeId: Id;
 }
 
 export interface StoredGraph {
@@ -1110,7 +1061,6 @@ export interface FlowVersionEntity {
 }
 
 export interface WorkOrderFlowGraph {
-    flowId: Id;
     name: string;
     lockTimeout: number;
     nodes: GraphNode[];
@@ -1384,24 +1334,6 @@ export const INVITATION_STATE_CONFIG: Record<
     revoked: {
         label: 'Revoked',
         className: 'badge-error',
-    },
-};
-
-export const CONFIDENCE_CONFIG: Record<
-    ConfidenceLevel,
-    StatusDisplay
-> = {
-    high: {
-        label: 'High',
-        className: 'text-success',
-    },
-    medium: {
-        label: 'Medium',
-        className: 'text-warning',
-    },
-    low: {
-        label: 'Low',
-        className: 'text-error',
     },
 };
 
@@ -1757,16 +1689,3 @@ export function projectStateIsApproved(
 ): boolean {
     return state === 'approved';
 }
-
-export function projectStateIsScorable(
-    state: ProjectState,
-): boolean {
-    return state === 'under-review';
-}
-
-export function projectStateAllowsMeasurement(
-    state: ProjectState,
-): boolean {
-    return state === 'approved';
-}
-

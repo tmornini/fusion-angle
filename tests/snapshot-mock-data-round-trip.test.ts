@@ -1,4 +1,4 @@
-// @ts-expect-error - Node global stub
+// @ts-expect-error — Node global stub
 globalThis.localStorage = {
     getItem: () => null,
     setItem: () => {},
@@ -7,7 +7,7 @@ globalThis.localStorage = {
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
-import { populateMockData } from '../api/mock-data.ts';
+import { postMockDataLoad } from '../api/mock-data.ts';
 import {
     createRequestContext,
 } from '../web-app/app/adapters/shared.ts';
@@ -28,8 +28,8 @@ test(
     + ' member name',
     async () => {
         const db = new MemoryDbAdapter();
-        await db.createSchema();
-        await populateMockData(db);
+        await db.postSchemaCreation();
+        await postMockDataLoad(db);
         const ctx = createRequestContext(
             db, await devToken(),
         );

@@ -9,7 +9,7 @@ const AT = '2026-06-04T00:00:00.000000Z';
 
 async function freshDb() {
     const db = new MemoryDbAdapter();
-    await db.createSchema();
+    await db.postSchemaCreation();
     return db;
 }
 

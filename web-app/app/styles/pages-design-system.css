@@ -67,9 +67,6 @@
   border-radius: var(--radius);
   border: 1px solid hsl(var(--border));
 }
-.color-swatch-block-2 {
-  border-width: 2px;
-}
 
 .shadow-swatch {
   display: flex;
@@ -219,4 +216,3 @@
   gap: var(--space-3);
   max-width: 24rem;
 }
-

@@ -8,7 +8,7 @@ const T2 = '2026-02-01T00:00:00.000000Z';
 
 async function freshDb() {
     const db = new MemoryDbAdapter();
-    await db.createSchema();
+    await db.postSchemaCreation();
     return db;
 }
 

@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import {
-    populateMockData,
+    postMockDataLoad,
     OBJECTIVE_SEEDS,
 } from '../api/mock-data.ts';
 import {
@@ -39,7 +39,7 @@ test('seeds every objective seed plus the org-2 objective',
 async () => {
     const db = new MemoryDbAdapter();
     await seedAdminSchema(db);
-    await populateMockData(db);
+    await postMockDataLoad(db);
     const rows = await db.objectives.getAll();
     assert.equal(rows.length, OBJECTIVE_SEEDS.length + 1);
     for (const r of rows) {
@@ -48,11 +48,11 @@ async () => {
     }
 });
 
-test('populateMockData seeds one revision per objective',
+test('postMockDataLoad seeds one revision per objective',
     async () => {
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
-        await populateMockData(db);
+        await postMockDataLoad(db);
         const revs =
             await db.objectiveRevisions.getAll();
         assert.equal(revs.length, OBJECTIVE_SEEDS.length + 1);
@@ -68,11 +68,11 @@ test('populateMockData seeds one revision per objective',
         assert.deepEqual(revObjIds, objIds);
     });
 
-test('populateMockData seeds zero archived objectives',
+test('postMockDataLoad seeds zero archived objectives',
     async () => {
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
-        await populateMockData(db);
+        await postMockDataLoad(db);
         const ctx = createRequestContext(db, await devToken());
         const ids = await getArchivedObjectiveIds(ctx);
         assert.equal(ids.size, 0);
@@ -82,7 +82,7 @@ test('approved projects have full baseline coverage',
     async () => {
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
-        await populateMockData(db);
+        await postMockDataLoad(db);
         const ctx = createRequestContext(db, await devToken());
         const approved = await projectIdsByState(
             ctx, 'approved',
@@ -121,7 +121,7 @@ test('completed projects have at least one actual per pair',
     async () => {
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
-        await populateMockData(db);
+        await postMockDataLoad(db);
         const ctx = createRequestContext(db, await devToken());
         const completed = await projectIdsByState(
             ctx, 'archived',
@@ -159,7 +159,7 @@ test('approved projects have an actual for every pair',
     async () => {
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
-        await populateMockData(db);
+        await postMockDataLoad(db);
         const ctx = createRequestContext(db, await devToken());
         const approved = await projectIdsByState(
             ctx, 'approved',
@@ -196,7 +196,7 @@ test('approved projects have an actual for every pair',
 test('submitted projects have zero scores', async () => {
     const db = new MemoryDbAdapter();
     await seedAdminSchema(db);
-    await populateMockData(db);
+    await postMockDataLoad(db);
     const ctx = createRequestContext(db, await devToken());
     const submitted = await projectIdsByState(
         ctx, 'submitted',

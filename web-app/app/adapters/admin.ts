@@ -24,7 +24,7 @@ export type {
     OrganizationEntity,
 } from '../../../api/types.ts';
 
-async function getOrganizationRow(
+async function getOrganizationEntity(
     ctx: RequestContext,
 ): Promise<OrganizationEntity> {
     // The active org — the tenant the session is scoped to —
@@ -145,7 +145,7 @@ export async function getOrganization(
     ctx: RequestContext,
 ): Promise<Organization> {
     const [entity, derived] = await Promise.all([
-        getOrganizationRow(ctx),
+        getOrganizationEntity(ctx),
         deriveOrganizationFacts(ctx),
     ]);
     return new Organization(entity, derived);
@@ -198,7 +198,7 @@ putOrganizationGeneralInfo(
     ctx: RequestContext,
     draft: GeneralInfoDraft,
 ): Promise<void> {
-    const current = await getOrganizationRow(ctx);
+    const current = await getOrganizationEntity(ctx);
     const { id: _id, ...rest } = current;
     await putOrganization(
         ctx, activeOrg(ctx), {

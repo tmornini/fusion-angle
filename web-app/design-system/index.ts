@@ -1,5 +1,11 @@
 import { $required } from '../app/dom.ts';
 import {
+    CYCLE_DASH,
+    LABEL_CHAR_WIDTH,
+    LABEL_PADDING,
+    LABEL_HEIGHT,
+} from '../app/flow-graph.ts';
+import {
     html,
     setHtml,
     trusted,
@@ -190,10 +196,12 @@ function buildFlowEdgeSvg(
     const x1 = 10;
     const x2 = w - 10;
     const dash = isDashed
-        ? ' stroke-dasharray="6 3"' : '';
+        ? ` stroke-dasharray="${CYCLE_DASH}"`
+        : '';
     const mid = (x1 + x2) / 2;
-    const lw = label.length * 7 + 12;
-    const lh = 20;
+    const lw = label.length * LABEL_CHAR_WIDTH
+        + LABEL_PADDING;
+    const lh = LABEL_HEIGHT;
     return trusted(
         `<svg width="${w}" height="${h}">`
         + buildFlowDefs()

@@ -8,7 +8,6 @@ import {
     type IdentityCredentialKind,
     type IdentityCredentialStatus,
 } from '../../../api/types.ts';
-import { hashPassword } from '../../../api/password-hash.ts';
 import {
     latestByKey,
 } from '../../../api/ledger-reduction.ts';
@@ -34,30 +33,6 @@ async function appendCredentialEvent(
         secret,
         at: nowUtc(),
     });
-}
-
-export async function postIdentityCredentialSet(
-    ctx: RequestContext,
-    identityId: Id,
-    kind: IdentityCredentialKind,
-    secret: string,
-): Promise<void> {
-    await appendCredentialEvent(
-        ctx, identityId, kind, 'set',
-        await hashPassword(secret),
-    );
-}
-
-export async function postIdentityCredentialRotation(
-    ctx: RequestContext,
-    identityId: Id,
-    kind: IdentityCredentialKind,
-    secret: string,
-): Promise<void> {
-    await appendCredentialEvent(
-        ctx, identityId, kind, 'rotated',
-        await hashPassword(secret),
-    );
 }
 
 export async function

@@ -353,7 +353,7 @@ function getLocalData(
 
 export async function getZipEntries(
     data: Uint8Array,
-    limits: ZipLimits = DEFAULT_ZIP_LIMITS,
+    limits: ZipLimits,
 ): Promise<ZipEntry[]> {
     const decoder = new TextDecoder();
     const view = new DataView(

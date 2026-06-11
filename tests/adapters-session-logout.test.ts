@@ -1,4 +1,4 @@
-// @ts-expect-error - Node global stub
+// @ts-expect-error — Node global stub
 globalThis.localStorage = (() => {
     const store = new Map<string, string>();
     return {
@@ -21,9 +21,7 @@ globalThis.localStorage = (() => {
 
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
 import {
-    createRequestContext,
     type RequestContext,
 } from '../web-app/app/adapters/shared.ts';
 import {
@@ -34,19 +32,12 @@ import {
     putSessionCredentials,
 } from '../web-app/app/adapters/session-credentials.ts';
 import { devToken, orgToken } from './token-fixtures.ts';
-import { seedAdminSchema } from './test-fixtures.ts';
-
-async function setup() {
-    const db = new MemoryDbAdapter();
-    await seedAdminSchema(db);
-    const ctx = createRequestContext(db, await devToken());
-    return { db, ctx };
-}
+import { adminContext } from './context-fixtures.ts';
 
 test('logout revokes this identity and clears credentials',
 async () => {
     localStorage.clear();
-    const { db, ctx } = await setup();
+    const { db, ctx } = await adminContext();
     putSessionCredentials({
         accessToken: await devToken(),
         refreshToken: await orgToken(),

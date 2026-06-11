@@ -1,8 +1,4 @@
 import {
-    generateCryptoSafeBase62,
-} from '../../../api/crypto-safe-base62.ts';
-import {
-    nowUtc,
     type Id,
     type IdentityProviderAction,
     type IdentityProviderEntity,
@@ -14,46 +10,6 @@ import {
 import {
     latestByKey,
 } from '../../../api/ledger-reduction.ts';
-
-async function appendProviderEvent(
-    ctx: RequestContext,
-    identityId: Id,
-    provider: string,
-    providerSubject: string,
-    action: IdentityProviderAction,
-): Promise<void> {
-    const id = generateCryptoSafeBase62();
-    await ctx.PUT(`identity-providers/${id}`, {
-        identity_id: identityId,
-        provider,
-        provider_subject: providerSubject,
-        action,
-        at: nowUtc(),
-    });
-}
-
-export async function postProviderLink(
-    ctx: RequestContext,
-    identityId: Id,
-    provider: string,
-    providerSubject: string,
-): Promise<void> {
-    await appendProviderEvent(
-        ctx, identityId, provider, providerSubject, 'linked',
-    );
-}
-
-export async function postProviderUnlink(
-    ctx: RequestContext,
-    identityId: Id,
-    provider: string,
-    providerSubject: string,
-): Promise<void> {
-    await appendProviderEvent(
-        ctx, identityId, provider, providerSubject,
-        'unlinked',
-    );
-}
 
 // One provider link/unlink event in the domain idiom: the
 // presenter reads camelCase, never the snake_case row.

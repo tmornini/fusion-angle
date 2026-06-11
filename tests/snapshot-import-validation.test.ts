@@ -41,7 +41,7 @@ test(
         const adapter =
             new LocalStorageDbAdapter();
         await assert.rejects(
-            () => adapter.importSnapshot(
+            () => adapter.putSnapshot(
                 '{not valid',
             ),
             /not valid JSON/,
@@ -56,7 +56,7 @@ test(
         const adapter =
             new LocalStorageDbAdapter();
         await assert.rejects(
-            () => adapter.importSnapshot(
+            () => adapter.putSnapshot(
                 '[]',
             ),
             /object with table keys/,
@@ -71,7 +71,7 @@ test(
         const adapter =
             new LocalStorageDbAdapter();
         await assert.rejects(
-            () => adapter.importSnapshot(
+            () => adapter.putSnapshot(
                 'null',
             ),
             /object with table keys/,
@@ -86,7 +86,7 @@ test(
         const adapter =
             new LocalStorageDbAdapter();
         await assert.rejects(
-            () => adapter.importSnapshot(
+            () => adapter.putSnapshot(
                 '"string"',
             ),
             /object with table keys/,
@@ -104,7 +104,7 @@ test(
             members: { not: 'an array' },
         });
         await assert.rejects(
-            () => adapter.importSnapshot(json),
+            () => adapter.putSnapshot(json),
             /table "members" is not an array/,
         );
     },
@@ -120,7 +120,7 @@ test(
             members: ['not an object'],
         });
         await assert.rejects(
-            () => adapter.importSnapshot(json),
+            () => adapter.putSnapshot(json),
             /row 0 in table "members" is not an object/,
         );
     },
@@ -136,7 +136,7 @@ test(
             members: [null],
         });
         await assert.rejects(
-            () => adapter.importSnapshot(json),
+            () => adapter.putSnapshot(json),
             /row 0 in table "members" is not an object/,
         );
     },
@@ -152,7 +152,7 @@ test(
             members: [['not', 'an', 'object']],
         });
         await assert.rejects(
-            () => adapter.importSnapshot(json),
+            () => adapter.putSnapshot(json),
             /row 0 in table "members" is not an object/,
         );
     },
@@ -174,7 +174,7 @@ test(
             ],
         });
         await assert.rejects(
-            () => adapter.importSnapshot(json),
+            () => adapter.putSnapshot(json),
             /snapshot\.members\[0\]/,
         );
     },
@@ -195,7 +195,7 @@ test(
             }],
         });
         await assert.rejects(
-            () => adapter.importSnapshot(json),
+            () => adapter.putSnapshot(json),
             /snapshot\.objectives\[0\]/,
         );
     },
@@ -214,7 +214,7 @@ test(
                 position: 1,
             }],
         });
-        await adapter.importSnapshot(json);
+        await adapter.putSnapshot(json);
         assert.ok(
             map.get(KEY_PREFIX + 'objectives'),
             'objective row should persist',
@@ -239,7 +239,7 @@ test(
                 },
             ],
         });
-        await adapter.importSnapshot(json);
+        await adapter.putSnapshot(json);
         const stored = map.get(
             KEY_PREFIX + 'human_members',
         );
@@ -248,14 +248,14 @@ test(
 );
 
 test(
-    'importSnapshot materializes every known table as empty',
+    'putSnapshot materializes every known table as empty',
     async () => {
         installShim();
         const adapter =
             new LocalStorageDbAdapter();
-        await adapter.importSnapshot('{}');
+        await adapter.putSnapshot('{}');
         const reExported = JSON.parse(
-            await adapter.exportSnapshot(),
+            await adapter.getSnapshot(),
         );
         for (const table of TABLE_NAMES) {
             assert.deepStrictEqual(
@@ -268,7 +268,7 @@ test(
 );
 
 test(
-    'createSchema/hasSchema/deleteSchema lifecycle',
+    'postSchemaCreation/hasSchema/deleteSchema lifecycle',
     async () => {
         installShim();
         const adapter =
@@ -277,10 +277,10 @@ test(
             await adapter.hasSchema(), false,
             'fresh storage has no schema',
         );
-        await adapter.createSchema();
+        await adapter.postSchemaCreation();
         assert.equal(
             await adapter.hasSchema(), true,
-            'createSchema makes hasSchema true',
+            'postSchemaCreation makes hasSchema true',
         );
         await adapter.deleteSchema();
         assert.equal(
@@ -291,20 +291,20 @@ test(
 );
 
 test(
-    'createSchema is idempotent on re-run',
+    'postSchemaCreation is idempotent on re-run',
     async () => {
         const map = installShim();
         const adapter =
             new LocalStorageDbAdapter();
-        await adapter.createSchema();
+        await adapter.postSchemaCreation();
         await adapter.members.put('u1', {
             type: 'human',
         });
-        await adapter.createSchema();
+        await adapter.postSchemaCreation();
         const members = await adapter.members.getAll();
         assert.equal(
             members.length, 1,
-            'second createSchema preserves data',
+            'second postSchemaCreation preserves data',
         );
         assert.ok(
             map.get(KEY_PREFIX + 'members'),
@@ -313,12 +313,12 @@ test(
 );
 
 test(
-    'exportSnapshot includes every known table',
+    'getSnapshot includes every known table',
     async () => {
         installShim();
         const adapter =
             new LocalStorageDbAdapter();
-        await adapter.createSchema();
+        await adapter.postSchemaCreation();
         await adapter.flowVersions.put('fv1', {
             flow_id: 'flow-aaaa',
             name: 'Flow',
@@ -332,7 +332,7 @@ test(
             at: '2026-01-01T00:00:00.000000Z',
         });
         const json =
-            await adapter.exportSnapshot();
+            await adapter.getSnapshot();
         const parsed = JSON.parse(json);
         for (const table of TABLE_NAMES) {
             assert.ok(

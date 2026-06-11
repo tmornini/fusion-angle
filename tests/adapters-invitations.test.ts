@@ -26,7 +26,7 @@ const AT = '2026-01-01T00:00:00.000000Z';
 // identity with no membership anywhere (a fresh invitee).
 async function seed(): Promise<MemoryDbAdapter> {
     const db = new MemoryDbAdapter();
-    await db.createSchema();
+    await db.postSchemaCreation();
     await db.organizations.put('1', orgRow('Stark'));
     await db.organizations.put('2', orgRow('Wayne'));
     for (const org of ['1', '2']) {
@@ -106,7 +106,7 @@ test('validateInvitationEntity rejects a bad timestamp', () => {
 
 test('the invitations store round-trips a row', async () => {
     const db = new MemoryDbAdapter();
-    await db.createSchema();
+    await db.postSchemaCreation();
     await db.invitations.put('inv1', {
         organization_id: '2', identity_id: 'sarah', at: AT,
     });
@@ -123,7 +123,7 @@ test('grant by email appends a pending invitation', async () => {
     assert.equal(rows.length, 1);
     assert.equal(rows[0]!.organization_id, '2');
     assert.equal(rows[0]!.identity_id, 'sarah');
-    const state = await db.states.currentFor(rows[0]!.id);
+    const state = await db.states.getCurrentFor(rows[0]!.id);
     assert.equal(state?.state, 'pending');
 });
 
@@ -169,6 +169,31 @@ async () => {
     assert.equal(mine.length, 1);
     assert.equal(mine[0]!.organizationName, 'Wayne');
     assert.equal(mine[0]!.state, 'pending');
+});
+
+test('the view omits the inviter name when PII is erased',
+async () => {
+    const { db } = await ctxFor('current', '2');
+    const tony = await ctxOn(db, 'current', '2');
+    await postInvitationGrant(tony, 'sarah@x.com');
+    await db.identityPii.delete('current');
+    const sarah = await ctxOn(db, 'sarah', '1');
+    const mine = await getInvitations(sarah);
+    assert.equal(mine.length, 1);
+    assert.ok(!('invitedByName' in mine[0]!));
+});
+
+test('the view omits the org name when the org is gone',
+async () => {
+    const { db } = await ctxFor('current', '2');
+    const tony = await ctxOn(db, 'current', '2');
+    await postInvitationGrant(tony, 'sarah@x.com');
+    await db.states.postEvent('ev-org-gone', '2', 'deleted',
+        'system');
+    const sarah = await ctxOn(db, 'sarah', '1');
+    const mine = await getInvitations(sarah);
+    assert.equal(mine.length, 1);
+    assert.ok(!('organizationName' in mine[0]!));
 });
 
 test('accept writes a membership in the invitation org',
@@ -297,4 +322,15 @@ async () => {
     // Switched to Stark, the Wayne invitation is out of scope.
     const tonyStark = await ctxOn(db, 'current', '1');
     assert.equal((await getSentInvitations(tonyStark)).length, 0);
+});
+
+test('the sent view omits the email when PII is erased',
+async () => {
+    const { db } = await ctxFor('current', '2');
+    const tony = await ctxOn(db, 'current', '2');
+    await postInvitationGrant(tony, 'sarah@x.com');
+    await db.identityPii.delete('sarah');
+    const sent = await getSentInvitations(tony);
+    assert.equal(sent.length, 1);
+    assert.ok(!('inviteeEmail' in sent[0]!));
 });

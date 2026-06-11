@@ -13,7 +13,7 @@ import {
 // readwrite commit so other tabs can refresh.
 export class IndexedDbDbAdapter extends BackedDbAdapter {
     constructor(
-        post?: (tables: readonly string[]) => void,
+        post: (tables: readonly string[]) => void,
     ) {
         const backend = new IndexedDbBackend(post);
         super(

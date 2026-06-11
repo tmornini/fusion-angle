@@ -11,7 +11,7 @@ import { navigateTo } from '../app/core.ts';
 import {
     createRequestContext,
     sessionContext,
-    getProjectRows,
+    getProjectEntities,
     getProjects,
     getProjectsScoreColumn,
     putProject,
@@ -55,7 +55,7 @@ async function loadProjectMaps(
 }> {
     const [rows, scoreColumn] =
         await Promise.all([
-            getProjectRows(ctx),
+            getProjectEntities(ctx),
             getProjectsScoreColumn(ctx),
         ]);
     return {

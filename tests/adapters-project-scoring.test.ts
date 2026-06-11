@@ -113,14 +113,14 @@ async function seedTwoApprovedProjects(
         ...projectBody,
         title: 't1', position: 0,
     });
-    await db.states.record(
+    await db.states.postEvent(
         'st-p1', 'p1', 'approved', 'system',
     );
     await db.projects.put('p2', {
         ...projectBody,
         title: 't2', position: 1,
     });
-    await db.states.record(
+    await db.states.postEvent(
         'st-p2', 'p2', 'approved', 'system',
     );
     await db.objectives.put('o1', {

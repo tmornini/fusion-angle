@@ -51,10 +51,10 @@ async () => {
         name: 'P', email: 'p@x.io', phone: '1', bio: 'b',
     });
     await db.members.put('p1', { type: 'human' });
-    await db.states.record('e1', 'someEntity', 'active', 'p1');
+    await db.states.postEvent('e1', 'someEntity', 'active', 'p1');
     await deleteIdentityPii(ctx, 'p1');
     assert.equal((await getMemberPii(ctx, 'p1')).erased, true);
     assert.equal((await getIdentity(ctx, 'p1')).isPerson(), true);
-    const events = await db.states.allFor('someEntity');
+    const events = await db.states.getAllFor('someEntity');
     assert.equal(events[0]!.member_id, 'p1');
 });

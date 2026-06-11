@@ -5,13 +5,13 @@ import {
 } from '../api/db-memory.ts';
 import {
     createRequestContext,
-    type RequestContext,
 } from '../web-app/app/adapters/shared.ts';
 import { devToken } from './token-fixtures.ts';
+import { adminContext } from './context-fixtures.ts';
 import {
-    getProjectRows,
+    getProjectEntities,
     getProjects,
-    getProjectRow,
+    getProjectEntity,
     postProjectStateChange,
     putProject,
     ProjectView,
@@ -28,7 +28,6 @@ import {
     seedCurrentMember,
     seedHumanMember,
 } from './member-fixtures.ts';
-import { seedAdminSchema } from './test-fixtures.ts';
 
 function buildProject(
     id: string,
@@ -62,32 +61,22 @@ async function seedProject(
     await db.projects.put(
         id, buildProject(id, title, overrides),
     );
-    await db.states.record(
+    await db.states.postEvent(
         `st-${id}`, id, state, 'system',
     );
 }
 
-async function setupDb(): Promise<{
-    db: MemoryDbAdapter;
-    ctx: RequestContext;
-}> {
-    const db = new MemoryDbAdapter();
-    await seedAdminSchema(db);
-    const ctx = createRequestContext(db, await devToken());
-    return { db, ctx };
-}
-
 test(
-    'getProjectRow round-trips all fields',
+    'getProjectEntity round-trips all fields',
     async () => {
-        const { db, ctx } = await setupDb();
+        const { db, ctx } = await adminContext();
         await db.projects.put('p1', buildProject(
             'p1', 'Alpha', {
                 progress: 73,
                 estimated_cost: 99000,
             },
         ));
-        const row = await getProjectRow(ctx, 'p1');
+        const row = await getProjectEntity(ctx, 'p1');
         assert.equal(row.id, 'p1');
         assert.equal(row.title, 'Alpha');
         assert.equal(row.description, 'desc for Alpha');
@@ -103,27 +92,27 @@ test(
 );
 
 test(
-    'getProjectRow rejects for missing id',
+    'getProjectEntity rejects for missing id',
     async () => {
-        const { ctx } = await setupDb();
+        const { ctx } = await adminContext();
         await assert.rejects(
-            () => getProjectRow(ctx, 'nope'),
+            () => getProjectEntity(ctx, 'nope'),
             /Not found/,
         );
     },
 );
 
 test(
-    'getProjectRows returns persisted rows',
+    'getProjectEntities returns persisted rows',
     async () => {
-        const { db, ctx } = await setupDb();
+        const { db, ctx } = await adminContext();
         await db.projects.put(
             'p1', buildProject('p1', 'Alpha'),
         );
         await db.projects.put(
             'p2', buildProject('p2', 'Beta'),
         );
-        const rows = await getProjectRows(ctx);
+        const rows = await getProjectEntities(ctx);
         assert.equal(rows.length, 2);
         const titles = rows
             .map(r => r.title)
@@ -133,10 +122,10 @@ test(
 );
 
 test(
-    'getProjectRows returns empty on empty db',
+    'getProjectEntities returns empty on empty db',
     async () => {
-        const { ctx } = await setupDb();
-        const rows = await getProjectRows(ctx);
+        const { ctx } = await adminContext();
+        const rows = await getProjectEntities(ctx);
         assert.deepEqual(rows, []);
     },
 );
@@ -144,7 +133,7 @@ test(
 test(
     'getProjects wraps rows in Project objects',
     async () => {
-        const { db, ctx } = await setupDb();
+        const { db, ctx } = await adminContext();
         await seedProject(db, 'p1', 'Alpha');
         const projects = await getProjects(ctx);
         assert.equal(projects.length, 1);
@@ -161,7 +150,7 @@ test(
 test(
     'getProjects excludes deleted-state rows',
     async () => {
-        const { db, ctx } = await setupDb();
+        const { db, ctx } = await adminContext();
         await seedProject(db, 'keep', 'Keep');
         await seedProject(
             db, 'gone', 'Gone', 'deleted',
@@ -177,7 +166,7 @@ test(
 test(
     'getProjects excludes tombstoned rows',
     async () => {
-        const { db, ctx } = await setupDb();
+        const { db, ctx } = await adminContext();
         await seedProject(db, 'keep', 'Keep');
         await seedProject(db, 'gone', 'Gone');
         await db.projects.delete('gone');
@@ -186,13 +175,13 @@ test(
         assert.equal(
             projects[0]?.titleText(), 'Keep',
         );
-        const rows = await getProjectRows(ctx);
+        const rows = await getProjectEntities(ctx);
         assert.equal(rows.length, 1);
     },
 );
 
 test('putProject persists a new project', async () => {
-    const { db, ctx } = await setupDb();
+    const { db, ctx } = await adminContext();
     await putProject(
         ctx, 'p1', buildProject('p1', 'Created'),
     );
@@ -201,7 +190,7 @@ test('putProject persists a new project', async () => {
 });
 
 test('putProject updates an existing project', async () => {
-    const { db, ctx } = await setupDb();
+    const { db, ctx } = await adminContext();
     await db.projects.put(
         'p1', buildProject('p1', 'Before'),
     );
@@ -218,12 +207,12 @@ test('putProject updates an existing project', async () => {
 test(
     'putProject changes are visible to a fresh ctx',
     async () => {
-        const { db, ctx } = await setupDb();
+        const { db, ctx } = await adminContext();
         await putProject(ctx, 'p1', buildProject(
             'p1', 'Persisted',
         ));
         const fresh = createRequestContext(db, await devToken());
-        const row = await getProjectRow(fresh, 'p1');
+        const row = await getProjectEntity(fresh, 'p1');
         assert.equal(row.title, 'Persisted');
     },
 );
@@ -266,7 +255,7 @@ test(
     'postProjectStateChange records a state event'
     + ' without touching the project row',
     async () => {
-        const { db, ctx } = await setupDb();
+        const { db, ctx } = await adminContext();
         await seedCurrentMember(db);
         await seedProject(
             db, 'p1', 'Original', 'approved',
@@ -281,7 +270,7 @@ test(
         const after =
             await db.projects.getById('p1');
         assert.deepEqual(after, before);
-        const events = await db.states.allFor('p1');
+        const events = await db.states.getAllFor('p1');
         assert.equal(events.length, 2);
         assert.equal(
             events.at(-1)?.state, 'archived',

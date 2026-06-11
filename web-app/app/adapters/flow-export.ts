@@ -48,6 +48,7 @@ import type {
     ParsedEdge,
 } from '../mermaid-parse.ts';
 import {
+    DEFAULT_ZIP_LIMITS,
     buildZip, getZipEntries,
 } from '../zip.ts';
 import {
@@ -116,12 +117,16 @@ function buildSidecar(
     }, null, 2);
 }
 
+// 'YYYY-MM-DDTHH:MM' — the ISO prefix through
+// minute precision.
+const ISO_MINUTE_WIDTH = 16;
+
 function fileStamp(
     timeSep: string,
 ): string {
     const iso = new Date()
         .toISOString()
-        .slice(0, 16) + 'Z';
+        .slice(0, ISO_MINUTE_WIDTH) + 'Z';
     return timeSep === ':'
         ? iso
         : iso.replaceAll(':', timeSep);
@@ -421,7 +426,9 @@ function validateBackupJson(
 export async function getBackupFromZip(
     data: Uint8Array,
 ): Promise<Backup> {
-    const entries = await getZipEntries(data);
+    const entries = await getZipEntries(
+        data, DEFAULT_ZIP_LIMITS,
+    );
     const jsonEntry = entries.find(
         e => e.name === 'flow.json'
             || e.name.endsWith(
@@ -1012,7 +1019,9 @@ export async function postFlowFromZip(
     warnings: string[];
 }> {
     const dec = new TextDecoder();
-    const entries = await getZipEntries(data);
+    const entries = await getZipEntries(
+        data, DEFAULT_ZIP_LIMITS,
+    );
 
     const mmdEntry = entries.find(
         e => e.name === 'flow.mmd'

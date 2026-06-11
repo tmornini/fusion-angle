@@ -1,5 +1,5 @@
 import {
-    $, $input, $inputRequired, $required,
+    $, $$, $input, $inputRequired, $required,
     $select, $textarea,
     populateIcons,
 } from '../app/dom.ts';
@@ -145,9 +145,7 @@ function initMemberListFilters(): void {
             'input', onSearchInput,
             { signal },
         );
-    document.querySelectorAll<HTMLElement>(
-        '[data-kind-chip]',
-    ).forEach(chip => {
+    $$('[data-kind-chip]', document).forEach(chip => {
         chip.addEventListener(
             'click', onKindChipClick,
             { signal },
@@ -180,9 +178,7 @@ function onKindChipClick(e: Event): void {
     membersState = applyManagedMembersKind(
         membersState, kind as MemberKindFilter,
     );
-    document.querySelectorAll<HTMLElement>(
-        '[data-kind-chip]',
-    ).forEach(chip => {
+    $$('[data-kind-chip]', document).forEach(chip => {
         chip.setAttribute(
             'aria-pressed',
             chip.getAttribute('data-kind-chip')
@@ -215,8 +211,8 @@ function bindAddMemberDialog(): void {
         'add-member-btn',
         handleAddMemberSubmit,
     );
-    document.querySelectorAll<HTMLInputElement>(
-        '#add-member-kind-toggle input',
+    $$(
+        '#add-member-kind-toggle input', document,
     ).forEach(input => {
         input.addEventListener(
             'change', onKindRadioChange,
@@ -345,10 +341,11 @@ function onDialogKeydown(e: KeyboardEvent): void {
 }
 
 function selectedKind(): 'human' | 'ai' {
-    const checked = document.querySelector<
-        HTMLInputElement
-    >('#add-member-kind-toggle'
-        + ' input[name="member-kind"]:checked');
+    const checked = $input(
+        '#add-member-kind-toggle'
+        + ' input[name="member-kind"]:checked',
+        document,
+    );
     if (checked && checked.value === 'ai') {
         return 'ai';
     }

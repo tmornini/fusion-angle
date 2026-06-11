@@ -1,5 +1,5 @@
 import {
-    $, $required, bindEnterToClick,
+    $, $$, $required, bindEnterToClick,
     isFormField,
 } from '../app/dom.ts';
 import {
@@ -16,7 +16,7 @@ import {
 import { navigateTo } from '../app/core.ts';
 import {
     getIdea,
-    getProjectRows,
+    getProjectEntities,
     postIdeaConversion,
     createRequestContext,
     sessionContext,
@@ -166,12 +166,15 @@ export async function init(
         }
         const baselines =
             new Map<ObjectiveId, number>();
-        document.querySelectorAll<
-            HTMLInputElement
-        >(
+        $$(
             '#convert-scores-section'
             + ' .baseline-slider',
+            document,
         ).forEach(slider => {
+            if (
+                !(slider instanceof
+                    HTMLInputElement)
+            ) return;
             const row = slider.closest(
                 '.convert-scores-row',
             );
@@ -347,12 +350,12 @@ export async function init(
     }
 
     function bindEvents(): void {
-        document
-            .querySelectorAll<HTMLElement>(
-                '.card input,'
-                + ' .card select,'
-                + ' .card textarea',
-            )
+        $$(
+            '.card input,'
+            + ' .card select,'
+            + ' .card textarea',
+            document,
+        )
             .forEach(el => {
                 const handler = () => {
                     mutateValidation(
@@ -371,13 +374,15 @@ export async function init(
             '#convert-submit-btn';
         bindEnterToClick(
             '#convert-project-name',
-            submitSel,
+            submitSel, document,
         );
         bindEnterToClick(
             '#convert-time-days', submitSel,
+            document,
         );
         bindEnterToClick(
             '#convert-cost', submitSel,
+            document,
         );
 
         const scoresSection = $(
@@ -397,10 +402,9 @@ export async function init(
                         '.convert-scores-row',
                     );
                     if (!row) return;
-                    const valueEl =
-                        row.querySelector(
-                            '.slider-value',
-                        );
+                    const valueEl = $(
+                        '.slider-value', row,
+                    );
                     if (valueEl) {
                         const v = Number(
                             (target as
@@ -569,7 +573,7 @@ async function performConversion(
     activeObjectives: readonly Objective[],
 ): Promise<void> {
     const fields = draft.fields;
-    const projects = await getProjectRows(ctx);
+    const projects = await getProjectEntities(ctx);
     const position = nextPosition(
         projects.map(p => p.position),
     );

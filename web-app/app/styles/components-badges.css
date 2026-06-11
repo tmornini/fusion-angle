@@ -5,31 +5,6 @@
   justify-content: center;
 }
 
-
-.status-dot {
-  position: absolute;
-  bottom: -2px;
-  right: -2px;
-  width: 0.875rem;
-  height: 0.875rem;
-  border-radius: var(--radius-full);
-  border: 2px solid hsl(var(--card));
-}
-
-.status-dot[data-tone="success"] {
-  background: hsl(var(--success));
-}
-.status-dot[data-tone="warning"] {
-  background: hsl(var(--warning));
-}
-.status-dot[data-tone="error"] {
-  background: hsl(var(--error));
-}
-.status-dot[data-tone="muted"] {
-  background: hsl(var(--muted-foreground));
-}
-
-
 /* Count badge over an icon button (the invitations bell): the
    host is the positioning anchor, the badge a small pill at its
    top-right corner. */
@@ -53,7 +28,6 @@
   text-align: center;
   border: 2px solid hsl(var(--card));
 }
-
 
 .badge {
   display: inline-flex;
@@ -205,15 +179,6 @@
   color: hsl(var(--error-text));
 }
 
-/* Quick-action button: outline btn variant
-   that sits at top-left with vertical icon+label */
-.btn-quick-action {
-  height: auto;
-  padding: var(--space-3) var(--space-4);
-  justify-content: flex-start;
-  gap: var(--space-3);
-}
-
 /* Stat cell tinted card (used by organization, idea, project) */
 .stat-cell {
   padding: var(--space-4);
@@ -232,14 +197,6 @@
   background-color: hsl(var(--primary));
 }
 
-/* Activity row — subtle hover highlight */
-.activity-row {
-  transition: var(--transition-colors);
-}
-.activity-row:hover {
-  background-color: hsl(var(--muted) / 0.3);
-}
-
 /* Page header / title (used by snapshots and similar pages) */
 .page-header {
   display: flex;
@@ -254,4 +211,3 @@
   font-weight: var(--font-weight-bold);
   color: hsl(var(--foreground));
 }
-

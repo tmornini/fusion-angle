@@ -3,6 +3,7 @@ import {
 } from '../safe-html.ts';
 import { formatDateTime } from '../core.ts';
 import { DISPLAY_ABSENT } from '../format.ts';
+import { mutedEmptyNote } from './empty-note.ts';
 import type {
     TokenEvent,
     TokenChain,
@@ -65,12 +66,6 @@ function buildChainCard(chain: TokenChain): SafeHtml {
         </div>`;
 }
 
-function buildEmptyState(): SafeHtml {
-    return html`<div class="${
-        'p-4 text-sm text-muted text-center'
-    }">No tokens.</div>`;
-}
-
 export class IdentityTokensPresenter {
     readonly #chains: readonly TokenChain[];
 
@@ -81,7 +76,7 @@ export class IdentityTokensPresenter {
     render(container: HTMLElement): void {
         setHtml(container, html`${
             this.#chains.length === 0
-                ? buildEmptyState()
+                ? mutedEmptyNote('No tokens.')
                 : html`${this.#chains.map(buildChainCard)}`
         }`);
     }

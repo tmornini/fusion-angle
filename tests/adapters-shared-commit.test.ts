@@ -1,33 +1,26 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
 import {
-    createRequestContext,
     CommitError,
 } from '../web-app/app/adapters/shared.ts';
-import { devToken } from './token-fixtures.ts';
+import { adminContext } from './context-fixtures.ts';
 import {
-    seedAdminSchema,
-} from './test-fixtures.ts';
-import {
-    getProviderModels,
-} from '../api/provider-models.ts';
+    firstProviderModel,
+} from './member-fixtures.ts';
 
 function buildAIMemberBody(description: string) {
     return {
         name: 'AI ' + description,
         description,
         skill_focus: '',
-        model: getProviderModels()[0]!.id,
+        model: firstProviderModel().id,
     };
 }
 
 test(
     'ctx.commit runs all ops in supplied order',
     async () => {
-        const db = new MemoryDbAdapter();
-        await seedAdminSchema(db);
-        const ctx = createRequestContext(db, await devToken());
+        const { db, ctx } = await adminContext();
         await ctx.commit({
             ops: [
                 {
@@ -67,9 +60,7 @@ test(
     'ctx.commit throws CommitError and rolls back'
     + ' the whole batch',
     async () => {
-        const db = new MemoryDbAdapter();
-        await seedAdminSchema(db);
-        const ctx = createRequestContext(db, await devToken());
+        const { db, ctx } = await adminContext();
         const goodA = {
             method: 'put' as const,
             resource: 'ai-members/ai_1',
@@ -95,8 +86,6 @@ test(
         }
         assert.ok(caught instanceof CommitError);
         const err = caught as CommitError;
-        assert.equal(err.failedAt, 0);
-        assert.equal(err.applied.length, 0);
         assert.ok(err.cause instanceof Error);
         // Real rollback: the earlier valid op did not land.
         const all = await db.aiMembers.getAll();
@@ -105,39 +94,10 @@ test(
 );
 
 test(
-    'ctx.commit CommitError reports failedAt 0'
-    + ' when first op fails',
-    async () => {
-        const db = new MemoryDbAdapter();
-        await seedAdminSchema(db);
-        const ctx = createRequestContext(db, await devToken());
-        const bad = {
-            method: 'put' as const,
-            resource: 'ai-members/ai_1',
-            body: { rogue_field: 'oops' },
-        };
-        let caught: unknown;
-        try {
-            await ctx.commit({ ops: [bad] });
-        } catch (e) { caught = e; }
-        assert.ok(caught instanceof CommitError);
-        assert.equal(
-            (caught as CommitError).failedAt, 0,
-        );
-        assert.equal(
-            (caught as CommitError).applied.length,
-            0,
-        );
-    },
-);
-
-test(
     'ctx.commit rolls back every op when the'
     + ' final op fails',
     async () => {
-        const db = new MemoryDbAdapter();
-        await seedAdminSchema(db);
-        const ctx = createRequestContext(db, await devToken());
+        const { db, ctx } = await adminContext();
         const goodA = {
             method: 'put' as const,
             resource: 'ai-members/ai_1',
@@ -160,13 +120,6 @@ test(
             });
         } catch (e) { caught = e; }
         assert.ok(caught instanceof CommitError);
-        assert.equal(
-            (caught as CommitError).failedAt, 0,
-        );
-        assert.equal(
-            (caught as CommitError).applied.length,
-            0,
-        );
         // Real rollback: neither good op landed.
         assert.equal(
             (await db.aiMembers.getAll()).length, 0,

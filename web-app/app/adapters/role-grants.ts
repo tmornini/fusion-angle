@@ -5,13 +5,8 @@ import {
     nowUtc,
     type Id,
     type RoleGrantAction,
-    type RoleGrantEntity,
 } from '../../../api/types.ts';
 import {
-    currentRolesForInOrg,
-} from '../../../api/authorization.ts';
-import {
-    activeOrg,
     type RequestContext,
 } from './shared.ts';
 
@@ -31,30 +26,10 @@ async function appendRoleEvent(
     });
 }
 
-export async function postRoleGrant(
-    ctx: RequestContext,
-    identityId: Id,
-    role: string,
-): Promise<void> {
-    await appendRoleEvent(ctx, identityId, role, 'granted');
-}
-
 export async function postRoleRevocation(
     ctx: RequestContext,
     identityId: Id,
     role: string,
 ): Promise<void> {
     await appendRoleEvent(ctx, identityId, role, 'revoked');
-}
-
-export async function getRolesFor(
-    ctx: RequestContext,
-    identityId: Id,
-): Promise<string[]> {
-    const all = await ctx.GET<RoleGrantEntity[]>(
-        'role-grants',
-    );
-    return currentRolesForInOrg(
-        all, identityId, activeOrg(ctx),
-    );
 }

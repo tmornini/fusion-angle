@@ -34,7 +34,7 @@ async function rejectsImport(
     installShim();
     const adapter = new LocalStorageDbAdapter();
     await assert.rejects(
-        () => adapter.importSnapshot(json),
+        () => adapter.putSnapshot(json),
         pattern,
     );
 }
@@ -42,7 +42,7 @@ async function rejectsImport(
 async function acceptsImport(json: string): Promise<void> {
     installShim();
     const adapter = new LocalStorageDbAdapter();
-    await adapter.importSnapshot(json);
+    await adapter.putSnapshot(json);
 }
 
 const AT = '2026-01-01T00:00:00.000000Z';
