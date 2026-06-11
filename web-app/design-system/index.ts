@@ -327,8 +327,7 @@ export async function init(): Promise<void> {
                     }Primary brand colors ${''
                     }for Fusion AI</p>
             </div>
-            <div class="ds-grid-4"
-                class="stats-grid">
+            <div class="ds-grid-4 stats-grid">
                 ${buildColorSwatch(
                     'Primary Blue',
                     '--primary',
@@ -359,8 +358,7 @@ export async function init(): Promise<void> {
                     }for ${''
                     }nuanced UI design</p>
             </div>
-            <div class="ds-grid-5"
-                class="stats-grid">
+            <div class="ds-grid-5 stats-grid">
                 ${buildColorSwatch(
                     'Blue 50', '--blue-50',
                 )}
@@ -377,8 +375,7 @@ export async function init(): Promise<void> {
                     'Blue 400', '--blue-400',
                 )}
             </div>
-            <div class="ds-grid-5"
-                class="stats-grid">
+            <div class="ds-grid-5 stats-grid">
                 ${buildColorSwatch(
                     'Blue 500', '--blue-500',
                 )}
@@ -408,8 +405,7 @@ export async function init(): Promise<void> {
                     }colors ${''
                     }(WCAG AA compliant)</p>
             </div>
-            <div class="ds-grid-4"
-                class="stats-grid">
+            <div class="ds-grid-4 stats-grid">
                 ${buildColorSwatch(
                     'Success', '--success',
                 )}
@@ -424,8 +420,7 @@ export async function init(): Promise<void> {
                     'Info', '--info',
                 )}
             </div>
-            <div class="ds-grid-4"
-                class="stats-grid">
+            <div class="ds-grid-4 stats-grid">
                 ${buildColorSwatch(
                     'Success Soft',
                     '--success-soft',
@@ -456,8 +451,7 @@ export async function init(): Promise<void> {
                     }and ${''
                     }border colors</p>
             </div>
-            <div class="ds-grid-6"
-                class="stats-grid">
+            <div class="ds-grid-6 stats-grid">
                 ${buildColorSwatch(
                     'Background',
                     '--background',
@@ -786,8 +780,7 @@ export async function init(): Promise<void> {
                     }Input fields and ${''
                     }text areas</p>
             </div>
-            <div class="ds-grid-2"
-                class="convert-grid">
+            <div class="ds-grid-2 convert-grid">
                 <div class="card p-6">
                     <h3 class="${''
                         }font-semibold mb-4">${''
@@ -905,10 +898,8 @@ export async function init(): Promise<void> {
                     }with ${''
                     }consistent styling</p>
             </div>
-            <div class="ds-grid-3"
-                class="score-grid">
-                <div class="card card-hover"
-                    class="p-6">
+            <div class="ds-grid-3 score-grid">
+                <div class="card card-hover p-6">
                     <h3 class="${''
                         }font-semibold mb-1">${''
                         }Fusion Card</h3>
@@ -924,8 +915,7 @@ export async function init(): Promise<void> {
                         }shadow ${''
                         }effect.</p>
                 </div>
-                <div class="card card-flat"
-                    class="p-6">
+                <div class="card card-flat p-6">
                     <h3 class="${''
                         }font-semibold mb-1">${''
                         }Flat Card</h3>
@@ -976,8 +966,7 @@ export async function init(): Promise<void> {
                     } ${''
                     }and hierarchy</p>
             </div>
-            <div class="ds-grid-5"
-                class="stats-grid">
+            <div class="ds-grid-5 stats-grid">
                 ${buildShadowBox(
                     'shadow-xs',
                     '--shadow-xs',
@@ -1236,8 +1225,7 @@ export async function init(): Promise<void> {
                     }and ${''
                     }system messages</p>
             </div>
-            <div class="ds-grid-2"
-                class="convert-grid">
+            <div class="ds-grid-2 convert-grid">
                 <div class="card p-6">
                     <h3 class="${''
                         }font-semibold mb-3">${''
@@ -1475,10 +1463,8 @@ export async function init(): Promise<void> {
                     }the ${''
                     }design system</p>
             </div>
-            <div class="ds-grid-2"
-                class="convert-grid">
-                <div class="card"
-                    class="ds-do-card">
+            <div class="ds-grid-2 convert-grid">
+                <div class="card ds-do-card">
                     <h3 class="${''
                         }font-semibold${''
                         } text-success${''
@@ -1486,8 +1472,7 @@ export async function init(): Promise<void> {
                         }gap-2 mb-4">${''
                         }${iconCheck(20, '')
                         } Do</h3>
-                    <div class="text-sm"
-                        class="flex flex-col gap-2">
+                    <div class="text-sm flex flex-col gap-2">
                         <p>${iconCheck(
                             14,
                             'text-success',
@@ -1528,8 +1513,7 @@ export async function init(): Promise<void> {
                             }accessibility</p>
                     </div>
                 </div>
-                <div class="card"
-                    class="ds-dont-card">
+                <div class="card ds-dont-card">
                     <h3 class="${''
                         }font-semibold${''
                         } text-error ${''
@@ -1537,8 +1521,7 @@ export async function init(): Promise<void> {
                         }gap-2 mb-4">${''
                         }${iconX(20, '')
                         } Don't</h3>
-                    <div class="text-sm"
-                        class="flex flex-col gap-2">
+                    <div class="text-sm flex flex-col gap-2">
                         <p>${iconX(
                             14,
                             'text-error',
@@ -1593,8 +1576,7 @@ export async function init(): Promise<void> {
 
             <h3 class="font-semibold">${''
                 }Node Variants</h3>
-            <div class="ds-grid-3"
-                class="stats-grid">
+            <div class="ds-grid-3 stats-grid">
                 <div class="ds-stack">
                     <code class="${''
                         }text-xs text-muted">${''
@@ -1632,8 +1614,7 @@ export async function init(): Promise<void> {
 
             <h3 class="font-semibold">${''
                 }Edge Variants</h3>
-            <div class="ds-grid-3"
-                class="stats-grid">
+            <div class="ds-grid-3 stats-grid">
                 <div class="ds-stack">
                     <code class="${''
                         }text-xs text-muted">${''

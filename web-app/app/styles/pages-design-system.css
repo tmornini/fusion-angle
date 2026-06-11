@@ -216,3 +216,47 @@
   gap: var(--space-3);
   max-width: 24rem;
 }
+
+/* Token swatch fills. These class names never appear as
+   literals: buildColorSwatch (design-system/index.ts)
+   CONSTRUCTS them from the token name at runtime
+   ('bg' + variable.replace('--', '-')), so a dead-CSS
+   sweep that greps for literal usage will not match
+   them. Do not delete without checking that builder. */
+.bg-primary { background-color: hsl(var(--primary)); }
+.bg-primary-foreground {
+  background-color: hsl(var(--primary-foreground));
+}
+.bg-accent { background-color: hsl(var(--accent)); }
+.bg-accent-foreground {
+  background-color: hsl(var(--accent-foreground));
+}
+.bg-foreground { background-color: hsl(var(--foreground)); }
+.bg-card { background-color: hsl(var(--card)); }
+.bg-muted { background-color: hsl(var(--muted)); }
+.bg-border { background-color: hsl(var(--border)); }
+.bg-ring { background-color: hsl(var(--ring)); }
+.bg-destructive {
+  background-color: hsl(var(--destructive));
+}
+.bg-success { background-color: hsl(var(--success)); }
+.bg-success-soft {
+  background-color: hsl(var(--success-soft));
+}
+.bg-warning { background-color: hsl(var(--warning)); }
+.bg-warning-soft {
+  background-color: hsl(var(--warning-soft));
+}
+.bg-error-soft { background-color: hsl(var(--error-soft)); }
+.bg-info { background-color: hsl(var(--info)); }
+.bg-info-soft { background-color: hsl(var(--info-soft)); }
+.bg-blue-50 { background-color: hsl(var(--blue-50)); }
+.bg-blue-100 { background-color: hsl(var(--blue-100)); }
+.bg-blue-200 { background-color: hsl(var(--blue-200)); }
+.bg-blue-300 { background-color: hsl(var(--blue-300)); }
+.bg-blue-400 { background-color: hsl(var(--blue-400)); }
+.bg-blue-500 { background-color: hsl(var(--blue-500)); }
+.bg-blue-600 { background-color: hsl(var(--blue-600)); }
+.bg-blue-700 { background-color: hsl(var(--blue-700)); }
+.bg-blue-800 { background-color: hsl(var(--blue-800)); }
+.bg-blue-900 { background-color: hsl(var(--blue-900)); }
