@@ -1,10 +1,10 @@
 import type {
+    FlowEntity,
     FlowRecordEntity,
     FlowRecordId,
     Id,
     RecordId,
     FlowWorkOrderEntity,
-    WorkOrderEntity,
 } from '../../../api/types.ts';
 import {
     filterByField,
@@ -13,6 +13,14 @@ import {
 import {
     notifyRecordChange,
 } from './records.ts';
+import {
+    getWorkOrders,
+    type WorkOrder,
+} from './work-orders-queries.ts';
+import {
+    generateCryptoSafeBase62,
+} from '../../../api/crypto-safe-base62.ts';
+import { nowUtc } from '../../../api/types.ts';
 
 export type {
     FlowRecordEntity,
@@ -48,6 +56,39 @@ export async function deleteFlowRecord(
     notifyRecordChange();
 }
 
+// Bind a flow to a record: a fresh covenant row with
+// the moment of union. POST-shaped — each call mints
+// a new binding id.
+export async function postFlowRecordBinding(
+    ctx: RequestContext,
+    flowId: Id,
+    recordId: RecordId,
+): Promise<void> {
+    await putFlowRecord(
+        ctx,
+        generateCryptoSafeBase62(),
+        {
+            flow_id: flowId,
+            record_id: recordId,
+            at: nowUtc(),
+        },
+    );
+}
+
+// Unbind a flow from its record. No-op when the flow
+// has no binding — the absence IS the unbound state.
+export async function deleteFlowRecordForFlow(
+    ctx: RequestContext,
+    flowId: Id,
+): Promise<void> {
+    const rows = await getFlowRecordEntities(ctx);
+    const existing = rows.find(
+        r => r.flow_id === flowId,
+    );
+    if (!existing) return;
+    await deleteFlowRecord(ctx, existing.id);
+}
+
 export async function getRecordForFlow(
     ctx: RequestContext,
     flowId: Id,
@@ -81,28 +122,43 @@ export async function getRecordForWorkOrder(
     return found ? found.record_id : null;
 }
 
-export async function getFlowsForRecord(
+// The flows bound to a record, shaped for display:
+// the adapter owns the flow-records join AND the flow
+// name lookup, so the record-detail page never speaks
+// a table name or a raw wire row.
+export interface BoundFlowSummary {
+    readonly id: Id;
+    readonly name: string;
+}
+
+export async function getFlowSummariesForRecord(
     ctx: RequestContext,
     recordId: RecordId,
-): Promise<Id[]> {
-    const rows = await getFlowRecordEntities(ctx);
-    return filterByField(rows, 'record_id', recordId)
-        .map(r => r.flow_id);
+): Promise<BoundFlowSummary[]> {
+    const [rows, flows] = await Promise.all([
+        getFlowRecordEntities(ctx),
+        ctx.GET<FlowEntity[]>('flows'),
+    ]);
+    const wanted = new Set(
+        filterByField(rows, 'record_id', recordId)
+            .map(r => r.flow_id),
+    );
+    return flows
+        .filter(f => wanted.has(f.id))
+        .map(f => ({ id: f.id, name: f.name }));
 }
 
 export async function getWorkOrdersForRecord(
     ctx: RequestContext,
     recordId: RecordId,
-): Promise<WorkOrderEntity[]> {
+): Promise<WorkOrder[]> {
     const [bindings, flowWorkOrders, workOrders]
         = await Promise.all([
             getFlowRecordEntities(ctx),
             ctx.GET<FlowWorkOrderEntity[]>(
                 'flow-work-orders',
             ),
-            ctx.GET<WorkOrderEntity[]>(
-                'work-orders',
-            ),
+            getWorkOrders(ctx),
         ]);
     const flowIds = new Set(
         filterByField(bindings, 'record_id', recordId)

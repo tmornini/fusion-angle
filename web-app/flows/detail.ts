@@ -23,10 +23,8 @@ import {
     getRecordEntities,
     getRecordForFlow,
     getRecordAttributesByRecord,
-    putFlowRecord,
-    deleteFlowRecord,
-    generateCryptoSafeBase62,
-    nowUtc,
+    postFlowRecordBinding,
+    deleteFlowRecordForFlow,
     postClipboardCopy,
     subscribeResize,
     type RequestContext,
@@ -1353,19 +1351,13 @@ async function handleBindRecord(
             getRecordForFlow(ctx, flowId);
         if (existing === recordId) return;
         if (existing !== null) {
-            await deleteExistingFlowRecord(
+            await deleteFlowRecordForFlow(
                 ctx, flowId,
             );
         }
         if (recordId !== null) {
-            await putFlowRecord(
-                ctx,
-                generateCryptoSafeBase62(),
-                {
-                    flow_id: flowId,
-                    record_id: recordId,
-                    at: nowUtc(),
-                },
+            await postFlowRecordBinding(
+                ctx, flowId, recordId,
             );
         }
         const attributes =
@@ -1393,20 +1385,6 @@ async function handleBindRecord(
             'error',
         );
     }
-}
-
-async function deleteExistingFlowRecord(
-    ctx: RequestContext,
-    flowId: string,
-): Promise<void> {
-    const all = await ctx.GET<
-        Array<{ id: string; flow_id: string }>
-    >('flow-records');
-    const existing = all.find(
-        r => r.flow_id === flowId,
-    );
-    if (!existing) return;
-    await deleteFlowRecord(ctx, existing.id);
 }
 
 export async function init(

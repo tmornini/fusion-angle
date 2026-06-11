@@ -11,7 +11,6 @@ import {
 } from '../flow-stats-aggregate.ts';
 import { getFlowGraph } from './flow-queries.ts';
 import {
-    getWorkOrderEntities,
     getFlowWorkOrderEntities,
 } from './work-orders-queries.ts';
 import {
@@ -32,13 +31,11 @@ export async function getFlowStats(
 }> {
     const [
         graph,
-        allWorkOrders,
         eventsByWo,
         fwoRows,
         memberMap,
     ] = await Promise.all([
         getFlowGraph(ctx, flowId),
-        getWorkOrderEntities(ctx),
         getTransitionEventsByWorkOrder(ctx),
         getFlowWorkOrderEntities(ctx),
         getMemberMap(ctx),
@@ -48,8 +45,6 @@ export async function getFlowStats(
         filterByField(fwoRows, 'flow_id', flowId)
             .map(r => r.work_order_id),
     );
-    const workOrders =
-        allWorkOrders.filter(w => woIds.has(w.id));
     const transitions: TransitionEvent[] = [];
     for (const [woId, events] of eventsByWo) {
         if (!woIds.has(woId)) continue;
@@ -68,7 +63,6 @@ export async function getFlowStats(
     const input: FlowStatsInput = {
         nodes: graph.nodes,
         edges: graph.edges,
-        workOrders,
         transitions,
         nowMs: Date.now(),
         windowDays: 90,

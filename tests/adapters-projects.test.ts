@@ -14,6 +14,8 @@ import {
     getProjectEntity,
     postProjectStateChange,
     putProject,
+    putProjectFields,
+    putProjectPosition,
     ProjectView,
 } from '../web-app/app/adapters/projects.ts';
 import {
@@ -214,6 +216,61 @@ test(
         const fresh = createRequestContext(db, await devToken());
         const row = await getProjectEntity(fresh, 'p1');
         assert.equal(row.title, 'Persisted');
+    },
+);
+
+test(
+    'putProjectFields merges the camel patch onto'
+    + ' the stored row, keeping untouched columns',
+    async () => {
+        const { db, ctx } = await adminContext();
+        await db.projects.put(
+            'p1', buildProject('p1', 'Before', {
+                position: 7,
+                progress: 40,
+            }),
+        );
+        await putProjectFields(ctx, 'p1', {
+            title: 'After',
+            description: 'new desc',
+            startDate: '2026-02-01',
+            targetEndDate: '2026-11-30',
+            estimatedCost: 75000,
+        });
+        const stored =
+            await db.projects.getById('p1');
+        assert.equal(stored.title, 'After');
+        assert.equal(
+            stored.description, 'new desc',
+        );
+        assert.equal(
+            stored.start_date, '2026-02-01',
+        );
+        assert.equal(
+            stored.target_end_date, '2026-11-30',
+        );
+        assert.equal(
+            stored.estimated_cost, 75000,
+        );
+        assert.equal(stored.position, 7);
+        assert.equal(stored.progress, 40);
+    },
+);
+
+test(
+    'putProjectPosition writes only the position',
+    async () => {
+        const { db, ctx } = await adminContext();
+        await db.projects.put(
+            'p1', buildProject('p1', 'Stay', {
+                position: 1,
+            }),
+        );
+        await putProjectPosition(ctx, 'p1', 9.5);
+        const stored =
+            await db.projects.getById('p1');
+        assert.equal(stored.position, 9.5);
+        assert.equal(stored.title, 'Stay');
     },
 );
 

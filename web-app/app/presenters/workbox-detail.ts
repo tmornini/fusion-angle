@@ -4,10 +4,9 @@ import {
 import type { SafeHtml } from '../safe-html.ts';
 import {
     memberName,
-    validateWorkOrderFlowGraph,
-    type WorkOrderEntity,
+    type WorkOrder,
     type TransitionEvent,
-    type StateFieldValueEntity,
+    type StateFieldValue,
     type WorkOrderFlowGraph,
     type GraphNode,
     type GraphEdge,
@@ -53,7 +52,7 @@ export function buildAttributeInputHtml(
     const disabledAttr = isReadonly
         ? trusted('disabled')
         : html``;
-    if (attribute.attribute_type === 'select') {
+    if (attribute.attributeType === 'select') {
         const options = attribute.options;
         return html`<select
             class="input"
@@ -71,7 +70,7 @@ export function buildAttributeInputHtml(
             )}
         </select>`;
     }
-    if (attribute.attribute_type === 'radio') {
+    if (attribute.attributeType === 'radio') {
         const options = attribute.options;
         return html`<div class="radio-group">
             ${options.map(
@@ -89,12 +88,12 @@ export function buildAttributeInputHtml(
         </div>`;
     }
     const spec = ATTRIBUTE_HTML_TYPE[
-        attribute.attribute_type
+        attribute.attributeType
     ];
     if (!spec) {
         throw new Error(
-            'unknown attribute_type: '
-            + attribute.attribute_type,
+            'unknown attributeType: '
+            + attribute.attributeType,
         );
     }
     if (spec.type === 'checkbox') {
@@ -115,7 +114,7 @@ export function buildAttributeInputHtml(
 }
 
 export class WorkboxDetailPresenter {
-    readonly #workOrder: WorkOrderEntity;
+    readonly #workOrder: WorkOrder;
     readonly #flowGraph: WorkOrderFlowGraph;
     readonly #currentNode: GraphNode;
     readonly #outgoingEdges:
@@ -128,13 +127,13 @@ export class WorkboxDetailPresenter {
     >;
 
     constructor(
-        workOrder: WorkOrderEntity,
+        workOrder: WorkOrder,
         transitions:
             readonly TransitionEvent[],
         fieldValuesByEvent:
             ReadonlyMap<
                 Id,
-                readonly StateFieldValueEntity[]
+                readonly StateFieldValue[]
             >,
         activeClaim:
             { memberId: Id; at: string } | null,
@@ -145,10 +144,7 @@ export class WorkboxDetailPresenter {
         >,
     ) {
         this.#workOrder = workOrder;
-        this.#flowGraph =
-            validateWorkOrderFlowGraph(
-                workOrder.flow_graph,
-            );
+        this.#flowGraph = workOrder.flowGraph;
         this.#attributeMap = attributeMap;
 
         const sorted = [...transitions]
@@ -195,7 +191,7 @@ export class WorkboxDetailPresenter {
     }
 
     displayIdText(): string {
-        return this.#workOrder.display_id;
+        return this.#workOrder.displayId;
     }
 
     isArchive(): boolean {
@@ -350,8 +346,8 @@ export class WorkboxDetailPresenter {
             }))
             .toSorted(
                 (a, b) =>
-                    a.attribute.sort_order
-                    - b.attribute.sort_order,
+                    a.attribute.sortOrder
+                    - b.attribute.sortOrder,
             );
         return html`<div
             id="work-order-fields"
@@ -372,7 +368,7 @@ export class WorkboxDetailPresenter {
         ref: NodeAttribute,
     ): RecordAttribute {
         return this.#requireAttributeById(
-            ref.attribute_id,
+            ref.attributeId,
         );
     }
 
@@ -385,7 +381,7 @@ export class WorkboxDetailPresenter {
         if (!attribute) {
             throw new Error(
                 'attribute reference points to'
-                + ' unknown attribute_id: '
+                + ' unknown attributeId: '
                 + attributeId,
             );
         }
@@ -461,7 +457,7 @@ export class WorkboxDetailPresenter {
         const label = attribute.name
             + (ref.isRequired ? ' *' : '');
         if (
-            attribute.attribute_type === 'radio'
+            attribute.attributeType === 'radio'
         ) {
             return html`<fieldset class="${
                 'attribute-group-fieldset mb-4'
@@ -535,7 +531,7 @@ function findCurrentNode(
             + ' order has no transitions',
         );
     }
-    const lastToId = lastTransition.to_node_id;
+    const lastToId = lastTransition.toNodeId;
     const node = nodes.find(
         n => n.id === lastToId,
     );
@@ -570,7 +566,7 @@ function buildHistory(
     fieldValuesByEvent:
         ReadonlyMap<
             Id,
-            readonly StateFieldValueEntity[]
+            readonly StateFieldValue[]
         >,
     nodes: readonly GraphNode[],
     memberMap: Map<Id, Member>,
@@ -585,12 +581,12 @@ function buildHistory(
             HistoryFieldValue[] = [];
         for (const row of rows) {
             const attribute = attributeMap.get(
-                row.field_id,
+                row.fieldId,
             );
             if (!attribute) {
                 throw new Error(
                     'Attribute not found: '
-                        + row.field_id,
+                        + row.fieldId,
                 );
             }
             fieldValues.push({
@@ -604,13 +600,13 @@ function buildHistory(
                     ? 'Created'
                     : nodeNameById(
                         nodes,
-                        t.from_node_id,
+                        t.fromNodeId,
                     ),
             toNodeName: nodeNameById(
-                nodes, t.to_node_id,
+                nodes, t.toNodeId,
             ),
             memberName: memberName(
-                memberMap, t.member_id,
+                memberMap, t.memberId,
             ),
             transitionedAt:
                 t.at,

@@ -122,7 +122,8 @@ function onRecordsLoaded(
             if (!recordState) return;
             const found =
                 recordState.records.find(
-                    r => r.entity.id === id,
+                    r => r.record.idForLink()
+                        === id,
                 );
             if (!found) return;
             const ctx = sessionContext();

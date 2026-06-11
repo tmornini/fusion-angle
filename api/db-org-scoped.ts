@@ -11,7 +11,7 @@ import type {
     FlowWorkOrderEntity,
     FlowRecordEntity,
     IdeaSubmissionEntity,
-    ObjectiveRevision,
+    ObjectiveRevisionEntity,
     ProjectObjectiveBaselineScore,
     ProjectObjectiveActualScore,
     StateFieldValueEntity,
@@ -206,7 +206,7 @@ export function orgScopedAdapter(
             base.objectiveRevisions, 'objective_revisions',
             viaParent(
                 base.objectives,
-                (r: ObjectiveRevision) => r.objective_id),
+                (r: ObjectiveRevisionEntity) => r.objective_id),
         ),
         projectObjectiveBaselineScores: parentScope(
             base.projectObjectiveBaselineScores,

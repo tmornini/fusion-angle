@@ -81,28 +81,30 @@ export function latestStatesForIds<S extends string>(
 // A transition event in the shape flow-stats-aggregate
 // and the workbox detail presenter expect. Derived
 // from the states log: each non-claim event for a
-// work order is a transition into state=to_node_id.
+// work order is a transition into state=toNodeId.
 // The first event is the creation transition — it has
 // no prior node, so its union member carries no
-// from_node_id; every step names the node it left.
+// fromNodeId; every step names the node it left.
 // The id is the underlying state event's id — the
-// foreign-key target for state_field_values.
+// foreign-key target for state_field_values. The
+// adapter is the divorce point: the projection exits
+// in camelCase; snake_case stays on the storage rows.
 export interface CreationTransition {
     kind: 'creation';
     id: Id;
-    work_order_id: Id;
-    to_node_id: Id;
-    member_id: Id;
+    workOrderId: Id;
+    toNodeId: Id;
+    memberId: Id;
     at: string;
 }
 
 export interface StepTransition {
     kind: 'step';
     id: Id;
-    work_order_id: Id;
-    from_node_id: Id;
-    to_node_id: Id;
-    member_id: Id;
+    workOrderId: Id;
+    fromNodeId: Id;
+    toNodeId: Id;
+    memberId: Id;
     at: string;
 }
 
@@ -218,16 +220,16 @@ function projectTransitions(
     for (const ev of transitions) {
         const base = {
             id: ev.id,
-            work_order_id: workOrderId,
-            to_node_id: ev.state,
-            member_id: ev.member_id,
+            workOrderId,
+            toNodeId: ev.state,
+            memberId: ev.member_id,
             at: ev.at,
         };
         out.push(prior === null
             ? { kind: 'creation', ...base }
             : {
                 kind: 'step',
-                from_node_id: prior,
+                fromNodeId: prior,
                 ...base,
             });
         prior = ev.state;

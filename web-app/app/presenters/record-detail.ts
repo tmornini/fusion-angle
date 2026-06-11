@@ -9,13 +9,14 @@ import {
     iconTrash,
 } from '../icons.ts';
 import type {
-    RecordEntity,
-    RecordAttribute,
-    RecordState,
-    WorkOrderEntity,
     AttributeType,
     Constraint,
 } from '../../../api/types.ts';
+import type {
+    RecordAttribute,
+    RecordModel,
+    WorkOrder,
+} from '../adapters/index.ts';
 import {
     ATTRIBUTE_TYPES,
 } from '../../../api/types.ts';
@@ -24,8 +25,7 @@ import {
 } from './state-display.ts';
 
 export interface RecordDetailView {
-    readonly record: RecordEntity;
-    readonly state: RecordState;
+    readonly record: RecordModel;
     readonly attributes:
         readonly RecordAttribute[];
     readonly boundFlows: readonly {
@@ -33,7 +33,7 @@ export interface RecordDetailView {
         name: string;
     }[];
     readonly workOrders:
-        readonly WorkOrderEntity[];
+        readonly WorkOrder[];
 }
 
 export class RecordDetailPresenter {
@@ -44,7 +44,8 @@ export class RecordDetailPresenter {
     }
 
     buildPage(): SafeHtml {
-        const state = this.#view.state;
+        const state =
+            this.#view.record.stateValue();
         const cfg = RECORD_STATE_CONFIG[state];
         return html`<div class="entity">
             <div class="${
@@ -68,7 +69,8 @@ export class RecordDetailPresenter {
                             + ' font-display'
                             + ' font-bold'
                         }">${
-                            this.#view.record.name
+                            this.#view.record
+                                .nameText()
                         }</h1>
                         <span class="${
                             'badge '
@@ -86,7 +88,8 @@ export class RecordDetailPresenter {
             </div>
             <p class="text-muted mb-6"
                 >${
-                    this.#view.record.description
+                    this.#view.record
+                        .descriptionText()
                 }</p>
             ${this.#buildAttributesCard()}
             ${this.#buildBoundFlowsCard()}
@@ -99,7 +102,7 @@ export class RecordDetailPresenter {
             ...this.#view.attributes,
         ].toSorted(
             (a, b) =>
-                a.sort_order - b.sort_order,
+                a.sortOrder - b.sortOrder,
         );
         return html`<div class="card mb-6 p-6">
             <h2 class="${
@@ -123,7 +126,7 @@ export class RecordDetailPresenter {
                 >${a.name}</span>
             <span class="${
                 'badge badge-outline text-xs'
-            }">${a.attribute_type}</span>
+            }">${a.attributeType}</span>
             <span class="text-muted text-sm"
                 >${
                     a.constraints
@@ -177,7 +180,7 @@ export class RecordDetailPresenter {
                         data-work-order-id="${
                             w.id
                         }"
-                            >#${w.display_id}</button>
+                            >#${w.displayId}</button>
                     </li>`,
                 )}
                 </ul>`}
@@ -194,32 +197,33 @@ export interface RecordDetailDraft {
 export interface AttributeDraft {
     id: string;
     name: string;
-    attribute_type: AttributeType;
-    sort_order: number;
+    attributeType: AttributeType;
+    sortOrder: number;
     options: string[];
     constraints: Constraint[];
 }
 
 export function recordDraftFromView(
     view: {
-        record: RecordEntity;
+        record: RecordModel;
         attributes:
             readonly RecordAttribute[];
     },
 ): RecordDetailDraft {
     return {
-        name: view.record.name,
-        description: view.record.description,
+        name: view.record.nameText(),
+        description:
+            view.record.descriptionText(),
         attributes: view.attributes
             .toSorted(
                 (a, b) =>
-                    a.sort_order - b.sort_order,
+                    a.sortOrder - b.sortOrder,
             )
             .map(a => ({
                 id: a.id,
                 name: a.name,
-                attribute_type: a.attribute_type,
-                sort_order: a.sort_order,
+                attributeType: a.attributeType,
+                sortOrder: a.sortOrder,
                 options: [...a.options],
                 constraints: a.constraints.map(
                     c => ({ ...c }),
@@ -298,8 +302,8 @@ export class RecordDetailEditPresenter {
                 ${this.#draft.attributes
                     .toSorted(
                         (a, b) =>
-                            a.sort_order
-                            - b.sort_order,
+                            a.sortOrder
+                            - b.sortOrder,
                     )
                     .map(
                         a => this
@@ -351,7 +355,7 @@ export class RecordDetailEditPresenter {
                     t => html`<option
                         value="${t}"${
                             trusted(
-                                a.attribute_type
+                                a.attributeType
                                     === t
                                     ? ' selected'
                                     : '',
@@ -373,8 +377,8 @@ export class RecordDetailEditPresenter {
         a: AttributeDraft,
     ): SafeHtml {
         if (
-            a.attribute_type !== 'select'
-            && a.attribute_type !== 'radio'
+            a.attributeType !== 'select'
+            && a.attributeType !== 'radio'
         ) {
             return html``;
         }
@@ -391,7 +395,7 @@ export class RecordDetailEditPresenter {
     ): SafeHtml {
         const allowed =
             allowedConstraintKinds(
-                a.attribute_type,
+                a.attributeType,
             );
         const constraintRows = a.constraints.map(
             (c, i) => this.#buildConstraintRow(

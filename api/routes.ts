@@ -16,7 +16,7 @@ import type {
     IdeaEntity,
     IdeaSubmissionEntity,
     Objective,
-    ObjectiveRevision,
+    ObjectiveRevisionEntity,
     ProjectEntity,
     ProjectFlowEntity,
     ProjectObjectiveBaselineScore,
@@ -685,7 +685,7 @@ export const routes: Route[] = [
         get: (db) =>
             db.objectiveRevisions.getAll(),
     }),
-    makeIdRoute<ObjectiveRevision>({
+    makeIdRoute<ObjectiveRevisionEntity>({
         noun: 'objective-revisions',
         store: db => db.objectiveRevisions,
         verbs: ['put'],

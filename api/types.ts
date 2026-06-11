@@ -43,8 +43,10 @@ export type Constraint =
 
 // Hidden is encoded by absence from the array, so
 // hidden + isRequired is structurally impossible.
+// Storage spells the id key attribute_id; the seam maps
+// it (validators.ts asNodeAttribute in, storedGraph out).
 export interface NodeAttribute {
-    attribute_id: RecordAttributeId;
+    attributeId: RecordAttributeId;
     mode: 'editable' | 'readonly';
     isRequired: boolean;
 }
@@ -925,7 +927,7 @@ export interface Objective {
     position: number;
 }
 
-export interface ObjectiveRevision {
+export interface ObjectiveRevisionEntity {
     id: Id;
     objective_id: ObjectiveId;
     name: string;
@@ -1031,6 +1033,76 @@ export interface WorkOrderFlowGraph {
     edges: GraphEdge[];
 }
 
+// The graph storage seam, serialize half — the parse half
+// is asStoredGraph in validators.ts. The stored JSON shape
+// is a pinned contract (SCHEMA.md documents it; old rows
+// and exported backups carry it), so domain graphs cross
+// into rows ONLY through these mappers — a domain-type
+// change cannot silently rewrite storage.
+function storedNodeAttribute(
+    ref: NodeAttribute,
+): Record<string, unknown> {
+    return {
+        attribute_id: ref.attributeId,
+        mode: ref.mode,
+        isRequired: ref.isRequired,
+    };
+}
+
+function storedGraphNode(
+    node: GraphNode,
+): Record<string, unknown> {
+    return {
+        id: node.id,
+        name: node.name,
+        positionX: node.positionX,
+        positionY: node.positionY,
+        isCreate: node.isCreate,
+        isArchive: node.isArchive,
+        memberIds: node.memberIds,
+        attributes:
+            node.attributes.map(storedNodeAttribute),
+        taskInstructions: node.taskInstructions,
+    };
+}
+
+function storedGraphEdge(
+    edge: GraphEdge,
+): Record<string, unknown> {
+    return {
+        id: edge.id,
+        name: edge.name,
+        fromNodeId: edge.fromNodeId,
+        toNodeId: edge.toNodeId,
+    };
+}
+
+export function storedGraph(
+    graph: StoredGraph,
+): Record<string, unknown> {
+    return {
+        nodes: graph.nodes.map(storedGraphNode),
+        edges: graph.edges.map(storedGraphEdge),
+    };
+}
+
+export function storedGraphField(
+    graph: StoredGraph,
+): JsonObjectField {
+    return jsonObjectField(storedGraph(graph));
+}
+
+export function storedWorkOrderFlowGraphField(
+    graph: WorkOrderFlowGraph,
+): JsonObjectField {
+    return jsonObjectField({
+        name: graph.name,
+        lockTimeout: graph.lockTimeout,
+        nodes: graph.nodes.map(storedGraphNode),
+        edges: graph.edges.map(storedGraphEdge),
+    });
+}
+
 export interface WorkOrderEntity {
     id: Id;
     organization_id: Id;
@@ -1063,21 +1135,6 @@ export interface RecordAttributeEntity {
     sort_order: number;
     options: JsonArrayField;
     constraints: JsonArrayField;
-}
-
-// The parsed domain twin of RecordAttributeEntity: the
-// adapter is the divorce point, so above the storage seam
-// `options` and `constraints` are real arrays, never the
-// JsonArrayField strings the datastore persists.
-export interface RecordAttribute {
-    id: RecordAttributeId;
-    organization_id: Id;
-    record_id: RecordId;
-    name: string;
-    attribute_type: AttributeType;
-    sort_order: number;
-    options: string[];
-    constraints: Constraint[];
 }
 
 export interface FlowRecordEntity {

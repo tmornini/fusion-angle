@@ -241,7 +241,7 @@ export function applyRemoveAttributeRef(
                 ...n,
                 attributes:
                     n.attributes.filter(
-                        a => a.attribute_id
+                        a => a.attributeId
                             !== attributeId,
                     ),
             }
@@ -260,7 +260,7 @@ export function applyUpdateAttributeMode(
             ? {
                 ...n,
                 attributes: n.attributes.map(
-                    a => a.attribute_id
+                    a => a.attributeId
                         === attributeId
                         ? { ...a, mode }
                         : a,
@@ -281,7 +281,7 @@ export function applyUpdateAttributeRequired(
             ? {
                 ...n,
                 attributes: n.attributes.map(
-                    a => a.attribute_id
+                    a => a.attributeId
                         === attributeId
                         ? { ...a, isRequired }
                         : a,

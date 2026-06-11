@@ -1,10 +1,12 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import type {
-    RecordAttribute,
     AttributeType,
     Constraint,
 } from '../api/types.ts';
+import type {
+    RecordAttribute,
+} from '../web-app/app/adapters/record-attributes.ts';
 import {
     validateAttributeValue,
     formatViolation,
@@ -17,10 +19,11 @@ function makeAttribute(
 ): RecordAttribute {
     return {
         id: 'a-1',
-        record_id: 'rec-1',
+        organizationId: '1',
+        recordId: 'rec-1',
         name: 'Field',
-        attribute_type: attributeType,
-        sort_order: 0,
+        attributeType,
+        sortOrder: 0,
         options: [],
         constraints,
         ...overrides,

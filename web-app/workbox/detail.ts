@@ -28,15 +28,16 @@ import {
     createRequestContext,
     sessionContext,
     generateCryptoSafeBase62,
-    validateWorkOrderFlowGraph,
     getRecordForWorkOrder,
     getRecordAttributesByRecord,
     RecordTransitionViolations,
 } from '../app/adapters/index.ts';
 import type {
     NodeAttribute,
-    RecordAttribute,
 } from '../../api/types.ts';
+import type {
+    RecordAttribute,
+} from '../app/adapters/index.ts';
 
 /* ── Helpers ─────────────── */
 
@@ -78,7 +79,7 @@ function hasEmptyRequiredAttribute(
     return refs
         .filter(r => r.isRequired)
         .some(r => {
-            const v = values[r.attribute_id];
+            const v = values[r.attributeId];
             return v === undefined || v === '';
         });
 }
@@ -236,9 +237,6 @@ async function loadPresenter(
 ): Promise<WorkboxDetailPresenter> {
     const workOrder =
         await getWorkOrder(ctx, workOrderId);
-    const fg = validateWorkOrderFlowGraph(
-        workOrder.flow_graph,
-    );
     const [
         transitions,
         fieldValuesByEvent,
@@ -251,7 +249,8 @@ async function loadPresenter(
         ),
         getStateFieldValuesByEvent(ctx),
         getWorkOrderActiveClaim(
-            ctx, workOrderId, fg.lockTimeout,
+            ctx, workOrderId,
+            workOrder.flowGraph.lockTimeout,
         ),
         getMemberMap(ctx),
         getRecordForWorkOrder(ctx, workOrderId),

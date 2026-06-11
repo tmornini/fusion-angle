@@ -24,10 +24,10 @@ import type {
 } from '../adapters/flows.ts';
 import type {
     MemberId,
-    RecordAttribute,
 } from '../../../api/types.ts';
 import {
     generateCryptoSafeBase62,
+    type RecordAttribute,
 } from '../adapters/index.ts';
 import {
     buildGraphSvg,

@@ -69,7 +69,6 @@ export {
     projectPatchFromDraft,
     type ProjectFieldKey,
     type ProjectDraftFields,
-    type ProjectEntityPatch,
 } from './project-detail.ts';
 export {
     OrganizationPresenter,

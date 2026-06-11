@@ -1,6 +1,7 @@
 import {
     nowUtc,
-    jsonObjectField,
+    storedGraph,
+    storedGraphField,
     DEFAULT_LOCK_TIMEOUT,
     DEFAULT_NODE_MEMBER_IDS,
     DEFAULT_NODE_TASK_INSTRUCTIONS,
@@ -289,9 +290,17 @@ function buildBackupJson(
             graph,
         },
     };
-    return JSON.stringify(
-        backup, null, 2,
-    );
+    // The backup file speaks the storage tongue —
+    // import re-parses it with asStoredGraph.
+    return JSON.stringify({
+        ...backup,
+        flow: {
+            ...backup.flow,
+            graph: storedGraph(
+                backup.flow.graph,
+            ),
+        },
+    }, null, 2);
 }
 
 export async function getFlowZip(
@@ -555,7 +564,7 @@ export async function postFlowFromBackup(
                         backup.flow.isAutoFit,
                     lock_timeout:
                         backup.flow.lockTimeout,
-                    graph: putFlowGraph({
+                    graph: storedGraphField({
                         nodes, edges,
                     }),
                 },
@@ -731,16 +740,6 @@ function autoWireDefaults(
     return [...edges, ...extras];
 }
 
-function putFlowGraph(
-    graph: StoredGraph,
-): string {
-    return jsonObjectField(
-        graph as unknown as Record<
-            string, unknown
-        >,
-    );
-}
-
 export async function postFlowFromMermaid(
     ctx: RequestContext,
     flowId: string,
@@ -877,7 +876,7 @@ export async function postFlowFromMermaid(
                     is_auto_fit: true,
                     lock_timeout:
                         DEFAULT_LOCK_TIMEOUT,
-                    graph: putFlowGraph(graph),
+                    graph: storedGraphField(graph),
                 },
             },
             {
@@ -1224,7 +1223,7 @@ export async function postFlowFromZip(
                     is_auto_fit: true,
                     lock_timeout:
                         DEFAULT_LOCK_TIMEOUT,
-                    graph: putFlowGraph(graph),
+                    graph: storedGraphField(graph),
                 },
             },
             {

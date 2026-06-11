@@ -268,7 +268,7 @@ const attr = (
     id: string,
     mode: 'editable' | 'readonly' = 'editable',
     isRequired = false,
-) => ({ attribute_id: id, mode, isRequired });
+) => ({ attributeId: id, mode, isRequired });
 
 test('applyAddNode appends a node with defaults', () => {
     const result = applyAddNode(
@@ -297,12 +297,12 @@ test('applyAddAttributeRef appends to the matching node', () => {
     const result = applyAddAttributeRef(
         nodes, 'a', attr('x'));
     assert.deepEqual(
-        result[0]!.attributes.map(r => r.attribute_id),
+        result[0]!.attributes.map(r => r.attributeId),
         ['x']);
     assert.equal(result[1]!.attributes.length, 0);
 });
 
-test('applyRemoveAttributeRef drops by attribute_id', () => {
+test('applyRemoveAttributeRef drops by attributeId', () => {
     const nodes = [
         {
             ...node('a'),
@@ -311,7 +311,7 @@ test('applyRemoveAttributeRef drops by attribute_id', () => {
     ];
     const result = applyRemoveAttributeRef(nodes, 'a', 'x');
     assert.deepEqual(
-        result[0]!.attributes.map(r => r.attribute_id),
+        result[0]!.attributes.map(r => r.attributeId),
         ['y']);
 });
 

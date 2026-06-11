@@ -15,7 +15,8 @@ import {
     generateCryptoSafeBase62,
     getTransitionEventsByWorkOrder,
     getWorkOrderActiveClaim,
-    validateWorkOrderFlowGraph,
+    getWorkOrders,
+    type WorkOrder,
 } from '../web-app/app/adapters/index.ts';
 import {
     buildInboxItems,
@@ -34,7 +35,6 @@ import type {
     GraphNode,
     GraphEdge,
     StoredGraph,
-    WorkOrderEntity,
     Member,
     MemberId,
     Id,
@@ -122,7 +122,7 @@ function buildLinearGraph(): StoredGraph {
 }
 
 interface WoTables {
-    workOrders: WorkOrderEntity[];
+    workOrders: WorkOrder[];
     transitionsByWo:
         Map<Id, readonly TransitionEvent[]>;
     activeClaimsByWo: Map<Id, ActiveClaim>;
@@ -133,17 +133,14 @@ async function collectTables(
     db: MemoryDbAdapter,
 ): Promise<WoTables> {
     const ctx = createRequestContext(db, await devToken());
-    const workOrders = await db.workOrders.getAll();
+    const workOrders = await getWorkOrders(ctx);
     const transitionsByWo =
         await getTransitionEventsByWorkOrder(ctx);
     const activeClaimsByWo =
         new Map<Id, ActiveClaim>();
     for (const wo of workOrders) {
-        const fg = validateWorkOrderFlowGraph(
-            wo.flow_graph,
-        );
         const claim = await getWorkOrderActiveClaim(
-            ctx, wo.id, fg.lockTimeout,
+            ctx, wo.id, wo.flowGraph.lockTimeout,
         );
         if (claim !== null) {
             activeClaimsByWo.set(wo.id, claim);

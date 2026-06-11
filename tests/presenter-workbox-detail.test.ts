@@ -1,16 +1,12 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import {
-    jsonObjectField,
     nowUtc,
     DEFAULT_LOCK_TIMEOUT,
-    type WorkOrderEntity,
-    type StateFieldValueEntity,
     type WorkOrderFlowGraph,
     type GraphNode,
     type GraphEdge,
     type NodeAttribute,
-    type RecordAttribute,
     type AttributeType,
     type Id,
     type Member,
@@ -20,6 +16,14 @@ import type {
     StepTransition,
     TransitionEvent,
 } from '../web-app/app/adapters/state-events.ts';
+import type {
+    RecordAttribute,
+} from '../web-app/app/adapters/record-attributes.ts';
+import type {
+    StateFieldValue,
+    WorkOrder,
+} from
+'../web-app/app/adapters/work-orders-queries.ts';
 import type {
     ConstraintViolation,
 } from '../web-app/app/record-constraints.ts';
@@ -37,15 +41,14 @@ import {
 // field values, the active claim (or null), a
 // memberMap, the current member id, and the
 // attribute map; buildPage() returns SafeHtml.
-// The work order's flow_graph is a JsonObjectField
-// (a JSON string) that the presenter re-validates,
-// so we stringify a WorkOrderFlowGraph shape.
+// The work order arrives as the parsed domain model
+// — the adapter already validated the flow graph.
 
 function makeAttributeRef(
     overrides: Partial<NodeAttribute> = {},
 ): NodeAttribute {
     return {
-        attribute_id: 'a-1',
+        attributeId: 'a-1',
         mode: 'editable',
         isRequired: false,
         ...overrides,
@@ -56,13 +59,14 @@ function makeAttribute(
     overrides: Partial<RecordAttribute> = {},
 ): RecordAttribute {
     const attributeType: AttributeType =
-        overrides.attribute_type ?? 'text';
+        overrides.attributeType ?? 'text';
     return {
         id: 'a-1',
-        record_id: 'rec-1',
+        organizationId: '1',
+        recordId: 'rec-1',
         name: 'Notes',
-        attribute_type: attributeType,
-        sort_order: 0,
+        attributeType,
+        sortOrder: 0,
         options: [],
         constraints: [],
         ...overrides,
@@ -129,16 +133,13 @@ function makeFlowGraph(
 
 function makeWorkOrder(
     graph: WorkOrderFlowGraph,
-    overrides: Partial<WorkOrderEntity> = {},
-): WorkOrderEntity {
+    overrides: Partial<WorkOrder> = {},
+): WorkOrder {
     return {
         id: 'wo-1',
-        display_id: 'WO-42',
-        flow_graph: jsonObjectField(
-            graph as unknown as Record<
-                string, unknown
-            >,
-        ),
+        organizationId: '1',
+        displayId: 'WO-42',
+        flowGraph: graph,
         position: 0,
         ...overrides,
     };
@@ -150,9 +151,9 @@ function makeCreation(
     return {
         kind: 'creation',
         id: 't-1',
-        work_order_id: 'wo-1',
-        to_node_id: 'n-1',
-        member_id: 'p-1',
+        workOrderId: 'wo-1',
+        toNodeId: 'n-1',
+        memberId: 'p-1',
         at: '2026-04-01T12:00:00.000000Z',
         ...overrides,
     };
@@ -164,10 +165,10 @@ function makeStep(
     return {
         kind: 'step',
         id: 't-2',
-        work_order_id: 'wo-1',
-        from_node_id: 'n-1',
-        to_node_id: 'n-2',
-        member_id: 'p-1',
+        workOrderId: 'wo-1',
+        fromNodeId: 'n-1',
+        toNodeId: 'n-2',
+        memberId: 'p-1',
         at: '2026-04-01T12:00:00.000000Z',
         ...overrides,
     };
@@ -201,10 +202,10 @@ const MEMBER_MAP = makeMemberMap([
 function makePresenter(
     args: {
         graph?: WorkOrderFlowGraph;
-        workOrder?: WorkOrderEntity;
+        workOrder?: WorkOrder;
         transitions?: TransitionEvent[];
         fieldValues?:
-            Map<Id, StateFieldValueEntity[]>;
+            Map<Id, StateFieldValue[]>;
         activeClaim?:
             { memberId: Id; at: string } | null;
         currentMemberId?: string;
@@ -236,10 +237,10 @@ test(
     + ' carrying the attribute id',
     () => {
         const ref = makeAttributeRef({
-            attribute_id: 'a-x',
+            attributeId: 'a-x',
         });
         const attribute = makeAttribute({
-            id: 'a-x', attribute_type: 'text',
+            id: 'a-x', attributeType: 'text',
         });
         const out = buildAttributeInputHtml(
             ref, attribute,
@@ -274,7 +275,7 @@ test(
     () => {
         const ref = makeAttributeRef();
         const attribute = makeAttribute({
-            attribute_type: 'number',
+            attributeType: 'number',
         });
         const out = buildAttributeInputHtml(
             ref, attribute,
@@ -290,7 +291,7 @@ test(
     () => {
         const ref = makeAttributeRef();
         const attribute = makeAttribute({
-            attribute_type: 'date',
+            attributeType: 'date',
         });
         const out = buildAttributeInputHtml(
             ref, attribute,
@@ -306,7 +307,7 @@ test(
     () => {
         const ref = makeAttributeRef();
         const attribute = makeAttribute({
-            attribute_type: 'select',
+            attributeType: 'select',
             options: ['Low', 'High'],
         });
         const out = buildAttributeInputHtml(
@@ -325,7 +326,7 @@ test(
     () => {
         const ref = makeAttributeRef();
         const attribute = makeAttribute({
-            attribute_type: 'radio',
+            attributeType: 'radio',
             options: ['Low', 'High'],
         });
         const out = buildAttributeInputHtml(
@@ -345,7 +346,7 @@ test(
     () => {
         const ref = makeAttributeRef();
         const attribute = makeAttribute({
-            attribute_type: 'checkbox',
+            attributeType: 'checkbox',
         });
         const out = buildAttributeInputHtml(
             ref, attribute,
@@ -378,7 +379,7 @@ test(
             mode: 'readonly',
         });
         const attribute = makeAttribute({
-            attribute_type: 'select',
+            attributeType: 'select',
             options: ['A'],
         });
         const out = buildAttributeInputHtml(
@@ -416,13 +417,13 @@ test(
             transitions: [
                 makeCreation({
                     id: 't-1',
-                    to_node_id: 'n-1',
+                    toNodeId: 'n-1',
                     at:
                         '2026-04-01T12:00:00.000000Z',
                 }),
                 makeStep({
-                    id: 't-2', from_node_id: 'n-1',
-                    to_node_id: 'n-2',
+                    id: 't-2', fromNodeId: 'n-1',
+                    toNodeId: 'n-2',
                     at:
                         '2026-04-02T09:00:00.000000Z',
                 }),
@@ -443,14 +444,14 @@ test(
         const amountAttr = makeAttribute({
             id: 'a-amt',
             name: 'Amount',
-            attribute_type: 'number',
-            sort_order: 0,
+            attributeType: 'number',
+            sortOrder: 0,
         });
         const noteAttr = makeAttribute({
             id: 'a-note',
             name: 'Note',
-            attribute_type: 'text',
-            sort_order: 1,
+            attributeType: 'text',
+            sortOrder: 1,
         });
         const graph = makeFlowGraph({
             nodes: [
@@ -458,11 +459,11 @@ test(
                     id: 'n-1', name: 'Triage',
                     attributes: [
                         makeAttributeRef({
-                            attribute_id: 'a-amt',
+                            attributeId: 'a-amt',
                             isRequired: true,
                         }),
                         makeAttributeRef({
-                            attribute_id: 'a-note',
+                            attributeId: 'a-note',
                             isRequired: false,
                         }),
                     ],
@@ -547,7 +548,7 @@ test(
             transitions: [
                 makeCreation({
                     id: 't-1',
-                    to_node_id: 'n-2',
+                    toNodeId: 'n-2',
                 }),
             ],
         });
@@ -583,7 +584,7 @@ test(
         const amountAttr = makeAttribute({
             id: 'a-amt',
             name: 'Amount',
-            attribute_type: 'number',
+            attributeType: 'number',
         });
         const graph = makeFlowGraph({
             nodes: [
@@ -591,7 +592,7 @@ test(
                     id: 'n-1', name: 'Triage',
                     attributes: [
                         makeAttributeRef({
-                            attribute_id: 'a-amt',
+                            attributeId: 'a-amt',
                         }),
                     ],
                 }),
@@ -601,12 +602,10 @@ test(
             ],
         });
         const fieldValues = new Map<
-            Id, StateFieldValueEntity[]
+            Id, StateFieldValue[]
         >([
             ['t-2', [{
-                id: 'fv-1',
-                state_event_id: 't-2',
-                field_id: 'a-amt',
+                fieldId: 'a-amt',
                 value: '1200',
             }]],
         ]);
@@ -615,15 +614,15 @@ test(
             transitions: [
                 makeCreation({
                     id: 't-1',
-                    to_node_id: 'n-1',
-                    member_id: 'p-1',
+                    toNodeId: 'n-1',
+                    memberId: 'p-1',
                     at:
                         '2026-04-01T12:00:00.000000Z',
                 }),
                 makeStep({
-                    id: 't-2', from_node_id: 'n-1',
-                    to_node_id: 'n-2',
-                    member_id: 'p-2',
+                    id: 't-2', fromNodeId: 'n-1',
+                    toNodeId: 'n-2',
+                    memberId: 'p-2',
                     at:
                         '2026-04-03T08:00:00.000000Z',
                 }),
@@ -708,11 +707,11 @@ test(
     () => {
         const amount = makeAttribute({
             id: 'a-amt', name: 'Amount',
-            attribute_type: 'number',
+            attributeType: 'number',
         });
         const due = makeAttribute({
             id: 'a-when', name: 'Due date',
-            attribute_type: 'date',
+            attributeType: 'date',
         });
         const presenter = makePresenter({
             attributes: [amount, due],
@@ -764,7 +763,7 @@ test(
                     attributeName: 'Ghost',
                 },
             ]),
-            /unknown attribute_id: ghost/,
+            /unknown attributeId: ghost/,
         );
     },
 );

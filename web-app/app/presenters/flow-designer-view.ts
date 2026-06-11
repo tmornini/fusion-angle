@@ -162,7 +162,7 @@ class="text-sm text-muted"
     );
     const refRows = node.attributes.map(ref => {
         const attribute = attributeById.get(
-            ref.attribute_id,
+            ref.attributeId,
         );
         if (!attribute) {
             return html`<div
@@ -175,7 +175,7 @@ class="text-xs text-muted"
     });
     const referencedIds = new Set(
         node.attributes.map(
-            r => r.attribute_id,
+            r => r.attributeId,
         ),
     );
     const pickerAttributes = attributes

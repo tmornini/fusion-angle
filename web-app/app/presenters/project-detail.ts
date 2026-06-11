@@ -21,7 +21,7 @@ import {
 } from '../core.ts';
 import type {
     ProjectView,
-    ProjectEntity,
+    ProjectFieldsPatch,
     ProjectState,
 } from '../adapters/index.ts';
 import {
@@ -47,16 +47,8 @@ export interface ProjectDraftFields {
 export type ProjectFieldKey =
     keyof ProjectDraftFields;
 
-export type ProjectEntityPatch =
-    Pick<ProjectEntity,
-        | 'title'
-        | 'description'
-        | 'start_date'
-        | 'target_end_date'
-        | 'estimated_cost'>;
-
 export interface ProjectPatch {
-    entity: ProjectEntityPatch;
+    fields: ProjectFieldsPatch;
     state: ProjectState;
 }
 
@@ -102,12 +94,12 @@ export function projectPatchFromDraft(
         );
     }
     return {
-        entity: {
+        fields: {
             title: draft.title,
             description: draft.description,
-            start_date: draft.startDate,
-            target_end_date: draft.targetEndDate,
-            estimated_cost: costK * COST_DIVISOR,
+            startDate: draft.startDate,
+            targetEndDate: draft.targetEndDate,
+            estimatedCost: costK * COST_DIVISOR,
         },
         state,
     };

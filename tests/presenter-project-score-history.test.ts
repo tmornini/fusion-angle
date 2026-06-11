@@ -44,12 +44,12 @@ const actuals = [
 ];
 const revisions = [
     { id: 'r1',
-      objective_id: 'o1', name: 'Increase Revenue',
-      description: 'd1', member_id: 'w1',
+      objectiveId: 'o1', name: 'Increase Revenue',
+      description: 'd1', memberId: 'w1',
       at: '2026-02-01T00:00:00.000000Z' },
     { id: 'r2',
-      objective_id: 'o1', name: 'Drive Growth',
-      description: 'd2', member_id: 'w1',
+      objectiveId: 'o1', name: 'Drive Growth',
+      description: 'd2', memberId: 'w1',
       at: '2026-03-18T11:02:00.000000Z' },
 ];
 const archivals: {

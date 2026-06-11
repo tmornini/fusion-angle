@@ -42,7 +42,7 @@ import type {
     RecordAttributeEntity,
     FlowRecordEntity,
     Objective,
-    ObjectiveRevision,
+    ObjectiveRevisionEntity,
     ProjectObjectiveBaselineScore,
     ProjectObjectiveActualScore,
 } from './types.ts';
@@ -155,7 +155,7 @@ export class BackedDbAdapter
         GuardedEntityStore<IdeaSubmissionEntity>;
     readonly objectives!: GuardedEntityStore<Objective>;
     readonly objectiveRevisions!:
-        GuardedEntityStore<ObjectiveRevision>;
+        GuardedEntityStore<ObjectiveRevisionEntity>;
     readonly projectObjectiveBaselineScores!:
         GuardedEntityStore<ProjectObjectiveBaselineScore>;
     readonly projectObjectiveActualScores!:

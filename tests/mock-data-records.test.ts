@@ -214,11 +214,11 @@ test(
                 if (
                     ref.isRequired
                     && !storedAttrIds.has(
-                        ref.attribute_id,
+                        ref.attributeId,
                     )
                 ) {
                     violations.push(
-                        ref.attribute_id,
+                        ref.attributeId,
                     );
                 }
             }

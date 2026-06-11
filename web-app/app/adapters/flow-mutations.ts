@@ -6,7 +6,7 @@ import type {
 } from '../../../api/types.ts';
 import {
     nowUtc,
-    jsonObjectField,
+    storedGraphField,
     DEFAULT_LOCK_TIMEOUT,
 } from '../../../api/types.ts';
 import {
@@ -41,16 +41,6 @@ export function notifyFlowChange(): void {
     flowChanges.notify();
 }
 
-function putFlowGraph(
-    graph: StoredGraph,
-): string {
-    return jsonObjectField(
-        graph as unknown as Record<
-            string, unknown
-        >,
-    );
-}
-
 export interface FlowCreationInput {
     flowId: string;
     linkId: string;
@@ -83,7 +73,7 @@ export async function postFlowCreation(
                     is_auto_fit: false,
                     lock_timeout:
                         DEFAULT_LOCK_TIMEOUT,
-                    graph: putFlowGraph(graph),
+                    graph: storedGraphField(graph),
                 },
             },
             {
@@ -132,11 +122,9 @@ export async function putFlowOps(
         is_auto_layout: save.isAutoLayout,
         is_auto_fit: save.isAutoFit,
         lock_timeout: save.lockTimeout,
-        graph: jsonObjectField({
-            nodes: save.nodes as unknown as
-                Record<string, unknown>[],
-            edges: save.edges as unknown as
-                Record<string, unknown>[],
+        graph: storedGraphField({
+            nodes: save.nodes,
+            edges: save.edges,
         }),
     };
     const body =

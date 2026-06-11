@@ -91,6 +91,14 @@ test(
         assert.equal(grouped.size, 2);
         assert.equal(grouped.get('o1')!.length, 2);
         assert.equal(grouped.get('o2')!.length, 1);
+        assert.deepEqual(grouped.get('o2')![0], {
+            id: 'o2:t0',
+            objectiveId: 'o2',
+            name: 'C',
+            description: 'd:C',
+            memberId: 'w1',
+            at: '2026-05-14T00:00:00.000000Z',
+        });
     },
 );
 

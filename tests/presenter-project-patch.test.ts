@@ -90,7 +90,7 @@ test(
         const patch =
             projectPatchFromDraft(view, draft);
         assert.equal(
-            patch.entity.estimated_cost,
+            patch.fields.estimatedCost,
             7 * COST_DIVISOR,
         );
     },

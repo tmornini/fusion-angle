@@ -29,9 +29,8 @@ import {
 } from '../app/core.ts';
 import {
     getProject,
-    getProjectEntity,
     ProjectView,
-    putProject,
+    putProjectFields,
     postProjectStateChange,
     getFlowsByProject,
     postFlowCreation,
@@ -39,7 +38,6 @@ import {
     generateCryptoSafeBase62,
     sessionContext,
     type RequestContext,
-    type ProjectEntity,
     getProjectScoring,
     postProjectBaselineScoring,
     postProjectActualMeasurement,
@@ -81,13 +79,11 @@ type PageState =
     | {
         kind: 'reading';
         view: ProjectView;
-        entity: ProjectEntity;
         flows: FlowListItem[];
     }
     | {
         kind: 'editing';
         view: ProjectView;
-        entity: ProjectEntity;
         flows: FlowListItem[];
         draft: ProjectDraftFields;
     };
@@ -119,16 +115,13 @@ async function loadProjectView(
     ctx: RequestContext,
 ): Promise<{
     view: ProjectView;
-    entity: ProjectEntity;
 }> {
     const [
         project,
-        entity,
         objectives,
         scoring,
     ] = await Promise.all([
         getProject(ctx, projectId),
-        getProjectEntity(ctx, projectId),
         getObjectives(ctx),
         getProjectScoring(ctx, projectId),
     ]);
@@ -138,7 +131,7 @@ async function loadProjectView(
         scoring.baseline,
         scoring.actual,
     );
-    return { view, entity };
+    return { view };
 }
 
 function buildPresenter():
@@ -198,7 +191,6 @@ export async function init(
 
     let project: {
         view: ProjectView;
-        entity: ProjectEntity;
     };
     let flows: FlowListItem[];
     try {
@@ -233,7 +225,6 @@ export async function init(
     state = {
         kind: 'reading',
         view: project.view,
-        entity: project.entity,
         flows,
     };
     buildPresenter().renderShell(container);
@@ -251,7 +242,6 @@ export async function init(
         state = {
             kind: 'reading',
             view: upd.view,
-            entity: upd.entity,
             flows: updFlows,
         };
         rerender();
@@ -269,7 +259,6 @@ export async function init(
         state = {
             kind: 'reading',
             view: upd.view,
-            entity: upd.entity,
             flows: updFlows,
         };
         rerender();
@@ -286,7 +275,6 @@ export async function init(
         state = {
             kind: 'reading',
             view: upd.view,
-            entity: upd.entity,
             flows: updFlows,
         };
         rerender();
@@ -547,7 +535,6 @@ function handleProjectActions(
             state = {
                 kind: 'editing',
                 view: state.view,
-                entity: state.entity,
                 flows: state.flows,
                 draft: projectDraftFromView(
                     state.view,
@@ -562,7 +549,6 @@ function handleProjectActions(
             state = {
                 kind: 'reading',
                 view: state.view,
-                entity: state.entity,
                 flows: state.flows,
             };
             rerender();
@@ -630,7 +616,6 @@ function onDocumentKeydown(
     state = {
         kind: 'reading',
         view: state.view,
-        entity: state.entity,
         flows: state.flows,
     };
     rerender();
@@ -641,10 +626,6 @@ async function handleSave(): Promise<void> {
         return;
     }
     const projectId = state.view.idForLink();
-    const {
-        organization_id: _org,
-        ...entity
-    } = state.entity;
     const ctx = sessionContext();
     try {
         // Inside the try: a draft with an empty/invalid
@@ -653,11 +634,12 @@ async function handleSave(): Promise<void> {
             state.view,
             state.draft,
         );
-        const patchEntity = trimStrings(patch.entity);
-        const next = { ...entity, ...patchEntity };
+        const fields = trimStrings(patch.fields);
         const stateChanged =
             patch.state !== state.view.stateValue();
-        await putProject(ctx, projectId, next);
+        await putProjectFields(
+            ctx, projectId, fields,
+        );
         if (stateChanged) {
             await postProjectStateChange(
                 ctx, projectId, patch.state,

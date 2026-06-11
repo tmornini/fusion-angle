@@ -7,7 +7,7 @@ import {
     deleteFlowRecord,
     getRecordForFlow,
     getRecordForWorkOrder,
-    getFlowsForRecord,
+    getFlowSummariesForRecord,
     getWorkOrdersForRecord,
 } from '../web-app/app/adapters/flow-records.ts';
 import {
@@ -16,6 +16,27 @@ import {
 } from '../api/types.ts';
 
 const AT = '2026-05-01T00:00:00.000000Z';
+
+async function seedFlow(
+    db: MemoryDbAdapter,
+    id: string,
+    name: string,
+): Promise<void> {
+    await db.flows.put(id, {
+        organization_id: '1',
+        name,
+        is_locked: false,
+        is_auto_layout: true,
+        is_auto_fit: true,
+        lock_timeout: DEFAULT_LOCK_TIMEOUT,
+        graph: jsonObjectField({
+            name,
+            lockTimeout: DEFAULT_LOCK_TIMEOUT,
+            nodes: [],
+            edges: [],
+        }),
+    });
+}
 
 async function seedWorkOrder(
     db: MemoryDbAdapter,
@@ -144,10 +165,13 @@ test(
 );
 
 test(
-    'getFlowsForRecord returns every flow id'
-    + ' bound to a record',
+    'getFlowSummariesForRecord returns id and'
+    + ' name for every flow bound to a record',
     async () => {
-        const { ctx } = await adminContext();
+        const { db, ctx } = await adminContext();
+        await seedFlow(db, 'flow-a', 'Alpha');
+        await seedFlow(db, 'flow-b', 'Beta');
+        await seedFlow(db, 'flow-c', 'Gamma');
         await putFlowRecord(ctx, 'fr-1', {
             flow_id: 'flow-a',
             record_id: 'rec-1',
@@ -163,12 +187,19 @@ test(
             record_id: 'rec-other',
             at: AT,
         });
-        const flows = await getFlowsForRecord(
-            ctx, 'rec-1',
-        );
+        const flows =
+            await getFlowSummariesForRecord(
+                ctx, 'rec-1',
+            );
         assert.deepEqual(
-            flows.sort(),
-            ['flow-a', 'flow-b'],
+            flows.toSorted(
+                (a, b) =>
+                    a.id.localeCompare(b.id),
+            ),
+            [
+                { id: 'flow-a', name: 'Alpha' },
+                { id: 'flow-b', name: 'Beta' },
+            ],
         );
     },
 );

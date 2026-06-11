@@ -7,7 +7,7 @@ import {
 // Destroying a record attribute must not orphan its
 // covenants: state_field_values rows name the attribute in
 // IMMUTABLE event payloads (field_id), and flow / work-order
-// graphs bind it to nodes (NodeAttribute.attribute_id).
+// graphs bind it to nodes (NodeAttribute.attributeId).
 // Cascading would rewrite history the ledger promised to
 // keep — so destruction is RESTRICTED: a referenced
 // attribute refuses to die (409) until its referrers are
@@ -36,7 +36,7 @@ export const ATTRIBUTE_RESTRICT_TABLES:
 interface BoundGraph {
     readonly nodes: readonly {
         readonly attributes: readonly {
-            readonly attribute_id: string;
+            readonly attributeId: string;
         }[];
     }[];
 }
@@ -47,7 +47,7 @@ function graphBindsAttribute(
 ): boolean {
     return graph.nodes.some(node =>
         node.attributes.some(
-            attr => attr.attribute_id === attributeId,
+            attr => attr.attributeId === attributeId,
         ),
     );
 }

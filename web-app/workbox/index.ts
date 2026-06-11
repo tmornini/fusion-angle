@@ -22,7 +22,7 @@ import {
     initDropdown,
 } from '../app/core.ts';
 import {
-    getWorkOrderEntities,
+    getWorkOrders,
     getTransitionEventsByWorkOrder,
     getActiveClaimsByWorkOrder,
     getMemberMap,
@@ -32,10 +32,9 @@ import {
     sessionContext,
     generateCryptoSafeBase62,
     subscribeWorkOrderChanges,
-    validateWorkOrderFlowGraph,
     type NotReadyFlowEntry,
     type RequestContext,
-    type WorkOrderEntity,
+    type WorkOrder,
 } from '../app/adapters/index.ts';
 import type { Id } from '../../api/types.ts';
 import {
@@ -52,8 +51,8 @@ const { signal } = createPageAbort();
 
 let activePresenter:
     WorkboxInboxPresenter | null = null;
-let workOrderEntities:
-    Map<string, WorkOrderEntity> = new Map();
+let workOrdersById:
+    Map<string, WorkOrder> = new Map();
 
 export async function init(
     _params?: Record<string, string>,
@@ -164,19 +163,17 @@ async function loadInboxItems(
     const [
         workOrders, transitionsByWo, memberMap,
     ] = await Promise.all([
-        getWorkOrderEntities(ctx),
+        getWorkOrders(ctx),
         getTransitionEventsByWorkOrder(ctx),
         getMemberMap(ctx),
     ]);
-    workOrderEntities = new Map(
+    workOrdersById = new Map(
         workOrders.map(w => [w.id, w]),
     );
     const lockTimeoutByWo = new Map<Id, number>(
         workOrders.map(wo => [
             wo.id,
-            validateWorkOrderFlowGraph(
-                wo.flow_graph,
-            ).lockTimeout,
+            wo.flowGraph.lockTimeout,
         ]),
     );
     const activeClaimsByWo =
@@ -223,12 +220,13 @@ function onActiveListLoaded(
         '[data-work-order-card]',
         'data-work-order-card',
         async (id, newPosition) => {
-            const entity =
-                workOrderEntities.get(id);
-            if (!entity) return;
+            const workOrder =
+                workOrdersById.get(id);
+            if (!workOrder) return;
             try {
                 await putWorkOrder(ctx, id, {
-                    ...entity,
+                    displayId: workOrder.displayId,
+                    flowGraph: workOrder.flowGraph,
                     position: newPosition,
                 });
             } catch (err) {

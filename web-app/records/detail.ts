@@ -11,12 +11,10 @@ import {
     navigateTo,
 } from '../app/core.ts';
 import {
-    createRequestContext,
     sessionContext,
-    getRecord,
-    getRecordState,
+    getRecordModel,
     getRecordAttributesByRecord,
-    getFlowsForRecord,
+    getFlowSummariesForRecord,
     getWorkOrdersForRecord,
     putRecord,
     postRecordChange,
@@ -34,12 +32,13 @@ import {
     type RecordDetailView,
 } from '../app/presenters/index.ts';
 import type {
-    FlowEntity,
     RecordEntity,
-    RecordAttribute,
     RecordAttributeEntity,
     Constraint,
 } from '../../api/types.ts';
+import type {
+    RecordAttribute,
+} from '../app/adapters/index.ts';
 
 const { signal } = createPageAbort();
 
@@ -89,24 +88,20 @@ async function load(
         skeleton: buildSkeleton('detail', 1),
         fetch: async () => {
             const ctx = sessionContext();
-            const [record, state,
-                attributes, flowIds,
+            const [record,
+                attributes, flows,
                 workOrders] = await Promise.all([
-                getRecord(ctx, id),
-                getRecordState(ctx, id),
+                getRecordModel(ctx, id),
                 getRecordAttributesByRecord(
                     ctx, id,
                 ),
-                getFlowsForRecord(ctx, id),
+                getFlowSummariesForRecord(
+                    ctx, id,
+                ),
                 getWorkOrdersForRecord(ctx, id),
             ]);
-            const flows = flowIds.length === 0
-                ? []
-                : await loadFlowSummaries(
-                    ctx, flowIds,
-                );
             return {
-                record, state,
+                record,
                 attributes, flows, workOrders,
             };
         },
@@ -114,7 +109,6 @@ async function load(
         onData: loaded => {
             currentView = {
                 record: loaded.record,
-                state: loaded.state,
                 attributes: loaded.attributes,
                 boundFlows: loaded.flows,
                 workOrders: loaded.workOrders,
@@ -123,23 +117,6 @@ async function load(
             bindActions(root);
         },
     });
-}
-
-async function loadFlowSummaries(
-    ctx: ReturnType<
-        typeof createRequestContext
-    >,
-    flowIds: string[],
-): Promise<{ id: string; name: string }[]> {
-    const all = await ctx.GET<FlowEntity[]>(
-        'flows',
-    );
-    const wanted = new Set(flowIds);
-    return all
-        .filter(f => wanted.has(f.id))
-        .map(f => ({
-            id: f.id, name: f.name,
-        }));
 }
 
 function render(root: HTMLElement): void {
@@ -353,7 +330,7 @@ function onChange(
         updateAttributeType(
             attrId,
             target.value as AttributeDraft[
-                'attribute_type'
+                'attributeType'
             ],
         );
         render(root);
@@ -451,8 +428,8 @@ function commitPendingAttribute(): void {
     pageState.draft.attributes.push({
         id: generateCryptoSafeBase62(),
         name,
-        attribute_type: 'text',
-        sort_order:
+        attributeType: 'text',
+        sortOrder:
             pageState.draft.attributes.length,
         options: [],
         constraints: [],
@@ -479,13 +456,13 @@ function updateAttributeName(
 
 function updateAttributeType(
     id: string,
-    type: AttributeDraft['attribute_type'],
+    type: AttributeDraft['attributeType'],
 ): void {
     if (pageState.kind !== 'editing') return;
     const attr = pageState.draft.attributes
         .find(a => a.id === id);
     if (!attr) return;
-    attr.attribute_type = type;
+    attr.attributeType = type;
     const allowed = new Set(
         allowedConstraintKinds(type),
     );
@@ -580,7 +557,8 @@ async function handleSave(
     > = {
         name: draft.name.trim(),
         description: draft.description,
-        position: originalRecord.position,
+        position:
+            originalRecord.positionSortKey(),
     };
     const draftEntities = draftToEntities(
         draft, recordId,
@@ -598,8 +576,9 @@ async function handleSave(
             draftEntities, originalAttrs,
         );
     const recordChanged =
-        originalRecord.name !== recordFields.name
-        || originalRecord.description
+        originalRecord.nameText()
+            !== recordFields.name
+        || originalRecord.descriptionText()
             !== recordFields.description;
     if (!attributesChanged && !recordChanged) {
         pageState = { kind: 'reading' };
@@ -648,7 +627,7 @@ function draftToEntities(
             id: a.id,
             record_id: recordId,
             name: a.name.trim(),
-            attribute_type: a.attribute_type,
+            attribute_type: a.attributeType,
             sort_order: i,
             options: jsonArrayField(a.options),
             constraints: jsonArrayField(
@@ -674,8 +653,8 @@ function draftAttributesDifferFromOriginal(
         if (
             o === undefined
             || o.name !== d.name
-            || o.attribute_type !== d.attribute_type
-            || o.sort_order !== d.sort_order
+            || o.attributeType !== d.attribute_type
+            || o.sortOrder !== d.sort_order
             || jsonArrayField(o.options) !== d.options
             || jsonArrayField(o.constraints)
                 !== d.constraints

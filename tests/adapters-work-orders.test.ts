@@ -488,7 +488,7 @@ test(
         // start, post-start, after-transition
         assert.equal(events.length, 3);
         assert.equal(
-            events.at(-1)!.to_node_id, 'n-finish',
+            events.at(-1)!.toNodeId, 'n-finish',
         );
     },
 );

@@ -203,7 +203,7 @@ test(
         );
         const records = await getRecords(ctx);
         const ids = records
-            .map(r => r.entity.id)
+            .map(r => r.record.idForLink())
             .sort();
         assert.deepEqual(ids, ['rec-1']);
     },

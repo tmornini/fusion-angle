@@ -40,7 +40,7 @@ import type {
     RecordState,
     FlowRecordEntity,
     Objective,
-    ObjectiveRevision,
+    ObjectiveRevisionEntity,
     ProjectObjectiveBaselineScore,
     ProjectObjectiveActualScore,
     StateEntity,
@@ -258,7 +258,7 @@ function asNodeAttribute(
         );
     }
     return {
-        attribute_id: asString(
+        attributeId: asString(
             obj['attribute_id'],
             label + '.attribute_id',
         ),
@@ -1456,7 +1456,7 @@ const OBJECTIVE_REVISION_BODY_KEYS:
 
 export function validateObjectiveRevisionEntity(
     body: Record<string, unknown>,
-): Omit<ObjectiveRevision, 'id'> {
+): Omit<ObjectiveRevisionEntity, 'id'> {
     assertOnlyKeys(
         body,
         OBJECTIVE_REVISION_BODY_KEYS,

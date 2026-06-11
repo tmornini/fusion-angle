@@ -1,6 +1,9 @@
 import type {
-    RecordAttribute,
+    AttributeType,
+    Constraint,
+    Id,
     RecordAttributeEntity,
+    RecordAttributeId,
     RecordId,
 } from '../../../api/types.ts';
 import {
@@ -13,20 +16,35 @@ import {
 } from './shared.ts';
 
 export type {
-    RecordAttribute,
     RecordAttributeId,
 } from '../../../api/types.ts';
+
+// The parsed domain twin of RecordAttributeEntity: the
+// adapter is the divorce point, so above the storage seam
+// `options` and `constraints` are real arrays (never the
+// JsonArrayField strings the datastore persists) and the
+// fields speak camelCase — snake_case stays below the seam.
+export interface RecordAttribute {
+    id: RecordAttributeId;
+    organizationId: Id;
+    recordId: RecordId;
+    name: string;
+    attributeType: AttributeType;
+    sortOrder: number;
+    options: string[];
+    constraints: Constraint[];
+}
 
 function toRecordAttribute(
     entity: RecordAttributeEntity,
 ): RecordAttribute {
     return {
         id: entity.id,
-        organization_id: entity.organization_id,
-        record_id: entity.record_id,
+        organizationId: entity.organization_id,
+        recordId: entity.record_id,
         name: entity.name,
-        attribute_type: entity.attribute_type,
-        sort_order: entity.sort_order,
+        attributeType: entity.attribute_type,
+        sortOrder: entity.sort_order,
         options: validateStringArrayJson(
             entity.options,
             'recordAttribute.options',
@@ -52,9 +70,9 @@ export async function getRecordAttributesByRecord(
     recordId: RecordId,
 ): Promise<RecordAttribute[]> {
     const rows = await getRecordAttributeEntities(ctx);
-    return filterByField(rows, 'record_id', recordId)
+    return filterByField(rows, 'recordId', recordId)
         .toSorted(
             (a, b) =>
-                a.sort_order - b.sort_order,
+                a.sortOrder - b.sortOrder,
         );
 }

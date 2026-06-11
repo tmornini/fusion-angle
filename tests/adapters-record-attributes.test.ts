@@ -24,8 +24,32 @@ function attributeRow(
 }
 
 test(
+    'getRecordAttributesByRecord maps storage rows'
+    + ' to the camelCase domain shape',
+    async () => {
+        const { db, ctx } = await adminContext();
+        await db.recordAttributes.put(
+            'a-1', attributeRow('rec-1', 'A1', 3));
+        const [attr] = await
+            getRecordAttributesByRecord(
+                ctx, 'rec-1',
+            );
+        assert.deepEqual(attr, {
+            id: 'a-1',
+            organizationId: '1',
+            recordId: 'rec-1',
+            name: 'A1',
+            attributeType: 'text',
+            sortOrder: 3,
+            options: [],
+            constraints: [],
+        });
+    },
+);
+
+test(
     'getRecordAttributesByRecord returns only the'
-    + ' attributes for the given record_id',
+    + ' attributes for the given recordId',
     async () => {
         const { db, ctx } = await adminContext();
         await db.recordAttributes.put(
@@ -45,7 +69,7 @@ test(
 
 test(
     'getRecordAttributesByRecord returns rows in'
-    + ' sort_order ascending',
+    + ' sortOrder ascending',
     async () => {
         const { db, ctx } = await adminContext();
         await db.recordAttributes.put(

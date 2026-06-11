@@ -2,7 +2,6 @@ import type {
     GraphEdge,
     GraphNode,
     Id,
-    WorkOrderEntity,
 } from '../../api/types.ts';
 import {
     MS_PER_DAY,
@@ -16,8 +15,6 @@ import type { MemberHazardLevel } from './flow-graph.ts';
 export interface FlowStatsInput {
     readonly nodes: readonly GraphNode[];
     readonly edges: readonly GraphEdge[];
-    readonly workOrders:
-        readonly WorkOrderEntity[];
     readonly transitions:
         readonly TransitionEvent[];
     readonly nowMs: number;
@@ -142,9 +139,9 @@ function reconstructRuns(
     const byWo =
         new Map<string, TransitionEvent[]>();
     for (const t of input.transitions) {
-        const arr = byWo.get(t.work_order_id) ?? [];
+        const arr = byWo.get(t.workOrderId) ?? [];
         arr.push(t);
-        byWo.set(t.work_order_id, arr);
+        byWo.set(t.workOrderId, arr);
     }
     const dropped = new Set<string>();
     const runs: WoRun[] = [];
@@ -160,9 +157,9 @@ function reconstructRuns(
         let hadDropped = false;
         for (let i = 0; i < ts.length; i++) {
             const t = ts[i]!;
-            const node = nodeById.get(t.to_node_id);
+            const node = nodeById.get(t.toNodeId);
             if (!node) {
-                dropped.add(t.to_node_id);
+                dropped.add(t.toNodeId);
                 hadDropped = true;
                 continue;
             }
@@ -179,7 +176,7 @@ function reconstructRuns(
                 sojourns.push({
                     nodeId: node.id,
                     enterMs, exitMs,
-                    memberId: t.member_id,
+                    memberId: t.memberId,
                 });
             }
             if (node.isArchive) completed = true;
@@ -319,17 +316,17 @@ export function buildFlowStats(
         new Map<string, Map<string, number>>();
     for (const t of input.transitions) {
         if (t.kind === 'creation') continue;
-        if (!nodeById.has(t.from_node_id)) continue;
+        if (!nodeById.has(t.fromNodeId)) continue;
         const ms = Date.parse(t.at);
         if (ms < winLo || ms > winHi) continue;
         const inner =
-            outByNode.get(t.from_node_id)
+            outByNode.get(t.fromNodeId)
             ?? new Map<string, number>();
         inner.set(
-            t.member_id,
-            (inner.get(t.member_id) ?? 0) + 1,
+            t.memberId,
+            (inner.get(t.memberId) ?? 0) + 1,
         );
-        outByNode.set(t.from_node_id, inner);
+        outByNode.set(t.fromNodeId, inner);
     }
 
     // Precompute outgoing edges per node so each
@@ -410,11 +407,11 @@ export function buildFlowStats(
             const perTarget = new Map<string, number>();
             for (const tx of input.transitions) {
                 if (tx.kind === 'creation') continue;
-                if (tx.from_node_id !== n.id) continue;
+                if (tx.fromNodeId !== n.id) continue;
                 const ms = Date.parse(tx.at);
                 if (ms < winLo || ms > winHi) continue;
-                perTarget.set(tx.to_node_id,
-                    (perTarget.get(tx.to_node_id) ?? 0)
+                perTarget.set(tx.toNodeId,
+                    (perTarget.get(tx.toNodeId) ?? 0)
                     + 1);
             }
             const total =

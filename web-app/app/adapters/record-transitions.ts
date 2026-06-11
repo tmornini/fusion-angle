@@ -109,14 +109,14 @@ export async function validateRecordTransition(
     const out: ConstraintViolation[] = [];
     for (const ref of targetNode.attributes) {
         const attribute = attributeById.get(
-            ref.attribute_id,
+            ref.attributeId,
         );
         if (!attribute) {
             throw new Error(
                 'node ' + targetNodeId
                 + ' references unknown'
                 + ' attribute '
-                + ref.attribute_id,
+                + ref.attributeId,
             );
         }
         const pending = pendingValues.get(

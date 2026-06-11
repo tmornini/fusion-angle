@@ -11,16 +11,14 @@ import { navigateTo } from '../app/core.ts';
 import {
     createRequestContext,
     sessionContext,
-    getProjectEntities,
     getProjects,
     getProjectsScoreColumn,
-    putProject,
+    putProjectPosition,
     isProjectState,
     subscribeProjectChanges,
     subscribeProjectScoreChanges,
     subscribeObjectiveChanges,
     type Project,
-    type ProjectEntity,
 } from '../app/adapters/index.ts';
 import {
     ProjectListPresenter,
@@ -41,34 +39,21 @@ type ScoreRow = Awaited<
 >[number];
 
 let projectState: ProjectListState | null = null;
-let projectEntities:
-    Map<string, ProjectEntity> = new Map();
 let scoreMap: Map<string, ScoreRow> = new Map();
 let projectListEl: HTMLElement | null = null;
 let projectBadgesEl: HTMLElement | null = null;
 let projectSortControlsEl: HTMLElement | null = null;
 
-async function loadProjectMaps(
+async function loadScoreMap(
     ctx: ReturnType<typeof createRequestContext>,
-): Promise<{
-    entities: Map<string, ProjectEntity>;
-    scores: Map<string, ScoreRow>;
-}> {
-    const [rows, scoreColumn] =
-        await Promise.all([
-            getProjectEntities(ctx),
-            getProjectsScoreColumn(ctx),
-        ]);
-    return {
-        entities: new Map(
-            rows.map(r => [r.id, r]),
+): Promise<Map<string, ScoreRow>> {
+    const scoreColumn =
+        await getProjectsScoreColumn(ctx);
+    return new Map(
+        scoreColumn.map(
+            s => [s.projectId, s],
         ),
-        scores: new Map(
-            scoreColumn.map(
-                s => [s.projectId, s],
-            ),
-        ),
-    };
+    );
 }
 
 export async function init(): Promise<void> {
@@ -103,12 +88,10 @@ async function onProjectsLoaded(
     listEl: HTMLElement,
     ctx: ReturnType<typeof createRequestContext>,
 ): Promise<void> {
-    const maps = await loadProjectMaps(ctx);
+    scoreMap = await loadScoreMap(ctx);
 
     projectState =
         buildInitialProjectListState(projects);
-    projectEntities = maps.entities;
-    scoreMap = maps.scores;
     projectListEl = listEl;
     projectBadgesEl = $(
         '#status-badges', document,
@@ -138,16 +121,15 @@ async function onProjectsLoaded(
 
     subscribeProjectChanges(async () => {
         const refreshCtx = sessionContext();
-        const [refreshedProjects, maps] =
+        const [refreshedProjects, scores] =
             await Promise.all([
                 getProjects(refreshCtx),
-                loadProjectMaps(refreshCtx),
+                loadScoreMap(refreshCtx),
             ]);
         projectState = applyProjectListUpdate(
             projectState!, refreshedProjects,
         );
-        projectEntities = maps.entities;
-        scoreMap = maps.scores;
+        scoreMap = scores;
         rerenderProjects();
     });
 
@@ -176,19 +158,9 @@ async function onProjectsLoaded(
         '[data-project-card]',
         'data-project-card',
         async (id, newPosition) => {
-            const entity =
-                projectEntities.get(id);
-            if (!entity) return;
-            const {
-                organization_id: _org,
-                ...fields
-            } = entity;
-            await putProject(
+            await putProjectPosition(
                 sessionContext(), id,
-                {
-                    ...fields,
-                    position: newPosition,
-                },
+                newPosition,
             );
         },
     );

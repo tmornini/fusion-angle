@@ -241,6 +241,60 @@ export async function putProject(
     projectChanges.notify();
 }
 
+// The current row's writable fields, read fresh so the
+// domain ops below can overwrite whole-row without the
+// caller ever holding the wire shape.
+async function projectRowFields(
+    ctx: RequestContext,
+    id: string,
+): Promise<Omit<ProjectEntity, 'id' | 'organization_id'>> {
+    const {
+        id: _id,
+        organization_id: _org,
+        ...fields
+    } = await getProjectEntity(ctx, id);
+    return fields;
+}
+
+// The camelCase patch for a project's editable fields.
+// The adapter is the divorce point: pages and presenters
+// speak this shape; the wire merge below speaks storage.
+export interface ProjectFieldsPatch {
+    title: string;
+    description: string;
+    startDate: string;
+    targetEndDate: string;
+    estimatedCost: number;
+}
+
+export async function putProjectFields(
+    ctx: RequestContext,
+    id: string,
+    patch: ProjectFieldsPatch,
+): Promise<void> {
+    const fields = await projectRowFields(ctx, id);
+    await putProject(ctx, id, {
+        ...fields,
+        title: patch.title,
+        description: patch.description,
+        start_date: patch.startDate,
+        target_end_date: patch.targetEndDate,
+        estimated_cost: patch.estimatedCost,
+    });
+}
+
+export async function putProjectPosition(
+    ctx: RequestContext,
+    id: string,
+    position: number,
+): Promise<void> {
+    const fields = await projectRowFields(ctx, id);
+    await putProject(ctx, id, {
+        ...fields,
+        position,
+    });
+}
+
 // State transition for an existing project: one
 // state event, nothing else. Per the doctrine
 // "every state is an event; the latest event is the

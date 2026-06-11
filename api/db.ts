@@ -29,7 +29,7 @@ import type {
     RecordAttributeEntity,
     FlowRecordEntity,
     Objective,
-    ObjectiveRevision,
+    ObjectiveRevisionEntity,
     ProjectObjectiveBaselineScore,
     ProjectObjectiveActualScore,
     StateEntity,
@@ -358,7 +358,7 @@ export interface DbStores {
     objectives:
         EntityStore<Objective>;
     objectiveRevisions:
-        EntityStore<ObjectiveRevision>;
+        EntityStore<ObjectiveRevisionEntity>;
     projectObjectiveBaselineScores:
         EntityStore<
             ProjectObjectiveBaselineScore

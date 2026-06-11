@@ -108,7 +108,7 @@ function buildAttributeRef(
     overrides?: Partial<NodeAttribute>,
 ): NodeAttribute {
     return {
-        attribute_id: attributeId,
+        attributeId,
         mode: 'editable',
         isRequired: false,
         ...overrides,
@@ -810,7 +810,7 @@ test(
         if (op.kind !== 'ok') return;
         assert.equal(op.nodeId, 'a');
         assert.equal(
-            op.ref.attribute_id, 'attr-1',
+            op.ref.attributeId, 'attr-1',
         );
         assert.equal(op.ref.mode, 'editable');
         assert.equal(op.ref.isRequired, true);

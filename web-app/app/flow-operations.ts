@@ -452,7 +452,7 @@ export async function performAddAttributeRef(
         return { kind: 'noop' };
     }
     const ref: NodeAttribute = {
-        attribute_id: attributeId,
+        attributeId,
         mode,
         isRequired,
     };
