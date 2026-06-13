@@ -25,6 +25,7 @@ import {
     trimStrings,
     openDialog,
     closeDialog,
+    clickedOutside,
     parseDialogClick,
 } from '../app/core.ts';
 import {
@@ -371,10 +372,16 @@ export async function init(
         { signal },
     );
 
-    $('#history-backdrop', document)!
-        .addEventListener(
+    const historyDialog = $(
+        '#history-dialog', document,
+    )!;
+    historyDialog.addEventListener(
         'click',
-        () => closeDialog('history'),
+        (e) => {
+            if (clickedOutside(historyDialog, e)) {
+                closeDialog('history');
+            }
+        },
         { signal },
     );
 
@@ -476,6 +483,14 @@ function onClick(
 ): void {
     const target = e.target as Element | null;
     if (!target) return;
+
+    if (
+        target instanceof HTMLDialogElement
+        && clickedOutside(target, e)
+    ) {
+        target.close();
+        return;
+    }
 
     const dialogIntent = parseDialogClick(target);
     if (dialogIntent) {

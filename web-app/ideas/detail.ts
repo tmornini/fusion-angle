@@ -25,6 +25,7 @@ import {
     trimStrings,
     openDialog,
     closeDialog,
+    clickedOutside,
     parseDialogClick,
 } from '../app/core.ts';
 import {
@@ -212,6 +213,14 @@ function onClick(
 ): void {
     const target = e.target as Element | null;
     if (!target) return;
+
+    if (
+        target instanceof HTMLDialogElement
+        && clickedOutside(target, e)
+    ) {
+        target.close();
+        return;
+    }
 
     const dialogIntent = parseDialogClick(target);
     if (dialogIntent) {

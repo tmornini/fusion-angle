@@ -64,7 +64,7 @@ export class ProjectScoreHistoryPresenter {
         const events = this.#mergedEvents();
         return html`
             <div class="score-history-body">
-                <h3>Scoring history</h3>
+                <h3 id="history-title">Scoring history</h3>
                 <table class="score-history-table">
                     <thead>
                         <tr>

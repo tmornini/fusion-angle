@@ -90,7 +90,7 @@
           hsl(var(--gray-800)) 100%);
 }
 
-[data-theme="dark"] .dialog-backdrop,
+[data-theme="dark"] dialog.dialog::backdrop,
 [data-theme="dark"] .sheet-backdrop,
 [data-theme="dark"]
     .command-palette-backdrop {

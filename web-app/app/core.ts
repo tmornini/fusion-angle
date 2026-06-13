@@ -86,6 +86,7 @@ export {
 export {
     openDialog,
     closeDialog,
+    clickedOutside,
     initDialog,
     initTabs,
     parseDialogClick,

@@ -31,6 +31,7 @@ import {
     navigateTo,
     openDialog,
     closeDialog,
+    clickedOutside,
 } from '../app/core.ts';
 import {
     credentialRevealPanel,
@@ -493,31 +494,26 @@ export async function init(
         },
     );
 
+    const wipeDialog = $required(
+        '#confirm-wipe-dialog', document,
+    );
+    // Any close path — cancel, Escape (native cancel
+    // event), light dismiss, or programmatic — drops the
+    // queued action through the one close event.
+    wipeDialog.addEventListener('close', () => {
+        pending = { kind: 'idle' };
+    });
     $required(
         '#confirm-wipe-cancel', document,
     ).addEventListener(
         'click',
-        () => {
-            pending = { kind: 'idle' };
+        () => closeDialog('confirm-wipe'),
+    );
+    wipeDialog.addEventListener('click', (e) => {
+        if (clickedOutside(wipeDialog, e)) {
             closeDialog('confirm-wipe');
-        },
-    );
-    $required(
-        '#confirm-wipe-backdrop', document,
-    ).addEventListener(
-        'click',
-        (e) => {
-            if (
-                e.target
-                === e.currentTarget
-            ) {
-                pending = { kind: 'idle' };
-                closeDialog(
-                    'confirm-wipe',
-                );
-            }
-        },
-    );
+        }
+    });
     $required(
         '#confirm-wipe-submit', document,
     ).addEventListener(

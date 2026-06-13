@@ -374,19 +374,10 @@ function buildApprovalButtons(): SafeHtml {
 
 function buildApprovalDialogs(): SafeHtml {
     return html`
-    <div
-        id="approval-send-back-backdrop"
-        class="${
-            'dialog-backdrop hidden'
-        }"
-        data-dialog-id="${
-            'approval-send-back'
-        }">
-    </div>
-    <div
+    <dialog
         id="approval-send-back-dialog"
         class="${
-            'dialog dialog-narrow hidden'
+            'dialog dialog-narrow'
         }"
         role="dialog"
         aria-modal="true">
@@ -446,7 +437,7 @@ function buildApprovalDialogs(): SafeHtml {
                 Send Back
             </button>
         </div>
-    </div>`;
+    </dialog>`;
 }
 
 function buildProblemSolutionReadonlyCard(

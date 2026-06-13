@@ -51,14 +51,6 @@
   }
 }
 
-.dialog-backdrop {
-  position: fixed;
-  inset: 0;
-  background-color: hsl(var(--backdrop) / 0.5);
-  z-index: var(--z-modal-backdrop);
-  animation: fade-in var(--duration-normal) var(--ease-out);
-}
-
 .dialog {
   position: fixed;
   top: 50%;
@@ -73,6 +65,19 @@
   max-height: 85vh;
   overflow-y: auto;
   animation: scale-in var(--duration-normal) var(--ease-out);
+}
+
+/* Native <dialog> shown via showModal(): the ::backdrop */
+/* pseudo-element dims the page and the top layer provides the */
+/* focus trap. Reset the UA border; the card styling above */
+/* already applies by class. */
+dialog.dialog {
+  border: 0;
+}
+
+dialog.dialog::backdrop {
+  background-color: hsl(var(--backdrop) / 0.5);
+  animation: fade-in var(--duration-normal) var(--ease-out);
 }
 
 .dialog-narrow {

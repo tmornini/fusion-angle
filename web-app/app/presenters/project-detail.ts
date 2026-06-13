@@ -845,15 +845,10 @@ function buildSidebar(
 }
 
 function buildNewFlowDialog(): SafeHtml {
-    return html`<div
-class="${'dialog-backdrop hidden'}"
-id="new-flow-backdrop"
-data-dialog-id="new-flow">
-<div class="${
-    'dialog dialog-narrow hidden'
+    return html`<dialog class="${
+    'dialog dialog-narrow'
 }"
-    id="new-flow-dialog"
-    aria-hidden="true">
+    id="new-flow-dialog">
 <div class="${
     'dialog-section'
     + ' dialog-section-divider-bottom'
@@ -894,8 +889,7 @@ data-dialog-id="new-flow">
     }"
     >Create</button>
 </div>
-</div>
-</div>`;
+</dialog>`;
 }
 
 export class ProjectDetailPresenter {

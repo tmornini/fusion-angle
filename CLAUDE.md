@@ -179,12 +179,16 @@ defined as CSS classes in `web-app/app/styles/` and helper
 functions across `web-app/app/` modules. No external
 component library.
 
-**Dialog pattern.** Use `openDialog(id)` / `closeDialog(id)`
-from `core.ts`. Requires matching HTML elements:
-`id="{id}-backdrop"` (with `class="dialog-backdrop hidden"`)
-and `id="{id}-dialog"` (with `class="dialog hidden"
-aria-hidden="true"`). Helpers manage visibility, ARIA
-attributes, and focus.
+**Dialog pattern.** Native `<dialog>` driven by `openDialog(id)`
+/ `closeDialog(id)` from `core.ts`. The element is
+`id="{id}-dialog"` with `class="dialog"` (and `aria-labelledby`
+to its title); `openDialog` calls `showModal()` — the platform
+supplies the top-layer focus trap, the `::backdrop`, and Escape
+(the `cancel` event) — and `closeDialog` calls `close()`. No
+backdrop div, no `hidden`/`aria-hidden`. `initDialog(id,
+openBtnId, onSubmit?)` wires open/cancel/submit by id convention
+and adds click-outside dismiss; pages that hand-roll dialog
+clicks use `parseDialogClick`.
 
 **Tab pattern.** Use `initTabs('[data-tab]', '.tab-panel')`
 from `core.ts`. Tab buttons use `data-tab="{name}"`
