@@ -382,9 +382,11 @@ function buildApprovalDialogs(): SafeHtml {
             'dialog dialog-narrow'
         }"
         role="dialog"
-        aria-modal="true">
+        aria-modal="true"
+        aria-labelledby="approval-send-back-title">
         <div class="dialog-header">
-            <h3 class="dialog-title">
+            <h3 class="dialog-title"
+                id="approval-send-back-title">
                 Send Back for Revision
             </h3>
             <p class="${

@@ -850,12 +850,13 @@ function buildNewFlowDialog(): SafeHtml {
     return html`<dialog class="${
     'dialog dialog-narrow'
 }"
-    id="new-flow-dialog">
+    id="new-flow-dialog"
+    aria-labelledby="new-flow-title">
 <div class="${
     'dialog-section'
     + ' dialog-section-divider-bottom'
 }">
-<h3 class="${
+<h3 id="new-flow-title" class="${
     'text-lg font-display'
     + ' font-semibold'
 }">New Flow</h3>
