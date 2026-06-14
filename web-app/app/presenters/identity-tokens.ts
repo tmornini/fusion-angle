@@ -32,7 +32,7 @@ function buildEventRow(
                     'text-xs text-muted truncate'
                 }">
                     parent: ${
-                        event.parentJti === ''
+                        event.parentJti === undefined
                             ? DISPLAY_ABSENT
                             : event.parentJti
                     }

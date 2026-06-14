@@ -76,8 +76,7 @@ const VALID_ROWS: Record<
     },
     identity_tokens: {
         id: 't1', jti: 'jti-1', identity_id: 'i1',
-        action: 'issued', chain_id: 'ch1',
-        parent_jti: 'jti-0', at: AT,
+        action: 'issued', chain_id: 'ch1', at: AT,
     },
     clients: {
         id: 'cl1', grant_types: 'authorization_code',

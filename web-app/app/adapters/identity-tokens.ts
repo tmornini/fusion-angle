@@ -2,6 +2,9 @@ import {
     type Id,
     type IdentityTokenEntity,
 } from '../../../api/types.ts';
+import {
+    parentJtiByJti,
+} from '../../../api/identity-tokens.ts';
 import type { RequestContext } from './shared.ts';
 import {
     createSubscriptionChannel,
@@ -32,9 +35,11 @@ export class TokenReuseError extends Error {
 
 // One refresh-rotation event in the domain idiom: the
 // presenter reads camelCase, never the snake_case row.
+// `parentJti` is absent on a root (no predecessor) — the
+// derivation omits it rather than storing an empty sentinel.
 export interface TokenEvent {
     readonly jti: string;
-    readonly parentJti: string;
+    readonly parentJti?: string;
     readonly action: IdentityTokenEntity['action'];
     readonly at: string;
 }
@@ -57,12 +62,15 @@ export async function getTokenChainsFor(
     const rows = await ctx.GET<IdentityTokenEntity[]>(
         'identity-tokens',
     );
+    const parentByJti = parentJtiByJti(rows);
     const byChain = new Map<string, TokenEvent[]>();
     for (const row of rows) {
         if (row.identity_id !== identityId) continue;
+        const parent = parentByJti.get(row.jti);
         const event: TokenEvent = {
             jti: row.jti,
-            parentJti: row.parent_jti,
+            ...(parent !== undefined
+                ? { parentJti: parent } : {}),
             action: row.action,
             at: row.at,
         };

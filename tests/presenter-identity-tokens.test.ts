@@ -48,7 +48,7 @@ test('renders a card per chain with each jti event', () => {
             chainId: 'c1',
             events: [
                 {
-                    jti: 'j1', parentJti: '',
+                    jti: 'j1',
                     action: 'issued',
                     at: '2026-01-01T00:00:00.000000Z',
                 },

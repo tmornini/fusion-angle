@@ -27,7 +27,6 @@ async function seededDb(): Promise<MemoryDbAdapter> {
     await db.identityTokens.put('t-root', {
         jti: ROOT_JTI, identity_id: 'current',
         action: 'issued', chain_id: 'chain-1',
-        parent_jti: '',
         at: '2026-06-01T00:00:00.000000Z',
     });
     return db;

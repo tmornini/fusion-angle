@@ -93,6 +93,45 @@ export function identityForJti(
     );
 }
 
+// The predecessor of each successor jti, DERIVED from the
+// ledger for display only: a rotation appends a 'rotated' (old)
+// and an 'issued' (new) at one shared `at` within a chain, so a
+// successor's parent is the jti 'rotated' at its 'issued'
+// instant. A root 'issued' has no co-`at` 'rotated', so it gets
+// no entry — absence IS root-of-chain (the value `parent_jti`
+// once stored as ''). Scoped per chain so the pairing needs
+// only a per-chain-unique `at`, not a global one.
+//
+// This drives no computation today; it feeds one display line.
+// Promote to a STORED lineage relation only when a path must
+// traverse or query lineage — when the parent would drive
+// computation. Until then, deriving honors derive-from-ledger.
+export function parentJtiByJti(
+    rows: readonly IdentityTokenEntity[],
+): Map<string, string> {
+    const rotatedByChainAt =
+        new Map<string, Map<string, string>>();
+    for (const row of rows) {
+        if (row.action !== 'rotated') continue;
+        let byAt = rotatedByChainAt.get(row.chain_id);
+        if (byAt === undefined) {
+            byAt = new Map<string, string>();
+            rotatedByChainAt.set(row.chain_id, byAt);
+        }
+        byAt.set(row.at, row.jti);
+    }
+    const parent = new Map<string, string>();
+    for (const row of rows) {
+        if (row.action !== 'issued') continue;
+        const predecessor =
+            rotatedByChainAt.get(row.chain_id)?.get(row.at);
+        if (predecessor !== undefined) {
+            parent.set(row.jti, predecessor);
+        }
+    }
+    return parent;
+}
+
 // The chain-wide revocation rows: one 'revoked' event per jti
 // ever seen in the chain, all at one instant. Shared by the
 // replay path of planRotation and the explicit revocation
@@ -105,8 +144,7 @@ export function revocationAppends(
 ): Omit<IdentityTokenEntity, 'id'>[] {
     return jtisInChain(rows, chainId).map(jti => ({
         jti, identity_id: identityId,
-        action: 'revoked' as const, chain_id: chainId,
-        parent_jti: '', at,
+        action: 'revoked' as const, chain_id: chainId, at,
     }));
 }
 
@@ -147,13 +185,11 @@ export function planRotation(
             appends: [
                 {
                     jti: presentedJti, identity_id: identityId,
-                    action: 'rotated', chain_id: chainId,
-                    parent_jti: '', at,
+                    action: 'rotated', chain_id: chainId, at,
                 },
                 {
                     jti: newJti, identity_id: identityId,
-                    action: 'issued', chain_id: chainId,
-                    parent_jti: presentedJti, at,
+                    action: 'issued', chain_id: chainId, at,
                 },
             ],
         };

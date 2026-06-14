@@ -863,8 +863,7 @@ export function validateRoleGrantEntity(
 }
 
 const IDENTITY_TOKEN_BODY_KEYS: readonly string[] = [
-    'jti', 'identity_id', 'action', 'chain_id',
-    'parent_jti', 'at',
+    'jti', 'identity_id', 'action', 'chain_id', 'at',
 ];
 
 export function validateIdentityTokenEntity(
@@ -886,7 +885,6 @@ export function validateIdentityTokenEntity(
         identity_id: pickString(body, 'identity_id'),
         action,
         chain_id: pickString(body, 'chain_id'),
-        parent_jti: pickString(body, 'parent_jti'),
         at,
     };
 }

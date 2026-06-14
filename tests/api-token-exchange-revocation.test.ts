@@ -91,7 +91,7 @@ test('refresh on a logged-out but live jti is the'
     // branch — pinning that branch, not the reuse path.
     await db.identityTokens.put('t-live', {
         jti: 'live-jti', identity_id: 'u1',
-        action: 'issued', chain_id: 'c1', parent_jti: '',
+        action: 'issued', chain_id: 'c1',
         at: '2019-01-01T00:00:00.000000Z',
     });
     const iat = Math.floor(

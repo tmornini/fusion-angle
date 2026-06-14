@@ -166,12 +166,12 @@ async () => {
     await db.identityTokens.put('e1', {
         jti: 'dev-current', identity_id: 'current',
         action: 'issued', chain_id: 'c1',
-        parent_jti: '', at: '2026-01-01T00:00:00.000000Z',
+        at: '2026-01-01T00:00:00.000000Z',
     });
     await db.identityTokens.put('e2', {
         jti: 'dev-current', identity_id: 'current',
         action: 'revoked', chain_id: 'c1',
-        parent_jti: '', at: '2026-02-01T00:00:00.000000Z',
+        at: '2026-02-01T00:00:00.000000Z',
     });
     await assert.rejects(
         async () => GET(db, 'members', await devToken()),

@@ -194,7 +194,6 @@ async function recordIssuedRoot(
             identity_id: identityId,
             action: 'issued',
             chain_id: generateCryptoSafeBase62(),
-            parent_jti: '',
             at: nowUtc(),
         });
     return refreshJti;

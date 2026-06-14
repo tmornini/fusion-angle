@@ -26,7 +26,6 @@ const goodRow = {
     identity_id: 'current',
     action: 'issued',
     chain_id: 'chain-1',
-    parent_jti: '',
     at: '2026-06-03T00:00:00.000000Z',
 };
 
@@ -35,12 +34,11 @@ test('validates an issued token event', () => {
         validateIdentityTokenEntity(goodRow), goodRow);
 });
 
-test('accepts a non-empty parent_jti for a rotation', () => {
-    const rotated = {
-        ...goodRow, action: 'rotated', parent_jti: 'jti-0',
-    };
-    assert.deepEqual(
-        validateIdentityTokenEntity(rotated), rotated);
+test('rejects the retired parent_jti key', () => {
+    assert.throws(() =>
+        validateIdentityTokenEntity({
+            ...goodRow, parent_jti: 'jti-0',
+        }));
 });
 
 test('rejects an unknown action', () => {
@@ -71,12 +69,12 @@ async () => {
     await db.identityTokens.put('t1', {
         jti: 'jti-1', identity_id: 'current',
         action: 'issued', chain_id: 'c1',
-        parent_jti: '', at: '2026-01-01T00:00:00.000000Z',
+        at: '2026-01-01T00:00:00.000000Z',
     });
     await db.identityTokens.put('t2', {
         jti: 'jti-1', identity_id: 'current',
         action: 'rotated', chain_id: 'c1',
-        parent_jti: '', at: '2026-02-01T00:00:00.000000Z',
+        at: '2026-02-01T00:00:00.000000Z',
     });
     const rows = await db.identityTokens.getAll();
     assert.equal(rows.length, 2);   // append-only retained
