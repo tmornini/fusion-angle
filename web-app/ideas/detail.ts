@@ -23,10 +23,8 @@ import {
 import {
     navigateTo,
     trimStrings,
-    openDialog,
     closeDialog,
-    clickedOutside,
-    parseDialogClick,
+    handleDialogClick,
 } from '../app/core.ts';
 import {
     getIdea,
@@ -214,21 +212,7 @@ function onClick(
     const target = e.target as Element | null;
     if (!target) return;
 
-    if (
-        target instanceof HTMLDialogElement
-        && clickedOutside(target, e)
-    ) {
-        target.close();
-        return;
-    }
-
-    const dialogIntent = parseDialogClick(target);
-    if (dialogIntent) {
-        if (dialogIntent.kind === 'open') {
-            openDialog(dialogIntent.id);
-        } else {
-            closeDialog(dialogIntent.id);
-        }
+    if (handleDialogClick(target, e)) {
         return;
     }
     if (handleIdeaActions(target)) {

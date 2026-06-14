@@ -13,7 +13,7 @@ import {
     iconPersonPlus, iconSend,
 } from '../app/icons.ts';
 import {
-    initDialog, closeDialog,
+    handleDialogClick, closeDialog,
     navigateTo, trimStrings,
 } from '../app/core.ts';
 import {
@@ -44,6 +44,19 @@ export async function init(): Promise<void> {
         ['#add-identity-submit-icon', iconSend(ICON_SIZE.base, '')],
     ]);
     bindAddIdentityDialog();
+    // One delegate opens, cancels, and light-dismisses the add
+    // dialog through data-dialog-open / data-dialog-cancel — one
+    // voice with every other dialog surface.
+    document.addEventListener(
+        'click',
+        e => {
+            const target = e.target;
+            if (target instanceof Element) {
+                handleDialogClick(target, e);
+            }
+        },
+        { signal },
+    );
 
     const ctx = sessionContext();
     await loadInto({
@@ -100,11 +113,12 @@ function onListClick(e: MouseEvent): void {
 }
 
 function bindAddIdentityDialog(): void {
-    initDialog(
-        'add-identity',
-        'add-identity-btn',
-        handleAddIdentitySubmit,
-    );
+    $required('#add-identity-submit', document)
+        .addEventListener(
+            'click',
+            () => void handleAddIdentitySubmit(),
+            { signal },
+        );
     $$(
         '#add-identity-kind-toggle input', document,
     ).forEach(input => {

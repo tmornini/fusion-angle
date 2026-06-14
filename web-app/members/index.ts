@@ -22,7 +22,7 @@ import {
     iconSend, iconMail,
 } from '../app/icons.ts';
 import {
-    initDialog, closeDialog,
+    handleDialogClick, closeDialog,
     navigateTo, trimStrings,
 } from '../app/core.ts';
 import {
@@ -74,6 +74,19 @@ export async function init(): Promise<void> {
     initMemberListFilters();
     bindAddMemberDialog();
     bindInviteMemberDialog();
+    // One delegate opens, cancels, and light-dismisses both
+    // member dialogs through data-dialog-open / data-dialog-cancel
+    // — one voice with every other dialog surface.
+    document.addEventListener(
+        'click',
+        e => {
+            const target = e.target;
+            if (target instanceof Element) {
+                handleDialogClick(target, e);
+            }
+        },
+        { signal },
+    );
     const modelSelect = $select('#ai-model', document);
     if (modelSelect) {
         setHtml(
@@ -211,11 +224,12 @@ function onMemberListClick(e: MouseEvent): void {
 }
 
 function bindAddMemberDialog(): void {
-    initDialog(
-        'add-member',
-        'add-member-btn',
-        handleAddMemberSubmit,
-    );
+    $required('#add-member-submit', document)
+        .addEventListener(
+            'click',
+            () => void handleAddMemberSubmit(),
+            { signal },
+        );
     $$(
         '#add-member-kind-toggle input', document,
     ).forEach(input => {
@@ -232,11 +246,12 @@ function bindAddMemberDialog(): void {
 }
 
 function bindInviteMemberDialog(): void {
-    initDialog(
-        'invite-member',
-        'invite-member-btn',
-        handleInviteSubmit,
-    );
+    $required('#invite-member-submit', document)
+        .addEventListener(
+            'click',
+            () => void handleInviteSubmit(),
+            { signal },
+        );
     // Clear a stale field error when the dialog reopens, so a
     // prior rejection does not greet the next invite.
     $required('#invite-member-btn', document)

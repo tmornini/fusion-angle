@@ -7,6 +7,7 @@ import {
 } from '../app/loading-states.ts';
 import {
     navigateTo, openDialog, closeDialog,
+    handleDialogClick,
 } from '../app/core.ts';
 import {
     sessionContext,
@@ -115,12 +116,17 @@ function bindListeners(container: HTMLElement): void {
         'click', e => void onClick(e),
         { signal },
     );
-    $required(
-        '[data-action="cancel-confirm-erase"]',
-        document,
-    ).addEventListener(
+    // The erase dialog sits outside the page container, so its
+    // cancel/backdrop clicks route through a document delegate —
+    // one voice with every other dialog surface.
+    document.addEventListener(
         'click',
-        () => closeDialog('confirm-erase'),
+        e => {
+            const target = e.target;
+            if (target instanceof Element) {
+                handleDialogClick(target, e);
+            }
+        },
         { signal },
     );
     $required(

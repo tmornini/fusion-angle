@@ -185,10 +185,13 @@ component library.
 to its title); `openDialog` calls `showModal()` — the platform
 supplies the top-layer focus trap, the `::backdrop`, and Escape
 (the `cancel` event) — and `closeDialog` calls `close()`. No
-backdrop div, no `hidden`/`aria-hidden`. `initDialog(id,
-openBtnId, onSubmit?)` wires open/cancel/submit by id convention
-and adds click-outside dismiss; pages that hand-roll dialog
-clicks use `parseDialogClick`.
+backdrop div, no `hidden`/`aria-hidden`. Open and cancel
+controls carry `data-dialog-open="{id}"` /
+`data-dialog-cancel="{id}"`; each page routes its clicks through
+`handleDialogClick(target, e)` (from `core.ts`), which opens,
+closes, and light-dismisses by those attributes — one voice
+across every dialog. Submit/confirm stay page-specific (a
+`#{id}-submit` listener or a `data-*-action`).
 
 **Tab pattern.** Use `initTabs('[data-tab]', '.tab-panel')`
 from `core.ts`. Tab buttons use `data-tab="{name}"`

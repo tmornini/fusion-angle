@@ -16,6 +16,7 @@ import { extractErrorMessage } from '../app/error-helpers.ts';
 import {
     trimStrings,
     openDialog, closeDialog,
+    handleDialogClick,
 } from '../app/core.ts';
 import {
     getOrganization,
@@ -261,12 +262,6 @@ export async function init(): Promise<void> {
 
     // Add-Objective dialog wiring
     $(
-        '[data-action="cancel-add-objective"]',
-        document,
-    )!.addEventListener('click',
-        () => closeDialog('add-objective'),
-        { signal });
-    $(
         '[data-action="confirm-add-objective"]',
         document,
     )!.addEventListener('click', async () => {
@@ -290,12 +285,6 @@ export async function init(): Promise<void> {
 
     // Edit-Objective dialog wiring
     $(
-        '[data-action="cancel-edit-objective"]',
-        document,
-    )!.addEventListener('click',
-        () => closeDialog('edit-objective'),
-        { signal });
-    $(
         '[data-action="confirm-edit-objective"]',
         document,
     )!.addEventListener('click', async () => {
@@ -316,12 +305,6 @@ export async function init(): Promise<void> {
     }, { signal });
 
     // Confirm-archive dialog wiring
-    $(
-        '[data-action="cancel-confirm-archive"]',
-        document,
-    )!.addEventListener('click',
-        () => closeDialog('confirm-archive'),
-        { signal });
     $(
         '[data-action="confirm-archive"]',
         document,
@@ -388,6 +371,19 @@ function bindStableListeners(
         input: e => onInput(e),
         keydown: e => onContainerKeydown(e),
     }, signal);
+    // The objective dialogs sit outside the page container, so
+    // their open/cancel/backdrop clicks route through a document
+    // delegate — one voice with every other dialog surface.
+    document.addEventListener(
+        'click',
+        e => {
+            const target = e.target;
+            if (target instanceof Element) {
+                handleDialogClick(target, e);
+            }
+        },
+        { signal },
+    );
     document.addEventListener(
         'keydown',
         e => onDocumentKeydown(e),

@@ -31,7 +31,7 @@ import {
     navigateTo,
     openDialog,
     closeDialog,
-    clickedOutside,
+    handleDialogClick,
 } from '../app/core.ts';
 import {
     credentialRevealPanel,
@@ -504,15 +504,10 @@ export async function init(
     wipeDialog.addEventListener('close', () => {
         pending = { kind: 'idle' };
     });
-    $required(
-        '#confirm-wipe-cancel', document,
-    ).addEventListener(
-        'click',
-        () => closeDialog('confirm-wipe'),
-    );
     wipeDialog.addEventListener('click', (e) => {
-        if (clickedOutside(wipeDialog, e)) {
-            closeDialog('confirm-wipe');
+        const target = e.target;
+        if (target instanceof Element) {
+            handleDialogClick(target, e);
         }
     });
     $required(

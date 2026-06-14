@@ -19,6 +19,7 @@ import {
     navigateTo,
     openDialog,
     closeDialog,
+    handleDialogClick,
 } from '../app/core.ts';
 import {
     sessionContext,
@@ -213,8 +214,8 @@ function bindImport(): void {
     const fileInput = $(
         '#import-flow-input', document,
     ) as HTMLInputElement | null;
-    const cancelBtn = $(
-        '#import-cancel', document,
+    const dialog = $(
+        '#import-flow-dialog', document,
     );
     const chooseBtn = $(
         '#import-choose', document,
@@ -231,7 +232,7 @@ function bindImport(): void {
 
     if (
         !btn || !fileInput
-        || !cancelBtn || !chooseBtn
+        || !dialog || !chooseBtn
     ) return;
 
     btn.addEventListener(
@@ -239,14 +240,18 @@ function bindImport(): void {
         () => void openImportDialog(),
     );
 
-    cancelBtn.addEventListener(
-        'click',
-        () => {
-            importStore.reset();
-            resetImportDialog();
-            closeDialog('import-flow');
-        },
-    );
+    // Cancel, Escape, or light dismiss all close the dialog;
+    // the one close event drops the queued import.
+    dialog.addEventListener('click', (e) => {
+        const target = e.target;
+        if (target instanceof Element) {
+            handleDialogClick(target, e);
+        }
+    });
+    dialog.addEventListener('close', () => {
+        importStore.reset();
+        resetImportDialog();
+    });
 
     chooseBtn.addEventListener(
         'click',
