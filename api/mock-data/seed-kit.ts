@@ -4,7 +4,11 @@
 // through them so the seeded world stays byte-for-byte stable
 // (pinned by tests/mock-data-fingerprint.test.ts).
 
-export const now = new Date();
+// A FIXED anchor, never the wall clock: date-derived seed ids
+// (objective scores embed scoredAt) must not drift across UTC
+// days, or the fingerprint becomes a false prophet. Bump
+// deliberately to refresh how current the demo dates look.
+export const now = new Date('2026-06-15T00:00:00.000Z');
 
 function pad(n: number): string {
     return String(n).padStart(2, '0');

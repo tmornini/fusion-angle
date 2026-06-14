@@ -259,75 +259,55 @@ function buildFlowPortSvg(
 function buildFlowPropPanel(): SafeHtml {
     return html`
     <div class="ds-prop-panel">
-        <h4 class="${''
-            }font-semibold text-sm mb-3">${''
-            }Node Properties</h4>
+        <h4 class="font-semibold text-sm mb-3">Node Properties</h4>
         <div class="${
             'flex flex-col gap-3'
         }">
             <div class="ds-prop-field">
-                <label class="${''
-                    }text-xs text-muted"
-                    for="ds-prop-name">${''
-                    }Name</label>
+                <label class="text-xs text-muted"
+                    for="ds-prop-name">Name</label>
                 <input class="input"
                     id="ds-prop-name"
                     value="Data Capture"
                     readonly/>
             </div>
             <div class="ds-prop-field">
-                <div class="${''
-                    }text-xs text-muted">${''
-                    }Type</div>
-                <span class="${''
-                    }badge badge-default">${''
-                    }Standard</span>
+                <div class="text-xs text-muted">Type</div>
+                <span class="badge badge-default">Standard</span>
             </div>
             <div class="ds-prop-field">
-                <div class="${''
-                    }text-xs text-muted">${''
-                    }Fields</div>
-                <span class="${''
-                    }text-sm">8 fields</span>
+                <div class="text-xs text-muted">Fields</div>
+                <span class="text-sm">8 fields</span>
             </div>
         </div>
     </div>`;
 }
 
-export async function init(): Promise<void> {
-    const root = $required(
-        '#design-system-content', document,
-    );
-
-    setHtml(root, html`
+export function buildDesignSystemPage(): SafeHtml {
+    return html`
     <div class="ds-page">
         <div>
-            <h1 class="${''
-                }text-3xl font-bold${''
-                } font-display">${''
-                }Fusion AI Design System</h1>
-            <p class="text-muted mt-2">${''
-                }A production-ready design ${''
-                }system ${''
-                }for enterprise ${''
-                }applications ${''
-                }prioritizing clarity, ${''
-                }trust, ${''
-                }focus, and calm ${''
-                }decision-making.</p>
+            <h1 class="${
+                'text-3xl font-bold font-display'
+                }">Fusion AI Design System</h1>
+            <p class="text-muted mt-2">${
+                'A production-ready design system '
+                + 'for enterprise applications '
+                + 'prioritizing clarity, trust, '
+                + 'focus, and calm decision-making.'
+                }</p>
         </div>
 
         <hr class="ds-hr"/>
 
         <section class="ds-section">
             <div>
-                <h2 class="${''
-                    }text-2xl font-semibold ${''
-                    }font-display">${''
-                    }Brand Colors</h2>
-                <p class="text-muted mt-1">${''
-                    }Primary brand colors ${''
-                    }for Fusion AI</p>
+                <h2 class="${
+                    'text-2xl font-semibold font-display'
+                    }">Brand Colors</h2>
+                <p class="text-muted mt-1">${
+                    'Primary brand colors for Fusion AI'
+                    }</p>
             </div>
             <div class="ds-grid-4 stats-grid">
                 ${buildColorSwatch(
@@ -351,14 +331,12 @@ export async function init(): Promise<void> {
 
         <section class="ds-section">
             <div>
-                <h2 class="${''
-                    }text-2xl font-semibold ${''
-                    }font-display">${''
-                    }Blue Scale</h2>
-                <p class="text-muted mt-1">${''
-                    }Full blue color ramp ${''
-                    }for ${''
-                    }nuanced UI design</p>
+                <h2 class="${
+                    'text-2xl font-semibold font-display'
+                    }">Blue Scale</h2>
+                <p class="text-muted mt-1">${
+                    'Full blue color ramp for nuanced UI design'
+                    }</p>
             </div>
             <div class="ds-grid-5 stats-grid">
                 ${buildColorSwatch(
@@ -398,14 +376,12 @@ export async function init(): Promise<void> {
 
         <section class="ds-section">
             <div>
-                <h2 class="${''
-                    }text-2xl font-semibold ${''
-                    }font-display">${''
-                    }Semantic Colors</h2>
-                <p class="text-muted mt-1">${''
-                    }Status and feedback ${''
-                    }colors ${''
-                    }(WCAG AA compliant)</p>
+                <h2 class="${
+                    'text-2xl font-semibold font-display'
+                    }">Semantic Colors</h2>
+                <p class="text-muted mt-1">${
+                    'Status and feedback colors (WCAG AA compliant)'
+                    }</p>
             </div>
             <div class="ds-grid-4 stats-grid">
                 ${buildColorSwatch(
@@ -444,14 +420,12 @@ export async function init(): Promise<void> {
 
         <section class="ds-section">
             <div>
-                <h2 class="${''
-                    }text-2xl font-semibold ${''
-                    }font-display">${''
-                    }UI Colors</h2>
-                <p class="text-muted mt-1">${''
-                    }Background, surface, ${''
-                    }and ${''
-                    }border colors</p>
+                <h2 class="${
+                    'text-2xl font-semibold font-display'
+                    }">UI Colors</h2>
+                <p class="text-muted mt-1">${
+                    'Background, surface, and border colors'
+                    }</p>
             </div>
             <div class="ds-grid-6 stats-grid">
                 ${buildColorSwatch(
@@ -481,14 +455,12 @@ export async function init(): Promise<void> {
 
         <section class="ds-section">
             <div>
-                <h2 class="${''
-                    }text-2xl font-semibold ${''
-                    }font-display">${''
-                    }Typography</h2>
-                <p class="text-muted mt-1">${''
-                    }IBM Plex Sans for ${''
-                    }display, ${''
-                    }Inter for body text</p>
+                <h2 class="${
+                    'text-2xl font-semibold font-display'
+                    }">Typography</h2>
+                <p class="text-muted mt-1">${
+                    'IBM Plex Sans for display, Inter for body text'
+                    }</p>
             </div>
             <div class="card p-6">
                 ${buildTypographyRow(
@@ -554,47 +526,26 @@ export async function init(): Promise<void> {
 
         <section class="ds-section">
             <div>
-                <h2 class="${''
-                    }text-2xl font-semibold ${''
-                    }font-display">${''
-                    }Buttons</h2>
-                <p class="text-muted mt-1">${''
-                    }All button variants ${''
-                    }and sizes</p>
+                <h2 class="${
+                    'text-2xl font-semibold font-display'
+                    }">Buttons</h2>
+                <p class="text-muted mt-1">${
+                    'All button variants and sizes'
+                    }</p>
             </div>
             <div class="card p-6">
-                <h3 class="${''
-                    }font-semibold mb-4">${''
-                    }Variants</h3>
-                <div class="${''
-                    }flex flex-wrap gap-3 mb-4">
-                    <button class="${''
-                        }btn btn-primary">${''
-                        }Default</button>
-                    <button class="${''
-                        }btn btn-secondary">${''
-                        }Secondary</button>
-                    <button class="${''
-                        }btn btn-outline">${''
-                        }Outline</button>
-                    <button class="${''
-                        }btn btn-ghost">${''
-                        }Ghost</button>
-                    <button class="${''
-                        }btn btn-destructive">${''
-                        }Destructive</button>
-                    <button class="${''
-                        }btn btn-success">${''
-                        }Success</button>
-                    <button class="${''
-                        }btn btn-hero">${''
-                        }Hero</button>
+                <h3 class="font-semibold mb-4">Variants</h3>
+                <div class="flex flex-wrap gap-3 mb-4">
+                    <button class="btn btn-primary">Default</button>
+                    <button class="btn btn-secondary">Secondary</button>
+                    <button class="btn btn-outline">Outline</button>
+                    <button class="btn btn-ghost">Ghost</button>
+                    <button class="btn btn-destructive">Destructive</button>
+                    <button class="btn btn-success">Success</button>
+                    <button class="btn btn-hero">Hero</button>
                 </div>
-                <h3 class="${''
-                    }font-semibold mb-4">${''
-                    }Soft Variants</h3>
-                <div class="${''
-                    }flex flex-wrap gap-3 mb-4">
+                <h3 class="font-semibold mb-4">Soft Variants</h3>
+                <div class="flex flex-wrap gap-3 mb-4">
                     <button class="${
                         'btn ds-soft-btn'
                     }" data-tone="primary">${
@@ -616,79 +567,44 @@ export async function init(): Promise<void> {
                         'Soft Destructive'
                     }</button>
                 </div>
-                <h3 class="${''
-                    }font-semibold mb-4">${''
-                    }Disabled</h3>
-                <div class="${''
-                    }flex flex-wrap gap-3 mb-4">
-                    <button class="${''
-                        }btn btn-primary"
-                        disabled>${''
-                        }Disabled</button>
-                    <button class="${''
-                        }btn btn-outline"
-                        disabled>${''
-                        }Disabled Outline${''
-                        }</button>
+                <h3 class="font-semibold mb-4">Disabled</h3>
+                <div class="flex flex-wrap gap-3 mb-4">
+                    <button class="btn btn-primary"
+                        disabled>Disabled</button>
+                    <button class="btn btn-outline"
+                        disabled>Disabled Outline</button>
                 </div>
-                <h3 class="${''
-                    }font-semibold mb-4">${''
-                    }Sizes</h3>
-                <div class="${''
-                    }flex flex-wrap ${''
-                    }items-center ${''
-                    }gap-3 mb-4">
-                    <button class="${''
-                        }btn btn-primary${''
-                        } btn-xs">${''
-                        }Extra Small</button>
-                    <button class="${''
-                        }btn btn-primary${''
-                        } btn-sm">${''
-                        }Small</button>
-                    <button class="${''
-                        }btn btn-primary">${''
-                        }Default</button>
-                    <button class="${''
-                        }btn btn-primary${''
-                        } btn-lg">${''
-                        }Large</button>
-                    <button class="${''
-                        }btn btn-primary${''
-                        } btn-xl">${''
-                        }Extra Large</button>
+                <h3 class="font-semibold mb-4">Sizes</h3>
+                <div class="flex flex-wrap items-center gap-3 mb-4">
+                    <button class="${
+                        'btn btn-primary btn-xs'
+                        }">Extra Small</button>
+                    <button class="btn btn-primary btn-sm">Small</button>
+                    <button class="btn btn-primary">Default</button>
+                    <button class="btn btn-primary btn-lg">Large</button>
+                    <button class="${
+                        'btn btn-primary btn-xl'
+                        }">Extra Large</button>
                 </div>
-                <h3 class="${''
-                    }font-semibold mb-4">${''
-                    }With Icons</h3>
+                <h3 class="font-semibold mb-4">With Icons</h3>
                 <div class="${
                     'flex flex-wrap gap-3'
                 }">
-                    <button class="${''
-                        }btn btn-primary${''
-                        } gap-2">${''
-                        }${iconPlus(16, '')
-                        } Create</button>
-                    <button class="${''
-                        }btn btn-outline${''
-                        } gap-2">${''
-                        }${iconSearch(16, '')} ${''
-                        }Search</button>
-                    <button class="${''
-                        }btn btn-outline${''
-                        } gap-2">${''
-                        }Continue ${''
-                        }${iconArrowRight(16, '')
-                        }</button>
-                    <button class="${''
-                        }btn btn-destructive${''
-                        } gap-2">${''
-                        }${iconTrash(16, '')} ${''
-                        }Delete</button>
-                    <button class="${''
-                        }btn btn-primary${''
-                        } btn-icon">${''
-                        }${iconPlus(20, '')}</button>
+                    <button class="${
+                        'btn btn-primary gap-2'
+                        }">${iconPlus(16, '')} Create</button>
+                    <button class="${
+                        'btn btn-outline gap-2'
+                        }">${iconSearch(16, '')} Search</button>
+                    <button class="${
+                        'btn btn-outline gap-2'
+                        }">Continue ${iconArrowRight(16, '')}</button>
+                    <button class="${
+                        'btn btn-destructive gap-2'
+                        }">${iconTrash(16, '')} Delete</button>
+                    <button class="${
+                        'btn btn-primary btn-icon'
+                        }">${iconPlus(20, '')}</button>
                 </div>
             </div>
         </section>
@@ -697,75 +613,44 @@ export async function init(): Promise<void> {
 
         <section class="ds-section">
             <div>
-                <h2 class="${''
-                    }text-2xl font-semibold ${''
-                    }font-display">${''
-                    }Badges</h2>
-                <p class="text-muted mt-1">${''
-                    }Status indicators ${''
-                    }and labels</p>
+                <h2 class="${
+                    'text-2xl font-semibold font-display'
+                    }">Badges</h2>
+                <p class="text-muted mt-1">${
+                    'Status indicators and labels'
+                    }</p>
             </div>
             <div class="card p-6">
-                <h3 class="${''
-                    }font-semibold mb-4">${''
-                    }Standard</h3>
-                <div class="${''
-                    }flex flex-wrap gap-3 mb-4">
-                    <span class="${''
-                        }badge badge-default">${''
-                        }Default</span>
-                    <span class="${''
-                        }badge${''
-                        } badge-secondary">${''
-                        }Secondary</span>
-                    <span class="${''
-                        }badge${''
-                        } badge-outline">${''
-                        }Outline</span>
-                    <span class="${''
-                        }badge${''
-                        } badge-primary">${''
-                        }Primary</span>
-                    <span class="${''
-                        }badge${''
-                        } badge-destructive">${''
-                        }Destructive</span>
+                <h3 class="font-semibold mb-4">Standard</h3>
+                <div class="flex flex-wrap gap-3 mb-4">
+                    <span class="badge badge-default">Default</span>
+                    <span class="badge badge-secondary">Secondary</span>
+                    <span class="badge badge-outline">Outline</span>
+                    <span class="badge badge-primary">Primary</span>
+                    <span class="badge badge-destructive">Destructive</span>
                 </div>
-                <h3 class="${''
-                    }font-semibold mb-4">${''
-                    }Status with Dot</h3>
-                <div class="${''
-                    }flex flex-wrap gap-3 mb-4">
-                    <span class="${''
-                        }badge${''
-                        } badge-success">${''
-                        }${iconCheck(12, '')} ${''
-                        }Approved</span>
-                    <span class="${''
-                        }badge${''
-                        } badge-warning">${''
-                        }${iconAlertTriangle(12, '')
-                        } ${''
-                        }Pending</span>
-                    <span class="${''
-                        }badge badge-error">${''
-                        }${iconX(12, '')} ${''
-                        }Rejected</span>
-                    <span class="${''
-                        }status-badge-info">${''
-                        }${iconInfo(12, '')
-                        } Info</span>
+                <h3 class="font-semibold mb-4">Status with Dot</h3>
+                <div class="flex flex-wrap gap-3 mb-4">
+                    <span class="${
+                        'badge badge-success'
+                        }">${iconCheck(12, '')} Approved</span>
+                    <span class="${
+                        'badge badge-warning'
+                        }">${iconAlertTriangle(12, '')} Pending</span>
+                    <span class="${
+                        'badge badge-error'
+                        }">${iconX(12, '')} Rejected</span>
+                    <span class="${
+                        'status-badge-info'
+                        }">${iconInfo(12, '')} Info</span>
                 </div>
-                <h3 class="${''
-                    }font-semibold mb-4">${''
-                    }Soft Accent</h3>
+                <h3 class="font-semibold mb-4">Soft Accent</h3>
                 <div class="${
                     'flex flex-wrap gap-3'
                 }">
                     <span class="${
                         'ds-accent-badge'
-                    }">${''
-                        }Accent Badge</span>
+                    }">Accent Badge</span>
                 </div>
             </div>
         </section>
@@ -774,41 +659,27 @@ export async function init(): Promise<void> {
 
         <section class="ds-section">
             <div>
-                <h2 class="${''
-                    }text-2xl font-semibold ${''
-                    }font-display">${''
-                    }Form Elements</h2>
-                <p class="text-muted mt-1">${''
-                    }Input fields and ${''
-                    }text areas</p>
+                <h2 class="${
+                    'text-2xl font-semibold font-display'
+                    }">Form Elements</h2>
+                <p class="text-muted mt-1">${
+                    'Input fields and text areas'
+                    }</p>
             </div>
             <div class="ds-grid-2 convert-grid">
                 <div class="card p-6">
-                    <h3 class="${''
-                        }font-semibold mb-4">${''
-                        }Inputs</h3>
+                    <h3 class="font-semibold mb-4">Inputs</h3>
                     <div class="ds-stack">
                         <div>
-                            <label class="${''
-                                }label mb-1${''
-                                } text-sm"
-                                for="${''
-                                }ds-input-default">${''
-                                }Default ${''
-                                }Input</label>
+                            <label class="label mb-1 text-sm"
+                                for="ds-input-default">Default Input</label>
                             <input class="input"
                                 id="ds-input-default"
-                                placeholder="${''
-                                }Enter text..."/>
+                                placeholder="Enter text..."/>
                         </div>
                         <div>
-                            <label class="${''
-                                }label mb-1${''
-                                } text-sm"
-                                for="${''
-                                }ds-input-value">${''
-                                }With ${''
-                                }Value</label>
+                            <label class="label mb-1 text-sm"
+                                for="ds-input-value">With Value</label>
                             <input class="input"
                                 id="ds-input-value"
                                 value="${
@@ -817,16 +688,9 @@ export async function init(): Promise<void> {
                                 }"/>
                         </div>
                         <div>
-                            <label class="${''
-                                }label mb-1${''
-                                } text-sm"
-                                for="${''
-                                }ds-input-error">${''
-                                }Error ${''
-                                }State</label>
-                            <input class="${''
-                                }input${''
-                                } input-error"
+                            <label class="label mb-1 text-sm"
+                                for="ds-input-error">Error State</label>
+                            <input class="input input-error"
                                 id="ds-input-error"
                                 value="${
                                     'Invalid'
@@ -835,72 +699,42 @@ export async function init(): Promise<void> {
                             <p class="${
                                     'text-xs mt-1'
                                     + ' text-error'
-                                }">${''
-                                }This field ${''
-                                }is ${''
-                                }required</p>
+                                }">This field is required</p>
                         </div>
                         <div>
-                            <label class="${''
-                                }label mb-1${''
-                                } text-sm"
-                                for="${''
-                                }ds-input-disabled">${''
-                                }Disabled</label>
+                            <label class="label mb-1 text-sm"
+                                for="ds-input-disabled">Disabled</label>
                             <input class="input"
                                 id="ds-input-disabled"
                                 disabled
-                                placeholder="${''
-                                }Disabled${''
-                                } input"/>
+                                placeholder="Disabled input"/>
                         </div>
                     </div>
                 </div>
                 <div class="card p-6">
-                    <h3 class="${''
-                        }font-semibold mb-4">${''
-                        }Textareas</h3>
+                    <h3 class="font-semibold mb-4">Textareas</h3>
                     <div class="ds-stack">
                         <div>
-                            <label class="${''
-                                }label mb-1${''
-                                } text-sm"
-                                for="${''
-                                }ds-textarea-default">${''
-                                }Default ${''
-                                }Textarea</label>
+                            <label class="label mb-1 text-sm"
+                                for="ds-textarea-default">${
+                                    'Default Textarea'
+                                    }</label>
                             <textarea
                                 class="textarea"
-                                id="${''
-                                }ds-textarea-default"
-                                placeholder="${''
-                                }Enter longer${''
-                                } text...">${''
-                                }</textarea>
+                                id="ds-textarea-default"
+                                placeholder="Enter longer text..."></textarea>
                         </div>
                         <div>
-                            <label class="${''
-                                }label mb-1${''
-                                } text-sm"
-                                for="${''
-                                }ds-textarea-error">${''
-                                }Error ${''
-                                }State</label>
-                            <textarea class="${''
-                                }textarea${''
-                                } input-error"
-                                id="${''
-                                }ds-textarea-error">${''
-                                }Invalid${''
-                                } content${''
-                                }</textarea>
+                            <label class="label mb-1 text-sm"
+                                for="ds-textarea-error">Error State</label>
+                            <textarea class="textarea input-error"
+                                id="ds-textarea-error">${
+                                    'Invalid content'
+                                    }</textarea>
                             <p class="${
                                     'text-xs mt-1'
                                     + ' text-error'
-                                }">${''
-                                }Please provide${''
-                                } a valid ${''
-                                }description</p>
+                                }">Please provide a valid description</p>
                         </div>
                     </div>
                 </div>
@@ -911,65 +745,39 @@ export async function init(): Promise<void> {
 
         <section class="ds-section">
             <div>
-                <h2 class="${''
-                    }text-2xl font-semibold ${''
-                    }font-display">${''
-                    }Cards</h2>
-                <p class="text-muted mt-1">${''
-                    }Content containers ${''
-                    }with ${''
-                    }consistent styling</p>
+                <h2 class="${
+                    'text-2xl font-semibold font-display'
+                    }">Cards</h2>
+                <p class="text-muted mt-1">${
+                    'Content containers with consistent styling'
+                    }</p>
             </div>
             <div class="ds-grid-3 score-grid">
                 <div class="card card-hover p-6">
-                    <h3 class="${''
-                        }font-semibold mb-1">${''
-                        }Fusion Card</h3>
-                    <p class="${''
-                        }text-xs text-muted${''
-                        } mb-2">${''
-                        }With hover effect</p>
-                    <p class="${''
-                        }text-sm text-muted">${''
-                        }Hover over this ${''
-                        }card to ${''
-                        }see the subtle ${''
-                        }shadow ${''
-                        }effect.</p>
+                    <h3 class="font-semibold mb-1">Fusion Card</h3>
+                    <p class="text-xs text-muted mb-2">With hover effect</p>
+                    <p class="text-sm text-muted">${
+                        'Hover over this card to see the '
+                        + 'subtle shadow effect.'
+                        }</p>
                 </div>
                 <div class="card card-flat p-6">
-                    <h3 class="${''
-                        }font-semibold mb-1">${''
-                        }Flat Card</h3>
-                    <p class="${''
-                        }text-xs text-muted${''
-                        } mb-2">${''
-                        }No shadow or hover</p>
-                    <p class="${''
-                        }text-sm text-muted">${''
-                        }A minimal card with${''
-                        } just ${''
-                        }a border, suitable${''
-                        } for ${''
-                        }secondary ${''
-                        }content.</p>
+                    <h3 class="font-semibold mb-1">Flat Card</h3>
+                    <p class="text-xs text-muted mb-2">No shadow or hover</p>
+                    <p class="text-sm text-muted">${
+                        'A minimal card with just a '
+                        + 'border, suitable for secondary '
+                        + 'content.'
+                        }</p>
                 </div>
                 <div class="card p-6">
-                    <h3 class="${''
-                        }font-semibold mb-1">${''
-                        }Standard Card</h3>
-                    <p class="${''
-                        }text-xs text-muted${''
-                        } mb-2">${''
-                        }Default styling</p>
-                    <p class="${''
-                        }text-sm text-muted">${''
-                        }The standard card ${''
-                        }with ${''
-                        }subtle shadow, ${''
-                        }suitable ${''
-                        }for most ${''
-                        }content.</p>
+                    <h3 class="font-semibold mb-1">Standard Card</h3>
+                    <p class="text-xs text-muted mb-2">Default styling</p>
+                    <p class="text-sm text-muted">${
+                        'The standard card with subtle '
+                        + 'shadow, suitable for most '
+                        + 'content.'
+                        }</p>
                 </div>
             </div>
         </section>
@@ -978,15 +786,12 @@ export async function init(): Promise<void> {
 
         <section class="ds-section">
             <div>
-                <h2 class="${''
-                    }text-2xl font-semibold ${''
-                    }font-display">${''
-                    }Elevation &amp; ${''
-                    }Shadows</h2>
-                <p class="text-muted mt-1">${''
-                    }Shadow scale for depth${''
-                    } ${''
-                    }and hierarchy</p>
+                <h2 class="${
+                    'text-2xl font-semibold font-display'
+                    }">Elevation &amp; Shadows</h2>
+                <p class="text-muted mt-1">${
+                    'Shadow scale for depth and hierarchy'
+                    }</p>
             </div>
             <div class="ds-grid-5 stats-grid">
                 ${buildShadowBox(
@@ -1016,20 +821,15 @@ export async function init(): Promise<void> {
 
         <section class="ds-section">
             <div>
-                <h2 class="${''
-                    }text-2xl font-semibold ${''
-                    }font-display">${''
-                    }Iconography</h2>
-                <p class="text-muted mt-1">${''
-                    }Lucide-compatible ${''
-                    }inline ${''
-                    }SVG icons at standard${''
-                    } ${''
-                    }sizes</p>
+                <h2 class="${
+                    'text-2xl font-semibold font-display'
+                    }">Iconography</h2>
+                <p class="text-muted mt-1">${
+                    'Lucide-compatible inline SVG icons at standard sizes'
+                    }</p>
             </div>
             <div class="card p-6">
-                <div class="${''
-                    }flex items-end gap-8">
+                <div class="flex items-end gap-8">
                     ${[16, 20, 24, 48].map(
                         size => html`
                     <div class="icon-size-col">
@@ -1037,18 +837,15 @@ export async function init(): Promise<void> {
                             >${iconSparkles(
                                 size, '',
                             )}</div>
-                        <code class="${''
-                            }text-xs${''
-                            } text-muted">${''
-                            }${size}px</code>
+                        <code class="text-xs text-muted">${size}px</code>
                     </div>
                     `,
                     )}
                 </div>
-                <div class="${''
-                    }flex flex-wrap gap-4${''
-                    } mt-6 ${''
-                    }pt-4 section-divider-top">
+                <div class="${
+                    'flex flex-wrap gap-4 mt-6 '
+                    + 'pt-4 section-divider-top'
+                    }">
                     ${[
                       {
                           fn: iconHome,
@@ -1096,11 +893,7 @@ export async function init(): Promise<void> {
                             'text-foreground'
                         }">${entry.fn(20, '')
                             }</div>
-                        <span class="${''
-                            }text-2xs${''
-                            } text-muted">${''
-                            }${entry.name
-                            }</span>
+                        <span class="text-2xs text-muted">${entry.name}</span>
                     </div>
                     `)}
                 </div>
@@ -1111,14 +904,12 @@ export async function init(): Promise<void> {
 
         <section class="ds-section">
             <div>
-                <h2 class="${''
-                    }text-2xl font-semibold ${''
-                    }font-display">${''
-                    }Spacing System</h2>
-                <p class="text-muted mt-1">${''
-                    }8pt grid for ${''
-                    }consistent ${''
-                    }spacing</p>
+                <h2 class="${
+                    'text-2xl font-semibold font-display'
+                    }">Spacing System</h2>
+                <p class="text-muted mt-1">${
+                    '8pt grid for consistent spacing'
+                    }</p>
             </div>
             <div class="card p-6">
                 ${[
@@ -1163,9 +954,7 @@ export async function init(): Promise<void> {
                       w: '4rem',
                   },
                 ].map(space => html`
-                <div class="${''
-                    }flex items-center gap-4 ${''
-                    }mb-3">
+                <div class="flex items-center gap-4 mb-3">
                     <code class="${
                         'text-xs text-muted'
                         + ' w-rem-5'
@@ -1173,9 +962,7 @@ export async function init(): Promise<void> {
                     <div class="ds-space-bar"
                         style="--space-w:${space.w}"
                     ></div>
-                    <span class="${''
-                        }text-sm text-muted">${''
-                        }${space.value}</span>
+                    <span class="text-sm text-muted">${space.value}</span>
                 </div>
                 `)}
             </div>
@@ -1185,14 +972,12 @@ export async function init(): Promise<void> {
 
         <section class="ds-section">
             <div>
-                <h2 class="${''
-                    }text-2xl font-semibold ${''
-                    }font-display">Toast</h2>
-                <p class="text-muted mt-1">${''
-                    }Transient ${''
-                    }notifications ${''
-                    }dispatched via ${''
-                    }showToast()</p>
+                <h2 class="${
+                    'text-2xl font-semibold font-display'
+                    }">Toast</h2>
+                <p class="text-muted mt-1">${
+                    'Transient notifications dispatched via showToast()'
+                    }</p>
             </div>
             <div class="card p-6">
                 <div class="ds-toast-col">
@@ -1235,246 +1020,162 @@ export async function init(): Promise<void> {
 
         <section class="ds-section">
             <div>
-                <h2 class="${''
-                    }text-2xl font-semibold ${''
-                    }font-display">${''
-                    }Error &amp; System ${''
-                    }States</h2>
-                <p class="text-muted mt-1">${''
-                    }Patterns for ${''
-                    }validation ${''
-                    }errors, failures, ${''
-                    }and ${''
-                    }system messages</p>
+                <h2 class="${
+                    'text-2xl font-semibold font-display'
+                    }">Error &amp; System States</h2>
+                <p class="text-muted mt-1">${
+                    'Patterns for validation errors, '
+                    + 'failures, and system messages'
+                    }</p>
             </div>
             <div class="ds-grid-2 convert-grid">
                 <div class="card p-6">
-                    <h3 class="${''
-                        }font-semibold mb-3">${''
-                        }Inline Validation</h3>
+                    <h3 class="font-semibold mb-3">Inline Validation</h3>
                     <div class="${
                         'flex flex-col gap-3'
                     }">
                         <div>
-                            <label class="${''
-                                }label mb-1${''
-                                } text-sm"
-                                for="${''
-                                }ds-validation-email">${''
-                                }Email ${''
-                                }Address</label>
-                            <input class="${''
-                                }input${''
-                                } input-error"
-                                id="${''
-                                }ds-validation-email"
+                            <label class="label mb-1 text-sm"
+                                for="ds-validation-email">${
+                                    'Email Address'
+                                    }</label>
+                            <input class="input input-error"
+                                id="ds-validation-email"
                                 value="${
                                     'invalid'
                                     + '-email'
                                 }"/>
-                            <p class="${''
-                                }text-xs mt-1${''
-                                } flex ${''
-                                }items-center${''
-                                } gap-1 text-error">${''
-                                }${
-                                iconAlertCircle(12, '')
-                                } ${''
-                                }Please enter ${''
-                                }a valid ${''
-                                }email ${''
-                                }address</p>
+                            <p class="${
+                                    'text-xs mt-1 flex '
+                                    + 'items-center gap-1 text-error'
+                                    }">${iconAlertCircle(12, '')} ${
+                                    'Please enter a valid '
+                                    + 'email address'
+                                    }</p>
                         </div>
                         <div>
-                            <label class="${''
-                                }label mb-1${''
-                                } text-sm"
-                                for="${''
-                                }ds-validation-name">${''
-                                }Project ${''
-                                }Name</label>
+                            <label class="label mb-1 text-sm"
+                                for="ds-validation-name">Project Name</label>
                             <input class="${
                                 'input'
                                 + ' ds-success-border'
                             }"
-                                id="${''
-                                }ds-validation-name"
-                                value="${''
-                                }AI Segmentation"/>
-                            <p class="${''
-                                }text-xs mt-1${''
-                                } flex ${''
-                                }items-center${''
-                                } gap-1${''
-                                } text-success">${''
-                                }${iconCheck(12, '')
-                                } ${''
-                                }Looks good!</p>
+                                id="ds-validation-name"
+                                value="AI Segmentation"/>
+                            <p class="${
+                                    'text-xs mt-1 flex items-center '
+                                    + 'gap-1 text-success'
+                                    }">${iconCheck(12, '')} Looks good!</p>
                         </div>
                     </div>
                 </div>
                 <div class="card p-6">
-                    <h3 class="${''
-                        }font-semibold mb-3">${''
-                        }Upload Failed</h3>
+                    <h3 class="font-semibold mb-3">Upload Failed</h3>
                     <div class="ds-upload-fail">
                         ${iconUpload(
                             32, 'text-error',
                         )}
-                        <p class="${''
-                            }font-medium${''
-                            } text-sm mt-2 text-error">${''
-                            }Upload Failed</p>
-                        <p class="${''
-                            }text-xs${''
-                            } text-muted${''
-                            } mt-1">${''
-                            }File exceeds ${''
-                            }maximum ${''
-                            }size of 10MB</p>
-                        <button class="${''
-                            }btn btn-outline ${''
-                            }btn-sm mt-3">${''
-                            }Try Again</button>
+                        <p class="${
+                            'font-medium text-sm mt-2 '
+                            + 'text-error'
+                            }">Upload Failed</p>
+                        <p class="text-xs text-muted mt-1">${
+                            'File exceeds maximum size of 10MB'
+                            }</p>
+                        <button class="${
+                            'btn btn-outline btn-sm mt-3'
+                            }">Try Again</button>
                     </div>
                 </div>
                 <div class="card p-6">
-                    <h3 class="${''
-                        }font-semibold mb-3">${''
-                        }Save Failed</h3>
+                    <h3 class="font-semibold mb-3">Save Failed</h3>
                     <div class="ds-soft-row" data-tone="error">
                         ${iconAlertCircle(
                             20,
                             'text-error',
                         )}
                         <div class="flex-1">
-                            <p class="${''
-                                }text-sm${''
-                                } font-medium text-error">${''
-                                }Changes could${''
-                                } not ${''
-                                }be saved</p>
-                            <p class="${''
-                                }text-xs${''
-                                } text-muted ${''
-                                }mt-0.5">${''
-                                }Please check${''
-                                } your ${''
-                                }connection ${''
-                                }and ${''
-                                }try again.</p>
+                            <p class="${
+                                'text-sm font-medium '
+                                + 'text-error'
+                                }">Changes could not be saved</p>
+                            <p class="text-xs text-muted mt-0.5">${
+                                'Please check your connection '
+                                + 'and try again.'
+                                }</p>
                         </div>
-                        <button class="${''
-                            }btn btn-outline ${''
-                            }btn-xs">${''
-                            }Retry</button>
+                        <button class="btn btn-outline btn-xs">Retry</button>
                     </div>
                 </div>
                 <div class="card p-6">
-                    <h3 class="${''
-                        }font-semibold mb-3">${''
-                        }Connection Issue</h3>
+                    <h3 class="font-semibold mb-3">Connection Issue</h3>
                     <div class="ds-soft-row" data-tone="warning">
                         ${iconAlertTriangle(
                             20,
                             'text-warning',
                         )}
                         <div class="flex-1">
-                            <p class="${''
-                                }text-sm${''
-                                } font-medium text-warning">${''
-                                }Connection ${''
-                                }interrupted</p>
-                            <p class="${''
-                                }text-xs${''
-                                } text-muted ${''
-                                }mt-0.5">${''
-                                }Reconnecting${''
-                                } ${''
-                                }automatically${''
-                                }...</p>
+                            <p class="${
+                                'text-sm font-medium '
+                                + 'text-warning'
+                                }">Connection interrupted</p>
+                            <p class="text-xs text-muted mt-0.5">${
+                                'Reconnecting automatically...'
+                                }</p>
                         </div>
                     </div>
                 </div>
             </div>
             <div class="card p-6">
-                <h3 class="${''
-                    }font-semibold mb-3">${''
-                    }Inline System Error</h3>
+                <h3 class="font-semibold mb-3">Inline System Error</h3>
                 <div class="ds-soft-row" data-tone="error">
                     ${iconAlertCircle(
                         20,
                         'text-error',
                     )}
                     <div class="flex-1">
-                        <p class="${''
-                            }text-sm${''
-                            } font-medium text-error">${''
-                            }Something went${''
-                            } wrong</p>
-                        <p class="${''
-                            }text-xs${''
-                            } text-muted ${''
-                            }mt-0.5">${''
-                            }An unexpected${''
-                            } error ${''
-                            }occurred while${''
-                            } loading ${''
-                            }this section.${''
-                            } Our team ${''
-                            }has been ${''
-                            }notified.</p>
+                        <p class="${
+                            'text-sm font-medium '
+                            + 'text-error'
+                            }">Something went wrong</p>
+                        <p class="text-xs text-muted mt-0.5">${
+                            'An unexpected error occurred '
+                            + 'while loading this section. '
+                            + 'Our team has been notified.'
+                            }</p>
                     </div>
-                    <button class="${''
-                        }btn btn-outline ${''
-                        }btn-sm">${''
-                        }Reload Section</button>
+                    <button class="${
+                        'btn btn-outline btn-sm'
+                        }">Reload Section</button>
                 </div>
             </div>
             <div class="${
                 'card text-center p-12'
             }">
-                <h3 class="${''
-                    }font-semibold mb-3">${''
-                    }Full Page Error</h3>
+                <h3 class="font-semibold mb-3">Full Page Error</h3>
                 <div class="p-8">
                     ${iconAlertTriangle(
                         48,
                         'text-error',
                     )}
-                    <h3 class="${''
-                        }text-xl font-display${''
-                        } ${''
-                        }font-semibold mt-4">${''
-                        }Something went${''
-                        } wrong</h3>
-                    <p class="${''
-                        }text-sm text-muted${''
-                        } mt-2${''
-                        } ds-fullpage-err-desc">${''
-                        }We encountered an ${''
-                        }unexpected error. ${''
-                        }Please try ${''
-                        }refreshing ${''
-                        }the page or ${''
-                        }contact ${''
-                        }support if the ${''
-                        }problem ${''
-                        }persists.</p>
-                    <div class="${''
-                        }flex justify-center${''
-                        } ${''
-                        }gap-3 mt-6">
-                        <button class="${''
-                            }btn${''
-                            } btn-primary">${''
-                            }Refresh ${''
-                            }Page</button>
-                        <button class="${''
-                            }btn${''
-                            } btn-outline">${''
-                            }Contact ${''
-                            }Support</button>
+                    <h3 class="${
+                        'text-xl font-display '
+                        + 'font-semibold mt-4'
+                        }">Something went wrong</h3>
+                    <p class="${
+                        'text-sm text-muted mt-2 '
+                        + 'ds-fullpage-err-desc'
+                        }">${
+                        'We encountered an unexpected '
+                        + 'error. Please try refreshing '
+                        + 'the page or contact support '
+                        + 'if the problem persists.'
+                        }</p>
+                    <div class="flex justify-center gap-3 mt-6">
+                        <button class="btn btn-primary">Refresh Page</button>
+                        <button class="${
+                            'btn btn-outline'
+                            }">Contact Support</button>
                     </div>
                 </div>
             </div>
@@ -1484,108 +1185,71 @@ export async function init(): Promise<void> {
 
         <section class="ds-section">
             <div>
-                <h2 class="${''
-                    }text-2xl font-semibold ${''
-                    }font-display">${''
-                    }Usage Guidelines</h2>
-                <p class="text-muted mt-1">${''
-                    }Do's and don'ts for ${''
-                    }the ${''
-                    }design system</p>
+                <h2 class="${
+                    'text-2xl font-semibold font-display'
+                    }">Usage Guidelines</h2>
+                <p class="text-muted mt-1">Do's and don'ts ${
+                    'for the design system'
+                    }</p>
             </div>
             <div class="ds-grid-2 convert-grid">
                 <div class="card ds-do-card">
-                    <h3 class="${''
-                        }font-semibold${''
-                        } text-success${''
-                        } flex items-center ${''
-                        }gap-2 mb-4">${''
-                        }${iconCheck(20, '')
-                        } Do</h3>
+                    <h3 class="${
+                        'font-semibold text-success '
+                        + 'flex items-center gap-2 mb-4'
+                        }">${iconCheck(20, '')} Do</h3>
                     <div class="text-sm flex flex-col gap-2">
                         <p>${iconCheck(
                             14,
                             'text-success',
-                        )} Use semantic ${''
-                            }color ${''
-                            }tokens, not ${''
-                            }raw ${''
-                            }hex values</p>
+                        )} Use semantic color tokens, not raw hex values</p>
                         <p>${iconCheck(
                             14,
                             'text-success',
-                        )} Maintain ${''
-                            }consistent ${''
-                            }spacing with ${''
-                            }the ${''
-                            }8pt grid</p>
+                        )} Maintain consistent spacing with the 8pt grid</p>
                         <p>${iconCheck(
                             14,
                             'text-success',
-                        )} Ensure all ${''
-                            }interactive ${''
-                            }elements have ${''
-                            }focus states</p>
+                        )} ${
+                            'Ensure all interactive elements '
+                            + 'have focus states'
+                            }</p>
                         <p>${iconCheck(
                             14,
                             'text-success',
-                        )} Use the proper${''
-                            } ${''
-                            }typography ${''
-                            }scale ${''
-                            }for hierarchy</p>
+                        )} Use the proper typography scale for hierarchy</p>
                         <p>${iconCheck(
                             14,
                             'text-success',
-                        )} Test contrast ${''
-                            }ratios ${''
-                            }for ${''
-                            }accessibility</p>
+                        )} Test contrast ratios for accessibility</p>
                     </div>
                 </div>
                 <div class="card ds-dont-card">
-                    <h3 class="${''
-                        }font-semibold${''
-                        } text-error ${''
-                        }flex items-center ${''
-                        }gap-2 mb-4">${''
-                        }${iconX(20, '')
-                        } Don't</h3>
+                    <h3 class="${
+                        'font-semibold text-error '
+                        + 'flex items-center gap-2 mb-4'
+                        }">${iconX(20, '')} Don't</h3>
                     <div class="text-sm flex flex-col gap-2">
                         <p>${iconX(
                             14,
                             'text-error',
-                        )} Use pure black${''
-                            } ${''
-                            }(#000) for ${''
-                            }text</p>
+                        )} Use pure black (#000) for text</p>
                         <p>${iconX(
                             14,
                             'text-error',
-                        )} Create custom ${''
-                            }colors ${''
-                            }outside the ${''
-                            }system</p>
+                        )} Create custom colors outside the system</p>
                         <p>${iconX(
                             14,
                             'text-error',
-                        )} Use decorative${''
-                            } ${''
-                            }animations</p>
+                        )} Use decorative animations</p>
                         <p>${iconX(
                             14,
                             'text-error',
-                        )} Skip focus ${''
-                            }states on ${''
-                            }interactive ${''
-                            }elements</p>
+                        )} Skip focus states on interactive elements</p>
                         <p>${iconX(
                             14,
                             'text-error',
-                        )} Mix typography ${''
-                            }scales ${''
-                            }inconsistently${''
-                            }</p>
+                        )} Mix typography scales inconsistently</p>
                     </div>
                 </div>
             </div>
@@ -1595,22 +1259,18 @@ export async function init(): Promise<void> {
 
         <section class="ds-section">
             <div>
-                <h2 class="${''
-                    }text-2xl font-semibold ${''
-                    }font-display">${''
-                    }Flow Components</h2>
-                <p class="text-muted mt-1">${''
-                    }Visual vocabulary for ${''
-                    }the flow designer</p>
+                <h2 class="${
+                    'text-2xl font-semibold font-display'
+                    }">Flow Components</h2>
+                <p class="text-muted mt-1">${
+                    'Visual vocabulary for the flow designer'
+                    }</p>
             </div>
 
-            <h3 class="font-semibold">${''
-                }Node Variants</h3>
+            <h3 class="font-semibold">Node Variants</h3>
             <div class="ds-grid-3 stats-grid">
                 <div class="ds-stack">
-                    <code class="${''
-                        }text-xs text-muted">${''
-                        }Start Node</code>
+                    <code class="text-xs text-muted">Start Node</code>
                     ${buildFlowNodeSvg(
                         'Start',
                         '',
@@ -1619,9 +1279,7 @@ export async function init(): Promise<void> {
                     )}
                 </div>
                 <div class="ds-stack">
-                    <code class="${''
-                        }text-xs text-muted">${''
-                        }Standard Node</code>
+                    <code class="text-xs text-muted">Standard Node</code>
                     ${buildFlowNodeSvg(
                         'Data Capture',
                         '8 fields',
@@ -1630,9 +1288,7 @@ export async function init(): Promise<void> {
                     )}
                 </div>
                 <div class="ds-stack">
-                    <code class="${''
-                        }text-xs text-muted">${''
-                        }Complete Node</code>
+                    <code class="text-xs text-muted">Complete Node</code>
                     ${buildFlowNodeSvg(
                         'End',
                         '',
@@ -1642,13 +1298,10 @@ export async function init(): Promise<void> {
                 </div>
             </div>
 
-            <h3 class="font-semibold">${''
-                }Edge Variants</h3>
+            <h3 class="font-semibold">Edge Variants</h3>
             <div class="ds-grid-3 stats-grid">
                 <div class="ds-stack">
-                    <code class="${''
-                        }text-xs text-muted">${''
-                        }Forward Edge</code>
+                    <code class="text-xs text-muted">Forward Edge</code>
                     ${buildFlowEdgeSvg(
                         'submit',
                         FLOW_BLUE,
@@ -1657,9 +1310,7 @@ export async function init(): Promise<void> {
                     )}
                 </div>
                 <div class="ds-stack">
-                    <code class="${''
-                        }text-xs text-muted">${''
-                        }Cycle Edge</code>
+                    <code class="text-xs text-muted">Cycle Edge</code>
                     ${buildFlowEdgeSvg(
                         'needs revision',
                         FLOW_WARN,
@@ -1668,9 +1319,7 @@ export async function init(): Promise<void> {
                     )}
                 </div>
                 <div class="ds-stack">
-                    <code class="${''
-                        }text-xs text-muted">${''
-                        }Completion Edge</code>
+                    <code class="text-xs text-muted">Completion Edge</code>
                     ${buildFlowEdgeSvg(
                         'approve',
                         FLOW_GREEN,
@@ -1680,39 +1329,38 @@ export async function init(): Promise<void> {
                 </div>
             </div>
 
-            <h3 class="font-semibold">${''
-                }Port Styles</h3>
-            <div class="${''
-                }flex flex-wrap gap-6">
+            <h3 class="font-semibold">Port Styles</h3>
+            <div class="flex flex-wrap gap-6">
                 <div class="ds-stack">
-                    <code class="${''
-                        }text-xs text-muted">${''
-                        }Standard</code>
+                    <code class="text-xs text-muted">Standard</code>
                     ${buildFlowPortSvg(
                         FLOW_BLUE, 'port',
                     )}
                 </div>
                 <div class="ds-stack">
-                    <code class="${''
-                        }text-xs text-muted">${''
-                        }Start / End</code>
+                    <code class="text-xs text-muted">Start / End</code>
                     ${buildFlowPortSvg(
                         FLOW_GREEN, 'port',
                     )}
                 </div>
                 <div class="ds-stack">
-                    <code class="${''
-                        }text-xs text-muted">${''
-                        }Cycle</code>
+                    <code class="text-xs text-muted">Cycle</code>
                     ${buildFlowPortSvg(
                         FLOW_WARN, 'port',
                     )}
                 </div>
             </div>
 
-            <h3 class="font-semibold">${''
-                }Properties Panel</h3>
+            <h3 class="font-semibold">Properties Panel</h3>
             ${buildFlowPropPanel()}
         </section>
-    </div>`);
+    </div>`;
+}
+
+export async function init(): Promise<void> {
+    const root = $required(
+        '#design-system-content', document,
+    );
+
+    setHtml(root, buildDesignSystemPage());
 }

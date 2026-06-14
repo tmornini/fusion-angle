@@ -61,9 +61,9 @@ const EXPECTED: Record<string, TableFingerprint> = {
     'objectives': { count: 5, hash: '67473fdc' },
     'objective_revisions': { count: 5, hash: 'dd09a688' },
     'project_objective_baseline_scores':
-        { count: 49, hash: '3fe47f82' },
+        { count: 49, hash: '01d7b8b0' },
     'project_objective_actual_scores':
-        { count: 92, hash: '315a6565' },
+        { count: 92, hash: 'f7c18b25' },
     'states': { count: 911, hash: '679a7541' },
 };
 
